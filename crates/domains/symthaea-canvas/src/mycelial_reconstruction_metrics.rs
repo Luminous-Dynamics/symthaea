@@ -1719,6 +1719,149 @@ mod tests {
         }
     }
 
+    fn brute_force_best_assignment(
+        predictions: &[AnnotatedJunction],
+        truth: &[AnnotatedJunction],
+        maximum_distance: f64,
+    ) -> (usize, f64) {
+        fn visit(
+            prediction_index: usize,
+            predictions: &[AnnotatedJunction],
+            truth: &[AnnotatedJunction],
+            maximum_distance: f64,
+            used_truth: &mut BTreeSet<usize>,
+            matched: usize,
+            total_distance: f64,
+            best: &mut (usize, f64),
+        ) {
+            if prediction_index == predictions.len() {
+                if matched > best.0 || (matched == best.0 && total_distance < best.1) {
+                    *best = (matched, total_distance);
+                }
+                return;
+            }
+            visit(
+                prediction_index + 1,
+                predictions,
+                truth,
+                maximum_distance,
+                used_truth,
+                matched,
+                total_distance,
+                best,
+            );
+            for truth_index in 0..truth.len() {
+                if used_truth.contains(&truth_index) {
+                    continue;
+                }
+                let distance = point_distance(
+                    predictions[prediction_index].position,
+                    truth[truth_index].position,
+                    ReconstructionDimensionality::ThreeD,
+                );
+                if distance <= maximum_distance {
+                    used_truth.insert(truth_index);
+                    visit(
+                        prediction_index + 1,
+                        predictions,
+                        truth,
+                        maximum_distance,
+                        used_truth,
+                        matched + 1,
+                        total_distance + distance,
+                        best,
+                    );
+                    used_truth.remove(&truth_index);
+                }
+            }
+        }
+
+        let mut best = (0usize, f64::INFINITY);
+        visit(
+            0,
+            predictions,
+            truth,
+            maximum_distance,
+            &mut BTreeSet::new(),
+            0,
+            0.0,
+            &mut best,
+        );
+        best
+    }
+
+    #[test]
+    fn hungarian_matching_matches_exhaustive_small_assignment_oracle() {
+        let maximum_distance = 1.75;
+        let mut seed = 0x8f3d_9a71_2c5e_104b_u64;
+        let mut next_coordinate = || {
+            seed = seed
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            ((seed >> 32) % 2_000) as f64 / 100.0
+        };
+
+        for case_index in 0..24 {
+            let prediction_count = case_index % 5 + 1;
+            let truth_count = (case_index * 3) % 5 + 1;
+            let predictions: Vec<_> = (0..prediction_count)
+                .map(|index| {
+                    node(
+                        &format!("p{index:02}"),
+                        AnnotatedJunctionKind::Tip,
+                        next_coordinate(),
+                        next_coordinate(),
+                        next_coordinate(),
+                    )
+                })
+                .collect();
+            let truth: Vec<_> = (0..truth_count)
+                .map(|index| {
+                    node(
+                        &format!("t{index:02}"),
+                        AnnotatedJunctionKind::Tip,
+                        next_coordinate(),
+                        next_coordinate(),
+                        next_coordinate(),
+                    )
+                })
+                .collect();
+            let ground_truth = graph("human", truth.clone(), Vec::new());
+            let prediction = graph("model", predictions.clone(), Vec::new());
+            let matches =
+                match_junctions_hungarian(&ground_truth, &prediction, maximum_distance).unwrap();
+            let mut prediction_by_id = BTreeMap::new();
+            for value in &predictions {
+                prediction_by_id.insert(value.id.as_str(), value);
+            }
+            let mut truth_by_id = BTreeMap::new();
+            for value in &truth {
+                truth_by_id.insert(value.id.as_str(), value);
+            }
+            let actual_distance: f64 = matches
+                .iter()
+                .map(|matched| {
+                    point_distance(
+                        prediction_by_id[matched.predicted_junction_id.as_str()].position,
+                        truth_by_id[matched.ground_truth_junction_id.as_str()].position,
+                        ReconstructionDimensionality::ThreeD,
+                    )
+                })
+                .sum();
+            let (expected_cardinality, expected_distance) =
+                brute_force_best_assignment(&predictions, &truth, maximum_distance);
+            assert_eq!(
+                matches.len(),
+                expected_cardinality,
+                "maximum-cardinality mismatch in deterministic case {case_index}"
+            );
+            assert!(
+                (actual_distance - expected_distance).abs() <= 1.0e-9,
+                "minimum-distance mismatch in deterministic case {case_index}: {actual_distance} vs {expected_distance}"
+            );
+        }
+    }
+
     #[test]
     fn hungarian_matching_preserves_cardinality_when_greedy_would_lose_a_match() {
         let truth = graph(
