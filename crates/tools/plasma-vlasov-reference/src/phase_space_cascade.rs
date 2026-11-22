@@ -6,7 +6,7 @@
 //! is labelled the phase-mixing sector and k*s > 0 the phase-unmixing sector.
 //! These are directional spectral occupancies, not transfer rates or fluxes.
 
-use super::{Complex, SolverError, VlasovPoisson1d1v, fft, signed_mode};
+use super::{Complex, SolverError, VlasovPoisson1d1v, VlasovPoissonConfig, fft, signed_mode};
 
 /// Velocity-grid time scales for a registered spatial Fourier mode.
 ///
