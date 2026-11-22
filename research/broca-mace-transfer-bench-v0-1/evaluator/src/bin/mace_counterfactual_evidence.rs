@@ -393,6 +393,17 @@ fn matched_random_ids(
     if expanded.iter().any(|id| target_set.contains(id)) {
         return None;
     }
+    // Closure expansion must not reintroduce the target's common-cause
+    // roots/families through a derived child. Count matching is not enough.
+    for id in &expanded {
+        let item = index.records.get(id)?;
+        if (item.source_root_digest.is_known()
+            && target_roots.contains(&item.source_root_digest))
+            || (item.source_family != 0 && target_families.contains(&item.source_family))
+        {
+            return None;
+        }
+    }
     if evidence_strata(index, &expanded)? != evidence_strata(index, &target)? {
         return None;
     }
