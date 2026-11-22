@@ -182,6 +182,150 @@
       "query": "How can I securely sandbox an agent that can run generated browser code?",
       "expected_pattern_ids": [],
       "kind": "hard_negative"
+    },
+    {
+      "id": "LEPTOS-RET-025",
+      "query": "How do I declare URL-backed pages and switch between them without manual conditionals?",
+      "expected_pattern_ids": [
+        "LEPTOS08-ROUTER-009"
+      ],
+      "kind": "positive"
+    },
+    {
+      "id": "LEPTOS-RET-026",
+      "query": "I need navigation links and the current URL to drive which mode is highlighted in the header.",
+      "expected_pattern_ids": [
+        "LEPTOS08-ROUTER-009"
+      ],
+      "kind": "positive"
+    },
+    {
+      "id": "LEPTOS-RET-027",
+      "query": "How can nested page components read one shared application state object without passing it through every prop?",
+      "expected_pattern_ids": [
+        "LEPTOS08-CONTEXT-010"
+      ],
+      "kind": "positive"
+    },
+    {
+      "id": "LEPTOS-RET-028",
+      "query": "Where should I create a shared state store so route descendants can retrieve it by type?",
+      "expected_pattern_ids": [
+        "LEPTOS08-CONTEXT-010"
+      ],
+      "kind": "positive"
+    },
+    {
+      "id": "LEPTOS-RET-029",
+      "query": "A category is determined entirely by the selected item. How do I keep it derived instead of storing a second mutable signal?",
+      "expected_pattern_ids": [
+        "LEPTOS08-MEMO-011"
+      ],
+      "kind": "positive"
+    },
+    {
+      "id": "LEPTOS-RET-030",
+      "query": "I have a costly lookup based on one signal and want downstream consumers to observe the computed value.",
+      "expected_pattern_ids": [
+        "LEPTOS08-MEMO-011"
+      ],
+      "kind": "positive"
+    },
+    {
+      "id": "LEPTOS-RET-031",
+      "query": "After the user chooses a track I want to send them back to the Listen page using the router API.",
+      "expected_pattern_ids": [
+        "LEPTOS08-NAVIGATION-012"
+      ],
+      "kind": "positive"
+    },
+    {
+      "id": "LEPTOS-RET-032",
+      "query": "Which hook gives me a programmatic navigation callback inside a route component?",
+      "expected_pattern_ids": [
+        "LEPTOS08-NAVIGATION-012"
+      ],
+      "kind": "positive"
+    },
+    {
+      "id": "LEPTOS-RET-033",
+      "query": "How should I model a complex widget with typed events, state transitions and a list of effects for the browser to perform?",
+      "expected_pattern_ids": [
+        "LEPTOS08-REDUCER-013"
+      ],
+      "kind": "positive"
+    },
+    {
+      "id": "LEPTOS-RET-034",
+      "query": "I need state-machine logic I can unit test without rendering a DOM. What architecture fits?",
+      "expected_pattern_ids": [
+        "LEPTOS08-REDUCER-013"
+      ],
+      "kind": "positive"
+    },
+    {
+      "id": "LEPTOS-RET-035",
+      "query": "My audio player must keep playing when a user navigates to another route. Where should the audio node live?",
+      "expected_pattern_ids": [
+        "LEPTOS08-PERSISTENT-DOM-014"
+      ],
+      "kind": "positive"
+    },
+    {
+      "id": "LEPTOS-RET-036",
+      "query": "How can I keep one browser resource mounted while swapping the page content inside a router?",
+      "expected_pattern_ids": [
+        "LEPTOS08-PERSISTENT-DOM-014"
+      ],
+      "kind": "positive"
+    },
+    {
+      "id": "LEPTOS-RET-037",
+      "query": "Browser callbacks may arrive after a new track is loaded. How do I ignore events belonging to an older source?",
+      "expected_pattern_ids": [
+        "LEPTOS08-EVENT-BRIDGE-015"
+      ],
+      "kind": "positive"
+    },
+    {
+      "id": "LEPTOS-RET-038",
+      "query": "What is the event-adapter pattern for turning DOM events into typed reducer events with generation IDs?",
+      "expected_pattern_ids": [
+        "LEPTOS08-EVENT-BRIDGE-015"
+      ],
+      "kind": "positive"
+    },
+    {
+      "id": "LEPTOS-RET-039",
+      "query": "An import needs a permission choice, and doing nothing must not be treated as consent. How should the UI gate submission?",
+      "expected_pattern_ids": [
+        "LEPTOS08-AUTH-GATE-016"
+      ],
+      "kind": "positive"
+    },
+    {
+      "id": "LEPTOS-RET-040",
+      "query": "How do I force an explicit authorisation selection before triggering a mutating request?",
+      "expected_pattern_ids": [
+        "LEPTOS08-AUTH-GATE-016"
+      ],
+      "kind": "positive"
+    },
+    {
+      "id": "LEPTOS-RET-041",
+      "query": "When a page mounts, I need to load supporting data and show loading, success and error messages.",
+      "expected_pattern_ids": [
+        "LEPTOS08-ASYNC-INIT-017"
+      ],
+      "kind": "positive"
+    },
+    {
+      "id": "LEPTOS-RET-042",
+      "query": "How do I start an asynchronous bootstrap fetch in an effect and bind the outcome to reactive state?",
+      "expected_pattern_ids": [
+        "LEPTOS08-ASYNC-INIT-017"
+      ],
+      "kind": "positive"
     }
   ],
   "metrics": [
@@ -215,6 +359,7 @@
     "Queries are paraphrases and are not copied from the pattern titles.",
     "Hard negatives deliberately target topics not currently represented by the eight-entry corpus.",
     "Expected empty sets require calibrated abstention, not forced retrieval.",
-    "No retrieval scores have been measured."
+    "No retrieval scores have been measured.",
+    "Corpus expanded from eight to seventeen source-grounded patterns; the query set now contains two paraphrases per pattern, plus eight hard negatives."
   ]
 }
