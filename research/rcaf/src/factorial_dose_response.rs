@@ -492,10 +492,7 @@ fn render_point(point: &FactorialDoseResponsePoint) -> String {
                     "          \"fnv1a64_fingerprint\": \"{}\"\n",
                     "        }"
                 ),
-                cell.cell_id,
-                cell.rms,
-                cell.max_absolute_value,
-                cell.fnv1a64_fingerprint
+                cell.cell_id, cell.rms, cell.max_absolute_value, cell.fnv1a64_fingerprint
             )
         })
         .collect::<Vec<_>>()
@@ -763,7 +760,10 @@ mod tests {
                 .estimators
                 .iter()
                 .all(|item| item.signal_retention_fraction.is_none()));
-            assert!(point.connectivity_direction.signal_projection_gain.is_none());
+            assert!(point
+                .connectivity_direction
+                .signal_projection_gain
+                .is_none());
         }
     }
 
