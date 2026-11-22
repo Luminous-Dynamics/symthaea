@@ -43,3 +43,25 @@ SFEB should measure verified engineering change rather than screenshots alone: c
 Proposed targets, not achieved results: 100% critical/security/evidence fault detection; ≥95% high-severity and ≥90% overall seeded fault detection; zero positive-control false rejects; 100% metamorphic pass; ≥90/100 visual quality; ≥90% interactive journeys; ≥85% full-stack pass; ≥95% keyboard completion; ≥85% repair within three bounded attempts; <5% unrelated-journey regressions; ≤70% matched-baseline cost per accepted task; ECE ≤0.10.
 
 The 30-task corpus remains a plan: one fixture is fixture-ready and 29 briefs remain planned. The task-family manifest correctly retains `runnable_task_count=0` until Rust/WASM and trusted browser/oracle qualification pass.
+
+
+## Reproducible independent oracle command
+
+Added `benchmarks/frontend/independent-oracle/search-filter-reference.mjs`
+with no third-party packages. Run from the repository root:
+
+```sh
+node benchmarks/frontend/independent-oracle/search-filter-reference.mjs
+```
+
+Executed locally with Node.js v22.16.0 against the fixture JSON copied from
+the repository branch. Output: 11/11 golden cases, 5,000/5,000 deterministic
+generated property states, 9/9 semantic fault models, and 8/8 independent
+URL-field omission controls detected. The tool exits non-zero on an
+assertion mismatch.
+
+This improves reproducibility of the JavaScript model cross-check, but it is
+not a third independent oracle implementation of the Rust module (it is a
+separate-language model), does not execute the Leptos candidate and does not
+include the DOM-based XSS assertion or responsive CSS browser mutation. Node
+script output must not be conflated with the Rust CLI or CI workflows.
