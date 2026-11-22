@@ -240,29 +240,21 @@ pub fn score_binary_subject_v1(
         previous_recall = recall;
     }
 
-    let positive_scores: Vec<f64> = subject
-        .samples
-        .iter()
-        .filter(|s| s.positive)
-        .map(|s| s.score)
-        .collect();
-    let negative_scores: Vec<f64> = subject
-        .samples
-        .iter()
-        .filter(|s| !s.positive)
-        .map(|s| s.score)
-        .collect();
-    let mut wins = 0.0;
-    for positive in &positive_scores {
-        for negative in &negative_scores {
-            if positive > negative {
-                wins += 1.0;
-            } else if positive == negative {
-                wins += 0.5;
-            }
-        }
+    // Rank-group AUROC in O(n log n): each positive receives full credit
+    // for lower-scored negatives and half credit for tied negatives. This
+    // avoids the O(P*N) pairwise loop that becomes prohibitive at wafer scale.
+    let mut negatives_seen_at_or_above = 0usize;
+    let mut concordant_pairs = 0.0_f64;
+    for (_, group) in groups_desc(&subject.samples, |sample| sample.score) {
+        let group_positive = group.iter().filter(|sample| sample.positive).count();
+        let group_negative = group.len() - group_positive;
+        let negatives_below =
+            negative_count - negatives_seen_at_or_above - group_negative;
+        concordant_pairs += group_positive as f64
+            * (negatives_below as f64 + 0.5 * group_negative as f64);
+        negatives_seen_at_or_above += group_negative;
     }
-    let auroc = wins / (positive_count * negative_count) as f64;
+    let auroc = concordant_pairs / (positive_count as f64 * negative_count as f64);
 
     let brier_score = subject
         .samples
@@ -414,6 +406,45 @@ mod tests {
         let mut reversed = subject;
         reversed.samples.reverse();
         assert_eq!(score_binary_subject_v1(&reversed).unwrap(), expected);
+    }
+
+    #[test]
+    fn rank_group_auroc_scales_to_large_tied_sample_sets() {
+        let mut samples = Vec::with_capacity(40_000);
+        for index in 0..10_000 {
+            samples.push(BinaryScoreSampleV1 {
+                sample_id: format!("high-positive-{index}"),
+                positive: true,
+                score: 0.75,
+            });
+            samples.push(BinaryScoreSampleV1 {
+                sample_id: format!("high-negative-{index}"),
+                positive: false,
+                score: 0.75,
+            });
+            samples.push(BinaryScoreSampleV1 {
+                sample_id: format!("low-positive-{index}"),
+                positive: true,
+                score: 0.25,
+            });
+            samples.push(BinaryScoreSampleV1 {
+                sample_id: format!("low-negative-{index}"),
+                positive: false,
+                score: 0.25,
+            });
+        }
+        let subject = BinaryScoreSubjectV1 {
+            schema: INPUT_SCHEMA_V1.to_string(),
+            case_id: Some("large-tied-rank-group-case".to_string()),
+            decision_threshold: 0.5,
+            calibration_bins: 10,
+            recall_target: 0.95,
+            positive_class_semantics: Some("synthetic-binary-risk".to_string()),
+            samples,
+        };
+        let report = score_binary_subject_v1(&subject).expect("large synthetic case scores");
+        assert_eq!(report.sample_count, 40_000);
+        assert_eq!(report.ranking_metrics.auroc, 0.5);
     }
 
     #[test]
