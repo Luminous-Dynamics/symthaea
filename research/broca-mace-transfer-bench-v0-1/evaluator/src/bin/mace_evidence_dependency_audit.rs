@@ -20,7 +20,7 @@ use std::mem::size_of;
 use std::time::Instant;
 
 use broca_mace_hdc_retrieval::experience_view_digest;
-use broca_mace_policy::{is_qualified, decide, Action, Decision, DecisionNeedV1, Experience, Policy, Query};
+use broca_mace_policy::{decide, is_qualified, Action, Decision, DecisionNeedV1, Experience, Policy, Query};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
@@ -180,6 +180,13 @@ impl EvidenceDependencyIndex {
             .values()
             .filter(|node| node.source_root == [0; 32])
             .count()
+    }
+
+    fn dependency_link_count(&self) -> usize {
+        self.nodes
+            .values()
+            .map(|node| node.derived_from.len() + node.supersedes.len())
+            .sum()
     }
 
     fn close_dependents(&self, seeds: impl IntoIterator<Item = u32>) -> BTreeSet<u32> {
@@ -374,6 +381,17 @@ fn matched_random_control(
             .entry((action_key(node.action), node.payload_bytes))
             .or_default() += 1;
     }
+    let (target_root_count, target_family_count, _) = index.counts_for_ids(removed_ids);
+    let excluded_roots: BTreeSet<[u8; 32]> = removed_ids
+        .iter()
+        .filter_map(|id| index.nodes.get(id).map(|node| node.source_root))
+        .filter(|root| *root != [0; 32])
+        .collect();
+    let excluded_families: BTreeSet<u16> = removed_ids
+        .iter()
+        .filter_map(|id| index.nodes.get(id).map(|node| node.source_family))
+        .filter(|family| *family != 0)
+        .collect();
     let mut selected = BTreeSet::new();
     for ((action, byte_size), count) in target_histogram {
         let mut candidates: Vec<&EvidenceNode> = index
@@ -381,6 +399,8 @@ fn matched_random_control(
             .values()
             .filter(|node| {
                 !removed_ids.contains(&node.event_id)
+                    && (node.source_root == [0; 32] || !excluded_roots.contains(&node.source_root))
+                    && (node.source_family == 0 || !excluded_families.contains(&node.source_family))
                     && action_key(node.action) == action
                     && node.payload_bytes == byte_size
             })
@@ -395,6 +415,10 @@ fn matched_random_control(
                 .take(count)
                 .map(|node| node.event_id),
         );
+    }
+    let (control_root_count, control_family_count, _) = index.counts_for_ids(&selected);
+    if control_root_count != target_root_count || control_family_count != target_family_count {
+        return None;
     }
     Some(selected)
 }
@@ -483,18 +507,11 @@ fn build_plans(
     Ok(plans)
 }
 
-fn candidate_evidence_digest(
-    memory: &[Experience],
-    need: DecisionNeedV1,
-    cluster: u64,
-    family: &str,
-) -> String {
+fn candidate_evidence_digest(memory: &[Experience], need: DecisionNeedV1) -> String {
     let mut ordered = memory.to_vec();
     ordered.sort_by_key(|item| item.event_id);
     let mut hasher = Sha256::new();
     hasher.update(b"luminous:mace:dependency-audit-candidate-input:v1\0");
-    hasher.update(cluster.to_be_bytes());
-    hasher.update(family.as_bytes());
     hasher.update(need.canonical_digest().as_bytes());
     for item in &ordered {
         hasher.update(experience_view_digest(item));
@@ -543,6 +560,7 @@ struct EvaluationMetrics {
     candidate_root_count: usize,
     candidate_family_count: usize,
     unknown_root_count: usize,
+    lineage_edge_count: usize,
 }
 
 struct EvaluatedPlan {
@@ -563,12 +581,7 @@ fn evaluate_plan(
         .filter(|item| !plan.removed_ids.contains(&item.event_id))
         .copied()
         .collect();
-    let input_digest = candidate_evidence_digest(
-        &candidate_memory,
-        case.decision_need,
-        case.cluster,
-        case.family,
-    );
+    let input_digest = candidate_evidence_digest(&candidate_memory, case.decision_need);
     let started = Instant::now();
     let decision = decide(Policy::CausalQualified, &candidate_memory, case.query);
     let latency_ns = started.elapsed().as_nanos().min(u128::from(u64::MAX)) as u64;
@@ -578,14 +591,14 @@ fn evaluate_plan(
     let candidate_record = json!({
         "schema_version": SCHEMA_VERSION,
         "record_type": "candidate_decision",
-        "record_id": plan.plan_id,
-        "world_cluster_id": case.cluster.to_string(),
-        "scenario_family": case.family,
+        // Candidate-side identifiers bind only the visible input. They do not
+        // reveal the evaluator's intervention kind/target or scenario-family label.
+        "record_id": input_digest,
         "candidate_input_sha256": input_digest,
         "decision_need_sha256": case.decision_need.canonical_digest().to_hex(),
         "memory_snapshot_sha256": input_digest,
         "decision": action_name(decision.action),
-        "decision_support_event_ids": decision.evidence_ids,
+        "decision_support_event_ids": decision.evidence_ids.clone(),
         "candidate_memory_event_count": candidate_ids.len(),
         "decision_trace_sha256": trace_digest,
         "latency_ns": latency_ns
@@ -636,6 +649,7 @@ fn evaluate_plan(
         candidate_root_count,
         candidate_family_count,
         unknown_root_count,
+        lineage_edge_count: original_index.dependency_link_count(),
     };
     EvaluatedPlan {
         plan: plan.clone(),
@@ -671,7 +685,8 @@ fn evaluator_record(
         "remaining_event_count": metrics.candidate_memory_count,
         "remaining_unique_root_count": metrics.candidate_root_count,
         "remaining_unique_family_count": metrics.candidate_family_count,
-        "remaining_unknown_root_event_count": metrics.unknown_root_count
+        "remaining_unknown_root_event_count": metrics.unknown_root_count,
+        "fixture_dependency_link_count": metrics.lineage_edge_count
     });
     if let Some(parent) = &metrics.paired_plan_id {
         value["matched_to_plan_id"] = json!(parent);
@@ -824,7 +839,7 @@ fn run() -> Result<(), String> {
 
             let aggregate = totals.entry(item.metrics.kind.clone()).or_default();
             aggregate.rows += 1;
-            aggregate.decision_changes += usize::from(item.metrics.changed_vs_full);
+            aggregate.decision_changes += if item.metrics.changed_vs_full { 1 } else { 0 };
             aggregate.invalid_evidence_uses += item.metrics.invalid_evidence_use_count;
             aggregate.added_regret_sum += item.metrics.added_regret_vs_full;
             if let Some(control) = matched {
@@ -862,6 +877,7 @@ fn run() -> Result<(), String> {
         "claim_ceiling": [
             "synthetic dependency-closure and policy sensitivity diagnostic",
             "fixture root digests are not independently attested provenance",
+            "the current Experience projection supplies no derived-view or supersession edges; graph closures are tested with explicit synthetic edge fixtures",
             "no production lifecycle or derived-view lineage is inferred from Experience fields",
             "public co-located evaluator is not independent custody",
             "no Rust execution result is implied by the presence of authored tests"
@@ -1021,6 +1037,16 @@ mod tests {
     }
 
     #[test]
+    fn experience_projection_does_not_invent_dependency_lineage() {
+        let cases = stress::generated_worlds(1);
+        let case = cases.iter().find(|case| !case.memory.is_empty()).unwrap();
+        let index = EvidenceDependencyIndex::from_experiences(&case.memory).unwrap();
+        assert_eq!(index.dependency_link_count(), 0);
+        assert_eq!(index.event_closure(case.memory[0].event_id).unwrap(),
+                   BTreeSet::from([case.memory[0].event_id]));
+    }
+
+    #[test]
     fn duplicate_event_ids_are_rejected_before_planning() {
         let duplicate = vec![
             node(1, 1, root(1), Action::A),
@@ -1101,19 +1127,9 @@ mod tests {
             .iter()
             .find(|case| case.memory.len() >= 2)
             .unwrap();
-        let full = candidate_evidence_digest(
-            &case.memory,
-            case.decision_need,
-            case.cluster,
-            case.family,
-        );
+        let full = candidate_evidence_digest(&case.memory, case.decision_need);
         let reduced: Vec<Experience> = case.memory.iter().skip(1).copied().collect();
-        let changed = candidate_evidence_digest(
-            &reduced,
-            case.decision_need,
-            case.cluster,
-            case.family,
-        );
+        let changed = candidate_evidence_digest(&reduced, case.decision_need);
         assert_ne!(full, changed);
     }
 
@@ -1125,18 +1141,10 @@ mod tests {
         changed.truth.utility_a = 0.001;
         changed.truth.utility_b = 0.999;
         changed.truth.causal_action = Some(Action::B);
-        let before = candidate_evidence_digest(
-            &original.memory,
-            original.decision_need,
-            original.cluster,
-            original.family,
-        );
-        let after = candidate_evidence_digest(
-            &changed.memory,
-            changed.decision_need,
-            changed.cluster,
-            changed.family,
-        );
+        let before = candidate_evidence_digest(&original.memory, original.decision_need);
+        changed.cluster = 99_999;
+        changed.family = "hidden-family-label-mutated";
+        let after = candidate_evidence_digest(&changed.memory, changed.decision_need);
         assert_eq!(before, after);
     }
 
