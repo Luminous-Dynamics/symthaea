@@ -2,6 +2,7 @@
 
 pub mod binary_metrics;
 pub mod dtco_manifest;
+pub mod mf_acquisition;
 pub mod pair_manifest;
 pub mod secom_raw;
 pub mod split_manifest;
@@ -23,4 +24,9 @@ pub use secom_raw::{
 
 pub use dtco_manifest::{
     DtcoLineageError, DtcoLineageManifestV1, DtcoLineageReportV1, validate_dtco_lineage_v1,
+};
+
+pub use mf_acquisition::{
+    AcquisitionCandidateV1, AcquisitionError, AcquisitionReportV1, AcquisitionSubjectV1,
+    select_high_fidelity_candidates_v1,
 };
