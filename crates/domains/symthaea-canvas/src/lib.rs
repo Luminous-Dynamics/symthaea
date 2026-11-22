@@ -30,6 +30,7 @@ pub mod geometry;
 pub mod mycelial_junction_graph;
 pub mod mycelial_contact_persistence;
 pub mod mycelial_reference_networks;
+pub mod mycelial_reconstruction_metrics;
 pub mod mycelial_mesh;
 pub mod mycelial_model;
 pub mod mycelial_network;
@@ -102,6 +103,17 @@ pub use mycelial_contact_persistence::{
 pub use mycelial_reference_networks::{
     MAX_REFERENCE_NETWORK_JUNCTIONS, MycelialMinimumSpanningForestReport,
     MycelialReferenceNetworkError, build_observed_network_minimum_spanning_forest,
+};
+pub use mycelial_reconstruction_metrics::{
+    AnnotatedHyphaSegment, AnnotatedJunction, AnnotatedJunctionKind, AnnotatedMycelialSkeleton,
+    JunctionIdentityMatch, JunctionKindScore, MAX_RECONSTRUCTION_ID_BYTES,
+    MAX_RECONSTRUCTION_JUNCTIONS, MAX_RECONSTRUCTION_SEGMENTS,
+    MycelialReconstructionError, MycelialReconstructionScore,
+    MYCELIAL_RECONSTRUCTION_SCHEMA_VERSION, MYCELIAL_RECONSTRUCTION_SCORE_SCHEMA_VERSION,
+    ReconstructionCounts, ReconstructionDimensionality, ReconstructionEvaluationConfig,
+    ReconstructionLengthError, ReconstructionLengthUnit, ReconstructionLocalizationError,
+    ReconstructionPoint3, ReconstructionTopologyDelta, ReconstructionTopologySummary,
+    evaluate_mycelial_reconstruction,
 };
 pub use mycelial_mesh::{
     FilamentMeshRange, MAX_MYCELIAL_FILAMENTS, MAX_TUBE_MESH_VERTICES, MycelialTubeMesh,
