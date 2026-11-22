@@ -21,7 +21,7 @@ An optional bootstrap count may be supplied after the report path for score and 
 ## Integrity guarantees
 
 - Joins by sample identifier, never row position.
-- Supports the organizer's published metadata fields `wave_file_name` and `average_semantic_alignement_score`, and the baseline's preprocessed metadata dialect `wav_file_name` and `average_score`.
+- Supports the organizer's published metadata fields `wave_file_name` and `average_semantic_alignement_score`, and the alternative identifier/score columns expected by the baseline code `wav_file_name` and `average_score`.
 - Supports the baseline inference output field `wav_file_name` and the alternative `wave_file_name` prediction field.
 - Rejects files containing both aliases for the same logical field, as well as duplicate, missing or extra sample IDs; no silent inner-join loss.
 - Reports the exact identifier and score columns selected for each input.
@@ -39,7 +39,7 @@ The official XACLE 2027 task changes the generalization setting from seen genera
 
 The official baseline uses frozen M2D-CLAP audio/text encoders and a trainable projector/regressor. Its README reports SRCC 0.5648, LCC 0.6142, Kendall tau-b 0.3997 and MSE 3.1847 on its inherited labelled test split. These are not results on the blind XACLE 2027 evaluation dataset.
 
-The organizer's 2027 development-dataset README names the metadata columns `wave_file_name` and `average_semantic_alignement_score` (including that spelling), while the official baseline's dataset loader/evaluator expects a preprocessed `wav_file_name` and `average_score` dialect. The baseline inference script emits `wav_file_name,pred_score`. The audit accepts each documented dialect explicitly, records which columns were selected, and rejects ambiguous files that contain both aliases. This avoids conflating the metadata schema with the baseline prediction-output schema.
+The organizer's 2027 development-dataset README names the metadata columns `wave_file_name` and `average_semantic_alignement_score` (including that spelling), while the official baseline's dataset loader/evaluator expects `wav_file_name` and `average_score`. The baseline inference script emits `wav_file_name,pred_score`. The audit accepts each documented dialect explicitly, records which columns were selected, and rejects ambiguous files that contain both aliases. The published dataset README and baseline code therefore disagree on the expected input headers. The audit reports the actual selected headers instead of claiming that one is a universal schema.
 
 This tool closes a specific evaluation-integrity gap in the baseline's public evaluate.py: it performs an inner merge by sample name without explicitly rejecting duplicate IDs or reporting missing/extra coverage. It also does not calculate generator-stratified performance.
 
