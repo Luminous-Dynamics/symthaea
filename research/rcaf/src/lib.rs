@@ -13,10 +13,10 @@ pub mod groupwise_null_calibration;
 pub mod held_out_null_calibration;
 pub mod motion_transient;
 pub mod simulation;
+pub mod sketch_sufficiency_audit;
 pub mod spatial_calibration;
 pub mod spatial_nuisance;
 pub mod weighted_covariate_shift;
-pub mod sketch_sufficiency_audit;
 
 use std::fmt;
 
