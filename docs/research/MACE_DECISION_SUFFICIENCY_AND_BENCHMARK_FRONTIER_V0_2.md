@@ -44,7 +44,7 @@ This is deliberately conditional on a decision family. There is no reason to ass
 - **Evidence-complete reference:** the same frozen candidate/backbone sees the authorized, evidence-complete history. This approximates the decision information ceiling for that model and task.
 - **Strongest practical memory reference:** the best reproduced conventional memory system (for example, full-context within budget, BM25/dense/hybrid retrieval, structured KV or a competitive memory architecture) under matched all-in costs.
 
-The evidence-complete reference is a diagnostic ceiling, not a fair efficiency baseline when its context cost is much larger. A memory method should report both gaps.
+The evidence-complete reference is a diagnostic ceiling, not a fair efficiency baseline when its context cost is much larger. A memory method should report both gaps. The seven-arm MACE runner now emits `typed_content_hdc_vs_exact_scope_scan` as a diagnostic contrast with paired utility/regret deltas and resource differences; it measures the decision-sufficiency gap introduced by typed top-k compression and is not an equal-cost competitor.
 
 ### 2.2 The budget is a vector
 
