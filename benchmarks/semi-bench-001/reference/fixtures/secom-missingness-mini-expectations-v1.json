@@ -1,0 +1,9 @@
+{
+  "schema": "luminous.semi-bench.secom-raw-expectations.v1",
+  "dataset_id": "synthetic-secom-missingness-v1",
+  "expected_feature_sha256": "0df85eb7076f8a0d70e51a947b53e0f83dd4e2ae0e3ceff229c0411c129f7268",
+  "expected_label_sha256": "bfa3f66d7231b32e9e8daf4a137bc15c4647117c90dd60161bb6617b3dfebf87",
+  "expected_rows": 8,
+  "expected_features_per_row": 2,
+  "clock_domain_id": "synthetic-secom-clock"
+}
