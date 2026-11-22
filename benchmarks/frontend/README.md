@@ -80,6 +80,50 @@ The sample records six journeys, 16 named source regions and the current
 telemetry handshake/retry behavior. It deliberately calls out that changing
 the gateway URL does not terminate an already-open WebSocket immediately.
 
+## Task and oracle contract
+
+`task-oracle-v1.schema.json` defines a typed task format with a product brief,
+implementation constraints, pinned environment requirements, reference-fixture
+digest, semantic regions, viewports, journeys, machine-readable assertions,
+hard gates, evidence obligations and a bounded task budget.
+
+The first original task is:
+
+- `tasks/sfeb-l1-service-dashboard-v1.json`
+- Reference assets: `fixtures/service-dashboard/reference.html` and
+  `fixtures/service-dashboard/style.css`
+- Eight required semantic regions, eleven assertions, five fixed viewports and
+  two acceptance journeys.
+- The fixture digest is SHA-256 over the reference HTML bytes, one NUL byte, then
+  the CSS bytes. The task validator recomputes it before accepting the fixture.
+- The task remains `specification_only` in the SFEB index because Chromium
+  screenshots, independent browser oracles and a baseline agent run are not
+  available yet. The source fixture assets themselves are checked in.
+
+### Standalone Rust validator
+
+`contract-check` is intentionally outside the main Symthaea workspace and
+does not add dependencies to production crates. It validates JSON Schema
+conformance, duplicate/missing source anchors, task fixture digest, fixture
+region mapping, duplicate assertion IDs and a fixture-only resource policy.
+
+From the repository root:
+
+```bash
+# Unit tests validate the checked-in contract, task definition and fixtures.
+cargo test --manifest-path benchmarks/frontend/contract-check/Cargo.toml
+
+# Validate the Leptos source-observed interface contract.
+cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml
+
+# Validate the SFEB task schema, fixture digest and required region anchors.
+cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --task
+```
+
+The commands are authored but have not been executed in this environment
+because the Rust toolchain is unavailable. JSON documents were parsed and the
+fixture digest was independently confirmed with `sha256sum`.
+
 ## Task lifecycle
 
 A task moves through these states:
