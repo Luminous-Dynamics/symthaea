@@ -316,6 +316,13 @@ gate therefore remains blocked, not passed. The task stays
 `specification_only` in the SFEB index until its screenshot baselines,
 independent oracles and browser runs exist.
 
+A separate framework compatibility plan is recorded at
+`benchmarks/frontend/compatibility/leptos-0.8.20-to-0.8.23-v1.json`. It has
+seven gates: exact resolution, lockfile diff, fmt/Clippy, package tests, WASM
+builds, browser regressions and performance comparison. The plan is
+specification-only; no 0.8.23 upgrade has been run, and the benchmark baseline
+remains 0.8.20.
+
 The first Leptos implementation also received 17 stable `data-sfeb-id` anchors,
 semantic live/status/alert regions, responsive adjustments, visible focus and
 reduced-motion behavior. The telemetry lifecycle is presented as four distinct
@@ -347,13 +354,15 @@ HTTP/WebSocket boundaries, Router / Routes / Route, typed context, derived
 epoch-tagged browser event adapters, fail-closed authorization, and
 asynchronous initialization.
 
-Each pattern records its source file and exact Git blob SHA-1. The corpus has
-an accompanying JSON Schema and a standalone Rust validator mode
+Each pattern records its primary source file and exact Git blob SHA-1, plus
+related source files when the example spans modules. The corpus has an
+accompanying JSON Schema and a standalone Rust validator mode
 (`--patterns`) which:
 - validates the corpus against the versioned schema;
 - checks pattern ID uniqueness;
 - rejects absolute, parent-traversing and non-normalized source paths;
-- recomputes Git blob IDs from exact source bytes and rejects stale examples.
+- recomputes Git blob IDs from exact source bytes and rejects stale examples or
+  stale related-source references.
 
 A first public retrieval pilot query set now accompanies the corpus at
 `benchmarks/frontend/knowledge/leptos-0.8/retrieval-queries-v0.json`: 34
@@ -372,9 +381,9 @@ public pilot; a private holdout is required before claiming an HDC advantage.
 The corpus distinguishes `source_observed_not_compiled`,
 `source_observed_reference_checked`, `compiled`, `unit_tested`, and
 `browser_verified`. It currently contains no compiled or browser-verified
-claims. The validator has tests for the known Git blob hash vector, the complete
-checked-in corpus and unsafe paths, but the Rust toolchain is not available here
-to execute them.
+claims. The validator has tests for the known Git blob hash vector, the complete 17-pattern corpus,
+unsafe paths and stale related-source negative controls, but the Rust toolchain
+is not available here to execute them.
 
 ### Benchmark contamination boundary
 
