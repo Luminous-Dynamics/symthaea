@@ -554,12 +554,11 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
             brier_sum += brier;
             brier_count += 1;
             let worst_case_phase_error = signed_error_ns.map(|signed| {
-                (signed.unsigned_abs() as f64
-                    + panel.time_alignment_max_uncertainty_ns as f64)
+                (signed.unsigned_abs() as f64 + panel.time_alignment_max_uncertainty_ns as f64)
                     / predicted.local_beat_period_ns as f64
             });
-            let within = worst_case_phase_error
-                .map(|value| value <= panel.policy.maximum_onset_error_beats);
+            let within =
+                worst_case_phase_error.map(|value| value <= panel.policy.maximum_onset_error_beats);
             event_findings.push(EventForecastFinding {
                 forecast_id: forecast.forecast_id.clone(),
                 forecast_event_id: predicted.forecast_event_id.clone(),
@@ -1008,8 +1007,7 @@ mod tests {
     #[test]
     fn time_alignment_domain_mismatch_is_rejected() {
         let mut value = panel();
-        value["time_alignment_target_clock_domain_id"] =
-            serde_json::json!("another-runner-clock");
+        value["time_alignment_target_clock_domain_id"] = serde_json::json!("another-runner-clock");
         let error = audit(&value).expect_err("clock domains must be bound explicitly");
         assert!(error.contains("source/target domains"));
     }
