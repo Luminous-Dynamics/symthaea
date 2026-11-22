@@ -72,13 +72,13 @@ pub struct SemanticExperienceQueryV1 {
     /// Exact semantic-estimand identity cue. A digest match is not proof that
     /// the upstream semantic descriptor was correctly authored or attested.
     pub estimand_digest: Option<EvidenceDigest256>,
-    pub require_intervention: Option<bool>,
-    pub require_pre_registered: Option<bool>,
-    pub require_outcome_reconciled: Option<bool>,
-    pub require_source_trusted: Option<bool>,
-    pub require_source_not_retracted: Option<bool>,
-    pub require_confounders_controlled: Option<bool>,
-    pub require_delayed_horizon_complete: Option<bool>,
+    pub target_intervention: Option<bool>,
+    pub target_prediction_pre_registered: Option<bool>,
+    pub target_outcome_reconciled: Option<bool>,
+    pub target_source_trusted: Option<bool>,
+    pub target_source_retracted: Option<bool>,
+    pub target_confounders_controlled: Option<bool>,
+    pub target_delayed_horizon_complete: Option<bool>,
 }
 
 impl SemanticExperienceQueryV1 {
@@ -93,13 +93,13 @@ impl SemanticExperienceQueryV1 {
             target_max_standardized_mean_difference_micros: None,
             identification_method: None,
             estimand_digest: None,
-            require_intervention: None,
-            require_pre_registered: None,
-            require_outcome_reconciled: None,
-            require_source_trusted: None,
-            require_source_not_retracted: None,
-            require_confounders_controlled: None,
-            require_delayed_horizon_complete: None,
+            target_intervention: None,
+            target_prediction_pre_registered: None,
+            target_outcome_reconciled: None,
+            target_source_trusted: None,
+            target_source_retracted: None,
+            target_confounders_controlled: None,
+            target_delayed_horizon_complete: None,
         }
     }
 }
@@ -623,15 +623,15 @@ fn encode_query(
     }
 
     for (tag, value) in [
-        ("intervention", query.require_intervention),
-        ("prediction_pre_registered", query.require_pre_registered),
-        ("outcome_reconciled", query.require_outcome_reconciled),
-        ("source_trusted", query.require_source_trusted),
-        ("source_retracted", query.require_source_not_retracted.map(|value| !value)),
-        ("confounders_controlled", query.require_confounders_controlled),
+        ("intervention", query.target_intervention),
+        ("prediction_pre_registered", query.target_prediction_pre_registered),
+        ("outcome_reconciled", query.target_outcome_reconciled),
+        ("source_trusted", query.target_source_trusted),
+        ("source_retracted", query.target_source_retracted),
+        ("confounders_controlled", query.target_confounders_controlled),
         (
             "delayed_horizon_complete",
-            query.require_delayed_horizon_complete,
+            query.target_delayed_horizon_complete,
         ),
     ] {
         if let Some(value) = value {
@@ -985,8 +985,8 @@ mod tests {
         let mut decision_query = query(target_scope, Action::A, None);
         decision_query.estimand_digest = Some(EvidenceDigest256::from_bytes([7; 32]));
         decision_query.identification_method = Some(IdentificationMethodV1::Unknown);
-        decision_query.require_source_trusted = Some(true);
-        decision_query.require_outcome_reconciled = Some(true);
+        decision_query.target_source_trusted = Some(true);
+        decision_query.target_outcome_reconciled = Some(true);
 
         let result = index.retrieve(decision_query, 1).unwrap();
         assert_eq!(result.candidates[0].event_id, 11);
