@@ -2996,6 +2996,19 @@ mod tests {
         )
         .unwrap();
         assert_eq!(plan.ranked_entity_ids[0], "D");
+
+        let betweenness = build_mycelial_failure_attack_plan(
+            &graph,
+            &demands(),
+            MycelialFailureAttackConfig {
+                strategy: MycelialFailureAttackStrategy::BetweennessJunctions,
+                seed: 0,
+                maximum_failure_budget: 1,
+                spatial_seed_junction_id: None,
+            },
+        )
+        .unwrap();
+        assert_eq!(betweenness.ranked_entity_ids[0], "A");
     }
 
     #[test]
