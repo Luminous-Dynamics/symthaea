@@ -369,13 +369,17 @@ fn solve_three_by_three(
         for value in &mut augmented[column][column..4] {
             *value /= diagonal;
         }
-        for row in 0..3 {
-            if row == column {
+        let pivot_values = augmented[column];
+        for (row_index, row_values) in augmented.iter_mut().enumerate() {
+            if row_index == column {
                 continue;
             }
-            let factor = augmented[row][column];
-            for entry in column..4 {
-                augmented[row][entry] -= factor * augmented[column][entry];
+            let factor = row_values[column];
+            for (entry, pivot_entry) in row_values[column..]
+                .iter_mut()
+                .zip(pivot_values[column..].iter())
+            {
+                *entry -= factor * pivot_entry;
             }
         }
     }
