@@ -53,6 +53,10 @@ struct InterventionManifest {
     seed: u64,
     baseline_evidence_sha256: String,
     interventions: Vec<Intervention>,
+    max_root_pairs: usize,
+    root_pair_count: usize,
+    matched_random_count: usize,
+    unmatched_random_target_count: usize,
     manifest_sha256: String,
 }
 
@@ -334,7 +338,8 @@ fn build_manifest(
         }
     }
 
-    for (key, ids) in index.family_groups() {
+    let family_groups: Vec<(String, Vec<u32>)> = index.family_groups().collect();
+    for (key, ids) in &family_groups {
         push_intervention(
             &mut interventions,
             InterventionKind::SourceFamily,
@@ -345,15 +350,15 @@ fn build_manifest(
 
         if let Some(random_ids) = matched_random_ids(
             &index,
-            &ids,
-            public_seed ^ stable_key_seed(&key),
+            ids,
+            public_seed ^ stable_key_seed(key),
         ) {
             push_intervention(
                 &mut interventions,
                 InterventionKind::MatchedRandom,
                 format!("matched:{key}"),
                 random_ids,
-                Some(key),
+                Some(key.clone()),
             );
         }
     }
@@ -394,11 +399,27 @@ fn build_manifest(
             .then_with(|| left.removed_event_ids.cmp(&right.removed_event_ids))
     });
 
+    let root_pair_count = interventions
+        .iter()
+        .filter(|item| item.kind == InterventionKind::SourceRootPair)
+        .count();
+    let matched_random_count = interventions
+        .iter()
+        .filter(|item| item.kind == InterventionKind::MatchedRandom)
+        .count();
+    let matched_random_target_count = root_groups.len() + family_groups.len();
+    let unmatched_random_target_count =
+        matched_random_target_count.saturating_sub(matched_random_count);
+
     let manifest_payload = serde_json::to_vec(&json!({
         "schema_version": SCHEMA_VERSION,
         "seed": public_seed,
         "baseline_evidence_sha256": baseline_evidence_sha256,
-        "interventions": interventions
+        "max_root_pairs": max_root_pairs,
+        "root_pair_count": root_pair_count,
+        "matched_random_count": matched_random_count,
+        "unmatched_random_target_count": unmatched_random_target_count,
+        "interventions": &interventions
     }))
     .expect("candidate intervention manifest is serializable");
     let manifest_sha256 = hex_digest(Sha256::digest(manifest_payload).as_slice());
@@ -408,6 +429,10 @@ fn build_manifest(
         seed: public_seed,
         baseline_evidence_sha256,
         interventions,
+        max_root_pairs,
+        root_pair_count,
+        matched_random_count,
+        unmatched_random_target_count,
         manifest_sha256,
     })
 }
@@ -530,11 +555,18 @@ fn run() -> Result<(), String> {
         .unwrap_or(32);
 
     let cases = mace_generated_stress::generated_worlds(clusters);
+    let source_code_sha256 =
+        hex_digest(Sha256::digest(include_bytes!("mace_counterfactual_evidence.rs")).as_slice());
+    let fixture_sha256 =
+        hex_digest(Sha256::digest(include_bytes!("mace_generated_stress.rs")).as_slice());
+    let source_revision = env::var("MACE_SOURCE_REVISION").ok();
+    let run_identity = format!(
+        "{clusters}:{public_seed}:{SCHEMA_VERSION}:{source_code_sha256}:{fixture_sha256}:{}",
+        source_revision.as_deref().unwrap_or("unspecified")
+    );
     let run_id = format!(
         "mace-counterfactual-{}-{}",
-        &hex_digest(Sha256::digest(
-            format!("{clusters}:{public_seed}:{SCHEMA_VERSION}").as_bytes()
-        ).as_slice())[..16],
+        &hex_digest(Sha256::digest(run_identity.as_bytes()).as_slice())[..16],
         clusters
     );
     let mut candidate_records = Vec::new();
@@ -560,6 +592,13 @@ fn run() -> Result<(), String> {
             "public_seed": manifest.seed,
             "intervention_count": manifest.interventions.len(),
             "interventions": &manifest.interventions,
+            "max_root_pairs": manifest.max_root_pairs,
+            "root_pair_count": manifest.root_pair_count,
+            "matched_random_count": manifest.matched_random_count,
+            "unmatched_random_target_count": manifest.unmatched_random_target_count,
+            "source_code_sha256": source_code_sha256,
+            "fixture_sha256": fixture_sha256,
+            "source_revision": source_revision,
             "known_root_count": EvidenceDependencyIndex::build(&case.memory)
                 .map_err(|error| format!("dependency index failed: {error:?}"))?
                 .known_root_count(),
@@ -590,7 +629,7 @@ fn run() -> Result<(), String> {
             "support_known_family_count": baseline_support.2,
             "support_unresolved_count": baseline_support.3,
             "available_event_count": baseline.evidence_event_count,
-            "available_experience_struct_bytes_lower_bound": baseline.evidence_event_count.saturating_mul(size_of::<Experience>()),
+            "available_experience_struct_bytes": baseline.evidence_event_count.saturating_mul(size_of::<Experience>()),
             "available_known_root_count": baseline.evidence_root_count,
             "available_known_family_count": baseline.evidence_family_count,
             "unknown_root_event_count": baseline.unknown_root_event_count,
@@ -609,7 +648,7 @@ fn run() -> Result<(), String> {
             "target_key": "full_evidence_reference",
             "removed_event_ids": [],
             "removed_event_count": 0,
-            "removed_experience_struct_bytes_lower_bound": 0,
+            "removed_experience_struct_bytes": 0,
             "decision": action_name(baseline.decision.action),
             "utility": truth_utility(case.truth, baseline.decision.action),
             "regret": baseline_regret,
