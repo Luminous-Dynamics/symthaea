@@ -36,6 +36,7 @@ pub enum TrackKind {
 struct TimingPolicyV1 {
     maximum_relative_period_error: f64,
     required_consecutive_stable_estimates: usize,
+    minimum_estimate_spacing_ns: u64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -460,6 +461,7 @@ fn validate_header(panel: &MusicalTimingPanelV1) -> Result<(), String> {
         || policy.maximum_relative_period_error <= 0.0
         || policy.maximum_relative_period_error > 1.0
         || policy.required_consecutive_stable_estimates == 0
+        || policy.minimum_estimate_spacing_ns == 0
     {
         return Err("invalid tempo adaptation policy".to_owned());
     }
@@ -547,6 +549,7 @@ fn validate_estimates<'a>(
     let mut result = BTreeMap::<&str, Vec<&TempoEstimateV1>>::new();
     let mut ids = BTreeSet::new();
     let mut previous_time = None;
+    let mut previous_time_by_segment = BTreeMap::<&str, u64>::new();
     for estimate in &panel.tempo_estimates {
         require_text(&estimate.estimate_id, "tempo estimate ID")?;
         require_digest(&estimate.provenance_sha256, "tempo estimate provenance")?;
@@ -571,10 +574,20 @@ fn validate_estimates<'a>(
                 estimate.estimate_id
             ));
         }
-        if previous_time.is_some_and(|time| estimate.observed_at_ns < time) {
-            return Err("tempo estimate observations must be monotonic".to_owned());
+        if previous_time.is_some_and(|time| estimate.observed_at_ns <= time) {
+            return Err("tempo estimate observations must be strictly monotonic".to_owned());
         }
         previous_time = Some(estimate.observed_at_ns);
+        if previous_time_by_segment
+            .get(estimate.segment_id.as_str())
+            .is_some_and(|time| estimate.observed_at_ns - *time < panel.policy.minimum_estimate_spacing_ns)
+        {
+            return Err(format!(
+                "tempo estimate {} violates minimum spacing",
+                estimate.estimate_id
+            ));
+        }
+        previous_time_by_segment.insert(estimate.segment_id.as_str(), estimate.observed_at_ns);
         let segment = segments.get(estimate.segment_id.as_str()).ok_or_else(|| {
             format!(
                 "estimate {} references unknown segment",
@@ -767,6 +780,17 @@ mod tests {
         value["tempo_estimates"][5]["observed_at_ns"] = serde_json::json!(1_999_999_999_u64);
         let error = score(&value).expect_err("no estimate can precede change availability");
         assert!(error.contains("observed before its segment became available"));
+    }
+
+    #[test]
+    fn tempo_estimates_cannot_be_repeated_at_the_same_timestamp() {
+        let mut value = panel();
+        value["tempo_estimates"][6]["observed_at_ns"] =
+            value["tempo_estimates"][5]["observed_at_ns"].clone();
+        value["tempo_estimates"][6]["evidence_window_end_ns"] =
+            value["tempo_estimates"][6]["observed_at_ns"].clone();
+        let error = score(&value).expect_err("same-timestamp estimates must not fake stability");
+        assert!(error.contains("strictly monotonic"));
     }
 
     #[test]
