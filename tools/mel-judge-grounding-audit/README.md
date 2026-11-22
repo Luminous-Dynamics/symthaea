@@ -30,3 +30,17 @@ This is not a music-quality model. It is an *instrument qualification* tool: it 
 All tolerance values are predeclared in the probe panel. Nuisance transforms must be human-validated as semantics-preserving for the target task. A tempo change is not a nuisance when the prompt specifies tempo; a channel conversion is not automatically safe if it removes spatial cues relevant to the prompt.
 
 The evaluator checks supplied digest-shaped identifiers and declared relationships. It does not open audio files, verify transformations, authenticate model execution, or prove the judge was isolated from the human reference. Synthetic fixtures establish only Rust evaluator conformance.
+
+
+## Task-scoped transform qualification
+
+A separate reference validator qualifies each transformation for one declared task dimension. It recomputes the source and variant file digests, validates the task/preservation declarations and rights-scope receipt digests, and requires an independent listener-equivalence interval wholly inside the preregistered margin with adequate listener and item counts. An underpowered, inconclusive or out-of-margin receipt is ineligible, not a pass.
+
+Run it with:
+
+    cargo run --manifest-path tools/mel-judge-grounding-audit/Cargo.toml --bin mel-audio-transform-qualification -- audit \
+      tools/mel-judge-grounding-audit/fixtures/valid-transform-qualification-v1.json \
+      tools/mel-judge-grounding-audit/fixtures/source-audio.bin \
+      tools/mel-judge-grounding-audit/fixtures/variant-audio.bin report.json
+
+The CLI requires `sha256sum` on PATH. Its committed byte fixtures are not playable audio and its panel receipt is synthetic. It does not authenticate receipts or verify decoded audio metadata; see the separate transform-qualification research note.

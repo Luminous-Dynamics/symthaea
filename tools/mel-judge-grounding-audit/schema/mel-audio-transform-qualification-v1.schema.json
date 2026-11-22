@@ -1,0 +1,299 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel-audio-transform-qualification-v1.schema.json",
+  "title": "MEL Audio Transform Qualification v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "experiment_id",
+    "frozen_at_utc",
+    "task",
+    "policy",
+    "source",
+    "variant",
+    "transformation",
+    "rights",
+    "equivalence",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mel-audio-transform-qualification-v1"
+    },
+    "experiment_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "frozen_at_utc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "task": {
+      "$ref": "#/$defs/task"
+    },
+    "policy": {
+      "$ref": "#/$defs/policy"
+    },
+    "source": {
+      "$ref": "#/$defs/asset"
+    },
+    "variant": {
+      "$ref": "#/$defs/asset"
+    },
+    "transformation": {
+      "$ref": "#/$defs/transformation"
+    },
+    "rights": {
+      "$ref": "#/$defs/rights"
+    },
+    "equivalence": {
+      "$ref": "#/$defs/equivalence"
+    },
+    "claim_ceiling": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_id",
+        "task_dimension",
+        "prompt_sha256",
+        "rubric_sha256"
+      ],
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "task_dimension": {
+          "type": "string",
+          "minLength": 1
+        },
+        "prompt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "rubric_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "confidence_level",
+        "minimum_listeners",
+        "minimum_items",
+        "equivalence_margin"
+      ],
+      "properties": {
+        "confidence_level": {
+          "type": "number",
+          "minimum": 0.9,
+          "maximum": 0.99
+        },
+        "minimum_listeners": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "minimum_items": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "equivalence_margin": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "asset_id",
+        "sha256",
+        "sample_rate_hz",
+        "channels",
+        "duration_frames",
+        "encoding"
+      ],
+      "properties": {
+        "asset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "sample_rate_hz": {
+          "type": "integer",
+          "minimum": 8000,
+          "maximum": 384000
+        },
+        "channels": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8
+        },
+        "duration_frames": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "encoding": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "transformation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "family",
+        "algorithm",
+        "implementation_sha256",
+        "parameters_sha256",
+        "intended_preserved_dimensions",
+        "may_alter_dimensions"
+      ],
+      "properties": {
+        "family": {
+          "type": "string",
+          "minLength": 1
+        },
+        "algorithm": {
+          "type": "string",
+          "minLength": 1
+        },
+        "implementation_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "parameters_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "intended_preserved_dimensions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "may_alter_dimensions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "rights": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "purpose",
+        "rights_receipt_sha256",
+        "consent_receipt_sha256"
+      ],
+      "properties": {
+        "purpose": {
+          "const": "music-judge-qualification"
+        },
+        "rights_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "consent_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "equivalence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "outcome",
+        "method",
+        "panel_protocol_sha256",
+        "cohort_commitment_sha256",
+        "analysis_plan_sha256",
+        "independence_attestation_sha256",
+        "listener_count",
+        "item_count",
+        "confidence_level",
+        "mean_difference",
+        "confidence_interval_lower",
+        "confidence_interval_upper",
+        "equivalence_margin"
+      ],
+      "properties": {
+        "outcome": {
+          "enum": [
+            "equivalent",
+            "not_equivalent",
+            "inconclusive"
+          ]
+        },
+        "method": {
+          "enum": [
+            "paired_cluster_bootstrap",
+            "crossed_mixed_effects"
+          ]
+        },
+        "panel_protocol_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "cohort_commitment_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "analysis_plan_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "independence_attestation_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "listener_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "item_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "confidence_level": {
+          "type": "number",
+          "minimum": 0.9,
+          "maximum": 0.99
+        },
+        "mean_difference": {
+          "type": "number"
+        },
+        "confidence_interval_lower": {
+          "type": "number"
+        },
+        "confidence_interval_upper": {
+          "type": "number"
+        },
+        "equivalence_margin": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    }
+  }
+}
