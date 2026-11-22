@@ -259,7 +259,8 @@
     "Obtain independent mathematical review of the role graph.",
     "Reconstruct the source-to-Lean correspondence for the cell-centering identities in Part II §5.1, including the constant sum and the linear-in-a term.",
     "Reconstruct the finite-group translation identity (II.22) and the derived distinguished-cell identity (5.4), then distinguish the exact combinatorial identity from the separate uniform error estimates (5.6), (II.26) and (5.7).",
-    "Map the fixed-modulus prime number theorem cell-density argument and the uniform Estimate C dependency separately; do not transfer fixed-modulus O_A bounds to varying moduli."
+    "Map the fixed-modulus prime number theorem cell-density argument and the uniform Estimate C dependency separately; do not transfer fixed-modulus O_A bounds to varying moduli.",
+    "Run the finite cyclic translation oracle on the exact latest PR head; do not promote the source-added status until its workflow is observed."
   ],
   "limitations": [
     "The original Lean source mirror is an exact mirror of the published source but no license was established here; this Symthaea artifact stores only paths, declaration names, line spans, blob IDs and explanatory metadata, not source code.",
@@ -316,6 +317,26 @@
     "evidence_status": "Human-exposition identity source-inspected; not independently formalized by Symthaea.",
     "source_refs": [
       "Rubinstein working guide Part II §5.3, equations (5.4)–(5.5), PDF pp.34–35"
+    ]
+  },
+  "finite_translation_oracle": {
+    "method": "Exhaustive finite check of the translate-count identity in cyclic groups C_n",
+    "group_sizes": [
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "subsets": "Every nonempty subset T2 of each C_n",
+    "group_target_cases": 620,
+    "row_indicator_cases": 1240,
+    "checked_identity": "For every target s, exactly |T2| translates u satisfy s in u+T2. With chi_q in {-1,+1}, the row-filtered count satisfies 2*selected_count = |T2|*(1+chi_q).",
+    "test_function": "translation_average_selects_each_column_exactly_cardinality_t2_times",
+    "status": "source_added_exact_head_ci_pending",
+    "limitations": [
+      "Finite cyclic groups only; not a formal proof for the actual group H used in the RH construction.",
+      "Does not verify the theta-lift, cell-weight perturbations, prime density or any uniform analytic estimate."
     ]
   }
 }
