@@ -36,6 +36,7 @@ pub mod mycelial_network;
 pub mod mycelial_presence;
 pub mod mycelial_reconstruction_metrics;
 pub mod mycelial_reconstruction_calibration;
+pub mod mycelial_annotation_triage;
 pub mod mycelial_reference_networks;
 pub mod mycelial_temporal_cycles;
 pub mod scene_features;
@@ -117,6 +118,13 @@ pub use mycelial_junction_graph::{
     MycelialJunction, MycelialJunctionGraphConfig, MycelialJunctionGraphError,
     MycelialJunctionGraphMetrics, MycelialJunctionHyphaGraph, PARAMETER_SCALE,
     build_mycelial_junction_hypha_graph,
+};
+pub use mycelial_annotation_triage::{
+    MAX_MYCELIAL_ANNOTATION_TRIAGE_ITEMS, MYCELIAL_ANNOTATION_TRIAGE_SCHEMA_VERSION,
+    MycelialAnnotationTriageConfig, MycelialAnnotationTriageError,
+    MycelialAnnotationTriageReport, MycelialAnnotationTriageTopologySummary,
+    MycelialJunctionReviewItem, MycelialReviewOrderingPolicy,
+    build_mycelial_annotation_triage,
 };
 pub use mycelial_reconstruction_calibration::{
     MAX_RECONSTRUCTION_CALIBRATION_BINS, MAX_RECONSTRUCTION_CALIBRATION_PREDICTIONS,
