@@ -20,6 +20,7 @@ pub const MYCELIAL_RECONSTRUCTION_SCHEMA_VERSION: u16 = 1;
 pub const MYCELIAL_RECONSTRUCTION_SCORE_SCHEMA_VERSION: u16 = 1;
 pub const MAX_RECONSTRUCTION_JUNCTIONS: usize = 8_192;
 pub const MAX_RECONSTRUCTION_SEGMENTS: usize = 16_384;
+pub const MAX_AUTOMATIC_MATCH_JUNCTIONS_PER_GRAPH: usize = 128;
 pub const MAX_RECONSTRUCTION_ID_BYTES: usize = 128;
 const MAX_RECONSTRUCTION_COORDINATE: f64 = 1.0e9;
 const MAX_SEGMENT_LENGTH: f64 = 1.0e12;
@@ -233,6 +234,11 @@ pub enum MycelialReconstructionError {
     LengthUnitMismatch,
     InvalidConfig,
     InvalidMatchingPolicy,
+    AutomaticMatchingLimitExceeded {
+        prediction_count: usize,
+        ground_truth_count: usize,
+        limit_per_graph: usize,
+    },
     DuplicatePredictionMatch(String),
     DuplicateGroundTruthMatch(String),
     UnknownPredictionJunction(String),
@@ -271,6 +277,14 @@ impl fmt::Display for MycelialReconstructionError {
             }
             Self::InvalidConfig => write!(f, "invalid reconstruction evaluation configuration"),
             Self::InvalidMatchingPolicy => write!(f, "matching policy ID must be non-empty and bounded"),
+            Self::AutomaticMatchingLimitExceeded {
+                prediction_count,
+                ground_truth_count,
+                limit_per_graph,
+            } => write!(
+                f,
+                "automatic matcher is bounded to {limit_per_graph} junctions per graph; prediction={prediction_count}, ground_truth={ground_truth_count}"
+            ),
             Self::DuplicatePredictionMatch(id) => {
                 write!(f, "prediction junction {id} is matched more than once")
             }
@@ -420,6 +434,189 @@ impl AnnotatedMycelialSkeleton {
         }
         Ok(hex_digest(hasher.finalize().as_bytes()))
     }
+}
+
+/// Compute a deterministic one-to-one junction correspondence using a
+/// bounded Hungarian assignment.
+///
+/// The assignment objective is lexicographic: maximize the number of matches
+/// within `maximum_distance`, then minimize their total Euclidean localization
+/// error. Junction IDs are sorted before assignment so ties resolve reproducibly.
+/// This function only proposes correspondences; the caller still names the
+/// matching policy when constructing the evaluation receipt.
+///
+/// Complexity is O((n_prediction + n_truth)^3), bounded to 128 junctions per
+/// graph. Larger reconstructions must use a separately qualified sparse or
+/// spatially partitioned matcher and report its policy.
+pub fn match_junctions_hungarian(
+    ground_truth: &AnnotatedMycelialSkeleton,
+    prediction: &AnnotatedMycelialSkeleton,
+    maximum_distance: f64,
+) -> Result<Vec<JunctionIdentityMatch>, MycelialReconstructionError> {
+    ground_truth.validate()?;
+    prediction.validate()?;
+    if ground_truth.frame_id != prediction.frame_id {
+        return Err(MycelialReconstructionError::FrameMismatch);
+    }
+    if ground_truth.source_observation_digest != prediction.source_observation_digest {
+        return Err(MycelialReconstructionError::SourceObservationMismatch);
+    }
+    if ground_truth.dimensionality != prediction.dimensionality {
+        return Err(MycelialReconstructionError::DimensionalityMismatch);
+    }
+    if ground_truth.length_unit != prediction.length_unit {
+        return Err(MycelialReconstructionError::LengthUnitMismatch);
+    }
+    if !maximum_distance.is_finite()
+        || maximum_distance <= 0.0
+        || maximum_distance > MAX_RECONSTRUCTION_COORDINATE
+    {
+        return Err(MycelialReconstructionError::InvalidConfig);
+    }
+    if prediction.junctions.len() > MAX_AUTOMATIC_MATCH_JUNCTIONS_PER_GRAPH
+        || ground_truth.junctions.len() > MAX_AUTOMATIC_MATCH_JUNCTIONS_PER_GRAPH
+    {
+        return Err(MycelialReconstructionError::AutomaticMatchingLimitExceeded {
+            prediction_count: prediction.junctions.len(),
+            ground_truth_count: ground_truth.junctions.len(),
+            limit_per_graph: MAX_AUTOMATIC_MATCH_JUNCTIONS_PER_GRAPH,
+        });
+    }
+
+    let mut prediction_nodes: Vec<_> = prediction.junctions.iter().collect();
+    let mut ground_truth_nodes: Vec<_> = ground_truth.junctions.iter().collect();
+    prediction_nodes.sort_by(|left, right| left.id.cmp(&right.id));
+    ground_truth_nodes.sort_by(|left, right| left.id.cmp(&right.id));
+    let prediction_count = prediction_nodes.len();
+    let truth_count = ground_truth_nodes.len();
+    let matrix_size = prediction_count + truth_count;
+    if matrix_size == 0 {
+        return Ok(Vec::new());
+    }
+
+    // Leaving one prediction and one truth node unmatched costs just over the
+    // maximum admissible pair distance, so every additional admissible match
+    // is preferable to leaving both unmatched. The Hungarian objective
+    // therefore maximizes cardinality before minimizing total distance.
+    let unmatched_cost = maximum_distance * 0.5 + maximum_distance * 1.0e-9;
+    let forbidden_cost = maximum_distance * 10.0 + unmatched_cost * 2.0;
+    let mut costs = vec![vec![0.0f64; matrix_size]; matrix_size];
+
+    for prediction_index in 0..prediction_count {
+        for truth_index in 0..truth_count {
+            let distance = point_distance(
+                prediction_nodes[prediction_index].position,
+                ground_truth_nodes[truth_index].position,
+                ground_truth.dimensionality,
+            );
+            costs[prediction_index][truth_index] = if distance <= maximum_distance {
+                distance
+            } else {
+                forbidden_cost
+            };
+        }
+        for dummy_column in truth_count..matrix_size {
+            costs[prediction_index][dummy_column] = unmatched_cost;
+        }
+    }
+    for dummy_row in prediction_count..matrix_size {
+        for truth_column in 0..truth_count {
+            costs[dummy_row][truth_column] = unmatched_cost;
+        }
+        for dummy_column in truth_count..matrix_size {
+            costs[dummy_row][dummy_column] = 0.0;
+        }
+    }
+
+    let assignment = hungarian_min_assignment(&costs);
+    let mut matches = Vec::new();
+    for (prediction_index, &column) in assignment.iter().take(prediction_count).enumerate() {
+        if column >= truth_count {
+            continue;
+        }
+        let distance = costs[prediction_index][column];
+        if distance <= maximum_distance {
+            matches.push(JunctionIdentityMatch {
+                predicted_junction_id: prediction_nodes[prediction_index].id.clone(),
+                ground_truth_junction_id: ground_truth_nodes[column].id.clone(),
+            });
+        }
+    }
+    matches.sort_by(|left, right| {
+        left.predicted_junction_id
+            .cmp(&right.predicted_junction_id)
+            .then_with(|| left.ground_truth_junction_id.cmp(&right.ground_truth_junction_id))
+    });
+    Ok(matches)
+}
+
+fn hungarian_min_assignment(costs: &[Vec<f64>]) -> Vec<usize> {
+    let size = costs.len();
+    if size == 0 {
+        return Vec::new();
+    }
+    let mut row_potential = vec![0.0f64; size + 1];
+    let mut column_potential = vec![0.0f64; size + 1];
+    let mut matched_row_for_column = vec![0usize; size + 1];
+    let mut predecessor_column = vec![0usize; size + 1];
+
+    for row in 1..=size {
+        matched_row_for_column[0] = row;
+        let mut current_column = 0usize;
+        let mut minimum_reduced_cost = vec![f64::INFINITY; size + 1];
+        let mut used_columns = vec![false; size + 1];
+        loop {
+            used_columns[current_column] = true;
+            let current_row = matched_row_for_column[current_column];
+            let mut delta = f64::INFINITY;
+            let mut next_column = 0usize;
+            for column in 1..=size {
+                if used_columns[column] {
+                    continue;
+                }
+                let reduced_cost = costs[current_row - 1][column - 1]
+                    - row_potential[current_row]
+                    - column_potential[column];
+                if reduced_cost < minimum_reduced_cost[column] {
+                    minimum_reduced_cost[column] = reduced_cost;
+                    predecessor_column[column] = current_column;
+                }
+                if minimum_reduced_cost[column] < delta {
+                    delta = minimum_reduced_cost[column];
+                    next_column = column;
+                }
+            }
+            for column in 0..=size {
+                if used_columns[column] {
+                    row_potential[matched_row_for_column[column]] += delta;
+                    column_potential[column] -= delta;
+                } else {
+                    minimum_reduced_cost[column] -= delta;
+                }
+            }
+            current_column = next_column;
+            if matched_row_for_column[current_column] == 0 {
+                break;
+            }
+        }
+        loop {
+            let previous_column = predecessor_column[current_column];
+            matched_row_for_column[current_column] =
+                matched_row_for_column[previous_column];
+            current_column = previous_column;
+            if current_column == 0 {
+                break;
+            }
+        }
+    }
+
+    let mut assignment = vec![usize::MAX; size];
+    for column in 1..=size {
+        if matched_row_for_column[column] != 0 {
+            assignment[matched_row_for_column[column] - 1] = column - 1;
+        }
+    }
+    assignment
 }
 
 /// Evaluate prediction fidelity after an explicit one-to-one junction matching
