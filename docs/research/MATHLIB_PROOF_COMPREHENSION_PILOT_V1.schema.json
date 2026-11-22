@@ -1,0 +1,308 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/MATHLIB_PROOF_COMPREHENSION_PILOT_V1.schema.json",
+  "title": "Symthaea Mathlib Proof Comprehension Pilot Dataset v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "dataset_id",
+    "status",
+    "source_snapshot",
+    "task_count",
+    "tasks",
+    "evaluation_plan",
+    "limitations",
+    "next_stage"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "dataset_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": [
+        "source_pinned_seed_not_gold",
+        "expert_reviewed",
+        "frozen_benchmark",
+        "retired"
+      ]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date"
+    },
+    "description": {
+      "type": "string"
+    },
+    "source_snapshot": {
+      "type": "object",
+      "required": [
+        "repository",
+        "commit",
+        "commit_date",
+        "files"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string"
+        },
+        "commit": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "commit_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "commit_date": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "files": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "path",
+              "blob_sha",
+              "url"
+            ],
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "blob_sha": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{40}$"
+              },
+              "url": {
+                "type": "string",
+                "format": "uri"
+              }
+            }
+          }
+        }
+      }
+    },
+    "task_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "tasks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "declaration",
+          "mechanism",
+          "source",
+          "statement",
+          "proof_expression",
+          "concept",
+          "graph_status",
+          "provisional_edges",
+          "explanation_gaps",
+          "questions",
+          "counterfactuals",
+          "annotation_status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "declaration": {
+            "type": "string",
+            "minLength": 1
+          },
+          "mechanism": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source": {
+            "type": "object",
+            "required": [
+              "path",
+              "blob_sha",
+              "line_start",
+              "line_end",
+              "permalink"
+            ],
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "blob_sha": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{40}$"
+              },
+              "line_start": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "line_end": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "permalink": {
+                "type": "string",
+                "format": "uri"
+              }
+            }
+          },
+          "statement": {
+            "type": "string",
+            "minLength": 1
+          },
+          "proof_expression": {
+            "type": "string",
+            "minLength": 1
+          },
+          "concept": {
+            "type": "string",
+            "minLength": 1
+          },
+          "graph_status": {
+            "enum": [
+              "source_expression_edges_only",
+              "simp_trace_required",
+              "lean_environment_extracted",
+              "independently_reviewed"
+            ]
+          },
+          "provisional_edges": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "source",
+                "target",
+                "relation",
+                "evidence"
+              ],
+              "properties": {
+                "source": {
+                  "type": "string"
+                },
+                "target": {
+                  "type": "string"
+                },
+                "relation": {
+                  "type": "string"
+                },
+                "evidence": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "explanation_gaps": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "questions": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          },
+          "counterfactuals": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "mutation",
+                "expected"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "mutation": {
+                  "type": "string"
+                },
+                "expected": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "annotation_status": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "evaluation_plan": {
+      "type": "object",
+      "required": [
+        "baseline_arms",
+        "measures",
+        "hard_gates",
+        "status"
+      ],
+      "properties": {
+        "baseline_arms": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "measures": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "hard_gates": {
+          "type": "object",
+          "properties": {
+            "wrong_statement_acceptance": {
+              "const": 0
+            },
+            "unsupported_formal_fact_claims": {
+              "const": 0
+            },
+            "unknown_allowed": {
+              "const": true
+            }
+          }
+        },
+        "status": {
+          "enum": [
+            "not_run",
+            "in_progress",
+            "complete",
+            "inconclusive"
+          ]
+        }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    },
+    "next_stage": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}
