@@ -8,10 +8,41 @@
   "total_cost_budget": 13,
   "exploration_weight": 0.5,
   "candidates": [
-    {"candidate_id":"A","estimated_cost":8,"expected_feasible_hv_gain":0.12,"epistemic_stddev":0.05,"frontier_relevance":0.9},
-    {"candidate_id":"B","estimated_cost":6,"expected_feasible_hv_gain":0.11,"epistemic_stddev":0.02,"frontier_relevance":0.4},
-    {"candidate_id":"C","estimated_cost":5,"expected_feasible_hv_gain":0.075,"epistemic_stddev":0.08,"frontier_relevance":0.8},
-    {"candidate_id":"D","estimated_cost":4,"expected_feasible_hv_gain":0.03,"epistemic_stddev":0.03,"frontier_relevance":0.2},
-    {"candidate_id":"E","estimated_cost":7,"expected_feasible_hv_gain":0.15,"epistemic_stddev":0.1,"frontier_relevance":0.95}
-  ]
+    {
+      "candidate_id": "A",
+      "estimated_cost": 8,
+      "expected_feasible_hv_gain": 0.12,
+      "epistemic_stddev": 0.05,
+      "frontier_relevance": 0.9
+    },
+    {
+      "candidate_id": "B",
+      "estimated_cost": 6,
+      "expected_feasible_hv_gain": 0.11,
+      "epistemic_stddev": 0.02,
+      "frontier_relevance": 0.4
+    },
+    {
+      "candidate_id": "C",
+      "estimated_cost": 5,
+      "expected_feasible_hv_gain": 0.075,
+      "epistemic_stddev": 0.08,
+      "frontier_relevance": 0.8
+    },
+    {
+      "candidate_id": "D",
+      "estimated_cost": 4,
+      "expected_feasible_hv_gain": 0.03,
+      "epistemic_stddev": 0.03,
+      "frontier_relevance": 0.2
+    },
+    {
+      "candidate_id": "E",
+      "estimated_cost": 7,
+      "expected_feasible_hv_gain": 0.15,
+      "epistemic_stddev": 0.1,
+      "frontier_relevance": 0.95
+    }
+  ],
+  "uncertainty_calibration_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
 }
