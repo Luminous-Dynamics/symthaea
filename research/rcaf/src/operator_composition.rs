@@ -15,6 +15,9 @@ pub struct ProjectionOrderReport {
     pub filter_design_rank: usize,
     pub joint_design_rank: usize,
     pub dependent_columns_dropped: usize,
+    /// Frobenius norm of the projection-operator commutator, normalized by sqrt(time_points).
+    /// This is an input-independent measure of structural order sensitivity.
+    pub projection_operator_commutator_ratio: f64,
     pub nuisance_then_filter_nuisance_leakage: f64,
     pub filter_then_nuisance_nuisance_leakage: f64,
     pub nuisance_then_filter_filter_leakage: f64,
@@ -105,6 +108,11 @@ pub fn run_projection_order_challenge(
         dependent_columns_dropped: nuisance_basis.dropped_columns
             + filter_basis.dropped_columns
             + joint_basis.dropped_columns,
+        projection_operator_commutator_ratio: projection_operator_commutator_ratio(
+            &nuisance_basis,
+            &filter_basis,
+            time_points,
+        ),
         nuisance_then_filter_nuisance_leakage: projected_energy_fraction(
             &nuisance_then_filter,
             &nuisance_basis,
@@ -266,6 +274,29 @@ fn projected_energy_fraction(observations: &[Vec<f64>], basis: &OrthonormalBasis
     (projected / total).clamp(0.0, 1.0)
 }
 
+/// Compute ||P_N P_H - P_H P_N||_F / sqrt(T) without materializing either
+/// projector. The orthonormal bases are sufficient because P = Q Q^T.
+fn projection_operator_commutator_ratio(
+    nuisance_basis: &OrthonormalBasis,
+    filter_basis: &OrthonormalBasis,
+    time_points: usize,
+) -> f64 {
+    let mut commutator = vec![vec![0.0; time_points]; time_points];
+    for nuisance_direction in &nuisance_basis.columns {
+        for filter_direction in &filter_basis.columns {
+            let overlap = dot(nuisance_direction, filter_direction);
+            for (i, row) in commutator.iter_mut().enumerate() {
+                for (j, value) in row.iter_mut().enumerate() {
+                    *value += overlap
+                        * (nuisance_direction[i] * filter_direction[j]
+                            - filter_direction[i] * nuisance_direction[j]);
+                }
+            }
+        }
+    }
+    frobenius_norm(&commutator) / (time_points as f64).sqrt()
+}
+
 fn concatenate_designs(left: &[Vec<f64>], right: &[Vec<f64>]) -> Vec<Vec<f64>> {
     left.iter()
         .zip(right.iter())
@@ -315,6 +346,7 @@ mod tests {
         assert!(report.nuisance_then_filter_nuisance_leakage > 0.1);
         assert!(report.filter_then_nuisance_nuisance_leakage < 1e-10);
         assert!(report.order_difference_ratio > 0.1);
+        assert!(report.projection_operator_commutator_ratio > 0.0);
     }
 
     #[test]
@@ -344,6 +376,7 @@ mod tests {
         let filter = col(&[0.0, 1.0, 0.0, 0.0]);
         let report = run_projection_order_challenge(&observations, &nuisance, &filter).unwrap();
         assert!(report.order_difference_ratio < 1e-10);
+        assert!(report.projection_operator_commutator_ratio < 1e-12);
     }
 
     #[test]
