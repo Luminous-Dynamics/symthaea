@@ -281,7 +281,9 @@ fn validate_policy(policy: &MetrologyAuditPolicyV1) -> Result<(), MetrologyAudit
         policy.uncertainty_weight,
         policy.evsi_weight,
     ];
-    if weights.iter().any(|weight| !weight.is_finite() || *weight < 0.0)
+    if weights
+        .iter()
+        .any(|weight| !weight.is_finite() || *weight < 0.0)
         || (weights.iter().sum::<f64>() - 1.0).abs() > 1.0e-9
     {
         return Err(MetrologyAuditError(
@@ -289,7 +291,9 @@ fn validate_policy(policy: &MetrologyAuditPolicyV1) -> Result<(), MetrologyAudit
         ));
     }
     if policy.candidates.is_empty() {
-        return Err(MetrologyAuditError("candidates: expected non-empty array".into()));
+        return Err(MetrologyAuditError(
+            "candidates: expected non-empty array".into(),
+        ));
     }
     let mut candidate_ids = BTreeSet::new();
     for (index, candidate) in policy.candidates.iter().enumerate() {
@@ -297,7 +301,10 @@ fn validate_policy(policy: &MetrologyAuditPolicyV1) -> Result<(), MetrologyAudit
             ("candidate_id", candidate.candidate_id.as_str()),
             ("subject_id", candidate.subject_id.as_str()),
             ("stratum_id", candidate.stratum_id.as_str()),
-            ("target_measurand_id", candidate.target_measurand_id.as_str()),
+            (
+                "target_measurand_id",
+                candidate.target_measurand_id.as_str(),
+            ),
         ] {
             require_text(value, &format!("candidates[{index}].{field}"))?;
         }
@@ -337,7 +344,11 @@ fn stratum_seed(seed: u64, stratum_id: &str) -> u64 {
     digest.update(seed.to_le_bytes());
     digest.update(stratum_id.as_bytes());
     let bytes = digest.finalize();
-    u64::from_le_bytes(bytes[..8].try_into().expect("SHA-256 prefix has eight bytes"))
+    u64::from_le_bytes(
+        bytes[..8]
+            .try_into()
+            .expect("SHA-256 prefix has eight bytes"),
+    )
 }
 
 /// Selects deterministic high-utility candidates first, then performs a
@@ -362,9 +373,11 @@ pub fn select_metrology_audit_v1(
         let right_candidate = &candidates[*right];
         let left_ratio = priority(left_candidate) / left_candidate.measurement_cost as f64;
         let right_ratio = priority(right_candidate) / right_candidate.measurement_cost as f64;
-        right_ratio
-            .total_cmp(&left_ratio)
-            .then_with(|| left_candidate.candidate_id.cmp(&right_candidate.candidate_id))
+        right_ratio.total_cmp(&left_ratio).then_with(|| {
+            left_candidate
+                .candidate_id
+                .cmp(&right_candidate.candidate_id)
+        })
     });
 
     let mut selected_method = vec![MetrologySelectionMethodV1::NotSelected; candidates.len()];
@@ -426,9 +439,9 @@ pub fn select_metrology_audit_v1(
             .map(|index| candidates[*index].measurement_cost)
             .max()
             .unwrap_or(0);
-        let stratum_worst_case = maximum_cost
-            .checked_mul(quota as u64)
-            .ok_or_else(|| MetrologyAuditError(format!("stratum {stratum}: audit cost overflow")))?;
+        let stratum_worst_case = maximum_cost.checked_mul(quota as u64).ok_or_else(|| {
+            MetrologyAuditError(format!("stratum {stratum}: audit cost overflow"))
+        })?;
         audit_worst_case_cost = audit_worst_case_cost
             .checked_add(stratum_worst_case)
             .ok_or_else(|| MetrologyAuditError("audit cost overflow".into()))?;
@@ -561,10 +574,14 @@ pub fn estimate_metrology_population_v1(
     cutoff: &PredictionInformationCutoffV1,
 ) -> Result<MetrologyAuditPopulationEstimateV1, MetrologyAuditError> {
     if selection.schema != SELECTION_SCHEMA_V1 || !valid_sha256(&selection.selection_sha256) {
-        return Err(MetrologyAuditError("selection schema/digest invalid".into()));
+        return Err(MetrologyAuditError(
+            "selection schema/digest invalid".into(),
+        ));
     }
     if report_digest(selection)? != selection.selection_sha256 {
-        return Err(MetrologyAuditError("selection digest does not match payload".into()));
+        return Err(MetrologyAuditError(
+            "selection digest does not match payload".into(),
+        ));
     }
     if outcomes.len() != selection.rows.iter().filter(|row| row.selected).count() {
         return Err(MetrologyAuditError(
@@ -590,7 +607,10 @@ pub fn estimate_metrology_population_v1(
     let mut used_label_ids = BTreeSet::new();
     let mut used_candidate_ids = BTreeSet::new();
     for (index, outcome) in outcomes.iter().enumerate() {
-        require_text(&outcome.candidate_id, &format!("outcomes[{index}].candidate_id"))?;
+        require_text(
+            &outcome.candidate_id,
+            &format!("outcomes[{index}].candidate_id"),
+        )?;
         require_text(&outcome.label_id, &format!("outcomes[{index}].label_id"))?;
         let selected = selection_by_id
             .get(outcome.candidate_id.as_str())
@@ -644,8 +664,10 @@ pub fn estimate_metrology_population_v1(
                 "outcomes[{index}] graph subject/measurand does not match selected candidate"
             )));
         }
-        derived_positive_by_candidate
-            .insert(outcome.candidate_id.as_str(), classification.derived_positive);
+        derived_positive_by_candidate.insert(
+            outcome.candidate_id.as_str(),
+            classification.derived_positive,
+        );
     }
     let mut stratum_map: BTreeMap<String, Vec<&MetrologyAuditSelectionRowV1>> = BTreeMap::new();
     for row in &selection.rows {
@@ -670,11 +692,21 @@ pub fn estimate_metrology_population_v1(
     for (stratum_id, rows) in stratum_map {
         let exploit: Vec<_> = rows
             .iter()
-            .filter(|row| matches!(&row.method, MetrologySelectionMethodV1::DeterministicExploit))
+            .filter(|row| {
+                matches!(
+                    &row.method,
+                    MetrologySelectionMethodV1::DeterministicExploit
+                )
+            })
             .collect();
         let residual: Vec<_> = rows
             .iter()
-            .filter(|row| !matches!(&row.method, MetrologySelectionMethodV1::DeterministicExploit))
+            .filter(|row| {
+                !matches!(
+                    &row.method,
+                    MetrologySelectionMethodV1::DeterministicExploit
+                )
+            })
             .collect();
         let audit: Vec<_> = residual
             .iter()
@@ -761,8 +793,7 @@ pub fn estimate_metrology_population_v1(
                     / audit_count as f64
             })
         };
-        let stratum_variance_qualified =
-            positive_variance.is_some() && brier_variance.is_some();
+        let stratum_variance_qualified = positive_variance.is_some() && brier_variance.is_some();
         if let Some(variance) = positive_variance {
             total_positive_variance += variance;
         } else {
@@ -845,7 +876,7 @@ pub fn estimate_metrology_population_v1(
 mod tests {
     use super::*;
     use crate::benchmark::process_event_graph::{
-        ClockBasisV1, ProcessEventKindV1, ProcessEventV1, MetrologyLabelV1,
+        ClockBasisV1, MetrologyLabelV1, ProcessEventKindV1, ProcessEventV1,
     };
 
     const SHA_A: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
@@ -861,7 +892,8 @@ mod tests {
             unit: "binary".into(),
             positive_class_name: "defect".into(),
             negative_class_name: "pass".into(),
-            positive_condition: crate::benchmark::metrology_semantics::PositiveConditionV1::GreaterThanOrEqual,
+            positive_condition:
+                crate::benchmark::metrology_semantics::PositiveConditionV1::GreaterThanOrEqual,
             threshold: 0.5,
             authority_ref: "quality-plan:defect-rate-v1".into(),
             semantics_sha256: String::new(),
@@ -901,10 +933,7 @@ mod tests {
             risk_weight: 0.4,
             uncertainty_weight: 0.3,
             evsi_weight: 0.3,
-            audit_quota_by_stratum: BTreeMap::from([
-                ("tool-a".into(), 3),
-                ("tool-b".into(), 3),
-            ]),
+            audit_quota_by_stratum: BTreeMap::from([("tool-a".into(), 3), ("tool-b".into(), 3)]),
             seed: 77,
             candidates,
         }
@@ -915,7 +944,10 @@ mod tests {
         let report = select_metrology_audit_v1(&policy()).unwrap();
         for row in &report.rows {
             assert!(row.inclusion_probability > 0.0 && row.inclusion_probability <= 1.0);
-            if matches!(&row.method, MetrologySelectionMethodV1::DeterministicExploit) {
+            if matches!(
+                &row.method,
+                MetrologySelectionMethodV1::DeterministicExploit
+            ) {
                 assert_eq!(row.inclusion_probability, 1.0);
             }
         }
@@ -939,19 +971,41 @@ mod tests {
         let mut changed = policy();
         changed.seed += 1;
         let second = select_metrology_audit_v1(&changed).unwrap();
-        let exploit_a: Vec<_> = first.rows.iter()
-            .filter(|row| matches!(&row.method, MetrologySelectionMethodV1::DeterministicExploit))
-            .map(|row| row.candidate_id.clone()).collect();
-        let exploit_b: Vec<_> = second.rows.iter()
-            .filter(|row| matches!(&row.method, MetrologySelectionMethodV1::DeterministicExploit))
-            .map(|row| row.candidate_id.clone()).collect();
+        let exploit_a: Vec<_> = first
+            .rows
+            .iter()
+            .filter(|row| {
+                matches!(
+                    &row.method,
+                    MetrologySelectionMethodV1::DeterministicExploit
+                )
+            })
+            .map(|row| row.candidate_id.clone())
+            .collect();
+        let exploit_b: Vec<_> = second
+            .rows
+            .iter()
+            .filter(|row| {
+                matches!(
+                    &row.method,
+                    MetrologySelectionMethodV1::DeterministicExploit
+                )
+            })
+            .map(|row| row.candidate_id.clone())
+            .collect();
         assert_eq!(exploit_a, exploit_b);
-        let audit_a: Vec<_> = first.rows.iter()
+        let audit_a: Vec<_> = first
+            .rows
+            .iter()
             .filter(|row| matches!(&row.method, MetrologySelectionMethodV1::RandomizedAudit))
-            .map(|row| row.candidate_id.clone()).collect();
-        let audit_b: Vec<_> = second.rows.iter()
+            .map(|row| row.candidate_id.clone())
+            .collect();
+        let audit_b: Vec<_> = second
+            .rows
+            .iter()
             .filter(|row| matches!(&row.method, MetrologySelectionMethodV1::RandomizedAudit))
-            .map(|row| row.candidate_id.clone()).collect();
+            .map(|row| row.candidate_id.clone())
+            .collect();
         assert_ne!(audit_a, audit_b);
     }
 
@@ -969,10 +1023,7 @@ mod tests {
     #[test]
     fn graph_maturity_and_ht_estimator_reconcile_census_audit_design() {
         let mut input = policy();
-        input.audit_quota_by_stratum = BTreeMap::from([
-            ("tool-a".into(), 4),
-            ("tool-b".into(), 4),
-        ]);
+        input.audit_quota_by_stratum = BTreeMap::from([("tool-a".into(), 4), ("tool-b".into(), 4)]);
         input.exploit_cost_budget = 0;
         input.audit_cost_budget = 8;
         input.total_cost_budget = 8;
@@ -1055,8 +1106,8 @@ mod tests {
             clock_domain_id: "fab-local".into(),
             clock_basis: ClockBasisV1::SourceLocalNaive,
         };
-        let estimate = estimate_metrology_population_v1(&selection, &outcomes, &graph, &cutoff)
-            .unwrap();
+        let estimate =
+            estimate_metrology_population_v1(&selection, &outcomes, &graph, &cutoff).unwrap();
         assert_eq!(estimate.population_count, 12);
         assert_eq!(estimate.measured_count, 8);
         assert!((0.0..=1.0).contains(&estimate.measurement_reduction_fraction));
@@ -1074,7 +1125,13 @@ mod tests {
         // A selected outcome cannot be evaluated without a matching matured
         // graph label. An empty graph must fail closed.
         let outcome = MetrologyAuditOutcomeV1 {
-            candidate_id: selection.rows.iter().find(|row| row.selected).unwrap().candidate_id.clone(),
+            candidate_id: selection
+                .rows
+                .iter()
+                .find(|row| row.selected)
+                .unwrap()
+                .candidate_id
+                .clone(),
             label_id: "not-in-graph".into(),
         };
         let graph = ProcessEventGraphV1 {
@@ -1128,6 +1185,5 @@ mod tests {
             })
             .collect();
         assert!(estimate_metrology_population_v1(&selection, &outcomes, &graph, &cutoff).is_err());
-
     }
 }
