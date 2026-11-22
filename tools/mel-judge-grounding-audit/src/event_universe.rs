@@ -62,6 +62,7 @@ struct CandidateForecastV1 {
     model_sha256: String,
     forecast_payload_sha256: String,
     committed_at_ns: u64,
+    input_snapshot_available_at_ns: u64,
     input_snapshot_sha256: String,
     policy_sha256: String,
 }
@@ -488,6 +489,9 @@ fn validate_header(panel: &EventUniversePanelV1) -> Result<(), String> {
     require_digest(&panel.candidate.forecast_payload_sha256, "forecast payload digest")?;
     require_digest(&panel.candidate.input_snapshot_sha256, "candidate input snapshot")?;
     require_digest(&panel.candidate.policy_sha256, "candidate policy digest")?;
+    if panel.candidate.input_snapshot_available_at_ns > panel.candidate.committed_at_ns {
+        return Err("candidate input snapshot was not available at forecast commitment".to_owned());
+    }
     if panel.candidate.committed_at_ns <= universe.universe_frozen_at_ns {
         return Err("candidate forecast must be committed after the opportunity universe was frozen".to_owned());
     }
