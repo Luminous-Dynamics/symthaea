@@ -39,7 +39,7 @@ Tempo changes are separate observed events. Their reference local period is supp
 - evidence-window end timestamp;
 - estimated period, confidence and provenance digest.
 
-An estimate is rejected if it uses evidence beyond its observation time or predates the change becoming observable. Estimate timestamps must be strictly increasing and meet a preregistered minimum spacing. Recovery occurs only after K consecutive estimates fall inside the relative-period tolerance; one lucky estimate cannot qualify.
+An estimate is rejected if it uses evidence beyond its observation time or predates the change becoming observable. Estimate timestamps must be strictly increasing and meet a preregistered minimum spacing. An estimate must also meet a preregistered minimum confidence before it can count toward the K-stable run; low-confidence numerically correct estimates do not count. Recovery occurs only after K consecutive estimates fall inside the relative-period tolerance; one lucky estimate cannot qualify.
 
 ## Clock and evidence rules
 
