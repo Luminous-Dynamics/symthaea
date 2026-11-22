@@ -297,6 +297,7 @@ struct CandidateItem {
     item_id: u8,
     event_group: u8,
     token_cost: u8,
+    source_root_id: u64,
     singleton_estimate_micros: i64,
 }
 
@@ -368,6 +369,7 @@ fn generate_case(
             item_id,
             event_group,
             token_cost: 1,
+            source_root_id: cluster_id * 100 + u64::from(item_id) + 1,
             singleton_estimate_micros: singleton_estimate,
         });
     }
@@ -418,6 +420,11 @@ fn candidate_is_eligible(candidate: &CandidatePortfolio, model: &PairwiseModel) 
         && !model.calibration_families.contains(&candidate.task_family)
         && !model.train_clusters.contains(&candidate.cluster_id)
         && !model.calibration_clusters.contains(&candidate.cluster_id)
+        && candidate.items.iter().all(|item| {
+            item.source_root_id != 0
+                && !model.train_roots.contains(&item.source_root_id)
+                && !model.calibration_roots.contains(&item.source_root_id)
+        })
         && model.train_clusters.is_disjoint(&model.calibration_clusters)
         && model.train_roots.is_disjoint(&model.calibration_roots)
 }
@@ -606,7 +613,7 @@ fn bootstrap_ci(differences: &[i64], samples: usize, seed: u64) -> Option<(f64, 
         }
         means.push(total as f64 / differences.len() as f64);
     }
-    means.sort_by(f64::total_cmp);
+    means.sort_by(|left, right| left.total_cmp(right));
     let lower = ((samples as f64) * 0.025).floor() as usize;
     let upper = ((samples as f64) * 0.975).floor() as usize;
     Some((
@@ -693,13 +700,22 @@ fn run_seed(seed: u64) -> Option<(ArmMetrics, ArmMetrics, Vec<i64>, usize)> {
 fn report() {
     println!("MACE portfolio interaction benchmark v0.1");
     println!(
-        "train_clusters={}, calibration_clusters={}, stable_test_clusters={}, shifted_test_clusters={}",
+        concat!(
+            "train_clusters={}, calibration_clusters={}, ",
+            "stable_test_clusters={}, shifted_test_clusters={}"
+        ),
         TRAIN_CLUSTERS,
         CALIBRATION_CLUSTERS,
         STABLE_TEST_CLUSTERS,
         SHIFTED_TEST_CLUSTERS
     );
-    println!("arm,mean_utility,mean_regret,selected_items,token_spend,redundancy_loss,synergy_captured,false_synergy,false_redundancy,pairwise_abstentions");
+    println!(
+        concat!(
+            "arm,mean_utility,mean_regret,selected_items,token_spend,",
+            "redundancy_loss,synergy_captured,false_synergy,",
+            "false_redundancy,pairwise_abstentions"
+        )
+    );
 
     let mut additive_total = ArmMetrics::default();
     let mut pairwise_total = ArmMetrics::default();
@@ -875,6 +891,16 @@ mod tests {
         let second = bootstrap_ci(&differences, 500, 77).unwrap();
         assert_eq!(first, second);
         assert!(first.0 <= first.1);
+    }
+
+    #[test]
+    fn pairwise_model_rejects_test_source_root_reuse() {
+        let train = training_split(10, 1_000, 96, &[1, 2]);
+        let calibration = training_split(11, 2_000, 48, &[3]);
+        let model = fit_pairwise_model(&train, &calibration).unwrap();
+        let mut heldout = generate_case(3_000, 4, Regime::Stable, 99);
+        heldout.candidate.items[0].source_root_id = *model.train_roots.iter().next().unwrap();
+        assert!(select_pairwise(&heldout.candidate, &model).is_none());
     }
 
     #[test]
