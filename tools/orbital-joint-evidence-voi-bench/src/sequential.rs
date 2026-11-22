@@ -1191,9 +1191,50 @@ mod tests {
     }
 
     #[test]
+    fn memoized_exact_state_replay_does_not_expand_the_search_twice() {
+        let corpus: SequentialCorpus = serde_json::from_slice(FIXTURE).unwrap();
+        let scenario = &corpus.scenarios[0];
+        let mut memo = BTreeMap::new();
+        let mut stats = SearchStats::default();
+        let first = solve(
+            scenario,
+            &scenario.states,
+            &scenario.budget,
+            scenario.max_actions,
+            &BTreeSet::new(),
+            &BTreeSet::new(),
+            &mut memo,
+            &mut stats,
+        )
+        .unwrap();
+        let expanded = stats.states_expanded;
+        assert!(expanded > 0);
+        assert_eq!(memo.len(), expanded);
+
+        let second = solve(
+            scenario,
+            &scenario.states,
+            &scenario.budget,
+            scenario.max_actions,
+            &BTreeSet::new(),
+            &BTreeSet::new(),
+            &mut memo,
+            &mut stats,
+        )
+        .unwrap();
+        assert_eq!(first.node, second.node);
+        assert_eq!(first.worst_case_regret, second.worst_case_regret);
+        assert_eq!(stats.states_expanded, expanded);
+        assert_eq!(stats.memo_hits, 1);
+    }
+
+    #[test]
     fn exact_finite_horizon_policy_beats_myopic_stop_rule() {
         let result = receipt();
         let scenario = &result.scenarios[0];
+        assert!(scenario.search_states_expanded > 0);
+        assert_eq!(scenario.search_memo_entries, scenario.search_states_expanded);
+        assert!(scenario.policy_tree_nodes > 0);
         assert_eq!(scenario.baseline_terminal_disposition, "HOLD");
         assert_eq!(scenario.baseline_worst_case_regret, 2.0);
         assert_eq!(scenario.myopic.worst_case_regret, 2.0);
