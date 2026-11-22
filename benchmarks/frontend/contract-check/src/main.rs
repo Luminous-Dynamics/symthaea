@@ -284,12 +284,16 @@ fn git_blob_sha1(bytes: &[u8]) -> String {
 fn validate_relative_repo_path(raw: &str) -> Result<(), String> {
     let path = Path::new(raw);
     if raw.is_empty()
+        || raw.contains('\\')
+        || raw.split('/').any(|part| part.is_empty() || part == "." || part == "..")
         || path.is_absolute()
         || path.components().any(|component| {
             !matches!(component, Component::Normal(_))
         })
     {
-        return Err(format!("source path must be a normalized repository-relative path: {raw}"));
+        return Err(format!(
+            "source path must be a normalized repository-relative path: {raw}"
+        ));
     }
     Ok(())
 }
@@ -351,7 +355,18 @@ fn validate_pattern_corpus(
             continue;
         }
 
-        let full_path = repository_root.join(raw_path);
+        let canonical_root = repository_root
+            .canonicalize()
+            .map_err(|error| format!("failed to resolve repository root {}: {error}", repository_root.display()))?;
+        let joined_path = canonical_root.join(raw_path);
+        let full_path = joined_path
+            .canonicalize()
+            .map_err(|error| format!("failed to resolve pattern source {}: {error}", joined_path.display()))?;
+        if !full_path.starts_with(&canonical_root) {
+            return Err(format!(
+                "pattern source resolves outside the repository root: {raw_path}"
+            ));
+        }
         let bytes = std::fs::read(&full_path)
             .map_err(|error| format!("failed to read pattern source {}: {error}", full_path.display()))?;
         let actual_sha = git_blob_sha1(&bytes);
@@ -533,6 +548,9 @@ mod tests {
         assert!(validate_relative_repo_path("../outside.rs").is_err());
         assert!(validate_relative_repo_path("/etc/passwd").is_err());
         assert!(validate_relative_repo_path("crates/../secret.rs").is_err());
+        assert!(validate_relative_repo_path("crates/./secret.rs").is_err());
+        assert!(validate_relative_repo_path(r"crates\\secret.rs").is_err());
+        assert!(validate_relative_repo_path("crates//secret.rs").is_err());
     }
 
     #[test]
