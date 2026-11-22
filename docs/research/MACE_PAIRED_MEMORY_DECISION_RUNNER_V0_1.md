@@ -110,13 +110,13 @@ The evaluator crate promotes its HDC retrieval and SHA-256 dependencies to norma
 2. Replace the structural sibling-task placebo with a genuinely irrelevant, same-scope, count/token/byte-matched placebo using task content that is safe for the same tenant.
 3. Connect richer candidate-visible DecisionNeed attributes (outcome, horizon and target estimand) before using the typed index's optional numeric/estimand query fields; never derive these from evaluator truth.
 4. Add a competitive conventional retrieval ladder: deterministic KV/episodic, BM25, dense and hybrid under equal total memory, context, verification, latency and compute budgets.
-4. Keep exact-scope full scan as an upper-bound diagnostic, not a practical baseline.
-5. Add full-history and salience-only arms only when their input and memory budgets are precisely matched.
-6. Add evidence knockout and placebo substitution on a preregistered audit sample.
-7. Compose post-correction and pre-correction snapshots with canonical source/revision revalidation at decision consumption; do not create another timestamp or lifecycle authority.
-8. Add explicit candidate-side run validity, missing-pair counts, attrition-by-arm, cluster-weighting sensitivity and multiplicity correction.
-9. Move hidden labels and evaluator operation to independent custody before any challenge-grade claim.
-10. Extend to genuine visual/frame/action evidence and qualify against the official WorldMemArena and MemoryArena/AMA-Bench protocols without changing their scoring rules.
+5. Keep exact-scope full scan as an upper-bound diagnostic, not a practical baseline.
+6. Add full-history and salience-only arms only when their input and memory budgets are precisely matched.
+7. Add evidence knockout and placebo substitution on a preregistered audit sample.
+8. Compose post-correction and pre-correction snapshots with canonical source/revision revalidation at decision consumption; do not create another timestamp or lifecycle authority.
+9. Add explicit candidate-side run validity, missing-pair counts, attrition-by-arm, cluster-weighting sensitivity and multiplicity correction.
+10. Move hidden labels and evaluator operation to independent custody before any challenge-grade claim.
+11. Extend to genuine visual/frame/action evidence and qualify against the official WorldMemArena and MemoryArena/AMA-Bench protocols without changing their scoring rules.
 
 ## 9. Claim boundary
 
