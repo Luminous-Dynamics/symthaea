@@ -1462,11 +1462,14 @@ mod tests {
         assert_eq!(profile.metrics.cycle_birth_count, 2);
         assert_eq!(profile.metrics.final_cycle_rank, 2);
         assert_eq!(profile.candidate_observations.len(), 2);
-        assert_ne!(
+        assert_eq!(
             profile.candidate_observations[0].source_filament_id,
-            profile.candidate_observations[1].source_filament_id,
-        )
-        .eq(&false);
+            profile.candidate_observations[1].source_filament_id
+        );
+        assert_ne!(
+            profile.candidate_observations[0].target_filament_id,
+            profile.candidate_observations[1].target_filament_id
+        );
     }
 
     #[test]
