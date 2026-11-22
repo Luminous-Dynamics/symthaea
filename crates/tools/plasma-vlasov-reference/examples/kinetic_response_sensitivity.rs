@@ -125,9 +125,8 @@ fn moment_neutral_direction(
             let velocity = config.velocity(iv);
             let u = velocity / velocity_scale;
             let angle = TAU * (velocity - config.velocity_min) / velocity_length;
-            let value = base[start + iv]
-                * x_factor
-                * (velocity_mode as f64 * angle + velocity_phase).cos();
+            let value =
+                base[start + iv] * x_factor * (velocity_mode as f64 * angle + velocity_phase).cos();
             raw[iv] = value;
             let weighted = value * config.dv();
             moments[0] += weighted;
@@ -158,8 +157,7 @@ fn moment_neutral_direction(
         }
         for moment in 0..3 {
             let relative = residual[moment].abs() / scales[moment].max(f64::MIN_POSITIVE);
-            maximum_relative_moment_residual =
-                maximum_relative_moment_residual.max(relative);
+            maximum_relative_moment_residual = maximum_relative_moment_residual.max(relative);
         }
     }
 
@@ -177,9 +175,8 @@ fn positivity_limited_epsilon(
     let mut maximum_epsilon = f64::INFINITY;
     for ((pulse, control), delta) in pulse_base.iter().zip(control_base).zip(direction) {
         if delta.abs() > f64::MIN_POSITIVE {
-            maximum_epsilon = maximum_epsilon.min(
-                (pulse.min(control) - POSITIVITY_FLOOR) / delta.abs(),
-            );
+            maximum_epsilon =
+                maximum_epsilon.min((pulse.min(control) - POSITIVITY_FLOOR) / delta.abs());
         }
     }
     let epsilon = REQUESTED_EPSILON.min(0.25 * maximum_epsilon);
@@ -249,7 +246,10 @@ fn peak(samples: &[ComplexTraceSample]) -> ResponsePeak {
     };
     let (_, real, imaginary) = samples.get(peak_index).copied().unwrap_or((0.0, 0.0, 0.0));
     ResponsePeak {
-        time: samples.get(peak_index).map(|sample| sample.0).unwrap_or(0.0),
+        time: samples
+            .get(peak_index)
+            .map(|sample| sample.0)
+            .unwrap_or(0.0),
         magnitude,
         phase: imaginary.atan2(real),
         fwhm,
@@ -319,20 +319,11 @@ fn central_difference_trace(
 fn subtract_traces(left: &[ComplexTraceSample], right: &[ComplexTraceSample]) -> ComplexTrace {
     left.iter()
         .zip(right)
-        .map(|(pulse, control)| {
-            (
-                pulse.0,
-                pulse.1 - control.1,
-                pulse.2 - control.2,
-            )
-        })
+        .map(|(pulse, control)| (pulse.0, pulse.1 - control.1, pulse.2 - control.2))
         .collect()
 }
 
-fn sensitivity_at_time(
-    samples: &[ComplexTraceSample],
-    target_time: f64,
-) -> ComplexTraceSample {
+fn sensitivity_at_time(samples: &[ComplexTraceSample], target_time: f64) -> ComplexTraceSample {
     samples
         .iter()
         .copied()
@@ -382,11 +373,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                 velocity_mode,
                 velocity_phase,
             )?;
-            let epsilon = positivity_limited_epsilon(
-                &pulse_checkpoint,
-                &control_checkpoint,
-                &direction,
-            )?;
+            let epsilon =
+                positivity_limited_epsilon(&pulse_checkpoint, &control_checkpoint, &direction)?;
 
             let (pulse_trace, pulse_off_trace) = central_difference_trace(
                 config,
@@ -405,8 +393,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 2,
             )?;
             let intervention_trace = subtract_traces(&pulse_trace, &control_trace);
-            let intervention_off_trace =
-                subtract_traces(&pulse_off_trace, &control_off_trace);
+            let intervention_off_trace = subtract_traces(&pulse_off_trace, &control_off_trace);
             let intervention_peak = peak(&intervention_trace);
             let intervention_mode_peak = peak(&intervention_off_trace);
             let pulse_rephase = sensitivity_at_time(&pulse_trace, 2.0);
@@ -430,13 +417,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                 future_steps,
                 2,
             )?;
-            let half_intervention_trace =
-                subtract_traces(&half_pulse_trace, &half_control_trace);
+            let half_intervention_trace = subtract_traces(&half_pulse_trace, &half_control_trace);
             let half_intervention_peak = peak(&half_intervention_trace);
-            let half_relative_delta = (half_intervention_peak.magnitude
-                - intervention_peak.magnitude)
-                .abs()
-                / intervention_peak.magnitude.max(f64::MIN_POSITIVE);
+            let half_relative_delta =
+                (half_intervention_peak.magnitude - intervention_peak.magnitude).abs()
+                    / intervention_peak.magnitude.max(f64::MIN_POSITIVE);
             let off_target_ratio = intervention_mode_peak.magnitude
                 / intervention_peak.magnitude.max(f64::MIN_POSITIVE);
 
@@ -492,7 +477,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     Ok(())
 }
-
 
 #[cfg(test)]
 mod tests {
