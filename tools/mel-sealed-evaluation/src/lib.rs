@@ -301,7 +301,7 @@ pub fn evaluate(
         .collect();
     if strengths.len() != human_reference.item_strengths.len()
         || strengths.len() != candidate_ids.len()
-        || strengths.keys().any(|item_id| !candidate_ids.contains(**item_id))
+        || strengths.keys().any(|item_id| !candidate_ids.contains(*item_id))
         || human_reference
             .item_strengths
             .iter()
@@ -402,7 +402,6 @@ pub fn evaluate(
             human_directional_pair_count += 1;
             counter.human_directional_count += 1;
             if let JudgeOutcome::StableDirectional = outcome {
-                judge_stable_directional_pair_count; // Counted above; retain a separate gold-eligible count below.
                 counter.judge_stable_directional_count += 1;
                 let selected = first_selected.ok_or_else(|| {
                     format!("stable directional pair {} has no selected item", pair.pair_id)
