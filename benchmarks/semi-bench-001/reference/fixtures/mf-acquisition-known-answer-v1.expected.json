@@ -1,0 +1,34 @@
+{
+  "budget_unit": "normalized-high-fidelity-minutes",
+  "claim_limits": {
+    "does_not_establish_physical_process_or_fabrication_authority": true,
+    "selected_candidates_require_independent_final_evaluation": true,
+    "selection_does_not_execute_high_fidelity_simulation": true,
+    "selection_is_not_design_approval": true
+  },
+  "model_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "objective_spec_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "policy_id": "transparent-budgeted-multifidelity-baseline-v1",
+  "prediction_packet_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "schema": "luminous.semi-bench.mf-acquisition-report.v1",
+  "selected": [
+    {
+      "acquisition_utility": 0.114,
+      "candidate_id": "B",
+      "estimated_cost": 6,
+      "expected_feasible_hv_gain": 0.11,
+      "exploration_bonus": 0.004
+    },
+    {
+      "acquisition_utility": 0.1975,
+      "candidate_id": "E",
+      "estimated_cost": 7,
+      "expected_feasible_hv_gain": 0.15,
+      "exploration_bonus": 0.0475
+    }
+  ],
+  "subsets_examined": 32,
+  "total_acquisition_utility": 0.3115,
+  "total_cost_budget": 13,
+  "used_cost_budget": 13
+}
