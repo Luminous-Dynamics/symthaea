@@ -207,12 +207,8 @@ pub fn compare_csv(
         (Some(base), Some(candidate)) => Some(candidate - base),
         _ => None,
     };
-    let interval = paired_srcc_delta_interval(
-        &baseline_pairs,
-        &candidate_pairs,
-        bootstrap_samples,
-        seed,
-    );
+    let interval =
+        paired_srcc_delta_interval(&baseline_pairs, &candidate_pairs, bootstrap_samples, seed);
 
     Ok(ComparisonReport {
         schema_version: "mel-xacle-audit-report-v1".to_owned(),
@@ -265,16 +261,13 @@ pub fn validate_submission_csv(
 }
 
 fn parse_metadata(bytes: &[u8], labels_required: bool) -> Result<Vec<MetadataItem>, String> {
-    let mut reader = csv::ReaderBuilder::new()
-        .flexible(false)
-        .from_reader(bytes);
+    let mut reader = csv::ReaderBuilder::new().flexible(false).from_reader(bytes);
     let headers = reader
         .headers()
         .map_err(|error| format!("invalid metadata CSV header: {error}"))?
         .clone();
 
-    let id_index = header_index(&headers, "wave_file_name", true)?
-        .expect("required header index");
+    let id_index = header_index(&headers, "wave_file_name", true)?.expect("required header index");
     let target_index = header_index(&headers, "average_score", labels_required)?;
     let model_id_index = header_index(&headers, "model_id", false)?;
     let model_name_index = header_index(&headers, "model_name", false)?;
@@ -283,11 +276,17 @@ fn parse_metadata(bytes: &[u8], labels_required: bool) -> Result<Vec<MetadataIte
     let mut metadata = Vec::new();
     for (row_index, record) in reader.records().enumerate() {
         let record = record.map_err(|error| {
-            format!("invalid metadata CSV record at row {}: {error}", row_index + 2)
+            format!(
+                "invalid metadata CSV record at row {}: {error}",
+                row_index + 2
+            )
         })?;
         let id = field(&record, id_index, "wave_file_name", row_index + 2)?;
         if id.trim().is_empty() {
-            return Err(format!("empty wave_file_name at metadata row {}", row_index + 2));
+            return Err(format!(
+                "empty wave_file_name at metadata row {}",
+                row_index + 2
+            ));
         }
         if !seen.insert(id.to_owned()) {
             return Err(format!("duplicate metadata wave_file_name: {id}"));
@@ -300,10 +299,10 @@ fn parse_metadata(bytes: &[u8], labels_required: bool) -> Result<Vec<MetadataIte
             None
         };
 
-        let model_id = optional_field(&record, model_id_index)
-            .filter(|value| !value.trim().is_empty());
-        let model_name = optional_field(&record, model_name_index)
-            .filter(|value| !value.trim().is_empty());
+        let model_id =
+            optional_field(&record, model_id_index).filter(|value| !value.trim().is_empty());
+        let model_name =
+            optional_field(&record, model_name_index).filter(|value| !value.trim().is_empty());
         let group = if let Some(model_id) = model_id {
             format!("model_id:{model_id}")
         } else if let Some(model_name) = model_name {
@@ -326,27 +325,30 @@ fn parse_metadata(bytes: &[u8], labels_required: bool) -> Result<Vec<MetadataIte
 }
 
 fn parse_predictions(bytes: &[u8]) -> Result<Vec<Prediction>, String> {
-    let mut reader = csv::ReaderBuilder::new()
-        .flexible(false)
-        .from_reader(bytes);
+    let mut reader = csv::ReaderBuilder::new().flexible(false).from_reader(bytes);
     let headers = reader
         .headers()
         .map_err(|error| format!("invalid prediction CSV header: {error}"))?
         .clone();
-    let id_index = header_index(&headers, "wave_file_name", true)?
-        .expect("required header index");
-    let score_index = header_index(&headers, "pred_score", true)?
-        .expect("required prediction score header");
+    let id_index = header_index(&headers, "wave_file_name", true)?.expect("required header index");
+    let score_index =
+        header_index(&headers, "pred_score", true)?.expect("required prediction score header");
 
     let mut seen = BTreeSet::new();
     let mut predictions = Vec::new();
     for (row_index, record) in reader.records().enumerate() {
         let record = record.map_err(|error| {
-            format!("invalid prediction CSV record at row {}: {error}", row_index + 2)
+            format!(
+                "invalid prediction CSV record at row {}: {error}",
+                row_index + 2
+            )
         })?;
         let id = field(&record, id_index, "wave_file_name", row_index + 2)?;
         if id.trim().is_empty() {
-            return Err(format!("empty prediction wave_file_name at row {}", row_index + 2));
+            return Err(format!(
+                "empty prediction wave_file_name at row {}",
+                row_index + 2
+            ));
         }
         if !seen.insert(id.to_owned()) {
             return Err(format!("duplicate prediction wave_file_name: {id}"));
@@ -549,8 +551,8 @@ fn kendall_tau_b(left: &[f64], right: &[f64]) -> Option<f64> {
 
     for i in 0..n {
         for j in (i + 1)..n {
-            let left_order = left[i].total_cmp(&left[j]);
-            let right_order = right[i].total_cmp(&right[j]);
+            let left_order = left[i].partial_cmp(&left[j]).unwrap_or(std::cmp::Ordering::Equal);
+            let right_order = right[i].partial_cmp(&right[j]).unwrap_or(std::cmp::Ordering::Equal);
             match (left_order, right_order) {
                 (std::cmp::Ordering::Equal, std::cmp::Ordering::Equal) => {
                     ties_left += 1.0;
@@ -608,8 +610,7 @@ fn paired_srcc_delta_interval(
         let indices: Vec<usize> = (0..baseline.len())
             .map(|_| rng.index(baseline.len()))
             .collect();
-        let baseline_sample: Vec<ItemPair> =
-            indices.iter().map(|index| baseline[*index]).collect();
+        let baseline_sample: Vec<ItemPair> = indices.iter().map(|index| baseline[*index]).collect();
         let candidate_sample: Vec<ItemPair> =
             indices.iter().map(|index| candidate[*index]).collect();
         if let (Some(base), Some(candidate)) = (
@@ -844,38 +845,46 @@ b5.wav,9\n";
     #[test]
     fn duplicate_metadata_ids_are_rejected() {
         let duplicate = b"wave_file_name,average_score\na.wav,1\na.wav,2\n";
-        assert!(parse_metadata(duplicate, true)
-            .expect_err("duplicate ID must fail")
-            .contains("duplicate metadata"));
+        assert!(
+            parse_metadata(duplicate, true)
+                .expect_err("duplicate ID must fail")
+                .contains("duplicate metadata")
+        );
     }
 
     #[test]
     fn duplicate_prediction_ids_are_rejected() {
         let duplicate = b"wave_file_name,pred_score\na.wav,1\na.wav,2\n";
-        assert!(parse_predictions(duplicate)
-            .expect_err("duplicate prediction ID must fail")
-            .contains("duplicate prediction"));
+        assert!(
+            parse_predictions(duplicate)
+                .expect_err("duplicate prediction ID must fail")
+                .contains("duplicate prediction")
+        );
     }
 
     #[test]
     fn missing_or_extra_prediction_ids_are_rejected() {
         let missing = b"wave_file_name,pred_score\na0.wav,1\n";
-        assert!(score_csv(METADATA.as_bytes(), missing, "x", 0, 42)
-            .expect_err("coverage mismatch must fail")
-            .contains("coverage mismatch"));
+        assert!(
+            score_csv(METADATA.as_bytes(), missing, "x", 0, 42)
+                .expect_err("coverage mismatch must fail")
+                .contains("coverage mismatch")
+        );
 
         let extra = format!("{BASELINE}extra.wav,5\n");
-        assert!(score_csv(METADATA.as_bytes(), extra.as_bytes(), "x", 0, 42)
-            .expect_err("extra ID must fail")
-            .contains("coverage mismatch"));
+        assert!(
+            score_csv(METADATA.as_bytes(), extra.as_bytes(), "x", 0, 42)
+                .expect_err("extra ID must fail")
+                .contains("coverage mismatch")
+        );
     }
 
     #[test]
     fn non_finite_and_out_of_range_scores_are_rejected() {
         for score in ["NaN", "inf", "-0.1", "10.1"] {
             let csv = format!("wave_file_name,pred_score\na0.wav,{score}\n");
-            let error = parse_predictions(csv.as_bytes())
-                .expect_err("invalid output should be rejected");
+            let error =
+                parse_predictions(csv.as_bytes()).expect_err("invalid output should be rejected");
             assert!(error.contains("finite and in [0, 10]"));
         }
     }
@@ -903,17 +912,17 @@ b5.wav,9\n";
     fn blind_submission_rejects_missing_rows() {
         let evaluation = b"wave_file_name,text\nx0.wav,ambient piano\nx1.wav,fast jazz\n";
         let predictions = b"wave_file_name,pred_score\nx0.wav,6.4\n";
-        assert!(validate_submission_csv(evaluation, predictions, "system")
-            .expect_err("missing row must fail")
-            .contains("coverage mismatch"));
+        assert!(
+            validate_submission_csv(evaluation, predictions, "system")
+                .expect_err("missing row must fail")
+                .contains("coverage mismatch")
+        );
     }
 
     #[test]
     fn bootstrap_interval_is_deterministic() {
-        let a = score_csv(METADATA.as_bytes(), CANDIDATE.as_bytes(), "x", 100, 123)
-            .expect("score");
-        let b = score_csv(METADATA.as_bytes(), CANDIDATE.as_bytes(), "x", 100, 123)
-            .expect("score");
+        let a = score_csv(METADATA.as_bytes(), CANDIDATE.as_bytes(), "x", 100, 123).expect("score");
+        let b = score_csv(METADATA.as_bytes(), CANDIDATE.as_bytes(), "x", 100, 123).expect("score");
         assert_eq!(
             a.system.srcc_interval_95.unwrap().lower_95,
             b.system.srcc_interval_95.unwrap().lower_95
