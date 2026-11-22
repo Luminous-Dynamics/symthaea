@@ -129,8 +129,10 @@ pub use mycelial_reconstruction_metrics::{
     ReconstructionTopologySummary, evaluate_mycelial_reconstruction, match_junctions_hungarian,
 };
 pub use mycelial_reference_networks::{
-    MAX_REFERENCE_NETWORK_JUNCTIONS, MycelialMinimumSpanningForestReport,
-    MycelialReferenceNetworkError, build_observed_network_minimum_spanning_forest,
+    MAX_REFERENCE_NETWORK_JUNCTIONS, MycelialEuclideanMstEdge, MycelialEuclideanMstReport,
+    MycelialMinimumSpanningForestReport, MycelialReferenceNetworkError,
+    SpatialReferenceDimensionality, SpatialReferenceEfficiencyReport,
+    build_euclidean_minimum_spanning_tree, build_observed_network_minimum_spanning_forest,
 };
 pub use mycelial_temporal_cycles::{
     MAX_TEMPORAL_CYCLE_RECORDS, MAX_TEMPORAL_CYCLE_SEARCH_STEPS,
