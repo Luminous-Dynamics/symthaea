@@ -15,8 +15,9 @@ use std::hint::black_box;
 use std::time::Instant;
 
 use symthaea_canvas::{
-    MycelialTemporalCycleConfig, TemporalEdgeEvidence, TemporalMycelialEdge,
-    TemporalMycelialSequence, TemporalMycelialSnapshot, TemporalWindowCoverage,
+    MAX_TEMPORAL_CYCLE_SEARCH_STEPS, MycelialTemporalCycleConfig,
+    TemporalEdgeEvidence, TemporalMycelialEdge, TemporalMycelialSequence,
+    TemporalMycelialSnapshot, TemporalWindowCoverage,
     build_temporal_mycelial_cycle_profile,
 };
 
@@ -141,6 +142,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         profile.edge_evidence_counts.synthetic_fixture_observations
     );
     println!("distinct_cycles: {}", profile.cycles.len());
+    println!("maximum_cycle_search_steps_per_window: {MAX_TEMPORAL_CYCLE_SEARCH_STEPS}");
     println!(
         "persistent_cycle_hyperedges: {}",
         profile.persistent_cycle_hyperedges.len()
