@@ -1,0 +1,85 @@
+name: MEL predictive forecast integrity qualification
+
+on:
+  pull_request:
+    paths:
+      - "tools/mel-forecast-integrity/**"
+      - "docs/research/MEL_PREDICTIVE_FORECAST_INTEGRITY_V1_2026-11-22.md"
+      - ".github/workflows/mel-predictive-forecast-integrity.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  forecast-integrity-reference:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact pull request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Verify exact head and record committed sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="${{ github.event.pull_request.head.sha }}"
+          test "$actual" = "$expected"
+          mkdir -p "$RUNNER_TEMP/mel-forecast-evidence"
+          printf 'triggered_revision=%s\n' "$actual" > "$RUNNER_TEMP/mel-forecast-evidence/triggered_revision.txt"
+          git rev-parse HEAD:tools/mel-forecast-integrity/src/lib.rs > "$RUNNER_TEMP/mel-forecast-evidence/committed_lib_git_blob.txt"
+          git rev-parse HEAD:tools/mel-forecast-integrity/src/main.rs > "$RUNNER_TEMP/mel-forecast-evidence/committed_main_git_blob.txt"
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Format and record normalization diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum tools/mel-forecast-integrity/src/lib.rs > "$RUNNER_TEMP/mel-forecast-evidence/committed_lib_worktree.sha256"
+          cargo +1.96.0 fmt --manifest-path tools/mel-forecast-integrity/Cargo.toml
+          git diff --check
+          git diff -- tools/mel-forecast-integrity/src/lib.rs tools/mel-forecast-integrity/src/main.rs > "$RUNNER_TEMP/mel-forecast-evidence/rustfmt-normalization.diff"
+          sha256sum tools/mel-forecast-integrity/src/lib.rs > "$RUNNER_TEMP/mel-forecast-evidence/normalized_lib_worktree.sha256"
+      - name: Verify normalized formatting
+        run: cargo +1.96.0 fmt --check --manifest-path tools/mel-forecast-integrity/Cargo.toml
+      - name: Generate isolated dependency lock
+        run: cargo +1.96.0 generate-lockfile --manifest-path tools/mel-forecast-integrity/Cargo.toml
+      - name: Run deterministic forecast integrity tests
+        run: cargo +1.96.0 test --locked --manifest-path tools/mel-forecast-integrity/Cargo.toml
+      - name: Run warnings-denied Clippy
+        run: cargo +1.96.0 clippy --locked --manifest-path tools/mel-forecast-integrity/Cargo.toml -- -D warnings
+      - name: Parse versioned schema and fixture seed
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m json.tool tools/mel-forecast-integrity/schema/mel-predictive-forecast-integrity-v1.schema.json > /dev/null
+          python -m json.tool tools/mel-forecast-integrity/fixtures/precommitted-visible-forecast-unsealed-v1.json > /dev/null
+      - name: Seal and replay known-answer fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 run --locked --quiet --manifest-path tools/mel-forecast-integrity/Cargo.toml -- --seal tools/mel-forecast-integrity/fixtures/precommitted-visible-forecast-unsealed-v1.json "$RUNNER_TEMP/sealed-forecast-trace.json"
+          cargo +1.96.0 run --locked --quiet --manifest-path tools/mel-forecast-integrity/Cargo.toml -- "$RUNNER_TEMP/sealed-forecast-trace.json" > "$RUNNER_TEMP/forecast-report.json"
+          python -m json.tool "$RUNNER_TEMP/forecast-report.json" > /dev/null
+          grep -q '"human_visible_realization_count": 1' "$RUNNER_TEMP/forecast-report.json"
+      - name: Record lock and report identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp tools/mel-forecast-integrity/Cargo.lock "$RUNNER_TEMP/mel-forecast-evidence/Cargo.lock"
+          cp "$RUNNER_TEMP/sealed-forecast-trace.json" "$RUNNER_TEMP/mel-forecast-evidence/"
+          cp "$RUNNER_TEMP/forecast-report.json" "$RUNNER_TEMP/mel-forecast-evidence/"
+          sha256sum tools/mel-forecast-integrity/Cargo.lock > "$RUNNER_TEMP/mel-forecast-evidence/lock.sha256"
+          printf 'tested_revision=%s\n' "$(git rev-parse HEAD)" > "$RUNNER_TEMP/mel-forecast-evidence/tested_revision.txt"
+          printf 'source_test_mode=rustfmt-normalized-working-tree; see normalization diff\n' > "$RUNNER_TEMP/mel-forecast-evidence/source_test_mode.txt"
+      - name: Upload exact-run evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: mel-predictive-forecast-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/mel-forecast-evidence/
+          if-no-files-found: error
+          retention-days: 90
