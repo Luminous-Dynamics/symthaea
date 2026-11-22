@@ -91,11 +91,12 @@ Bounds:
 - 4,096 windows per sequence;
 - 128 nodes and 512 edges per window;
 - 2,048 simple cycles per window;
+- 1,000,000 adjacency-edge search steps per window during DFS cycle enumeration;
 - 32,768 distinct cycle records per sequence;
 - 1,000,000 cycle-window observations per profile;
 - 1,000,000 edge-window observations retained in the detached profile receipt.
 
-This is a bounded small/medium-graph method, not a scalable general graph persistence engine. If cycle enumeration exceeds the limit, the profile fails instead of returning a silently truncated cycle set.
+This is a bounded small/medium-graph method, not a scalable general graph persistence engine. The cycle-count limit bounds the output cardinality; the separate search-step budget bounds the work spent traversing candidate simple paths before cycles are emitted. If either bound is exceeded, the profile fails instead of returning a silently truncated cycle set. The synthetic CLI reports the per-window search-step budget.
 
 ## 6. Recurrence and node participation
 
