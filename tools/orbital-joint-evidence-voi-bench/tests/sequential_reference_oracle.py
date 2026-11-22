@@ -438,13 +438,37 @@ def main():
         "scenarios": results,
     }
     print(json.dumps(report, sort_keys=True, indent=2))
-    if len(results) != 2 or report["oracle_matches"] != 2:
+    if len(results) != 3 or report["oracle_matches"] != 3:
         raise SystemExit(1)
     by_id = {item["scenario_id"]: item for item in results}
     if by_id["SEQ-001"]["adaptive_first_action"] != "A-COMBINED-LOAD-SCREEN":
         raise SystemExit("SEQ-001 first action mismatch")
     if by_id["SEQ-002"]["adaptive_first_action"] != "B-THERMAL-INSPECTION":
         raise SystemExit("SEQ-002 first action mismatch")
+    aer01 = by_id["SEQ-003-AER01-NDE-STRUCTURAL"]
+    if aer01["baseline_terminal_disposition"] != "HOLD":
+        raise SystemExit("AER-01 no-evidence baseline must remain HOLD")
+    if aer01["adaptive_first_action"] != "A-CALIBRATION-CHAIN":
+        raise SystemExit("AER-01 calibration-chain first action mismatch")
+    policy = aer01["adaptive_policy"]
+    if policy["node_kind"] != "Test" or policy["action_id"] != "A-CALIBRATION-CHAIN":
+        raise SystemExit("AER-01 policy root mismatch")
+    branches = policy["branches"]
+    if branches["INVALID"]["decision"] != "HOLD":
+        raise SystemExit("AER-01 invalid calibration must HOLD")
+    valid = branches["VALID"]
+    if valid["action_id"] != "B-LOAD-CAPACITY":
+        raise SystemExit("AER-01 valid calibration must permit load screen")
+    if valid["branches"]["FAIL"]["decision"] != "REJECT":
+        raise SystemExit("AER-01 load failure must REJECT")
+    nde = valid["branches"]["PASS"]
+    if nde["action_id"] != "C-ULTRASONIC-NDE":
+        raise SystemExit("AER-01 load pass must proceed to NDE")
+    if nde["branches"]["CLEAR"]["decision"] != "ACCEPT":
+        raise SystemExit("AER-01 NDE clear must complete acceptance obligations")
+    if nde["branches"]["INDICATION"]["decision"] != "REJECT":
+        raise SystemExit("AER-01 NDE indication must REJECT")
+
 
 
 if __name__ == "__main__":
