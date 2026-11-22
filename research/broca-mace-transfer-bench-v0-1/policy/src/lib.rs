@@ -760,13 +760,13 @@ pub fn is_transfer_qualified(item: &Experience, query: Query) -> bool {
         && item.measurement_error_bound.is_finite()
         && (0.0..=1.0).contains(&item.measurement_error_bound)
         && item.causal_identification.qualifies_for_transfer()
-        && item.intervention
-        && item.prediction_pre_registered
-        && item.outcome_reconciled
-        && item.source_trusted
-        && !item.source_retracted
-        && item.confounders_controlled
-        && item.delayed_horizon_complete
+        && (!MACE_REQUIRE_INTERVENTION || item.intervention)
+        && (!MACE_REQUIRE_PRE_REGISTRATION || item.prediction_pre_registered)
+        && (!MACE_REQUIRE_RECONCILED_OUTCOME || item.outcome_reconciled)
+        && (!MACE_REQUIRE_TRUSTED_SOURCE || item.source_trusted)
+        && (!MACE_FORBID_RETRACTED_SOURCE || !item.source_retracted)
+        && (!MACE_REQUIRE_CONFOUNDER_CONTROL || item.confounders_controlled)
+        && (!MACE_REQUIRE_COMPLETED_DELAYED_HORIZON || item.delayed_horizon_complete)
 }
 
 const INVARIANCE_EQUIVALENCE_MARGIN: f64 = 0.12;
