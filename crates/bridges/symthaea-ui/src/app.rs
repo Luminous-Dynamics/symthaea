@@ -282,6 +282,7 @@ pub fn App() -> impl IntoView {
             let connected_since =
                 std::rc::Rc::new(std::cell::Cell::<Option<std::time::Instant>>::new(None));
             loop {
+                telemetry_state.set(TelemetryState::Connecting);
                 let gw = gateway.get_untracked();
                 let retry_state = std::rc::Rc::clone(&retry_attempt);
                 let connected_state = std::rc::Rc::clone(&connected_since);
@@ -299,7 +300,11 @@ pub fn App() -> impl IntoView {
                         }
                     },
                     move |connected| {
-                        ws_connected.set(connected);
+                        telemetry_state.set(if connected {
+                            TelemetryState::Connected
+                        } else {
+                            TelemetryState::Disconnected
+                        });
                         if connected {
                             connected_state.set(Some(std::time::Instant::now()));
                         } else if let Some(started) = connected_state.take() {
@@ -318,7 +323,6 @@ pub fn App() -> impl IntoView {
                 let delay_ms = telemetry_retry_delay_ms(attempt);
                 retry_attempt.set(attempt.saturating_add(1));
                 gloo_timers::future::TimeoutFuture::new(delay_ms).await;
-                telemetry_state.set(TelemetryState::Connecting);
             }
         });
     });
