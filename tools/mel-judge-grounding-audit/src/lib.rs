@@ -936,7 +936,12 @@ mod tests {
         let report = parse_and_audit(&panel.to_string()).expect("probe structure is valid");
         assert_eq!(report.nuisance_transform.pass_rate, Some(0.0));
         assert!(
-            (report.nuisance_transform.mean_maximum_absolute_score_drift.unwrap() - 0.8).abs()
+            (report
+                .nuisance_transform
+                .mean_maximum_absolute_score_drift
+                .unwrap()
+                - 0.8)
+                .abs()
                 < 1e-9
         );
         let nuisance_finding = report
@@ -960,7 +965,12 @@ mod tests {
         assert!((nuisance_finding.candidate_a_absolute_score_drift.unwrap() - 0.05).abs() < 1e-9);
         assert!((nuisance_finding.candidate_b_absolute_score_drift.unwrap() - 0.05).abs() < 1e-9);
         assert!(
-            (report.nuisance_transform.mean_maximum_absolute_score_drift.unwrap() - 0.05).abs()
+            (report
+                .nuisance_transform
+                .mean_maximum_absolute_score_drift
+                .unwrap()
+                - 0.05)
+                .abs()
                 < 1e-9
         );
     }
