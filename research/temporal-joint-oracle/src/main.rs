@@ -670,6 +670,58 @@ mod tests {
         }
     }
 
+    /// Independent small-fixture reference using direct inclusion-exclusion
+    /// over all sub-subsets rather than the production in-place transform.
+    fn direct_inclusion_exclusion_reference(
+        input: &ExactJointOracleInput,
+    ) -> Vec<(u64, [i128; 3], [i128; 12])> {
+        let expected_count = 1_usize << input.factor_action_ids.len();
+        let mut by_mask = vec![None; expected_count];
+        for alternative in &input.alternatives {
+            let mut mask = 0_usize;
+            for action in &alternative.plan.actions {
+                let index = input.factor_action_ids.binary_search(&action.action_id).unwrap();
+                mask |= 1_usize << index;
+            }
+            by_mask[mask] = Some(alternative);
+        }
+        let by_mask = by_mask
+            .into_iter()
+            .map(|alternative| alternative.unwrap())
+            .collect::<Vec<_>>();
+        let baseline_debt = by_mask[0].realized_debt.values();
+        let baseline_cost = by_mask[0].measured_cost.values();
+        let mut result = Vec::with_capacity(expected_count.saturating_sub(1));
+
+        for mask in 1..expected_count {
+            let mut exposure = [0_i128; 3];
+            let mut resources = [0_i128; 12];
+            for subset in 0..expected_count {
+                if subset & !mask != 0 {
+                    continue;
+                }
+                let distance = mask.count_ones() - subset.count_ones();
+                let sign = if distance % 2 == 0 { 1_i128 } else { -1_i128 };
+                let debt = by_mask[subset].realized_debt.values();
+                let cost = by_mask[subset].measured_cost.values();
+                for axis in 0..3 {
+                    exposure[axis] += sign
+                        * (i128::from(baseline_debt[axis]) - i128::from(debt[axis]));
+                }
+                for axis in 0..12 {
+                    resources[axis] += sign
+                        * (i128::from(cost[axis]) - i128::from(baseline_cost[axis]));
+                }
+            }
+            result.push((
+                u64::try_from(mask).unwrap(),
+                exposure,
+                resources,
+            ));
+        }
+        result
+    }
+
     fn three_factor_interaction_input() -> ExactJointOracleInput {
         let ids = [10_u64, 20, 30];
         let alternatives = (0_u64..8)
@@ -730,6 +782,23 @@ mod tests {
             factor_action_ids: ids.to_vec(),
             candidate_plan_id: 507,
             alternatives,
+        }
+    }
+
+    #[test]
+    fn factorial_transform_matches_independent_inclusion_exclusion_reference() {
+        for input in [three_factor_interaction_input(), input()] {
+            let report = decompose_exact_joint_interactions(&input).unwrap();
+            let reference = direct_inclusion_exclusion_reference(&input);
+            assert_eq!(report.interaction_terms.len(), reference.len());
+
+            for (term, (mask, exposure, resources)) in
+                report.interaction_terms.iter().zip(reference.iter())
+            {
+                assert_eq!(term.subset_mask, *mask);
+                assert_eq!(term.exposure_benefit_dividend_us, *exposure);
+                assert_eq!(term.resource_cost_dividend, *resources);
+            }
         }
     }
 
