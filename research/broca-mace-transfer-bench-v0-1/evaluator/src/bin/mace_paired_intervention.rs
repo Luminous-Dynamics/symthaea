@@ -346,6 +346,7 @@ fn execute_arm(
             .saturating_mul(size_of::<Experience>() as u64)
     };
 
+    let had_execution_error = error.is_some();
     let abstention_reason = error.or_else(|| {
         if decision.action.is_none() {
             Some("no admissible decision-support evidence".to_string())
@@ -355,7 +356,7 @@ fn execute_arm(
     });
     CandidateRun {
         decision,
-        retrieved_ids: if abstention_reason.is_some() && error.is_some() {
+        retrieved_ids: if had_execution_error {
             Vec::new()
         } else {
             retrieved_ids
@@ -497,12 +498,6 @@ fn evaluate_arm(
             }
         }
     }
-    if candidate.abstention_reason.as_deref().is_some_and(|reason| {
-        reason.contains("duplicate") || reason.contains("unresolved") || reason.contains("revalidation")
-    }) {
-        invalid += 1;
-    }
-
     let false_causal_claim_count = u64::from(
         candidate.decision.causal_claim.is_some()
             && candidate.decision.causal_claim != case.truth.causal_action,
