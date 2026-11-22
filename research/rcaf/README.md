@@ -226,3 +226,21 @@ cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_factorial_dose
 ```
 
 The example crosses signal scales `[0, 0.5, 1, 2]` with nuisance component-variance fractions `[0, 0.05, 0.10, 0.20]`. The report stores raw innovation fingerprints, every four-cell report, requested/realized fractions, covariance, combined variance and matched-cell invariants. The focused workflow validates exact zero controls and stable nuisance-only fingerprints across signal strengths, then hashes and archives the report. This is a construction/calibration surface only; estimator recovery, null false-positive rates and confidence coverage are the next qualification layer. The output contract is `factorial-dose-response.schema.json`, with the design specified in `docs/neuroscience/RCAF_FACTORIAL_DOSE_RESPONSE_SURFACE_V1.md`.
+
+
+## Estimator response across factorial dose-response points
+
+The factorial dose-response runner now converts each of the four raw time × ROI cells to a Pearson ROI-connectivity matrix, then evaluates the three existing RCAF similarity estimators:
+- absolute weighted Jaccard;
+- signed-shift weighted Jaccard;
+- normalized mean absolute edge error.
+
+Each dose point reports target signal distance, nuisance-only displacement, residual displacement on the signal background, normalized signal-retention fraction and nuisance-to-signal distance ratio. Zero-signal ratios are explicitly null rather than fabricated. It also reports the direction and projection gain of the signal-induced connectivity change before and after nuisance.
+
+Run the same smoke fixture:
+
+```sh
+cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_factorial_dose_response
+```
+
+The JSON report adds estimator summaries and connectivity-space direction metrics for every one of the 16 points. This closes the gap between merely constructing four matched cells and evaluating how the existing connectivity estimators respond to them. These are synthetic per-matrix scores, not participant-level power, false-positive rates or confidence coverage. See `docs/neuroscience/RCAF_ESTIMATOR_RESPONSE_SURFACE_V1.md` for the metric definitions and next confirmatory benchmark requirements.
