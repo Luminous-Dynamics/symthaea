@@ -289,7 +289,7 @@ This creates a stronger claim than “HDC beats RAG”: MACE would demonstrate w
 9. Report regret gap versus full exact-scope evidence and incremental regret gap versus each method's own full-evidence baseline, separating information-ceiling, retrieval-substrate and knockout effects.
 10. Split candidate decision records from evaluator intervention manifests/scores. Candidate-facing pair identifiers are opaque and derived only from candidate-visible task/evidence digests, not evaluator scenario-family labels. Candidate records expose the retrieval method and returned evidence IDs, but not intervention kinds, removed IDs or evaluator utilities.
 11. Bound source-code, fixture and JSON-Schema digests into the run identity/evaluator manifest, and introduced `data/schemas/mace_counterfactual_evidence_v0_1.schema.json`.
-12. Added 22 authored binary tests for duplicate IDs, root aliases, unknown identities and their knockouts, source-family closures, deterministic/truth-blind planning across methods, coalition caps, matched controls, evidence-digest changes, candidate-contract rejection, opaque pair identifiers, KV bounds, indexed HDC canonical resolution and HDC rebuild after root knockout.
+12. Added 22 authored intervention-runner tests and 6 authored aggregation tests for duplicate IDs, root aliases, unknown identities and their knockouts, source-family closures, deterministic/truth-blind planning across methods, coalition caps, matched controls, evidence-digest changes, candidate-contract rejection, opaque pair identifiers, KV bounds, canonical HDC resolution/rebuild, cluster-first aggregation, paired task matching and manifest provenance.
 
 ### Remaining qualification work
 
@@ -297,7 +297,7 @@ This creates a stronger claim than “HDC beats RAG”: MACE would demonstrate w
 2. Add verified transitive source-lineage/derived-view closure. The current Experience fixture has no parent-edge field, so this binary only groups direct root/family identities.
 3. Add explicit semantic decoys, correction-between-retrieval-and-use and lifecycle closure.
 4. Add exact subset enumeration for small evidence sets, sampled larger coalitions and decision-interaction estimates.
-5. Add cluster-level summaries, confidence intervals and pre-registered primary contrasts.
+5. The first cluster-first reducer and cluster bootstrap are now authored; preregister primary contrasts/margins, multiplicity policy and hierarchical model-fit-seed resampling.
 6. Reproduce BM25, dense, sparse/dense RRF, intent-adaptive channels, context neighbours, causal-graph retrieval and state-first retrieval on the correct raw or structured data lanes.
 7. Move evaluator truth to independent custody and run held-out external benchmarks through pinned adapters.
 
@@ -320,13 +320,25 @@ cargo run --manifest-path research/broca-mace-transfer-bench-v0-1/evaluator/Carg
 
 Arguments are cluster count, candidate JSONL path, evaluator JSONL path, public intervention seed and maximum source-root pairs. The runner writes separate streams. Evaluator output contains the frozen intervention manifest and hidden-outcome scores. Candidate output contains method, DecisionNeed/evidence digests, retrieved event IDs, chosen action, evidence-support IDs, typed-profile digest when available and resource counts, but not knockout labels, removed event IDs or evaluator utility. The candidate observation identifier allows the streams to be joined without placing intervention type in the candidate record.
 
+The offline cluster reducer consumes the evaluator stream only:
+
+```bash
+cargo run --manifest-path research/broca-mace-transfer-bench-v0-1/evaluator/Cargo.toml \
+  --bin mace_counterfactual_aggregate -- \
+  mace_counterfactual_evaluator.jsonl mace_counterfactual_summary.jsonl 12345
+```
+
+The reducer verifies that all manifest rows belong to one run and share source-code, fixture, schema and source-revision provenance. It hashes the sorted manifest set and binds the summary to both input and reducer-code digests. It averages repeated interventions within each opaque task block, averages task blocks within each world cluster, then bootstrap-resamples world clusters (2,000 replicates). It emits method summaries and paired method-minus-exact-scope contrasts only when both methods exist for the same task block. The output contract is `data/schemas/mace_counterfactual_summary_v0_1.schema.json`.
+
+This is an initial cluster-aware statistical reducer, not a preregistered confirmatory analysis. It does not yet apply multiplicity correction across intervention families, establish independent-world assumptions empirically, or provide hierarchical model-fit-seed resampling; those remain #13265.
+
 ### Important limits
 
 - The root index groups equal nonzero `SourceRootDigest` values. A nonzero digest is an identity key, **not cryptographic authentication of its issuer**. The synthetic `source_family` integer is also a fixture identity, not an independently verified family credential.
 - The current `Experience` structure has no explicit parent/derived-view edges. The implementation therefore does not yet compute transitive lineage closure; it groups records sharing the same direct root digest or family label.
 - Unknown root/family values are counted separately, do not inflate known-identity counts, and now have explicit knockout groups. The code does not independently verify signatures, source authority, tenant permissions or external receipts.
 - Matched-random controls preserve count within regime/objective/action/estimand strata, but do not yet guarantee equal source-root/family multiplicity, exact serialized bytes or equal verification work. They are stratified random controls, not fully dependency- and cost-matched placebo interventions. They are omitted when the candidate-visible pool cannot match a stratum; coverage is reported. The current byte measure is only `size_of::<Experience>()` per record and excludes serialization, allocator, index, sidecar, source and verification costs.
-- Root-pair interventions are deterministically enumerated up to a caller-supplied cap. Higher-order coalition sampling, exact subset optimization, Shapley attribution, statistical aggregation and confidence intervals are not yet implemented.
+- Root-pair interventions are deterministically enumerated up to a caller-supplied cap. Higher-order coalition sampling, exact subset optimization and Shapley attribution are not yet implemented. An initial offline cluster-first reducer with paired method-minus-exact contrasts and 2,000-replicate cluster bootstrap is authored, but unexecuted; confirmatory preregistration, multiplicity correction and hierarchical resampling remain outstanding.
 - The audit reruns five methods on every full-evidence and knockout condition: **exact-scope scan**, deterministic event-ID/KV top-k, **static event-ID HDC**, **zero-input HDC-LTC**, and **typed-content HDC top-2 per action**. All feed the same `Policy::CausalQualified` rule. This separates the exact-evidence reference, simple event-ID selection, associative-HDC substrate, zero-input LTC evolution and typed-content retrieval. The indexes are rebuilt per condition; no incremental update/replay performance is claimed. The KV and event-ID HDC arms are internal controls, not substitutes for strong BM25/dense/RRF competitors.
 - Typed-content HDC remains structured feature retrieval over the synthetic Experience type, not natural-language or multimodal memory. The experiment reports candidate IDs and canonical view resolution; it does not yet report labelled retrieval recall/precision because the fixture has no independent per-query relevance annotation.
 - DecisionNeedV1 is validated and used by the typed query adapter. The exact-scope method uses its declared scope and action alternatives. A general natural-language/task/environment parser is not implemented.
@@ -335,7 +347,7 @@ Arguments are cluster count, candidate JSONL path, evaluator JSONL path, public 
 
 Abstention is an explicit zero-utility outside option only for the current synthetic benchmark. Every real application must define its own abstention cost/value and deadline policy.
 
-**Validation:** Cargo, rustc and rustfmt are unavailable in this execution environment. The new binary, tests and JSON Schema are source-authored but unexecuted. No compilation, test pass, formatting pass, schema validation, runner result or hosted-check pass is claimed. The previously inspected PR workflows were skipped; skipped is not passed.
+**Validation:** Cargo, rustc and rustfmt are unavailable in this execution environment. The intervention runner, offline aggregate binary, their 28 authored tests and both JSON Schemas are source-authored but unexecuted. No compilation, test pass, formatting pass, schema validation, runner result or hosted-check pass is claimed. The previously inspected PR workflows were skipped; skipped is not passed.
 
 No retrieval gain, decision-utility improvement, official benchmark score, causal sufficiency result, production readiness or SOTA superiority is claimed.
 
