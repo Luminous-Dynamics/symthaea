@@ -263,3 +263,36 @@ The companion JSON Schema is `MATH_PROOF_COMPREHENSION_RECEIPT_V1.schema.json`. 
 - TheoremBench: https://arxiv.org/abs/2606.09450
 - Formal Conjectures: https://arxiv.org/abs/2605.13171
 - EasyProver / Aegis (2026-10-28): https://arxiv.org/abs/2610.38174
+
+
+## 11. SAT / ETH implementation readiness audit (2026-11-22)
+
+A source-level inspection of the current public issues and draft PRs gives the following readiness boundary:
+
+| Component | Current source-level state | What remains before it can support a promoted result |
+|---|---|---|
+| #10801 / PR #10801 — reference CNF semantics | Draft change correctly adds OR-over-AND distribution, explicit TRUE/FALSE clause conventions, normalization and branch-state isolation in the diff | Rust format/tests, exact-head CI, independent review; keep this narrow repair distinct from solver scalability |
+| #10809 / PR #10809 — Tseitin | Draft source adds biconditional gate constraints, root assertion, deterministic collision-checked auxiliary names, and small-formula unique-extension tests | Rust compile/tests and independent review; bounded input depth/output size; complete integer-ID / projection contract from #10804 |
+| #10810 — typed decision outcomes | Open specification correctly separates SAT model, UNSAT decision, theorem validity and independently checkable proof | Migrate callers and ensure SAT model validation / total variable universe; UNKNOWN, timeout, resource limit and error stay distinct |
+| #10849 — bounded CNF conversion | Open source-review issue identifies unbounded Cartesian expansion and unsafe allocation sizing in the distributive path | Checked size arithmetic, deterministic budgets, fallible reserve and typed incomplete outcomes; never return partial CNF as complete |
+| #10803 — independent UNSAT verification | Open plan for DIMACS, pinned Kissat/CaDiCaL adapters and DRAT/LRAT-style independent proof checking | Actual parser/adapters/checker and executable negative controls |
+| #10805 / #10784 — benchmarks | Public plan pins SAT Competition 2026 data and defines reproducible solver comparisons | Executed same-machine, per-instance baselines and proof/model validation; no solver score until then |
+| #10049 / #10090 — ETH / exact counting | Research programme and exact-counting benchmark specifications are open | Reconstruct the full algorithm/proof, bit complexity, independent implementation and matched exact-counter comparisons |
+
+### Specific source-level caution
+
+The current `dpll_sat` implementation still calls the distributive `to_cnf` path rather than the Tseitin API. Thus PR #10809, even if merged, would not by itself make the DPLL execution path scalable. The distributive path's Cartesian-product capacity calculation uses saturating multiplication, which prevents arithmetic wraparound but does not impose a safe resource budget. The current decision API also returns a legacy `ProofResult` for SAT/UNSAT; its trace is not an independently checkable UNSAT certificate.
+
+These observations are source-level review findings, not runtime test results. They should be resolved through the existing #10810, #10849, #10803 and #10804 work items rather than creating competing APIs here.
+
+### ETH/P-vs-NP interpretation
+
+The exact-counting programme is an ETH-adjacent research programme. A deterministic subexponential algorithm for a suitable #SAT class would have consequences for ETH, but it is not a polynomial-time SAT algorithm and does not establish P=NP. Keep these claims separate:
+- formal theorem status;
+- paper-to-Lean correspondence;
+- machine / encoding translation;
+- exact implementation correctness;
+- competition performance;
+- worst-case asymptotic bound.
+
+For practical SAT performance, compare against the pinned 2026 competition winners and specialist solvers using official per-instance data. For exact counting, compare against the matching Model Counting Competition track and specialized counters. Do not compare #SAT results to SAT solved counts or approximate counters to exact counters.
