@@ -299,6 +299,19 @@ an accompanying JSON Schema and a standalone Rust validator mode
 - rejects absolute, parent-traversing and non-normalized source paths;
 - recomputes Git blob IDs from exact source bytes and rejects stale examples.
 
+A first public retrieval pilot query set now accompanies the corpus at
+`benchmarks/frontend/knowledge/leptos-0.8/retrieval-queries-v0.json`: 16
+positive paraphrases and eight hard negatives, with exact expected pattern IDs.
+The standalone validator's `--retrieval` mode checks query-schema validity,
+unique IDs, positive/negative structure and every gold ID against the corpus.
+This is a dataset validation gate only; no retrieval quality has been measured.
+
+The intended comparison is keyword exact-match, BM25, TF-IDF, dense embeddings,
+HDC associative retrieval and hybrid retrieval under identical corpus and
+hardware constraints. Metrics include recall@1/3, MRR, nDCG@3, precision@3,
+hard-negative false-positive rate, latency, memory and cost. The query set is a
+public pilot; a private holdout is required before claiming an HDC advantage.
+
 The corpus distinguishes `source_observed_not_compiled`,
 `source_observed_reference_checked`, `compiled`, `unit_tested`, and
 `browser_verified`. It currently contains no compiled or browser-verified
