@@ -161,6 +161,12 @@ fn portrait_from_json(v: &Value) -> Option<String> {
     Some(format!("data:image/svg+xml;base64,{encoded}"))
 }
 
+/// A connection stable for at least a minute clears accumulated failure
+/// backoff; quick flaps continue to increase the retry delay.
+fn telemetry_connection_is_stable(duration_ms: u128) -> bool {
+    duration_ms >= 60_000
+}
+
 /// Deterministic reconnect backoff: 1s, 2s, 4s, 8s, 16s, then 30s.
 fn telemetry_retry_delay_ms(attempt: u32) -> u32 {
     1_000_u32
@@ -182,6 +188,14 @@ mod telemetry_retry_tests {
         assert_eq!(telemetry_retry_delay_ms(5), 30_000);
         assert_eq!(telemetry_retry_delay_ms(6), 30_000);
         assert_eq!(telemetry_retry_delay_ms(u32::MAX), 30_000);
+    }
+
+    #[test]
+    fn only_a_stable_minute_resets_failure_backoff() {
+        assert!(!telemetry_connection_is_stable(0));
+        assert!(!telemetry_connection_is_stable(59_999));
+        assert!(telemetry_connection_is_stable(60_000));
+        assert!(telemetry_connection_is_stable(600_000));
     }
 }
 
@@ -207,15 +221,19 @@ pub fn App() -> impl IntoView {
     let movie_canvas = NodeRef::<leptos::html::Canvas>::new();
 
     // Keep one telemetry stream alive. Connection state is reported only
-    // after WebSocket::open succeeds; ended streams retry with capped
-    // exponential backoff. A changed gateway URL is picked up on the next
-    // attempt, without opening a second socket alongside the existing one.
+    // after the browser WebSocket reaches OPEN. Failed/short-lived streams use
+    // capped exponential backoff; a connection stable for at least one minute
+    // resets the backoff. Gateway changes are picked up on the next attempt.
     Effect::new(move |_| {
         ws_connected.set(false);
         spawn_local(async move {
-            let mut retry_attempt = 0_u32;
+            let retry_attempt = std::rc::Rc::new(std::cell::Cell::new(0_u32));
+            let connected_since =
+                std::rc::Rc::new(std::cell::Cell::<Option<std::time::Instant>>::new(None));
             loop {
                 let gw = gateway.get_untracked();
+                let retry_state = std::rc::Rc::clone(&retry_attempt);
+                let connected_state = std::rc::Rc::clone(&connected_since);
                 api::stream_telemetry(
                     &gw,
                     move |payload| {
@@ -229,13 +247,25 @@ pub fn App() -> impl IntoView {
                             movie_frame.set(0);
                         }
                     },
-                    move |connected| ws_connected.set(connected),
+                    move |connected| {
+                        ws_connected.set(connected);
+                        if connected {
+                            connected_state.set(Some(std::time::Instant::now()));
+                        } else if let Some(started) = connected_state.take() {
+                            if telemetry_connection_is_stable(
+                                started.elapsed().as_millis(),
+                            ) {
+                                retry_state.set(0);
+                            }
+                        }
+                    },
                 )
                 .await;
 
                 ws_connected.set(false);
-                let delay_ms = telemetry_retry_delay_ms(retry_attempt);
-                retry_attempt = retry_attempt.saturating_add(1);
+                let attempt = retry_attempt.get();
+                let delay_ms = telemetry_retry_delay_ms(attempt);
+                retry_attempt.set(attempt.saturating_add(1));
                 gloo_timers::future::TimeoutFuture::new(delay_ms).await;
             }
         });
