@@ -1,4 +1,4 @@
-use crate::{canonical_token, hash_field, ManufacturingContractError};
+use crate::{ManufacturingContractError, canonical_token, hash_field};
 use serde::{Deserialize, Serialize};
 use symthaea_manufacturing_process::ProcessDefinitionId;
 
@@ -61,9 +61,15 @@ pub struct ProcessCapabilityProfileV1 {
 
 impl ProcessCapabilityProfileV1 {
     pub fn validate(&self) -> Result<(), ManufacturingContractError> {
-        canonical_token("capability.resource_subject_ref", &self.resource_subject_ref)?;
+        canonical_token(
+            "capability.resource_subject_ref",
+            &self.resource_subject_ref,
+        )?;
         canonical_token("capability.process_id", &self.process_id.0)?;
-        canonical_token("capability.envelope_profile_ref", &self.envelope_profile_ref)?;
+        canonical_token(
+            "capability.envelope_profile_ref",
+            &self.envelope_profile_ref,
+        )?;
         canonical_token(
             "capability.configuration_profile_ref",
             &self.configuration_profile_ref,
