@@ -169,6 +169,8 @@ pub struct MycelialReconstructionCalibrationReport {
     pub ground_truth_graph_digest: String,
     pub prediction_graph_digest: String,
     pub reconstruction_score_digest: String,
+    /// Digest of sorted prediction IDs and exact probability-vector bit patterns.
+    pub probability_inventory_digest: String,
     pub matching_policy_id: String,
     pub calibration_policy_id: String,
     pub bin_count: usize,
@@ -422,6 +424,7 @@ pub fn evaluate_mycelial_reconstruction_calibration(
         ground_truth_graph_digest: ground_truth_digest,
         prediction_graph_digest: prediction_digest,
         reconstruction_score_digest: score_digest,
+        probability_inventory_digest: probability_inventory_digest(&predictions),
         matching_policy_id: reconstruction_score.matching_policy_id.clone(),
         calibration_policy_id: calibration_policy_id.to_string(),
         bin_count: config.bin_count,
@@ -502,7 +505,7 @@ fn class_calibration(
     let mut squared_error = 0.0;
     for sample in samples {
         let confidence = sample.probabilities[class.index()];
-        let outcome = f64::from(sample.target == class);
+        let outcome = if sample.target == class { 1.0 } else { 0.0 };
         squared_error += (confidence - outcome).powi(2);
         let bin = &mut bins[calibration_bin_index(confidence, bin_count)];
         bin.sample_count += 1;
@@ -546,7 +549,7 @@ fn top_label_calibration(
     for sample in samples {
         let is_correct = sample.predicted_class == sample.target;
         correct += usize::from(is_correct);
-        brier += (sample.confidence - f64::from(is_correct)).powi(2);
+        brier += (sample.confidence - if is_correct { 1.0 } else { 0.0 }).powi(2);
         nll -= sample.probabilities[sample.target.index()]
             .max(epsilon)
             .ln();
@@ -554,7 +557,7 @@ fn top_label_calibration(
         bin.sample_count += 1;
         bin.mean_confidence = Some(bin.mean_confidence.unwrap_or(0.0) + sample.confidence);
         bin.empirical_frequency = Some(
-            bin.empirical_frequency.unwrap_or(0.0) + f64::from(is_correct),
+            bin.empirical_frequency.unwrap_or(0.0) + if is_correct { 1.0 } else { 0.0 },
         );
     }
     let mut ece = 0.0;
@@ -630,6 +633,7 @@ impl MycelialReconstructionCalibrationReport {
             || !valid_digest(&self.ground_truth_graph_digest)
             || !valid_digest(&self.prediction_graph_digest)
             || !valid_digest(&self.reconstruction_score_digest)
+            || !valid_digest(&self.probability_inventory_digest)
             || !valid_id(&self.matching_policy_id)
             || !valid_id(&self.calibration_policy_id)
             || self.bin_count == 0
@@ -652,6 +656,12 @@ impl MycelialReconstructionCalibrationReport {
                 .any(|((class, _), expected)| *class != expected)
             || self.class_prediction_counts.iter().map(|(_, count)| *count).sum::<usize>()
                 != self.counts.prediction_count
+            || self
+                .class_prediction_counts
+                .iter()
+                .find(|(class, _)| *class == ReconstructionCalibrationClass::Anastomosis)
+                .map(|(_, count)| *count)
+                != Some(self.counts.predicted_anastomosis_count)
             || self.class_calibration.len() != RECONSTRUCTION_CALIBRATION_CLASS_COUNT
             || self
                 .class_calibration
@@ -661,14 +671,35 @@ impl MycelialReconstructionCalibrationReport {
                     metric.class != expected
                         || metric.bins.len() != self.bin_count
                         || !valid_calibration_bins(&metric.bins)
-                        || metric.brier_score.is_some_and(|value| !value.is_finite() || value < 0.0)
+                        || metric.bins.iter().map(|bin| bin.sample_count).sum::<usize>()
+                        != self.counts.prediction_count
+                        || (self.counts.prediction_count == 0)
+                            != metric.brier_score.is_none()
+                        || (self.counts.prediction_count == 0)
+                            != metric.expected_calibration_error.is_none()
+                    || metric.brier_score.is_some_and(|value| !value.is_finite() || !(0.0..=2.0).contains(&value))
                         || metric
                             .expected_calibration_error
                             .is_some_and(|value| !value.is_finite() || value < 0.0)
                 })
             || self.top_label_calibration.bins.len() != self.bin_count
             || !valid_calibration_bins(&self.top_label_calibration.bins)
-            || self.top_label_calibration.brier_score.is_some_and(|value| !value.is_finite() || value < 0.0)
+            || self
+                .top_label_calibration
+                .bins
+                .iter()
+                .map(|bin| bin.sample_count)
+                .sum::<usize>()
+                != self.counts.prediction_count
+            || (self.counts.prediction_count == 0)
+                != self.top_label_calibration.brier_score.is_none()
+            || (self.counts.prediction_count == 0)
+                != self.top_label_calibration.accuracy.is_none()
+            || (self.counts.prediction_count == 0)
+                != self.top_label_calibration.negative_log_likelihood.is_none()
+            || (self.counts.prediction_count == 0)
+                != self.top_label_calibration.expected_calibration_error.is_none()
+            || self.top_label_calibration.brier_score.is_some_and(|value| !value.is_finite() || !(0.0..=1.0).contains(&value))
             || self.top_label_calibration.expected_calibration_error.is_some_and(|value| !value.is_finite() || value < 0.0)
             || self.top_label_calibration.negative_log_likelihood.is_some_and(|value| !value.is_finite() || value < 0.0)
             || self.top_label_calibration.accuracy.is_some_and(|value| !(0.0..=1.0).contains(&value))
@@ -707,7 +738,14 @@ impl MycelialReconstructionCalibrationReport {
                 && self
                     .selective_risk_curve
                     .last()
-                    .is_none_or(|point| point.retained_prediction_count != self.counts.prediction_count)
+                    .is_none_or(|point| {
+                        point.retained_prediction_count != self.counts.prediction_count
+                            || point.classification_error_count != self.counts.top_label_error_count
+                            || point.predicted_anastomosis_count
+                                != self.counts.predicted_anastomosis_count
+                            || point.false_anastomosis_prediction_count
+                                != self.counts.false_anastomosis_prediction_count
+                    })
         {
             return Err(MycelialReconstructionCalibrationError::InvalidReport(
                 "selective-risk curve does not terminate at full prediction coverage",
@@ -728,6 +766,7 @@ impl MycelialReconstructionCalibrationReport {
             &self.ground_truth_graph_digest,
             &self.prediction_graph_digest,
             &self.reconstruction_score_digest,
+            &self.probability_inventory_digest,
         ] {
             hasher.update(digest.as_bytes());
         }
@@ -780,6 +819,21 @@ impl MycelialReconstructionCalibrationReport {
         }
         Ok(hex_digest(hasher.finalize().as_bytes()))
     }
+}
+
+fn probability_inventory_digest(
+    predictions: &[JunctionClassProbabilityPrediction],
+) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"symthaea-reconstruction-probability-inventory-v1");
+    hasher.update(&(predictions.len() as u64).to_le_bytes());
+    for prediction in predictions {
+        hash_str(&mut hasher, &prediction.predicted_junction_id);
+        for probability in prediction.probabilities {
+            hasher.update(&probability.to_bits().to_le_bytes());
+        }
+    }
+    hex_digest(hasher.finalize().as_bytes())
 }
 
 fn valid_calibration_bins(bins: &[ReconstructionCalibrationBin]) -> bool {
