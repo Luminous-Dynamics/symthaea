@@ -486,3 +486,33 @@ The calibration set must be disjoint from model training and outer prediction ro
 The evaluator reports class-conditional empirical coverage, singleton accuracy, abstention/empty/doubleton rates, mean set size and marginal coverage. Minority-class calibration counts and exact finite-sample ranks are retained; very small failure support yields coarse or unbounded thresholds rather than fake precision.
 
 **Guarantee boundary:** class-conditional split conformal coverage is finite-sample marginally valid only under exchangeability within each class, using calibration data disjoint from model training/test. It is not per-wafer conditional coverage and does not survive arbitrary time, tool, chamber, recipe or fab shift. The event-graph maturity snapshot prevents future/immature labels from entering calibration; it does not make an exchangeability assumption true. Under shift, the system must track coverage degradation and use a separately specified online/delayed-feedback conformal method. Abstention is a decision-support state, not a wafer hold/release command.
+
+
+## Online conformal calibration under delayed metrology feedback
+
+The Rust module \`benchmark::online_conformal\` extends static Mondrian conformal abstention into a prequential state machine. It keeps one immutable model SHA per calibration epoch and starts from calibration residuals whose labels are matured/validated in a re-built process-event graph snapshot.
+
+### State and update contract
+
+1. **Initialize:** bind model digest, graph identity/digest, source clock domain, cutoff and alpha; require disjoint training/calibration sample IDs and matured validated calibration label IDs; require configured positive and negative calibration support.
+2. **Predict:** accept only prediction ID, sample ID, subject ID, score and source-clock timestamp. Compute class-conditional set from the current bounded residual windows and register the immutable output set before any truth label is available.
+3. **Mature:** later, receive a feedback reference to the registered prediction. Revalidate the full process graph and rebuild its information-cutoff snapshot. A label is accepted only if it is present in \`matured_validated_label_ids\`, and its physical measurement event/subject/measurand/revision/clock fields match the supplied feedback interpretation.
+4. **Update:** add the class-conditional nonconformity residual and coverage outcome only at the information cutoff when the validated result is consumed. Keep bounded per-class residual and coverage windows.
+5. **Revise:** a superseding physical label must refer to the currently active label for the same prediction/subject/measurand and increase revision number. The old residual and coverage outcome are removed before the new revision is inserted. One physical prediction therefore contributes at most one active outcome.
+6. **Drift sentinel:** monitor rolling class-conditional empirical miscoverage only after labels mature. If miscoverage exceeds alpha plus the configured margin after the minimum support is reached, latch \`coverage_degraded\`. Subsequent predictions emit \`{0,1}\` and abstain until a new calibration epoch is independently initialized.
+
+Every state mutation updates a digest over the serialized state. Prediction receipts bind the model and pre-prediction calibration-state digest; feedback receipts bind the accepted label, replacement identity, window supports, coverage state and new state digest.
+
+### Important distinctions
+
+- Physical measurement/event time is not label availability time.
+- Label availability time is not the same as the time the online service ingests the result.
+- Only graph-validated, matured labels update residuals.
+- Revisions replace; they do not duplicate; late arrival is processed at the current information cutoff.
+- Clock-domain or basis mismatch rejects instead of coercing timestamps.
+- A model SHA change requires a new calibration epoch; this state machine does not mix model versions.
+- Class interpretation is carried by a versioned \`class_semantics_ref\`; a fab adapter must independently qualify the mapping from the physical measurand to the binary class.
+
+### Guarantees and limitations
+
+The rolling-window update is an engineering adaptation and coverage-degradation sentinel, not a distribution-free guarantee under arbitrary drift. A detected coverage gap causes abstention; a non-detected gap does not prove calibration. Delayed-feedback behavior must be benchmarked against fixed-window, exponential weighting, change-point detection and update-on-every-label under matched synthetic streams and later fab shadow data. No hold/release, APC or recipe authority is created.

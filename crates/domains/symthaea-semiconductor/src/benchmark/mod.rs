@@ -4,6 +4,7 @@ pub mod binary_metrics;
 pub mod conformal_abstention;
 pub mod dtco_manifest;
 pub mod mf_acquisition;
+pub mod online_conformal;
 pub mod pair_manifest;
 pub mod process_event_graph;
 pub mod secom_fold_preprocessor;
@@ -72,6 +73,13 @@ pub use secom_raw::{
 
 pub use dtco_manifest::{
     DtcoLineageError, DtcoLineageManifestV1, DtcoLineageReportV1, validate_dtco_lineage_v1,
+};
+
+pub use online_conformal::{
+    OnlineConformalConfigV1, OnlineConformalError, OnlineConformalStateV1,
+    OnlineCoverageStateV1, OnlineFeedbackReceiptV1, OnlineMaturedFeedbackV1,
+    OnlinePredictionInputV1, OnlinePredictionReceiptV1, ingest_online_metrology_feedback_v1,
+    initialize_online_conformal_v1, predict_online_conformal_v1,
 };
 
 pub use mf_acquisition::{
