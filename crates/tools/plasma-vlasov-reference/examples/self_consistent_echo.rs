@@ -134,7 +134,7 @@ fn run_resolution(
             let control_scale = control_spectrum.spectral_f_strophy.max(f64::MIN_POSITIVE);
 
             println!(
-                "# cascade,{label},{step},{:.8},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e}",
+                "# cascade,{label},{step},{:.8},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e}",
                 pulsed.time(),
                 pulse_budget.total_casimir,
                 control_budget.total_casimir,
