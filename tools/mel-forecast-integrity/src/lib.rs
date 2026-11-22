@@ -829,6 +829,14 @@ pub fn validate_trace(trace: &ForecastTraceV1) -> ForecastReportV1 {
         .map(|(forecast_id, state)| {
             let realized = state.lifecycle == LifecycleV1::Realized;
             let displayed = state.displayed_at_ns.is_some();
+            let display_preceded_realization = state.displayed_at_ns.is_some_and(|displayed_at| {
+                displayed_at >= state.issued_at_ns
+                    && displayed_at < state.issued.target_window.start_ns
+                    && displayed_at <= state.issued.expires_at_ns
+                    && state
+                        .realization_started_at_ns
+                        .is_some_and(|realized_at| displayed_at < realized_at)
+            });
             let issue_latency = state.issued_at_ns.checked_sub(state.input_time_ns);
             let display_lead = state
                 .displayed_at_ns
@@ -850,7 +858,7 @@ pub fn validate_trace(trace: &ForecastTraceV1) -> ForecastReportV1 {
                 displayed,
                 partner_disposition: state.disposition,
                 realized,
-                human_visible_realization: displayed && realized,
+                human_visible_realization: displayed && realized && display_preceded_realization,
                 input_to_issue_latency_ns: issue_latency,
                 display_lead_time_ns: display_lead,
                 input_to_realization_ns: input_to_realization,
@@ -985,6 +993,7 @@ mod tests {
         let report = validate_trace(&trace);
         assert!(!report.valid);
         assert!(report.issues.iter().any(|issue| issue.code == "display_not_pre_output"));
+        assert_eq!(report.human_visible_realization_count, 0);
     }
 
     #[test]
