@@ -27,7 +27,7 @@ jobs:
       - name: Strict format check
         run: cargo fmt --manifest-path crates/tools/plasma-vlasov-reference/Cargo.toml -- --check
       - name: Unit tests
-        run: cargo test --locked --manifest-path crates/tools/plasma-vlasov-reference/Cargo.toml
+        run: cargo test --all-targets --locked --manifest-path crates/tools/plasma-vlasov-reference/Cargo.toml
       - name: Strict Clippy
         run: cargo clippy --locked --manifest-path crates/tools/plasma-vlasov-reference/Cargo.toml --all-targets -- -D warnings
       - name: Create reproducible trajectory artifacts
