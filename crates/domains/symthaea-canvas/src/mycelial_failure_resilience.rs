@@ -28,6 +28,8 @@ pub const MAX_FAILURE_DEMAND_PAIRS: usize = 256;
 pub const MAX_FAILURE_DEMAND_SOURCES: usize = 32;
 pub const MAX_FAILURE_SCENARIOS: usize = 768;
 pub const MAX_FAILURE_ID_BYTES: usize = 128;
+/// Largest total demand weight exactly representable as an IEEE-754 f64 integer.
+pub const MAX_FAILURE_TOTAL_DEMAND_WEIGHT: u128 = 9_007_199_254_740_992;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MycelialDemandPair {
@@ -260,6 +262,7 @@ fn validate_demands(
     let mut demand_ids = BTreeSet::new();
     let mut sources = BTreeSet::new();
     let mut previous_id: Option<&str> = None;
+    let mut total_weight = 0u128;
     for demand in demands {
         if !valid_id(&demand.id)
             || demand.weight == 0
@@ -272,6 +275,7 @@ fn validate_demands(
             ));
         }
         previous_id = Some(&demand.id);
+        total_weight = total_weight.saturating_add(u128::from(demand.weight));
         if !indexed.node_index.contains_key(&demand.source_junction_id) {
             return Err(MycelialFailureResilienceError::UnknownDemandJunction(
                 demand.source_junction_id.clone(),
@@ -287,6 +291,11 @@ fn validate_demands(
     if sources.len() > MAX_FAILURE_DEMAND_SOURCES {
         return Err(MycelialFailureResilienceError::TooManyDemandSources(
             sources.len(),
+        ));
+    }
+    if total_weight > MAX_FAILURE_TOTAL_DEMAND_WEIGHT {
+        return Err(MycelialFailureResilienceError::InvalidProfile(
+            "total demand weight exceeds the exact f64 accumulation bound",
         ));
     }
     Ok(())
