@@ -58,6 +58,7 @@ pub enum ObservationalIdentifiabilityError {
     DimensionMismatch,
     InvalidResolutionTolerance,
     NonFiniteInput,
+    NonFiniteOutput,
     InvalidComponentAmplitude,
 }
 
@@ -71,6 +72,7 @@ impl fmt::Display for ObservationalIdentifiabilityError {
                 write!(f, "observation-resolution tolerance must be finite and non-negative")
             }
             Self::NonFiniteInput => write!(f, "observations and component inputs must be finite"),
+            Self::NonFiniteOutput => write!(f, "generated counterfactual observations must remain finite"),
             Self::InvalidComponentAmplitude => write!(f, "component amplitude must be finite"),
         }
     }
@@ -112,6 +114,14 @@ pub fn construct_observationally_equivalent_pair(
         temporal_process,
         amplitude,
     );
+    if target_change_world
+        .iter()
+        .flatten()
+        .chain(artifact_only_world.iter().flatten())
+        .any(|value| !value.is_finite())
+    {
+        return Err(ObservationalIdentifiabilityError::NonFiniteOutput);
+    }
 
     Ok(ObservationallyEquivalentPair {
         target_change_world,
@@ -340,6 +350,22 @@ mod tests {
         assert!(matches!(
             construct_observationally_equivalent_pair(&clean, &spatial, &temporal, f64::INFINITY),
             Err(ObservationalIdentifiabilityError::InvalidComponentAmplitude)
+        ));
+    }
+
+    #[test]
+    fn finite_inputs_that_overflow_the_generated_world_fail_closed() {
+        let clean = clean();
+        let spatial = [2.0, 2.0, 2.0, 2.0];
+        let temporal = vec![2.0; 12];
+        assert!(matches!(
+            construct_observationally_equivalent_pair(
+                &clean,
+                &spatial,
+                &temporal,
+                f64::MAX
+            ),
+            Err(ObservationalIdentifiabilityError::NonFiniteOutput)
         ));
     }
 
