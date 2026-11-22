@@ -21,6 +21,11 @@ pub enum VelocityFourierSpongeError {
     NonFiniteTransform,
     InvalidPositivityFloor,
     MomentProjectionSingular,
+    MomentResidualExceeded {
+        moment: usize,
+        relative_residual: f64,
+        tolerance: f64,
+    },
     PositivityFloorViolation { minimum: f64, floor: f64 },
     Solver(SolverError),
 }
@@ -58,6 +63,14 @@ impl fmt::Display for VelocityFourierSpongeError {
                     "discrete velocity-moment Gram matrix is singular"
                 )
             }
+            Self::MomentResidualExceeded {
+                moment,
+                relative_residual,
+                tolerance,
+            } => write!(
+                formatter,
+                "moment constraint {moment} residual {relative_residual:e} exceeds tolerance {tolerance:e}"
+            ),
             Self::PositivityFloorViolation { minimum, floor } => write!(
                 formatter,
                 "moment-constrained sponge minimum {minimum:e} is below positivity floor {floor:e}"
@@ -101,6 +114,16 @@ pub struct VelocityFourierSpongeReport {
     /// Maximum per-row scale-normalized residuals for [mass, momentum, second moment].
     pub max_relative_moment_residuals: [f64; 3],
     pub minimum_distribution_after: f64,
+    pub negative_value_fraction_before: f64,
+    pub negative_value_fraction_after: f64,
+    pub high_s_casimir_before: f64,
+    pub high_s_casimir_after: f64,
+    /// Positive means high-|s| C2 was removed; negative means reintroduced.
+    pub high_s_casimir_removed: f64,
+    pub low_s_casimir_before: f64,
+    pub low_s_casimir_after: f64,
+    /// Signed low-|s| C2 change after moment restoration.
+    pub low_s_casimir_change: f64,
     pub preserves_first_three_moments: bool,
 }
 
@@ -172,6 +195,14 @@ impl VlasovPoisson1d1v {
                 max_absolute_moment_residuals: [0.0; 3],
                 max_relative_moment_residuals: [0.0; 3],
                 minimum_distribution_after: diagnostics_before.minimum_distribution,
+                negative_value_fraction_before: negative_value_fraction(&self.distribution),
+                negative_value_fraction_after: negative_value_fraction(&self.distribution),
+                high_s_casimir_before: 0.0,
+                high_s_casimir_after: 0.0,
+                high_s_casimir_removed: 0.0,
+                low_s_casimir_before: 0.0,
+                low_s_casimir_after: 0.0,
+                low_s_casimir_change: 0.0,
                 preserves_first_three_moments: true,
             });
         }
@@ -319,6 +350,15 @@ impl VlasovPoisson1d1v {
 }
 
 /// Discrete moments [integral f, integral v f, integral v^2 f] on one velocity row.
+const MOMENT_PROJECTION_RELATIVE_TOLERANCE: f64 = 1.0e-11;
+
+fn negative_value_fraction(values: &[f64]) -> f64 {
+    if values.is_empty() {
+        return 0.0;
+    }
+    values.iter().filter(|value| **value < 0.0).count() as f64 / values.len() as f64
+}
+
 fn discrete_velocity_moments(row: &[f64], config: super::VlasovPoissonConfig) -> [f64; 3] {
     let mut moments = [0.0; 3];
     for (iv, value) in row.iter().copied().enumerate() {
@@ -420,10 +460,22 @@ impl VlasovPoisson1d1v {
         )?;
         let config = self.config;
 
+        // Scale velocity to [-1,1] before forming the polynomial Gram
+        // matrix. This leaves the correction span unchanged but improves
+        // conditioning when the physical velocity extent is enlarged.
+        let velocity_scale = config
+            .velocity_min
+            .abs()
+            .max(config.velocity_max.abs())
+            .max(1.0);
         let mut gram = [[0.0; 3]; 3];
         for iv in 0..config.nv {
-            let velocity = config.velocity(iv);
-            let basis = [1.0, velocity, velocity * velocity];
+            let normalized_velocity = config.velocity(iv) / velocity_scale;
+            let basis = [
+                1.0,
+                normalized_velocity,
+                normalized_velocity * normalized_velocity,
+            ];
             for row in 0..3 {
                 for column in 0..3 {
                     gram[row][column] += config.dv() * basis[row] * basis[column];
@@ -443,17 +495,39 @@ impl VlasovPoisson1d1v {
             let candidate_row = &mut candidate_solver.distribution[start..end];
             let target_moments = discrete_velocity_moments(target_row, config);
             let filtered_moments = discrete_velocity_moments(candidate_row, config);
+            // Constraints are solved in the scaled basis {1,u,u^2};
+            // this is algebraically equivalent to {1,v,v^2}.
+            let mut target_scaled_moments = [0.0; 3];
+            let mut filtered_scaled_moments = [0.0; 3];
+            for (iv, (target, filtered)) in target_row
+                .iter()
+                .zip(candidate_row.iter())
+                .enumerate()
+            {
+                let u = config.velocity(iv) / velocity_scale;
+                let weight = config.dv();
+                target_scaled_moments[0] += target * weight;
+                target_scaled_moments[1] = u.mul_add(target * weight, target_scaled_moments[1]);
+                target_scaled_moments[2] =
+                    (u * u).mul_add(target * weight, target_scaled_moments[2]);
+                filtered_scaled_moments[0] += filtered * weight;
+                filtered_scaled_moments[1] =
+                    u.mul_add(filtered * weight, filtered_scaled_moments[1]);
+                filtered_scaled_moments[2] =
+                    (u * u).mul_add(filtered * weight, filtered_scaled_moments[2]);
+            }
             let residual = [
-                target_moments[0] - filtered_moments[0],
-                target_moments[1] - filtered_moments[1],
-                target_moments[2] - filtered_moments[2],
+                target_scaled_moments[0] - filtered_scaled_moments[0],
+                target_scaled_moments[1] - filtered_scaled_moments[1],
+                target_scaled_moments[2] - filtered_scaled_moments[2],
             ];
             let correction = solve_three_by_three(gram, residual)?;
 
             for (iv, value) in candidate_row.iter_mut().enumerate() {
-                let velocity = config.velocity(iv);
-                let delta =
-                    correction[0] + correction[1] * velocity + correction[2] * velocity * velocity;
+                let normalized_velocity = config.velocity(iv) / velocity_scale;
+                let delta = correction[0]
+                    + correction[1] * normalized_velocity
+                    + correction[2] * normalized_velocity * normalized_velocity;
                 *value += delta;
                 correction_l2_squared =
                     (delta * delta).mul_add(config.dx() * config.dv(), correction_l2_squared);
@@ -484,8 +558,16 @@ impl VlasovPoisson1d1v {
                     .max(f64::MIN_POSITIVE);
                 max_absolute_moment_residuals[moment] =
                     max_absolute_moment_residuals[moment].max(absolute);
+                let relative_residual = absolute / scale;
                 max_relative_moment_residuals[moment] =
-                    max_relative_moment_residuals[moment].max(absolute / scale);
+                    max_relative_moment_residuals[moment].max(relative_residual);
+                if relative_residual > MOMENT_PROJECTION_RELATIVE_TOLERANCE {
+                    return Err(VelocityFourierSpongeError::MomentResidualExceeded {
+                        moment,
+                        relative_residual,
+                        tolerance: MOMENT_PROJECTION_RELATIVE_TOLERANCE,
+                    });
+                }
             }
         }
 
@@ -519,6 +601,11 @@ impl VlasovPoisson1d1v {
         let mut after_line = vec![Complex::ZERO; config.nv];
         let spectral_weight = config.dx() * config.dv() / config.nv as f64;
         let mut spectral_removed_casimir = 0.0;
+        let mut high_s_casimir_before = 0.0;
+        let mut high_s_casimir_after = 0.0;
+        let mut low_s_casimir_before = 0.0;
+        let mut low_s_casimir_after = 0.0;
+        let nyquist_mode = config.nv / 2;
         for ix in 0..config.nx {
             for iv in 0..config.nv {
                 let index = ix * config.nv + iv;
@@ -537,6 +624,16 @@ impl VlasovPoisson1d1v {
                     after_line[mode].im * after_line[mode].im,
                 );
                 spectral_removed_casimir += (before_power - after_power) * spectral_weight;
+                let normalized_mode =
+                    crate::signed_mode(mode, config.nv).unsigned_abs() as f64
+                        / nyquist_mode as f64;
+                if normalized_mode > report.start_fraction_of_nyquist {
+                    high_s_casimir_before += before_power * spectral_weight;
+                    high_s_casimir_after += after_power * spectral_weight;
+                } else {
+                    low_s_casimir_before += before_power * spectral_weight;
+                    low_s_casimir_after += after_power * spectral_weight;
+                }
             }
         }
 
@@ -555,6 +652,10 @@ impl VlasovPoisson1d1v {
             removed_spatial_mean_casimir,
             removed_fluctuation_f_strophy,
             casimir_accounting_residual,
+            high_s_casimir_before,
+            high_s_casimir_after,
+            low_s_casimir_before,
+            low_s_casimir_after,
         ]
         .iter()
         .all(|value| value.is_finite())
@@ -578,6 +679,16 @@ impl VlasovPoisson1d1v {
         report.max_absolute_moment_residuals = max_absolute_moment_residuals;
         report.max_relative_moment_residuals = max_relative_moment_residuals;
         report.minimum_distribution_after = minimum_distribution_after;
+        report.negative_value_fraction_before =
+            negative_value_fraction(&original_distribution);
+        report.negative_value_fraction_after =
+            negative_value_fraction(&candidate_solver.distribution);
+        report.high_s_casimir_before = high_s_casimir_before;
+        report.high_s_casimir_after = high_s_casimir_after;
+        report.high_s_casimir_removed = high_s_casimir_before - high_s_casimir_after;
+        report.low_s_casimir_before = low_s_casimir_before;
+        report.low_s_casimir_after = low_s_casimir_after;
+        report.low_s_casimir_change = low_s_casimir_after - low_s_casimir_before;
         report.preserves_first_three_moments = true;
 
         *self = candidate_solver;
