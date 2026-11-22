@@ -67,9 +67,10 @@ pub enum PortfolioReject {
     InvalidPlanValue,
     InvalidRepresentationOption,
     PlanNotAdmissible,
-    ReobservationProfileRejected,
+    ReobservationProfileRejected(crate::reobservation::ReobservationReject),
     DuplicateOption,
     ConflictingEventIdentity(u32),
+    DuplicateEvidenceAcrossEvents(String),
     InconsistentPortfolioScope,
     InconsistentKnowledgeSnapshot,
     InconsistentAuthorityScope,
@@ -111,7 +112,7 @@ impl MemoryPortfolioOptionV1 {
             profile,
             policy.clone(),
         )
-        .map_err(|_| PortfolioReject::ReobservationProfileRejected)?;
+        .map_err(PortfolioReject::ReobservationProfileRejected)?;
         if !admissible
             .iter()
             .any(|candidate| candidate.plan_sha256 == plan.plan_sha256)
@@ -407,6 +408,7 @@ fn prepare_options(
     let mut seen_options = BTreeSet::new();
     let mut groups: BTreeMap<u32, Vec<usize>> = BTreeMap::new();
     let mut event_identity: BTreeMap<u32, (String, String)> = BTreeMap::new();
+    let mut evidence_event: BTreeMap<String, u32> = BTreeMap::new();
 
     for (index, option) in options.iter().enumerate() {
         if option.event_id == 0
@@ -430,6 +432,18 @@ fn prepare_options(
         }
         if !seen_options.insert(option.option_sha256.clone()) {
             return Err(PortfolioReject::DuplicateOption);
+        }
+        match evidence_event.entry(option.evidence_sha256.clone()) {
+            std::collections::btree_map::Entry::Vacant(entry) => {
+                entry.insert(option.event_id);
+            }
+            std::collections::btree_map::Entry::Occupied(entry) => {
+                if *entry.get() != option.event_id {
+                    return Err(PortfolioReject::DuplicateEvidenceAcrossEvents(
+                        option.evidence_sha256.clone(),
+                    ));
+                }
+            }
         }
 
         match event_identity.entry(option.event_id) {
@@ -1080,6 +1094,44 @@ mod tests {
                 budget(10, 2, 10, 10, 10)
             ),
             Err(PortfolioReject::InconsistentAuthorityScope)
+        );
+    }
+
+    #[test]
+    fn exact_evidence_payload_cannot_be_double_counted_under_two_event_ids() {
+        let first = option(
+            11,
+            "first",
+            ReobservationDispositionV1::PersistKnowledge,
+            100,
+            4,
+            0,
+            0,
+            1,
+            0,
+        );
+        let mut second = option(
+            12,
+            "second",
+            ReobservationDispositionV1::PersistKnowledge,
+            100,
+            4,
+            0,
+            0,
+            1,
+            0,
+        );
+        second.evidence_sha256 = first.evidence_sha256.clone();
+        second.option_sha256 = second.canonical_digest();
+
+        assert_eq!(
+            optimize_memory_portfolio_exact(
+                &[first, second],
+                budget(16, 2, 10, 10, 10),
+            ),
+            Err(PortfolioReject::DuplicateEvidenceAcrossEvents(
+                digest("evidence-11")
+            ))
         );
     }
 
