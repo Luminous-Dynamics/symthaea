@@ -74,7 +74,6 @@ pub use metrology_semantics::{
     seal_binary_measurand_semantics_v1, validate_binary_measurand_semantics_v1,
 };
 
-
 pub use metrology_audit::{
     MetrologyAuditCandidateV1, MetrologyAuditError, MetrologyAuditOutcomeV1,
     MetrologyAuditPolicyV1, MetrologyAuditPopulationEstimateV1, MetrologyAuditSelectionReportV1,
