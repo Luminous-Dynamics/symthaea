@@ -790,6 +790,25 @@ mod tests {
     }
 
     #[test]
+    fn root_knockout_removes_every_event_sharing_digest_not_legacy_id() {
+        let mut memory = first_memory();
+        let shared = SourceRootDigest::from_bytes([0xB6; 32]);
+        memory[0].source_root_digest = shared;
+        memory[1].source_root_digest = shared;
+        memory[0].source_root_id = 17;
+        memory[1].source_root_id = 901;
+
+        let index = EvidenceDependencyIndex::build(&memory).unwrap();
+        let (_, root_ids) = index
+            .root_groups()
+            .find(|(key, _)| key == &format!("root:{}", shared.to_hex()))
+            .unwrap();
+        let retained = index.retain_without(&root_ids);
+        assert!(retained.iter().all(|item| item.source_root_digest != shared));
+        assert_eq!(retained.len(), memory.len() - 2);
+    }
+
+    #[test]
     fn unknown_roots_and_families_do_not_inflate_independence_counts() {
         let mut memory = first_memory();
         memory[0].source_root_digest = SourceRootDigest::UNKNOWN;
@@ -846,6 +865,32 @@ mod tests {
         assert!(first.interventions.iter().any(|item| item.kind == InterventionKind::Event));
         assert!(first.interventions.iter().any(|item| item.kind == InterventionKind::SourceRoot));
         assert!(first.interventions.iter().any(|item| item.kind == InterventionKind::SourceFamily));
+    }
+
+    #[test]
+    fn root_pair_interventions_respect_the_declared_coalition_cap() {
+        let memory = first_memory();
+        let capped = build_manifest(&memory, 77, 1).unwrap();
+        let unlimited = build_manifest(&memory, 77, usize::MAX).unwrap();
+        assert_eq!(capped.root_pair_count, 1);
+        assert!(unlimited.root_pair_count >= capped.root_pair_count);
+        assert_eq!(capped.max_root_pairs, 1);
+        assert_eq!(unlimited.max_root_pairs, usize::MAX);
+    }
+
+    #[test]
+    fn hidden_outcome_mutation_does_not_change_candidate_only_manifest() {
+        let original = generated_worlds(1).remove(0);
+        let mut changed_hidden = original.clone();
+        changed_hidden.truth.utility_a = 0.001;
+        changed_hidden.truth.utility_b = 0.999;
+        changed_hidden.truth.causal_action = Some(Action::B);
+        changed_hidden.truth.invalid_a = !changed_hidden.truth.invalid_a;
+
+        assert_eq!(
+            build_manifest(&original.memory, 0x1234, 8).unwrap(),
+            build_manifest(&changed_hidden.memory, 0x1234, 8).unwrap()
+        );
     }
 
     #[test]
