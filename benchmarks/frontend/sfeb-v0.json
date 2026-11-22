@@ -311,9 +311,11 @@
         "accessibility_tree",
         "keyboard_action_trace",
         "network_and_console_log",
-        "human_visual_review"
+        "human_visual_review",
+        "fixture-visibility-classification"
       ],
-      "status": "specification_only"
+      "status": "specification_only",
+      "fixture_exposure": "public_pilot"
     }
   ],
   "evaluation_protocol": {
@@ -433,5 +435,11 @@
       "browser_verified"
     ],
     "compilation_status": "pending_rust_toolchain"
+  },
+  "anti_contamination_policy": {
+    "public_pilot": "Public task definitions and fixtures may be used for iterative development but do not count as hidden holdout performance.",
+    "controller_only": "Reference source is mounted only into the evaluator container; the agent receives the brief and rendered reference captures.",
+    "hidden_holdout": "Task definition, fixture source, source screenshots and acceptance details remain unavailable to the agent before evaluation. Keep these outside public repositories and block external retrieval.",
+    "reporting": "Never merge public-pilot and hidden-holdout scores into one unlabeled aggregate."
   }
 }
