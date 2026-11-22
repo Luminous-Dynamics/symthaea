@@ -2756,6 +2756,40 @@ mod tests {
     }
 
     #[test]
+    fn dependency_sidecar_serialization_binds_bitemporal_scope_and_unknown_status() {
+        let batch = ingest_batch_as_known(
+            &[raw()],
+            query(180, 250),
+            &TestVerifier::default(),
+        )
+        .unwrap();
+        let sidecar = build_consolidation_evidence_pack(&batch, &[42])
+            .unwrap()
+            .dependency_sidecar();
+        let encoded = sidecar.to_json_value();
+
+        assert_eq!(
+            encoded["schema_version"],
+            "mace_evidence_dependency_sidecar_v1"
+        );
+        assert_eq!(encoded["valid_at_ms"], 180);
+        assert_eq!(encoded["known_at_ms"], 250);
+        assert_eq!(
+            encoded["records"][0]["dependency_lineage_status"],
+            "unknown"
+        );
+        assert_eq!(
+            encoded["records"][0]["lifecycle_status_as_known"]["status"],
+            "active"
+        );
+        assert_eq!(
+            encoded["canonical_sha256"],
+            sidecar.canonical_digest()
+        );
+        assert!(sidecar.verify_integrity());
+    }
+
+    #[test]
     fn dependency_lineage_rejects_self_duplicate_unsorted_and_uncommitted_edges() {
         for (ids, status, digest) in [
             (vec![42], DependencyLineageStatusV1::Partial, Some("9".repeat(64))),
