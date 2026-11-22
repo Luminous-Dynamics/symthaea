@@ -56,6 +56,15 @@ impl Default for TypedContentConfigV1 {
     }
 }
 
+impl TypedContentConfigV1 {
+    /// Canonical profile identifier for a validated encoder configuration.
+    /// This is a digest, not an authentication signature.
+    pub fn profile_digest(self) -> Result<String, TypedContentError> {
+        validate_config(self)?;
+        Ok(profile_digest(self))
+    }
+}
+
 /// Structured query over the same typed feature vocabulary as the candidate
 /// Experience encoder. Optional fields add query constraints/cues without
 /// changing the canonical evidence qualification rules.
