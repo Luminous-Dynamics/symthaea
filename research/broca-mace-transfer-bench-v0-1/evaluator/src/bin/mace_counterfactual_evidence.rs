@@ -837,22 +837,27 @@ fn run() -> Result<(), String> {
     for case in &cases {
         let manifest = build_manifest(&case.memory, public_seed, max_root_pairs)
             .map_err(|error| format!("dependency index failed: {error:?}"))?;
-        let baseline_exact = run_candidate(
-            CandidateMode::ExactScopeScan,
-            case.query,
-            case.decision_need,
-            &case.memory,
-        )
-        .map_err(|error| format!("exact-scope baseline failed: {error:?}"))?;
-        let baseline_typed = run_candidate(
-            CandidateMode::TypedContentHdc,
-            case.query,
-            case.decision_need,
-            &case.memory,
-        )
-        .map_err(|error| format!("typed-content baseline failed: {error:?}"))?;
-        let baseline_exact_regret = regret(case.truth, baseline_exact.decision.action);
-        let baseline_typed_regret = regret(case.truth, baseline_typed.decision.action);
+        let baseline_observations: Vec<CandidateObservation> = CandidateMode::ALL
+            .iter()
+            .map(|mode| {
+                run_candidate(*mode, case.query, case.decision_need, &case.memory)
+                    .map_err(|error| format!("{} baseline failed: {error:?}", mode.name()))
+            })
+            .collect::<Result<_, _>>()?;
+        let baseline_regrets: BTreeMap<CandidateMode, f64> = baseline_observations
+            .iter()
+            .map(|observation| {
+                (
+                    observation.mode,
+                    regret(case.truth, observation.decision.action),
+                )
+            })
+            .collect();
+        let baseline_exact = baseline_observations
+            .iter()
+            .find(|observation| observation.mode == CandidateMode::ExactScopeScan)
+            .ok_or_else(|| "exact-scope baseline missing".to_string())?;
+        let baseline_exact_regret = baseline_regrets[&CandidateMode::ExactScopeScan];
 
         // Opaque pair identity: do not expose generated evaluator scenario
         // family labels (for example, retraction or common-cause attack).
@@ -885,7 +890,7 @@ fn run() -> Result<(), String> {
             "candidate_validity": "diagnostic_only"
         }));
 
-        for baseline in [&baseline_exact, &baseline_typed] {
+        for baseline in &baseline_observations {
             let support = EvidenceDependencyIndex::build(&case.memory)
                 .map_err(|error| format!("dependency index failed: {error:?}"))?
                 .support_closure_counts(&baseline.decision.evidence_ids);
@@ -1011,10 +1016,7 @@ fn run() -> Result<(), String> {
                 candidate_records.push(candidate_record);
 
                 let current_regret = regret(case.truth, candidate.decision.action);
-                let same_method_baseline_regret = match mode {
-                    CandidateMode::ExactScopeScan => baseline_exact_regret,
-                    CandidateMode::TypedContentHdc => baseline_typed_regret,
-                };
+                let same_method_baseline_regret = baseline_regrets[&mode];
                 let evaluator_record = json!({
                     "schema_version": SCHEMA_VERSION,
                     "record_type": "evaluator_score",
