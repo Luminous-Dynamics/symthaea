@@ -276,6 +276,54 @@ Primary reference: https://arxiv.org/abs/2509.21734
 
 **Next benchmark phase:** scale from the small exact oracle to frozen held-out scenario families and matched-budget multi-step policy tournaments. Report per-scenario false acceptance, terminal regret, correct abstention, mandatory-obligation coverage, expected and worst-path resources by dimension, stop depth, test count, policy computation, and confidence intervals across repeated seeds where a stochastic policy is used. Do not blend distribution-free regret and expected loss into one score.
 
+
+### 7.2 Sequential planning: theory boundary and SOTA baselines
+
+The finite-horizon proof-of-concept is deliberately an **exact small-instance reference**, not a claim that a general aerospace test-selection problem is easy.
+
+Relevant research baselines:
+- Golovin and Krause's adaptive-submodularity framework proves greedy-policy guarantees for objectives satisfying adaptive monotonicity/submodularity assumptions. Those properties must be established for the particular objective; they do not automatically apply to worst-case decision regret with hard evidence-obligation gates. [JAIR 2011](https://ocs.aaai.org/Library/JAIR/Vol42/jair42-012.php).
+- Fujii and Sakaue introduce adaptive-submodularity ratios to extend guarantees to broader classes of adaptive objectives; this motivates testing a provable greedy approximation only after the ratio/assumptions are characterized for our decision objective. [ICML/PMLR 2019](https://proceedings.mlr.press/v97/fujii19a.html).
+- BINOCULARS provides an efficient non-myopic sequential-experimental-design approach using long-horizon information to inform the next batch/choice, and is a relevant approximation baseline against an exact finite-horizon policy. [ICML/PMLR 2020](https://proceedings.mlr.press/v119/jiang20b.html).
+- Dynamic programming has previously been used to plan beyond the next experiment rather than choosing myopically. Our differentiator to test is not “non-myopic planning exists”; it is **non-myopic planning under distribution-free worst-case decision regret, hard qualification obligations, exact article applicability and vector-valued resources**. [Cognition 2017](https://pmc.ncbi.nlm.nih.gov/articles/PMC5474365/).
+
+Our finite-state objective is:
+
+`min_policy max_hidden_state regret(terminal_disposition, state)`
+
+subject to path-specific resource budgets, exact decision context and mandatory evidence obligations at every terminal leaf. State-frequency weights are used solely for expected resource accounting. They never become acceptance probabilities or dilute worst-case regret.
+
+No approximation ratio is claimed. In particular, a test-selection objective with non-compensatory evidence obligations and minimax terminal regret need not be adaptive submodular or adaptively monotone. A greedy policy may therefore be useful as a baseline but must not inherit a theorem whose hypotheses have not been proved.
+
+### 7.3 Scale-up plan and next benchmark
+
+Exact finite-horizon dynamic programming is the ground-truth policy oracle for deliberately small cases. Its search tree can grow combinatorially with action count, outcome branching and horizon; the current proof-of-concept has no validated large-campaign scaling claim.
+
+Next benchmark increment:
+1. Freeze a generated family of finite decision problems with 3–8 hidden states, 3–32 candidate tests, 2–6 action depth, up to 4 observations/action, and six-dimensional resource budgets.
+2. Include common subproblems, duplicate information channels, redundant tests, test-order permutations, unusable/indeterminate outcomes, and cases where a nested child plan needs human review.
+3. Compare exact DP with fixed campaign, one-step myopic, highest uncertainty, greedy minimax-regret reduction, adaptive-greedy only on cases where its assumptions hold, and BINOCULARS-style non-myopic approximation where the input model supports it.
+4. Count search nodes, unique memoized states, dominance-pruned labels, wall time, peak memory, policy-tree size, and exact-oracle regret gap. Publish the whole frontier and failure cases, not only mean runtime.
+5. Verify the exact solver and all approximate policies against an independently enumerated oracle for small state/action counts. Preserve a sealed held-out family for policy comparison.
+
+Proposed engineering targets (not measured):
+- 100% exact-oracle agreement on enumerable small cases;
+- zero ACCEPT leaves missing any mandatory evidence obligation;
+- zero false-accepts on frozen critical negatives;
+- zero automatic selection when a tied candidate contains unresolved resource comparison;
+- deterministic policy tree under action-order permutation;
+- characterize the largest problem size solved exactly under a declared runtime/memory budget before selecting an approximation method.
+
+A necessary conservative rule is implemented in the sequential selector: if any best-regret top-level candidate contains a nested policy with unresolved expected resources, it remains on the human-review frontier. Another tied plan with a known cost may not be selected by silently discarding the unresolved alternative. This preserves uncertainty through recursive planning.
+
+### 7.4 Federated digital-thread baseline
+
+ISO 23247-5:2026 specifies digital-thread connectivity and lifecycle maintenance across design, planning, production and testing; ISO 23247-6:2026 describes integrated, unified and federated composition of independently developed twins. The preferred Luminous composition is federated: each owner retains native authority and schema, with typed references, revision/effectivity, exact subject/configuration and evidence digests. Do not claim conformance without a clause-by-clause assessment. [ISO 23247-5:2026](https://www.iso.org/standard/87425.html) · [ISO 23247-6:2026](https://www.iso.org/standard/87426.html).
+
+Hexagon PC-DMIS 2026.2 advertises STEP AP242 semantic-PMI import into QIF measurement planning, UUID-based mapping and Teamcenter traceability. This is a real integration target. Compare identical files, semantic assertions, QIF records and persistent IDs; do not claim we have surpassed its parsing or CMM programming capability. [PC-DMIS 2026.2 release, 29 October 2026](https://hexagon.com/about/news-media/media-alerts/2026/pc-dmis) · [PC-DMIS STEP/QIF workflow](https://hexagon.com/products/pc-dmis).
+
+NASA's 2026 ISAM State of Play is a useful capability map rather than a performance leaderboard. It reports 621 capability-area entries, 61 facilities and 169 developer profiles across 11 functional areas; inclusion requires physical ground prototype or flight hardware, not concept claims. Use it to identify missing real-world interfaces and demonstrator dependencies, not to assign a fabricated SOTA score to software repositories. [NASA 2026 ISAM State of Play](https://www.nasa.gov/isam/).
+
 ## 8. Proposed gates, not achieved results
 
 - 100% attempted, rejected, failed, aborted, censored, invalid and abstained action accounting.
