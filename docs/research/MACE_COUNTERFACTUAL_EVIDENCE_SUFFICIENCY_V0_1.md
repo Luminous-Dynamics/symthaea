@@ -683,7 +683,14 @@ It ranks positive-net-EVSI requests deterministically and otherwise returns \`st
 
 The planner receives prior probabilities, declared action-loss vectors and candidate observation likelihoods. It does not inspect realized future outcomes or evaluator labels. The current CLI emits a small analytic two-hypothesis fixture to \`acquisition.jsonl\`; it does not contact a source, execute a measurement or obtain a receipt. Cost and loss terms must be expressed in a common, declared decision-loss unit; the code does not invent a conversion from dollars, seconds or privacy exposure. The exposure term applies only after the separate hard privacy-approval gate has passed.
 
-The fixture is a policy unit test, not an empirical agent benchmark. The module has regression tests for decision-relevant versus uncertainty-only evidence, unauthorized high-value queries, malformed observation models and query/outcome order invariance. The frontier also tests retrieval-profile binding in candidate identity and random-control selection invariance under reversed memory ordering.
+The planner now reports three parallel query selectors under the same hard admissibility gates:
+- **EVSI** — maximize expected decision-risk reduction after the observation, less normalized acquisition/delay/approved-disclosure costs.
+- **Uncertainty-only** — maximize predictive outcome entropy, deliberately ignoring decision relevance and cost.
+- **Seeded random** — choose among admissible requests using a stable public-seed/query-ID hash.
+
+The fixture's decision-relevant measurement has two equiprobable outcomes (1 bit predictive entropy) and reduces Bayes risk from 0.5 to 0.1. Its irrelevant signal has four equiprobable outcomes (2 bits) yet leaves the posterior decision risk unchanged. Thus the uncertainty-only selector deliberately chooses the irrelevant query, while EVSI chooses the measurement that changes the optimal decision. The unauthorized perfect-information query is rejected by the same source-authority gate for all three selectors. This is an analytic counterexample to treating entropy reduction as decision value, not an empirical agent result.
+
+The fixture is a policy unit test, not an empirical agent benchmark. The module has regression tests for decision-relevant versus uncertainty-only evidence, unauthorized high-value queries, malformed observation models and query/outcome order invariance. The EVSI and uncertainty-only selectors are compared against a seeded-random admissible-request control. The frontier also tests retrieval-profile binding in candidate identity and random-control selection invariance under reversed memory ordering.
 
 ### Current competitor and baseline boundaries
 
