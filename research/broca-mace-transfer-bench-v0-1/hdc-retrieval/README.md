@@ -20,8 +20,11 @@ A consumer must resolve every returned ID against the canonical evidence registr
 - Exact-scan candidate ceiling.
 - Static ContinuousHV key/value associative bundle.
 - HDC-LTC zero-input temporal evolution.
+- Typed-content HDC, now included as a separate arm in the MACE paired decision runner. The runner builds a query from the current candidate-visible regime/objective/action and the MACE policy's categorical qualification requirements (RCT method, intervention, pre-registration, reconciliation, trust, non-retraction, interference, confounder control and delayed-horizon completion).
 
-Distractor, semantically confusable interference, irregular-gap and delayed-correction schedules remain follow-on arms from #13099. This package does not claim that HDC-LTC improves retrieval or decision utility.
+The typed runner profile intentionally does not encode propensity/balance thresholds as numeric point targets; those are inequality predicates enforced by the unchanged MACE policy after exact record resolution. A richer target outcome/horizon/estimand profile still requires a candidate-visible DecisionNeed from #13222 and must never be fabricated from evaluator labels.
+
+Distractor, semantically confusable interference, irregular-gap and delayed-correction schedules remain follow-on arms from #13099. This package does not claim that HDC-LTC or typed-content HDC improves retrieval or decision utility.
 
 ## Run
 
@@ -47,7 +50,7 @@ Categorical features use deterministic role/value binding. Continuous values use
 
 **Identity and authority are deliberately not approximated.** Event IDs, source-family/root identity, source signatures, tenant/authority information and canonical receipt bytes remain outside the vector. Retrieval returns the exact event ID and candidate-view digest; the caller must resolve the canonical record and re-run MACE qualification.
 
-The current policy `Query` only exposes regime/objective. Therefore this module's richer numeric/causal query fields are an API and controlled unit-test capability, not yet an end-to-end task runner integration. Do not fabricate them from evaluator truth. An agent-level comparison needs a candidate-visible `DecisionNeed` derived from the actual observation and task.
+The current policy `Query` only exposes regime/objective. The paired runner now integrates a restricted typed-content arm using that scope/action plus the MACE policy's fixed categorical qualification requirements. The optional numeric target and estimand fields are still not populated from a task-level source. Do not fabricate them from evaluator truth. A broader agent-level comparison needs a candidate-visible `DecisionNeed` derived from the actual observation and task.
 
 The typed index is structured semantic retrieval, **not natural-language understanding** and not proof that HDC-LTC has learned temporal dynamics. It is static HDC v0.1; event-driven LTC and irregular-time streams remain separate follow-on work.
 
