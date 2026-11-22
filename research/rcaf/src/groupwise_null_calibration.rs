@@ -872,32 +872,34 @@ mod tests {
 
     #[test]
     fn invalid_strata_and_unexpected_calibration_groups_fail_closed() {
-        let mut config = config();
-        config.expected_strata.push("low_motion_single_echo".to_string());
+        let mut invalid_config = config();
+        invalid_config
+            .expected_strata
+            .push("low_motion_single_echo".to_string());
         assert_eq!(
-            calibrate_groupwise_null(&calibration(), &evaluation(), &config),
+            calibrate_groupwise_null(&calibration(), &evaluation(), &invalid_config),
             Err(GroupwiseCalibrationError::DuplicateExpectedStratum)
         );
         let mut unexpected = calibration();
         unexpected[0].stratum_id = "undeclared_site".to_string();
         assert!(matches!(
             calibrate_groupwise_null(&unexpected, &evaluation(), &config()),
-            Err(GroupwiseCalibrationError::DuplicateExpectedStratum)
+            Err(GroupwiseCalibrationError::UnexpectedCalibrationStratum { .. })
         ));
     }
 
     #[test]
     fn invalid_alpha_and_direction_threshold_fail_closed() {
-        let mut config = config();
-        config.alpha = 0.0;
+        let mut invalid_alpha = config();
+        invalid_alpha.alpha = 0.0;
         assert_eq!(
-            calibrate_groupwise_null(&calibration(), &evaluation(), &config),
+            calibrate_groupwise_null(&calibration(), &evaluation(), &invalid_alpha),
             Err(GroupwiseCalibrationError::InvalidAlpha)
         );
-        let mut config = config();
-        config.minimum_direction_cosine = 1.2;
+        let mut invalid_direction = config();
+        invalid_direction.minimum_direction_cosine = 1.2;
         assert_eq!(
-            calibrate_groupwise_null(&calibration(), &evaluation(), &config),
+            calibrate_groupwise_null(&calibration(), &evaluation(), &invalid_direction),
             Err(GroupwiseCalibrationError::InvalidDirectionThreshold)
         );
     }
