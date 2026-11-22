@@ -417,6 +417,14 @@
       "total_group_target_cases": 67067,
       "total_row_indicator_cases": 134134,
       "scope": "Standalone dependency-free finite oracle and research fixture checks only; no Lean extraction, Lean kernel replay, RH proof validation, human study, or full workspace CI."
+    },
+    "receipt_validation_run": {
+      "pr_head": "60216f9b3f9bad0fb8f532c21086c33c7ac3bf5b",
+      "workflow_run_id": 45075466842,
+      "workflow_url": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/45075466842",
+      "workflow_name": "Math Proof Comprehension Pilot",
+      "conclusion": "success",
+      "validated": "The recorded code-test receipt, current JSON fixture, product-group counts, status and schema-compatible structure all passed the focused workflow."
     }
   },
   "upstream_graph_crosschecks": [
