@@ -38,7 +38,6 @@ pub struct MotionTransientConfig {
     pub spatial_decay_length: f64,
     pub broad_events: Vec<MotionEvent>,
     pub localized_events: Vec<LocalizedMotionEvent>,
-    pub seed: u64,
 }
 
 /// Generated motion-like nuisance. Layout: time x ROI.
@@ -51,7 +50,6 @@ pub struct MotionTransientField {
     /// Per-localized-event spatial loading; event order matches localized_events.
     pub localized_spatial_loadings: Vec<Vec<f64>>,
     pub localized_seed_roi_indices: Vec<usize>,
-    pub rng_seed: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -101,6 +99,16 @@ pub fn generate_motion_transient_field(
     graph
         .validate()
         .map_err(|_| MotionTransientError::InvalidGraph("graph validation failed"))?;
+    if graph
+        .adjacency
+        .iter()
+        .flatten()
+        .any(|weight| *weight > 0.0 && !(1.0 / *weight).is_finite())
+    {
+        return Err(MotionTransientError::InvalidGraph(
+            "inverse edge lengths must remain finite",
+        ));
+    }
     validate_config(config)?;
 
     let roi_count = graph.roi_labels.len();
@@ -108,6 +116,10 @@ pub fn generate_motion_transient_field(
     for (event_index, event) in config.broad_events.iter().enumerate() {
         validate_event(event_index, event, config.time_points)?;
         accumulate_event_train(&mut broad_event_train, event);
+    }
+
+    if broad_event_train.iter().any(|value| !value.is_finite()) {
+        return Err(MotionTransientError::NonFiniteGeneratedField);
     }
 
     let mut localized_event_trains = Vec::with_capacity(config.localized_events.len());
@@ -121,12 +133,20 @@ pub fn generate_motion_transient_field(
                 index: localized.seed_roi_index,
             });
         }
-        localized_event_trains.push(event_train(localized.event, config.time_points));
-        localized_spatial_loadings.push(graph_distance_loading(
+        let train = event_train(localized.event, config.time_points);
+        if train.iter().any(|value| !value.is_finite()) {
+            return Err(MotionTransientError::NonFiniteGeneratedField);
+        }
+        let spatial_loading = graph_distance_loading(
             graph,
             localized.seed_roi_index,
             config.spatial_decay_length,
-        ));
+        );
+        if spatial_loading.iter().any(|value| !value.is_finite()) {
+            return Err(MotionTransientError::NonFiniteGeneratedField);
+        }
+        localized_event_trains.push(train);
+        localized_spatial_loadings.push(spatial_loading);
         localized_seed_roi_indices.push(localized.seed_roi_index);
     }
 
@@ -155,7 +175,6 @@ pub fn generate_motion_transient_field(
         localized_event_trains,
         localized_spatial_loadings,
         localized_seed_roi_indices,
-        rng_seed: config.seed,
     })
 }
 
@@ -316,7 +335,6 @@ mod tests {
                 },
                 seed_roi_index: 2,
             }],
-            seed: 12345,
         }
     }
 
