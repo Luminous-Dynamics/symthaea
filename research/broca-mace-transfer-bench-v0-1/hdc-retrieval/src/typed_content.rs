@@ -664,11 +664,13 @@ fn push_category(
     let role = ContinuousHV::new_random(
         config.dimension,
         derive_seed(config.seed, b"role", tag, &[]),
-    );
+    )
+    .normalize();
     let filler = ContinuousHV::new_random(
         config.dimension,
         derive_seed(config.seed, b"category", tag, value),
-    );
+    )
+    .normalize();
     features.push(role.bind(&filler));
 }
 
@@ -682,13 +684,15 @@ fn push_numeric(
     let role = ContinuousHV::new_random(
         config.dimension,
         derive_seed(config.seed, b"role", tag, &[]),
-    );
+    )
+    .normalize();
     let filler = random_fourier_rbf(
         config.dimension,
         derive_seed(config.seed, NUMERIC_KERNEL, tag, &[]),
         value,
         bandwidth,
-    );
+    )
+    .normalize();
     features.push(role.bind(&filler));
 }
 
