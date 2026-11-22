@@ -12,9 +12,12 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
 
+use crate::benchmark::metrology_semantics::{
+    BinaryMeasurandSemanticsV1, classify_validated_metrology_label_v1,
+    validate_binary_measurand_semantics_v1,
+};
 use crate::benchmark::process_event_graph::{
-    MetrologyLabelStatusV1, PredictionInformationCutoffV1, ProcessEventGraphV1,
-    build_information_cutoff_snapshot_v1,
+    PredictionInformationCutoffV1, ProcessEventGraphV1, build_information_cutoff_snapshot_v1,
 };
 
 pub const POLICY_SCHEMA_V1: &str = "luminous.semi-bench.metrology-audit-policy.v1";
@@ -28,8 +31,6 @@ pub struct MetrologyAuditCandidateV1 {
     /// Source-defined context such as tool/chamber/recipe/product/time block.
     pub stratum_id: String,
     pub target_measurand_id: String,
-    pub class_semantics_ref: String,
-    pub class_semantics_sha256: String,
     pub predicted_defect_probability: f64,
     pub epistemic_uncertainty: f64,
     pub expected_value_of_information: f64,
@@ -43,6 +44,7 @@ pub struct MetrologyAuditPolicyV1 {
     pub model_sha256: String,
     pub prediction_packet_sha256: String,
     pub policy_config_sha256: String,
+    pub binary_semantics: BinaryMeasurandSemanticsV1,
     pub total_cost_budget: u64,
     pub exploit_cost_budget: u64,
     pub audit_cost_budget: u64,
@@ -87,6 +89,7 @@ pub struct MetrologyAuditSelectionReportV1 {
     pub model_sha256: String,
     pub prediction_packet_sha256: String,
     pub policy_config_sha256: String,
+    pub binary_semantics: BinaryMeasurandSemanticsV1,
     pub seed: u64,
     pub total_cost_budget: u64,
     pub exploit_cost_budget: u64,
@@ -109,9 +112,6 @@ pub struct MetrologyAuditSelectionReportV1 {
 pub struct MetrologyAuditOutcomeV1 {
     pub candidate_id: String,
     pub label_id: String,
-    pub positive: bool,
-    pub class_semantics_ref: String,
-    pub class_semantics_sha256: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -261,6 +261,9 @@ fn validate_policy(policy: &MetrologyAuditPolicyV1) -> Result<(), MetrologyAudit
     require_sha256(&policy.model_sha256, "model_sha256")?;
     require_sha256(&policy.prediction_packet_sha256, "prediction_packet_sha256")?;
     require_sha256(&policy.policy_config_sha256, "policy_config_sha256")?;
+    validate_binary_measurand_semantics_v1(&policy.binary_semantics).map_err(|error| {
+        MetrologyAuditError(format!("binary metrology semantics rejected: {error}"))
+    })?;
     if policy.total_cost_budget == 0
         || policy.exploit_cost_budget > policy.total_cost_budget
         || policy.audit_cost_budget > policy.total_cost_budget
@@ -295,14 +298,14 @@ fn validate_policy(policy: &MetrologyAuditPolicyV1) -> Result<(), MetrologyAudit
             ("subject_id", candidate.subject_id.as_str()),
             ("stratum_id", candidate.stratum_id.as_str()),
             ("target_measurand_id", candidate.target_measurand_id.as_str()),
-            ("class_semantics_ref", candidate.class_semantics_ref.as_str()),
         ] {
             require_text(value, &format!("candidates[{index}].{field}"))?;
         }
-        require_sha256(
-            &candidate.class_semantics_sha256,
-            &format!("candidates[{index}].class_semantics_sha256"),
-        )?;
+        if candidate.target_measurand_id != policy.binary_semantics.target_measurand_id {
+            return Err(MetrologyAuditError(format!(
+                "candidates[{index}].target_measurand_id differs from frozen binary semantics"
+            )));
+        }
         if !candidate_ids.insert(candidate.candidate_id.as_str()) {
             return Err(MetrologyAuditError(format!(
                 "candidates[{index}].candidate_id: duplicate identity"
@@ -490,8 +493,8 @@ pub fn select_metrology_audit_v1(
             subject_id: candidate.subject_id.clone(),
             stratum_id: candidate.stratum_id.clone(),
             target_measurand_id: candidate.target_measurand_id.clone(),
-            class_semantics_ref: candidate.class_semantics_ref.clone(),
-            class_semantics_sha256: candidate.class_semantics_sha256.clone(),
+            class_semantics_ref: policy.binary_semantics.semantics_id.clone(),
+            class_semantics_sha256: policy.binary_semantics.semantics_sha256.clone(),
             predicted_defect_probability: candidate.predicted_defect_probability,
             priority_score: priority(candidate),
             measurement_cost: candidate.measurement_cost,
@@ -514,6 +517,7 @@ pub fn select_metrology_audit_v1(
         model_sha256: policy.model_sha256.clone(),
         prediction_packet_sha256: policy.prediction_packet_sha256.clone(),
         policy_config_sha256: policy.policy_config_sha256.clone(),
+        binary_semantics: policy.binary_semantics.clone(),
         seed: policy.seed,
         total_cost_budget: policy.total_cost_budget,
         exploit_cost_budget: policy.exploit_cost_budget,
