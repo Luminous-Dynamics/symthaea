@@ -285,3 +285,18 @@ cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_groupwise_null
 The report contract is `groupwise-null-calibration.schema.json`. It reports local and common-guard FPR, signal detection, directionally correct detections, wrong-direction acceptance, Wilson intervals, calibration resolution and worst observed group results. The specification is `docs/neuroscience/RCAF_GROUPWISE_SHIFT_CALIBRATION_V1.md`.
 
 The finite-sample interpretation remains conditional on exchangeability within each predeclared stratum. This does not solve arbitrary continuous covariate shift, participant/site dependence or unseen-domain generalization. Per-estimator alpha is reported separately; post-hoc selection among the three estimators requires multiplicity control.
+
+
+## Weighted continuous covariate-shift calibration
+
+The `weighted_covariate_shift` module extends held-out calibration to continuous source/target covariate shift using supplied importance weights. Each evaluation point receives its own weighted upper-tail threshold, with its own test-point weight placed at (+infty). If that mass consumes more than the alpha tail budget, no finite threshold exists and the point is explicitly abstained.
+
+Run the synthetic continuous-weight smoke fixture:
+
+```sh
+cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_weighted_covariate_shift
+```
+
+The report contract is `weighted-covariate-shift.schema.json`. It includes calibration ESS, an empirical chi-square divergence proxy, maximum normalized calibration weight, maximum/mean concentration and test-point mass shares. A known-ratio fixture can be marked exact-guarantee-applicable only with explicit source-support and conditional-score-invariance attestations. Estimated ratios always remain diagnostic-only, even when cross-fitted and trained on a disjoint ratio-estimation split.
+
+The module does not estimate density ratios or claim arbitrary shift validity. Zero target weights are rejected as outside-support points; low ESS, unverified assumptions and excessive test-point mass produce explicit abstentions. See `docs/neuroscience/RCAF_WEIGHTED_CONTINUOUS_SHIFT_V1.md` for the weighted conformal assumptions and research frontier on sketched calibration and score-conditional leakage.
