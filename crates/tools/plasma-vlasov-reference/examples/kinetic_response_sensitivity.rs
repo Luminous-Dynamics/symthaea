@@ -283,7 +283,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let checkpoint_diagnostics = checkpoint_solver.diagnostics()?;
     println!(
-        "spatial_mode,velocity_mode,epsilon,minimum_plus,minimum_minus,max_moment_residual,ballistic_rephase_time,target_dE_rephase_magnitude,target_dE_rephase_phase,target_peak_time,target_peak_sensitivity,target_peak_phase,off_target_peak_sensitivity,off_target_to_target_ratio,epsilon_half_peak_sensitivity,epsilon_half_peak_relative_delta"
+        "spatial_mode,velocity_mode,epsilon,minimum_plus,minimum_minus,max_moment_residual,ballistic_rephase_time,target_dE_rephase_magnitude,target_dE_rephase_phase,target_peak_time,target_peak_sensitivity,target_peak_phase,intervention_mode_peak_sensitivity,intervention_to_echo_sensitivity_ratio,epsilon_half_peak_sensitivity,epsilon_half_peak_relative_delta"
     );
 
     for velocity_mode in VELOCITY_MODES {
@@ -322,7 +322,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             &direction,
             epsilon_half,
             future_steps,
-            future_steps,
+            2,
         )?;
         let half_peak = peak(&half_trace);
         let half_relative_delta = (half_peak.magnitude - target_peak.magnitude).abs()
