@@ -756,11 +756,11 @@ mod tests {
 
     #[test]
     fn invalid_statistics_directions_and_thresholds_fail_closed() {
-        let mut calibration = calibration();
-        calibration[0].statistics[0] = f64::NAN;
+        let mut invalid_calibration = calibration();
+        invalid_calibration[0].statistics[0] = f64::NAN;
         assert!(matches!(
             calibrate_and_evaluate_held_out_null(
-                &calibration,
+                &invalid_calibration,
                 &evaluation(),
                 "cal",
                 "eval",
@@ -770,12 +770,12 @@ mod tests {
             Err(HeldOutCalibrationError::InvalidStatistic { .. })
         ));
 
-        let mut evaluation = evaluation();
-        evaluation[0].signal_directional_cosine = 1.5;
+        let mut invalid_evaluation = evaluation();
+        invalid_evaluation[0].signal_directional_cosine = 1.5;
         assert!(matches!(
             calibrate_and_evaluate_held_out_null(
                 &calibration(),
-                &evaluation,
+                &invalid_evaluation,
                 "cal",
                 "eval",
                 0.05,
