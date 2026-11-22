@@ -760,8 +760,8 @@ mod tests {
 
         let (patterns, sources) = validate_pattern_corpus(&schema, &corpus, &repository_root)
             .expect("pattern corpus schema and Git blob provenance must match");
-        assert_eq!(patterns, 8);
-        assert_eq!(sources, 2);
+        assert_eq!(patterns, 17);
+        assert_eq!(sources, 7);
     }
 
     #[test]
