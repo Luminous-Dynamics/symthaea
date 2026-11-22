@@ -27,6 +27,36 @@ Frontend engineering combines multiple capabilities which should not be collapse
 
 SFEB separates these dimensions and requires independent browser evidence. It complements external benchmarks such as Vision2Web and Design2Code; it does not replace or impersonate them.
 
+## Observation harness
+
+The first Chromium observation primitive reuses the existing
+`crates/domains/symthaea-browser` crate and its `chromiumoxide` CDP session.
+Do not add a parallel browser-control dependency for the initial Chromium lane.
+
+`CdpSession::capture_frontend_evidence(FrontendEvidenceContext)` produces:
+
+- a redacted accessibility-tree JSON artifact;
+- a bounded layout JSON artifact with viewport, document overflow and semantic
+  element rectangles;
+- a full-page PNG screenshot;
+- a receipt with source/task/fixture identity, environment-manifest digest,
+  capture time, final redacted URL, viewport and SHA-256 artifact digests.
+
+Important limitations:
+
+- This is a browser-library capture primitive, not the SFEB runner.
+- Capture steps are sequential, not an atomic snapshot.
+- The bundle deliberately keeps binary screenshot bytes outside JSON
+  serialization.
+- The accessibility tree is sanitized, but screenshots and page-derived
+  artifacts must still be treated as potentially sensitive.
+- The module does not create OS-level network isolation or make an arbitrary
+  CDP endpoint trustworthy. Run benchmark browsers in disposable, fixture-only
+  network sandboxes; do not expose a host browser debugging port.
+- The current layout probe is intentionally bounded to semantic elements.
+  Reference fixtures should mark important component regions with stable
+  `data-sfeb-id` attributes to connect rendered geometry to source components.
+
 ## Task lifecycle
 
 A task moves through these states:
@@ -58,7 +88,7 @@ Never let the tested agent be the only evaluator of its own output. Use determin
 
 1. Author original reference briefs and screenshot assets with clear provenance.
 2. Add fixture-backed routes and service behavior for the selected tasks.
-3. Choose a Rust-first browser adapter after a small CDP/WebDriver proof of concept.
+3. Build the Rust-owned runner on the existing `symthaea-browser` CDP substrate; evaluate WebDriver BiDi only as a later cross-browser adapter.
 4. Implement the runner and immutable receipt schema.
 5. Run the existing `symthaea-ui` as the baseline.
 6. Run controlled ablations: base model, retrieval, interface contract, browser observation/repair, and full Symthaea integration.
