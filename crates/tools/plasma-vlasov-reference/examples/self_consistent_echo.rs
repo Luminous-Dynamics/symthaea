@@ -179,6 +179,13 @@ fn run_resolution(
     };
     let wrong_prediction =
         plasma_vlasov_reference::echo_analysis::predict_two_pulse_echo(wrong_pulse_pair)?;
+    let velocity_spacing = config.dv();
+    let fundamental_wave_number =
+        FIRST_MODE as f64 * TAU / config.domain_length;
+    let velocity_nyquist_time =
+        PI / (fundamental_wave_number * velocity_spacing);
+    let velocity_recurrence_time =
+        TAU / (fundamental_wave_number * velocity_spacing);
 
     let initial = maxwellian_perturbation(config, INITIAL_AMPLITUDE, FIRST_MODE, THERMAL_SPEED)?;
     let mut pulsed = VlasovPoisson1d1v::new(config, initial.clone())?;
@@ -544,9 +551,12 @@ fn run_resolution(
     )?;
 
     println!(
-        "# summary,{label},{},{},{dt:.8},{impulse_amplitude:.8},echo_mode={},predicted_echo_time={:.8},sampled_peak_time={:.8},peak_amplitude={:.12e},peak_phase={:.12e},detected={},fwhm={},wall_seconds={:.6}",
+        "# summary,{label},{},{},{dt:.8},{impulse_amplitude:.8},dv={:.8},velocity_nyquist_time={:.8},velocity_recurrence_time={:.8},echo_mode={},predicted_echo_time={:.8},sampled_peak_time={:.8},peak_amplitude={:.12e},peak_phase={:.12e},detected={},fwhm={},wall_seconds={:.6}",
         config.nx,
         config.nv,
+        velocity_spacing,
+        velocity_nyquist_time,
+        velocity_recurrence_time,
         prediction.echo_mode,
         prediction.echo_time,
         measurement.sampled_peak_time,
