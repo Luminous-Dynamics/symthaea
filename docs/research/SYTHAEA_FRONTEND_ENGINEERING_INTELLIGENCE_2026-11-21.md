@@ -794,14 +794,15 @@ acceptance remains anchored in executable oracles, not a VLM's confidence.
   evaluation. It does not measure SFEB's full runtime/security/maintenance
   loop.
   Source: https://aclanthology.org/2025.naacl-long.199/
-- WebdriverIO's browser-agent benchmark methodology fixes model, harness and
-  prompt while swapping browser tools; it uses a fixed-seed sample of 100
-  Online-Mind2Web tasks, publishes judgments and reports Wilson intervals.
-  Its current page, when rechecked on 2026-11-22, displayed no published
-  workflow runs, so this update does **not** repeat a historical 62% value as a
-  current leaderboard result. Its stated limitations still include live-site
-  nondeterminism, roughly ±10-point intervals at 100 tasks/one run, and
-  disagreement with human reviewers on about one run in seven.
+- WebdriverIO's browser-agent benchmark fixes model, harness and prompt
+  while swapping browser tools. Its page was updated October 9, 2026 and
+  currently lists 7 tools, 100 live-web tasks, 2 models and 2,511 total agent
+  runs. The displayed WebdriverIO session v10.0.2 row reports 62% success
+  (103/165; displayed 95% interval 55–69%), $0.013 median cost per task and
+  156 seconds median time per task. The benchmark explicitly warns that a
+  competing tool whose 95% interval overlaps the leader is not reliably worse.
+  Treat this as a browser-tool comparison, not a website-code-generation
+  leaderboard or evidence that one tool is significantly superior.
   Source: https://benchmark.webdriver.io/
 
 Raw scores across these benchmarks remain non-comparable. SFEB should reproduce
