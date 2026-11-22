@@ -145,7 +145,8 @@ pub struct MusicalTimingReport {
     pub observed_count: usize,
     pub missed_count: usize,
     pub extra_onset_count: usize,
-    pub event_match_completeness: f64,
+    pub target_accounting_completeness: f64,
+    pub observed_target_coverage_rate: f64,
     pub signed_phase_error_beats: Distribution,
     pub absolute_phase_error_beats: Distribution,
     pub absolute_error_ms: Distribution,
@@ -368,7 +369,7 @@ fn score_panel(panel: &MusicalTimingPanelV1) -> Result<MusicalTimingReport, Stri
     }
     let future_information_violations = 0usize;
     let total_targets = panel.target_events.len();
-    let event_match_completeness = if total_targets == 0 {
+    let target_accounting_completeness = if total_targets == 0 {
         0.0
     } else {
         (observed_count + missed_count) as f64 / total_targets as f64
@@ -386,7 +387,12 @@ fn score_panel(panel: &MusicalTimingPanelV1) -> Result<MusicalTimingReport, Stri
         observed_count,
         missed_count,
         extra_onset_count: panel.extra_onsets.len(),
-        event_match_completeness,
+        target_accounting_completeness,
+        observed_target_coverage_rate: if total_targets == 0 {
+            0.0
+        } else {
+            observed_count as f64 / total_targets as f64
+        },
         signed_phase_error_beats: distribution(&signed),
         absolute_phase_error_beats: distribution(&absolute),
         absolute_error_ms: distribution(&absolute_ms),
@@ -753,7 +759,8 @@ mod tests {
         let report = score(&value).expect("missed/extra events should be reported");
         assert_eq!(report.missed_count, 1);
         assert_eq!(report.extra_onset_count, 1);
-        assert_eq!(report.event_match_completeness, 1.0);
+        assert_eq!(report.target_accounting_completeness, 1.0);
+        assert_eq!(report.observed_target_coverage_rate, 0.75);
         assert!(!report.qualified_for_declared_timing_contract);
     }
 
