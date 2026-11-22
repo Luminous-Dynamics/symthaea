@@ -368,6 +368,43 @@ These are proposed programme targets. They must be calibrated after the first ba
 
 Do not compare these internal scores numerically with Vision2Web's public score unless we reproduce its exact scoring pipeline. The internal targets are directional gates, not claims of SOTA.
 
+### Benchmark scale and statistical power targets
+
+The internal suite should grow in controlled stages:
+
+| Stage | Task count | Composition | Holdout policy |
+|---|---:|---|---|
+| Pilot | 30 | 10 static, 10 interactive, 10 integration/maintenance | Public development tasks; no blind claim |
+| Comparative v1 | 150 | 50 per broad level, at least 5 product domains | 30% controller-only/hidden holdout |
+| Competitive v2 | 500+ | At least 150 static, 150 interactive, 150 full-stack, remainder maintenance/repair/adversarial | At least 20% hidden, disjoint by product/domain/template family |
+
+Run at least three independent trials per task for the primary comparison and
+five for high-variance tasks. Use paired task-level differences, bootstrap or
+appropriate hierarchical confidence intervals, and per-domain breakdowns. Do
+not treat multiple viewports from one task as independent tasks. Pre-register
+the task split, evaluator, budgets and primary outcome before the competitive
+run.
+
+### Stretch objectives against the dated external references
+
+The Vision2Web S4 snapshot's reported category averages were 87.4 static, 83.2
+interactive and 76.3 full-stack. Our internal stretch goals of 90 static, 88
+interactive and 82 full-stack are deliberately above those historical numbers,
+but **are not cross-benchmark equivalent**. A credible claim requires either
+running the exact Vision2Web protocol or a matched, independently reviewed
+reproduction. The browser-agent benchmark is a separate tool-use dimension;
+its 62% small-sample result should not be blended with code-generation scores.
+
+Additional proposed goals, measured on the same environment:
+- accepted-task cost at or below 70% of the same base agent after quality gates;
+- seeded repair success at least 80%, with regression below 5%;
+- expected calibration error below 0.10 for task-level confidence buckets;
+- zero critical accessibility or security failures, regardless of aggregate score;
+- at least 90% keyboard completion on the required user journeys;
+- report Core Web Vitals separately from local fixture timings and WASM transfer size.
+
+These are stretch goals for research planning, not achieved performance.
+
 ## 7. Knowledge curriculum: Leptos first
 
 The first knowledge corpus should be versioned and tested against the repository's actual dependency set.
