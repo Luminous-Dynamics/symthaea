@@ -360,7 +360,7 @@ See [MACE Provider-Native Trace Integrity and Outcome Grounding Benchmark v0.1](
 
 ## AML Add/Search adapter
 
-See [MACE AML Add/Search Adapter v0.1](../../docs/research/MACE_AML_ADD_SEARCH_ADAPTER_V0_1.md) for the public protocol, Luminous memory projection and next-cycle qualification targets. The workspace includes a separate broca-aml-adapter Rust contract core with 15 authored tests. It is not a hosted service and has not been runner-verified.
+See [MACE AML Add/Search Adapter v0.1](../../docs/research/MACE_AML_ADD_SEARCH_ADAPTER_V0_1.md) for the public protocol, Luminous memory projection and next-cycle qualification targets. The workspace includes a separate broca-aml-adapter Rust contract core with 15 authored tests. It is not a hosted service and has not been runner-verified. Hosted deployment, live Add/Search visibility and the next-cycle smoke path are tracked separately in [#13188](https://github.com/Luminous-Dynamics/symthaea/issues/13188).
 
 ## Current end-to-end integration inventory (2026-11-19)
 

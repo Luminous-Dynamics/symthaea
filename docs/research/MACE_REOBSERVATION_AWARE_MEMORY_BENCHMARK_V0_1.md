@@ -213,3 +213,6 @@ The source-level canonicality checks now verify more than a recalculable digest:
 - mutation controls rehash tampered values and require semantic validation to reject them.
 
 This is internal consistency and semantic validation, **not** authenticity. A public digest is not a signature; production plans still require the appropriate Mycelix-signed receipt and policy/authority validation at use. The portfolio module now has **13 authored tests** by source count (not execution status).
+
+
+The AML Add/Search core remains contract-only; hosted deployment, durability, immediate visibility and smoke qualification are tracked in [#13188](https://github.com/Luminous-Dynamics/symthaea/issues/13188).

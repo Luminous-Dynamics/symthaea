@@ -555,3 +555,8 @@ The source-level canonicality checks now verify more than a recalculable digest:
 - mutation controls rehash tampered values and require semantic validation to reject them.
 
 This is internal consistency and semantic validation, **not** authenticity. A public digest is not a signature; production plans still require the appropriate Mycelix-signed receipt and policy/authority validation at use. The portfolio module now has **13 authored tests** by source count (not execution status).
+
+
+### Hosted AML service prerequisite
+
+Cycle 2 results are useful reference baselines, but the current MACE adapter remains contract-only. Deployment, durable Add/visibility, tenant isolation, hosted HTTPS, smoke testing and next-cycle operational qualification are tracked in [#13188](https://github.com/Luminous-Dynamics/symthaea/issues/13188). The official platform owns Answer/Eval; MACE should provide provider-neutral Add/Search only.
