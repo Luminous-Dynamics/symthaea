@@ -490,7 +490,9 @@ pub fn evaluate_decision_regret_observation(
 
         let (bayes_action, expected_numerator, expected_world_count) =
             bayes_action_for_outcome(class, &priors, &likelihoods, outcome)?;
-        if expected_world_count != possible_worlds.len() as u64 {
+        let possible_world_count = u64::try_from(possible_worlds.len())
+            .map_err(|_| DecisionRegretVoiError::ArithmeticOverflow)?;
+        if expected_world_count != possible_world_count {
             return Err(DecisionRegretVoiError::ArithmeticOverflow);
         }
         after_expected_numerator =
@@ -501,7 +503,7 @@ pub fn evaluate_decision_regret_observation(
                 CandidateVisibleOutcome::Delivered(digest) => Some(digest),
                 CandidateVisibleOutcome::NoResultByDeadline => None,
             },
-            possible_world_count: possible_worlds.len() as u64,
+            possible_world_count,
             minimax_regret_action_id: minimax_action,
             worst_case_regret_ppm: worst_case_regret,
             bayes_regret_action_id: bayes_action,
@@ -543,7 +545,7 @@ pub fn evaluate_decision_regret_observation(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::decision_observability::{CandidateViewIdentity, CounterfactualWorld};
+    use crate::decision_observability::CandidateViewIdentity;
 
     fn digest(byte: u8) -> [u8; 32] {
         [byte; 32]
@@ -565,7 +567,7 @@ mod tests {
     ) -> CounterfactualWorld {
         CounterfactualWorld {
             evaluator_world_id: world_id,
-            hidden_world_sha256: digest(world_id as u8 + 10),
+            hidden_world_sha256: digest(if world_id == 1 { 11 } else { 12 }),
             candidate_view: view(),
             candidate_action_id: candidate_action.to_owned(),
             action_losses: losses
