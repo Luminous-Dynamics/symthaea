@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/rcaf/held-out-null-calibration.schema.json",
+  "title": "RCAF held-out null calibration report",
+  "description": "Synthetic disjoint-split conformal-style null calibration, with Wilson intervals; not empirical validation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "source_status",
+    "calibration_split_id",
+    "evaluation_split_id",
+    "alpha",
+    "minimum_direction_cosine",
+    "calibration_replicates",
+    "evaluation_replicates",
+    "calibration_replicate_ids_fingerprint",
+    "evaluation_replicate_ids_fingerprint",
+    "estimators",
+    "claim_limits"
+  ],
+  "properties": {
+    "schema_version": { "const": "rcaf.held-out-null-calibration/0.1.0" },
+    "source_status": { "const": "synthetic_held_out_null_calibration" },
+    "calibration_split_id": { "const": "synthetic-calibration-split-v1" },
+    "evaluation_split_id": { "const": "synthetic-evaluation-split-v1" },
+    "alpha": { "const": 0.05 },
+    "minimum_direction_cosine": { "const": 0.0 },
+    "calibration_replicates": { "const": 99 },
+    "evaluation_replicates": { "const": 100 },
+    "calibration_replicate_ids_fingerprint": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{16}$"
+    },
+    "evaluation_replicate_ids_fingerprint": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{16}$"
+    },
+    "estimators": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "estimator_id",
+          "alpha",
+          "critical_value",
+          "minimum_resolvable_alpha",
+          "calibration_replicates",
+          "evaluation_replicates",
+          "held_out_false_positive_rate",
+          "signal_detection_rate",
+          "directionally_correct_signal_rate",
+          "wrong_direction_acceptance_rate"
+        ],
+        "properties": {
+          "estimator_id": {
+            "enum": [
+              "absolute_weighted_jaccard",
+              "signed_shift_weighted_jaccard",
+              "normalized_mean_absolute_edge_error"
+            ]
+          },
+          "alpha": { "const": 0.05 },
+          "critical_value": { "type": ["number", "null"], "minimum": 0 },
+          "minimum_resolvable_alpha": { "const": 0.01 },
+          "calibration_replicates": { "const": 99 },
+          "evaluation_replicates": { "const": 100 },
+          "held_out_false_positive_rate": { "$ref": "#/$defs/proportion" },
+          "signal_detection_rate": { "$ref": "#/$defs/proportion" },
+          "directionally_correct_signal_rate": { "$ref": "#/$defs/proportion" },
+          "wrong_direction_acceptance_rate": { "$ref": "#/$defs/proportion" }
+        }
+      }
+    },
+    "claim_limits": {
+      "type": "array",
+      "minItems": 5,
+      "items": { "type": "string", "minLength": 1 }
+    }
+  },
+  "$defs": {
+    "proportion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "successes",
+        "trials",
+        "estimate",
+        "wilson_95_lower",
+        "wilson_95_upper"
+      ],
+      "properties": {
+        "successes": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "trials": { "const": 100 },
+        "estimate": { "type": "number", "minimum": 0, "maximum": 1 },
+        "wilson_95_lower": { "type": "number", "minimum": 0, "maximum": 1 },
+        "wilson_95_upper": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    }
+  }
+}
