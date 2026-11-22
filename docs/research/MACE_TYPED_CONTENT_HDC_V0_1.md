@@ -57,7 +57,7 @@ The following remain outside the lossy vector:
 - tenant, principal, capability, audience and purpose;
 - canonical lifecycle authority.
 
-Candidate hits retain the event ID and the existing candidate-visible Experience-view digest. The consumer must resolve the ID against the canonical evidence registry, compare the exact view digest and re-run all MACE predicates. A vector match is never evidence of trust, provenance, causal identification or authority.
+Candidate hits retain the event ID and the existing candidate-visible Experience-view digest. The index retains exact Scope and Action keys and filters to exact target scope/action before approximate HDC ranking; wrong-scope/action records cannot crowd out valid top-k candidates. The consumer must resolve the ID against the canonical evidence registry, compare the exact view digest and re-run all MACE predicates. A vector match is never evidence of trust, provenance, causal identification or authority.
 
 The estimand digest is included only as a candidate-ranking cue. Exact digest equality is still checked in the canonical record, and digest equality alone does not prove that the underlying semantic descriptor or receipt is authentic.
 
@@ -120,7 +120,7 @@ The index returns:
 - best similarity and best-vs-second margin;
 - profile digest;
 - elapsed query time;
-- vector/ID/digest payload lower-bound bytes.
+- vector/ID/digest/scope/action payload lower-bound bytes (including exact scope/action partition keys; allocator and map/runtime overhead remain excluded).
 
 Regime/objective and action are also retained as exact index partition keys and used as **hard prefilters** before vector ranking. A high-similarity candidate from another regime, objective or action cannot occupy a top-k slot and crowd out an applicable candidate. This is recorded in the typed profile version/digest. The current payload lower bound includes these exact partition keys.
 
@@ -157,7 +157,8 @@ The module now contains nine authored tests for:
 - profile digest sensitivity to dimension, seed, bandwidth and exact-filter policy;
 - duplicate-ID and non-finite input rejection;
 - query-time estimand/evidence-quality cues while preserving candidate-only authority;
-- the paired-runner typed arm uses the MACE qualification profile and emits a typed retrieval-profile digest.
+- the paired-runner typed arm uses the MACE qualification profile, exact scope/action prefilters and emits a typed retrieval-profile digest;
+- high-similarity wrong-scope/wrong-action items cannot displace in-scope candidates.
 
 These tests are authored source, not executed passes. Cargo, rustc and rustfmt are unavailable in the present environment.
 
