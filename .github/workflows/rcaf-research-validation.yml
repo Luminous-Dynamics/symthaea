@@ -384,6 +384,73 @@ jobs:
           print("PASS: matched four-cell counterfactuals with calibrated variance across four nuisance families")
           PY
 
+      - name: Run matched factorial signal-by-nuisance dose-response sweep
+        run: |
+          cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_factorial_dose_response -- "$RUNNER_TEMP/rcaf-factorial-dose-response.json"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import jsonschema
+
+          schema = json.loads(Path("research/rcaf/factorial-dose-response.schema.json").read_text())
+          report = json.loads(Path(os.environ["RUNNER_TEMP"] + "/rcaf-factorial-dose-response.json").read_text())
+          jsonschema.Draft202012Validator.check_schema(schema)
+          jsonschema.validate(report, schema)
+          assert report["source_status"] == "synthetic_factorial_sweep"
+          assert report["point_count"] == 16
+          assert report["signal_scales"] == [0.0, 0.5, 1.0, 2.0]
+          assert report["nuisance_component_variance_fractions"] == [0.0, 0.05, 0.10, 0.20]
+          assert len(report["raw_signal_fingerprint"]) == 16
+          assert len(report["raw_nuisance_fingerprint"]) == 16
+          points = report["points"]
+          for signal_index, signal_scale in enumerate(report["signal_scales"]):
+              row = points[signal_index * 4:(signal_index + 1) * 4]
+              for nuisance_index, point in enumerate(row):
+                  target = report["nuisance_component_variance_fractions"][nuisance_index]
+                  assert point["signal_scale_index"] == signal_index
+                  assert point["nuisance_fraction_index"] == nuisance_index
+                  assert point["signal_scale"] == signal_scale
+                  assert point["requested_nuisance_component_variance_fraction"] == target
+                  assert abs(point["realized_nuisance_component_variance_fraction"] - target) <= 1e-12
+                  assert [cell["cell_id"] for cell in point["cells"]] == [
+                      "clean_null",
+                      "signal_only",
+                      "nuisance_only",
+                      "signal_plus_nuisance",
+                  ]
+                  assert point["invariants"]["all_invariants_within_tolerance"] is True
+                  clean = point["clean_component_variance"]
+                  nuisance = point["nuisance_component_variance"]
+                  covariance = point["clean_nuisance_covariance"]
+                  denominator = clean + nuisance
+                  realized = nuisance / denominator if denominator > 0.0 else 0.0
+                  assert abs(realized - target) <= 1e-12
+                  combined = max(0.0, clean + nuisance + 2.0 * covariance)
+                  assert abs(point["combined_observed_variance"] - combined) <= 1e-10
+              assert all(
+                  row[index]["nuisance_component_variance"] < row[index + 1]["nuisance_component_variance"]
+                  for index in range(3)
+              )
+          # Common-random-numbers invariant: nuisance-only cells are identical across signal scales.
+          for nuisance_index in range(4):
+              fingerprints = [
+                  points[signal_index * 4 + nuisance_index]["cells"][2]["fnv1a64_fingerprint"]
+                  for signal_index in range(4)
+              ]
+              assert len(set(fingerprints)) == 1
+          # Exact factorial zero controls.
+          for signal_index in range(4):
+              zero_nuisance = points[signal_index * 4]
+              assert zero_nuisance["cells"][0]["fnv1a64_fingerprint"] == zero_nuisance["cells"][2]["fnv1a64_fingerprint"]
+              assert zero_nuisance["cells"][1]["fnv1a64_fingerprint"] == zero_nuisance["cells"][3]["fnv1a64_fingerprint"]
+          zero_signal = points[0:4]
+          for point in zero_signal:
+              assert point["cells"][0]["fnv1a64_fingerprint"] == point["cells"][1]["fnv1a64_fingerprint"]
+              assert point["cells"][2]["fnv1a64_fingerprint"] == point["cells"][3]["fnv1a64_fingerprint"]
+          print("PASS: 4 x 4 common-random-numbers signal × nuisance dose-response surface")
+          PY
+
       - name: Build content-addressed simulation execution receipt
         run: |
           python research/rcaf/tools/build_execution_receipt.py \
@@ -397,7 +464,8 @@ jobs:
               "$RUNNER_TEMP/rcaf-common-mode-nuisance-sweep.json" \
               "$RUNNER_TEMP/rcaf-spatial-nuisance.json" \
               "$RUNNER_TEMP/rcaf-spatial-variance-calibration.json" \
-              "$RUNNER_TEMP/rcaf-factorial-counterfactual.json"
+              "$RUNNER_TEMP/rcaf-factorial-counterfactual.json" \
+              "$RUNNER_TEMP/rcaf-factorial-dose-response.json"
           python - <<'PY'
           import json
           import os
@@ -430,6 +498,7 @@ jobs:
             ${{ runner.temp }}/rcaf-spatial-nuisance.json
             ${{ runner.temp }}/rcaf-spatial-variance-calibration.json
             ${{ runner.temp }}/rcaf-factorial-counterfactual.json
+            ${{ runner.temp }}/rcaf-factorial-dose-response.json
             ${{ runner.temp }}/rcaf-execution-receipt.json
           if-no-files-found: error
           retention-days: 30
