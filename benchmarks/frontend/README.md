@@ -53,6 +53,12 @@ Important limitations:
 - The module does not create OS-level network isolation or make an arbitrary
   CDP endpoint trustworthy. Run benchmark browsers in disposable, fixture-only
   network sandboxes; do not expose a host browser debugging port.
+- An ignored, no-network Chromium smoke test is provided at
+  `crates/domains/symthaea-browser/tests/frontend_capture_smoke.rs`. It runs
+  against `about:blank` and must be invoked explicitly on a host with Chrome or
+  Chromium installed:
+  `cargo test -p symthaea-browser --test frontend_capture_smoke -- --ignored --nocapture`.
+  It is not an SFEB task score and has not been executed in this environment.
 - The current layout probe is intentionally bounded to semantic elements.
   Reference fixtures should mark important component regions with stable
   `data-sfeb-id` attributes to connect rendered geometry to source components.
