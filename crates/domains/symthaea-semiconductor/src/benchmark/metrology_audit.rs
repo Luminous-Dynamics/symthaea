@@ -368,6 +368,9 @@ pub fn select_metrology_audit_v1(
     let mut exploit_cost_used = 0u64;
     for index in exploit_order {
         let cost = candidates[index].measurement_cost;
+        if priority(&candidates[index]) <= 0.0 {
+            continue;
+        }
         if let Some(next) = exploit_cost_used.checked_add(cost)
             && next <= policy.exploit_cost_budget
         {
@@ -583,6 +586,7 @@ pub fn estimate_metrology_population_v1(
         .collect();
     let mut outcome_by_candidate = BTreeMap::new();
     let mut used_label_ids = BTreeSet::new();
+    let mut used_candidate_ids = BTreeSet::new();
     for (index, outcome) in outcomes.iter().enumerate() {
         require_text(&outcome.candidate_id, &format!("outcomes[{index}].candidate_id"))?;
         require_text(&outcome.label_id, &format!("outcomes[{index}].label_id"))?;
@@ -602,6 +606,11 @@ pub fn estimate_metrology_population_v1(
         if !selected.selected {
             return Err(MetrologyAuditError(format!(
                 "outcomes[{index}] refers to an unselected candidate"
+            )));
+        }
+        if !used_candidate_ids.insert(outcome.candidate_id.as_str()) {
+            return Err(MetrologyAuditError(format!(
+                "outcomes[{index}].candidate_id: duplicate outcome"
             )));
         }
         if !matured.contains(outcome.label_id.as_str()) {
@@ -1087,6 +1096,19 @@ mod tests {
             clock_domain_id: "fab-local".into(),
             clock_basis: ClockBasisV1::SourceLocalNaive,
         };
-        assert!(estimate_metrology_population_v1(&selection, &[outcome], &graph, &cutoff).is_err());
+        let outcomes: Vec<_> = selection
+            .rows
+            .iter()
+            .filter(|row| row.selected)
+            .map(|row| MetrologyAuditOutcomeV1 {
+                candidate_id: row.candidate_id.clone(),
+                label_id: format!("unmatured-{}", row.candidate_id),
+                positive: false,
+                class_semantics_ref: row.class_semantics_ref.clone(),
+                class_semantics_sha256: row.class_semantics_sha256.clone(),
+            })
+            .collect();
+        assert!(estimate_metrology_population_v1(&selection, &outcomes, &graph, &cutoff).is_err());
+
     }
 }
