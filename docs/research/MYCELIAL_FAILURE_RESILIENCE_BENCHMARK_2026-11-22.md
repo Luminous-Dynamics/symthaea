@@ -171,13 +171,14 @@ Configuration:
 - fixed-point per-entity removal-success probability from 0 to 1,000,000;
 - deterministic seed.
 
-For each scenario and trial, each attempted segment/junction removal is independently enacted with the configured probability. A versioned SplitMix64 draw is derived from the profile seed, scenario ID and trial index. Every trial stores its exact realized failed segment/junction IDs plus its structural/demand results. Per-scenario summaries include mean realized failure count, probability of at least one enacted failure, weighted reachability mean/P05/P50/P95/min/max and directness/path-length means among trials where demand remains reachable.
+For each scenario and trial, each attempted segment/junction removal is enacted according to a counter-based, entity-keyed draw derived from the profile seed, trial index, entity kind and stable entity ID. This supplies common random numbers: the same source entity receives the same simulated delivery result across different attack strategies and across nested budgets. Different entity IDs use separate domain-separated draws. Every trial stores its exact realized failed segment/junction IDs plus its structural/demand results. Per-scenario summaries include mean realized failure count, probability of at least one enacted failure, weighted reachability mean/P05/P50/P95/min/max and directness/path-length means among trials where demand remains reachable.
 
 The profile validator:
 - checks every scenario has the configured number of trials;
-- recomputes the exact realized failed-ID lists from the PRNG and declared seed;
+- recomputes the exact entity-keyed realized failed-ID lists from the declared seed, trial index and stable entity IDs;
 - re-runs the weighted graph evaluator for **every trial** from those realized failed IDs and compares reachability, directness, path length, component count and cycle rank;
 - checks the trial ordering and uniqueness;
+- verifies realised failure sets remain nested across budget prefixes (common-random-number invariant);
 - recomputes all distribution summaries from the stored trials;
 - binds source graph, demand inventory, attack-plan digest and probability/seed configuration.
 
@@ -190,7 +191,7 @@ Bounds:
 - 0% success probability must realize no removals and reproduce baseline reachability.
 - 100% success probability must enact each attempted removal and match the deterministic attack evaluation.
 - intermediate probabilities are a **simulation assumption**, not an empirical estimate, unless calibrated from observed delivery/failure data.
-- current draws are independent across attempted entities; common-cause or correlated intervention delivery is not implemented.
+- current draws are domain-separated by entity kind and stable ID, with the same draw shared across attack policies for paired comparisons; common-cause or correlated intervention delivery is not implemented.
 - this profile models attack enactment uncertainty, not stochastic biological failure, organism survival or physical transport.
 - a high failure probability setting does not mean a hypha has that probability of breaking; it means the hypothetical intervention has that chance of being enacted in the model.
 
