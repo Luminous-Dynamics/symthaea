@@ -25,7 +25,7 @@
       "k": "x^(9/2+O(ε))",
       "n": "x^(2+O(ε))"
     },
-    "conceptual_role": "The average arithmetic divisibility sum is bounded by a size-derived main term plus a controlled error. The four error contributions balance with m about sqrt(x), enabling the one-sided prime-sum estimate."
+    "conceptual_role": "The average arithmetic divisibility sum is bounded by a size-derived main term plus a controlled error. The error terms balance with m about sqrt(x). The log-weight term is forced by centering each residue cell's smoothed prime sum: its universal μ y log y part plus its cell-specific linear constant combine to the exact M expression, leaving only residuals."
   },
   "quantities": [
     {
@@ -256,7 +256,10 @@
     "Map the Galois-cohomology bound and the denominator passage.",
     "Verify exact dependency membership for each named declaration against the upstream kernel-export dependency graph, not merely against a source file or the human guide.",
     "Reconstruct the assembly of maps and weights and the averaged M inequality, including the explicit constants/parameter constraints.",
-    "Obtain independent mathematical review of the role graph."
+    "Obtain independent mathematical review of the role graph.",
+    "Reconstruct the source-to-Lean correspondence for the cell-centering identities in Part II §5.1, including the constant sum and the linear-in-a term.",
+    "Reconstruct the finite-group translation identity (II.22) and the derived distinguished-cell identity (5.4), then distinguish the exact combinatorial identity from the separate uniform error estimates (5.6), (II.26) and (5.7).",
+    "Map the fixed-modulus prime number theorem cell-density argument and the uniform Estimate C dependency separately; do not transfer fixed-modulus O_A bounds to varying moduli."
   ],
   "limitations": [
     "The original Lean source mirror is an exact mirror of the published source but no license was established here; this Symthaea artifact stores only paths, declaration names, line spans, blob IDs and explanatory metadata, not source code.",
@@ -264,5 +267,55 @@
     "The proof's main inequality is still not derived in Rubinstein's working guide; the guide explicitly quotes substantial inputs from Lean.",
     "The Mathlib theorem extractor in #13295 has not been implemented or run.",
     "No theorem or proof acceptance is claimed by Symthaea."
-  ]
+  ],
+  "centering_bridge": {
+    "paper_section": "Part II §5.1, equations (5.1)–(5.3), PDF pp.33–34",
+    "source_formulas": {
+      "cell_smoothed_sum": "S_i(y) = sum_{r in cell i} c(r) (y/r - 1)_+",
+      "cell_counting_function": "Psi_i(z) = sum_{r in cell i, r <= z} c(r)",
+      "integral_identity": "S_i(y)/y = integral_1^y Psi_i(z) dz/z^2",
+      "cell_decomposition": "S_i(y) = μ y log y + C_i y + R_i(y)",
+      "cell_constant": "C_i = integral_1^infinity (Psi_i(z)-μz) dz/z^2",
+      "residual": "R_i(y) = -y integral_y^infinity (Psi_i(z)-μz) dz/z^2"
+    },
+    "density": {
+      "raw_prime_density_per_cell": "1/(4n): one half nonsquare mod d, one half specified sign mod q, and 1/n specified residue-pair column; CRT gives independence over invertible residue classes",
+      "weight_coefficient": "c(r) = (1-χ_d(r)) log p; coefficient is 2 log p on contributing ordinary primes, doubling the raw density",
+      "weighted_density": "μ = 1/(2n)",
+      "caveat": "This uses the fixed-modulus prime number theorem for each fixed q,d,N. Its error constants can depend on the moduli. Uniformity as q,d,N vary with x is not supplied by this fixed-modulus argument; Estimate C handles the uniform non-distinguished-cell control later."
+    },
+    "constants": {
+      "identity": "sum_i C_i = -1 - γ + c_{χ_d}",
+      "source_reason": "sum_i S_i(y) = S_1(y)-S_{χ_d}(y); the ordinary smoothed von Mangoldt sum has linear coefficient -1-γ, while the nonprincipal χ_d sum has linear coefficient -c_{χ_d}",
+      "cell_count": "There are 2n cells and μ=1/(2n)."
+    },
+    "weighted_recombination": {
+      "identity": "P_{u,t,j} = sum_i w_i S_i(a/w_i)",
+      "main_terms": "sum_i w_i [μ(a/w_i) log(a/w_i) + C_i(a/w_i)]",
+      "logarithmic_part": "μa sum_i log(a/w_i) = a log a - a <log w>, where <log w>=(1/(2n))sum_i log w_i",
+      "linear_constant_part": "a sum_i C_i = a(-1-γ+c_{χ_d})",
+      "conclusion": "P_{u,t,j} - M_{u,t,j} = sum_i w_i R_i(a/w_i)",
+      "precise_M": "M_{u,t,j}=a(log a - 1 - γ + c_{χ_d} - <log w>)"
+    },
+    "evidence_status": "Human-exposition derivation source-inspected; the local Lean declaration graph for these exact identities has not yet been extracted.",
+    "source_refs": [
+      "Rubinstein working guide Part II §5.1, equations (5.1)–(5.3), PDF pp.33–34"
+    ]
+  },
+  "translation_average": {
+    "paper_section": "Part II §5.3, equations (5.4)–(5.5), PDF pp.34–35",
+    "identity": "(1/n) sum_{u in H} 1_{v(r)=1, t[r] in u T2} = δ 1_{χ_q(r)=1} = δ/2 (1+χ_q(r))",
+    "reason": "For a fixed column s=t[r], each z in T2 determines exactly one translate u=s z^{-1}; therefore exactly |T2| translates select that column. The row condition v(r)=1 is equivalent to χ_q(r)=1.",
+    "weighted_consequence": "(1/n) sum_u sum_{i distinguished at u} b S_i(a/b) = (δ b/2) S_{q,d}(a/b)",
+    "residual_consequence": "By linearity of subtracting the common logarithmic and linear centering terms, the same identity holds for residuals R_i and R_{q,d}.",
+    "caveats": [
+      "This exact identity assumes the finite group H and the stated T2 subset construction.",
+      "The replacement of actual distinguished weights by b, the control of nondistinguished cells, and the change from a_t/b to x require separate error estimates; they are not consequences of translation counting alone.",
+      "Estimate C supplies a uniform bound as q,d,N vary; the fixed-modulus PNT does not supply that uniformity."
+    ],
+    "evidence_status": "Human-exposition identity source-inspected; not independently formalized by Symthaea.",
+    "source_refs": [
+      "Rubinstein working guide Part II §5.3, equations (5.4)–(5.5), PDF pp.34–35"
+    ]
+  }
 }
