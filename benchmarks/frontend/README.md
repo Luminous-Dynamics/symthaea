@@ -332,3 +332,13 @@ See [the execution protocol](qualification/EXECUTION.md). This is an evidence
 adjudicator, not the browser mutation executor. It does not run Chromium, create
 mutations, or cryptographically authenticate the runner's reported oracle IDs.
 The current SFEB benchmark remains `specification_only`.
+
+
+## Comparative evaluation protocol
+
+The machine-readable study design is in
+[`comparative-evaluation-v1.json`](comparative-evaluation-v1.json) with a
+matching schema. It defines matched arms A0–A4 plus a human reference arm,
+task-block randomization, task-cluster bootstrap, exact McNemar testing,
+Wilson intervals, multiple-comparison correction, judge blinding and
+publication/holdout scale targets. It is a protocol, not an executed result.
