@@ -21,6 +21,7 @@ use crate::mycelial_junction_graph::{
 };
 
 pub const MAX_REFERENCE_NETWORK_JUNCTIONS: usize = 2_048;
+pub const MYCELIAL_EUCLIDEAN_MST_SCHEMA_VERSION: u16 = 1;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MycelialMinimumSpanningForestReport {
@@ -67,9 +68,16 @@ pub struct SpatialReferenceEfficiencyReport {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MycelialEuclideanMstReport {
+    pub schema_version: u16,
     pub source_graph_digest: String,
     pub dimensionality: SpatialReferenceDimensionality,
     pub length_unit: JunctionLengthUnit,
+    /// Complete sorted junction identity set from the source graph.
+    pub junction_ids: Vec<String>,
+    /// The root identities explicitly supplied by the caller.
+    pub declared_root_junction_ids: Vec<String>,
+    /// Source graph terminals used for the root-directed efficiency denominator.
+    pub terminal_junction_ids: Vec<String>,
     pub selected_edges: Vec<MycelialEuclideanMstEdge>,
     pub selected_edge_count: usize,
     pub connected_components: usize,
@@ -355,17 +363,237 @@ pub fn build_euclidean_minimum_spanning_tree(
     let root_directed_geometric_efficiency =
         euclidean_root_efficiency(&junctions, &adjacency, root_junction_ids, dimensionality)?;
 
-    Ok(MycelialEuclideanMstReport {
+    let mut declared_root_junction_ids = root_junction_ids.to_vec();
+    declared_root_junction_ids.sort_unstable();
+    declared_root_junction_ids.dedup();
+    let mut terminal_junction_ids: Vec<_> = junctions
+        .iter()
+        .filter(|junction| !junction.terminal_filament_ids.is_empty())
+        .map(|junction| junction.id.clone())
+        .collect();
+    terminal_junction_ids.sort_unstable();
+    let report = MycelialEuclideanMstReport {
+        schema_version: MYCELIAL_EUCLIDEAN_MST_SCHEMA_VERSION,
         source_graph_digest,
         dimensionality,
         length_unit: graph.length_unit,
+        junction_ids: junctions.iter().map(|junction| junction.id.clone()).collect(),
+        declared_root_junction_ids,
+        terminal_junction_ids,
         selected_edge_count: selected_edges.len(),
         selected_edges,
         connected_components,
         total_euclidean_cost_model_units_microunits: quantize_nonnegative(total_cost),
         global_geometric_efficiency,
         root_directed_geometric_efficiency,
-    })
+    };
+    report
+        .validate()
+        .map_err(|_| MycelialReferenceNetworkError::InvalidReferenceGraph(
+            "Euclidean MST receipt failed its internal validation",
+        ))?;
+    Ok(report)
+}
+
+impl MycelialEuclideanMstReport {
+    pub fn validate(&self) -> Result<(), MycelialReferenceNetworkError> {
+        let valid_id = |value: &str| {
+            !value.is_empty()
+                && value.len() <= 128
+                && !value.chars().any(char::is_control)
+        };
+        let valid_digest = self.source_graph_digest.len() == 64
+            && self
+                .source_graph_digest
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte));
+        let junction_set: BTreeSet<_> = self.junction_ids.iter().map(String::as_str).collect();
+        let roots_valid = self.declared_root_junction_ids.windows(2).all(|pair| {
+            pair[0] < pair[1]
+        }) && self
+            .declared_root_junction_ids
+            .iter()
+            .all(|id| junction_set.contains(id.as_str()));
+        let terminals_valid = self.terminal_junction_ids.windows(2).all(|pair| {
+            pair[0] < pair[1]
+        }) && self
+            .terminal_junction_ids
+            .iter()
+            .all(|id| junction_set.contains(id.as_str()));
+        let mut edge_set = BTreeSet::new();
+        let edges_valid = self.selected_edges.iter().all(|edge| {
+            valid_id(&edge.source_junction_id)
+                && valid_id(&edge.target_junction_id)
+                && edge.source_junction_id < edge.target_junction_id
+                && junction_set.contains(edge.source_junction_id.as_str())
+                && junction_set.contains(edge.target_junction_id.as_str())
+                && edge.euclidean_length_model_units.is_finite()
+                && edge.euclidean_length_model_units >= 0.0
+                && edge_set.insert((
+                    edge.source_junction_id.as_str(),
+                    edge.target_junction_id.as_str(),
+                ))
+        }) && self.selected_edges.windows(2).all(|pair| {
+            (
+                pair[0].source_junction_id.as_str(),
+                pair[0].target_junction_id.as_str(),
+            ) <= (
+                pair[1].source_junction_id.as_str(),
+                pair[1].target_junction_id.as_str(),
+            )
+        });
+        let expected_components = if self.junction_ids.is_empty() { 0 } else { 1 };
+        let expected_edges = self.junction_ids.len().saturating_sub(expected_components);
+        let expected_cost = quantize_nonnegative(
+            self.selected_edges
+                .iter()
+                .map(|edge| edge.euclidean_length_model_units)
+                .sum(),
+        );
+        let global = &self.global_geometric_efficiency;
+        let expected_global_pairs = self
+            .junction_ids
+            .len()
+            .saturating_mul(self.junction_ids.len().saturating_sub(1))
+            / 2;
+        let root = &self.root_directed_geometric_efficiency;
+        let global_valid = global.eligible_pairs == expected_global_pairs
+            && global.reachable_pairs == expected_global_pairs
+            && global.unreachable_pairs == 0
+            && global.scored_pairs + global.coincident_zero_path_pairs
+                == global.reachable_pairs
+            && valid_efficiency_values(global);
+        let expected_root_reachable = if self.declared_root_junction_ids.is_empty() {
+            0
+        } else {
+            self.terminal_junction_ids.len()
+        };
+        let root_valid = root.eligible_pairs == self.terminal_junction_ids.len()
+            && root.reachable_pairs == expected_root_reachable
+            && root.unreachable_pairs == root.eligible_pairs.saturating_sub(root.reachable_pairs)
+            && root.scored_pairs + root.coincident_zero_path_pairs == root.reachable_pairs
+            && valid_efficiency_values(root);
+        if self.schema_version != MYCELIAL_EUCLIDEAN_MST_SCHEMA_VERSION
+            || !valid_digest
+            || self.junction_ids.len() > MAX_REFERENCE_NETWORK_JUNCTIONS
+            || self.junction_ids.windows(2).any(|pair| pair[0] >= pair[1])
+            || self.junction_ids.iter().any(|id| !valid_id(id))
+            || !roots_valid
+            || !terminals_valid
+            || !edges_valid
+            || self.selected_edge_count != self.selected_edges.len()
+            || self.selected_edge_count != expected_edges
+            || self.connected_components != expected_components
+            || self.total_euclidean_cost_model_units_microunits != expected_cost
+            || !global_valid
+            || !root_valid
+        {
+            return Err(MycelialReferenceNetworkError::InvalidReferenceGraph(
+                "Euclidean MST receipt is internally inconsistent",
+            ));
+        }
+        Ok(())
+    }
+
+    pub fn canonical_digest_hex(
+        &self,
+    ) -> Result<String, MycelialReferenceNetworkError> {
+        self.validate()?;
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea-euclidean-mst-reference-v1");
+        hasher.update(&self.schema_version.to_le_bytes());
+        hasher.update(self.source_graph_digest.as_bytes());
+        hasher.update(&[match self.dimensionality {
+            SpatialReferenceDimensionality::TwoD => 0,
+            SpatialReferenceDimensionality::ThreeD => 1,
+        }]);
+        hasher.update(&[match self.length_unit {
+            JunctionLengthUnit::OrganismLocalModelUnit => 0,
+        }]);
+        hash_string_list(&mut hasher, &self.junction_ids);
+        hash_string_list(&mut hasher, &self.declared_root_junction_ids);
+        hash_string_list(&mut hasher, &self.terminal_junction_ids);
+        for edge in &self.selected_edges {
+            hash_str(&mut hasher, &edge.source_junction_id);
+            hash_str(&mut hasher, &edge.target_junction_id);
+            hasher.update(&edge.euclidean_length_model_units.to_bits().to_le_bytes());
+        }
+        hasher.update(&(self.selected_edge_count as u64).to_le_bytes());
+        hasher.update(&(self.connected_components as u64).to_le_bytes());
+        hasher.update(&self.total_euclidean_cost_model_units_microunits.to_le_bytes());
+        hash_efficiency(&mut hasher, &self.global_geometric_efficiency);
+        hash_efficiency(&mut hasher, &self.root_directed_geometric_efficiency);
+        Ok(hex_digest(hasher.finalize().as_bytes()))
+    }
+}
+
+fn valid_efficiency_values(report: &SpatialReferenceEfficiencyReport) -> bool {
+    let mean_values_valid = report.mean_directness.is_none_or(|value| {
+        value.is_finite() && (0.0..=1.0 + 1.0e-9).contains(&value)
+    }) && report
+        .mean_network_path_length_model_units
+        .is_none_or(|value| value.is_finite() && value > 0.0);
+    let scored_values_present = if report.scored_pairs == 0 {
+        report.mean_directness.is_none()
+            && report.mean_network_path_length_model_units.is_none()
+    } else {
+        report.mean_directness.is_some()
+            && report.mean_network_path_length_model_units.is_some()
+    };
+    report.reachable_pairs <= report.eligible_pairs
+        && report.unreachable_pairs
+            == report.eligible_pairs.saturating_sub(report.reachable_pairs)
+        && report.scored_pairs + report.coincident_zero_path_pairs
+            == report.reachable_pairs
+        && mean_values_valid
+        && scored_values_present
+}
+
+fn hash_string_list(hasher: &mut blake3::Hasher, values: &[String]) {
+    hasher.update(&(values.len() as u64).to_le_bytes());
+    for value in values {
+        hash_str(hasher, value);
+    }
+}
+
+fn hash_str(hasher: &mut blake3::Hasher, value: &str) {
+    hasher.update(&(value.len() as u64).to_le_bytes());
+    hasher.update(value.as_bytes());
+}
+
+fn hash_efficiency(hasher: &mut blake3::Hasher, report: &SpatialReferenceEfficiencyReport) {
+    for value in [
+        report.eligible_pairs,
+        report.reachable_pairs,
+        report.unreachable_pairs,
+        report.coincident_zero_path_pairs,
+        report.scored_pairs,
+    ] {
+        hasher.update(&(value as u64).to_le_bytes());
+    }
+    hash_optional_f64(hasher, report.mean_directness);
+    hash_optional_f64(hasher, report.mean_network_path_length_model_units);
+}
+
+fn hash_optional_f64(hasher: &mut blake3::Hasher, value: Option<f64>) {
+    match value {
+        Some(value) => {
+            hasher.update(&[1]);
+            hasher.update(&value.to_bits().to_le_bytes());
+        }
+        None => {
+            hasher.update(&[0]);
+        }
+    }
+}
+
+fn hex_digest(bytes: &[u8; 32]) -> String {
+    let mut output = String::with_capacity(64);
+    for byte in bytes {
+        use fmt::Write as _;
+        write!(&mut output, "{byte:02x}").expect("writing to String cannot fail");
+    }
+    output
 }
 
 fn spatial_distance(
