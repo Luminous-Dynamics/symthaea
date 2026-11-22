@@ -159,6 +159,35 @@ Human review + immutable evidence receipt
 
 Start with `symthaea-ui`, not a rewrite of `symthaea-web`. It is the smaller service-gateway application and its README already defines a narrow v0 product. Use it to prove the loop. Keep the Leptos/WASM UI independent from the large Symthaea engine, preserving the current gateway boundary.
 
+### Existing browser substrate discovered during implementation
+
+The repository already contains `crates/domains/symthaea-browser`, a CDP browser agent built on `chromiumoxide`. It is not necessary to introduce a second browser automation dependency for the first SFEB lane.
+
+Verified existing capabilities include:
+
+- Chromium launch or attachment through `CdpSession`;
+- bounded accessibility-tree observations with redaction and URL sanitization;
+- full-page PNG screenshots;
+- capability- and policy-governed browser mutations through `BrowserExecutor`;
+- URL scheme, origin, credential and local-network checks (with an explicit warning that a production network boundary must additionally pin DNS resolution and re-check redirects).
+
+This programme extends that substrate with `symthaea_browser::frontend`:
+
+- a fixed-script, bounded layout probe for semantic elements;
+- optional `data-sfeb-id` identifiers linking reference regions to rendered components;
+- viewport and document overflow observations;
+- a capture bundle containing separate PNG, accessibility JSON and layout JSON artifacts;
+- SHA-256 artifact digests, byte lengths, a receipt digest and tamper verification;
+- sensitive-field and URL-secret redaction before serializing the accessibility artifact.
+
+The binary bundle deliberately does not implement JSON serialization: screenshot bytes remain a separate artifact instead of becoming an accidental unbounded JSON byte array.
+
+**Capture limitation:** accessibility, layout and screenshot observations are sequential, not an atomic browser transaction. SFEB fixtures must freeze animations, use deterministic fixture services, wait for fonts/layout readiness, and capture under a pinned browser environment. The capture primitive does not by itself enforce OS-level network isolation or make an arbitrary existing CDP endpoint trustworthy.
+
+For local fixture applications, use a disposable browser/network namespace and a fixture-only allowlist. Do not expose the host browser's debugging port or enable private-network access on a general-purpose browser session merely to make localhost tests work.
+
+Start with `symthaea-ui`, not a rewrite of `symthaea-web`. It is the smaller service-gateway application and its README already defines a narrow v0 product. Use it to prove the loop. Keep the Leptos/WASM UI independent from the large Symthaea engine, preserving the current gateway boundary.
+
 ## 4. SFEB benchmark design
 
 SFEB is an internal, versioned benchmark. It complements external leaderboards; it must not be described as an independent public leaderboard until its tasks, fixtures, scoring, and submissions are published with reproducibility instructions.
@@ -277,9 +306,11 @@ Each lesson/example must have: version, runnable code, expected output, negative
 
 ### Increment B — runner and fixtures
 
-- Create a Rust-owned runner/orchestrator and a pinned disposable Chromium environment.
-- Add fixed viewport and intermediate-width capture.
-- Record screenshots, DOM, accessibility tree, console, route trace, network fixture log and performance data.
+- Reuse `symthaea-browser::CdpSession` and `capture_frontend_evidence`; do not add another browser-control framework for the initial Chromium lane.
+- Create a Rust-owned SFEB runner/orchestrator and a pinned disposable Chromium environment.
+- Add fixed viewport and intermediate-width capture. The current layout probe records viewport, document overflow and bounded semantic element rectangles; `data-sfeb-id` anchors should be added to original fixture components.
+- Extend the receipt pipeline with exact source SHA, Cargo.lock digest, resolved Leptos version, browser build, OS image, font set, fixture revision, network policy and evaluator revision.
+- Record route/action traces, browser console, failed requests and performance observations alongside the three current capture artifacts.
 - Create independent assertions for each task and at least one hidden holdout partition.
 
 ### Increment C — baseline and ablations
@@ -301,10 +332,13 @@ Extend `symthaea-ui` with one bounded, reviewed feature from its README's deferr
 |---|---|
 | Public repository baseline inspected | **Verified** at `36eb3ad` |
 | Existing Leptos application surfaces inspected | **Verified** by source/manifests |
+| Existing `symthaea-browser` CDP substrate inspected | **Verified** by source |
+| Frontend layout/AX/screenshot evidence bundle | **Implemented in source**; compile/tests not run |
+| Bundle unit tests | **Authored**; not executed |
 | External benchmark landscape researched | **Sources reviewed**; benchmark protocols differ |
 | Programme and task inventory written | **Proposed** in this branch |
-| Runnable SFEB evaluator | **Not implemented** |
-| Browser execution and screenshot evidence | **Not run** |
+| Runnable SFEB evaluator and fixtures | **Not implemented** |
+| Browser execution on SFEB fixtures | **Not run** |
 | Symthaea frontend competence baseline | **Not measured** |
 | SOTA superiority | **Not claimed** |
 | CI | **Not awaited; no CI pass claimed** |
