@@ -35,7 +35,7 @@ pub enum TaskFamily {
     Recovery,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum TrackKind {
     Midi,
@@ -706,6 +706,22 @@ mod tests {
         value["events"][5]["sequence"] = serde_json::json!(6);
         let error = audit(&value).expect_err("duplicate event sequence/output sequence must fail");
         assert!(error.contains("sequence") || error.contains("output_sequence"));
+    }
+
+    #[test]
+    fn midi_output_inside_protected_rest_is_a_false_interruption() {
+        let mut value = trace();
+        value["events"][1]["decision"]["deadline_ns"] = serde_json::json!(250);
+        let mut output = value["events"][2].clone();
+        output["event_id"] = serde_json::json!("output-during-rest");
+        output["sequence"] = serde_json::json!(6);
+        output["monotonic_ns"] = serde_json::json!(230);
+        output["output"]["output_sequence"] = serde_json::json!(2);
+        output["output"]["first_emitted_ns"] = serde_json::json!(220);
+        value["events"].as_array_mut().unwrap().push(output);
+        let report = audit(&value).expect("late rest interruption remains auditable");
+        assert_eq!(report.false_interruption_count, 1);
+        assert!(!report.qualified_for_declared_trace_contract);
     }
 
     #[test]
