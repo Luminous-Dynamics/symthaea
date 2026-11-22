@@ -20,7 +20,10 @@ pub struct ComplexCoefficient {
 
 impl ComplexCoefficient {
     fn from_internal(value: Complex) -> Self {
-        Self { real: value.re, imaginary: value.im }
+        Self {
+            real: value.re,
+            imaginary: value.im,
+        }
     }
 
     fn into_internal(self) -> Complex {
@@ -62,20 +65,47 @@ pub enum KineticMemoryError {
     InvalidEtaGrid,
     InvalidTolerance,
     InvalidPacketId,
-    ShapeMismatch { expected: usize, actual: usize },
-    NonFiniteImpulse { index: usize },
-    NonFinitePhase { index: usize },
-    NonGridAlignedStreaming { spatial_mode: isize, requested_bins: f64 },
+    ShapeMismatch {
+        expected: usize,
+        actual: usize,
+    },
+    NonFiniteImpulse {
+        index: usize,
+    },
+    NonFinitePhase {
+        index: usize,
+    },
+    NonGridAlignedStreaming {
+        spatial_mode: isize,
+        requested_bins: f64,
+    },
     StreamingShiftOverflow,
     GridSizeOverflow,
-    AllocationFailed { elements: usize },
+    AllocationFailed {
+        elements: usize,
+    },
     NonFiniteTransform,
-    CaptureReconstructionExceeded { relative_error: f64, tolerance: f64 },
-    CaptureCasimirClosureExceeded { relative_error: f64, tolerance: f64 },
-    CaptureFieldChanged { relative_error: f64, tolerance: f64 },
+    CaptureReconstructionExceeded {
+        relative_error: f64,
+        tolerance: f64,
+    },
+    CaptureCasimirClosureExceeded {
+        relative_error: f64,
+        tolerance: f64,
+    },
+    CaptureFieldChanged {
+        relative_error: f64,
+        tolerance: f64,
+    },
     IncompatibleSolverGrid,
-    OutsideRestorationBand { relative_amplitude: f64, tolerance: f64 },
-    ReconstructionImaginaryResidual { relative_residual: f64, tolerance: f64 },
+    OutsideRestorationBand {
+        relative_amplitude: f64,
+        tolerance: f64,
+    },
+    ReconstructionImaginaryResidual {
+        relative_residual: f64,
+        tolerance: f64,
+    },
     AlreadyConsumed,
 }
 
@@ -94,8 +124,14 @@ impl fmt::Display for KineticMemoryError {
             }
             Self::NonFiniteImpulse { index } => write!(f, "impulse {index} is non-finite"),
             Self::NonFinitePhase { index } => write!(f, "phase {index} is non-finite"),
-            Self::NonGridAlignedStreaming { spatial_mode, requested_bins } => {
-                write!(f, "mode {spatial_mode} requests non-grid eta shift {requested_bins}")
+            Self::NonGridAlignedStreaming {
+                spatial_mode,
+                requested_bins,
+            } => {
+                write!(
+                    f,
+                    "mode {spatial_mode} requests non-grid eta shift {requested_bins}"
+                )
             }
             Self::StreamingShiftOverflow => write!(f, "streaming shift exceeds integer range"),
             Self::GridSizeOverflow => write!(f, "memory grid size overflows usize"),
@@ -103,21 +139,51 @@ impl fmt::Display for KineticMemoryError {
                 write!(f, "unable to allocate {elements} memory values")
             }
             Self::NonFiniteTransform => write!(f, "memory transform produced non-finite values"),
-            Self::CaptureReconstructionExceeded { relative_error, tolerance } => {
-                write!(f, "capture reconstruction error {relative_error:e} exceeds {tolerance:e}")
+            Self::CaptureReconstructionExceeded {
+                relative_error,
+                tolerance,
+            } => {
+                write!(
+                    f,
+                    "capture reconstruction error {relative_error:e} exceeds {tolerance:e}"
+                )
             }
-            Self::CaptureCasimirClosureExceeded { relative_error, tolerance } => {
-                write!(f, "capture C2 closure error {relative_error:e} exceeds {tolerance:e}")
+            Self::CaptureCasimirClosureExceeded {
+                relative_error,
+                tolerance,
+            } => {
+                write!(
+                    f,
+                    "capture C2 closure error {relative_error:e} exceeds {tolerance:e}"
+                )
             }
-            Self::CaptureFieldChanged { relative_error, tolerance } => {
-                write!(f, "capture changed field by {relative_error:e}, tolerance {tolerance:e}")
+            Self::CaptureFieldChanged {
+                relative_error,
+                tolerance,
+            } => {
+                write!(
+                    f,
+                    "capture changed field by {relative_error:e}, tolerance {tolerance:e}"
+                )
             }
             Self::IncompatibleSolverGrid => write!(f, "packet and active solver grids differ"),
-            Self::OutsideRestorationBand { relative_amplitude, tolerance } => {
-                write!(f, "out-of-band amplitude {relative_amplitude:e} exceeds {tolerance:e}")
+            Self::OutsideRestorationBand {
+                relative_amplitude,
+                tolerance,
+            } => {
+                write!(
+                    f,
+                    "out-of-band amplitude {relative_amplitude:e} exceeds {tolerance:e}"
+                )
             }
-            Self::ReconstructionImaginaryResidual { relative_residual, tolerance } => {
-                write!(f, "imaginary residual {relative_residual:e} exceeds {tolerance:e}")
+            Self::ReconstructionImaginaryResidual {
+                relative_residual,
+                tolerance,
+            } => {
+                write!(
+                    f,
+                    "imaginary residual {relative_residual:e} exceeds {tolerance:e}"
+                )
             }
             Self::AlreadyConsumed => write!(f, "packet has already been restored"),
         }
@@ -168,20 +234,29 @@ impl KineticMemoryPacket {
             return Err(KineticMemoryError::InvalidVelocityGrid);
         }
 
-        let before_budget = solver.quadratic_casimir_budget().map_err(KineticMemoryError::Solver)?;
+        let before_budget = solver
+            .quadratic_casimir_budget()
+            .map_err(KineticMemoryError::Solver)?;
         let original_distribution = solver.distribution.clone();
         let original_field = solver.electric_field.clone();
-        let expected = config.nx.checked_mul(config.nv).ok_or(KineticMemoryError::GridSizeOverflow)?;
+        let expected = config
+            .nx
+            .checked_mul(config.nv)
+            .ok_or(KineticMemoryError::GridSizeOverflow)?;
 
         let mut active_candidate = Vec::new();
-        active_candidate.try_reserve_exact(expected)
+        active_candidate
+            .try_reserve_exact(expected)
             .map_err(|_| KineticMemoryError::AllocationFailed { elements: expected })?;
         let mut packet_coefficients = Vec::new();
-        packet_coefficients.try_reserve_exact(expected)
+        packet_coefficients
+            .try_reserve_exact(expected)
             .map_err(|_| KineticMemoryError::AllocationFailed { elements: expected })?;
         let mut line = Vec::new();
         line.try_reserve_exact(config.nv)
-            .map_err(|_| KineticMemoryError::AllocationFailed { elements: config.nv })?;
+            .map_err(|_| KineticMemoryError::AllocationFailed {
+                elements: config.nv,
+            })?;
         line.resize(config.nv, Complex::ZERO);
 
         let mut maximum_imaginary = 0.0_f64;
@@ -287,15 +362,24 @@ impl KineticMemoryPacket {
         }
 
         solver.distribution = active_candidate;
-        if let Err(error) = solver.refresh_electric_field().and_then(|()| solver.ensure_finite_state()) {
+        if let Err(error) = solver
+            .refresh_electric_field()
+            .and_then(|()| solver.ensure_finite_state())
+        {
             solver.distribution = original_distribution;
             solver.electric_field = original_field;
             return Err(KineticMemoryError::Solver(error));
         }
 
-        let field_scale = original_field.iter().map(|value| value.abs()).fold(0.0_f64, f64::max)
+        let field_scale = original_field
+            .iter()
+            .map(|value| value.abs())
+            .fold(0.0_f64, f64::max)
             .max(f64::MIN_POSITIVE);
-        let field_delta = solver.electric_field.iter().zip(original_field.iter())
+        let field_delta = solver
+            .electric_field
+            .iter()
+            .zip(original_field.iter())
             .map(|(after, before)| (after - before).abs())
             .fold(0.0_f64, f64::max);
         let relative_field_delta = field_delta / field_scale;
@@ -316,8 +400,9 @@ impl KineticMemoryPacket {
                 return Err(KineticMemoryError::Solver(error));
             }
         };
-        let actual_c2_error = (active_after + packet.captured_casimir - before_budget.total_casimir).abs()
-            / before_budget.total_casimir.abs().max(f64::MIN_POSITIVE);
+        let actual_c2_error =
+            (active_after + packet.captured_casimir - before_budget.total_casimir).abs()
+                / before_budget.total_casimir.abs().max(f64::MIN_POSITIVE);
         if actual_c2_error > relative_tolerance {
             solver.distribution = original_distribution;
             solver.electric_field = original_field;
@@ -330,28 +415,51 @@ impl KineticMemoryPacket {
         Ok(packet)
     }
 
-    pub fn packet_id(&self) -> u64 { self.packet_id }
-    pub fn time(&self) -> f64 { self.time }
-    pub fn spatial_points(&self) -> usize { self.nx }
-    pub fn eta_points(&self) -> usize { self.eta_points }
-    pub fn eta_min(&self) -> f64 { self.eta_min }
-    pub fn eta_spacing(&self) -> f64 { self.eta_spacing }
+    pub fn packet_id(&self) -> u64 {
+        self.packet_id
+    }
+    pub fn time(&self) -> f64 {
+        self.time
+    }
+    pub fn spatial_points(&self) -> usize {
+        self.nx
+    }
+    pub fn eta_points(&self) -> usize {
+        self.eta_points
+    }
+    pub fn eta_min(&self) -> f64 {
+        self.eta_min
+    }
+    pub fn eta_spacing(&self) -> f64 {
+        self.eta_spacing
+    }
     pub fn eta_max(&self) -> f64 {
         self.eta_min + self.eta_points.saturating_sub(1) as f64 * self.eta_spacing
     }
-    pub fn is_consumed(&self) -> bool { self.consumed }
-    pub fn capture_reconstruction_error(&self) -> f64 { self.capture_reconstruction_error }
+    pub fn is_consumed(&self) -> bool {
+        self.consumed
+    }
+    pub fn capture_reconstruction_error(&self) -> f64 {
+        self.capture_reconstruction_error
+    }
 
     pub fn coefficient(&self, x_index: usize, eta_index: usize) -> Option<ComplexCoefficient> {
         if x_index >= self.nx || eta_index >= self.eta_points {
             return None;
         }
-        self.coefficients.get(x_index * self.eta_points + eta_index).copied()
+        self.coefficients
+            .get(x_index * self.eta_points + eta_index)
+            .copied()
     }
 
     /// Discrete Parseval C2: dx*d_eta/(2*pi) times the squared coefficient sum.
     pub fn quadratic_casimir(&self) -> f64 {
-        packet_casimir(self.nx, self.domain_length, self.eta_spacing, &self.coefficients)
+        packet_casimir(
+            self.nx,
+            self.domain_length,
+            self.eta_spacing,
+            &self.coefficients,
+        )
     }
 
     /// Free-stream each spatial Fourier mode as eta -> eta-k*dt.
@@ -382,8 +490,11 @@ impl KineticMemoryPacket {
         }
 
         let mut candidate = Vec::new();
-        candidate.try_reserve_exact(self.coefficients.len())
-            .map_err(|_| KineticMemoryError::AllocationFailed { elements: self.coefficients.len() })?;
+        candidate
+            .try_reserve_exact(self.coefficients.len())
+            .map_err(|_| KineticMemoryError::AllocationFailed {
+                elements: self.coefficients.len(),
+            })?;
         for (x_index, impulse) in impulses.iter().copied().enumerate() {
             for eta_index in 0..self.eta_points {
                 let index = x_index * self.eta_points + eta_index;
@@ -392,7 +503,9 @@ impl KineticMemoryPacket {
                 if !phase.is_finite() {
                     return Err(KineticMemoryError::NonFinitePhase { index });
                 }
-                let value = self.coefficients[index].into_internal().mul(Complex::cis(phase));
+                let value = self.coefficients[index]
+                    .into_internal()
+                    .mul(Complex::cis(phase));
                 if !value.re.is_finite() || !value.im.is_finite() {
                     return Err(KineticMemoryError::NonFiniteTransform);
                 }
@@ -411,9 +524,13 @@ impl KineticMemoryPacket {
         if velocities.iter().any(|velocity| !velocity.is_finite()) {
             return Err(KineticMemoryError::InvalidVelocityGrid);
         }
-        let count = self.nx.checked_mul(velocities.len()).ok_or(KineticMemoryError::GridSizeOverflow)?;
+        let count = self
+            .nx
+            .checked_mul(velocities.len())
+            .ok_or(KineticMemoryError::GridSizeOverflow)?;
         let mut values = Vec::new();
-        values.try_reserve_exact(count)
+        values
+            .try_reserve_exact(count)
             .map_err(|_| KineticMemoryError::AllocationFailed { elements: count })?;
         let weight = self.eta_spacing / TAU;
         let mut maximum_imaginary = 0.0_f64;
@@ -427,8 +544,8 @@ impl KineticMemoryPacket {
                     if !phase.is_finite() {
                         return Err(KineticMemoryError::NonFiniteTransform);
                     }
-                    let coefficient = self.coefficients[x_index * self.eta_points + eta_index]
-                        .into_internal();
+                    let coefficient =
+                        self.coefficients[x_index * self.eta_points + eta_index].into_internal();
                     sum = sum.add(coefficient.mul(Complex::cis(phase)));
                 }
                 let result = sum.scale(weight);
@@ -460,14 +577,19 @@ impl KineticMemoryPacket {
         let config = solver.config;
         if config.nx != self.nx
             || config.nv != self.reference_nv
-            || (config.domain_length - self.domain_length).abs() > relative_tolerance * self.domain_length.abs().max(1.0)
-            || (config.velocity_min - self.velocity_origin).abs() > relative_tolerance * self.velocity_origin.abs().max(1.0)
-            || (config.dv() - self.reference_dv).abs() > relative_tolerance * self.reference_dv.abs().max(1.0)
+            || (config.domain_length - self.domain_length).abs()
+                > relative_tolerance * self.domain_length.abs().max(1.0)
+            || (config.velocity_min - self.velocity_origin).abs()
+                > relative_tolerance * self.velocity_origin.abs().max(1.0)
+            || (config.dv() - self.reference_dv).abs()
+                > relative_tolerance * self.reference_dv.abs().max(1.0)
         {
             return Err(KineticMemoryError::IncompatibleSolverGrid);
         }
 
-        let amplitude_scale = self.coefficients.iter()
+        let amplitude_scale = self
+            .coefficients
+            .iter()
             .map(|value| value.amplitude())
             .fold(0.0_f64, f64::max)
             .max(f64::MIN_POSITIVE);
@@ -476,9 +598,8 @@ impl KineticMemoryPacket {
             let eta = self.eta_min + eta_index as f64 * self.eta_spacing;
             if eta.abs() > self.maximum_restore_eta * (1.0 + relative_tolerance) {
                 for x_index in 0..self.nx {
-                    maximum_out_of_band = maximum_out_of_band.max(
-                        self.coefficients[x_index * self.eta_points + eta_index].amplitude()
-                    );
+                    maximum_out_of_band = maximum_out_of_band
+                        .max(self.coefficients[x_index * self.eta_points + eta_index].amplitude());
                 }
             }
         }
@@ -499,14 +620,21 @@ impl KineticMemoryPacket {
             });
         }
 
-        let before_budget = solver.quadratic_casimir_budget().map_err(KineticMemoryError::Solver)?;
+        let before_budget = solver
+            .quadratic_casimir_budget()
+            .map_err(KineticMemoryError::Solver)?;
         let before_diagnostics = solver.diagnostics().map_err(KineticMemoryError::Solver)?;
         let previous_distribution = solver.distribution.clone();
         let previous_field = solver.electric_field.clone();
         let mut candidate = Vec::new();
-        candidate.try_reserve_exact(previous_distribution.len())
-            .map_err(|_| KineticMemoryError::AllocationFailed { elements: previous_distribution.len() })?;
-        for (active, contribution) in previous_distribution.iter().copied()
+        candidate
+            .try_reserve_exact(previous_distribution.len())
+            .map_err(|_| KineticMemoryError::AllocationFailed {
+                elements: previous_distribution.len(),
+            })?;
+        for (active, contribution) in previous_distribution
+            .iter()
+            .copied()
             .zip(reconstruction.values.iter().copied())
         {
             let value = active + contribution;
@@ -517,7 +645,10 @@ impl KineticMemoryPacket {
         }
 
         solver.distribution = candidate;
-        if let Err(error) = solver.refresh_electric_field().and_then(|()| solver.ensure_finite_state()) {
+        if let Err(error) = solver
+            .refresh_electric_field()
+            .and_then(|()| solver.ensure_finite_state())
+        {
             solver.distribution = previous_distribution;
             solver.electric_field = previous_field;
             return Err(KineticMemoryError::Solver(error));
@@ -545,7 +676,9 @@ impl KineticMemoryPacket {
             restored_casimir: packet_casimir,
             active_casimir_before: before_budget.total_casimir,
             active_casimir_after: after_budget.total_casimir,
-            casimir_closure_residual: after_budget.total_casimir - before_budget.total_casimir - packet_casimir,
+            casimir_closure_residual: after_budget.total_casimir
+                - before_budget.total_casimir
+                - packet_casimir,
             capture_reconstruction_error: self.capture_reconstruction_error,
             relative_imaginary_residual: reconstruction.relative_imaginary_residual,
             mass_delta: after_diagnostics.total_mass - before_diagnostics.total_mass,
@@ -556,7 +689,11 @@ impl KineticMemoryPacket {
     }
 
     fn ensure_unconsumed(&self) -> Result<(), KineticMemoryError> {
-        if self.consumed { Err(KineticMemoryError::AlreadyConsumed) } else { Ok(()) }
+        if self.consumed {
+            Err(KineticMemoryError::AlreadyConsumed)
+        } else {
+            Ok(())
+        }
     }
 
     fn translate_free_streaming(&mut self, dt: f64) -> Result<(), KineticMemoryError> {
