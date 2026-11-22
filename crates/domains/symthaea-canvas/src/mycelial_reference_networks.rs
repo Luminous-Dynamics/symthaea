@@ -10,7 +10,7 @@
 //! explicitly dimensioned reference constructions.
 
 use std::cmp::Ordering;
-use std::collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap};
+use std::collections::{BTreeSet, BinaryHeap, HashMap};
 use std::error::Error;
 use std::fmt;
 
