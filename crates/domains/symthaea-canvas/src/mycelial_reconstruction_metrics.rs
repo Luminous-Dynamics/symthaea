@@ -1974,6 +1974,170 @@ mod tests {
     }
 
     #[test]
+    fn component_attribution_counts_a_false_merge_even_when_all_nodes_match() {
+        let truth = graph(
+            "human",
+            vec![
+                node("A", AnnotatedJunctionKind::Origin, 0.0, 0.0, 0.0),
+                node("B", AnnotatedJunctionKind::Tip, 1.0, 0.0, 0.0),
+                node("C", AnnotatedJunctionKind::Origin, 10.0, 0.0, 0.0),
+                node("D", AnnotatedJunctionKind::Tip, 11.0, 0.0, 0.0),
+            ],
+            vec![edge("gt-ab", "A", "B", 1.0), edge("gt-cd", "C", "D", 1.0)],
+        );
+        let prediction = graph(
+            "model",
+            vec![
+                node("pA", AnnotatedJunctionKind::Origin, 0.0, 0.0, 0.0),
+                node("pB", AnnotatedJunctionKind::Tip, 1.0, 0.0, 0.0),
+                node("pC", AnnotatedJunctionKind::Origin, 10.0, 0.0, 0.0),
+                node("pD", AnnotatedJunctionKind::Tip, 11.0, 0.0, 0.0),
+            ],
+            vec![
+                edge("p-ab", "pA", "pB", 1.0),
+                edge("false-merge", "pB", "pC", 9.0),
+                edge("p-cd", "pC", "pD", 1.0),
+            ],
+        );
+        let matches = vec![
+            JunctionIdentityMatch {
+                predicted_junction_id: "pA".to_string(),
+                ground_truth_junction_id: "A".to_string(),
+            },
+            JunctionIdentityMatch {
+                predicted_junction_id: "pB".to_string(),
+                ground_truth_junction_id: "B".to_string(),
+            },
+            JunctionIdentityMatch {
+                predicted_junction_id: "pC".to_string(),
+                ground_truth_junction_id: "C".to_string(),
+            },
+            JunctionIdentityMatch {
+                predicted_junction_id: "pD".to_string(),
+                ground_truth_junction_id: "D".to_string(),
+            },
+        ];
+        let score = evaluate_mycelial_reconstruction(
+            &truth,
+            &prediction,
+            "explicit-match-v1",
+            &matches,
+            ReconstructionEvaluationConfig::default(),
+        )
+        .unwrap();
+        assert_eq!(score.ground_truth_topology.connected_components, 2);
+        assert_eq!(score.prediction_topology.connected_components, 1);
+        assert_eq!(score.component_error_summary.false_merge_count, 1);
+        assert_eq!(score.component_error_summary.false_split_count, 0);
+        assert_eq!(score.component_error_summary.matched_junction_count, 4);
+        assert_eq!(score.edge_topology.false_positive, 1);
+        score.validate().unwrap();
+    }
+
+    #[test]
+    fn component_attribution_counts_a_false_split_into_disconnected_prediction_parts() {
+        let truth = graph(
+            "human",
+            vec![
+                node("A", AnnotatedJunctionKind::Branch, 0.0, 0.0, 0.0),
+                node("B", AnnotatedJunctionKind::Branch, 1.0, 0.0, 0.0),
+                node("C", AnnotatedJunctionKind::Tip, 2.0, 0.0, 0.0),
+            ],
+            vec![edge("gt-ab", "A", "B", 1.0), edge("gt-bc", "B", "C", 1.0)],
+        );
+        let prediction = graph(
+            "model",
+            vec![
+                node("pA", AnnotatedJunctionKind::Branch, 0.0, 0.0, 0.0),
+                node("pB", AnnotatedJunctionKind::Branch, 1.0, 0.0, 0.0),
+                node("pC", AnnotatedJunctionKind::Tip, 2.0, 0.0, 0.0),
+            ],
+            vec![edge("p-ab", "pA", "pB", 1.0)],
+        );
+        let matches = vec![
+            JunctionIdentityMatch {
+                predicted_junction_id: "pA".to_string(),
+                ground_truth_junction_id: "A".to_string(),
+            },
+            JunctionIdentityMatch {
+                predicted_junction_id: "pB".to_string(),
+                ground_truth_junction_id: "B".to_string(),
+            },
+            JunctionIdentityMatch {
+                predicted_junction_id: "pC".to_string(),
+                ground_truth_junction_id: "C".to_string(),
+            },
+        ];
+        let score = evaluate_mycelial_reconstruction(
+            &truth,
+            &prediction,
+            "explicit-match-v1",
+            &matches,
+            ReconstructionEvaluationConfig::default(),
+        )
+        .unwrap();
+        assert_eq!(score.ground_truth_topology.connected_components, 1);
+        assert_eq!(score.prediction_topology.connected_components, 2);
+        assert_eq!(score.component_error_summary.false_merge_count, 0);
+        assert_eq!(score.component_error_summary.false_split_count, 1);
+        assert_eq!(score.edge_topology.false_negative, 1);
+    }
+
+    #[test]
+    fn component_attribution_separates_unmatched_components_from_splits_and_merges() {
+        let truth = graph(
+            "human",
+            vec![
+                node("A", AnnotatedJunctionKind::Tip, 0.0, 0.0, 0.0),
+                node("B", AnnotatedJunctionKind::Tip, 1.0, 0.0, 0.0),
+            ],
+            Vec::new(),
+        );
+        let prediction = graph(
+            "model",
+            vec![
+                node("pA", AnnotatedJunctionKind::Tip, 0.0, 0.0, 0.0),
+                node("pB", AnnotatedJunctionKind::Tip, 1.0, 0.0, 0.0),
+                node("pC", AnnotatedJunctionKind::Tip, 2.0, 0.0, 0.0),
+            ],
+            Vec::new(),
+        );
+        let matches = vec![
+            JunctionIdentityMatch {
+                predicted_junction_id: "pA".to_string(),
+                ground_truth_junction_id: "A".to_string(),
+            },
+            JunctionIdentityMatch {
+                predicted_junction_id: "pB".to_string(),
+                ground_truth_junction_id: "B".to_string(),
+            },
+        ];
+        let score = evaluate_mycelial_reconstruction(
+            &truth,
+            &prediction,
+            "explicit-match-v1",
+            &matches,
+            ReconstructionEvaluationConfig::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            score.component_error_summary.unmatched_prediction_component_count,
+            1
+        );
+        assert_eq!(
+            score.component_error_summary.unmatched_ground_truth_component_count,
+            0
+        );
+        assert_eq!(score.component_error_summary.false_merge_count, 0);
+        assert_eq!(score.component_error_summary.false_split_count, 0);
+        let digest = score.canonical_digest_hex().unwrap();
+        let mut tampered = score;
+        tampered.component_error_summary.false_merge_count = 1;
+        assert!(tampered.validate().is_err());
+        assert_ne!(tampered.canonical_digest_hex(), Ok(digest));
+    }
+
+    #[test]
     fn mismatched_junction_class_is_separate_from_detection_success() {
         let truth = graph(
             "human_annotation",
