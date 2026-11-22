@@ -67,6 +67,9 @@ pub struct HeldOutNullCalibrationReport {
     pub minimum_direction_cosine: f64,
     pub calibration_replicates: usize,
     pub evaluation_replicates: usize,
+    /// FNV-1a diagnostics over the ordered replicate identifiers; receipt supplies crypto digests.
+    pub calibration_replicate_ids_fingerprint: String,
+    pub evaluation_replicate_ids_fingerprint: String,
     pub estimators: Vec<EstimatorNullCalibrationSummary>,
 }
 
@@ -120,6 +123,8 @@ impl HeldOutNullCalibrationReport {
                 "  \"minimum_direction_cosine\": {:.12},\n",
                 "  \"calibration_replicates\": {},\n",
                 "  \"evaluation_replicates\": {},\n",
+                "  \"calibration_replicate_ids_fingerprint\": \"{}\",\n",
+                "  \"evaluation_replicate_ids_fingerprint\": \"{}\",\n",
                 "  \"estimators\": [\n{}\n  ],\n",
                 "  \"claim_limits\": [\n",
                 "    \"calibration and evaluation replicate identifiers are disjoint\",\n",
@@ -137,6 +142,8 @@ impl HeldOutNullCalibrationReport {
             self.minimum_direction_cosine,
             self.calibration_replicates,
             self.evaluation_replicates,
+            self.calibration_replicate_ids_fingerprint,
+            self.evaluation_replicate_ids_fingerprint,
             estimators,
         )
     }
@@ -412,8 +419,25 @@ pub fn calibrate_and_evaluate_held_out_null(
         minimum_direction_cosine,
         calibration_replicates: calibration.len(),
         evaluation_replicates: evaluation.len(),
+        calibration_replicate_ids_fingerprint: identifier_fingerprint(
+            calibration.iter().map(|item| item.replicate_id.as_str()),
+        ),
+        evaluation_replicate_ids_fingerprint: identifier_fingerprint(
+            evaluation.iter().map(|item| item.replicate_id.as_str()),
+        ),
         estimators,
     })
+}
+
+fn identifier_fingerprint<'a>(identifiers: impl Iterator<Item = &'a str>) -> String {
+    let mut hash = 0xcbf2_9ce4_8422_2325u64;
+    for identifier in identifiers {
+        for byte in identifier.as_bytes().iter().copied().chain([0xff]) {
+            hash ^= u64::from(byte);
+            hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+    }
+    format!("{hash:016x}")
 }
 
 fn validate_split_id(value: &str, field: &'static str) -> Result<(), HeldOutCalibrationError> {
