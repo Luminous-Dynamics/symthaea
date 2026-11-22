@@ -584,6 +584,12 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
             });
             let within =
                 worst_case_phase_error.map(|value| value <= panel.policy.maximum_onset_error_beats);
+            if within == Some(false) {
+                findings.push(format!(
+                    "forecast event {} exceeded onset tolerance including clock-alignment uncertainty",
+                    predicted.forecast_event_id
+                ));
+            }
             event_findings.push(EventForecastFinding {
                 forecast_id: forecast.forecast_id.clone(),
                 forecast_event_id: predicted.forecast_event_id.clone(),
@@ -1060,6 +1066,10 @@ mod tests {
                 .abs()
                 < 1e-9
         );
+        assert!(report
+            .qualification_findings
+            .iter()
+            .any(|finding| finding.contains("clock-alignment uncertainty")));
     }
 
     #[test]
