@@ -183,7 +183,9 @@ fn validate_subject(subject: &StratifiedSplitSubjectV1) -> Result<(), Stratified
     }
     require_text(&subject.seed_provenance, "seed_provenance")?;
     if subject.seeds.is_empty() {
-        return Err(StratifiedSplitError("seeds: expected non-empty array".into()));
+        return Err(StratifiedSplitError(
+            "seeds: expected non-empty array".into(),
+        ));
     }
     let mut unique_seeds = BTreeSet::new();
     for seed in &subject.seeds {
@@ -202,10 +204,7 @@ fn validate_subject(subject: &StratifiedSplitSubjectV1) -> Result<(), Stratified
     let mut seen_ids = BTreeSet::new();
     let mut counts = [0usize; 2];
     for (index, sample) in subject.samples.iter().enumerate() {
-        require_text(
-            &sample.sample_id,
-            &format!("samples[{index}].sample_id"),
-        )?;
+        require_text(&sample.sample_id, &format!("samples[{index}].sample_id"))?;
         if !seen_ids.insert(sample.sample_id.as_str()) {
             return Err(StratifiedSplitError(format!(
                 "samples[{index}].sample_id: duplicate"
@@ -284,13 +283,21 @@ fn build_repeat(
     for (index, sample_id) in negative_ids.iter().enumerate() {
         partition_by_id.insert(
             sample_id.clone(),
-            if index < negative_test_count { "test" } else { "train" },
+            if index < negative_test_count {
+                "test"
+            } else {
+                "train"
+            },
         );
     }
     for (index, sample_id) in positive_ids.iter().enumerate() {
         partition_by_id.insert(
             sample_id.clone(),
-            if index < positive_test_count { "test" } else { "train" },
+            if index < positive_test_count {
+                "test"
+            } else {
+                "train"
+            },
         );
     }
 
@@ -355,7 +362,11 @@ pub fn generate_repeated_stratified_splits_v1(
     subject: &StratifiedSplitSubjectV1,
 ) -> Result<StratifiedRepeatReportV1, StratifiedSplitError> {
     validate_subject(subject)?;
-    let total_positive = subject.samples.iter().filter(|sample| sample.positive).count();
+    let total_positive = subject
+        .samples
+        .iter()
+        .filter(|sample| sample.positive)
+        .count();
     let total_negative = subject.samples.len() - total_positive;
     let mut manifests = Vec::with_capacity(subject.seeds.len());
     let mut repeats = Vec::with_capacity(subject.seeds.len());
