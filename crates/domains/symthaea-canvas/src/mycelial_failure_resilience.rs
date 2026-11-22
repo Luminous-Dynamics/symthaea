@@ -22,6 +22,7 @@ use crate::mycelial_junction_graph::{
 use crate::mycelial_model::SpatialPoint3;
 
 pub const MYCELIAL_FAILURE_PROFILE_SCHEMA_VERSION: u16 = 1;
+pub const MYCELIAL_FAILURE_ATTACK_PLAN_SCHEMA_VERSION: u16 = 1;
 pub const MAX_FAILURE_JUNCTIONS: usize = 256;
 pub const MAX_FAILURE_SEGMENTS: usize = 512;
 pub const MAX_FAILURE_DEMAND_PAIRS: usize = 256;
@@ -1141,7 +1142,7 @@ pub fn build_mycelial_failure_attack_plan(
     }
 
     let plan = MycelialFailureAttackPlan {
-        schema_version: MYCELIAL_FAILURE_PROFILE_SCHEMA_VERSION,
+        schema_version: MYCELIAL_FAILURE_ATTACK_PLAN_SCHEMA_VERSION,
         source_graph_digest: graph.canonical_digest_hex()?,
         demand_digest: canonical_demand_digest(demands),
         strategy: config.strategy,
@@ -1186,7 +1187,7 @@ impl MycelialFailureAttackPlan {
                 ));
             }
         }
-        if self.schema_version != MYCELIAL_FAILURE_PROFILE_SCHEMA_VERSION
+        if self.schema_version != MYCELIAL_FAILURE_ATTACK_PLAN_SCHEMA_VERSION
             || self.source_graph_digest != graph.canonical_digest_hex()?
             || self.demand_digest != canonical_demand_digest(demands)
         {
@@ -1235,7 +1236,8 @@ impl MycelialFailureAttackPlan {
     pub fn canonical_digest_hex(
         &self,
     ) -> Result<String, MycelialFailureResilienceError> {
-        if self.maximum_failure_budget == 0
+        if self.schema_version != MYCELIAL_FAILURE_ATTACK_PLAN_SCHEMA_VERSION
+            || self.maximum_failure_budget == 0
             || self.maximum_failure_budget > MAX_FAILURE_SCENARIOS
             || self.scenarios.len() != self.maximum_failure_budget
             || self.ranked_entity_ids.len() < self.maximum_failure_budget
@@ -1245,7 +1247,16 @@ impl MycelialFailureAttackPlan {
                 .ranked_entity_ids_per_step
                 .iter()
                 .zip(&self.ranked_entity_ids)
-                .any(|(ranking, selected)| ranking.first() != Some(selected))
+                .any(|(ranking, selected)| {
+                    ranking.first() != Some(selected)
+                        || ranking.iter().any(|id| !valid_id(id))
+                        || ranking.iter().collect::<BTreeSet<_>>().len() != ranking.len()
+                })
+            || self.ranked_entity_ids_per_step.iter().enumerate().any(|(step, ranking)| {
+                let already_selected: BTreeSet<_> =
+                    self.ranked_entity_ids[..step].iter().map(String::as_str).collect();
+                ranking.iter().any(|id| already_selected.contains(id.as_str()))
+            })
             || !valid_digest(&self.source_graph_digest)
             || !valid_digest(&self.demand_digest)
             || self.ranked_entity_ids.iter().any(|id| !valid_id(id))
