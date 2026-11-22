@@ -377,7 +377,7 @@ fn execute_arm(
     CandidateRun {
         decision,
         retrieved_ids,
-        memory_digest: experience_list_digest(&resolved),
+        memory_digest: experience_list_digest(&memory),
         resolved,
         latency_ns: u64::try_from(started.elapsed().as_nanos()).unwrap_or(u64::MAX),
         index_bytes,
