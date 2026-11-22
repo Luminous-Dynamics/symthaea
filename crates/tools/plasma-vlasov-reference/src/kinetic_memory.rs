@@ -563,10 +563,16 @@ impl KineticMemoryPacket {
         if dt == 0.0 {
             return Ok(());
         }
-        let spectral_count = self.nx.checked_mul(self.eta_points).ok_or(KineticMemoryError::GridSizeOverflow)?;
+        let spectral_count = self
+            .nx
+            .checked_mul(self.eta_points)
+            .ok_or(KineticMemoryError::GridSizeOverflow)?;
         let mut spectral = Vec::new();
-        spectral.try_reserve_exact(spectral_count)
-            .map_err(|_| KineticMemoryError::AllocationFailed { elements: spectral_count })?;
+        spectral.try_reserve_exact(spectral_count).map_err(|_| {
+            KineticMemoryError::AllocationFailed {
+                elements: spectral_count,
+            }
+        })?;
         spectral.resize(spectral_count, Complex::ZERO);
         let mut line = Vec::new();
         line.try_reserve_exact(self.nx)
@@ -584,7 +590,8 @@ impl KineticMemoryPacket {
         }
 
         let mut shifts = Vec::new();
-        shifts.try_reserve_exact(self.nx)
+        shifts
+            .try_reserve_exact(self.nx)
             .map_err(|_| KineticMemoryError::AllocationFailed { elements: self.nx })?;
         let mut min_shift = i64::MAX;
         let mut max_shift = i64::MIN;
@@ -608,13 +615,24 @@ impl KineticMemoryPacket {
             max_shift = max_shift.max(shift);
         }
 
-        let span = max_shift.checked_sub(min_shift).ok_or(KineticMemoryError::StreamingShiftOverflow)?;
+        let span = max_shift
+            .checked_sub(min_shift)
+            .ok_or(KineticMemoryError::StreamingShiftOverflow)?;
         let span = usize::try_from(span).map_err(|_| KineticMemoryError::StreamingShiftOverflow)?;
-        let new_eta_points = self.eta_points.checked_add(span).ok_or(KineticMemoryError::GridSizeOverflow)?;
-        let new_count = self.nx.checked_mul(new_eta_points).ok_or(KineticMemoryError::GridSizeOverflow)?;
+        let new_eta_points = self
+            .eta_points
+            .checked_add(span)
+            .ok_or(KineticMemoryError::GridSizeOverflow)?;
+        let new_count = self
+            .nx
+            .checked_mul(new_eta_points)
+            .ok_or(KineticMemoryError::GridSizeOverflow)?;
         let mut shifted = Vec::new();
-        shifted.try_reserve_exact(new_count)
-            .map_err(|_| KineticMemoryError::AllocationFailed { elements: new_count })?;
+        shifted
+            .try_reserve_exact(new_count)
+            .map_err(|_| KineticMemoryError::AllocationFailed {
+                elements: new_count,
+            })?;
         shifted.resize(new_count, Complex::ZERO);
 
         for mode in 0..self.nx {
@@ -626,7 +644,8 @@ impl KineticMemoryPacket {
             }
             let origin_factor = Complex::cis(origin_phase);
             for eta_index in 0..self.eta_points {
-                let new_index = (eta_index as i64).checked_sub(shifts[mode])
+                let new_index = (eta_index as i64)
+                    .checked_sub(shifts[mode])
                     .and_then(|index| index.checked_add(max_shift))
                     .ok_or(KineticMemoryError::StreamingShiftOverflow)?;
                 let new_index = usize::try_from(new_index)
@@ -641,8 +660,11 @@ impl KineticMemoryPacket {
             return Err(KineticMemoryError::NonFiniteTransform);
         }
         let mut candidate = Vec::new();
-        candidate.try_reserve_exact(new_count)
-            .map_err(|_| KineticMemoryError::AllocationFailed { elements: new_count })?;
+        candidate.try_reserve_exact(new_count).map_err(|_| {
+            KineticMemoryError::AllocationFailed {
+                elements: new_count,
+            }
+        })?;
         candidate.resize(new_count, ComplexCoefficient::default());
         for eta_index in 0..new_eta_points {
             for (mode, value) in line.iter_mut().enumerate() {
@@ -653,7 +675,8 @@ impl KineticMemoryPacket {
                 if !value.re.is_finite() || !value.im.is_finite() {
                     return Err(KineticMemoryError::NonFiniteTransform);
                 }
-                candidate[x_index * new_eta_points + eta_index] = ComplexCoefficient::from_internal(value);
+                candidate[x_index * new_eta_points + eta_index] =
+                    ComplexCoefficient::from_internal(value);
             }
         }
 
@@ -673,14 +696,28 @@ fn validate_tolerance(tolerance: f64) -> Result<(), KineticMemoryError> {
 
 fn distribution_casimir(config: super::VlasovPoissonConfig, distribution: &[f64]) -> f64 {
     let weight = config.dx() * config.dv();
-    distribution.iter().map(|value| value * value * weight).sum()
+    distribution
+        .iter()
+        .map(|value| value * value * weight)
+        .sum()
 }
 
-fn packet_casimir(nx: usize, domain_length: f64, eta_spacing: f64, values: &[ComplexCoefficient]) -> f64 {
+fn packet_casimir(
+    nx: usize,
+    domain_length: f64,
+    eta_spacing: f64,
+    values: &[ComplexCoefficient],
+) -> f64 {
     let weight = domain_length / nx as f64 * eta_spacing / TAU;
-    values.iter().map(|value| {
-        value.real.mul_add(value.real, value.imaginary * value.imaginary) * weight
-    }).sum()
+    values
+        .iter()
+        .map(|value| {
+            value
+                .real
+                .mul_add(value.real, value.imaginary * value.imaginary)
+                * weight
+        })
+        .sum()
 }
 
 #[cfg(test)]
@@ -713,7 +750,8 @@ mod tests {
         let original = solver.distribution().to_vec();
         let field_energy_before = solver.diagnostics().unwrap().field_energy;
         let c2_before = solver.quadratic_casimir_budget().unwrap().total_casimir;
-        let mut packet = KineticMemoryPacket::capture_high_velocity_modes(&mut solver, 11, 8, 1.0e-10).unwrap();
+        let mut packet =
+            KineticMemoryPacket::capture_high_velocity_modes(&mut solver, 11, 8, 1.0e-10).unwrap();
         assert!(packet.quadratic_casimir() > 0.0);
         let active_c2 = solver.quadratic_casimir_budget().unwrap().total_casimir;
         assert!((active_c2 + packet.quadratic_casimir() - c2_before).abs() < 1.0e-10 * c2_before);
@@ -727,18 +765,24 @@ mod tests {
         for (actual, expected) in solver.distribution().iter().zip(original.iter()) {
             assert!((actual - expected).abs() < 1.0e-10);
         }
-        assert!(matches!(packet.restore_into_solver(&mut solver, 1.0e-10), Err(KineticMemoryError::AlreadyConsumed)));
+        assert!(matches!(
+            packet.restore_into_solver(&mut solver, 1.0e-10),
+            Err(KineticMemoryError::AlreadyConsumed)
+        ));
     }
 
     #[test]
     fn free_streaming_expands_eta_support_without_periodic_wraparound() {
         let mut solver = solver();
-        let mut packet = KineticMemoryPacket::capture_high_velocity_modes(&mut solver, 12, 8, 1.0e-10).unwrap();
+        let mut packet =
+            KineticMemoryPacket::capture_high_velocity_modes(&mut solver, 12, 8, 1.0e-10).unwrap();
         let old_points = packet.eta_points();
         let old_c2 = packet.quadratic_casimir();
         let old_min = packet.eta_min();
         // For Lx=2pi and deta=2pi/12=pi/6, dt=pi/6 shifts mode k=1 by one bin.
-        packet.advance_free_streaming(std::f64::consts::PI / 6.0).unwrap();
+        packet
+            .advance_free_streaming(std::f64::consts::PI / 6.0)
+            .unwrap();
         assert!(packet.eta_points() > old_points);
         assert!(packet.eta_min() < old_min);
         assert!((packet.quadratic_casimir() - old_c2).abs() < 1.0e-10);
@@ -748,7 +792,8 @@ mod tests {
     #[test]
     fn velocity_impulse_preserves_packet_c2_and_is_reversible() {
         let mut solver = solver();
-        let mut packet = KineticMemoryPacket::capture_high_velocity_modes(&mut solver, 13, 6, 1.0e-10).unwrap();
+        let mut packet =
+            KineticMemoryPacket::capture_high_velocity_modes(&mut solver, 13, 6, 1.0e-10).unwrap();
         let before = packet.coefficients.clone();
         let c2_before = packet.quadratic_casimir();
         let config = config();
@@ -768,7 +813,8 @@ mod tests {
     #[test]
     fn non_grid_aligned_streaming_fails_without_mutation() {
         let mut solver = solver();
-        let mut packet = KineticMemoryPacket::capture_high_velocity_modes(&mut solver, 14, 8, 1.0e-10).unwrap();
+        let mut packet =
+            KineticMemoryPacket::capture_high_velocity_modes(&mut solver, 14, 8, 1.0e-10).unwrap();
         let before = packet.coefficients.clone();
         let eta_min = packet.eta_min();
         assert!(matches!(
@@ -783,8 +829,12 @@ mod tests {
     fn invalid_capture_inputs_leave_solver_unchanged() {
         let mut solver = solver();
         let before = solver.distribution().to_vec();
-        assert!(KineticMemoryPacket::capture_high_velocity_modes(&mut solver, 15, 0, 1.0e-10).is_err());
-        assert!(KineticMemoryPacket::capture_high_velocity_modes(&mut solver, 15, 8, f64::NAN).is_err());
+        assert!(
+            KineticMemoryPacket::capture_high_velocity_modes(&mut solver, 15, 0, 1.0e-10).is_err()
+        );
+        assert!(
+            KineticMemoryPacket::capture_high_velocity_modes(&mut solver, 15, 8, f64::NAN).is_err()
+        );
         assert_eq!(solver.distribution(), before.as_slice());
     }
 }
