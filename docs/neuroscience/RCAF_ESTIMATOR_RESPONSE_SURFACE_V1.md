@@ -88,3 +88,30 @@ Do not confuse M Monte Carlo replicates with N independent participants. The cur
 ## Claim limits
 
 The module evaluates existing RCAF matrix similarity estimators on synthetic Pearson connectivity matrices. It does not establish superiority to fMRIPrep, XCP-D, CONN or current denoising SOTA. It does not estimate empirical artifact distributions or qualify biological/clinical outcomes. A superiority claim still requires matched public data, native comparator settings, frozen external evaluation and independent replication.
+
+
+## 7. Current industry benchmark anchors and reproducible comparator set
+
+The primary modern denoising comparator should be *Benchmarking fMRI Denoising Pipelines* (Human Brain Mapping, first published 1 July 2026; DOI [10.1002/hbm.70561](https://doi.org/10.1002/hbm.70561)). It evaluates task and rest across single-/multi-band and single-/multi-echo acquisitions, and includes one-step nuisance regression, pre-whitening and temporally shifted physiological regressors. Its endpoints include tSNR, retained degrees of freedom, motion correction and signal preservation. RCAF should reproduce relevant configurations and report the same endpoints alongside the matched factorial nuisance-only and signal-plus-nuisance controls.
+
+A second benchmark, *An evaluation of the efficacy of single-echo and multi-echo fMRI denoising strategies* (Network Neuroscience, 2026; DOI [10.1162/NETN.a.547](https://doi.org/10.1162/NETN.a.547)), evaluates 90 pipelines in 358 healthy adults and examines both data-quality metrics and behavioural prediction. Its denoising-versus-prediction trade-off reinforces that no single estimator score should stand in for scientific validity.
+
+A current public comparator candidate is the **ABCC v4.1.0 release dated 18 November 2026** ([release page](https://github.com/ChildMindInstitute/abcd-hcp-pipeline/releases/tag/v4.1.0)). It publishes derivatives using fMRIPrep 25.1.4 and XCP-D 26.1.1, and includes ReproTM individualized-network outputs for resting-state and several task conditions. Treat these as an explicitly pinned derivative snapshot—not a claim that those are the latest versions of every package. The actual fMRIPrep/XCP-D configuration, input release, container digest and confound/denoising settings must be recorded.
+
+### Minimum fair comparison protocol
+
+- Compare native recommended configurations and separately declared matched configurations; never silently retune one comparator more aggressively than another.
+- Freeze raw data release, atlas/ROI mapping, participant IDs, quality filters, split seeds, endpoints and evaluation code before running the comparison.
+- Use participant-grouped and site-held-out splits. Any model or threshold selection happens inside training folds only.
+- Report the full trade-off: tSNR, DoF retained, motion correction, signal/task preservation, connectivity reliability, behavioural prediction where appropriate, attrition and compute.
+- Include nuisance-only null controls and known target interventions at every acquisition stratum. A method does not win by censoring away the difficult participants or by deleting target signal.
+- Publish failure cases, missing derivatives and unsuccessful runs. A comparison that reports only completed favourable cells is not a qualification.
+
+### Four result classes that must stay separate
+
+1. **Cell-construction invariance:** the same interventions were used in matched counterfactual cells.
+2. **Per-matrix estimator response:** similarities, displacement, retention and connectivity-direction diagnostics from this module.
+3. **Statistical qualification:** repeated independent nulls, power/recovery, wrong-direction rejection and interval coverage.
+4. **Empirical transportability:** participant-level and site-held-out validation against public/independent data.
+
+Only the third and fourth categories can support claims about statistical detection performance or generalization. The current estimator response surface supplies category two and deterministic checks for category one; it is not itself a statistical-power benchmark.
