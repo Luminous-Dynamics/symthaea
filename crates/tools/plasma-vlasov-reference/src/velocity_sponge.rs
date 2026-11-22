@@ -112,13 +112,33 @@ impl VlasovPoisson1d1v {
         let before = self
             .quadratic_casimir_budget()
             .map_err(VelocityFourierSpongeError::Solver)?;
+
+        // Preserve exact identity semantics and avoid an unnecessary FFT
+        // round-trip when the requested operator has no effect.
+        if duration == 0.0 || maximum_damping_rate == 0.0 {
+            return Ok(VelocityFourierSpongeReport {
+                duration,
+                start_fraction_of_nyquist,
+                maximum_damping_rate,
+                exponent,
+                nyquist_attenuation: 1.0,
+                casimir_before: before,
+                casimir_after: before,
+                removed_total_casimir: 0.0,
+                removed_spatial_mean_casimir: 0.0,
+                removed_fluctuation_f_strophy: 0.0,
+                spectral_removed_casimir: 0.0,
+                casimir_accounting_residual: 0.0,
+            });
+        }
+
         let config = self.config;
         let expected = config
             .nx
             .checked_mul(config.nv)
-            .ok_or_else(|| {
-                VelocityFourierSpongeError::Solver(SolverError::GridSizeOverflow)
-            })?;
+            .ok_or(VelocityFourierSpongeError::Solver(
+                SolverError::GridSizeOverflow,
+            ))?;
 
         let mut candidate = Vec::new();
         candidate.try_reserve_exact(expected).map_err(|_| {
