@@ -198,3 +198,8 @@ The current Rust contract has been strengthened beyond parent/output digest matc
 The frozen DTCO fixture now carries the design and constraint digests as root-run inputs (seven distinct artifacts). Eleven DTCO-specific tests cover the known answer and adversarial lineage, stage, uncertainty and binding cases.
 
 Hosted run [#44989349728](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44989349728) passed **35/35 Rust tests** and **46/46 Python reference tests**, Rust fmt and Clippy, plus byte-for-byte output comparisons for Python binary/inspection/pair reports and Rust binary/SECOM/DTCO CLI reports. The root workspace limitation remains isolated from this crate-level run.
+
+
+## Current exact-head verification
+
+Hosted run [#44989451987](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44989451987) passed on the latest PR head: 46/46 Python reference tests, 35/35 Rust tests, rustfmt, Clippy and all six report comparisons. The DTCO lineage known answer covers design/constraint binding, model uncertainty, monotonic fidelity, acyclic parent graph and measurement provenance.
