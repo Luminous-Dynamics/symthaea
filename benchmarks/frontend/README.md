@@ -382,3 +382,9 @@ implemented executor or measured benchmark result.
 ### New external comparisons (2026-11-22)
 
 The external comparator ledger now includes Arena Code Arena's WebDev, Image-to-WebDev and Fullstack preference boards, and Interaction-as-a-Judge research. These are distinct human-preference / interaction-judge dimensions and must not be blended with SFEB's deterministic oracle qualification or Vision2Web scores. See `external-comparator-ledger-v1.json` and the linked research note.
+
+
+## Evaluator and judge qualification
+
+- [Judge qualification plan](judge-qualification-v1.json) and [schema](judge-qualification-v1.schema.json) compare deterministic, code-only, visual, interaction-grounded and bounded-ensemble evaluators.
+- [Judge qualification research note](../../docs/research/SFEB_JUDGE_QUALIFICATION_2026-11-22.md) defines authority separation, calibration, adversarial testing and Arena dataset rights constraints.

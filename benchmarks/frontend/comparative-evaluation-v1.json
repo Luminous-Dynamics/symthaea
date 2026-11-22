@@ -73,7 +73,25 @@
     "blinding": "Judges do not see arm identity, model identity, run cost or agent self-evaluation before scoring.",
     "disagreement": "Two independent judges for subjective outcomes; disagreement goes to a third adjudicator. Report raw agreement and Cohen's kappa; target kappa ≥0.80 before using a judge as the only source for subjective dimensions.",
     "audit_sample_fraction": 0.2,
-    "human_review": "Review 100% of disputed outcomes and a stratified random 20% of accepted and rejected cases."
+    "human_review": "Review 100% of disputed outcomes and a stratified random 20% of accepted and rejected cases.",
+    "interaction_as_a_judge": {
+      "role": "secondary diagnostic/evaluation arm",
+      "comparison": "Compare code-only, screenshot-only, code+screenshot, interaction-only and bounded ensemble judges on identical frozen application versions, traces, task labels and budgets.",
+      "authority": "May identify broken requirements, rank repair hypotheses and score subjective preference; cannot override critical deterministic oracles or promote inconclusive evidence.",
+      "calibration": "Freeze model, prompt, toolchain and calibration data; validate against two blinded human reviewers plus third-party disagreement adjudication.",
+      "attacks": "Include page prompt injection, stale DOM/accessibility snapshots, fake success toasts, hidden keyboard controls, manipulated screenshots and incomplete exploration.",
+      "metrics": [
+        "balanced_accuracy",
+        "critical_defect_recall",
+        "human_preference_agreement",
+        "Brier_score",
+        "ECE",
+        "false_acceptance",
+        "inconclusive_rate",
+        "latency_p50_p95",
+        "cost_per_judged_requirement"
+      ]
+    }
   },
   "metrics": {
     "primary": [
@@ -93,7 +111,11 @@
       "time_to_accepted_result",
       "tokens_per_accepted_result",
       "cost_per_accepted_result",
-      "calibration_error"
+      "calibration_error",
+      "interaction_judge_human_agreement",
+      "judge_prompt_injection_resistance",
+      "stale_observation_detection",
+      "judge_inconclusive_rate"
     ],
     "hard_gates": {
       "critical_security_failures": 0,
@@ -141,6 +163,26 @@
       "name": "Coding benchmark quality audit",
       "scope": "task-quality auditing for underspecification, overstrict tests, low-coverage oracles and misleading prompts",
       "reference": "https://openai.com/index/separating-signal-from-noise-coding-evaluations/"
+    },
+    {
+      "name": "Arena Code Arena WebDev/Frontend",
+      "scope": "pairwise human preference on frontend web-app generation; November 20, 2026 snapshot",
+      "reference": "https://arena.ai/leaderboard/code/webdev/frontend"
+    },
+    {
+      "name": "Arena Image-to-WebDev",
+      "scope": "pairwise human preference on screenshot-conditioned web-app generation",
+      "reference": "https://arena.ai/leaderboard/code/image-to-webdev"
+    },
+    {
+      "name": "Arena Fullstack",
+      "scope": "pairwise human preference on full-stack application generation",
+      "reference": "https://arena.ai/leaderboard/code/webdev/fullstack"
+    },
+    {
+      "name": "Interaction-as-a-Judge",
+      "scope": "computer-use agent judge with human preference and requirement-correctness labels",
+      "reference": "https://arena.ai/blog/interaction-as-a-judge"
     }
   ],
   "limits": [

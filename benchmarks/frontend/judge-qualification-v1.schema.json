@@ -1,0 +1,347 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/sfeb/judge-qualification-v1.schema.json",
+  "title": "SFEB Judge Qualification Protocol v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "version",
+    "study_id",
+    "as_of",
+    "status",
+    "purpose",
+    "authority_model",
+    "evaluator_arms",
+    "task_plan",
+    "human_annotation",
+    "adversarial_trials",
+    "metrics",
+    "promotion_gates",
+    "external_data",
+    "limits"
+  ],
+  "properties": {
+    "schema": {
+      "const": "sfeb-judge-qualification-v1"
+    },
+    "version": {
+      "type": "string"
+    },
+    "study_id": {
+      "type": "string",
+      "pattern": "^SFEB-JUDGE-[0-9]{3}$"
+    },
+    "as_of": {
+      "type": "string",
+      "format": "date"
+    },
+    "status": {
+      "enum": [
+        "protocol_designed_not_executed",
+        "executed"
+      ]
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 30
+    },
+    "authority_model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "primary_authority",
+        "secondary_evidence",
+        "forbidden_promotion"
+      ],
+      "properties": {
+        "primary_authority": {
+          "const": "independently verified deterministic contract and security oracles"
+        },
+        "secondary_evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "forbidden_promotion": {
+          "type": "string",
+          "minLength": 40
+        }
+      }
+    },
+    "evaluator_arms": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "inputs",
+          "role",
+          "authority",
+          "description"
+        ],
+        "properties": {
+          "id": {
+            "enum": [
+              "J0",
+              "J1",
+              "J2",
+              "J3",
+              "J4",
+              "J5"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "inputs": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          },
+          "role": {
+            "enum": [
+              "reference_oracle",
+              "judge",
+              "ensemble"
+            ]
+          },
+          "authority": {
+            "enum": [
+              "primary_for_contract_assertions",
+              "secondary_only"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "minLength": 20
+          }
+        }
+      }
+    },
+    "task_plan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "public_development_pairs",
+        "comparative_pairs",
+        "publication_pairs_min",
+        "hidden_fraction_target",
+        "categories",
+        "severity_balance",
+        "pair_unit",
+        "holdout_rule"
+      ],
+      "properties": {
+        "public_development_pairs": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "comparative_pairs": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "publication_pairs_min": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "hidden_fraction_target": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "categories": {
+          "type": "array",
+          "minItems": 6,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "severity_balance": {
+          "type": "string"
+        },
+        "pair_unit": {
+          "type": "string"
+        },
+        "holdout_rule": {
+          "type": "string"
+        }
+      }
+    },
+    "human_annotation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "independent_reviewers_per_item",
+        "disagreement_resolution",
+        "blinding",
+        "agreement_reporting",
+        "gold_policy"
+      ],
+      "properties": {
+        "independent_reviewers_per_item": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "disagreement_resolution": {
+          "type": "string"
+        },
+        "blinding": {
+          "type": "string"
+        },
+        "agreement_reporting": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "string"
+          }
+        },
+        "gold_policy": {
+          "type": "string"
+        }
+      }
+    },
+    "adversarial_trials": {
+      "type": "array",
+      "minItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "attack",
+          "expected_behavior",
+          "criticality"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^JADV-[0-9]{3}$"
+          },
+          "attack": {
+            "type": "string",
+            "minLength": 10
+          },
+          "expected_behavior": {
+            "type": "string",
+            "minLength": 10
+          },
+          "criticality": {
+            "enum": [
+              "critical",
+              "high",
+              "medium"
+            ]
+          }
+        }
+      }
+    },
+    "metrics": {
+      "type": "array",
+      "minItems": 8,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "promotion_gates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "heldout_balanced_accuracy_min",
+        "critical_defect_recall_min",
+        "ece_max",
+        "annotator_agreement_min",
+        "critical_authority_rule",
+        "promotion_rule"
+      ],
+      "properties": {
+        "heldout_balanced_accuracy_min": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "critical_defect_recall_min": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "ece_max": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "annotator_agreement_min": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "critical_authority_rule": {
+          "type": "string"
+        },
+        "promotion_rule": {
+          "type": "string"
+        }
+      }
+    },
+    "external_data": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "use",
+          "license_observation",
+          "restriction",
+          "reuse_status",
+          "reference"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "use": {
+            "type": "string"
+          },
+          "license_observation": {
+            "type": "string"
+          },
+          "restriction": {
+            "type": "string"
+          },
+          "reuse_status": {
+            "enum": [
+              "reference_only_pending_rights_review",
+              "approved_for_limited_research_use",
+              "not_approved"
+            ]
+          },
+          "reference": {
+            "type": "string",
+            "format": "uri"
+          }
+        }
+      }
+    },
+    "limits": {
+      "type": "array",
+      "minItems": 5,
+      "items": {
+        "type": "string",
+        "minLength": 20
+      }
+    }
+  }
+}
