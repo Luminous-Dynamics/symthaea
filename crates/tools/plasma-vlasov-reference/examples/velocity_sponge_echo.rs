@@ -172,8 +172,11 @@ fn run_case(
     )?;
 
     let final_budget = sponge_pulse.quadratic_casimir_budget()?;
+    let final_control_budget = sponge_control.quadratic_casimir_budget()?;
     let final_diagnostics = sponge_pulse.diagnostics()?;
     let direct_c2_drop = initial_budget.total_casimir - final_budget.total_casimir;
+    let direct_control_c2_drop =
+        initial_budget.total_casimir - final_control_budget.total_casimir;
     let cumulative_c2_fraction =
         pulse_removed_c2 / initial_budget.total_casimir.max(f64::MIN_POSITIVE);
     let direct_c2_fraction =
@@ -194,33 +197,37 @@ fn run_case(
         (final_diagnostics.field_energy - initial_diagnostics.field_energy)
             / initial_diagnostics.field_energy.abs().max(f64::MIN_POSITIVE);
 
+    let control_cumulative_c2_fraction =
+        control_removed_c2 / initial_budget.total_casimir.max(f64::MIN_POSITIVE);
+    let control_direct_c2_drop_fraction =
+        direct_control_c2_drop / initial_budget.total_casimir.max(f64::MIN_POSITIVE);
+    let control_c2_accounting_error =
+        (control_removed_c2 - direct_control_c2_drop).abs()
+            / initial_budget.total_casimir.max(f64::MIN_POSITIVE);
+    let echo_mode = prediction.echo_mode;
+    let predicted_rephase_time = prediction.echo_time;
+    let baseline_peak_amplitude = baseline_measurement.peak_amplitude;
+    let sponge_peak_amplitude = sponge_measurement.peak_amplitude;
+    let baseline_peak_time = baseline_measurement.sampled_peak_time;
+    let sponge_peak_time = sponge_measurement.sampled_peak_time;
+    let baseline_peak_phase = baseline_measurement.peak_phase_radians;
+    let sponge_peak_phase = sponge_measurement.peak_phase_radians;
+    let baseline_detected = baseline_measurement.detected;
+    let sponge_detected = sponge_measurement.detected;
+    let baseline_fwhm = baseline_measurement
+        .full_width_half_maximum
+        .unwrap_or(f64::NAN);
+    let sponge_fwhm = sponge_measurement
+        .full_width_half_maximum
+        .unwrap_or(f64::NAN);
+    let pulse_removed_f_strophy_value = pulse_removed_f_strophy;
+    let control_removed_f_strophy_value = control_removed_f_strophy;
+    let momentum_delta = final_diagnostics.momentum - initial_diagnostics.momentum;
+    let minimum_f = final_diagnostics.minimum_distribution;
+    let wall_seconds = started.elapsed().as_secs_f64();
+
     println!(
-        "{label},{start_fraction:.4},{maximum_damping_rate:.4},{:.8},{:.8},{:.12e},{:.12e},{:.8},{:.8},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.6}",
-        prediction.echo_mode,
-        prediction.echo_time,
-        baseline_measurement.peak_amplitude,
-        sponge_measurement.peak_amplitude,
-        baseline_measurement.sampled_peak_time,
-        sponge_measurement.sampled_peak_time,
-        response_ratio,
-        baseline_measurement.peak_phase_radians,
-        sponge_measurement.peak_phase_radians,
-        baseline_measurement
-            .full_width_half_maximum
-            .unwrap_or(f64::NAN),
-        sponge_measurement
-            .full_width_half_maximum
-            .unwrap_or(f64::NAN),
-        cumulative_c2_fraction,
-        direct_c2_fraction,
-        c2_accounting_error,
-        pulse_removed_f_strophy,
-        mass_relative_delta,
-        momentum_relative_delta,
-        kinetic_energy_relative_delta,
-        field_energy_relative_delta,
-        final_diagnostics.minimum_distribution,
-        started.elapsed().as_secs_f64(),
+        "{label},{start_fraction:.4},{maximum_damping_rate:.4},{echo_mode},{predicted_rephase_time:.8},{baseline_peak_amplitude:.12e},{sponge_peak_amplitude:.12e},{baseline_peak_time:.8},{sponge_peak_time:.8},{response_ratio:.12e},{baseline_peak_phase:.12e},{sponge_peak_phase:.12e},{baseline_detected},{sponge_detected},{baseline_fwhm:.8},{sponge_fwhm:.8},{cumulative_c2_fraction:.12e},{direct_c2_fraction:.12e},{c2_accounting_error:.12e},{control_cumulative_c2_fraction:.12e},{control_direct_c2_drop_fraction:.12e},{control_c2_accounting_error:.12e},{pulse_removed_f_strophy_value:.12e},{control_removed_f_strophy_value:.12e},{mass_relative_delta:.12e},{momentum_delta:.12e},{kinetic_energy_relative_delta:.12e},{field_energy_relative_delta:.12e},{minimum_f:.12e},{wall_seconds:.6}"
     );
 
     let _ = control_removed_c2;
@@ -230,7 +237,7 @@ fn run_case(
 
 fn main() -> Result<(), Box<dyn Error>> {
     println!(
-        "case,start_fraction,max_damping_rate,echo_mode,predicted_rephase_time,baseline_peak_amplitude,sponge_peak_amplitude,baseline_peak_time,sponge_peak_time,amplitude_ratio,baseline_peak_phase,sponge_peak_phase,baseline_fwhm,sponge_fwhm,cumulative_removed_C2_fraction,direct_C2_drop_fraction,C2_accounting_error_fraction,removed_f_strophy,mass_relative_delta,momentum_relative_delta,kinetic_energy_relative_delta,field_energy_relative_delta,minimum_f,wall_seconds"
+        "case,start_fraction,max_damping_rate,echo_mode,predicted_rephase_time,baseline_peak_amplitude,sponge_peak_amplitude,baseline_peak_time,sponge_peak_time,amplitude_ratio,baseline_peak_phase,sponge_peak_phase,baseline_detected,sponge_detected,baseline_fwhm,sponge_fwhm,pulse_cumulative_removed_C2_fraction,pulse_direct_C2_drop_fraction,pulse_C2_accounting_error_fraction,control_cumulative_removed_C2_fraction,control_direct_C2_drop_fraction,control_C2_accounting_error_fraction,pulse_removed_f_strophy,control_removed_f_strophy,mass_relative_delta,momentum_delta,kinetic_energy_relative_delta,field_energy_relative_delta,minimum_f,wall_seconds"
     );
 
     run_case("mild", 0.90, 0.5)?;
