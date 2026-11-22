@@ -14,6 +14,7 @@ use std::io::{BufWriter, Write};
 use std::mem::size_of;
 use std::time::Instant;
 
+use broca_mace_ingress::EvidenceDependencySidecarV1;
 use broca_mace_hdc_retrieval::{
     experience_view_digest,
     typed_content::{SemanticExperienceQueryV1, TypedContentConfigV1, TypedContentIndexV1},
@@ -27,6 +28,9 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
 mod mace_generated_stress;
+mod receipt_dependency;
+
+use receipt_dependency::ReceiptDependencyProjection;
 
 const SCHEMA_VERSION: &str = "mace_counterfactual_evidence_v0_1";
 const ABSTENTION_UTILITY: f64 = 0.0;
@@ -70,6 +74,9 @@ struct InterventionManifest {
     root_pair_count: usize,
     matched_random_count: usize,
     unmatched_random_target_count: usize,
+    dependency_sidecar_sha256: Option<String>,
+    lineage_incomplete_event_count: usize,
+    unresolved_parent_reference_count: usize,
     manifest_sha256: String,
 }
 
@@ -80,6 +87,9 @@ struct EvidenceDependencyIndex {
     families: BTreeMap<u16, BTreeSet<u32>>,
     unknown_root_ids: BTreeSet<u32>,
     unknown_family_ids: BTreeSet<u32>,
+    receipt_dependencies: Option<ReceiptDependencyProjection>,
+    lineage_incomplete_event_count: usize,
+    unresolved_parent_reference_count: usize,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -89,6 +99,7 @@ enum IndexError {
     TypedIndexFailure(String),
     UnresolvedCandidateId(u32),
     CanonicalViewMismatch(u32),
+    InvalidDependencySidecar(String),
 }
 
 impl EvidenceDependencyIndex {
@@ -123,13 +134,44 @@ impl EvidenceDependencyIndex {
             }
         }
 
+        let lineage_incomplete_event_count = records.len();
         Ok(Self {
             records,
             roots,
             families,
             unknown_root_ids,
             unknown_family_ids,
+            receipt_dependencies: None,
+            lineage_incomplete_event_count,
+            unresolved_parent_reference_count: 0,
         })
+    }
+
+    fn build_with_sidecar(
+        memory: &[Experience],
+        sidecar: &EvidenceDependencySidecarV1,
+    ) -> Result<Self, IndexError> {
+        let mut index = Self::build(memory)?;
+        let projection = ReceiptDependencyProjection::build(memory, sidecar)
+            .map_err(|error| IndexError::InvalidDependencySidecar(format!("{error:?}")))?;
+        index.lineage_incomplete_event_count = projection.lineage_incomplete_event_count();
+        index.unresolved_parent_reference_count =
+            projection.unresolved_parent_reference_count();
+        index.receipt_dependencies = Some(projection);
+        Ok(index)
+    }
+
+    fn dependent_closure(&self, seeds: &[u32]) -> Vec<u32> {
+        match &self.receipt_dependencies {
+            Some(projection) => projection.dependent_closure(seeds.iter().copied()),
+            None => normalized_ids(seeds.to_vec()),
+        }
+    }
+
+    fn dependency_sidecar_sha256(&self) -> Option<&str> {
+        self.receipt_dependencies
+            .as_ref()
+            .map(ReceiptDependencyProjection::sidecar_sha256)
     }
 
     fn event_count(&self) -> usize {
@@ -160,6 +202,19 @@ impl EvidenceDependencyIndex {
         for (event_id, item) in &self.records {
             hasher.update(event_id.to_be_bytes());
             hasher.update(experience_view_digest(item));
+        }
+        match self.dependency_sidecar_sha256() {
+            Some(digest) => {
+                hasher.update(b"receipt-sidecar:verified:v1\\0");
+                hasher.update(digest.as_bytes());
+            }
+            None => {
+                // No sidecar means ancestry is unknown, never independent.
+                hasher.update(b"receipt-sidecar:unavailable:lineage-unknown:v1\\0");
+                hasher.update(
+                    (self.lineage_incomplete_event_count as u64).to_be_bytes(),
+                );
+            }
         }
         hex_digest(hasher.finalize().as_slice())
     }
@@ -316,21 +371,37 @@ fn build_manifest(
     public_seed: u64,
     max_root_pairs: usize,
 ) -> Result<InterventionManifest, IndexError> {
-    let index = EvidenceDependencyIndex::build(memory)?;
+    build_manifest_with_sidecar(memory, None, public_seed, max_root_pairs)
+}
+
+fn build_manifest_with_sidecar(
+    memory: &[Experience],
+    sidecar: Option<&EvidenceDependencySidecarV1>,
+    public_seed: u64,
+    max_root_pairs: usize,
+) -> Result<InterventionManifest, IndexError> {
+    let index = match sidecar {
+        Some(sidecar) => EvidenceDependencyIndex::build_with_sidecar(memory, sidecar)?,
+        None => EvidenceDependencyIndex::build(memory)?,
+    };
     let baseline_evidence_sha256 = index.baseline_evidence_digest();
     let mut interventions = Vec::new();
 
     for event_id in index.records.keys() {
+        let closure = index.dependent_closure(&[*event_id]);
         push_intervention(
             &mut interventions,
             InterventionKind::Event,
             format!("event:{event_id}"),
-            vec![*event_id],
+            closure,
             None,
         );
     }
 
-    let root_groups: Vec<(String, Vec<u32>)> = index.root_groups().collect();
+    let root_groups: Vec<(String, Vec<u32>)> = index
+        .root_groups()
+        .map(|(key, ids)| (key, index.dependent_closure(&ids)))
+        .collect();
     for (key, ids) in &root_groups {
         push_intervention(
             &mut interventions,
@@ -355,7 +426,10 @@ fn build_manifest(
         }
     }
 
-    let family_groups: Vec<(String, Vec<u32>)> = index.family_groups().collect();
+    let family_groups: Vec<(String, Vec<u32>)> = index
+        .family_groups()
+        .map(|(key, ids)| (key, index.dependent_closure(&ids)))
+        .collect();
     for (key, ids) in &family_groups {
         push_intervention(
             &mut interventions,
@@ -385,7 +459,7 @@ fn build_manifest(
             &mut interventions,
             InterventionKind::UnknownRoot,
             "unknown_source_roots".to_string(),
-            index.unknown_root_ids.iter().copied().collect(),
+            index.dependent_closure(&index.unknown_root_ids.iter().copied().collect::<Vec<_>>()),
             None,
         );
     }
@@ -394,7 +468,7 @@ fn build_manifest(
             &mut interventions,
             InterventionKind::UnknownFamily,
             "unknown_source_families".to_string(),
-            index.unknown_family_ids.iter().copied().collect(),
+            index.dependent_closure(&index.unknown_family_ids.iter().copied().collect::<Vec<_>>()),
             None,
         );
     }
@@ -455,6 +529,9 @@ fn build_manifest(
         "root_pair_count": root_pair_count,
         "matched_random_count": matched_random_count,
         "unmatched_random_target_count": unmatched_random_target_count,
+        "dependency_sidecar_sha256": index.dependency_sidecar_sha256(),
+        "lineage_incomplete_event_count": index.lineage_incomplete_event_count,
+        "unresolved_parent_reference_count": index.unresolved_parent_reference_count,
         "interventions": &interventions
     }))
     .expect("candidate intervention manifest is serializable");
@@ -469,6 +546,9 @@ fn build_manifest(
         root_pair_count,
         matched_random_count,
         unmatched_random_target_count,
+        dependency_sidecar_sha256: index.dependency_sidecar_sha256().map(str::to_owned),
+        lineage_incomplete_event_count: index.lineage_incomplete_event_count,
+        unresolved_parent_reference_count: index.unresolved_parent_reference_count,
         manifest_sha256,
     })
 }
