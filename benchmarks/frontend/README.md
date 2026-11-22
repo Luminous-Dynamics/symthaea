@@ -38,7 +38,7 @@ Do not add a parallel browser-control dependency for the initial Chromium lane.
 - a redacted accessibility-tree JSON artifact;
 - a bounded layout JSON artifact with viewport, document overflow and semantic
   element rectangles;
-- a full-page PNG screenshot;
+- a viewport PNG screenshot;
 - a receipt with source/task/fixture identity, environment-manifest digest,
   capture time, final redacted URL, viewport and SHA-256 artifact digests.
 
