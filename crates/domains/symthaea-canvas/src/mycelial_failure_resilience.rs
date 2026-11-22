@@ -298,11 +298,19 @@ impl fmt::Display for MycelialFailureResilienceError {
             }
             Self::InvalidScenario(id) => write!(f, "invalid failure scenario {id}"),
             Self::DuplicateScenarioId(id) => write!(f, "duplicate failure scenario ID {id}"),
-            Self::InvalidAttackConfig(reason) => write!(f, "invalid failure attack configuration: {reason}"),
+            Self::InvalidAttackConfig(reason) => {
+                write!(f, "invalid failure attack configuration: {reason}")
+            }
             Self::InvalidAttackPlan(reason) => write!(f, "invalid failure attack plan: {reason}"),
-            Self::UnknownSpatialSeedJunction(id) => write!(f, "unknown spatial attack seed junction {id}"),
-            Self::InvalidDeliveryConfig(reason) => write!(f, "invalid attack-delivery uncertainty config: {reason}"),
-            Self::InvalidDeliveryProfile(reason) => write!(f, "invalid attack-delivery uncertainty profile: {reason}"),
+            Self::UnknownSpatialSeedJunction(id) => {
+                write!(f, "unknown spatial attack seed junction {id}")
+            }
+            Self::InvalidDeliveryConfig(reason) => {
+                write!(f, "invalid attack-delivery uncertainty config: {reason}")
+            }
+            Self::InvalidDeliveryProfile(reason) => {
+                write!(f, "invalid attack-delivery uncertainty profile: {reason}")
+            }
             Self::PathShorterThanEuclideanDistance {
                 demand_id,
                 direct_distance,
@@ -812,15 +820,14 @@ fn failure_entity_tie_priority(seed: u64, entity_kind: u8, entity_id: &str) -> u
     hasher.update(&[entity_kind]);
     hash_string(&mut hasher, entity_id);
     let digest = hasher.finalize();
-    u64::from_le_bytes(digest.as_bytes()[..8].try_into().expect("digest prefix is eight bytes"))
+    u64::from_le_bytes(
+        digest.as_bytes()[..8]
+            .try_into()
+            .expect("digest prefix is eight bytes"),
+    )
 }
 
-fn failure_entity_order(
-    seed: u64,
-    entity_kind: u8,
-    left: &str,
-    right: &str,
-) -> Ordering {
+fn failure_entity_order(seed: u64, entity_kind: u8, left: &str, right: &str) -> Ordering {
     failure_entity_tie_priority(seed, entity_kind, left)
         .cmp(&failure_entity_tie_priority(seed, entity_kind, right))
         .then_with(|| left.cmp(right))
@@ -857,9 +864,7 @@ fn demand_weighted_path_load(
         adjacency[target].push((source, weight, edge_index));
     }
     for neighbours in &mut adjacency {
-        neighbours.sort_by(|left, right| {
-            left.0.cmp(&right.0).then_with(|| left.2.cmp(&right.2))
-        });
+        neighbours.sort_by(|left, right| left.0.cmp(&right.0).then_with(|| left.2.cmp(&right.2)));
     }
 
     let mut segment_load = vec![0u128; indexed.edge_ids.len()];
@@ -872,35 +877,36 @@ fn demand_weighted_path_load(
         if !active_nodes[source] || !active_nodes[target] {
             continue;
         }
-        let (distances, predecessor_node, predecessor_edge) = cache.entry(source).or_insert_with(|| {
-            let mut distances = vec![f64::INFINITY; indexed.node_ids.len()];
-            let mut predecessor_node = vec![None; indexed.node_ids.len()];
-            let mut predecessor_edge = vec![None; indexed.node_ids.len()];
-            let mut queue = BinaryHeap::new();
-            distances[source] = 0.0;
-            queue.push(QueueEntry {
-                node: source,
-                distance: 0.0,
-            });
-            while let Some(current) = queue.pop() {
-                if current.distance > distances[current.node] {
-                    continue;
-                }
-                for &(next, weight, edge_index) in &adjacency[current.node] {
-                    let candidate = current.distance + weight;
-                    if candidate < distances[next] {
-                        distances[next] = candidate;
-                        predecessor_node[next] = Some(current.node);
-                        predecessor_edge[next] = Some(edge_index);
-                        queue.push(QueueEntry {
-                            node: next,
-                            distance: candidate,
-                        });
+        let (distances, predecessor_node, predecessor_edge) =
+            cache.entry(source).or_insert_with(|| {
+                let mut distances = vec![f64::INFINITY; indexed.node_ids.len()];
+                let mut predecessor_node = vec![None; indexed.node_ids.len()];
+                let mut predecessor_edge = vec![None; indexed.node_ids.len()];
+                let mut queue = BinaryHeap::new();
+                distances[source] = 0.0;
+                queue.push(QueueEntry {
+                    node: source,
+                    distance: 0.0,
+                });
+                while let Some(current) = queue.pop() {
+                    if current.distance > distances[current.node] {
+                        continue;
+                    }
+                    for &(next, weight, edge_index) in &adjacency[current.node] {
+                        let candidate = current.distance + weight;
+                        if candidate < distances[next] {
+                            distances[next] = candidate;
+                            predecessor_node[next] = Some(current.node);
+                            predecessor_edge[next] = Some(edge_index);
+                            queue.push(QueueEntry {
+                                node: next,
+                                distance: candidate,
+                            });
+                        }
                     }
                 }
-            }
-            (distances, predecessor_node, predecessor_edge)
-        });
+                (distances, predecessor_node, predecessor_edge)
+            });
         // Unreachable demand pairs contribute no path load.
         if !distances[target].is_finite() {
             continue;
@@ -910,10 +916,9 @@ fn demand_weighted_path_load(
         let mut reversed_nodes = vec![target];
         let mut steps = 0usize;
         while cursor != source {
-            let (Some(previous), Some(edge_index)) = (
-                predecessor_node[cursor],
-                predecessor_edge[cursor],
-            ) else {
+            let (Some(previous), Some(edge_index)) =
+                (predecessor_node[cursor], predecessor_edge[cursor])
+            else {
                 // A positive-weight reachable path must have a complete predecessor chain.
                 reversed_nodes.clear();
                 break;
@@ -933,7 +938,11 @@ fn demand_weighted_path_load(
         }
         // Demand-path junction load counts internal transit junctions, not
         // the originating or terminating demand endpoints.
-        for node_index in reversed_nodes.iter().skip(1).take(reversed_nodes.len().saturating_sub(2)) {
+        for node_index in reversed_nodes
+            .iter()
+            .skip(1)
+            .take(reversed_nodes.len().saturating_sub(2))
+        {
             junction_load[*node_index] =
                 junction_load[*node_index].saturating_add(u128::from(demand.weight));
         }
@@ -983,8 +992,7 @@ fn unweighted_static_betweenness(indexed: &IndexedGraph) -> Vec<f64> {
                     if existing.is_finite() {
                         let maximum = existing.max(incoming);
                         let minimum = existing.min(incoming);
-                        log_sigma[next] =
-                            maximum + (1.0 + (minimum - maximum).exp()).ln();
+                        log_sigma[next] = maximum + (1.0 + (minimum - maximum).exp()).ln();
                     } else {
                         log_sigma[next] = incoming;
                     }
@@ -1059,9 +1067,9 @@ fn rank_failure_entities(
             ranked.sort_by(|left, right| {
                 let left_score = centrality[indexed.node_index[left]];
                 let right_score = centrality[indexed.node_index[right]];
-                right_score.total_cmp(&left_score).then_with(|| {
-                    failure_entity_order(config.seed, 1, left, right)
-                })
+                right_score
+                    .total_cmp(&left_score)
+                    .then_with(|| failure_entity_order(config.seed, 1, left, right))
             });
         }
         MycelialFailureAttackStrategy::LowestDegreeJunctions => {
@@ -1111,15 +1119,9 @@ fn rank_failure_entities(
                     "spatial-cluster strategy requires a seed junction ID",
                 ),
             )?;
-            let seed_index = indexed
-                .node_index
-                .get(seed_id)
-                .copied()
-                .ok_or_else(|| {
-                    MycelialFailureResilienceError::UnknownSpatialSeedJunction(
-                        seed_id.to_string(),
-                    )
-                })?;
+            let seed_index = indexed.node_index.get(seed_id).copied().ok_or_else(|| {
+                MycelialFailureResilienceError::UnknownSpatialSeedJunction(seed_id.to_string())
+            })?;
             let seed_position = indexed.positions[seed_index];
             ranked.sort_by(|left, right| {
                 let left_distance = indexed.positions[indexed.node_index[left]]
@@ -1128,9 +1130,9 @@ fn rank_failure_entities(
                 let right_distance = indexed.positions[indexed.node_index[right]]
                     .sub(seed_position)
                     .length();
-                left_distance.total_cmp(&right_distance).then_with(|| {
-                    failure_entity_order(config.seed, 1, left, right)
-                })
+                left_distance
+                    .total_cmp(&right_distance)
+                    .then_with(|| failure_entity_order(config.seed, 1, left, right))
             });
         }
     }
@@ -1179,12 +1181,8 @@ fn adaptive_demand_path_load_ranking(
     seed: u64,
 ) -> Vec<String> {
     let targets_segments = attack_strategy_targets_segments(strategy);
-    let (segment_load, junction_load) = demand_weighted_path_load(
-        indexed,
-        demands,
-        failed_segment_ids,
-        failed_junction_ids,
-    );
+    let (segment_load, junction_load) =
+        demand_weighted_path_load(indexed, demands, failed_segment_ids, failed_junction_ids);
     let mut ranked: Vec<_> = if targets_segments {
         indexed
             .edge_ids
@@ -1212,12 +1210,7 @@ fn adaptive_demand_path_load_ranking(
             junction_load[indexed.node_index[right]]
         };
         right_load.cmp(&left_load).then_with(|| {
-            failure_entity_order(
-                seed,
-                if targets_segments { 0 } else { 1 },
-                left,
-                right,
-            )
+            failure_entity_order(seed, if targets_segments { 0 } else { 1 }, left, right)
         })
     });
     ranked
@@ -1283,19 +1276,13 @@ pub fn build_mycelial_failure_attack_plan(
 ) -> Result<MycelialFailureAttackPlan, MycelialFailureResilienceError> {
     let indexed = index_source_graph(graph)?;
     validate_demands(&indexed, demands)?;
-    if config.maximum_failure_budget == 0
-        || config.maximum_failure_budget > MAX_FAILURE_SCENARIOS
-    {
+    if config.maximum_failure_budget == 0 || config.maximum_failure_budget > MAX_FAILURE_SCENARIOS {
         return Err(MycelialFailureResilienceError::InvalidAttackConfig(
             "maximum failure budget must be within the scenario limit",
         ));
     }
-    match (
-        config.strategy,
-        config.spatial_seed_junction_id.as_deref(),
-    ) {
-        (MycelialFailureAttackStrategy::SpatialClusterJunctions, Some(id))
-            if valid_id(id) => {}
+    match (config.strategy, config.spatial_seed_junction_id.as_deref()) {
+        (MycelialFailureAttackStrategy::SpatialClusterJunctions, Some(id)) if valid_id(id) => {}
         (MycelialFailureAttackStrategy::SpatialClusterJunctions, _) => {
             return Err(MycelialFailureResilienceError::InvalidAttackConfig(
                 "spatial-cluster strategy requires a valid seed junction ID",
@@ -1317,9 +1304,7 @@ pub fn build_mycelial_failure_attack_plan(
     for budget in 1..=config.maximum_failure_budget {
         let mut failed_ids = ranked_entity_ids[..budget].to_vec();
         failed_ids.sort_unstable();
-        let scenario_id = format!(
-            "attack:{strategy_id}:seed:{seed_id:016x}:budget:{budget:04}"
-        );
+        let scenario_id = format!("attack:{strategy_id}:seed:{seed_id:016x}:budget:{budget:04}");
         scenarios.push(MycelialFailureScenario {
             scenario_id,
             failed_segment_ids: if attack_strategy_targets_segments(config.strategy) {
@@ -1363,12 +1348,8 @@ impl MycelialFailureAttackPlan {
             maximum_failure_budget: self.maximum_failure_budget,
             spatial_seed_junction_id: self.spatial_seed_junction_id.clone(),
         };
-        match (
-            config.strategy,
-            config.spatial_seed_junction_id.as_deref(),
-        ) {
-            (MycelialFailureAttackStrategy::SpatialClusterJunctions, Some(id))
-                if valid_id(id) => {}
+        match (config.strategy, config.spatial_seed_junction_id.as_deref()) {
+            (MycelialFailureAttackStrategy::SpatialClusterJunctions, Some(id)) if valid_id(id) => {}
             (MycelialFailureAttackStrategy::SpatialClusterJunctions, _) => {
                 return Err(MycelialFailureResilienceError::InvalidAttackPlan(
                     "spatial-cluster plan lacks a valid seed junction",
@@ -1415,9 +1396,17 @@ impl MycelialFailureAttackPlan {
             );
             if scenario.scenario_id != expected_id
                 || scenario.failed_segment_ids
-                    != if target_is_segment { expected_ids.clone() } else { Vec::new() }
+                    != if target_is_segment {
+                        expected_ids.clone()
+                    } else {
+                        Vec::new()
+                    }
                 || scenario.failed_junction_ids
-                    != if target_is_segment { Vec::new() } else { expected_ids }
+                    != if target_is_segment {
+                        Vec::new()
+                    } else {
+                        expected_ids
+                    }
             {
                 return Err(MycelialFailureResilienceError::InvalidAttackPlan(
                     "attack scenario is not the declared nested ranked prefix",
@@ -1427,16 +1416,17 @@ impl MycelialFailureAttackPlan {
         Ok(())
     }
 
-    pub fn canonical_digest_hex(
-        &self,
-    ) -> Result<String, MycelialFailureResilienceError> {
+    pub fn canonical_digest_hex(&self) -> Result<String, MycelialFailureResilienceError> {
         if self.schema_version != MYCELIAL_FAILURE_ATTACK_PLAN_SCHEMA_VERSION
             || self.maximum_failure_budget == 0
             || self.maximum_failure_budget > MAX_FAILURE_SCENARIOS
             || self.scenarios.len() != self.maximum_failure_budget
             || self.ranked_entity_ids.len() < self.maximum_failure_budget
             || self.ranked_entity_ids_per_step.len() != self.maximum_failure_budget
-            || self.ranked_entity_ids_per_step.iter().any(|ranking| ranking.is_empty())
+            || self
+                .ranked_entity_ids_per_step
+                .iter()
+                .any(|ranking| ranking.is_empty())
             || self
                 .ranked_entity_ids_per_step
                 .iter()
@@ -1446,15 +1436,26 @@ impl MycelialFailureAttackPlan {
                         || ranking.iter().any(|id| !valid_id(id))
                         || ranking.iter().collect::<BTreeSet<_>>().len() != ranking.len()
                 })
-            || self.ranked_entity_ids_per_step.iter().enumerate().any(|(step, ranking)| {
-                let already_selected: BTreeSet<_> =
-                    self.ranked_entity_ids[..step].iter().map(String::as_str).collect();
-                ranking.iter().any(|id| already_selected.contains(id.as_str()))
-            })
+            || self
+                .ranked_entity_ids_per_step
+                .iter()
+                .enumerate()
+                .any(|(step, ranking)| {
+                    let already_selected: BTreeSet<_> = self.ranked_entity_ids[..step]
+                        .iter()
+                        .map(String::as_str)
+                        .collect();
+                    ranking
+                        .iter()
+                        .any(|id| already_selected.contains(id.as_str()))
+                })
             || !valid_digest(&self.source_graph_digest)
             || !valid_digest(&self.demand_digest)
             || self.ranked_entity_ids.iter().any(|id| !valid_id(id))
-            || self.spatial_seed_junction_id.as_deref().is_some_and(|id| !valid_id(id))
+            || self
+                .spatial_seed_junction_id
+                .as_deref()
+                .is_some_and(|id| !valid_id(id))
             || self.ranked_entity_ids.iter().collect::<BTreeSet<_>>().len()
                 != self.ranked_entity_ids.len()
         {
@@ -1505,9 +1506,7 @@ impl MycelialFailureAttackPlan {
 }
 
 impl MycelialFailureAttackEvaluation {
-    pub fn canonical_digest_hex(
-        &self,
-    ) -> Result<String, MycelialFailureResilienceError> {
+    pub fn canonical_digest_hex(&self) -> Result<String, MycelialFailureResilienceError> {
         if !valid_digest(&self.attack_plan_digest) {
             return Err(MycelialFailureResilienceError::InvalidProfile(
                 "attack evaluation has an invalid plan digest",
@@ -1554,12 +1553,7 @@ fn validate_delivery_config(
     Ok(())
 }
 
-fn delivery_entity_draw(
-    seed: u64,
-    trial_index: usize,
-    entity_kind: u8,
-    entity_id: &str,
-) -> u64 {
+fn delivery_entity_draw(seed: u64, trial_index: usize, entity_kind: u8, entity_id: &str) -> u64 {
     // Counter-based entity-keyed draw: the same source entity receives the
     // same outcome in a given trial across strategies and nested budgets.
     // This supplies common random numbers for paired attack-policy comparison.
@@ -1570,8 +1564,11 @@ fn delivery_entity_draw(
     hasher.update(&[entity_kind]);
     hash_string(&mut hasher, entity_id);
     let digest = hasher.finalize();
-    u64::from_le_bytes(digest.as_bytes()[..8].try_into().expect("digest prefix is eight bytes"))
-        % 1_000_000
+    u64::from_le_bytes(
+        digest.as_bytes()[..8]
+            .try_into()
+            .expect("digest prefix is eight bytes"),
+    ) % 1_000_000
 }
 
 fn realize_attack_delivery(
@@ -1603,9 +1600,7 @@ fn summarize_delivery_trials(
     attempted_entity_count: usize,
     trials: &[MycelialFailureDeliveryTrial],
 ) -> Result<MycelialFailureDeliveryScenarioSummary, MycelialFailureResilienceError> {
-    if trials.is_empty()
-        || trials.iter().any(|trial| trial.scenario_id != scenario_id)
-    {
+    if trials.is_empty() || trials.iter().any(|trial| trial.scenario_id != scenario_id) {
         return Err(MycelialFailureResilienceError::InvalidDeliveryProfile(
             "scenario summary has no matching trial inventory",
         ));
@@ -1613,8 +1608,8 @@ fn summarize_delivery_trials(
     let mean_realized_failure_count = trials
         .iter()
         .map(|trial| {
-            (trial.realized_failed_segment_ids.len()
-                + trial.realized_failed_junction_ids.len()) as f64
+            (trial.realized_failed_segment_ids.len() + trial.realized_failed_junction_ids.len())
+                as f64
         })
         .sum::<f64>()
         / trials.len() as f64;
@@ -1750,9 +1745,10 @@ impl MycelialFailureDeliveryProfile {
             || !valid_digest(&self.attack_plan_digest)
             || self.scenarios.is_empty()
             || self.scenarios.len() > MAX_FAILURE_SCENARIOS
-            || self.scenarios.windows(2).any(|pair| {
-                pair[0].scenario_id >= pair[1].scenario_id
-            })
+            || self
+                .scenarios
+                .windows(2)
+                .any(|pair| pair[0].scenario_id >= pair[1].scenario_id)
         {
             return Err(MycelialFailureResilienceError::InvalidDeliveryProfile(
                 "invalid schema, digest or scenario summary order",
@@ -1760,7 +1756,10 @@ impl MycelialFailureDeliveryProfile {
         }
         validate_delivery_config(self.config, self.scenarios.len())?;
         if self.trials.len()
-            != self.scenarios.len().saturating_mul(self.config.trials_per_scenario)
+            != self
+                .scenarios
+                .len()
+                .saturating_mul(self.config.trials_per_scenario)
             || self.trials.windows(2).any(|pair| {
                 pair[0].scenario_id > pair[1].scenario_id
                     || (pair[0].scenario_id == pair[1].scenario_id
@@ -1790,19 +1789,31 @@ impl MycelialFailureDeliveryProfile {
                     || trial.realized_failed_segment_ids.len()
                         + trial.realized_failed_junction_ids.len()
                         > summary.attempted_entity_count
-                    || trial.realized_failed_segment_ids.iter().any(|id| !valid_id(id))
-                    || trial.realized_failed_junction_ids.iter().any(|id| !valid_id(id))
-                    || trial.realized_failed_segment_ids.windows(2).any(|pair| pair[0] >= pair[1])
-                    || trial.realized_failed_junction_ids.windows(2).any(|pair| pair[0] >= pair[1])
-                    || trial.weighted_reachability.is_some_and(|value| {
-                        !value.is_finite() || !(0.0..=1.0).contains(&value)
-                    })
+                    || trial
+                        .realized_failed_segment_ids
+                        .iter()
+                        .any(|id| !valid_id(id))
+                    || trial
+                        .realized_failed_junction_ids
+                        .iter()
+                        .any(|id| !valid_id(id))
+                    || trial
+                        .realized_failed_segment_ids
+                        .windows(2)
+                        .any(|pair| pair[0] >= pair[1])
+                    || trial
+                        .realized_failed_junction_ids
+                        .windows(2)
+                        .any(|pair| pair[0] >= pair[1])
+                    || trial
+                        .weighted_reachability
+                        .is_some_and(|value| !value.is_finite() || !(0.0..=1.0).contains(&value))
                     || trial.weighted_mean_directness.is_some_and(|value| {
                         !value.is_finite() || !(0.0..=1.0 + 1.0e-5).contains(&value)
                     })
-                    || trial.weighted_mean_network_path_length.is_some_and(|value| {
-                        !value.is_finite() || value <= 0.0
-                    })
+                    || trial
+                        .weighted_mean_network_path_length
+                        .is_some_and(|value| !value.is_finite() || value <= 0.0)
                     || trial.weighted_mean_directness.is_some()
                         != trial.weighted_mean_network_path_length.is_some()
                     || trial.connected_components > MAX_FAILURE_JUNCTIONS
@@ -1879,17 +1890,23 @@ impl MycelialFailureDeliveryProfile {
                     || trial.trial_index != trial_index
                     || trial.realized_failed_segment_ids != expected_segments
                     || trial.realized_failed_junction_ids != expected_junctions
-                    || trial.realized_failed_segment_ids.windows(2).any(|pair| pair[0] >= pair[1])
-                    || trial.realized_failed_junction_ids.windows(2).any(|pair| pair[0] >= pair[1])
-                    || trial.weighted_reachability.is_some_and(|value| {
-                        !value.is_finite() || !(0.0..=1.0).contains(&value)
-                    })
+                    || trial
+                        .realized_failed_segment_ids
+                        .windows(2)
+                        .any(|pair| pair[0] >= pair[1])
+                    || trial
+                        .realized_failed_junction_ids
+                        .windows(2)
+                        .any(|pair| pair[0] >= pair[1])
+                    || trial
+                        .weighted_reachability
+                        .is_some_and(|value| !value.is_finite() || !(0.0..=1.0).contains(&value))
                     || trial.weighted_mean_directness.is_some_and(|value| {
                         !value.is_finite() || !(0.0..=1.0 + 1.0e-5).contains(&value)
                     })
-                    || trial.weighted_mean_network_path_length.is_some_and(|value| {
-                        !value.is_finite() || value <= 0.0
-                    })
+                    || trial
+                        .weighted_mean_network_path_length
+                        .is_some_and(|value| !value.is_finite() || value <= 0.0)
                     || trial.weighted_mean_directness.is_some()
                         != trial.weighted_mean_network_path_length.is_some()
                 {
@@ -1963,9 +1980,7 @@ impl MycelialFailureDeliveryProfile {
         Ok(())
     }
 
-    pub fn canonical_digest_hex(
-        &self,
-    ) -> Result<String, MycelialFailureResilienceError> {
+    pub fn canonical_digest_hex(&self) -> Result<String, MycelialFailureResilienceError> {
         self.validate()?;
         let mut hasher = blake3::Hasher::new();
         hasher.update(b"symthaea-mycelial-failure-delivery-profile-v2");
@@ -2452,10 +2467,26 @@ mod tests {
             id: id.to_string(),
             kind: JunctionKind::Branch,
             position: match id {
-                "A" => SpatialPoint3 { x: 0.0, y: 0.0, z: 0.0 },
-                "B" => SpatialPoint3 { x: 1.0, y: 0.0, z: 0.0 },
-                "C" => SpatialPoint3 { x: 1.0, y: 1.0, z: 0.0 },
-                "D" => SpatialPoint3 { x: 0.0, y: 1.0, z: 0.0 },
+                "A" => SpatialPoint3 {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 0.0,
+                },
+                "B" => SpatialPoint3 {
+                    x: 1.0,
+                    y: 0.0,
+                    z: 0.0,
+                },
+                "C" => SpatialPoint3 {
+                    x: 1.0,
+                    y: 1.0,
+                    z: 0.0,
+                },
+                "D" => SpatialPoint3 {
+                    x: 0.0,
+                    y: 1.0,
+                    z: 0.0,
+                },
                 _ => SpatialPoint3::ZERO,
             },
             incident_filament_ids,
@@ -2754,21 +2785,14 @@ mod tests {
             maximum_failure_budget: 2,
             spatial_seed_junction_id: None,
         };
-        let first = build_mycelial_failure_attack_plan(
-            &graph,
-            &demand_pairs,
-            config.clone(),
-        )
-        .unwrap();
-        let second =
-            build_mycelial_failure_attack_plan(&graph, &demand_pairs, config).unwrap();
+        let first =
+            build_mycelial_failure_attack_plan(&graph, &demand_pairs, config.clone()).unwrap();
+        let second = build_mycelial_failure_attack_plan(&graph, &demand_pairs, config).unwrap();
         assert_eq!(first, second);
         assert_eq!(first.scenarios.len(), 2);
         assert_eq!(first.ranked_entity_ids.len(), 3);
-        let budget_one: BTreeSet<_> =
-            first.scenarios[0].failed_segment_ids.iter().collect();
-        let budget_two: BTreeSet<_> =
-            first.scenarios[1].failed_segment_ids.iter().collect();
+        let budget_one: BTreeSet<_> = first.scenarios[0].failed_segment_ids.iter().collect();
+        let budget_two: BTreeSet<_> = first.scenarios[1].failed_segment_ids.iter().collect();
         assert!(budget_one.is_subset(&budget_two));
         first.validate_against(&graph, &demand_pairs).unwrap();
 
@@ -2847,13 +2871,12 @@ mod tests {
         assert!(scores[a] > scores[b]);
         assert!(scores[c] > scores[d]);
 
-        let priority_first = if failure_entity_tie_priority(19, 1, "A")
-            < failure_entity_tie_priority(19, 1, "C")
-        {
-            "A"
-        } else {
-            "C"
-        };
+        let priority_first =
+            if failure_entity_tie_priority(19, 1, "A") < failure_entity_tie_priority(19, 1, "C") {
+                "A"
+            } else {
+                "C"
+            };
         let betweenness = build_mycelial_failure_attack_plan(
             &graph,
             &adaptive_path_load_demands(),
@@ -2910,9 +2933,7 @@ mod tests {
         .unwrap();
         assert_eq!(&static_plan.ranked_entity_ids[..2], &["edge-ab", "edge-bc"]);
         assert_eq!(adaptive_plan.ranked_entity_ids[0], "edge-ab");
-        assert!(
-            ["edge-ad", "edge-cd"].contains(&adaptive_plan.ranked_entity_ids[1].as_str())
-        );
+        assert!(["edge-ad", "edge-cd"].contains(&adaptive_plan.ranked_entity_ids[1].as_str()));
         assert_eq!(
             adaptive_plan.ranked_entity_ids_per_step[1][0],
             adaptive_plan.ranked_entity_ids[1]
@@ -2922,7 +2943,9 @@ mod tests {
                 .iter()
                 .all(|id| id != "edge-ab")
         );
-        adaptive_plan.validate_against(&graph, &demand_pairs).unwrap();
+        adaptive_plan
+            .validate_against(&graph, &demand_pairs)
+            .unwrap();
 
         let static_junction_plan = build_mycelial_failure_attack_plan(
             &graph,
@@ -2949,10 +2972,7 @@ mod tests {
         assert_eq!(static_junction_plan.ranked_entity_ids[0], "B");
         assert_eq!(adaptive_junction_plan.ranked_entity_ids[0], "B");
         assert_eq!(adaptive_junction_plan.ranked_entity_ids[1], "D");
-        assert_eq!(
-            adaptive_junction_plan.ranked_entity_ids_per_step[1][0],
-            "D"
-        );
+        assert_eq!(adaptive_junction_plan.ranked_entity_ids_per_step[1][0], "D");
         adaptive_junction_plan
             .validate_against(&graph, &demand_pairs)
             .unwrap();
@@ -2995,7 +3015,9 @@ mod tests {
                 .iter()
                 .all(|id| id != "A")
         );
-        adaptive_plan.validate_against(&graph, &demand_pairs).unwrap();
+        adaptive_plan
+            .validate_against(&graph, &demand_pairs)
+            .unwrap();
     }
 
     #[test]
@@ -3122,13 +3144,11 @@ mod tests {
         )
         .unwrap();
         assert_eq!(profile.trials.len(), 16);
-        assert!(
-            profile.trials.iter().all(|trial| {
-                trial.realized_failed_segment_ids.is_empty()
-                    && trial.realized_failed_junction_ids.is_empty()
-                    && trial.weighted_reachability == Some(1.0)
-            })
-        );
+        assert!(profile.trials.iter().all(|trial| {
+            trial.realized_failed_segment_ids.is_empty()
+                && trial.realized_failed_junction_ids.is_empty()
+                && trial.weighted_reachability == Some(1.0)
+        }));
         assert!(
             profile
                 .scenarios
@@ -3137,7 +3157,9 @@ mod tests {
                     && summary.probability_at_least_one_failure == 0.0
                     && summary.mean_weighted_reachability == Some(1.0))
         );
-        profile.validate_against(&graph, &demand_pairs, &plan).unwrap();
+        profile
+            .validate_against(&graph, &demand_pairs, &plan)
+            .unwrap();
     }
 
     #[test]
@@ -3176,18 +3198,16 @@ mod tests {
                 .filter(|trial| trial.scenario_id == scenario.scenario_id)
                 .collect();
             assert_eq!(trials.len(), 4);
-            assert!(
-                trials.iter().all(|trial| {
-                    trial.realized_failed_segment_ids == scenario.failed_segment_ids
-                        && trial.realized_failed_junction_ids == scenario.failed_junction_ids
-                        && trial.weighted_reachability == metric.weighted_reachability
-                        && trial.weighted_mean_directness == metric.weighted_mean_directness
-                        && trial.weighted_mean_network_path_length
-                            == metric.weighted_mean_network_path_length
-                        && trial.connected_components == metric.connected_components
-                        && trial.cycle_rank == metric.cycle_rank
-                })
-            );
+            assert!(trials.iter().all(|trial| {
+                trial.realized_failed_segment_ids == scenario.failed_segment_ids
+                    && trial.realized_failed_junction_ids == scenario.failed_junction_ids
+                    && trial.weighted_reachability == metric.weighted_reachability
+                    && trial.weighted_mean_directness == metric.weighted_mean_directness
+                    && trial.weighted_mean_network_path_length
+                        == metric.weighted_mean_network_path_length
+                    && trial.connected_components == metric.connected_components
+                    && trial.cycle_rank == metric.cycle_rank
+            }));
         }
         assert!(
             delivery
@@ -3241,18 +3261,16 @@ mod tests {
         let demand_final_start = (demand_plan.scenarios.len() - 1) * config.trials_per_scenario;
         for trial_index in 0..config.trials_per_scenario {
             assert_eq!(
-                random_profile.trials[random_final_start + trial_index]
-                    .realized_failed_segment_ids,
-                demand_profile.trials[demand_final_start + trial_index]
-                    .realized_failed_segment_ids
+                random_profile.trials[random_final_start + trial_index].realized_failed_segment_ids,
+                demand_profile.trials[demand_final_start + trial_index].realized_failed_segment_ids
             );
         }
 
         for trial_index in 0..config.trials_per_scenario {
             let mut previous = BTreeSet::new();
             for scenario_index in 0..random_plan.scenarios.len() {
-                let trial =
-                    &random_profile.trials[scenario_index * config.trials_per_scenario + trial_index];
+                let trial = &random_profile.trials
+                    [scenario_index * config.trials_per_scenario + trial_index];
                 let current: BTreeSet<_> =
                     trial.realized_failed_segment_ids.iter().cloned().collect();
                 assert!(previous.is_subset(&current));
@@ -3288,11 +3306,9 @@ mod tests {
             seed: 0xfeed_1234,
         };
         let first =
-            build_mycelial_failure_delivery_profile(&graph, &demand_pairs, &plan, config)
-                .unwrap();
+            build_mycelial_failure_delivery_profile(&graph, &demand_pairs, &plan, config).unwrap();
         let second =
-            build_mycelial_failure_delivery_profile(&graph, &demand_pairs, &plan, config)
-                .unwrap();
+            build_mycelial_failure_delivery_profile(&graph, &demand_pairs, &plan, config).unwrap();
         assert_eq!(first, second);
         assert_eq!(
             first.canonical_digest_hex().unwrap(),
@@ -3308,8 +3324,9 @@ mod tests {
         );
 
         let mut metric_tampered = first;
-        metric_tampered.trials[0].connected_components =
-            metric_tampered.trials[0].connected_components.saturating_add(1);
+        metric_tampered.trials[0].connected_components = metric_tampered.trials[0]
+            .connected_components
+            .saturating_add(1);
         assert!(
             metric_tampered
                 .validate_against(&graph, &demand_pairs, &plan)
