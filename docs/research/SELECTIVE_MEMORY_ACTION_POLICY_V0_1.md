@@ -184,26 +184,49 @@ FAMA penalizes use of obsolete or invalidated memories. MACE should separately r
 
 The official [Agent Memory Challenge Cycle 2 results](https://agentmemoryleaderboard.ai/results/cycle-2/) were released on 2026-11-19. It has separate Textual, Coding and Multimodal boards and separate open-method, closed-source and commercial divisions. Keep each score in its own track; none is directly comparable with internal MACE utility or this action-policy benchmark.
 
-For the next eligible official open-method comparison, use a proposed **+5 absolute-point stretch target** over each current open-method leader and target the weaker submetrics explicitly:
+For the next eligible official open-method comparison, use a proposed **+5 absolute-point stretch target over the best observed score in each capability across the entire corresponding open-method division**. The aggregate winner and the per-capability leaders are not necessarily the same system. Each row below names the actual Cycle 2 per-metric leader; the target is a stretch goal, not a predicted result.
 
-| Track / capability | Cycle 2 open-method leader | Proposed stretch target |
+### Textual — Open-source Methods
+
+| Capability | Best Cycle 2 score (system) | Proposed +5 target |
 |---|---:|---:|
-| Textual overall (Resurface) | 61.22 | 66.22 |
-| Textual temporal sequencing | 57.76 | 62.76 |
-| Textual personalization/care | 38.82 | 43.82 |
-| Textual workflow execution | 59.67 | 64.67 |
-| Textual streaming | 49.65 | 54.65 |
-| Coding overall resolved (InsightMem) | 63.33% | 68.33% |
-| Coding new-feature resolution | 74.51% | 79.51% |
-| Coding bug-fix resolution | 57.58% | 62.58% |
-| Multimodal overall (Khipu) | 43.26 | 48.26 |
-| Multimodal retrieval | 50.28 | 55.28 |
-| Multimodal temporal reasoning | 34.23 | 39.23 |
-| Multimodal continual learning | 38.45 | 43.45 |
-| Multimodal personalization | 11.04 | 16.04 |
-| Multimodal evidence governance | 31.29 | 36.29 |
+| Overall | 61.22 (Resurface) | 66.22 |
+| Explicit fact recall | 64.36 (E2-Mem) | 69.36 |
+| Relational & multi-hop | 59.65 (starwingMem) | 64.65 |
+| Temporal & event sequencing | 60.05 (E2-Mem) | 65.05 |
+| Memory governance | 76.55 (Resurface) | 81.55 |
+| Personalization & care | 46.62 (miyako_viola) | 51.62 |
+| In-context learning / workflow | 61.08 (LMC-5) | 66.08 |
+| Epistemic safety & privacy | 81.61 (Atlas-Memory) | 86.61 |
+| Streaming | 53.62 (RE-call) | 58.62 |
 
-The current textual open-method leader already has 76.55 memory-governance and 68.59 epistemic-safety/privacy scores; those should be preserved rather than improved by sacrificing safety. The commercial/closed-source Cycle 2 references are MemoraX at 69.26 Textual, 68.00% Coding resolved and 53.68 Multimodal. A later Stage-2 ambition is at least one point above those values, but only on the same official board and protocol.
+### Multimodal — Open-source Methods
+
+| Capability | Best Cycle 2 score (system) | Proposed +5 target |
+|---|---:|---:|
+| Overall | 43.26 (Khipu) | 48.26 |
+| Retrieval | 50.71 (Multimodal-RAW-RAG) | 55.71 |
+| Relational reasoning | 45.82 (Khipu) | 50.82 |
+| Temporal reasoning | 43.84 (TraceMem-MM) | 48.84 |
+| Continual learning | 38.45 (Khipu) | 43.45 |
+| Personalization | 15.52 (TraceMem-MM) | 20.52 |
+| Evidence governance | 53.27 (SGM-MM-Memory) | 58.27 |
+
+### Coding — Open-source Methods
+
+| Capability | Best Cycle 2 score (system) | Proposed +5 target |
+|---|---:|---:|
+| Overall resolved | 63.33% (InsightMem) | 68.33% |
+| Relevant tasks — overall resolved | 64.00% (Aranea-Agents) | 69.00% |
+| Relevant tasks — new feature | 78.43% (Aranea-Agents) | 83.43% |
+| Relevant tasks — bug fix | 60.61% (EviBind) | 65.61% |
+| Noisy tasks — overall resolved | 64.00% (ZfaiOpen) | 69.00% |
+| Noisy tasks — new feature | 74.51% (InsightMem / ZfaiOpen) | 79.51% |
+| Noisy tasks — bug fix | 59.60% (LCM-X) | 64.60% |
+
+These capability maxima form a **multi-system frontier**, not a single system profile. The open-method leader in overall multimodal score, for example, is not the leader in retrieval, temporal reasoning, personalization or evidence governance. Preserve the official composite score, but also report the full per-capability vector and Pareto trade-offs; do not cherry-pick one subscore or silently combine incompatible tracks.
+
+The commercial/closed-source Cycle 2 overall references are MemoraX at 69.26 Textual, 68.00% Coding resolved and 53.68 Multimodal. A later Stage-2 ambition is at least one point above those overall values (70.26, 69.00% and 54.68 respectively), but only on the same official board and protocol. These overall stretch targets do not replace the separate per-capability frontier above.
 
 This target ladder is arithmetic-derived, not a forecast. Cycle 2 is a historical baseline; the next eligible competition requires its own submission window, API contract and official evaluation. Do not tune against sealed official test data.
 
