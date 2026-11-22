@@ -2,7 +2,7 @@
   "schema": "sfeb-task-family-plan-v1",
   "plan_id": "SFEB-TASK-PLAN-001",
   "as_of": "2026-11-22",
-  "status": "blueprint_only",
+  "status": "fixtures_in_progress",
   "candidate_task_count": 30,
   "runnable_task_count": 0,
   "target_distribution": {
@@ -427,10 +427,11 @@
         "screenshot_accessibility_layout_bundle",
         "independent_oracle_result"
       ],
-      "fixture_status": "not_authored",
-      "oracle_status": "not_authored",
+      "fixture_status": "fixture_ready",
+      "oracle_status": "golden_cases_authored_rust_execution_pending",
       "exposure": "public_pilot",
-      "promotion_status": "planned_not_runnable"
+      "promotion_status": "browser_runner_pending",
+      "promoted_task_id": "SFEB-L2-005"
     },
     {
       "task_id": "SFEB-PILOT-INT-004",

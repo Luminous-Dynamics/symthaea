@@ -393,3 +393,8 @@ The external comparator ledger now includes Arena Code Arena's WebDev, Image-to-
 ## 30-task pilot family blueprint
 
 [`task-family-plan-v1.json`](task-family-plan-v1.json) defines 30 candidate task briefs across static visual, interactive multi-route and fullstack/maintenance levels. It is a planning artifact only: all 30 candidate fixtures and oracle policies are marked not authored, and the current runnable candidate count remains zero. See [issue #13251](https://github.com/Luminous-Dynamics/symthaea/issues/13251).
+
+
+## Executable deterministic search/filter task
+
+[`SFEB-L2-005`](tasks/sfeb-l2-search-filter-v1.json) adds an original search/filter/sort/pagination fixture with 13 synthetic assets, ten golden cases, mutation/positive controls and a pure Rust reference model. Use `cargo run --manifest-path contract-check/Cargo.toml -- --search-filter-model` to validate data semantics without Chromium. Rust compilation/tests remain pending; browser-runner qualification is not complete.

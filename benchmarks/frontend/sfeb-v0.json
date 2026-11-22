@@ -10,7 +10,7 @@
     "framework_family": "Leptos 0.8",
     "lockfile_resolution_required": true
   },
-  "important_notice": "SFEB remains a staged benchmark, not a completed end-to-end evaluation. A public-pilot dashboard fixture, interface/task contracts, a standalone contract/provenance validator, a retrieval evaluator, and a CDP evidence-capture library primitive are checked in. Their source-level presence does not imply compilation, execution, browser verification, independent-oracle qualification, or benchmark scores. The full isolated browser runner and task-level result pipeline remain pending.",
+  "important_notice": "SFEB remains a staged benchmark, not a completed end-to-end evaluation. A public-pilot dashboard fixture and a second original search/filter fixture with 13 synthetic assets, ten golden cases and a pure offline Rust reference model are checked in. Source presence does not imply Rust compilation, agent browser verification, independent-oracle qualification or benchmark scores. The isolated browser runner and task-level qualification pipeline remain pending.",
   "scoring": {
     "report_vector": [
       "visual_fidelity",
@@ -325,6 +325,42 @@
         "fixture-visibility-classification"
       ],
       "status": "specification_only",
+      "fixture_exposure": "public_pilot"
+    },
+    {
+      "id": "SFEB-L2-005",
+      "level": 2,
+      "category": "search_filter_sort",
+      "title": "Implement a searchable, filterable and deterministic asset inventory explorer",
+      "target_surface": "new_fixture_application",
+      "task_definition": "benchmarks/frontend/tasks/sfeb-l2-search-filter-v1.json",
+      "reference_fixture": "benchmarks/frontend/fixtures/search-filter-explorer/",
+      "inputs": [
+        "synthetic_asset_dataset",
+        "task_contract",
+        "reference_screenshots_from_fixture"
+      ],
+      "acceptance_criteria": [
+        "Case-insensitive search across name, SKU and description.",
+        "Conjunctive category, stock and inclusive price filters.",
+        "Stable ascending asset-ID sort ties.",
+        "Filter/sort before one-based pagination.",
+        "Complete URL-state round-trip.",
+        "Ten deterministic golden cases pass.",
+        "Browser keyboard/accessibility/responsive/network gates pass."
+      ],
+      "required_evidence": [
+        "task_contract",
+        "dataset_and_oracle_digests",
+        "rust_model_test_receipt",
+        "query_state_url",
+        "browser_journey_trace",
+        "screenshots",
+        "accessibility_tree",
+        "layout_report",
+        "network_log"
+      ],
+      "status": "fixture_ready",
       "fixture_exposure": "public_pilot"
     }
   ],

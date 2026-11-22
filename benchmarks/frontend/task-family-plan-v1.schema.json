@@ -161,16 +161,36 @@
             }
           },
           "fixture_status": {
-            "const": "not_authored"
+            "enum": [
+              "not_authored",
+              "fixture_ready",
+              "reference_only",
+              "fully_executable"
+            ]
           },
           "oracle_status": {
-            "const": "not_authored"
+            "enum": [
+              "not_authored",
+              "golden_cases_authored_rust_execution_pending",
+              "golden_cases_executed",
+              "independently_qualified"
+            ]
           },
           "exposure": {
             "const": "public_pilot"
           },
           "promotion_status": {
-            "const": "planned_not_runnable"
+            "enum": [
+              "planned_not_runnable",
+              "browser_runner_pending",
+              "ready_for_independent_qualification",
+              "runnable",
+              "holdout_qualified"
+            ]
+          },
+          "promoted_task_id": {
+            "type": "string",
+            "pattern": "^SFEB-L[0-4]-[0-9]{3}$"
           }
         }
       }

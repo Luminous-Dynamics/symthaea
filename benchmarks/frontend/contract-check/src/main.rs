@@ -9,6 +9,7 @@ use std::process::ExitCode;
 use sha2::{Digest, Sha256};
 
 mod trace;
+mod search_filter;
 
 const ANCHOR_MARKER: &str = "data-sfeb-id=\"";
 
@@ -193,6 +194,94 @@ fn validate_service_dashboard_reference(html: &str, css: &str) -> Result<(), Str
     Ok(())
 }
 
+
+const DEFAULT_FILTER_DATASET_SCHEMA: &str =
+    "benchmarks/frontend/search-filter-dataset-v1.schema.json";
+const DEFAULT_FILTER_ORACLE_SCHEMA: &str =
+    "benchmarks/frontend/search-filter-oracle-cases-v1.schema.json";
+const DEFAULT_FILTER_DATASET: &str =
+    "benchmarks/frontend/fixtures/search-filter-explorer/dataset.json";
+const DEFAULT_FILTER_CASES: &str =
+    "benchmarks/frontend/fixtures/search-filter-explorer/oracle-cases.json";
+
+fn run_search_filter_model(dataset_path: &str, cases_path: &str) -> Result<(), String> {
+    let dataset_schema = read_json(DEFAULT_FILTER_DATASET_SCHEMA)?;
+    let oracle_schema = read_json(DEFAULT_FILTER_ORACLE_SCHEMA)?;
+    let dataset = read_json(dataset_path)?;
+    let cases = read_json(cases_path)?;
+    for (name, schema, instance) in [
+        ("dataset", &dataset_schema, &dataset),
+        ("oracle cases", &oracle_schema, &cases),
+    ] {
+        let validator = validator_for(schema)
+            .map_err(|error| format!("invalid {name} schema: {error}"))?;
+        let errors: Vec<String> = validator.iter_errors(instance)
+            .map(|error| format!("{}: {error}", error.instance_path()))
+            .collect();
+        if !errors.is_empty() {
+            return Err(format!("{name} does not satisfy its schema:\n{}", errors.join("\n")));
+        }
+    }
+    let dataset_source = fs::read_to_string(dataset_path)
+        .map_err(|error| format!("failed to read dataset {dataset_path}: {error}"))?;
+    let cases_source = fs::read_to_string(cases_path)
+        .map_err(|error| format!("failed to read oracle cases {cases_path}: {error}"))?;
+    let passed = search_filter::validate_golden_cases(&dataset_source, &cases_source)?;
+    let dataset_id = dataset.get("dataset_id").and_then(Value::as_str).unwrap_or("<unnamed>");
+    println!("SFEB deterministic search/filter reference valid: {dataset_id} (golden_cases={passed})");
+    println!("No browser or network is invoked; this qualifies data semantics only.");
+    Ok(())
+}
+
+fn validate_inventory_reference(html: &str, css: &str) -> Result<(), String> {
+    let normalized_html = html.to_ascii_lowercase();
+    let normalized_css = css.to_ascii_lowercase();
+    if normalized_html.matches("<main ").count() != 1
+        || !html.contains("<h1 id=\"inventory-title\">Asset inventory</h1>")
+    {
+        return Err("inventory fixture must contain one main landmark and the required heading".to_string());
+    }
+    for id in [
+        "inventory.shell", "inventory.header", "inventory.main", "inventory.heading",
+        "inventory.filters", "inventory.results", "inventory.table", "inventory.pagination",
+    ] {
+        let anchor = format!("data-sfeb-id=\"{id}\"");
+        if html.matches(anchor.as_str()).count() != 1 {
+            return Err(format!("inventory fixture must contain exactly one {id} anchor"));
+        }
+    }
+    for required in [
+        "href=\"#main-content\"", "class=\"skip-link\"",
+        "aria-label=\"Asset inventory filters\"", "for=\"asset-search\"",
+        "id=\"asset-category\"", "id=\"min-price\"", "id=\"max-price\"",
+        "id=\"available-only\"", "id=\"sort-order\"", "aria-live=\"polite\"",
+        "<caption class=\"visually-hidden\">Synthetic field equipment inventory</caption>",
+    ] {
+        if !html.contains(required) {
+            return Err(format!("inventory fixture is missing required semantic control: {required}"));
+        }
+    }
+    if html.matches("<tr data-asset-id=").count() != 5 {
+        return Err("inventory reference must contain exactly five first-page sample rows".to_string());
+    }
+    if !normalized_css.contains(".skip-link:focus")
+        || !normalized_css.contains(".table-wrap")
+        || !normalized_css.contains("overflow-x:auto")
+        || !normalized_css.contains("@media(max-width:680px)")
+        || !normalized_css.contains("@media(max-width:380px)")
+    {
+        return Err("inventory fixture is missing focus-visible or responsive overflow rules".to_string());
+    }
+    if normalized_html.contains("<script") || normalized_css.contains("@import")
+        || normalized_css.contains("url(") || normalized_html.contains("http://")
+        || normalized_html.contains("https://") || normalized_css.contains("http://")
+        || normalized_css.contains("https://")
+    {
+        return Err("inventory fixture must not contain executable scripts or external resources".to_string());
+    }
+    Ok(())
+}
+
 fn validate_task_instance(
     schema: &Value,
     task: &Value,
@@ -247,6 +336,9 @@ fn validate_task_instance(
     let anchors = extract_source_anchors(html_text)?;
     if task.get("task_id").and_then(Value::as_str) == Some("SFEB-L1-004") {
         validate_service_dashboard_reference(html_text, css_text)?;
+    }
+    if task.get("task_id").and_then(Value::as_str) == Some("SFEB-L2-005") {
+        validate_inventory_reference(html_text, css_text)?;
     }
     let regions = task
         .get("required_regions")
@@ -1521,11 +1613,21 @@ fn run_trace(trace_path: &str, expected_run_id: Option<&str>) -> Result<(), Stri
     Ok(())
 }
 
+    if args.first().is_some_and(|arg| arg == "--search-filter-model") {
+        if args.len() > 3 {
+            return Err("--search-filter-model accepts at most dataset and oracle-case paths".to_string());
+        }
+        return run_search_filter_model(
+            args.get(1).map(String::as_str).unwrap_or(DEFAULT_FILTER_DATASET),
+            args.get(2).map(String::as_str).unwrap_or(DEFAULT_FILTER_CASES),
+        );
+    }
 fn run() -> Result<(), String> {
     let args: Vec<String> = env::args().skip(1).collect();
     if args.iter().any(|arg| arg == "--help" || arg == "-h") {
         println!(
-            "Usage:\n  cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- [CONTRACT_SCHEMA [CONTRACT_JSON [APP_SOURCE.rs]]]\n  cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --task [TASK_SCHEMA [TASK_JSON]]\n  cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --patterns [PATTERN_SCHEMA [CORPUS_JSON [REPOSITORY_ROOT]]]\n  cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --retrieval [RETRIEVAL_SCHEMA [QUERY_SET_JSON [PATTERN_CORPUS_JSON]]]\n  cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --verify-trace TRACE_JSONL [EXPECTED_RUN_ID]\n\nThe default mode validates the Leptos interface contract and exact source anchors. --task validates the task schema, required fixture regions and canonical fixture digest. --patterns validates the Leptos knowledge schema and exact Git blob provenance for every source example. --retrieval validates positive/hard-negative queries and their gold IDs against the versioned pattern corpus. --mutations validates the oracle-qualification campaign definition only; it does not execute the campaign. --qualification-report validates the complete paired execution report, receipts and artifact bytes, then computes Wilson intervals and hard-gate qualification. --verify-trace validates RFC 8785 hash-chained JSONL traces, rejecting duplicate keys, tampering, reordering, truncation and cross-run replay."
+            "Usage:\n  cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- [CONTRACT_SCHEMA [CONTRACT_JSON [APP_SOURCE.rs]]]\n  cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --task [TASK_SCHEMA [TASK_JSON]]\n  cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --patterns [PATTERN_SCHEMA [CORPUS_JSON [REPOSITORY_ROOT]]]\n  cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --retrieval [RETRIEVAL_SCHEMA [QUERY_SET_JSON [PATTERN_CORPUS_JSON]]]\n  cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --verify-trace TRACE_JSONL [EXPECTED_RUN_ID]
+  cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --search-filter-model [DATASET_JSON [ORACLE_CASES_JSON]]\n\nThe default mode validates the Leptos interface contract and exact source anchors. --task validates the task schema, required fixture regions and canonical fixture digest. --patterns validates the Leptos knowledge schema and exact Git blob provenance for every source example. --retrieval validates positive/hard-negative queries and their gold IDs against the versioned pattern corpus. --mutations validates the oracle-qualification campaign definition only; it does not execute the campaign. --qualification-report validates the complete paired execution report, receipts and artifact bytes, then computes Wilson intervals and hard-gate qualification. --verify-trace validates RFC 8785 hash-chained JSONL traces, rejecting duplicate keys, tampering, reordering, truncation and cross-run replay. --search-filter-model validates the local synthetic inventory and executes deterministic Rust golden search/filter/sort/pagination cases without a browser."
         );
         return Ok(());
     }
@@ -2138,6 +2240,36 @@ mod tests {
     }
 
 
+
+    #[test]
+    fn search_filter_task_reference_fixture_and_contract_are_valid() {
+        let schema: Value = serde_json::from_str(include_str!("../../task-oracle-v1.schema.json"))
+            .expect("task schema JSON");
+        let task: Value = serde_json::from_str(include_str!("../../tasks/sfeb-l2-search-filter-v1.json"))
+            .expect("search/filter task JSON");
+        let html = include_bytes!("../../fixtures/search-filter-explorer/reference.html");
+        let css = include_bytes!("../../fixtures/search-filter-explorer/style.css");
+        let (regions, assertions) = validate_task_instance(&schema, &task, html, css)
+            .expect("search/filter task and fixture validate");
+        assert_eq!(regions, 8);
+        assert_eq!(assertions, 12);
+    }
+
+    #[test]
+    fn search_filter_dataset_and_golden_cases_satisfy_schemas() {
+        let dataset_schema: Value = serde_json::from_str(include_str!("../../search-filter-dataset-v1.schema.json"))
+            .expect("dataset schema JSON");
+        let oracle_schema: Value = serde_json::from_str(include_str!("../../search-filter-oracle-cases-v1.schema.json"))
+            .expect("oracle schema JSON");
+        let dataset: Value = serde_json::from_str(include_str!("../../fixtures/search-filter-explorer/dataset.json"))
+            .expect("dataset JSON");
+        let cases: Value = serde_json::from_str(include_str!("../../fixtures/search-filter-explorer/oracle-cases.json"))
+            .expect("oracle cases JSON");
+        assert!(validator_for(&dataset_schema).unwrap().is_valid(&dataset));
+        assert!(validator_for(&oracle_schema).unwrap().is_valid(&cases));
+        assert_eq!(cases["cases"].as_array().unwrap().len(), 10);
+    }
+
     #[test]
     fn task_family_blueprint_matches_schema_and_keeps_planned_tasks_non_runnable() {
         let schema: Value = serde_json::from_str(include_str!(
@@ -2167,7 +2299,13 @@ mod tests {
             10
         );
         assert_eq!(plan["runnable_task_count"], 0);
-        assert!(tasks.iter().all(|task| {
+        let authored: Vec<&Value> = tasks.iter().filter(|task| task["fixture_status"] != "not_authored").collect();
+        assert_eq!(authored.len(), 1);
+        assert_eq!(authored[0]["promoted_task_id"], "SFEB-L2-005");
+        assert_eq!(authored[0]["fixture_status"], "fixture_ready");
+        assert_eq!(authored[0]["oracle_status"], "golden_cases_authored_rust_execution_pending");
+        assert_eq!(authored[0]["promotion_status"], "browser_runner_pending");
+        assert!(tasks.iter().filter(|task| task["task_id"] != "SFEB-PILOT-INT-003").all(|task| {
             task["fixture_status"] == "not_authored"
                 && task["oracle_status"] == "not_authored"
                 && task["promotion_status"] == "planned_not_runnable"
