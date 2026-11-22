@@ -13,6 +13,7 @@ on:
   push:
     branches:
       - research/mel-predictive-transparency-audit-v1-20261123
+      - research/mel-forecast-observation-closure-v1-20261123
     paths:
       - "tools/mel-judge-grounding-audit/**"
       - "docs/research/MEL_PREDICTIVE_TRANSPARENCY_AUDITOR_V1_2026-11-23.md"
