@@ -71,11 +71,7 @@ impl JointPhaseSpaceSpectrum {
     }
 
     /// Return the f-strophy in one joint FFT bin, or None for an invalid index.
-    pub fn mode_energy(
-        &self,
-        x_mode_index: usize,
-        velocity_mode_index: usize,
-    ) -> Option<f64> {
+    pub fn mode_energy(&self, x_mode_index: usize, velocity_mode_index: usize) -> Option<f64> {
         if x_mode_index >= self.nx || velocity_mode_index >= self.nv {
             return None;
         }
@@ -120,8 +116,7 @@ impl VlasovPoisson1d1v {
                 (mean * mean).mul_add(config.domain_length * dv, spatial_mean_casimir);
         }
 
-        let partition_residual =
-            total_casimir - spatial_mean_casimir - fluctuation_f_strophy;
+        let partition_residual = total_casimir - spatial_mean_casimir - fluctuation_f_strophy;
         if !total_casimir.is_finite()
             || !spatial_mean_casimir.is_finite()
             || !fluctuation_f_strophy.is_finite()
@@ -147,9 +142,7 @@ impl VlasovPoisson1d1v {
     ///
     /// This computes spectral occupancy, not a transfer flux. Flux requires
     /// time-resolved cross-scale transfer terms or a separately derived budget.
-    pub fn joint_phase_space_spectrum(
-        &self,
-    ) -> Result<JointPhaseSpaceSpectrum, SolverError> {
+    pub fn joint_phase_space_spectrum(&self) -> Result<JointPhaseSpaceSpectrum, SolverError> {
         let config = self.config;
         let nx = config.nx;
         let nv = config.nv;
@@ -165,8 +158,7 @@ impl VlasovPoisson1d1v {
         let mut x_spectrum = vec![Complex::ZERO; nx * nv];
         for iv in 0..nv {
             for ix in 0..nx {
-                x_line[ix] =
-                    Complex::new(self.distribution[ix * nv + iv] - spatial_mean[iv], 0.0);
+                x_line[ix] = Complex::new(self.distribution[ix * nv + iv] - spatial_mean[iv], 0.0);
             }
             fft(&mut x_line, false);
             for (kx, coefficient) in x_line.iter().copied().enumerate() {
@@ -214,8 +206,7 @@ impl VlasovPoisson1d1v {
             }
         }
 
-        let parseval_absolute_residual =
-            (spectral_f_strophy - budget.fluctuation_f_strophy).abs();
+        let parseval_absolute_residual = (spectral_f_strophy - budget.fluctuation_f_strophy).abs();
         let parseval_scale = spectral_f_strophy
             .max(budget.fluctuation_f_strophy)
             .max(f64::MIN_POSITIVE);
@@ -281,8 +272,7 @@ mod tests {
         let spectrum = solver.joint_phase_space_spectrum().unwrap();
         assert!(spectrum.parseval_relative_residual < 1.0e-12);
         assert!(
-            (spectrum.spectral_f_strophy - budget.fluctuation_f_strophy).abs()
-                <= 1.0e-12 * scale
+            (spectrum.spectral_f_strophy - budget.fluctuation_f_strophy).abs() <= 1.0e-12 * scale
         );
         assert!(
             (spectrum.phase_mixing_f_strophy
@@ -321,10 +311,9 @@ mod tests {
         solver.advance_free_streaming(0.4).unwrap();
         let kick: Vec<f64> = (0..solver.config.nx)
             .map(|ix| {
-                0.02
-                    * (std::f64::consts::TAU * 2.0 * solver.config.x(ix)
-                        / solver.config.domain_length)
-                        .sin()
+                0.02 * (std::f64::consts::TAU * 2.0 * solver.config.x(ix)
+                    / solver.config.domain_length)
+                    .sin()
             })
             .collect();
         solver.apply_velocity_impulse(&kick).unwrap();
