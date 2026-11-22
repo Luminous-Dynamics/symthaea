@@ -128,7 +128,7 @@ pub use mycelial_temporal_cycles::{
     TemporalMycelialEdgeEvidenceCounts, TemporalMycelialEdgeEvidenceRecord,
     TemporalMycelialNodeMetrics, TemporalMycelialSequence, TemporalMycelialSnapshot,
     TemporalMycelialSnapshotMetrics, TemporalWindowCoverage,
-    build_temporal_mycelial_cycle_profile,
+    build_temporal_mycelial_cycle_profile, temporal_snapshot_from_annotated_skeleton,
 };
 pub use mycelial_mesh::{
     FilamentMeshRange, MAX_MYCELIAL_FILAMENTS, MAX_TUBE_MESH_VERTICES, MycelialTubeMesh,
