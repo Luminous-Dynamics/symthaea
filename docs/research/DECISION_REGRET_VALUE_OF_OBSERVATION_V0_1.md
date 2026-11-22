@@ -120,7 +120,7 @@ Thirteen Rust unit tests are authored for:
 5. delivery exactly at the deadline;
 6. absent observations remaining explicit;
 7. duplicate rows with the same visible transcript being deduplicated;
-8. distinct availability times remaining distinct outcome keys;
+8. transcript digests that conflict on candidate-visible availability time being rejected;
 9. unknown world IDs being rejected;
 10. worlds without declared possible outcomes being rejected;
 11. near-optimal common action accepted by a frozen epsilon-regret tolerance even without a common exact optimum;
