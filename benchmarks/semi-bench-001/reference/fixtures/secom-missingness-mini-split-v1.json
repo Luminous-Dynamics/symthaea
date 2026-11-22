@@ -1,0 +1,16 @@
+{
+  "schema": "luminous.semi-bench.split-manifest.v1",
+  "dataset_id": "synthetic-secom-missingness-v1",
+  "dataset_snapshot_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "split_scheme": "stratified_sample",
+  "assignments": [
+    {"sample_id": "synthetic-row-0000", "split": "train", "positive": false},
+    {"sample_id": "synthetic-row-0001", "split": "train", "positive": false},
+    {"sample_id": "synthetic-row-0002", "split": "train", "positive": true},
+    {"sample_id": "synthetic-row-0003", "split": "train", "positive": true},
+    {"sample_id": "synthetic-row-0004", "split": "validation", "positive": false},
+    {"sample_id": "synthetic-row-0005", "split": "validation", "positive": true},
+    {"sample_id": "synthetic-row-0006", "split": "test", "positive": false},
+    {"sample_id": "synthetic-row-0007", "split": "test", "positive": true}
+  ]
+}
