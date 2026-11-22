@@ -131,12 +131,7 @@ struct SummaryAccumulator {
 }
 
 impl SummaryAccumulator {
-    fn add(
-        &mut self,
-        passed: bool,
-        observed: Option<f64>,
-        metric_kind: MetricKind,
-    ) {
+    fn add(&mut self, passed: bool, observed: Option<f64>, metric_kind: MetricKind) {
         self.probes += 1;
         self.evaluable += 1;
         if passed {
@@ -175,10 +170,7 @@ impl SummaryAccumulator {
                 self.margin_shift_count,
             ),
             mean_margin_ratio: mean(self.margin_ratio_sum, self.margin_ratio_count),
-            mean_expected_candidate_score_drop: mean(
-                self.score_drop_sum,
-                self.score_drop_count,
-            ),
+            mean_expected_candidate_score_drop: mean(self.score_drop_sum, self.score_drop_count),
         }
     }
 }
@@ -254,8 +246,9 @@ fn audit_panel(panel: &ProbePanelV1) -> Result<GroundingReport, String> {
                             passed: None,
                             observed_value: None,
                             threshold: Some(panel.policy.maximum_prompt_only_margin_ratio),
-                            reason: "baseline pair margin is below the configured evaluability floor"
-                                .to_owned(),
+                            reason:
+                                "baseline pair margin is below the configured evaluability floor"
+                                    .to_owned(),
                         });
                     } else {
                         let ratio = probe_margin.abs() / baseline_margin.abs();
@@ -329,7 +322,8 @@ fn audit_panel(panel: &ProbePanelV1) -> Result<GroundingReport, String> {
                     }
                 }
                 "nuisance_transform" => {
-                    let tolerance = probe.maximum_margin_shift
+                    let tolerance = probe
+                        .maximum_margin_shift
                         .expect("validated nuisance transform requires tolerance");
                     let shift = (baseline_margin - probe_margin).abs();
                     let passed = shift <= tolerance;
@@ -575,12 +569,20 @@ fn validate_probe_shape(case: &ProbeCaseV1, probe: &ProbeV1) -> Result<(), Strin
                 ));
             }
             let tolerance = probe.maximum_margin_shift.ok_or_else(|| {
-                format!("nuisance probe {} needs maximum_margin_shift", probe.probe_id)
+                format!(
+                    "nuisance probe {} needs maximum_margin_shift",
+                    probe.probe_id
+                )
             })?;
-            if !tolerance.is_finite() || tolerance < 0.0 || probe.minimum_score_drop.is_some()
+            if !tolerance.is_finite()
+                || tolerance < 0.0
+                || probe.minimum_score_drop.is_some()
                 || probe.expected_candidate.is_some()
             {
-                return Err(format!("nuisance probe {} has invalid tolerance/fields", probe.probe_id));
+                return Err(format!(
+                    "nuisance probe {} has invalid tolerance/fields",
+                    probe.probe_id
+                ));
             }
         }
         "semantic_mismatch" => {
@@ -594,7 +596,10 @@ fn validate_probe_shape(case: &ProbeCaseV1, probe: &ProbeV1) -> Result<(), Strin
                 ));
             }
             let expected = probe.expected_candidate.as_deref().ok_or_else(|| {
-                format!("semantic-mismatch probe {} needs expected_candidate", probe.probe_id)
+                format!(
+                    "semantic-mismatch probe {} needs expected_candidate",
+                    probe.probe_id
+                )
             })?;
             if expected != "a" && expected != "b" {
                 return Err(format!(
@@ -615,15 +620,24 @@ fn validate_probe_shape(case: &ProbeCaseV1, probe: &ProbeV1) -> Result<(), Strin
                 ));
             }
             let minimum = probe.minimum_score_drop.ok_or_else(|| {
-                format!("semantic-mismatch probe {} needs minimum_score_drop", probe.probe_id)
+                format!(
+                    "semantic-mismatch probe {} needs minimum_score_drop",
+                    probe.probe_id
+                )
             })?;
-            if !minimum.is_finite() || minimum < 0.0
-                || probe.maximum_margin_shift.is_some()
-            {
-                return Err(format!("semantic-mismatch probe {} has invalid threshold/fields", probe.probe_id));
+            if !minimum.is_finite() || minimum < 0.0 || probe.maximum_margin_shift.is_some() {
+                return Err(format!(
+                    "semantic-mismatch probe {} has invalid threshold/fields",
+                    probe.probe_id
+                ));
             }
         }
-        other => return Err(format!("unsupported probe kind {other} in case {}", case.case_id)),
+        other => {
+            return Err(format!(
+                "unsupported probe kind {other} in case {}",
+                case.case_id
+            ));
+        }
     }
     Ok(())
 }
@@ -641,17 +655,27 @@ fn require_same_text_context(case: &ProbeCaseV1, probe: &ProbeV1) -> Result<(), 
 }
 
 fn require_audio_hashes(case: &ProbeCaseV1, probe: &ProbeV1) -> Result<(), String> {
-    let audio_a = probe.audio_a_sha256.as_deref()
+    let audio_a = probe
+        .audio_a_sha256
+        .as_deref()
         .ok_or_else(|| format!("probe {} is missing audio A digest", probe.probe_id))?;
-    let audio_b = probe.audio_b_sha256.as_deref()
+    let audio_b = probe
+        .audio_b_sha256
+        .as_deref()
         .ok_or_else(|| format!("probe {} is missing audio B digest", probe.probe_id))?;
     require_digest(audio_a, "probe audio A digest")?;
     require_digest(audio_b, "probe audio B digest")?;
     if audio_a == audio_b {
-        return Err(format!("probe {} has identical A/B audio digests", probe.probe_id));
+        return Err(format!(
+            "probe {} has identical A/B audio digests",
+            probe.probe_id
+        ));
     }
     if case.candidate_a_audio_sha256 == case.candidate_b_audio_sha256 {
-        return Err(format!("case {} has identical candidate audio digests", case.case_id));
+        return Err(format!(
+            "case {} has identical candidate audio digests",
+            case.case_id
+        ));
     }
     Ok(())
 }
@@ -697,11 +721,15 @@ fn validate_claims(claims: &[String]) -> Result<(), String> {
 
 fn require_digest(value: &str, name: &str) -> Result<(), String> {
     if value.len() == 64
-        && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
     {
         Ok(())
     } else {
-        Err(format!("{name} must be a 64-character lowercase SHA-256 digest"))
+        Err(format!(
+            "{name} must be a 64-character lowercase SHA-256 digest"
+        ))
     }
 }
 
