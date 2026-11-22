@@ -439,6 +439,10 @@ mod tests {
         let mut coarse = VlasovPoisson1d1v::new(config, distribution.clone()).unwrap();
         let mut refined = VlasovPoisson1d1v::new(config, distribution.clone()).unwrap();
         let initial = distribution;
+        let mut initial_refined = Vec::new();
+        for row in initial.chunks_exact(config.nv) {
+            initial_refined.extend(zero_pad_periodic_real_line(row, 2).unwrap().values);
+        }
         let old_horizon = config.velocity_sampling_horizon(1).unwrap();
 
         let refine_time = 0.4 * old_horizon.nyquist_encounter_time;
@@ -463,17 +467,24 @@ mod tests {
             .zip(initial.iter())
             .map(|(observed, expected)| (observed - expected).abs())
             .fold(0.0_f64, f64::max);
-        let refined_error = refined
+        let refined_old_node_error = refined
             .distribution()
             .iter()
             .step_by(2)
             .zip(initial.iter())
             .map(|(observed, expected)| (observed - expected).abs())
             .fold(0.0_f64, f64::max);
+        let refined_full_grid_error = refined
+            .distribution()
+            .iter()
+            .zip(initial_refined.iter())
+            .map(|(observed, expected)| (observed - expected).abs())
+            .fold(0.0_f64, f64::max);
         assert!(coarse_error < 1.0e-10);
+        assert!(refined_old_node_error < 1.0e-10);
         assert!(
-            refined_error > 1.0e-2,
-            "refined grid unexpectedly recurred at the old horizon: {refined_error:e}"
+            refined_full_grid_error > 1.0e-2,
+            "refined fine-grid state unexpectedly recurred at the old horizon: {refined_full_grid_error:e}"
         );
     }
 
