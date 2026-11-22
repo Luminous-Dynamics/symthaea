@@ -85,7 +85,7 @@ fn run_resolution(
             let pulse_tails = pulsed.spectral_tail_diagnostics(0.75)?;
 
             println!(
-                "{label},{},{},{dt:.8},{step},{time:.8},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e}",
+                "{label},{},{},{dt:.8},{step},{time:.8},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e}",
                 config.nx,
                 config.nv,
                 pulse_echo.real,
@@ -116,8 +116,11 @@ fn run_resolution(
                 pulse_tails.x.nyquist_energy_fraction,
                 pulse_tails.velocity.nyquist_energy_fraction,
                 control_diagnostics.total_mass,
+                control_diagnostics.momentum,
                 control_diagnostics.total_energy,
+                control_diagnostics.field_energy,
                 control_diagnostics.max_poisson_residual,
+                control_diagnostics.minimum_distribution,
                 control_diagnostics.velocity_boundary_ratio,
                 pulse_diagnostics.time,
             );
@@ -165,7 +168,7 @@ fn run_resolution(
 
 fn main() -> Result<(), Box<dyn Error>> {
     println!(
-        "run,nx,nv,dt,step,time,pulse_echo_real,pulse_echo_imag,pulse_echo_amplitude,control_echo_real,control_echo_imag,control_echo_amplitude,delta_echo_real,delta_echo_imag,delta_echo_amplitude,pulse_second_real,pulse_second_imag,pulse_second_amplitude,control_second_real,control_second_imag,control_second_amplitude,pulse_mass,pulse_momentum,pulse_kinetic_energy,pulse_field_energy,pulse_total_energy,pulse_poisson_residual,pulse_minimum_f,pulse_velocity_boundary_ratio,pulse_x_high_tail_fraction,pulse_v_high_tail_fraction,pulse_x_nyquist_fraction,pulse_v_nyquist_fraction,control_mass,control_total_energy,control_poisson_residual,control_velocity_boundary_ratio,diagnostic_time"
+        "run,nx,nv,dt,step,time,pulse_echo_real,pulse_echo_imag,pulse_echo_amplitude,control_echo_real,control_echo_imag,control_echo_amplitude,delta_echo_real,delta_echo_imag,delta_echo_amplitude,pulse_second_real,pulse_second_imag,pulse_second_amplitude,control_second_real,control_second_imag,control_second_amplitude,pulse_mass,pulse_momentum,pulse_kinetic_energy,pulse_field_energy,pulse_total_energy,pulse_poisson_residual,pulse_minimum_f,pulse_velocity_boundary_ratio,pulse_x_high_tail_fraction,pulse_v_high_tail_fraction,pulse_x_nyquist_fraction,pulse_v_nyquist_fraction,control_mass,control_momentum,control_total_energy,control_field_energy,control_poisson_residual,control_minimum_f,control_velocity_boundary_ratio,diagnostic_time"
     );
 
     let common = |nx, nv| VlasovPoissonConfig {
