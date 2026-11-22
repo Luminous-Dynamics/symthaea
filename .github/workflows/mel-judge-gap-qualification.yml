@@ -1,0 +1,94 @@
+name: MEL rank-gap judge qualification
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "tools/mel-judge-gap/**"
+      - "docs/research/MEL_JUDGE_RANK_GAP_QUALIFICATION_V1_2026-11-22.md"
+      - ".github/workflows/mel-judge-gap-qualification.yml"
+  push:
+    branches:
+      - research/mel-judge-gap-qualification-v1-20261122
+    paths:
+      - "tools/mel-judge-gap/**"
+      - "docs/research/MEL_JUDGE_RANK_GAP_QUALIFICATION_V1_2026-11-22.md"
+      - ".github/workflows/mel-judge-gap-qualification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-machine-judge:
+    name: Exact-head rank-gap and position-swap qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact tested head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify head and preserve committed source
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+          evidence="$RUNNER_TEMP/mel-judge-gap-evidence"
+          mkdir -p "$evidence"
+          echo "exact_head=$actual" > "$evidence/source-revision.txt"
+          git rev-parse HEAD:tools/mel-judge-gap/src/lib.rs > "$evidence/lib-blob.txt"
+          git rev-parse HEAD:tools/mel-judge-gap/src/main.rs > "$evidence/main-blob.txt"
+          cp tools/mel-judge-gap/src/lib.rs "$evidence/lib.committed.rs"
+          cp tools/mel-judge-gap/src/main.rs "$evidence/main.committed.rs"
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Normalize formatting and preserve exact diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 fmt --manifest-path tools/mel-judge-gap/Cargo.toml
+          cargo +1.96.0 fmt --check --manifest-path tools/mel-judge-gap/Cargo.toml
+          diff -u "$RUNNER_TEMP/mel-judge-gap-evidence/lib.committed.rs" tools/mel-judge-gap/src/lib.rs > "$RUNNER_TEMP/mel-judge-gap-evidence/lib-rustfmt.diff" || test "$?" -eq 1
+          diff -u "$RUNNER_TEMP/mel-judge-gap-evidence/main.committed.rs" tools/mel-judge-gap/src/main.rs > "$RUNNER_TEMP/mel-judge-gap-evidence/main-rustfmt.diff" || test "$?" -eq 1
+          cp tools/mel-judge-gap/src/lib.rs "$RUNNER_TEMP/mel-judge-gap-evidence/lib.formatted.rs"
+          cp tools/mel-judge-gap/src/main.rs "$RUNNER_TEMP/mel-judge-gap-evidence/main.formatted.rs"
+      - name: Generate isolated dependency lock
+        run: cargo +1.96.0 generate-lockfile --manifest-path tools/mel-judge-gap/Cargo.toml
+      - name: Run rank-gap and order-swap conformance tests
+        run: cargo +1.96.0 test --locked --manifest-path tools/mel-judge-gap/Cargo.toml
+      - name: Run warnings-denied Clippy
+        run: cargo +1.96.0 clippy --locked --manifest-path tools/mel-judge-gap/Cargo.toml --all-targets -- -D warnings
+      - name: Parse schema and fixture
+        run: |
+          jq empty tools/mel-judge-gap/schema/mel-judge-gap-qualification-v1.schema.json
+          jq empty tools/mel-judge-gap/fixtures/valid-judge-gap-v1.json
+      - name: Execute known-answer fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 run --locked --quiet --manifest-path tools/mel-judge-gap/Cargo.toml -- tools/mel-judge-gap/fixtures/valid-judge-gap-v1.json > "$RUNNER_TEMP/mel-judge-gap-report.json"
+          jq -e '.valid == true and .pair_count == 10 and .presentation_count == 20 and .swap_stable_pair_count == 10 and .swap_inconsistent_pair_count == 0 and .gold_agreement_count == 10 and .ranking_graph_connected == true and .spearman_rank_correlation_to_gold > 0.99 and .left_choice_rate == 0.5' "$RUNNER_TEMP/mel-judge-gap-report.json"
+      - name: Seal reproducibility evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/mel-judge-gap-evidence"
+          cp tools/mel-judge-gap/Cargo.toml "$evidence/Cargo.toml"
+          cp tools/mel-judge-gap/Cargo.lock "$evidence/Cargo.lock"
+          cp tools/mel-judge-gap/schema/mel-judge-gap-qualification-v1.schema.json "$evidence/schema.json"
+          cp tools/mel-judge-gap/fixtures/valid-judge-gap-v1.json "$evidence/fixture.json"
+          cp "$RUNNER_TEMP/mel-judge-gap-report.json" "$evidence/report.json"
+          (cd "$evidence" && sha256sum Cargo.toml Cargo.lock schema.json fixture.json report.json lib.committed.rs lib.formatted.rs main.committed.rs main.formatted.rs > SHA256SUMS)
+      - name: Upload qualification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: mel-judge-gap-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/mel-judge-gap-evidence/
+          if-no-files-found: error
+          retention-days: 90
