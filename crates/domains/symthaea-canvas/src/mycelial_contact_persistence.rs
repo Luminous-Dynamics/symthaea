@@ -281,14 +281,17 @@ pub fn build_mycelial_contact_filtration(
         let parameter_micros = |value: f32| {
             (f64::from(value.clamp(0.0, 1.0)) * 1_000_000.0).round() as u32
         };
-        let contact_key = (
+        let source_contact = (
             fusion.source_filament_id,
             parameter_micros(fusion.source_t),
+        );
+        let target_contact = (
             fusion.target_filament_id,
             parameter_micros(fusion.target_t),
-            fusion.kind,
         );
-        if !seen_contacts.insert(contact_key)
+        if source_contact == target_contact
+            || !seen_contacts.insert(source_contact)
+            || !seen_contacts.insert(target_contact)
             || !anchor_error.is_finite()
             || anchor_error > CONTACT_DISTANCE_ABSOLUTE_EPSILON
         {
@@ -1203,6 +1206,39 @@ mod tests {
         assert_eq!(profile.metrics.candidate_count_above_maximum, 1);
         assert_eq!(profile.metrics.final_cycle_rank, 0);
         assert!(profile.snapshots.is_empty());
+    }
+
+    #[test]
+    fn two_candidates_cannot_claim_the_same_tip_contact() {
+        let model = fixture_model(0.25);
+        let first = tip_to_side_candidate(&model, 17, 0.25);
+        let mut second = tip_to_side_candidate(&model, 18, 0.25);
+        second.fusion.target_filament_id = 1;
+        second.fusion.target_t = 0.5;
+        let target = model.filaments.iter().find(|value| value.id == 1).unwrap();
+        let target_point = bezier_point(target, 0.5);
+        let source = model.filaments.iter().find(|value| value.id == 2).unwrap();
+        second.fusion.junction_position = source
+            .end
+            .add(target_point)
+            .scale(0.5);
+        second.contact_distance = point_distance(source.end, target_point);
+        let mut invalid = second.clone();
+        invalid.fusion.source_filament_id = first.fusion.source_filament_id;
+        invalid.fusion.source_t = first.fusion.source_t;
+        invalid.fusion.target_filament_id = first.fusion.target_filament_id;
+        invalid.fusion.target_t = first.fusion.target_t;
+        invalid.fusion.junction_position = first.fusion.junction_position;
+        invalid.contact_distance = first.contact_distance;
+        let result = build_mycelial_contact_filtration(
+            &model,
+            &[first, invalid],
+            MycelialContactFiltrationConfig::default(),
+        );
+        assert!(matches!(
+            result,
+            Err(MycelialContactFiltrationError::InvalidCandidateGeometry(_))
+        ));
     }
 
     #[test]
