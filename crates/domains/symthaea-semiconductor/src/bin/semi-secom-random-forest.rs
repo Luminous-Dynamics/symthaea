@@ -21,12 +21,12 @@ use symthaea_semiconductor::benchmark::secom_raw::{
 use symthaea_semiconductor::benchmark::split_manifest::{
     SplitManifestV1, validate_split_manifest_v1,
 };
+use symthaea_semiconductor::benchmark::stratified_repeat::StratifiedRepeatReportV1;
 use symthaea_semiconductor::benchmark::{
     ForestClassWeightingV1, RandomForestInputSampleV1, RandomForestParametersV1,
     RandomForestPredictionReportV1, RandomForestTrainingSampleV1, fit_random_forest_v1,
     predict_random_forest_v1, prepare_secom_stratified_fold_v1, score_random_forest_predictions_v1,
 };
-use symthaea_semiconductor::benchmark::stratified_repeat::StratifiedRepeatReportV1;
 
 #[derive(Serialize)]
 struct RandomForestArmReportV1 {
