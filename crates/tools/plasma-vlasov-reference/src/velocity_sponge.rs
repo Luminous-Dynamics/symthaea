@@ -32,13 +32,19 @@ impl fmt::Display for VelocityFourierSpongeError {
                 write!(formatter, "sponge start fraction must be in [0, 1)")
             }
             Self::InvalidMaximumDamping => {
-                write!(formatter, "maximum damping rate must be finite and nonnegative")
+                write!(
+                    formatter,
+                    "maximum damping rate must be finite and nonnegative"
+                )
             }
             Self::InvalidExponent => {
                 write!(formatter, "sponge exponent must be in 1..=16")
             }
             Self::NonFiniteTransform => {
-                write!(formatter, "velocity-Fourier sponge produced a non-finite transform")
+                write!(
+                    formatter,
+                    "velocity-Fourier sponge produced a non-finite transform"
+                )
             }
             Self::Solver(error) => write!(formatter, "solver failure during sponge: {error}"),
         }
@@ -133,18 +139,17 @@ impl VlasovPoisson1d1v {
         }
 
         let config = self.config;
-        let expected = config
-            .nx
-            .checked_mul(config.nv)
-            .ok_or(VelocityFourierSpongeError::Solver(
-                SolverError::GridSizeOverflow,
-            ))?;
+        let expected =
+            config
+                .nx
+                .checked_mul(config.nv)
+                .ok_or(VelocityFourierSpongeError::Solver(
+                    SolverError::GridSizeOverflow,
+                ))?;
 
         let mut candidate = Vec::new();
         candidate.try_reserve_exact(expected).map_err(|_| {
-            VelocityFourierSpongeError::Solver(SolverError::AllocationFailed {
-                elements: expected,
-            })
+            VelocityFourierSpongeError::Solver(SolverError::AllocationFailed { elements: expected })
         })?;
 
         let mut line = Vec::new();
@@ -170,8 +175,8 @@ impl VlasovPoisson1d1v {
                 let signed = signed_mode(mode, config.nv);
                 let normalized = signed.unsigned_abs() as f64 / nyquist_mode as f64;
                 let attenuation = if normalized > start_fraction_of_nyquist {
-                    let ramp =
-                        (normalized - start_fraction_of_nyquist) / (1.0 - start_fraction_of_nyquist);
+                    let ramp = (normalized - start_fraction_of_nyquist)
+                        / (1.0 - start_fraction_of_nyquist);
                     let damping_rate = maximum_damping_rate * ramp.powi(exponent as i32);
                     (-damping_rate * duration).exp()
                 } else {
@@ -224,12 +229,10 @@ impl VlasovPoisson1d1v {
         };
 
         let removed_total_casimir = before.total_casimir - after.total_casimir;
-        let removed_spatial_mean_casimir =
-            before.spatial_mean_casimir - after.spatial_mean_casimir;
+        let removed_spatial_mean_casimir = before.spatial_mean_casimir - after.spatial_mean_casimir;
         let removed_fluctuation_f_strophy =
             before.fluctuation_f_strophy - after.fluctuation_f_strophy;
-        let casimir_accounting_residual =
-            removed_total_casimir - spectral_removed_casimir;
+        let casimir_accounting_residual = removed_total_casimir - spectral_removed_casimir;
 
         if !removed_total_casimir.is_finite()
             || !removed_spatial_mean_casimir.is_finite()
@@ -330,9 +333,7 @@ mod tests {
 
         assert!((high_after - expected_high).abs() < 1.0e-10);
         assert!((low_after - low_before).abs() < 1.0e-10);
-        assert!(
-            (density_mode_after.amplitude() - density_mode_before.amplitude()).abs() < 1.0e-12
-        );
+        assert!((density_mode_after.amplitude() - density_mode_before.amplitude()).abs() < 1.0e-12);
         assert_eq!(solver.time(), time_before);
         assert!((report.nyquist_attenuation - (-1.0_f64).exp()).abs() < 1.0e-14);
         assert!(report.removed_total_casimir > 0.0);
