@@ -60,3 +60,44 @@ jobs:
             "$RUNNER_TEMP/xacle-submission.json"
           jq -e '.expected_item_count == 4 and .received_item_count == 4 and .exact_id_coverage == true' \
             "$RUNNER_TEMP/xacle-submission.json" > /dev/null
+      - name: Assemble reproducibility evidence
+        if: always()
+        shell: bash
+        run: |
+          set -uo pipefail
+          evidence="$RUNNER_TEMP/mel-xacle-evidence"
+          mkdir -p "$evidence"
+          printf 'tested_head=%s\n' "$(git rev-parse HEAD)" > "$evidence/source-revision.txt"
+          git rev-parse HEAD:tools/mel-xacle-audit/src/lib.rs > "$evidence/lib-blob.txt"
+          git rev-parse HEAD:tools/mel-xacle-audit/src/main.rs > "$evidence/main-blob.txt"
+          rustc +1.96.0 --version > "$evidence/rustc-version.txt" 2>&1 || true
+          cargo +1.96.0 --version > "$evidence/cargo-version.txt" 2>&1 || true
+          cp tools/mel-xacle-audit/Cargo.toml "$evidence/Cargo.toml"
+          cp tools/mel-xacle-audit/schema/mel-xacle-audit-report-v1.schema.json "$evidence/schema.json"
+          cp tools/mel-xacle-audit/src/lib.rs "$evidence/lib.rs"
+          cp tools/mel-xacle-audit/src/main.rs "$evidence/main.rs"
+          cp tools/mel-xacle-audit/fixtures/metadata-labelled.csv "$evidence/metadata-labelled.csv"
+          cp tools/mel-xacle-audit/fixtures/baseline-predictions.csv "$evidence/baseline-predictions.csv"
+          cp tools/mel-xacle-audit/fixtures/candidate-predictions.csv "$evidence/candidate-predictions.csv"
+          cp tools/mel-xacle-audit/fixtures/blind-evaluation.csv "$evidence/blind-evaluation.csv"
+          cp tools/mel-xacle-audit/fixtures/blind-predictions.csv "$evidence/blind-predictions.csv"
+          if [[ -f tools/mel-xacle-audit/Cargo.lock ]]; then
+            cp tools/mel-xacle-audit/Cargo.lock "$evidence/Cargo.lock"
+          else
+            printf 'Cargo.lock unavailable\n' > "$evidence/Cargo.lock-unavailable.txt"
+          fi
+          if [[ -f "$RUNNER_TEMP/xacle-compare.json" ]]; then
+            cp "$RUNNER_TEMP/xacle-compare.json" "$evidence/compare-report.json"
+          fi
+          if [[ -f "$RUNNER_TEMP/xacle-submission.json" ]]; then
+            cp "$RUNNER_TEMP/xacle-submission.json" "$evidence/submission-report.json"
+          fi
+          (cd "$evidence" && find . -maxdepth 1 -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)
+      - name: Upload reproducibility evidence bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mel-xacle-audit-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/mel-xacle-evidence/
+          if-no-files-found: error
+          retention-days: 90
