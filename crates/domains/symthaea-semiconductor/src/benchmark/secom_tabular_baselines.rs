@@ -736,7 +736,14 @@ mod tests {
     fn held_out_label_changes_do_not_change_any_fitted_model_digest() {
         let changed_labels = String::from_utf8(LABELS.to_vec())
             .unwrap()
-            .replace("-1 \"19/07/2008 12:15:00\"", "1 \"19/07/2008 12:15:00\"");
+            .replace(
+                "-1 \"19/07/2008 12:15:00\"",
+                "1 \"19/07/2008 12:15:00\"",
+            )
+            .replace(
+                "1 \"19/07/2008 12:20:00\"",
+                "-1 \"19/07/2008 12:20:00\"",
+            );
         let original = evaluate(FEATURES, LABELS);
         let changed = evaluate(FEATURES, changed_labels.as_bytes());
         for baseline in ["B2", "B3", "B4"] {
@@ -777,21 +784,63 @@ mod tests {
 
     #[test]
     fn sample_input_order_does_not_affect_fitted_model_digest() {
-        let mut rows: Vec<&str> = std::str::from_utf8(FEATURES).unwrap().lines().collect();
-        rows[..4].reverse();
-        let permuted = rows.join("\n");
-        let mut label_rows: Vec<&str> = std::str::from_utf8(LABELS).unwrap().lines().collect();
-        label_rows[..4].reverse();
-        let permuted_labels = label_rows.join("\n");
-        let report = evaluate(FEATURES, LABELS);
-        let changed = evaluate(permuted.as_bytes(), permuted_labels.as_bytes());
-        // Fitted statistics are permutation invariant when source features,
-        // labels and training split membership remain paired.
-        for baseline in ["B2", "B3", "B4"] {
-            assert_eq!(
-                report.baselines[baseline].model_sha256,
-                changed.baselines[baseline].model_sha256
+        let features = parse_features(FEATURES).expect("fixture features parse");
+        let labels = parse_labels(LABELS).expect("fixture labels parse");
+        let split: SplitManifestV1 =
+            serde_json::from_str(SPLIT).expect("split fixture parses");
+
+        let digest_for = |baseline_id: &str,
+                          policy: SecomImputationPolicyV1,
+                          uses_missingness_indicators: bool,
+                          features: &[SecomSensorRowV1],
+                          labels: &[SecomLabelRowV1],
+                          assignments: &[crate::benchmark::split_manifest::SplitAssignmentV1]| {
+            let model = fit_model_v1(
+                baseline_id,
+                policy,
+                uses_missingness_indicators,
+                features,
+                labels,
+                assignments,
+            )
+            .expect("training-only fit succeeds");
+            sha256_hex(&serde_json::to_vec(&model).expect("model serializes"))
+        };
+
+        let configurations = [
+            ("B2", SecomImputationPolicyV1::TrainingMedian, false),
+            ("B3", SecomImputationPolicyV1::TrainingMedian, true),
+            ("B4", SecomImputationPolicyV1::Zero, true),
+        ];
+
+        let mut permuted_features = features.clone();
+        let mut permuted_labels = labels.clone();
+        let mut permuted_assignments = split.assignments.clone();
+        // Reorder paired training rows inside the model-fitting boundary.
+        // The raw-file auditor still enforces the source's chronological order.
+        permuted_features[..4].reverse();
+        permuted_labels[..4].reverse();
+        permuted_assignments[..4].reverse();
+
+        for (baseline_id, policy, with_mask) in configurations {
+            let original = digest_for(
+                baseline_id,
+                policy,
+                with_mask,
+                &features,
+                &labels,
+                &split.assignments,
             );
+            let permuted = digest_for(
+                baseline_id,
+                policy,
+                with_mask,
+                &permuted_features,
+                &permuted_labels,
+                &permuted_assignments,
+            );
+            assert_eq!(original, permuted, "{baseline_id} must be row-order invariant");
         }
     }
+}
 }
