@@ -109,5 +109,5 @@ jobs:
           test -s docs/research/MATH_PROOF_COMPREHENSION_COMPETITIVE_LEDGER_V1.md
           test -s docs/research/MATH_PROOF_COMPREHENSION_HUMAN_STUDY_PREREG_V1.md
           grep -F "No human study has been run" docs/research/MATH_PROOF_COMPREHENSION_HUMAN_STUDY_PREREG_V1.md >/dev/null
-          grep -F "does not establish" docs/research/MATH_PROOF_COMPREHENSION_COMPETITIVE_LEDGER_V1.md >/dev/null || true
+          grep -F "Scores and budgets are not directly comparable" docs/research/MATH_PROOF_COMPREHENSION_COMPETITIVE_LEDGER_V1.md >/dev/null
           echo "MATH_PROOF_COMPREHENSION_PILOT_FIXTURES_PASS"
