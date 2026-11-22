@@ -793,6 +793,7 @@ mod tests {
                 ordering_policy: MycelialReviewOrderingPolicy::StructuralImpactThenUncertainty,
                 uncertainty_confidence_threshold: 0.8,
                 articulation_component_delta_threshold: 1,
+                ..MycelialAnnotationTriageConfig::default()
             },
         )
         .unwrap();
@@ -802,6 +803,7 @@ mod tests {
         let junction_d = report.review_items.iter().find(|item| item.junction_id == "D").unwrap();
         assert!(junction_d.needs_uncertainty_review);
         assert!(junction_d.cycle_rank_loss > 0);
+        report.validate_against(&graph, &calibration).unwrap();
         assert_eq!(graph.canonical_digest_hex().unwrap(), graph_digest);
     }
 
