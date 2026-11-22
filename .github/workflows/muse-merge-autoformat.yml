@@ -1,0 +1,49 @@
+name: MUSE Semantic Merge Autoformat
+
+on:
+  push:
+    branches:
+      - "research/muse-semantic-branch-merge-v1"
+    paths:
+      - "tools/mel-muse-merge/src/lib.rs"
+      - ".github/workflows/muse-merge-autoformat.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: muse-merge-autoformat
+  cancel-in-progress: true
+
+jobs:
+  format-and-commit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact branch head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Format isolated reference crate
+        run: cargo fmt --manifest-path tools/mel-muse-merge/Cargo.toml --all
+
+      - name: Commit formatting only when changed
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- tools/mel-muse-merge/src/lib.rs; then
+            echo "Rust source is already formatted."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tools/mel-muse-merge/src/lib.rs
+          git commit -m "style(muse): apply pinned rustfmt to merge evaluator"
+          git push origin HEAD:${GITHUB_REF_NAME}
