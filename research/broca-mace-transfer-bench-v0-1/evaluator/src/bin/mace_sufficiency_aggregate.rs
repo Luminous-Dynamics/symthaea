@@ -11,7 +11,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fs::File;
-use std::io::{BufRead, BufReader, BufWriter, Write};
+use std::io::{BufWriter, Write};
 
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -336,6 +336,27 @@ fn cluster_means(
     Ok(output)
 }
 
+fn paired_cluster_deltas(
+    treatment: &BTreeMap<u64, PointMetrics>,
+    baseline: &BTreeMap<u64, PointMetrics>,
+) -> Result<(Vec<f64>, Vec<f64>), String> {
+    if treatment.keys().copied().collect::<BTreeSet<_>>()
+        != baseline.keys().copied().collect::<BTreeSet<_>>()
+    {
+        return Err("paired contrast requires identical world-cluster sets".into());
+    }
+    let mut utility_deltas = Vec::with_capacity(treatment.len());
+    let mut regret_deltas = Vec::with_capacity(treatment.len());
+    for (cluster, value) in treatment {
+        let reference = baseline
+            .get(cluster)
+            .ok_or_else(|| format!("no_memory baseline missing cluster {cluster}"))?;
+        utility_deltas.push(value.utility - reference.utility);
+        regret_deltas.push(value.absolute_regret - reference.absolute_regret);
+    }
+    Ok((utility_deltas, regret_deltas))
+}
+
 fn dominates(left: ParetoCost, right: ParetoCost) -> bool {
     let no_worse = left.selected_bytes <= right.selected_bytes
         && left.index_bytes <= right.index_bytes
@@ -457,15 +478,12 @@ fn reduce(input_path: &str, output_path: &str, seed: u64) -> Result<(), String> 
     )>::new();
     for arm in rows.keys() {
         let means = cluster_means(&rows, arm)?;
-        let mut utility_deltas = Vec::with_capacity(clusters.len());
-        let mut regret_deltas = Vec::with_capacity(clusters.len());
+        let (utility_deltas, regret_deltas) =
+            paired_cluster_deltas(&means, &baseline_means)?;
         let mut sum = PointMetrics::default();
         for cluster in &clusters {
             let current = means.get(cluster).ok_or("current cluster mean missing")?;
-            let baseline = baseline_means.get(cluster).ok_or("baseline cluster mean missing")?;
             sum = sum.plus(*current);
-            utility_deltas.push(current.utility - baseline.utility);
-            regret_deltas.push(current.absolute_regret - baseline.absolute_regret);
         }
         let mean = sum.divide(clusters.len() as f64);
         let utility_ci = bootstrap_paired_ci(
@@ -540,6 +558,7 @@ fn reduce(input_path: &str, output_path: &str, seed: u64) -> Result<(), String> 
             "utility_delta_vs_no_memory_cluster_bootstrap_95pct_ci": [utility_ci.0, utility_ci.1],
             "regret_delta_vs_no_memory_cluster_bootstrap_95pct_ci": [regret_ci.0, regret_ci.1],
             "paired_contrast_baseline": "no_memory",
+            "multiple_comparison_status": "exploratory_no_multiplicity_correction",
             "pareto_frontier_member": frontier,
             "evaluation_validity": "diagnostic_only",
             "evidence_qualified_sufficiency": false,
@@ -618,6 +637,27 @@ mod tests {
         assert!(first.0 <= first.1);
         assert!(first.0 >= -0.2);
         assert!(first.1 <= 0.5);
+    }
+
+    #[test]
+    fn paired_cluster_deltas_match_worlds_and_report_regret_direction() {
+        let treatment = BTreeMap::from([
+            (1, PointMetrics { utility: 0.8, absolute_regret: 0.2, ..PointMetrics::default() }),
+            (2, PointMetrics { utility: 0.7, absolute_regret: 0.3, ..PointMetrics::default() }),
+        ]);
+        let baseline = BTreeMap::from([
+            (1, PointMetrics { utility: 0.5, absolute_regret: 0.5, ..PointMetrics::default() }),
+            (2, PointMetrics { utility: 0.6, absolute_regret: 0.4, ..PointMetrics::default() }),
+        ]);
+        let (utility, regret) = paired_cluster_deltas(&treatment, &baseline).unwrap();
+        assert_eq!(utility, vec![0.3, 0.1]);
+        assert_eq!(regret, vec![-0.3, -0.1]);
+
+        let unmatched = BTreeMap::from([(
+            1,
+            PointMetrics { utility: 0.8, absolute_regret: 0.2, ..PointMetrics::default() },
+        )]);
+        assert!(paired_cluster_deltas(&unmatched, &baseline).is_err());
     }
 
     #[test]
