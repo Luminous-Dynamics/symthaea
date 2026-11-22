@@ -222,17 +222,39 @@ No public benchmark currently substitutes for the causal-intervention and eviden
 
 ### 8.1 Verified public anchors as of 2026-11-22
 
-- **AML Cycle 2 official open-method results**, published November 19, 2026: Resurface 61.22 textual, InsightMem 63.33% coding resolved, and Khipu 43.26 multimodal. Separate commercial leaders are MemoraX at 69.26, 68.00% resolved and 53.68 respectively. These are different tracks and divisions, not a common score. The official rules require participant-hosted Add/Search endpoints; a repository-only or Docker-only submission is not sufficient.
-- **Memora (ICML 2026)** reports 86.3% LLM-judge accuracy on LoCoMo and 87.4% on LongMemEval in its own setup, with up to 98% fewer context tokens than full-context inference. These are not directly comparable to AML or MACE.
-- **LongMemEval-V2** reports AgentRunbook-C at 74.9% on its small split with 108.3-second query latency and 70.1% on medium with 139.9 seconds. Codex is 69.9%/177.2 seconds and 68.7%/185.8 seconds. These scores depend on its fixed reader and trajectory protocol.
-- **AMA-Agent** reports 57.22% average accuracy on AMA-Bench and an 11.16-point improvement over the strongest baseline in that paper's protocol.
-- **WorldMemArena** describes 400 multi-session multimodal tasks across lifelong evolution and agentic execution, with write/maintain/retrieve/use evaluation. Dataset revisions and sample counts should be pinned by release/commit before local comparison.
-- **MemoryArena** finds that systems near saturation on long-context recall can still perform poorly on interdependent multi-session agent-environment tasks. This is why MACE needs decision utility, not only recall.
-- **StateMemBench** contains 234 multi-session state-tracking scenarios. Its paper reports same-backbone current-state accuracy improvements from 0.205 to 0.363 on DeepSeek-V4-Flash and from 0.149 to 0.233 on Qwen-3.5-9B; these are setup-specific results, not a generic multiplier.
-- **TimlMemBench** currently describes 208 reviewed bilingual samples, 1,566 sessions, 1,715 questions and 1,821 governance/activation cases. Its raw-native track is especially relevant because it tests ingestion and update behavior rather than giving every system an identical prebuilt memory pool.
-- **FAMA** explicitly measures the cost of relying on obsolete or invalidated memories. **MCB** provides a small reuse-time decision study; its authors report limitations in corrected significance and naturalistic extension size, so treat it as a diagnostic, not a decisive league table.
-- **CL-Bench** contains 1,899 tasks and 31,607 verification rubrics across four context-learning categories. Its central lesson for MACE is methodological: memory must outperform a strong naive in-context-learning control to show genuine experience gain.
-- **Agentic Abstention** evaluates 28K+ instructions across WebShop, Terminal-Bench and QA. One reported held-out WebShop configuration improves timely abstention from 26.7% to 57.4%; this is specific to that model/scaffold/dataset.
+- **AML Cycle 2 official results**, published November 19, 2026: open-method leaders are Resurface 61.22/100 textual, InsightMem 63.33% coding resolved, and Khipu 43.26/100 multimodal. Commercial leaders are MemoraX 69.26 textual, 68.00% coding resolved and 53.68 multimodal. These are separate tracks/divisions and must not be averaged. Cycle 2 covers 289 track entries across nine leaderboards. See the official results page: https://agentmemoryleaderboard.ai/results/cycle-2/.
+- **Textual capability breakdown matters.** Resurface's 61.22 open-method score includes 76.55 Memory Governance, 68.59 Epistemic Safety & Privacy, 57.76 Temporal & Event Sequencing, but 38.82 Personalization & Care. MACE should report capability subgroups and should not optimize only an aggregate memory score.
+- **Resurface (official textual open-method leader)** is an Add/Search evidence-retrieval service. Its public repository describes metadata-rich turns, keyword plus dense recall, reciprocal-rank fusion and optional neighbouring-turn evidence. This is the baseline MACE must beat or complement on real textual trajectories—not a deterministic event-ID ordering. Repository: https://github.com/lilysttail/Resurface.
+- **Khipu (official multimodal open-method leader)** keeps source messages verbatim and describes BM25, vector, entity, literal-match and date channels, fused with intent-aware reciprocal-rank fusion. Its multimodal branch retains original image evidence alongside descriptions. This suggests an explicit MACE retrieval baseline combining exact lexical anchors, temporal/entity channels and original-evidence pointers. Repository: https://github.com/Lv999APTITUDE/khipu.
+- **InsightMem (official coding open-method leader)** combines source-chunk BM25, code-expanded BM25 and dense cosine retrieval with reciprocal-rank fusion, adjacent-slice merging, deduplication and query coverage. This is a stronger coding baseline than generic dense retrieval. Repository: https://github.com/Kline-song/InsightMem.
+- **Memora (ICML 2026)** reports 86.3% LLM-judge accuracy on LoCoMo and 87.4% on LongMemEval in its own setup, with up to 98% fewer context tokens than full-context inference. Its abstraction hierarchy and cue anchors are particularly important competitors to a flat typed vector index. These scores are not directly comparable to AML or MACE. See https://www.microsoft.com/en-us/research/blog/memora-a-harmonic-memory-representation-balancing-abstraction-and-specificity/.
+- **LongMemEval-V2** reports AgentRunbook-C at 74.9% on its small split with 108.3-second query latency and 70.1% on medium with 139.9 seconds; Codex is 69.9%/177.2 seconds and 68.7%/185.8 seconds respectively. It uses a fixed reader and reports accuracy and query latency, so preserve that exact protocol. See https://xiaowu0162.github.io/longmemeval-v2/.
+- **AMA-Agent / AMA-Bench (ICML 2026)** reports 57.22% average accuracy and an 11.16 percentage-point gain over the strongest baseline in that paper's protocol. The paper identifies missed causal/objective information and lossy similarity retrieval as weaknesses, then uses causality graphs and tool-augmented retrieval. MACE should reproduce this as a serious causal-graph baseline. See https://proceedings.mlr.press/v306/zhao26bs.html.
+- **WorldMemArena** evaluates 400 multi-session multimodal tasks over the write, maintain, retrieve and use lifecycle. It emphasizes action–world interaction, original visual evidence, updating stale state and decision-time use. See https://worldmemarena-mem.github.io/ and https://arxiv.org/abs/2605.29341.
+- **MemoryArena (ICML 2026)** couples memory with later environment actions across interdependent multi-session tasks; near-saturated long-context recall does not guarantee good agentic performance. Use its task families to test real experience transfer, not just answer recall. See https://proceedings.mlr.press/v306/he26am.html.
+- **StateMemBench** contains 234 multi-session evolving-state scenarios. StateMem reports current-state improvements from 0.205 to 0.363 on DeepSeek-V4-Flash and from 0.149 to 0.233 on Qwen-3.5-9B in its own protocols; it also reports gains from adding explicit state structure to other memory backends. MACE should make supersession and current-state resolution first-class controls. See https://arxiv.org/abs/2608.19652.
+- **TimlMemBench (Findings EMNLP 2026)** reports 208 reviewed bilingual samples, 1,566 sessions, 1,715 questions and 1,821 governance/activation cases. Its raw-native evaluation starts from source sessions and tests revocation, supersession, scope, provenance and restraint, exposing weaknesses hidden by a canonical prebuilt memory pool. See https://aclanthology.org/2026.findings-emnlp.507/.
+- **CL-Bench** contains 500 contexts, 1,899 tasks and 31,607 verification rubrics. Its central methodological lesson is to compare against strong naive in-context learning: a dedicated memory system has to demonstrate real experience gain. See https://arxiv.org/abs/2602.03587.
+- **FAMA** explicitly evaluates reliance on obsolete or invalidated memories. **MCB (Remember, Verify, or Ask?)** supplies a reuse-time decision diagnostic, but its small-sample/significance limitations make it a diagnostic rather than a definitive leaderboard. See https://aclanthology.org/2026.findings-acl.1337/ and https://aclanthology.org/2026.nora-1.2/.
+- **Agentic Abstention** evaluates more than 28K instructions across WebShop, Terminal-Bench and QA. One reported held-out WebShop configuration improves timely abstention from 26.7% to 57.4%; this is model/scaffold/task-specific and should not be transplanted as an absolute target. See https://lhannnn.github.io/agentic-abstention/.
+
+### 8.1.1 What the public leaders teach MACE
+
+The current high-performing systems are not merely dense embedding databases:
+
+| Competitor | Publicly described technique | MACE consequence |
+|---|---|---|
+| Resurface | Keyword + dense recall, RRF and neighboring evidence context | Implement BM25/keyword, dense and RRF controls with matched context expansion |
+| Khipu | Verbatim memory, BM25/vector/entity/date/literal channels, intent-aware RRF | Add exact entity/date/numeric anchors and query-intent stratification |
+| InsightMem | Source BM25 + code-expanded BM25 + dense cosine + RRF | Add source-preserving and task-specific retrieval lanes for code/trajectory memory |
+| Memora | Abstraction hierarchy and cue anchors | Compare hierarchical capsules and cue-to-source traversal against flat typed HDC |
+| AMA-Agent | Causal graphs and tool-augmented retrieval | Compare dependency/effect graph retrieval and query-time evidence expansion |
+| StateMem | Explicit current state, supersession and relational dependencies | Compare a state-first view and bitemporal revision resolution |
+| CL-Bench controls | Naive in-context learning | Demonstrate that persistent memory adds value beyond a strong prompt/context baseline |
+
+**Baseline parity rule:** the current MACE Experience fixture is structured and contains no general natural-language trajectory field. A lexical BM25/dense system over this typed fixture would not reproduce Resurface, Khipu or InsightMem. Build a separate raw-trajectory Add/Search adapter for AML-style comparisons, while preserving the synthetic causal intervention lane as a distinct MACE evaluation. Do not blur the two.
+
+For fair comparisons pin the competitor's public commit, data, encoder/model, tokenizer, reader/judge, prompts, retrieval parameters, token accounting and resource budget. Compare not only output score but index size, source bytes, context size, p50/p95/p99 latency, update/replay cost and verification overhead. Reproduce methods rather than copying their reported leaderboard numbers.
 
 ### 8.2 MACE's competitive wedge
 
@@ -249,26 +271,63 @@ This creates a stronger claim than “HDC beats RAG”: MACE would demonstrate w
 
 ## 9. Immediate implementation sequence
 
-1. Fix evaluator abstention semantics before interpreting any knockout or regret result.
-2. Introduce a canonical EvidenceDependencyIndex over event IDs, verified root digests, source-family identity and derived-view lineage.
-3. Add a frozen intervention manifest with event/root/family/coalition and matched-random knockout plans.
-4. Add a candidate-input evidence-set digest that changes for every candidate-visible intervention while remaining independent of evaluator truth.
-5. Add evaluator-only paired score records for regret, decision flips, abstention, hard-gate failure and support closure.
-6. Add exact small-set coalition enumeration and deterministic sampled coalitions for larger sets.
-7. Add a schema and regression tests for same-root aliases, common-cause attacks, complementary support, misleading support, supersession and source correction between retrieval and use.
-8. Reproduce conventional KV, BM25, dense and hybrid retrieval under matched all-in budgets; add a byte/token-matched semantic placebo.
-9. Run Rust formatting, compilation, focused tests, the intervention runner and schema validation on an exact commit head.
-10. Move evaluator truth to independent custody and run held-out external benchmarks through pinned adapters.
+### Authored on the follow-on branch
+
+1. Corrected the synthetic evaluator's abstention mapping to an explicit zero-utility outside option and added a regression test.
+2. Added `mace_counterfactual_evidence.rs`, a separate executable audit binary using the existing generated stress worlds and candidate-visible MACE policy.
+3. Added an `EvidenceDependencyIndex` that rejects duplicate event IDs, groups events by nonzero source-root digest and source-family ID, and counts unknown root/family identities separately.
+4. Added deterministic event, source-root, source-family, bounded root-pair, matched-random and no-memory interventions.
+5. Stratified matched-random controls by scope, objective, action and estimand digest; report when a target has no matched control.
+6. Bound the candidate input digest to DecisionNeedV1 plus the post-intervention canonical evidence-set digest.
+7. Split candidate decision records from evaluator intervention manifests/scores. The candidate stream does not receive intervention kinds, removed IDs or evaluator utilities.
+8. Added source-code and fixture digests to the evaluator run manifest and introduced `data/schemas/mace_counterfactual_evidence_v0_1.schema.json`.
+9. Added authored tests for duplicate IDs, root aliases, unknown identities, source-family closures, deterministic/truth-blind planning, matched controls, evidence-digest changes and abstention.
+
+### Remaining qualification work
+
+1. Execute rustfmt, compile, unit tests and the runner; validate every JSONL record against the new schema.
+2. Add verified transitive source-lineage/derived-view closure. The current Experience fixture has no parent-edge field, so this binary only groups direct root/family identities.
+3. Add explicit semantic decoys, correction-between-retrieval-and-use and lifecycle closure.
+4. Add exact subset enumeration for small evidence sets, sampled larger coalitions and decision-interaction estimates.
+5. Add cluster-level summaries, confidence intervals and pre-registered primary contrasts.
+6. Reproduce BM25, dense, sparse/dense RRF, intent-adaptive channels, context neighbours, causal-graph retrieval and state-first retrieval on the correct raw or structured data lanes.
+7. Move evaluator truth to independent custody and run held-out external benchmarks through pinned adapters.
 
 ## 10. Current implementation and validation boundary
 
-This follow-on branch starts from the inspected child-PR head and adds the first evaluator hardening change: abstention is now scored as an explicit zero-utility outside option in the current synthetic benchmark, instead of being silently mapped to Action B. A regression test covers this distinction.
+The follow-on branch is stacked directly on the inspected #13221 child-PR head and contains the following authored artifacts:
 
-This is a synthetic evaluator convention only. It must be configurable per scenario before transfer to a domain where non-action has a nonzero cost or benefit.
+- `research/broca-mace-transfer-bench-v0-1/evaluator/src/bin/mace_counterfactual_evidence.rs`
+- `data/schemas/mace_counterfactual_evidence_v0_1.schema.json`
+- `docs/research/MACE_COUNTERFACTUAL_EVIDENCE_SUFFICIENCY_V0_1.md`
 
-The evidence-knockout engine, dependency-closure index, coalition sampler and separate intervention schema are specified here but have not yet been implemented. The existing typed HDC code is structured typed-content retrieval, not natural-language understanding or a learned causal model. The seven-arm runner and this branch's new regression test have not been executed in this environment: Cargo, rustc and rustfmt are unavailable. Hosted checks that are skipped are not passes.
+Example invocation after a Rust-enabled checkout:
 
-No retrieval gain, decision-utility improvement, benchmark score, causal sufficiency result, production readiness or SOTA superiority is claimed.
+```bash
+MACE_SOURCE_REVISION="$(git rev-parse HEAD)" \
+cargo run --manifest-path research/broca-mace-transfer-bench-v0-1/evaluator/Cargo.toml \
+  --bin mace_counterfactual_evidence -- \
+  64 mace_counterfactual_candidate.jsonl mace_counterfactual_evaluator.jsonl 12345 32
+```
+
+Arguments are cluster count, candidate JSONL path, evaluator JSONL path, public intervention seed and maximum source-root pairs. The runner writes separate streams. Evaluator output contains the frozen intervention manifest and hidden-outcome scores. Candidate output contains DecisionNeed/evidence digests, chosen action, evidence-support IDs and resource counts, but not knockout labels or evaluator utility. The candidate observation identifier allows the streams to be joined without placing intervention type in the candidate record.
+
+### Important limits
+
+- The root index groups equal nonzero `SourceRootDigest` values. A nonzero digest is an identity key, **not cryptographic authentication of its issuer**. The synthetic `source_family` integer is also a fixture identity, not an independently verified family credential.
+- The current `Experience` structure has no explicit parent/derived-view edges. The implementation therefore does not yet compute transitive lineage closure; it groups records sharing the same direct root digest or family label.
+- Unknown root/family values are counted separately and do not inflate known-identity counts. The code does not independently verify signatures, source authority, tenant permissions or external receipts.
+- Matched-random controls preserve count by scope, objective, action and estimand, but are omitted when the candidate-visible pool cannot match a stratum. Coverage is reported. The current byte measure is only `size_of::<Experience>()` per record; it excludes serialization, allocator, index, sidecar, source and verification costs.
+- Root-pair interventions are deterministically enumerated up to a caller-supplied cap. Higher-order coalition sampling, exact subset optimization, Shapley attribution, statistical aggregation and confidence intervals are not yet implemented.
+- This binary tests the synthetic `Policy::CausalQualified` over the existing public fixture. DecisionNeedV1 is digested into the candidate input, but a general natural-language/task/environment parser is not implemented.
+- The candidate/evaluator are still in one public repository. Separate JSONL files are a data-boundary test, not independent evaluator custody.
+- The existing typed HDC remains structured typed-content retrieval; it is not natural-language understanding, a learned causal model or a production source verifier.
+
+Abstention is an explicit zero-utility outside option only for the current synthetic benchmark. Every real application must define its own abstention cost/value and deadline policy.
+
+**Validation:** Cargo, rustc and rustfmt are unavailable in this execution environment. The new binary, tests and JSON Schema are source-authored but unexecuted. No compilation, test pass, formatting pass, schema validation, runner result or hosted-check pass is claimed. The previously inspected PR workflows were skipped; skipped is not passed.
+
+No retrieval gain, decision-utility improvement, official benchmark score, causal sufficiency result, production readiness or SOTA superiority is claimed.
 
 ## References
 
@@ -286,3 +345,4 @@ No retrieval gain, decision-utility improvement, benchmark score, causal suffici
 - CL-Bench: https://arxiv.org/abs/2602.03587
 - MCB / Memory–Clarification Boundary: https://aclanthology.org/2026.nora-1.2/
 - Agentic Abstention, NeurIPS 2026: https://lhannnn.github.io/agentic-abstention/
+- MACE competitive-baseline reproduction issue: https://github.com/Luminous-Dynamics/symthaea/issues/13261
