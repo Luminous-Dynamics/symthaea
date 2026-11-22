@@ -1124,16 +1124,7 @@ mod tests {
         let selection = select_metrology_audit_v1(&input).unwrap();
         // A selected outcome cannot be evaluated without a matching matured
         // graph label. An empty graph must fail closed.
-        let outcome = MetrologyAuditOutcomeV1 {
-            candidate_id: selection
-                .rows
-                .iter()
-                .find(|row| row.selected)
-                .unwrap()
-                .candidate_id
-                .clone(),
-            label_id: "not-in-graph".into(),
-        };
+
         let graph = ProcessEventGraphV1 {
             schema: crate::benchmark::process_event_graph::GRAPH_SCHEMA_V1.into(),
             graph_id: "empty-audit-graph".into(),
@@ -1179,9 +1170,6 @@ mod tests {
             .map(|row| MetrologyAuditOutcomeV1 {
                 candidate_id: row.candidate_id.clone(),
                 label_id: format!("unmatured-{}", row.candidate_id),
-                positive: false,
-                class_semantics_ref: row.class_semantics_ref.clone(),
-                class_semantics_sha256: row.class_semantics_sha256.clone(),
             })
             .collect();
         assert!(estimate_metrology_population_v1(&selection, &outcomes, &graph, &cutoff).is_err());
