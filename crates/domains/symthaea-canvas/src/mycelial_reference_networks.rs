@@ -494,6 +494,60 @@ mod tests {
         }
     }
 
+    fn brute_force_minimum_forest_traversal_cost(
+        graph: &MycelialJunctionHyphaGraph,
+    ) -> f64 {
+        let components = graph.metrics().unwrap().connected_components;
+        let required_edges = graph.junctions.len().saturating_sub(components);
+        let edge_count = graph.segments.len();
+        assert!(edge_count < usize::BITS as usize);
+        let index_by_id: HashMap<_, _> = graph
+            .junctions
+            .iter()
+            .enumerate()
+            .map(|(index, junction)| (junction.id.as_str(), index))
+            .collect();
+        let mut best = f64::INFINITY;
+        for mask in 0usize..(1usize << edge_count) {
+            if mask.count_ones() as usize != required_edges {
+                continue;
+            }
+            let mut parent: Vec<_> = (0..graph.junctions.len()).collect();
+            let mut component_count = graph.junctions.len();
+            let mut cost = 0.0;
+            let mut is_forest = true;
+            for (edge_index, segment) in graph.segments.iter().enumerate() {
+                if mask & (1usize << edge_index) == 0 {
+                    continue;
+                }
+                let mut source = index_by_id[segment.start_junction_id.as_str()];
+                while parent[source] != source {
+                    source = parent[source];
+                }
+                let mut target = index_by_id[segment.end_junction_id.as_str()];
+                while parent[target] != target {
+                    target = parent[target];
+                }
+                if source == target {
+                    is_forest = false;
+                    break;
+                }
+                let (lower, higher) = if source < target {
+                    (source, target)
+                } else {
+                    (target, source)
+                };
+                parent[higher] = lower;
+                component_count -= 1;
+                cost += segment.traversal_length_model_units();
+            }
+            if is_forest && component_count == components {
+                best = best.min(cost);
+            }
+        }
+        best
+    }
+
     #[test]
     fn forest_of_a_tree_matches_observed_graph_cost_and_paths() {
         let graph = build_mycelial_junction_hypha_graph(
@@ -557,6 +611,39 @@ mod tests {
         assert!(
             report.hypha_arc_cost_model_units_microunits
                 <= graph.metrics().unwrap().total_hypha_length_model_units_microunits
+        );
+    }
+
+    #[test]
+    fn kruskal_cost_matches_exhaustive_small_graph_oracle() {
+        let model = fixture_model();
+        let fusion = MycelialAnastomosis {
+            id: 17,
+            source_filament_id: 2,
+            source_t: 1.0,
+            target_filament_id: 3,
+            target_t: 0.5,
+            kind: AnastomosisKind::TipToSide,
+            junction_position: SpatialPoint3 {
+                x: 0.0,
+                y: 15.0,
+                z: 0.0,
+            },
+        };
+        let graph = build_mycelial_junction_hypha_graph(
+            &model,
+            &[fusion],
+            MycelialJunctionGraphConfig::default(),
+        )
+        .unwrap();
+        let report =
+            build_observed_network_minimum_spanning_forest(&graph, &["origin:1".to_string()])
+                .unwrap();
+        let independent_cost = brute_force_minimum_forest_traversal_cost(&graph);
+        let report_cost = report.traversal_cost_model_units_microunits as f64 / 1_000_000.0;
+        assert!(
+            (report_cost - independent_cost).abs() <= 1.0e-6,
+            "Kruskal cost {report_cost} differs from exhaustive optimum {independent_cost}"
         );
     }
 
