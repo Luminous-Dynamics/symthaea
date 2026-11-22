@@ -615,6 +615,18 @@ mod tests {
                 response_treatment: frame(50, 50, 7_000, 0),
                 expected_relation: ExpectedRelationV2::Follow,
             },
+            TargetFeatureV2::Register => {
+                let mut arm = CausalArmV2 {
+                    input_control: frame(60, 60, 0, 0),
+                    input_treatment: frame(60, 60, 0, 0),
+                    response_control: frame(50, 50, 0, 0),
+                    response_treatment: frame(50, 50, 0, 0),
+                    expected_relation: ExpectedRelationV2::Follow,
+                };
+                arm.input_treatment.events[0].register = 72;
+                arm.response_treatment.events[0].register = 69;
+                arm
+            }
             _ => unreachable!(),
         }
     }
@@ -658,6 +670,19 @@ mod tests {
         assert!(report.valid, "{:?}", report.issues);
         assert_eq!(report.partner_to_agent.input_target_delta, 12_000);
         assert_eq!(report.partner_to_agent.response_target_delta, 7_000);
+    }
+
+    #[test]
+    fn register_positive_control_qualifies_both_directions() {
+        let mut trial = positive_trial();
+        trial.target_feature = TargetFeatureV2::Register;
+        trial.partner_to_agent = positive_arm(TargetFeatureV2::Register);
+        trial.agent_to_partner = positive_arm(TargetFeatureV2::Register);
+        seal_trial(&mut trial).unwrap();
+        let report = validate_trial(&trial);
+        assert!(report.valid, "{:?}", report.issues);
+        assert_eq!(report.partner_to_agent.input_target_delta, 8);
+        assert_eq!(report.partner_to_agent.response_target_delta, 5);
     }
 
     #[test]
