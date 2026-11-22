@@ -49,6 +49,7 @@ pub(crate) struct EvidenceQuery {
 pub(crate) struct VoiContext {
     pub hypotheses: Vec<Hypothesis>,
     pub queries: Vec<EvidenceQuery>,
+    pub public_seed: u64,
 }
 
 #[derive(Clone, Debug)]
@@ -58,6 +59,7 @@ pub(crate) struct QueryEvaluation {
     pub admissible: bool,
     pub rejection_reason: Option<String>,
     pub risk_before: f64,
+    pub predictive_outcome_entropy_bits: Option<f64>,
     pub expected_post_query_risk: Option<f64>,
     pub expected_risk_reduction: Option<f64>,
     pub acquisition_cost: f64,
@@ -66,12 +68,16 @@ pub(crate) struct QueryEvaluation {
     pub total_cost: f64,
     pub net_evsi: Option<f64>,
     pub selected: bool,
+    pub selected_by_uncertainty_only: bool,
+    pub selected_by_random_control: bool,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct VoiPlan {
     pub risk_before: f64,
     pub chosen_query_id: Option<String>,
+    pub uncertainty_only_query_id: Option<String>,
+    pub random_control_query_id: Option<String>,
     pub stop_reason: &'static str,
     pub evaluations: Vec<QueryEvaluation>,
 }
@@ -155,6 +161,33 @@ fn validate_context(context: &VoiContext) -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+fn predictive_outcome_entropy_bits(
+    context: &VoiContext,
+    query: &EvidenceQuery,
+) -> Result<f64, String> {
+    let mut entropy = 0.0_f64;
+    for outcome in &query.outcomes {
+        let probability: f64 = context
+            .hypotheses
+            .iter()
+            .zip(&outcome.likelihood_by_hypothesis)
+            .map(|(hypothesis, likelihood)| hypothesis.prior_probability * likelihood)
+            .sum();
+        if probability > 0.0 {
+            entropy -= probability * probability.log2();
+        }
+    }
+    if !entropy.is_finite() || entropy < -PROBABILITY_TOLERANCE {
+        return Err(format!("query {} has invalid predictive outcome entropy", query.id));
+    }
+    Ok(entropy.max(0.0))
+}
+
+fn stable_query_random_key(seed: u64, query_id: &str) -> u64 {
+    let digest = sha2::Sha256::digest(format!("mace-voi-random:{seed}:{query_id}").as_bytes());
+    u64::from_be_bytes(digest[..8].try_into().expect("SHA-256 prefix is eight bytes"))
 }
 
 fn bayes_risk(hypotheses: &[Hypothesis], probabilities: &[f64]) -> f64 {
@@ -247,6 +280,7 @@ pub(crate) fn plan_next_evidence(context: &VoiContext) -> Result<VoiPlan, String
                 admissible: false,
                 rejection_reason: Some(reason.to_string()),
                 risk_before,
+                predictive_outcome_entropy_bits: None,
                 expected_post_query_risk: None,
                 expected_risk_reduction: None,
                 acquisition_cost: query.acquisition_cost,
@@ -255,10 +289,13 @@ pub(crate) fn plan_next_evidence(context: &VoiContext) -> Result<VoiPlan, String
                 total_cost,
                 net_evsi: None,
                 selected: false,
+                selected_by_uncertainty_only: false,
+                selected_by_random_control: false,
             });
             continue;
         }
 
+        let predictive_entropy = predictive_outcome_entropy_bits(context, query)?;
         let expected_post = expected_post_query_risk(&context.hypotheses, &prior, query)?;
         // Information cannot worsen the Bayes-optimal decision before cost.
         // Clamp only tiny floating-point negatives; material violations reject.
@@ -280,6 +317,7 @@ pub(crate) fn plan_next_evidence(context: &VoiContext) -> Result<VoiPlan, String
             admissible: true,
             rejection_reason: None,
             risk_before,
+            predictive_outcome_entropy_bits: Some(predictive_entropy),
             expected_post_query_risk: Some(expected_post),
             expected_risk_reduction: Some(reduction),
             acquisition_cost: query.acquisition_cost,
@@ -288,6 +326,8 @@ pub(crate) fn plan_next_evidence(context: &VoiContext) -> Result<VoiPlan, String
             total_cost,
             net_evsi: Some(net_evsi),
             selected: false,
+            selected_by_uncertainty_only: false,
+            selected_by_random_control: false,
         });
     }
 
@@ -310,6 +350,42 @@ pub(crate) fn plan_next_evidence(context: &VoiContext) -> Result<VoiPlan, String
         evaluations[index].selected = true;
         evaluations[index].query_id.clone()
     });
+
+    // Baseline 1: maximize predictive observation entropy, ignoring decision
+    // relevance and acquisition costs, but still obeying hard admissibility gates.
+    let uncertainty_only_index = evaluations
+        .iter()
+        .enumerate()
+        .filter(|(_, evaluation)| evaluation.admissible)
+        .max_by(|(_, left), (_, right)| {
+            left.predictive_outcome_entropy_bits
+                .unwrap_or(f64::NEG_INFINITY)
+                .total_cmp(&right.predictive_outcome_entropy_bits.unwrap_or(f64::NEG_INFINITY))
+                .then_with(|| right.query_id.cmp(&left.query_id))
+        })
+        .map(|(index, _)| index);
+    let uncertainty_only_query_id = uncertainty_only_index.map(|index| {
+        evaluations[index].selected_by_uncertainty_only = true;
+        evaluations[index].query_id.clone()
+    });
+
+    // Baseline 2: deterministic random admissible request, keyed by a public seed.
+    let random_control_index = evaluations
+        .iter()
+        .enumerate()
+        .filter(|(_, evaluation)| evaluation.admissible)
+        .min_by_key(|(_, evaluation)| {
+            (
+                stable_query_random_key(context.public_seed, &evaluation.query_id),
+                evaluation.query_id.clone(),
+            )
+        })
+        .map(|(index, _)| index);
+    let random_control_query_id = random_control_index.map(|index| {
+        evaluations[index].selected_by_random_control = true;
+        evaluations[index].query_id.clone()
+    });
+
     let stop_reason = if context.queries.is_empty() {
         "no_candidate_queries"
     } else if chosen_query_id.is_none() {
@@ -321,6 +397,8 @@ pub(crate) fn plan_next_evidence(context: &VoiContext) -> Result<VoiPlan, String
     Ok(VoiPlan {
         risk_before,
         chosen_query_id,
+        uncertainty_only_query_id,
+        random_control_query_id,
         stop_reason,
         evaluations,
     })
@@ -331,6 +409,7 @@ pub(crate) fn plan_next_evidence(context: &VoiContext) -> Result<VoiPlan, String
 /// high-entropy but decision-irrelevant query, and never overrides authority.
 pub(crate) fn reference_fixture_context() -> VoiContext {
     VoiContext {
+        public_seed: 0x4D41_4345,
         hypotheses: vec![
             Hypothesis {
                 id: "state_a".into(),
@@ -452,6 +531,7 @@ mod tests {
     #[test]
     fn malformed_observation_model_fails_closed() {
         let mut context = VoiContext {
+            public_seed: 1,
             hypotheses: vec![Hypothesis {
                 id: "h1".into(),
                 prior_probability: 1.0,
