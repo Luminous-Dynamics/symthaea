@@ -443,9 +443,9 @@ mod tests {
         };
         let permuted = generate_motion_transient_field(&permuted_graph, &permuted_config).unwrap();
         for time in 0..24 {
-            for roi in 0..6 {
+            for (roi, &original_roi) in permutation.iter().enumerate() {
                 assert!(
-                    (original.values[time][permutation[roi]] - permuted.values[time][roi]).abs()
+                    (original.values[time][original_roi] - permuted.values[time][roi]).abs()
                         < 1e-12
                 );
             }
