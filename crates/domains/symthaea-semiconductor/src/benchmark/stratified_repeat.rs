@@ -5,7 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use thiserror::Error;
 
 pub const INPUT_SCHEMA_V1: &str = "luminous.semi-bench.stratified-repeat-subject.v1";
@@ -203,7 +203,7 @@ fn validate_subject(subject: &StratifiedSplitSubjectV1) -> Result<(), Stratified
                 "samples[{index}].sample_id: duplicate"
             )));
         }
-        counts[usize::from(sample.positive)] += 1;
+        counts[if sample.positive { 1 } else { 0 }] += 1;
     }
     if counts.contains(&0) {
         return Err(StratifiedSplitError(
