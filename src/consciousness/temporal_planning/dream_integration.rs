@@ -11,6 +11,10 @@ use super::types::PlannedAction;
 
 #[cfg(feature = "magi_loop")]
 use crate::consciousness::recursive_improvement::dream_feedback::DreamFeedbackBridge;
+#[cfg(feature = "magi_loop")]
+use crate::consciousness::recursive_improvement::{
+    DreamConfidenceGate, EpistemicWorldRecord, WorldEvidenceKind,
+};
 
 /// Convert a dream feedback bridge's priors into MCTS action priors.
 ///
@@ -45,6 +49,33 @@ pub fn adjust_plan_confidence(
     adjusted.clamp(0.0, 1.0)
 }
 
+/// Apply dream confidence adjustment with typed empirical authority.
+///
+/// The existing `adjust_plan_confidence` path remains non-promoting. This
+/// opt-in API permits a positive dream-prior adjustment only when the gate has
+/// a capability matching the exact context, claim identity and scope identity.
+#[cfg(feature = "magi_loop")]
+pub fn adjust_plan_confidence_with_gate(
+    confidence: f64,
+    bridge: &DreamFeedbackBridge,
+    gate: &DreamConfidenceGate,
+    context_hash: u64,
+    claim_identity: &str,
+    scope_identity: &str,
+    prior_source_family_identity: &str,
+) -> f64 {
+    gate.adjust_confidence(
+        bridge,
+        confidence,
+        context_hash,
+        claim_identity,
+        scope_identity,
+        prior_source_family_identity,
+    )
+    .0
+    .clamp(0.0, 1.0)
+}
+
 /// Cosine similarity between two vectors (delegates to shared implementation).
 fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
     symthaea_core::math::cosine_similarity_f32(a, b).clamp(-1.0, 1.0)
@@ -63,6 +94,77 @@ mod tests {
     use super::*;
     #[cfg(feature = "magi_loop")]
     use crate::consciousness::recursive_improvement::dream_feedback::DreamInsight;
+
+    #[cfg(feature = "magi_loop")]
+    #[test]
+    fn ordinary_plan_confidence_path_remains_non_promoting() {
+        let mut bridge = DreamFeedbackBridge::new();
+        let insight = DreamInsight::new(12345, vec![0.0, 0.0], vec![1.0, 0.0], 0.2)
+            .with_claim_scope_and_source("claim:alpha", "scope:site-a", "family:dream");
+        assert!(bridge.process_insight(insight));
+
+        assert!(adjust_plan_confidence(0.6, &bridge, 12345) <= 0.6);
+    }
+
+    #[cfg(feature = "magi_loop")]
+    #[test]
+    fn plan_confidence_promotion_requires_exact_claim_and_scope_binding() {
+        let mut bridge = DreamFeedbackBridge::new();
+        let insight = DreamInsight::new(12345, vec![0.0, 0.0], vec![1.0, 0.0], 0.2)
+            .with_claim_scope_and_source("claim:alpha", "scope:site-a", "family:dream");
+        assert!(bridge.process_insight(insight));
+
+        let generated = EpistemicWorldRecord::new(
+            WorldEvidenceKind::Counterfactual,
+            "event:dream",
+        )
+        .unwrap()
+        .with_binding("claim:alpha", "scope:site-a", "family:dream")
+        .unwrap();
+        let observed = EpistemicWorldRecord::new(
+            WorldEvidenceKind::Recorded,
+            "event:observed",
+        )
+        .unwrap()
+        .with_binding("claim:alpha", "scope:site-a", "family:sensor")
+        .unwrap();
+        let capability = generated.validated_by(&observed).unwrap();
+
+        let mut gate = DreamConfidenceGate::new();
+        assert!(gate.validate_generated_context(12345, capability));
+
+        let promoted = adjust_plan_confidence_with_gate(
+            0.6,
+            &bridge,
+            &gate,
+            12345,
+            "claim:alpha",
+            "scope:site-a",
+            "family:dream",
+        );
+        assert!(promoted > 0.6);
+
+        let wrong_claim = adjust_plan_confidence_with_gate(
+            0.6,
+            &bridge,
+            &gate,
+            12345,
+            "claim:other",
+            "scope:site-a",
+            "family:dream",
+        );
+        let wrong_scope = adjust_plan_confidence_with_gate(
+            0.6,
+            &bridge,
+            &gate,
+            12345,
+            "claim:alpha",
+            "scope:site-b",
+            "family:dream",
+        );
+        assert_eq!(wrong_claim, 0.6);
+        assert_eq!(wrong_scope, 0.6);
+    }
 
     #[test]
     fn test_cosine_similarity_identical() {
@@ -112,7 +214,8 @@ mod tests {
     #[test]
     fn test_dream_priors_applied() {
         let mut bridge = DreamFeedbackBridge::new();
-        let insight = DreamInsight::new(12345, vec![0.0, 0.0], vec![1.0, 0.0], 0.2);
+        let insight = DreamInsight::new(12345, vec![0.0, 0.0], vec![1.0, 0.0], 0.2)
+            .with_claim_scope_and_source("claim:alpha", "scope:site-a", "family:dream");
         bridge.process_insight(insight);
 
         let mut actions = vec![

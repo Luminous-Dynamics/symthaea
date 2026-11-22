@@ -55,6 +55,8 @@ pub mod calibration;
 pub mod calibration_analytics;
 pub mod constraint_gate;
 pub mod dream_feedback;
+pub mod dream_confidence_gate;
+pub mod epistemic_world;
 pub mod magi_integration;
 pub mod persistence;
 pub mod resolution;
@@ -141,6 +143,11 @@ pub use runtime::{
 pub use dream_feedback::{
     ActionPrior, ConfidenceAdjustment, DreamFeedbackBridge, DreamFeedbackStats, DreamInsight,
     hash_context,
+};
+pub use dream_confidence_gate::DreamConfidenceGate;
+pub use epistemic_world::{
+    EmpiricalValidationEvidence, EpistemicWorldError, EpistemicWorldRecord,
+    ValidatedEpistemicWorldRecord, WorldEvidenceKind,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════

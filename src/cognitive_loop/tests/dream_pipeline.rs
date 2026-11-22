@@ -86,8 +86,8 @@ fn dream_exploration_bounded_across_cycles() {
 
 #[test]
 fn dream_confidence_bounded_across_cycles() {
-    // Dream Phi insights can boost confidence via adjust_confidence("dream_phi_insight", ...).
-    // Verify prediction_confidence stays in [0, 1].
+    // Dream Phi insights are not empirical evidence and must not promote
+    // waking prediction confidence. Also verify the value remains bounded.
     let mut svc = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
     for i in 0..150 {
         svc.cycle("dream confidence");
