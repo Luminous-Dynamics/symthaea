@@ -96,13 +96,6 @@ impl Accumulator {
     }
 }
 
-#[derive(Clone, Debug)]
-struct SummaryRows {
-    task_blocks: usize,
-    intervention_rows: usize,
-    cluster_means: BTreeMap<u64, Metrics>,
-}
-
 fn required_string<'a>(record: &'a Value, field: &str) -> Result<&'a str, String> {
     record
         .get(field)
@@ -560,7 +553,7 @@ fn reduce(
 
             let mut paired_by_cluster: BTreeMap<u64, Vec<Metrics>> = BTreeMap::new();
             let mut paired_task_block_count = 0_usize;
-            for ((cluster, pair_block), methods) in &block_rows {
+            for ((cluster, _pair_block), methods) in &block_rows {
                 let Some(treatment) = methods.get(&key).and_then(|value| value.mean()) else {
                     continue;
                 };
@@ -573,7 +566,6 @@ fn reduce(
                     ..Metrics::default()
                 };
                 paired_by_cluster.entry(*cluster).or_default().push(delta);
-                let _ = pair_block;
                 paired_task_block_count += 1;
             }
             let paired_cluster_means = reduce_cluster_blocks(&paired_by_cluster);
