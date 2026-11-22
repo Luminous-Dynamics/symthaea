@@ -222,9 +222,19 @@ fn run_resolution(
             let control_scale = control_spectrum.spectral_f_strophy.max(f64::MIN_POSITIVE);
             let pulse_ridge = echo_mode_ridge(&pulse_spectrum, prediction.echo_mode as isize);
             let control_ridge = echo_mode_ridge(&control_spectrum, prediction.echo_mode as isize);
+            let response_distribution: Vec<f64> = pulsed
+                .distribution()
+                .iter()
+                .zip(no_second_pulse.distribution())
+                .map(|(pulse, control)| pulse - control)
+                .collect();
+            let response_state = VlasovPoisson1d1v::new(config, response_distribution)?;
+            let response_spectrum = response_state.joint_phase_space_spectrum()?;
+            let response_ridge =
+                echo_mode_ridge(&response_spectrum, prediction.echo_mode as isize);
 
             println!(
-                "# ridge,{label},{step},{:.8},{},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.8},{},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.8},{}",
+                "# ridge,{label},{step},{:.8},{},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.8},{},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.8},{},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.8},{}",
                 pulsed.time(),
                 prediction.echo_mode,
                 pulse_ridge.total,
@@ -241,6 +251,13 @@ fn run_resolution(
                 control_ridge.nyquist_s_fraction,
                 control_ridge.signed_s_centroid,
                 control_ridge.dominant_signed_s,
+                response_ridge.total,
+                response_ridge.positive_s_fraction,
+                response_ridge.negative_s_fraction,
+                response_ridge.zero_s_fraction,
+                response_ridge.nyquist_s_fraction,
+                response_ridge.signed_s_centroid,
+                response_ridge.dominant_signed_s,
             );
 
             println!(
@@ -317,7 +334,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
 
     println!(
-        "# ridge_columns,run,step,time,mode,pulse_k_mode_f_strophy,pulse_positive_s_fraction,pulse_negative_s_fraction,pulse_zero_s_fraction,pulse_nyquist_s_fraction,pulse_signed_s_centroid,pulse_dominant_signed_s,control_k_mode_f_strophy,control_positive_s_fraction,control_negative_s_fraction,control_zero_s_fraction,control_nyquist_s_fraction,control_signed_s_centroid,control_dominant_signed_s"
+        "# ridge_columns,run,step,time,mode,pulse_k_mode_f_strophy,pulse_positive_s_fraction,pulse_negative_s_fraction,pulse_zero_s_fraction,pulse_nyquist_s_fraction,pulse_signed_s_centroid,pulse_dominant_signed_s,control_k_mode_f_strophy,control_positive_s_fraction,control_negative_s_fraction,control_zero_s_fraction,control_nyquist_s_fraction,control_signed_s_centroid,control_dominant_signed_s,response_k_mode_f_strophy,response_positive_s_fraction,response_negative_s_fraction,response_zero_s_fraction,response_nyquist_s_fraction,response_signed_s_centroid,response_dominant_signed_s"
     );
 
     let common = |nx, nv| VlasovPoissonConfig {
