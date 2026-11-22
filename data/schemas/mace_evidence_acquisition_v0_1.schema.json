@@ -1,0 +1,207 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/mace_evidence_acquisition_v0_1.schema.json",
+  "title": "MACE Evidence Acquisition / EVSI Plan v0.1",
+  "description": "Candidate-side expected value of sample information query proposal. This schema records proposals only; it does not authorize source contact, observation execution or disclosure.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/query_evaluation"
+    },
+    {
+      "$ref": "#/$defs/plan_decision"
+    }
+  ],
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "nullableNumber": {
+      "oneOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "query_evaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "record_type",
+        "run_id",
+        "fixture_id",
+        "query_id",
+        "observation_model_sha256",
+        "admissible",
+        "rejection_reason",
+        "risk_before",
+        "expected_post_query_risk",
+        "expected_risk_reduction",
+        "acquisition_cost",
+        "delay_cost",
+        "disclosure_exposure_cost",
+        "total_cost",
+        "net_evsi",
+        "selected",
+        "observation_executed",
+        "observation_receipt_sha256",
+        "scope"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mace_evidence_acquisition_v0_1"
+        },
+        "record_type": {
+          "const": "query_evaluation"
+        },
+        "run_id": {
+          "$ref": "#/$defs/id"
+        },
+        "fixture_id": {
+          "$ref": "#/$defs/id"
+        },
+        "query_id": {
+          "$ref": "#/$defs/id"
+        },
+        "observation_model_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "admissible": {
+          "type": "boolean"
+        },
+        "rejection_reason": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "risk_before": {
+          "type": "number",
+          "minimum": 0
+        },
+        "expected_post_query_risk": {
+          "$ref": "#/$defs/nullableNumber"
+        },
+        "expected_risk_reduction": {
+          "$ref": "#/$defs/nullableNumber"
+        },
+        "acquisition_cost": {
+          "type": "number",
+          "minimum": 0
+        },
+        "delay_cost": {
+          "type": "number",
+          "minimum": 0
+        },
+        "disclosure_exposure_cost": {
+          "type": "number",
+          "minimum": 0
+        },
+        "total_cost": {
+          "type": "number",
+          "minimum": 0
+        },
+        "net_evsi": {
+          "$ref": "#/$defs/nullableNumber"
+        },
+        "selected": {
+          "type": "boolean"
+        },
+        "observation_executed": {
+          "const": false
+        },
+        "observation_receipt_sha256": {
+          "type": "null"
+        },
+        "scope": {
+          "const": "synthetic_policy_fixture_not_agent_benchmark"
+        }
+      }
+    },
+    "plan_decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "record_type",
+        "run_id",
+        "fixture_id",
+        "risk_before",
+        "chosen_query_id",
+        "planner_action",
+        "stop_reason",
+        "query_count",
+        "observation_executed",
+        "authority_or_execution_granted",
+        "scope"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mace_evidence_acquisition_v0_1"
+        },
+        "record_type": {
+          "const": "plan_decision"
+        },
+        "run_id": {
+          "$ref": "#/$defs/id"
+        },
+        "fixture_id": {
+          "$ref": "#/$defs/id"
+        },
+        "risk_before": {
+          "type": "number",
+          "minimum": 0
+        },
+        "chosen_query_id": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "planner_action": {
+          "enum": [
+            "propose_acquisition",
+            "stop_or_abstain"
+          ]
+        },
+        "stop_reason": {
+          "enum": [
+            "no_candidate_queries",
+            "no_admissible_positive_net_evsi",
+            "positive_net_evsi_query_selected"
+          ]
+        },
+        "query_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "observation_executed": {
+          "const": false
+        },
+        "authority_or_execution_granted": {
+          "const": false
+        },
+        "scope": {
+          "const": "synthetic_policy_fixture_not_agent_benchmark"
+        }
+      }
+    }
+  }
+}
