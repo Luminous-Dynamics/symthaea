@@ -30,19 +30,13 @@ fn run_resolution(
     };
     let prediction = plasma_vlasov_reference::echo_analysis::predict_two_pulse_echo(pulse_pair)?;
 
-    let initial = maxwellian_perturbation(
-        config,
-        INITIAL_AMPLITUDE,
-        FIRST_MODE,
-        THERMAL_SPEED,
-    )?;
+    let initial = maxwellian_perturbation(config, INITIAL_AMPLITUDE, FIRST_MODE, THERMAL_SPEED)?;
     let mut pulsed = VlasovPoisson1d1v::new(config, initial.clone())?;
     let mut no_second_pulse = VlasovPoisson1d1v::new(config, initial)?;
 
     let second_kick: Vec<f64> = (0..config.nx)
         .map(|ix| {
-            let phase =
-                TAU * SECOND_MODE as f64 * config.x(ix) / config.domain_length;
+            let phase = TAU * SECOND_MODE as f64 * config.x(ix) / config.domain_length;
             IMPULSE_AMPLITUDE * phase.sin()
         })
         .collect();
@@ -78,8 +72,7 @@ fn run_resolution(
             let delta_real = pulse_echo.real - control_echo.real;
             let delta_imaginary = pulse_echo.imaginary - control_echo.imaginary;
             let pulse_second = pulsed.electric_mode_coefficient(SECOND_MODE)?;
-            let control_second =
-                no_second_pulse.electric_mode_coefficient(SECOND_MODE)?;
+            let control_second = no_second_pulse.electric_mode_coefficient(SECOND_MODE)?;
             let pulse_diagnostics = pulsed.diagnostics()?;
             let control_diagnostics = no_second_pulse.diagnostics()?;
             let pulse_tails = pulsed.spectral_tail_diagnostics(0.75)?;
