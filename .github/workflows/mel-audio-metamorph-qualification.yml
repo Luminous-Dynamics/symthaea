@@ -94,7 +94,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mel-audio-metamorph-${ github.event.pull_request.head.sha || github.sha }
-          path: ${ runner.temp }/mel-audio-metamorph-evidence/
+          name: mel-audio-metamorph-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/mel-audio-metamorph-evidence/
           if-no-files-found: error
           retention-days: 90
