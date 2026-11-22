@@ -34,6 +34,16 @@ Preserve only the minimum information necessary to replay the declared oracles. 
 
 The current CDP capture primitive remains the browser observation substrate; this design does not introduce a second browser framework.
 
+## Network-egress dependency
+
+The isolated Chromium executor must integrate [#7435 — enforce outbound URL
+policy before requests and redirects](https://github.com/Luminous-Dynamics/symthaea/issues/7435).
+Controller-side URL validation is not an SSRF boundary and cannot stop an
+already-issued redirect, subresource request or DNS-rebinding connection.
+Treat the external egress policy as a hard gate; do not claim isolation until
+the request/redirect policy and OS-level default-deny boundary are both
+exercised with request/packet evidence.
+
 ## Verification sequence
 
 1. Freeze and hash campaign, task, fixture, source baseline, environment manifest and policies.

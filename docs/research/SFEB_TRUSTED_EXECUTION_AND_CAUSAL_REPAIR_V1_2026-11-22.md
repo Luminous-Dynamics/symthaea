@@ -57,6 +57,16 @@ The worker must run in a disposable microVM or a reviewed equivalent, non-root, 
 
 CDP must remain inside the sandbox. Use a private pipe or isolated controller channel; never bind the debugging port on a host interface. A container alone is not automatically an adequate boundary: document the actual kernel, namespace, capability, mount and egress controls.
 
+## Network-egress dependency
+
+The isolated Chromium executor must integrate [#7435 — enforce outbound URL
+policy before requests and redirects](https://github.com/Luminous-Dynamics/symthaea/issues/7435).
+Controller-side URL validation is not an SSRF boundary and cannot stop an
+already-issued redirect, subresource request or DNS-rebinding connection.
+Treat the external egress policy as a hard gate; do not claim isolation until
+the request/redirect policy and OS-level default-deny boundary are both
+exercised with request/packet evidence.
+
 ## 3. Independent oracle derivation
 
 The current report checker accepts an asserted oracle ID when checking a claimed kill. The next verifier must instead derive each oracle from trace and observation data:
