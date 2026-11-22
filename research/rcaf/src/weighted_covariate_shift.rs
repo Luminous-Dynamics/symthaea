@@ -375,8 +375,7 @@ pub fn evaluation_observation_from_estimator_response(
     validate_statistics(replicate_id, &null_statistics)?;
     validate_statistics(replicate_id, &signal_statistics)?;
     validate_weight(replicate_id, importance_weight)?;
-    if !signal_directional_cosine.is_finite()
-        || !(-1.0..=1.0).contains(&signal_directional_cosine)
+    if !signal_directional_cosine.is_finite() || !(-1.0..=1.0).contains(&signal_directional_cosine)
     {
         return Err(WeightedCovariateShiftError::InvalidDirectionCosine {
             replicate_id: replicate_id.to_string(),
@@ -899,9 +898,7 @@ mod tests {
     }
 
     fn estimator_response(direction: Option<f64>) -> FactorialEstimatorResponseReport {
-        use crate::estimator_response::{
-            ConnectivityDirectionReport, EstimatorResponseSummary,
-        };
+        use crate::estimator_response::{ConnectivityDirectionReport, EstimatorResponseSummary};
         FactorialEstimatorResponseReport {
             schema_version: "rcaf.factorial-estimator-response/0.1.0",
             experiment_id: "weighted-adapter-fixture".to_string(),
@@ -942,31 +939,23 @@ mod tests {
         let response = estimator_response(Some(0.9));
         let null =
             null_observation_from_estimator_response("cal-adapter-01", 1.25, &response).unwrap();
-        let evaluation = evaluation_observation_from_estimator_response(
-            "eval-adapter-01",
-            1.5,
-            &response,
-        )
-        .unwrap();
-        assert!(
-            null.statistics
-                .iter()
-                .zip([0.20, 0.21, 0.22])
-                .all(|(actual, expected)| (actual - expected).abs() < 1e-12)
-        );
-        assert!(
-            evaluation
-                .null_statistics
-                .iter()
-                .zip([0.20, 0.21, 0.22])
-                .all(|(actual, expected)| (actual - expected).abs() < 1e-12)
-        );
-        assert!(
-            evaluation
-                .signal_statistics
-                .iter()
-                .all(|actual| (*actual - 0.25).abs() < 1e-12)
-        );
+        let evaluation =
+            evaluation_observation_from_estimator_response("eval-adapter-01", 1.5, &response)
+                .unwrap();
+        assert!(null
+            .statistics
+            .iter()
+            .zip([0.20, 0.21, 0.22])
+            .all(|(actual, expected)| (actual - expected).abs() < 1e-12));
+        assert!(evaluation
+            .null_statistics
+            .iter()
+            .zip([0.20, 0.21, 0.22])
+            .all(|(actual, expected)| (actual - expected).abs() < 1e-12));
+        assert!(evaluation
+            .signal_statistics
+            .iter()
+            .all(|actual| (*actual - 0.25).abs() < 1e-12));
         assert_eq!(evaluation.importance_weight, 1.5);
         assert_eq!(evaluation.signal_directional_cosine, 0.9);
     }
