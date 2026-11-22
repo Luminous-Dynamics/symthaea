@@ -99,7 +99,14 @@
         "intervention_count",
         "interventions",
         "known_root_count",
-        "candidate_validity"
+        "candidate_validity",
+        "max_root_pairs",
+        "root_pair_count",
+        "matched_random_count",
+        "unmatched_random_target_count",
+        "source_code_sha256",
+        "fixture_sha256",
+        "source_revision"
       ],
       "properties": {
         "schema_version": {
@@ -141,6 +148,34 @@
         },
         "candidate_validity": {
           "const": "diagnostic_only"
+        },
+        "max_root_pairs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "root_pair_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "matched_random_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unmatched_random_target_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "source_code_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "fixture_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "source_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
         }
       }
     },
@@ -163,7 +198,7 @@
         "support_known_family_count",
         "support_unresolved_count",
         "available_event_count",
-        "available_experience_struct_bytes_lower_bound",
+        "available_experience_struct_bytes",
         "available_known_root_count",
         "available_known_family_count",
         "unknown_root_event_count",
@@ -224,10 +259,6 @@
           "type": "integer",
           "minimum": 0
         },
-        "available_experience_struct_bytes_lower_bound": {
-          "type": "integer",
-          "minimum": 0
-        },
         "available_known_root_count": {
           "type": "integer",
           "minimum": 0
@@ -245,6 +276,10 @@
           "minimum": 0
         },
         "latency_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "available_experience_struct_bytes": {
           "type": "integer",
           "minimum": 0
         }
@@ -265,7 +300,7 @@
         "target_key",
         "removed_event_ids",
         "removed_event_count",
-        "removed_experience_struct_bytes_lower_bound",
+        "removed_experience_struct_bytes",
         "decision",
         "full_evidence_decision",
         "decision_agrees_with_full",
@@ -318,10 +353,6 @@
           "type": "integer",
           "minimum": 0
         },
-        "removed_experience_struct_bytes_lower_bound": {
-          "type": "integer",
-          "minimum": 0
-        },
         "decision": {
           "$ref": "#/$defs/decision"
         },
@@ -360,6 +391,10 @@
         "invalidity_reason": {
           "type": "string",
           "maxLength": 1024
+        },
+        "removed_experience_struct_bytes": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     }
