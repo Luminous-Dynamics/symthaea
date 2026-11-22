@@ -1795,6 +1795,24 @@ mod tests {
     }
 
     #[test]
+    fn hungarian_matching_is_stable_for_subnormal_coordinate_units() {
+        let truth = graph(
+            "human",
+            vec![node("A", AnnotatedJunctionKind::Tip, 5.0e-321, 0.0, 0.0)],
+            Vec::new(),
+        );
+        let prediction = graph(
+            "model",
+            vec![node("pA", AnnotatedJunctionKind::Tip, 0.0, 0.0, 0.0)],
+            Vec::new(),
+        );
+        let matches = match_junctions_hungarian(&truth, &prediction, 1.0e-320).unwrap();
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].predicted_junction_id, "pA");
+        assert_eq!(matches[0].ground_truth_junction_id, "A");
+    }
+
+    #[test]
     fn hungarian_matching_is_order_independent_and_respects_distance_cutoff() {
         let truth = graph(
             "human",
