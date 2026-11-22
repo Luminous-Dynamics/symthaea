@@ -504,8 +504,14 @@ fn is_lower_hex_64(value: &str) -> bool {
 }
 
 fn sha256_hex(input: &[u8]) -> String {
+    use std::fmt::Write as _;
+
     let digest = Sha256::digest(input);
-    digest.iter().map(|byte| format!("{byte:02x}")).collect()
+    let mut encoded = String::with_capacity(64);
+    for byte in digest {
+        write!(&mut encoded, "{byte:02x}").expect("writing to String cannot fail");
+    }
+    encoded
 }
 
 fn assignment_selects_a_left(seed: &str, assay_id: &str, presentation_id: &str) -> bool {
@@ -521,7 +527,11 @@ fn assignment_selects_a_left(seed: &str, assay_id: &str, presentation_id: &str) 
 }
 
 fn rate(successes: usize, total: usize) -> Option<f64> {
-    (total > 0).then(|| successes as f64 / total as f64)
+    if total == 0 {
+        None
+    } else {
+        Some(successes as f64 / total as f64)
+    }
 }
 
 fn wilson_95(successes: usize, total: usize) -> Option<[f64; 2]> {
