@@ -434,7 +434,35 @@
       "unit_tested",
       "browser_verified"
     ],
-    "compilation_status": "pending_rust_toolchain"
+    "compilation_status": "pending_rust_toolchain",
+    "retrieval_evaluation": {
+      "query_set": "benchmarks/frontend/knowledge/leptos-0.8/retrieval-queries-v0.json",
+      "schema": "benchmarks/frontend/knowledge/leptos-0.8/retrieval-v1.schema.json",
+      "query_count": 24,
+      "positives": 16,
+      "hard_negatives": 8,
+      "status": "specification_only",
+      "validator_command": "cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --retrieval",
+      "baselines": [
+        "keyword_exact",
+        "BM25",
+        "sparse_TFIDF",
+        "dense_embedding",
+        "HDC_associative",
+        "hybrid_sparse_dense_HDC"
+      ],
+      "primary_metrics": [
+        "recall_at_1",
+        "recall_at_3",
+        "mean_reciprocal_rank",
+        "ndcg_at_3",
+        "precision_at_3",
+        "abstention_accuracy_on_hard_negatives",
+        "latency_p50_p95",
+        "memory_bytes",
+        "cost_per_1000_queries"
+      ]
+    }
   },
   "anti_contamination_policy": {
     "public_pilot": "Public task definitions and fixtures may be used for iterative development but do not count as hidden holdout performance.",
