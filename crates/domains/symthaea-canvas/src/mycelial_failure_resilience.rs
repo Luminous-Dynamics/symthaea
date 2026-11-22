@@ -412,7 +412,7 @@ fn evaluate_one(
     failed_segment_ids: &[String],
     failed_junction_ids: &[String],
     length_unit: JunctionLengthUnit,
-) -> MycelialFailureMetrics {
+) -> Result<MycelialFailureMetrics, MycelialFailureResilienceError> {
     let failed_edges: BTreeSet<_> = failed_segment_ids.iter().map(String::as_str).collect();
     let failed_nodes: BTreeSet<_> = failed_junction_ids.iter().map(String::as_str).collect();
     let active_nodes: Vec<_> = indexed
@@ -447,6 +447,7 @@ fn evaluate_one(
         .saturating_sub(remaining_junction_count);
 
     let mut distances_by_source = HashMap::<usize, Vec<f64>>::new();
+    let mut outcomes = Vec::with_capacity(demands.len());
     let mut total_demand_weight = 0u128;
     let mut reachable_demand_weight = 0u128;
     let mut reachable_demand_pair_count = 0usize;
@@ -458,6 +459,11 @@ fn evaluate_one(
         let source = indexed.node_index[&demand.source_junction_id];
         let target = indexed.node_index[&demand.target_junction_id];
         if !active_nodes[source] || !active_nodes[target] {
+            outcomes.push(MycelialDemandPairOutcome {
+                demand_id: demand.id.clone(),
+                direct_distance_model_units: None,
+                network_path_length_model_units: None,
+            });
             continue;
         }
         let distances = distances_by_source
@@ -465,23 +471,33 @@ fn evaluate_one(
             .or_insert_with(|| dijkstra(&adjacency, source));
         let path_length = distances[target];
         if !path_length.is_finite() {
+            outcomes.push(MycelialDemandPairOutcome {
+                demand_id: demand.id.clone(),
+                direct_distance_model_units: None,
+                network_path_length_model_units: None,
+            });
             continue;
         }
-        let direct_distance = indexed.positions[source]
-            .sub(indexed.positions[target])
-            .length() as f64;
-        if !path_length.is_finite() || path_length <= 0.0
-            || direct_distance as f64 > path_length + 1.0e-5
-        {
-            // A graph path shorter than Euclidean endpoint distance is an invalid
-            // source graph or a metric-contract violation. The enclosing
-            // profile builder validates source geometry; use no contribution.
-            continue;
+        let direct_distance =
+            f64::from(indexed.positions[source].sub(indexed.positions[target]).length());
+        if path_length <= 0.0 || direct_distance > path_length + 1.0e-5 {
+            return Err(
+                MycelialFailureResilienceError::PathShorterThanEuclideanDistance {
+                    demand_id: demand.id.clone(),
+                    direct_distance,
+                    network_path_length: path_length,
+                },
+            );
         }
         reachable_demand_pair_count += 1;
         reachable_demand_weight += weight;
         weighted_directness_sum += (direct_distance / path_length) * weight as f64;
         weighted_path_length_sum += path_length * weight as f64;
+        outcomes.push(MycelialDemandPairOutcome {
+            demand_id: demand.id.clone(),
+            direct_distance_model_units: Some(direct_distance),
+            network_path_length_model_units: Some(path_length),
+        });
     }
     let unreachable_demand_pair_count = demands.len().saturating_sub(reachable_demand_pair_count);
     let unreachable_demand_weight = total_demand_weight.saturating_sub(reachable_demand_weight);
@@ -492,8 +508,11 @@ fn evaluate_one(
     let weighted_mean_network_path_length = (reachable_demand_weight > 0)
         .then_some(weighted_path_length_sum / reachable_demand_weight as f64);
 
-    MycelialFailureMetrics {
+    Ok(MycelialFailureMetrics {
         scenario_id: scenario_id.to_string(),
+        failed_segment_ids: failed_segment_ids.to_vec(),
+        failed_junction_ids: failed_junction_ids.to_vec(),
+        demand_pair_outcomes: outcomes,
         failed_segment_count: failed_segment_ids.len(),
         failed_junction_count: failed_junction_ids.len(),
         remaining_junction_count,
@@ -510,7 +529,7 @@ fn evaluate_one(
         weighted_mean_directness,
         weighted_mean_network_path_length,
         length_unit,
-    }
+    })
 }
 
 /// Evaluate baseline demand functionality and explicit controlled failures.
