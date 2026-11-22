@@ -260,7 +260,7 @@
     "Reconstruct the source-to-Lean correspondence for the cell-centering identities in Part II §5.1, including the constant sum and the linear-in-a term.",
     "Reconstruct the finite-group translation identity (II.22) and the derived distinguished-cell identity (5.4), then distinguish the exact combinatorial identity from the separate uniform error estimates (5.6), (II.26) and (5.7).",
     "Map the fixed-modulus prime number theorem cell-density argument and the uniform Estimate C dependency separately; do not transfer fixed-modulus O_A bounds to varying moduli.",
-    "Retain the exact CI receipt at the tested PR head; any change to the Rust oracle must trigger and pass a new exact-head focused run."
+    "If executable oracle source changes, run the focused workflow at the new exact head and replace the finite-oracle CI receipt; do not transfer a prior result to changed source."
   ],
   "limitations": [
     "The original Lean source mirror is an exact mirror of the published source but no license was established here; this Symthaea artifact stores only paths, declaration names, line spans, blob IDs and explanatory metadata, not source code.",
@@ -333,7 +333,7 @@
     "row_indicator_cases": 1240,
     "checked_identity": "For every target s, exactly |T2| translates u satisfy s in u+T2. With chi_q in {-1,+1}, the row-filtered count satisfies 2*selected_count = |T2|*(1+chi_q).",
     "test_function": "translation_average_selects_each_column_exactly_cardinality_t2_times",
-    "status": "source_added_exact_head_ci_pending",
+    "status": "passed_exact_head_ci",
     "limitations": [
       "Finite cyclic groups only; not a formal proof for the actual group H used in the RH construction.",
       "Does not verify the theta-lift, cell-weight perturbations, prime density or any uniform analytic estimate.",
@@ -397,7 +397,27 @@
     "test_functions": [
       "translation_average_selects_each_column_exactly_cardinality_t2_times",
       "translation_average_holds_for_small_product_cyclic_groups"
-    ]
+    ],
+    "ci_receipt": {
+      "tested_pr_head": "861db995fc80aa52c3339233fd6ce0cec0168458",
+      "workflow_run_id": 45075362857,
+      "workflow_url": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/45075362857",
+      "workflow_name": "Math Proof Comprehension Pilot",
+      "conclusion": "success",
+      "rust_toolchain": "1.96.0 (ac68faa20 2026-05-25)",
+      "rust_tests_passed": 11,
+      "rust_tests_failed": 0,
+      "rustfmt": "passed",
+      "compile_with_warnings_denied": "passed",
+      "json_fixture_assertions": "passed",
+      "cyclic_group_target_cases": 620,
+      "cyclic_group_row_indicator_cases": 1240,
+      "product_group_target_cases": 66447,
+      "product_group_row_indicator_cases": 132894,
+      "total_group_target_cases": 67067,
+      "total_row_indicator_cases": 134134,
+      "scope": "Standalone dependency-free finite oracle and research fixture checks only; no Lean extraction, Lean kernel replay, RH proof validation, human study, or full workspace CI."
+    }
   },
   "upstream_graph_crosschecks": [
     {
