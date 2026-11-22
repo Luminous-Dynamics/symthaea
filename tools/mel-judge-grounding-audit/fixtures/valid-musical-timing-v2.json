@@ -14,7 +14,8 @@
   "policy": {
     "maximum_relative_period_error": 0.05,
     "required_consecutive_stable_estimates": 5,
-    "minimum_estimate_spacing_ns": 10000000
+    "minimum_estimate_spacing_ns": 10000000,
+    "minimum_estimate_confidence": 0.8
   },
   "target_events": [
     {
