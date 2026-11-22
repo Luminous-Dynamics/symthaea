@@ -108,9 +108,7 @@ fn binary_entropy(probability: f64) -> f64 {
 
 fn bernoulli_js_divergence_bits(left: f64, right: f64) -> f64 {
     let midpoint = 0.5 * (left + right);
-    ((binary_entropy(midpoint)
-        - 0.5 * binary_entropy(left)
-        - 0.5 * binary_entropy(right))
+    ((binary_entropy(midpoint) - 0.5 * binary_entropy(left) - 0.5 * binary_entropy(right))
         / LN_2)
         .clamp(0.0, 1.0)
 }
@@ -219,8 +217,7 @@ fn compare_profiles(
     }
     let mean_absolute_feature_rate_delta =
         absolute_deltas.iter().sum::<f64>() / absolute_deltas.len() as f64;
-    let mean_feature_js_divergence_bits =
-        feature_js.iter().sum::<f64>() / feature_js.len() as f64;
+    let mean_feature_js_divergence_bits = feature_js.iter().sum::<f64>() / feature_js.len() as f64;
     Ok(SecomObservationDriftV1 {
         reference_split: reference_split.into(),
         compared_split: compared_split.into(),
@@ -234,9 +231,7 @@ fn compare_profiles(
             absolute_deltas.iter().copied().fold(0.0, f64::max),
         ),
         mean_feature_js_divergence_bits: rounded(mean_feature_js_divergence_bits),
-        maximum_feature_js_divergence_bits: rounded(
-            feature_js.iter().copied().fold(0.0, f64::max),
-        ),
+        maximum_feature_js_divergence_bits: rounded(feature_js.iter().copied().fold(0.0, f64::max)),
         features_with_rate_delta_at_least_5pp: features_over_alert,
         mean_missing_features_per_row_delta: rounded(
             compared.mean_missing_features_per_row - reference.mean_missing_features_per_row,
@@ -275,8 +270,7 @@ pub fn evaluate_secom_observation_drift_v1(
         )));
     }
     if split_manifest.split_scheme == "forward_time"
-        && split_manifest.clock_domain_id.as_deref()
-            != Some(expectations.clock_domain_id.as_str())
+        && split_manifest.clock_domain_id.as_deref() != Some(expectations.clock_domain_id.as_str())
     {
         return Err(SecomObservationDriftError(
             "forward-time split clock_domain_id does not match raw expectations".into(),
@@ -285,12 +279,7 @@ pub fn evaluate_secom_observation_drift_v1(
 
     let features = parse_features(feature_bytes)?;
     let labels = parse_labels(label_bytes)?;
-    for (index, (assignment, label)) in split_manifest
-        .assignments
-        .iter()
-        .zip(&labels)
-        .enumerate()
-    {
+    for (index, (assignment, label)) in split_manifest.assignments.iter().zip(&labels).enumerate() {
         if assignment.positive != (label.label == 1) {
             return Err(SecomObservationDriftError(format!(
                 "split assignment {index} label does not match source label row"
@@ -311,9 +300,7 @@ pub fn evaluate_secom_observation_drift_v1(
             .assignments
             .iter()
             .enumerate()
-            .filter_map(|(index, assignment)| {
-                (assignment.split == split).then_some(index)
-            })
+            .filter_map(|(index, assignment)| (assignment.split == split).then_some(index))
             .collect::<Vec<_>>()
     };
 
@@ -390,12 +377,7 @@ mod tests {
         for (assignment, label) in split.assignments.iter_mut().zip(&parsed_labels) {
             assignment.positive = label.label == 1;
         }
-        evaluate_secom_observation_drift_v1(
-            feature_bytes,
-            label_bytes,
-            &expectations,
-            &split,
-        )
+        evaluate_secom_observation_drift_v1(feature_bytes, label_bytes, &expectations, &split)
         .expect("synthetic fixture evaluates")
     }
 
@@ -416,9 +398,7 @@ mod tests {
 
     #[test]
     fn one_sensor_shift_is_detected_even_when_labels_are_unchanged() {
-        let shifted = FEATURES
-            .split(|byte| *byte == b'\n')
-            .collect::<Vec<_>>();
+        let shifted = FEATURES.split(|byte| *byte == b'\n').collect::<Vec<_>>();
         assert_eq!(shifted.len(), 9);
         let mut modified = shifted.iter().map(|row| row.to_vec()).collect::<Vec<_>>();
         modified[4] = b"NaN 2.2".to_vec();
