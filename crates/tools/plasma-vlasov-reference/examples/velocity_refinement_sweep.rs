@@ -1,9 +1,7 @@
 use std::error::Error;
 
 use plasma_vlasov_reference::phase_space_cascade::JointPhaseSpaceSpectrum;
-use plasma_vlasov_reference::{
-    VlasovPoisson1d1v, VlasovPoissonConfig, maxwellian_perturbation,
-};
+use plasma_vlasov_reference::{VlasovPoisson1d1v, VlasovPoissonConfig, maxwellian_perturbation};
 
 const ALPHA: f64 = 0.05;
 const MODE: usize = 1;
@@ -24,10 +22,7 @@ fn relative_linf_error(observed: &[f64], expected: &[f64]) -> f64 {
     maximum_error / scale
 }
 
-fn guardband_fraction(
-    spectrum: &JointPhaseSpaceSpectrum,
-    spatial_mode: usize,
-) -> f64 {
+fn guardband_fraction(spectrum: &JointPhaseSpaceSpectrum, spatial_mode: usize) -> f64 {
     let negative_mode = (spectrum.nx - spatial_mode) % spectrum.nx;
     let mut total = 0.0;
     let mut guardband = 0.0;
@@ -100,8 +95,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     early.advance_free_streaming(early_refine_time)?;
     let early_guardband = guardband_fraction(&early.joint_phase_space_spectrum()?, MODE);
     let early_report = early.refine_velocity_grid_fourier(FACTOR)?;
-    let remaining_to_old_recurrence =
-        old_horizon.discrete_recurrence_time - early_refine_time;
+    let remaining_to_old_recurrence = old_horizon.discrete_recurrence_time - early_refine_time;
     early.advance_free_streaming(remaining_to_old_recurrence)?;
     let early_exact_at_old_recurrence = analytic_free_streaming_state(
         fine_config,
@@ -141,8 +135,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let late_report = late.refine_velocity_grid_fourier(FACTOR)?;
     let late_exact_state =
         analytic_free_streaming_state(fine_config, ALPHA, MODE, late_refine_time)?;
-    let late_characteristic_error =
-        relative_linf_error(late.distribution(), &late_exact_state);
+    let late_characteristic_error = relative_linf_error(late.distribution(), &late_exact_state);
 
     println!(
         "case,source_nv,destination_nv,old_t_nyquist,old_t_recurrence,new_t_nyquist,new_t_recurrence,transition_time,guardband_fraction,old_node_error,characteristic_error,fine_recurrence_error,c2_relative_delta,mass_relative_delta,old_bytes,new_bytes"
