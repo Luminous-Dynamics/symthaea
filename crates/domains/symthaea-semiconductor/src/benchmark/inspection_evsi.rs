@@ -180,7 +180,9 @@ fn validate_subject(subject: &EvsiSubjectV1) -> Result<(), EvsiError> {
         "budget.max_measurement_cost",
     )?;
     if subject.budget.max_per_group == 0 {
-        return Err(EvsiError("budget.max_per_group: expected positive integer".into()));
+        return Err(EvsiError(
+            "budget.max_per_group: expected positive integer".into(),
+        ));
     }
     if subject.candidates.is_empty() {
         return Err(EvsiError("candidates: expected non-empty array".into()));
@@ -208,10 +210,16 @@ fn validate_subject(subject: &EvsiSubjectV1) -> Result<(), EvsiError> {
         }
 
         for (field, value) in [
-            ("prior_defect_probability", candidate.prior_defect_probability),
+            (
+                "prior_defect_probability",
+                candidate.prior_defect_probability,
+            ),
             ("test_sensitivity", candidate.test_sensitivity),
             ("test_specificity", candidate.test_specificity),
-            ("actionability_probability", candidate.actionability_probability),
+            (
+                "actionability_probability",
+                candidate.actionability_probability,
+            ),
         ] {
             probability(value, &format!("{}.{}", candidate.candidate_id, field))?;
         }
@@ -237,9 +245,7 @@ fn minimum_loss_action(
     let no_action_loss = defect_probability * candidate.defect_loss;
     let intervene_loss = candidate.intervention_cost
         + (1.0 - defect_probability) * candidate.false_intervention_cost
-        + defect_probability
-            * (1.0 - candidate.actionability_probability)
-            * candidate.defect_loss;
+        + defect_probability * (1.0 - candidate.actionability_probability) * candidate.defect_loss;
 
     // Stable tie-break: do not intervene when the expected losses are equal.
     if intervene_loss < no_action_loss - EPSILON {
@@ -295,9 +301,7 @@ fn outcome_decision(
     }
 }
 
-fn evaluate_candidate(
-    candidate: &EvsiCandidateV1,
-) -> Result<EvsiCandidateReportV1, EvsiError> {
+fn evaluate_candidate(candidate: &EvsiCandidateV1) -> Result<EvsiCandidateReportV1, EvsiError> {
     let p = candidate.prior_defect_probability;
     let (pre_action, pre_loss) = minimum_loss_action(p, candidate);
 
@@ -344,7 +348,10 @@ fn evaluate_candidate(
     let net_evsi = gross_evsi - candidate.measurement_cost - delay_penalty;
     for (name, value) in [
         ("expected_loss_without_measurement", pre_loss),
-        ("expected_loss_after_measurement_pre_cost", post_measurement_loss),
+        (
+            "expected_loss_after_measurement_pre_cost",
+            post_measurement_loss,
+        ),
         ("delay_penalty", delay_penalty),
         ("net_evsi", net_evsi),
     ] {
@@ -391,10 +398,7 @@ fn subset_is_better(candidate: &SubsetScore, incumbent: &SubsetScore) -> bool {
     candidate.selected_ids < incumbent.selected_ids
 }
 
-fn exact_subset(
-    candidates: &[EvsiCandidateReportV1],
-    budget: &EvsiBudgetV1,
-) -> SubsetScore {
+fn exact_subset(candidates: &[EvsiCandidateReportV1], budget: &EvsiBudgetV1) -> SubsetScore {
     let subset_count = 1usize << candidates.len();
     let mut best = SubsetScore {
         selected_ids: Vec::new(),
@@ -443,10 +447,7 @@ fn exact_subset(
     best
 }
 
-fn risk_only(
-    candidates: &[EvsiCandidateReportV1],
-    budget: &EvsiBudgetV1,
-) -> EvsiComparatorV1 {
+fn risk_only(candidates: &[EvsiCandidateReportV1], budget: &EvsiBudgetV1) -> EvsiComparatorV1 {
     let mut ordered: Vec<&EvsiCandidateReportV1> = candidates.iter().collect();
     ordered.sort_by(|left, right| {
         right
@@ -617,13 +618,20 @@ mod tests {
         let input = subject(vec![candidate("A", "LOT-A", 0.2, 0.8, 0.9, 0.0)]);
         let result = report(&input);
         let row = &result.candidates[0];
-        assert!((row.positive_outcome.outcome_probability
-            + row.negative_outcome.outcome_probability
-            - 1.0)
-            .abs()
-            < 1.0e-12);
-        assert_eq!(row.positive_outcome.posterior_defect_probability, Some(0.666666666667));
-        assert_eq!(row.negative_outcome.posterior_defect_probability, Some(0.052631578947));
+        assert!(
+            (row.positive_outcome.outcome_probability + row.negative_outcome.outcome_probability
+                - 1.0)
+                .abs()
+                < 1.0e-12
+        );
+        assert_eq!(
+            row.positive_outcome.posterior_defect_probability,
+            Some(0.666666666667)
+        );
+        assert_eq!(
+            row.negative_outcome.posterior_defect_probability,
+            Some(0.052631578947)
+        );
     }
 
     #[test]
@@ -654,7 +662,10 @@ mod tests {
         let b = candidate("B", "LOT-B", 0.1, 0.8, 0.9, 0.5);
         let forward = report(&subject(vec![a.clone(), b.clone()]));
         let reverse = report(&subject(vec![b, a]));
-        assert_eq!(forward.selected_candidate_ids, reverse.selected_candidate_ids);
+        assert_eq!(
+            forward.selected_candidate_ids,
+            reverse.selected_candidate_ids
+        );
         assert_eq!(forward.candidates, reverse.candidates);
     }
 
@@ -693,8 +704,10 @@ mod tests {
         assert!(result.selected_candidate_ids.len() <= 2);
         assert!(result.selected_total_measurement_cost <= 2.0);
         assert!(result.selected_total_measurement_minutes <= 10.0);
-        assert!(!(result.selected_candidate_ids.contains(&"A".into())
-            && result.selected_candidate_ids.contains(&"B".into())));
+        assert!(
+            !(result.selected_candidate_ids.contains(&"A".into())
+                && result.selected_candidate_ids.contains(&"B".into()))
+        );
     }
 
     #[test]
