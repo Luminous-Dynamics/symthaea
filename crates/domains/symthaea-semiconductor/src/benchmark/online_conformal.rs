@@ -912,7 +912,7 @@ mod tests {
         }];
         let mut labels = Vec::new();
         for (label_id, available_at, revision, supersedes) in label_ids {
-            let mut label = crate::benchmark::process_event_graph::MetrologyLabelV1 {
+            let label = crate::benchmark::process_event_graph::MetrologyLabelV1 {
                 label_id: (*label_id).into(),
                 measurement_event_id: "met-event".into(),
                 subject_id: "wafer-100".into(),
@@ -937,7 +937,6 @@ mod tests {
                 source_artifact_sha256: SOURCE_SHA.into(),
                 authority_ref: "lims-validated".into(),
             };
-            label.label_id = (*label_id).into();
             labels.push(label);
         }
         // The graph only needs one metrology event; all labels are revisions/
@@ -964,7 +963,7 @@ mod tests {
     }
 
     fn subject() -> ConformalSubjectV1 {
-        let calibration_samples: Vec<_> = (0..12)
+        let calibration_samples: Vec<_> = (0..40)
             .map(|index| ConformalCalibrationSampleV1 {
                 sample_id: format!("cal-sample-{index:02}"),
                 label_id: format!("cal-label-{index:02}"),
@@ -1054,7 +1053,7 @@ mod tests {
         .unwrap();
         assert_eq!(receipt.model_sha256, MODEL_SHA);
         assert!(valid_sha256(&receipt.calibration_state_sha256));
-        assert!(matches!(receipt.coverage_state, OnlineCoverageStateV1::Qualified));
+        assert!(matches!(&receipt.coverage_state, OnlineCoverageStateV1::Qualified));
         assert!(verify_state(&state).is_ok());
     }
 
@@ -1301,7 +1300,7 @@ mod tests {
             )
             .unwrap();
         }
-        assert!(matches!(state.coverage_state, OnlineCoverageStateV1::CoverageDegraded));
+        assert!(matches!(&state.coverage_state, OnlineCoverageStateV1::CoverageDegraded));
         let receipt = predict_online_conformal_v1(
             &mut state,
             &OnlinePredictionInputV1 {
@@ -1315,8 +1314,8 @@ mod tests {
             },
         )
         .unwrap();
-        assert!(matches!(receipt.coverage_state, OnlineCoverageStateV1::CoverageDegraded));
-        assert!(matches!(receipt.prediction_set.decision, SelectiveDecisionV1::Abstain));
+        assert!(matches!(&receipt.coverage_state, OnlineCoverageStateV1::CoverageDegraded));
+        assert!(matches!(&receipt.prediction_set.decision, SelectiveDecisionV1::Abstain));
         assert_eq!(receipt.prediction_set.set_size, 2);
     }
 }
