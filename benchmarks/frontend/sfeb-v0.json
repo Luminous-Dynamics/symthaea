@@ -368,7 +368,7 @@
     "outputs": [
       "sanitized accessibility-tree JSON",
       "bounded layout JSON (viewport, overflow, semantic element geometry)",
-      "full-page PNG screenshot",
+      "viewport-matched PNG screenshot",
       "SHA-256 content-addressed artifact records",
       "receipt SHA-256 and artifact-integrity verification"
     ],
@@ -379,7 +379,9 @@
       "The capture library does not enforce OS-level network isolation.",
       "Screenshot artifacts remain potentially sensitive and must be stored separately with fixture-only data.",
       "CDP endpoints must not be exposed beyond the isolated benchmark environment."
-    ]
+    ],
+    "viewport_capture": "PNG pixel dimensions must match recorded CSS viewport multiplied by window.devicePixelRatio.",
+    "source_anchor_count": 17
   },
   "evidence_contract": {
     "schema": "sfeb-frontend-evidence/v1",
@@ -412,8 +414,8 @@
     "example_path": "benchmarks/frontend/contracts/symthaea-ui-v0.json",
     "schema_draft": "https://json-schema.org/draft/2020-12/schema",
     "status": "schema_and_source_observed_example_authored",
-    "example_source_commit": "9f036e4f0c427830c18a931e9203107231c5cce1",
-    "region_count": 16,
+    "example_source_commit": "808998bb903202e813b5bd275fe4a395bcff528e",
+    "region_count": 17,
     "acceptance_journey_count": 6,
     "browser_verified_journeys": 0,
     "important_rule": "source_observed and browser_verified are distinct evidence states; an implementation contract cannot promote itself to browser_verified."
@@ -462,7 +464,9 @@
         "memory_bytes",
         "cost_per_1000_queries"
       ]
-    }
+    },
+    "source_commit": "808998bb903202e813b5bd275fe4a395bcff528e",
+    "source_anchor_count": 17
   },
   "anti_contamination_policy": {
     "public_pilot": "Public task definitions and fixtures may be used for iterative development but do not count as hidden holdout performance.",
