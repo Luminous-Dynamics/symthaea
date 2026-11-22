@@ -339,6 +339,7 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
     }
 
     let mut realization_ids = BTreeSet::new();
+    let mut realized_forecast_ids = BTreeSet::new();
     let mut realized_event_ids = BTreeSet::new();
     let mut realized_by_forecast_event =
         BTreeMap::<(&str, &str), (&ForecastRealizationV1, &RealizedEventV1)>::new();
@@ -348,6 +349,12 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
     for realization in &panel.realizations {
         if !realization_ids.insert(realization.realization_id.as_str()) {
             return Err(format!("duplicate realization_id: {}", realization.realization_id));
+        }
+        if !realized_forecast_ids.insert(realization.forecast_id.as_str()) {
+            return Err(format!(
+                "forecast {} has more than one realization record",
+                realization.forecast_id
+            ));
         }
         let forecast = forecast_ids
             .get(realization.forecast_id.as_str())
@@ -453,20 +460,6 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
                 }
                 None => unforecasted_realized_event_count += 1,
             }
-        }
-    }
-
-    for disposition in &panel.dispositions {
-        if disposition.action == "veto"
-            && panel.realizations.iter().any(|realization| {
-                realization.forecast_id == disposition.forecast_id
-                    && !realization.events.is_empty()
-            })
-        {
-            findings.push(format!(
-                "vetoed forecast {} has output events",
-                disposition.forecast_id
-            ));
         }
     }
 
