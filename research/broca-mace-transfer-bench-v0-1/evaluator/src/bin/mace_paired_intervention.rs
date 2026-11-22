@@ -93,6 +93,8 @@ struct ScoredArm {
     invalid_evidence_use_count: u64,
     stale_evidence_use_count: u64,
     wrong_scope_evidence_use_count: u64,
+    false_causal_claim_count: u64,
+    support_count: usize,
 }
 
 fn sha256(bytes: &[u8]) -> String {
@@ -199,11 +201,11 @@ fn exact_scope_ids(memory: &[Experience], query: Query) -> Vec<u32> {
     ids
 }
 
-fn hdc_ids(
+fn hdc_hits(
     memory: &[Experience],
     query: Query,
     profile: RepresentationProfile,
-) -> Result<(Vec<u32>, u64), String> {
+) -> Result<(Vec<CandidateHit>, u64), String> {
     let index = CandidateIndex::build(
         memory,
         IndexConfig {
@@ -224,8 +226,7 @@ fn hdc_ids(
             .cmp(&right.rank)
             .then_with(|| left.event_id.cmp(&right.event_id))
     });
-    let ids = hits.into_iter().map(|hit| hit.event_id).collect();
-    Ok((ids, index.index_payload_bytes()))
+    Ok((hits, index.index_payload_bytes()))
 }
 
 fn execute_arm(
@@ -237,6 +238,7 @@ fn execute_arm(
     let memory = source_memory_for_arm(arm, case, all_cases);
     let mut index_bytes = 0_u64;
     let mut retrieved_ids = Vec::new();
+    let mut expected_view_digests = BTreeMap::new();
     let mut error = None;
 
     let ids_result: Result<Vec<u32>, String> = match arm {
@@ -248,16 +250,21 @@ fn execute_arm(
                 .saturating_mul(size_of::<u32>() as u64);
             Ok(conventional_ids(&memory, case.query, TOP_K))
         }
-        Arm::StaticHdc => hdc_ids(
+        Arm::StaticHdc => hdc_hits(
             &memory,
             case.query,
             RepresentationProfile::StaticContinuousHv,
         )
-        .map(|(ids, bytes)| {
+        .map(|(hits, bytes)| {
             index_bytes = bytes;
+            let mut ids = Vec::with_capacity(hits.len());
+            for hit in hits {
+                expected_view_digests.insert(hit.event_id, hit.view_digest);
+                ids.push(hit.event_id);
+            }
             ids
         }),
-        Arm::HdcLtc => hdc_ids(
+        Arm::HdcLtc => hdc_hits(
             &memory,
             case.query,
             RepresentationProfile::HdcLtcZeroInput {
@@ -268,8 +275,13 @@ fn execute_arm(
                 neuron_seed: HDC_NEURON_SEED,
             },
         )
-        .map(|(ids, bytes)| {
+        .map(|(hits, bytes)| {
             index_bytes = bytes;
+            let mut ids = Vec::with_capacity(hits.len());
+            for hit in hits {
+                expected_view_digests.insert(hit.event_id, hit.view_digest);
+                ids.push(hit.event_id);
+            }
             ids
         }),
         Arm::SemanticPlacebo => {
@@ -305,7 +317,10 @@ fn execute_arm(
         let mut verified = Vec::with_capacity(retrieved_ids.len());
         for (id, item) in retrieved_ids.iter().zip(resolved.iter()) {
             let expected = experience_view_digest(item);
-            let index_hit_is_current = *id == item.event_id && !expected.iter().all(|b| *b == 0);
+            let index_hit_is_current = expected_view_digests
+                .get(id)
+                .is_some_and(|indexed_digest| *indexed_digest == expected)
+                && *id == item.event_id;
             if !index_hit_is_current {
                 error = Some(format!("canonical candidate revalidation failed for {id}"));
                 break;
@@ -340,13 +355,13 @@ fn execute_arm(
         } else {
             retrieved_ids
         },
-        memory_digest: json_sha256(&resolved).unwrap_or_else(|_| sha256(b"serialization-error")),
+        memory_digest: experience_list_digest(&resolved),
         resolved,
         latency_ns: u64::try_from(started.elapsed().as_nanos()).unwrap_or(u64::MAX),
         index_bytes,
         sidecar_bytes,
         abstention_reason: error.or_else(|| {
-            if decision_is_abstention(arm, case, all_cases) {
+            if decision.action.is_none() {
                 Some("no admissible decision-support evidence".to_string())
             } else {
                 None
@@ -355,26 +370,13 @@ fn execute_arm(
     }
 }
 
-fn decision_is_abstention(
-    arm: Arm,
-    case: &stress::Case,
-    all_cases: &[stress::Case],
-) -> bool {
-    let memory = source_memory_for_arm(arm, case, all_cases);
-    if arm == Arm::NoMemory {
-        return false;
+fn experience_list_digest(items: &[Experience]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"luminous:mace:experience-list:v1\0");
+    for item in items {
+        hasher.update(experience_view_digest(item));
     }
-    let ids = match arm {
-        Arm::ExactScopeScan => exact_scope_ids(&memory, case.query),
-        Arm::ConventionalRetrieval | Arm::SemanticPlacebo => {
-            conventional_ids(&memory, case.query, TOP_K)
-        }
-        Arm::StaticHdc | Arm::HdcLtc => return false,
-        Arm::NoMemory => return false,
-    };
-    resolve_ids(&ids, &memory)
-        .map(|resolved| decide(Policy::CausalQualified, &resolved, case.query).action.is_none())
-        .unwrap_or(true)
+    hasher.finalize().iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
 fn action_name(action: Option<Action>) -> &'static str {
@@ -503,7 +505,10 @@ fn evaluate_arm(
         invalid += 1;
     }
 
-    let _ = no_memory_action;
+    let false_causal_claim_count = u64::from(
+        candidate.decision.causal_claim.is_some()
+            && candidate.decision.causal_claim != case.truth.causal_action,
+    );
     ScoredArm {
         arm,
         cluster: case.cluster,
@@ -519,6 +524,8 @@ fn evaluate_arm(
         invalid_evidence_use_count: invalid,
         stale_evidence_use_count: stale,
         wrong_scope_evidence_use_count: wrong_scope,
+        false_causal_claim_count,
+        support_count: candidate.decision.evidence_ids.len(),
     }
 }
 
@@ -536,7 +543,8 @@ fn evaluator_record(
     let justified = if decision_changed {
         Some(
             support_is_valid
-                && !case.truth.causal_action.is_none()
+                && score.support_count > 0
+                && case.truth.causal_action.is_some()
                 && score.decision == case.truth.causal_action
                 && score.decision.is_some(),
         )
@@ -568,7 +576,7 @@ fn evaluator_record(
         "invalid_evidence_use_count": score.invalid_evidence_use_count,
         "stale_evidence_use_count": score.stale_evidence_use_count,
         "wrong_scope_evidence_use_count": score.wrong_scope_evidence_use_count,
-        "false_causal_claim_count": 0,
+        "false_causal_claim_count": score.false_causal_claim_count,
         "decision_changed_vs_no_memory": decision_changed,
         "decision_change_justified": justified,
         "harmful_memory_dependence": harmful,
@@ -722,7 +730,12 @@ fn contrast_record(
             100.0 * (*treat_success as f64 / *treat_count as f64
                 - *base_success as f64 / *base_count as f64)
         })
-        .fold(0.0_f64, f64::min);
+        .fold(f64::INFINITY, f64::min);
+    let worst_family_delta = if worst_family_delta.is_finite() {
+        worst_family_delta
+    } else {
+        0.0
+    };
     let mut latency_deltas = contrast.latency_deltas.clone();
     latency_deltas.sort_unstable();
     let p95_latency_delta = if latency_deltas.is_empty() {
