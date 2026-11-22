@@ -7,15 +7,16 @@ use std::fs;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use symthaea_semiconductor::benchmark::{
-    StratifiedRepeatReportV1, StratifiedSampleV1, StratifiedSplitSubjectV1,
-    generate_repeated_stratified_splits_v1,
-};
 use symthaea_semiconductor::benchmark::secom_raw::{
     SecomRawExpectationsV1, audit_secom_raw_v1, parse_labels,
 };
 use symthaea_semiconductor::benchmark::split_manifest::{
     SplitManifestV1, validate_split_manifest_v1,
+};
+
+use symthaea_semiconductor::benchmark::{
+    StratifiedRepeatReportV1, StratifiedSampleV1, StratifiedSplitSubjectV1,
+    generate_repeated_stratified_splits_v1,
 };
 
 fn run() -> Result<(), String> {
@@ -56,7 +57,9 @@ fn run() -> Result<(), String> {
         || snapshot_manifest.clock_domain_id.as_deref()
             != Some(expectations.clock_domain_id.as_str())
     {
-        return Err("dataset snapshot manifest does not bind the expected source-local chronology".into());
+        return Err(
+            "dataset snapshot manifest does not bind the expected source-local chronology".into(),
+        );
     }
     let snapshot_report = validate_split_manifest_v1(&snapshot_manifest)
         .map_err(|error| format!("dataset snapshot manifest rejected input: {error}"))?;
@@ -106,9 +109,8 @@ fn run() -> Result<(), String> {
                 .into(),
         samples,
     };
-    let report: StratifiedRepeatReportV1 =
-        generate_repeated_stratified_splits_v1(&subject)
-            .map_err(|error| format!("stratified split generation rejected input: {error}"))?;
+    let report: StratifiedRepeatReportV1 = generate_repeated_stratified_splits_v1(&subject)
+        .map_err(|error| format!("stratified split generation rejected input: {error}"))?;
     let canonical = serde_json::to_value(&report)
         .map_err(|error| format!("cannot canonicalize stratified split report: {error}"))?;
     let rendered = serde_json::to_string_pretty(&canonical)
