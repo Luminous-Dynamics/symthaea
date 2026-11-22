@@ -438,8 +438,14 @@ impl DecisionNeedV1 {
                 Objective::Cost => 2,
                 Objective::Speed => 3,
             },
-            1_u8, // Action::A
-            2_u8, // Action::B
+            match self.action_alternatives[0] {
+                Action::A => 1,
+                Action::B => 2,
+            },
+            match self.action_alternatives[1] {
+                Action::A => 1,
+                Action::B => 2,
+            },
             match self.identification_method {
                 IdentificationMethodV1::RandomizedControlledTrial => 1,
                 IdentificationMethodV1::QuasiExperimental => 2,
@@ -1566,6 +1572,13 @@ mod decision_need_contract_tests {
         let mut need = DecisionNeedV1::new(scope, estimand(1)).unwrap();
         need.qualification_profile_digest = EvidenceDigest256::UNKNOWN;
         assert!(!need.is_valid());
+        let mut changed_actions = DecisionNeedV1::new(scope, estimand(1)).unwrap();
+        changed_actions.action_alternatives = [Action::A, Action::A];
+        assert!(!changed_actions.is_valid());
+        assert_ne!(
+            changed_actions.canonical_digest(),
+            DecisionNeedV1::new(scope, estimand(1)).unwrap().canonical_digest()
+        );
         assert_ne!(
             need.canonical_digest(),
             DecisionNeedV1::new(scope, estimand(1)).unwrap().canonical_digest()
