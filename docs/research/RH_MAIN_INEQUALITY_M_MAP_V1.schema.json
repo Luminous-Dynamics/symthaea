@@ -372,6 +372,64 @@
           }
         }
       }
+    },
+    "finite_translation_oracle": {
+      "type": "object",
+      "required": [
+        "method",
+        "group_sizes",
+        "subsets",
+        "group_target_cases",
+        "row_indicator_cases",
+        "checked_identity",
+        "test_function",
+        "status",
+        "limitations"
+      ],
+      "properties": {
+        "method": {
+          "type": "string"
+        },
+        "group_sizes": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 2
+          }
+        },
+        "subsets": {
+          "type": "string"
+        },
+        "group_target_cases": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "row_indicator_cases": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "checked_identity": {
+          "type": "string"
+        },
+        "test_function": {
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "source_added_exact_head_ci_pending",
+            "passed_exact_head_ci",
+            "failed_exact_head_ci",
+            "not_run"
+          ]
+        },
+        "limitations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        }
+      }
     }
   }
 }
