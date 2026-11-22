@@ -416,5 +416,22 @@
     "browser_verified_journeys": 0,
     "important_rule": "source_observed and browser_verified are distinct evidence states; an implementation contract cannot promote itself to browser_verified."
   },
-  "task_oracle_schema": "benchmarks/frontend/task-oracle-v1.schema.json"
+  "task_oracle_schema": "benchmarks/frontend/task-oracle-v1.schema.json",
+  "knowledge_corpus": {
+    "status": "source_observed_provenance_checked_in_source_validator",
+    "corpus_path": "benchmarks/frontend/knowledge/leptos-0.8/patterns-v0.json",
+    "schema_path": "benchmarks/frontend/knowledge/leptos-0.8/pattern-v1.schema.json",
+    "pattern_count": 8,
+    "framework": "Leptos 0.8 CSR",
+    "source_provenance": "Git blob SHA-1 over the Git object header and exact source bytes",
+    "validator_command": "cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --patterns",
+    "promotion_states": [
+      "source_observed_not_compiled",
+      "source_observed_reference_checked",
+      "compiled",
+      "unit_tested",
+      "browser_verified"
+    ],
+    "compilation_status": "pending_rust_toolchain"
+  }
 }
