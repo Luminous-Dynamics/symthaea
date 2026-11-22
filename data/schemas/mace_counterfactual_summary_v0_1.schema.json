@@ -56,7 +56,7 @@
         "record_type",
         "method",
         "intervention_kind",
-        "independent_world_cluster_count",
+        "world_cluster_count",
         "resampling_unit",
         "bootstrap_replicates",
         "evaluation_validity",
@@ -96,7 +96,7 @@
         "intervention_kind": {
           "$ref": "#/$defs/kind"
         },
-        "independent_world_cluster_count": {
+        "world_cluster_count": {
           "type": "integer",
           "minimum": 1
         },
@@ -201,7 +201,7 @@
         "record_type",
         "method",
         "intervention_kind",
-        "independent_world_cluster_count",
+        "world_cluster_count",
         "resampling_unit",
         "bootstrap_replicates",
         "evaluation_validity",
@@ -238,7 +238,7 @@
         "intervention_kind": {
           "$ref": "#/$defs/kind"
         },
-        "independent_world_cluster_count": {
+        "world_cluster_count": {
           "type": "integer",
           "minimum": 1
         },
