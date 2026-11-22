@@ -27,6 +27,7 @@ const FTRL_ALPHA: f64 = 0.05;
 const FTRL_BETA: f64 = 1.0;
 const FTRL_L1: f64 = 0.0;
 const FTRL_L1_SPARSE: f64 = 0.01;
+const FTRL_L1_STRONG: f64 = 1.0;
 const FTRL_L2: f64 = 1.0;
 const FTRL_EPOCHS: usize = 80;
 
@@ -710,6 +711,28 @@ pub fn evaluate_secom_logistic_v1(
             &split_manifest.assignments,
         )?,
     );
+    models.insert(
+        "B6-strong".into(),
+        evaluate_model(
+            "B6-ftrl-elastic-net-strong-l1",
+            false,
+            FTRL_L1_STRONG,
+            &features,
+            &labels,
+            &split_manifest.assignments,
+        )?,
+    );
+    models.insert(
+        "B6-strong-balanced".into(),
+        evaluate_model(
+            "B6-ftrl-elastic-net-strong-l1-class-balanced",
+            true,
+            FTRL_L1_STRONG,
+            &features,
+            &labels,
+            &split_manifest.assignments,
+        )?,
+    );
     Ok(SecomLogisticReportV1 {
         schema: OUTPUT_SCHEMA_V1.into(),
         dataset_id: expectations.dataset_id.clone(),
@@ -778,6 +801,8 @@ mod tests {
         assert!(report.models.contains_key("B5-balanced"));
         assert!(report.models.contains_key("B6"));
         assert!(report.models.contains_key("B6-balanced"));
+        assert!(report.models.contains_key("B6-strong"));
+        assert!(report.models.contains_key("B6-strong-balanced"));
         assert_eq!(report.models["B5"].config.l1, 0.0);
         assert_eq!(report.models["B6"].config.l1, FTRL_L1_SPARSE);
         assert_eq!(report.models["B6-balanced"].config.l1, FTRL_L1_SPARSE);
@@ -800,7 +825,14 @@ mod tests {
             .replace("1 \"19/07/2008 12:20:00\"", "-1 \"19/07/2008 12:20:00\"");
         let original = evaluate(FEATURES, LABELS);
         let modified = evaluate(FEATURES, changed.as_bytes());
-        for key in ["B5", "B5-balanced", "B6", "B6-balanced"] {
+        for key in [
+            "B5",
+            "B5-balanced",
+            "B6",
+            "B6-balanced",
+            "B6-strong",
+            "B6-strong-balanced",
+        ] {
             assert_eq!(
                 original.models[key].model_sha256,
                 modified.models[key].model_sha256
@@ -850,6 +882,8 @@ mod tests {
             (true, FTRL_L1),
             (false, FTRL_L1_SPARSE),
             (true, FTRL_L1_SPARSE),
+            (false, FTRL_L1_STRONG),
+            (true, FTRL_L1_STRONG),
         ] {
             let original = fit_model_v1(
                 "sample-order",
