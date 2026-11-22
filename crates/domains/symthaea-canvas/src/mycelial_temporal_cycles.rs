@@ -913,14 +913,11 @@ fn snapshot_topology(snapshot: &TemporalMycelialSnapshot) -> (usize, usize) {
 
 impl TemporalMycelialCycleProfile {
     pub fn validate(&self) -> Result<(), MycelialTemporalCycleError> {
-        let evidence_total = self.edge_evidence_counts.directly_observed_hypha_observations
-            + self.edge_evidence_counts.accepted_parent_branch_observations
-            + self.edge_evidence_counts.accepted_anastomosis_observations
-            + self.edge_evidence_counts.synthetic_fixture_observations;
         if self.schema_version != MYCELIAL_TEMPORAL_CYCLE_PROFILE_SCHEMA_VERSION
             || !valid_id(&self.session_id)
             || !valid_id(&self.coordinate_frame_id)
             || !valid_digest(&self.calibration_digest)
+            || !valid_id(&self.observation_scope_id)
             || !valid_digest(&self.sequence_digest)
             || self.config.minimum_present_windows == 0
             || self.config.minimum_present_duration_ns == 0
@@ -932,7 +929,6 @@ impl TemporalMycelialCycleProfile {
             || self.config.minimum_known_duration_fraction == 0.0
             || !self.config.tcr_epsilon.is_finite()
             || !(1.0e-15..=1.0e-3).contains(&self.config.tcr_epsilon)
-            || self.observed_duration_ns != self.complete_duration_ns + self.partial_duration_ns
             || self.snapshot_metrics.is_empty()
             || self.snapshot_metrics.len() > MAX_TEMPORAL_MYCELIAL_WINDOWS
             || self.source_node_ids.len()
@@ -941,25 +937,34 @@ impl TemporalMycelialCycleProfile {
             || self.source_node_ids.windows(2).any(|pair| pair[0] >= pair[1])
             || self.snapshot_metrics.iter().any(|snapshot| {
                 !valid_id(&snapshot.snapshot_id)
+                    || snapshot.duration_ns == 0
                     || snapshot.node_count > MAX_TEMPORAL_MYCELIAL_NODES
+                    || snapshot.node_ids.len() != snapshot.node_count
+                    || snapshot.node_ids.iter().any(|id| !valid_id(id))
+                    || snapshot.node_ids.windows(2).any(|pair| pair[0] >= pair[1])
                     || snapshot.edge_count > MAX_TEMPORAL_MYCELIAL_EDGES
+                    || snapshot.edge_ids.len() != snapshot.edge_count
+                    || snapshot.edge_ids.iter().any(|id| !valid_id(id))
+                    || snapshot.edge_ids.windows(2).any(|pair| pair[0] >= pair[1])
                     || snapshot.simple_cycle_count > MAX_TEMPORAL_CYCLES_PER_WINDOW
                     || snapshot.cycle_rank > snapshot.simple_cycle_count
             })
             || self.snapshot_metrics.windows(2).any(|pair| {
                 pair[0].snapshot_id == pair[1].snapshot_id
             })
-            || self.edge_evidence_inventory.len() > MAX_TEMPORAL_MYCELIAL_WINDOWS
-                .saturating_mul(MAX_TEMPORAL_MYCELIAL_EDGES)
-            || self.edge_evidence_inventory.iter().any(|edge| !valid_id(&edge.edge_id))
+            || self.edge_evidence_inventory.len()
+                > MAX_TEMPORAL_MYCELIAL_WINDOWS.saturating_mul(MAX_TEMPORAL_MYCELIAL_EDGES)
+            || self.edge_evidence_inventory.iter().any(|edge| {
+                !valid_id(&edge.edge_id)
+                    || !valid_id(&edge.source_node_id)
+                    || !valid_id(&edge.target_node_id)
+                    || edge.source_node_id >= edge.target_node_id
+                    || self.source_node_ids.binary_search(&edge.source_node_id).is_err()
+                    || self.source_node_ids.binary_search(&edge.target_node_id).is_err()
+            })
             || self.edge_evidence_inventory.windows(2).any(|pair| {
                 pair[0].edge_id >= pair[1].edge_id
             })
-            || self.edge_evidence_counts.total_edge_observations != evidence_total
-            || self.edge_evidence_inventory.len()
-                > self.edge_evidence_counts.total_edge_observations
-            || (self.edge_evidence_counts.synthetic_fixture_observations > 0
-                && !self.config.allow_synthetic_evidence)
             || self.cycles.len() > MAX_TEMPORAL_CYCLE_RECORDS
             || self.cycles.len().saturating_mul(self.snapshot_metrics.len())
                 > MAX_TEMPORAL_CYCLE_WINDOW_OBSERVATIONS
@@ -974,15 +979,100 @@ impl TemporalMycelialCycleProfile {
             })
         {
             return Err(MycelialTemporalCycleError::InvalidProfile(
-                "invalid metadata, evidence counts, config, durations or canonical ordering",
+                "invalid metadata, limits, inventories or canonical ordering",
             ));
         }
 
-        let evidence_ids: BTreeSet<_> = self
+        let edge_evidence_by_id: BTreeMap<_, _> = self
             .edge_evidence_inventory
             .iter()
-            .map(|edge| edge.edge_id.as_str())
+            .map(|edge| (edge.edge_id.as_str(), edge))
             .collect();
+        let inventory_edge_ids: BTreeSet<_> = edge_evidence_by_id.keys().copied().collect();
+        let mut source_node_union = BTreeSet::new();
+        let mut snapshot_edge_union = BTreeSet::new();
+        let mut expected_observed_duration = 0u128;
+        let mut expected_complete_duration = 0u128;
+        let mut expected_partial_duration = 0u128;
+        let mut expected_edge_counts = TemporalMycelialEdgeEvidenceCounts {
+            total_edge_observations: 0,
+            directly_observed_hypha_observations: 0,
+            accepted_parent_branch_observations: 0,
+            accepted_anastomosis_observations: 0,
+            synthetic_fixture_observations: 0,
+        };
+        let mut expected_degree_exposure = BTreeMap::<String, u128>::new();
+
+        for snapshot in &self.snapshot_metrics {
+            expected_observed_duration += u128::from(snapshot.duration_ns);
+            match snapshot.coverage {
+                TemporalWindowCoverage::CompleteWithinDeclaredScope => {
+                    expected_complete_duration += u128::from(snapshot.duration_ns);
+                }
+                TemporalWindowCoverage::PartialOrOccluded => {
+                    expected_partial_duration += u128::from(snapshot.duration_ns);
+                }
+            }
+            source_node_union.extend(snapshot.node_ids.iter().map(String::as_str));
+            snapshot_edge_union.extend(snapshot.edge_ids.iter().map(String::as_str));
+            expected_edge_counts.total_edge_observations += snapshot.edge_ids.len();
+
+            let mut node_degree = BTreeMap::<&str, usize>::new();
+            for node_id in &snapshot.node_ids {
+                node_degree.insert(node_id.as_str(), 0);
+            }
+            for edge_id in &snapshot.edge_ids {
+                let edge = edge_evidence_by_id.get(edge_id.as_str()).ok_or(
+                    MycelialTemporalCycleError::InvalidProfile(
+                        "snapshot references an edge absent from the evidence inventory",
+                    ),
+                )?;
+                if !node_degree.contains_key(edge.source_node_id.as_str())
+                    || !node_degree.contains_key(edge.target_node_id.as_str())
+                {
+                    return Err(MycelialTemporalCycleError::InvalidProfile(
+                        "snapshot edge endpoint is not visible in that window",
+                    ));
+                }
+                *node_degree.get_mut(edge.source_node_id.as_str()).expect("checked source") += 1;
+                *node_degree.get_mut(edge.target_node_id.as_str()).expect("checked target") += 1;
+                match edge.evidence {
+                    TemporalEdgeEvidence::DirectlyObservedHypha => {
+                        expected_edge_counts.directly_observed_hypha_observations += 1;
+                    }
+                    TemporalEdgeEvidence::AcceptedParentBranch => {
+                        expected_edge_counts.accepted_parent_branch_observations += 1;
+                    }
+                    TemporalEdgeEvidence::AcceptedAnastomosis => {
+                        expected_edge_counts.accepted_anastomosis_observations += 1;
+                    }
+                    TemporalEdgeEvidence::SyntheticFixture => {
+                        expected_edge_counts.synthetic_fixture_observations += 1;
+                    }
+                }
+            }
+            for (node_id, degree) in node_degree {
+                *expected_degree_exposure.entry(node_id.to_string()).or_default() +=
+                    (degree as u128) * u128::from(snapshot.duration_ns);
+            }
+        }
+
+        if source_node_union.into_iter().ne(self.source_node_ids.iter().map(String::as_str))
+            || snapshot_edge_union != inventory_edge_ids
+            || expected_observed_duration
+                != expected_complete_duration + expected_partial_duration
+            || expected_observed_duration != self.observed_duration_ns
+            || expected_complete_duration != self.complete_duration_ns
+            || expected_partial_duration != self.partial_duration_ns
+            || expected_edge_counts != self.edge_evidence_counts
+            || (expected_edge_counts.synthetic_fixture_observations > 0
+                && !self.config.allow_synthetic_evidence)
+        {
+            return Err(MycelialTemporalCycleError::InvalidProfile(
+                "source identity, edge evidence or observed-duration inventory is inconsistent",
+            ));
+        }
+
         let mut expected_tcn = BTreeMap::<String, u128>::new();
         let mut expected_node_cycle_counts = BTreeMap::<String, usize>::new();
         let mut expected_cycle_counts_per_snapshot =
@@ -994,7 +1084,7 @@ impl TemporalMycelialCycleProfile {
                 || cycle.cycle_id != cycle_digest(&cycle.edge_ids)
                 || cycle.edge_ids.len() < 2
                 || cycle.edge_ids.iter().any(|id| {
-                    !valid_id(id) || !evidence_ids.contains(id.as_str())
+                    !valid_id(id) || !inventory_edge_ids.contains(id.as_str())
                 })
                 || cycle.edge_ids.windows(2).any(|pair| pair[0] >= pair[1])
                 || cycle.node_ids.len() < 2
@@ -1017,6 +1107,51 @@ impl TemporalMycelialCycleProfile {
                 ));
             }
 
+            let cycle_node_set: BTreeSet<_> =
+                cycle.node_ids.iter().map(String::as_str).collect();
+            let mut cycle_adjacency = BTreeMap::<&str, Vec<&str>>::new();
+            for node_id in &cycle.node_ids {
+                cycle_adjacency.insert(node_id.as_str(), Vec::new());
+            }
+            for edge_id in &cycle.edge_ids {
+                let edge = edge_evidence_by_id[edge_id.as_str()];
+                if !cycle_node_set.contains(edge.source_node_id.as_str())
+                    || !cycle_node_set.contains(edge.target_node_id.as_str())
+                {
+                    return Err(MycelialTemporalCycleError::InvalidProfile(
+                        "cycle edge endpoints do not match its node identity set",
+                    ));
+                }
+                cycle_adjacency.get_mut(edge.source_node_id.as_str())
+                    .expect("cycle source node exists")
+                    .push(edge.target_node_id.as_str());
+                cycle_adjacency.get_mut(edge.target_node_id.as_str())
+                    .expect("cycle target node exists")
+                    .push(edge.source_node_id.as_str());
+            }
+            if cycle_adjacency.values().any(|neighbours| neighbours.len() != 2) {
+                return Err(MycelialTemporalCycleError::InvalidProfile(
+                    "cycle edge inventory does not form a degree-two multigraph",
+                ));
+            }
+            let start_node = cycle.node_ids[0].as_str();
+            let mut visited_nodes = BTreeSet::from([start_node]);
+            let mut pending_nodes = vec![start_node];
+            while let Some(current) = pending_nodes.pop() {
+                for neighbour in &cycle_adjacency[current] {
+                    if visited_nodes.insert(*neighbour) {
+                        pending_nodes.push(neighbour);
+                    }
+                }
+            }
+            if visited_nodes.len() != cycle.node_ids.len()
+                || cycle.edge_ids.len() != cycle.node_ids.len()
+            {
+                return Err(MycelialTemporalCycleError::InvalidProfile(
+                    "cycle edge inventory is disconnected or not a simple cycle",
+                ));
+            }
+
             let mut present_windows = 0usize;
             let mut absent_windows = 0usize;
             let mut unknown_windows = 0usize;
@@ -1024,11 +1159,30 @@ impl TemporalMycelialCycleProfile {
             let mut absent_duration = 0u128;
             let mut unknown_duration = 0u128;
             for (index, observation) in cycle.observations.iter().enumerate() {
-                if observation.snapshot_id != self.snapshot_metrics[index].snapshot_id
-                    || observation.duration_ns == 0
+                let snapshot = &self.snapshot_metrics[index];
+                if observation.snapshot_id != snapshot.snapshot_id
+                    || observation.duration_ns != snapshot.duration_ns
                 {
                     return Err(MycelialTemporalCycleError::InvalidProfile(
-                        "cycle observations are not aligned with snapshot order",
+                        "cycle observations are not aligned with snapshot identity and duration",
+                    ));
+                }
+                let all_cycle_edges_present = cycle.edge_ids.iter().all(|edge_id| {
+                    snapshot.edge_ids.binary_search(edge_id).is_ok()
+                });
+                let all_cycle_nodes_present = cycle.node_ids.iter().all(|node_id| {
+                    snapshot.node_ids.binary_search(node_id).is_ok()
+                });
+                let expected_state = if all_cycle_edges_present && all_cycle_nodes_present {
+                    TemporalCycleWindowState::Present
+                } else if snapshot.coverage == TemporalWindowCoverage::CompleteWithinDeclaredScope {
+                    TemporalCycleWindowState::Absent
+                } else {
+                    TemporalCycleWindowState::Unknown
+                };
+                if observation.state != expected_state {
+                    return Err(MycelialTemporalCycleError::InvalidProfile(
+                        "cycle present/absent/unknown state disagrees with the observed edge inventory and window coverage",
                     ));
                 }
                 match observation.state {
@@ -1117,6 +1271,8 @@ impl TemporalMycelialCycleProfile {
             node.tcn_duration_ns != expected_tcn.get(&node.node_id).copied().unwrap_or(0)
                 || node.persistent_cycle_count
                     != expected_node_cycle_counts.get(&node.node_id).copied().unwrap_or(0)
+                || node.degree_exposure_ns
+                    != expected_degree_exposure.get(&node.node_id).copied().unwrap_or(0)
                 || node.degree_exposure_complete != degree_exposure_complete
                 || node.tcr.is_some() != degree_exposure_complete
                 || node.tcr.is_some_and(|value| {
@@ -1130,7 +1286,7 @@ impl TemporalMycelialCycleProfile {
                 })
         }) {
             return Err(MycelialTemporalCycleError::InvalidProfile(
-                "node TCN/TCR metrics disagree with persistent cycle hyperedges",
+                "node TCN/TCR metrics disagree with observed edge exposure and persistent cycles",
             ));
         }
         Ok(())
