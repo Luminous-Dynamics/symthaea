@@ -39,6 +39,7 @@ pub enum MycelialFailureAttackStrategy {
     RandomJunctions,
     HighestDegreeJunctions,
     AdaptiveHighestDegreeJunctions,
+    BetweennessJunctions,
     LowestDegreeJunctions,
     DemandPathLoadSegments,
     DemandPathLoadJunctions,
@@ -54,6 +55,7 @@ impl MycelialFailureAttackStrategy {
             Self::RandomJunctions => "random-junctions-v1",
             Self::HighestDegreeJunctions => "highest-degree-junctions-v1",
             Self::AdaptiveHighestDegreeJunctions => "adaptive-highest-degree-junctions-v1",
+            Self::BetweennessJunctions => "betweenness-junctions-v1",
             Self::LowestDegreeJunctions => "lowest-degree-junctions-v1",
             Self::DemandPathLoadSegments => "demand-path-load-segments-v1",
             Self::DemandPathLoadJunctions => "demand-path-load-junctions-v1",
@@ -938,6 +940,73 @@ fn demand_weighted_path_load(
     (segment_load, junction_load)
 }
 
+/// Brandes unweighted undirected node betweenness. Shortest-path
+/// multiplicities are accumulated in the log domain to avoid integer overflow
+/// on graphs with many equal-length routes. Scores are divided by two for the
+/// undirected graph convention; this does not alter ranking.
+fn unweighted_static_betweenness(indexed: &IndexedGraph) -> Vec<f64> {
+    let node_count = indexed.node_ids.len();
+    let mut adjacency = vec![Vec::<usize>::new(); node_count];
+    for &(source, target, _) in &indexed.edge_endpoints {
+        adjacency[source].push(target);
+        adjacency[target].push(source);
+    }
+    for neighbours in &mut adjacency {
+        neighbours.sort_unstable();
+        neighbours.dedup();
+    }
+
+    let mut centrality = vec![0.0f64; node_count];
+    for source in 0..node_count {
+        let mut predecessors = vec![Vec::<usize>::new(); node_count];
+        let mut distance = vec![usize::MAX; node_count];
+        let mut log_sigma = vec![f64::NEG_INFINITY; node_count];
+        let mut queue = VecDeque::new();
+        let mut stack = Vec::with_capacity(node_count);
+        distance[source] = 0;
+        log_sigma[source] = 0.0;
+        queue.push_back(source);
+
+        while let Some(current) = queue.pop_front() {
+            stack.push(current);
+            for &next in &adjacency[current] {
+                if distance[next] == usize::MAX {
+                    distance[next] = distance[current].saturating_add(1);
+                    queue.push_back(next);
+                }
+                if distance[next] == distance[current].saturating_add(1) {
+                    predecessors[next].push(current);
+                    let existing = log_sigma[next];
+                    let incoming = log_sigma[current];
+                    if existing.is_finite() {
+                        let maximum = existing.max(incoming);
+                        let minimum = existing.min(incoming);
+                        log_sigma[next] =
+                            maximum + (1.0 + (minimum - maximum).exp()).ln();
+                    } else {
+                        log_sigma[next] = incoming;
+                    }
+                }
+            }
+        }
+
+        let mut dependency = vec![0.0f64; node_count];
+        while let Some(node) = stack.pop() {
+            for &predecessor in &predecessors[node] {
+                let path_fraction = (log_sigma[predecessor] - log_sigma[node]).exp();
+                dependency[predecessor] += path_fraction * (1.0 + dependency[node]);
+            }
+            if node != source {
+                centrality[node] += dependency[node];
+            }
+        }
+    }
+    for value in &mut centrality {
+        *value *= 0.5;
+    }
+    centrality
+}
+
 fn rank_failure_entities(
     indexed: &IndexedGraph,
     demands: &[MycelialDemandPair],
@@ -981,6 +1050,16 @@ fn rank_failure_entities(
                 degree[right_index]
                     .cmp(&degree[left_index])
                     .then_with(|| failure_entity_order(config.seed, 1, left, right))
+            });
+        }
+        MycelialFailureAttackStrategy::BetweennessJunctions => {
+            let centrality = unweighted_static_betweenness(indexed);
+            ranked.sort_by(|left, right| {
+                let left_score = centrality[indexed.node_index[left]];
+                let right_score = centrality[indexed.node_index[right]];
+                right_score.total_cmp(&left_score).then_with(|| {
+                    failure_entity_order(config.seed, 1, left, right)
+                })
             });
         }
         MycelialFailureAttackStrategy::LowestDegreeJunctions => {
