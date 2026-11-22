@@ -372,5 +372,16 @@
       }
     ],
     "receipt_integrity": "The serialized receipt has its own SHA-256 digest; each artifact length and digest must verify before evaluation."
+  },
+  "interface_contract": {
+    "schema_path": "benchmarks/frontend/interface-contract-v1.schema.json",
+    "example_path": "benchmarks/frontend/contracts/symthaea-ui-v0.json",
+    "schema_draft": "https://json-schema.org/draft/2020-12/schema",
+    "status": "schema_and_source_observed_example_authored",
+    "example_source_commit": "9f036e4f0c427830c18a931e9203107231c5cce1",
+    "region_count": 16,
+    "acceptance_journey_count": 6,
+    "browser_verified_journeys": 0,
+    "important_rule": "source_observed and browser_verified are distinct evidence states; an implementation contract cannot promote itself to browser_verified."
   }
 }
