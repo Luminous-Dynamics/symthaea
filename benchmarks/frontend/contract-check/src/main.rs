@@ -208,4 +208,22 @@ mod tests {
         assert!(extract_source_anchors("<main></main>").is_err());
         assert!(extract_source_anchors(r#"<main data-sfeb-id="unfinished>"#).is_err());
     }
+
+    #[test]
+    fn checked_in_symthaea_ui_contract_matches_schema_and_source() {
+        let schema: Value = serde_json::from_str(include_str!(
+            "../../interface-contract-v1.schema.json"
+        ))
+        .expect("checked-in interface schema is valid JSON");
+        let contract: Value = serde_json::from_str(include_str!(
+            "../../contracts/symthaea-ui-v0.json"
+        ))
+        .expect("checked-in interface contract is valid JSON");
+        let source = include_str!("../../../../crates/bridges/symthaea-ui/src/app.rs");
+
+        let (regions, journeys) = validate_contract(&schema, &contract, source)
+            .expect("checked-in contract validates against its schema and source anchors");
+        assert_eq!(regions, 16);
+        assert_eq!(journeys, 6);
+    }
 }
