@@ -8,6 +8,8 @@ use sha1::Sha1;
 use std::process::ExitCode;
 use sha2::{Digest, Sha256};
 
+mod trace;
+
 const ANCHOR_MARKER: &str = "data-sfeb-id=\"";
 
 const DEFAULT_SCHEMA: &str = "benchmarks/frontend/interface-contract-v1.schema.json";
@@ -1489,11 +1491,41 @@ fn run_qualification_report(
     Ok(())
 }
 
+const DEFAULT_TRACE_SCHEMA: &str =
+    "benchmarks/frontend/attestation/sfeb-trace-event-v1.schema.json";
+
+fn run_trace(trace_path: &str, expected_run_id: Option<&str>) -> Result<(), String> {
+    let bytes = fs::read(trace_path)
+        .map_err(|error| format!("failed to read trace {trace_path}: {error}"))?;
+    let events = trace::parse_jsonl(&bytes)?;
+    let schema = read_json(DEFAULT_TRACE_SCHEMA)?;
+    let validator = validator_for(&schema)
+        .map_err(|error| format!("invalid trace-event schema: {error}"))?;
+
+    for (index, event) in events.iter().enumerate() {
+        if let Some(error) = validator.iter_errors(event).next() {
+            return Err(format!(
+                "trace event {} does not satisfy its schema at {}: {error}",
+                index,
+                error.instance_path()
+            ));
+        }
+    }
+
+    let summary = trace::verify_events(&events, &bytes, expected_run_id)?;
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&summary)
+            .map_err(|error| format!("failed to serialize trace summary: {error}"))?
+    );
+    Ok(())
+}
+
 fn run() -> Result<(), String> {
     let args: Vec<String> = env::args().skip(1).collect();
     if args.iter().any(|arg| arg == "--help" || arg == "-h") {
         println!(
-            "Usage:\n  cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- [CONTRACT_SCHEMA [CONTRACT_JSON [APP_SOURCE.rs]]]\n  cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --task [TASK_SCHEMA [TASK_JSON]]\n  cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --patterns [PATTERN_SCHEMA [CORPUS_JSON [REPOSITORY_ROOT]]]\n  cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --retrieval [RETRIEVAL_SCHEMA [QUERY_SET_JSON [PATTERN_CORPUS_JSON]]]\n\nThe default mode validates the Leptos interface contract and exact source anchors. --task validates the task schema, required fixture regions and canonical fixture digest. --patterns validates the Leptos knowledge schema and exact Git blob provenance for every source example. --retrieval validates positive/hard-negative queries and their gold IDs against the versioned pattern corpus. --mutations validates the oracle-qualification campaign definition only; it does not execute the campaign. --qualification-report validates the complete paired execution report, receipts and artifact bytes, then computes Wilson intervals and hard-gate qualification."
+            "Usage:\n  cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- [CONTRACT_SCHEMA [CONTRACT_JSON [APP_SOURCE.rs]]]\n  cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --task [TASK_SCHEMA [TASK_JSON]]\n  cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --patterns [PATTERN_SCHEMA [CORPUS_JSON [REPOSITORY_ROOT]]]\n  cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --retrieval [RETRIEVAL_SCHEMA [QUERY_SET_JSON [PATTERN_CORPUS_JSON]]]\n\nThe default mode validates the Leptos interface contract and exact source anchors. --task validates the task schema, required fixture regions and canonical fixture digest. --patterns validates the Leptos knowledge schema and exact Git blob provenance for every source example. --retrieval validates positive/hard-negative queries and their gold IDs against the versioned pattern corpus. --mutations validates the oracle-qualification campaign definition only; it does not execute the campaign. --qualification-report validates the complete paired execution report, receipts and artifact bytes, then computes Wilson intervals and hard-gate qualification. --verify-trace validates RFC 8785 hash-chained JSONL traces, rejecting duplicate keys, tampering, reordering, truncation and cross-run replay."
         );
         return Ok(());
     }
@@ -1534,6 +1566,12 @@ fn run() -> Result<(), String> {
             args.get(1).map(String::as_str).unwrap_or(DEFAULT_MUTATION_SCHEMA),
             args.get(2).map(String::as_str).unwrap_or(DEFAULT_MUTATION_CAMPAIGN),
         );
+    }
+    if args.first().is_some_and(|arg| arg == "--verify-trace") {
+        if !(2..=3).contains(&args.len()) {
+            return Err("--verify-trace requires TRACE_JSONL and an optional EXPECTED_RUN_ID".to_string());
+        }
+        return run_trace(&args[1], args.get(2).map(String::as_str));
     }
     if args.first().is_some_and(|arg| arg == "--qualification-report") {
         if args.len() > 4 {

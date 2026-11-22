@@ -14,7 +14,8 @@
     "redaction_state",
     "payload",
     "previous_event_sha256",
-    "event_sha256"
+    "event_sha256",
+    "payload_sha256"
   ],
   "properties": {
     "schema": {
@@ -119,5 +120,5 @@
       }
     }
   ],
-  "description": "A single event in a run-local SHA-256 chain. The event hash is SHA-256 over RFC 8785 JCS bytes of the complete event object with event_sha256 omitted. The verifier checks sequence continuity, run identity and predecessor linkage across the JSONL stream."
+  "description": "A single event in a run-local SHA-256 chain. The event hash is SHA-256 over RFC 8785 JCS bytes of the complete event object with event_sha256 omitted. The verifier checks sequence continuity, run identity and predecessor linkage across the JSONL stream. The verifier rejects duplicate object keys and integers outside the I-JSON safe range before canonicalization."
 }

@@ -89,3 +89,38 @@ Confidence values must be calibrated on held-out diagnoses. Report top-1/top-3 l
 - JSON parsing can be checked independently.
 - Rust schema integration, cryptographic verification, executor isolation, trace replay, browser execution and qualification measurements remain pending.
 - No signature, trusted-runner status, successful mutation campaign, causal-repair success rate or benchmark score is claimed.
+
+## Offline Rust trace verifier
+
+The standalone contract checker now has a source implementation of
+`--verify-trace TRACE_JSONL [EXPECTED_RUN_ID]` (execution still requires a
+Rust toolchain). It uses the pinned `serde_jcs` JCS serializer and verifies:
+
+- strict JSON parsing with recursive duplicate-object-key rejection;
+- I-JSON safe-integer bounds before canonicalization;
+- canonical payload hashes and event hashes;
+- contiguous zero-based sequence numbers and monotonic elapsed time;
+- one run identity throughout the trace, with optional expected-run binding;
+- all-zero first predecessor, exact predecessor chain and terminal
+  `run_finished` event;
+- exact raw JSONL bundle SHA-256, separately from the terminal event hash.
+
+The first event must be `run_started` with elapsed time zero; the final event
+must be `run_finished`. Each event requires `payload_sha256`, computed as
+SHA-256 over RFC 8785 JCS bytes of its payload object. The event hash is
+SHA-256 over JCS bytes of the complete event with only `event_sha256` omitted.
+
+Run:
+
+```bash
+cargo test --manifest-path benchmarks/frontend/contract-check/Cargo.toml
+cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- \
+  --verify-trace path/to/trace.jsonl expected-run-id
+```
+
+Tests are authored for valid traces, duplicate JSON keys, payload tampering,
+reordering, truncation, cross-run replay, duplicate sequence numbers, elapsed
+time regression and expected-run mismatch. They have **not** been compiled or
+executed in the current environment. This verifier proves internal trace
+consistency; it does not authenticate the runner, prove browser completeness,
+or derive semantic oracle outcomes.
