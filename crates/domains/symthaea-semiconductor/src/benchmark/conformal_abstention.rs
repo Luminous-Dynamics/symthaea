@@ -370,8 +370,8 @@ pub fn build_mondrian_conformal_sets_v1(
             let positive_nonconformity = 1.0 - sample.score;
             let negative_in_set = threshold_contains(&negative_threshold, negative_nonconformity);
             let positive_in_set = threshold_contains(&positive_threshold, positive_nonconformity);
-            let set_size = (if negative_in_set { 1 } else { 0 })
-                + (if positive_in_set { 1 } else { 0 });
+            let set_size =
+                (if negative_in_set { 1 } else { 0 }) + (if positive_in_set { 1 } else { 0 });
             let decision = match (negative_in_set, positive_in_set) {
                 (true, false) => SelectiveDecisionV1::PredictNegative,
                 (false, true) => SelectiveDecisionV1::PredictPositive,
@@ -589,9 +589,7 @@ pub fn evaluate_conformal_sets_v1(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::benchmark::process_event_graph::{
-        ClockBasisV1, PredictionInformationCutoffV1,
-    };
+    use crate::benchmark::process_event_graph::{ClockBasisV1, PredictionInformationCutoffV1};
 
     const MODEL_SHA: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     const GRAPH_SHA: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
