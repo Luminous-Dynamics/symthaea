@@ -109,7 +109,7 @@ The convenience constructor `SemanticExperienceQueryV1::qualified_transfer` buil
 
 Optional numeric targets mean similarity to a declared reference value under the matching RBF bandwidth. They are not threshold predicates. Optional evidence-quality boolean targets are exact-match ranking cues, not admission gates; either true or false can be queried for positive controls and negative controls.
 
-**Current integration boundary:** the paired MACE runner now includes `typed_content_hdc` as a seventh arm. It supplies only candidate-visible scope/action and the fixed categorical qualification profile derived from the MACE policy. This supports a structured evidence-retrieval comparison through the unchanged MACE decision gate, but it does not supply a task-defined target outcome distribution, semantic estimand or target horizon. The richer optional numeric/estimand fields remain unpopulated until #13222 defines a candidate-visible DecisionNeed. Never populate them from Truth/oracle state.
+**Current integration boundary:** the paired MACE runner now includes `typed_content_hdc` as a seventh arm and receives a candidate-visible `DecisionNeedV1` from the generated task contract. The need binds exact scope/action alternatives, a complete semantic estimand (population, treatment/comparator, outcome definition/unit and follow-up horizon), identification method and the versioned MACE qualification-profile digest. The candidate projection excludes `Truth`; a negative control changes hidden utilities/optimal action while requiring the candidate `DecisionNeed` and input digests to remain unchanged. The typed query uses the need's exact semantic-estimand digest as a ranking cue. Never populate it from evaluator truth. The broader task/environment contract for non-synthetic domains remains tracked in #13222.
 
 ## 6. Retrieval and fail-closed behavior
 
@@ -157,6 +157,7 @@ The module now contains eleven authored tests for:
 - profile digest sensitivity to dimension, seed, bandwidth and exact-filter policy;
 - duplicate-ID and non-finite input rejection;
 - query-time estimand/evidence-quality cues while preserving candidate-only authority;
+- conversion from DecisionNeedV1 into a typed query, with target estimand and profile digest binding;
 - conversion from a valid DecisionNeedV1 and rejection of actions outside the declared alternatives;
 - the paired-runner typed arm uses the MACE qualification profile, exact scope/action prefilters and emits decision-need plus typed retrieval-profile digests.
 
