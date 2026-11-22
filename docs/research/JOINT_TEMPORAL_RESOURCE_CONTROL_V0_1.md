@@ -1,8 +1,9 @@
 # Unified Temporal Resource Control and Qualification Protocol v0.1
 
 **Tracking:** NEURO-SILICON-009 / #9666  
-**Implementation branch:** `research/temporal-joint-resource-control-20261101`  
-**Status:** candidate allocator and evaluator exact-oracle source authored; no Rust compilation, tests, benchmark runs, hardware measurements or security deployment are claimed.
+**Base implementation:** #9828 (`research/temporal-joint-resource-control-20261101`)  
+**Interaction extension:** `research/temporal-factorial-interactions-20261122`  
+**Status:** candidate allocator and evaluator exact-oracle source authored; 14 Rust tests are authored for the oracle (none executed); no Rust compilation, benchmark runs, hardware measurements or security deployment are claimed.
 
 ## 1. Research thesis
 
@@ -72,6 +73,52 @@ The allocator accepts complete-plan estimates. Therefore, it can represent non-a
 
 A four-factor fixture enumerates all 16 sensing/memory/compute/verification combinations. This captures all pairwise, three-way and four-way interactions for that finite action set. It does not establish global optimality over continuous policies, arbitrary action spaces or unenumerated horizons.
 
+### Exact factorial interaction decomposition
+
+The interaction extension adds `decompose_exact_joint_interactions()` to the evaluator-only oracle. It reuses the exact-oracle admission checks and then applies a subset-lattice Möbius transform to the **evaluator-measured** outcome and cost records.
+
+For a subset of enabled action factors \(S\), define exposure benefit relative to the no-action baseline:
+
+\[
+v_E(S)=D_E(\varnothing)-D_E(S)
+\]
+
+where \(D_E\) is one of wrong-belief, abstention or missing-output debt.
+
+For resource dimension \(j\), define incremental measured cost:
+
+\[
+v_{C_j}(S)=C_j(S)-C_j(\varnothing)
+\]
+
+The exact subset dividend for any non-empty coalition is:
+
+\[
+\Delta v(S)=v(S)-\sum_{T\subset S}\Delta v(T)
+\]
+
+These are Möbius/Harsanyi coalition dividends, not a probability-weighted causal effect or an ordinary ANOVA coefficient. They obey the exact reconstruction identity:
+
+\[
+v(\{1,\ldots,n\})=\sum_{\varnothing\ne S\subseteq\{1,\ldots,n\}}\Delta v(S)
+\]
+
+Interpretation is intentionally axis-specific:
+
+- Positive exposure-benefit dividends mean a combination reduces more temporal debt than is explained by its lower-order terms (synergy).
+- Negative exposure-benefit dividends mean antagonism: the combination gives back some lower-order benefit.
+- Positive resource-cost dividends mean the combination consumes additional resources beyond lower-order cost effects.
+- Negative resource-cost dividends mean a combination saves resources relative to the lower-order cost model.
+
+The report contains every non-empty subset term, its factor bitmask and interaction order, all three exposure dividends, all twelve resource-cost dividends, and summaries aggregated by interaction order. It also reports the direct full-joint contrast and checks that the dividends reconstruct it exactly.
+
+The computation is integer-only after outcome intake and uses checked `i128` arithmetic. For \(n\) binary factors, the transform costs \(O(15n2^n)\) arithmetic operations across the three exposure and twelve resource axes, with \(2^n-1\) non-empty terms. The existing hard limit of 16 factors therefore yields at most 65,535 terms.
+
+**Important causal boundary:** exact decomposition explains the finite factorial response surface supplied to it. It does not make observationally confounded real-world data causal. A real campaign still needs valid paired interventions/randomization or a controlled replay design, an identical episode commitment, measured resource costs and evaluator-only outcomes. It covers binary factor presence/absence; graded doses, sequential adaptive policies and unenumerated actions need separate designs.
+
+The new hand-calculated controls use a known three-factor surface with an AB synergy of +7 µs and an ABC antagonism of −5 µs, plus distinct resource-cost interactions. A separate four-factor control isolates the sensing × memory × compute × verification term from every proper subset. Input-row permutation must not change the report; omitted subsets fail closed.
+
+
 ## 5. The paradigm shift: measure the value of not remaining ignorant
 
 The key quantity is not merely prediction accuracy. It is the *marginal reduction in future decision exposure* produced by information acquisition, retention, computation or verification, after charging the complete resource cost.
@@ -139,6 +186,15 @@ The model/forecasting rows and the action-allocation rows answer different quest
 **NeuroBench** supplies an algorithm track and a system track. Its algorithm-side metrics include footprint, connection/activation sparsity and synaptic operations; system comparisons are task-level and require timing and power/energy methodology. Report its metrics where the Symthaea workload fits, then add full-path memory traffic, tail latency and verified energy boundaries. <https://www.nature.com/articles/s41467-025-56739-4> <https://neurobench.ai/>
 
 **MLPerf Tiny v1.3** covers image classification, person detection, keyword spotting, anomaly detection and streaming wakeword, with single-stream latency/quality and optional energy measurements. It is not a general irregular-time-series or continual-learning leaderboard. Use it only for compatible streaming or embedded inference deployments, preserving the official model, quality and measurement rules. <https://mlcommons.org/benchmarks/inference-tiny/>
+
+### 7.1 Current benchmark releases — checked 22 November 2026
+
+- **NeuroBench 2.4.0** is the current pinned documentation lane used here. Its v1.0 tasks include keyword few-shot class-incremental learning, event-camera detection, non-human-primate motor prediction and chaotic-function prediction. The maintained harness exposes task and static metrics; its examples report footprint, connection sparsity, classification accuracy, activation sparsity and effective multiply-accumulate / accumulate operations. Use official definitions only on compatible tasks; HDC-LTC work counters are not interchangeable with SNN synaptic-operation counts. https://neurobench.readthedocs.io/en/2.4.0/readme.html
+- **MLPerf Inference v6.1** includes 10 datacenter and 6 edge benchmarks, with new end-to-end RAG and agentic-edge workloads and updated interactive scenarios. Its agentic-edge design is particularly relevant to our system track because it evaluates task accuracy under time constraints and a deterministic workload; it remains an inference comparator, not an active-sensing benchmark. https://mlcommons.org/2026/09/chairs-mlperf-inference-v6-1/
+- **MLPerf Endpoints v1.0**, released 19 November 2026 with 26 submissions, compares throughput and interactivity for endpoint-serving systems. **MLPerf Training v6.1**, released 16 November 2026 with 153 submissions across 14 rounds, adds Qwen3.5-397B post-training and DLRMv4-HSTU recommendation workloads. These releases show the industry shift toward multi-turn, end-to-end and agentic systems, but their raw scores are not directly comparable to Symthaea temporal-decision metrics. https://results.mlcommons.org/ ; https://mlcommons.org/2026/11/mlperf-training-v6-1-results/
+- **TIME (ICML 2026)** supplies 50 fresh datasets and 98 strictly zero-shot forecasting tasks; **BITS (September 2026)** covers 11 irregular time-series datasets across nine domains and finds that rankings change across irregularity strata and metric families. Keep these as separate external forecasting tracks and retain pattern/irregularity-specific reporting. https://proceedings.mlr.press/v306/qiao26g.html ; https://arxiv.org/abs/2609.33303
+
+The strategic implication is that Symthaea should compete at two levels: reproduce compatible external workload metrics so it is legible to the field, then add the missing temporal-decision layer (decision regret, observability, temporal freshness, interaction effects and complete resource costs) as a clearly labelled extension. Do not replace native benchmark metrics with a proprietary composite score.
 
 ## 8. Preregistered target gates (targets, not results)
 
