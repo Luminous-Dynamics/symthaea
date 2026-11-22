@@ -165,11 +165,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
     let transient_field = generate_motion_transient_field(&graph, &transient_config)?;
     let (calibrated_transient, _transient_calibration) =
-        calibrate_nuisance_matrix_to_component_fraction(
-            &clean,
-            &transient_field.values,
-            0.10,
-        )?;
+        calibrate_nuisance_matrix_to_component_fraction(&clean, &transient_field.values, 0.10)?;
     let motion_transient = run_family(
         "motion_transient",
         "transient-onset-24-57-seed-roi-05-calibrated-10pct",
