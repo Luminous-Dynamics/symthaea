@@ -692,6 +692,15 @@ mod tests {
     }
 
     #[test]
+    fn tempo_estimate_cannot_use_future_audio_evidence() {
+        let mut value = panel();
+        value["tempo_estimates"][5]["evidence_window_end_ns"] =
+            serde_json::json!(2_200_000_000_u64);
+        let error = score(&value).expect_err("tempo estimate may not inspect future audio");
+        assert!(error.contains("future evidence"));
+    }
+
+    #[test]
     fn invalid_subdivision_is_rejected() {
         let mut value = panel();
         value["target_events"][0]["subdivision_index"] = serde_json::json!(4);
