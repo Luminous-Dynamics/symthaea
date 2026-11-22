@@ -22,5 +22,5 @@ pub use secom_raw::{
 };
 
 pub use dtco_manifest::{
-    DtcoLineageManifestV1, DtcoLineageError, DtcoLineageReportV1, validate_dtco_lineage_v1,
+    DtcoLineageError, DtcoLineageManifestV1, DtcoLineageReportV1, validate_dtco_lineage_v1,
 };
