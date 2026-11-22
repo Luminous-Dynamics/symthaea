@@ -38,6 +38,18 @@ The semantic_placebo arm is deliberately named to align with the v0.1 record sch
 
 The input/state digests are deterministic identifiers for the synthetic fixture block. They are not hashes of a complete real-agent prompt, multimodal observation, or serialized production agent state.
 
+### Candidate-visible DecisionNeed
+
+Every generated task now carries a `DecisionNeedV1` that is separate from evaluator `Truth`. It binds:
+- exact target scope and declared action alternatives;
+- a complete semantic estimand with population, treatment/comparator, outcome definition/unit and follow-up horizon;
+- the required identification method;
+- a digest of the current MACE transfer-qualification profile (overlap, balance, interference and lifecycle requirements).
+
+The generator creates this contract independently of hidden utility and optimal-action fields. The reduced candidate projection contains the need but not `Truth`. Candidate records carry `decision_need_sha256`, and the candidate-input digest also binds it. A negative-control test mutates hidden utilities/optimal action while asserting that the DecisionNeed and candidate-input digests remain unchanged.
+
+The typed HDC adapter constructs one query per declared action alternative via `SemanticExperienceQueryV1::from_decision_need`. The exact estimand digest is a candidate-ranking cue; canonical semantic descriptor equality, causal qualification and source validity are still checked by MACE after candidate resolution. The profile digest describes the authoritative MACE thresholds/flags; it does not replace their execution. This is currently a generated synthetic task contract, not yet a general task-language/observation parser.
+
 ## 4. Output streams
 
 The runner writes three JSONL files:
