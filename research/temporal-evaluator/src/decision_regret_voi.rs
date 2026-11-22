@@ -71,7 +71,10 @@ pub struct ObservationModel {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 enum CandidateVisibleOutcome {
-    Delivered([u8; 32]),
+    Delivered {
+        transcript_sha256: [u8; 32],
+        available_at_us: u64,
+    },
     NoResultByDeadline,
 }
 
@@ -79,6 +82,8 @@ enum CandidateVisibleOutcome {
 pub struct ObservationOutcomeCertificate {
     /// None denotes the single candidate-visible no-result-by-deadline class.
     pub candidate_visible_outcome_sha256: Option<[u8; 32]>,
+    /// The candidate-visible availability time; None denotes no result by deadline.
+    pub available_at_us: Option<u64>,
     pub possible_world_count: u64,
     /// Evaluator-only worst-case-regret-optimal action for this outcome.
     pub minimax_regret_action_id: String,
@@ -244,7 +249,10 @@ fn normalize_visible_outcome(
                     world_id: row.evaluator_world_id,
                 });
             }
-            Ok(CandidateVisibleOutcome::Delivered(row.candidate_visible_outcome_sha256))
+            Ok(CandidateVisibleOutcome::Delivered {
+                transcript_sha256: row.candidate_visible_outcome_sha256,
+                available_at_us,
+            })
         }
         Some(_) | None => Ok(CandidateVisibleOutcome::NoResultByDeadline),
     }
@@ -500,7 +508,11 @@ pub fn evaluate_decision_regret_observation(
 
         outcome_certificates.push(ObservationOutcomeCertificate {
             candidate_visible_outcome_sha256: match outcome {
-                CandidateVisibleOutcome::Delivered(digest) => Some(digest),
+                CandidateVisibleOutcome::Delivered { transcript_sha256, .. } => Some(transcript_sha256),
+                CandidateVisibleOutcome::NoResultByDeadline => None,
+            },
+            available_at_us: match outcome {
+                CandidateVisibleOutcome::Delivered { available_at_us, .. } => Some(available_at_us),
                 CandidateVisibleOutcome::NoResultByDeadline => None,
             },
             possible_world_count,
