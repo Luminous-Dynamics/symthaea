@@ -730,6 +730,66 @@ mod tests {
     }
 
     #[test]
+    fn held_out_numeric_changes_do_not_change_fitted_model_digests() {
+        let changed = String::from_utf8(FEATURES.to_vec())
+            .unwrap()
+            .replace("1.2 2.2", "9999.0 -9999.0");
+        let original = evaluate(FEATURES, LABELS);
+        let modified = evaluate(changed.as_bytes(), LABELS);
+        for key in ["B5", "B5-balanced"] {
+            assert_eq!(
+                original.models[key].model_sha256,
+                modified.models[key].model_sha256
+            );
+        }
+    }
+
+    #[test]
+    fn all_missing_training_sensor_uses_explicit_zero_median_fallback() {
+        let all_missing = b"1.0 NaN\n1.1 NaN\nNaN NaN\nNaN NaN\n1.2 NaN\nNaN NaN\n1.3 NaN\nNaN NaN\n";
+        let report = evaluate(all_missing, LABELS);
+        for model in report.models.values() {
+            assert_eq!(model.missing_features_without_observed_training_values, 1);
+        }
+    }
+
+    #[test]
+    fn training_row_permutation_preserves_fitted_model_digest() {
+        let features = parse_features(FEATURES).expect("fixture features parse");
+        let labels = parse_labels(LABELS).expect("fixture labels parse");
+        let split: SplitManifestV1 = serde_json::from_str(SPLIT).expect("split fixture parses");
+        let mut permuted_features = features.clone();
+        let mut permuted_labels = labels.clone();
+        let mut permuted_assignments = split.assignments.clone();
+        permuted_features[..4].reverse();
+        permuted_labels[..4].reverse();
+        permuted_assignments[..4].reverse();
+
+        for balanced in [false, true] {
+            let original = fit_model_v1(
+                "sample-order",
+                balanced,
+                &features,
+                &labels,
+                &split.assignments,
+            )
+            .expect("original fit succeeds");
+            let permuted = fit_model_v1(
+                "sample-order",
+                balanced,
+                &permuted_features,
+                &permuted_labels,
+                &permuted_assignments,
+            )
+            .expect("permuted fit succeeds");
+            assert_eq!(
+                sha256_hex(&serde_json::to_vec(&original).unwrap()),
+                sha256_hex(&serde_json::to_vec(&permuted).unwrap())
+            );
+        }
+    }
+
+    #[test]
     fn stable_sigmoid_and_ftrl_weights_handle_extreme_values() {
         assert!(sigmoid(10_000.0) > 0.999);
         assert!(sigmoid(-10_000.0) < 0.001);
