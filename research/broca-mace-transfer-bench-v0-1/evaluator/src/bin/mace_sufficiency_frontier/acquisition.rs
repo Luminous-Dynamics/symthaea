@@ -314,8 +314,8 @@ pub(crate) fn plan_next_evidence(context: &VoiContext) -> Result<VoiPlan, String
 /// A deliberately small policy fixture, not a measured agent benchmark.
 /// It proves that the planner prefers decision-relevant evidence over a
 /// high-entropy but decision-irrelevant query, and never overrides authority.
-pub(crate) fn reference_fixture_plan() -> Result<VoiPlan, String> {
-    let context = VoiContext {
+pub(crate) fn reference_fixture_context() -> VoiContext {
+    VoiContext {
         hypotheses: vec![
             Hypothesis {
                 id: "state_a".into(),
@@ -393,8 +393,11 @@ pub(crate) fn reference_fixture_plan() -> Result<VoiPlan, String> {
                 deadline_feasible: true,
             },
         ],
-    };
-    plan_next_evidence(&context)
+    }
+}
+
+pub(crate) fn reference_fixture_plan() -> Result<VoiPlan, String> {
+    plan_next_evidence(&reference_fixture_context())
 }
 
 #[cfg(test)]
@@ -462,9 +465,16 @@ mod tests {
 
     #[test]
     fn query_and_outcome_order_do_not_change_the_selected_request() {
-        let plan = reference_fixture_plan().unwrap();
-        let mut reversed = reference_fixture_plan().unwrap();
-        reversed.evaluations.reverse();
+        let context = reference_fixture_context();
+        let plan = plan_next_evidence(&context).unwrap();
+
+        let mut reversed_context = reference_fixture_context();
+        reversed_context.queries.reverse();
+        for query in &mut reversed_context.queries {
+            query.outcomes.reverse();
+        }
+        let reversed = plan_next_evidence(&reversed_context).unwrap();
         assert_eq!(plan.chosen_query_id, reversed.chosen_query_id);
+        assert!((plan.risk_before - reversed.risk_before).abs() < PROBABILITY_TOLERANCE);
     }
 }
