@@ -4,6 +4,7 @@ pub mod binary_metrics;
 pub mod dtco_manifest;
 pub mod mf_acquisition;
 pub mod pair_manifest;
+pub mod process_event_graph;
 pub mod secom_fold_preprocessor;
 pub mod secom_logistic;
 pub mod secom_missingness;
@@ -17,6 +18,13 @@ pub use binary_metrics::{
     BinaryClassCounts, BinaryMetricReportV1, BinaryMetricsError, BinaryScoreSampleV1,
     BinaryScoreSubjectV1, score_binary_subject_v1,
 };
+pub use process_event_graph::{
+    build_information_cutoff_snapshot_v1, validate_process_event_graph_v1, ClockBasisV1,
+    InformationCutoffSnapshotV1, MetrologyLabelStatusV1, MetrologyLabelV1,
+    PredictionInformationCutoffV1, ProcessEventEdgeV1, ProcessEventGraphError,
+    ProcessEventGraphV1, ProcessEventKindV1, ProcessEventV1, ProcessGraphValidationReportV1,
+};
+
 pub use pair_manifest::{
     ContrastivePairManifestV1, PairManifestError, PairValidationReportV1, validate_pair_manifest_v1,
 };
