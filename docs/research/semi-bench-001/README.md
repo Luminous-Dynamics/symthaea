@@ -651,3 +651,16 @@ Hosted run [#44989349728](https://github.com/Luminous-Dynamics/symthaea/actions/
 Hosted run [#44989451987](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44989451987) passed on current clean-base PR head `382649c720935cbf1e84689501f967f9b9867f56`: **46/46 Python reference tests**, **35/35 Rust tests**, rustfmt, Clippy with warnings denied, and all six byte-for-byte report comparisons (three Python and three Rust CLI reports).
 
 The DTCO lineage validator's 11 tests now additionally enforce model uncertainty binding, monotonic fidelity direction, root design-input binding and constraint-digest consumption. This is lineage integrity, not a physics or fab qualification claim.
+
+
+## Rust multi-fidelity acquisition oracle — first executable #13175 increment
+
+The Rust crate now includes `benchmark/mf_acquisition.rs` and the standalone `semi-mf-acquire` CLI. It solves an exact subset selection problem for up to 18 candidates under a declared high-fidelity evaluation budget:
+
+`utility = expected_feasible_hv_gain + exploration_weight × epistemic_stddev × frontier_relevance`
+
+The subject binds the prediction packet, model, uncertainty-calibration artifact and objective specification by SHA-256. The report includes the selected candidate IDs, expected gain, exploration bonus, utility and budget consumption. It deterministically maximizes total utility, then minimizes cost, then uses lexicographic candidate IDs for ties.
+
+The frozen five-candidate synthetic fixture uses a 13-unit budget and selects B/E (cost 13; modeled utility 0.3115). These are synthetic scheduler outputs, not measured PPA gains or executed simulator calls. The oracle does not execute SPICE/TCAD/route and does not approve designs.
+
+Hosted run [#44989958104](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44989958104) passed 43/43 Rust tests, 46/46 Python reference tests, fmt, Clippy and four Rust CLI report checks, including the new acquisition report.
