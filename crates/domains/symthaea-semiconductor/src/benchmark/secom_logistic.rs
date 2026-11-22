@@ -352,7 +352,7 @@ fn fit_model_v1(
     });
     let mut class_counts = [0usize; 2];
     for &index in &training_indices {
-        let class_index = usize::from(labels[index].label == 1);
+        let class_index = if labels[index].label == 1 { 1 } else { 0 };
         class_counts[class_index] += 1;
     }
     let training_rows = training_indices.len();
@@ -394,7 +394,7 @@ fn fit_model_v1(
             vector.push(value.unwrap_or(medians[feature_index]));
         }
         for value in &features[row_index].values {
-            vector.push(f64::from(value.is_none()));
+            vector.push(if value.is_none() { 1.0 } else { 0.0 });
         }
         for (index, value) in vector.iter().enumerate() {
             means[index] += *value;
