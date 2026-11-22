@@ -728,6 +728,17 @@ The event-ID arm is intentionally named an **ordered control**, not a key/value 
 
 The Pareto filter is an exact within-world non-dominance check over four dimensions: selected struct-byte lower bound, index-payload-byte lower bound, measured index-build plus candidate-selection/decision latency, and evaluator absolute regret. It is not an aggregate statistical frontier across independent worlds. The latter requires cluster-level paired aggregation/bootstrapping and is a subsequent increment.
 
+### EVSI comparator arms: entropy-only and seeded random
+
+The EVSI fixture now emits three candidate request selectors under the same admissibility gates:
+1. **Decision-specific EVSI:** maximize positive expected decision-risk reduction minus normalized costs.
+2. **Uncertainty-only:** choose the admissible request with maximum predictive outcome entropy, intentionally ignoring decision relevance and acquisition cost.
+3. **Seeded random:** choose an admissible request by a deterministic public-seed hash. This is a reproducible random-selection control, not a uniform random number generator guarantee.
+
+The two-hypothesis fixture makes the entropy-only trap explicit. The decision-relevant measurement has two equally likely outcomes (1 bit) and reduces Bayes decision risk from 0.5 to 0.1. The irrelevant signal has four equally likely outcomes (2 bits) but leaves the posterior action losses unchanged, so it provides zero decision-risk reduction. With its small positive acquisition cost it has negative net EVSI. The EVSI policy therefore selects the relevant measurement, while the uncertainty-only comparator selects the irrelevant signal. An unauthorized perfect-information query is excluded by the source-authority gate from EVSI, uncertainty-only and random selection alike.
+
+This is a policy-mechanics unit fixture, not an empirical agent benchmark. The 2-bit/1-bit values are analytic properties of the authored likelihood table, not measured entropy from a real source.
+
 ### EVSI core and policy boundary
 
 The finite-state EVSI core validates:
