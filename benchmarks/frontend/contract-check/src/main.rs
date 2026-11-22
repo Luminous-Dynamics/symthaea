@@ -1214,6 +1214,9 @@ fn validate_qualification_report(
         let fixture_id = case.get("fixture_id").and_then(Value::as_str).unwrap_or_default();
         let baseline = case.get("baseline").ok_or_else(|| format!("{id}: baseline run missing"))?;
         let candidate = case.get("candidate").ok_or_else(|| format!("{id}: candidate run missing"))?;
+        if baseline.get("source_commit").and_then(Value::as_str) != Some(baseline_commit) {
+            return Err(format!("{id}: baseline source commit does not match report"));
+        }
         for run in [baseline, candidate] {
             let run_id = run.get("run_id").and_then(Value::as_str).unwrap_or_default();
             if !run_ids.insert(run_id.to_string()) {
@@ -1258,6 +1261,9 @@ fn validate_qualification_report(
         let fixture_id = case.get("fixture_id").and_then(Value::as_str).unwrap_or_default();
         let baseline = case.get("baseline").ok_or_else(|| format!("{id}: baseline run missing"))?;
         let candidate = case.get("candidate").ok_or_else(|| format!("{id}: candidate run missing"))?;
+        if baseline.get("source_commit").and_then(Value::as_str) != Some(baseline_commit) {
+            return Err(format!("{id}: baseline source commit does not match report"));
+        }
         for run in [baseline, candidate] {
             let run_id = run.get("run_id").and_then(Value::as_str).unwrap_or_default();
             if !run_ids.insert(run_id.to_string()) {
