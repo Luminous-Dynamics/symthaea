@@ -342,3 +342,18 @@ matching schema. It defines matched arms A0–A4 plus a human reference arm,
 task-block randomization, task-cluster bootstrap, exact McNemar testing,
 Wilson intervals, multiple-comparison correction, judge blinding and
 publication/holdout scale targets. It is a protocol, not an executed result.
+
+
+## Reference-fixture static audit
+
+The standalone task validator now checks a static, independently-auditable subset
+of the public service-dashboard reference: exactly one `main` landmark and one
+named `h1`, the skip-link target and focus CSS, named workspace/summary/activity/
+schedule regions, exactly three metric-card source anchors, declared desktop and
+mobile grid rules, and absence of scripts/external asset imports. Tests also seed
+a missing heading and a breakpoint regression while recomputing the fixture digest.
+
+This audit qualifies the **reference fixture**, not the evaluated agent's
+rendered page. Runtime reflow, keyboard reachability, accessibility-tree
+behavior, network egress and actual screenshot geometry still require browser
+execution.
