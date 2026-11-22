@@ -248,10 +248,9 @@ pub fn score_binary_subject_v1(
     for (_, group) in groups_desc(&subject.samples, |sample| sample.score) {
         let group_positive = group.iter().filter(|sample| sample.positive).count();
         let group_negative = group.len() - group_positive;
-        let negatives_below =
-            negative_count - negatives_seen_at_or_above - group_negative;
-        concordant_pairs += group_positive as f64
-            * (negatives_below as f64 + 0.5 * group_negative as f64);
+        let negatives_below = negative_count - negatives_seen_at_or_above - group_negative;
+        concordant_pairs +=
+            group_positive as f64 * (negatives_below as f64 + 0.5 * group_negative as f64);
         negatives_seen_at_or_above += group_negative;
     }
     let auroc = concordant_pairs / (positive_count as f64 * negative_count as f64);
