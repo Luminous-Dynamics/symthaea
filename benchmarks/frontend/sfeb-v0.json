@@ -470,7 +470,24 @@
     "source_file_count": 7,
     "framework_locked_version": "0.8.20",
     "latest_upstream_stable": "0.8.23",
-    "prerelease": "0.9.0-rc1"
+    "prerelease": "0.9.0-rc1",
+    "retrieval_evaluator": {
+      "status": "source_and_tests_authored_not_executed",
+      "path": "benchmarks/frontend/retrieval-eval/",
+      "result_schema": "benchmarks/frontend/retrieval-eval/result-v1.schema.json",
+      "implemented_methods": [
+        "keyword_overlap",
+        "bm25",
+        "tfidf",
+        "hdc_bipolar",
+        "hybrid_rrf_bm25_tfidf_hdc"
+      ],
+      "hdc_dimensions": 16384,
+      "hdc_encoding": "BLAKE3-seeded bipolar word/bigram/character-trigram feature bundling",
+      "dense_embedding": "not_implemented_requires_pinned_model_adapter",
+      "abstention": "threshold not hardcoded; threshold calibration requires separate development split",
+      "unit_tests": 8
+    }
   },
   "anti_contamination_policy": {
     "public_pilot": "Public task definitions and fixtures may be used for iterative development but do not count as hidden holdout performance.",
