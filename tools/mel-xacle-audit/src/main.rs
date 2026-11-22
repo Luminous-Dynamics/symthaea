@@ -8,11 +8,11 @@ use mel_xacle_audit::{DEFAULT_BOOTSTRAP_SAMPLES, compare_csv, score_csv, validat
 fn write_report(path: &str, report: &impl serde::Serialize) -> Result<(), String> {
     let json = serde_json::to_string_pretty(report)
         .map_err(|error| format!("failed to serialize report: {error}"))?;
-    if let Some(parent) = Path::new(path).parent() {
-        if !parent.as_os_str().is_empty() {
-            fs::create_dir_all(parent)
-                .map_err(|error| format!("failed to create report directory: {error}"))?;
-        }
+    if let Some(parent) = Path::new(path).parent()
+        && !parent.as_os_str().is_empty()
+    {
+        fs::create_dir_all(parent)
+            .map_err(|error| format!("failed to create report directory: {error}"))?;
     }
     fs::write(path, format!("{json}\n"))
         .map_err(|error| format!("failed to write report {path}: {error}"))
