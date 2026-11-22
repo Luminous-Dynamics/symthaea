@@ -49,9 +49,7 @@ fn evaluate_tseitin_toy() -> TseitinCounts {
                         // Complete biconditional gates:
                         // u <-> (p AND q)
                         // s <-> (u OR r)
-                        let correct = (u == (p && q))
-                            && (s == (u || r))
-                            && s; // assert root
+                        let correct = (u == (p && q)) && (s == (u || r)) && s; // assert root
 
                         if correct {
                             correct_extensions += 1;
@@ -73,8 +71,7 @@ fn evaluate_tseitin_toy() -> TseitinCounts {
                 mutated_models += mutated_extensions;
                 correct_decision_equivalent &= (correct_extensions > 0) == source;
                 mutated_decision_equivalent &= (mutated_extensions > 0) == source;
-                correct_unique_extension &=
-                    correct_extensions == if source { 1 } else { 0 };
+                correct_unique_extension &= correct_extensions == if source { 1 } else { 0 };
             }
         }
     }
