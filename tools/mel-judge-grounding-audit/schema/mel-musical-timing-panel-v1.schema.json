@@ -18,7 +18,8 @@
     "target_events",
     "tempo_estimates",
     "extra_onsets",
-    "claim_ceiling"
+    "claim_ceiling",
+    "clock_calibration_receipt_sha256"
   ],
   "properties": {
     "schema_version": {
@@ -88,6 +89,9 @@
         "type": "string",
         "minLength": 1
       }
+    },
+    "clock_calibration_receipt_sha256": {
+      "$ref": "#/$defs/sha256"
     }
   },
   "$defs": {
@@ -218,6 +222,7 @@
         "estimate_id",
         "segment_id",
         "observed_at_ns",
+        "evidence_window_end_ns",
         "estimated_period_ns",
         "confidence",
         "provenance_sha256"
@@ -246,6 +251,10 @@
         },
         "provenance_sha256": {
           "$ref": "#/$defs/sha256"
+        },
+        "evidence_window_end_ns": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     },
