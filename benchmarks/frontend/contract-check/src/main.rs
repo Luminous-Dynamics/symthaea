@@ -1160,7 +1160,7 @@ fn validate_qualification_report(
         if baseline.get("disposition").and_then(Value::as_str) != Some("accepted") {
             return Err(format!("{id}: baseline control must be accepted before mutation"));
         }
-        for run in [baseline, candidate] {
+        for (run, phase) in [(baseline, "baseline"), (candidate, "candidate")] {
             if run.get("fixture_sha256") != baseline.get("fixture_sha256")
                 || run.get("environment_manifest_sha256") != baseline.get("environment_manifest_sha256")
                 || run.get("environment_manifest_sha256").and_then(Value::as_str) != Some(environment_sha)
@@ -1172,9 +1172,15 @@ fn validate_qualification_report(
             {
                 return Err(format!("{id}: malformed fixture digest"));
             }
-            validate_evidence_run(run, &artifact_root, id,
-                if std::ptr::eq(run, baseline) { "baseline" } else { "candidate" },
-                task_id, fixture_id, environment_sha)?;
+            validate_evidence_run(
+                run,
+                &artifact_root,
+                id,
+                phase,
+                task_id,
+                fixture_id,
+                environment_sha,
+            )?;
         }
         if baseline.get("source_commit").and_then(Value::as_str) != Some(baseline_commit) {
             return Err(format!("{id}: baseline source commit does not match report"));
