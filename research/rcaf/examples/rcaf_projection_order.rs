@@ -12,11 +12,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     ];
     let nuisance = vec![vec![1.0], vec![0.0], vec![0.0], vec![0.0]];
     let removed_filter = vec![vec![1.0], vec![1.0], vec![0.0], vec![0.0]];
-    let report = run_projection_order_challenge(
-        &observations,
-        &nuisance,
-        &removed_filter,
-    )?;
+    let report = run_projection_order_challenge(&observations, &nuisance, &removed_filter)?;
 
     let rendered = format!(
         concat!(
