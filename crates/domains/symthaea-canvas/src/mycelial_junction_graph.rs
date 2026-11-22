@@ -1533,6 +1533,50 @@ mod tests {
     }
 
     #[test]
+    fn projected_two_dimensional_crossing_does_not_create_anastomosis() {
+        let model = MycelialModel {
+            schema_version: MYCELIAL_MODEL_VERSION,
+            mode: PresenceMode::Ambient,
+            activity: None,
+            speech_output: None,
+            viseme: None,
+            gaze: None,
+            uncertainty: None,
+            filaments: vec![
+                filament(
+                    20,
+                    None,
+                    true,
+                    SpatialPoint3 { x: 0.0, y: 0.0, z: 0.0 },
+                    SpatialPoint3 { x: 10.0 / 3.0, y: 10.0 / 3.0, z: 0.0 },
+                    SpatialPoint3 { x: 20.0 / 3.0, y: 20.0 / 3.0, z: 0.0 },
+                    SpatialPoint3 { x: 10.0, y: 10.0, z: 0.0 },
+                ),
+                filament(
+                    21,
+                    None,
+                    true,
+                    SpatialPoint3 { x: 0.0, y: 10.0, z: 0.0 },
+                    SpatialPoint3 { x: 10.0 / 3.0, y: 20.0 / 3.0, z: 0.0 },
+                    SpatialPoint3 { x: 20.0 / 3.0, y: 10.0 / 3.0, z: 0.0 },
+                    SpatialPoint3 { x: 10.0, y: 0.0, z: 0.0 },
+                ),
+            ],
+            orbital_cells: Vec::<OrbitalCell>::new(),
+        };
+        let graph = build_mycelial_junction_hypha_graph(
+            &model,
+            &[],
+            MycelialJunctionGraphConfig::default(),
+        )
+        .unwrap();
+        let metrics = graph.metrics().unwrap();
+        assert_eq!(metrics.connected_components, 2);
+        assert_eq!(metrics.cycle_rank, 0);
+        assert_eq!(metrics.hypha_segment_count, 2);
+    }
+
+    #[test]
     fn validator_rejects_a_graph_missing_an_entire_source_filament() {
         let model = fixture_model();
         let mut graph = build_mycelial_junction_hypha_graph(
