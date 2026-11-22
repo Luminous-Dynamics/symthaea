@@ -1435,14 +1435,24 @@ fn validate_delivery_config(
     Ok(())
 }
 
-fn delivery_trial_seed(seed: u64, scenario_id: &str, trial_index: usize) -> u64 {
+fn delivery_entity_draw(
+    seed: u64,
+    trial_index: usize,
+    entity_kind: u8,
+    entity_id: &str,
+) -> u64 {
+    // Counter-based entity-keyed draw: the same source entity receives the
+    // same outcome in a given trial across strategies and nested budgets.
+    // This supplies common random numbers for paired attack-policy comparison.
     let mut hasher = blake3::Hasher::new();
-    hasher.update(b"symthaea-failure-delivery-trial-seed-v1");
+    hasher.update(b"symthaea-failure-delivery-entity-draw-v2");
     hasher.update(&seed.to_le_bytes());
-    hash_string(&mut hasher, scenario_id);
     hasher.update(&(trial_index as u64).to_le_bytes());
+    hasher.update(&[entity_kind]);
+    hash_string(&mut hasher, entity_id);
     let digest = hasher.finalize();
     u64::from_le_bytes(digest.as_bytes()[..8].try_into().expect("digest prefix is eight bytes"))
+        % 1_000_000
 }
 
 fn realize_attack_delivery(
@@ -1450,18 +1460,17 @@ fn realize_attack_delivery(
     config: MycelialFailureDeliveryConfig,
     trial_index: usize,
 ) -> (Vec<String>, Vec<String>) {
-    let mut state = delivery_trial_seed(config.seed, &scenario.scenario_id, trial_index);
     let mut failed_segments = Vec::new();
     let mut failed_junctions = Vec::new();
     for id in &scenario.failed_segment_ids {
-        if splitmix64_next(&mut state) % 1_000_000
+        if delivery_entity_draw(config.seed, trial_index, 0, id)
             < u64::from(config.removal_success_probability_micros)
         {
             failed_segments.push(id.clone());
         }
     }
     for id in &scenario.failed_junction_ids {
-        if splitmix64_next(&mut state) % 1_000_000
+        if delivery_entity_draw(config.seed, trial_index, 1, id)
             < u64::from(config.removal_success_probability_micros)
         {
             failed_junctions.push(id.clone());
