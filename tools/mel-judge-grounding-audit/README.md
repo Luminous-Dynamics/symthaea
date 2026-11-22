@@ -21,7 +21,7 @@ Each case binds a baseline audio A/B score and exact prompt, instruction and aud
 - \`nuisance_transform\`: replace one or both audio assets with a validated semantics-preserving transform. The pairwise margin should remain within a per-probe tolerance.
 - \`semantic_mismatch\`: alter exactly one candidate's audio to violate a declared prompt attribute. That candidate's score should fall by at least the per-probe minimum.
 
-Human-reference direction is supplied separately in the post-judge probe panel. The evaluator reports baseline human-reference accuracy on clear cases, but never feeds those labels to the judge. The sealed execution workflow in MEL-SEALED-EVAL-001 remains responsible for ensuring reference release happens only after prediction freeze.
+The scoring-time probe panel is assembled only after the judge-output package is frozen and the independent human reference is released. The assembled panel contains both probe outputs and post-freeze human-reference directions; it must never be mounted or sent to the judge. The evaluator reports baseline human-reference accuracy on clear cases. The sealed execution workflow in MEL-SEALED-EVAL-001 remains responsible for proving prediction freeze precedes reference release.
 
 ## Interpretation
 
