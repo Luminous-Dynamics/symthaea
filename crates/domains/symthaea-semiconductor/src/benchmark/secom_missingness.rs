@@ -190,8 +190,7 @@ fn fit_missingness_model(
         let pass_missing = (missing_when_pass[feature_index] as f64 + alpha)
             / (training_passes as f64 + 2.0 * alpha);
         log_odds_missing_by_feature.push((fail_missing / pass_missing).ln());
-        log_odds_observed_by_feature
-            .push(((1.0 - fail_missing) / (1.0 - pass_missing)).ln());
+        log_odds_observed_by_feature.push(((1.0 - fail_missing) / (1.0 - pass_missing)).ln());
     }
 
     Ok(BernoulliMissingnessModelV1 {
@@ -253,8 +252,7 @@ fn observation_profile(
                     rows: class_rows,
                     missing_cells: class_missing,
                     sensor_cells: class_rows * feature_count,
-                    missing_fraction: class_missing as f64
-                        / (class_rows * feature_count) as f64,
+                    missing_fraction: class_missing as f64 / (class_rows * feature_count) as f64,
                 },
             )
         })
@@ -328,8 +326,7 @@ pub fn evaluate_secom_missingness_v1(
         )));
     }
     if split_manifest.split_scheme == "forward_time"
-        && split_manifest.clock_domain_id.as_deref()
-            != Some(expectations.clock_domain_id.as_str())
+        && split_manifest.clock_domain_id.as_deref() != Some(expectations.clock_domain_id.as_str())
     {
         return Err(SecomMissingnessError(
             "forward-time split clock_domain_id does not match raw expectations".into(),
@@ -338,12 +335,7 @@ pub fn evaluate_secom_missingness_v1(
 
     let features = parse_features(feature_bytes)?;
     let labels = parse_labels(label_bytes)?;
-    for (index, (assignment, label)) in split_manifest
-        .assignments
-        .iter()
-        .zip(&labels)
-        .enumerate()
-    {
+    for (index, (assignment, label)) in split_manifest.assignments.iter().zip(&labels).enumerate() {
         if assignment.positive != (label.label == 1) {
             return Err(SecomMissingnessError(format!(
                 "split assignment {index} label does not match source label row"
@@ -478,10 +470,11 @@ pub fn evaluate_secom_missingness_v1(
 mod tests {
     use super::*;
     use crate::benchmark::split_manifest::{
-        SplitAssignmentV1, INPUT_SCHEMA_V1 as SPLIT_INPUT_SCHEMA_V1,
+        INPUT_SCHEMA_V1 as SPLIT_INPUT_SCHEMA_V1, SplitAssignmentV1,
     };
 
-    const FEATURES: &[u8] = b"1.0 2.0\n1.1 2.1\nNaN NaN\nNaN NaN\n1.2 2.2\nNaN NaN\n1.3 2.3\nNaN NaN\n";
+    const FEATURES: &[u8] =
+        b"1.0 2.0\n1.1 2.1\nNaN NaN\nNaN NaN\n1.2 2.2\nNaN NaN\n1.3 2.3\nNaN NaN\n";
     const LABELS: &[u8] = b"-1 \"19/07/2008 11:55:00\"\n-1 \"19/07/2008 12:00:00\"\n1 \"19/07/2008 12:05:00\"\n1 \"19/07/2008 12:10:00\"\n-1 \"19/07/2008 12:15:00\"\n1 \"19/07/2008 12:20:00\"\n-1 \"19/07/2008 12:25:00\"\n1 \"19/07/2008 12:30:00\"\n";
 
     fn expectations(label_bytes: &[u8], feature_bytes: &[u8]) -> SecomRawExpectationsV1 {
@@ -497,7 +490,16 @@ mod tests {
     }
 
     fn manifest(labels: &[i8]) -> SplitManifestV1 {
-        let splits = ["train", "train", "train", "train", "validation", "validation", "test", "test"];
+        let splits = [
+            "train",
+            "train",
+            "train",
+            "train",
+            "validation",
+            "validation",
+            "test",
+            "test",
+        ];
         let assignments = labels
             .iter()
             .enumerate()
@@ -520,11 +522,7 @@ mod tests {
         }
     }
 
-    fn run(
-        feature_bytes: &[u8],
-        label_bytes: &[u8],
-        labels: &[i8],
-    ) -> SecomMissingnessReportV1 {
+    fn run(feature_bytes: &[u8], label_bytes: &[u8], labels: &[i8]) -> SecomMissingnessReportV1 {
         evaluate_secom_missingness_v1(
             feature_bytes,
             label_bytes,
@@ -536,19 +534,21 @@ mod tests {
 
     #[test]
     fn detects_a_missingness_shortcut_against_prevalence_control() {
-        let report = run(
-            FEATURES,
-            LABELS,
-            &[-1, -1, 1, 1, -1, 1, -1, 1],
-        );
+        let report = run(FEATURES, LABELS, &[-1, -1, 1, 1, -1, 1, -1, 1]);
         let validation = &report.held_out["validation"];
         let test = &report.held_out["test"];
         assert_eq!(report.training_rows, 4);
         assert_eq!(report.training_failures, 2);
         assert_eq!(report.training_passes, 2);
-        assert_eq!(validation.prevalence_only_metrics.ranking_metrics.auroc, 0.5);
+        assert_eq!(
+            validation.prevalence_only_metrics.ranking_metrics.auroc,
+            0.5
+        );
         assert_eq!(test.prevalence_only_metrics.ranking_metrics.auroc, 0.5);
-        assert_eq!(validation.missingness_only_metrics.ranking_metrics.auroc, 1.0);
+        assert_eq!(
+            validation.missingness_only_metrics.ranking_metrics.auroc,
+            1.0
+        );
         assert_eq!(test.missingness_only_metrics.ranking_metrics.auroc, 1.0);
         assert_eq!(test.observation_profile.rows, 2);
         assert_eq!(test.observation_profile.missing_fraction, 0.5);
@@ -557,17 +557,9 @@ mod tests {
 
     #[test]
     fn held_out_label_changes_cannot_change_the_fitted_model_or_scores() {
-        let original = run(
-            FEATURES,
-            LABELS,
-            &[-1, -1, 1, 1, -1, 1, -1, 1],
-        );
+        let original = run(FEATURES, LABELS, &[-1, -1, 1, 1, -1, 1, -1, 1]);
         let changed_labels: &[u8] = b"-1 \"19/07/2008 11:55:00\"\n-1 \"19/07/2008 12:00:00\"\n1 \"19/07/2008 12:05:00\"\n1 \"19/07/2008 12:10:00\"\n1 \"19/07/2008 12:15:00\"\n-1 \"19/07/2008 12:20:00\"\n1 \"19/07/2008 12:25:00\"\n-1 \"19/07/2008 12:30:00\"\n";
-        let changed = run(
-            FEATURES,
-            changed_labels,
-            &[-1, -1, 1, 1, 1, -1, 1, -1],
-        );
+        let changed = run(FEATURES, changed_labels, &[-1, -1, 1, 1, 1, -1, 1, -1]);
         assert_eq!(
             original.missingness_model_sha256,
             changed.missingness_model_sha256
@@ -587,16 +579,8 @@ mod tests {
     fn measured_value_changes_cannot_change_missingness_model_or_scores() {
         let changed_features: &[u8] =
             b"100.0 -20.0\n101.1 -21.0\nNaN NaN\nNaN NaN\n102.2 -22.0\nNaN NaN\n103.3 -23.0\nNaN NaN\n";
-        let original = run(
-            FEATURES,
-            LABELS,
-            &[-1, -1, 1, 1, -1, 1, -1, 1],
-        );
-        let changed = run(
-            changed_features,
-            LABELS,
-            &[-1, -1, 1, 1, -1, 1, -1, 1],
-        );
+        let original = run(FEATURES, LABELS, &[-1, -1, 1, 1, -1, 1, -1, 1]);
+        let changed = run(changed_features, LABELS, &[-1, -1, 1, 1, -1, 1, -1, 1]);
         assert_eq!(
             original.missingness_model_sha256,
             changed.missingness_model_sha256
