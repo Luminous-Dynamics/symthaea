@@ -38,7 +38,7 @@ The two bridge applications currently declare Leptos `0.8` and CSR features in t
 
 ### Framework version policy
 
-The upstream release page consulted on 2026-11-21 lists `0.8.22` and `0.9.0-rc0`. The latter is a release candidate. The repository declares the `0.8` semver family, with exact dependency resolution governed by the lockfile. Keep the initial benchmark on the checked-in lockfile and record the resolved versions in every run receipt. Treat 0.9 migration as a separate compatibility experiment; never mix framework migration with a frontend-quality comparison.
+As rechecked on 2026-11-22, the latest published stable 0.8 release is `0.8.23` (published 2026-10-31); `0.9.0-rc1` is a prerelease. The checked-in repository `Cargo.lock` currently resolves `leptos` to `0.8.20`, despite the manifests declaring the `0.8` semver family. Keep the initial benchmark pinned to the lockfile resolution `0.8.20` and record the resolved version plus lockfile object identity in every run receipt. Evaluate upgrading the workspace lock to `0.8.23` as a separate compatibility experiment; never mix framework migration with a frontend-quality comparison.
 
 ## 2. Paradigm shifts to investigate
 
@@ -337,12 +337,15 @@ visual sample.
 
 ### Leptos 0.8 knowledge and provenance
 
-A first versioned knowledge corpus now exists at
-`benchmarks/frontend/knowledge/leptos-0.8/patterns-v0.json`. It currently
-contains eight patterns extracted from the existing Leptos application sources:
-component composition, `RwSignal`, tracked versus untracked reads, Effects,
-`spawn_local`, keyed `For` rendering, typed `NodeRef`, and the HTTP/WebSocket
-service boundary.
+A versioned Leptos knowledge corpus now exists at
+`benchmarks/frontend/knowledge/leptos-0.8/patterns-v0.json`. It contains
+seventeen source-grounded patterns across the existing Symthaea and Muse
+applications: component composition, `RwSignal`, tracked versus untracked
+reads, Effects, `spawn_local`, keyed `For` rendering, typed `NodeRef`,
+HTTP/WebSocket boundaries, Router / Routes / Route, typed context, derived
+`Memo` state, programmatic navigation, pure reducers, persistent DOM resources,
+epoch-tagged browser event adapters, fail-closed authorization, and
+asynchronous initialization.
 
 Each pattern records its source file and exact Git blob SHA-1. The corpus has
 an accompanying JSON Schema and a standalone Rust validator mode
@@ -353,8 +356,9 @@ an accompanying JSON Schema and a standalone Rust validator mode
 - recomputes Git blob IDs from exact source bytes and rejects stale examples.
 
 A first public retrieval pilot query set now accompanies the corpus at
-`benchmarks/frontend/knowledge/leptos-0.8/retrieval-queries-v0.json`: 16
-positive paraphrases and eight hard negatives, with exact expected pattern IDs.
+`benchmarks/frontend/knowledge/leptos-0.8/retrieval-queries-v0.json`: 34
+positive paraphrases (two per pattern) and eight hard negatives, with exact
+expected pattern IDs.
 The standalone validator's `--retrieval` mode checks query-schema validity,
 unique IDs, positive/negative structure and every gold ID against the corpus.
 This is a dataset validation gate only; no retrieval quality has been measured.
@@ -536,7 +540,7 @@ Extend `symthaea-ui` with one bounded, reviewed feature from its README's deferr
 | Programme, task/oracle schemas and source-observed contract | **Authored** in this branch |
 | First static design fixture and task definition | **Authored public pilot**; canonical digest confirmed with `sha256sum`; not a hidden holdout |
 | Standalone Rust contract/task/provenance validator | **Implemented in source with tests authored**; compilation/tests not run |
-| Leptos 0.8 pattern corpus | **Eight source-grounded entries with exact Git blob provenance**; compilation pending |
+| Leptos 0.8 pattern corpus | **17 source-grounded entries across six/seven source files with exact Git blob provenance**; compilation pending |
 | Fixture exposure / anti-contamination policy | **Specified** for public pilot, controller-only and hidden holdout |
 | Viewport-only browser capture | **Implemented in source**; Chromium capture timed out in this container |
 | Runnable SFEB browser evaluator and screenshot baselines | **Not implemented** |
