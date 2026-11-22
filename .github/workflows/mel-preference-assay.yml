@@ -28,13 +28,13 @@ jobs:
       - name: Checkout exact tested head
         uses: actions/checkout@v4
         with:
-          ref: \${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
       - name: Verify source revision and preserve committed inputs
         shell: bash
         run: |
           set -euo pipefail
-          expected="\${{ github.event.pull_request.head.sha || github.sha }}"
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
           actual="$(git rev-parse HEAD)"
           test "$actual" = "$expected"
           evidence="$RUNNER_TEMP/mel-preference-evidence"
@@ -91,7 +91,7 @@ jobs:
       - name: Upload exact-source evidence
         uses: actions/upload-artifact@v4
         with:
-          name: mel-preference-assay-\${{ github.event.pull_request.head.sha || github.sha }}
-          path: \${{ runner.temp }}/mel-preference-evidence/
+          name: mel-preference-assay-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/mel-preference-evidence/
           if-no-files-found: error
           retention-days: 90
