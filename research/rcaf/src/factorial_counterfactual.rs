@@ -70,10 +70,7 @@ impl FactorialCounterfactualReport {
                         "      \"fnv1a64_fingerprint\": \"{}\"\n",
                         "    }}"
                     ),
-                    cell.cell_id,
-                    cell.rms,
-                    cell.max_absolute_value,
-                    cell.fnv1a64_fingerprint,
+                    cell.cell_id, cell.rms, cell.max_absolute_value, cell.fnv1a64_fingerprint,
                 )
             })
             .collect::<Vec<_>>()
@@ -174,11 +171,16 @@ impl fmt::Display for FactorialExperimentError {
                 "target component-variance fraction must be finite and in [0, 1)"
             ),
             Self::EmptyMatrix => write!(f, "counterfactual matrices must be non-empty"),
-            Self::InsufficientMatrixShape => write!(f, "counterfactual matrices require at least three time points and two ROIs"),
+            Self::InsufficientMatrixShape => write!(
+                f,
+                "counterfactual matrices require at least three time points and two ROIs"
+            ),
             Self::RaggedMatrix(name) => write!(f, "{name} matrix must be rectangular"),
             Self::DimensionMismatch(reason) => write!(f, "factorial dimension mismatch: {reason}"),
             Self::NonFiniteInput(name) => write!(f, "{name} contains non-finite values"),
-            Self::NonFiniteOutput(name) => write!(f, "factorial construction produced non-finite {name}"),
+            Self::NonFiniteOutput(name) => {
+                write!(f, "factorial construction produced non-finite {name}")
+            }
             Self::NonFiniteMoment => write!(f, "factorial pooled moments are non-finite"),
         }
     }
@@ -199,7 +201,12 @@ pub fn run_factorial_counterfactual_experiment(
     validate_metadata(metadata)?;
     let (time_points, roi_count) = validate_matrix(clean_observations, "clean observations")?;
     validate_matching_matrix(signal_component, time_points, roi_count, "signal component")?;
-    validate_matching_matrix(nuisance_component, time_points, roi_count, "nuisance component")?;
+    validate_matching_matrix(
+        nuisance_component,
+        time_points,
+        roi_count,
+        "nuisance component",
+    )?;
 
     let mut signal_only = Vec::with_capacity(time_points);
     let mut nuisance_only = Vec::with_capacity(time_points);
@@ -216,10 +223,14 @@ pub fn run_factorial_counterfactual_experiment(
             let nuisance_value = clean + nuisance;
             let combined_value = clean + signal + nuisance;
             if !signal_value.is_finite() {
-                return Err(FactorialExperimentError::NonFiniteOutput("signal-only cell"));
+                return Err(FactorialExperimentError::NonFiniteOutput(
+                    "signal-only cell",
+                ));
             }
             if !nuisance_value.is_finite() {
-                return Err(FactorialExperimentError::NonFiniteOutput("nuisance-only cell"));
+                return Err(FactorialExperimentError::NonFiniteOutput(
+                    "nuisance-only cell",
+                ));
             }
             if !combined_value.is_finite() {
                 return Err(FactorialExperimentError::NonFiniteOutput(
@@ -238,13 +249,9 @@ pub fn run_factorial_counterfactual_experiment(
     let clean_null = clean_observations.to_vec();
     let (clean_variance, nuisance_variance, clean_nuisance_covariance) =
         pooled_within_roi_moments(clean_observations, nuisance_component);
-    if [
-        clean_variance,
-        nuisance_variance,
-        clean_nuisance_covariance,
-    ]
-    .iter()
-    .any(|value| !value.is_finite())
+    if [clean_variance, nuisance_variance, clean_nuisance_covariance]
+        .iter()
+        .any(|value| !value.is_finite())
     {
         return Err(FactorialExperimentError::NonFiniteMoment);
     }
@@ -254,11 +261,9 @@ pub fn run_factorial_counterfactual_experiment(
     } else {
         0.0
     };
-    let combined_observed_variance = clean_variance
-        + nuisance_variance
-        + 2.0 * clean_nuisance_covariance;
-    if !realized_component_variance_fraction.is_finite()
-        || !combined_observed_variance.is_finite()
+    let combined_observed_variance =
+        clean_variance + nuisance_variance + 2.0 * clean_nuisance_covariance;
+    if !realized_component_variance_fraction.is_finite() || !combined_observed_variance.is_finite()
     {
         return Err(FactorialExperimentError::NonFiniteMoment);
     }
@@ -272,10 +277,18 @@ pub fn run_factorial_counterfactual_experiment(
     .into_iter()
     .fold(1.0f64, f64::max);
     let numerical_tolerance = 1e-12 * scale;
-    let matched_nuisance_delta_max_abs =
-        max_matched_delta(&nuisance_only, &clean_null, &signal_plus_nuisance, &signal_only);
-    let matched_signal_delta_max_abs =
-        max_matched_delta(&signal_only, &clean_null, &signal_plus_nuisance, &nuisance_only);
+    let matched_nuisance_delta_max_abs = max_matched_delta(
+        &nuisance_only,
+        &clean_null,
+        &signal_plus_nuisance,
+        &signal_only,
+    );
+    let matched_signal_delta_max_abs = max_matched_delta(
+        &signal_only,
+        &clean_null,
+        &signal_plus_nuisance,
+        &nuisance_only,
+    );
     let additive_interaction_max_abs = max_additive_interaction(
         &clean_null,
         &signal_only,
@@ -302,9 +315,9 @@ pub fn run_factorial_counterfactual_experiment(
     let nuisance_component_rms = rms(nuisance_component);
     if !signal_component_rms.is_finite()
         || !nuisance_component_rms.is_finite()
-        || cells.iter().any(|cell| {
-            !cell.rms.is_finite() || !cell.max_absolute_value.is_finite()
-        })
+        || cells
+            .iter()
+            .any(|cell| !cell.rms.is_finite() || !cell.max_absolute_value.is_finite())
     {
         return Err(FactorialExperimentError::NonFiniteMoment);
     }
@@ -345,14 +358,18 @@ fn validate_metadata(
         ("experiment_id", metadata.experiment_id.as_str()),
         ("signal_id", metadata.signal_id.as_str()),
         ("nuisance_family_id", metadata.nuisance_family_id.as_str()),
-        ("nuisance_instance_id", metadata.nuisance_instance_id.as_str()),
+        (
+            "nuisance_instance_id",
+            metadata.nuisance_instance_id.as_str(),
+        ),
     ] {
         if value.trim().is_empty() {
             return Err(FactorialExperimentError::EmptyIdentifier(name));
         }
-        if !value.bytes().all(|byte| {
-            byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b':' | b'-')
-        }) {
+        if !value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b':' | b'-'))
+        {
             return Err(FactorialExperimentError::InvalidIdentifier(name));
         }
     }
@@ -406,8 +423,7 @@ fn pooled_within_roi_moments(clean: &[Vec<f64>], nuisance: &[Vec<f64>]) -> (f64,
     let mut cross_products = 0.0;
     for roi in 0..roi_count {
         let clean_mean = clean.iter().map(|row| row[roi]).sum::<f64>() / time_points as f64;
-        let nuisance_mean =
-            nuisance.iter().map(|row| row[roi]).sum::<f64>() / time_points as f64;
+        let nuisance_mean = nuisance.iter().map(|row| row[roi]).sum::<f64>() / time_points as f64;
         for time in 0..time_points {
             let centered_clean = clean[time][roi] - clean_mean;
             let centered_nuisance = nuisance[time][roi] - nuisance_mean;
@@ -425,12 +441,20 @@ fn pooled_within_roi_moments(clean: &[Vec<f64>], nuisance: &[Vec<f64>]) -> (f64,
 
 fn rms(matrix: &[Vec<f64>]) -> f64 {
     let count = matrix.iter().map(Vec::len).sum::<usize>();
-    let squares = matrix.iter().flatten().map(|value| value * value).sum::<f64>();
+    let squares = matrix
+        .iter()
+        .flatten()
+        .map(|value| value * value)
+        .sum::<f64>();
     (squares / count as f64).sqrt()
 }
 
 fn max_abs(matrix: &[Vec<f64>]) -> f64 {
-    matrix.iter().flatten().map(|value| value.abs()).fold(0.0, f64::max)
+    matrix
+        .iter()
+        .flatten()
+        .map(|value| value.abs())
+        .fold(0.0, f64::max)
 }
 
 fn max_matched_delta(
@@ -598,19 +622,17 @@ mod tests {
             .iter()
             .map(|row| row.iter().map(|value| *value * 0.1).collect::<Vec<_>>())
             .collect::<Vec<_>>();
-        let aligned_result = run_factorial_counterfactual_experiment(
-            &clean, &signal, &aligned, &metadata(),
-        )
-        .unwrap();
+        let aligned_result =
+            run_factorial_counterfactual_experiment(&clean, &signal, &aligned, &metadata())
+                .unwrap();
         assert!(aligned_result.report.clean_nuisance_covariance > 0.0);
         let anti_aligned = aligned
             .iter()
             .map(|row| row.iter().map(|value| -*value).collect::<Vec<_>>())
             .collect::<Vec<_>>();
-        let anti_result = run_factorial_counterfactual_experiment(
-            &clean, &signal, &anti_aligned, &metadata(),
-        )
-        .unwrap();
+        let anti_result =
+            run_factorial_counterfactual_experiment(&clean, &signal, &anti_aligned, &metadata())
+                .unwrap();
         assert!(anti_result.report.clean_nuisance_covariance < 0.0);
     }
 
@@ -679,7 +701,10 @@ mod tests {
         huge_nuisance[0][0] = f64::MAX;
         assert!(matches!(
             run_factorial_counterfactual_experiment(
-                &clean(), &huge_signal, &huge_nuisance, &metadata()
+                &clean(),
+                &huge_signal,
+                &huge_nuisance,
+                &metadata()
             ),
             Err(FactorialExperimentError::NonFiniteOutput(_))
         ));
@@ -694,13 +719,12 @@ mod tests {
                 *value = 1e200;
             }
         }
-        let result = run_factorial_counterfactual_experiment(
-            &clean,
-            &huge_signal,
-            &nuisance(),
-            &metadata(),
-        );
-        assert!(matches!(result, Err(FactorialExperimentError::NonFiniteMoment)));
+        let result =
+            run_factorial_counterfactual_experiment(&clean, &huge_signal, &nuisance(), &metadata());
+        assert!(matches!(
+            result,
+            Err(FactorialExperimentError::NonFiniteMoment)
+        ));
     }
 
     #[test]
@@ -741,8 +765,7 @@ mod tests {
             permute(&original.signal_plus_nuisance)
         );
         assert!(
-            (permuted.report.clean_component_variance
-                - original.report.clean_component_variance)
+            (permuted.report.clean_component_variance - original.report.clean_component_variance)
                 .abs()
                 < 1e-12
         );
@@ -753,8 +776,7 @@ mod tests {
                 < 1e-12
         );
         assert!(
-            (permuted.report.clean_nuisance_covariance
-                - original.report.clean_nuisance_covariance)
+            (permuted.report.clean_nuisance_covariance - original.report.clean_nuisance_covariance)
                 .abs()
                 < 1e-12
         );
@@ -782,10 +804,7 @@ mod tests {
             &metadata(),
         )
         .unwrap();
-        assert!(
-            (scaled.report.cells[0].rms - factor * original.report.cells[0].rms).abs()
-                < 1e-12
-        );
+        assert!((scaled.report.cells[0].rms - factor * original.report.cells[0].rms).abs() < 1e-12);
         assert!(
             (scaled.report.clean_component_variance
                 - factor * factor * original.report.clean_component_variance)
@@ -825,8 +844,7 @@ mod tests {
         let zero = vec![vec![0.0; 4]; 32];
         let nuisance = nuisance();
         let experiment =
-            run_factorial_counterfactual_experiment(&clean, &zero, &nuisance, &metadata())
-                .unwrap();
+            run_factorial_counterfactual_experiment(&clean, &zero, &nuisance, &metadata()).unwrap();
         assert_eq!(experiment.signal_only, experiment.clean_null);
         assert_eq!(experiment.signal_plus_nuisance, experiment.nuisance_only);
         assert_eq!(experiment.report.signal_component_rms, 0.0);
