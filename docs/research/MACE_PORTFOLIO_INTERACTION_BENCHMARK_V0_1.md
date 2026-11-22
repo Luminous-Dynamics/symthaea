@@ -73,3 +73,8 @@ Next:
 3. Compare pairwise selection with sampled marginal/Shapley estimates on bounded small portfolios.
 4. Test higher-order interactions, diminishing returns, complementarity cycles and adversarial feature misclassification.
 5. Evaluate interaction-aware selection only after the baseline additive portfolio tests remain unchanged.
+
+
+## Source verification status
+
+The implementation contains **13 authored Rust unit tests** by source count. These tests have not been executed in the current environment: `cargo`, `rustc` and `rustfmt` are unavailable. No compile, test, formatting, emitted-output, CI or benchmark run pass is claimed. The authored count is not an executed-test count.

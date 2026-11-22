@@ -636,3 +636,5 @@ cargo test --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p
 ```
 
 The current implementation is a synthetic pairwise diagnostic, not the production portfolio optimiser. Its relation labels and training observations are generated fixtures; calibration radii are empirical envelopes, not statistical confidence intervals. The test suite is authored but has not been executed in this environment.
+
+**Verification:** 13 Rust tests are authored in the binary, but have not run here; no Cargo/Rust/rustfmt toolchain is available. Source audits are not test passes.
