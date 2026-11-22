@@ -1323,6 +1323,117 @@ mod tests {
     }
 
     #[test]
+    fn hungarian_matching_preserves_cardinality_when_greedy_would_lose_a_match() {
+        let truth = graph(
+            "human",
+            vec![
+                node("A", AnnotatedJunctionKind::Branch, 0.0, 0.0, 0.0),
+                node("B", AnnotatedJunctionKind::Branch, 2.0, 0.0, 0.0),
+            ],
+            Vec::new(),
+        );
+        let prediction = graph(
+            "model",
+            vec![
+                node("p1", AnnotatedJunctionKind::Branch, 0.9, 0.0, 0.0),
+                node("p2", AnnotatedJunctionKind::Branch, -0.9, 0.0, 0.0),
+            ],
+            Vec::new(),
+        );
+        // A greedy nearest-neighbour pass taking p1->A first leaves p2
+        // unmatched. A global assignment must choose p1->B and p2->A.
+        let matches =
+            match_junctions_hungarian(&truth, &prediction, 2.0).unwrap();
+        assert_eq!(matches.len(), 2);
+        assert_eq!(
+            matches,
+            vec![
+                JunctionIdentityMatch {
+                    predicted_junction_id: "p1".to_string(),
+                    ground_truth_junction_id: "B".to_string(),
+                },
+                JunctionIdentityMatch {
+                    predicted_junction_id: "p2".to_string(),
+                    ground_truth_junction_id: "A".to_string(),
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn hungarian_matching_is_order_independent_and_respects_distance_cutoff() {
+        let truth = graph(
+            "human",
+            vec![
+                node("A", AnnotatedJunctionKind::Tip, 0.0, 0.0, 0.0),
+                node("B", AnnotatedJunctionKind::Tip, 4.0, 0.0, 0.0),
+            ],
+            Vec::new(),
+        );
+        let prediction = graph(
+            "model",
+            vec![
+                node("pA", AnnotatedJunctionKind::Tip, 0.1, 0.0, 0.0),
+                node("pB", AnnotatedJunctionKind::Tip, 4.1, 0.0, 0.0),
+            ],
+            Vec::new(),
+        );
+        let first = match_junctions_hungarian(&truth, &prediction, 0.5).unwrap();
+        let mut reordered_truth = truth.clone();
+        reordered_truth.junctions.reverse();
+        let mut reordered_prediction = prediction.clone();
+        reordered_prediction.junctions.reverse();
+        let second =
+            match_junctions_hungarian(&reordered_truth, &reordered_prediction, 0.5).unwrap();
+        assert_eq!(first, second);
+        assert_eq!(first.len(), 2);
+
+        let distant = graph(
+            "model",
+            vec![node("far", AnnotatedJunctionKind::Tip, 10.0, 0.0, 0.0)],
+            Vec::new(),
+        );
+        assert!(
+            match_junctions_hungarian(&truth, &distant, 0.5)
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn hungarian_matching_fails_closed_above_declared_size_limit() {
+        let truth_nodes: Vec<_> = (0..=MAX_AUTOMATIC_MATCH_JUNCTIONS_PER_GRAPH)
+            .map(|index| {
+                node(
+                    &format!("g{index:03}"),
+                    AnnotatedJunctionKind::Tip,
+                    index as f64,
+                    0.0,
+                    0.0,
+                )
+            })
+            .collect();
+        let prediction_nodes = truth_nodes
+            .iter()
+            .map(|value| {
+                node(
+                    &format!("p{}", value.id),
+                    value.kind,
+                    value.position.x,
+                    value.position.y,
+                    value.position.z,
+                )
+            })
+            .collect();
+        let truth = graph("human", truth_nodes, Vec::new());
+        let prediction = graph("model", prediction_nodes, Vec::new());
+        assert!(matches!(
+            match_junctions_hungarian(&truth, &prediction, 1.0),
+            Err(MycelialReconstructionError::AutomaticMatchingLimitExceeded { .. })
+        ));
+    }
+
+    #[test]
     fn perfect_reconstruction_scores_all_graph_layers_as_exact() {
         let truth = graph(
             "human_annotation",
