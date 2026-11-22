@@ -153,6 +153,13 @@ fn valid_sha256(value: &str) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
+fn required_u64(record: &Value, field: &str) -> Result<u64, String> {
+    record
+        .get(field)
+        .and_then(Value::as_u64)
+        .ok_or_else(|| format!("missing or invalid unsigned integer field {field}"))
+}
+
 fn parse_manifest(record: &Value) -> Result<(InputProvenance, String), String> {
     if required_string(record, "schema_version")? != INPUT_SCHEMA {
         return Err("unsupported intervention manifest schema version".to_string());
@@ -191,13 +198,78 @@ fn parse_manifest(record: &Value) -> Result<(InputProvenance, String), String> {
     {
         return Err("intervention manifest has invalid source_revision".to_string());
     }
+
     let manifest_sha256 = required_string(record, "manifest_sha256")?.to_string();
     if !valid_sha256(&manifest_sha256) {
         return Err("invalid manifest_sha256".to_string());
     }
+
+    // Reconstruct exactly the candidate runner's hashed payload. Metadata
+    // outside this payload (run ID, pair block, source digests) is separately
+    // validated and bound by the reducer's run-level provenance checks.
+    let public_seed = required_u64(record, "public_seed")?;
+    let baseline_evidence_sha256 =
+        required_string(record, "baseline_evidence_sha256")?.to_string();
+    if !valid_sha256(&baseline_evidence_sha256) {
+        return Err("invalid baseline_evidence_sha256 in intervention manifest".to_string());
+    }
+    let max_root_pairs = required_u64(record, "max_root_pairs")?;
+    let declared_intervention_count = required_u64(record, "intervention_count")?;
+    let interventions = record
+        .get("interventions")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "missing or invalid interventions array".to_string())?;
+
+    if usize::try_from(declared_intervention_count).ok() != Some(interventions.len()) {
+        return Err("intervention_count does not match interventions array length".to_string());
+    }
+
+    let count_kind = |kind: &str| -> Result<u64, String> {
+        let mut count = 0_u64;
+        for intervention in interventions {
+            let actual_kind = required_string(intervention, "kind")?;
+            if actual_kind == kind {
+                count = count
+                    .checked_add(1)
+                    .ok_or_else(|| format!("intervention count overflow for {kind}"))?;
+            }
+        }
+        Ok(count)
+    };
+
+    let actual_root_pair_count = count_kind("source_root_pair")?;
+    let actual_matched_random_count = count_kind("matched_random")?;
+    let root_pair_count = required_u64(record, "root_pair_count")?;
+    let matched_random_count = required_u64(record, "matched_random_count")?;
+    let unmatched_random_target_count =
+        required_u64(record, "unmatched_random_target_count")?;
+
+    if root_pair_count != actual_root_pair_count {
+        return Err("root_pair_count does not match interventions array".to_string());
+    }
+    if matched_random_count != actual_matched_random_count {
+        return Err("matched_random_count does not match interventions array".to_string());
+    }
+
+    let manifest_payload = serde_json::to_vec(&json!({
+        "schema_version": INPUT_SCHEMA,
+        "seed": public_seed,
+        "baseline_evidence_sha256": baseline_evidence_sha256,
+        "max_root_pairs": max_root_pairs,
+        "root_pair_count": root_pair_count,
+        "matched_random_count": matched_random_count,
+        "unmatched_random_target_count": unmatched_random_target_count,
+        "interventions": interventions
+    }))
+    .map_err(|error| format!("serialize intervention manifest payload: {error}"))?;
+    let computed_manifest_sha256 =
+        hex_digest(Sha256::digest(manifest_payload).as_slice());
+    if computed_manifest_sha256 != manifest_sha256 {
+        return Err("intervention manifest digest does not match canonical payload".to_string());
+    }
+
     Ok((provenance, manifest_sha256))
 }
-
 fn parse_score(record: &Value) -> Result<(TaskKey, MethodKind, Metrics), String> {
     if required_string(record, "schema_version")? != INPUT_SCHEMA {
         return Err("unsupported input schema version".to_string());
@@ -680,28 +752,88 @@ mod tests {
     }
 
     fn manifest_record(run_id: &str, source_sha: &str) -> Value {
+        let baseline_evidence_sha256 = "a".repeat(64);
+        let public_seed = 17_u64;
+        let max_root_pairs = 8_u64;
+        let root_pair_count = 0_u64;
+        let matched_random_count = 0_u64;
+        let unmatched_random_target_count = 0_u64;
+        let interventions = Vec::<Value>::new();
+        let payload = serde_json::to_vec(&json!({
+            "schema_version": INPUT_SCHEMA,
+            "seed": public_seed,
+            "baseline_evidence_sha256": baseline_evidence_sha256,
+            "max_root_pairs": max_root_pairs,
+            "root_pair_count": root_pair_count,
+            "matched_random_count": matched_random_count,
+            "unmatched_random_target_count": unmatched_random_target_count,
+            "interventions": interventions
+        }))
+        .unwrap();
+        let manifest_sha256 = hex_digest(Sha256::digest(payload).as_slice());
+
         json!({
             "schema_version": INPUT_SCHEMA,
             "record_type": "intervention_manifest",
             "run_id": run_id,
+            "pair_block_id": "world-1:task-manifest-test",
+            "manifest_sha256": manifest_sha256,
+            "baseline_evidence_sha256": baseline_evidence_sha256,
+            "public_seed": public_seed,
+            "intervention_count": 0,
+            "interventions": interventions,
+            "max_root_pairs": max_root_pairs,
+            "root_pair_count": root_pair_count,
+            "matched_random_count": matched_random_count,
+            "unmatched_random_target_count": unmatched_random_target_count,
             "source_code_sha256": source_sha,
             "fixture_sha256": "b".repeat(64),
             "schema_sha256": "c".repeat(64),
-            "source_revision": "d".repeat(40),
-            "manifest_sha256": "e".repeat(64)
+            "source_revision": "d".repeat(40)
         })
     }
 
     #[test]
-    fn manifest_provenance_requires_canonical_hashes() {
+    fn manifest_provenance_and_canonical_payload_digest_are_verified() {
         let valid = manifest_record("run-1", &"a".repeat(64));
         let (provenance, manifest_sha) = parse_manifest(&valid).unwrap();
         assert_eq!(provenance.run_id, "run-1");
         assert_eq!(provenance.source_revision.as_deref().map(str::len), Some(40));
-        assert_eq!(manifest_sha, "e".repeat(64));
+        assert!(valid_sha256(&manifest_sha));
 
         let invalid = manifest_record("run-1", "not-a-sha");
         assert!(parse_manifest(&invalid).is_err());
+    }
+
+    #[test]
+    fn manifest_rejects_intervention_mutation_with_stale_digest() {
+        let mut record = manifest_record("run-1", &"a".repeat(64));
+        record["intervention_count"] = json!(1);
+        record["interventions"] = json!([{
+            "intervention_id": "event:1",
+            "kind": "event",
+            "target_key": "event:1",
+            "removed_event_ids": [1],
+            "matched_to": null
+        }]);
+        let error = parse_manifest(&record).unwrap_err();
+        assert!(error.contains("digest does not match"));
+    }
+
+    #[test]
+    fn manifest_rejects_intervention_count_mismatch() {
+        let mut record = manifest_record("run-1", &"a".repeat(64));
+        record["intervention_count"] = json!(1);
+        let error = parse_manifest(&record).unwrap_err();
+        assert!(error.contains("intervention_count"));
+    }
+
+    #[test]
+    fn manifest_rejects_root_pair_count_mismatch() {
+        let mut record = manifest_record("run-1", &"a".repeat(64));
+        record["root_pair_count"] = json!(1);
+        let error = parse_manifest(&record).unwrap_err();
+        assert!(error.contains("root_pair_count"));
     }
 
     #[test]
