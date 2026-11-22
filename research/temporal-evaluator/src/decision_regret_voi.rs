@@ -131,7 +131,10 @@ impl fmt::Display for RobustObservationVoiError {
                 candidate_visible_outcome_sha256,
                 first_available_at_us,
                 conflicting_available_at_us,
-            } => write!(formatter, "candidate-visible transcript digest {candidate_visible_outcome_sha256:02x?} binds conflicting availability times {first_available_at_us} and {conflicting_available_at_us}"),
+            } => {
+                let _ = candidate_visible_outcome_sha256;
+                write!(formatter, "candidate-visible transcript digest binds conflicting availability times {first_available_at_us} and {conflicting_available_at_us}")
+            },
             Self::ArithmeticOverflow => write!(formatter, "robust observation-regret arithmetic overflowed"),
             Self::DecisionObservability(error) => write!(formatter, "base decision-observability qualification failed: {error}"),
         }
