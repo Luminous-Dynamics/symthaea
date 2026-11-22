@@ -105,7 +105,13 @@ jobs:
             and .finite_translation_oracle.product_group_target_cases == 66447
             and .finite_translation_oracle.product_group_row_indicator_cases == 132894
             and .finite_translation_oracle.total_group_target_cases == 67067
-            and .finite_translation_oracle.total_row_indicator_cases == 134134' \
+            and .finite_translation_oracle.total_row_indicator_cases == 134134
+            and .finite_translation_oracle.status == "passed_exact_head_ci"
+            and .finite_translation_oracle.ci_receipt.tested_pr_head == "861db995fc80aa52c3339233fd6ce0cec0168458"
+            and .finite_translation_oracle.ci_receipt.workflow_run_id == 45075362857
+            and .finite_translation_oracle.ci_receipt.rust_tests_passed == 11
+            and .finite_translation_oracle.ci_receipt.rust_tests_failed == 0
+            and .finite_translation_oracle.ci_receipt.conclusion == "success"' \
             docs/research/RH_MAIN_INEQUALITY_M_MAP_V1.json >/dev/null
 
           echo "RH_PROOF_GRAPH_AND_M_MAP_FIXTURES_PASS"
