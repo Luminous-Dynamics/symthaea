@@ -12,6 +12,7 @@ A dependency-free Rust research crate for repeatability-calibrated comparison of
 - Direct edge-polarity transition counts, including neutral-band transitions.
 - Synthetic Gaussian-factor null/injection calibration plus a shared observation-only common-mode nuisance challenge in `src/simulation.rs`.
 - Separate graph-Laplacian spatial nuisance generators in `src/spatial_nuisance.rs`: graph-smooth low-rank fields and localized heat-kernel fields, with deterministic per-mode RNG substreams and optional target-process coupling.
+- Event-triggered broad and graph-localized exponential transient nuisance in `src/motion_transient.rs`, with explicit event onsets, signed amplitudes and decay constants.
 - Matched signal-plus-nuisance dose response, with the same deterministic innovation stream as its nuisance-only counterfactual and separate direction-aware recovery outputs.
 - Draft 2020-12 schemas and semantic validation for RCAF result receipts.
 
@@ -209,4 +210,4 @@ Run the multi-family smoke fixture:
 cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_factorial_counterfactual
 ```
 
-The fixture applies the same target signal to three synthetic nuisance families: common-mode, graph-smooth low-rank and localized heat-kernel. The latter two are calibrated to a common component-variance target. This example is a software integration fixture, not a physical or biological simulation. The output contract is `factorial-counterfactual.schema.json`.
+The fixture applies the same target signal to three synthetic nuisance families: common-mode, graph-smooth low-rank and localized heat-kernel. The latter two are calibrated to a common component-variance target. This example is a software integration fixture, not a physical or biological simulation. The output contract is `factorial-counterfactual.schema.json`. The complete design, benchmark targets and industry comparison protocol are specified in `docs/neuroscience/RCAF_FACTORIAL_COUNTERFACTUAL_ENGINE_V1.md`.
