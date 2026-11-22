@@ -2,9 +2,7 @@ use std::error::Error;
 use std::f64::consts::TAU;
 
 use plasma_vlasov_reference::echo_analysis::{EchoPulsePair, predict_two_pulse_echo};
-use plasma_vlasov_reference::{
-    VlasovPoisson1d1v, VlasovPoissonConfig, maxwellian_perturbation,
-};
+use plasma_vlasov_reference::{VlasovPoisson1d1v, VlasovPoissonConfig, maxwellian_perturbation};
 
 const DT: f64 = 0.05;
 const SECOND_PULSE_TIME: f64 = 80.0;
@@ -130,8 +128,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let coarse_initial =
         maxwellian_perturbation(coarse_config, INITIAL_AMPLITUDE, FIRST_MODE, 1.0)?;
-    let fine_initial =
-        maxwellian_perturbation(fine_config, INITIAL_AMPLITUDE, FIRST_MODE, 1.0)?;
+    let fine_initial = maxwellian_perturbation(fine_config, INITIAL_AMPLITUDE, FIRST_MODE, 1.0)?;
     let mut coarse_pulse = VlasovPoisson1d1v::new(coarse_config, coarse_initial.clone())?;
     let mut coarse_control = VlasovPoisson1d1v::new(coarse_config, coarse_initial)?;
     let mut fine_pulse = VlasovPoisson1d1v::new(fine_config, fine_initial.clone())?;
@@ -144,9 +141,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut sponge_control_removed_c2 = 0.0;
     let mut sponge_removed_f_strophy = 0.0;
     let mut sponge_control_removed_f_strophy = 0.0;
-    let initial_field_coarse = coarse_pulse.electric_mode_coefficient(prediction.echo_mode as usize)?;
+    let initial_field_coarse =
+        coarse_pulse.electric_mode_coefficient(prediction.echo_mode as usize)?;
     let initial_field_fine = fine_pulse.electric_mode_coefficient(prediction.echo_mode as usize)?;
-    let initial_field_sponge = sponge_pulse.electric_mode_coefficient(prediction.echo_mode as usize)?;
+    let initial_field_sponge =
+        sponge_pulse.electric_mode_coefficient(prediction.echo_mode as usize)?;
 
     let second_kick: Vec<f64> = (0..coarse_config.nx)
         .map(|ix| {
@@ -160,7 +159,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut fine_trace = Vec::new();
     let mut sponge_trace = Vec::new();
 
-    println!("trace_columns,time,coarse_real,coarse_imag,fine_real,fine_imag,sponge_real,sponge_imag");
+    println!(
+        "trace_columns,time,coarse_real,coarse_imag,fine_real,fine_imag,sponge_real,sponge_imag"
+    );
     for step in 0..=total_steps {
         if step == pulse_step {
             coarse_pulse.apply_velocity_impulse(&second_kick)?;
@@ -262,8 +263,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let sponge_peak = measure_peak(&sponge_trace);
     let sponge_final_c2 = sponge_pulse.quadratic_casimir_budget()?.total_casimir;
     let sponge_direct_c2_drop = initial_c2 - sponge_final_c2;
-    let c2_closure_error = (sponge_removed_c2 - sponge_direct_c2_drop).abs()
-        / initial_c2.abs().max(f64::MIN_POSITIVE);
+    let c2_closure_error =
+        (sponge_removed_c2 - sponge_direct_c2_drop).abs() / initial_c2.abs().max(f64::MIN_POSITIVE);
 
     println!(
         "summary,case,nv,t_nyquist,t_recurrence,echo_mode,predicted_rephase_time,coarse_peak_time,coarse_amplitude,coarse_phase,coarse_fwhm,fine_peak_time,fine_amplitude,fine_phase,fine_fwhm,sponge_peak_time,sponge_amplitude,sponge_phase,sponge_fwhm,sponge_to_fine_amplitude_ratio,sponge_pulse_removed_C2_fraction,sponge_C2_closure_error,sponge_pulse_removed_f_strophy,sponge_control_removed_C2_fraction,sponge_control_removed_f_strophy,coarse_initial_E,fine_initial_E,sponge_initial_E"
@@ -299,4 +300,3 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
     Ok(())
 }
-
