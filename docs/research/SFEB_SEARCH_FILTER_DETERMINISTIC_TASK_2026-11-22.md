@@ -1,12 +1,14 @@
 # SFEB-L2-005: deterministic search/filter task slice
 
 **Date:** 2026-11-22  
-**Status:** original reference fixture and golden contract authored; Rust execution and browser qualification pending
+**Status:** reference fixture authored; Leptos candidate source added; Rust/WASM and full browser qualification pending
 
-The task fixes search over name/SKU/description, category and availability conjunction, inclusive integer-cent bounds exercised at exact asset-price boundaries, deterministic ID tie-breaking for all sorts, filter-then-sort-then-paginate semantics, and a complete state-URL round trip.
+The task defines trimmed ASCII case-insensitive search over name/SKU/description, conjunctive category and stock filters, inclusive integer-cent price boundaries, deterministic ID tie-breaking, filter-sort-pagination semantics and complete query-state URL restoration. Its fixture contains 13 synthetic assets, eleven golden cases, ten mutation hypotheses, five positive controls and five metamorphic relations. One description contains an inert HTML-injection canary for a future browser text-node assertion.
 
-The public-pilot fixture contains 13 synthetic asset records, eleven golden positive/negative cases, ten mutation hypotheses, five positive controls and five metamorphic relations. The data has no credentials or network dependencies. One synthetic description contains an inert HTML-injection canary so browser tests can assert that untrusted strings remain text nodes.
+A Leptos 0.8.20 CSR candidate is present under `benchmarks/frontend/solutions/sfeb-l2-search-filter-reference/`. It uses the same pure Rust evaluator/query codec as the standalone contract checker. It is source-authored but has not been compiled or browser-run.
 
-The standalone checker now has a `--search-filter-model` path backed by a pure Rust module. Unit tests cover the eleven golden cases, case-fold invariance, filter-subset monotonicity, stable ties, page concatenation, URL round-trip and reversed-range rejection.
+An independent JavaScript evaluator matched all 11 golden cases and passed 5,000 deterministic generated query states. Nine of nine simulated semantic faults were detected. This is a model/oracle sensitivity preflight, not a compiled-candidate mutation campaign. The canary has only a source-level escaping audit.
 
-This reference model is not a Leptos implementation and does not establish browser behavior. Keyboard access, actual candidate semantics, accessibility-tree output, responsive layout, network policy and visual quality remain browser qualification gates. The mutation campaign is specified but not executed; no mutation kill rate or oracle qualification is claimed. Independent sensitivity preflight identified and repaired the missing exact-boundary and hostile-text coverage before any agent score is reported.
+A local Chromium/Playwright preflight of the static reference fixture exposed a 390px input-width overflow. The input sizing rule `.field input,.field select{width:100%;min-width:0}` removes document-level horizontal overflow across 320/390/768/1280/1440 widths. Keyboard skip-link focus and reduced-motion media emulation were also checked. These checks concern the static reference fixture, not the Leptos candidate.
+
+Rust compilation/tests/format/Clippy, WASM build, candidate-browser tests, complete keyboard/accessibility-tree checks, enforced egress policy and independent browser oracle replay remain outstanding. The task is not yet runnable.
