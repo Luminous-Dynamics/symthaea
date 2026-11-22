@@ -286,3 +286,59 @@ No retrieval gain, decision-utility improvement, benchmark score, causal suffici
 - CL-Bench: https://arxiv.org/abs/2602.03587
 - MCB / Memory–Clarification Boundary: https://aclanthology.org/2026.nora-1.2/
 - Agentic Abstention, NeurIPS 2026: https://lhannnn.github.io/agentic-abstention/
+
+
+---
+
+## 11. MACE Evidence Dependency Knockout Audit v0.1 — first executable tranche (2026-11-22)
+
+**Implementation:** research/broca-mace-transfer-bench-v0-1/evaluator/src/bin/mace_evidence_dependency_audit.rs  
+**Record contract:** data/schemas/mace_evidence_dependency_audit_v0_1.schema.json  
+**Branch:** research/mace-evidence-dependency-knockouts-v0-1
+
+This follow-on turns part of the v0.1 intervention specification into an executable diagnostic. It does not modify the production allocator, the MACE causal policy or the typed HDC retrieval arm.
+
+### Implemented
+
+- A canonical EvidenceDependencyIndex rejects duplicate event identities, missing predecessors, repeated/self references and cyclic dependency graphs.
+- Event closure follows transitive derived descendants; source-root closure unifies records that share a root even when their family labels differ; source-family closure removes every member of that family and its descendants; lifecycle closure follows supersession links in both directions and then removes dependent descendants; two-root coalitions union root closures.
+- A deterministic intervention planner generates full-evidence reference, event, root, family, lifecycle and bounded two-root-coalition knockouts.
+- Matched random controls preserve the removed (action, in-memory payload-size) histogram, exclude the target's removed root/family identities and are retained only when their distinct root/family counts match. If an exact match cannot be constructed, the control is omitted rather than weakened.
+- Each intervention is passed through the unchanged CausalQualified policy. Evaluator-only records score utility, absolute regret, regret added versus full evidence, decision flips, invalid evidence use, and remaining event/root/family counts.
+- Candidate decisions and evaluator scores are written to separate JSONL files. Candidate records contain the digest of the actual candidate-visible evidence set and task DecisionNeed; they omit intervention kind/target and scenario-family labels. Evaluator rows carry the same candidate-input digest for offline pairing.
+- The JSON Schema defines the manifest, candidate, evaluator, rejected-block and summary records.
+- Authored unit tests cover transitive closure, same-root aliases with different family labels, family closures, supersession closure, root coalitions, unknown roots, duplicate IDs, missing links, cycles, matched-control determinism/identity balance, candidate-input digest changes, and candidate/evaluator separation.
+
+### Critical lineage limitation
+
+The current Experience projection contains event identity, source-family identity and source-root identity, but does not contain derived_from or supersedes references. The generated-world adapter therefore supplies zero dependency/lifecycle edges. On the generated data, event closure is a singleton and lifecycle-closure rows are not produced. Explicit synthetic graph edges are exercised by unit tests only.
+
+This is intentional: the audit must not invent causal ancestry from shared roots or event order. To turn event/lifecycle closures into benchmark interventions, the next integration must export verified derived-view, correction and supersession lineage from receipt-preserving ingress/consolidation records into a candidate-visible dependency sidecar, and bind that sidecar into the candidate-input digest. A missing or unverifiable edge must not be treated as evidence of independence.
+
+The root/family relationships exercised by the current generated fixtures are still synthetic. SourceRootDigest values are fixture identities, not independent Mycelix attestations. payload_bytes is size_of<Experience>, an in-memory lower bound; this first control does not match serialized sidecars, evidence receipts or token cost. A source-count match is not semantic exchangeability.
+
+### Run and validate
+
+~~~bash
+MACE_SOURCE_REVISION="$(git rev-parse HEAD)" \
+cargo run --release \
+  --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml \
+  -p broca-mace-evaluator \
+  --bin mace_evidence_dependency_audit \
+  -- 64 /tmp/mace-dependency-candidate.jsonl \
+     /tmp/mace-dependency-evaluator.jsonl \
+     /tmp/mace-dependency-summary.jsonl
+
+cargo test \
+  --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml \
+  -p broca-mace-evaluator \
+  --bin mace_evidence_dependency_audit
+~~~
+
+The candidate/evaluator JSONL streams are deliberately separate, but the evaluator source and labels remain public and co-located in this research workspace. This is not independent evaluator custody. The summary is descriptive and does not emit confirmatory confidence intervals; a later qualification must freeze a primary intervention contrast and cluster-level inference plan before opening held-out labels.
+
+### Verification and claim boundary
+
+At authoring time, no cargo, rustc or rustfmt executable is available in the execution environment. The Rust tests are authored but not executed; no compile, formatting, runner or CI pass is claimed. The JSON Schema text was parsed as JSON at authoring time, but no external JSON-Schema validator has been run. No utility gain, causal sufficiency result, external benchmark score, physical intervention authority or SOTA advantage is claimed.
+
+The immediate next integration is a verifier-issued dependency sidecar from Mycelix/Symtropy/ingress, followed by schema validation, exact-head Cargo execution, hidden evaluator custody, and matched semantic/byte/token baselines.
