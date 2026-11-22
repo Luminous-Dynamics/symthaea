@@ -472,6 +472,8 @@ fn summarize(
     let mut positive_count = 0usize;
     let mut hit_at_1 = 0usize;
     let mut hit_at_3 = 0usize;
+    let mut recall_at_1_sum = 0.0;
+    let mut recall_at_3_sum = 0.0;
     let mut reciprocal_rank_sum = 0.0;
     let mut ndcg_at_3_sum = 0.0;
     let mut precision_at_3_sum = 0.0;
@@ -480,27 +482,32 @@ fn summarize(
     let mut details = Vec::new();
 
     for (query, ranking) in queries.iter().zip(rankings) {
-        let positions = rank_positions(ranking);
         if query.is_positive {
             positive_count += 1;
-            let relevant_positions: Vec<usize> = ranking
+            let positions = rank_positions(ranking);
+            let mut relevant_positions: Vec<usize> = query
+                .expected
                 .iter()
-                .enumerate()
-                .filter_map(|(index, item)| {
-                    query.expected.contains(&item.id).then_some(index + 1)
-                })
+                .filter_map(|pattern_id| positions.get(pattern_id).copied())
                 .collect();
-            if let Some(rank) = relevant_positions.first().copied() {
-                reciprocal_rank_sum += 1.0 / rank as f64;
-                if rank == 1 {
-                    hit_at_1 += 1;
-                }
-            }
+            relevant_positions.sort_unstable();
 
+            let relevant_at_1 = relevant_positions.iter().filter(|rank| **rank <= 1).count();
             let relevant_at_3 = relevant_positions.iter().filter(|rank| **rank <= 3).count();
+            let relevant_total = query.expected.len().max(1) as f64;
+
+            recall_at_1_sum += relevant_at_1 as f64 / relevant_total;
+            recall_at_3_sum += relevant_at_3 as f64 / relevant_total;
+            if relevant_at_1 > 0 {
+                hit_at_1 += 1;
+            }
             if relevant_at_3 > 0 {
                 hit_at_3 += 1;
             }
+            if let Some(rank) = relevant_positions.first().copied() {
+                reciprocal_rank_sum += 1.0 / rank as f64;
+            }
+
             precision_at_3_sum += relevant_at_3 as f64 / 3.0;
 
             let dcg = relevant_positions
@@ -547,8 +554,10 @@ fn summarize(
         "method": method,
         "positive_queries": positive_count,
         "hard_negative_queries": negative_top_scores.len(),
-        "recall_at_1": hit_at_1 as f64 / n,
-        "recall_at_3": hit_at_3 as f64 / n,
+        "recall_at_1": recall_at_1_sum / n,
+        "recall_at_3": recall_at_3_sum / n,
+        "hit_rate_at_1": hit_at_1 as f64 / n,
+        "hit_rate_at_3": hit_at_3 as f64 / n,
         "mean_reciprocal_rank": reciprocal_rank_sum / n,
         "ndcg_at_3": ndcg_at_3_sum / n,
         "precision_at_3": precision_at_3_sum / n,
@@ -776,6 +785,27 @@ mod tests {
         assert_eq!(summary["recall_at_3"], 1.0);
         assert!((summary["precision_at_3"].as_f64().unwrap() - (2.0 / 3.0)).abs() < 1e-12);
         assert_eq!(summary["ndcg_at_3"], 1.0);
+    }
+
+    #[test]
+    fn recall_and_hit_rate_are_distinct_for_multi_relevant_queries() {
+        let queries = vec![Query {
+            id: "q-partial".into(),
+            text: "related patterns".into(),
+            expected: HashSet::from(["p1".to_string(), "p2".to_string()]),
+            is_positive: true,
+        }];
+        let rankings = vec![vec![
+            Ranked { id: "p1".into(), score: 1.0 },
+            Ranked { id: "p3".into(), score: 0.9 },
+            Ranked { id: "p4".into(), score: 0.8 },
+        ]];
+        let summary = summarize("test", &queries, &rankings, &[0.1]);
+
+        assert_eq!(summary["recall_at_1"], 0.5);
+        assert_eq!(summary["recall_at_3"], 0.5);
+        assert_eq!(summary["hit_rate_at_1"], 1.0);
+        assert_eq!(summary["hit_rate_at_3"], 1.0);
     }
 
     #[test]
