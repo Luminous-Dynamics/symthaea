@@ -15,7 +15,7 @@ use std::time::Instant;
 
 use broca_mace_hdc_retrieval::experience_view_digest;
 use broca_mace_policy::{
-    decide, Action, Decision, DecisionNeedV1, Experience, Policy, Query, Scope, SourceRootDigest,
+    decide, Action, Decision, DecisionNeedV1, Experience, Policy, Query, SourceRootDigest,
 };
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -336,10 +336,24 @@ fn build_manifest(
         push_intervention(
             &mut interventions,
             InterventionKind::SourceFamily,
-            key,
-            ids,
+            key.clone(),
+            ids.clone(),
             None,
         );
+
+        if let Some(random_ids) = matched_random_ids(
+            &index,
+            &ids,
+            public_seed ^ stable_key_seed(&key),
+        ) {
+            push_intervention(
+                &mut interventions,
+                InterventionKind::MatchedRandom,
+                format!("matched:{key}"),
+                random_ids,
+                Some(key),
+            );
+        }
     }
 
     let mut emitted_pairs = 0_usize;
@@ -749,6 +763,24 @@ mod tests {
         assert!(group.1.contains(&memory[0].event_id));
         let retained = index.retain_without(&group.1);
         assert!(retained.iter().all(|item| item.source_family != family));
+    }
+
+    #[test]
+    fn source_family_knockout_removes_multiple_alias_events() {
+        let mut memory = first_memory();
+        let shared_family = memory[0].source_family;
+        memory[1].source_family = shared_family;
+
+        let index = EvidenceDependencyIndex::build(&memory).unwrap();
+        let group = index
+            .family_groups()
+            .find(|(key, _)| key == &format!("family:{shared_family}"))
+            .unwrap();
+        assert!(group.1.contains(&memory[0].event_id));
+        assert!(group.1.contains(&memory[1].event_id));
+
+        let retained = index.retain_without(&group.1);
+        assert!(retained.iter().all(|item| item.source_family != shared_family));
     }
 
     #[test]
