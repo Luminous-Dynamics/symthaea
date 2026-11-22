@@ -58,9 +58,9 @@ The fixture is synthetic and MIDI-style. It proves only deterministic evaluator 
 
 ## Beat-phase and tempo-adaptation audit
 
-The musical timing evaluator scores signed/absolute beat-phase error, error distributions and per-instrument strata, target/missed/extra event accounting, descriptive phase drift and recovery after tempo changes using consecutive stable estimates. Each estimate binds the end of the evidence window; future evidence is rejected.
+The musical timing evaluator consumes expected onset and local beat-period values from the canonical #9477 time mapper, bound by map ID/version/kind and a receipt digest. It does not implement a second beat-to-time map. It scores signed/absolute beat-phase error, per-instrument strata, target/missed/extra event accounting, descriptive phase drift and recovery after tempo changes using consecutive, spaced estimates. Each estimate binds the end of the evidence window; future evidence is rejected.
 
     cargo run --manifest-path tools/mel-judge-grounding-audit/Cargo.toml --bin mel-musical-timing-audit -- score \
-      tools/mel-judge-grounding-audit/fixtures/valid-musical-timing-v1.json report.json
+      tools/mel-judge-grounding-audit/fixtures/valid-musical-timing-v2.json report.json
 
 Its MIDI-style fixture is synthetic. No real timing or performance claim follows from the example output.
