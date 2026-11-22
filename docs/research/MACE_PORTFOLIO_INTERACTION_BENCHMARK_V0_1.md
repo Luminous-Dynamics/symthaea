@@ -1,4 +1,4 @@
-# MACE Portfolio Interaction Benchmark v0.1
+# MACE Portfolio Interaction Benchmark v0.2
 
 **Snapshot:** 2026-11-22  
 **Status:** Synthetic benchmark implementation and protocol; no measured result or SOTA claim.
@@ -28,7 +28,7 @@ The current synthetic world has six candidate items, a four-token budget, and on
 
 Training and calibration use distinct cluster IDs, source-root IDs and task-family IDs. Held-out candidate records also carry source-root IDs, and the candidate selector rejects a test root reused from either training or calibration. Held-out stable-regime tasks use another family and distinct clusters/roots. A shifted regime changes the underlying pair effects; the pairwise selector must abstain and fall back to the additive arm. Unknown relation features also force abstention rather than assuming zero interaction.
 
-The candidate model fits a mean interaction per relation class. It rejects duplicate cluster/relation observations, zero or reused source roots, missing per-cluster relation support, and mixed task-family identity within a cluster. It calibrates an empirical residual envelope on the calibration split, then uses the lower bound (mean minus radius) in selection. The selector rechecks the fitted-model digest before applying it. This is intentionally conservative but **not** a statistical confidence interval or proof of coverage. Held-out evaluation reports false-synergy and false-redundancy counts.
+The candidate model fits a mean interaction per relation class. It rejects duplicate cluster/relation observations, zero or reused source roots, missing per-cluster relation support, and mixed task-family identity within a cluster. The radius is the 90% split-conformal absolute-residual quantile using rank `ceil((n_calibration + 1) × 0.90)`; selection uses the resulting lower bound. The selector rechecks the fitted-model digest before applying it. Under exchangeability of calibration and future residuals within a relation class, this gives a finite-sample marginal prediction-interval coverage guarantee for correctly classified relation labels. It is not a confidence interval for the mean and does not guarantee conditional coverage under task-, source- or regime-shift. This is intentionally conservative but **not** a statistical confidence interval or proof of coverage. Held-out evaluation reports false-synergy and false-redundancy counts.
 
 ## Metrics
 
@@ -39,6 +39,8 @@ Report independently:
 - actual complementary synergy captured;
 - false synergy: predicted positive lower bound but realized interaction is non-positive;
 - false redundancy: predicted negative upper bound but realized interaction is non-negative;
+- empirical prediction-interval coverage, reported separately for correctly classified stable and shifted relation features;
+- relation-feature misclassification and unknown-feature counts, so interval coverage is never conflated with classifier accuracy;
 - pairwise abstention rate after unknown features or regime shift;
 - selected items, context-token spend and worst-case regret.
 
@@ -52,7 +54,7 @@ Five deterministic seeds are run. For each seed:
 - 64 held-out stable-regime clusters from task family 4;
 - 32 shifted-regime negative-control clusters from task family 5.
 
-The relation model is fitted only on training outcomes; its empirical radius uses calibration outcomes; no held-out outcome is passed into the candidate selector. Cluster, source-root and task-family identities are disjoint by construction.
+The relation model is fitted only on training outcomes; its split-conformal residual quantile uses calibration outcomes; no held-out outcome is passed into the candidate selector. The runner reports held-out interval coverage only on correctly classified, known relation labels, with relation-label errors and unknown labels counted separately. Cluster, source-root and task-family identities are disjoint by construction.
 
 ## Qualification targets (not results)
 
@@ -65,7 +67,7 @@ The relation model is fitted only on training outcomes; its empirical radius use
 
 ## Limitations and next tranche
 
-This v0.1 diagnostic uses a small, explicit relationship vocabulary and a synthetic relation-feature generator. It does not yet estimate semantic overlap from embeddings, learn complementary sets larger than pairs, handle higher-order interactions, or replace the exact additive production portfolio. The empirical calibration radius is an observed residual envelope, not a probabilistic guarantee. No benchmark leaderboard result is implied.
+This v0.1 diagnostic uses a small, explicit relationship vocabulary and a synthetic relation-feature generator. It does not yet estimate semantic overlap from embeddings, learn complementary sets larger than pairs, handle higher-order interactions, or replace the exact additive production portfolio. The split-conformal interval has a marginal finite-sample coverage guarantee only under within-relation exchangeability and correct relation labels. The benchmark also reports observed stable/shifted coverage separately; it does not claim conditional coverage or robustness to distribution shift. No benchmark leaderboard result is implied.
 
 Next:
 1. Connect candidate interaction features to the real decision-capsule/evidence graph, not item IDs or opaque labels.
@@ -77,4 +79,4 @@ Next:
 
 ## Source verification status
 
-The implementation contains **13 authored Rust unit tests** by source count. These tests have not been executed in the current environment: `cargo`, `rustc` and `rustfmt` are unavailable. No compile, test, formatting, emitted-output, CI or benchmark run pass is claimed. The authored count is not an executed-test count.
+The implementation contains **16 authored Rust unit tests** by source count. These tests have not been executed in the current environment: `cargo`, `rustc` and `rustfmt` are unavailable. No compile, test, formatting, emitted-output, CI or benchmark run pass is claimed. The authored count is not an executed-test count.

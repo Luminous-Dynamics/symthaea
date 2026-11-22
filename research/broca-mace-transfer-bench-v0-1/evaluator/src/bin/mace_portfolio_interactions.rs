@@ -90,6 +90,30 @@ struct TrainingPair {
     observed_interaction_micros: i64,
 }
 
+const PAIRWISE_COVERAGE_BPS: u32 = 9_000;
+
+fn conformal_radius_micros(
+    mut residuals: Vec<u64>,
+    coverage_bps: u32,
+) -> Result<u64, FitError> {
+    if residuals.is_empty() || coverage_bps == 0 || coverage_bps >= 10_000 {
+        return Err(FitError::InsufficientRelationSupport);
+    }
+    let numerator = (residuals.len() as u64 + 1)
+        .checked_mul(u64::from(coverage_bps))
+        .ok_or(FitError::ValueOverflow)?;
+    // Split-conformal rank is ceil((n + 1) * coverage).
+    let rank = numerator
+        .checked_add(9_999)
+        .ok_or(FitError::ValueOverflow)?
+        / 10_000;
+    if rank == 0 || rank > residuals.len() as u64 {
+        return Err(FitError::InsufficientRelationSupport);
+    }
+    residuals.sort_unstable();
+    Ok(residuals[(rank - 1) as usize])
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct RelationEstimate {
     mean_micros: i64,
@@ -98,6 +122,7 @@ struct RelationEstimate {
     upper_bound_micros: i64,
     train_count: usize,
     calibration_count: usize,
+    nominal_coverage_bps: u32,
 }
 
 #[derive(Clone, Debug)]
@@ -206,18 +231,16 @@ fn fit_pairwise_model(
             total.checked_add(row.observed_interaction_micros)
         }).ok_or(FitError::ValueOverflow)?;
         let mean = sum / train.len() as i64;
-        let mut radius = 0_u64;
+        let mut residuals = Vec::with_capacity(calibrate.len());
         for row in &calibrate {
             let residual = row
                 .observed_interaction_micros
                 .checked_sub(mean)
                 .ok_or(FitError::ValueOverflow)?
                 .unsigned_abs();
-            radius = radius.max(residual);
+            residuals.push(residual);
         }
-        // A one-unit pad avoids claiming a zero-width interval from a finite
-        // calibration sample. This remains an empirical envelope, not a CI.
-        radius = radius.checked_add(1).ok_or(FitError::ValueOverflow)?;
+        let radius = conformal_radius_micros(residuals, PAIRWISE_COVERAGE_BPS)?;
         let radius_i64 = i64::try_from(radius).map_err(|_| FitError::ValueOverflow)?;
         let lower = mean.checked_sub(radius_i64).ok_or(FitError::ValueOverflow)?;
         let upper = mean.checked_add(radius_i64).ok_or(FitError::ValueOverflow)?;
@@ -231,6 +254,7 @@ fn fit_pairwise_model(
                 upper_bound_micros: upper,
                 train_count: train.len(),
                 calibration_count: calibrate.len(),
+                nominal_coverage_bps: PAIRWISE_COVERAGE_BPS,
             },
         );
     }
@@ -260,6 +284,7 @@ fn model_digest(model: &PairwiseModel) -> String {
         fields.push(estimate.upper_bound_micros.to_string());
         fields.push(estimate.train_count.to_string());
         fields.push(estimate.calibration_count.to_string());
+        fields.push(estimate.nominal_coverage_bps.to_string());
     }
     fields.extend(model.train_clusters.iter().map(u64::to_string));
     fields.extend(model.calibration_clusters.iter().map(u64::to_string));
@@ -349,6 +374,7 @@ struct CandidatePortfolio {
 struct OracleTruth {
     singleton_values_micros: BTreeMap<u8, i64>,
     pair_values_micros: BTreeMap<(u8, u8), i64>,
+    true_relations: BTreeMap<(u8, u8), Relation>,
 }
 
 #[derive(Clone, Debug)]
@@ -410,6 +436,7 @@ fn generate_case(
 
     let mut pair_relations = BTreeMap::new();
     let mut pair_values = BTreeMap::new();
+    let mut true_relations = BTreeMap::new();
     for left in 0..items.len() as u8 {
         for right in (left + 1)..items.len() as u8 {
             let actual_relation = known_relation(left, right);
@@ -427,6 +454,7 @@ fn generate_case(
                 };
             }
             pair_relations.insert((left, right), candidate_relation);
+            true_relations.insert((left, right), actual_relation);
             let actual = base_interaction(actual_relation, regime) + rng.signed(1);
             pair_values.insert((left, right), actual);
         }
@@ -444,6 +472,7 @@ fn generate_case(
         truth: OracleTruth {
             singleton_values_micros: singleton_values,
             pair_values_micros: pair_values,
+            true_relations,
         },
     }
 }
@@ -570,6 +599,66 @@ fn actual_utility(ids: &[u8], truth: &OracleTruth) -> Option<i64> {
     Some(total)
 }
 
+#[derive(Clone, Copy, Debug, Default)]
+struct IntervalMetrics {
+    stable_correct_label_pairs: u64,
+    stable_covered_pairs: u64,
+    shifted_correct_label_pairs: u64,
+    shifted_covered_pairs: u64,
+    relation_label_errors: u64,
+    unknown_relation_pairs: u64,
+}
+
+fn update_interval_metrics(
+    metrics: &mut IntervalMetrics,
+    candidate: &CandidatePortfolio,
+    truth: &OracleTruth,
+    model: &PairwiseModel,
+) {
+    for left in 0..candidate.items.len() as u8 {
+        for right in (left + 1)..candidate.items.len() as u8 {
+            let key = pair_key(left, right);
+            let Some(true_relation) = truth.true_relations.get(&key) else {
+                continue;
+            };
+            let Some(predicted_relation) = candidate.pair_relations.get(&key) else {
+                metrics.unknown_relation_pairs += 1;
+                continue;
+            };
+            if *predicted_relation == Relation::Unknown {
+                metrics.unknown_relation_pairs += 1;
+                continue;
+            }
+            if predicted_relation != true_relation {
+                metrics.relation_label_errors += 1;
+                continue;
+            }
+            let Some(estimate) = model.estimates.get(predicted_relation) else {
+                continue;
+            };
+            let Some(actual) = truth.pair_values_micros.get(&key) else {
+                continue;
+            };
+            let covered = *actual >= estimate.lower_bound_micros
+                && *actual <= estimate.upper_bound_micros;
+            match candidate.regime {
+                Regime::Stable => {
+                    metrics.stable_correct_label_pairs += 1;
+                    if covered {
+                        metrics.stable_covered_pairs += 1;
+                    }
+                }
+                Regime::Shifted => {
+                    metrics.shifted_correct_label_pairs += 1;
+                    if covered {
+                        metrics.shifted_covered_pairs += 1;
+                    }
+                }
+            }
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default)]
 struct ArmMetrics {
     utility_sum: i64,
@@ -657,7 +746,9 @@ fn bootstrap_ci(differences: &[i64], samples: usize, seed: u64) -> Option<(f64, 
     ))
 }
 
-fn run_seed(seed: u64) -> Option<(ArmMetrics, ArmMetrics, Vec<i64>, usize)> {
+fn run_seed(
+    seed: u64,
+) -> Option<(ArmMetrics, ArmMetrics, Vec<i64>, usize, IntervalMetrics)> {
     let training = training_split(seed + 101, 1_000 + seed * 1_000, TRAIN_CLUSTERS, &[1, 2]);
     let calibration = training_split(
         seed + 202,
@@ -670,6 +761,7 @@ fn run_seed(seed: u64) -> Option<(ArmMetrics, ArmMetrics, Vec<i64>, usize)> {
     let mut additive = ArmMetrics::default();
     let mut pairwise = ArmMetrics::default();
     let mut differences = Vec::new();
+    let mut interval_metrics = IntervalMetrics::default();
     let mut cases = 0_usize;
     let mut unknown_abstentions = 0_usize;
 
@@ -690,6 +782,12 @@ fn run_seed(seed: u64) -> Option<(ArmMetrics, ArmMetrics, Vec<i64>, usize)> {
             return None;
         }
 
+        update_interval_metrics(
+            &mut interval_metrics,
+            &case.candidate,
+            &case.truth,
+            &model,
+        );
         let additive_selection = select_additive(&case.candidate)?;
         let pairwise_prediction = select_pairwise(&case.candidate, &model);
         let pairwise_selection = pairwise_prediction
@@ -729,11 +827,11 @@ fn run_seed(seed: u64) -> Option<(ArmMetrics, ArmMetrics, Vec<i64>, usize)> {
     }
 
     let _ = unknown_abstentions;
-    Some((additive, pairwise, differences, cases))
+    Some((additive, pairwise, differences, cases, interval_metrics))
 }
 
 fn report() {
-    println!("MACE portfolio interaction benchmark v0.1");
+    println!("MACE portfolio interaction benchmark v0.2");
     println!(
         concat!(
             "train_clusters={}, calibration_clusters={}, ",
@@ -751,13 +849,22 @@ fn report() {
             "false_redundancy,pairwise_abstentions"
         )
     );
+    println!(
+        concat!(
+            "interval_nominal_coverage_bps={}, ",
+            "stable_coverage_pct,stable_pairs,shifted_coverage_pct,",
+            "shifted_pairs,relation_label_errors,unknown_relation_pairs"
+        ),
+        PAIRWISE_COVERAGE_BPS
+    );
 
     let mut additive_total = ArmMetrics::default();
     let mut pairwise_total = ArmMetrics::default();
     let mut paired = Vec::new();
+    let mut interval_total = IntervalMetrics::default();
     let mut cases = 0_usize;
     for seed in 1..=5 {
-        let Some((additive, pairwise, differences, count)) = run_seed(seed) else {
+        let Some((additive, pairwise, differences, count, intervals)) = run_seed(seed) else {
             println!("ERROR,model_fit_or_case_generation_failed");
             return;
         };
@@ -778,6 +885,12 @@ fn report() {
         pairwise_total.false_redundancy += pairwise.false_redundancy;
         pairwise_total.pairwise_abstentions += pairwise.pairwise_abstentions;
         paired.extend(differences);
+        interval_total.stable_correct_label_pairs += intervals.stable_correct_label_pairs;
+        interval_total.stable_covered_pairs += intervals.stable_covered_pairs;
+        interval_total.shifted_correct_label_pairs += intervals.shifted_correct_label_pairs;
+        interval_total.shifted_covered_pairs += intervals.shifted_covered_pairs;
+        interval_total.relation_label_errors += intervals.relation_label_errors;
+        interval_total.unknown_relation_pairs += intervals.unknown_relation_pairs;
         cases += count;
     }
 
@@ -810,6 +923,26 @@ fn report() {
         println!("paired_cluster_bootstrap_95pct_ci_micros={:.3},{:.3}", lower, upper);
     }
     println!("pairwise_mean_regret_vs_evaluator_oracle_micros={:.3}", oracle_regret);
+    println!(
+        "stable_coverage_pct={:.2}",
+        100.0 * interval_total.stable_covered_pairs as f64
+            / interval_total.stable_correct_label_pairs.max(1) as f64
+    );
+    println!(
+        "stable_correctly_labelled_pairs={}",
+        interval_total.stable_correct_label_pairs
+    );
+    println!(
+        "shifted_coverage_pct={:.2}",
+        100.0 * interval_total.shifted_covered_pairs as f64
+            / interval_total.shifted_correct_label_pairs.max(1) as f64
+    );
+    println!(
+        "shifted_correctly_labelled_pairs={}",
+        interval_total.shifted_correct_label_pairs
+    );
+    println!("relation_label_errors={}", interval_total.relation_label_errors);
+    println!("unknown_relation_pairs={}", interval_total.unknown_relation_pairs);
     println!("cases={}", cases);
     println!("claim=synthetic_diagnostic_only_no_external_sota_claim");
 }
@@ -821,6 +954,35 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn split_conformal_quantile_uses_finite_sample_rank() {
+        let residuals = (1_u64..=48).collect::<Vec<_>>();
+        assert_eq!(conformal_radius_micros(residuals, 9_000), Ok(45));
+    }
+
+    #[test]
+    fn split_conformal_radius_is_not_the_maximum_residual() {
+        let mut residuals = (1_u64..=48).collect::<Vec<_>>();
+        residuals[47] = 10_000;
+        assert_eq!(conformal_radius_micros(residuals, 9_000), Ok(45));
+    }
+
+    #[test]
+    fn conformal_quantile_rejects_invalid_coverage_and_small_samples() {
+        assert_eq!(
+            conformal_radius_micros(vec![1, 2], 9_000),
+            Err(FitError::InsufficientRelationSupport)
+        );
+        assert_eq!(
+            conformal_radius_micros(vec![1, 2, 3], 10_000),
+            Err(FitError::InsufficientRelationSupport)
+        );
+        assert_eq!(
+            conformal_radius_micros(vec![1, 2, 3], 0),
+            Err(FitError::InsufficientRelationSupport)
+        );
+    }
 
     #[test]
     fn duplicate_training_observations_cannot_inflate_pair_support() {
