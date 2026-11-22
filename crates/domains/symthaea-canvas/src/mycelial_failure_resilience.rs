@@ -1005,6 +1005,39 @@ mod tests {
     }
 
     #[test]
+    fn anastomosis_cycle_preserves_demand_after_edge_failure_better_than_tree() {
+        let ring = triangle_graph();
+        let mut tree = triangle_graph();
+        tree.source_model_digest = "b".repeat(64);
+        tree.source_filament_ids = vec![1, 2];
+        tree.segments.retain(|segment| segment.id != "edge-ca");
+        tree.junctions[0].kind = JunctionKind::Tip;
+        tree.junctions[0].incident_filament_ids = vec![1];
+        tree.junctions[0].terminal_filament_ids = vec![1];
+        tree.junctions[1].kind = JunctionKind::Branch;
+        tree.junctions[1].terminal_filament_ids.clear();
+        tree.junctions[2].kind = JunctionKind::Tip;
+        tree.junctions[2].incident_filament_ids = vec![2];
+        tree.junctions[2].terminal_filament_ids = vec![2];
+        tree.junctions[2].anastomosis_ids.clear();
+
+        let scenario = MycelialFailureScenario {
+            scenario_id: "remove-edge-ab".to_string(),
+            failed_segment_ids: vec!["edge-ab".to_string()],
+            failed_junction_ids: Vec::new(),
+        };
+        let ring_profile =
+            build_mycelial_failure_resilience_profile(&ring, &demands(), &[scenario.clone()])
+                .unwrap();
+        let tree_profile =
+            build_mycelial_failure_resilience_profile(&tree, &demands(), &[scenario]).unwrap();
+        assert_eq!(ring_profile.scenarios[0].weighted_reachability, Some(1.0));
+        assert_eq!(tree_profile.scenarios[0].weighted_reachability, Some(0.25));
+        assert_eq!(ring_profile.scenarios[0].connected_components, 1);
+        assert_eq!(tree_profile.scenarios[0].connected_components, 2);
+    }
+
+    #[test]
     fn junction_failure_exposes_loss_of_functional_demand() {
         let graph = triangle_graph();
         let scenario = MycelialFailureScenario {
