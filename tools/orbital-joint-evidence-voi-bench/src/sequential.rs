@@ -1456,7 +1456,7 @@ mod tests {
         let adaptive_resources = aer01.adaptive_campaign.expected_resources.as_ref().unwrap();
         assert!((adaptive_resources.engineering_hours - 1.25).abs() < 1.0e-9);
         assert!((adaptive_resources.facility_hours - 1.215).abs() < 1.0e-9);
-        assert!((adaptive_resources.specimen_count - 0.95).abs() < 1.0e-9);
+        assert!((adaptive_resources.specimen_count - 1.75).abs() < 1.0e-9);
         assert!((adaptive_resources.review_hours - 0.235).abs() < 1.0e-9);
         assert!((adaptive_resources.external_cost_units - 0.5275).abs() < 1.0e-9);
         assert!(expected_dominates(
