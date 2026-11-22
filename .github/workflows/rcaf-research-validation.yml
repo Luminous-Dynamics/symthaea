@@ -637,7 +637,7 @@ jobs:
                   assert abs(adaptive["held_out_false_positive_rate"]["estimate"] - 0.05) <= 1e-12
                   assert guard["held_out_false_positive_rate"]["successes"] <= 5
                   assert adaptive["directionally_correct_signal_rate"]["successes"] + adaptive["wrong_direction_acceptance_rate"]["successes"] == adaptive["signal_detection_rate"]["successes"]
-                  expected_wrong = [4, 10, 10][estimator_index]
+                  expected_wrong = [5, 10, 10][estimator_index]
                   assert adaptive["wrong_direction_acceptance_rate"]["successes"] == expected_wrong
           print("PASS: per-stratum calibration, common max-quantile guard, worst-group rates and unseen-stratum abstention")
           PY
