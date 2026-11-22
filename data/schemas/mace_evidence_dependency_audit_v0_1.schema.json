@@ -1,0 +1,192 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/mace_evidence_dependency_audit_v0_1.schema.json",
+  "title": "MACE Evidence Dependency Audit v0.1",
+  "description": "Candidate-visible decision records and evaluator-only intervention scores are separate JSONL streams. The evaluator is public and co-located in this diagnostic prototype.",
+  "oneOf": [
+    {"$ref": "#/$defs/run_manifest"},
+    {"$ref": "#/$defs/candidate_decision"},
+    {"$ref": "#/$defs/evaluator_score"},
+    {"$ref": "#/$defs/rejected_block"},
+    {"$ref": "#/$defs/run_summary"}
+  ],
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "git_sha": {"type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"},
+    "decision": {"type": "string", "enum": ["action_a", "action_b", "abstain"]},
+    "event_ids": {
+      "type": "array",
+      "items": {"type": "integer", "minimum": 0, "maximum": 4294967295},
+      "uniqueItems": true
+    },
+    "run_manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version", "record_type", "run_id", "source_revision",
+        "cluster_count", "scenario_count", "candidate_policy",
+        "candidate_stream_contract", "dependency_lineage_contract",
+        "candidate_stream_contains_evaluator_labels", "evaluator_custody",
+        "root_identity", "payload_bytes"
+      ],
+      "properties": {
+        "schema_version": {"const": "mace_evidence_dependency_audit_v0_1"},
+        "record_type": {"const": "run_manifest"},
+        "run_id": {"type": "string", "minLength": 1},
+        "source_revision": {"$ref": "#/$defs/git_sha"},
+        "cluster_count": {"type": "integer", "minimum": 1},
+        "scenario_count": {"type": "integer", "minimum": 1},
+        "candidate_policy": {"const": "causal_qualified_v1"},
+        "candidate_stream_contract": {"type": "string", "minLength": 1},
+        "dependency_lineage_contract": {"type": "string", "minLength": 1},
+        "candidate_stream_contains_evaluator_labels": {"const": false},
+        "evaluator_custody": {"const": "public_co_located_diagnostic_only"},
+        "root_identity": {"const": "synthetic_fixture_digest_not_cryptographic_attestation"},
+        "payload_bytes": {"const": "in_memory_Experience_size_lower_bound"}
+      }
+    },
+    "candidate_decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version", "record_type", "record_id", "candidate_input_sha256",
+        "decision_need_sha256", "memory_snapshot_sha256", "decision",
+        "decision_support_event_ids", "candidate_memory_event_count",
+        "decision_trace_sha256", "latency_ns", "run_id", "source_revision"
+      ],
+      "properties": {
+        "schema_version": {"const": "mace_evidence_dependency_audit_v0_1"},
+        "record_type": {"const": "candidate_decision"},
+        "record_id": {"$ref": "#/$defs/sha256"},
+        "candidate_input_sha256": {"$ref": "#/$defs/sha256"},
+        "decision_need_sha256": {"$ref": "#/$defs/sha256"},
+        "memory_snapshot_sha256": {"$ref": "#/$defs/sha256"},
+        "decision": {"$ref": "#/$defs/decision"},
+        "decision_support_event_ids": {"$ref": "#/$defs/event_ids"},
+        "candidate_memory_event_count": {"type": "integer", "minimum": 0},
+        "decision_trace_sha256": {"$ref": "#/$defs/sha256"},
+        "latency_ns": {"type": "integer", "minimum": 0},
+        "run_id": {"type": "string", "minLength": 1},
+        "source_revision": {"$ref": "#/$defs/git_sha"}
+      }
+    },
+    "matched_control": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record_id", "utility", "regret", "added_regret_vs_full_evidence",
+        "decision_changed_vs_full_evidence", "excess_regret_over_matched_random"
+      ],
+      "properties": {
+        "record_id": {"$ref": "#/$defs/sha256"},
+        "utility": {"type": "number"},
+        "regret": {"type": "number", "minimum": 0},
+        "added_regret_vs_full_evidence": {"type": "number"},
+        "decision_changed_vs_full_evidence": {"type": "boolean"},
+        "excess_regret_over_matched_random": {"type": "number"}
+      }
+    },
+    "evaluator_score": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version", "record_type", "record_id", "candidate_input_sha256",
+        "world_cluster_id", "scenario_family", "intervention_kind",
+        "intervention_target", "removed_event_ids", "removed_event_count",
+        "removed_unique_root_count", "removed_unique_family_count", "decision",
+        "utility", "regret", "added_regret_vs_full_evidence",
+        "decision_changed_vs_full_evidence", "invalid_evidence_use_count",
+        "remaining_event_count", "remaining_unique_root_count",
+        "remaining_unique_family_count", "remaining_unknown_root_event_count",
+        "fixture_dependency_link_count"
+      ],
+      "properties": {
+        "schema_version": {"const": "mace_evidence_dependency_audit_v0_1"},
+        "record_type": {"const": "evaluator_score"},
+        "record_id": {"$ref": "#/$defs/sha256"},
+        "candidate_input_sha256": {"$ref": "#/$defs/sha256"},
+        "world_cluster_id": {"type": "string", "minLength": 1},
+        "scenario_family": {"type": "string", "minLength": 1},
+        "intervention_kind": {
+          "type": "string",
+          "enum": [
+            "full_evidence_reference", "event_closure", "lifecycle_closure",
+            "source_root_closure", "source_family_closure",
+            "two_root_coalition", "matched_random_control"
+          ]
+        },
+        "intervention_target": {"type": "string", "minLength": 1},
+        "removed_event_ids": {"$ref": "#/$defs/event_ids"},
+        "removed_event_count": {"type": "integer", "minimum": 0},
+        "removed_unique_root_count": {"type": "integer", "minimum": 0},
+        "removed_unique_family_count": {"type": "integer", "minimum": 0},
+        "decision": {"$ref": "#/$defs/decision"},
+        "utility": {"type": "number"},
+        "regret": {"type": "number", "minimum": 0},
+        "added_regret_vs_full_evidence": {"type": "number"},
+        "decision_changed_vs_full_evidence": {"type": "boolean"},
+        "invalid_evidence_use_count": {"type": "integer", "minimum": 0},
+        "remaining_event_count": {"type": "integer", "minimum": 0},
+        "remaining_unique_root_count": {"type": "integer", "minimum": 0},
+        "remaining_unique_family_count": {"type": "integer", "minimum": 0},
+        "remaining_unknown_root_event_count": {"type": "integer", "minimum": 0},
+        "fixture_dependency_link_count": {"type": "integer", "minimum": 0},
+        "matched_to_plan_id": {"$ref": "#/$defs/sha256"},
+        "matched_control": {"$ref": "#/$defs/matched_control"}
+      }
+    },
+    "rejected_block": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "record_type", "world_cluster_id", "scenario_family", "rejection_reason"],
+      "properties": {
+        "schema_version": {"const": "mace_evidence_dependency_audit_v0_1"},
+        "record_type": {"const": "rejected_block"},
+        "world_cluster_id": {"type": "string", "minLength": 1},
+        "scenario_family": {"type": "string", "minLength": 1},
+        "rejection_reason": {"type": "string", "minLength": 1}
+      }
+    },
+    "aggregate_kind": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "intervention_kind", "rows", "decision_changes_vs_full",
+        "invalid_evidence_uses", "mean_added_regret_vs_full",
+        "matched_pairs", "mean_excess_regret_over_matched_random"
+      ],
+      "properties": {
+        "intervention_kind": {"type": "string", "minLength": 1},
+        "rows": {"type": "integer", "minimum": 0},
+        "decision_changes_vs_full": {"type": "integer", "minimum": 0},
+        "invalid_evidence_uses": {"type": "integer", "minimum": 0},
+        "mean_added_regret_vs_full": {"type": "number"},
+        "matched_pairs": {"type": "integer", "minimum": 0},
+        "mean_excess_regret_over_matched_random": {"type": ["number", "null"]}
+      }
+    },
+    "run_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version", "record_type", "run_id", "source_revision",
+        "scenario_count", "rejected_duplicate_or_invalid_identity_blocks",
+        "candidate_decision_rows", "matched_random_control_rows",
+        "aggregation", "by_intervention_kind", "claim_ceiling"
+      ],
+      "properties": {
+        "schema_version": {"const": "mace_evidence_dependency_audit_v0_1"},
+        "record_type": {"const": "run_summary"},
+        "run_id": {"type": "string", "minLength": 1},
+        "source_revision": {"$ref": "#/$defs/git_sha"},
+        "scenario_count": {"type": "integer", "minimum": 1},
+        "rejected_duplicate_or_invalid_identity_blocks": {"type": "integer", "minimum": 0},
+        "candidate_decision_rows": {"type": "integer", "minimum": 0},
+        "matched_random_control_rows": {"type": "integer", "minimum": 0},
+        "aggregation": {"const": "descriptive_only_no_confirmatory_confidence_interval"},
+        "by_intervention_kind": {"type": "array", "items": {"$ref": "#/$defs/aggregate_kind"}},
+        "claim_ceiling": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1}
+      }
+    }
+  }
+}
