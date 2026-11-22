@@ -32,7 +32,7 @@
       "required":["minimum_baseline_margin","maximum_prompt_only_margin_ratio"],
       "properties":{
         "minimum_baseline_margin":{"type":"number","minimum":0},
-        "maximum_prompt_only_margin_ratio":{"type":"number","minimum":0}
+        "maximum_prompt_only_margin_ratio":{"type":"number","minimum":0,"maximum":1}
       }
     },
     "case":{
