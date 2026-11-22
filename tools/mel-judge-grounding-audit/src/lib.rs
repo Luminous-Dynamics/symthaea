@@ -423,6 +423,7 @@ fn validate_header(panel: &ProbePanelV1) -> Result<(), String> {
         || panel.policy.minimum_baseline_margin < 0.0
         || !panel.policy.maximum_prompt_only_margin_ratio.is_finite()
         || panel.policy.maximum_prompt_only_margin_ratio < 0.0
+        || panel.policy.maximum_prompt_only_margin_ratio > 1.0
     {
         return Err("invalid probe policy thresholds".to_owned());
     }
@@ -733,11 +734,11 @@ fn rate(numerator: usize, denominator: usize) -> Option<f64> {
 }
 
 fn mean(sum: f64, count: usize) -> Option<f64> {
-    if count == 0 { None } else { Some(sum / count as f64) }
-}
-
-fn main_fixture() -> String {
-    String::new()
+    if count == 0 {
+        None
+    } else {
+        Some(sum / count as f64)
+    }
 }
 
 #[cfg(test)]
@@ -776,6 +777,15 @@ mod tests {
         let report = parse_and_audit(&panel.to_string()).expect("prompt-only probe is valid");
         assert_eq!(report.prompt_only.pass_rate, Some(0.0));
         assert!(report.prompt_only.mean_margin_ratio.unwrap() > 0.99);
+    }
+
+    #[test]
+    fn prompt_only_policy_ratio_must_be_between_zero_and_one() {
+        let mut panel = value();
+        panel["policy"]["maximum_prompt_only_margin_ratio"] = serde_json::json!(1.1);
+        let error = parse_and_audit(&panel.to_string())
+            .expect_err("prompt-only ratio above one should be rejected");
+        assert!(error.contains("invalid probe policy thresholds"));
     }
 
     #[test]
