@@ -131,6 +131,8 @@ pub struct MycelialContactFiltration {
     pub metrics: MycelialContactFiltrationMetrics,
     /// Complete identity set for the baseline filament vertices.
     pub source_filament_ids: Vec<u32>,
+    /// Source filaments marked terminal in the source morphology.
+    pub source_terminal_filament_ids: Vec<u32>,
     /// Explicit baseline branch edges used to verify cycle witness paths.
     pub baseline_parent_edges: Vec<MycelialContactBaselineEdge>,
     /// Complete sorted input inventory, including candidates above the sweep cap.
@@ -488,6 +490,16 @@ pub fn build_mycelial_contact_filtration(
             final_cycle_rank,
         },
         source_filament_ids: baseline.filament_ids.clone(),
+        source_terminal_filament_ids: {
+            let mut ids: Vec<_> = model
+                .filaments
+                .iter()
+                .filter(|filament| filament.terminal)
+                .map(|filament| filament.id)
+                .collect();
+            ids.sort_unstable();
+            ids
+        },
         baseline_parent_edges: baseline
             .connections
             .iter()
@@ -543,10 +555,24 @@ impl MycelialContactFiltration {
             ));
         }
         let source_ids: BTreeSet<_> = self.source_filament_ids.iter().copied().collect();
-        if self.candidate_observations.iter().any(|candidate| {
+        let terminal_ids: BTreeSet<_> = self
+            .source_terminal_filament_ids
+            .iter()
+            .copied()
+            .collect();
+        if self.source_terminal_filament_ids.windows(2).any(|pair| pair[0] >= pair[1])
+            || self
+                .source_terminal_filament_ids
+                .iter()
+                .any(|id| !source_ids.contains(id))
+            || self.candidate_observations.iter().any(|candidate| {
             candidate.source_filament_id == candidate.target_filament_id
                 || !source_ids.contains(&candidate.source_filament_id)
                 || !source_ids.contains(&candidate.target_filament_id)
+                || !terminal_ids.contains(&candidate.source_filament_id)
+                || (candidate.kind == AnastomosisKind::TipToTip
+                    && !terminal_ids.contains(&candidate.target_filament_id))
+                || candidate.contact_distance_microunits > 100_000_000
                 || candidate.source_parameter_micros != 1_000_000
                 || candidate.target_parameter_micros > 1_000_000
                 || match candidate.kind {
@@ -858,6 +884,9 @@ impl MycelialContactFiltration {
             hasher.update(&(value as u64).to_le_bytes());
         }
         for filament_id in &self.source_filament_ids {
+            hasher.update(&filament_id.to_le_bytes());
+        }
+        for filament_id in &self.source_terminal_filament_ids {
             hasher.update(&filament_id.to_le_bytes());
         }
         for edge in &self.baseline_parent_edges {
