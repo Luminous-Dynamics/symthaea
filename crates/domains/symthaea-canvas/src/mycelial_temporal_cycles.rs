@@ -20,6 +20,8 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
+use crate::mycelial_reconstruction_metrics::AnnotatedMycelialSkeleton;
+
 pub const MYCELIAL_TEMPORAL_CYCLE_SCHEMA_VERSION: u16 = 1;
 pub const MYCELIAL_TEMPORAL_CYCLE_PROFILE_SCHEMA_VERSION: u16 = 1;
 pub const MAX_TEMPORAL_MYCELIAL_WINDOWS: usize = 4_096;
@@ -108,6 +110,84 @@ impl TemporalMycelialSnapshot {
         }
         Ok(hex_digest(hasher.finalize().as_bytes()))
     }
+}
+
+/// Convert one annotated junction–hypha reconstruction into a temporal
+/// snapshot. Every annotated segment requires an explicit evidence record;
+/// this function never assumes that a predicted segment is directly observed.
+/// Candidate fusion links have no evidence enum variant and cannot be imported.
+///
+/// Use `DirectlyObservedHypha` only for segments supported by the source image
+/// annotation protocol. Use `AcceptedAnastomosis` only after a separate
+/// acceptance/evidence process has established that fusion. Synthetic fixtures
+/// require the profile config's explicit synthetic-evidence opt-in.
+pub fn temporal_snapshot_from_annotated_skeleton(
+    skeleton: &AnnotatedMycelialSkeleton,
+    window_start_ns: u64,
+    window_end_ns: u64,
+    observation_scope_id: &str,
+    coverage: TemporalWindowCoverage,
+    edge_evidence: &[TemporalMycelialEdgeEvidenceRecord],
+) -> Result<TemporalMycelialSnapshot, MycelialTemporalCycleError> {
+    skeleton.validate().map_err(|error| {
+        MycelialTemporalCycleError::InvalidAnnotatedSkeleton(error.to_string())
+    })?;
+    if window_end_ns <= window_start_ns || !valid_id(observation_scope_id) {
+        return Err(MycelialTemporalCycleError::InvalidSnapshot {
+            snapshot_id: skeleton.frame_id.clone(),
+            reason: "invalid temporal interval or observation scope",
+        });
+    }
+    let mut evidence_by_id = BTreeMap::new();
+    for record in edge_evidence {
+        if !valid_id(&record.edge_id)
+            || evidence_by_id.insert(record.edge_id.as_str(), record.evidence).is_some()
+        {
+            return Err(MycelialTemporalCycleError::EdgeEvidenceInventoryMismatch(
+                record.edge_id.clone(),
+            ));
+        }
+    }
+    if evidence_by_id.len() != skeleton.segments.len() {
+        return Err(MycelialTemporalCycleError::EdgeEvidenceInventoryMismatch(
+            "segment/evidence inventory cardinality differs".to_string(),
+        ));
+    }
+
+    let mut node_ids: Vec<_> = skeleton
+        .junctions
+        .iter()
+        .map(|junction| junction.id.clone())
+        .collect();
+    node_ids.sort_unstable();
+    let mut edges = Vec::with_capacity(skeleton.segments.len());
+    for segment in &skeleton.segments {
+        let evidence = evidence_by_id
+            .get(segment.id.as_str())
+            .copied()
+            .ok_or_else(|| MycelialTemporalCycleError::EdgeEvidenceInventoryMismatch(
+                segment.id.clone(),
+            ))?;
+        edges.push(TemporalMycelialEdge {
+            id: segment.id.clone(),
+            source_node_id: segment.start_junction_id.clone(),
+            target_node_id: segment.end_junction_id.clone(),
+            evidence,
+        });
+    }
+    edges.sort_by(|left, right| left.id.cmp(&right.id));
+    let snapshot = TemporalMycelialSnapshot {
+        snapshot_id: skeleton.frame_id.clone(),
+        window_start_ns,
+        window_end_ns,
+        observation_scope_id: observation_scope_id.to_string(),
+        source_observation_digest: skeleton.source_observation_digest.clone(),
+        coverage,
+        node_ids,
+        edges,
+    };
+    validate_snapshot(&snapshot)?;
+    Ok(snapshot)
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -239,6 +319,8 @@ pub enum MycelialTemporalCycleError {
     InvalidSchemaVersion(u16),
     InvalidSequenceMetadata,
     InvalidConfig,
+    InvalidAnnotatedSkeleton(String),
+    EdgeEvidenceInventoryMismatch(String),
     TooManyWindows(usize),
     TooManyNodes { snapshot_id: String, count: usize },
     TooManyEdges { snapshot_id: String, count: usize },
@@ -262,6 +344,12 @@ impl fmt::Display for MycelialTemporalCycleError {
                 write!(f, "invalid temporal sequence identity, frame or calibration digest")
             }
             Self::InvalidConfig => write!(f, "invalid temporal cycle recurrence configuration"),
+            Self::InvalidAnnotatedSkeleton(reason) => {
+                write!(f, "annotated skeleton cannot be adapted to a temporal snapshot: {reason}")
+            }
+            Self::EdgeEvidenceInventoryMismatch(id) => {
+                write!(f, "temporal edge evidence does not map exactly to annotated segment {id}")
+            }
             Self::TooManyWindows(count) => {
                 write!(f, "snapshot count {count} exceeds {MAX_TEMPORAL_MYCELIAL_WINDOWS}")
             }
