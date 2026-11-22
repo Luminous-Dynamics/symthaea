@@ -26,6 +26,24 @@ cargo test --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p
 
 No external service, GPU, database or model API is required. The current verifier used by tests is synthetic, not a production Mycelix adapter.
 
+## Paired memory-to-decision intervention runner
+
+A separate executable now schedules the six initial intervention arms over the existing generated MACE worlds: true empty memory, exact-scope scan, deterministic key-value retrieval, static HDC, HDC-LTC, and a same-cluster sibling-task structural placebo. It writes candidate decisions, evaluator-only synthetic scores, and cluster-bootstrap summaries to separate JSONL streams.
+
+~~~~bash
+MACE_SOURCE_REVISION="$(git rev-parse HEAD)" \
+cargo run --release \
+  --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml \
+  -p broca-mace-evaluator \
+  --bin mace_paired_intervention \
+  -- 256 /tmp/mace-candidate-decisions.jsonl \
+     /tmp/mace-evaluator-scores.jsonl \
+     /tmp/mace-paired-summary.jsonl
+~~~~
+
+The structural placebo is not yet a text/embedding-level or exact token-matched placebo, and the deterministic key-value arm is not BM25/dense retrieval. The evaluator is public and co-located, so all outputs are diagnostic-only, not an independent benchmark result. See [MACE Paired Memory-to-Decision Runner v0.1](../../docs/research/MACE_PAIRED_MEMORY_DECISION_RUNNER_V0_1.md) for the record contract, resource-accounting caveats, and qualification gates.
+
+
 ## Build-graph boundary
 
 - `policy/` is the candidate-policy crate. It contains candidate-visible experience/query types, policy logic and decision receipts. It has no dependency on the evaluator and no `OracleTruth` type.
