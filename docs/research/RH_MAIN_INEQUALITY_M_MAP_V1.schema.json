@@ -428,6 +428,97 @@
             "type": "string"
           },
           "minItems": 1
+        },
+        "product_group_structures": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "group",
+              "m",
+              "n",
+              "group_size"
+            ],
+            "properties": {
+              "group": {
+                "type": "string"
+              },
+              "m": {
+                "type": "integer",
+                "minimum": 2
+              },
+              "n": {
+                "type": "integer",
+                "minimum": 2
+              },
+              "group_size": {
+                "type": "integer",
+                "minimum": 4
+              }
+            }
+          }
+        },
+        "product_group_target_cases": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "product_group_row_indicator_cases": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_group_target_cases": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_row_indicator_cases": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "test_functions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "previous_ci_receipt": {
+          "type": "object",
+          "properties": {
+            "tested_pr_head": {
+              "type": "string"
+            },
+            "workflow_run_id": {
+              "type": "integer"
+            },
+            "workflow_url": {
+              "type": "string",
+              "format": "uri"
+            },
+            "workflow_name": {
+              "type": "string"
+            },
+            "conclusion": {
+              "type": "string"
+            },
+            "rust_toolchain": {
+              "type": "string"
+            },
+            "rust_tests_passed": {
+              "type": "integer"
+            },
+            "rust_tests_failed": {
+              "type": "integer"
+            },
+            "rustfmt": {
+              "type": "string"
+            },
+            "json_fixture_assertions": {
+              "type": "string"
+            },
+            "scope": {
+              "type": "string"
+            }
+          }
         }
       }
     },
