@@ -38,7 +38,8 @@
         "source",
         "interpretation_scope",
         "roi_labels",
-        "constant_mode_policy"
+        "constant_mode_policy",
+        "graph_digest_required_at_execution"
       ],
       "properties": {
         "representation": {
