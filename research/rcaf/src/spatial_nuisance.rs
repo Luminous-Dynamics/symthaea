@@ -43,6 +43,12 @@ impl SpatialGraph {
             }
         }
         for i in 0..n {
+            let degree: f64 = self.adjacency[i].iter().sum();
+            if !degree.is_finite() {
+                return Err(SpatialNuisanceError::InvalidGeometry(
+                    "weighted node degree must remain finite",
+                ));
+            }
             for j in 0..n {
                 let weight = self.adjacency[i][j];
                 if !weight.is_finite() || weight < 0.0 {
@@ -119,6 +125,13 @@ impl SpatialNuisanceField {
         &self,
         clean_observations: &[Vec<f64>],
     ) -> Result<Vec<Vec<f64>>, SpatialNuisanceError> {
+        if self.values.iter().any(|row| {
+            row.len() != self.roi_labels.len() || row.iter().any(|value| !value.is_finite())
+        }) {
+            return Err(SpatialNuisanceError::InvalidObservation(
+                "stored nuisance field has invalid shape or non-finite values",
+            ));
+        }
         if clean_observations.len() != self.values.len()
             || clean_observations.iter().any(|row| row.len() != self.roi_labels.len())
         {
@@ -135,7 +148,7 @@ impl SpatialNuisanceField {
                         "clean observations must be finite",
                     ));
                 }
-                let combined_value = value + self.values[time_index][roi_index];
+                let combined_value = *value + self.values[time_index][roi_index];
                 if !combined_value.is_finite() {
                     return Err(SpatialNuisanceError::InvalidObservation(
                         "combined observations must remain finite",
@@ -266,6 +279,12 @@ pub fn generate_spatial_nuisance_field(
                 values[time][roi] += config.dose * loading * factor_series[mode][time];
             }
         }
+    }
+
+    if values.iter().flatten().any(|value| !value.is_finite()) {
+        return Err(SpatialNuisanceError::InvalidConfig(
+            "dose and factor loadings produced a non-finite nuisance field",
+        ));
     }
 
     Ok(SpatialNuisanceField {
@@ -408,8 +427,12 @@ fn symmetric_eigendecomposition(
     let spectral_scale = raw_values
         .iter()
         .map(|value| value.abs())
-        .fold(1.0f64, f64::max);
-    let tolerance = spectral_scale * 1e-10;
+        .fold(0.0f64, f64::max);
+    let tolerance = if spectral_scale > 0.0 {
+        spectral_scale * 1e-10
+    } else {
+        1e-12
+    };
     let mut values = Vec::with_capacity(n);
     for value in raw_values {
         if value < -tolerance {
@@ -603,7 +626,7 @@ fn correlation(left: &[f64], right: &[f64]) -> Option<f64> {
         right_variance += db * db;
     }
     let denominator = (left_variance * right_variance).sqrt();
-    (denominator > 1e-20).then_some(covariance / denominator)
+    (denominator > 1e-20).then_some((covariance / denominator).clamp(-1.0, 1.0))
 }
 
 fn lag_one_autocorrelation(values: &[f64]) -> Option<f64> {
