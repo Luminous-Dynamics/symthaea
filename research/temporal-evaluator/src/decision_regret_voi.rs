@@ -128,13 +128,13 @@ impl fmt::Display for RobustObservationVoiError {
             Self::WorldHasNoPossibleOutcome { world_id } => write!(formatter, "world {world_id} has no declared possible sensor outcome"),
             Self::EmptyDeliveredOutcomeDigest { world_id } => write!(formatter, "delivered outcome for world {world_id} has an empty candidate-visible transcript digest"),
             Self::OutcomeDigestAvailabilityMismatch {
-                candidate_visible_outcome_sha256,
                 first_available_at_us,
                 conflicting_available_at_us,
-            } => {
-                let _ = candidate_visible_outcome_sha256;
-                write!(formatter, "candidate-visible transcript digest binds conflicting availability times {first_available_at_us} and {conflicting_available_at_us}")
-            },
+                ..
+            } => write!(
+                formatter,
+                "candidate-visible transcript digest binds conflicting availability times {first_available_at_us} and {conflicting_available_at_us}"
+            ),
             Self::ArithmeticOverflow => write!(formatter, "robust observation-regret arithmetic overflowed"),
             Self::DecisionObservability(error) => write!(formatter, "base decision-observability qualification failed: {error}"),
         }
