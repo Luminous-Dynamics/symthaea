@@ -114,7 +114,7 @@ fn translation_count_cyclic(n: usize, t2: &[usize], target_column: usize) -> usi
     (0..n)
         .filter(|translate| {
             t2.iter()
-                .any(|z| (translate + *z) % n == target_column)
+                .any(|z| (*translate + *z) % n == target_column)
         })
         .count()
 }
