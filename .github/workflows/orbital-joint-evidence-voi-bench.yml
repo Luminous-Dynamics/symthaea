@@ -69,11 +69,14 @@ jobs:
           jq -e '
             .schema == "luminous.orbital-joint-evidence-voi.sequential.v0.1" and
             .benchmark_id == "ORBITAL-JOINT-SEQUENTIAL-PLANNING-001" and
-            (.scenarios | length == 2) and
+            (.scenarios | length == 3) and
             .scenarios[0].resource_frequency_model.used_for == "EXPECTED_RESOURCE_USE_ONLY" and
-            (.scenarios | all(.decision_obligations.ACCEPT == ["COMBINED-LOAD-CAPABILITY-001","THERMAL-WEAR-INSPECTABILITY-001"])) and
+            (.scenarios[0:2] | all(.decision_obligations.ACCEPT == ["COMBINED-LOAD-CAPABILITY-001","THERMAL-WEAR-INSPECTABILITY-001"])) and
+            .scenarios[2].scenario_id == "SEQ-003-AER01-NDE-STRUCTURAL" and
+            .scenarios[2].decision_obligations.ACCEPT == ["INSTRUMENT-CALIBRATION-001","STRUCTURAL-LOAD-PROOF-001","NDE-COVERAGE-001"] and
             (.scenarios | all(.actions | all(.obligations_by_observation != null))) and
-            (.scenarios[0].actions | map(.decision_context) | unique | length == 1)
+            (.scenarios[0].actions | map(.decision_context) | unique | length == 1) and
+            (.scenarios[2].actions | map(.decision_context) | unique | length == 1)
           ' fixtures/orbital-joint-evidence-voi/v0.1/sequential-campaign.synthetic.json
       - name: Format
         run: cargo fmt --manifest-path tools/orbital-joint-evidence-voi-bench/Cargo.toml --check
