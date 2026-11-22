@@ -237,11 +237,56 @@ Hard gates override weighted averages. A broken required journey, critical acces
 
 For image-based evaluation, combine deterministic geometric/region metrics, image metrics and blinded human assessment. Do not optimize only for a single SSIM/CLIP/VLM score; those measures can reward superficial similarity while missing semantic or interaction defects. Freeze evaluation assets before submission and keep hidden holdout tasks to detect overfitting.
 
+### Executable contract and first fixture-backed task
+
+This programme now has a first machine-readable interface contract and a first
+original design task, rather than only a benchmark outline.
+
+- `benchmarks/frontend/interface-contract-v1.schema.json` defines JSON Schema
+  2020-12 for product intent, Leptos runtime, routes, named regions, state
+  machines, data sources, responsive constraints, accessibility, security and
+  independent acceptance journeys.
+- `benchmarks/frontend/contracts/symthaea-ui-v0.json` describes the source
+  observed Converse/Observe application: 16 named regions and six journeys.
+  It remains `source_observed`, not `browser_verified`.
+- `benchmarks/frontend/task-oracle-v1.schema.json` defines the SFEB task and
+  assertion contract.
+- `benchmarks/frontend/tasks/sfeb-l1-service-dashboard-v1.json` defines the
+  first Leptos design task: an operational dashboard with 11 assertions, eight
+  required regions, five fixed viewports and two acceptance journeys.
+- `benchmarks/frontend/fixtures/service-dashboard/` contains an original,
+  static HTML/CSS fixture with no remote fonts, scripts or images. Its canonical
+  digest is SHA-256(HTML bytes || NUL || CSS bytes), stored in the task file.
+
+A standalone Rust utility at `benchmarks/frontend/contract-check` validates
+the JSON Schemas, the source-observed contract's exact `data-sfeb-id` mapping,
+the task's fixture digest, required fixture regions, unique assertion IDs and
+the fixture-only resource policy. Tests for the checked-in contract, task and
+tamper/mismatch negative controls are authored.
+
+The standalone validator is intentionally outside the primary workspace and
+does not add dependencies to production crates. It is not yet executed because
+this environment has no Rust toolchain. The HTML/CSS digest was independently
+confirmed using `sha256sum`. A Chromium headless screenshot attempt in the
+available container timed out before producing a capture; the browser-render
+gate therefore remains blocked, not passed. The task stays
+`specification_only` in the SFEB index until its screenshot baselines,
+independent oracles and browser runs exist.
+
+The first Leptos implementation also received 16 stable `data-sfeb-id` anchors,
+semantic live/status/alert regions, responsive adjustments, visible focus and
+reduced-motion behavior. Its telemetry indicator now waits for the actual
+gloo-net 0.5 `WebSocket::state() == State::Open` state, has a bounded 10-second
+handshake wait and retries sequentially with capped backoff. The backoff is
+deterministic (1, 2, 4, 8, 16, then 30 seconds), making it testable. The current
+gateway URL is picked up on the next retry; an already-live connection is not
+forcibly replaced.
+
 ## 5. External comparison and state of the field
 
-As of 2026-11-21:
+As rechecked on 2026-11-22:
 
-- **Vision2Web** is the closest external end-to-end comparator found in this research. Its official benchmark describes 193 tasks across 16 categories, 918 prototype images and 1,255 test cases, with static, interactive and full-stack levels and verification combining workflow-driven GUI testing with VLM visual judging. The search-indexed S4-2026 leaderboard snapshot (refreshed 2026-10-01) showed 82.3 for Claude-Fable-5 + Claude Code on 2026-08-28. The live page's currently selected season displayed no rows when rechecked on 2026-11-22, so 82.3 is a dated historical reference, not a verified current leader or a directly transferable SFEB target.
+- **Vision2Web** is the closest external end-to-end comparator found in this research. Its official benchmark describes 193 tasks across 16 categories, 918 prototype images and 1,255 test cases, with static, interactive and full-stack levels and verification combining workflow-driven GUI testing with VLM visual judging. The search-indexed S4-2026 leaderboard snapshot (refreshed 2026-10-01) showed 82.3 overall for Claude-Fable-5 + Claude Code on 2026-08-28, with level averages 87.4 static, 83.2 interactive and 76.3 full-stack. The live page's selected season displayed no rows when rechecked on 2026-11-22. These are dated historical reference scores, not a verified current leader or directly transferable SFEB targets.
 - **Design2Code** (2024/NAACL 2025 publication track) contains 484 real-world webpages and evaluates screenshot-to-code rendering with high-level CLIP similarity, block matching, text, position and color metrics, complemented by human pairwise judgments. Its analysis identifies visual-element recall and layout correctness as recurring weaknesses. Use it as a visual-reconstruction reference, subject to task/data license and reproducibility conditions.
 - **WebdriverIO's browser-agent benchmark** is a controlled tool comparison on a fixed random sample of Online-Mind2Web live-site tasks. It holds model, harness and prompt constant while swapping browser tools and uses an independent judge; its October 2026 page snapshot reported 62% for WebdriverIO session. This measures browser-operation performance, not frontend code generation. The methodology warns of roughly ±10-point intervals on its small sample, site instability and judge disagreement on about one in seven runs, so treat close scores as ties rather than a definitive SOTA ranking.
 - **Leptos upstream** is the API authority. Pin and record the actual lockfile version rather than treating a semver requirement as a resolved version.
@@ -267,9 +312,9 @@ These are proposed programme targets. They must be calibrated after the first ba
 | Milestone | Proposed acceptance target |
 |---|---|
 | M0 — Reproducible baseline | 100% of task definitions versioned; 100% of runs record source/environment/evaluator digests; no unreported task omissions |
-| M1 — Static competence | At least 85/100 aggregate visual score on the held-out internal L1 set; no target viewport below 75; zero critical semantic errors |
-| M2 — Interactive competence | At least 85% required journey pass rate; no critical keyboard trap; all required form errors and status transitions observable |
-| M3 — Full application | At least 75% L3 end-to-end completion initially, rising to 85%; all security and evidence hard gates pass |
+| M1 — Static competence | At least 90/100 aggregate visual score on the held-out internal L1 set; no target viewport below 85; zero critical semantic errors |
+| M2 — Interactive competence | At least 88% required journey pass rate; no critical keyboard trap; all required form errors and status transitions observable |
+| M3 — Full application | At least 82% L3 end-to-end completion; all security and evidence hard gates pass |
 | M4 — Maintenance | At least 80% seeded-defect repair success; regression rate below 5%; every patch tied to reproduced failure evidence |
 | M5 — Competitive claim | Statistically supported improvement over the same base model/harness on a preregistered holdout, without worse critical safety/accessibility outcomes |
 
@@ -337,8 +382,10 @@ Extend `symthaea-ui` with one bounded, reviewed feature from its README's deferr
 | Source anchors and first UI accessibility/responsive refinements | **Implemented in source**; browser validation not run |
 | Bundle unit tests and ignored Chromium smoke test | **Authored**; not executed |
 | External benchmark landscape researched | **Sources reviewed**; benchmark protocols differ |
-| Programme and task inventory written | **Proposed** in this branch |
-| Runnable SFEB evaluator and fixtures | **Not implemented** |
+| Programme, task/oracle schemas and source-observed contract | **Authored** in this branch |
+| First static design fixture and task definition | **Authored**; canonical digest confirmed with `sha256sum` |
+| Standalone Rust contract/task validator | **Implemented in source with tests authored**; compilation/tests not run |
+| Runnable SFEB browser evaluator and screenshot baselines | **Not implemented**; Chromium capture timed out in this container |
 | Browser execution on SFEB fixtures | **Not run** |
 | Symthaea frontend competence baseline | **Not measured** |
 | SOTA superiority | **Not claimed** |
