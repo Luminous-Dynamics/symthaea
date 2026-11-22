@@ -1,0 +1,234 @@
+{
+  "corpus_version": "0.1.0",
+  "corpus_id": "symthaea.leptos-0.8.patterns",
+  "status": "source_observed_reference_checked",
+  "framework": {
+    "name": "Leptos",
+    "api_family": "0.8",
+    "rendering_model": "csr",
+    "dependency_requirement": "leptos = { version = \"0.8\", features = [\"csr\"] }",
+    "source_commit": "fa4e726d542b40d7ec8cd22e8275c237f1de5915",
+    "compile_status": "not_compiled_in_this_environment"
+  },
+  "scope": {
+    "starter_surface": "crates/bridges/symthaea-ui",
+    "complementary_surface": "crates/bridges/symthaea-web",
+    "objective": "Teach Symthaea source-grounded Leptos 0.8 component, reactivity, asynchronous browser and integration patterns without promoting uncompiled examples to verified knowledge.",
+    "limitations": [
+      "Source presence is not proof that a pattern compiles on the pinned lockfile.",
+      "Official API documentation must be matched to the resolved minor release before promotion.",
+      "CSR source patterns must not be presented as SSR or hydration guidance.",
+      "Browser lifecycle and cleanup behavior requires browser tests."
+    ]
+  },
+  "patterns": [
+    {
+      "id": "LEPTOS08-COMPONENT-001",
+      "title": "Function component and view composition",
+      "concept": "Define a root UI unit with #[component] and return an IntoView tree from view!.",
+      "code": "#[component]\npub fn App() -> impl IntoView {\n    view! { <main class=\"shell\">...</main> }\n}",
+      "source": {
+        "path": "crates/bridges/symthaea-ui/src/app.rs",
+        "blob_sha": "de6fd5c81d0df8c6e9ecf553a4df0cb418b2e3a7"
+      },
+      "evidence_status": "source_observed_not_compiled",
+      "use_when": [
+        "A page or reusable UI unit has a clear semantic responsibility.",
+        "The component owns a coherent subtree and its local state."
+      ],
+      "avoid": [
+        "Do not collapse a whole complex application into one unstructured component when independently testable regions are needed."
+      ],
+      "tests_required": [
+        "Compile on the exact Cargo.lock resolution.",
+        "Assert the rendered semantic landmarks in a browser."
+      ]
+    },
+    {
+      "id": "LEPTOS08-SIGNAL-002",
+      "title": "Local reactive state with RwSignal",
+      "concept": "Use RwSignal for local state that is read and updated by multiple parts of a component.",
+      "code": "let gateway = RwSignal::new(DEFAULT_GATEWAY.to_string());\nlet sending = RwSignal::new(false);\n// Read reactively in the view:\nprop:value=move || gateway.get()\n// Update from an event:\non:change=move |ev| gateway.set(event_target_value(&ev))",
+      "source": {
+        "path": "crates/bridges/symthaea-ui/src/app.rs",
+        "blob_sha": "de6fd5c81d0df8c6e9ecf553a4df0cb418b2e3a7"
+      },
+      "evidence_status": "source_observed_reference_checked",
+      "use_when": [
+        "State is local to a component owner.",
+        "The view should update when the signal changes."
+      ],
+      "avoid": [
+        "Do not reach for global shared state before a real ownership boundary requires it.",
+        "Avoid cloning large state when read guards or update closures are adequate."
+      ],
+      "tests_required": [
+        "Check updates propagate to the expected DOM nodes.",
+        "Check no stale or disposed signal is accessed."
+      ]
+    },
+    {
+      "id": "LEPTOS08-TRACKING-003",
+      "title": "Tracked reads versus untracked reads",
+      "concept": "A tracked getter subscribes the current reactive observer; an untracked getter returns a value without creating that dependency.",
+      "code": "// Tracked: changing gateway re-runs the effect.\nEffect::new(move |_| {\n    let current = gateway.get();\n    use_gateway(current);\n});\n\n// Untracked: read the current endpoint on each explicit retry iteration.\nlet current = gateway.get_untracked();",
+      "source": {
+        "path": "crates/bridges/symthaea-ui/src/app.rs",
+        "blob_sha": "de6fd5c81d0df8c6e9ecf553a4df0cb418b2e3a7"
+      },
+      "evidence_status": "source_observed_reference_checked",
+      "use_when": [
+        "Use tracked reads for reactive dependencies.",
+        "Use untracked reads when the algorithm intentionally samples current state without resubscribing."
+      ],
+      "avoid": [
+        "Never assume get_untracked will cause an Effect to rerun when the signal changes.",
+        "Document the retry or polling event that causes the next untracked sample."
+      ],
+      "tests_required": [
+        "A tracked-read test must show rerun after set().",
+        "An untracked-read test must show no implicit subscription."
+      ]
+    },
+    {
+      "id": "LEPTOS08-EFFECT-004",
+      "title": "Effects for browser and external side effects",
+      "concept": "Effect::new runs after synchronous work and tracks reactive values read through tracked accessors; it is for side effects rather than derived state synchronization.",
+      "code": "Effect::new(move |_| {\n    let gateway = gateway.get_untracked();\n    spawn_local(async move {\n        // Open and maintain an external telemetry stream.\n    });\n});",
+      "source": {
+        "path": "crates/bridges/symthaea-ui/src/app.rs",
+        "blob_sha": "de6fd5c81d0df8c6e9ecf553a4df0cb418b2e3a7"
+      },
+      "evidence_status": "source_observed_reference_checked",
+      "use_when": [
+        "Connect reactive state to browser APIs or external systems.",
+        "Start mount-scoped subscriptions when their lifetime matches the owner."
+      ],
+      "avoid": [
+        "Do not use Effects merely to synchronize one signal from another; prefer derived signals or Memo.",
+        "Do not assume an untracked read creates a dependency.",
+        "A spawned async loop needs an explicit cancellation or owner-lifetime plan if its owner can be disposed."
+      ],
+      "tests_required": [
+        "Verify effect rerun and cleanup semantics.",
+        "Unmount the owner and verify spawned work is cancelled or harmless."
+      ]
+    },
+    {
+      "id": "LEPTOS08-ASYNC-005",
+      "title": "Client-side async work with spawn_local",
+      "concept": "Use spawn_local for browser-local asynchronous tasks and always resolve success and failure into explicit UI state.",
+      "code": "let send = move || {\n    let text = draft.get_untracked();\n    if text.trim().is_empty() || sending.get_untracked() { return; }\n    sending.set(true);\n    spawn_local(async move {\n        match api::send_query(&gateway.get_untracked(), &text).await {\n            Ok(response) => { /* update transcript or error */ }\n            Err(error) => last_error.set(Some(error)),\n        }\n        sending.set(false);\n    });\n};",
+      "source": {
+        "path": "crates/bridges/symthaea-ui/src/app.rs",
+        "blob_sha": "de6fd5c81d0df8c6e9ecf553a4df0cb418b2e3a7"
+      },
+      "evidence_status": "source_observed_not_compiled",
+      "use_when": [
+        "A CSR interaction awaits fetch, WebSocket or browser-only work.",
+        "The task runs on the browser's local execution context."
+      ],
+      "avoid": [
+        "Do not silently drop errors.",
+        "Do not permit duplicate submissions when a request is in flight.",
+        "Do not leave sending/loading state stuck after early returns or cancellation."
+      ],
+      "tests_required": [
+        "Successful and failing fixture requests.",
+        "Duplicate-submit negative control.",
+        "Owner-disposal/cancellation test."
+      ]
+    },
+    {
+      "id": "LEPTOS08-KEYED-006",
+      "title": "Keyed list rendering with For",
+      "concept": "Use For with a stable key so list items are associated with their logical identity during updates.",
+      "code": "<For\n    each=move || history.get().into_iter().enumerate()\n    key=|(index, _)| *index\n    children=move |(_, turn)| view! { <div class=\"turn\">{turn.text}</div> }\n/>",
+      "source": {
+        "path": "crates/bridges/symthaea-ui/src/app.rs",
+        "blob_sha": "de6fd5c81d0df8c6e9ecf553a4df0cb418b2e3a7"
+      },
+      "evidence_status": "source_observed_not_compiled",
+      "use_when": [
+        "Render collections whose item identity is stable over updates."
+      ],
+      "avoid": [
+        "An array index is only acceptable when the collection is append-only or reorder/delete semantics are explicitly absent; otherwise key by stable entity ID."
+      ],
+      "tests_required": [
+        "Append, replace, reorder and delete tests for the chosen identity model."
+      ]
+    },
+    {
+      "id": "LEPTOS08-NODEREF-007",
+      "title": "Typed NodeRef for DOM-backed rendering",
+      "concept": "Use a typed NodeRef to access a concrete DOM node after it is mounted, then react to the relevant signal changes.",
+      "code": "let movie_canvas = NodeRef::<leptos::html::Canvas>::new();\n// In the view:\n<canvas node_ref=movie_canvas></canvas>\n// In an effect:\nlet Some(canvas) = movie_canvas.get() else { return; };",
+      "source": {
+        "path": "crates/bridges/symthaea-ui/src/app.rs",
+        "blob_sha": "de6fd5c81d0df8c6e9ecf553a4df0cb418b2e3a7"
+      },
+      "evidence_status": "source_observed_not_compiled",
+      "use_when": [
+        "A browser API needs a concrete DOM element such as Canvas."
+      ],
+      "avoid": [
+        "Avoid using NodeRef as a substitute for declarative rendering when a normal Leptos view can express the UI."
+      ],
+      "tests_required": [
+        "Verify the node exists after mount and is unavailable or cleaned up after owner disposal."
+      ]
+    },
+    {
+      "id": "LEPTOS08-TRANSPORT-008",
+      "title": "Keep WASM UI behind a typed transport boundary",
+      "concept": "Keep the lightweight Leptos CSR crate dependent on the service HTTP/WebSocket interface rather than linking the entire Symthaea cognitive engine into the browser bundle.",
+      "code": "// UI API boundary\npub async fn send_query(gateway: &str, content: &str) -> Result<Value, String>;\npub async fn stream_telemetry(gateway: &str, on_message: impl FnMut(Value), on_connection_change: impl FnMut(bool));",
+      "source": {
+        "path": "crates/bridges/symthaea-ui/src/api.rs",
+        "blob_sha": "910dd6e9740c0d5bf7faea8f3694c2244f8133e4"
+      },
+      "evidence_status": "source_observed_not_compiled",
+      "use_when": [
+        "The cognitive engine is too heavy for a WASM frontend.",
+        "A service process can own long-running cognition and expose a narrower wire protocol."
+      ],
+      "avoid": [
+        "Avoid duplicating server wire structures unless a separate shared view-types contract is justified.",
+        "Treat response JSON as untrusted and validate dimensions, variants and lengths before allocating."
+      ],
+      "tests_required": [
+        "Contract fixtures for query/status/telemetry.",
+        "Negative malformed-payload tests.",
+        "Compatibility tests against the exact daemon wire version."
+      ]
+    }
+  ],
+  "promotion_policy": {
+    "statuses": [
+      "source_observed_not_compiled",
+      "reference_checked_not_compiled",
+      "compiled",
+      "unit_tested",
+      "browser_verified"
+    ],
+    "required_evidence": {
+      "source_observed_not_compiled": [
+        "Exact source path and blob SHA."
+      ],
+      "reference_checked_not_compiled": [
+        "Exact Leptos or dependency docs version and API reference."
+      ],
+      "compiled": [
+        "Exact Rust toolchain, Cargo.lock digest and successful cargo check."
+      ],
+      "unit_tested": [
+        "Exact head and passing unit/property test receipt."
+      ],
+      "browser_verified": [
+        "Pinned Chromium build, deterministic fixture, browser trace, screenshots and independent assertions."
+      ]
+    },
+    "rule": "A pattern is never promoted based on generated code alone. Unknown or stale framework versions remain quarantined until revalidated."
+  }
+}
