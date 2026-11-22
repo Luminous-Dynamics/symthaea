@@ -8,6 +8,62 @@
 
 use super::{Complex, SolverError, VlasovPoisson1d1v, fft, signed_mode};
 
+/// Velocity-grid time scales for a registered spatial Fourier mode.
+///
+/// These are representation warnings, not predictions of a self-consistent
+/// electric-field maximum. The recurrence estimate follows the discrete
+/// free-streaming phase increment across adjacent velocity cells.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct VelocitySamplingHorizon {
+    pub spatial_mode: usize,
+    pub physical_wave_number: f64,
+    pub velocity_spacing: f64,
+    pub nyquist_encounter_time: f64,
+    pub discrete_recurrence_time: f64,
+}
+
+impl VlasovPoissonConfig {
+    /// Estimate velocity-Fourier Nyquist and discrete recurrence times for
+    /// one nonzero, resolved positive spatial mode.
+    ///
+    /// For k = 2πm/Lx and velocity spacing dv:
+    /// t_N = π/(|k|dv), t_rec = 2π/(|k|dv).
+    pub fn velocity_sampling_horizon(
+        self,
+        spatial_mode: usize,
+    ) -> Result<VelocitySamplingHorizon, SolverError> {
+        self.validate()?;
+        if spatial_mode == 0 || spatial_mode >= self.nx / 2 {
+            return Err(SolverError::InvalidSpatialMode {
+                mode: spatial_mode,
+                maximum_exclusive: self.nx / 2,
+            });
+        }
+
+        let physical_wave_number =
+            std::f64::consts::TAU * spatial_mode as f64 / self.domain_length;
+        let velocity_spacing = self.dv();
+        let phase_rate = physical_wave_number.abs() * velocity_spacing;
+        let nyquist_encounter_time = std::f64::consts::PI / phase_rate;
+        let discrete_recurrence_time = std::f64::consts::TAU / phase_rate;
+        if !physical_wave_number.is_finite()
+            || !velocity_spacing.is_finite()
+            || !nyquist_encounter_time.is_finite()
+            || !discrete_recurrence_time.is_finite()
+        {
+            return Err(SolverError::NonFiniteState);
+        }
+
+        Ok(VelocitySamplingHorizon {
+            spatial_mode,
+            physical_wave_number,
+            velocity_spacing,
+            nyquist_encounter_time,
+            discrete_recurrence_time,
+        })
+    }
+}
+
 /// Discrete quadratic-Casimir partition for a 1D1V distribution.
 ///
 /// All values use the physical-coordinate quadrature dx*dv. The spatial mean
@@ -418,6 +474,65 @@ mod tests {
         assert!(
             relative_error < 2.0e-8,
             "two-pulse characteristic relative error = {relative_error:e}"
+        );
+    }
+
+    #[test]
+    fn velocity_sampling_horizon_scales_with_mode_spacing_and_extent() {
+        let base = config();
+        let base_mode_one = base.velocity_sampling_horizon(1).unwrap();
+        let base_mode_two = base.velocity_sampling_horizon(2).unwrap();
+        assert!(
+            (base_mode_two.discrete_recurrence_time
+                - 0.5 * base_mode_one.discrete_recurrence_time)
+                .abs()
+                < 1.0e-12
+        );
+        assert!(
+            (base_mode_one.discrete_recurrence_time
+                - 2.0 * base_mode_one.nyquist_encounter_time)
+                .abs()
+                < 1.0e-12
+        );
+
+        let refined_velocity = VlasovPoissonConfig {
+            nv: 512,
+            ..base
+        };
+        let refined_horizon = refined_velocity.velocity_sampling_horizon(1).unwrap();
+        assert!(
+            (refined_horizon.discrete_recurrence_time
+                - 2.0 * base_mode_one.discrete_recurrence_time)
+                .abs()
+                < 1.0e-12
+        );
+
+        let expanded_fixed_dv = VlasovPoissonConfig {
+            nv: 512,
+            velocity_min: -12.0,
+            velocity_max: 12.0,
+            ..base
+        };
+        let fixed_dv_horizon = expanded_fixed_dv.velocity_sampling_horizon(1).unwrap();
+        assert!((fixed_dv_horizon.velocity_spacing - base.dv()).abs() < 1.0e-14);
+        assert!(
+            (fixed_dv_horizon.discrete_recurrence_time
+                - base_mode_one.discrete_recurrence_time)
+                .abs()
+                < 1.0e-12
+        );
+
+        let expanded_fixed_nv = VlasovPoissonConfig {
+            velocity_min: -12.0,
+            velocity_max: 12.0,
+            ..base
+        };
+        let expanded_horizon = expanded_fixed_nv.velocity_sampling_horizon(1).unwrap();
+        assert!(
+            (expanded_horizon.discrete_recurrence_time
+                - 0.5 * base_mode_one.discrete_recurrence_time)
+                .abs()
+                < 1.0e-12
         );
     }
 
