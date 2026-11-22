@@ -1,0 +1,166 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/rcaf/spatial-variance-calibration.schema.json",
+  "title": "RCAF spatial nuisance variance calibration report",
+  "description": "Synthetic calibrated-dose reference report; not empirical validation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "source_status",
+    "geometry",
+    "time_points",
+    "target_component_variance_fraction",
+    "families",
+    "claim_limits"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "rcaf.spatial-variance-calibration/0.1.0"
+    },
+    "source_status": {
+      "const": "synthetic_fixture"
+    },
+    "geometry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["representation", "source", "interpretation_scope", "roi_labels", "weighted_edges"],
+      "properties": {
+        "representation": { "const": "weighted_undirected_graph" },
+        "source": { "const": "synthetic_path_graph" },
+        "interpretation_scope": { "const": "synthetic_topology_only" },
+        "roi_labels": {
+          "type": "array",
+          "minItems": 8,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "weighted_edges": {
+          "type": "array",
+          "minItems": 7,
+          "maxItems": 7,
+          "items": {
+            "type": "array",
+            "prefixItems": [
+              { "type": "string" },
+              { "type": "string" },
+              { "type": "number", "exclusiveMinimum": 0 }
+            ],
+            "minItems": 3,
+            "maxItems": 3
+          }
+        }
+      }
+    },
+    "time_points": {
+      "const": 160
+    },
+    "target_component_variance_fraction": {
+      "type": "number",
+      "const": 0.1
+    },
+    "families": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "family_id",
+          "spatial_rank",
+          "diffusion_time",
+          "seed_roi_indices",
+          "rng_seed",
+          "initial_additive_dose",
+          "temporal_ar1",
+          "temporal_coherence",
+          "target_component_variance_fraction",
+          "realized_component_variance_fraction",
+          "clean_component_variance",
+          "nuisance_component_variance",
+          "clean_nuisance_covariance",
+          "covariance_contribution_fraction",
+          "combined_observed_variance",
+          "applied_scale_multiplier"
+        ],
+        "properties": {
+          "family_id": {
+            "enum": [
+              "graph_smooth_low_rank",
+              "heat_kernel_localized"
+            ]
+          },
+          "spatial_rank": { "type": "integer", "minimum": 1 },
+          "diffusion_time": { "type": "number", "exclusiveMinimum": 0 },
+          "seed_roi_indices": {
+            "oneOf": [
+              { "type": "null" },
+              {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": { "type": "integer", "minimum": 0, "maximum": 7 }
+              }
+            ]
+          },
+          "rng_seed": {
+            "type": "string",
+            "pattern": "^0x[0-9a-f]{16}$"
+          },
+          "initial_additive_dose": {
+            "type": "number",
+            "minimum": 0
+          },
+          "temporal_ar1": {
+            "type": "number",
+            "exclusiveMinimum": -1,
+            "exclusiveMaximum": 1
+          },
+          "temporal_coherence": {
+            "const": 0
+          },
+          "target_component_variance_fraction": {
+            "const": 0.1
+          },
+          "realized_component_variance_fraction": {
+            "type": "number",
+            "minimum": 0.099999999999,
+            "maximum": 0.100000000001
+          },
+          "clean_component_variance": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "nuisance_component_variance": {
+            "type": "number",
+            "minimum": 0
+          },
+          "clean_nuisance_covariance": {
+            "type": "number"
+          },
+          "covariance_contribution_fraction": {
+            "type": "number"
+          },
+          "combined_observed_variance": {
+            "type": "number",
+            "minimum": 0
+          },
+          "applied_scale_multiplier": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "claim_limits": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}
