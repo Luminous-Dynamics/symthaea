@@ -390,3 +390,21 @@ For the synthetic fixture, the exact policy selects A/C/F with modeled net value
 Rust tests cover exact known-answer reproduction, input-order invariance, duplicate identities, invalid probabilities, negative costs, zero-time handling and the 18-candidate exact-oracle ceiling. The hosted workflow runs the CLI and diffs its canonical output against the independent Python known answer.
 
 **Claim limit:** the optimizer is exact only over the finite supplied candidates and the declared point-estimate utility model. It does not calibrate defect probabilities, test sensitivity, actionability, exposed volume, cost or delay. It must not control a metrology queue, hold/release wafers, write recipes or issue APC commands. Uninspected units remain unknown.
+
+
+## Bayesian EVSI active-metrology policy
+
+The Rust module \`benchmark::inspection_evsi\` evaluates the expected value of sample information for a binary measurement before direct measurement and delay cost.
+
+For each candidate it compares the minimum expected loss before measurement with the expected minimum conditional loss after positive and negative outcomes. Bayes' rule uses the declared prior defect probability, test sensitivity and specificity. For each posterior, the policy chooses between no intervention and intervention/containment, with explicit intervention cost, false-intervention cost and actionability.
+
+\`\`\`sh
+cargo run -p symthaea-semiconductor --bin semi-inspection-evsi -- \\
+  benchmarks/semi-bench-001/reference/fixtures/inspection-evsi-known-answer-v1.json
+\`\`\`
+
+The output records the prior, outcome probabilities, posterior probabilities, selected action per outcome, expected losses, gross EVSI, measurement cost, delay penalty and net EVSI. A finite exact subset optimizer selects positive-net-EVSI measurements under cash, time and per-group constraints, with a matched risk-only comparator. The exact optimizer is capped at 18 candidates.
+
+Analytical tests cover uninformative and perfect measurements, Bayes posterior arithmetic, zero-probability outcomes, non-degradation at zero measurement cost, positive measurement cost producing negative net EVSI, input-order invariance, duplicate IDs, invalid probabilities/costs, group capacity and the exact-oracle limit. The hosted workflow runs the synthetic CLI and checks probability conservation, non-negative gross EVSI and explicit no-execution claim limits.
+
+**Claim limit:** EVSI is only as trustworthy as its input prior, sensitivity/specificity, loss, actionability, cost and delay assumptions. This module does not calibrate those inputs, schedule inspections, authorize wafer holds/releases, or control equipment. The synthetic fixture establishes policy arithmetic, not observed manufacturing benefit. Unmeasured subjects remain unknown.
