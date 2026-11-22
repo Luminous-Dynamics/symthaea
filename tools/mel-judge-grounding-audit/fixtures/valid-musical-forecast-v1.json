@@ -91,5 +91,18 @@
   "time_alignment_target_clock_domain_id": "synthetic-runner-monotonic-v1",
   "time_alignment_valid_from_ns": 0,
   "time_alignment_valid_until_ns": 2000000000,
-  "time_alignment_max_uncertainty_ns": 5000000
+  "time_alignment_max_uncertainty_ns": 5000000,
+  "observation_closures": [
+    {
+      "forecast_id": "forecast-001",
+      "observation_kind": "midi_event_log",
+      "status": "complete",
+      "clock_domain_id": "synthetic-runner-monotonic-v1",
+      "coverage_start_ns": 900000000,
+      "coverage_end_ns": 1500000000,
+      "observed_through_ns": 1500000000,
+      "output_evidence_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "observation_receipt_sha256": "8888888888888888888888888888888888888888888888888888888888888888"
+    }
+  ]
 }

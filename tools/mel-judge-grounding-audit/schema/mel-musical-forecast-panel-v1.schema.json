@@ -26,7 +26,8 @@
     "time_alignment_target_clock_domain_id",
     "time_alignment_valid_from_ns",
     "time_alignment_valid_until_ns",
-    "time_alignment_max_uncertainty_ns"
+    "time_alignment_max_uncertainty_ns",
+    "observation_closures"
   ],
   "properties": {
     "schema_version": {
@@ -130,6 +131,13 @@
     "time_alignment_max_uncertainty_ns": {
       "type": "integer",
       "minimum": 0
+    },
+    "observation_closures": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/observationClosure"
+      }
     }
   },
   "$defs": {
@@ -424,6 +432,70 @@
           "minimum": 0
         },
         "input_history_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "observationClosure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "forecast_id",
+        "observation_kind",
+        "status",
+        "clock_domain_id",
+        "coverage_start_ns",
+        "coverage_end_ns",
+        "observed_through_ns",
+        "output_evidence_sha256",
+        "observation_receipt_sha256"
+      ],
+      "properties": {
+        "forecast_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observation_kind": {
+          "enum": [
+            "symbolic_score",
+            "midi_event_log",
+            "audio_capture"
+          ]
+        },
+        "status": {
+          "enum": [
+            "complete",
+            "partial",
+            "unavailable"
+          ]
+        },
+        "clock_domain_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "coverage_start_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "coverage_end_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "observed_through_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "output_evidence_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "observation_receipt_sha256": {
           "$ref": "#/$defs/sha256"
         }
       }
