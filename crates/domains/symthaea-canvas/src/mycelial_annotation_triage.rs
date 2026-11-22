@@ -818,7 +818,7 @@ mod tests {
             ],
             vec![edge("ab", "A", "B"), edge("bc", "B", "C"), edge("bd", "B", "D")],
         );
-        let calibration = calibrated_report(&graph, None);
+        let calibration = calibrated_report(&graph, Some("C"));
         let first = build_mycelial_annotation_triage(
             &graph,
             &calibration,
@@ -842,6 +842,46 @@ mod tests {
                 .collect::<BTreeMap<_, _>>()
         };
         assert_eq!(by_id(&first), by_id(&second));
+        assert_eq!(first.review_items[0].junction_id, "B");
+        assert_eq!(second.review_items[0].junction_id, "C");
+        first.validate_against(&graph, &calibration).unwrap();
+    }
+
+    #[test]
+    fn triage_digest_is_permutation_invariant_and_detects_tampering() {
+        let graph = skeleton(
+            vec![
+                node("A", AnnotatedJunctionKind::Origin, 0.0, 0.0),
+                node("B", AnnotatedJunctionKind::Branch, 1.0, 0.0),
+                node("C", AnnotatedJunctionKind::Tip, 2.0, 0.0),
+            ],
+            vec![edge("ab", "A", "B"), edge("bc", "B", "C")],
+        );
+        let calibration = calibrated_report(&graph, None);
+        let first = build_mycelial_annotation_triage(
+            &graph,
+            &calibration,
+            MycelialAnnotationTriageConfig::default(),
+        )
+        .unwrap();
+        let mut reordered = graph.clone();
+        reordered.junctions.reverse();
+        reordered.segments.reverse();
+        let reordered_calibration = calibrated_report(&reordered, None);
+        let second = build_mycelial_annotation_triage(
+            &reordered,
+            &reordered_calibration,
+            MycelialAnnotationTriageConfig::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            first.canonical_digest_hex().unwrap(),
+            second.canonical_digest_hex().unwrap()
+        );
+        let mut tampered = first;
+        tampered.review_items[0].cycle_rank_loss += 1;
+        assert!(tampered.validate().is_err());
+        assert!(tampered.canonical_digest_hex().is_err());
     }
 
     #[test]
