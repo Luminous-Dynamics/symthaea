@@ -79,9 +79,9 @@ impl<'de> Visitor<'de> for StrictValueVisitor {
         if !value.is_finite() {
             return Err(E::custom("non-finite number is not valid I-JSON"));
         }
-        if value.fract() == 0.0 && value.abs() > MAX_SAFE_INTEGER as f64 {
-            return Err(E::custom("integral floating-point value exceeds the RFC 8785 safe range; encode it as a string"));
-        }
+        // RFC 8785 canonicalizes finite IEEE-754 values, including exponent
+        // notation such as 1e30. The safe-integer guard belongs to integer
+        // tokens (visit_i64/u64/i128/u128), not every integral-looking f64.
         let number = serde_json::Number::from_f64(value)
             .ok_or_else(|| E::custom("number cannot be represented as JSON"))?;
         Ok(StrictValue(Value::Number(number)))
@@ -342,6 +342,15 @@ mod tests {
         assert_eq!(bytes, br#"{"a":1,"b":2}"#);
     }
 
+#[test]
+    fn jcs_orders_object_keys_by_utf16_code_units() {
+        let value: Value = serde_json::from_str(r#"{"\uE000":1,"\uD800\uDC00":2}"#)
+            .expect("valid surrogate-pair JSON");
+        let bytes = serde_jcs::to_vec(&value).expect("JCS serialization");
+        assert_eq!(bytes, r#"{"𐀀":2,"":1}"#.as_bytes());
+    }
+
+
     #[test]
     fn checked_in_trace_schema_accepts_a_valid_event_triplet() {
         let schema: Value = serde_json::from_str(include_str!(
@@ -444,9 +453,10 @@ mod tests {
     }
 
     #[test]
-    fn rejects_large_integral_floats_outside_the_jcs_safe_range() {
-        let result = parse_strict_json_line(b"9.007199254740992e15", 1);
-        assert!(result.unwrap_err().contains("safe range"));
+    fn canonicalizes_finite_exponent_values_with_jcs() {
+        let value: Value = serde_json::from_str("1e30").expect("finite exponent value");
+        let canonical = serde_jcs::to_vec(&value).expect("JCS serialization");
+        assert_eq!(canonical, b"1e+30");
     }
 
     #[test]

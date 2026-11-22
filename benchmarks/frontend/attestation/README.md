@@ -97,7 +97,7 @@ The standalone contract checker now has a source implementation of
 Rust toolchain). It uses the pinned `serde_jcs` JCS serializer and verifies:
 
 - strict JSON parsing with recursive duplicate-object-key rejection;
-- I-JSON safe-integer bounds before canonicalization;
+- I-JSON safe-integer bounds for integer tokens and finite IEEE-754 handling for decimal/exponent values;
 - canonical payload hashes and event hashes;
 - contiguous zero-based sequence numbers and monotonic elapsed time;
 - one run identity throughout the trace, with optional expected-run binding;

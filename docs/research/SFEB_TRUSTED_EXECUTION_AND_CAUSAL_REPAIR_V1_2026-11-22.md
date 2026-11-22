@@ -210,7 +210,7 @@ handwritten canonicalizer.
 The verifier:
 - parses each JSONL line with a recursive visitor that rejects duplicate
   object keys before conversion to `serde_json::Value`;
-- rejects integer values outside the RFC 8785 / I-JSON interoperable safe range;
+- rejects integer tokens outside the RFC 8785 / I-JSON interoperable safe range while accepting finite IEEE-754 decimal/exponent values (including 1e30) for JCS canonicalization;
 - checks the canonical payload digest and event digest for every event;
 - checks a zero predecessor on sequence zero, contiguous sequence numbers,
   one run identity, monotonic elapsed time and an exact predecessor chain;
@@ -221,7 +221,7 @@ The verifier:
 Adversarial unit tests are authored for valid traces, RFC 8785 key ordering,
 JSON Schema acceptance, duplicate keys, payload and event tampering, previous
 hash discontinuity, raw-bundle mismatch, reordering, truncation, cross-run
-replay, sequence errors, elapsed-time regression, unsafe integers and expected
+replay, sequence errors, elapsed-time regression, unsafe integer tokens, exponent-number canonicalization and UTF-16 key ordering, and expected
 run-ID mismatch.
 
 **Execution state:** Rust source and tests are committed. No Rust compiler or
