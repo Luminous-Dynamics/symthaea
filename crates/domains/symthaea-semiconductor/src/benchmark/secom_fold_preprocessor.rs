@@ -587,6 +587,23 @@ mod tests {
     }
 
     #[test]
+    fn changing_training_labels_does_not_change_preprocessing_parameters() {
+        let training = vec![
+            row("a", false, &[Some(1.0), Some(4.0)]),
+            row("b", false, &[Some(2.0), None]),
+            row("c", true, &[Some(3.0), Some(6.0)]),
+            row("d", true, &[Some(4.0), Some(7.0)]),
+        ];
+        let mut labels_changed = training.clone();
+        for sample in &mut labels_changed {
+            sample.positive = !sample.positive;
+        }
+        let first = fit_secom_preprocessor_v1(&training, &config()).unwrap();
+        let second = fit_secom_preprocessor_v1(&labels_changed, &config()).unwrap();
+        assert_eq!(first.pipeline_sha256, second.pipeline_sha256);
+    }
+
+    #[test]
     fn training_row_order_does_not_change_fitted_digest() {
         let mut training = vec![
             row("a", false, &[Some(1.0), Some(4.0)]),
