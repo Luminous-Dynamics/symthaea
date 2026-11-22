@@ -94,7 +94,12 @@ impl SketchSufficiencyReport {
             })
             .collect::<Vec<_>>()
             .join(",\n");
-        let cells = self.cells.iter().map(render_cell).collect::<Vec<_>>().join(",\n");
+        let cells = self
+            .cells
+            .iter()
+            .map(render_cell)
+            .collect::<Vec<_>>()
+            .join(",\n");
         let overall = self
             .overall_estimators
             .iter()
@@ -205,13 +210,22 @@ impl fmt::Display for SketchSufficiencyError {
                 write!(f, "replicate identifiers must be unique within {split}")
             }
             Self::SourceTargetReplicateOverlap => {
-                write!(f, "source and target replicate identifiers must be disjoint")
+                write!(
+                    f,
+                    "source and target replicate identifiers must be disjoint"
+                )
             }
             Self::UnexpectedSourceSketchCell { sketch_cell_id } => {
-                write!(f, "source observation belongs to undeclared sketch cell {sketch_cell_id}")
+                write!(
+                    f,
+                    "source observation belongs to undeclared sketch cell {sketch_cell_id}"
+                )
             }
             Self::InvalidObservation { replicate_id } => {
-                write!(f, "replicate {replicate_id} has an invalid score vector or sketch cell id")
+                write!(
+                    f,
+                    "replicate {replicate_id} has an invalid score vector or sketch cell id"
+                )
             }
         }
     }
@@ -292,15 +306,18 @@ pub fn audit_sketch_conditional_score_leakage(
         })
         .collect::<Vec<_>>();
 
-    let family_radius_factor = (4.0
-        * config.expected_sketch_cells.len() as f64
-        * ESTIMATOR_IDS.len() as f64
-        / config.confidence_delta)
-        .ln();
+    let family_radius_factor =
+        (4.0 * config.expected_sketch_cells.len() as f64 * ESTIMATOR_IDS.len() as f64
+            / config.confidence_delta)
+            .ln();
     let mut cells = Vec::with_capacity(config.expected_sketch_cells.len());
     for cell_id in &config.expected_sketch_cells {
-        let source_cell = source_by_cell.get(cell_id).map_or(&[][..], |items| items.as_slice());
-        let target_cell = target_by_cell.get(cell_id).map_or(&[][..], |items| items.as_slice());
+        let source_cell = source_by_cell
+            .get(cell_id)
+            .map_or(&[][..], |items| items.as_slice());
+        let target_cell = target_by_cell
+            .get(cell_id)
+            .map_or(&[][..], |items| items.as_slice());
         let source_count = source_cell.len();
         let target_count = target_cell.len();
 
@@ -336,11 +353,14 @@ pub fn audit_sketch_conditional_score_leakage(
                 .iter()
                 .map(|item| item.scores[estimator_index])
                 .collect::<Vec<_>>();
-            let empirical_ks_distance = empirical_ks_distance(&mut source_scores, &mut target_scores);
-            let source_dkw_radius =
-                (family_radius_factor / (2.0 * source_count as f64)).sqrt().min(1.0);
-            let target_dkw_radius =
-                (family_radius_factor / (2.0 * target_count as f64)).sqrt().min(1.0);
+            let empirical_ks_distance =
+                empirical_ks_distance(&mut source_scores, &mut target_scores);
+            let source_dkw_radius = (family_radius_factor / (2.0 * source_count as f64))
+                .sqrt()
+                .min(1.0);
+            let target_dkw_radius = (family_radius_factor / (2.0 * target_count as f64))
+                .sqrt()
+                .min(1.0);
             let conditional_score_leakage_upper_bound =
                 (empirical_ks_distance + source_dkw_radius + target_dkw_radius).min(1.0);
             estimator_audits.push(SketchEstimatorCellAudit {
@@ -348,9 +368,7 @@ pub fn audit_sketch_conditional_score_leakage(
                 empirical_ks_distance: Some(empirical_ks_distance),
                 source_dkw_radius: Some(source_dkw_radius),
                 target_dkw_radius: Some(target_dkw_radius),
-                conditional_score_leakage_upper_bound: Some(
-                    conditional_score_leakage_upper_bound,
-                ),
+                conditional_score_leakage_upper_bound: Some(conditional_score_leakage_upper_bound),
             });
         }
         cells.push(SketchCellAudit {
@@ -367,9 +385,7 @@ pub fn audit_sketch_conditional_score_leakage(
         .iter()
         .enumerate()
         .map(|(estimator_index, estimator_id)| {
-            let all_expected_cells_audited = cells
-                .iter()
-                .all(|cell| cell.disposition == "audited");
+            let all_expected_cells_audited = cells.iter().all(|cell| cell.disposition == "audited");
             let worst_cell_empirical_ks_distance = all_expected_cells_audited.then(|| {
                 cells
                     .iter()
@@ -419,9 +435,7 @@ fn validate_config(config: &SketchSufficiencyConfig) -> Result<(), SketchSuffici
     if config.expected_sketch_cells.is_empty() {
         return Err(SketchSufficiencyError::EmptyExpectedSketchCells);
     }
-    if !config.confidence_delta.is_finite()
-        || !(0.0..0.5).contains(&config.confidence_delta)
-    {
+    if !config.confidence_delta.is_finite() || !(0.0..0.5).contains(&config.confidence_delta) {
         return Err(SketchSufficiencyError::InvalidConfidenceDelta);
     }
     if config.minimum_replicates_per_domain_cell < 2 {
@@ -439,20 +453,20 @@ fn validate_config(config: &SketchSufficiencyConfig) -> Result<(), SketchSuffici
 
 fn validate_identifier(value: &str, field: &'static str) -> Result<(), SketchSufficiencyError> {
     if value.trim().is_empty()
-        || !value.bytes().all(|byte| {
-            byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b':' | b'-')
-        })
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b':' | b'-'))
     {
         return Err(SketchSufficiencyError::InvalidIdentifier(field));
     }
     Ok(())
 }
 
-fn validate_scores(
-    replicate_id: &str,
-    scores: &[f64; 3],
-) -> Result<(), SketchSufficiencyError> {
-    if scores.iter().any(|score| !score.is_finite() || *score < 0.0) {
+fn validate_scores(replicate_id: &str, scores: &[f64; 3]) -> Result<(), SketchSufficiencyError> {
+    if scores
+        .iter()
+        .any(|score| !score.is_finite() || *score < 0.0)
+    {
         return Err(SketchSufficiencyError::InvalidObservation {
             replicate_id: replicate_id.to_string(),
         });
@@ -464,7 +478,10 @@ fn validate_scores(
 pub fn empirical_ks_distance(source: &mut [f64], target: &mut [f64]) -> f64 {
     if source.is_empty()
         || target.is_empty()
-        || source.iter().chain(target.iter()).any(|score| !score.is_finite())
+        || source
+            .iter()
+            .chain(target.iter())
+            .any(|score| !score.is_finite())
     {
         return f64::NAN;
     }
@@ -479,8 +496,7 @@ pub fn empirical_ks_distance(source: &mut [f64], target: &mut [f64]) -> f64 {
         .map(|threshold| {
             let source_count = source.partition_point(|score| score <= threshold);
             let target_count = target.partition_point(|score| score <= threshold);
-            (source_count as f64 / source.len() as f64
-                - target_count as f64 / target.len() as f64)
+            (source_count as f64 / source.len() as f64 - target_count as f64 / target.len() as f64)
                 .abs()
         })
         .fold(0.0, f64::max)
@@ -562,10 +578,10 @@ mod tests {
         }
     }
 
-    fn source_and_target(medium_shift: f64, high_shift: f64) -> (
-        Vec<SketchScoreObservation>,
-        Vec<SketchScoreObservation>,
-    ) {
+    fn source_and_target(
+        medium_shift: f64,
+        high_shift: f64,
+    ) -> (Vec<SketchScoreObservation>, Vec<SketchScoreObservation>) {
         let mut source = Vec::new();
         let mut target = Vec::new();
         for (cell, shift) in [
@@ -599,7 +615,10 @@ mod tests {
         let (source, target) = source_and_target(0.0, 0.0);
         let report = audit_sketch_conditional_score_leakage(&source, &target, &config()).unwrap();
         assert_eq!(report.cells.len(), 3);
-        assert!(report.cells.iter().all(|cell| cell.disposition == "audited"));
+        assert!(report
+            .cells
+            .iter()
+            .all(|cell| cell.disposition == "audited"));
         assert!(report.cells.iter().all(|cell| {
             cell.estimators
                 .iter()
@@ -622,7 +641,10 @@ mod tests {
         assert_eq!(low.empirical_ks_distance, Some(0.0));
         assert!(medium.empirical_ks_distance.unwrap() > low.empirical_ks_distance.unwrap());
         assert!(high.empirical_ks_distance.unwrap() > medium.empirical_ks_distance.unwrap());
-        assert!(high.conditional_score_leakage_upper_bound.unwrap() >= high.empirical_ks_distance.unwrap());
+        assert!(
+            high.conditional_score_leakage_upper_bound.unwrap()
+                >= high.empirical_ks_distance.unwrap()
+        );
     }
 
     #[test]
@@ -645,14 +667,30 @@ mod tests {
     #[test]
     fn underresolved_and_missing_domain_cells_have_no_leakage_bound() {
         let (mut source, mut target) = source_and_target(0.0, 0.0);
-        source.retain(|item| item.sketch_cell_id != "medium_motion" || item.replicate_id.ends_with("000"));
+        source.retain(|item| {
+            item.sketch_cell_id != "medium_motion" || item.replicate_id.ends_with("000")
+        });
         target.retain(|item| item.sketch_cell_id != "high_motion");
         let report = audit_sketch_conditional_score_leakage(&source, &target, &config()).unwrap();
-        assert_eq!(report.cells[1].disposition, "abstain_underresolved_sketch_cell");
-        assert!(report.cells[1].estimators[0].conditional_score_leakage_upper_bound.is_none());
-        assert_eq!(report.cells[2].disposition, "abstain_missing_target_support");
-        assert!(report.overall_estimators.iter().all(|item| !item.all_expected_cells_audited));
-        assert!(report.overall_estimators.iter().all(|item| item.worst_cell_leakage_upper_bound.is_none()));
+        assert_eq!(
+            report.cells[1].disposition,
+            "abstain_underresolved_sketch_cell"
+        );
+        assert!(report.cells[1].estimators[0]
+            .conditional_score_leakage_upper_bound
+            .is_none());
+        assert_eq!(
+            report.cells[2].disposition,
+            "abstain_missing_target_support"
+        );
+        assert!(report
+            .overall_estimators
+            .iter()
+            .all(|item| !item.all_expected_cells_audited));
+        assert!(report
+            .overall_estimators
+            .iter()
+            .all(|item| item.worst_cell_leakage_upper_bound.is_none()));
     }
 
     #[test]
@@ -660,8 +698,14 @@ mod tests {
         let (mut source, target) = source_and_target(0.0, 0.0);
         source.retain(|item| item.sketch_cell_id != "high_motion");
         let report = audit_sketch_conditional_score_leakage(&source, &target, &config()).unwrap();
-        assert_eq!(report.cells[2].disposition, "abstain_missing_source_support");
-        assert!(report.cells[2].estimators.iter().all(|item| item.empirical_ks_distance.is_none()));
+        assert_eq!(
+            report.cells[2].disposition,
+            "abstain_missing_source_support"
+        );
+        assert!(report.cells[2]
+            .estimators
+            .iter()
+            .all(|item| item.empirical_ks_distance.is_none()));
     }
 
     #[test]
@@ -669,8 +713,12 @@ mod tests {
         let (source, target) = source_and_target(0.0, 0.0);
         let report = audit_sketch_conditional_score_leakage(&source, &target, &config()).unwrap();
         let expected = ((4.0 * 3.0 * 3.0 / 0.05_f64).ln() / (2.0 * 99.0)).sqrt();
-        assert!((report.cells[0].estimators[0].source_dkw_radius.unwrap() - expected).abs() < 1e-12);
-        assert!((report.cells[0].estimators[0].target_dkw_radius.unwrap() - expected).abs() < 1e-12);
+        assert!(
+            (report.cells[0].estimators[0].source_dkw_radius.unwrap() - expected).abs() < 1e-12
+        );
+        assert!(
+            (report.cells[0].estimators[0].target_dkw_radius.unwrap() - expected).abs() < 1e-12
+        );
     }
 
     #[test]
@@ -709,7 +757,9 @@ mod tests {
     fn duplicate_expected_cells_and_invalid_configuration_fail_closed() {
         let (source, target) = source_and_target(0.0, 0.0);
         let mut duplicate = config();
-        duplicate.expected_sketch_cells.push("low_motion".to_string());
+        duplicate
+            .expected_sketch_cells
+            .push("low_motion".to_string());
         assert_eq!(
             audit_sketch_conditional_score_leakage(&source, &target, &duplicate),
             Err(SketchSufficiencyError::DuplicateExpectedSketchCell)
