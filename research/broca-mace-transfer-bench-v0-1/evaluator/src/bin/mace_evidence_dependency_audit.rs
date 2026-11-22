@@ -20,6 +20,7 @@ use std::mem::size_of;
 use std::time::Instant;
 
 use broca_mace_hdc_retrieval::experience_view_digest;
+use broca_mace_ingress::{DependencyLineageStatusV1, EvidenceDependencySidecarV1};
 use broca_mace_policy::{decide, is_qualified, Action, Decision, DecisionNeedV1, Experience, Policy, Query};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -63,6 +64,8 @@ struct MaceAuditDependencyIndex {
     nodes: BTreeMap<u32, EvidenceNode>,
     dependents: BTreeMap<u32, BTreeSet<u32>>,
     lifecycle_neighbors: BTreeMap<u32, BTreeSet<u32>>,
+    incomplete_lineage_event_ids: BTreeSet<u32>,
+    unresolved_dependency_reference_count: usize,
 }
 
 impl MaceAuditDependencyIndex {
@@ -190,7 +193,77 @@ impl MaceAuditDependencyIndex {
             nodes,
             dependents,
             lifecycle_neighbors,
+            incomplete_lineage_event_ids: BTreeSet::new(),
+            unresolved_dependency_reference_count: 0,
         })
+    }
+
+    /// Build the evaluator's bounded projection from a verified ingress
+    /// sidecar. Any absent ancestry remains incomplete, not independent.
+    #[allow(dead_code)]
+    fn from_receipt_sidecar(
+        sidecar: &EvidenceDependencySidecarV1,
+        memory: &[Experience],
+    ) -> Result<Self, String> {
+        if !sidecar.verify_integrity() {
+            return Err("receipt dependency sidecar failed integrity verification".to_string());
+        }
+        if sidecar.records().len() != memory.len() {
+            return Err("sidecar/evidence cardinality mismatch".to_string());
+        }
+        let mut by_id = BTreeMap::<u32, &Experience>::new();
+        for item in memory {
+            if by_id.insert(item.event_id, item).is_some() {
+                return Err(format!("duplicate candidate event identity: {}", item.event_id));
+            }
+        }
+
+        let available_ids: BTreeSet<u32> = by_id.keys().copied().collect();
+        let mut nodes = Vec::with_capacity(sidecar.records().len());
+        let mut incomplete_lineage_event_ids = BTreeSet::new();
+        let mut unresolved_dependency_reference_count = 0_usize;
+        for record in sidecar.records() {
+            let item = by_id
+                .get(&record.event_id)
+                .ok_or_else(|| format!("sidecar event {} absent from candidate memory", record.event_id))?;
+            if item.source_family != record.source_family
+                || item.source_root_digest.as_bytes() != record.source_root_digest.as_bytes()
+                || item.action != record.action
+                || item.scope != record.scope
+            {
+                return Err(format!("receipt sidecar/evidence identity mismatch for event {}", record.event_id));
+            }
+
+            let mut in_pool_dependencies = Vec::new();
+            for parent_id in &record.derived_from_event_ids {
+                if available_ids.contains(parent_id) {
+                    in_pool_dependencies.push(*parent_id);
+                } else {
+                    // The lineage receipt names this parent, but it is outside
+                    // the selected memory pool. We retain an unresolved marker
+                    // rather than pretending the selected graph is complete.
+                    unresolved_dependency_reference_count += 1;
+                    incomplete_lineage_event_ids.insert(record.event_id);
+                }
+            }
+            if record.dependency_lineage_status != DependencyLineageStatusV1::Complete {
+                incomplete_lineage_event_ids.insert(record.event_id);
+            }
+            nodes.push(EvidenceNode {
+                event_id: record.event_id,
+                source_family: record.source_family,
+                source_root: *record.source_root_digest.as_bytes(),
+                action: record.action,
+                derived_from: in_pool_dependencies,
+                supersedes: Vec::new(),
+                payload_bytes: size_of::<Experience>() as u64,
+            });
+        }
+
+        let mut index = Self::new(nodes)?;
+        index.incomplete_lineage_event_ids = incomplete_lineage_event_ids;
+        index.unresolved_dependency_reference_count = unresolved_dependency_reference_count;
+        Ok(index)
     }
 
     fn event_ids(&self) -> BTreeSet<u32> {
@@ -225,6 +298,10 @@ impl MaceAuditDependencyIndex {
             .values()
             .map(|node| node.derived_from.len() + node.supersedes.len())
             .sum()
+    }
+
+    fn lineage_incomplete_count(&self) -> usize {
+        self.incomplete_lineage_event_ids.len()
     }
 
     fn close_dependents(&self, seeds: impl IntoIterator<Item = u32>) -> BTreeSet<u32> {
