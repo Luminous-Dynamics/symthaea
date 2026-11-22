@@ -65,6 +65,16 @@ pub struct MycelialContactCandidateObservation {
     pub admitted_within_maximum_tolerance: bool,
 }
 
+/// Candidate links that claim the same source-curve contact. They are
+/// competing hypotheses under the current pairwise-fusion model and must not
+/// be interpreted as simultaneously executable connections.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MycelialContactConflictGroup {
+    pub filament_id: u32,
+    pub parameter_micros: u32,
+    pub candidate_ids: Vec<u32>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MycelialContactFiltrationSnapshot {
     /// Current candidate admission threshold. This is not a physical distance.
@@ -116,6 +126,8 @@ pub struct MycelialContactFiltrationMetrics {
     pub candidate_count_total: usize,
     pub candidate_count_in_filtration: usize,
     pub candidate_count_above_maximum: usize,
+    pub contact_conflict_group_count: usize,
+    pub conflicting_candidate_count: usize,
     pub component_merge_count: usize,
     pub cycle_birth_count: usize,
     pub final_connected_components: usize,
@@ -137,6 +149,8 @@ pub struct MycelialContactFiltration {
     pub baseline_parent_edges: Vec<MycelialContactBaselineEdge>,
     /// Complete sorted input inventory, including candidates above the sweep cap.
     pub candidate_observations: Vec<MycelialContactCandidateObservation>,
+    /// All-candidate contact conflicts; these proposals may be mutually exclusive.
+    pub contact_conflict_groups: Vec<MycelialContactConflictGroup>,
     /// One snapshot after each distinct admitted contact distance.
     pub snapshots: Vec<MycelialContactFiltrationSnapshot>,
     pub component_merges: Vec<MycelialContactComponentMerge>,
@@ -468,6 +482,12 @@ pub fn build_mycelial_contact_filtration(
     let candidate_count_above_maximum = measured_candidates
         .len()
         .saturating_sub(candidate_count_in_filtration);
+    let contact_conflict_groups = contact_conflict_groups(&candidate_observations);
+    let conflicting_candidate_count = contact_conflict_groups
+        .iter()
+        .flat_map(|group| group.candidate_ids.iter().copied())
+        .collect::<BTreeSet<_>>()
+        .len();
     let final_components = disjoint.component_count();
     let final_cycle_rank = candidate_count_in_filtration
         .saturating_sub(baseline_components.saturating_sub(final_components));
@@ -484,6 +504,8 @@ pub fn build_mycelial_contact_filtration(
             candidate_count_total: candidates.len(),
             candidate_count_in_filtration,
             candidate_count_above_maximum,
+            contact_conflict_group_count: contact_conflict_groups.len(),
+            conflicting_candidate_count,
             component_merge_count: component_merges.len(),
             cycle_birth_count: cycle_births.len(),
             final_connected_components: final_components,
@@ -509,12 +531,47 @@ pub fn build_mycelial_contact_filtration(
             })
             .collect(),
         candidate_observations,
+        contact_conflict_groups,
         snapshots,
         component_merges,
         cycle_births,
     };
     profile.validate()?;
     Ok(profile)
+}
+
+fn contact_conflict_groups(
+    observations: &[MycelialContactCandidateObservation],
+) -> Vec<MycelialContactConflictGroup> {
+    let mut contacts = BTreeMap::<(u32, u32), Vec<u32>>::new();
+    for candidate in observations {
+        contacts
+            .entry((
+                candidate.source_filament_id,
+                candidate.source_parameter_micros,
+            ))
+            .or_default()
+            .push(candidate.fusion_candidate_id);
+        contacts
+            .entry((
+                candidate.target_filament_id,
+                candidate.target_parameter_micros,
+            ))
+            .or_default()
+            .push(candidate.fusion_candidate_id);
+    }
+    contacts
+        .into_iter()
+        .filter_map(|((filament_id, parameter_micros), mut candidate_ids)| {
+            candidate_ids.sort_unstable();
+            candidate_ids.dedup();
+            (candidate_ids.len() > 1).then_some(MycelialContactConflictGroup {
+                filament_id,
+                parameter_micros,
+                candidate_ids,
+            })
+        })
+        .collect()
 }
 
 impl MycelialContactFiltration {
@@ -650,6 +707,20 @@ impl MycelialContactFiltration {
         {
             return Err(MycelialContactFiltrationError::InvalidFiltration(
                 "candidate admission flags do not match their threshold distances",
+            ));
+        }
+        let expected_conflict_groups = contact_conflict_groups(&self.candidate_observations);
+        let expected_conflicting_candidate_count = expected_conflict_groups
+            .iter()
+            .flat_map(|group| group.candidate_ids.iter().copied())
+            .collect::<BTreeSet<_>>()
+            .len();
+        if self.contact_conflict_groups != expected_conflict_groups
+            || self.metrics.contact_conflict_group_count != expected_conflict_groups.len()
+            || self.metrics.conflicting_candidate_count != expected_conflicting_candidate_count
+        {
+            return Err(MycelialContactFiltrationError::InvalidFiltration(
+                "candidate contact-conflict inventory is inconsistent",
             ));
         }
         if self.metrics.candidate_count_total
@@ -917,6 +988,8 @@ impl MycelialContactFiltration {
             self.metrics.candidate_count_total,
             self.metrics.candidate_count_in_filtration,
             self.metrics.candidate_count_above_maximum,
+            self.metrics.contact_conflict_group_count,
+            self.metrics.conflicting_candidate_count,
             self.metrics.component_merge_count,
             self.metrics.cycle_birth_count,
             self.metrics.final_connected_components,
@@ -933,6 +1006,14 @@ impl MycelialContactFiltration {
         for edge in &self.baseline_parent_edges {
             hasher.update(&edge.source_filament_id.to_le_bytes());
             hasher.update(&edge.target_filament_id.to_le_bytes());
+        }
+        for group in &self.contact_conflict_groups {
+            hasher.update(&group.filament_id.to_le_bytes());
+            hasher.update(&group.parameter_micros.to_le_bytes());
+            hasher.update(&(group.candidate_ids.len() as u64).to_le_bytes());
+            for candidate_id in &group.candidate_ids {
+                hasher.update(&candidate_id.to_le_bytes());
+            }
         }
         for candidate in &self.candidate_observations {
             hasher.update(&candidate.fusion_candidate_id.to_le_bytes());
