@@ -63,6 +63,23 @@ Important limitations:
   Reference fixtures should mark important component regions with stable
   `data-sfeb-id` attributes to connect rendered geometry to source components.
 
+## Interface contracts
+
+The **Interface Contract Compiler** starts with a versioned JSON contract:
+
+- `interface-contract-v1.schema.json` — JSON Schema 2020-12 for product intent,
+  Leptos/runtime, routes, semantic regions, state machines, data sources,
+  responsive constraints, accessibility, security and acceptance journeys.
+- `contracts/symthaea-ui-v0.json` — first source-observed contract for the
+  existing Converse/Observe interface, tied to an exact source commit.
+
+Contract status is explicit: `source_observed` is not `browser_verified`.
+A contract may describe current implementation, proposed behavior or reviewed
+requirements, but browser-verified status requires independent runner receipts.
+The sample records six journeys, 16 named source regions and the current
+telemetry handshake/retry behavior. It deliberately calls out that changing
+the gateway URL does not terminate an already-open WebSocket immediately.
+
 ## Task lifecycle
 
 A task moves through these states:
