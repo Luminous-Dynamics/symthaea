@@ -1009,8 +1009,12 @@ fn run() -> Result<(), String> {
         .unwrap_or(32);
 
     let cases = mace_generated_stress::generated_worlds(clusters);
-    let source_code_sha256 =
-        hex_digest(Sha256::digest(include_bytes!("mace_counterfactual_evidence.rs")).as_slice());
+    let mut evaluator_code_hasher = Sha256::new();
+    evaluator_code_hasher.update(include_bytes!("mace_counterfactual_evidence.rs"));
+    evaluator_code_hasher.update(include_bytes!(
+        "mace_counterfactual_evidence/receipt_dependency.rs"
+    ));
+    let source_code_sha256 = hex_digest(evaluator_code_hasher.finalize().as_slice());
     let fixture_sha256 =
         hex_digest(Sha256::digest(include_bytes!("mace_generated_stress.rs")).as_slice());
     let schema_sha256 = hex_digest(
