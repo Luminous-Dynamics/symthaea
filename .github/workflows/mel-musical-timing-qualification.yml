@@ -50,10 +50,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m json.tool tools/mel-judge-grounding-audit/schema/mel-musical-timing-panel-v1.schema.json > /dev/null
+          python -m json.tool tools/mel-judge-grounding-audit/schema/mel-musical-timing-panel-v2.schema.json > /dev/null
           cargo +1.96.0 run --locked --quiet --manifest-path tools/mel-judge-grounding-audit/Cargo.toml \
             --bin mel-musical-timing-audit -- score \
-            tools/mel-judge-grounding-audit/fixtures/valid-musical-timing-v1.json \
+            tools/mel-judge-grounding-audit/fixtures/valid-musical-timing-v2.json \
             "$RUNNER_TEMP/mel-musical-timing-report.json"
           jq -e '.target_count == 4 and .observed_count == 4 and .missed_count == 0 and .extra_onset_count == 0 and .within_025_beat_rate == 1 and (.tempo_adaptation | length) == 2 and all(.tempo_adaptation[]; .recovered == true) and .qualified_for_declared_timing_contract == true' \
             "$RUNNER_TEMP/mel-musical-timing-report.json" > /dev/null
@@ -73,8 +73,8 @@ jobs:
           cp tools/mel-judge-grounding-audit/Cargo.lock "$evidence/"
           cp tools/mel-judge-grounding-audit/src/musical_timing.rs "$evidence/"
           cp tools/mel-judge-grounding-audit/src/bin/mel-musical-timing-audit.rs "$evidence/"
-          cp tools/mel-judge-grounding-audit/schema/mel-musical-timing-panel-v1.schema.json "$evidence/"
-          cp tools/mel-judge-grounding-audit/fixtures/valid-musical-timing-v1.json "$evidence/"
+          cp tools/mel-judge-grounding-audit/schema/mel-musical-timing-panel-v2.schema.json "$evidence/"
+          cp tools/mel-judge-grounding-audit/fixtures/valid-musical-timing-v2.json "$evidence/"
           cp docs/research/MEL_MUSICAL_TIMING_EVALUATOR_V1_2026-11-22.md "$evidence/"
           if [[ -f "$RUNNER_TEMP/mel-musical-timing-report.json" ]]; then
             cp "$RUNNER_TEMP/mel-musical-timing-report.json" "$evidence/"
