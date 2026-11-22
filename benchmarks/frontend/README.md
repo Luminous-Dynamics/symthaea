@@ -157,6 +157,28 @@ The validator rejects duplicate pattern IDs, unsafe paths, stale source blobs,
 and invalid corpus structure. It is authored but not yet executed because the
 Rust toolchain is unavailable in this environment.
 
+## Knowledge retrieval evaluation
+
+The first Leptos 0.8 retrieval pilot is defined in
+`knowledge/leptos-0.8/retrieval-queries-v0.json`:
+
+- 16 positive queries paraphrase the eight source-grounded patterns.
+- Eight hard negatives represent concepts not yet covered by the corpus.
+- The gold answers are exact versioned pattern IDs.
+- The public query set is development data, not a hidden holdout.
+
+Validate schema and gold-ID references with:
+
+```bash
+cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --retrieval
+```
+
+The intended controlled arms are keyword exact-match, BM25, TF-IDF, dense
+embeddings, HDC associative retrieval and a hybrid. Report recall@1/3, MRR,
+nDCG@3, precision@3, negative abstention accuracy, p50/p95 latency, memory
+and cost under the same corpus and hardware. Do not claim a Symthaea retrieval
+advantage until a private holdout query set has been evaluated.
+
 ## Task lifecycle
 
 A task moves through these states:
