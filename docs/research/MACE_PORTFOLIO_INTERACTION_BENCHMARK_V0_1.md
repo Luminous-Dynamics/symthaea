@@ -1,4 +1,4 @@
-# MACE Portfolio Interaction Benchmark v0.2
+# MACE Portfolio Interaction Benchmark v0.3
 
 **Snapshot:** 2026-11-22  
 **Status:** Synthetic benchmark implementation and protocol; no measured result or SOTA claim.
@@ -51,10 +51,14 @@ Governance and provenance failures are hard gates, not terms in a weighted utili
 Five deterministic seeds are run. For each seed:
 - 96 training clusters across task families 1 and 2;
 - 48 calibration clusters from task family 3;
-- 64 held-out stable-regime clusters from task family 4;
-- 32 shifted-regime negative-control clusters from task family 5.
+- 64 stable-regime conformal-evaluation clusters in task family 3, with cluster and source-root identities disjoint from calibration;
+- 32 stable-regime out-of-family clusters in task family 4;
+- 32 shifted-regime negative-control clusters in task family 5.
 
-The relation model is fitted only on training outcomes; its split-conformal residual quantile uses calibration outcomes; no held-out outcome is passed into the candidate selector. The runner reports held-out interval coverage only on correctly classified, known relation labels, with relation-label errors and unknown labels counted separately. Cluster, source-root and task-family identities are disjoint by construction.
+The task-family-3 conformal holdout uses the same stable relation-generation distribution as calibration but fresh clusters and roots; it is the only split for which the exchangeability premise is intended. Task-family-4 and shifted task-family-5 are separate out-of-distribution diagnostics.
+
+The relation model is fitted only on training outcomes; its split-conformal residual quantile uses calibration outcomes; no held-out outcome is passed into candidate selection. Interval coverage is reported separately for the same-family conformal holdout, stable task-family OOD and shifted-regime holdout, and only on correctly classified known relation labels. Relation-label errors and unknown labels are counted separately. Training/calibration clusters and roots are disjoint; calibration/test cluster and root IDs are also disjoint.
+
 
 ## Qualification targets (not results)
 
@@ -67,7 +71,7 @@ The relation model is fitted only on training outcomes; its split-conformal resi
 
 ## Limitations and next tranche
 
-This v0.1 diagnostic uses a small, explicit relationship vocabulary and a synthetic relation-feature generator. It does not yet estimate semantic overlap from embeddings, learn complementary sets larger than pairs, handle higher-order interactions, or replace the exact additive production portfolio. The split-conformal interval has a marginal finite-sample coverage guarantee only under within-relation exchangeability and correct relation labels. The benchmark also reports observed stable/shifted coverage separately; it does not claim conditional coverage or robustness to distribution shift. No benchmark leaderboard result is implied.
+This v0.1 diagnostic uses a small, explicit relationship vocabulary and a synthetic relation-feature generator. It does not yet estimate semantic overlap from embeddings, learn complementary sets larger than pairs, handle higher-order interactions, or replace the exact additive production portfolio. For the task-family-3 conformal holdout, calibration and test residuals are generated from the same stable relation distribution with disjoint clusters and roots; under this exchangeability premise, the quantile targets finite-sample marginal prediction-interval coverage for correctly classified relation labels. It is not a confidence interval for the mean. The premise is not extended to task-family-4 or regime-shifted task-family-5 evaluation. No benchmark leaderboard result is implied.
 
 Next:
 1. Connect candidate interaction features to the real decision-capsule/evidence graph, not item IDs or opaque labels.
@@ -79,4 +83,4 @@ Next:
 
 ## Source verification status
 
-The implementation contains **16 authored Rust unit tests** by source count. These tests have not been executed in the current environment: `cargo`, `rustc` and `rustfmt` are unavailable. No compile, test, formatting, emitted-output, CI or benchmark run pass is claimed. The authored count is not an executed-test count.
+The implementation contains **17 authored Rust unit tests** by source count. These tests have not been executed in the current environment: `cargo`, `rustc` and `rustfmt` are unavailable. No compile, test, formatting, emitted-output, CI or benchmark run pass is claimed. The authored count is not an executed-test count.

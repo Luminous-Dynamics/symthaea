@@ -19,7 +19,8 @@ const RELATIONS: [Relation; 4] = [
 ];
 const TRAIN_CLUSTERS: u64 = 96;
 const CALIBRATION_CLUSTERS: u64 = 48;
-const STABLE_TEST_CLUSTERS: u64 = 64;
+const CONFORMAL_TEST_CLUSTERS: u64 = 64;
+const OOD_STABLE_TEST_CLUSTERS: u64 = 32;
 const SHIFTED_TEST_CLUSTERS: u64 = 32;
 const TOKEN_BUDGET: u8 = 4;
 const BOOTSTRAP_RESAMPLES: usize = 2_000;
@@ -481,7 +482,6 @@ fn candidate_is_eligible(candidate: &CandidatePortfolio, model: &PairwiseModel) 
     candidate.regime == Regime::Stable
         && model.model_sha256 == model_digest(model)
         && !model.train_families.contains(&candidate.task_family)
-        && !model.calibration_families.contains(&candidate.task_family)
         && !model.train_clusters.contains(&candidate.cluster_id)
         && !model.calibration_clusters.contains(&candidate.cluster_id)
         && candidate.items.iter().all(|item| {
@@ -601,8 +601,10 @@ fn actual_utility(ids: &[u8], truth: &OracleTruth) -> Option<i64> {
 
 #[derive(Clone, Copy, Debug, Default)]
 struct IntervalMetrics {
-    stable_correct_label_pairs: u64,
-    stable_covered_pairs: u64,
+    conformal_correct_label_pairs: u64,
+    conformal_covered_pairs: u64,
+    ood_stable_correct_label_pairs: u64,
+    ood_stable_covered_pairs: u64,
     shifted_correct_label_pairs: u64,
     shifted_covered_pairs: u64,
     relation_label_errors: u64,
@@ -641,14 +643,20 @@ fn update_interval_metrics(
             };
             let covered = *actual >= estimate.lower_bound_micros
                 && *actual <= estimate.upper_bound_micros;
-            match candidate.regime {
-                Regime::Stable => {
-                    metrics.stable_correct_label_pairs += 1;
+            match (candidate.regime, candidate.task_family) {
+                (Regime::Stable, 3) => {
+                    metrics.conformal_correct_label_pairs += 1;
                     if covered {
-                        metrics.stable_covered_pairs += 1;
+                        metrics.conformal_covered_pairs += 1;
                     }
                 }
-                Regime::Shifted => {
+                (Regime::Stable, _) => {
+                    metrics.ood_stable_correct_label_pairs += 1;
+                    if covered {
+                        metrics.ood_stable_covered_pairs += 1;
+                    }
+                }
+                (Regime::Shifted, _) => {
                     metrics.shifted_correct_label_pairs += 1;
                     if covered {
                         metrics.shifted_covered_pairs += 1;
@@ -765,10 +773,18 @@ fn run_seed(
     let mut cases = 0_usize;
     let mut unknown_abstentions = 0_usize;
 
-    for offset in 0..(STABLE_TEST_CLUSTERS + SHIFTED_TEST_CLUSTERS) {
-        let shifted = offset >= STABLE_TEST_CLUSTERS;
+    let stable_total = CONFORMAL_TEST_CLUSTERS + OOD_STABLE_TEST_CLUSTERS;
+    let total_test_clusters = stable_total + SHIFTED_TEST_CLUSTERS;
+    for offset in 0..total_test_clusters {
+        let shifted = offset >= stable_total;
         let regime = if shifted { Regime::Shifted } else { Regime::Stable };
-        let task_family = if shifted { 5 } else { 4 };
+        let task_family = if offset < CONFORMAL_TEST_CLUSTERS {
+            3
+        } else if offset < stable_total {
+            4
+        } else {
+            5
+        };
         let cluster_id = 3_000 + seed * 1_000 + offset;
         let case = generate_case(
             cluster_id,
@@ -835,11 +851,13 @@ fn report() {
     println!(
         concat!(
             "train_clusters={}, calibration_clusters={}, ",
-            "stable_test_clusters={}, shifted_test_clusters={}"
+            "conformal_test_clusters={}, ood_stable_test_clusters={}, ",
+            "shifted_test_clusters={}"
         ),
         TRAIN_CLUSTERS,
         CALIBRATION_CLUSTERS,
-        STABLE_TEST_CLUSTERS,
+        CONFORMAL_TEST_CLUSTERS,
+        OOD_STABLE_TEST_CLUSTERS,
         SHIFTED_TEST_CLUSTERS
     );
     println!(
@@ -852,8 +870,10 @@ fn report() {
     println!(
         concat!(
             "interval_nominal_coverage_bps={}, ",
-            "stable_coverage_pct,stable_pairs,shifted_coverage_pct,",
-            "shifted_pairs,relation_label_errors,unknown_relation_pairs"
+            "conformal_coverage_pct,conformal_pairs,",
+            "ood_stable_coverage_pct,ood_stable_pairs,",
+            "shifted_coverage_pct,shifted_pairs,",
+            "relation_label_errors,unknown_relation_pairs"
         ),
         PAIRWISE_COVERAGE_BPS
     );
@@ -924,13 +944,22 @@ fn report() {
     }
     println!("pairwise_mean_regret_vs_evaluator_oracle_micros={:.3}", oracle_regret);
     println!(
-        "stable_coverage_pct={:.2}",
-        100.0 * interval_total.stable_covered_pairs as f64
-            / interval_total.stable_correct_label_pairs.max(1) as f64
+        "conformal_coverage_pct={:.2}",
+        100.0 * interval_total.conformal_covered_pairs as f64
+            / interval_total.conformal_correct_label_pairs.max(1) as f64
     );
     println!(
-        "stable_correctly_labelled_pairs={}",
-        interval_total.stable_correct_label_pairs
+        "conformal_correctly_labelled_pairs={}",
+        interval_total.conformal_correct_label_pairs
+    );
+    println!(
+        "ood_stable_coverage_pct={:.2}",
+        100.0 * interval_total.ood_stable_covered_pairs as f64
+            / interval_total.ood_stable_correct_label_pairs.max(1) as f64
+    );
+    println!(
+        "ood_stable_correctly_labelled_pairs={}",
+        interval_total.ood_stable_correct_label_pairs
     );
     println!(
         "shifted_coverage_pct={:.2}",
@@ -1119,6 +1148,23 @@ mod tests {
         let mut heldout = generate_case(3_000, 4, Regime::Stable, 99);
         heldout.candidate.items[0].source_root_id = *model.train_roots.iter().next().unwrap();
         assert!(select_pairwise(&heldout.candidate, &model).is_none());
+    }
+
+    #[test]
+    fn calibration_family_is_allowed_only_with_disjoint_clusters_and_roots() {
+        let train = training_split(10, 1_000, 96, &[1, 2]);
+        let calibration = training_split(11, 2_000, 48, &[3]);
+        let model = fit_pairwise_model(&train, &calibration).unwrap();
+        let conformal_holdout = generate_case(3_000, 3, Regime::Stable, 99);
+        assert!(candidate_is_eligible(&conformal_holdout.candidate, &model));
+        assert!(!model
+            .calibration_clusters
+            .contains(&conformal_holdout.candidate.cluster_id));
+        assert!(conformal_holdout
+            .candidate
+            .items
+            .iter()
+            .all(|item| !model.calibration_roots.contains(&item.source_root_id)));
     }
 
     #[test]
