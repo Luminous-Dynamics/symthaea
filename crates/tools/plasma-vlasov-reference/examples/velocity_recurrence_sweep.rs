@@ -1,9 +1,7 @@
 use std::error::Error;
 use std::time::Instant;
 
-use plasma_vlasov_reference::{
-    VlasovPoisson1d1v, VlasovPoissonConfig, maxwellian_perturbation,
-};
+use plasma_vlasov_reference::{VlasovPoisson1d1v, VlasovPoissonConfig, maxwellian_perturbation};
 
 fn run_case(
     label: &str,
