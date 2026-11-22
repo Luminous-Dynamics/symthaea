@@ -474,8 +474,12 @@ interactive and 76.3 full-stack. Our internal stretch goals of 90 static, 88
 interactive and 82 full-stack are deliberately above those historical numbers,
 but **are not cross-benchmark equivalent**. A credible claim requires either
 running the exact Vision2Web protocol or a matched, independently reviewed
-reproduction. The browser-agent benchmark is a separate tool-use dimension;
-its 62% small-sample result should not be blended with code-generation scores.
+reproduction. WebdriverIO is a separate browser-tool dimension: its indexed
+62% row is an aggregate over 103/165 observations in one model context, not a
+62/100 single-run result; another model-context run reports 58/100. These
+historical browser-tool numbers must not be blended with code-generation scores.
+Arena WebDev, Image-to-WebDev and Fullstack ratings are separate pairwise
+human-preference scales; report them separately from functional task success.
 
 Additional proposed goals, measured on the same environment:
 - accepted-task cost at or below 70% of the same base agent after quality gates;
