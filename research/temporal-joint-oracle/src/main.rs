@@ -787,9 +787,9 @@ mod tests {
 
     #[test]
     fn factorial_transform_matches_independent_inclusion_exclusion_reference() {
-        for input in [three_factor_interaction_input(), input()] {
-            let report = decompose_exact_joint_interactions(&input).unwrap();
-            let reference = direct_inclusion_exclusion_reference(&input);
+        for fixture_case in [three_factor_interaction_input(), input()] {
+            let report = decompose_exact_joint_interactions(&fixture_case).unwrap();
+            let reference = direct_inclusion_exclusion_reference(&fixture_case);
             assert_eq!(report.interaction_terms.len(), reference.len());
 
             for (term, (mask, exposure, resources)) in
