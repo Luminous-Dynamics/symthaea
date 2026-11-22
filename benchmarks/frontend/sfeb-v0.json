@@ -540,7 +540,7 @@
     "report_schema_path": "benchmarks/frontend/qualification/qualification-report-v1.schema.json",
     "execution_protocol_path": "benchmarks/frontend/qualification/EXECUTION.md",
     "adjudicator_command": "cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --qualification-report benchmarks/frontend/qualification/qualification-report-v1.schema.json benchmarks/frontend/qualification/mutation-campaign-v1.json path/to/qualification-report.json",
-    "adjudicator_status": "source_and_tests_authored_not_executed",
+    "adjudicator_status": "source_authored_tests_authored_preflight_checked_not_executed",
     "adjudicator_capabilities": [
       "bind exact campaign file SHA-256",
       "require complete mutation/positive/metamorphic case coverage",
@@ -579,5 +579,20 @@
     ],
     "primary_contrast": "A4 minus A0",
     "success_rule": "positive paired 95% interval excluding zero with all hard gates, or noninferiority within 2 percentage points and >=30% lower cost per accepted task"
+  },
+  "reference_fixture_audit": {
+    "status": "source_authored_preflight_checked_tests_not_executed",
+    "task_id": "SFEB-L1-004",
+    "checks": [
+      "exactly one main landmark",
+      "exactly one level-one heading with required name",
+      "skip-link target plus focus-visible style",
+      "named workspace/summary/activity/schedule regions",
+      "exactly three independently identified metric cards",
+      "three-column desktop metric layout declaration",
+      "one-column narrow-screen metric layout declaration",
+      "no scripts or external CSS asset imports"
+    ],
+    "limitation": "Audits original source fixture only; no browser-rendered or agent-output semantics are verified."
   }
 }
