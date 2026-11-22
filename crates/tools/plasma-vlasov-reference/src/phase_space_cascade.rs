@@ -332,8 +332,7 @@ mod tests {
         let mut reference_scale = 0.0_f64;
         for ix in 0..config.nx {
             for iv in 0..config.nv {
-                let phase =
-                    wave_number * (config.x(ix) - config.velocity(iv) * time);
+                let phase = wave_number * (config.x(ix) - config.velocity(iv) * time);
                 let expected = maxwellian[iv] * (1.0 + alpha * phase.cos());
                 let observed = solver.distribution[ix * config.nv + iv];
                 maximum_error = maximum_error.max((observed - expected).abs());
@@ -369,13 +368,11 @@ mod tests {
         let final_time = 3.5;
         let impulse_amplitude = 2.0e-2;
 
-        let initial =
-            maxwellian_perturbation(config, alpha, first_mode, thermal_speed).unwrap();
+        let initial = maxwellian_perturbation(config, alpha, first_mode, thermal_speed).unwrap();
         let mut solver = VlasovPoisson1d1v::new(config, initial).unwrap();
         solver.advance_free_streaming(first_time).unwrap();
 
-        let second_wave_number =
-            std::f64::consts::TAU * second_mode as f64 / config.domain_length;
+        let second_wave_number = std::f64::consts::TAU * second_mode as f64 / config.domain_length;
         let impulses: Vec<f64> = (0..config.nx)
             .map(|ix| impulse_amplitude * (second_wave_number * config.x(ix)).sin())
             .collect();
@@ -396,25 +393,21 @@ mod tests {
             *value /= normalization;
         }
 
-        let first_wave_number =
-            std::f64::consts::TAU * first_mode as f64 / config.domain_length;
+        let first_wave_number = std::f64::consts::TAU * first_mode as f64 / config.domain_length;
         let post_pulse_elapsed = final_time - second_time;
         let mut maximum_error = 0.0_f64;
         let mut reference_scale = 0.0_f64;
 
         for ix in 0..config.nx {
             for iv in 0..config.nv {
-                let x_at_pulse =
-                    config.x(ix) - config.velocity(iv) * post_pulse_elapsed;
+                let x_at_pulse = config.x(ix) - config.velocity(iv) * post_pulse_elapsed;
                 let kick = impulse_amplitude * (second_wave_number * x_at_pulse).sin();
                 let pre_pulse_velocity = config.velocity(iv) - kick;
                 let initial_phase =
                     first_wave_number * (x_at_pulse - pre_pulse_velocity * first_time);
-                let velocity_density = (-0.5 * (pre_pulse_velocity / thermal_speed).powi(2))
-                    .exp()
+                let velocity_density = (-0.5 * (pre_pulse_velocity / thermal_speed).powi(2)).exp()
                     / (std::f64::consts::TAU.sqrt() * thermal_speed * normalization);
-                let expected =
-                    velocity_density * (1.0 + alpha * initial_phase.cos());
+                let expected = velocity_density * (1.0 + alpha * initial_phase.cos());
                 let observed = solver.distribution[ix * config.nv + iv];
                 maximum_error = maximum_error.max((observed - expected).abs());
                 reference_scale = reference_scale.max(expected.abs());
