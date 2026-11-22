@@ -22,6 +22,8 @@ The research literature now has directly relevant comparators:
 
 - schema version and frame ID;
 - immutable source image/volume digest;
+- coordinate-frame ID, identifying the axes/origin used by all junction positions;
+- calibration-manifest digest, binding image-to-physical scale, voxel spacing, coordinate transforms, distortion correction and calibration uncertainty;
 - 2D or 3D dimensionality;
 - coordinate/length unit (pixels, micrometres, millimetres or organism-local model units);
 - producer ID and version;
@@ -47,6 +49,8 @@ A bounded Hungarian matcher is implemented as an explicit option:
 `match_junctions_hungarian(ground_truth, prediction, maximum_distance)`
 
 It sorts IDs before assignment, allows only pairs within the declared localization radius, and uses a lexicographic objective: **maximize admissible match cardinality first, then minimize total Euclidean localization error**. Its unmatched penalty dominates the maximum possible aggregate distance change, so a higher-cardinality assignment cannot lose to a lower-cardinality but shorter-distance assignment. The implementation is capped at 128 junctions per graph (at most a 256×256 padded assignment matrix). Larger graphs require a separately qualified sparse or spatially partitioned matcher.
+
+Ground truth and prediction must share the same source frame, coordinate-frame ID, calibration-manifest digest, dimensionality and length unit before geometry is compared. The calibration digest must identify a separately retained immutable manifest that specifies pixel-to-physical scale, voxel spacing, axis orientation/coordinate transform, distortion corrections and uncertainty. Two files both labelled “micrometres” are not comparable if they were produced under different calibration manifests. The matching threshold and calibration provenance are part of the benchmark, not incidental metadata.
 
 The matching-policy ID remains explicit in the score receipt, for example `hungarian-max-cardinality-min-distance-v1`. Annotation-ID matching, Hungarian assignment, image-tracked correspondence or another versioned policy can therefore be compared. Every supplied match must satisfy the configured coordinate-distance tolerance. The complete mapping and matching thresholds are retained in the receipt.
 
@@ -75,6 +79,7 @@ The graph canonical digest binds sorted junction identity, class and coordinates
 
 The score receipt binds:
 - ground-truth and prediction graph digests;
+- source image digest, coordinate-frame ID and calibration-manifest digest;
 - the named matching policy and full one-to-one identity map;
 - independent count metrics and per-class scores;
 - topology summaries and deltas;
