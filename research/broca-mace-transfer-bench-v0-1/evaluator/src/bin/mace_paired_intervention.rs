@@ -19,9 +19,7 @@ use std::time::Instant;
 use broca_mace_hdc_retrieval::{
     experience_view_digest, CandidateIndex, CandidateHit, IndexConfig, RepresentationProfile,
 };
-use broca_mace_policy::{
-    decide, is_qualified, Action, Decision, Experience, Policy, Query, Regime, Objective,
-};
+use broca_mace_policy::{decide, is_qualified, Action, Decision, Experience, Policy, Query};
 use serde::Serialize;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -348,9 +346,16 @@ fn execute_arm(
             .saturating_mul(size_of::<Experience>() as u64)
     };
 
+    let abstention_reason = error.or_else(|| {
+        if decision.action.is_none() {
+            Some("no admissible decision-support evidence".to_string())
+        } else {
+            None
+        }
+    });
     CandidateRun {
         decision,
-        retrieved_ids: if error.is_some() {
+        retrieved_ids: if abstention_reason.is_some() && error.is_some() {
             Vec::new()
         } else {
             retrieved_ids
@@ -360,13 +365,7 @@ fn execute_arm(
         latency_ns: u64::try_from(started.elapsed().as_nanos()).unwrap_or(u64::MAX),
         index_bytes,
         sidecar_bytes,
-        abstention_reason: error.or_else(|| {
-            if decision.action.is_none() {
-                Some("no admissible decision-support evidence".to_string())
-            } else {
-                None
-            }
-        }),
+        abstention_reason,
     }
 }
 
@@ -467,7 +466,6 @@ fn evaluate_arm(
     case: &stress::Case,
     arm: Arm,
     candidate: &CandidateRun,
-    no_memory_action: Option<Action>,
 ) -> ScoredArm {
     let action = candidate.decision.action;
     let selected_utility = action_utility(case.truth, action);
@@ -859,7 +857,7 @@ fn run() -> Result<(), String> {
             let result = arm_results
                 .get(&arm)
                 .ok_or_else(|| format!("missing arm result {}", arm.name()))?;
-            let score = evaluate_arm(case, arm, result, baseline_action);
+            let score = evaluate_arm(case, arm, result);
             let placebo_changed = if arm == Arm::SemanticPlacebo {
                 Some(score.decision != baseline_action)
             } else {
