@@ -83,3 +83,39 @@ presence of critical/security/evidence-integrity mutants, minimum case counts an
 hard 100% targets for the critical classes. It does not execute any mutation or
 browser test. Run the checker and the actual campaign separately; only retained
 per-case evidence can establish an executed qualification result.
+
+
+## Paired execution adjudicator
+
+The execution report schema is
+[`qualification-report-v1.schema.json`](qualification-report-v1.schema.json);
+the full pairing and artifact layout are specified in
+[`EXECUTION.md`](EXECUTION.md).
+
+The standalone Rust checker supports:
+
+```bash
+cargo test --manifest-path benchmarks/frontend/contract-check/Cargo.toml
+cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --mutations
+cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- \
+  --qualification-report \
+  benchmarks/frontend/qualification/qualification-report-v1.schema.json \
+  benchmarks/frontend/qualification/mutation-campaign-v1.json \
+  path/to/qualification-report.json
+```
+
+The adjudicator recomputes the raw campaign SHA-256, checks all case IDs and
+pair identities, reads the serialized evidence receipts, recomputes their
+SHA-256 values, reads the screenshot/accessibility/layout artifacts and
+recomputes their SHA-256 and byte lengths. It checks PNG dimensions against
+receipt viewport values and the layout JSON viewport against the same receipt.
+It then computes per-category/per-severity mutation kill rates and Wilson
+95% intervals.
+
+**Still not implemented:** the actual Chromium mutation executor and a trusted
+signed execution attestation. The adjudicator validates report structure,
+identity binding and captured bytes; it does not independently prove the
+report producer's identity or that an asserted oracle ID was genuinely
+emitted by a trusted browser oracle. Do not describe the report as
+cryptographically authenticated or as an independently run qualification
+until those layers exist.
