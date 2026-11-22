@@ -102,6 +102,8 @@ pub struct QualificationReport {
     pub gold_coverage: Option<f64>,
     pub conditional_gold_accuracy: Option<f64>,
     pub effective_gold_accuracy: Option<f64>,
+    pub observed_item_count: usize,
+    pub ranking_graph_connected: bool,
     pub gap_bins: Vec<GapBinReport>,
     pub judge_bradley_terry_ranking: Vec<ItemRankReport>,
     pub spearman_rank_correlation_to_gold: Option<f64>,
@@ -346,7 +348,17 @@ pub fn qualify(input: &QualificationV1) -> Result<QualificationReport, String> {
         }
     }
 
-    let fitted = fit_bradley_terry(input.items.len(), &bt_observations);
+    let observed_items: BTreeSet<usize> = bt_observations
+        .iter()
+        .flat_map(|observation| [observation.item_a, observation.item_b])
+        .collect();
+    let ranking_graph_connected =
+        comparison_graph_connected(input.items.len(), &bt_observations);
+    let fitted = if ranking_graph_connected {
+        fit_bradley_terry(input.items.len(), &bt_observations)
+    } else {
+        None
+    };
     let spearman = fitted.as_ref().and_then(|scores| {
         let gold: Vec<f64> = input.items.iter().map(|item| item.reference_strength_logit).collect();
         spearman(&gold, scores)
@@ -406,6 +418,8 @@ pub fn qualify(input: &QualificationV1) -> Result<QualificationReport, String> {
         gold_coverage: rate(stable_directional_decision_count, gold_directional_pair_count),
         conditional_gold_accuracy: rate(gold_agreement_count, stable_directional_decision_count),
         effective_gold_accuracy: rate(gold_agreement_count, gold_directional_pair_count),
+        observed_item_count: observed_items.len(),
+        ranking_graph_connected,
         gap_bins,
         judge_bradley_terry_ranking,
         spearman_rank_correlation_to_gold: spearman,
@@ -584,6 +598,29 @@ fn rate(numerator: usize, denominator: usize) -> Option<f64> {
     }
 }
 
+fn comparison_graph_connected(item_count: usize, observations: &[BtObservation]) -> bool {
+    if item_count < 2 || observations.is_empty() {
+        return false;
+    }
+    let mut adjacency = vec![Vec::<usize>::new(); item_count];
+    for observation in observations {
+        adjacency[observation.item_a].push(observation.item_b);
+        adjacency[observation.item_b].push(observation.item_a);
+    }
+    let mut visited = vec![false; item_count];
+    let mut stack = vec![0usize];
+    visited[0] = true;
+    while let Some(item) = stack.pop() {
+        for neighbor in &adjacency[item] {
+            if !visited[*neighbor] {
+                visited[*neighbor] = true;
+                stack.push(*neighbor);
+            }
+        }
+    }
+    visited.into_iter().all(|seen| seen)
+}
+
 fn fit_bradley_terry(item_count: usize, observations: &[BtObservation]) -> Option<Vec<f64>> {
     if observations.is_empty() {
         return None;
@@ -694,6 +731,8 @@ mod tests {
         assert_eq!(report.swap_inconsistent_pair_count, 0);
         assert_eq!(report.gold_directional_pair_count, 10);
         assert_eq!(report.gold_agreement_count, 10);
+        assert_eq!(report.observed_item_count, 5);
+        assert!(report.ranking_graph_connected);
         assert_eq!(report.left_choice_rate, Some(0.5));
         assert!(report.spearman_rank_correlation_to_gold.unwrap() > 0.99);
     }
@@ -710,6 +749,7 @@ mod tests {
         assert_eq!(report.swap_inconsistent_pair_count, 10);
         assert_eq!(report.swap_stability_rate, Some(0.0));
         assert_eq!(report.left_choice_rate, Some(1.0));
+        assert!(!report.ranking_graph_connected);
         assert!(report.spearman_rank_correlation_to_gold.is_none());
     }
 
