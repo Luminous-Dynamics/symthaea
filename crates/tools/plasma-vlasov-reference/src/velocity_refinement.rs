@@ -26,11 +26,19 @@ impl fmt::Display for SpectralRefinementError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidFactor { factor } => {
-                write!(formatter, "zero-padding factor {factor} must be a power of two >= 2")
+                write!(
+                    formatter,
+                    "zero-padding factor {factor} must be a power of two >= 2"
+                )
             }
-            Self::GridSizeOverflow => write!(formatter, "zero-padded velocity grid size overflowed"),
+            Self::GridSizeOverflow => {
+                write!(formatter, "zero-padded velocity grid size overflowed")
+            }
             Self::AllocationFailed { elements } => {
-                write!(formatter, "could not allocate {elements} zero-padded values")
+                write!(
+                    formatter,
+                    "could not allocate {elements} zero-padded values"
+                )
             }
             Self::NonFiniteInput { index } => {
                 write!(formatter, "zero-padding input {index} is non-finite")
@@ -42,7 +50,10 @@ impl fmt::Display for SpectralRefinementError {
                 formatter,
                 "real zero-padded interpolant has imaginary residual {residual:e} at scale {scale:e}"
             ),
-            Self::Solver(error) => write!(formatter, "solver failure during velocity refinement: {error}"),
+            Self::Solver(error) => write!(
+                formatter,
+                "solver failure during velocity refinement: {error}"
+            ),
         }
     }
 }
@@ -117,15 +128,20 @@ pub fn zero_pad_periodic_real_line(
         .map_err(|_| SpectralRefinementError::AllocationFailed {
             elements: original_len,
         })?;
-    source_spectrum.extend(samples.iter().copied().map(|value| Complex::new(value, 0.0)));
+    source_spectrum.extend(
+        samples
+            .iter()
+            .copied()
+            .map(|value| Complex::new(value, 0.0)),
+    );
     fft(&mut source_spectrum, false);
 
     let mut padded_spectrum = Vec::new();
-    padded_spectrum
-        .try_reserve_exact(padded_len)
-        .map_err(|_| SpectralRefinementError::AllocationFailed {
+    padded_spectrum.try_reserve_exact(padded_len).map_err(|_| {
+        SpectralRefinementError::AllocationFailed {
             elements: padded_len,
-        })?;
+        }
+    })?;
     padded_spectrum.resize(padded_len, Complex::ZERO);
 
     let scale = factor as f64;
@@ -147,11 +163,11 @@ pub fn zero_pad_periodic_real_line(
 
     fft(&mut padded_spectrum, true);
     let mut values = Vec::new();
-    values
-        .try_reserve_exact(padded_len)
-        .map_err(|_| SpectralRefinementError::AllocationFailed {
+    values.try_reserve_exact(padded_len).map_err(|_| {
+        SpectralRefinementError::AllocationFailed {
             elements: padded_len,
-        })?;
+        }
+    })?;
     let mut maximum_imaginary_residual = 0.0_f64;
     let mut maximum_real_magnitude = 0.0_f64;
     for (index, value) in padded_spectrum.iter().enumerate() {
@@ -260,7 +276,10 @@ impl VlasovPoisson1d1v {
         let momentum_delta = after_diagnostics.momentum - before_diagnostics.momentum;
         let kinetic_energy_relative_delta =
             (after_diagnostics.kinetic_energy - before_diagnostics.kinetic_energy).abs()
-                / before_diagnostics.kinetic_energy.abs().max(f64::MIN_POSITIVE);
+                / before_diagnostics
+                    .kinetic_energy
+                    .abs()
+                    .max(f64::MIN_POSITIVE);
         let field_energy_relative_delta =
             (after_diagnostics.field_energy - before_diagnostics.field_energy).abs()
                 / before_diagnostics.field_energy.abs().max(f64::MIN_POSITIVE);
@@ -347,7 +366,10 @@ mod tests {
             let expected = 1.2 + 0.3 * (3.0 * phase).cos() - 0.2 * (7.0 * phase).sin();
             maximum_error = maximum_error.max((padded.values[index] - expected).abs());
         }
-        assert!(maximum_error < 1.0e-12, "interpolation error = {maximum_error:e}");
+        assert!(
+            maximum_error < 1.0e-12,
+            "interpolation error = {maximum_error:e}"
+        );
         for (index, source_value) in source.iter().copied().enumerate() {
             assert!((padded.values[index * factor] - source_value).abs() < 1.0e-12);
         }
