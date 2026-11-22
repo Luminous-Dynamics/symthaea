@@ -673,8 +673,20 @@ fn main() -> Result<(), Box<dyn Error>> {
     run_resolution("dt_refined", common(64, 256, 6.0), 0.005, 4, 0.05)?;
     run_resolution("joint_refined", common(128, 512, 6.0), 0.005, 4, 0.05)?;
     // Extend velocity support while holding velocity spacing fixed (Nv doubles too).
-    run_resolution("domain_expanded_fixed_dv", common(64, 512, 12.0), 0.01, 2, 0.05)?;
+    run_resolution(
+        "domain_expanded_fixed_dv",
+        common(64, 512, 12.0),
+        0.01,
+        2,
+        0.05,
+    )?;
     // Extend velocity support at fixed Nv; dv doubles and recurrence time halves.
-    run_resolution("domain_expanded_fixed_nv", common(64, 256, 12.0), 0.01, 2, 0.05)?;
+    run_resolution(
+        "domain_expanded_fixed_nv",
+        common(64, 256, 12.0),
+        0.01,
+        2,
+        0.05,
+    )?;
     Ok(())
 }
