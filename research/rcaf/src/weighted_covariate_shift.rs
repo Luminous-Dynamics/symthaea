@@ -286,6 +286,12 @@ impl fmt::Display for WeightedCovariateShiftError {
                     "replicate {replicate_id} contains a non-finite or negative statistic"
                 )
             }
+            Self::InvalidEstimatorResponse { replicate_id } => {
+                write!(f, "replicate {replicate_id} has missing or reordered estimator summaries")
+            }
+            Self::UndefinedSignalDirection { replicate_id } => {
+                write!(f, "replicate {replicate_id} has no defined signal direction")
+            }
             Self::InvalidDirectionCosine { replicate_id } => {
                 write!(
                     f,
@@ -597,6 +603,17 @@ pub fn evaluate_weighted_covariate_shift(
         estimators: summaries,
         abstentions,
     })
+}
+
+fn validate_id(value: &str, field: &'static str) -> Result<(), WeightedCovariateShiftError> {
+    if value.trim().is_empty()
+        || !value.bytes().all(|byte| {
+            byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b':' | b'-')
+        })
+    {
+        return Err(WeightedCovariateShiftError::InvalidIdentifier(field));
+    }
+    Ok(())
 }
 
 fn validate_config(
