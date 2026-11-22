@@ -1018,6 +1018,51 @@ mod tests {
     }
 
     #[test]
+    fn four_factor_shapley_uses_lcm_denominator_and_splits_four_way_term_equally() {
+        let report = decompose_exact_joint_interactions(&input()).unwrap();
+        assert_eq!(report.shapley_common_denominator, 12);
+        assert_eq!(report.factor_shapley_attributions.len(), 4);
+
+        // The fixture has additive main effects and one pure four-way term.
+        // Shapley therefore gives each factor its main effect plus exactly
+        // one quarter of the four-way dividend.
+        let expected_wrong = [240_i128, 240, 240, 240];
+        let expected_abstention = [195_i128, 195, 195, 195];
+        let expected_missing = [219_i128, 159, 159, 159];
+
+        for index in 0..4 {
+            assert_eq!(
+                report.factor_shapley_attributions[index]
+                    .exposure_benefit_scaled_numerator_us[0],
+                expected_wrong[index]
+            );
+            assert_eq!(
+                report.factor_shapley_attributions[index]
+                    .exposure_benefit_scaled_numerator_us[1],
+                expected_abstention[index]
+            );
+            assert_eq!(
+                report.factor_shapley_attributions[index]
+                    .exposure_benefit_scaled_numerator_us[2],
+                expected_missing[index]
+            );
+        }
+
+        for axis in 0..3 {
+            let allocated: i128 = report
+                .factor_shapley_attributions
+                .iter()
+                .map(|attribution| attribution.exposure_benefit_scaled_numerator_us[axis])
+                .sum();
+            assert_eq!(
+                allocated,
+                report.total_exposure_benefit_us[axis]
+                    * i128::from(report.shapley_common_denominator)
+            );
+        }
+    }
+
+    #[test]
     fn interaction_order_summaries_reconstruct_total_joint_effect() {
         let report = decompose_exact_joint_interactions(&three_factor_interaction_input()).unwrap();
         assert_eq!(report.interaction_order_summaries.len(), 3);
