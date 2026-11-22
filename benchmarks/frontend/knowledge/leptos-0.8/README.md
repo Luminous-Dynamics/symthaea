@@ -86,3 +86,24 @@ The current browser implementation should follow the actual resolved versions in
 - Browser rendering, performance, CSP and untrusted content.
 - Component testing, visual regression, keyboard journeys and seeded defect
   repair.
+
+## Retrieval evaluation
+
+A first public pilot query set is available at
+`retrieval-queries-v0.json`, with its schema in
+`retrieval-v1.schema.json`. It contains 16 paraphrased positive queries and
+eight hard negatives, so the system must retrieve the right entry when one
+exists and abstain when the corpus has no relevant pattern.
+
+Validate query structure and gold-ID membership with:
+
+```bash
+cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --retrieval
+```
+
+Compare exact same queries and corpus using keyword, BM25, TF-IDF, dense
+embedding, HDC associative retrieval and hybrid retrieval. Report recall@1/3,
+MRR, nDCG@3, precision@3, negative-query false-positive rate, p50/p95 latency,
+memory and cost. This query set is public development data, not a hidden
+holdout; final claims require an additional private query set.
+
