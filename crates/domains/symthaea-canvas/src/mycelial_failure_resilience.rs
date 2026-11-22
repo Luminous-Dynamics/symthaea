@@ -761,7 +761,7 @@ fn demand_weighted_path_load(
     for demand in demands {
         let source = indexed.node_index[&demand.source_junction_id];
         let target = indexed.node_index[&demand.target_junction_id];
-        let (_, predecessor_node, predecessor_edge) = cache.entry(source).or_insert_with(|| {
+        let (distances, predecessor_node, predecessor_edge) = cache.entry(source).or_insert_with(|| {
             let mut distances = vec![f64::INFINITY; indexed.node_ids.len()];
             let mut predecessor_node = vec![None; indexed.node_ids.len()];
             let mut predecessor_edge = vec![None; indexed.node_ids.len()];
@@ -791,7 +791,7 @@ fn demand_weighted_path_load(
             (distances, predecessor_node, predecessor_edge)
         });
         // Unreachable demand pairs contribute no path load.
-        if !cache[&source].0[target].is_finite() {
+        if !distances[target].is_finite() {
             continue;
         }
 
