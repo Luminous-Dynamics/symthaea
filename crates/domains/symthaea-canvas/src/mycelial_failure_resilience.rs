@@ -2575,11 +2575,20 @@ mod tests {
             first.canonical_digest_hex().unwrap(),
             second.canonical_digest_hex().unwrap()
         );
-        let mut tampered = first;
+        let mut tampered = first.clone();
         tampered.trials[0].realized_failed_segment_ids.clear();
         assert!(tampered.canonical_digest_hex().is_err());
         assert!(
             tampered
+                .validate_against(&graph, &demand_pairs, &plan)
+                .is_err()
+        );
+
+        let mut metric_tampered = first;
+        metric_tampered.trials[0].connected_components =
+            metric_tampered.trials[0].connected_components.saturating_add(1);
+        assert!(
+            metric_tampered
                 .validate_against(&graph, &demand_pairs, &plan)
                 .is_err()
         );
