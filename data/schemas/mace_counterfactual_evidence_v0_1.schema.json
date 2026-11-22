@@ -444,6 +444,9 @@
       "type": "string",
       "enum": [
         "exact_scope_scan",
+        "event_id_key_value_topk",
+        "static_hdc",
+        "hdc_ltc_zero_input",
         "typed_content_hdc"
       ]
     }
