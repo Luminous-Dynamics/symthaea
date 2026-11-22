@@ -435,7 +435,7 @@ mod tests {
     #[test]
     fn refinement_extends_recurrence_horizon_and_prevents_old_grid_return() {
         let config = config(64, 256);
-        let distribution = maxwellian_perturbation(config, 1.0e-2, 1, 1.0).unwrap();
+        let distribution = maxwellian_perturbation(config, 1.0e-1, 1, 1.0).unwrap();
         let mut coarse = VlasovPoisson1d1v::new(config, distribution.clone()).unwrap();
         let mut refined = VlasovPoisson1d1v::new(config, distribution.clone()).unwrap();
         let initial = distribution;
