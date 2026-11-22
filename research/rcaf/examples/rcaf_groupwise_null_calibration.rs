@@ -31,7 +31,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
         for index in 0..100 {
             let value = (index + 1) as f64 / 100.0 * scale;
-            let signal = (0.90 + index as f64 / 1000.0) * scale;
+            let signal = (0.899 + index as f64 * 0.0011) * scale;
             evaluation.push(StratifiedHeldOutEvaluationObservation {
                 stratum_id: stratum_id.to_string(),
                 observation: HeldOutEvaluationObservation {
