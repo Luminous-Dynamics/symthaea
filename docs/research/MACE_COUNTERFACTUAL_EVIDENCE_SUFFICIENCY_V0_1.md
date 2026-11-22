@@ -824,3 +824,73 @@ The aggregate schema is \`mace_sufficiency_aggregate_v0_1\`. The reducer binds t
 
 Six reducer tests cover equal-weight within-cluster aggregation, deterministic cluster bootstrap, paired world-cluster matching/regret-delta direction, worst-family harm visibility, multi-dimensional Pareto dominance and canonical source revision validation. They have not been run in this environment.
 
+
+
+## 18. Updated 2026 long-term memory research and matched comparator requirements (2026-11-23)
+
+### Official AML Cycle 2 reference
+
+The official Cycle 2 page (published 19 November 2026) reports separate open-method, commercial-product and closed-source standings for textual, multimodal and coding tracks. Keep the divisions and metrics distinct:
+
+| Track / division | Leader | Result | Capability detail |
+|---|---|---:|---|
+| Textual / open method | Resurface | 61.22 overall | Explicit fact 62.98; relational/multi-hop 58.94; temporal 57.76; governance 76.55; personalization/care 38.82; workflow 59.67; epistemic safety/privacy 68.59; streaming 49.65 |
+| Multimodal / open method | Khipu | 43.26 overall | Retrieval 50.28; relational 45.82; temporal 34.23; continual learning 38.45; personalization 11.04; evidence governance 31.29 |
+| Coding / open method | InsightMem | 63.33% resolved | New-feature 74.51%; bug-fix 57.58% |
+| Textual / commercial and closed-source | MemoraX | 69.26 overall | A distinct division, not an open-source result |
+| Multimodal / commercial and closed-source | MemoraX | 53.68 overall | A distinct division, not an open-source result |
+| Coding / commercial and closed-source | MemoraX | 68.00% resolved | A distinct division, not an open-source result |
+
+Source: https://agentmemoryleaderboard.ai/results/cycle-2/ (published 2026-11-19). Capability gaps—not just overall rank—should drive the next MACE extensions. In particular, personalization/streaming and multimodal evidence governance remain weak points on the open boards. MACE has not entered Cycle 2 and cannot infer AML performance from synthetic regret results.
+
+The #13284 future open-method targets remain +3-point initial hurdles and +5-point stretch goals against the Cycle 2 open leaders:
+- Textual: 64.22 initial, 66.22 stretch.
+- Multimodal: 46.26 initial, 48.26 stretch.
+- Coding: 66.33% initial, 68.33% stretch.
+
+These must be reached on a future official cycle's exact rules and splits.
+
+### New direct and adjacent research comparators
+
+1. **MRAgent — active memory reconstruction (ICML 2026).** It represents memory as a Cue–Tag–Content associative graph and uses reasoning-time exploration/pruning of paths rather than a fixed retrieve-then-reason pipeline. Its paper reports up to 23% gains over strong baselines on LoCoMo/LongMemEval with lower retrieval cost in its own protocol. MACE should reproduce it as the active-reconstruction arm, then compare an evidence-gated variant where every expanded path is checked against scope, source identity, lineage and lifecycle before it is eligible to affect a decision. Source: https://proceedings.mlr.press/v306/ji26d.html
+
+2. **Complementary episodic + relational memory (Findings AACL 2026).** The Microsoft paper *Long-Term Agent Memory through Complementary Curation and Consolidation* combines episodic and structured relational memories with consolidation. It reports 90.2% LoCoMo accuracy and 85.5% LongMemEval-S accuracy under its own benchmark setup. This is a particularly relevant baseline because it tests whether multiple memory representations complement each other. Reproduce its exact backbone, metrics, data and adapter before comparing it with a MACE hybrid. Do not equate its accuracy values with MRAgent's judge score or AML's track score. Source: https://aclanthology.org/2026.findings-aacl.218/
+
+3. **REALM — retrieval-driven reconsolidation (2026).** It uses retrieval feedback to reorganize memory over time rather than treating retrieval as the endpoint. Its arXiv report gives 75.97% LoCoMo and 65.11% LongMemEval. Include it as a reconsolidation comparator, but reproduce its exact version/protocol before using these numbers in a table of measured results. Source: https://arxiv.org/abs/2609.16053
+
+4. **MemoPilot — learned memory-update policy (ICML 2026).** It optimizes updates to explicit memory for a frozen LLM/player through multi-turn GRPO. It reports 1,762 Elo on Limit Texas Hold'em and 1,590 on Rock-Paper-Scissors. These are game-specific results, not long-dialogue accuracy, AML scores or MACE regret. Its transferable method is learning *when and how to update memory* with sequential credit assignment. Source: https://proceedings.mlr.press/v306/cai26b.html
+
+5. **Darwinian Memory — utility-driven pruning (ICML 2026).** It breaks GUI trajectories into reusable units and uses utility-driven selection/pruning; it reports 18.0% average task-success and 33.9% execution-stability gains in its own multi-app GUI protocol. Include it as a governed-pruning comparator and add poison resistance, lineage and invalidation controls. Those percentages are not comparable to MACE. Source: https://proceedings.mlr.press/v306/mi26b.html
+
+6. **MemoryArena and FAMA.** MemoryArena evaluates interdependent multi-session Memory-Agent-Environment loops, exposing the gap between remembering and using experience. FAMA explicitly penalizes reliance on obsolete/invalidated memory. Use each benchmark's official evaluator separately. Sources: https://proceedings.mlr.press/v306/he26am.html and https://aclanthology.org/2026.findings-acl.1337/
+
+### Updated matched benchmark matrix
+
+The frontier must not stop at the synthetic HDC methods. Extend the comparison in stages:
+
+| Arm | Scientific question | Required control |
+|---|---|---|
+| No memory / full history | Lower and information-reference bounds | Same frozen answer model and context budget |
+| BM25 / dense / hybrid RRF + reranker | Does conventional retrieval beat typed HDC on raw sessions? | Real dialogue/trajectory source adapter, not stringified structs |
+| Episodic + relational hybrid | Are memory representations complementary? | Reproduce Microsoft AACL 2026 protocol, then matched MACE subset |
+| MRAgent-style active reconstruction | Does iterative path reconstruction improve use-time support? | Same task/model/tool/observation budget |
+| REALM-style reconsolidation | Does retrieval feedback improve long-run memory organization? | Freeze update horizon, measure maintenance cost and stale-use |
+| MemoPilot-style learned update policy | Does learned consolidation improve future task utility? | Frozen backbone, matched sequential environment, separate game-native replication |
+| Darwinian-style utility pruning | Does utility pruning reduce cost without deleting rare critical knowledge? | Poison, retraction, rare-detail and shift controls |
+| MACE receipt-governed decision-sufficient memory | Does evidence validity + active acquisition + lifecycle governance improve downstream regret? | Independent labels, authenticated lineage, current-at-use verification |
+| Oracle evidence/minimal memory | What is the evaluator-only upper bound? | Must never be candidate-visible |
+
+First reproduce each paper's own protocol. Only afterward build a distinct common matched-budget suite with exact adapters. Use one fixed backbone per comparison lane, same raw sessions, same observation/tool limits, same total model/token/compute budget, and same reader/judge. Keep per-benchmark native numbers in separate columns.
+
+### What would constitute a meaningful win
+
+A MACE result is stronger than a recall score only if it demonstrates all of the following on held-out independent world clusters:
+- positive paired downstream utility improvement versus no-memory and strongest reproduced non-oracle baseline;
+- lower regret and no unacceptable worst-family regression;
+- evidence selection with zero false independence or unauthorized/stale activation on deterministic and adversarial integrity panels;
+- positive net-EVSI gain over uncertainty-only and seeded-random acquisition after costs;
+- lower full lifecycle cost, including source verification, sidecar and graph maintenance, updates, tombstones, replay, context, latency and acquisition;
+- no loss of evidence validity under correction, retraction, supersession, distribution shift or multi-parent derivation.
+
+This is a staged research target, not a result. The current frontier/EVSI code uses a typed synthetic corpus, an analytic acquisition fixture and no authenticated dependency sidecar. It is a first runner—not a benchmark winner or a production memory system.
+
