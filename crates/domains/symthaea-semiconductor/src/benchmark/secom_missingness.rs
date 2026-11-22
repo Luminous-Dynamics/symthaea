@@ -292,10 +292,11 @@ fn binary_subject(
         ),
         samples: indices
             .iter()
-            .map(|&index| BinaryScoreSampleV1 {
+            .enumerate()
+            .map(|(position, &index)| BinaryScoreSampleV1 {
                 sample_id: assignments[index].sample_id.clone(),
                 positive: labels[index].label == 1,
-                score: scores[index],
+                score: scores[position],
             })
             .collect(),
     }
