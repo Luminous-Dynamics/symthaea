@@ -1394,6 +1394,11 @@ mod tests {
             .iter()
             .find(|scenario| scenario.scenario_id == "SEQ-002")
             .unwrap();
+        let aer01 = result
+            .scenarios
+            .iter()
+            .find(|scenario| scenario.scenario_id == "SEQ-003-AER01-NDE-STRUCTURAL")
+            .unwrap();
         assert_eq!(
             seq_one.adaptive_campaign.first_action_id.as_deref(),
             Some("A-COMBINED-LOAD-SCREEN")
@@ -1404,6 +1409,60 @@ mod tests {
         );
         assert_eq!(seq_one.adaptive_campaign.worst_case_regret, 0.0);
         assert_eq!(seq_two.adaptive_campaign.worst_case_regret, 0.0);
+        assert_eq!(aer01.baseline_terminal_disposition, "HOLD");
+        assert_eq!(aer01.baseline_worst_case_regret, 2.0);
+        assert_eq!(aer01.myopic.worst_case_regret, 2.0);
+        assert!(aer01.myopic.stops_without_action);
+        assert_eq!(aer01.fixed_campaign.worst_case_regret, 0.0);
+        assert_eq!(
+            aer01.adaptive_campaign.first_action_id.as_deref(),
+            Some("A-CALIBRATION-CHAIN")
+        );
+        assert_eq!(aer01.adaptive_campaign.worst_case_regret, 0.0);
+        let policy = &aer01.adaptive_campaign.policy;
+        let crate::sequential::PolicyNode::Test { branches, .. } = policy else {
+            panic!("AER-01 campaign must begin with a calibration-chain test");
+        };
+        let crate::sequential::PolicyNode::Test {
+            action_id: load_action,
+            branches: valid_branches,
+        } = branches.get("VALID").unwrap() else {
+            panic!("valid calibration must continue to combined-load screening");
+        };
+        assert_eq!(load_action, "B-LOAD-CAPACITY");
+        assert!(matches!(
+            branches.get("INVALID"),
+            Some(crate::sequential::PolicyNode::Terminal { decision, .. }) if decision == "HOLD"
+        ));
+        assert!(matches!(
+            valid_branches.get("FAIL"),
+            Some(crate::sequential::PolicyNode::Terminal { decision, .. }) if decision == "REJECT"
+        ));
+        let crate::sequential::PolicyNode::Test {
+            action_id: nde_action,
+            branches: nde_branches,
+        } = valid_branches.get("PASS").unwrap() else {
+            panic!("load pass must continue to ultrasonic inspection");
+        };
+        assert_eq!(nde_action, "C-ULTRASONIC-NDE");
+        assert!(matches!(
+            nde_branches.get("CLEAR"),
+            Some(crate::sequential::PolicyNode::Terminal { decision, .. }) if decision == "ACCEPT"
+        ));
+        assert!(matches!(
+            nde_branches.get("INDICATION"),
+            Some(crate::sequential::PolicyNode::Terminal { decision, .. }) if decision == "REJECT"
+        ));
+        let adaptive_resources = aer01.adaptive_campaign.expected_resources.as_ref().unwrap();
+        assert!((adaptive_resources.engineering_hours - 1.25).abs() < 1.0e-9);
+        assert!((adaptive_resources.facility_hours - 1.215).abs() < 1.0e-9);
+        assert!((adaptive_resources.specimen_count - 0.95).abs() < 1.0e-9);
+        assert!((adaptive_resources.review_hours - 0.235).abs() < 1.0e-9);
+        assert!((adaptive_resources.external_cost_units - 0.5275).abs() < 1.0e-9);
+        assert!(expected_dominates(
+            adaptive_resources,
+            &aer01.fixed_campaign.expected_resources
+        ));
         assert!(expected_dominates(
             seq_one
                 .adaptive_campaign
