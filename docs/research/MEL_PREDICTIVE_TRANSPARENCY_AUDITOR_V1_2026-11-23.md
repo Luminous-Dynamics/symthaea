@@ -90,3 +90,17 @@ The next human study should compare no-preview, post-hoc, yoked-preview, single-
 ## Claim ceiling
 
 The committed fixture contains invented timestamps, mock canonical time-map provenance, mock time-alignment provenance and synthetic event commitments. The tool validates declared clock-order relationships and receipt shapes; it does not authenticate receipts, prove the musician saw/understood the screen, establish a real model forecast, measure acoustic output, or show that previews improve collaboration. Real claims require the actual canonical mapper, a qualified performance-to-runtime clock alignment, UI display receipts, independently measured runtime timing and a preregistered musician study.
+
+
+## Output observation closure (MEL-OBS-CLOSE-001 / #13311)
+
+A missing forecast-event link is not automatically an observed absence. Every forecast now requires exactly one observation-closure receipt. The receipt states the observation kind (symbolic score, MIDI event log or audio capture), clock domain, coverage interval, observed-through time, completion status, output-evidence digest where available, and observation-receipt digest.
+
+Presence outcomes are tri-state:
+- **present:** the exact forecast event was observed inside the captured interval;
+- **absent:** a complete capture covers the full half-open forecast target interval and the event was not observed;
+- **unknown:** observation is partial or unavailable.
+
+Unknown outcomes are counted but excluded from Brier scoring. Unfulfilled forecasts count only observed-absent event slots. The report exposes observed-present, observed-absent, unknown and scored-event counts plus an explicit completeness flag. A complete observation's output-evidence digest must equal the realization artifact digest when realized events are present.
+
+A digest-shaped receipt is still not authenticated capture evidence. This layer prevents missingness from being silently treated as a negative label; it does not prove that the capture device ran or that a waveform detector found every perceptual event.
