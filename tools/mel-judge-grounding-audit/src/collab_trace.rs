@@ -187,9 +187,9 @@ fn audit_trace(trace: &InteractionTraceV1) -> Result<TraceAuditReport, String> {
         previous_sequence = event.sequence;
         previous_time = event.monotonic_ns;
 
-        let payload_count = usize::from(event.input_chunk.is_some())
-            + usize::from(event.decision.is_some())
-            + usize::from(event.output.is_some());
+        let payload_count = event.input_chunk.is_some() as usize
+            + event.decision.is_some() as usize
+            + event.output.is_some() as usize;
         if payload_count != 1 {
             return Err(format!(
                 "event {} must contain exactly one typed payload",
@@ -329,7 +329,7 @@ fn audit_trace(trace: &InteractionTraceV1) -> Result<TraceAuditReport, String> {
     let mut rest_windows_without_wait_or_yield = 0usize;
     for window in &trace.rest_windows {
         let has_rest_decision = trace.events.iter().any(|event| {
-            if event.monotonic_ns < window.start_ns || event.monotonic_ns > window.end_ns {
+            if event.monotonic_ns < window.start_ns || event.monotonic_ns >= window.end_ns {
                 return false;
             }
             decisions.get(&event.event_id).is_some_and(|decision| {
@@ -626,9 +626,9 @@ mod tests {
     #[test]
     fn response_inside_rest_is_ineligible_not_silently_accepted() {
         let mut value = trace();
-        value["events"][3]["monotonic_ns"] = serde_json::json!(220);
-        value["events"][3]["decision"]["state"] = serde_json::json!("respond");
-        value["events"][3]["decision"]["deadline_ns"] = serde_json::json!(280);
+        value["events"][4]["monotonic_ns"] = serde_json::json!(220);
+        value["events"][4]["decision"]["state"] = serde_json::json!("respond");
+        value["events"][4]["decision"]["deadline_ns"] = serde_json::json!(280);
         let report = audit(&value).expect("trace structure is still parseable");
         assert!(!report.qualified_for_declared_trace_contract);
         assert!(report.false_interruption_count > 0);
@@ -667,9 +667,11 @@ mod tests {
         let mut value = trace();
         let mut duplicate = value["events"][2].clone();
         duplicate["event_id"] = serde_json::json!("duplicate-output");
-        duplicate["sequence"] = serde_json::json!(6);
+        duplicate["sequence"] = serde_json::json!(4);
         duplicate["monotonic_ns"] = serde_json::json!(160);
         value["events"].as_array_mut().unwrap().insert(3, duplicate);
+        value["events"][4]["sequence"] = serde_json::json!(5);
+        value["events"][5]["sequence"] = serde_json::json!(6);
         let error = audit(&value).expect_err("duplicate event sequence/output sequence must fail");
         assert!(error.contains("sequence") || error.contains("output_sequence"));
     }
