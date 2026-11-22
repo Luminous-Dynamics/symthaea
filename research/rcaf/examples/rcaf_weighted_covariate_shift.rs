@@ -54,11 +54,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         || report.calibration_replicates != 99
         || report.evaluation_replicates != 100
         || report.abstentions.len() != 3
-        || report.estimators.iter().any(|item| {
-            item.finite_threshold_count != 99 || item.abstained_evaluation_count != 1
-        })
+        || report
+            .estimators
+            .iter()
+            .any(|item| item.finite_threshold_count != 99 || item.abstained_evaluation_count != 1)
     {
-        return Err("weighted covariate-shift report has unexpected dimensions or abstentions".into());
+        return Err(
+            "weighted covariate-shift report has unexpected dimensions or abstentions".into(),
+        );
     }
 
     let rendered = report.to_json_pretty();
