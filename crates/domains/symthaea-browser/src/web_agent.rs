@@ -151,7 +151,7 @@ impl WebAgent {
                 continue;
             }
 
-            let observation = match session.observe().await {
+            let observation = match executor.observe().await {
                 Ok(observation) => observation,
                 Err(error) => {
                     tracing::warn!(

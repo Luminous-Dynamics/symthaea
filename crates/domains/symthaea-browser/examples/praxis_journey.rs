@@ -58,7 +58,7 @@ async fn main() -> Result<()> {
             receipt.outcome
         );
 
-        let observation = session.observe().await?;
+        let observation = executor.observe().await?;
         println!(
             "    {} — {} elements, {} interactive",
             observation.title,

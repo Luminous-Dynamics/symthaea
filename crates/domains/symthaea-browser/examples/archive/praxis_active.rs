@@ -1,3 +1,13 @@
+// ARCHIVED LEGACY EXPLORATION HARNESS
+// SPDX-License-Identifier: AGPL-3.0-or-later
+//
+// This file is preserved for research-history and reproducibility only.
+// It directly evaluates page JavaScript and bypasses BrowserExecutor.
+// Do not use it as a maintained example or as evidence of controller safety.
+// The maintained browser path must use BrowserExecutor and typed CDP actions.
+//
+// Original source retained below without behavioral edits.
+
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Active browser agent — Symthaea navigates Praxis autonomously.

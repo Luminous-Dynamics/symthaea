@@ -8,11 +8,13 @@
 
 use std::time::Instant;
 
+use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 
 use crate::actions::BrowserAction;
 use crate::cdp::CdpSession;
 use crate::safety::{BrowserSafetyPolicy, PolicyDecision, PolicyDenial};
+use crate::observation::PageObservation;
 
 /// Result class for a dispatched browser action.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -52,6 +54,20 @@ impl ActionReceipt {
     }
 }
 
+/// Actions that read or manipulate current page state must revalidate the
+/// current URL. Explicit navigation and checked history navigation have their
+/// own destination-policy gates; NoOp does not touch the browser.
+fn requires_current_page_url_check(action: &BrowserAction) -> bool {
+    matches!(
+        action,
+        BrowserAction::Click { .. }
+            | BrowserAction::Type { .. }
+            | BrowserAction::ScrollTo { .. }
+            | BrowserAction::ExtractText { .. }
+            | BrowserAction::Screenshot
+    )
+}
+
 /// The only normal route from a cognitive action proposal to browser mutation.
 pub struct BrowserExecutor<'a> {
     session: &'a CdpSession,
@@ -68,9 +84,44 @@ impl<'a> BrowserExecutor<'a> {
         }
     }
 
+    /// Observe the current page through the executor's capability, Phi and URL checks.
+    ///
+    /// Perception loops should use this method rather than reading directly from
+    /// the low-level CDP session. It serializes against other actions and refuses
+    /// to expose page content when the current URL is denied by policy.
+    pub async fn observe(&self) -> Result<PageObservation> {
+        let _action_guard = self.session.begin_action().await;
+        let policy_action = BrowserAction::ExtractText { selector: None };
+        if let PolicyDecision::Deny { reason, .. } =
+            self.policy.evaluate_action(&policy_action, self.phi)
+        {
+            bail!("browser observation denied by action policy: {reason:?}");
+        }
+
+        let current_url = self.session.current_url().await?;
+        if let PolicyDecision::Deny { reason, .. } = self.policy.evaluate_url(&current_url) {
+            bail!("browser observation denied by current URL policy: {reason:?}");
+        }
+
+        let mut observation = self
+            .session
+            .observe()
+            .await
+            .context("Policy-checked accessibility observation failed")?;
+
+        // Return only the redacted URL to external callers; a permitted host
+        // can still place credentials or secret-bearing query parameters in the
+        // landed URL. Keep the raw URL inside the CDP session for policy checks.
+        observation.url = observation.redacted_url();
+        Ok(observation)
+    }
+
     /// Dispatch an action after evaluating capability, Phi, and URL policy.
     pub async fn execute(&self, action: BrowserAction) -> ActionReceipt {
         let started = Instant::now();
+        // Hold this guard from policy preflight through action dispatch so two
+        // executor calls cannot interleave current-URL validation and mutation.
+        let _action_guard = self.session.begin_action().await;
         let decision = self.policy.evaluate_action(&action, self.phi);
 
         if let PolicyDecision::Deny { ref reason, .. } = decision {
@@ -83,9 +134,61 @@ impl<'a> BrowserExecutor<'a> {
             };
         }
 
+        // A prior navigation may have been redirected by the browser or site.
+        // Re-check the currently displayed page before any observation or
+        // interaction that could expose data or cause a side effect. History
+        // actions perform their own destination check and remain available as
+        // a path away from an unsafe current page.
+        if requires_current_page_url_check(&action) {
+            let current_url = match self.session.current_url().await {
+                Ok(url) => url,
+                Err(error) => {
+                    return ActionReceipt {
+                        action,
+                        policy_decision: decision,
+                        outcome: ActionOutcome::Failed(error.to_string()),
+                        output: ActionOutput::None,
+                        elapsed_ms: started.elapsed().as_millis(),
+                    };
+                }
+            };
+            let current_url_decision = self.policy.evaluate_url(&current_url);
+            if let PolicyDecision::Deny { ref reason, .. } = current_url_decision {
+                let reason = reason.clone();
+                return ActionReceipt {
+                    action,
+                    policy_decision: current_url_decision,
+                    outcome: ActionOutcome::Denied(reason),
+                    output: ActionOutput::None,
+                    elapsed_ms: started.elapsed().as_millis(),
+                };
+            }
+        }
+
         let execution = match &action {
             BrowserAction::Navigate { url } => {
-                self.session.navigate(url).await.map(|_| ActionOutput::None)
+                match self.session.navigate(url).await {
+                    Err(error) => Err(error),
+                    Ok(()) => match self.session.current_url().await {
+                        Err(error) => Err(error),
+                        Ok(landed_url) => {
+                            let landing_decision = self.policy.evaluate_url(&landed_url);
+                            if !landing_decision.is_allowed() {
+                                return ActionReceipt {
+                                    action: action.clone(),
+                                    policy_decision: landing_decision,
+                                    outcome: ActionOutcome::Failed(
+                                        "blocked post-navigation URL; request may have occurred"
+                                            .to_string(),
+                                    ),
+                                    output: ActionOutput::None,
+                                    elapsed_ms: started.elapsed().as_millis(),
+                                };
+                            }
+                            Ok(ActionOutput::None)
+                        }
+                    },
+                }
             }
             BrowserAction::Click { selector } => self
                 .session
@@ -102,8 +205,52 @@ impl<'a> BrowserExecutor<'a> {
                 .scroll_to(selector)
                 .await
                 .map(|_| ActionOutput::None),
-            BrowserAction::GoBack => self.session.go_back().await.map(|_| ActionOutput::None),
-            BrowserAction::GoForward => self.session.go_forward().await.map(|_| ActionOutput::None),
+            BrowserAction::GoBack => {
+                match self
+                    .session
+                    .go_back_with_url_policy(|url| self.policy.evaluate_url(url))
+                    .await
+                {
+                    Ok(target_decision) if !target_decision.is_allowed() => {
+                        let reason = target_decision
+                            .denial_reason()
+                            .cloned()
+                            .unwrap_or(PolicyDenial::InvalidUrl);
+                        return ActionReceipt {
+                            action: action.clone(),
+                            policy_decision: target_decision,
+                            outcome: ActionOutcome::Denied(reason),
+                            output: ActionOutput::None,
+                            elapsed_ms: started.elapsed().as_millis(),
+                        };
+                    }
+                    Ok(_) => Ok(ActionOutput::None),
+                    Err(error) => Err(error),
+                }
+            }
+            BrowserAction::GoForward => {
+                match self
+                    .session
+                    .go_forward_with_url_policy(|url| self.policy.evaluate_url(url))
+                    .await
+                {
+                    Ok(target_decision) if !target_decision.is_allowed() => {
+                        let reason = target_decision
+                            .denial_reason()
+                            .cloned()
+                            .unwrap_or(PolicyDenial::InvalidUrl);
+                        return ActionReceipt {
+                            action: action.clone(),
+                            policy_decision: target_decision,
+                            outcome: ActionOutcome::Denied(reason),
+                            output: ActionOutput::None,
+                            elapsed_ms: started.elapsed().as_millis(),
+                        };
+                    }
+                    Ok(_) => Ok(ActionOutput::None),
+                    Err(error) => Err(error),
+                }
+            },
             BrowserAction::ExtractText { selector } => self
                 .session
                 .extract_text(selector.as_deref())
@@ -130,5 +277,37 @@ impl<'a> BrowserExecutor<'a> {
             output,
             elapsed_ms: started.elapsed().as_millis(),
         }
+    }
+}
+
+#[cfg(test)]
+mod current_page_policy_tests {
+    use super::*;
+    use crate::actions::ElementSelector;
+
+    #[test]
+    fn current_url_is_required_for_page_reads_and_interactions() {
+        assert!(requires_current_page_url_check(&BrowserAction::Screenshot));
+        assert!(requires_current_page_url_check(&BrowserAction::ExtractText { selector: None }));
+        assert!(requires_current_page_url_check(&BrowserAction::ScrollTo {
+            selector: ElementSelector::Css("main".into())
+        }));
+        assert!(requires_current_page_url_check(&BrowserAction::Click {
+            selector: ElementSelector::Css("button".into())
+        }));
+        assert!(requires_current_page_url_check(&BrowserAction::Type {
+            selector: ElementSelector::Css("input".into()),
+            text: "test".into()
+        }));
+    }
+
+    #[test]
+    fn destination_checked_navigation_and_noop_use_their_own_policy_path() {
+        assert!(!requires_current_page_url_check(&BrowserAction::Navigate {
+            url: "https://example.com".into()
+        }));
+        assert!(!requires_current_page_url_check(&BrowserAction::GoBack));
+        assert!(!requires_current_page_url_check(&BrowserAction::GoForward));
+        assert!(!requires_current_page_url_check(&BrowserAction::NoOp));
     }
 }
