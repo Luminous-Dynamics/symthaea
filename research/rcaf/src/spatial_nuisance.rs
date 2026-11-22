@@ -429,11 +429,7 @@ fn symmetric_eigendecomposition(matrix: &[Vec<f64>]) -> Result<EigenSystem, Spat
                 (k != p && k != q).then(|| {
                     let akp = row[p];
                     let akq = row[q];
-                    (
-                        k,
-                        cosine * akp - sine * akq,
-                        sine * akp + cosine * akq,
-                    )
+                    (k, cosine * akp - sine * akq, sine * akp + cosine * akq)
                 })
             })
             .collect::<Vec<_>>();
