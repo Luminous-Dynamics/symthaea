@@ -120,3 +120,11 @@ jobs:
           diff -u \
             /tmp/semi-rust-work/benchmarks/semi-bench-001/reference/fixtures/secom-mini-integrity-report-v1.expected.json \
             /tmp/semi-rust-secom-report.json
+      - name: Reproduce Rust DTCO lineage report byte-for-byte
+        run: |
+          cargo run --manifest-path /tmp/semi-rust-work/crates/domains/symthaea-semiconductor/Cargo.toml --bin semi-dtco-lineage -- \
+            /tmp/semi-rust-work/benchmarks/semi-bench-001/reference/fixtures/dtco-lineage-known-answer-v1.json \
+            > /tmp/semi-rust-dtco-lineage.json
+          diff -u \
+            /tmp/semi-rust-work/benchmarks/semi-bench-001/reference/fixtures/dtco-lineage-known-answer-v1.expected.json \
+            /tmp/semi-rust-dtco-lineage.json
