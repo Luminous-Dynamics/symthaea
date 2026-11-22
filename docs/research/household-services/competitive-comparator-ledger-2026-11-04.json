@@ -1,7 +1,7 @@
 {
-  "schema_version": "0.3",
+  "schema_version": "0.4",
   "snapshot_date": "2026-11-22",
-  "purpose": "Source-backed competitive comparator ledger for Verified Household Services. Manufacturer-declared specifications and announced product features are not independent physical test results. Snapshot refreshed 2026-11-22 with current Topten European desk references and the direct-DC PV-water-heating research frontier; all added catalogue values remain supplier-declared/database/modelled evidence, not Luminous physical results.",
+  "purpose": "Source-backed competitive comparator ledger for Verified Household Services. Manufacturer-declared specifications and announced product features are not independent physical test results. Snapshot refreshed 2026-11-22 with current Topten European desk references and the direct-DC PV-water-heating research frontier; all added catalogue values remain supplier-declared/database/modelled evidence, not Luminous physical results. South African direct-PV water-heating incumbents and the IEC 63349 controller standards family added 2026-11-22; all manufacturer performance data are claims, not independent measurements.",
   "claim_ceiling": [
     "Manufacturer product fiches are source evidence for what the manufacturer declares, not independent performance verification.",
     "Numbers from different programmes, markets, standards editions or loading protocols are not directly comparable without a matched test.",
@@ -588,6 +588,191 @@
         "url": "https://www.iso.org/standard/17187.html",
         "retrieved_date": "2026-11-22"
       }
+    },
+    {
+      "id": "IEC-63349-1-2025",
+      "category": "pv_direct_driven_appliance_controller",
+      "version": "IEC 63349-1:2025 Edition 1",
+      "status": "published_international_standard",
+      "relevant_changes": [
+        "Defines control functions and operational performance requirements for PV direct-driven appliance controllers coordinating power from sources such as PV, grid and storage to appliances such as heaters, refrigeration, air-conditioning and pumps.",
+        "Controller requirements apply to systems up to 1 500 V DC or 1 000 V AC.",
+        "Safety and EMC requirements for the controller are explicitly not covered by this document.",
+        "It references separate safety requirements for PV, grid and storage converters, and converter performance references IEC 62093."
+      ],
+      "source": {
+        "title": "IEC 63349-1:2025 — Photovoltaic direct-driven appliance controllers, Part 1",
+        "url": "https://webstore.iec.ch/en/publication/67424",
+        "source_date": "2025-12-04",
+        "retrieved_date": "2026-11-22"
+      }
+    },
+    {
+      "id": "IEC-TS-63349-2-2022",
+      "category": "pv_direct_driven_appliance_controller_user_modes",
+      "version": "IEC TS 63349-2:2022 Edition 1",
+      "status": "published_technical_specification",
+      "relevant_changes": [
+        "Defines operation modes for PV direct-driven appliance controllers and describes one example graphic display.",
+        "The display example aims to show connected equipment, generation and consumption in an understandable format.",
+        "This is a technical specification on operating modes/display, not product safety certification."
+      ],
+      "source": {
+        "title": "IEC TS 63349-2:2022 — Operation modes and graphic display",
+        "url": "https://webstore.iec.ch/en/publication/67425",
+        "source_date": "2022-02-03",
+        "retrieved_date": "2026-11-22"
+      }
+    },
+    {
+      "id": "SOUTH-AFRICA-MICROCARE-HWG-2025",
+      "category": "direct_pv_water_heating_incumbent",
+      "manufacturer": "Microcare Solar Energy",
+      "product": "Hot Water Generator (HWG / Kushushu)",
+      "market": "South Africa",
+      "evidence_status": "manufacturer_manual_and_datasheet_claims",
+      "existing_capabilities": [
+        "retrofit to existing geyser and 2 kW, 3 kW or 4 kW elements",
+        "PV input with AC mains override when solar is insufficient",
+        "uses thermistor sensing and existing thermostat / element where compatible",
+        "manufacturer manual states solar heating efficiency greater than 95%; separate product datasheet claims greater than 96%"
+      ],
+      "product_data": {
+        "version": "User manual 2025.1",
+        "datasheet_date": "2025-08",
+        "max_pv_input_voltage_Voc_v": 275,
+        "max_pv_input_power_kw": 2,
+        "recommended_min_pv_power_kw": 0.9,
+        "supported_element_kw": [
+          2,
+          3,
+          4
+        ],
+        "ac_input_voltage_v": 230,
+        "rated_ac_input_current_a": 20,
+        "warranty_months": 24
+      },
+      "notes": [
+        "All efficiency and savings figures are manufacturer claims and not independent Luminous test results.",
+        "Different manual and datasheet values (>95% vs >96%) should be retained as separate source-specific claims, not averaged.",
+        "The manual requires installation by a qualified registered electrician with a valid Wireman's Licence and warns against opening/modifying the controller.",
+        "Exact controller revision, PV string envelope, protective devices, local conformity and test scope must be checked before a physical comparator is admitted."
+      ],
+      "sources": [
+        {
+          "title": "Microcare Hot Water Generator User Manual v2025.1",
+          "url": "https://microcare.co.za/wp-content/uploads/2025/09/Microcare-HWG-Manual-2025v1.1.pdf"
+        },
+        {
+          "title": "Microcare Hot Water Generator product data sheet",
+          "url": "https://microcare.co.za/wp-content/uploads/2025/08/Microcare-Solar-Geyser-SolutionData-Sheet.pdf"
+        }
+      ],
+      "retrieved_date": "2026-11-22"
+    },
+    {
+      "id": "SOUTH-AFRICA-GEYSERWISE-PV-HEATING",
+      "category": "direct_pv_water_heating_incumbent",
+      "manufacturer": "Geyserwise",
+      "product": "PV Water Heating Systems / PV2Heat / MWS controller family",
+      "market": "South Africa",
+      "evidence_status": "manufacturer_public_product_pages_and_installation_manual",
+      "existing_capabilities": [
+        "retrofits existing geysers and offers 100 L, 150 L and 200 L system configurations",
+        "uses a PTC AC/DC element for PV and grid-compatible heating",
+        "no additional water-loop plumbing or solar-thermal circulation pump is required for direct-PV conversion",
+        "Geyserwise MWS controller page declares MPPT maximum performance 99% within its stated 120–350 V DC range",
+        "Geyserwise Dual offers AC/DC temperature control, timer, fault codes and mechanical thermal cut-out"
+      ],
+      "product_data": {
+        "mws_controller_mppt_efficiency_claim_percent": 99,
+        "mws_controller_mppt_input_voltage_range_vdc": "120–350",
+        "pv_system_nominal_tank_capacities_l": [
+          100,
+          150,
+          200
+        ],
+        "geyserwise_dual_ac_temperature_setpoint_range_c": [
+          30,
+          65
+        ],
+        "geyserwise_dual_dc_temperature_setpoint_range_c": [
+          50,
+          75
+        ],
+        "geyserwise_dual_mechanical_cutout_c": 90
+      },
+      "notes": [
+        "Values are manufacturer-declared product-page/manual values, not independent test results.",
+        "The MWS controller page, PV kit product page and Dual controller page describe related product-family capabilities; do not assume all values describe one identical kit/revision.",
+        "The 2021 PV installation guide and current pages must be reconciled to the exact comparator revision before acquisition."
+      ],
+      "sources": [
+        {
+          "title": "Geyserwise PV Water Heating Systems",
+          "url": "https://www.geyserwise.com/our-products/pv-water-heating-systems/"
+        },
+        {
+          "title": "Geyserwise MWS Controller",
+          "url": "https://www.geyserwise.com/mws-controller/"
+        },
+        {
+          "title": "Geyserwise Dual controller",
+          "url": "https://www.geyserwise.com/our-products/geyserwise-electronic-thermostats/geyserwise-dual/"
+        },
+        {
+          "title": "Geyserwise PV system installation manual",
+          "url": "https://www.geyserwise.com/wp-content/uploads/2022/01/13052021-PV-system-installation-manual-6.pdf"
+        }
+      ],
+      "retrieved_date": "2026-11-22"
+    },
+    {
+      "id": "SOUTH-AFRICA-APOLLO-NEOPV",
+      "category": "direct_pv_water_heating_incumbent",
+      "manufacturer": "Apollo Solar Technology",
+      "product": "NeoPV MPPT Smart Solar Water Heating System",
+      "market": "South Africa",
+      "evidence_status": "manufacturer_product_page",
+      "existing_capabilities": [
+        "retrofits existing geysers with DC-PV MPPT and AC mains bypass/backup",
+        "optional cloud-connected ESP32 monitoring dashboard",
+        "listed 100/150 L, 200 L and 300 L tank configurations with specified PV module counts",
+        "page lists MPPT efficiency greater than 99%"
+      ],
+      "product_data": {
+        "pv_modules_100_150_l": [
+          3,
+          580
+        ],
+        "pv_modules_200_l": [
+          4,
+          580
+        ],
+        "pv_modules_300_l": [
+          5,
+          580
+        ],
+        "max_solar_input_power_w": 4000,
+        "mppt_efficiency_claim_percent": 99,
+        "solar_input_voltage_range_vdc": "160–350 or 110–300 depending on listed configuration",
+        "ac_bypass_rated_voltage_v": 230,
+        "ac_bypass_rated_power_w": 4000,
+        "minimum_element_resistance_ohm": 13
+      },
+      "notes": [
+        "The product page displays both configuration families but the mapping of the two voltage/input-power columns to exact SKUs requires written clarification.",
+        "The advertised 60–90% water-heating-bill reduction is manufacturer marketing and not a matched independent test.",
+        "Cloud dashboard presence is not proof that basic safe control works offline; this should be a benchmark challenge.",
+        "No independent MPPT, thermal delivery, grid import, safety or lifecycle result is implied."
+      ],
+      "sources": [
+        {
+          "title": "Apollo NeoPV Smart Water Heating",
+          "url": "https://apollotechnology.co.za/neo-pv/"
+        }
+      ],
+      "retrieved_date": "2026-11-22"
     }
   ],
   "research_targets": {
