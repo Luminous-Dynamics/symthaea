@@ -59,13 +59,17 @@ fn solve_three_by_three(gram: [[f64; 3]; 3], rhs: [f64; 3]) -> Result<[f64; 3], 
         for value in &mut matrix[column][column..4] {
             *value /= diagonal;
         }
-        for row in 0..3 {
-            if row == column {
+        let pivot_values = matrix[column];
+        for (row_index, row_values) in matrix.iter_mut().enumerate() {
+            if row_index == column {
                 continue;
             }
-            let factor = matrix[row][column];
-            for entry in column..4 {
-                matrix[row][entry] -= factor * matrix[column][entry];
+            let factor = row_values[column];
+            for (entry, pivot_entry) in row_values[column..]
+                .iter_mut()
+                .zip(pivot_values[column..].iter())
+            {
+                *entry -= factor * pivot_entry;
             }
         }
     }
@@ -154,7 +158,11 @@ fn moment_neutral_direction(
     Ok((direction, epsilon, maximum_moment_residual))
 }
 
-fn peak(samples: &[(f64, f64, f64)]) -> ResponsePeak {
+type ComplexTraceSample = (f64, f64, f64);
+type ComplexTrace = Vec<ComplexTraceSample>;
+type SensitivityTracePair = (ComplexTrace, ComplexTrace);
+
+fn peak(samples: &[ComplexTraceSample]) -> ResponsePeak {
     let (time, real, imaginary) = samples
         .iter()
         .copied()
@@ -174,7 +182,7 @@ fn central_difference_trace(
     epsilon: f64,
     future_steps: usize,
     sample_every: usize,
-) -> Result<(Vec<(f64, f64, f64)>, Vec<(f64, f64, f64)>), Box<dyn Error>> {
+) -> Result<SensitivityTracePair, Box<dyn Error>> {
     let plus_distribution: Vec<f64> = base
         .iter()
         .zip(direction)
@@ -227,7 +235,7 @@ fn central_difference_trace(
     Ok((target_sensitivity, off_target_sensitivity))
 }
 
-fn sensitivity_at_time(samples: &[(f64, f64, f64)], target_time: f64) -> (f64, f64, f64) {
+fn sensitivity_at_time(samples: &[ComplexTraceSample], target_time: f64) -> ComplexTraceSample {
     samples
         .iter()
         .copied()
