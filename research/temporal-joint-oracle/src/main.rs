@@ -140,6 +140,21 @@ pub struct FactorialInteractionReport {
     /// Includes first-order main effects and every higher-order interaction.
     pub interaction_terms: Vec<FactorialInteractionTerm>,
     pub interaction_order_summaries: Vec<InteractionOrderSummary>,
+    /// Common denominator for every exact Shapley attribution.\n    pub shapley_common_denominator: u64,\n    pub factor_shapley_attributions: Vec<FactorShapleyAttribution>,\n}\n
+/// Shapley allocation of the complete joint effect to one binary action factor.
+///
+/// Every numerator is expressed over the report's shared
+/// `shapley_common_denominator`. Divide by that denominator to recover the
+/// exact rational microseconds or resource units attributed to this factor.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FactorShapleyAttribution {
+    pub action_id: u64,
+    pub action_kind: ActionKind,
+    /// Exact rational exposure-benefit attribution numerator.
+    pub exposure_benefit_scaled_numerator_us: [i128; 3],
+    /// Exact rational resource-cost attribution numerator in
+    /// ResourceDimension::ALL / ResourceVector::values() order.
+    pub resource_cost_scaled_numerator: [i128; 12],
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -327,6 +342,15 @@ pub fn qualify_exact_joint_oracle(
     })
 }
 
+fn gcd_u64(mut left: u64, mut right: u64) -> u64 {
+    while right != 0 {
+        let remainder = left % right;
+        left = right;
+        right = remainder;
+    }
+    left
+}
+
 /// Decompose a fully enumerated joint-action experiment into exact
 /// main-effect and higher-order interaction dividends.
 ///
@@ -504,7 +528,91 @@ pub fn decompose_exact_joint_interactions(
         return Err(OracleError::InteractionReconstructionMismatch);
     }
 
-    let factor_action_kinds = full.plan.actions.iter().map(|action| action.kind).collect();
+    // Standard Shapley allocation derived from the exact Harsanyi dividends:
+    // each coalition dividend is shared equally among its participating factors.
+    // Use one common LCM denominator for all interaction orders so fractional
+    // shares remain exact and can be reconstructed without floating point.
+    let mut shapley_common_denominator = 1_u64;
+    for order in 1..=factor_count {
+        let order_u64 = u64::try_from(order).map_err(|_| OracleError::ArithmeticOverflow)?;
+        let divisor = gcd_u64(shapley_common_denominator, order_u64);
+        shapley_common_denominator = (shapley_common_denominator / divisor)
+            .checked_mul(order_u64)
+            .ok_or(OracleError::ArithmeticOverflow)?;
+    }
+
+    let mut shapley_lattice = vec![[0_i128; AXIS_COUNT]; factor_count];
+    for term in &interaction_terms {
+        let mask = usize::try_from(term.subset_mask).map_err(|_| OracleError::ArithmeticOverflow)?;
+        let scale = shapley_common_denominator
+            .checked_div(u64::from(term.interaction_order))
+            .ok_or(OracleError::ArithmeticOverflow)?;
+        let scale = i128::from(scale);
+        for factor_index in 0..factor_count {
+            let bit = 1_usize
+                .checked_shl(u32::try_from(factor_index).map_err(|_| OracleError::ArithmeticOverflow)?)
+                .ok_or(OracleError::ArithmeticOverflow)?;
+            if mask & bit == 0 {
+                continue;
+            }
+            for axis in 0..3 {
+                let contribution = term.exposure_benefit_dividend_us[axis]
+                    .checked_mul(scale)
+                    .ok_or(OracleError::ArithmeticOverflow)?;
+                shapley_lattice[factor_index][axis] = shapley_lattice[factor_index][axis]
+                    .checked_add(contribution)
+                    .ok_or(OracleError::ArithmeticOverflow)?;
+            }
+            for axis in 0..12 {
+                let contribution = term.resource_cost_dividend[axis]
+                    .checked_mul(scale)
+                    .ok_or(OracleError::ArithmeticOverflow)?;
+                shapley_lattice[factor_index][3 + axis] =
+                    shapley_lattice[factor_index][3 + axis]
+                        .checked_add(contribution)
+                        .ok_or(OracleError::ArithmeticOverflow)?;
+            }
+        }
+    }
+
+    // Efficiency axiom check in exact rational arithmetic:
+    // the Shapley numerators across factors must sum to the full effect
+    // multiplied by the common denominator.
+    let denominator_i128 = i128::from(shapley_common_denominator);
+    for axis in 0..AXIS_COUNT {
+        let allocated = shapley_lattice.iter().try_fold(0_i128, |sum, factor| {
+            sum.checked_add(factor[axis]).ok_or(OracleError::ArithmeticOverflow)
+        })?;
+        let full_value = if axis < 3 {
+            total_exposure_benefit_us[axis]
+        } else {
+            total_resource_cost_delta[axis - 3]
+        };
+        let expected = full_value
+            .checked_mul(denominator_i128)
+            .ok_or(OracleError::ArithmeticOverflow)?;
+        if allocated != expected {
+            return Err(OracleError::InteractionReconstructionMismatch);
+        }
+    }
+
+    let factor_action_kinds: Vec<ActionKind> =
+        full.plan.actions.iter().map(|action| action.kind).collect();
+    let factor_shapley_attributions = (0..factor_count)
+        .map(|factor_index| {
+            let mut exposure = [0_i128; 3];
+            let mut resources = [0_i128; 12];
+            exposure.copy_from_slice(&shapley_lattice[factor_index][0..3]);
+            resources.copy_from_slice(&shapley_lattice[factor_index][3..15]);
+            FactorShapleyAttribution {
+                action_id: input.factor_action_ids[factor_index],
+                action_kind: factor_action_kinds[factor_index],
+                exposure_benefit_scaled_numerator_us: exposure,
+                resource_cost_scaled_numerator: resources,
+            }
+        })
+        .collect();
+
     Ok(FactorialInteractionReport {
         factor_action_ids: input.factor_action_ids.clone(),
         factor_action_kinds,
@@ -517,6 +625,8 @@ pub fn decompose_exact_joint_interactions(
         total_resource_cost_delta,
         interaction_terms,
         interaction_order_summaries,
+        shapley_common_denominator,
+        factor_shapley_attributions,
     })
 }
 
