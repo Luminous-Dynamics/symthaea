@@ -106,7 +106,8 @@
         "unmatched_random_target_count",
         "source_code_sha256",
         "fixture_sha256",
-        "source_revision"
+        "source_revision",
+        "schema_sha256"
       ],
       "properties": {
         "schema_version": {
@@ -176,6 +177,9 @@
             "string",
             "null"
           ]
+        },
+        "schema_sha256": {
+          "$ref": "#/$defs/sha256"
         }
       }
     },
