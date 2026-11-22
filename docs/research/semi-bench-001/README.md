@@ -603,3 +603,8 @@ See [2026-dtco-ucie40-frontier.md](2026-dtco-ucie40-frontier.md). This update ad
 2026 imec CFET research reports important coupled device/layout results (backside-contact resistance and survival-yield changes, 5T+1 SRAM area/write tradeoffs, and BEOL routability). UCIe 4.0 was released on 12 November 2026 with on-package memory and system-level trusted-state/link-health features. The normative specification is available by request; public-release headline metrics are not standards compliance.
 
 NIST's current 2026 physics-backed overlay/CD metrology programme and NVIDIA/TSMC's May 2026 fab-AI announcement have been added as current comparison anchors. Vendor/consortium figures are explicitly labelled as reported results, not independently verified Luminous benchmarks.
+
+
+## Current-head Rust scale check
+
+Hosted run [#44988247262](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44988247262) passed on commit `061cc034d38afabe12cbe189f2ef2f0a31183786`: 46/46 independent Python reference tests, 24/24 Rust unit tests, Rust formatting and Clippy. The Rust suite includes a 40,000-observation tied-score AUROC case. AUROC now uses rank-group accumulation in O(n log n), preserving half-credit for ties rather than enumerating all positive/negative pairs. Both Rust CLI outputs (binary metrics and SECOM raw integrity) reproduced their frozen expected reports byte-for-byte. The Rust workspace is isolated in CI because root workspace resolution is independently blocked by a missing workspace member in main.
