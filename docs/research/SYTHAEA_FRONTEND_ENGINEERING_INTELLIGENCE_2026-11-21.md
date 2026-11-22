@@ -306,6 +306,22 @@ claims. The validator has tests for the known Git blob hash vector, the complete
 checked-in corpus and unsafe paths, but the Rust toolchain is not available here
 to execute them.
 
+### Benchmark contamination boundary
+
+The first dashboard task is deliberately classified as `public_pilot`. Its
+reference HTML/CSS is checked into this public branch so the runner and oracle
+can be developed openly. It is therefore useful for iterative development and
+human-baseline work, but **cannot** count as a blind holdout or support an
+anti-contamination claim.
+
+All SFEB tasks now declare fixture exposure:
+`public_pilot`, `controller_only`, or `hidden_holdout`. Future hidden tasks
+must be stored outside public repositories, and their reference source and
+oracle must remain outside the agent workspace. The controller may render
+screenshots, while the agent receives only the authorized product brief and
+images. External retrieval of hidden source fixtures must be blocked. Public
+and hidden task scores must be reported separately.
+
 A specific knowledge distinction is emphasized: tracked Leptos reads subscribe
 reactive observers, while `get_untracked()` does not. The telemetry retry loop
 intentionally samples the current gateway with an untracked read on each retry;
@@ -415,9 +431,10 @@ Extend `symthaea-ui` with one bounded, reviewed feature from its README's deferr
 | Bundle unit tests and ignored Chromium smoke test | **Authored**; not executed |
 | External benchmark landscape researched | **Sources reviewed**; benchmark protocols differ |
 | Programme, task/oracle schemas and source-observed contract | **Authored** in this branch |
-| First static design fixture and task definition | **Authored**; canonical digest confirmed with `sha256sum` |
+| First static design fixture and task definition | **Authored public pilot**; canonical digest confirmed with `sha256sum`; not a hidden holdout |
 | Standalone Rust contract/task/provenance validator | **Implemented in source with tests authored**; compilation/tests not run |
 | Leptos 0.8 pattern corpus | **Eight source-grounded entries with exact Git blob provenance**; compilation pending |
+| Fixture exposure / anti-contamination policy | **Specified** for public pilot, controller-only and hidden holdout |
 | Viewport-only browser capture | **Implemented in source**; Chromium capture timed out in this container |
 | Runnable SFEB browser evaluator and screenshot baselines | **Not implemented** |
 | Browser execution on SFEB fixtures | **Not run** |
