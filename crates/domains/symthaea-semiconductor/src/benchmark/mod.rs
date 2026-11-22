@@ -22,6 +22,7 @@ pub use random_forest::{
     ForestClassWeightingV1, ForestNodeV1, ForestTreeV1, RandomForestError,
     RandomForestInputSampleV1, RandomForestModelV1, RandomForestParametersV1,
     RandomForestPredictionReportV1, RandomForestPredictionV1, RandomForestTrainingSampleV1,
+    RandomForestTruthSampleV1,
     fit_random_forest_v1, predict_random_forest_v1, score_random_forest_predictions_v1,
 };
 
