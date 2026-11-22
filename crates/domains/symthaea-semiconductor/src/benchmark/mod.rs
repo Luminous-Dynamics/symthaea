@@ -3,8 +3,8 @@
 pub mod binary_metrics;
 pub mod conformal_abstention;
 pub mod dtco_manifest;
-pub mod mf_acquisition;
 pub mod metrology_semantics;
+pub mod mf_acquisition;
 pub mod pair_manifest;
 pub mod process_event_graph;
 pub mod secom_fold_preprocessor;
