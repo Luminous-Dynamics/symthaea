@@ -237,6 +237,17 @@ fn audit_panel(panel: &AgencyPanelV1) -> Result<AgencyAuditReport, String> {
                 intervention.intervention_id, intervention.proposal_id
             ));
         }
+        if panel
+            .decision
+            .committed_at_ns
+            .is_some_and(|committed_at_ns| intervention.acted_at_ns > committed_at_ns)
+            && matches!(intervention.action.as_str(), "accept" | "steer" | "branch")
+        {
+            findings.push(format!(
+                "intervention {} arrived after commit and cannot authorize the committed result",
+                intervention.intervention_id
+            ));
+        }
         match intervention.action.as_str() {
             "accept" | "steer" => {
                 accept_or_steer.insert(intervention.proposal_id.as_str());
@@ -292,6 +303,16 @@ fn audit_panel(panel: &AgencyPanelV1) -> Result<AgencyAuditReport, String> {
             if panel.decision.committed || panel.decision.selected_proposal_ids.len() < 2 {
                 findings.push("branch must retain at least two alternatives without choosing a canonical commit".to_owned());
             }
+            let authors: BTreeSet<_> = panel
+                .decision
+                .selected_proposal_ids
+                .iter()
+                .filter_map(|proposal_id| proposals.get(proposal_id.as_str()))
+                .map(|proposal| proposal.author.as_str())
+                .collect();
+            if authors.len() < 2 {
+                findings.push("branch must preserve at least two distinct sources of proposal".to_owned());
+            }
             if !panel.decision.conflict_preserved {
                 findings.push("branch action did not preserve the alternatives as an explicit conflict".to_owned());
             }
@@ -333,6 +354,9 @@ fn audit_panel(panel: &AgencyPanelV1) -> Result<AgencyAuditReport, String> {
     }
 
     for constraint in &panel.hard_constraints {
+        if panel.decision.selected_proposal_ids.is_empty() {
+            continue;
+        }
         match constraint.kind.as_str() {
             "preserve_events" => {
                 let protected: BTreeSet<_> = constraint.protected_event_ids.iter().map(String::as_str).collect();
@@ -539,11 +563,11 @@ mod tests {
     }
 
     #[test]
-    fn preference_must_remain_soft_and_cannot_become_a_hard_constraint() {
+    fn soft_preference_cannot_smuggle_in_hard_authority() {
         let mut value = panel();
-        value["soft_preferences"][0]["dimension"] = serde_json::json!("");
-        let error = audit(&value).expect_err("empty preference dimension is invalid");
-        assert!(error.contains("preference dimension"));
+        value["soft_preferences"][0]["authority"] = serde_json::json!("hard");
+        let error = audit(&value).expect_err("soft preference schema rejects authority escalation");
+        assert!(error.contains("unknown field"));
     }
 
     #[test]
@@ -662,6 +686,40 @@ mod tests {
         let report = audit(&value).expect("personal grant cannot authorize global identity update");
         assert!(!report.structurally_valid_agency_trace);
         assert_eq!(report.unauthorized_persistent_update_count, 1);
+    }
+
+    #[test]
+    fn branch_requires_distinct_agent_and_collaborator_sources() {
+        let mut value = panel();
+        value["proposals"][1]["author"] = serde_json::json!("agent");
+        let report = audit(&value).expect("single-source branching is reported");
+        assert!(!report.structurally_valid_agency_trace);
+        assert!(report.qualification_findings.iter().any(|f| f.contains("distinct sources")));
+    }
+
+    #[test]
+    fn positive_accept_after_commit_cannot_authorize_the_result() {
+        let mut value = panel();
+        value["decision"]["action"] = serde_json::json!("apply");
+        value["decision"]["selected_proposal_ids"] = serde_json::json!(["agent-proposal"]);
+        value["decision"]["committed"] = true;
+        value["decision"]["committed_at_ns"] = serde_json::json!(200);
+        value["interventions"][0]["action"] = serde_json::json!("accept");
+        value["interventions"][0]["acted_at_ns"] = serde_json::json!(250);
+        let report = audit(&value).expect("post-commit accept remains reportable");
+        assert!(!report.structurally_valid_agency_trace);
+        assert!(report.qualification_findings.iter().any(|f| f.contains("after commit")));
+    }
+
+    #[test]
+    fn abstention_does_not_claim_hard_constraint_compliance() {
+        let mut value = panel();
+        value["decision"]["action"] = serde_json::json!("abstain");
+        value["decision"]["selected_proposal_ids"] = serde_json::json!([]);
+        value["decision"]["committed"] = false;
+        value["decision"]["committed_at_ns"] = serde_json::Value::Null;
+        let report = audit(&value).expect("abstention is a valid no-commit result");
+        assert_eq!(report.hard_constraint_compliance, None);
     }
 
     #[test]
