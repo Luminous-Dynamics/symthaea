@@ -300,7 +300,7 @@ This follow-on turns part of the v0.1 intervention specification into an executa
 
 ### Implemented
 
-- A canonical EvidenceDependencyIndex rejects duplicate event identities, missing predecessors, repeated/self references and cyclic dependency graphs.
+- A run-scoped MaceAuditDependencyIndex rejects duplicate event identities, missing predecessors, repeated/self references and cyclic dependency graphs.
 - Event closure follows transitive derived descendants; source-root closure unifies records that share a root even when their family labels differ; source-family closure removes every member of that family and its descendants; lifecycle closure follows supersession links in both directions and then removes dependent descendants; two-root coalitions union root closures.
 - A deterministic intervention planner generates full-evidence reference, event, root, family, lifecycle and bounded two-root-coalition knockouts.
 - Matched random controls preserve the removed (action, in-memory payload-size) histogram, exclude the target's removed root/family identities and are retained only when their distinct root/family counts match. If an exact match cannot be constructed, the control is omitted rather than weakened.
@@ -308,6 +308,17 @@ This follow-on turns part of the v0.1 intervention specification into an executa
 - Candidate decisions and evaluator scores are written to separate JSONL files. Candidate records contain the digest of the actual candidate-visible evidence set and task DecisionNeed; they omit intervention kind/target and scenario-family labels. Evaluator rows carry the same candidate-input digest for offline pairing.
 - The JSON Schema defines the manifest, candidate, evaluator, rejected-block and summary records.
 - Authored unit tests cover transitive closure, same-root aliases with different family labels, family closures, supersession closure, preservation of a replacement under ordinary event knockout, root coalitions, unknown roots, duplicate IDs, missing links, cycles, matched-control determinism/identity balance, candidate-input digest changes, and candidate/evaluator separation (17 tests total).
+
+### Architecture ownership and reuse
+
+This index is deliberately a private, bounded evaluator projection, not a new general-purpose evidence graph, persistent store, universal independence flag or trust scalar. Compose with the established owners:
+
+- [#10410](https://github.com/Luminous-Dynamics/symthaea/issues/10410) for provider-lineage/common-mode provenance profiles;
+- [#4918](https://github.com/Luminous-Dynamics/symthaea/issues/4918) for claim-relative independence and shared failure-domain semantics;
+- [#6283](https://github.com/Luminous-Dynamics/symthaea/issues/6283) for measurement validity and benchmark evidence-graph principles;
+- [#6430](https://github.com/Luminous-Dynamics/symthaea/issues/6430) for Mycelix DKG reuse and deterministic bounded DAG projections.
+
+The existing ingress EvidenceReceiptBundle already preserves lineage_digest, source family/root, acquisition mode, upstream source ID, source artifact digest, transformation digest, issuer and receipt digests. Those receipts are the right evidence base to extend. The current Experience projection and receipt bundle do not expose explicit event-level derived_from/supersedes references, so this binary must not infer them. The future MACE adapter should consume a verifier-issued sidecar projected from the existing lineage/DKG owners instead of introducing a second canonical graph.
 
 ### Critical lineage limitation
 
