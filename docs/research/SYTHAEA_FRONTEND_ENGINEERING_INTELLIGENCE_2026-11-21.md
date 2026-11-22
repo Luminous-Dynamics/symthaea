@@ -706,3 +706,121 @@ kill-rate targets, and prohibits positive-control false rejections.
 
 All of these are source-level fixes and authored tests. Rust compilation and
 test execution remain pending; there are no retrieval results yet.
+
+
+## 13. 2026-11-22 — paired counterfactual qualification and comparative evaluation
+
+### Paradigm: qualify the oracle, then qualify the claim
+
+A benchmark is not trustworthy merely because its schema validates or its
+runner executes. OpenAI's 2026-07-08 audit of SWE-Bench Pro reported that an
+automated pipeline flagged 200 of 731 public-split tasks (27.4%) and a human
+annotation campaign flagged 249 (34.1%). Issues included over-strict tests,
+underspecified prompts, low-coverage tests and misleading prompts. The article
+estimated roughly 30% of tasks were broken and emphasized human review of
+flagged cases. This does not estimate defect rates in Vision2Web or SFEB; it
+does show why task-oracle qualification must precede agent leaderboard claims.
+Source: https://openai.com/index/separating-signal-from-noise-coding-evaluations/
+
+The SFEB campaign has now been advanced from a list of intended cases into a
+paired execution-report protocol and a Rust-side adjudicator.
+
+Each mutation, positive control and metamorphic relation has a baseline and
+candidate run with the same fixture digest and environment-manifest digest.
+The report requires distinct run IDs, source revisions, serialized
+`sfeb-frontend-evidence/v1` receipts, and actual screenshot/accessibility/layout
+artifact paths. The adjudicator recomputes artifact SHA-256 and byte lengths,
+verifies receipt identity and SHA, checks PNG dimensions against the declared
+viewport and confirms the layout artifact agrees with its receipt.
+
+The summary reports overall, critical, high-severity, security and
+evidence-integrity mutation kill rates with Wilson 95% intervals. It also
+reports positive-control false rejections and metamorphic equivalence. A mutant
+is credited only if the candidate is rejected and at least one expected oracle
+identifier is recorded. An unrelated build failure or rejection does not count.
+
+**Trust boundary:** this is not yet a cryptographic proof. The adjudicator
+checks evidence bytes and identity bindings, but does not verify a digital
+signature from the runner or independently derive the reported oracle IDs from
+the full browser trace. The browser mutation executor, trusted isolation and
+verifiable workflow-identity attestation remain follow-on work. A report must
+not be described as externally authenticated until that layer exists.
+
+### Paradigm: compare interventions, not just products
+
+Added `benchmarks/frontend/comparative-evaluation-v1.json` and its schema.
+The six arms are:
+
+- A0: matched base agent.
+- A1: conventional documentation retrieval.
+- A2: retrieval plus Interface Contract Compiler.
+- A3: contracts plus browser evidence and repair.
+- A4: full Symthaea.
+- H0: human engineer reference distribution.
+
+The primary causal contrast is A4 minus A0, with A1–A3 enabling ablation
+analysis. Each task is a paired block: same model, prompt, tools, fixture,
+environment and budget. Arm order is randomized; tasks, not repeated trials,
+are the independent resampling unit. The protocol calls for exact McNemar
+testing on paired binary outcomes, task-cluster bootstrap intervals for
+continuous metrics, Wilson intervals for per-arm proportions and Holm
+correction for secondary comparisons.
+
+The scale plan is 30 public-pilot tasks for harness development, 150 matched
+comparison tasks (50 per level), then at least 500 tasks for publication-grade
+evaluation. At least 20% of the comparison corpus is reserved from agent
+exposure and the longer-term target is 30% hidden holdout. Ordinary tasks get
+at least three trials; high-variance tasks get at least five. Power analysis
+must use pilot discordant-pair rates and task-level variance; task count alone
+does not guarantee statistical power.
+
+Subjective visual and accessibility judgments are blinded to arm identity.
+Two independent judges score subjective outcomes; disagreements go to a third
+adjudicator. Report raw agreement and Cohen's kappa, with 0.80 as a target,
+and human-audit a stratified subset plus every disputed case. Automated
+acceptance remains anchored in executable oracles, not a VLM's confidence.
+
+### Current external benchmark evidence — rechecked 2026-11-22
+
+- Vision2Web is an ICML 2026 benchmark with 193 tasks, 16 categories, 918
+  prototype images and 1,255 test cases spanning static responsive UI,
+  interactive multi-page frontend and long-horizon full-stack development.
+  It uses a GUI agent verifier and VLM judge. This remains the closest broad
+  external comparator for SFEB's end-to-end objective.
+  Source: https://proceedings.mlr.press/v306/he26n.html
+- Design2Code remains a visual reconstruction comparator: 484 real-world
+  webpage screenshot-to-code cases with automatic metrics and human
+  evaluation. It does not measure SFEB's full runtime/security/maintenance
+  loop.
+  Source: https://aclanthology.org/2025.naacl-long.199/
+- WebdriverIO's browser-agent benchmark methodology fixes model, harness and
+  prompt while swapping browser tools; it uses a fixed-seed sample of 100
+  Online-Mind2Web tasks, publishes judgments and reports Wilson intervals.
+  Its current page, when rechecked on 2026-11-22, displayed no published
+  workflow runs, so this update does **not** repeat a historical 62% value as a
+  current leaderboard result. Its stated limitations still include live-site
+  nondeterminism, roughly ±10-point intervals at 100 tasks/one run, and
+  disagreement with human reviewers on about one run in seven.
+  Source: https://benchmark.webdriver.io/
+
+Raw scores across these benchmarks remain non-comparable. SFEB should reproduce
+each compatible public protocol separately, and use its own hidden tasks only
+for its own matched ablation claims.
+
+### New SOTA decision rule
+
+A credible SOTA advance must show more than a high static screenshot score:
+
+1. First pass the mutation/oracle qualification campaign on a pinned, trusted
+   runner.
+2. Reproduce a visual website benchmark and an interaction/browser-agent
+   benchmark independently, subject to each benchmark's access and reuse rules.
+3. Run A0–A4 on paired tasks with randomized arm order, independent judges and
+   hidden holdouts.
+4. Require the A4–A0 paired 95% interval to exclude zero while all hard gates
+   pass; or demonstrate non-inferiority within two percentage points and at
+   least 30% lower cost per accepted task.
+5. Publish per-task failures, intervals, judge agreement, model/tool versions,
+   cost, retries and benchmark exposure.
+
+No performance results or SOTA superiority are claimed by this protocol.
