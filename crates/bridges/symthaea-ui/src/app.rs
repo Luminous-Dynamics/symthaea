@@ -306,12 +306,12 @@ pub fn App() -> impl IntoView {
     };
 
     view! {
-        <div class="shell">
-            <header class="shell-header">
-                <h1>"Symthaea"</h1>
-                <div class="gateway-row">
+        <main class="shell" data-sfeb-id="symthaea-ui.shell">
+            <header class="shell-header" data-sfeb-id="symthaea-ui.header">
+                <h1 data-sfeb-id="symthaea-ui.title">"Symthaea"</h1>
+                <div class="gateway-row" data-sfeb-id="gateway.endpoint">
                     <label for="gateway">"gateway"</label>
-                    <input id="gateway" type="text"
+                    <input id="gateway" type="text" data-sfeb-id="gateway.input"
                         prop:value=move || gateway.get()
                         on:change=move |ev| gateway.set(event_target_value(&ev))
                     />
@@ -319,7 +319,7 @@ pub fn App() -> impl IntoView {
                         title=move || if ws_connected.get() { "telemetry connected" } else { "telemetry disconnected" }
                     ></span>
                 </div>
-                <div class="daemon-status">
+                <div class="daemon-status" role="status" aria-live="polite" data-sfeb-id="gateway.status">
                     {move || match daemon_status.get() {
                         Some(s) => format!(
                             "up {}s · {} requests · {} sleep cycles",
@@ -332,9 +332,9 @@ pub fn App() -> impl IntoView {
                 </div>
             </header>
 
-            <section class="vitals">
+            <section class="vitals" aria-label="Live cognitive telemetry" data-sfeb-id="vitals.panel">
                 <div class="orb-wrap">
-                    <div class="orb"
+                    <div class="orb" aria-hidden="true" data-sfeb-id="vitals.orb"
                         style:animation-duration=move || {
                             let load = vitals.get().thermodynamic_load.clamp(0.0, 1.0);
                             format!("{:.2}s", 2.6 - (load as f64 * 1.8))
@@ -347,7 +347,7 @@ pub fn App() -> impl IntoView {
                         }
                     ></div>
                 </div>
-                <dl class="readouts">
+                <dl class="readouts" data-sfeb-id="vitals.readouts">
                     <div><dt>"consciousness"</dt><dd>{move || format!("{:.1}%", vitals.get().consciousness_level * 100.0)}</dd></div>
                     <div><dt>"valence"</dt><dd>{move || format!("{:+.2}", vitals.get().valence)}</dd></div>
                     <div><dt>"arousal"</dt><dd>{move || format!("{:.2}", vitals.get().arousal)}</dd></div>
@@ -370,7 +370,7 @@ pub fn App() -> impl IntoView {
 
             // Projections: what she renders of herself. Panes appear only
             // once the corresponding stream has actually delivered content.
-            <section class="projections" style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start;">
+            <section class="projections" aria-label="Cognitive projections" data-sfeb-id="projections.region" style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start;">
                 {move || portrait.get().map(|portrait_src| view! {
                     <div class="projection-pane">
                         <h2 style="font-size:0.9em;opacity:0.7;">"self-portrait"</h2>
@@ -393,8 +393,8 @@ pub fn App() -> impl IntoView {
                 </div>
             </section>
 
-            <section class="converse">
-                <div class="transcript">
+            <section class="converse" aria-label="Conversation" data-sfeb-id="conversation.panel">
+                <div class="transcript" role="log" aria-live="polite" aria-relevant="additions" aria-label="Conversation transcript" data-sfeb-id="conversation.transcript">
                     <For
                         each=move || history.get().into_iter().enumerate()
                         key=|(i, _)| *i
@@ -408,18 +408,18 @@ pub fn App() -> impl IntoView {
                         }
                     />
                 </div>
-                {move || last_error.get().map(|e| view! { <div class="error">{e}</div> })}
-                <form class="composer" on:submit=move |ev| { ev.prevent_default(); send(); }>
-                    <input type="text" placeholder="talk to symthaea..."
+                {move || last_error.get().map(|e| view! { <div class="error" role="alert" aria-live="assertive" data-sfeb-id="conversation.error">{e}</div> })}
+                <form class="composer" data-sfeb-id="conversation.composer" on:submit=move |ev| { ev.prevent_default(); send(); }>
+                    <input type="text" id="message" aria-label="Message Symthaea" data-sfeb-id="conversation.input" placeholder="talk to symthaea..."
                         prop:value=move || draft.get()
                         on:input=move |ev| draft.set(event_target_value(&ev))
                     />
-                    <button type="submit" disabled=move || sending.get()>
+                    <button type="submit" data-sfeb-id="conversation.send" disabled=move || sending.get()>
                         {move || if sending.get() { "…" } else { "send" }}
                     </button>
                 </form>
             </section>
-        </div>
+        </main>
     }
 }
 
