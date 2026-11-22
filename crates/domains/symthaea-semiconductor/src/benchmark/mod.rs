@@ -4,6 +4,7 @@ pub mod binary_metrics;
 pub mod dtco_manifest;
 pub mod mf_acquisition;
 pub mod pair_manifest;
+pub mod random_forest;
 pub mod secom_fold_preprocessor;
 pub mod secom_logistic;
 pub mod secom_missingness;
@@ -17,6 +18,13 @@ pub use binary_metrics::{
     BinaryClassCounts, BinaryMetricReportV1, BinaryMetricsError, BinaryScoreSampleV1,
     BinaryScoreSubjectV1, score_binary_subject_v1,
 };
+pub use random_forest::{
+    ForestClassWeightingV1, ForestNodeV1, ForestTreeV1, RandomForestError,
+    RandomForestInputSampleV1, RandomForestModelV1, RandomForestParametersV1,
+    RandomForestPredictionReportV1, RandomForestPredictionV1, RandomForestTrainingSampleV1,
+    fit_random_forest_v1, predict_random_forest_v1, score_random_forest_predictions_v1,
+};
+
 pub use pair_manifest::{
     ContrastivePairManifestV1, PairManifestError, PairValidationReportV1, validate_pair_manifest_v1,
 };
