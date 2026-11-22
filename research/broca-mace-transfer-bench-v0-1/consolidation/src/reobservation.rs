@@ -24,6 +24,68 @@ pub enum MemoryObjectKindV1 {
     Preference,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum MemoryPurposeV1 {
+    PersonalPreference,
+    PrivateProjectKnowledge,
+    SharedTeamKnowledge,
+    PublicKnowledge,
+    EnvironmentState,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MemoryAuthorityScopeV1 {
+    /// Opaque Mycelix principal identity; never a user-facing name or raw PII.
+    pub principal_sha256: String,
+    /// Digest of the capability/authority receipt permitting memory use.
+    pub capability_sha256: String,
+    /// Opaque digest of the exact recipient/audience set.
+    pub audience_sha256: String,
+    /// Opaque digest of the exact resource or tenant/project boundary.
+    pub resource_sha256: String,
+    /// Digest of the policy/constitutional revision authorizing this use.
+    pub policy_revision_sha256: String,
+    pub purpose: MemoryPurposeV1,
+}
+
+impl MemoryAuthorityScopeV1 {
+    pub fn is_valid(&self) -> bool {
+        [
+            &self.principal_sha256,
+            &self.capability_sha256,
+            &self.audience_sha256,
+            &self.resource_sha256,
+            &self.policy_revision_sha256,
+        ]
+        .iter()
+        .all(|value| is_lower_sha256(value))
+    }
+
+    pub fn canonical_digest(&self) -> String {
+        digest_fields(
+            b"mycelix:mace:memory-authority-scope:v1\\0",
+            &[
+                self.principal_sha256.clone(),
+                self.capability_sha256.clone(),
+                self.audience_sha256.clone(),
+                self.resource_sha256.clone(),
+                self.policy_revision_sha256.clone(),
+                memory_purpose_code(self.purpose).to_owned(),
+            ],
+        )
+    }
+}
+
+fn memory_purpose_code(value: MemoryPurposeV1) -> &'static str {
+    match value {
+        MemoryPurposeV1::PersonalPreference => "personal_preference",
+        MemoryPurposeV1::PrivateProjectKnowledge => "private_project_knowledge",
+        MemoryPurposeV1::SharedTeamKnowledge => "shared_team_knowledge",
+        MemoryPurposeV1::PublicKnowledge => "public_knowledge",
+        MemoryPurposeV1::EnvironmentState => "environment_state",
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ReobservationAvailabilityV1 {
     Available {
@@ -40,6 +102,7 @@ pub struct ReobservationProposalV1 {
     pub event_id: u32,
     pub evidence_sha256: String,
     pub scope: Scope,
+    pub authority_scope: MemoryAuthorityScopeV1,
     pub as_known: AsKnownQuery,
     pub object_kind: MemoryObjectKindV1,
     pub availability: ReobservationAvailabilityV1,
@@ -71,7 +134,9 @@ impl ReobservationProposalV1 {
             self.event_id.to_string(),
             self.as_known.valid_at_ms.to_string(),
             self.as_known.known_at_ms.to_string(),
+            self.authority_scope.canonical_digest(),
             self.evidence_sha256.clone(),
+            self.authority_scope.canonical_digest(),
             scope_code(self.scope).to_owned(),
             self.as_known.valid_at_ms.to_string(),
             self.as_known.known_at_ms.to_string(),
@@ -122,6 +187,7 @@ pub trait ReobservationVerifierV1 {
         &self,
         proposal: &ReobservationProposalV1,
         target_scope: Scope,
+        authority_scope: &MemoryAuthorityScopeV1,
         as_known: AsKnownQuery,
     ) -> Option<ReobservationReceiptV1>;
 }
@@ -162,6 +228,8 @@ pub enum ReobservationReject {
     SnapshotMismatch,
     PredictionMismatch,
     InvalidSourceProfileDigest,
+    InvalidAuthorityScope,
+    AuthorityScopeMismatch,
     InvalidLocatorDigest,
     InvalidAvailabilityTime,
     InvalidSnapshotValidity,
@@ -178,6 +246,7 @@ pub enum ReobservationReject {
 pub fn verify_reobservation_profile(
     proposal: ReobservationProposalV1,
     target_scope: Scope,
+    authority_scope: &MemoryAuthorityScopeV1,
     as_known: AsKnownQuery,
     verifier: &impl ReobservationVerifierV1,
 ) -> Result<VerifiedReobservationProfileV1, ReobservationReject> {
@@ -189,6 +258,12 @@ pub fn verify_reobservation_profile(
     }
     if proposal.scope != target_scope {
         return Err(ReobservationReject::ScopeMismatch);
+    }
+    if !proposal.authority_scope.is_valid() || !authority_scope.is_valid() {
+        return Err(ReobservationReject::InvalidAuthorityScope);
+    }
+    if &proposal.authority_scope != authority_scope {
+        return Err(ReobservationReject::AuthorityScopeMismatch);
     }
     if proposal.as_known != as_known {
         return Err(ReobservationReject::SnapshotMismatch);
@@ -233,7 +308,7 @@ pub fn verify_reobservation_profile(
     }
 
     let receipt = verifier
-        .verify_profile(&proposal, target_scope, as_known)
+        .verify_profile(&proposal, target_scope, authority_scope, as_known)
         .ok_or(ReobservationReject::InvalidVerifierReceipt)?;
     if receipt.proposal_sha256 != proposal.canonical_digest()
         || receipt.verifier_id.trim().is_empty()
@@ -251,10 +326,12 @@ pub fn verify_reobservation_profile(
     Ok(VerifiedReobservationProfileV1 { proposal, receipt })
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ReobservationPolicyV1 {
     /// Exact bitemporal snapshot used by this decision.
     pub as_known: AsKnownQuery,
+    /// Exact principal/capability/audience/purpose/policy boundary for this use.
+    pub authority_scope: MemoryAuthorityScopeV1,
     pub decision_at_ms: i64,
     pub decision_deadline_ms: i64,
     pub context_budget_tokens: u32,
@@ -266,8 +343,9 @@ pub struct ReobservationPolicyV1 {
 }
 
 impl ReobservationPolicyV1 {
-    pub fn is_valid(self) -> bool {
-        self.decision_at_ms >= 0
+    pub fn is_valid(&self) -> bool {
+        self.authority_scope.is_valid()
+            && self.decision_at_ms >= 0
             && self.decision_at_ms == self.as_known.known_at_ms
             && self.decision_deadline_ms >= self.decision_at_ms
             && self.context_budget_tokens > 0
@@ -303,6 +381,7 @@ pub enum ReobservationReasonV1 {
 pub struct ReobservationPlanV1 {
     pub event_id: u32,
     pub as_known: AsKnownQuery,
+    pub authority_scope: MemoryAuthorityScopeV1,
     pub evidence_sha256: String,
     pub prediction_sha256: String,
     pub profile_sha256: String,
@@ -421,6 +500,9 @@ pub fn plan_memory_representation(
         return Err(ReobservationReject::PredictionMismatch);
     }
     let calibration = prediction.calibration_receipt();
+    if proposal.authority_scope != policy.authority_scope {
+        return Err(ReobservationReject::AuthorityScopeMismatch);
+    }
     if proposal.as_known != policy.as_known
         || calibration.as_known != proposal.as_known
         || calibration.target_scope != proposal.scope
@@ -577,6 +659,7 @@ pub fn plan_memory_representation(
     let mut plan = ReobservationPlanV1 {
         event_id: proposal.event_id,
         as_known: proposal.as_known,
+        authority_scope: proposal.authority_scope.clone(),
         evidence_sha256: proposal.evidence_sha256.clone(),
         prediction_sha256: prediction_sha,
         profile_sha256: profile_sha,
@@ -712,8 +795,12 @@ mod tests {
             &self,
             proposal: &ReobservationProposalV1,
             _: Scope,
+            authority_scope: &MemoryAuthorityScopeV1,
             _: AsKnownQuery,
         ) -> Option<ReobservationReceiptV1> {
+            if &proposal.authority_scope != authority_scope {
+                return None;
+            }
             let mut receipt = ReobservationReceiptV1 {
                 proposal_sha256: proposal.canonical_digest(),
                 verified_at_ms: proposal.as_known.known_at_ms,
@@ -774,6 +861,17 @@ mod tests {
         }
     }
 
+    fn authority_scope() -> MemoryAuthorityScopeV1 {
+        MemoryAuthorityScopeV1 {
+            principal_sha256: digest("principal-agent-a"),
+            capability_sha256: digest("capability-memory-read"),
+            audience_sha256: digest("audience-private-agent-a"),
+            resource_sha256: digest("resource-project-a"),
+            policy_revision_sha256: digest("policy-revision-v1"),
+            purpose: MemoryPurposeV1::PrivateProjectKnowledge,
+        }
+    }
+
     fn as_known() -> AsKnownQuery {
         AsKnownQuery {
             valid_at_ms: 100,
@@ -794,6 +892,7 @@ mod tests {
             event_id: 7,
             evidence_sha256: digest("evidence"),
             scope: scope(),
+            authority_scope: authority_scope(),
             as_known: as_known(),
             object_kind: kind,
             availability,
@@ -883,6 +982,7 @@ mod tests {
     fn policy() -> ReobservationPolicyV1 {
         ReobservationPolicyV1 {
             as_known: as_known(),
+            authority_scope: authority_scope(),
             decision_at_ms: 300,
             decision_deadline_ms: 500,
             context_budget_tokens: 512,
@@ -900,6 +1000,7 @@ mod tests {
         verify_reobservation_profile(
             proposal,
             scope(),
+            &authority_scope(),
             as_known(),
             &FixtureVerifier {
                 corrupt_receipt: false,
@@ -907,6 +1008,53 @@ mod tests {
             },
         )
         .unwrap()
+    }
+
+    #[test]
+    fn principal_audience_and_purpose_must_match_the_memory_use_authority() {
+        let proposal = proposal(
+            MemoryObjectKindV1::Preference,
+            ReobservationAvailabilityV1::Unavailable,
+            None,
+        );
+        let mut wrong_audience = authority_scope();
+        wrong_audience.audience_sha256 = digest("audience-team-b");
+        assert_eq!(
+            verify_reobservation_profile(
+                proposal.clone(),
+                scope(),
+                &wrong_audience,
+                as_known(),
+                &FixtureVerifier {
+                    corrupt_receipt: false,
+                    valid_for_ms: 10_000,
+                },
+            ),
+            Err(ReobservationReject::AuthorityScopeMismatch)
+        );
+
+        let profile = verified(proposal);
+        let mut wrong_principal = policy();
+        wrong_principal.authority_scope.principal_sha256 = digest("principal-agent-b");
+        assert_eq!(
+            plan_memory_representation(
+                &prediction(50_000, 1_000),
+                &profile,
+                wrong_principal,
+            ),
+            Err(ReobservationReject::AuthorityScopeMismatch)
+        );
+
+        let mut wrong_purpose = policy();
+        wrong_purpose.authority_scope.purpose = MemoryPurposeV1::PublicKnowledge;
+        assert_eq!(
+            plan_memory_representation(
+                &prediction(50_000, 1_000),
+                &profile,
+                wrong_purpose,
+            ),
+            Err(ReobservationReject::AuthorityScopeMismatch)
+        );
     }
 
     #[test]
@@ -1003,6 +1151,7 @@ mod tests {
         let old_profile = verify_reobservation_profile(
             old_proposal,
             scope(),
+            &authority_scope(),
             old_snapshot,
             &FixtureVerifier {
                 corrupt_receipt: false,
@@ -1127,6 +1276,7 @@ mod tests {
             verify_reobservation_profile(
                 wrong_proposal,
                 scope(),
+                &authority_scope(),
                 as_known(),
                 &FixtureVerifier {
                     corrupt_receipt: false,
@@ -1154,6 +1304,7 @@ mod tests {
         let profile = verify_reobservation_profile(
             item,
             scope(),
+            &authority_scope(),
             as_known(),
             &FixtureVerifier {
                 corrupt_receipt: false,
@@ -1223,6 +1374,7 @@ mod tests {
             verify_reobservation_profile(
                 item,
                 scope(),
+                &authority_scope(),
                 as_known(),
                 &FixtureVerifier {
                     corrupt_receipt: true,
@@ -1336,6 +1488,7 @@ mod tests {
         let profile = verify_reobservation_profile(
             item,
             scope(),
+            &authority_scope(),
             as_known(),
             &FixtureVerifier {
                 corrupt_receipt: false,
@@ -1364,6 +1517,7 @@ mod tests {
             verify_reobservation_profile(
                 item,
                 scope(),
+                &authority_scope(),
                 as_known(),
                 &FixtureVerifier {
                     corrupt_receipt: false,

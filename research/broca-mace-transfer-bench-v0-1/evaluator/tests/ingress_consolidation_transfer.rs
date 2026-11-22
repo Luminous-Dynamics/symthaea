@@ -30,6 +30,7 @@ use broca_mace_consolidation::reobservation::{
     plan_memory_representation, verify_reobservation_profile, MemoryObjectKindV1,
     ReobservationAvailabilityV1, ReobservationPolicyV1, ReobservationProposalV1,
     ReobservationReceiptV1, ReobservationVerifierV1, ReobservationDispositionV1,
+    MemoryAuthorityScopeV1, MemoryPurposeV1,
 };
 use broca_mace_consolidation::salience::{
     future_use_prediction_evidence_digest, verify_future_use_prediction,
@@ -340,6 +341,17 @@ fn memory_dose_rows(
     rows
 }
 
+fn memory_authority_scope() -> MemoryAuthorityScopeV1 {
+    MemoryAuthorityScopeV1 {
+        principal_sha256: hex_digest(510_006),
+        capability_sha256: hex_digest(510_007),
+        audience_sha256: hex_digest(510_008),
+        resource_sha256: hex_digest(510_009),
+        policy_revision_sha256: hex_digest(510_010),
+        purpose: MemoryPurposeV1::EnvironmentState,
+    }
+}
+
 struct FixtureReobservationVerifier;
 
 impl ReobservationVerifierV1 for FixtureReobservationVerifier {
@@ -347,8 +359,12 @@ impl ReobservationVerifierV1 for FixtureReobservationVerifier {
         &self,
         proposal: &ReobservationProposalV1,
         _: Scope,
+        authority_scope: &MemoryAuthorityScopeV1,
         as_known: AsKnownQuery,
     ) -> Option<ReobservationReceiptV1> {
+        if &proposal.authority_scope != authority_scope {
+            return None;
+        }
         let mut receipt = ReobservationReceiptV1 {
             proposal_sha256: proposal.canonical_digest(),
             verified_at_ms: as_known.known_at_ms,
@@ -656,6 +672,7 @@ fn receipt_qualified_session_a_evidence_selects_reobservation_aware_memory() {
         event_id: evidence.event_id(),
         evidence_sha256: evidence_digest,
         scope: evidence.scope(),
+        authority_scope: memory_authority_scope(),
         as_known: known,
         object_kind: MemoryObjectKindV1::CurrentState,
         availability: ReobservationAvailabilityV1::Available {
@@ -673,6 +690,7 @@ fn receipt_qualified_session_a_evidence_selects_reobservation_aware_memory() {
     let verified_profile = verify_reobservation_profile(
         proposal,
         scope(),
+        &memory_authority_scope(),
         known,
         &FixtureReobservationVerifier,
     )
@@ -683,6 +701,7 @@ fn receipt_qualified_session_a_evidence_selects_reobservation_aware_memory() {
         &verified_profile,
         ReobservationPolicyV1 {
             as_known: known,
+            authority_scope: memory_authority_scope(),
             decision_at_ms: known.known_at_ms,
             decision_deadline_ms: 800,
             context_budget_tokens: 512,
