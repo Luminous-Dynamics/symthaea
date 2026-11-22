@@ -458,6 +458,15 @@ fn action_name(action: Option<Action>) -> &'static str {
     }
 }
 
+fn candidate_pair_block_id(
+    world_cluster: u64,
+    decision_need: DecisionNeedV1,
+    evidence_sha256: &str,
+) -> String {
+    let input_digest = candidate_input_digest(decision_need, evidence_sha256);
+    format!("world-{world_cluster}:task-{}", &input_digest[..16])
+}
+
 fn candidate_input_digest(
     decision_need: DecisionNeedV1,
     evidence_sha256: &str,
@@ -598,13 +607,10 @@ fn run() -> Result<(), String> {
         // Opaque pair identity: do not expose generated evaluator scenario
         // family labels (for example, retraction or common-cause attack) to
         // the candidate-facing stream. Bind only candidate-visible inputs.
-        let pair_block_id = format!(
-            "world-{}:task-{}",
+        let pair_block_id = candidate_pair_block_id(
             case.cluster,
-            &candidate_input_digest(
-                case.decision_need,
-                &manifest.baseline_evidence_sha256
-            )[..16]
+            case.decision_need,
+            &manifest.baseline_evidence_sha256,
         );
         let manifest_record = json!({
             "schema_version": SCHEMA_VERSION,
@@ -976,6 +982,19 @@ mod tests {
             run_candidate(wrong_scope, case.decision_need, &case.memory).unwrap_err(),
             IndexError::InvalidDecisionNeed
         );
+    }
+
+    #[test]
+    fn pair_block_identity_does_not_expose_evaluator_scenario_family() {
+        let case = generated_worlds(1).remove(0);
+        let index = EvidenceDependencyIndex::build(&case.memory).unwrap();
+        let pair_id = candidate_pair_block_id(
+            case.cluster,
+            case.decision_need,
+            &index.baseline_evidence_digest(),
+        );
+        assert!(pair_id.starts_with(&format!("world-{}:task-", case.cluster)));
+        assert!(!pair_id.contains(case.family));
     }
 
     #[test]
