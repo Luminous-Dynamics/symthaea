@@ -28,6 +28,8 @@ pub const MAX_TEMPORAL_MYCELIAL_WINDOWS: usize = 4_096;
 pub const MAX_TEMPORAL_MYCELIAL_NODES: usize = 128;
 pub const MAX_TEMPORAL_MYCELIAL_EDGES: usize = 512;
 pub const MAX_TEMPORAL_CYCLES_PER_WINDOW: usize = 2_048;
+/// Upper bound on adjacency-edge visits during exact simple-cycle enumeration per window.
+pub const MAX_TEMPORAL_CYCLE_SEARCH_STEPS: usize = 1_000_000;
 const MAX_TEMPORAL_NODE_ID_BYTES: usize = 128;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -325,6 +327,11 @@ pub enum MycelialTemporalCycleError {
     TooManyNodes { snapshot_id: String, count: usize },
     TooManyEdges { snapshot_id: String, count: usize },
     TooManyCycles { snapshot_id: String, count: usize },
+    TooManyCycleSearchSteps {
+        snapshot_id: String,
+        count: usize,
+        limit: usize,
+    },
     InvalidSnapshot { snapshot_id: String, reason: &'static str },
     DuplicateSnapshotId(String),
     OverlappingWindows { previous: String, current: String },
@@ -362,6 +369,14 @@ impl fmt::Display for MycelialTemporalCycleError {
             Self::TooManyCycles { snapshot_id, count } => {
                 write!(f, "snapshot {snapshot_id} simple-cycle count {count} exceeds its bound")
             }
+            Self::TooManyCycleSearchSteps {
+                snapshot_id,
+                count,
+                limit,
+            } => write!(
+                f,
+                "snapshot {snapshot_id} cycle enumeration exceeded its search-step budget: {count} > {limit}"
+            ),
             Self::InvalidSnapshot { snapshot_id, reason } => {
                 write!(f, "invalid temporal snapshot {snapshot_id}: {reason}")
             }
@@ -537,6 +552,13 @@ struct DetectedCycle {
 fn enumerate_snapshot_cycles(
     snapshot: &TemporalMycelialSnapshot,
 ) -> Result<Vec<DetectedCycle>, MycelialTemporalCycleError> {
+    enumerate_snapshot_cycles_with_step_limit(snapshot, MAX_TEMPORAL_CYCLE_SEARCH_STEPS)
+}
+
+fn enumerate_snapshot_cycles_with_step_limit(
+    snapshot: &TemporalMycelialSnapshot,
+    maximum_search_steps: usize,
+) -> Result<Vec<DetectedCycle>, MycelialTemporalCycleError> {
     let mut adjacency = BTreeMap::<&str, Vec<(&str, &str)>>::new();
     for node_id in &snapshot.node_ids {
         adjacency.insert(node_id.as_str(), Vec::new());
@@ -556,6 +578,7 @@ fn enumerate_snapshot_cycles(
     }
 
     let mut cycles = BTreeMap::<String, DetectedCycle>::new();
+    let mut search_steps = 0usize;
     for start in snapshot.node_ids.iter().map(String::as_str) {
         let mut visited = BTreeSet::from([start]);
         let mut path_nodes = vec![start];
@@ -569,6 +592,8 @@ fn enumerate_snapshot_cycles(
             &mut path_nodes,
             &mut path_edges,
             &mut cycles,
+            &mut search_steps,
+            maximum_search_steps,
         )?;
     }
     Ok(cycles.into_values().collect())
@@ -584,9 +609,19 @@ fn enumerate_from<'a>(
     path_nodes: &mut Vec<&'a str>,
     path_edges: &mut Vec<&'a str>,
     cycles: &mut BTreeMap<String, DetectedCycle>,
+    search_steps: &mut usize,
+    maximum_search_steps: usize,
 ) -> Result<(), MycelialTemporalCycleError> {
     if let Some(neighbours) = adjacency.get(current) {
         for &(next, edge_id) in neighbours {
+            *search_steps = search_steps.saturating_add(1);
+            if *search_steps > maximum_search_steps {
+                return Err(MycelialTemporalCycleError::TooManyCycleSearchSteps {
+                    snapshot_id: snapshot.snapshot_id.clone(),
+                    count: *search_steps,
+                    limit: maximum_search_steps,
+                });
+            }
             if path_edges.contains(&edge_id) {
                 continue;
             }
@@ -633,6 +668,8 @@ fn enumerate_from<'a>(
                     path_nodes,
                     path_edges,
                     cycles,
+                    search_steps,
+                    maximum_search_steps,
                 )?;
                 path_edges.pop();
                 path_nodes.pop();
@@ -1854,6 +1891,30 @@ mod tests {
             }
         }
         count
+    }
+
+    #[test]
+    fn simple_cycle_enumerator_fails_closed_when_search_budget_is_exhausted() {
+        let cycle = vec![
+            edge("e-ab", "A", "B"),
+            edge("e-ac", "A", "C"),
+            edge("e-bc", "B", "C"),
+        ];
+        let input = snapshot(
+            "budget-window",
+            0,
+            10,
+            TemporalWindowCoverage::CompleteWithinDeclaredScope,
+            cycle,
+        );
+        assert!(matches!(
+            enumerate_snapshot_cycles_with_step_limit(&input, 0),
+            Err(MycelialTemporalCycleError::TooManyCycleSearchSteps {
+                snapshot_id,
+                count: 1,
+                limit: 0
+            }) if snapshot_id == "budget-window"
+        ));
     }
 
     #[test]
