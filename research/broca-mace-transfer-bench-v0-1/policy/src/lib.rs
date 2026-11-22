@@ -15,6 +15,12 @@ pub const MACE_FORBID_RETRACTED_SOURCE: bool = true;
 pub const MACE_REQUIRE_INTERFERENCE_CONTROL: bool = true;
 pub const MACE_REQUIRE_CONFOUNDER_CONTROL: bool = true;
 pub const MACE_REQUIRE_COMPLETED_DELAYED_HORIZON: bool = true;
+pub const MACE_REQUIRE_UNIQUE_EVENT_IDS: bool = true;
+pub const MACE_MIN_INDEPENDENT_SOURCE_ROOTS: usize = 2;
+pub const MACE_MIN_INDEPENDENT_SOURCE_FAMILIES: usize = 2;
+pub const MACE_MIN_SOURCE_EVENTS_PER_ACTION: usize = 2;
+pub const MACE_REQUIRE_BOTH_ACTION_ALTERNATIVES: bool = true;
+pub const MACE_REQUIRE_MATCHED_ESTIMAND_ACROSS_ACTIONS: bool = true;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum Action {
@@ -373,6 +379,12 @@ pub fn transfer_qualification_profile_digest() -> EvidenceDigest256 {
     hasher.update([u8::from(MACE_REQUIRE_INTERFERENCE_CONTROL)]);
     hasher.update([u8::from(MACE_REQUIRE_CONFOUNDER_CONTROL)]);
     hasher.update([u8::from(MACE_REQUIRE_COMPLETED_DELAYED_HORIZON)]);
+    hasher.update([u8::from(MACE_REQUIRE_UNIQUE_EVENT_IDS)]);
+    hasher.update((MACE_MIN_INDEPENDENT_SOURCE_ROOTS as u64).to_be_bytes());
+    hasher.update((MACE_MIN_INDEPENDENT_SOURCE_FAMILIES as u64).to_be_bytes());
+    hasher.update((MACE_MIN_SOURCE_EVENTS_PER_ACTION as u64).to_be_bytes());
+    hasher.update([u8::from(MACE_REQUIRE_BOTH_ACTION_ALTERNATIVES)]);
+    hasher.update([u8::from(MACE_REQUIRE_MATCHED_ESTIMAND_ACROSS_ACTIONS)]);
     hasher.update([0_u8, 1_u8]); // observed utility and measurement bound in [0, 1]
     let digest = hasher.finalize();
     let mut bytes = [0_u8; 32];
@@ -679,10 +691,10 @@ impl QualifiedGroup {
 
     fn is_qualified(&self) -> bool {
         self.has_single_estimand()
-            && self.independent_support() >= 2
-            && self.source_families.len() >= 2
-            && self.source_events.len() >= 2
-            && self.count >= 2
+            && self.independent_support() >= MACE_MIN_INDEPENDENT_SOURCE_ROOTS
+            && self.source_families.len() >= MACE_MIN_INDEPENDENT_SOURCE_FAMILIES
+            && self.source_events.len() >= MACE_MIN_SOURCE_EVENTS_PER_ACTION
+            && self.count >= MACE_MIN_SOURCE_EVENTS_PER_ACTION
     }
 }
 
@@ -694,7 +706,8 @@ fn causal_qualified_policy(memory: &[Experience], query: Query) -> Decision {
 
     let mut groups: BTreeMap<Action, QualifiedGroup> = BTreeMap::new();
     for item in memory.iter().filter(|item| {
-        event_frequency.get(&item.event_id) == Some(&1) && is_qualified(item, query)
+        (!MACE_REQUIRE_UNIQUE_EVENT_IDS || event_frequency.get(&item.event_id) == Some(&1))
+            && is_qualified(item, query)
     }) {
         groups.entry(item.action).or_default().add(item);
     }
@@ -703,7 +716,8 @@ fn causal_qualified_policy(memory: &[Experience], query: Query) -> Decision {
     let b = groups.get(&Action::B).cloned().unwrap_or_default();
     let a_ok = a.is_qualified();
     let b_ok = b.is_qualified();
-    if a_ok
+    if MACE_REQUIRE_MATCHED_ESTIMAND_ACROSS_ACTIONS
+        && a_ok
         && b_ok
         && (a.estimand_digest != b.estimand_digest
             || a.semantic_estimand != b.semantic_estimand)
