@@ -95,14 +95,26 @@ pub fn calibrate_spatial_nuisance_to_component_fraction(
 
     let time_points = clean_observations.len();
     let roi_count = nuisance_field.roi_labels.len();
+    let mode_count = nuisance_field.spatial_basis.first().map_or(0, Vec::len);
     if time_points < 3
         || roi_count < 2
+        || mode_count == 0
         || nuisance_field.values.len() != time_points
         || clean_observations.iter().any(|row| row.len() != roi_count)
         || nuisance_field
             .values
             .iter()
             .any(|row| row.len() != roi_count)
+        || nuisance_field.spatial_basis.len() != roi_count
+        || nuisance_field
+            .spatial_basis
+            .iter()
+            .any(|row| row.len() != mode_count)
+        || nuisance_field.factor_series.len() != mode_count
+        || nuisance_field
+            .factor_series
+            .iter()
+            .any(|series| series.len() != time_points)
     {
         return Err(SpatialVarianceCalibrationError::DimensionMismatch);
     }
@@ -110,6 +122,7 @@ pub fn calibrate_spatial_nuisance_to_component_fraction(
         .iter()
         .flatten()
         .chain(nuisance_field.values.iter().flatten())
+        .chain(nuisance_field.factor_series.iter().flatten())
         .any(|value| !value.is_finite())
     {
         return Err(SpatialVarianceCalibrationError::NonFiniteInput);
@@ -142,6 +155,15 @@ pub fn calibrate_spatial_nuisance_to_component_fraction(
     }
     for value in calibrated.factor_series.iter_mut().flatten() {
         *value *= scale_multiplier;
+    }
+    if calibrated
+        .values
+        .iter()
+        .flatten()
+        .chain(calibrated.factor_series.iter().flatten())
+        .any(|value| !value.is_finite())
+    {
+        return Err(SpatialVarianceCalibrationError::NonFiniteScale);
     }
 
     let (calibrated_clean_variance, calibrated_nuisance_variance, calibrated_covariance) =
@@ -333,6 +355,35 @@ mod tests {
             report.combined_observed_variance
                 > report.clean_component_variance + report.nuisance_component_variance
         );
+    }
+
+    #[test]
+    fn negative_signal_nuisance_covariance_is_reported_separately() {
+        let field = generate_spatial_nuisance_field(&graph(), &config(2, 0.2, 24), None).unwrap();
+        let clean = field
+            .values
+            .iter()
+            .map(|row| row.iter().map(|value| -*value).collect::<Vec<_>>())
+            .collect::<Vec<_>>();
+        let (_, report) =
+            calibrate_spatial_nuisance_to_component_fraction(&clean, &field, 0.25).unwrap();
+        assert!(report.clean_nuisance_covariance < 0.0);
+        assert!(report.covariance_contribution_fraction < 0.0);
+        assert!(
+            report.combined_observed_variance
+                < report.clean_component_variance + report.nuisance_component_variance
+        );
+    }
+
+    #[test]
+    fn malformed_factor_metadata_fails_closed() {
+        let clean = clean_observations();
+        let mut field = generate_spatial_nuisance_field(&graph(), &config(2, 0.2, 25), None).unwrap();
+        field.factor_series[0].pop();
+        assert!(matches!(
+            calibrate_spatial_nuisance_to_component_fraction(&clean, &field, 0.2),
+            Err(SpatialVarianceCalibrationError::DimensionMismatch)
+        ));
     }
 
     #[test]
