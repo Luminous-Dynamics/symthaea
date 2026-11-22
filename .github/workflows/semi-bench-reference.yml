@@ -379,6 +379,22 @@ jobs:
             .claim_limits.uninspected_units_remain_unknown == true
           ' /tmp/semi-inspection-decision-rust.json > /dev/null
 
+
+      - name: Run Bayesian EVSI synthetic decision subject
+        run: |
+          cargo run --manifest-path /tmp/semi-rust-work/crates/domains/symthaea-semiconductor/Cargo.toml --bin semi-inspection-evsi -- \
+            /tmp/semi-rust-work/benchmarks/semi-bench-001/reference/fixtures/inspection-evsi-known-answer-v1.json \
+            > /tmp/semi-inspection-evsi-report.json
+          jq -e '
+            .schema == "luminous.semi-bench.evsi-report.v1" and
+            .case_id == "EVSI-SECOM-SYNTHETIC-001" and
+            (.candidates | length == 3) and
+            all(.candidates[]; .gross_evsi >= 0) and
+            all(.candidates[]; ((.positive_outcome.outcome_probability + .negative_outcome.outcome_probability - 1) | fabs) < 0.0000000001) and
+            .claim_limits.unmeasured_subjects_remain_unknown == true and
+            .claim_limits.does_not_schedule_or_execute_physical_measurement == true
+          ' /tmp/semi-inspection-evsi-report.json > /dev/null
+
       - name: Archive real-source SECOM diagnostic reports
         uses: actions/upload-artifact@v4
         with:
