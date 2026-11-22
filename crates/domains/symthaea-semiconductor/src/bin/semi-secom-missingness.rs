@@ -38,13 +38,9 @@ fn run() -> Result<(), String> {
         .map_err(|error| format!("invalid expectations JSON: {error}"))?;
     let split_manifest: SplitManifestV1 = serde_json::from_str(&split_text)
         .map_err(|error| format!("invalid split manifest JSON: {error}"))?;
-    let report: SecomMissingnessReportV1 = evaluate_secom_missingness_v1(
-        &feature_bytes,
-        &label_bytes,
-        &expectations,
-        &split_manifest,
-    )
-    .map_err(|error| format!("SECOM missingness evaluation rejected input: {error}"))?;
+    let report: SecomMissingnessReportV1 =
+        evaluate_secom_missingness_v1(&feature_bytes, &label_bytes, &expectations, &split_manifest)
+            .map_err(|error| format!("SECOM missingness evaluation rejected input: {error}"))?;
     let rendered = serde_json::to_string_pretty(&report)
         .map_err(|error| format!("cannot render missingness report: {error}"))?;
     println!("{rendered}");
