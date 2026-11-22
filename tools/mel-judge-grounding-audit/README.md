@@ -64,3 +64,13 @@ The musical timing evaluator consumes expected onset and local beat-period value
       tools/mel-judge-grounding-audit/fixtures/valid-musical-timing-v2.json report.json
 
 Its MIDI-style fixture is synthetic. No real timing or performance claim follows from the example output.
+
+
+## Predictive transparency and musical forecasts
+
+The musical forecast auditor checks precommitted, input-snapshot-bound forecasts against later symbolic realization. It records delivery, actual display and collaborator disposition separately; verifies revision/supersession history; rejects post-hoc, yoked, future-input, stale and vetoed output; and reports conditional event-presence Brier, role agreement, beat-phase error and preview lead time. Deliberate user deviation remains valid agency.
+
+    cargo run --manifest-path tools/mel-judge-grounding-audit/Cargo.toml --bin mel-musical-forecast-audit -- audit \
+      tools/mel-judge-grounding-audit/fixtures/valid-musical-forecast-v1.json report.json
+
+The fixture is synthetic. Its Brier score is conditional on predicted event slots, not a general recall/calibration result. See docs/research/MEL_PREDICTIVE_TRANSPARENCY_AUDITOR_V1_2026-11-23.md.
