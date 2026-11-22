@@ -400,3 +400,68 @@ cargo run -p symthaea-semiconductor --bin semi-secom-stratified-splits -- \\
 Each report records per-repeat train/test sample counts and positive/negative support, plus independent manifest digests. Input ordering does not change manifests. The published-comparability split has no validation partition; thresholds must not be selected on its test split. Any hyperparameter selection requires nested CV or a separately declared inner split within the training partition.
 
 These stratified repeats measure interpolation across historical samples, not time-forward generalization, and the five repeats are not five independent lots or fabs. Continue to report the original chronological track separately.
+
+
+## Train-only preprocessing for the five-repeat stratified SECOM track
+
+The Rust CLI \`semi-secom-fold-preprocess\` consumes the digest-verified raw SECOM files, the five-repeat stratified report and the source-identity manifest. It validates the snapshot-manifest digest and every source row's sample ID, fail/pass label and naive source-local timestamp before creating per-repeat transforms.
+
+For each repeat, all preprocessing parameters are fitted on that repeat's 1,253 training rows only:
+- drop a feature when its training missing fraction is strictly greater than 0.50;
+- median-impute using observed training values only;
+- drop near-zero-variance features using the declared minimum population variance (1e-12) and minimum distinct-value count (2);
+- fit a complete empirical quantile reference over training-only median-imputed values;
+- apply the quantile map to training and held-out rows without refitting.
+
+The default output is an approximate normal-score empirical quantile transform using midranks and half-rank tail clipping. Uniform-rank output is also available through the typed configuration. The article does not disclose all quantile-transform defaults or exact variance thresholds, so these settings are Luminous reconstruction parameters, not claimed to be the authors' exact implementation.
+
+Two matrices are hashed independently:
+- **Feature Set A:** quantile-transformed retained numeric values; the paper-comparability path.
+- **Feature Set B:** Feature Set A plus retained-feature missingness indicators and one missing ratio over all original columns. This is a Luminous ablation, not attributed to Dong et al.'s exact pipeline.
+
+The fitted pipeline digest binds train sample IDs, config, retained feature identities, train medians, variances, distinct counts and full sorted quantile references. Reports bind source snapshot/identity-manifest digests, repeat index/seed and train/test matrix digests. Test values/labels do not affect the fitted pipeline digest.
+
+Run:
+
+\`\`\`sh
+cargo run -p symthaea-semiconductor --bin semi-secom-fold-preprocess -- \\
+  data/secom.data \\
+  data/secom_labels.data \\
+  docs/research/semi-bench-001/secom-raw-expectations-v1.json \\
+  stratified-80-20-repeats.json \\
+  docs/research/semi-bench-001/splits/uci-secom-mirror-0d27427a/chronological-60-20-20-v0.1.json
+\`\`\`
+
+This verifies fold-specific preprocessing and source binding; it does not train XGBoost or Random Forest. The 2026 paper's exact five seeds, full quantile-transform defaults and near-zero variance threshold are not fully disclosed in the accessible protocol, so direct numerical reproduction remains pending. Results from this stratified protocol must not be compared directly to the frozen chronological 940/313/314 results.
+
+
+## Process event graph and delayed-metrology label lifecycle
+
+The Rust module \`benchmark::process_event_graph\` adds a versioned event graph and a leakage-safe information-cutoff snapshot. It explicitly separates:
+- **event time**: when the physical process or measurement occurred;
+- **availability time**: when the record/result became available to the data/learning system.
+
+Both timestamps carry a clock-domain ID and declared basis (\`offset_aware\` or \`source_local_naive\`). Mismatched clocks are not silently coerced. Event/edge IDs, source digests, transform digests, authority references, subject/genealogy metadata, tool/chamber/module/process-step and recipe revision are represented only when source evidence provides them.
+
+Process edges are evidence-backed sequence/context relations (\`precedes\`, \`measures\`, \`same_subject_sequence\`, \`maintenance_context\`, \`calibration_context\`, \`recipe_context\`). A \`precedes\` edge is checked against event time when both endpoints share a comparable clock. These are not inferred physical causal relations.
+
+Metrology labels have their own immutable lifecycle:
+- validated;
+- provisional;
+- censored;
+- invalid;
+- unknown.
+
+A validated numeric target requires a finite point value, unit and standard uncertainty. Censored labels require bounds/censoring basis and no fabricated point value. Revisions reference a previous label ID, preserve the same subject/measurand and increase revision number.
+
+\`build_information_cutoff_snapshot_v1\` constructs the information actually available at a declared prediction/training cutoff:
+- events available by cutoff;
+- late-arriving/unavailable events, even if their event time is old;
+- events not comparable because their availability clock is unaligned;
+- future-time events;
+- validated metrology labels whose result-availability time has matured;
+- delayed, non-trainable and unaligned labels.
+
+**Critical invariant:** an old measurement event is not a usable training target until its result is available. Training and evaluation must never backfill a later lab result into an earlier model snapshot. Unaligned clock domains are excluded rather than guessed.
+
+Rust tests cover event/availability separation, delayed labels, late-arriving event exclusion, clock-domain mismatch, future timestamps, unresolved graph edges, label/subject consistency and immutable revision lineage. The graph validator establishes schema/time/identity integrity only; it does not prove sensor accuracy, physical causality, VM calibration, transfer or process-control authority.

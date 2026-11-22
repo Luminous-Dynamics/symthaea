@@ -225,6 +225,50 @@ jobs:
           jq -r '.repeats[] | [.repeat_index,.seed,.split_manifest_sha256,.train.samples,.train.positive,.test.samples,.test.positive] | @tsv' \
             /tmp/secom-real/stratified-80-20-repeats.json
 
+
+      - name: Fit train-only preprocessing for all five stratified SECOM repeats
+        run: |
+          EXPECTATIONS=/tmp/semi-rust-work/docs/research/semi-bench-001/secom-raw-expectations-v1.json
+          SNAPSHOT=/tmp/semi-rust-work/docs/research/semi-bench-001/splits/uci-secom-mirror-0d27427a/chronological-60-20-20-v0.1.json
+          cargo run --manifest-path /tmp/semi-rust-work/crates/domains/symthaea-semiconductor/Cargo.toml --bin semi-secom-fold-preprocess -- \
+            /tmp/secom-real/secom.data \
+            /tmp/secom-real/secom_labels.data \
+            "$EXPECTATIONS" \
+            /tmp/secom-real/stratified-80-20-repeats.json \
+            "$SNAPSHOT" \
+            > /tmp/secom-real/stratified-fold-preprocessing.json
+
+          jq -e '
+            .schema == "luminous.semi-bench.secom-five-repeat-preprocessing-report.v1" and
+            .repeat_count == 5 and
+            (.repeats | length == 5) and
+            all(.repeats[];
+              .training_rows == 1253 and
+              .test_rows == 314 and
+              .training_failures == 83 and
+              .test_failures == 21 and
+              .input_feature_count == 590 and
+              .retained_feature_count > 0 and
+              (.retained_feature_count + .dropped_missingness_count + .dropped_low_variance_count == 590) and
+              (.pipeline_sha256 | length == 64) and
+              (.training_feature_set_a_sha256 | length == 64) and
+              (.test_feature_set_a_sha256 | length == 64) and
+              (.training_feature_set_b_sha256 | length == 64) and
+              (.test_feature_set_b_sha256 | length == 64) and
+              .claim_limits.fitting_is_train_only == true and
+              .claim_limits.feature_set_b_is_a_luminous_ablation == true
+            )
+          ' /tmp/secom-real/stratified-fold-preprocessing.json > /dev/null
+
+          echo "Train-only filtering and quantile preprocessing by repeat:"
+          jq -r '
+            .repeats[] |
+            [.repeat_index,.seed,.input_feature_count,.retained_feature_count,
+             .dropped_missingness_count,.dropped_low_variance_count,
+             .pipeline_sha256,.training_feature_set_a_sha256,.test_feature_set_a_sha256]
+            | @tsv
+          ' /tmp/secom-real/stratified-fold-preprocessing.json
+
       - name: Run Rust B0/B1 and observation drift on the full pinned SECOM chronology
         run: |
           EXPECTATIONS=/tmp/semi-rust-work/docs/research/semi-bench-001/secom-raw-expectations-v1.json
@@ -407,4 +451,5 @@ jobs:
             /tmp/secom-real/tabular-baselines-report.json
             /tmp/secom-real/logistic-report.json
             /tmp/secom-real/stratified-80-20-repeats.json
+            /tmp/secom-real/stratified-fold-preprocessing.json
           if-no-files-found: error

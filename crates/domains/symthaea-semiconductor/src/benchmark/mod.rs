@@ -4,6 +4,8 @@ pub mod binary_metrics;
 pub mod dtco_manifest;
 pub mod mf_acquisition;
 pub mod pair_manifest;
+pub mod process_event_graph;
+pub mod secom_fold_preprocessor;
 pub mod secom_logistic;
 pub mod secom_missingness;
 pub mod secom_observation_drift;
@@ -16,6 +18,13 @@ pub use binary_metrics::{
     BinaryClassCounts, BinaryMetricReportV1, BinaryMetricsError, BinaryScoreSampleV1,
     BinaryScoreSubjectV1, score_binary_subject_v1,
 };
+pub use process_event_graph::{
+    ClockBasisV1, InformationCutoffSnapshotV1, MetrologyLabelStatusV1, MetrologyLabelV1,
+    PredictionInformationCutoffV1, ProcessEventEdgeV1, ProcessEventGraphError, ProcessEventGraphV1,
+    ProcessEventKindV1, ProcessEventV1, ProcessGraphValidationReportV1,
+    build_information_cutoff_snapshot_v1, validate_process_event_graph_v1,
+};
+
 pub use pair_manifest::{
     ContrastivePairManifestV1, PairManifestError, PairValidationReportV1, validate_pair_manifest_v1,
 };
@@ -40,6 +49,13 @@ pub use secom_observation_drift::{
 
 pub use secom_tabular_baselines::{
     SecomTabularBaselineError, SecomTabularBaselinesReportV1, evaluate_secom_tabular_baselines_v1,
+};
+
+pub use secom_fold_preprocessor::{
+    FittedSecomPreprocessorV1, PreparedSecomFoldV1, QuantileOutputV1, SecomFoldPreprocessorError,
+    SecomFoldPreprocessorReportV1, SecomPreprocessingRowV1, SecomPreprocessorConfigV1,
+    SecomTransformedSampleV1, fit_secom_preprocessor_v1, prepare_secom_stratified_fold_v1,
+    transform_secom_rows_v1,
 };
 
 pub use secom_raw::{
