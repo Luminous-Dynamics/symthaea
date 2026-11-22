@@ -219,6 +219,8 @@ pub struct TemporalMycelialCycleProfile {
     pub calibration_digest: String,
     pub sequence_digest: String,
     pub config: TemporalMycelialCycleConfig,
+    /// Complete sorted node identity inventory over every snapshot.
+    pub source_node_ids: Vec<String>,
     pub snapshot_metrics: Vec<TemporalMycelialSnapshotMetrics>,
     pub cycles: Vec<TemporalMycelialCycleRecord>,
     /// Persistent cycles represented as higher-order hyperedges over their nodes.
@@ -712,6 +714,7 @@ pub fn build_temporal_mycelial_cycle_profile(
     for snapshot in &sequence.snapshots {
         all_node_ids.extend(snapshot.node_ids.iter().cloned());
     }
+    let source_node_ids: Vec<_> = all_node_ids.iter().cloned().collect();
     let mut node_metrics = Vec::with_capacity(all_node_ids.len());
     for node_id in all_node_ids {
         let tcn_duration_ns = tcn.get(&node_id).copied().unwrap_or(0);
@@ -742,6 +745,7 @@ pub fn build_temporal_mycelial_cycle_profile(
         calibration_digest: sequence.calibration_digest.clone(),
         sequence_digest,
         config,
+        source_node_ids,
         snapshot_metrics,
         cycles: cycle_records,
         persistent_cycle_hyperedges: hyperedges,
@@ -820,12 +824,23 @@ impl TemporalMycelialCycleProfile {
                 != self.complete_duration_ns + self.partial_duration_ns
             || self.snapshot_metrics.is_empty()
             || self.snapshot_metrics.len() > MAX_TEMPORAL_MYCIELIAL_WINDOWS
+            || self.source_node_ids.len() > MAX_TEMPORAL_MYCIELIAL_NODES.saturating_mul(
+                self.snapshot_metrics.len(),
+            )
+            || self.source_node_ids.iter().any(|id| !valid_id(id))
+            || self.source_node_ids.windows(2).any(|pair| pair[0] >= pair[1])
             || self.snapshot_metrics.iter().any(|snapshot| !valid_id(&snapshot.snapshot_id))
             || self.snapshot_metrics.windows(2).any(|pair| {
                 pair[0].snapshot_id == pair[1].snapshot_id
             })
             || self.cycles.windows(2).any(|pair| pair[0].cycle_id >= pair[1].cycle_id)
             || self.node_metrics.windows(2).any(|pair| pair[0].node_id >= pair[1].node_id)
+            || self.node_metrics.len() != self.source_node_ids.len()
+            || self
+                .node_metrics
+                .iter()
+                .zip(&self.source_node_ids)
+                .any(|(metric, source_id)| &metric.node_id != source_id)
             || self.persistent_cycle_hyperedges.windows(2).any(|pair| {
                 pair[0].cycle_id >= pair[1].cycle_id
             })
@@ -850,6 +865,10 @@ impl TemporalMycelialCycleProfile {
                 || cycle.node_ids.len() < 2
                 || cycle.node_ids.iter().any(|id| !valid_id(id))
                 || cycle.node_ids.windows(2).any(|pair| pair[0] >= pair[1])
+                || cycle
+                    .node_ids
+                    .iter()
+                    .any(|node_id| self.source_node_ids.binary_search(node_id).is_err())
                 || cycle.observations.len() != self.snapshot_metrics.len()
                 || cycle.present_duration_ns
                     + cycle.known_absent_duration_ns
@@ -1003,6 +1022,10 @@ impl TemporalMycelialCycleProfile {
         hasher.update(&self.config.minimum_persistence_fraction.to_bits().to_le_bytes());
         hasher.update(&self.config.minimum_known_duration_fraction.to_bits().to_le_bytes());
         hasher.update(&self.config.tcr_epsilon.to_bits().to_le_bytes());
+        hasher.update(&(self.source_node_ids.len() as u64).to_le_bytes());
+        for node_id in &self.source_node_ids {
+            hash_string(&mut hasher, node_id);
+        }
         for snapshot in &self.snapshot_metrics {
             hash_string(&mut hasher, &snapshot.snapshot_id);
             hasher.update(&(snapshot.node_count as u64).to_le_bytes());
