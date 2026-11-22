@@ -40,6 +40,8 @@ The pairwise selector uses deterministic branch-and-bound, selects at most one r
 
 ## 5. Evaluator integration fixture
 
+The candidate-module tests also include a four-option mixed-interaction world with a strongly redundant pair and positive/negative complementarities. The branch-and-bound result is checked against independent exhaustive enumeration of all 16 subsets; the optimum is not the three highest singleton values. This is an authored small-instance exactness control, not an executed benchmark result.
+
 The evaluator fixture builds three candidate options through receipt-gated raw Session-A ingestion, calibrated future-use prediction, checked source availability, and re-derived `StoreLocator` representation plans. The hidden whole-portfolio utility remains in the evaluator test module. In the fixture, the additive selector prefers the strongest singleton plus one alternative; the hidden evaluator assigns additional joint value to B+C, and the interaction-aware selector should choose B+C.
 
 This is an authored synthetic integration fixture, not a measured performance result or an executed test.
