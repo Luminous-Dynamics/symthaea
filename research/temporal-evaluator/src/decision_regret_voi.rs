@@ -208,10 +208,8 @@ fn validate_and_partition_support(
             available_at_us,
         } = outcome
         {
-            if let Some(first_available_at_us) =
-                availability_by_digest.insert(transcript_sha256, available_at_us)
-            {
-                if first_available_at_us != available_at_us {
+            match availability_by_digest.insert(transcript_sha256, available_at_us) {
+                Some(first_available_at_us) if first_available_at_us != available_at_us => {
                     return Err(
                         RobustObservationVoiError::OutcomeDigestAvailabilityMismatch {
                             candidate_visible_outcome_sha256: transcript_sha256,
@@ -220,6 +218,7 @@ fn validate_and_partition_support(
                         },
                     );
                 }
+                _ => {}
             }
         }
         per_world
