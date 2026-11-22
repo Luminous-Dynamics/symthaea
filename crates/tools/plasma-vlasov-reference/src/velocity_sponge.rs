@@ -521,7 +521,8 @@ impl VlasovPoisson1d1v {
             // this is algebraically equivalent to {1,v,v^2}.
             let mut target_scaled_moments = [0.0; 3];
             let mut filtered_scaled_moments = [0.0; 3];
-            for (iv, (target, filtered)) in target_row.iter().zip(candidate_row.iter()).enumerate() {
+            for (iv, (target, filtered)) in target_row.iter().zip(candidate_row.iter()).enumerate()
+            {
                 let u = config.velocity(iv) / velocity_scale;
                 let weight = config.dv();
                 target_scaled_moments[0] += target * weight;
