@@ -224,7 +224,10 @@ fn score_panel(panel: &MusicalTimingPanelV2) -> Result<MusicalTimingReport, Stri
                     )
                 })?;
                 let receipt = target.capture_receipt_sha256.as_deref().ok_or_else(|| {
-                    format!("observed event {} is missing capture receipt", target.event_id)
+                    format!(
+                        "observed event {} is missing capture receipt",
+                        target.event_id
+                    )
                 })?;
                 require_digest(receipt, "target onset capture receipt")?;
                 let signed_error_ns = i128::from(observed) - i128::from(target.expected_onset_ns);
@@ -293,8 +296,7 @@ fn score_panel(panel: &MusicalTimingPanelV2) -> Result<MusicalTimingReport, Stri
         require_text(&extra.event_id, "extra onset event_id")?;
         require_text(&extra.instrument_id, "extra onset instrument_id")?;
         require_digest(&extra.capture_receipt_sha256, "extra onset capture receipt")?;
-        if !extra_ids.insert(extra.event_id.as_str())
-            || event_ids.contains(extra.event_id.as_str())
+        if !extra_ids.insert(extra.event_id.as_str()) || event_ids.contains(extra.event_id.as_str())
         {
             return Err(format!(
                 "duplicate or target-colliding extra onset ID: {}",
@@ -317,10 +319,7 @@ fn score_panel(panel: &MusicalTimingPanelV2) -> Result<MusicalTimingReport, Stri
         .iter()
         .map(|item| item.absolute_phase_error)
         .collect();
-    let absolute_ms: Vec<f64> = computed
-        .iter()
-        .map(|item| item.absolute_error_ms)
-        .collect();
+    let absolute_ms: Vec<f64> = computed.iter().map(|item| item.absolute_error_ms).collect();
     let signed_bias = mean(&signed);
     let drift = regression_slope(
         computed
@@ -435,7 +434,10 @@ fn validate_header(panel: &MusicalTimingPanelV2) -> Result<(), String> {
     require_text(&panel.clock_domain_id, "clock_domain_id")?;
     require_text(&panel.instrument_scope, "instrument_scope")?;
     require_text(&panel.reference_time_map_id, "reference_time_map_id")?;
-    require_text(&panel.reference_time_map_version, "reference_time_map_version")?;
+    require_text(
+        &panel.reference_time_map_version,
+        "reference_time_map_version",
+    )?;
     if !matches!(
         panel.reference_time_map_kind.as_str(),
         "notation_tempo" | "performance_time"
@@ -469,7 +471,9 @@ fn validate_header(panel: &MusicalTimingPanelV2) -> Result<(), String> {
     Ok(())
 }
 
-fn validate_tempo_changes(changes: &[TempoChangeV2]) -> Result<BTreeMap<&str, &TempoChangeV2>, String> {
+fn validate_tempo_changes(
+    changes: &[TempoChangeV2],
+) -> Result<BTreeMap<&str, &TempoChangeV2>, String> {
     let mut result = BTreeMap::new();
     let mut previous_time = None;
     for change in changes {
@@ -529,9 +533,12 @@ fn validate_estimates<'a>(
         }
         previous_time = Some(estimate.observed_at_ns);
 
-        let change = changes
-            .get(estimate.change_id.as_str())
-            .ok_or_else(|| format!("estimate references unknown tempo change {}", estimate.change_id))?;
+        let change = changes.get(estimate.change_id.as_str()).ok_or_else(|| {
+            format!(
+                "estimate references unknown tempo change {}",
+                estimate.change_id
+            )
+        })?;
         if estimate.observed_at_ns < change.change_observed_ns {
             return Err(format!(
                 "tempo estimate {} was observed before the tempo change became available",
@@ -645,8 +652,7 @@ fn threshold_rate(values: &[f64], threshold: f64) -> Option<f64> {
         None
     } else {
         Some(
-            values.iter().filter(|value| **value <= threshold).count() as f64
-                / values.len() as f64,
+            values.iter().filter(|value| **value <= threshold).count() as f64 / values.len() as f64,
         )
     }
 }
@@ -725,8 +731,7 @@ mod tests {
     #[test]
     fn estimate_before_tempo_change_is_rejected() {
         let mut value = panel();
-        value["tempo_estimates"][5]["observed_at_ns"] =
-            serde_json::json!(1_999_999_999_u64);
+        value["tempo_estimates"][5]["observed_at_ns"] = serde_json::json!(1_999_999_999_u64);
         value["tempo_estimates"][5]["evidence_window_end_ns"] =
             serde_json::json!(1_999_999_999_u64);
         let error = score(&value).expect_err("no estimate can precede change availability");
