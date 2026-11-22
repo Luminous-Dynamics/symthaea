@@ -430,6 +430,82 @@
           "minItems": 1
         }
       }
+    },
+    "upstream_graph_crosschecks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "declaration",
+          "source_file",
+          "source_lines",
+          "upstream_file",
+          "upstream_blob_sha",
+          "upstream_row",
+          "upstream_semantics",
+          "interpretation",
+          "limit"
+        ],
+        "properties": {
+          "declaration": {
+            "type": "string"
+          },
+          "source_file": {
+            "type": "string"
+          },
+          "source_lines": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "upstream_file": {
+            "type": "string"
+          },
+          "upstream_blob_sha": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{40}$"
+          },
+          "upstream_row": {
+            "type": "string"
+          },
+          "upstream_semantics": {
+            "type": "string"
+          },
+          "interpretation": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "uniform_error_bridges": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "paper_equation": {
+            "type": "string"
+          },
+          "bound": {
+            "type": "string"
+          },
+          "consequence": {
+            "type": "string"
+          },
+          "source_identity": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      }
     }
   }
 }
