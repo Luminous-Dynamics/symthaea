@@ -435,35 +435,55 @@ fn select_plan(mut candidates: Vec<Plan>) -> Result<Plan, String> {
         .filter(|(_, plan)| (plan.worst_case_regret - best_risk).abs() <= EPSILON)
         .map(|(index, _)| index)
         .collect();
-    let frontier: Vec<usize> = top_indices
+    // An unresolved child policy has no defensible expected-resource vector.
+    // It must remain on the review frontier; never silently drop it and select
+    // another tied plan merely because that other plan has a known cost.
+    let unresolved_cost = top_indices
         .iter()
-        .copied()
-        .filter(|candidate_index| {
-            let Some(candidate_cost) = &candidates[*candidate_index].expected_resources else {
-                return false;
-            };
-            !top_indices.iter().any(|other_index| {
-                other_index != candidate_index
-                    && candidates[*other_index]
-                        .expected_resources
-                        .as_ref()
-                        .is_some_and(|other_cost| expected_dominates(other_cost, candidate_cost))
+        .any(|index| candidates[*index].expected_resources.is_none());
+    let frontier: Vec<usize> = if unresolved_cost {
+        Vec::new()
+    } else {
+        top_indices
+            .iter()
+            .copied()
+            .filter(|candidate_index| {
+                let candidate_cost = candidates[*candidate_index]
+                    .expected_resources
+                    .as_ref()
+                    .expect("top-plan resource completeness checked");
+                !top_indices.iter().any(|other_index| {
+                    other_index != candidate_index
+                        && candidates[*other_index]
+                            .expected_resources
+                            .as_ref()
+                            .is_some_and(|other_cost| expected_dominates(other_cost, candidate_cost))
+                })
             })
-        })
-        .collect();
-    if frontier.len() == 1 {
+            .collect()
+    };
+    if !unresolved_cost && frontier.len() == 1 {
         return Ok(candidates.swap_remove(frontier[0]));
     }
-    let mut candidate_first_actions: Vec<String> = frontier
-        .iter()
-        .filter_map(|index| match &candidates[*index].node {
-            PolicyNode::Test { action_id, .. } => Some(action_id.clone()),
-            _ => None,
-        })
-        .collect();
+    let review_indices: Vec<usize> = if unresolved_cost {
+        top_indices
+    } else {
+        frontier
+    };
+    let mut candidate_first_actions = Vec::new();
+    for index in &review_indices {
+        match &candidates[*index].node {
+            PolicyNode::Test { action_id, .. } => candidate_first_actions.push(action_id.clone()),
+            PolicyNode::HumanReview {
+                candidate_first_actions: nested,
+                ..
+            } => candidate_first_actions.extend(nested.iter().cloned()),
+            PolicyNode::Terminal { .. } => {}
+        }
+    }
     candidate_first_actions.sort();
     candidate_first_actions.dedup();
-    let worst_path_resources = frontier
+    let worst_path_resources = review_indices
         .iter()
         .map(|index| candidates[*index].worst_path_resources.clone())
         .reduce(|left, right| max_resources(&left, &right))
@@ -1018,6 +1038,78 @@ mod tests {
 
     fn receipt() -> SequentialReceipt {
         run_sequential_audit(FIXTURE, SOURCE).expect("sequential campaign oracle must match")
+    }
+
+    #[test]
+    fn unresolved_child_cost_keeps_parent_candidates_on_human_review_frontier() {
+        let mut nested_branches = BTreeMap::new();
+        nested_branches.insert(
+            "PASS".to_owned(),
+            PolicyNode::HumanReview {
+                candidate_first_actions: vec![
+                    "A-CHILD-LOW-ENGINEERING".to_owned(),
+                    "A-CHILD-LOW-FACILITY".to_owned(),
+                ],
+                worst_case_regret: 0.0,
+            },
+        );
+        let unresolved_parent = Plan {
+            worst_case_regret: 0.0,
+            expected_resources: None,
+            worst_path_resources: Resources {
+                engineering_hours: 2.0,
+                compute_core_hours: 0.0,
+                facility_hours: 2.0,
+                specimen_count: 1,
+                review_hours: 1.0,
+                external_cost_units: 1.0,
+            },
+            node: PolicyNode::Test {
+                action_id: "A-PARENT-WITH-UNRESOLVED-CHILD".to_owned(),
+                branches: nested_branches,
+            },
+        };
+        let known_parent = Plan {
+            worst_case_regret: 0.0,
+            expected_resources: Some(expected_from_resources(&Resources {
+                engineering_hours: 0.5,
+                compute_core_hours: 0.0,
+                facility_hours: 0.5,
+                specimen_count: 1,
+                review_hours: 0.25,
+                external_cost_units: 0.25,
+            })),
+            worst_path_resources: Resources {
+                engineering_hours: 0.5,
+                compute_core_hours: 0.0,
+                facility_hours: 0.5,
+                specimen_count: 1,
+                review_hours: 0.25,
+                external_cost_units: 0.25,
+            },
+            node: PolicyNode::Test {
+                action_id: "B-KNOWN-COST-PARENT".to_owned(),
+                branches: BTreeMap::new(),
+            },
+        };
+
+        let selected = select_plan(vec![unresolved_parent, known_parent]).unwrap();
+        let PolicyNode::HumanReview {
+            candidate_first_actions,
+            worst_case_regret,
+        } = selected.node
+        else {
+            panic!("a known-cost plan must not displace a tied unresolved subtree");
+        };
+        assert_eq!(worst_case_regret, 0.0);
+        assert_eq!(
+            candidate_first_actions,
+            vec![
+                "A-PARENT-WITH-UNRESOLVED-CHILD".to_owned(),
+                "B-KNOWN-COST-PARENT".to_owned(),
+            ]
+        );
+        assert!(selected.expected_resources.is_none());
     }
 
     #[test]
