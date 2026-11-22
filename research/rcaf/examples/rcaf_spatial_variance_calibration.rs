@@ -174,12 +174,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             "  ]\n",
             "}}\n"
         ),
-        rendered_labels,
-        rendered_edges,
-        time_points,
-        target_fraction,
-        graph_smooth,
-        heat_kernel,
+        rendered_labels, rendered_edges, time_points, target_fraction, graph_smooth, heat_kernel,
     );
 
     if let Some(path) = std::env::args_os().nth(1) {
