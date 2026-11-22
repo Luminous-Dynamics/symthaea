@@ -1,0 +1,341 @@
+{
+  "schema_version": "1.0.0",
+  "dataset_id": "ALPOGE-RH-KERNEL-DEPENDENCY-BASELINE-V0.2.1",
+  "evidence_class": "external_kernel_export_dependency_analysis",
+  "status": "external_reference_snapshot_not_symthaea_extraction",
+  "upstream": {
+    "repository": "james-shore/rh-proof-dependencies",
+    "revision": "70fbb2fc21fed8de3c02d9f6df0b6067bf22e879",
+    "revision_date": "2026-11-21T14:48:11Z",
+    "dataset_version": "0.2.1",
+    "license": "CC0-1.0",
+    "license_notice": "The dataset repository is CC0-1.0 except specifically named tools/inputs in NOTICE under Apache-2.0. The Alpöge proof source itself is not included and is not covered by this license.",
+    "urls": {
+      "readme": "https://github.com/james-shore/rh-proof-dependencies/blob/70fbb2fc21fed8de3c02d9f6df0b6067bf22e879/README.md",
+      "dataset_schema": "https://github.com/james-shore/rh-proof-dependencies/blob/70fbb2fc21fed8de3c02d9f6df0b6067bf22e879/docs/dataset.md",
+      "method": "https://github.com/james-shore/rh-proof-dependencies/blob/70fbb2fc21fed8de3c02d9f6df0b6067bf22e879/docs/method.md",
+      "notice": "https://github.com/james-shore/rh-proof-dependencies/blob/70fbb2fc21fed8de3c02d9f6df0b6067bf22e879/NOTICE"
+    },
+    "pinned_files": [
+      {
+        "path": "data/spine.tsv",
+        "git_blob_sha": "4b3abbe77604c042ab48621838f1c0977356c5f8"
+      },
+      {
+        "path": "data/top-subtrees.tsv",
+        "git_blob_sha": "7962cfdaab5c42ce91c438ee51c5a690a9484463"
+      },
+      {
+        "path": "data/per-theorem.tsv",
+        "git_blob_sha": "0a4cf184b19f106ec6a16d5f5d244915c0d3c07f"
+      },
+      {
+        "path": "data/statement-cone-strict-deps.tsv",
+        "git_blob_sha": "c18530a587097564015ebda0da7cfae93f405a3b"
+      },
+      {
+        "path": "data/directories.tsv",
+        "git_blob_sha": "f0fe9cdfbbbdde9a951bf255d630a38c11f50380"
+      },
+      {
+        "path": "docs/dataset.md",
+        "git_blob_sha": "cff9f30bacf1b7afcbb6dd01cdc9ecebd7fc368c"
+      },
+      {
+        "path": "docs/method.md",
+        "git_blob_sha": "4599f69feb8dfa3f0ca4d7253e038868ded8fe3b"
+      },
+      {
+        "path": "NOTICE",
+        "git_blob_sha": "8d74222278154b7e1ab9f0eefeb43565059710f1"
+      }
+    ]
+  },
+  "proof_identity": {
+    "source_archive": "Alpöge's Lean RH/GRH formalization as exported by the upstream dependency study; proof source not copied here",
+    "theorem_roots": [
+      "riemannHypothesis",
+      "riemannZeta_eq_zero_re",
+      "LFunction_ne_zero_of_half_lt_re",
+      "LFunction_eq_zero_re",
+      "LFunction_eq_zero_re_of_isPrimitive"
+    ],
+    "scope": "Riemann Hypothesis plus GRH for Dirichlet L-functions; do not generalize to arbitrary L-function families"
+  },
+  "method_summary": {
+    "basis": "Lean kernel export (lean4export) direct constant references from declaration type/value and recursor rules; inductive blocks included",
+    "cross_check": "Upstream reports byte-identical reference/range results from three independently built compiled .olean environments",
+    "closure_semantics": "A constant is in the closure if referenced directly or transitively by the kernel proof term; this is a syntactic/formal dependency definition, not a mathematical-essentiality judgment",
+    "caveats": [
+      "Some unused declarations may still be required to compile because notation, tactics, simp lemmas and instances can leave no kernel-term reference.",
+      "Dominator relationships are graph-theoretic reachability facts, not a proof explanation or measure of mathematical importance.",
+      "Text labels such as 'known theorem' or 'crux' copied from external blueprint documents are not mathematically adjudicated gold labels.",
+      "The statement cone and the full proof dependency closure are different graphs."
+    ]
+  },
+  "summary": {
+    "files_total": 175187,
+    "source_lines_total": 17374215,
+    "lines_inside_used_declarations": 10737728,
+    "lines_inside_used_declarations_percent": 61.8,
+    "files_with_used_declaration": 146287,
+    "project_declarations_total": 1061400,
+    "project_declarations_used": 804912,
+    "project_declarations_used_percent": 75.8,
+    "kernel_constants_in_five_theorem_closure": 1484729,
+    "direct_reference_edges_in_kernel_export": 160315873,
+    "mathlib_constants_used": 204488,
+    "lean_core_constants_used": 9796,
+    "batteries_constants_used": 258,
+    "aesop_constants_used": 3
+  },
+  "per_theorem": [
+    {
+      "theorem": "riemannHypothesis",
+      "kernel_constants": 1484705,
+      "project_constants": 1270161,
+      "mathlib_constants": 204487,
+      "core_constants": 9796,
+      "batteries_constants": 258,
+      "aesop_constants": 3,
+      "project_declarations": 804891
+    },
+    {
+      "theorem": "riemannZeta_eq_zero_re",
+      "kernel_constants": 1484707,
+      "project_constants": 1270163,
+      "mathlib_constants": 204487,
+      "core_constants": 9796,
+      "batteries_constants": 258,
+      "aesop_constants": 3,
+      "project_declarations": 804892
+    },
+    {
+      "theorem": "LFunction_ne_zero_of_half_lt_re",
+      "kernel_constants": 1484697,
+      "project_constants": 1270158,
+      "mathlib_constants": 204482,
+      "core_constants": 9796,
+      "batteries_constants": 258,
+      "aesop_constants": 3,
+      "project_declarations": 804889
+    },
+    {
+      "theorem": "LFunction_eq_zero_re",
+      "kernel_constants": 1484710,
+      "project_constants": 1270169,
+      "mathlib_constants": 204484,
+      "core_constants": 9796,
+      "batteries_constants": 258,
+      "aesop_constants": 3,
+      "project_declarations": 804899
+    },
+    {
+      "theorem": "LFunction_eq_zero_re_of_isPrimitive",
+      "kernel_constants": 1484700,
+      "project_constants": 1270161,
+      "mathlib_constants": 204482,
+      "core_constants": 9796,
+      "batteries_constants": 258,
+      "aesop_constants": 3,
+      "project_declarations": 804892
+    }
+  ],
+  "dominator_spine": [
+    {
+      "rank": 1,
+      "name": "allChi",
+      "file": "src/Supplements/Kernels/MainTheorems.lean",
+      "line": 7,
+      "depth": 1,
+      "idom": "(root: the five theorems)",
+      "sub_decls": 886156,
+      "sub_lines": 10737526,
+      "children": 1
+    },
+    {
+      "rank": 2,
+      "name": "UpperTheory.FinalTheorems.everyCharacter",
+      "file": "src/Development/AutomorphicArithmetic/CharacterBoxes/MainConclusion.lean",
+      "line": 10,
+      "depth": 2,
+      "idom": "allChi",
+      "sub_decls": 886155,
+      "sub_lines": 10737525,
+      "children": 53864
+    },
+    {
+      "rank": 3,
+      "name": "UpperTheory.FinalTheorems.everyCharacter_of_row",
+      "file": "src/Development/AutomorphicArithmetic/CharacterBoxes/MainConclusion.lean",
+      "line": 7,
+      "depth": 3,
+      "idom": "UpperTheory.FinalTheorems.everyCharacter",
+      "sub_decls": 670692,
+      "sub_lines": 8308005,
+      "children": 7031
+    },
+    {
+      "rank": 4,
+      "name": "UpperTheory.LiteratureTheorems.every_character_of_literature_of_vWin",
+      "file": "src/Development/AutomorphicArithmetic/ThetaCorrespondence/ThetaPairLifts/ThirdPlaceSeries/EveryCharacterOfLiteratureOfVWin.lean",
+      "line": 810,
+      "depth": 4,
+      "idom": "UpperTheory.FinalTheorems.everyCharacter_of_row",
+      "sub_decls": 587596,
+      "sub_lines": 7172414,
+      "children": 43774
+    },
+    {
+      "rank": 5,
+      "name": "UpperTheory.Lit.every_character_of_theta_integrals_local_matching",
+      "file": "src/Development/AutomorphicArithmetic/ThetaCorrespondence/ThetaPairLifts/ThirdPlaceSeries/SiegelEisensteinSecondTermHypotheses.lean",
+      "line": 69,
+      "depth": 5,
+      "idom": "UpperTheory.LiteratureTheorems.every_character_of_literature_of_vWin",
+      "sub_decls": 366417,
+      "sub_lines": 4245419,
+      "children": 15560
+    },
+    {
+      "rank": 6,
+      "name": "UpperTheory.Lit.nonempty_hyps_definite_side_of_closed_bound",
+      "file": "src/Development/AutomorphicArithmetic/ThetaCorrespondence/ThetaPairLifts/ThirdPlaceSeries/SiegelEisensteinSecondTermHypotheses.lean",
+      "line": 44,
+      "depth": 6,
+      "idom": "UpperTheory.Lit.every_character_of_theta_integrals_local_matching",
+      "sub_decls": 305572,
+      "sub_lines": 3576707,
+      "children": 43368
+    },
+    {
+      "rank": 7,
+      "name": "GlobalTheory.Fc.S0.StageU.hypotheses_nonempty_of_unramified_exponents_alt",
+      "file": "src/Development/AutomorphicArithmetic/ThetaCorrespondence/ThetaPairLifts/ThirdPlaceSeries/HypothesesNonemptyOfUnramifiedExponents.lean",
+      "line": 41,
+      "depth": 7,
+      "idom": "UpperTheory.Lit.nonempty_hyps_definite_side_of_closed_bound",
+      "sub_decls": 102963,
+      "sub_lines": 1217085,
+      "children": 4216
+    },
+    {
+      "rank": 8,
+      "name": "UpperTheory.One.vwin_of_row",
+      "file": "src/Development/AutomorphicArithmetic/AutomorphicVarieties/ModularityArgument/ThresholdArguments/DenseThresholdCases/VwinOfRow.lean",
+      "line": 4,
+      "depth": 4,
+      "idom": "UpperTheory.FinalTheorems.everyCharacter_of_row",
+      "sub_decls": 61730,
+      "sub_lines": 914524,
+      "children": 3
+    },
+    {
+      "rank": 9,
+      "name": "UpperTheory.One.Join.automorphic_window_of_inputs",
+      "file": "src/Development/AutomorphicArithmetic/AutomorphicVarieties/ModularityArgument/ThresholdArguments/DenseThresholdCases/TopMainZj.lean",
+      "line": 71,
+      "depth": 5,
+      "idom": "UpperTheory.One.vwin_of_row",
+      "sub_decls": 61727,
+      "sub_lines": 914517,
+      "children": 31
+    },
+    {
+      "rank": 10,
+      "name": "UpperTheory.Gal.Int.galoisLocalGlobalStrong_recParameter",
+      "file": "src/Development/AutomorphicArithmetic/Foundations/GaloisRepresentations/IntegralStructures/RowSrc.lean",
+      "line": 6,
+      "depth": 3,
+      "idom": "UpperTheory.FinalTheorems.everyCharacter",
+      "sub_decls": 64176,
+      "sub_lines": 689213,
+      "children": 24
+    },
+    {
+      "rank": 11,
+      "name": "UpperTheory.Gal.Int.galoisRepresentations_of_thetaLift",
+      "file": "src/Development/AutomorphicArithmetic/Foundations/GaloisRepresentations/IntegralStructures/GaloisRepresentationsOfThetaLift.lean",
+      "line": 6,
+      "depth": 4,
+      "idom": "UpperTheory.Gal.Int.galoisLocalGlobalStrong_recParameter",
+      "sub_decls": 61003,
+      "sub_lines": 648197,
+      "children": 94
+    },
+    {
+      "rank": 12,
+      "name": "UpperTheory.Gal.Int.Geo.geoOne_holds",
+      "file": "src/Development/AutomorphicArithmetic/Foundations/GaloisRepresentations/IntegralStructures/GeometricFlagBases/WeightOneGeometricRealization.lean",
+      "line": 11,
+      "depth": 5,
+      "idom": "UpperTheory.Gal.Int.galoisRepresentations_of_thetaLift",
+      "sub_decls": 54856,
+      "sub_lines": 568278,
+      "children": 145
+    },
+    {
+      "rank": 13,
+      "name": "SelfIntersectionVolumeEstimates.topCovolSlim2_use_alt_alt",
+      "file": "src/Development/AutomorphicArithmetic/ThetaCorrespondence/ThetaPairLifts/ThirdPlaceSeries/TopCovolSlim2Use.lean",
+      "line": 15,
+      "depth": 5,
+      "idom": "UpperTheory.LiteratureTheorems.every_character_of_literature_of_vWin",
+      "sub_decls": 58036,
+      "sub_lines": 824935,
+      "children": 3021
+    },
+    {
+      "rank": 14,
+      "name": "PositivityTheory.HtPt.Ah.deep_slim_use",
+      "file": "src/Development/WeilBound/CoreStatements/AutomorphicKernels/MoriwakiBigness/HilbertSamuelApplications/AhSlimU.lean",
+      "line": 9,
+      "depth": 6,
+      "idom": "SelfIntersectionVolumeEstimates.topCovolSlim2_use_alt_alt",
+      "sub_decls": 33095,
+      "sub_lines": 488348,
+      "children": 32
+    },
+    {
+      "rank": 15,
+      "name": "GlobalTheory.CompanionTheory.Ar.Plug.deepStR_of_use",
+      "file": "src/Development/WeilBound/CoreStatements/AutomorphicKernels/MoriwakiBigness/HilbertSamuelApplications/DeepStROfUse.lean",
+      "line": 12,
+      "depth": 7,
+      "idom": "PositivityTheory.HtPt.Ah.deep_slim_use",
+      "sub_decls": 32642,
+      "sub_lines": 482986,
+      "children": 2148
+    }
+  ],
+  "next_slice_candidates": [
+    {
+      "name": "UpperTheory.FinalTheorems.everyCharacter_of_row",
+      "why": "First high-fanout theorem under the common RH proof root; 8,308,005 descendant declaration-lines per upstream graph; needs mathematical role review"
+    },
+    {
+      "name": "UpperTheory.LiteratureTheorems.every_character_of_literature_of_vWin",
+      "why": "Large theta/automorphic branch; 7,172,414 descendant lines per upstream graph; needs identification of its mathematical lemma role"
+    },
+    {
+      "name": "UpperTheory.Lit.every_character_of_theta_integrals_local_matching",
+      "why": "Candidate theta-integral sub-branch; 4,245,419 descendant lines"
+    },
+    {
+      "name": "UpperTheory.Gal.Int.galoisLocalGlobalStrong_recParameter",
+      "why": "Separate Galois/local-global branch; 689,213 descendant lines"
+    }
+  ],
+  "symthaea_usage": {
+    "use_external_graph_as": "reference baseline / discovery map / candidate slice selector",
+    "do_not_call_it": "Symthaea's own extraction, mathematical explanation, or proof audit",
+    "local_extractor_focus": "four Mathlib pilot theorems first; compare a sample of Lean-native extracted edges against this external graph format before any RH-scale work",
+    "inequality_M": "The precise Lean declarations corresponding to Rubinstein's inequality (M) have not yet been identified. Leave this target unresolved; do not infer from the graph's largest dominators alone."
+  },
+  "limitations": [
+    "Only a small attributed metadata snapshot is reproduced in this fixture; no proof source and no large graph files are copied.",
+    "All dominant declarations listed are graph-prioritization candidates, not human-validated mathematical roles.",
+    "The external graph is not a replacement for the natural-language-to-Lean statement fidelity audit.",
+    "This metadata snapshot is tied to upstream v0.2.1 and must be refreshed only with explicit version and digest changes."
+  ]
+}
