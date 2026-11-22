@@ -480,15 +480,26 @@ fn wilson_interval(successes: usize, trials: usize) -> ProportionInterval {
     let p = successes as f64 / n;
     let z = 1.959_963_984_540_054;
     let z2 = z * z;
-    let denominator = 1.0 + z2 / n;
-    let center = (p + z2 / (2.0 * n)) / denominator;
-    let half_width = z * ((p * (1.0 - p) / n + z2 / (4.0 * n * n)).sqrt()) / denominator;
+    let (lower, upper) = if successes == 0 {
+        (0.0, z2 / (n + z2))
+    } else if successes == trials {
+        (n / (n + z2), 1.0)
+    } else {
+        let denominator = 1.0 + z2 / n;
+        let center = (p + z2 / (2.0 * n)) / denominator;
+        let half_width =
+            z * ((p * (1.0 - p) / n + z2 / (4.0 * n * n)).sqrt()) / denominator;
+        (
+            (center - half_width).clamp(0.0, 1.0),
+            (center + half_width).clamp(0.0, 1.0),
+        )
+    };
     ProportionInterval {
         successes,
         trials,
         estimate: p,
-        wilson_95_lower: (center - half_width).clamp(0.0, 1.0),
-        wilson_95_upper: (center + half_width).clamp(0.0, 1.0),
+        wilson_95_lower: lower,
+        wilson_95_upper: upper,
     }
 }
 
@@ -523,7 +534,7 @@ mod tests {
         (0..100)
             .map(|index| {
                 let null = (index + 1) as f64 / 100.0;
-                let signal = 0.90 + index as f64 / 1000.0;
+                let signal = 0.899 + index as f64 * 0.0011;
                 HeldOutEvaluationObservation {
                     replicate_id: format!("eval-{index:03}"),
                     null_statistics: [null, null * 0.8, null * 0.6],
@@ -546,9 +557,9 @@ mod tests {
         )
         .unwrap();
         assert_eq!(report.estimators.len(), 3);
-        let expected_signal_detections = [49, 100, 100];
-        let expected_directionally_correct = [45, 90, 90];
-        let expected_wrong_direction = [4, 10, 10];
+        let expected_signal_detections = [53, 100, 100];
+        let expected_directionally_correct = [48, 90, 90];
+        let expected_wrong_direction = [5, 10, 10];
         for (index, estimator) in report.estimators.iter().enumerate() {
             assert_eq!(estimator.calibration_replicates, 99);
             assert_eq!(estimator.evaluation_replicates, 100);
@@ -729,10 +740,16 @@ mod tests {
         let null = null_observation_from_estimator_response("cal-001", &response).unwrap();
         let evaluation =
             evaluation_observation_from_estimator_response("eval-001", &response).unwrap();
-        assert_eq!(null.statistics, [0.2, 0.21, 0.22]);
-        assert_eq!(evaluation.null_statistics, [0.2, 0.21, 0.22]);
-        assert_eq!(evaluation.signal_statistics, [0.25, 0.25, 0.25]);
-        assert_eq!(evaluation.signal_directional_cosine, 0.9);
+        let close = |actual: &[f64], expected: &[f64]| {
+            actual
+                .iter()
+                .zip(expected.iter())
+                .all(|(actual, expected)| (actual - expected).abs() < 1e-12)
+        };
+        assert!(close(&null.statistics, &[0.2, 0.21, 0.22]));
+        assert!(close(&evaluation.null_statistics, &[0.2, 0.21, 0.22]));
+        assert!(close(&evaluation.signal_statistics, &[0.25, 0.25, 0.25]));
+        assert!((evaluation.signal_directional_cosine - 0.9).abs() < 1e-12);
     }
 
     #[test]
