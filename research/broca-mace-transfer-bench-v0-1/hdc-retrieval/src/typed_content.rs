@@ -24,8 +24,9 @@ use super::{experience_view_digest, CandidateHit, RetrievalResult};
 
 const MIN_DIMENSION: usize = 256;
 const MAX_DIMENSION: usize = 262_144;
-const PROFILE_DOMAIN: &[u8] = b"luminous:mace:typed-content-hdc:v1\0";
+const PROFILE_DOMAIN: &[u8] = b"luminous:mace:typed-content-hdc:v1.1\0";
 const NUMERIC_KERNEL: &[u8] = b"rff-rbf-gaussian-v1";
+const PARTITION_POLICY: &[u8] = b"exact-scope-action-prefilter-v1";
 
 /// Versioned encoder configuration. Bandwidths are part of the profile digest
 /// because they determine the meaning of numeric similarity.
@@ -218,6 +219,8 @@ impl TypedContentIndexV1 {
         let per_candidate_bytes = vector_bytes(config.dimension)?
             .checked_add(size_of::<u32>() as u64)
             .and_then(|value| value.checked_add(32))
+            .and_then(|value| value.checked_add(size_of::<Scope>() as u64))
+            .and_then(|value| value.checked_add(size_of::<Action>() as u64))
             .ok_or(TypedContentError::DimensionOutOfRange {
                 actual: config.dimension,
             })?;
@@ -826,6 +829,7 @@ fn profile_digest(config: TypedContentConfigV1) -> String {
     hasher.update((config.dimension as u64).to_be_bytes());
     hasher.update(config.seed.to_be_bytes());
     hasher.update(NUMERIC_KERNEL);
+    hasher.update(PARTITION_POLICY);
     hasher.update(config.utility_bandwidth.to_bits().to_be_bytes());
     hasher.update(config.measurement_error_bandwidth.to_bits().to_be_bytes());
     hasher.update(config.propensity_bandwidth.to_bits().to_be_bytes());
@@ -999,7 +1003,7 @@ mod tests {
     }
 
     #[test]
-    fn profile_digest_binds_dimension_seed_and_numeric_bandwidths() {
+    fn profile_digest_binds_dimension_seed_kernel_bandwidth_and_filter_policy() {
         let base = TypedContentConfigV1::default();
         let base_digest = profile_digest(base);
         assert_ne!(
@@ -1014,6 +1018,8 @@ mod tests {
             base_digest,
             profile_digest(TypedContentConfigV1 { utility_bandwidth: 0.2, ..base })
         );
+        assert!(PROFILE_DOMAIN.ends_with(b"v1.1\\0"));
+        assert!(!PARTITION_POLICY.is_empty());
     }
 
     #[test]
