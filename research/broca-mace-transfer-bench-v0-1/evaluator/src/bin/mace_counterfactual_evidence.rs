@@ -1183,6 +1183,62 @@ mod tests {
     }
 
     #[test]
+    fn typed_content_hdc_resolves_only_canonical_in_scope_hits() {
+        let case = generated_worlds(1).remove(0);
+        let typed = run_candidate(
+            CandidateMode::TypedContentHdc,
+            case.query,
+            case.decision_need,
+            &case.memory,
+        )
+        .unwrap();
+
+        assert!(typed.retrieval_profile_sha256.is_some());
+        assert!(typed.index_bytes > 0);
+        assert!(typed.retrieved_event_ids.len() <= TYPED_HDC_TOP_K * 2);
+        assert!(typed.retrieved_event_ids.iter().all(|event_id| {
+            case.memory.iter().any(|item| {
+                item.event_id == *event_id
+                    && item.scope == case.query.scope
+                    && case.decision_need.action_alternatives.contains(&item.action)
+            })
+        }));
+        assert!(typed.decision.evidence_ids.iter().all(|event_id| {
+            typed.retrieved_event_ids.contains(event_id)
+        }));
+    }
+
+    #[test]
+    fn typed_content_hdc_retrieval_is_recomputed_after_root_knockout() {
+        let case = generated_worlds(1).remove(0);
+        let full = run_candidate(
+            CandidateMode::TypedContentHdc,
+            case.query,
+            case.decision_need,
+            &case.memory,
+        )
+        .unwrap();
+        let index = EvidenceDependencyIndex::build(&case.memory).unwrap();
+        let first_root = index.root_groups().next().unwrap().1;
+        let retained = index.retain_without(&first_root);
+        let reduced = run_candidate(
+            CandidateMode::TypedContentHdc,
+            case.query,
+            case.decision_need,
+            &retained,
+        )
+        .unwrap();
+
+        assert_ne!(full.evidence_sha256, reduced.evidence_sha256);
+        assert!(reduced.retrieved_event_ids.iter().all(|event_id| {
+            retained.iter().any(|item| item.event_id == *event_id)
+        }));
+        assert!(reduced.retrieved_event_ids.iter().all(|event_id| {
+            !first_root.contains(event_id)
+        }));
+    }
+
+    #[test]
     fn no_memory_outside_option_is_not_action_b_payoff() {
         let truth = mace_generated_stress::Truth {
             utility_a: 0.1,
