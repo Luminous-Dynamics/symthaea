@@ -161,6 +161,30 @@ fn portrait_from_json(v: &Value) -> Option<String> {
     Some(format!("data:image/svg+xml;base64,{encoded}"))
 }
 
+/// Deterministic reconnect backoff: 1s, 2s, 4s, 8s, 16s, then 30s.
+fn telemetry_retry_delay_ms(attempt: u32) -> u32 {
+    1_000_u32
+        .saturating_mul(1_u32 << attempt.min(5))
+        .min(30_000)
+}
+
+#[cfg(test)]
+mod telemetry_retry_tests {
+    use super::telemetry_retry_delay_ms;
+
+    #[test]
+    fn reconnect_backoff_doubles_and_caps_at_thirty_seconds() {
+        assert_eq!(telemetry_retry_delay_ms(0), 1_000);
+        assert_eq!(telemetry_retry_delay_ms(1), 2_000);
+        assert_eq!(telemetry_retry_delay_ms(2), 4_000);
+        assert_eq!(telemetry_retry_delay_ms(3), 8_000);
+        assert_eq!(telemetry_retry_delay_ms(4), 16_000);
+        assert_eq!(telemetry_retry_delay_ms(5), 30_000);
+        assert_eq!(telemetry_retry_delay_ms(6), 30_000);
+        assert_eq!(telemetry_retry_delay_ms(u32::MAX), 30_000);
+    }
+}
+
 #[component]
 pub fn App() -> impl IntoView {
     let gateway = RwSignal::new(DEFAULT_GATEWAY.to_string());
@@ -182,27 +206,45 @@ pub fn App() -> impl IntoView {
     let movie_frame = RwSignal::new(0_usize);
     let movie_canvas = NodeRef::<leptos::html::Canvas>::new();
 
-    // Open the telemetry stream once, on mount, against whatever gateway
-    // URL is set at that moment. Reconnecting on URL change is a v1 nicety
-    // — not required for the wiring to be real and useful today.
+    // Keep one telemetry stream alive. Connection state is reported only
+    // after WebSocket::open succeeds; ended streams retry with capped
+    // exponential backoff. A changed gateway URL is picked up on the next
+    // attempt, without opening a second socket alongside the existing one.
     Effect::new(move |_| {
-        let gw = gateway.get_untracked();
         ws_connected.set(false);
         spawn_local(async move {
-            ws_connected.set(true);
-            api::stream_telemetry(&gw, move |payload| {
-                vitals.set(Vitals::from_json(&payload));
-                telemetry_count.update(|n| *n += 1);
-                if let Some(svg) = portrait_from_json(&payload) {
-                    portrait.set(Some(svg));
-                }
-                if let Some(m) = Movie::from_json(&payload) {
-                    movie.set(Some(m));
-                    movie_frame.set(0);
-                }
-            })
-            .await;
-            ws_connected.set(false);
+            let retry_attempt = std::rc::Rc::new(std::cell::Cell::new(0_u32));
+            loop {
+                let gw = gateway.get_untracked();
+                let retry_attempt_on_connect = std::rc::Rc::clone(&retry_attempt);
+                api::stream_telemetry(
+                    &gw,
+                    move |payload| {
+                        vitals.set(Vitals::from_json(&payload));
+                        telemetry_count.update(|n| *n += 1);
+                        if let Some(svg) = portrait_from_json(&payload) {
+                            portrait.set(Some(svg));
+                        }
+                        if let Some(m) = Movie::from_json(&payload) {
+                            movie.set(Some(m));
+                            movie_frame.set(0);
+                        }
+                    },
+                    move |connected| {
+                        ws_connected.set(connected);
+                        if connected {
+                            retry_attempt_on_connect.set(0);
+                        }
+                    },
+                )
+                .await;
+
+                ws_connected.set(false);
+                let attempt = retry_attempt.get();
+                let delay_ms = telemetry_retry_delay_ms(attempt);
+                retry_attempt.set(attempt.saturating_add(1));
+                gloo_timers::future::TimeoutFuture::new(delay_ms).await;
+            }
         });
     });
 
