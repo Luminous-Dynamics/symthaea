@@ -1212,24 +1212,8 @@ mod tests {
     fn two_candidates_cannot_claim_the_same_tip_contact() {
         let model = fixture_model(0.25);
         let first = tip_to_side_candidate(&model, 17, 0.25);
-        let mut second = tip_to_side_candidate(&model, 18, 0.25);
-        second.fusion.target_filament_id = 1;
-        second.fusion.target_t = 0.5;
-        let target = model.filaments.iter().find(|value| value.id == 1).unwrap();
-        let target_point = bezier_point(target, 0.5);
-        let source = model.filaments.iter().find(|value| value.id == 2).unwrap();
-        second.fusion.junction_position = source
-            .end
-            .add(target_point)
-            .scale(0.5);
-        second.contact_distance = point_distance(source.end, target_point);
-        let mut invalid = second.clone();
-        invalid.fusion.source_filament_id = first.fusion.source_filament_id;
-        invalid.fusion.source_t = first.fusion.source_t;
-        invalid.fusion.target_filament_id = first.fusion.target_filament_id;
-        invalid.fusion.target_t = first.fusion.target_t;
-        invalid.fusion.junction_position = first.fusion.junction_position;
-        invalid.contact_distance = first.contact_distance;
+        let mut invalid = first.clone();
+        invalid.fusion.id = 18;
         let result = build_mycelial_contact_filtration(
             &model,
             &[first, invalid],
