@@ -43,6 +43,8 @@ The protocol also treats the evaluation instrument as part of the experimental s
 
 ## Threat model and limitations
 
+The byte-level guarantees in v1 are deliberately scoped. The evaluator recomputes SHA-256 over the three raw JSON documents and verifies the cross-document links. Audio, prompt, generator configuration, rights receipt, protocol, judge response and external cohort/estimator digest fields are currently validated as 64-character digest references; this crate does not open those underlying assets or receipts and recompute their hashes. Likewise, timestamp strings are syntax/order checked, not validated against a trusted timestamp authority. The workflow evidence bundle preserves the exact JSON inputs, source files, resolved Cargo.lock and known-answer report, with a SHA-256 manifest for those run artifacts.
+
 The validator can check file hashes, identity equality, candidate/pair coverage, seed commitments, swapped-order conformance, response digests, and declared timestamp ordering. It cannot prove that a judge process never accessed a separate copy of the human labels, that audio was actually played, that a human heard it, or that a timestamp receipt is authentic. The current receipt fields are digest references only. Timestamp strings are declared metadata.
 
 Production qualification therefore requires:
