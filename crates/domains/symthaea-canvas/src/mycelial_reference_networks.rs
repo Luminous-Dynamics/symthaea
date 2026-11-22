@@ -351,6 +351,12 @@ pub fn build_euclidean_minimum_spanning_tree(
                 .then_with(|| left.1.total_cmp(&right.1))
         });
     }
+    // Re-sum in canonical output order so the receipt's quantized cost is
+    // independent of the Prim visitation order and matches its own validator.
+    total_cost = selected_edges
+        .iter()
+        .map(|edge| edge.euclidean_length_model_units)
+        .sum();
 
     let connected_components = if count > 0 { 1 } else { 0 };
     if selected_edges.len() != count.saturating_sub(connected_components) {
@@ -1443,6 +1449,35 @@ mod tests {
             first.root_directed_geometric_efficiency.mean_directness,
             second.root_directed_geometric_efficiency.mean_directness
         );
+        assert_eq!(
+            first.canonical_digest_hex().unwrap(),
+            second.canonical_digest_hex().unwrap()
+        );
+    }
+
+    #[test]
+    fn euclidean_mst_receipt_detects_edge_mutation_and_roundtrips() {
+        let graph = build_mycelial_junction_hypha_graph(
+            &fixture_model(),
+            &[],
+            MycelialJunctionGraphConfig::default(),
+        )
+        .unwrap();
+        let report = build_euclidean_minimum_spanning_tree(
+            &graph,
+            &["origin:1".to_string()],
+            SpatialReferenceDimensionality::ThreeD,
+        )
+        .unwrap();
+        let digest = report.canonical_digest_hex().unwrap();
+        let bytes = serde_json::to_vec(&report).unwrap();
+        let restored: MycelialEuclideanMstReport = serde_json::from_slice(&bytes).unwrap();
+        restored.validate().unwrap();
+        assert_eq!(restored.canonical_digest_hex().unwrap(), digest);
+        let mut tampered = restored;
+        tampered.selected_edges[0].euclidean_length_model_units += 0.1;
+        assert!(tampered.validate().is_err());
+        assert!(tampered.canonical_digest_hex().is_err());
     }
 
     #[test]
