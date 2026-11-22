@@ -34,6 +34,7 @@ cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_estimator_tour
 cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_estimator_dose_response_tournament
 cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_common_mode_nuisance_sweep
 cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_spatial_nuisance
+cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_spatial_variance_calibration
 ```
 
 The first example outputs a JSON report conforming to `injection-recovery.schema.json`. The sweep example evaluates loading increments `[0.0, 0.10, 0.20, 0.30, 0.40]` with common random numbers and outputs `injection-recovery-sweep.schema.json`. It estimates:
@@ -165,3 +166,22 @@ cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_spatial_nuisan
 ```
 
 The output contract is `spatial-nuisance-field.schema.json`. It records the exact ROI labels, weighted edges, per-family rank/diffusion parameters, target coupling, deterministic RNG algorithm/seed, realised field RMS and realised temporal autocorrelation so the field can be reconstructed from the archived report. Its path-graph fixture is a toy topology, not an anatomical atlas. The current `dose` parameter is an additive loading, not a calibrated nuisance variance fraction. The module generates nuisance fields only; it does not perform preprocessing, estimate connectivity, determine causality, or qualify biological claims. The spatial simulator must still be crossed with the four matched counterfactual cells and calibrated against empirical acquisition data before any biological robustness claim is supported.
+
+
+## Spatial nuisance variance calibration
+
+The spatial generator's additive loading is useful for defining a deterministic field, but it is not comparable across different graph ranks, diffusion scales, seed sets, or ROI geometries. The separate `spatial_calibration` module calibrates an already generated field against clean observations to a requested component-variance fraction:
+
+```
+Var(A) / (Var(X) + Var(A))
+```
+
+where X is the clean time-series data and A is the generated nuisance field. Variance is centred within each ROI before pooling across ROIs. The report separately records Cov(X,A), the covariance contribution to the total, and Var(X+A). This avoids hiding temporal alignment inside a nominal nuisance percentage.
+
+Run the deterministic calibration fixture:
+
+```sh
+cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_spatial_variance_calibration
+```
+
+The report contract is `spatial-variance-calibration.schema.json`. This calibrates synthetic field magnitude; it does not establish an empirical artifact distribution, and it cannot identify a latent change from an observationally equivalent nuisance source.
