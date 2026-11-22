@@ -711,3 +711,56 @@ References:
 
 The branch is source-authored and statically inspected, not compiled. No frontier metric, EVSI gain, empirical utility lift or SOTA result is claimed yet.
 
+
+
+## 16. Frontier runner implementation and active-acquisition fixture (2026-11-23)
+
+### Frontier sweep dimensions
+
+The new \`mace_sufficiency_frontier\` runner emits three separate JSONL streams:
+- candidate-only decisions;
+- evaluator-only regret/Pareto scores;
+- an evidence-acquisition EVSI policy fixture.
+
+The generated stress fixture defines 21 scenarios per independent world cluster. The frontier evaluates 18 points per scenario: no-memory, full-scope reference, and four retrieval/control arms at four per-action budgets. At the default 64 clusters, the expected output is 24,192 candidate rows and 24,192 evaluator rows, plus four EVSI fixture rows. This is a code-derived expected count, not an executed-run result.
+
+The event-ID arm is intentionally named an **ordered control**, not a key/value retrieval system: it ranks by deterministic event ID and does not implement a separately retained KV store. The HDC arms remain typed candidate indexes, not natural-language retrievers. BM25, dense and hybrid retrieval are not fabricated by tokenizing \`Experience\`; they require the raw-session adapter.
+
+The Pareto filter is an exact within-world non-dominance check over four dimensions: selected struct-byte lower bound, index-payload-byte lower bound, measured index-build plus candidate-selection/decision latency, and evaluator absolute regret. It is not an aggregate statistical frontier across independent worlds. The latter requires cluster-level paired aggregation/bootstrapping and is a subsequent increment.
+
+### EVSI core and policy boundary
+
+The finite-state EVSI core validates:
+- prior probabilities sum to one;
+- query observation likelihoods are finite, normalized per hypothesis and have consistent dimensions;
+- action-loss inputs and all cost components are finite and non-negative;
+- query IDs and outcome IDs are unique;
+- the observation-model digest is canonical lowercase SHA-256.
+
+For every query it computes prior Bayes decision risk, expected posterior Bayes risk, expected risk reduction, acquisition cost, delay cost, approved-disclosure exposure cost and net EVSI. It ranks only admissible positive-net-EVSI queries. When no query qualifies, the output is \`stop_or_abstain\`.
+
+The query carries upstream gate results for source authorization, exact scope validity, privacy approval and deadline feasibility. This module does not authenticate those booleans or issue authority; a real adapter must obtain them from the appropriate verifier/policy service. Rights/privacy prohibition is never converted into an EVSI penalty. The disclosure-exposure cost only describes a burden after the separate privacy-approval gate has passed. All scalar costs must be calibrated into the same explicit decision-loss unit; this module does not invent conversions between dollars, seconds, privacy and utility.
+
+The current fixture has two equally likely hypotheses, one decision-relevant measurement, one high-entropy but decision-irrelevant signal, and one unauthorized perfect measurement. It demonstrates policy mechanics only. No observation is executed, no source is contacted, no receipt is obtained, and no empirical agent improvement is claimed.
+
+### Reproduction and provenance
+
+\`\`\`text
+cargo run --manifest-path research/broca-mace-transfer-bench-v0-1/evaluator/Cargo.toml --bin mace_sufficiency_frontier -- 64 candidate.jsonl evaluator.jsonl 557... 0.01 acquisition.jsonl
+\`\`\`
+
+The run identity binds the runner source, generated fixture, policy and retrieval implementation sources, both JSON Schemas, arguments and optional \`MACE_SOURCE_REVISION\`. Candidate and evaluator streams remain separate. The candidate stream excludes scenario-family labels and evaluator utilities; the evaluator stream records the world cluster and hidden scores. Evaluator custody is nevertheless co-located in the same binary and repository, so this is still diagnostic rather than independent evaluation.
+
+### Comparator interpretation and claim boundary
+
+Current external paradigm arms to reproduce:
+- **MRAgent** dynamically explores and prunes associative memory paths during reasoning, reporting up to 23% gains on its LoCoMo/LongMemEval protocol. It is a direct comparator for active reconstruction, not an EVSI or causal-authority result. https://proceedings.mlr.press/v306/ji26d.html
+- **MemoPilot** learns memory updates over a frozen player using multi-turn GRPO, reporting 1762 Elo on Limit Texas Hold'em and 1590 on Rock-Paper-Scissors. Those game-specific Elo values are not comparable to MACE regret or AML track scores. https://proceedings.mlr.press/v306/cai26b.html
+- **Darwinian Memory** uses utility-driven pruning in GUI-agent trajectories, reporting average gains of 18.0% in task success and 33.9% in execution stability in its own multi-app protocol. MACE should reproduce it as a governed pruning comparator and add anti-poisoning, lifecycle and worst-family gates. https://proceedings.mlr.press/v306/mi26b.html
+
+The research opportunity is to combine active reconstruction, learned consolidation, utility-aware pruning and receipt-governed evidence eligibility without letting the memory learner certify its own sources or labels. We must reproduce each competitor under its native protocol before building any common matched-budget comparison.
+
+### Current verification
+
+Three frontier unit tests and four EVSI unit tests are authored. They have not been run. No Cargo, rustc, rustfmt or Nix toolchain is available in the authoring environment. JSON Schema files parse as JSON, but independent schema validation, build, test, formatting and deterministic execution remain pending. All results remain unexecuted source work; no SOTA, benchmark, safety or empirical utility claim is made.
+
