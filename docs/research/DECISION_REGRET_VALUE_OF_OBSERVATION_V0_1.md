@@ -25,12 +25,12 @@ The new complementary output is the robust worst-case regret envelope over the c
 
 Let:
 
-- (W) be an already-qualified observational equivalence class;
-- (A) be its common admissible action set;
-- (L(w,a)) be evaluator-owned loss;
-- (r(w,a)=L(w,a)-\min_{a'\in A}L(w,a')) be per-world regret;
-- (t_d) be the frozen decision deadline;
-- (Y(w)) be the complete set of candidate-visible outcomes possible in world (w) by (t_d).
+- \(W\) be an already-qualified observational equivalence class;
+- \(A\) be its common admissible action set;
+- \(L(w,a)\) be evaluator-owned loss;
+- \(r(w,a)=L(w,a)-\min_{a'\in A}L(w,a')\) be per-world regret;
+- \(t_d\) be the frozen decision deadline;
+- \(Y(w)\) be the complete set of candidate-visible outcomes possible in world \(w\) by \(t_d\).
 
 The baseline deterministic minimax-regret floor is:
 
@@ -38,7 +38,7 @@ The baseline deterministic minimax-regret floor is:
 R(W)=\min_{a\in A}\max_{w\in W}r(w,a)
 \]
 
-For each candidate-visible outcome (y), define its compatible hidden-world set:
+For each candidate-visible outcome \(y\), define its compatible hidden-world set:
 
 \[
 W_y=\{w\in W:y\in Y(w)\}
@@ -58,13 +58,35 @@ VOI_{robust}=R(W)-R_{post}^{robust}
 
 This is a worst-case support bound, not an expectation. Every outcome with nonzero possibility remains in the maximum, however small its probability.
 
+### Epsilon-regret information-set sufficiency
+
+Exact common optimality can be unnecessarily strict. A task may permit one action to be slightly suboptimal in every plausible world while still meeting its declared decision-quality tolerance.
+
+Let \(\epsilon\) be a task-declared maximum acceptable worst-case regret, expressed in the same normalized PPM loss scale. An information set is epsilon-regret sufficient when:
+
+\[
+R(W)\le\epsilon
+\]
+
+Equivalently, there exists at least one deterministic common action whose regret is no greater than epsilon in every world still consistent with that information set.
+
+After observation, the information set is robustly epsilon-sufficient only when **every** possible candidate-visible result leaves a compatible world set satisfying:
+
+\[
+\max_y R(W_y)\le\epsilon
+\]
+
+The report therefore separates exact decision-identifiability (#13152's common optimal action) from epsilon-regret sufficiency. A result can be decision-nonidentifiable yet epsilon-sufficient. The epsilon threshold must be frozen in the task contract before evaluation; it cannot be selected after observing results.
+
+This is an information-set property, not a certification that the candidate actually selected the minimax-regret action. Candidate-specific avoidable regret remains separately measured by #13152. Epsilon-sufficiency is also not safety, legal, rights, or authority approval: those remain independent non-compensatory gates.
+
 ## 3. Outcome and deadline semantics
 
 An outcome identity comprises the candidate-visible transcript digest and the time the complete result becomes accessible to the candidate policy. The availability timestamp is also a separate key component, so the evaluator will not silently merge outcomes that differ in decision-time freshness.
 
 Availability includes acquisition, transport, queueing and preprocessing. It is not merely the sensor's event time or first-byte arrival.
 
-A result available exactly at (t_d) is on time. A result strictly after (t_d), or no result, maps to one candidate-visible `no_result_by_deadline` outcome. A missing/error status that is actually delivered before the deadline is an ordinary visible result with its own transcript digest.
+A result available exactly at \(t_d\) is on time. A result strictly after \(t_d\), or no result, maps to one candidate-visible `no_result_by_deadline` outcome. A missing/error status that is actually delivered before the deadline is an ordinary visible result with its own transcript digest.
 
 Repeated latent rows that map to the same visible digest and availability timestamp are deduplicated. All worlds must have at least one declared possible outcome.
 
@@ -79,18 +101,18 @@ This module accepts no probabilities or priors. The likelihoods, posterior norma
 ## 5. Outputs
 
 The evaluator reports:
-- baseline deterministic minimax-regret floor;
-- worst post-observation minimax-regret floor across all possible visible outcomes;
+- baseline deterministic minimax-regret floor and epsilon-sufficiency status;
+- worst post-observation minimax-regret floor and robust epsilon-sufficiency status across all possible visible outcomes;
+- the frozen task regret tolerance;
 - guaranteed robust regret reduction;
-- per-outcome possible-world count;
-- per-outcome minimax-regret-optimal action and regret floor;
+- per-outcome possible-world count, minimax-regret-optimal action, regret floor and epsilon-sufficiency status;
 - visible transcript digest and availability timestamp, or the no-result class.
 
 The outcome-specific actions and hidden-world sets are evaluator-only. They must never be included in candidate-visible payloads or used as policy hints.
 
 ## 6. Adversarial controls
 
-Eleven Rust unit tests are authored for:
+Thirteen Rust unit tests are authored for:
 1. a perfect on-time observation removing decision-relevant ambiguity;
 2. a noisy full-support observation providing no worst-case guarantee;
 3. decision-irrelevant hidden variation;
@@ -101,15 +123,17 @@ Eleven Rust unit tests are authored for:
 8. distinct availability times remaining distinct outcome keys;
 9. unknown world IDs being rejected;
 10. worlds without declared possible outcomes being rejected;
-11. empty sensor, support-evidence and delivered-transcript commitments being rejected.
+11. near-optimal common action accepted by a frozen epsilon-regret tolerance even without a common exact optimum;
+12. out-of-range epsilon thresholds being rejected;
+13. empty sensor, support-evidence and delivered-transcript commitments being rejected.
 
-The machine-readable fixture supplies hand-calculated perfect, noisy/full-support, irrelevant and late-result cases.
+The machine-readable fixture supplies hand-calculated perfect, noisy/full-support, irrelevant, late-result and epsilon-sufficient cases.
 
 ## 7. Experimental integration
 
 Use the existing owners rather than adding another policy or benchmark:
 - #9563 supplies the active-sensing policy arms and temporal observability controls.
-- #13152 supplies the base deterministic minimax-regret certificate.
+- #13152 supplies the base deterministic minimax-regret certificate and candidate-specific regret.
 - #12567/#12551 supply noisy/delayed outcome integrity, posterior consistency and expected posterior Bayes-risk/VoI evaluation.
 - #9954 owns the common event-time/availability-time temporal benchmark contract, source splits, baseline registry and multi-axis result receipts.
 - #9666/#13176 own matched vector-budget joint allocation and exact factorial interaction attribution.
@@ -124,6 +148,6 @@ External comparison lanes remain separate: BITS/TIME for irregular forecasting, 
 
 This is an exact finite-support deterministic minimax-regret calculation for the supplied action/loss matrix and declared outcome support. It is not a universal guarantee over omitted worlds, a probabilistic expected-value result, a mixed-strategy guarantee, a safety certification or a physical energy measurement.
 
-Mixed-policy worst-case bounds remain with #13165. Expected posterior value remains with #12567/#12551. Confirmatory evaluation requires #9437 process isolation and protected evaluator state.
+The epsilon flag certifies only the declared regret condition over the finite information set; it does not certify the candidate's actual action or satisfy any independent hard gate. Mixed-policy worst-case bounds remain with #13165. Expected posterior value remains with #12567/#12551. Confirmatory evaluation requires #9437 process isolation and protected evaluator state.
 
 No Rust build, rustfmt, Clippy, unit-test execution, benchmark campaign, energy result, SOTA improvement or deployment qualification is claimed.
