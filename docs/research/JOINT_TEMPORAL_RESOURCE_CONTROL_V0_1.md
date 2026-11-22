@@ -3,7 +3,7 @@
 **Tracking:** NEURO-SILICON-009 / #9666  
 **Base implementation:** #9828 (`research/temporal-joint-resource-control-20261101`)  
 **Interaction extension:** `research/temporal-factorial-interactions-20261122`  
-**Status:** candidate allocator and evaluator exact-oracle source authored; 16 Rust tests are authored for the oracle (none executed); no Rust compilation, benchmark runs, hardware measurements or security deployment are claimed.
+**Status:** candidate allocator and evaluator exact-oracle source authored; 17 Rust tests are authored for the oracle (none executed); no Rust compilation, benchmark runs, hardware measurements or security deployment are claimed.
 
 ## 1. Research thesis
 
