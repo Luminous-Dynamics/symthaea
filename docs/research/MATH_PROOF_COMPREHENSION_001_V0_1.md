@@ -424,3 +424,21 @@ This is an **external proof-dependency baseline**, not a Symthaea extraction or 
 - Map Rubinstein's inequality (M) to exact Lean declaration(s) only after source-level identification. The current fixture deliberately records this mapping as unresolved.
 
 A dominator or large subgraph is only a graph-theoretic prioritization signal. It is not proof that a declaration is mathematically essential or the conceptual crux. Similarly, the strict theorem-statement dependency cone is not the full proof dependency graph.
+
+
+## 15. First RH mathematical bottleneck now has a bounded source map
+
+The main inequality (M) is no longer only a named gap in the working exposition. A source-inspected composition map is now recorded in `RH_MAIN_INEQUALITY_M_MAP_V1.json` and its human-readable companion.
+
+The first bounded formal bridge is:
+
+`ASK / MAIN`
+→ `each_unit_bound_statement` (per-translate `PointwiseBoundVariant`)
+→ `Deduction.ch_top_main_eq` / `Deduction.ch_top`
+→ `gapA` / error-bracket bound.
+
+This is pinned to the published-source mirror commit `40e56bab026552e089d7afcfeff08d2defb9c005`, with source blob IDs and line spans. The human exposition explicitly identifies `each_unit_bound_statement` as the per-translate statement used by the final theorem and explicitly warns that the averaged `MeanBoundSecondForm` of [7] is not the statement used in that form. This gives us a precise adversarial comprehension task: do not confuse similar names or averages with the actual formal bridge.
+
+The map also identifies source-level candidates for the Chowla–Selberg period, digit arithmetic, lattice-height and global local-comparison inputs. Their precise mathematical roles and full kernel dependency paths remain open. The exact Lean declaration(s) for all of hypothesis (B), the trace/rank/pairing bounds and the Galois-cohomology contribution are not yet mapped.
+
+Dedicated bounded work is now tracked in [#13296 — RH-M-COMPREHENSION-001](https://github.com/Luminous-Dynamics/symthaea/issues/13296). This does not reconstruct all of (M), independently verify RH, or turn the external kernel graph into a Symthaea proof.
