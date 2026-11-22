@@ -260,7 +260,7 @@ fn fit_model_v1(
     let mut observed_by_feature = vec![Vec::<f64>::new(); feature_count];
 
     for &row_index in &training_indices {
-        let class_index = usize::from(labels[row_index].label == 1);
+        let class_index = if labels[row_index].label == 1 { 1 } else { 0 };
         class_counts[class_index] += 1;
         if features[row_index].values.len() != feature_count {
             return Err(SecomTabularBaselineError(format!(
@@ -342,7 +342,7 @@ fn fit_model_v1(
     let mut normalized_training = Vec::with_capacity(imputed_training.len());
     for (position, values) in imputed_training.iter().enumerate() {
         let row_index = training_indices[position];
-        let class_index = usize::from(labels[row_index].label == 1);
+        let class_index = if labels[row_index].label == 1 { 1 } else { 0 };
         let normalized: Vec<f64> = values
             .iter()
             .enumerate()
