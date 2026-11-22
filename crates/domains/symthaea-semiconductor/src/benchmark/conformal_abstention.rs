@@ -431,8 +431,8 @@ pub fn evaluate_conformal_sets_v1(
         ));
     }
     for (index, prediction) in report.prediction_sets.iter().enumerate() {
-        let expected_size = usize::from(prediction.negative_in_set)
-            + usize::from(prediction.positive_in_set);
+        let expected_size = (if prediction.negative_in_set { 1 } else { 0 })
+            + (if prediction.positive_in_set { 1 } else { 0 });
         let expected_decision = match (prediction.negative_in_set, prediction.positive_in_set) {
             (true, false) => SelectiveDecisionV1::PredictNegative,
             (false, true) => SelectiveDecisionV1::PredictPositive,
