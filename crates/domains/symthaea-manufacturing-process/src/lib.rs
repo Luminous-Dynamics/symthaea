@@ -352,9 +352,9 @@ impl ExtensionRegistryV1 {
             profile.validate()?;
             let coordinate = profile.semantic_coordinate();
             if !coordinates.insert(coordinate.clone()) {
-                return Err(ManufacturingProcessError::DuplicateExtensionProfileCoordinate(
-                    coordinate,
-                ));
+                return Err(
+                    ManufacturingProcessError::DuplicateExtensionProfileCoordinate(coordinate),
+                );
             }
         }
         Ok(())
@@ -460,7 +460,8 @@ impl ProcessDefinitionV1 {
             reference.validate()?;
             let key = format!(
                 "{}::{}",
-                reference.semantic_coordinate(), reference.schema_sha256
+                reference.semantic_coordinate(),
+                reference.schema_sha256
             );
             if !extension_refs.insert(key.clone()) {
                 return Err(ManufacturingProcessError::DuplicateExtensionProfileRef(key));
