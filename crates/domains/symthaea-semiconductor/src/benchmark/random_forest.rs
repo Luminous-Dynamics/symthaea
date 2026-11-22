@@ -327,18 +327,14 @@ impl TreeBuilder<'_> {
                 .collect();
             values.sort_by(|left, right| left.0.total_cmp(&right.0));
 
-            let mut left_positive_count = 0usize;
-            let mut left_negative_count = 0usize;
             let mut left_positive_weight = 0.0;
             let mut left_negative_weight = 0.0;
 
             for split_index in 0..values.len().saturating_sub(1) {
                 let (value, positive) = values[split_index];
                 if positive {
-                    left_positive_count += 1;
                     left_positive_weight += self.positive_weight;
                 } else {
-                    left_negative_count += 1;
                     left_negative_weight += self.negative_weight;
                 }
 
