@@ -3,7 +3,9 @@ use serde_json::Value;
 use std::collections::BTreeSet;
 use std::env;
 use std::fs;
+use std::path::{Component, Path};
 use std::process::ExitCode;
+use sha2::{Digest, Sha256};
 
 const ANCHOR_MARKER: &str = "data-sfeb-id=\"";
 
@@ -121,13 +123,164 @@ fn validate_contract(
     Ok((regions.len(), journeys.len()))
 }
 
+
+const DEFAULT_TASK_SCHEMA: &str = "benchmarks/frontend/task-oracle-v1.schema.json";
+const DEFAULT_TASK: &str = "benchmarks/frontend/tasks/sfeb-l1-service-dashboard-v1.json";
+
+fn fixture_sha256(html: &[u8], css: &[u8]) -> String {
+    let mut digest = Sha256::new();
+    digest.update(html);
+    digest.update([0]);
+    digest.update(css);
+    hex::encode(digest.finalize())
+}
+
+fn validate_task_instance(
+    schema: &Value,
+    task: &Value,
+    html: &[u8],
+    css: &[u8],
+) -> Result<(usize, usize), String> {
+    let validator = validator_for(schema)
+        .map_err(|error| format!("invalid SFEB task schema: {error}"))?;
+    let errors: Vec<String> = validator
+        .iter_errors(task)
+        .map(|error| format!("{}: {error}", error.instance_path()))
+        .collect();
+    if !errors.is_empty() {
+        return Err(format!(
+            "task does not satisfy its schema:\n{}",
+            errors.join("\n")
+        ));
+    }
+
+    let html_text = std::str::from_utf8(html)
+        .map_err(|error| format!("reference HTML is not UTF-8: {error}"))?;
+    let css_text = std::str::from_utf8(css)
+        .map_err(|error| format!("reference CSS is not UTF-8: {error}"))?;
+
+    if html_text.contains("https://")
+        || html_text.contains("http://")
+        || css_text.contains("https://")
+        || css_text.contains("http://")
+        || html_text.contains("<script")
+    {
+        return Err("reference fixture must not load remote resources or scripts".to_string());
+    }
+
+    let expected_digest = task
+        .get("reference_fixture")
+        .and_then(|fixture| fixture.get("sha256"))
+        .and_then(Value::as_str)
+        .ok_or_else(|| "task.reference_fixture.sha256 is required".to_string())?;
+    let actual_digest = fixture_sha256(html, css);
+    if actual_digest != expected_digest {
+        return Err(format!(
+            "reference fixture digest mismatch: expected {expected_digest}, got {actual_digest}"
+        ));
+    }
+
+    let anchors = extract_source_anchors(html_text)?;
+    let regions = task
+        .get("required_regions")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "task.required_regions must be an array".to_string())?;
+
+    let mut region_ids = BTreeSet::new();
+    for region in regions {
+        let id = region
+            .get("id")
+            .and_then(Value::as_str)
+            .ok_or_else(|| "every required region needs an id".to_string())?;
+        if !region_ids.insert(id.to_string()) {
+            return Err(format!("duplicate required region id: {id}"));
+        }
+        if !anchors.contains(id) {
+            return Err(format!(
+                "required region id is missing from reference fixture: {id}"
+            ));
+        }
+    }
+
+    let assertions = task
+        .get("assertions")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "task.assertions must be an array".to_string())?;
+    let mut assertion_ids = BTreeSet::new();
+    for assertion in assertions {
+        let id = assertion
+            .get("id")
+            .and_then(Value::as_str)
+            .ok_or_else(|| "every assertion needs an id".to_string())?;
+        if !assertion_ids.insert(id.to_string()) {
+            return Err(format!("duplicate assertion id: {id}"));
+        }
+    }
+
+    Ok((regions.len(), assertions.len()))
+}
+
+fn run_task(schema_path: &str, task_path: &str) -> Result<(), String> {
+    let schema = read_json(schema_path)?;
+    let task = read_json(task_path)?;
+    let fixture_dir = task
+        .get("reference_fixture")
+        .and_then(|fixture| fixture.get("path"))
+        .and_then(Value::as_str)
+        .ok_or_else(|| "task.reference_fixture.path is required".to_string())?;
+    let fixture_dir = Path::new(fixture_dir);
+    if fixture_dir.is_absolute()
+        || fixture_dir.components().any(|component| {
+            matches!(
+                component,
+                Component::ParentDir | Component::RootDir | Component::Prefix(_)
+            )
+        })
+    {
+        return Err("reference fixture path must remain inside the repository".to_string());
+    }
+
+    let html_path = fixture_dir.join("reference.html");
+    let css_path = fixture_dir.join("style.css");
+    let html = fs::read(&html_path)
+        .map_err(|error| format!("failed to read {}: {error}", html_path.display()))?;
+    let css = fs::read(&css_path)
+        .map_err(|error| format!("failed to read {}: {error}", css_path.display()))?;
+
+    let (regions, assertions) = validate_task_instance(&schema, &task, &html, &css)?;
+    let task_id = task
+        .get("task_id")
+        .and_then(Value::as_str)
+        .unwrap_or("<unnamed>");
+    let status = task
+        .get("status")
+        .and_then(Value::as_str)
+        .unwrap_or("<unknown>");
+
+    println!(
+        "SFEB task valid: {task_id} (status={status}, required_regions={regions}, assertions={assertions})"
+    );
+    println!("Reference fixture digest: verified; local-only asset policy: verified.");
+    println!("Note: schema and fixture validity do not imply browser or agent verification.");
+    Ok(())
+}
+
 fn run() -> Result<(), String> {
     let args: Vec<String> = env::args().skip(1).collect();
     if args.iter().any(|arg| arg == "--help" || arg == "-h") {
         println!(
-            "Usage: cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- [SCHEMA.json [CONTRACT.json [APP_SOURCE.rs]]]\n\nDefaults validate the checked-in symthaea-ui source-observed contract."
+            "Usage:\n  cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- [CONTRACT_SCHEMA [CONTRACT_JSON [APP_SOURCE.rs]]]\n  cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --task [TASK_SCHEMA [TASK_JSON]]\n\nThe default mode validates the Leptos interface contract and exact source anchors. --task validates the task schema, required fixture regions and canonical fixture digest."
         );
         return Ok(());
+    }
+    if args.first().is_some_and(|arg| arg == "--task") {
+        if args.len() > 3 {
+            return Err("--task accepts at most a schema path and task path".to_string());
+        }
+        return run_task(
+            args.get(1).map(String::as_str).unwrap_or(DEFAULT_TASK_SCHEMA),
+            args.get(2).map(String::as_str).unwrap_or(DEFAULT_TASK),
+        );
     }
     if args.len() > 3 {
         return Err("expected at most three paths; use --help".to_string());
@@ -225,5 +378,24 @@ mod tests {
             .expect("checked-in contract validates against its schema and source anchors");
         assert_eq!(regions, 16);
         assert_eq!(journeys, 6);
+    }
+
+    #[test]
+    fn checked_in_sfeb_task_matches_schema_and_fixture() {
+        let schema: Value = serde_json::from_str(include_str!(
+            "../../task-oracle-v1.schema.json"
+        ))
+        .expect("checked-in task schema is valid JSON");
+        let task: Value = serde_json::from_str(include_str!(
+            "../../tasks/sfeb-l1-service-dashboard-v1.json"
+        ))
+        .expect("checked-in task is valid JSON");
+        let html = include_bytes!("../../fixtures/service-dashboard/reference.html");
+        let css = include_bytes!("../../fixtures/service-dashboard/style.css");
+
+        let (regions, assertions) = validate_task_instance(&schema, &task, html, css)
+            .expect("task schema, canonical fixture digest and region anchors must validate");
+        assert_eq!(regions, 8);
+        assert_eq!(assertions, 11);
     }
 }
