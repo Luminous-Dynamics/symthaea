@@ -272,3 +272,90 @@ The innovation target is not an appliance with the largest feature list. It is a
 - retains performance across production units and real use.
 
 One external replication of such a result is more defensible than a collection of untested smart features or synthetic benchmark wins.
+
+
+## 9. SOTA refresh — 22 November 2026
+
+**Evidence rule:** the following Topten values are supplier-declared / energy-label data curated in a third-party selection database. They are desk-screening references, not independent Luminous measurements and not automatically comparable with South African legacy-label products.
+
+### Washer frontier
+
+Topten's European list (last updated 17 August 2026) features:
+- AEG LR9WW80409: 10 kg; 20 kWh/100 Eco 40–60 cycles; 50 L/cycle; 235 minutes; spin-drying class B; noise class A; maximum spin speed shown as 1,351 rpm.
+- Samsung WF9000 / WF90F09C4SU5: 9 kg; 22 kWh/100 cycles; 50 L/cycle; 228 minutes; spin-drying class B.
+
+Topten's methodology identifies supplier declarations, national Topten sites and Encodex as data sources. Its EU programme, reference load and current IEC 60456:2024 test-method changes must be preserved; do not map these numbers to older SANS/legacy label classes.
+
+Source: https://www.topten.eu/private/products/washing_machines
+Selection-method context: https://www.topten.eu/private/selection-criteria/washing-machines
+
+### Heat-pump dryer frontier
+
+Topten's European list (last updated 19 May 2026) includes:
+- AEG TR9HH9AY: 9 kg; 79 kWh/100 cycles; efficiency index 42.9%; condenser efficiency class A; noise class A.
+- AEG TR948V4BC: 8 kg; 73 kWh/100 cycles; efficiency index 42.9%; condenser efficiency class A; noise class A.
+
+The lower 73 kWh/100-cycle number belongs to an 8 kg model, not a 9 kg service capacity. A noise class is not a numeric dB(A) result. Use the exact PNC / regional fiche, initial moisture, final moisture, programme and matched textile load for physical selection.
+
+Source: https://www.topten.eu/private/products/tumble_driers
+
+### Refrigerator frontier
+
+Topten's European list (last updated 10 September 2026) lists the Liebherr CBNbsa20 575i at:
+- 362 L total net volume (259 L refrigerator + 103 L freezer);
+- 92 kWh/year label energy;
+- ambient operating range 10–43°C;
+- noise class A; frost-free.
+
+This provides a useful high-ambient desk comparator. It does not prove energy consumption or food-temperature performance at every point from 10–43°C, nor outage holdover, warm-load pull-down or food safety.
+
+Source: https://www.topten.eu/private/products/refrigerators
+
+### HeatBank direct-DC PV water heating — new 2026 publication
+
+Walker, Thomas and Booysen, *Energy for Sustainable Development* 94 (October 2026), DOI 10.1016/j.esd.2026.102053, evaluates a 1.68 kWp / four-module direct-DC PV-to-electric-water-heater arrangement across seven Sub-Saharan African cities including Johannesburg. The paper reports a 5-minute simulation using a two-node tank model, stochastic household hot-water draws and 2024 satellite meteorology. Its abstract reports:
+- over 2,200 kWh/year accepted by the heater in the Johannesburg heavy-user scenario;
+- 21–47% simulated water-heating-bill savings across studied cities and demand profiles;
+- up to 10.3% avoidable cold draws for Johannesburg heavy users under the PV-priority configuration.
+
+These are model outputs, not measured household savings or a qualified commercial product. The public code/results repository is:
+https://github.com/WalkerFelix/Simulation-Based-Solar-PV-Assisted-Domestic-Water-Heating-in-Sub-Saharan-African-Cities
+
+An initial static inspection of the public repository found several reproducibility questions, tracked separately under Symthaea HEATBANK-DIRECTPV-REPRO-001:
+- repository configuration currently contains nine South African city keys, while the paper's abstract describes seven Sub-Saharan African cities; the exact commit/data bundle corresponding to the journal results needs pinning;
+- `config.py` uses a developer-specific absolute Windows ROOT_DIR and expects external `solar_data` and `user_data` directories;
+- `tariff.py` assigns a flat 0.186 USD/kWh rate to all nine configured cities;
+- `simulate.py` values PV energy at that flat tariff and constructs `cost_without_solar` as grid cost plus PV energy valued at the tariff, while the separate grid-only tank is used for cold-event comparison and its baseline electricity/cost is not accumulated into the returned KPI set;
+- `tank.py` applies draw-related energy removal first to the top node (then bottom if needed), but the inspected step does not explicitly advect/replace cold mains water into the lower tank node, so the two-node stratification trajectory needs independent mass/energy validation;
+- the current code snapshot's root `README.md` and `requirements.txt` were not found by the public file fetch; a reproducible run manifest and dependency/data checksums are needed.
+
+These are source-level questions, not a finding that the article's results are false. Do not use the published percentage or kWh values as HeatBank design guarantees until the exact paper result is reproduced and the physical tank/controller model is independently checked.
+
+### Critical performance-method scope correction for HeatBank
+
+IEC 60379:2023 is a method for household electric storage water heaters, but explicitly excludes heaters that use electricity as a **secondary** heating source and does not specify product safety. It must not be applied indiscriminately to direct-DC solar-primary, solar-thermal, hybrid-backup or heat-pump architectures.
+
+Use an architecture-specific method map:
+- conventional electric resistance storage: investigate IEC 60379:2023 for performance, and IEC 60335-1 with IEC 60335-2-21 for safety;
+- solar-only system: investigate ISO 9459-2:1995 outdoor method within scope; note ISO/AWI 9459-2 Edition 2 is under development and is not yet a published replacement;
+- solar system with integral backup / preheat: investigate ISO 9459-4:2013 component-test plus simulation method;
+- packaged heat-pump water heater: investigate EN 16147 and applicable national adoption / local conformity route; do not substitute IEC 60379 merely because a storage tank is present.
+
+All methods remain subject to South African SANS adoption, product classification, current SANAS scope, NRCS/VC 9006 and installation requirements. This crosswalk does not certify applicability.
+
+Sources:
+- IEC 60379:2023: https://webstore.iec.ch/en/publication/61520
+- ISO 9459-2:1995: https://www.iso.org/standard/17187.html
+- ISO/AWI 9459-2: https://www.iso.org/standard/95343.html
+- ISO 9459-4:2013: https://www.iso.org/standard/41695.html
+- EN 16147 reference context: https://www.ehpa.org/wp-content/uploads/2022/07/EHPA_TestReg_DHW-HP_V1.8_February_2021.pdf
+
+## 10. Next decision consequence
+
+The SOTA scan confirms that an energy-label win alone is unlikely to be a durable differentiator. The immediate design questions are now more precise:
+1. Can our washer-to-dryer service beat the 20 kWh/100-cycle washer reference and 73–79 kWh/100-cycle dryer references at equivalent accepted textile quality and final moisture while retaining repair and textile-life advantages?
+2. Can FoodSteward's refrigeration architecture deliver better useful cold-storage service and outage performance at a competitive whole-life cost than a 362 L, 92 kWh/year, 10–43°C desk reference?
+3. Can HeatBank reproduce the direct-DC model's useful service / cold-draw trade-off with an independently validated tank model, local tariffs and exact installed-system costs?
+4. Can the fan and appliance measurement cell yield independent repeatability and laboratory correlation rather than merely producing plausible plots?
+
+No percentage superiority claim follows from this desk update.
