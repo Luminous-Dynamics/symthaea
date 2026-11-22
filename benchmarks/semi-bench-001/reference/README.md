@@ -344,3 +344,15 @@ The same CLI now also evaluates two B6 variants using a frozen FTRL elastic-net 
 B5 retains L1 = 0 and L2 = 1.0. B6 reports the count of coefficients whose absolute value exceeds \`1e-12\`, so sparsity is measurable rather than inferred from the selected algorithm name. The synthetic and full pinned-source workflow checks assert both B6 variants and their declared L1 configuration.
 
 B6 is a fixed research comparator, not a validation-selected hyperparameter winner. The L1 penalty has not been tuned on the final chronological test. Feature selection/zero coefficients do not establish physical sensor importance because the public SECOM mirror does not carry interpretable sensor semantics.
+
+
+### Sparse Elastic-Net B6 extension
+
+The \`semi-secom-logistic\` CLI also evaluates:
+
+- **B6 sparse:** unweighted FTRL-Proximal with L1=0.01 and L2=1.0.
+- **B6-balanced:** the same sparse penalty with inverse-frequency class weights and the training-prior correction.
+
+B5 retains L1=0 and L2=1.0. B6 reports the number of nonzero coefficients (absolute weight > 1e-12), so sparsity is measured rather than assumed from the algorithm name. The synthetic and full pinned-source workflow checks assert the two B6 variants and their fixed L1 configuration.
+
+B6 is a preregistered research comparator, not a validation-selected hyperparameter winner. No tuning on the final chronological test is permitted. Zero coefficients do not establish physical sensor importance because the anonymous public SECOM mirror does not provide sensor semantics.
