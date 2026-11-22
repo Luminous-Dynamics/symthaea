@@ -30,5 +30,6 @@
   "subsets_examined": 32,
   "total_acquisition_utility": 0.3115,
   "total_cost_budget": 13,
+  "uncertainty_calibration_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
   "used_cost_budget": 13
 }
