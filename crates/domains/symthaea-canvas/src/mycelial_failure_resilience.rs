@@ -2420,6 +2420,151 @@ mod tests {
     }
 
     #[test]
+    fn attack_delivery_zero_probability_reproduces_intact_baseline() {
+        let graph = triangle_graph();
+        let demand_pairs = demands();
+        let plan = build_mycelial_failure_attack_plan(
+            &graph,
+            &demand_pairs,
+            MycelialFailureAttackConfig {
+                strategy: MycelialFailureAttackStrategy::HighestDegreeJunctions,
+                seed: 17,
+                maximum_failure_budget: 2,
+                spatial_seed_junction_id: None,
+            },
+        )
+        .unwrap();
+        let profile = build_mycelial_failure_delivery_profile(
+            &graph,
+            &demand_pairs,
+            &plan,
+            MycelialFailureDeliveryConfig {
+                trials_per_scenario: 8,
+                removal_success_probability_micros: 0,
+                seed: 0xdead_beef,
+            },
+        )
+        .unwrap();
+        assert_eq!(profile.trials.len(), 16);
+        assert!(
+            profile.trials.iter().all(|trial| {
+                trial.realized_failed_segment_ids.is_empty()
+                    && trial.realized_failed_junction_ids.is_empty()
+                    && trial.weighted_reachability == Some(1.0)
+            })
+        );
+        assert!(
+            profile
+                .scenarios
+                .iter()
+                .all(|summary| summary.mean_realized_failure_count == 0.0
+                    && summary.probability_at_least_one_failure == 0.0
+                    && summary.mean_weighted_reachability == Some(1.0))
+        );
+        profile.validate_against(&graph, &demand_pairs, &plan).unwrap();
+    }
+
+    #[test]
+    fn attack_delivery_full_success_matches_deterministic_removal_results() {
+        let graph = triangle_graph();
+        let demand_pairs = demands();
+        let plan = build_mycelial_failure_attack_plan(
+            &graph,
+            &demand_pairs,
+            MycelialFailureAttackConfig {
+                strategy: MycelialFailureAttackStrategy::DemandPathLoadSegments,
+                seed: 91,
+                maximum_failure_budget: 2,
+                spatial_seed_junction_id: None,
+            },
+        )
+        .unwrap();
+        let deterministic =
+            build_mycelial_failure_resilience_profile(&graph, &demand_pairs, &plan.scenarios)
+                .unwrap();
+        let delivery = build_mycelial_failure_delivery_profile(
+            &graph,
+            &demand_pairs,
+            &plan,
+            MycelialFailureDeliveryConfig {
+                trials_per_scenario: 4,
+                removal_success_probability_micros: 1_000_000,
+                seed: 123,
+            },
+        )
+        .unwrap();
+        for (scenario, metric) in plan.scenarios.iter().zip(&deterministic.scenarios) {
+            let trials: Vec<_> = delivery
+                .trials
+                .iter()
+                .filter(|trial| trial.scenario_id == scenario.scenario_id)
+                .collect();
+            assert_eq!(trials.len(), 4);
+            assert!(
+                trials.iter().all(|trial| {
+                    trial.realized_failed_segment_ids == scenario.failed_segment_ids
+                        && trial.realized_failed_junction_ids == scenario.failed_junction_ids
+                        && trial.weighted_reachability == metric.weighted_reachability
+                        && trial.weighted_mean_directness == metric.weighted_mean_directness
+                        && trial.weighted_mean_network_path_length
+                            == metric.weighted_mean_network_path_length
+                        && trial.connected_components == metric.connected_components
+                        && trial.cycle_rank == metric.cycle_rank
+                })
+            );
+        }
+        assert!(
+            delivery
+                .scenarios
+                .iter()
+                .all(|summary| summary.mean_realized_failure_count
+                    == summary.attempted_entity_count as f64
+                    && summary.probability_at_least_one_failure == 1.0)
+        );
+    }
+
+    #[test]
+    fn attack_delivery_trials_are_seed_replayable_and_detached_mutations_reject() {
+        let graph = triangle_graph();
+        let demand_pairs = demands();
+        let plan = build_mycelial_failure_attack_plan(
+            &graph,
+            &demand_pairs,
+            MycelialFailureAttackConfig {
+                strategy: MycelialFailureAttackStrategy::RandomSegments,
+                seed: 0x1234_5678,
+                maximum_failure_budget: 2,
+                spatial_seed_junction_id: None,
+            },
+        )
+        .unwrap();
+        let config = MycelialFailureDeliveryConfig {
+            trials_per_scenario: 32,
+            removal_success_probability_micros: 500_000,
+            seed: 0xfeed_1234,
+        };
+        let first =
+            build_mycelial_failure_delivery_profile(&graph, &demand_pairs, &plan, config)
+                .unwrap();
+        let second =
+            build_mycelial_failure_delivery_profile(&graph, &demand_pairs, &plan, config)
+                .unwrap();
+        assert_eq!(first, second);
+        assert_eq!(
+            first.canonical_digest_hex().unwrap(),
+            second.canonical_digest_hex().unwrap()
+        );
+        let mut tampered = first;
+        tampered.trials[0].realized_failed_segment_ids.clear();
+        assert!(tampered.canonical_digest_hex().is_err());
+        assert!(
+            tampered
+                .validate_against(&graph, &demand_pairs, &plan)
+                .is_err()
+        );
+    }
+
+    #[test]
     fn invalid_or_ambiguous_demand_scenarios_fail_closed() {
         let graph = triangle_graph();
         let mut bad_demands = demands();
