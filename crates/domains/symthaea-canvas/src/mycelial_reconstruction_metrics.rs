@@ -1130,7 +1130,7 @@ mod tests {
             vec![
                 node("A", AnnotatedJunctionKind::Branch, 0.0, 0.0, 0.0),
                 node("B", AnnotatedJunctionKind::Tip, 1.0, 0.0, 0.0),
-                node("C", AnnotatedJunctionKind::Tip, 0.0, 1.0, 0.0),
+                node("C", AnnotatedJunctionKind::ProjectedCrossing, 0.0, 1.0, 0.0),
             ],
             vec![edge("e1", "A", "B", 1.0), edge("e2", "A", "C", 1.0)],
         );
@@ -1336,6 +1336,86 @@ mod tests {
                 ReconstructionEvaluationConfig::default()
             ),
             Err(MycelialReconstructionError::FrameMismatch)
+        ));
+    }
+
+    #[test]
+    fn graph_order_permutations_preserve_canonical_digests() {
+        let truth = graph(
+            "human_annotation",
+            vec![
+                node("A", AnnotatedJunctionKind::Branch, 0.0, 0.0, 0.0),
+                node("B", AnnotatedJunctionKind::Tip, 1.0, 0.0, 0.0),
+                node("C", AnnotatedJunctionKind::ProjectedCrossing, 0.0, 1.0, 0.0),
+            ],
+            vec![edge("e1", "A", "B", 1.0), edge("e2", "A", "C", 1.0)],
+        );
+        let mut reordered = truth.clone();
+        reordered.junctions.reverse();
+        reordered.segments.reverse();
+        assert_eq!(
+            truth.canonical_digest_hex().unwrap(),
+            reordered.canonical_digest_hex().unwrap()
+        );
+    }
+
+    #[test]
+    fn score_serialization_roundtrip_preserves_digest_and_validation() {
+        let truth = graph(
+            "human_annotation",
+            vec![
+                node("A", AnnotatedJunctionKind::Branch, 0.0, 0.0, 0.0),
+                node("B", AnnotatedJunctionKind::Tip, 1.0, 0.0, 0.0),
+            ],
+            vec![edge("e1", "A", "B", 1.0)],
+        );
+        let prediction = graph(
+            "model",
+            vec![
+                node("pA", AnnotatedJunctionKind::Branch, 0.01, 0.0, 0.0),
+                node("pB", AnnotatedJunctionKind::Tip, 1.01, 0.0, 0.0),
+            ],
+            vec![edge("s1", "pA", "pB", 1.0)],
+        );
+        let score = evaluate_mycelial_reconstruction(
+            &truth,
+            &prediction,
+            "explicit-match-v1",
+            &[
+                JunctionIdentityMatch {
+                    predicted_junction_id: "pA".to_string(),
+                    ground_truth_junction_id: "A".to_string(),
+                },
+                JunctionIdentityMatch {
+                    predicted_junction_id: "pB".to_string(),
+                    ground_truth_junction_id: "B".to_string(),
+                },
+            ],
+            ReconstructionEvaluationConfig {
+                maximum_junction_match_distance: 0.05,
+                ..ReconstructionEvaluationConfig::default()
+            },
+        )
+        .unwrap();
+        let digest = score.canonical_digest_hex().unwrap();
+        let bytes = serde_json::to_vec(&score).unwrap();
+        let restored: MycelialReconstructionScore = serde_json::from_slice(&bytes).unwrap();
+        restored.validate().unwrap();
+        assert_eq!(restored.canonical_digest_hex().unwrap(), digest);
+    }
+
+    #[test]
+    fn two_dimensional_annotations_reject_nonzero_depth() {
+        let mut planar = graph(
+            "human",
+            vec![node("A", AnnotatedJunctionKind::Tip, 0.0, 0.0, 0.0)],
+            Vec::new(),
+        );
+        planar.dimensionality = ReconstructionDimensionality::TwoD;
+        planar.junctions[0].position.z = 0.01;
+        assert!(matches!(
+            planar.validate(),
+            Err(MycelialReconstructionError::InvalidGraph(_))
         ));
     }
 
