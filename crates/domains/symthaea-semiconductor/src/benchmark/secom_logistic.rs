@@ -836,11 +836,16 @@ mod tests {
         permuted_labels[..4].reverse();
         permuted_assignments[..4].reverse();
 
-        for balanced in [false, true] {
+        for (balanced, l1) in [
+            (false, FTRL_L1),
+            (true, FTRL_L1),
+            (false, FTRL_L1_SPARSE),
+            (true, FTRL_L1_SPARSE),
+        ] {
             let original = fit_model_v1(
                 "sample-order",
                 balanced,
-                FTRL_L1,
+                l1,
                 &features,
                 &labels,
                 &split.assignments,
@@ -849,7 +854,7 @@ mod tests {
             let permuted = fit_model_v1(
                 "sample-order",
                 balanced,
-                FTRL_L1,
+                l1,
                 &permuted_features,
                 &permuted_labels,
                 &permuted_assignments,
