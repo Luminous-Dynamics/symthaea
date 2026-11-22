@@ -276,14 +276,14 @@ This creates a stronger claim than “HDC beats RAG”: MACE would demonstrate w
 1. Corrected the synthetic evaluator's abstention mapping to an explicit zero-utility outside option and added a regression test.
 2. Added `mace_counterfactual_evidence.rs`, a separate executable audit binary using the existing generated stress worlds and candidate-visible MACE policy.
 3. Added an `EvidenceDependencyIndex` that rejects duplicate event IDs, groups events by nonzero source-root digest and source-family ID, and counts unknown root/family identities separately.
-4. Added deterministic event, source-root, source-family, bounded root-pair, stratified-random and no-memory interventions.
+4. Added deterministic event, source-root, source-family, explicit unknown-root/unknown-family, bounded root-pair, stratified-random and no-memory interventions.
 5. Stratified random controls by regime, objective, action and estimand digest; the manifest reports unmatched target strata.
 6. Added two candidate modes for every full-evidence and knockout condition: exact-scope scan and typed-content HDC top-2 per declared action.
 7. The typed-HDC mode rebuilds the typed index after each intervention, converts the candidate-visible DecisionNeedV1 to an action-specific query, resolves returned IDs against canonical Experience records and rejects any index-time/current-view digest mismatch.
 8. Bound candidate input digests to DecisionNeedV1 plus the post-intervention canonical evidence-set digest. Candidate observation IDs additionally bind the selected method.
 9. Report both regret gap versus full exact-scope evidence and incremental regret gap versus the same method's own full-evidence baseline, separating compression/retrieval loss from additional knockout loss.
 10. Split candidate decision records from evaluator intervention manifests/scores. Candidate-facing pair identifiers are opaque and derived only from candidate-visible task/evidence digests, not evaluator scenario-family labels. Candidate records expose the retrieval method and returned evidence IDs, but not intervention kinds, removed IDs or evaluator utilities.
-11. Added source-code and fixture digests to the evaluator run manifest and introduced `data/schemas/mace_counterfactual_evidence_v0_1.schema.json`.
+11. Bound source-code, fixture and JSON-Schema digests into the run identity/evaluator manifest, and introduced `data/schemas/mace_counterfactual_evidence_v0_1.schema.json`.
 12. Added 18 authored binary tests for duplicate IDs, root aliases, unknown identities, source-family closures, deterministic/truth-blind planning, coalition caps, matched controls, evidence-digest changes, candidate-contract rejection, opaque pair identifiers, typed-HDC canonical resolution after root knockout and explicit abstention.
 
 ### Remaining qualification work
@@ -319,7 +319,7 @@ Arguments are cluster count, candidate JSONL path, evaluator JSONL path, public 
 
 - The root index groups equal nonzero `SourceRootDigest` values. A nonzero digest is an identity key, **not cryptographic authentication of its issuer**. The synthetic `source_family` integer is also a fixture identity, not an independently verified family credential.
 - The current `Experience` structure has no explicit parent/derived-view edges. The implementation therefore does not yet compute transitive lineage closure; it groups records sharing the same direct root digest or family label.
-- Unknown root/family values are counted separately and do not inflate known-identity counts. The code does not independently verify signatures, source authority, tenant permissions or external receipts.
+- Unknown root/family values are counted separately, do not inflate known-identity counts, and now have explicit knockout groups. The code does not independently verify signatures, source authority, tenant permissions or external receipts.
 - Matched-random controls preserve count within regime/objective/action/estimand strata, but do not yet guarantee equal source-root/family multiplicity, exact serialized bytes or equal verification work. They are stratified random controls, not fully dependency- and cost-matched placebo interventions. They are omitted when the candidate-visible pool cannot match a stratum; coverage is reported. The current byte measure is only `size_of::<Experience>()` per record and excludes serialization, allocator, index, sidecar, source and verification costs.
 - Root-pair interventions are deterministically enumerated up to a caller-supplied cap. Higher-order coalition sampling, exact subset optimization, Shapley attribution, statistical aggregation and confidence intervals are not yet implemented.
 - The audit now reruns both **exact-scope scan** and **typed-content HDC top-2 per action** on every full-evidence and knockout condition, then applies the same `Policy::CausalQualified` admission/decision rule. This separates the exact-evidence reference, the full typed-compression gap, the knockout gap within each method, and total regret versus exact full evidence. The first HDC index is rebuilt per condition; no incremental update/replay performance is claimed.
