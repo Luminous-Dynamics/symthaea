@@ -160,8 +160,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             "    \"representation\": \"weighted_undirected_graph\",\n",
             "    \"source\": \"synthetic_path_graph\",\n",
             "    \"interpretation_scope\": \"synthetic_topology_only\",\n",
-            "    \"roi_labels\": [{rendered_labels}],\n",
-            "    \"weighted_edges\": [{rendered_edges}]\n",
+            "    \"roi_labels\": [{}],\n",
+            "    \"weighted_edges\": [{}]\n",
             "  }},\n",
             "  \"time_points\": {},\n",
             "  \"target_component_variance_fraction\": {:.12},\n",
@@ -174,7 +174,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             "  ]\n",
             "}}\n"
         ),
-        time_points, target_fraction, graph_smooth, heat_kernel,
+        rendered_labels,
+        rendered_edges,
+        time_points,
+        target_fraction,
+        graph_smooth,
+        heat_kernel,
     );
 
     if let Some(path) = std::env::args_os().nth(1) {
