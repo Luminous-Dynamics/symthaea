@@ -104,7 +104,9 @@ pub struct OnlineFeedbackLedgerV1 {
     pub class_semantics_ref: String,
     pub revision: u64,
     pub supersedes_label_id: Option<String>,
+    pub available_at: String,
     pub ingested_at: String,
+    pub label_delay_micros: i64,
     pub sequence: u64,
 }
 
@@ -181,7 +183,9 @@ pub struct OnlineFeedbackReceiptV1 {
     pub coverage_window_positive: usize,
     pub coverage_window_negative: usize,
     pub coverage_state: OnlineCoverageStateV1,
+    pub available_at: String,
     pub ingested_at: String,
+    pub label_delay_micros: i64,
 }
 
 #[derive(Clone, Debug, PartialEq, Error)]
@@ -701,6 +705,12 @@ pub fn ingest_online_metrology_feedback_v1(
             "measurement time is after result availability".into(),
         ));
     }
+    let label_delay_micros = ingested_micros - available_at;
+    if label_delay_micros < 0 {
+        return Err(OnlineConformalError(
+            "negative label delay is impossible at ingestion cutoff".into(),
+        ));
+    }
     let prediction = state
         .predictions
         .iter()
@@ -814,7 +824,9 @@ pub fn ingest_online_metrology_feedback_v1(
         class_semantics_ref: feedback.class_semantics_ref.clone(),
         revision: feedback.revision,
         supersedes_label_id: feedback.supersedes_label_id.clone(),
+        available_at: graph_label.available_at.clone(),
         ingested_at: cutoff.cutoff_time.clone(),
+        label_delay_micros,
         sequence: next_sequence,
     });
     state.active_label_by_prediction.insert(
@@ -856,7 +868,9 @@ pub fn ingest_online_metrology_feedback_v1(
         coverage_window_positive: coverage_positive,
         coverage_window_negative: coverage_negative,
         coverage_state: state.coverage_state.clone(),
+        available_at: graph_label.available_at.clone(),
         ingested_at: cutoff.cutoff_time.clone(),
+        label_delay_micros,
     })
 }
 
@@ -954,8 +968,8 @@ mod tests {
             .map(|index| ConformalCalibrationSampleV1 {
                 sample_id: format!("cal-sample-{index:02}"),
                 label_id: format!("cal-label-{index:02}"),
-                positive: index < 6,
-                score: if index < 6 { 0.85 } else { 0.15 },
+                positive: index < 20,
+                score: if index < 20 { 0.85 } else { 0.15 },
             })
             .collect();
         ConformalSubjectV1 {
@@ -971,7 +985,7 @@ mod tests {
 
     fn graph_with_initial_calibration() -> ProcessEventGraphV1 {
         let mut input = graph(&[]);
-        input.metrology_labels = (0..12)
+        input.metrology_labels = (0..40)
             .map(|index| crate::benchmark::process_event_graph::MetrologyLabelV1 {
                 label_id: format!("cal-label-{index:02}"),
                 measurement_event_id: "met-event".into(),
@@ -1115,6 +1129,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(result.label_id, "label-new");
+        assert_eq!(result.label_delay_micros, 900_000_000);
         assert_eq!(state.active_label_by_prediction.get("prediction-1").unwrap(), "label-new");
         assert!(state.residuals.iter().any(|row| row.label_id == "label-new"));
         assert!(verify_state(&state).is_ok());
