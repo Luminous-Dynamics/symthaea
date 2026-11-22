@@ -1,0 +1,152 @@
+{
+  "schema": "sfeb-comparative-evaluation-design-v1",
+  "version": "1.0.0",
+  "study_id": "SFEB-COMP-001",
+  "as_of": "2026-11-22",
+  "status": "protocol_designed_not_executed",
+  "purpose": "Estimate the causal contribution of Symthaea frontend memory, interface contracts and browser-grounded repair under a matched task, model, tool and environment protocol.",
+  "task_corpus": {
+    "initial_public_pilot": 30,
+    "comparative_phase": 150,
+    "publication_phase_minimum": 500,
+    "levels": [
+      "static_visual",
+      "interactive_multiroute",
+      "fullstack_maintenance"
+    ],
+    "target_distribution_per_level_at_150": 50,
+    "exposure_partitions": {
+      "public_pilot": "Used for development and debugging; excluded from hidden-holdout headline results.",
+      "controller_only": "Agent sees task brief and rendered references, but fixture implementation and expected oracle details remain evaluator-controlled.",
+      "hidden_holdout": "Private task and fixture content; fresh task release after a frozen evaluation window; no access by agents or retrieval systems."
+    },
+    "holdout_fraction_min": 0.2,
+    "hidden_holdout_fraction_target": 0.3,
+    "high_variance_trials_min": 5,
+    "ordinary_trials_min": 3
+  },
+  "comparison_arms": [
+    {
+      "id": "A0",
+      "name": "matched base agent",
+      "description": "Same foundation model, system prompt, browser access and engineering tools; no SFEB patterns, contract compiler or evidence-guided repair."
+    },
+    {
+      "id": "A1",
+      "name": "documentation retrieval",
+      "description": "A0 plus conventional keyword/BM25/TF-IDF and pinned documentation retrieval."
+    },
+    {
+      "id": "A2",
+      "name": "interface contract",
+      "description": "A1 plus the versioned Interface Contract Compiler and requirement-to-oracle traceability."
+    },
+    {
+      "id": "A3",
+      "name": "browser evidence and repair",
+      "description": "A2 plus bounded browser capture, semantic source anchors, controlled interventions and regression replay."
+    },
+    {
+      "id": "A4",
+      "name": "full Symthaea",
+      "description": "A3 plus the full qualified Symthaea engineering memory and selected cognitive retrieval backends."
+    },
+    {
+      "id": "H0",
+      "name": "human engineer reference",
+      "description": "Experienced frontend engineer using the same brief, fixture, browser and acceptance contract; used as a reference distribution, not a model arm."
+    }
+  ],
+  "pairing": {
+    "unit": "task_id × trial_id",
+    "rule": "Every agent arm receives the same task revision, source baseline, fixture digest, environment manifest, model version and tool budget for a paired block.",
+    "order": "Randomize arm order within each task block using a frozen seed; publish the seed after the hidden evaluation window.",
+    "repeats": "At least three independent trials per task and five for tasks classified high-variance before evaluation.",
+    "independence": "Trials are repeated measurements nested within tasks. Do not treat task-trial rows as independent tasks when estimating uncertainty.",
+    "control": "A0 must be rerun if model, prompt, tools, fixture, evaluator, browser or environment changes."
+  },
+  "judging": {
+    "primary": "Independent contract oracle plus observed required journey outcomes; no agent self-report counts as acceptance evidence.",
+    "visual": "Region-aware geometric and perceptual measurements plus blinded human review; VLM scores are secondary evidence, not sole acceptance.",
+    "accessibility": "Automated semantic checks, keyboard journey replay and human assistive-technology review for a stratified subset.",
+    "security": "Negative role tests, fixture network egress policy and evidence of fail-closed handling.",
+    "blinding": "Judges do not see arm identity, model identity, run cost or agent self-evaluation before scoring.",
+    "disagreement": "Two independent judges for subjective outcomes; disagreement goes to a third adjudicator. Report raw agreement and Cohen's kappa; target kappa ≥0.80 before using a judge as the only source for subjective dimensions.",
+    "audit_sample_fraction": 0.2,
+    "human_review": "Review 100% of disputed outcomes and a stratified random 20% of accepted and rejected cases."
+  },
+  "metrics": {
+    "primary": [
+      "accepted_task_rate",
+      "paired_success_difference_A4_minus_A0"
+    ],
+    "secondary": [
+      "visual_region_quality",
+      "required_journey_completion",
+      "responsive_failure_rate",
+      "keyboard_journey_completion",
+      "critical_accessibility_failures",
+      "security_boundary_failures",
+      "regression_rate",
+      "defect_localization_accuracy",
+      "repair_attempts",
+      "time_to_accepted_result",
+      "tokens_per_accepted_result",
+      "cost_per_accepted_result",
+      "calibration_error"
+    ],
+    "hard_gates": {
+      "critical_security_failures": 0,
+      "critical_accessibility_blockers": 0,
+      "evidence_receipt_integrity_failures": 0,
+      "omitted_required_tasks": 0,
+      "unapproved_network_egress": 0
+    },
+    "cost_definition": "Report provider/model cost, tool/runtime cost, retries, wall-clock time and human review cost. Primary efficiency denominator is accepted tasks, not attempted tasks."
+  },
+  "analysis": {
+    "binary_paired_outcome": "Use exact McNemar test on per-task paired success/failure outcomes; report discordant-pair counts and paired absolute risk difference.",
+    "proportions": "Report Wilson 95% intervals for each arm's accepted-task proportion.",
+    "continuous_metrics": "Use paired task-cluster bootstrap intervals; sample tasks as clusters and retain all repeated trials within a sampled task.",
+    "multiple_comparisons": "Pre-register A4 vs A0 as the primary contrast. Use Holm correction for secondary arm comparisons.",
+    "repeated_trials": "Aggregate repeats within task before task-level paired tests, and additionally report per-trial distributions and within-task variability.",
+    "calibration": "Report ECE with fixed bins plus Brier score; freeze calibration on a separate development split.",
+    "minimum_effect": "Pre-register the minimum practically meaningful effect after a blinded pilot and before opening the holdout.",
+    "power": "Perform power analysis from pilot discordant-pair rates and task-level variance. Do not infer sufficient power from raw task count alone.",
+    "stop_rule": "No optional stopping on the hidden set. Stop only at the pre-registered task and trial counts or documented safety/validity failure."
+  },
+  "success_criteria": {
+    "benchmark_qualification": "The separate mutation/oracle qualification must pass before any agent score is called qualified.",
+    "superiority": "For the primary A4 vs A0 success difference, require a positive paired 95% confidence interval excluding zero and all hard gates passing.",
+    "noninferiority_efficiency": "Alternatively, require success within a pre-registered 2 percentage-point non-inferiority margin and at least 30% lower cost per accepted task.",
+    "no_cross_benchmark_blending": "Never pool SFEB, Vision2Web, Design2Code or browser-agent scores; reproduce each external benchmark's own protocol and report separately."
+  },
+  "external_comparators": [
+    {
+      "name": "Vision2Web",
+      "scope": "static UI, interactive multi-page frontend, long-horizon full-stack website development",
+      "reference": "https://proceedings.mlr.press/v306/he26n.html"
+    },
+    {
+      "name": "Design2Code",
+      "scope": "screenshot-to-code visual reconstruction over 484 real-world webpages",
+      "reference": "https://aclanthology.org/2025.naacl-long.199/"
+    },
+    {
+      "name": "WebdriverIO Browser Agent Benchmark",
+      "scope": "browser-tool comparison under a fixed model, harness and prompt; report current live run status at evaluation time",
+      "reference": "https://benchmark.webdriver.io/"
+    },
+    {
+      "name": "Coding benchmark quality audit",
+      "scope": "task-quality auditing for underspecification, overstrict tests, low-coverage oracles and misleading prompts",
+      "reference": "https://openai.com/index/separating-signal-from-noise-coding-evaluations/"
+    }
+  ],
+  "limits": [
+    "This file defines an evaluation protocol; it contains no model performance results.",
+    "The current SFEB task inventory is public-pilot material and is not sufficient for a contamination-resistant superiority claim.",
+    "Human-engineer references are distributions over qualified participants, not a single perfect gold implementation.",
+    "A score on an external benchmark is reportable only after a compatible, authorized reproduction of that benchmark's protocol."
+  ]
+}
