@@ -457,7 +457,7 @@ pub fn fit_random_forest_v1(
         validate_training_samples(&samples)?;
     let resolved_mtry = validate_parameters(parameters, feature_count)?;
 
-    let (positive_weight, negative_weight) = match parameters.class_weighting {
+    let (positive_weight, negative_weight) = match &parameters.class_weighting {
         ForestClassWeightingV1::None => (1.0, 1.0),
         ForestClassWeightingV1::Balanced => (
             samples.len() as f64 / (2.0 * positive_count as f64),
