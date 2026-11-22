@@ -977,6 +977,33 @@ mod tests {
     }
 
     #[test]
+    fn boolean_query_targets_rank_trusted_current_and_negative_controls_separately() {
+        let target_scope = scope(Regime::Baseline, Objective::Quality);
+        let current_trusted = fixture(31, Action::A, target_scope, 0.75, 0.01);
+        let mut untrusted_retracted = fixture(32, Action::A, target_scope, 0.75, 0.01);
+        untrusted_retracted.source_trusted = false;
+        untrusted_retracted.source_retracted = true;
+
+        let index = TypedContentIndexV1::build(
+            &[current_trusted, untrusted_retracted],
+            TypedContentConfigV1 { dimension: 2_048, ..TypedContentConfigV1::default() },
+        )
+        .unwrap();
+
+        let mut safe_query = query(target_scope, Action::A, None);
+        safe_query.target_source_trusted = Some(true);
+        safe_query.target_source_retracted = Some(false);
+        let safe = index.retrieve(safe_query, 2).unwrap();
+        assert_eq!(safe.candidates[0].event_id, 31);
+
+        let mut negative_control = query(target_scope, Action::A, None);
+        negative_control.target_source_trusted = Some(false);
+        negative_control.target_source_retracted = Some(true);
+        let negative = index.retrieve(negative_control, 2).unwrap();
+        assert_eq!(negative.candidates[0].event_id, 32);
+    }
+
+    #[test]
     fn query_can_target_causal_estimand_and_evidence_quality_without_authorizing() {
         let target_scope = scope(Regime::Baseline, Objective::Quality);
         let mut item = fixture(11, Action::A, target_scope, 0.8, 0.01);
