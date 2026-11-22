@@ -178,16 +178,28 @@ impl std::fmt::Display for EchoAnalysisError {
                 "echo time {echo_time} must be finite and after second pulse at {second_pulse_time}"
             ),
             Self::WrongEchoMode { expected, actual } => {
-                write!(formatter, "trace mode {actual} does not match expected echo mode {expected}")
+                write!(
+                    formatter,
+                    "trace mode {actual} does not match expected echo mode {expected}"
+                )
             }
             Self::TooFewTraceSamples { actual } => {
-                write!(formatter, "echo trace has {actual} samples; at least three are required")
+                write!(
+                    formatter,
+                    "echo trace has {actual} samples; at least three are required"
+                )
             }
             Self::NonFiniteTraceSample { index } => {
-                write!(formatter, "echo trace sample {index} contains a non-finite value")
+                write!(
+                    formatter,
+                    "echo trace sample {index} contains a non-finite value"
+                )
             }
             Self::NonFiniteTraceInterval { index } => {
-                write!(formatter, "echo trace interval before sample {index} overflowed")
+                write!(
+                    formatter,
+                    "echo trace interval before sample {index} overflowed"
+                )
             }
             Self::NonFiniteEchoTime => write!(formatter, "predicted echo time must be finite"),
             Self::ZeroPredictedEchoMode => write!(formatter, "predicted echo mode must be nonzero"),
@@ -195,7 +207,10 @@ impl std::fmt::Display for EchoAnalysisError {
                 write!(formatter, "echo peak measurement contains invalid values")
             }
             Self::NonIncreasingTraceTime { index } => {
-                write!(formatter, "echo trace time at sample {index} is not increasing")
+                write!(
+                    formatter,
+                    "echo trace time at sample {index} is not increasing"
+                )
             }
             Self::TraceDoesNotSpanEchoTime {
                 echo_time,
@@ -206,10 +221,16 @@ impl std::fmt::Display for EchoAnalysisError {
                 "echo trace [{first_sample_time}, {last_sample_time}] does not span {echo_time}"
             ),
             Self::InvalidSignalFloor => {
-                write!(formatter, "echo signal floor must be finite and nonnegative")
+                write!(
+                    formatter,
+                    "echo signal floor must be finite and nonnegative"
+                )
             }
             Self::InvalidTimeTolerance => {
-                write!(formatter, "echo time tolerances must be finite and nonnegative")
+                write!(
+                    formatter,
+                    "echo time tolerances must be finite and nonnegative"
+                )
             }
             Self::EchoNotDetected {
                 peak_amplitude,
