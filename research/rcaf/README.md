@@ -165,3 +165,24 @@ cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_spatial_nuisan
 ```
 
 The output contract is `spatial-nuisance-field.schema.json`. It records the exact ROI labels, weighted edges, per-family rank/diffusion parameters, target coupling, deterministic RNG algorithm/seed, realised field RMS and realised temporal autocorrelation so the field can be reconstructed from the archived report. Its path-graph fixture is a toy topology, not an anatomical atlas. The current `dose` parameter is an additive loading, not a calibrated nuisance variance fraction. The module generates nuisance fields only; it does not perform preprocessing, estimate connectivity, determine causality, or qualify biological claims. The spatial simulator must still be crossed with the four matched counterfactual cells and calibrated against empirical acquisition data before any biological robustness claim is supported.
+
+
+## Event-triggered spatial transient nuisance (S3)
+
+The `motion_transient` module is a stylized event-triggered artifact family, separate from the common-mode and static spatial families. It combines:
+
+- a broad spatially constant event train;
+- one or more localized event trains with explicit seed ROIs;
+- exponential post-event decay with per-event onset, signed amplitude and decay constant;
+- graph-distance spatial localization, with edge traversal cost declared as inverse adjacency weight;
+- deterministic reuse of event and graph inputs, suitable for matched nuisance-only and signal-plus-nuisance cells.
+
+The current graph is a synthetic topology. This is not rigid-body motion, an acquisition simulator, or an empirically calibrated model of motion-induced BOLD. The event times and amplitudes are declared synthetic inputs. A physical model must eventually be driven by measured motion traces, acquisition geometry and validated signal-response models.
+
+Run the smoke fixture:
+
+```sh
+cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_motion_transient
+```
+
+The output contract is `motion-transient.schema.json`. The report captures the graph, event times/amplitudes/decay constants, seed ROIs, graph-distance loading fields and realized field magnitude. The focused workflow validates and archives it as an additional content-addressed report.
