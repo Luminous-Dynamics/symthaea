@@ -54,8 +54,19 @@ impl Default for OnlineConformalConfigV1 {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum OnlineCoverageStateV1 {
-    Qualified,
+    MonitoringInsufficient,
+    MonitoringWithinTolerance,
     CoverageDegraded,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct OnlineCoverageDiagnosticV1 {
+    pub class_positive: bool,
+    pub sample_count: usize,
+    pub miss_count: usize,
+    pub observed_miscoverage: Option<f64>,
+    pub allowed_miscoverage: f64,
+    pub exceeds_tolerance: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -128,7 +139,10 @@ pub struct OnlineConformalStateV1 {
     pub feedback_ledger: Vec<OnlineFeedbackLedgerV1>,
     pub active_label_by_prediction: BTreeMap<String, String>,
     pub coverage_history: Vec<OnlineCoverageObservationV1>,
+    pub positive_coverage: OnlineCoverageDiagnosticV1,
+    pub negative_coverage: OnlineCoverageDiagnosticV1,
     pub coverage_state: OnlineCoverageStateV1,
+    pub coverage_degraded_at_sequence: Option<u64>,
     pub update_sequence: u64,
     pub last_ingested_at: String,
     /// Hash of the complete state with this field set to the empty string.
@@ -156,6 +170,8 @@ pub struct OnlinePredictionReceiptV1 {
     pub negative_threshold: ConformalClassThresholdV1,
     pub positive_threshold: ConformalClassThresholdV1,
     pub coverage_state: OnlineCoverageStateV1,
+    pub positive_coverage: OnlineCoverageDiagnosticV1,
+    pub negative_coverage: OnlineCoverageDiagnosticV1,
     pub prediction_set: ConformalPredictionSetV1,
 }
 
@@ -187,6 +203,9 @@ pub struct OnlineFeedbackReceiptV1 {
     pub coverage_window_positive: usize,
     pub coverage_window_negative: usize,
     pub coverage_state: OnlineCoverageStateV1,
+    pub positive_coverage: OnlineCoverageDiagnosticV1,
+    pub negative_coverage: OnlineCoverageDiagnosticV1,
+    pub coverage_degraded_at_sequence: Option<u64>,
     pub available_at: String,
     pub ingested_at: String,
     pub label_delay_micros: i64,
@@ -512,6 +531,8 @@ pub fn initialize_online_conformal_v1(
         ));
     }
 
+    let positive_coverage = coverage_diagnostic(&[], true, &config);
+    let negative_coverage = coverage_diagnostic(&[], false, &config);
     let mut state = OnlineConformalStateV1 {
         schema: ONLINE_STATE_SCHEMA_V1.into(),
         state_id: subject.case_id.clone(),
@@ -527,7 +548,10 @@ pub fn initialize_online_conformal_v1(
         feedback_ledger: Vec::new(),
         active_label_by_prediction: BTreeMap::new(),
         coverage_history: Vec::new(),
-        coverage_state: OnlineCoverageStateV1::Qualified,
+        positive_coverage,
+        negative_coverage,
+        coverage_state: OnlineCoverageStateV1::MonitoringInsufficient,
+        coverage_degraded_at_sequence: None,
         update_sequence: 0,
         last_ingested_at: cutoff.cutoff_time.clone(),
         state_sha256: String::new(),
@@ -624,6 +648,8 @@ pub fn predict_online_conformal_v1(
         negative_threshold,
         positive_threshold,
         coverage_state: state.coverage_state.clone(),
+        positive_coverage: state.positive_coverage.clone(),
+        negative_coverage: state.negative_coverage.clone(),
         prediction_set,
     })
 }
@@ -867,21 +893,26 @@ pub fn ingest_online_metrology_feedback_v1(
     state.graph_sha256 = snapshot.graph_sha256;
     state.cutoff_id = cutoff.cutoff_id.clone();
 
-    for positive in [false, true] {
-        let observations: Vec<&OnlineCoverageObservationV1> = state
-            .coverage_history
-            .iter()
-            .filter(|row| row.positive == positive)
-            .collect();
-        if observations.len() >= state.config.minimum_coverage_observations_per_class {
-            let errors = observations.iter().filter(|row| !row.covered).count();
-            let observed_miscoverage = errors as f64 / observations.len() as f64;
-            if observed_miscoverage
-                > state.config.alpha + state.config.maximum_miscoverage_excess
-            {
-                state.coverage_state = OnlineCoverageStateV1::CoverageDegraded;
-            }
-        }
+    state.positive_coverage =
+        coverage_diagnostic(&state.coverage_history, true, &state.config);
+    state.negative_coverage =
+        coverage_diagnostic(&state.coverage_history, false, &state.config);
+    if state.positive_coverage.exceeds_tolerance || state.negative_coverage.exceeds_tolerance {
+        state.coverage_state = OnlineCoverageStateV1::CoverageDegraded;
+        state.coverage_degraded_at_sequence.get_or_insert(next_sequence);
+    } else if !matches!(
+        &state.coverage_state,
+        OnlineCoverageStateV1::CoverageDegraded
+    ) {
+        let monitoring_has_support = state.positive_coverage.sample_count
+            >= state.config.minimum_coverage_observations_per_class
+            && state.negative_coverage.sample_count
+                >= state.config.minimum_coverage_observations_per_class;
+        state.coverage_state = if monitoring_has_support {
+            OnlineCoverageStateV1::MonitoringWithinTolerance
+        } else {
+            OnlineCoverageStateV1::MonitoringInsufficient
+        };
     }
     update_state_digest(state)?;
     let (residual_positive, residual_negative, coverage_positive, coverage_negative) =
@@ -897,6 +928,9 @@ pub fn ingest_online_metrology_feedback_v1(
         coverage_window_positive: coverage_positive,
         coverage_window_negative: coverage_negative,
         coverage_state: state.coverage_state.clone(),
+        positive_coverage: state.positive_coverage.clone(),
+        negative_coverage: state.negative_coverage.clone(),
+        coverage_degraded_at_sequence: state.coverage_degraded_at_sequence,
         available_at: graph_label.available_at.clone(),
         ingested_at: cutoff.cutoff_time.clone(),
         label_delay_micros,
@@ -1083,7 +1117,10 @@ mod tests {
         .unwrap();
         assert_eq!(receipt.model_sha256, MODEL_SHA);
         assert!(valid_sha256(&receipt.calibration_state_sha256));
-        assert!(matches!(&receipt.coverage_state, OnlineCoverageStateV1::Qualified));
+        assert!(matches!(
+            &receipt.coverage_state,
+            OnlineCoverageStateV1::MonitoringInsufficient
+        ));
         assert!(verify_state(&state).is_ok());
     }
 
