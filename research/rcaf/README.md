@@ -213,3 +213,16 @@ cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_factorial_coun
 ```
 
 The fixture applies the same target signal to four synthetic nuisance families: common-mode, graph-smooth low-rank, localized heat-kernel and event-triggered motion-like transient. All four nuisance matrices are calibrated against the same clean observations to a requested 10% component-variance fraction using `calibrate_nuisance_matrix_to_component_fraction`; requested and realized fractions and clean–nuisance covariance remain separately visible. This example is a software integration fixture, not a physical or biological simulation. The output contract is `factorial-counterfactual.schema.json`. The complete design, benchmark targets and industry comparison protocol are specified in `docs/neuroscience/RCAF_FACTORIAL_COUNTERFACTUAL_ENGINE_V1.md`.
+
+
+## Matched factorial signal × nuisance dose-response surface
+
+The `factorial_dose_response` module varies target-signal amplitude and nuisance component-variance fraction while holding the underlying target and nuisance innovations fixed. For each point, it runs the four-cell engine `X`, `X+S`, `X+A`, `X+S+A`. It uses common random numbers across the grid: changing dose scales the frozen matrices instead of regenerating them. This makes neighbouring points directly comparable without stochastic redraw noise.
+
+Run the 4 × 4 S3 transient smoke surface:
+
+```sh
+cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_factorial_dose_response
+```
+
+The example crosses signal scales `[0, 0.5, 1, 2]` with nuisance component-variance fractions `[0, 0.05, 0.10, 0.20]`. The report stores raw innovation fingerprints, every four-cell report, requested/realized fractions, covariance, combined variance and matched-cell invariants. The focused workflow validates exact zero controls and stable nuisance-only fingerprints across signal strengths, then hashes and archives the report. This is a construction/calibration surface only; estimator recovery, null false-positive rates and confidence coverage are the next qualification layer. The output contract is `factorial-dose-response.schema.json`, with the design specified in `docs/neuroscience/RCAF_FACTORIAL_DOSE_RESPONSE_SURFACE_V1.md`.
