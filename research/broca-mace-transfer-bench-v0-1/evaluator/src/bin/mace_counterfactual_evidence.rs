@@ -72,6 +72,7 @@ struct EvidenceDependencyIndex {
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum IndexError {
     DuplicateEventId(u32),
+    InvalidDecisionNeed,
 }
 
 impl EvidenceDependencyIndex {
@@ -480,6 +481,9 @@ fn run_candidate(
     memory: &[Experience],
 ) -> Result<CandidateObservation, IndexError> {
     let started = Instant::now();
+    if !decision_need.is_valid() || decision_need.scope != query.scope {
+        return Err(IndexError::InvalidDecisionNeed);
+    }
     let index = EvidenceDependencyIndex::build(memory)?;
     let evidence_sha256 = index.baseline_evidence_digest();
     let input_sha256 = candidate_input_digest(decision_need, &evidence_sha256);
@@ -628,7 +632,6 @@ fn run() -> Result<(), String> {
             "candidate_input_sha256": baseline.input_sha256,
             "decision_need_sha256": case.decision_need.canonical_digest().to_hex(),
             "candidate_evidence_sha256": baseline.evidence_sha256,
-            "intervention_id": "full_evidence_reference",
             "decision": action_name(baseline.decision.action),
             "decision_support_event_ids": baseline.decision.evidence_ids,
             "support_event_count": baseline_support.0,
@@ -930,6 +933,28 @@ mod tests {
             .unwrap()
             .baseline_evidence_digest();
         assert_ne!(before, after);
+    }
+
+    #[test]
+    fn candidate_rejects_invalid_or_scope_mismatched_decision_need() {
+        let case = generated_worlds(1).remove(0);
+        let mut invalid_need = case.decision_need;
+        invalid_need.schema_version = 99;
+        assert_eq!(
+            run_candidate(case.query, invalid_need, &case.memory).unwrap_err(),
+            IndexError::InvalidDecisionNeed
+        );
+
+        let wrong_scope = Query {
+            scope: Scope {
+                regime: Regime::Shifted,
+                objective: case.query.scope.objective,
+            },
+        };
+        assert_eq!(
+            run_candidate(wrong_scope, case.decision_need, &case.memory).unwrap_err(),
+            IndexError::InvalidDecisionNeed
+        );
     }
 
     #[test]
