@@ -674,9 +674,9 @@ mod tests {
         let ids = [10_u64, 20, 30];
         let alternatives = (0_u64..8)
             .map(|mask| {
-                let a = u64::from(mask & 1 != 0);
-                let b = u64::from(mask & 2 != 0);
-                let c = u64::from(mask & 4 != 0);
+                let a = if mask & 1 != 0 { 1_u64 } else { 0_u64 };
+                let b = if mask & 2 != 0 { 1_u64 } else { 0_u64 };
+                let c = if mask & 4 != 0 { 1_u64 } else { 0_u64 };
                 let ab = a * b;
                 let abc = a * b * c;
 
