@@ -473,3 +473,44 @@ The industry scores are not directly comparable with MACE's synthetic utility/re
 3. Add explicit receipt-bound supersession history/edge semantics for lifecycle knockouts; do not infer them from current status.
 4. Move evaluator labels/seed custody out of the candidate repository and qualify the manifest under a separately held evaluator.
 5. Execute exact-head Rust formatting, compilation and tests on a real toolchain, then publish receipts. Skipped hosted checks remain skipped, not passes.
+
+
+## 13. New ICML 2026 memory paradigms and MACE comparator design (2026-11-22)
+
+Three recent ICML 2026 methods sharpen the research gap:
+
+1. **MRAgent — active memory reconstruction.** It rejects a rigid retrieve-then-reason pipeline and reconstructs memory paths dynamically as intermediate reasoning discovers new cues. The paper reports gains up to 23% over strong baselines on LoCoMo and LongMemEval with lower retrieval cost. MACE should include an active-reconstruction arm: evidence paths can be expanded, pruned or revised as the task contract is refined, while every resolved node still passes the same scope/provenance/lifecycle gates.
+2. **MemoPilot — learned memory update policy.** It treats memory updating as a multi-turn decision problem and uses multi-turn GRPO to optimize updates for downstream performance of a frozen agent. It reports first-place Elo of 1762 on Limit Texas Hold'em and 1590 on Rock-Paper-Scissors. Those game-specific metrics are not comparable to MACE or general memory benchmarks; the transferable research idea is explicit credit assignment for *when and how memory changes*.
+3. **Darwinian Memory — utility-driven pruning.** It decomposes long trajectories into reusable units and applies utility-driven selection/pruning, reporting mean gains of 18.0% in success rate and 33.9% in execution stability on its multi-app GUI evaluation, alongside reduced latency. MACE should test governed pruning as a baseline, but add hard anti-poisoning, source-lineage, revocation, and worst-family regret gates. Utility selection alone must not authorize promotion or forgetting.
+
+WorldMemArena independently motivates the same move from snapshot retrieval to a lifecycle: write, maintain, retrieve and use over action–world interaction. Its public benchmark describes 400 multimodal multi-session tasks and notes that recall/storage quality does not guarantee use-time correctness, with costly and brittle performance in harder agentic regimes.
+
+### How MACE should beat the frontier without making a misleading SOTA claim
+
+The target is not to claim one architecture wins all benchmark scores. It is to demonstrate a better *Pareto frontier* on a matched frozen backbone and resource budget:
+
+- **Quality:** downstream task success, decision utility, regret and calibration.
+- **Evidence validity:** false independence, stale/revoked use, wrong scope/estimand, unknown ancestry and unsupported causal claims.
+- **Adaptation:** useful active reconstruction, selective verification, re-observation and bounded experimentation.
+- **Lifecycle:** promote, compress, supersede, quarantine, forget-from-index and privacy erase as separate decisions with independent receipts.
+- **Economics:** all-in bytes, receipt/index/tombstone overhead, background consolidation compute, model/tool tokens, p50/p95/p99 latency, and energy/cost where measurable.
+- **Distribution shift:** per-family and worst-regime degradation, not only pooled means.
+
+The next baseline matrix under #8427 should include:
+- full-history and no-memory controls;
+- BM25, dense retrieval, hybrid retrieval and a strong reranker;
+- versioned key-value/file memory;
+- static HDC, HDC-LTC and typed-content HDC;
+- MRAgent-style active associative reconstruction;
+- MemoPilot-style learned memory update policy over a frozen backbone;
+- Darwinian-style utility pruning;
+- receipt-governed MACE consolidation/decision-sufficient memory;
+- oracle upper bounds clearly labelled evaluator-only.
+
+These are method comparators, not scores to average together. Reproduce the published systems under their own native evaluation protocols first; then run a separate matched-budget common suite where an exact adapter exists. MemoPilot's board-game Elo, Darwinian Memory's GUI success/stability percentages, MRAgent's LoCoMo/LongMemEval gains, AML's track scores and MACE's synthetic utility/regret must stay in different columns.
+
+### AML Cycle 2 submission implications
+
+Cycle 2 is closed. Its official results were published November 19, 2026. For a future cycle, repository publication is not enough: every entrant must host stable participant-operated Add and Search endpoints; the platform does not deploy a repository-only or Docker-only system. Open-source Methods also have declared embedding/LLM component restrictions, with rerankers treated separately in the current guide. Therefore, preserve an AML-compliant hosted adapter as a distinct integration profile rather than silently substituting the MACE HDC encoder into a component slot constrained by the next official rules. Re-check the next cycle's exact API/model rules when it opens.
+
+Sources: MRAgent (https://proceedings.mlr.press/v306/ji26d.html); MemoPilot (https://proceedings.mlr.press/v306/cai26b.html); Darwinian Memory (https://proceedings.mlr.press/v306/mi26b.html); WorldMemArena (https://worldmemarena-mem.github.io/); AML Cycle 2 results (https://agentmemoryleaderboard.ai/results/cycle-2/); AML participation/API rules (https://agentmemories.ai/rules).
