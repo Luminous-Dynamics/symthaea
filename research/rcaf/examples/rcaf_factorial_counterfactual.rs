@@ -102,7 +102,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         seed: 0x5243_4146_4641_4354,
     };
     let graph_field = generate_spatial_nuisance_field(&graph, &base, None)?;
-    let (calibrated_graph, graph_calibration) =
+    let (calibrated_graph, _graph_calibration) =
         calibrate_spatial_nuisance_to_component_fraction(&clean, &graph_field, 0.10)?;
     let graph_smooth = run_family(
         "graph_smooth_low_rank",
@@ -110,7 +110,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         &clean,
         &signal,
         &calibrated_graph.values,
-        Some(graph_calibration.realized_component_variance_fraction),
+        Some(0.10),
     )?;
 
     let heat_config = SpatialNuisanceConfig {
@@ -121,7 +121,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         ..base
     };
     let heat_field = generate_spatial_nuisance_field(&graph, &heat_config, None)?;
-    let (calibrated_heat, heat_calibration) =
+    let (calibrated_heat, _heat_calibration) =
         calibrate_spatial_nuisance_to_component_fraction(&clean, &heat_field, 0.10)?;
     let heat_kernel = run_family(
         "heat_kernel_localized",
@@ -129,7 +129,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         &clean,
         &signal,
         &calibrated_heat.values,
-        Some(heat_calibration.realized_component_variance_fraction),
+        Some(0.10),
     )?;
 
     let common_mode = run_family(
