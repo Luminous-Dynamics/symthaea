@@ -664,3 +664,16 @@ The subject binds the prediction packet, model, uncertainty-calibration artifact
 The frozen five-candidate synthetic fixture uses a 13-unit budget and selects B/E (cost 13; modeled utility 0.3115). These are synthetic scheduler outputs, not measured PPA gains or executed simulator calls. The oracle does not execute SPICE/TCAD/route and does not approve designs.
 
 Hosted run [#44989958104](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44989958104) passed 43/43 Rust tests, 46/46 Python reference tests, fmt, Clippy and four Rust CLI report checks, including the new acquisition report.
+
+
+## Verified budgeted multi-fidelity acquisition baseline
+
+The Rust crate now contains `mf_acquisition.rs` and CLI `semi-mf-acquire`. It exactly selects a candidate subset under a high-fidelity cost budget (up to 18 candidates) using:
+
+`expected_feasible_hv_gain + exploration_weight × epistemic_stddev × frontier_relevance`
+
+The acquisition subject binds the prediction packet, model, uncertainty-calibration artifact and objective specification by SHA-256. The output is a scheduling recommendation only; it does not execute a simulator or approve the design.
+
+On the frozen five-candidate synthetic fixture, budget 13 selects B/E (cost 13; modeled utility 0.3115). This is only a known-answer result.
+
+Hosted run [#44990125209](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44990125209) passed **43/43 Rust tests**, **46/46 Python reference tests**, rustfmt, Clippy and all seven CLI/report comparisons (three Python and four Rust).
