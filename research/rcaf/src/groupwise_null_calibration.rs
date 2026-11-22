@@ -347,10 +347,12 @@ pub fn calibrate_groupwise_null(
     let mut thresholds = vec![[None; 3]; expected.len()];
     let mut minimum_resolvable = vec![1.0; expected.len()];
     for (stratum_index, stratum) in expected.iter().enumerate() {
-        let observations = calibration_by_stratum.get(stratum).map_or(&[][..], Vec::as_slice);
+        let observations = calibration_by_stratum
+            .get(stratum)
+            .map_or(&[][..], |items| items.as_slice());
         minimum_resolvable[stratum_index] = 1.0 / (observations.len() as f64 + 1.0);
-        for estimator_index in 0..ESTIMATOR_IDS.len() {
-            thresholds[stratum_index][estimator_index] = upper_tail_threshold(
+        for (estimator_index, threshold) in thresholds[stratum_index].iter_mut().enumerate() {
+            *threshold = upper_tail_threshold(
                 observations
                     .iter()
                     .map(|item| item.statistics[estimator_index])
@@ -763,13 +765,19 @@ mod tests {
         let report = calibrate_groupwise_null(&calibration(), &evaluation(), &config()).unwrap();
         assert_eq!(report.strata.len(), 3);
         assert_eq!(report.estimators.len(), 3);
-        for estimator_index in 0..3 {
-            let first = report.strata[0].estimators[estimator_index].stratum_critical_value.unwrap();
-            let second = report.strata[1].estimators[estimator_index].stratum_critical_value.unwrap();
-            let third = report.strata[2].estimators[estimator_index].stratum_critical_value.unwrap();
+        for (estimator_index, estimator_guard) in report.estimators.iter().enumerate() {
+            let first = report.strata[0].estimators[estimator_index]
+                .stratum_critical_value
+                .unwrap();
+            let second = report.strata[1].estimators[estimator_index]
+                .stratum_critical_value
+                .unwrap();
+            let third = report.strata[2].estimators[estimator_index]
+                .stratum_critical_value
+                .unwrap();
             assert!(first < second && second < third);
             assert_eq!(
-                report.estimators[estimator_index]
+                estimator_guard
                     .worst_observed_guard_fpr
                     .as_ref()
                     .unwrap()
@@ -777,8 +785,8 @@ mod tests {
                     .successes,
                 5
             );
-            assert!(report.estimators[estimator_index].all_strata_resolvable);
-            assert!(report.estimators[estimator_index].all_strata_evaluated);
+            assert!(estimator_guard.all_strata_resolvable);
+            assert!(estimator_guard.all_strata_evaluated);
         }
     }
 
