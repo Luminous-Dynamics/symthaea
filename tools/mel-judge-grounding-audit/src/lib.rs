@@ -303,6 +303,8 @@ fn audit_panel(panel: &ProbePanelV1) -> Result<GroundingReport, String> {
                             candidate_a_absolute_score_drift: None,
                             candidate_b_absolute_score_drift: None,
                             maximum_absolute_score_drift: None,
+                            pair_margin_absolute_drift: None,
+                            maximum_margin_shift_threshold: None,
                             reason:
                                 "baseline pair margin is below the configured evaluability floor"
                                     .to_owned(),
