@@ -305,6 +305,50 @@ mod tests {
     }
 
     #[test]
+    fn free_streaming_matches_independent_continuous_characteristic_solution() {
+        let config = config();
+        let alpha = 1.0e-2;
+        let mode = 1usize;
+        let thermal_speed = 1.0;
+        let time = 2.375;
+        let initial = maxwellian_perturbation(config, alpha, mode, thermal_speed).unwrap();
+        let mut solver = VlasovPoisson1d1v::new(config, initial).unwrap();
+
+        let mut maxwellian: Vec<f64> = (0..config.nv)
+            .map(|iv| {
+                let velocity = config.velocity(iv);
+                (-0.5 * (velocity / thermal_speed).powi(2)).exp()
+                    / (std::f64::consts::TAU.sqrt() * thermal_speed)
+            })
+            .collect();
+        let normalization = maxwellian.iter().sum::<f64>() * config.dv();
+        for value in &mut maxwellian {
+            *value /= normalization;
+        }
+
+        solver.advance_free_streaming(time).unwrap();
+        let wave_number = std::f64::consts::TAU * mode as f64 / config.domain_length;
+        let mut maximum_error = 0.0_f64;
+        let mut reference_scale = 0.0_f64;
+        for ix in 0..config.nx {
+            for iv in 0..config.nv {
+                let phase =
+                    wave_number * (config.x(ix) - config.velocity(iv) * time);
+                let expected = maxwellian[iv] * (1.0 + alpha * phase.cos());
+                let observed = solver.distribution[ix * config.nv + iv];
+                maximum_error = maximum_error.max((observed - expected).abs());
+                reference_scale = reference_scale.max(expected.abs());
+            }
+        }
+
+        let relative_error = maximum_error / reference_scale.max(f64::MIN_POSITIVE);
+        assert!(
+            relative_error < 1.0e-11,
+            "free-streaming characteristic relative error = {relative_error:e}"
+        );
+    }
+
+    #[test]
     fn finite_velocity_grid_has_predicted_nyquist_encounter_and_recurrence() {
         let config = config();
         let mut solver = initial_solver();
