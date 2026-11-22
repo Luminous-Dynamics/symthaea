@@ -942,6 +942,17 @@ b5.wav,9\n";
     }
 
     #[test]
+    fn alternate_prediction_identifier_alias_is_accepted_and_reported() {
+        let predictions = b"wave_file_name,pred_score\na0.wav,0\na1.wav,1\na2.wav,2\na3.wav,3\na4.wav,4\na5.wav,5\nb0.wav,6\nb1.wav,7\nb2.wav,8\nb3.wav,9\nb4.wav,10\nb5.wav,9\n";
+        let report = score_csv(METADATA.as_bytes(), predictions, "alternate-output", 0, 11)
+            .expect("wave_file_name prediction alias should be accepted");
+        assert_eq!(report.metadata_id_column, "wave_file_name");
+        assert_eq!(report.prediction_id_column, "wave_file_name");
+        assert_eq!(report.target_score_column, "average_semantic_alignement_score");
+        assert_eq!(report.metrics.srcc, Some(1.0));
+    }
+
+    #[test]
     fn baseline_preprocessed_metadata_dialect_is_accepted_and_reported() {
         let metadata = b"wav_file_name,text,average_score\na.wav,calm piano,6.0\nb.wav,bright jazz,8.0\n";
         let predictions = b"wav_file_name,pred_score\nb.wav,8.0\na.wav,6.0\n";
