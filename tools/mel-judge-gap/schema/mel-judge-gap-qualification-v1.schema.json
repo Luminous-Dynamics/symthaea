@@ -68,7 +68,7 @@
       "required": ["item_id", "reference_strength_logit"],
       "properties": {
         "item_id": { "type": "string", "minLength": 1 },
-        "reference_strength_logit": { "type": "number" },
+        "reference_strength_logit": { "type": "number" }
       }
     },
     "difficulty_bin": {
