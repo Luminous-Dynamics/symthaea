@@ -1,4 +1,4 @@
-use crate::{canonical_token, hash_field, ManufacturingContractError};
+use crate::{ManufacturingContractError, canonical_token, hash_field};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use symthaea_manufacturing_process::ProcessDefinitionId;
@@ -317,11 +317,16 @@ fn validate_mainline_dag(
     plan: &ProcessPlanV1,
     nodes_by_id: &BTreeMap<&str, &ProcessPlanNodeV1>,
 ) -> Result<(), ManufacturingContractError> {
-    let mut indegree: BTreeMap<&str, usize> =
-        nodes_by_id.keys().map(|id| (*id, 0_usize)).collect();
+    let mut indegree: BTreeMap<&str, usize> = nodes_by_id.keys().map(|id| (*id, 0_usize)).collect();
     let mut outgoing: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
-    for edge in plan.edges.iter().filter(|edge| edge.kind != PlanEdgeKindV1::Rework) {
-        *indegree.get_mut(edge.to.as_str()).expect("validated target") += 1;
+    for edge in plan
+        .edges
+        .iter()
+        .filter(|edge| edge.kind != PlanEdgeKindV1::Rework)
+    {
+        *indegree
+            .get_mut(edge.to.as_str())
+            .expect("validated target") += 1;
         outgoing
             .entry(edge.from.as_str())
             .or_default()
@@ -360,9 +365,10 @@ fn validate_mainline_dag(
     let finals = nodes_by_id
         .keys()
         .filter(|id| {
-            !plan.edges.iter().any(|edge| {
-                edge.kind != PlanEdgeKindV1::Rework && edge.from.as_str() == **id
-            })
+            !plan
+                .edges
+                .iter()
+                .any(|edge| edge.kind != PlanEdgeKindV1::Rework && edge.from.as_str() == **id)
         })
         .count();
     if finals != 1 {
@@ -404,24 +410,33 @@ fn validate_reachability(
     plan: &ProcessPlanV1,
     nodes_by_id: &BTreeMap<&str, &ProcessPlanNodeV1>,
 ) -> Result<(), ManufacturingContractError> {
-    let mut incoming: BTreeMap<&str, usize> =
-        nodes_by_id.keys().map(|id| (*id, 0_usize)).collect();
-    for edge in plan.edges.iter().filter(|edge| edge.kind != PlanEdgeKindV1::Rework) {
-        *incoming.get_mut(edge.to.as_str()).expect("validated target") += 1;
+    let mut incoming: BTreeMap<&str, usize> = nodes_by_id.keys().map(|id| (*id, 0_usize)).collect();
+    for edge in plan
+        .edges
+        .iter()
+        .filter(|edge| edge.kind != PlanEdgeKindV1::Rework)
+    {
+        *incoming
+            .get_mut(edge.to.as_str())
+            .expect("validated target") += 1;
     }
     let start = incoming
         .iter()
         .find_map(|(id, degree)| (*degree == 0).then_some(*id))
-        .ok_or(ManufacturingContractError::Invalid("missing mainline start"))?;
+        .ok_or(ManufacturingContractError::Invalid(
+            "missing mainline start",
+        ))?;
     let mut seen = BTreeSet::new();
     let mut queue = VecDeque::from([start]);
     while let Some(id) = queue.pop_front() {
         if !seen.insert(id) {
             continue;
         }
-        for edge in plan.edges.iter().filter(|edge| {
-            edge.kind != PlanEdgeKindV1::Rework && edge.from.as_str() == id
-        }) {
+        for edge in plan
+            .edges
+            .iter()
+            .filter(|edge| edge.kind != PlanEdgeKindV1::Rework && edge.from.as_str() == id)
+        {
             queue.push_back(edge.to.as_str());
         }
     }
