@@ -15,6 +15,7 @@ struct MusicalTimingPanelV1 {
     instrument_scope: String,
     reference_grid_receipt_sha256: String,
     onset_capture_receipt_sha256: String,
+    clock_calibration_receipt_sha256: String,
     policy: TimingPolicyV1,
     tempo_segments: Vec<TempoSegmentV1>,
     target_events: Vec<TargetEventV1>,
@@ -67,6 +68,7 @@ struct TempoEstimateV1 {
     estimate_id: String,
     segment_id: String,
     observed_at_ns: u64,
+    evidence_window_end_ns: u64,
     estimated_period_ns: u64,
     confidence: f64,
     provenance_sha256: String,
@@ -413,6 +415,10 @@ fn validate_header(panel: &MusicalTimingPanelV1) -> Result<(), String> {
     require_text(&panel.instrument_scope, "instrument_scope")?;
     require_digest(&panel.reference_grid_receipt_sha256, "reference grid receipt")?;
     require_digest(&panel.onset_capture_receipt_sha256, "onset capture receipt")?;
+    require_digest(
+        &panel.clock_calibration_receipt_sha256,
+        "clock calibration receipt",
+    )?;
     if panel.claim_ceiling.is_empty() || panel.claim_ceiling.iter().any(|s| s.trim().is_empty()) {
         return Err("claim_ceiling must contain explicit non-empty limits".to_owned());
     }
@@ -506,6 +512,12 @@ fn validate_estimates<'a>(
             || !(0.0..=1.0).contains(&estimate.confidence)
         {
             return Err(format!("tempo estimate {} has invalid values", estimate.estimate_id));
+        }
+        if estimate.evidence_window_end_ns > estimate.observed_at_ns {
+            return Err(format!(
+                "tempo estimate {} references future evidence",
+                estimate.estimate_id
+            ));
         }
         if previous_time.is_some_and(|time| estimate.observed_at_ns < time) {
             return Err("tempo estimate observations must be monotonic".to_owned());
