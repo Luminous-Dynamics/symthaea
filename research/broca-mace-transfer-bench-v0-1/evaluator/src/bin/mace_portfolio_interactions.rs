@@ -601,11 +601,11 @@ fn actual_utility(ids: &[u8], truth: &OracleTruth) -> Option<i64> {
 
 #[derive(Clone, Copy, Debug, Default)]
 struct IntervalMetrics {
-    conformal_correct_label_pairs: u64,
+    conformal_evaluated_pairs: u64,
     conformal_covered_pairs: u64,
-    ood_stable_correct_label_pairs: u64,
+    ood_stable_evaluated_pairs: u64,
     ood_stable_covered_pairs: u64,
-    shifted_correct_label_pairs: u64,
+    shifted_evaluated_pairs: u64,
     shifted_covered_pairs: u64,
     relation_label_errors: u64,
     unknown_relation_pairs: u64,
@@ -623,45 +623,46 @@ fn update_interval_metrics(
             let Some(true_relation) = truth.true_relations.get(&key) else {
                 continue;
             };
-            let Some(predicted_relation) = candidate.pair_relations.get(&key) else {
-                metrics.unknown_relation_pairs += 1;
-                continue;
-            };
-            if *predicted_relation == Relation::Unknown {
-                metrics.unknown_relation_pairs += 1;
-                continue;
-            }
-            if predicted_relation != true_relation {
-                metrics.relation_label_errors += 1;
-                continue;
-            }
-            let Some(estimate) = model.estimates.get(predicted_relation) else {
-                continue;
-            };
             let Some(actual) = truth.pair_values_micros.get(&key) else {
                 continue;
             };
-            let covered = *actual >= estimate.lower_bound_micros
-                && *actual <= estimate.upper_bound_micros;
-            match (candidate.regime, candidate.task_family) {
-                (Regime::Stable, 3) => {
-                    metrics.conformal_correct_label_pairs += 1;
-                    if covered {
-                        metrics.conformal_covered_pairs += 1;
+
+            // Coverage is evaluated against evaluator-owned true relation
+            // classes, independently of the candidate's noisy relation label.
+            if let Some(estimate) = model.estimates.get(true_relation) {
+                let covered = *actual >= estimate.lower_bound_micros
+                    && *actual <= estimate.upper_bound_micros;
+                match (candidate.regime, candidate.task_family) {
+                    (Regime::Stable, 3) => {
+                        metrics.conformal_evaluated_pairs += 1;
+                        if covered {
+                            metrics.conformal_covered_pairs += 1;
+                        }
+                    }
+                    (Regime::Stable, _) => {
+                        metrics.ood_stable_evaluated_pairs += 1;
+                        if covered {
+                            metrics.ood_stable_covered_pairs += 1;
+                        }
+                    }
+                    (Regime::Shifted, _) => {
+                        metrics.shifted_evaluated_pairs += 1;
+                        if covered {
+                            metrics.shifted_covered_pairs += 1;
+                        }
                     }
                 }
-                (Regime::Stable, _) => {
-                    metrics.ood_stable_correct_label_pairs += 1;
-                    if covered {
-                        metrics.ood_stable_covered_pairs += 1;
-                    }
+            }
+
+            // Feature-classifier quality is a separate diagnostic.
+            match candidate.pair_relations.get(&key) {
+                None | Some(Relation::Unknown) => {
+                    metrics.unknown_relation_pairs += 1;
                 }
-                (Regime::Shifted, _) => {
-                    metrics.shifted_correct_label_pairs += 1;
-                    if covered {
-                        metrics.shifted_covered_pairs += 1;
-                    }
+                Some(predicted_relation) if predicted_relation != true_relation => {
+                    metrics.relation_label_errors += 1;
                 }
+                Some(_) => {}
             }
         }
     }
@@ -905,13 +906,13 @@ fn report() {
         pairwise_total.false_redundancy += pairwise.false_redundancy;
         pairwise_total.pairwise_abstentions += pairwise.pairwise_abstentions;
         paired.extend(differences);
-        interval_total.conformal_correct_label_pairs +=
+        interval_total.conformal_evaluated_pairs +=
             intervals.conformal_correct_label_pairs;
         interval_total.conformal_covered_pairs += intervals.conformal_covered_pairs;
-        interval_total.ood_stable_correct_label_pairs +=
+        interval_total.ood_stable_evaluated_pairs +=
             intervals.ood_stable_correct_label_pairs;
         interval_total.ood_stable_covered_pairs += intervals.ood_stable_covered_pairs;
-        interval_total.shifted_correct_label_pairs += intervals.shifted_correct_label_pairs;
+        interval_total.shifted_evaluated_pairs += intervals.shifted_correct_label_pairs;
         interval_total.shifted_covered_pairs += intervals.shifted_covered_pairs;
         interval_total.relation_label_errors += intervals.relation_label_errors;
         interval_total.unknown_relation_pairs += intervals.unknown_relation_pairs;
@@ -953,7 +954,7 @@ fn report() {
             / interval_total.conformal_correct_label_pairs.max(1) as f64
     );
     println!(
-        "conformal_correctly_labelled_pairs={}",
+        "conformal_evaluated_pairs={}",
         interval_total.conformal_correct_label_pairs
     );
     println!(
@@ -962,7 +963,7 @@ fn report() {
             / interval_total.ood_stable_correct_label_pairs.max(1) as f64
     );
     println!(
-        "ood_stable_correctly_labelled_pairs={}",
+        "ood_stable_evaluated_pairs={}",
         interval_total.ood_stable_correct_label_pairs
     );
     println!(
@@ -971,7 +972,7 @@ fn report() {
             / interval_total.shifted_correct_label_pairs.max(1) as f64
     );
     println!(
-        "shifted_correctly_labelled_pairs={}",
+        "shifted_evaluated_pairs={}",
         interval_total.shifted_correct_label_pairs
     );
     println!("relation_label_errors={}", interval_total.relation_label_errors);
