@@ -559,6 +559,7 @@ fn run() -> Result<(), String> {
             "baseline_evidence_sha256": manifest.baseline_evidence_sha256,
             "public_seed": manifest.seed,
             "intervention_count": manifest.interventions.len(),
+            "interventions": manifest.interventions,
             "known_root_count": EvidenceDependencyIndex::build(&case.memory)
                 .map_err(|error| format!("dependency index failed: {error:?}"))?
                 .known_root_count(),
