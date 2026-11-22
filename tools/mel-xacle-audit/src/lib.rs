@@ -948,13 +948,17 @@ b5.wav,9\n";
             .expect("wave_file_name prediction alias should be accepted");
         assert_eq!(report.metadata_id_column, "wave_file_name");
         assert_eq!(report.prediction_id_column, "wave_file_name");
-        assert_eq!(report.target_score_column, "average_semantic_alignement_score");
+        assert_eq!(
+            report.target_score_column,
+            "average_semantic_alignement_score"
+        );
         assert_eq!(report.metrics.srcc, Some(1.0));
     }
 
     #[test]
     fn baseline_preprocessed_metadata_dialect_is_accepted_and_reported() {
-        let metadata = b"wav_file_name,text,average_score\na.wav,calm piano,6.0\nb.wav,bright jazz,8.0\n";
+        let metadata =
+            b"wav_file_name,text,average_score\na.wav,calm piano,6.0\nb.wav,bright jazz,8.0\n";
         let predictions = b"wav_file_name,pred_score\nb.wav,8.0\na.wav,6.0\n";
         let report = score_csv(metadata, predictions, "baseline-dialect", 0, 9)
             .expect("baseline's preprocessed CSV dialect should be accepted");
@@ -975,7 +979,8 @@ b5.wav,9\n";
 
     #[test]
     fn ambiguous_target_aliases_are_rejected() {
-        let metadata = b"wave_file_name,average_score,average_semantic_alignement_score\na.wav,6.0,6.0\n";
+        let metadata =
+            b"wave_file_name,average_score,average_semantic_alignement_score\na.wav,6.0,6.0\n";
         let error = parse_metadata(metadata, true)
             .expect_err("both target aliases must be rejected as ambiguous");
         assert!(error.contains("multiple columns for target score"));
