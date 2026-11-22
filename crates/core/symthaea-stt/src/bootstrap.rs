@@ -119,9 +119,7 @@ impl PrototypeEncoderMetadata {
         hasher.update(self.encoder_id.as_bytes());
         let representation_id = match self.representation {
             PrototypeRepresentation::DirectMelFrameV1 => "direct_mel_frame_v1",
-            PrototypeRepresentation::DirectMelTemporalWindow7V1 => {
-                "direct_mel_temporal_window7_v1"
-            }
+            PrototypeRepresentation::DirectMelTemporalWindow7V1 => "direct_mel_temporal_window7_v1",
         };
         hasher.update(representation_id.as_bytes());
         hasher.update(&self.audio_config.sample_rate.to_le_bytes());
@@ -205,10 +203,7 @@ impl TrainedPrototypes {
     ///
     /// This is a fail-closed check: old artifacts without metadata are not
     /// assumed compatible merely because they contain 2048-bit hypervectors.
-    pub fn validate_encoder(
-        &self,
-        expected: &PrototypeEncoderMetadata,
-    ) -> Result<(), String> {
+    pub fn validate_encoder(&self, expected: &PrototypeEncoderMetadata) -> Result<(), String> {
         expected.validate()?;
         let actual = self.encoder_metadata.as_ref().ok_or_else(|| {
             "prototype artifact has no encoder metadata; legacy models require an explicit migration"
@@ -1339,17 +1334,14 @@ mod tests {
     fn prototype_encoder_metadata_is_stable_and_rejects_representation_mismatch() {
         let config = AudioConfig::default();
         let raw = PrototypeEncoderMetadata::direct_mel_frame_v1(config.clone());
-        let temporal =
-            PrototypeEncoderMetadata::direct_mel_temporal_window7_v1(config.clone());
+        let temporal = PrototypeEncoderMetadata::direct_mel_temporal_window7_v1(config.clone());
 
         assert!(raw.validate().is_ok());
         assert!(temporal.validate().is_ok());
         assert_ne!(raw.fingerprint, temporal.fingerprint);
 
-        let prototypes = TrainedPrototypes::new_with_encoder(
-            BootstrapConfig::default(),
-            raw.clone(),
-        );
+        let prototypes =
+            TrainedPrototypes::new_with_encoder(BootstrapConfig::default(), raw.clone());
         assert!(prototypes.validate_encoder(&raw).is_ok());
         assert!(prototypes.validate_encoder(&temporal).is_err());
 
@@ -1361,8 +1353,7 @@ mod tests {
     #[test]
     fn legacy_prototype_artifacts_are_not_assumed_encoder_compatible() {
         let prototypes = TrainedPrototypes::new(BootstrapConfig::default());
-        let expected =
-            PrototypeEncoderMetadata::direct_mel_frame_v1(AudioConfig::default());
+        let expected = PrototypeEncoderMetadata::direct_mel_frame_v1(AudioConfig::default());
         assert!(prototypes.validate_encoder(&expected).is_err());
 
         // Old JSON without encoder_metadata must still deserialize so it can be
@@ -1377,8 +1368,7 @@ mod tests {
 
     #[test]
     fn prototype_encoder_metadata_detects_descriptor_tampering() {
-        let mut metadata =
-            PrototypeEncoderMetadata::direct_mel_frame_v1(AudioConfig::default());
+        let mut metadata = PrototypeEncoderMetadata::direct_mel_frame_v1(AudioConfig::default());
         metadata.audio_config.sample_rate = 48_000;
         assert!(metadata.validate().is_err());
     }
