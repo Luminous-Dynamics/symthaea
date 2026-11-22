@@ -279,6 +279,30 @@ jobs:
           print("PASS: RCAF graph-smooth and heat-kernel spatial nuisance generators")
           PY
 
+      - name: Run observational equivalence and abstention reference
+        run: |
+          cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_observational_identifiability -- "$RUNNER_TEMP/rcaf-observational-identifiability.json"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import jsonschema
+
+          schema = json.loads(Path("research/rcaf/observational-identifiability.schema.json").read_text())
+          report = json.loads(Path(os.environ["RUNNER_TEMP"] + "/rcaf-observational-identifiability.json").read_text())
+          jsonschema.Draft202012Validator.check_schema(schema)
+          jsonschema.validate(report, schema)
+          equivalent = report["equivalence_case"]
+          distinct = report["distinct_control"]
+          assert equivalent["max_absolute_difference"] == 0.0
+          assert equivalent["observationally_equivalent_at_resolution"] is True
+          assert equivalent["disposition"] == "not_identifiable_abstain"
+          assert distinct["max_absolute_difference"] > distinct["resolution_tolerance"]
+          assert distinct["observationally_equivalent_at_resolution"] is False
+          assert distinct["disposition"] == "observationally_distinct_at_declared_resolution"
+          print("PASS: observational equivalence requires abstention; distinct control makes no causal claim")
+          PY
+
       - name: Build content-addressed simulation execution receipt
         run: |
           python research/rcaf/tools/build_execution_receipt.py \
@@ -290,7 +314,8 @@ jobs:
               "$RUNNER_TEMP/rcaf-estimator-tournament.json" \
               "$RUNNER_TEMP/rcaf-estimator-dose-surface.json" \
               "$RUNNER_TEMP/rcaf-common-mode-nuisance-sweep.json" \
-              "$RUNNER_TEMP/rcaf-spatial-nuisance.json"
+              "$RUNNER_TEMP/rcaf-spatial-nuisance.json" \
+              "$RUNNER_TEMP/rcaf-observational-identifiability.json"
           python - <<'PY'
           import json
           import os
@@ -305,7 +330,7 @@ jobs:
           checked_out_head = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
           assert receipt["source_commit"] == checked_out_head
           assert receipt["workflow"]["event_sha"] == os.environ["GITHUB_SHA"]
-          assert len(receipt["simulation_reports"]) == 6
+          assert len(receipt["simulation_reports"]) == 7
           assert len(receipt["source_files"]) > 0
           print("PASS: content-addressed RCAF execution receipt")
           PY
@@ -321,6 +346,7 @@ jobs:
             ${{ runner.temp }}/rcaf-estimator-dose-surface.json
             ${{ runner.temp }}/rcaf-common-mode-nuisance-sweep.json
             ${{ runner.temp }}/rcaf-spatial-nuisance.json
+            ${{ runner.temp }}/rcaf-observational-identifiability.json
             ${{ runner.temp }}/rcaf-execution-receipt.json
           if-no-files-found: error
           retention-days: 30
