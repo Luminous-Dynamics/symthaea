@@ -542,9 +542,8 @@ mod tests {
     fn model_prediction_requires_uncertainty_artifact() {
         let mut manifest = known_answer();
         manifest.runs[0].evidence_kind = "model_prediction".to_string();
-        manifest.runs[0].model_sha256 = Some(
-            "5555555555555555555555555555555555555555555555555555555555555555".to_string(),
-        );
+        manifest.runs[0].model_sha256 =
+            Some("5555555555555555555555555555555555555555555555555555555555555555".to_string());
         assert!(
             validate_dtco_lineage_v1(&manifest)
                 .unwrap_err()
@@ -557,8 +556,7 @@ mod tests {
     fn later_fidelity_stage_cannot_be_parent_of_earlier_stage() {
         let mut manifest = known_answer();
         manifest.runs[0].parent_run_ids = vec!["run-measurement".to_string()];
-        manifest.runs[0].input_artifact_sha256 =
-            manifest.runs[2].output_artifact_sha256.clone();
+        manifest.runs[0].input_artifact_sha256 = manifest.runs[2].output_artifact_sha256.clone();
         manifest.runs[2].parent_run_ids.clear();
         assert!(
             validate_dtco_lineage_v1(&manifest)
@@ -571,9 +569,8 @@ mod tests {
     #[test]
     fn root_run_must_bind_design_and_constraints_must_be_consumed() {
         let mut manifest = known_answer();
-        manifest.runs[0].input_artifact_sha256 = vec![
-            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc".to_string(),
-        ];
+        manifest.runs[0].input_artifact_sha256 =
+            vec!["cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc".to_string()];
         assert!(
             validate_dtco_lineage_v1(&manifest)
                 .unwrap_err()
@@ -582,8 +579,7 @@ mod tests {
         );
 
         let mut manifest = known_answer();
-        manifest.runs[0].input_artifact_sha256 =
-            vec![manifest.design_input_sha256.clone()];
+        manifest.runs[0].input_artifact_sha256 = vec![manifest.design_input_sha256.clone()];
         assert!(
             validate_dtco_lineage_v1(&manifest)
                 .unwrap_err()
