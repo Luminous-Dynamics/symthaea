@@ -644,6 +644,19 @@ fn candidate_evidence_digest(memory: &[Experience], need: DecisionNeedV1) -> Str
     hex(&hasher.finalize())
 }
 
+#[allow(dead_code)]
+fn candidate_evidence_digest_with_sidecar(
+    memory: &[Experience],
+    need: DecisionNeedV1,
+    sidecar: &EvidenceDependencySidecarV1,
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"luminous:mace:candidate-input-with-dependency-sidecar:v1\\0");
+    hasher.update(candidate_evidence_digest(memory, need).as_bytes());
+    hasher.update(sidecar.canonical_digest().as_bytes());
+    hex(&hasher.finalize())
+}
+
 fn decision_trace_digest(
     input_digest: &str,
     decision: &Decision,
@@ -1068,6 +1081,222 @@ mod tests {
             supersedes: Vec::new(),
             payload_bytes: 64,
         }
+    }
+
+    fn sidecar_scope() -> broca_mace_policy::Scope {
+        broca_mace_policy::Scope {
+            regime: broca_mace_policy::Regime::Baseline,
+            objective: broca_mace_policy::Objective::Quality,
+        }
+    }
+
+    fn sidecar_semantic_estimand() -> broca_mace_policy::SemanticEstimandV1 {
+        use broca_mace_policy::{EvidenceDigest256, SemanticEstimandV1};
+        SemanticEstimandV1::new(
+            1,
+            EvidenceDigest256::from_bytes([20; 32]),
+            EvidenceDigest256::from_bytes([21; 32]),
+            EvidenceDigest256::from_bytes([22; 32]),
+            EvidenceDigest256::from_bytes([23; 32]),
+            EvidenceDigest256::from_bytes([24; 32]),
+            30_000,
+            EvidenceDigest256::from_bytes([25; 32]),
+            EvidenceDigest256::from_bytes([26; 32]),
+            EvidenceDigest256::from_bytes([27; 32]),
+        )
+    }
+
+    fn sidecar_causal_identification() -> broca_mace_policy::CausalIdentificationV1 {
+        use broca_mace_policy::{CausalIdentificationV1, EvidenceDigest256, IdentificationMethodV1};
+        let semantic = sidecar_semantic_estimand();
+        CausalIdentificationV1::new(
+            IdentificationMethodV1::RandomizedControlledTrial,
+            EvidenceDigest256::from_bytes([1; 32]),
+            semantic.canonical_digest(),
+            5_000,
+            5_000,
+            50_000,
+            true,
+        )
+        .with_semantic_estimand(semantic)
+    }
+
+    fn sidecar_raw(event_id: u32) -> broca_mace_ingress::RawInteractionV1 {
+        use broca_mace_ingress::RawInteractionV1;
+        RawInteractionV1 {
+            event_id,
+            session_id: format!("session-{event_id}"),
+            task_id: format!("task-{event_id}"),
+            payload_sha256: format!("{event_id:064x}"),
+            raw_event_receipt_id: format!("raw-{event_id}"),
+            scope: sidecar_scope(),
+            action: Action::A,
+            observed_utility: 0.87,
+            utility_unit: "normalized_utility".into(),
+            valid_from_ms: 100,
+            valid_until_ms: Some(300),
+            occurred_at_ms: 170,
+            prediction_registered_at_ms: Some(150),
+            action_dispatched_at_ms: Some(170),
+            outcome_observed_at_ms: 200,
+            lineage_receipt_id: format!("lineage-{event_id}"),
+            calibration_receipt_id: format!("calibration-{event_id}"),
+            causal_assessment_receipt_id: format!("causal-{event_id}"),
+            outcome_receipt_id: format!("outcome-{event_id}"),
+        }
+    }
+
+    struct SidecarTestVerifier;
+
+    impl broca_mace_ingress::EvidenceVerifier for SidecarTestVerifier {
+        fn verify_raw_event(
+            &self,
+            _receipt_id: &str,
+            raw: &broca_mace_ingress::RawInteractionV1,
+            _known_at_ms: i64,
+        ) -> Option<broca_mace_ingress::VerifiedRawEvent> {
+            use broca_mace_ingress::{AuthorityStatus, VerifiedRawEvent};
+            Some(VerifiedRawEvent {
+                event_id: raw.event_id,
+                session_id: raw.session_id.clone(),
+                task_id: raw.task_id.clone(),
+                payload_sha256: raw.payload_sha256.clone(),
+                canonical_event_hash: "c".repeat(64),
+                authority_status: AuthorityStatus::ReceiptAttested,
+                authority_receipt_digest: "b".repeat(64),
+                valid_from_ms: raw.valid_from_ms,
+                valid_until_ms: raw.valid_until_ms,
+                occurred_at_ms: raw.occurred_at_ms,
+                received_at_ms: 220,
+                receipt_digest: format!("{:064x}", u64::from(raw.event_id) + 100),
+            })
+        }
+
+        fn verify_lineage(
+            &self,
+            _receipt_id: &str,
+            event_id: u32,
+            _scope: broca_mace_policy::Scope,
+            _known_at_ms: i64,
+        ) -> Option<broca_mace_ingress::VerifiedLineage> {
+            use broca_mace_ingress::{
+                DependencyLineageStatusV1, SourceTrustStatus, VerifiedLineage,
+            };
+            let parents = if event_id == 43 { vec![42] } else { Vec::new() };
+            Some(VerifiedLineage {
+                source_family: u16::try_from(event_id).ok()?,
+                source_root_id: event_id,
+                source_root_digest: {
+                    let mut bytes = [0_u8; 32];
+                    bytes[..4].copy_from_slice(&event_id.to_be_bytes());
+                    broca_mace_policy::SourceRootDigest::from_bytes(bytes)
+                },
+                trust_status: SourceTrustStatus::TrustedForScope,
+                trust_policy_digest: "8".repeat(64),
+                acquisition_mode: "api".into(),
+                upstream_source_id: format!("synthetic-upstream-{event_id}"),
+                source_artifact_digest: format!("{:064x}", u64::from(event_id) + 10),
+                transformation_digest: format!("{:064x}", u64::from(event_id) + 20),
+                derived_from_event_ids: parents,
+                dependency_lineage_status: DependencyLineageStatusV1::Complete,
+                dependency_manifest_digest: Some("9".repeat(64)),
+                issuer_id: "did:key:test-source-ledger".into(),
+                receipt_digest: format!("{:064x}", u64::from(event_id) + 30),
+            })
+        }
+
+        fn verify_measurement(
+            &self,
+            _receipt_id: &str,
+            expected_unit: &str,
+            _scope: broca_mace_policy::Scope,
+            _observed_at_ms: i64,
+            _known_at_ms: i64,
+        ) -> Option<broca_mace_ingress::VerifiedMeasurement> {
+            Some(broca_mace_ingress::VerifiedMeasurement {
+                absolute_error_bound: 0.02,
+                unit: expected_unit.into(),
+                instrument_id: "instrument-1".into(),
+                method_id: "method-1".into(),
+                calibration_revision: "cal-rev-1".into(),
+                valid_from_ms: 100,
+                valid_until_ms: Some(300),
+                calibration_digest: "1".repeat(64),
+            })
+        }
+
+        fn verify_causal_assessment(
+            &self,
+            _receipt_id: &str,
+            _event_id: u32,
+            _scope: broca_mace_policy::Scope,
+            _known_at_ms: i64,
+        ) -> Option<broca_mace_ingress::VerifiedCausalAssessment> {
+            Some(broca_mace_ingress::VerifiedCausalAssessment {
+                intervention_confirmed: true,
+                prediction_pre_registered: true,
+                confounders_controlled: true,
+                delayed_horizon_complete: true,
+                identification: sidecar_causal_identification(),
+                assessment_digest: "2".repeat(64),
+            })
+        }
+
+        fn verify_outcome(
+            &self,
+            _receipt_id: &str,
+            _event_id: u32,
+            _observed_at_ms: i64,
+            _known_at_ms: i64,
+        ) -> Option<broca_mace_ingress::VerifiedOutcome> {
+            Some(broca_mace_ingress::VerifiedOutcome {
+                reconciled: true,
+                success: true,
+                observed_utility: 0.87,
+                utility_unit: "normalized_utility".into(),
+                outcome_digest: "3".repeat(64),
+            })
+        }
+
+        fn lifecycle_status_as_of(
+            &self,
+            _event_id: u32,
+            _known_at_ms: i64,
+        ) -> Option<broca_mace_ingress::SourceLifecycleStatus> {
+            Some(broca_mace_ingress::SourceLifecycleStatus::Active)
+        }
+    }
+
+    #[test]
+    fn receipt_sidecar_drives_the_audit_dependency_closure() {
+        use broca_mace_ingress::{
+            build_consolidation_evidence_pack, ingest_batch_as_known, AsKnownQuery,
+        };
+
+        let query = AsKnownQuery {
+            valid_at_ms: 180,
+            known_at_ms: 250,
+        };
+        let batch = ingest_batch_as_known(
+            &[sidecar_raw(42), sidecar_raw(43)],
+            query,
+            &SidecarTestVerifier,
+        )
+        .expect("receipt-backed two-event session should ingest");
+        let pack = build_consolidation_evidence_pack(&batch, &[42, 43])
+            .expect("both source events should enter the evidence pack");
+        let sidecar = pack.dependency_sidecar();
+        assert!(sidecar.verify_integrity());
+        let memory: Vec<Experience> = pack.events().iter().map(|event| event.experience()).collect();
+
+        let index = MaceAuditDependencyIndex::from_receipt_sidecar(&sidecar, &memory)
+            .expect("the audit adapter should validate and consume the receipt sidecar");
+        assert_eq!(index.event_closure(42).unwrap(), BTreeSet::from([42, 43]));
+        assert_eq!(index.lineage_incomplete_count(), 0);
+        assert_eq!(index.unresolved_dependency_reference_count, 0);
+
+        let base_digest = candidate_evidence_digest(&memory, memory[0].causal_identification.semantic_estimand.into());
+        assert!(!base_digest.is_empty());
     }
 
     #[test]
