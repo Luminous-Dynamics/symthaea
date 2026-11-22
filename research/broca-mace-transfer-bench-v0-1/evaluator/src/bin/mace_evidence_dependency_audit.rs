@@ -70,7 +70,11 @@ struct MaceAuditDependencyIndex {
 
 impl MaceAuditDependencyIndex {
     fn from_experiences(memory: &[Experience]) -> Result<Self, String> {
-        Self::new(memory.iter().map(EvidenceNode::from_experience).collect())
+        let mut index = Self::new(memory.iter().map(EvidenceNode::from_experience).collect())?;
+        // Experience deliberately carries source identity but not derived-view
+        // ancestry. Do not interpret the missing edge list as a complete graph.
+        index.incomplete_lineage_event_ids = index.event_ids();
+        Ok(index)
     }
 
     fn new(records: Vec<EvidenceNode>) -> Result<Self, String> {
@@ -683,6 +687,8 @@ struct EvaluationMetrics {
     candidate_family_count: usize,
     unknown_root_count: usize,
     lineage_edge_count: usize,
+    lineage_incomplete_event_count: usize,
+    unresolved_dependency_reference_count: usize,
 }
 
 struct EvaluatedPlan {
@@ -773,6 +779,8 @@ fn evaluate_plan(
         candidate_family_count,
         unknown_root_count,
         lineage_edge_count: original_index.dependency_link_count(),
+        lineage_incomplete_event_count: original_index.lineage_incomplete_count(),
+        unresolved_dependency_reference_count: original_index.unresolved_dependency_reference_count,
     };
     EvaluatedPlan {
         plan: plan.clone(),
@@ -810,7 +818,9 @@ fn evaluator_record(
         "remaining_unique_root_count": metrics.candidate_root_count,
         "remaining_unique_family_count": metrics.candidate_family_count,
         "remaining_unknown_root_event_count": metrics.unknown_root_count,
-        "fixture_dependency_link_count": metrics.lineage_edge_count
+        "fixture_dependency_link_count": metrics.lineage_edge_count,
+        "lineage_incomplete_event_count": metrics.lineage_incomplete_event_count,
+        "unresolved_dependency_reference_count": metrics.unresolved_dependency_reference_count
     });
     if let Some(parent) = &metrics.paired_plan_id {
         value["matched_to_plan_id"] = json!(parent);
