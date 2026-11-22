@@ -1185,6 +1185,9 @@ fn run() -> Result<(), String> {
                     "available_known_family_count": candidate.evidence_family_count,
                     "unknown_root_event_count": candidate.unknown_root_event_count,
                     "unknown_family_event_count": candidate.unknown_family_event_count,
+                    "dependency_sidecar_sha256": candidate.dependency_sidecar_sha256,
+                    "lineage_incomplete_event_count": candidate.lineage_incomplete_event_count,
+                    "unresolved_parent_reference_count": candidate.unresolved_parent_reference_count,
                     "index_bytes": candidate.index_bytes,
                     "latency_ns": candidate.latency_ns
                 });
@@ -1209,6 +1212,9 @@ fn run() -> Result<(), String> {
                     "target_key": intervention.target_key,
                     "matched_to": intervention.matched_to,
                     "retrieved_event_ids": candidate.retrieved_event_ids,
+                    "dependency_sidecar_sha256": candidate.dependency_sidecar_sha256,
+                    "lineage_incomplete_event_count": candidate.lineage_incomplete_event_count,
+                    "unresolved_parent_reference_count": candidate.unresolved_parent_reference_count,
                     "index_bytes": candidate.index_bytes,
                     "removed_event_ids": intervention.removed_event_ids,
                     "removed_event_count": intervention.removed_event_ids.len(),
