@@ -1128,13 +1128,10 @@ mod tests {
     #[test]
     fn no_display_is_not_counted_as_human_visible() {
         let mut trace = valid_trace();
+        trace.events.remove(3);
         trace.events.remove(2);
         trace.events[2].sequence = 3;
-        trace.events[2].monotonic_time_ns = 4_000;
         trace.events[3].sequence = 4;
-        trace.events[3].monotonic_time_ns = 6_000;
-        trace.events[4].sequence = 5;
-        trace.events[4].monotonic_time_ns = 8_000;
         seal_trace(&mut trace).unwrap();
         let report = validate_trace(&trace);
         assert!(report.valid, "{:?}", report.issues);
