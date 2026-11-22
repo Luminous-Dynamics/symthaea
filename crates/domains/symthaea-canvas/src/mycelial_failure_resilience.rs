@@ -305,6 +305,7 @@ fn validate_scenarios(
     for scenario in scenarios {
         if !valid_id(&scenario.scenario_id)
             || scenario.scenario_id == "baseline"
+            || (scenario.failed_segment_ids.is_empty() && scenario.failed_junction_ids.is_empty())
             || !scenario_ids.insert(scenario.scenario_id.as_str())
             || scenario.failed_segment_ids.windows(2).any(|pair| pair[0] >= pair[1])
             || scenario.failed_junction_ids.windows(2).any(|pair| pair[0] >= pair[1])
@@ -643,6 +644,9 @@ impl MycelialFailureResilienceProfile {
             || self.scenarios.windows(2).any(|pair| {
                 pair[0].scenario_id >= pair[1].scenario_id
             })
+            || self.scenarios.iter().any(|metric| {
+                metric.failed_segment_ids.is_empty() && metric.failed_junction_ids.is_empty()
+            })
         {
             return Err(MycelialFailureResilienceError::InvalidProfile(
                 "invalid version, digest, demand inventory, baseline or scenario order",
@@ -668,6 +672,14 @@ impl MycelialFailureResilienceProfile {
                 )
                 || metric.failed_segment_ids.iter().any(|id| !valid_id(id))
                 || metric.failed_junction_ids.iter().any(|id| !valid_id(id))
+                || metric.failed_segment_ids.iter().any(|id| {
+                    self.baseline.failed_segment_ids.contains(id)
+                })
+                || metric.failed_junction_ids.iter().any(|id| {
+                    self.baseline.failed_junction_ids.contains(id)
+                })
+                || metric.remaining_junction_count > self.baseline.remaining_junction_count
+                || metric.remaining_segment_count > self.baseline.remaining_segment_count
                 || metric.failed_segment_ids.windows(2).any(|pair| pair[0] >= pair[1])
                 || metric.failed_junction_ids.windows(2).any(|pair| pair[0] >= pair[1])
                 || metric.failed_segment_count != metric.failed_segment_ids.len()
@@ -800,6 +812,20 @@ fn canonical_demand_digest(demands: &[MycelialDemandPair]) -> String {
 
 fn hash_metrics(hasher: &mut blake3::Hasher, metric: &MycelialFailureMetrics) {
     hash_string(hasher, &metric.scenario_id);
+    hasher.update(&(metric.failed_segment_ids.len() as u64).to_le_bytes());
+    for id in &metric.failed_segment_ids {
+        hash_string(hasher, id);
+    }
+    hasher.update(&(metric.failed_junction_ids.len() as u64).to_le_bytes());
+    for id in &metric.failed_junction_ids {
+        hash_string(hasher, id);
+    }
+    hasher.update(&(metric.demand_pair_outcomes.len() as u64).to_le_bytes());
+    for outcome in &metric.demand_pair_outcomes {
+        hash_string(hasher, &outcome.demand_id);
+        hash_option(hasher, outcome.direct_distance_model_units);
+        hash_option(hasher, outcome.network_path_length_model_units);
+    }
     for value in [
         metric.failed_segment_count,
         metric.failed_junction_count,
