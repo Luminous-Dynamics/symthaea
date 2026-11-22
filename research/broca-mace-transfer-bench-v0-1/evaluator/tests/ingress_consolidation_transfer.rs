@@ -1108,6 +1108,7 @@ fn interaction_aware_portfolio_beats_additive_selection_on_hidden_joint_utility(
         scope: context.scope,
         as_known: context.as_known,
         budget,
+        authority_scope_sha256: context.authority_scope_sha256.clone(),
         target_model_sha256: context.target_model_sha256.clone(),
         baseline_policy_sha256: context.baseline_policy_sha256.clone(),
         task_protocol_sha256: context.task_protocol_sha256.clone(),
