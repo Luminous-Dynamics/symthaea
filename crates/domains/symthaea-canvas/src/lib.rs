@@ -27,16 +27,16 @@ pub mod color;
 pub mod embodiment;
 pub mod embodiment_trace;
 pub mod geometry;
-pub mod mycelial_junction_graph;
 pub mod mycelial_contact_persistence;
-pub mod mycelial_reference_networks;
-pub mod mycelial_reconstruction_metrics;
-pub mod mycelial_temporal_cycles;
 pub mod mycelial_failure_resilience;
+pub mod mycelial_junction_graph;
 pub mod mycelial_mesh;
 pub mod mycelial_model;
 pub mod mycelial_network;
 pub mod mycelial_presence;
+pub mod mycelial_reconstruction_metrics;
+pub mod mycelial_reference_networks;
+pub mod mycelial_temporal_cycles;
 pub mod scene_features;
 pub mod scene_graph;
 pub mod svg_renderer;
@@ -86,6 +86,23 @@ pub use embodiment_trace::{
     MAX_EMBODIMENT_TRACE_EVENTS, OpenActivityInterval, OpenPlaybackInterval,
 };
 pub use geometry::build_scene;
+pub use mycelial_contact_persistence::{
+    DEFAULT_MAX_CONTACT_TOLERANCE_MODEL_UNITS, MAX_CONTACT_FILTRATION_CANDIDATES,
+    MYCELIAL_CONTACT_FILTRATION_SCHEMA_VERSION, MycelialContactBaselineEdge,
+    MycelialContactCandidateObservation, MycelialContactComponentMerge,
+    MycelialContactConflictGroup, MycelialContactCycleBirth, MycelialContactFiltration,
+    MycelialContactFiltrationConfig, MycelialContactFiltrationError,
+    MycelialContactFiltrationMetrics, MycelialContactFiltrationSnapshot, MycelialCyclePathStep,
+    build_mycelial_contact_filtration,
+};
+pub use mycelial_failure_resilience::{
+    MAX_FAILURE_DEMAND_PAIRS, MAX_FAILURE_DEMAND_SOURCES, MAX_FAILURE_ID_BYTES,
+    MAX_FAILURE_JUNCTIONS, MAX_FAILURE_SCENARIOS, MAX_FAILURE_SEGMENTS,
+    MAX_FAILURE_TOTAL_DEMAND_WEIGHT, MYCELIAL_FAILURE_PROFILE_SCHEMA_VERSION, MycelialDemandPair,
+    MycelialDemandPairOutcome, MycelialFailureMetrics, MycelialFailureResilienceError,
+    MycelialFailureResilienceProfile, MycelialFailureScenario,
+    build_mycelial_failure_resilience_profile, build_single_failure_resilience_profile,
+};
 pub use mycelial_junction_graph::{
     GeometricEfficiencyReport, JunctionKind, JunctionLengthUnit, MAX_JUNCTION_GRAPH_JUNCTIONS,
     MAX_JUNCTION_GRAPH_SEGMENTS, MYCELIAL_JUNCTION_GRAPH_SCHEMA_VERSION, MycelialHyphaSegment,
@@ -93,53 +110,33 @@ pub use mycelial_junction_graph::{
     MycelialJunctionGraphMetrics, MycelialJunctionHyphaGraph, PARAMETER_SCALE,
     build_mycelial_junction_hypha_graph,
 };
-pub use mycelial_contact_persistence::{
-    DEFAULT_MAX_CONTACT_TOLERANCE_MODEL_UNITS, MAX_CONTACT_FILTRATION_CANDIDATES,
-    MYCELIAL_CONTACT_FILTRATION_SCHEMA_VERSION, MycelialContactBaselineEdge,
-    MycelialContactCandidateObservation, MycelialContactComponentMerge,
-    MycelialContactConflictGroup,
-    MycelialContactCycleBirth, MycelialContactFiltration,
-    MycelialContactFiltrationConfig, MycelialContactFiltrationError,
-    MycelialContactFiltrationMetrics, MycelialContactFiltrationSnapshot,
-    MycelialCyclePathStep, build_mycelial_contact_filtration,
+pub use mycelial_reconstruction_metrics::{
+    AnnotatedHyphaSegment, AnnotatedJunction, AnnotatedJunctionKind, AnnotatedMycelialSkeleton,
+    JunctionIdentityMatch, JunctionKindScore, MAX_AUTOMATIC_MATCH_JUNCTIONS_PER_GRAPH,
+    MAX_RECONSTRUCTION_ID_BYTES, MAX_RECONSTRUCTION_JUNCTIONS, MAX_RECONSTRUCTION_SEGMENTS,
+    MYCELIAL_RECONSTRUCTION_SCHEMA_VERSION, MYCELIAL_RECONSTRUCTION_SCORE_SCHEMA_VERSION,
+    MycelialReconstructionError, MycelialReconstructionScore, ReconstructionCounts,
+    ReconstructionDimensionality, ReconstructionEvaluationConfig, ReconstructionLengthError,
+    ReconstructionLengthUnit, ReconstructionLocalizationError, ReconstructionPoint3,
+    ReconstructionTopologyDelta, ReconstructionTopologySummary, evaluate_mycelial_reconstruction,
+    match_junctions_hungarian,
 };
 pub use mycelial_reference_networks::{
     MAX_REFERENCE_NETWORK_JUNCTIONS, MycelialMinimumSpanningForestReport,
     MycelialReferenceNetworkError, build_observed_network_minimum_spanning_forest,
 };
-pub use mycelial_reconstruction_metrics::{
-    AnnotatedHyphaSegment, AnnotatedJunction, AnnotatedJunctionKind, AnnotatedMycelialSkeleton,
-    JunctionIdentityMatch, JunctionKindScore, MAX_AUTOMATIC_MATCH_JUNCTIONS_PER_GRAPH,
-    MAX_RECONSTRUCTION_ID_BYTES, MAX_RECONSTRUCTION_JUNCTIONS, MAX_RECONSTRUCTION_SEGMENTS,
-    MycelialReconstructionError, MycelialReconstructionScore,
-    MYCELIAL_RECONSTRUCTION_SCHEMA_VERSION, MYCELIAL_RECONSTRUCTION_SCORE_SCHEMA_VERSION,
-    ReconstructionCounts, ReconstructionDimensionality, ReconstructionEvaluationConfig,
-    ReconstructionLengthError, ReconstructionLengthUnit, ReconstructionLocalizationError,
-    ReconstructionPoint3, ReconstructionTopologyDelta, ReconstructionTopologySummary,
-    evaluate_mycelial_reconstruction, match_junctions_hungarian,
-};
 pub use mycelial_temporal_cycles::{
     MAX_TEMPORAL_CYCLE_RECORDS, MAX_TEMPORAL_CYCLE_WINDOW_OBSERVATIONS,
     MAX_TEMPORAL_CYCLES_PER_WINDOW, MAX_TEMPORAL_EDGE_WINDOW_OBSERVATIONS,
-    MAX_TEMPORAL_MYCELIAL_EDGES,
-    MAX_TEMPORAL_MYCELIAL_NODES, MAX_TEMPORAL_MYCELIAL_WINDOWS,
+    MAX_TEMPORAL_MYCELIAL_EDGES, MAX_TEMPORAL_MYCELIAL_NODES, MAX_TEMPORAL_MYCELIAL_WINDOWS,
     MYCELIAL_TEMPORAL_CYCLE_PROFILE_SCHEMA_VERSION, MYCELIAL_TEMPORAL_CYCLE_SCHEMA_VERSION,
     MycelialTemporalCycleConfig, MycelialTemporalCycleError, TemporalCycleWindowObservation,
     TemporalCycleWindowState, TemporalEdgeEvidence, TemporalMycelialCycleHyperedge,
     TemporalMycelialCycleProfile, TemporalMycelialCycleRecord, TemporalMycelialEdge,
     TemporalMycelialEdgeEvidenceCounts, TemporalMycelialEdgeEvidenceRecord,
     TemporalMycelialNodeMetrics, TemporalMycelialSequence, TemporalMycelialSnapshot,
-    TemporalMycelialSnapshotMetrics, TemporalWindowCoverage,
-    build_temporal_mycelial_cycle_profile, temporal_snapshot_from_annotated_skeleton,
-};
-pub use mycelial_failure_resilience::{
-    MAX_FAILURE_DEMAND_PAIRS, MAX_FAILURE_DEMAND_SOURCES, MAX_FAILURE_ID_BYTES,
-    MAX_FAILURE_JUNCTIONS, MAX_FAILURE_SCENARIOS, MAX_FAILURE_SEGMENTS,
-    MAX_FAILURE_TOTAL_DEMAND_WEIGHT, MYCELIAL_FAILURE_PROFILE_SCHEMA_VERSION,
-    MycelialDemandPair, MycelialDemandPairOutcome,
-    MycelialFailureMetrics, MycelialFailureResilienceError, MycelialFailureResilienceProfile,
-    MycelialFailureScenario, build_mycelial_failure_resilience_profile,
-    build_single_failure_resilience_profile,
+    TemporalMycelialSnapshotMetrics, TemporalWindowCoverage, build_temporal_mycelial_cycle_profile,
+    temporal_snapshot_from_annotated_skeleton,
 };
 
 pub use mycelial_mesh::{
