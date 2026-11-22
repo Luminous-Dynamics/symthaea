@@ -1105,12 +1105,12 @@ mod tests {
         let mut visited = BTreeSet::from([demand.source_junction_id.as_str()]);
         let mut queue = VecDeque::from([demand.source_junction_id.as_str()]);
         while let Some(current) = queue.pop_front() {
-            if current == demand.target_junction_id {
+            if current == demand.target_junction_id.as_str() {
                 return true;
             }
             for neighbour in &adjacency[current] {
                 if !failed_junctions.contains(*neighbour) && visited.insert(*neighbour) {
-                    queue.push_back(neighbour);
+                    queue.push_back(*neighbour);
                 }
             }
         }
