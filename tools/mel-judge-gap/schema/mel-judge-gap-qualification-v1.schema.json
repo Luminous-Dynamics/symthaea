@@ -65,11 +65,10 @@
     },
     "item": {
       "type": "object", "additionalProperties": false,
-      "required": ["item_id", "reference_strength_logit", "standard_error_logit"],
+      "required": ["item_id", "reference_strength_logit"],
       "properties": {
         "item_id": { "type": "string", "minLength": 1 },
         "reference_strength_logit": { "type": "number" },
-        "standard_error_logit": { "type": "number", "minimum": 0 }
       }
     },
     "difficulty_bin": {
@@ -83,11 +82,12 @@
     },
     "pair": {
       "type": "object", "additionalProperties": false,
-      "required": ["pair_id", "item_a_id", "item_b_id", "presentations"],
+      "required": ["pair_id", "item_a_id", "item_b_id", "reference_gap_standard_error_logit", "presentations"],
       "properties": {
         "pair_id": { "type": "string", "minLength": 1 },
         "item_a_id": { "type": "string", "minLength": 1 },
         "item_b_id": { "type": "string", "minLength": 1 },
+        "reference_gap_standard_error_logit": { "type": "number", "minimum": 0 },
         "presentations": {
           "type": "array", "minItems": 2, "maxItems": 2,
           "items": { "$ref": "#/$defs/presentation" }
