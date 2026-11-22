@@ -1119,6 +1119,19 @@ impl EvidenceDependencySidecarV1 {
         &self.records
     }
 
+    /// Produce a new bitemporal sidecar after a candidate-visible evidence
+    /// knockout. Parent references to removed events remain explicit, so the
+    /// consumer can count them as unresolved instead of silently dropping them.
+    pub fn retain_without_event_ids(&self, removed_event_ids: &[u32]) -> Self {
+        let retained: Vec<EvidenceDependencyRecordV1> = self
+            .records
+            .iter()
+            .filter(|record| !removed_event_ids.contains(&record.event_id))
+            .cloned()
+            .collect();
+        Self::new(self.as_known, retained)
+    }
+
     pub fn canonical_digest(&self) -> &str {
         &self.canonical_digest
     }
