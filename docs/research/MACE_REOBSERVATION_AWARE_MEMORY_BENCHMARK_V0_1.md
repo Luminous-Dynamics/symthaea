@@ -100,6 +100,30 @@ These are target thresholds, not current results. They should be recalibrated af
 
 Microsoft Research reports 86.3% LoCoMo and 87.4% LongMemEval for its separate Memora representation, with about half as many memory entries as Mem0 and up to 98% token savings versus full-context baselines in its evaluated settings. These are protocol-specific research-report results, not scores from a shared public leaderboard. MACE should first reproduce the exact backbone, judge, task split, context/token accounting and memory API; then target at least +2 percentage points on a held-out extension with no higher memory-token budget. On mutable-state episodes, the additional target is at least 90% fewer retained snapshot tokens than store-everything without a downstream utility regression. Do not confuse this system with the separate ACL Memora/FAMA benchmark.
 
+## External benchmark crosswalk — WorldMemArena
+
+[WorldMemArena (2026)](https://arxiv.org/abs/2605.29341) and its [benchmark site](https://worldmemarena-mem.github.io/) provide a useful external transfer target: 400 multi-session multimodal tasks evaluated through an observable **write → maintain → retrieve → use** lifecycle, spanning Lifelong Evolution and Agentic Execution. The paper reports that storage quality alone does not guarantee downstream performance, that append-only memory maintenance remains a weakness, and that systems often lose visual, spatial and procedural detail when observations are reduced to captions.
+
+Map the MACE representation factor to the benchmark lifecycle without replacing its task definitions or official evaluator:
+
+| WorldMemArena stage | MACE representation experiment | Required evidence |
+|---|---|---|
+| Write | Choose persist-knowledge, locator, bounded snapshot or discard | Original observation/action evidence, exact source receipt, chosen representation and reason |
+| Maintain | Re-evaluate after source changes, corrections, expiry and environment transitions | Bitemporal update/retraction chain; no stale resurrection |
+| Retrieve | Resolve evidence or locator under the same memory/context/tool budget | Candidate IDs, source/scope checks, retrieval and re-observation latency |
+| Use | Decide or act using the revalidated evidence | Actual environment outcome, action/evidence trace, correctness and utility at consumption |
+
+The key multimodal control is **preserve evidence, not just captions**: a visual memory candidate should retain a stable pointer/digest to the original screenshot, frame, spatial relation or action/feedback trace, while a text description remains an optional index. A locator may re-observe mutable screen/world state; a learned procedure should preserve the tested action sequence and its outcome evidence. Do not allow a caption or a model-generated tool claim to become the evidence source.
+
+External comparison protocol:
+1. Keep WorldMemArena's official task split, action contract and evaluator unchanged. Do not tune thresholds on its held-out tasks.
+2. Compare long-context/full-history, fixed summary/snapshot, a strong conventional external-memory baseline, salience-only retention, always-reobserve, and MACE representation selection.
+3. Match backbone, tool permissions, prompt/context tokens, memory bytes, call budget and decision deadline; separately report unavoidable harness overhead.
+4. Report stage-wise failure attribution and full task utility, plus stale-state use, visual evidence grounding, procedure transfer, correction recovery, token/storage footprint, calls, latency and cost.
+5. Report separate per-domain/worst-family outcomes and paired uncertainty at the independent task/world unit. Never substitute synthetic MACE utility or internal fixture success for the official benchmark score.
+
+This mapping is an evaluation plan, not an assertion that a WorldMemArena adapter or run exists. It makes the central research claim falsifiable: representation choice should improve future action under matched budgets, not merely improve the memory artefact.
+
 ## Limitations and next steps
 
 - The module uses verifier-declared availability probability, failure penalty, normalized costs and a decision deadline; real deployments need independently calibrated tool latency, API availability, energy/cost and failure distributions. Stable-fact retention and mutable-state caching deliberately have different validity rules.
