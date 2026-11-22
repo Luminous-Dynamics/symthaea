@@ -746,6 +746,27 @@ mod tests {
     }
 
     #[test]
+    fn precision_and_ndcg_support_multiple_relevant_patterns() {
+        let queries = vec![Query {
+            id: "q-multi".into(),
+            text: "related patterns".into(),
+            expected: HashSet::from(["p1".to_string(), "p2".to_string()]),
+            is_positive: true,
+        }];
+        let rankings = vec![vec![
+            Ranked { id: "p1".into(), score: 1.0 },
+            Ranked { id: "p2".into(), score: 0.9 },
+            Ranked { id: "p3".into(), score: 0.8 },
+        ]];
+        let summary = summarize("test", &queries, &rankings, &[0.1]);
+
+        assert_eq!(summary["recall_at_1"], 1.0);
+        assert_eq!(summary["recall_at_3"], 1.0);
+        assert!((summary["precision_at_3"].as_f64().unwrap() - (2.0 / 3.0)).abs() < 1e-12);
+        assert_eq!(summary["ndcg_at_3"], 1.0);
+    }
+
+    #[test]
     fn bm25_and_tfidf_return_finite_scores() {
         let corpus = json!({
             "patterns": [
