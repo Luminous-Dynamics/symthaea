@@ -189,6 +189,8 @@ pub enum GroupwiseCalibrationError {
     InvalidAlpha,
     InvalidDirectionThreshold,
     EmptyExpectedStrata,
+    EmptyCalibrationSet,
+    EmptyEvaluationSet,
     DuplicateExpectedStratum,
     InvalidIdentifier(&'static str),
     InvalidStratumIdentifier { stratum_id: String },
@@ -207,6 +209,8 @@ impl fmt::Display for GroupwiseCalibrationError {
                 write!(f, "minimum direction cosine must be finite and in [-1, 1]")
             }
             Self::EmptyExpectedStrata => write!(f, "at least one expected stratum is required"),
+            Self::EmptyCalibrationSet => write!(f, "at least one calibration observation is required"),
+            Self::EmptyEvaluationSet => write!(f, "at least one evaluation observation is required"),
             Self::DuplicateExpectedStratum => write!(f, "expected stratum identifiers must be unique"),
             Self::InvalidIdentifier(field) => {
                 write!(f, "{field} must be a non-empty stable ASCII identifier")
@@ -249,6 +253,13 @@ pub fn calibrate_groupwise_null(
     validate_config(config)?;
     let mut expected = config.expected_strata.clone();
     expected.sort();
+
+    if calibration.is_empty() {
+        return Err(GroupwiseCalibrationError::EmptyCalibrationSet);
+    }
+    if evaluation.is_empty() {
+        return Err(GroupwiseCalibrationError::EmptyEvaluationSet);
+    }
 
     let expected_set = expected.iter().map(String::as_str).collect::<HashSet<_>>();
     let mut calibration_ids = HashSet::with_capacity(calibration.len());
@@ -332,7 +343,7 @@ pub fn calibrate_groupwise_null(
         })
         .collect::<Vec<_>>();
 
-    let mut thresholds_by_estimator = [[None; 1]; 3];
+    let mut thresholds_by_estimator = [None; 3];
     let mut thresholds = vec![[None; 3]; expected.len()];
     let mut minimum_resolvable = vec![1.0; expected.len()];
     for (stratum_index, stratum) in expected.iter().enumerate() {
@@ -348,11 +359,11 @@ pub fn calibrate_groupwise_null(
             );
         }
     }
-    for estimator_index in 0..ESTIMATOR_IDS.len() {
+    for (estimator_index, _) in ESTIMATOR_IDS.iter().enumerate() {
         let all_resolvable = thresholds
             .iter()
             .all(|values| values[estimator_index].is_some());
-        thresholds_by_estimator[estimator_index][0] = all_resolvable.then(|| {
+        thresholds_by_estimator[estimator_index] = all_resolvable.then(|| {
             thresholds
                 .iter()
                 .filter_map(|values| values[estimator_index])
@@ -370,7 +381,7 @@ pub fn calibrate_groupwise_null(
             .enumerate()
             .map(|(estimator_index, estimator_id)| {
                 let critical = thresholds[stratum_index][estimator_index];
-                let guard_critical = thresholds_by_estimator[estimator_index][0];
+                let guard_critical = thresholds_by_estimator[estimator_index];
                 GroupwiseStratumEstimatorSummary {
                     estimator_id,
                     calibration_replicates: calibration_by_stratum
@@ -506,10 +517,10 @@ fn rates_if_resolved(
     threshold: Option<f64>,
     minimum_direction_cosine: f64,
 ) -> Option<GroupwiseRateSet> {
-    if evaluation.is_empty() || threshold.is_none() {
+    if evaluation.is_empty() {
         return None;
     }
-    let threshold = threshold.unwrap();
+    let threshold = threshold?;
     let false_positives = evaluation
         .iter()
         .filter(|item| is_rejected(item.null_statistics[estimator_index], Some(threshold)))
