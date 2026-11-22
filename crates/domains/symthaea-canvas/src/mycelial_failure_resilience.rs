@@ -37,6 +37,7 @@ pub enum MycelialFailureAttackStrategy {
     RandomSegments,
     RandomJunctions,
     HighestDegreeJunctions,
+    AdaptiveHighestDegreeJunctions,
     LowestDegreeJunctions,
     DemandPathLoadSegments,
     DemandPathLoadJunctions,
@@ -49,6 +50,7 @@ impl MycelialFailureAttackStrategy {
             Self::RandomSegments => "random-segments-v1",
             Self::RandomJunctions => "random-junctions-v1",
             Self::HighestDegreeJunctions => "highest-degree-junctions-v1",
+            Self::AdaptiveHighestDegreeJunctions => "adaptive-highest-degree-junctions-v1",
             Self::LowestDegreeJunctions => "lowest-degree-junctions-v1",
             Self::DemandPathLoadSegments => "demand-path-load-segments-v1",
             Self::DemandPathLoadJunctions => "demand-path-load-junctions-v1",
@@ -79,7 +81,10 @@ pub struct MycelialFailureAttackPlan {
     pub seed: u64,
     pub maximum_failure_budget: usize,
     pub spatial_seed_junction_id: Option<String>,
+    /// Selected entity order, one choice per sequential intervention step.
     pub ranked_entity_ids: Vec<String>,
+    /// Complete candidate ranking visible at each step, after prior removals.
+    pub ranked_entity_ids_per_step: Vec<Vec<String>>,
     pub scenarios: Vec<MycelialFailureScenario>,
 }
 
@@ -773,6 +778,13 @@ pub fn build_single_failure_resilience_profile(
     }
     scenarios.sort_by(|left, right| left.scenario_id.cmp(&right.scenario_id));
     build_mycelial_failure_resilience_profile(graph, demands, &scenarios)
+}
+
+fn attack_strategy_is_adaptive(strategy: MycelialFailureAttackStrategy) -> bool {
+    matches!(
+        strategy,
+        MycelialFailureAttackStrategy::AdaptiveHighestDegreeJunctions
+    )
 }
 
 fn attack_strategy_targets_segments(strategy: MycelialFailureAttackStrategy) -> bool {
