@@ -759,6 +759,43 @@
       "tested_commit": "382649c720935cbf1e84689501f967f9b9867f56",
       "total_rust_unit_tests": 35,
       "claim_ceiling": "lineage-integrity-only; does not validate physics or model accuracy"
+    },
+    "rust_mf_acquisition_oracle": {
+      "implementation": "crates/domains/symthaea-semiconductor/src/benchmark/mf_acquisition.rs",
+      "cli": "crates/domains/symthaea-semiconductor/src/bin/semi-mf-acquire.rs",
+      "tests": "inline-unit-tests",
+      "input_fixture": "benchmarks/semi-bench-001/reference/fixtures/mf-acquisition-known-answer-v1.json",
+      "expected_output": "benchmarks/semi-bench-001/reference/fixtures/mf-acquisition-known-answer-v1.expected.json",
+      "test_count": 8,
+      "maximum_candidates_exact": 18,
+      "method": "exact-subset-budgeted-maximization",
+      "utility_formula": "expected_feasible_hv_gain + exploration_weight * epistemic_stddev * frontier_relevance",
+      "required_sha256_bindings": [
+        "prediction_packet_sha256",
+        "model_sha256",
+        "uncertainty_calibration_sha256",
+        "objective_spec_sha256"
+      ],
+      "deterministic_tie_break": [
+        "higher-total-utility",
+        "lower-total-cost",
+        "lexicographic-selected-candidate-IDs"
+      ],
+      "known_answer": {
+        "budget": 13,
+        "budget_unit": "normalized-high-fidelity-minutes",
+        "selected": [
+          "B",
+          "E"
+        ],
+        "total_cost": 13,
+        "total_utility": 0.3115,
+        "synthetic": true
+      },
+      "hosted_ci_status": "success",
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44989958104",
+      "tested_commit": "66ed78d31b858a383f5eaa90036e7226f8a7cc93",
+      "claim_ceiling": "candidate scheduling only; no simulation execution, no verified Pareto gain, no design approval"
     }
   },
   "reproducibility_artifacts": [
