@@ -374,17 +374,31 @@
       "snapshot_status": "methodology_only",
       "observations": [
         {
-          "kind": "dataset_preference",
+          "kind": "paper_reported_results",
+          "paper_dataset_preference_pairs": 6858,
+          "paper_correctness_applications": 222,
+          "preference_prediction_code_only_percent": 65.6,
+          "preference_prediction_interaction_judge_percent": 69.1,
+          "requirement_verification_code_only_percent": 77,
+          "requirement_verification_interaction_judge_percent": 81.6,
+          "iterative_repair_code_only_percent": 55.4,
+          "iterative_repair_interaction_judge_percent": 75.5,
+          "reward_model_win_rate_uplift_percentage_points": 6.7,
+          "generated_code_length_reduction_percent": 35.7,
+          "build_failure_rate_reduction_percentage_points": 7.2
+        },
+        {
+          "kind": "released_dataset_card_counts",
           "dataset": "ArenaWebdevPreferences",
           "application_pairs": 6390,
           "categories": 7,
-          "labels": "human preferences",
-          "includes_agent_traces": true
+          "contains_agent_traces": true,
+          "preference_labels": true
         },
         {
-          "kind": "dataset_correctness",
+          "kind": "released_dataset_card_counts",
           "dataset": "ArenaWebdevCorrectness",
-          "game_versions": 189,
+          "application_versions": 189,
           "human_verified_requirements": 362,
           "labels": [
             "Broken",
@@ -392,41 +406,26 @@
           ]
         },
         {
-          "kind": "reported_result",
-          "method": "interaction-as-a-judge",
-          "human_preference_alignment_percent": 70.8
+          "kind": "count_discrepancy",
+          "paper_preference_pairs": 6858,
+          "dataset_card_preference_pairs": 6390,
+          "paper_correctness_applications": 222,
+          "dataset_card_correctness_versions": 189,
+          "status": "unresolved; paper and released-card counts are different snapshots/definitions and must not be conflated"
         },
         {
-          "kind": "reported_result",
-          "method": "requirement_defect_detection",
-          "code_only_percent": 63,
-          "interaction_judge_percent": 71.1
-        },
-        {
-          "kind": "reported_result",
-          "method": "iterative_repair",
-          "code_only_success_percent": 55.4,
-          "interaction_judge_success_percent": 75.5
-        },
-        {
-          "kind": "reported_result",
-          "method": "interaction_only_reward_model",
-          "base_model": "Qwen-3.5-9B",
-          "reported_arena_rating_uplift_points": 50
-        },
-        {
-          "kind": "license_and_data_shape",
-          "preference_dataset_license": "CC-BY-4.0 for user prompts",
-          "model_output_terms": "outputs are governed by their respective model-provider terms",
-          "pii_note": "dataset card states PII de-identification was performed"
+          "kind": "data_license",
+          "preference_dataset_prompt_license": "CC-BY-4.0",
+          "model_output_terms": "governed by respective model-provider terms",
+          "correctness_dataset_license": "CC-BY-4.0"
         }
       ],
       "limitations": [
-        "These results belong to the authors' specific datasets, models, evaluators and protocols; they are not universal UI quality rates.",
-        "A computer-use judge can miss states, be manipulated by page content or misinterpret task intent; deterministic and human-calibrated checks remain necessary.",
-        "The human-preference dataset can train/calibrate a secondary judge, but cannot replace frozen executable acceptance oracles.",
-        "The correctness data focuses on game versions and human-verified requirements; transfer to enterprise websites requires validation.",
-        "Do not assume the generated model outputs are licensed for commercial redistribution or training; the preference dataset card says output terms remain with providers."
+        "The paper's 6,858 preference pairs and 222 correctness applications differ from the released dataset cards' 6,390 pairs and 189 app versions; the difference is unresolved and counts must be reported separately.",
+        "Reported gains are on the paper's specific data, models, judge configurations and protocols; they are not general frontend accuracy rates or SFEB results.",
+        "Human preference prediction and requirement correctness are distinct target variables.",
+        "Computer-use judges can miss states, be manipulated by page content or misinterpret task intent; deterministic and human-calibrated checks remain necessary.",
+        "The preference dataset card lists CC-BY-4.0 for user prompts but model outputs remain under provider terms; review component assets/privacy before reuse."
       ],
       "sources": [
         "https://arena.ai/blog/interaction-as-a-judge",
@@ -434,6 +433,60 @@
         "https://arena.ai/how-it-works",
         "https://huggingface.co/datasets/lmarena-ai/arena-webdev-preferences",
         "https://huggingface.co/datasets/lmarena-ai/arena-webdev-correctness"
+      ]
+    },
+    {
+      "id": "arena-webdev-html",
+      "name": "Arena Code Arena — HTML",
+      "scope": "Human pairwise-preference board for HTML-oriented web-development submissions.",
+      "task_count": null,
+      "snapshot_status": "current_live_snapshot",
+      "observations": [
+        {
+          "kind": "snapshot",
+          "observed_date": "2026-11-20",
+          "user_votes": 213322,
+          "models": 161,
+          "leader": "GPT-6.2 Astra (Max)",
+          "leader_rating": 1854,
+          "points_ahead_of_rank_2": 14
+        }
+      ],
+      "limitations": [
+        "This is a human preference rating, not deterministic requirement completion.",
+        "Model configuration and Arena prompt distribution are part of the submission.",
+        "The HTML board is distinct from general WebDev/Frontend and React boards; do not pool ratings or votes."
+      ],
+      "sources": [
+        "https://arena.ai/leaderboard/code/webdev/html",
+        "https://arena.ai/how-it-works"
+      ]
+    },
+    {
+      "id": "arena-webdev-react",
+      "name": "Arena Code Arena — React",
+      "scope": "Human pairwise-preference board for React-specific web-app development submissions.",
+      "task_count": null,
+      "snapshot_status": "current_live_snapshot",
+      "observations": [
+        {
+          "kind": "snapshot",
+          "observed_date": "2026-11-20",
+          "user_votes": 682332,
+          "models": 146,
+          "leader": "Claude Fable 5.2 (xHigh)",
+          "leader_rating": 1885,
+          "points_ahead_of_rank_2": 14
+        }
+      ],
+      "limitations": [
+        "This is a human preference rating, not deterministic requirement completion.",
+        "React-specific ratings do not represent Leptos capability; use as an ecosystem comparator, not a Rust framework benchmark.",
+        "Do not pool React and general WebDev ratings."
+      ],
+      "sources": [
+        "https://arena.ai/leaderboard/code/webdev/react",
+        "https://arena.ai/how-it-works"
       ]
     }
   ]

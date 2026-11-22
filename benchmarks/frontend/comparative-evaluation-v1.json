@@ -183,6 +183,16 @@
       "name": "Interaction-as-a-Judge",
       "scope": "computer-use agent judge with human preference and requirement-correctness labels",
       "reference": "https://arena.ai/blog/interaction-as-a-judge"
+    },
+    {
+      "name": "Arena Code Arena HTML",
+      "scope": "HTML-focused preference sub-board, separately calibrated",
+      "reference": "https://arena.ai/leaderboard/code/webdev/html"
+    },
+    {
+      "name": "Arena Code Arena React",
+      "scope": "React-specific preference sub-board; ecosystem comparator rather than Leptos equivalence",
+      "reference": "https://arena.ai/leaderboard/code/webdev/react"
     }
   ],
   "limits": [

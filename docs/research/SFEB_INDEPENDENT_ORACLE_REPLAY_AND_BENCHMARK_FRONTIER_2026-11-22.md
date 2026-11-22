@@ -42,7 +42,7 @@ Do not pool raw results. Reproduce each benchmark's original task set, model, pr
 
 ## 3A. Interaction-as-a-Judge: the most important new research direction
 
-Arena's November 12, 2026 research uses computer-use agents to inspect generated applications through live interaction. It reports broken-requirement detection improving from 63.0% with a code-only judge to 71.1% with interaction, iterative repair improving from 55.4% to 75.5%, and a trained 9B reward model reaching 70.8% human-preference agreement. Its released data includes 6,390 application pairs with interaction traces and human preference labels, plus 189 game versions with 362 human-verified requirements. These are results under that study's own protocol, not general frontend accuracy rates.
+The October 13, 2026 paper reports preference prediction improving from 65.6% to 69.1%, requirement verification from 77.0% to 81.6%, and iterative repair from 55.4% to 75.5% within five attempts. Its paper describes 6,858 preference pairs and 222 correctness applications; it also reports a 6.7 percentage-point reward-model win-rate uplift, 35.7% shorter generated code and a 7.2 percentage-point reduction in build failures. The released Hugging Face dataset cards currently list 6,390 preference pairs and 189 correctness application versions with 362 human-verified requirements. The paper and dataset-card counts differ; the discrepancy is unresolved, so do not merge those denominators. These results are specific to the authors' models and evaluation protocol, not general frontend accuracy rates.
 
 This changes SFEB's evaluation strategy:
 
@@ -55,7 +55,7 @@ This changes SFEB's evaluation strategy:
 
 The key paradigm is **interaction-grounded evaluation with independently bounded authority**: the judge explores and proposes explanations, while the trusted verifier controls verdict promotion. This can improve agent learning and repair loops without making a learned reward model the final arbiter.
 
-Sources: https://arena.ai/blog/interaction-as-a-judge and https://arxiv.org/abs/2610.17895.
+Sources: https://arxiv.org/abs/2610.17895, https://arena.ai/blog/interaction-as-a-judge, https://huggingface.co/datasets/lmarena-ai/arena-webdev-preferences and https://huggingface.co/datasets/lmarena-ai/arena-webdev-correctness.
 
 ## 4. What we should aim to beat
 

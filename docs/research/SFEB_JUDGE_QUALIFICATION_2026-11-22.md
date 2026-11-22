@@ -5,7 +5,7 @@
 
 ## 1. New industry direction
 
-Arena's November 12, 2026 Interaction-as-a-Judge research evaluates generated applications with computer-use agents instead of relying only on code and screenshots. The authors report improvements in broken-requirement detection and iterative repair under their own task/model setup. The released ArenaWebdevPreferences and ArenaWebdevCorrectness datasets provide preference and requirement labels with interaction traces.
+The October 13, 2026 Interaction-as-a-Judge paper evaluates generated applications with computer-use agents. It reports preference prediction 65.6% → 69.1%, requirement verification 77.0% → 81.6%, and iterative repair 55.4% → 75.5% within five attempts. It also reports a 6.7 percentage-point reward model uplift, 35.7% less generated code and a 7.2 percentage-point reduction in build failures on its protocol. The paper describes 6,858 preference pairs and 222 correctness applications; the released dataset cards list 6,390 pairs and 189 app versions/362 human-verified requirements. This count discrepancy is unresolved; preserve both snapshots separately.
 
 The useful insight for SFEB is not to replace deterministic tests with an LLM judge. It is to add a richer observation channel: a computer-use evaluator can explore states, attempt journeys, identify broken requirements, and supply evidence-linked diagnostic hypotheses.
 
@@ -43,7 +43,7 @@ Proposed judge promotion targets:
 - explicit per-category false-accept and false-reject rates;
 - 100% deterministic rejection of seeded critical security/evidence controls.
 
-The judge is promoted only for the narrow capability actually qualified. Requalify after model, prompt, tool, environment or policy changes.
+The judge is promoted only for the narrow capability actually qualified. Requalify after model, prompt, tool, environment or policy changes. Preference prediction and requirement correctness must be separate target metrics. Do not use paper and dataset-card sample counts interchangeably.
 
 ## 6. Related work
 
