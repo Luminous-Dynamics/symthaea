@@ -17,7 +17,9 @@ use std::mem::size_of;
 use std::time::Instant;
 
 use broca_mace_hdc_retrieval::{
-    experience_view_digest, CandidateIndex, CandidateHit, IndexConfig, RepresentationProfile,
+    experience_view_digest,
+    typed_content::{SemanticExperienceQueryV1, TypedContentConfigV1, TypedContentIndexV1},
+    CandidateIndex, CandidateHit, IndexConfig, RepresentationProfile,
 };
 use broca_mace_policy::{decide, is_qualified, Action, Decision, Experience, Policy, Query};
 use serde::Serialize;
@@ -39,16 +41,18 @@ enum Arm {
     ConventionalRetrieval,
     StaticHdc,
     HdcLtc,
+    TypedContentHdc,
     SemanticPlacebo,
 }
 
 impl Arm {
-    const ALL: [Self; 6] = [
+    const ALL: [Self; 7] = [
         Self::NoMemory,
         Self::ExactScopeScan,
         Self::ConventionalRetrieval,
         Self::StaticHdc,
         Self::HdcLtc,
+        Self::TypedContentHdc,
         Self::SemanticPlacebo,
     ];
 
@@ -59,6 +63,7 @@ impl Arm {
             Self::ConventionalRetrieval => "conventional_retrieval",
             Self::StaticHdc => "static_hdc",
             Self::HdcLtc => "hdc_ltc",
+            Self::TypedContentHdc => "typed_content_hdc",
             Self::SemanticPlacebo => "semantic_placebo",
         }
     }
@@ -73,6 +78,7 @@ struct CandidateRun {
     index_bytes: u64,
     sidecar_bytes: u64,
     memory_digest: String,
+    retrieval_profile_digest: Option<String>,
     abstention_reason: Option<String>,
 }
 
@@ -246,6 +252,36 @@ fn hdc_hits(
     Ok((hits, index.index_payload_bytes()))
 }
 
+fn typed_content_hits(
+    memory: &[Experience],
+    query: Query,
+) -> Result<(Vec<CandidateHit>, u64, String), String> {
+    let config = TypedContentConfigV1 {
+        dimension: HDC_DIMENSION,
+        seed: HDC_CODEBOOK_SEED,
+        ..TypedContentConfigV1::default()
+    };
+    let index = TypedContentIndexV1::build(memory, config)
+        .map_err(|error| error.to_string())?;
+    let profile_digest = index.profile_digest().to_string();
+
+    let mut hits = Vec::new();
+    for action in [Action::A, Action::B] {
+        let candidate_query =
+            SemanticExperienceQueryV1::qualified_transfer(query.scope, action);
+        let result = index
+            .retrieve(candidate_query, TOP_K)
+            .map_err(|error| error.to_string())?;
+        hits.extend(result.candidates);
+    }
+    hits.sort_by(|left, right| {
+        left.rank
+            .cmp(&right.rank)
+            .then_with(|| left.event_id.cmp(&right.event_id))
+    });
+    Ok((hits, index.index_payload_bytes(), profile_digest))
+}
+
 fn execute_arm(
     arm: Arm,
     case: &CandidateTask<'_>,
@@ -256,6 +292,7 @@ fn execute_arm(
     let mut index_bytes = 0_u64;
     let mut retrieved_ids = Vec::new();
     let mut expected_view_digests = BTreeMap::new();
+    let mut retrieval_profile_digest = None;
     let mut error = None;
 
     let ids_result: Result<Vec<u32>, String> = match arm {
@@ -301,6 +338,17 @@ fn execute_arm(
             }
             ids
         }),
+        Arm::TypedContentHdc => typed_content_hits(&memory, case.query)
+            .map(|(hits, bytes, profile_digest)| {
+                index_bytes = bytes;
+                retrieval_profile_digest = Some(profile_digest);
+                let mut ids = Vec::with_capacity(hits.len());
+                for hit in hits {
+                    expected_view_digests.insert(hit.event_id, hit.view_digest);
+                    ids.push(hit.event_id);
+                }
+                ids
+            }),
         Arm::SemanticPlacebo => {
             index_bytes = u64::try_from(memory.len())
                 .unwrap_or(u64::MAX)
@@ -332,7 +380,12 @@ fn execute_arm(
 
     // HDC candidate IDs are only hints. The canonical Experience view is
     // independently compared with the index-time view digest before policy use.
-    if error.is_none() && matches!(arm, Arm::StaticHdc | Arm::HdcLtc) {
+    if error.is_none()
+        && matches!(
+            arm,
+            Arm::StaticHdc | Arm::HdcLtc | Arm::TypedContentHdc
+        )
+    {
         let mut verified = Vec::with_capacity(retrieved_ids.len());
         for (id, item) in retrieved_ids.iter().zip(resolved.iter()) {
             let expected = experience_view_digest(item);
@@ -378,6 +431,7 @@ fn execute_arm(
         decision,
         retrieved_ids,
         memory_digest: experience_list_digest(&memory),
+        retrieval_profile_digest,
         resolved,
         latency_ns: u64::try_from(started.elapsed().as_nanos()).unwrap_or(u64::MAX),
         index_bytes,
@@ -429,10 +483,17 @@ fn initial_state_digest(case: &CandidateTask<'_>) -> String {
 }
 
 fn candidate_policy_digest(arm: Arm) -> String {
+    let typed_profile = TypedContentConfigV1 {
+        dimension: HDC_DIMENSION,
+        seed: HDC_CODEBOOK_SEED,
+        ..TypedContentConfigV1::default()
+    }
+    .profile_digest()
+    .unwrap_or_else(|_| "invalid-typed-profile".to_string());
     sha256(
         format!(
-            "mace-candidate-policy-v1|arm={}|top_k={}|dimension={}|codebook_seed={:016x}|neuron_seed={:016x}",
-            arm.name(), TOP_K, HDC_DIMENSION, HDC_CODEBOOK_SEED, HDC_NEURON_SEED
+            "mace-candidate-policy-v1|arm={}|top_k={}|dimension={}|codebook_seed={:016x}|neuron_seed={:016x}|typed_content_profile={}",
+            arm.name(), TOP_K, HDC_DIMENSION, HDC_CODEBOOK_SEED, HDC_NEURON_SEED, typed_profile
         )
         .as_bytes(),
     )
@@ -454,6 +515,7 @@ fn candidate_record(
         "retrieved_event_ids": result.retrieved_ids,
         "decision_support_event_ids": decision_support_ids,
         "memory_snapshot_sha256": result.memory_digest,
+        "retrieval_profile_sha256": result.retrieval_profile_digest,
         "latency_ns": result.latency_ns
     }))
     .unwrap_or_else(|_| sha256(b"candidate-trace-serialization-error"));
@@ -480,6 +542,9 @@ fn candidate_record(
         "index_bytes": result.index_bytes,
         "evidence_sidecar_bytes": result.sidecar_bytes
     });
+    if let Some(profile_digest) = &result.retrieval_profile_digest {
+        record["retrieval_profile_sha256"] = json!(profile_digest);
+    }
     if let Some(reason) = &result.abstention_reason {
         record["abstention_reason"] = json!(reason);
     }
@@ -924,6 +989,18 @@ fn run() -> Result<(), String> {
         contrast_record("content_vs_placebo", Arm::SemanticPlacebo, Arm::HdcLtc, &scores),
         contrast_record("hdc_ltc_vs_conventional", Arm::ConventionalRetrieval, Arm::HdcLtc, &scores),
         contrast_record("hdc_ltc_vs_static_hdc", Arm::StaticHdc, Arm::HdcLtc, &scores),
+        contrast_record(
+            "typed_content_hdc_vs_conventional",
+            Arm::ConventionalRetrieval,
+            Arm::TypedContentHdc,
+            &scores,
+        ),
+        contrast_record(
+            "typed_content_hdc_vs_static_hdc",
+            Arm::StaticHdc,
+            Arm::TypedContentHdc,
+            &scores,
+        ),
     ];
     let summary = json!({
         "schema_version": SCHEMA_VERSION,
@@ -1042,6 +1119,28 @@ mod tests {
                     && candidate.query.scope.objective == task.query.scope.objective
             });
         assert!(sibling.is_some());
+    }
+
+    #[test]
+    fn typed_content_arm_binds_profile_and_revalidates_exact_candidate_views() {
+        let cases = stress::generated_worlds(1);
+        let tasks: Vec<CandidateTask<'_>> = cases.iter().map(candidate_task).collect();
+        let task = &tasks[0];
+        let result = execute_arm(Arm::TypedContentHdc, task, &tasks);
+        assert!(result.retrieval_profile_digest.is_some());
+        assert!(!result.retrieved_ids.is_empty());
+        assert!(result.retrieved_ids.iter().all(|id| {
+            result.resolved.iter().any(|item| item.event_id == *id)
+        }));
+        let record = candidate_record("typed-test", task, Arm::TypedContentHdc, &result);
+        assert_eq!(
+            record["retrieval_profile_sha256"].as_str(),
+            result.retrieval_profile_digest.as_deref()
+        );
+        assert_eq!(
+            record["memory_snapshot_sha256"].as_str(),
+            Some(experience_list_digest(task.memory).as_str())
+        );
     }
 
     #[test]
