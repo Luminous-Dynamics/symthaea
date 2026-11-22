@@ -156,7 +156,6 @@ impl SummaryAccumulator {
                     self.score_drop_sum += value;
                     self.score_drop_count += 1;
                 }
-                MetricKind::None => {}
             }
         }
     }
@@ -186,7 +185,6 @@ impl SummaryAccumulator {
 
 #[derive(Debug, Clone, Copy)]
 enum MetricKind {
-    None,
     MarginShift,
     MarginRatio,
     ScoreDrop,
@@ -231,7 +229,9 @@ fn audit_panel(panel: &ProbePanelV1) -> Result<GroundingReport, String> {
         }
 
         let mut probe_ids = BTreeSet::new();
+        let mut probe_kinds = BTreeSet::new();
         for probe in &case.probes {
+            probe_kinds.insert(probe.kind.as_str());
             total_probe_count += 1;
             if probe.probe_id.trim().is_empty() || !probe_ids.insert(probe.probe_id.as_str()) {
                 return Err(format!(
@@ -374,6 +374,20 @@ fn audit_panel(panel: &ProbePanelV1) -> Result<GroundingReport, String> {
                     ));
                 }
                 other => return Err(format!("unsupported probe kind {other}")),
+            }
+        }
+        for required_kind in [
+            "prompt_only",
+            "audio_swap",
+            "instruction_paraphrase",
+            "nuisance_transform",
+            "semantic_mismatch",
+        ] {
+            if !probe_kinds.contains(required_kind) {
+                return Err(format!(
+                    "case {} is missing required probe kind {required_kind}",
+                    case.case_id
+                ));
             }
         }
     }
@@ -821,6 +835,15 @@ mod tests {
         panel["cases"][0]["probes"][4]["score_a"] = serde_json::json!(7.0);
         let report = parse_and_audit(&panel.to_string()).expect("probe structure is valid");
         assert_eq!(report.semantic_mismatch.pass_rate, Some(0.0));
+    }
+
+    #[test]
+    fn missing_probe_kind_is_rejected_not_counted_as_a_pass() {
+        let mut panel = value();
+        panel["cases"][0]["probes"].as_array_mut().unwrap().pop();
+        let error = parse_and_audit(&panel.to_string())
+            .expect_err("incomplete probe panel must be rejected");
+        assert!(error.contains("missing required probe kind semantic_mismatch"));
     }
 
     #[test]
