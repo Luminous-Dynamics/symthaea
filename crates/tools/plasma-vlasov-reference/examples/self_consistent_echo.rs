@@ -493,6 +493,50 @@ fn run_resolution(
     Ok(())
 }
 
+#[cfg(test)]
+mod tests {
+    use super::integrate_quadratic_flux_triplet;
+
+    fn polynomial(time: f64) -> f64 {
+        2.0 * time * time - 3.0 * time + 4.0
+    }
+
+    fn antiderivative(time: f64) -> f64 {
+        (2.0 / 3.0) * time.powi(3) - 1.5 * time.powi(2) + 4.0 * time
+    }
+
+    #[test]
+    fn quadratic_flux_integrator_is_exact_for_uniform_samples() {
+        let observed = integrate_quadratic_flux_triplet(
+            0.0,
+            1.0,
+            2.0,
+            polynomial(0.0),
+            polynomial(1.0),
+            polynomial(2.0),
+        );
+        let expected = antiderivative(2.0) - antiderivative(0.0);
+        assert!((observed - expected).abs() < 1.0e-13);
+    }
+
+    #[test]
+    fn quadratic_flux_integrator_is_exact_for_nonuniform_samples() {
+        let start = -1.0;
+        let middle = 0.5;
+        let end = 3.0;
+        let observed = integrate_quadratic_flux_triplet(
+            start,
+            middle,
+            end,
+            polynomial(start),
+            polynomial(middle),
+            polynomial(end),
+        );
+        let expected = antiderivative(end) - antiderivative(start);
+        assert!((observed - expected).abs() < 1.0e-12);
+    }
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     println!(
         "run,nx,nv,dt,step,time,pulse_echo_real,pulse_echo_imag,pulse_echo_amplitude,control_echo_real,control_echo_imag,control_echo_amplitude,delta_echo_real,delta_echo_imag,delta_echo_amplitude,pulse_second_real,pulse_second_imag,pulse_second_amplitude,control_second_real,control_second_imag,control_second_amplitude,pulse_mass,pulse_momentum,pulse_kinetic_energy,pulse_field_energy,pulse_total_energy,pulse_poisson_residual,pulse_minimum_f,pulse_velocity_boundary_ratio,pulse_x_high_tail_fraction,pulse_v_high_tail_fraction,pulse_x_nyquist_fraction,pulse_v_nyquist_fraction,control_mass,control_momentum,control_total_energy,control_field_energy,control_poisson_residual,control_minimum_f,control_velocity_boundary_ratio,diagnostic_time"
