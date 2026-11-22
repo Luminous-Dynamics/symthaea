@@ -474,6 +474,14 @@ fn reduce(
             None => return Err(format!("line {} has no record_type", line_index + 1)),
         }
 
+        let expected_run_id = input_provenance
+            .as_ref()
+            .ok_or_else(|| "evaluator_score appeared before its run manifest".to_string())?
+            .run_id
+            .as_str();
+        if required_string(&record, "run_id")? != expected_run_id {
+            return Err("evaluator_score run_id does not match manifest provenance".to_string());
+        }
         let (task_key, method_kind, metrics) = parse_score(&record)
             .map_err(|error| format!("line {}: {error}", line_index + 1))?;
         block_rows
