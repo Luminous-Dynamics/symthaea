@@ -15,9 +15,8 @@ use std::hint::black_box;
 use std::time::Instant;
 
 use symthaea_canvas::{
-    EmbodimentSnapshot, MycelialJunctionGraphConfig, PresenceMode,
-    build_mycelial_junction_hypha_graph, build_mycelial_model,
-    detect_anastomosis_candidates, MycelialNetworkConfig,
+    EmbodimentSnapshot, MycelialJunctionGraphConfig, MycelialNetworkConfig, PresenceMode,
+    build_mycelial_junction_hypha_graph, build_mycelial_model, detect_anastomosis_candidates,
 };
 
 const DEFAULT_SAMPLES: usize = 100;
@@ -37,10 +36,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         return Err(format!("sample count must be in 1..={MAX_SAMPLES}").into());
     }
 
-    let model = build_mycelial_model(
-        &EmbodimentSnapshot::default(),
-        PresenceMode::Cognitive,
-    );
+    let model = build_mycelial_model(&EmbodimentSnapshot::default(), PresenceMode::Cognitive);
     let config = MycelialJunctionGraphConfig::default();
     let fusion_config = MycelialNetworkConfig::default();
 
@@ -53,11 +49,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .collect();
 
     for _ in 0..WARMUP_RUNS {
-        let graph = build_mycelial_junction_hypha_graph(
-            black_box(&model),
-            &[],
-            config,
-        )?;
+        let graph = build_mycelial_junction_hypha_graph(black_box(&model), &[], config)?;
         black_box(graph.canonical_digest_hex()?);
         black_box(graph.metrics()?);
         black_box(graph.global_geometric_efficiency()?);
@@ -68,11 +60,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut final_graph = None;
     for _ in 0..samples {
         let started = Instant::now();
-        let graph = build_mycelial_junction_hypha_graph(
-            black_box(&model),
-            &[],
-            config,
-        )?;
+        let graph = build_mycelial_junction_hypha_graph(black_box(&model), &[], config)?;
         black_box(graph.canonical_digest_hex()?);
         let metrics = graph.metrics()?;
         let global = graph.global_geometric_efficiency()?;
@@ -92,7 +80,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("benchmark: mycelial-junction-hypha-v1");
     println!("model_schema_version: {}", model.schema_version);
     println!("model_filaments: {}", model.filament_count());
-    println!("model_terminal_filaments: {}", model.terminal_filament_count());
+    println!(
+        "model_terminal_filaments: {}",
+        model.terminal_filament_count()
+    );
     println!("accepted_anastomoses: 0");
     println!("anastomosis_candidates_proposed: {}", candidates.len());
     println!("junctions: {}", metrics.junction_count);
@@ -107,7 +98,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         "junction_weld_offsets_model_units_microunits: {}",
         metrics.total_junction_offset_model_units_microunits
     );
-    println!("maximum_junction_gap_model_units_microunits: {}", metrics.maximum_junction_gap_microunits);
+    println!(
+        "maximum_junction_gap_model_units_microunits: {}",
+        metrics.maximum_junction_gap_microunits
+    );
     println!("length_unit: organism_local_model_unit");
     println!("global_geometric_directness: {:?}", global.mean_directness);
     println!("global_eligible_pairs: {}", global.eligible_pairs);
@@ -117,16 +111,30 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("declared_origin_anchors: {}", root_ids.len());
     println!("root_geometric_directness: {:?}", root.mean_directness);
     println!("root_eligible_terminal_junctions: {}", root.eligible_pairs);
-    println!("root_reachable_terminal_junctions: {}", root.reachable_pairs);
-    println!("root_unreachable_terminal_junctions: {}", root.unreachable_pairs);
+    println!(
+        "root_reachable_terminal_junctions: {}",
+        root.reachable_pairs
+    );
+    println!(
+        "root_unreachable_terminal_junctions: {}",
+        root.unreachable_pairs
+    );
     println!("source_geometry_digest: {}", graph.source_geometry_digest);
     println!("junction_graph_digest: {digest}");
     println!("warmup_runs: {WARMUP_RUNS}");
     println!("samples: {samples}");
-    println!("graph_build_plus_metrics_time_ns_p50: {}", percentile(&durations_ns, 50));
-    println!("graph_build_plus_metrics_time_ns_p95: {}", percentile(&durations_ns, 95));
+    println!(
+        "graph_build_plus_metrics_time_ns_p50: {}",
+        percentile(&durations_ns, 50)
+    );
+    println!(
+        "graph_build_plus_metrics_time_ns_p95: {}",
+        percentile(&durations_ns, 95)
+    );
     println!("platform_os: {}", std::env::consts::OS);
     println!("platform_arch: {}", std::env::consts::ARCH);
-    println!("benchmark_scope: deterministic synthetic renderer-local graph; proposals only; no biology/physical units/transport/GPU claims");
+    println!(
+        "benchmark_scope: deterministic synthetic renderer-local graph; proposals only; no biology/physical units/transport/GPU claims"
+    );
     Ok(())
 }
