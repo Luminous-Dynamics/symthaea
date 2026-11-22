@@ -550,7 +550,7 @@ fn run_resolution(
     )?;
 
     println!(
-        "# summary,{label},{},{},{dt:.8},{impulse_amplitude:.8},dv={:.8},velocity_nyquist_time={:.8},velocity_recurrence_time={:.8},echo_mode={},predicted_echo_time={:.8},sampled_peak_time={:.8},peak_amplitude={:.12e},peak_phase={:.12e},detected={},fwhm={},wall_seconds={:.6}",
+        "# summary,{label},{},{},{dt:.8},{impulse_amplitude:.8},dv={:.8},velocity_nyquist_time={:.8},velocity_recurrence_time={:.8},echo_mode={},predicted_echo_time={:.8},sampled_peak_time={:.8},peak_amplitude={:.12e},peak_over_impulse={:.12e},peak_over_impulse_squared={:.12e},peak_phase={:.12e},detected={},fwhm={},wall_seconds={:.6}",
         config.nx,
         config.nv,
         velocity_spacing,
@@ -560,6 +560,8 @@ fn run_resolution(
         prediction.echo_time,
         measurement.sampled_peak_time,
         measurement.peak_amplitude,
+        measurement.peak_amplitude / impulse_amplitude,
+        measurement.peak_amplitude / impulse_amplitude.powi(2),
         measurement.peak_phase_radians,
         measurement.detected,
         measurement
@@ -569,7 +571,7 @@ fn run_resolution(
         wall_clock_start.elapsed().as_secs_f64(),
     );
     println!(
-        "# negative_summary,{label},{impulse_amplitude:.8},wrong_pulse_mode={},predicted_echo_mode={},predicted_rephasing_time={:.8},wrong_mode_nyquist_time={:.8},wrong_mode_recurrence_time={:.8},sampled_wrong_mode_peak_time={:.8},wrong_mode_peak_amplitude={:.12e},wrong_mode_peak_phase={:.12e},wrong_mode_detected={},off_target_original_mode_peak={:.12e},off_target_peak_time={:.8}",
+        "# negative_summary,{label},{impulse_amplitude:.8},wrong_pulse_mode={},predicted_echo_mode={},predicted_rephasing_time={:.8},wrong_mode_nyquist_time={:.8},wrong_mode_recurrence_time={:.8},sampled_wrong_mode_peak_time={:.8},wrong_mode_peak_amplitude={:.12e},wrong_mode_peak_phase={:.12e},wrong_mode_detected={},off_target_original_mode_peak={:.12e},off_target_peak_time={:.8},off_target_to_registered_ratio={:.12e}",
         WRONG_SECOND_MODE,
         wrong_prediction.echo_mode,
         wrong_prediction.echo_time,
@@ -581,6 +583,7 @@ fn run_resolution(
         wrong_measurement.detected,
         wrong_mode_off_target_peak,
         wrong_mode_off_target_peak_time,
+        wrong_mode_off_target_peak / wrong_measurement.peak_amplitude.max(f64::MIN_POSITIVE),
     );
 
     Ok(())
@@ -640,7 +643,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
 
     println!(
-        "# negative_summary_columns,run,impulse_amplitude,wrong_pulse_mode,predicted_echo_mode,predicted_rephasing_time,wrong_mode_nyquist_time,wrong_mode_recurrence_time,sampled_peak_time,peak_amplitude,peak_phase,detected,off_target_peak,off_target_peak_time"
+        "# negative_summary_columns,run,impulse_amplitude,wrong_pulse_mode,predicted_echo_mode,predicted_rephasing_time,wrong_mode_nyquist_time,wrong_mode_recurrence_time,sampled_peak_time,peak_amplitude,peak_phase,detected,off_target_peak,off_target_peak_time,off_target_to_registered_ratio"
     );
 
     println!(
