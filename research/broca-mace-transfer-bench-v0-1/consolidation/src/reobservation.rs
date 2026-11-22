@@ -69,6 +69,8 @@ impl ReobservationProposalV1 {
         };
         let fields = [
             self.event_id.to_string(),
+            self.as_known.valid_at_ms.to_string(),
+            self.as_known.known_at_ms.to_string(),
             self.evidence_sha256.clone(),
             scope_code(self.scope).to_owned(),
             self.as_known.valid_at_ms.to_string(),
@@ -299,6 +301,7 @@ pub enum ReobservationReasonV1 {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ReobservationPlanV1 {
     pub event_id: u32,
+    pub as_known: AsKnownQuery,
     pub evidence_sha256: String,
     pub prediction_sha256: String,
     pub profile_sha256: String,
@@ -384,8 +387,10 @@ fn expected_failure_loss(
     success_probability_bps: u16,
 ) -> i64 {
     let failure_probability_bps = 10_000_u32.saturating_sub(u32::from(success_probability_bps));
-    ((u64::from(failure_probability_bps) * u64::from(failure_penalty_micros))
-        / 10_000) as i64
+    let expected_loss = u64::from(failure_probability_bps)
+        * u64::from(failure_penalty_micros)
+        / 10_000;
+    i64::try_from(expected_loss).unwrap_or(i64::MAX)
 }
 
 pub fn plan_memory_representation(
@@ -555,6 +560,7 @@ pub fn plan_memory_representation(
 
     let mut plan = ReobservationPlanV1 {
         event_id: proposal.event_id,
+        as_known: proposal.as_known,
         evidence_sha256: proposal.evidence_sha256.clone(),
         prediction_sha256: prediction_sha,
         profile_sha256: profile_sha,
@@ -1062,6 +1068,27 @@ mod tests {
     }
 
     #[test]
+    fn stable_fact_uses_a_locator_only_when_its_risk_adjusted_value_wins() {
+        let profile = verified(proposal(
+            MemoryObjectKindV1::StableFact,
+            ReobservationAvailabilityV1::Available {
+                available_at_ms: 300,
+                locator_sha256: digest("stable-fact-source"),
+            },
+            None,
+        ));
+        let plan = plan_memory_representation(
+            &prediction(50_000, 1_000),
+            &profile,
+            policy(),
+        )
+        .unwrap();
+        assert_eq!(plan.disposition, ReobservationDispositionV1::StoreLocator);
+        assert!(plan.locator_sha256.is_some());
+        assert_eq!(plan.as_known, as_known());
+    }
+
+    #[test]
     fn stable_fact_can_be_retained_without_an_expiring_snapshot() {
         let profile = verified(proposal(
             MemoryObjectKindV1::StableFact,
@@ -1200,6 +1227,7 @@ mod tests {
         let plan = plan_memory_representation(&prediction(50_000, 1_000), &profile, policy())
             .unwrap();
         assert_eq!(plan.plan_sha256, plan.canonical_digest());
+        assert_eq!(plan.as_known, profile.proposal().as_known);
         assert_ne!(plan.profile_sha256, profile.proposal().canonical_digest());
     }
 }
