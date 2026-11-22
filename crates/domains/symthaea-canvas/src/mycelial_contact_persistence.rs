@@ -60,6 +60,8 @@ pub struct MycelialContactCandidateObservation {
     pub source_parameter_micros: u32,
     pub target_parameter_micros: u32,
     pub contact_distance_microunits: u64,
+    /// Zero-based deterministic insertion order; None for candidates above the sweep cap.
+    pub admission_order: Option<u32>,
     pub admitted_within_maximum_tolerance: bool,
 }
 
@@ -319,6 +321,7 @@ pub fn build_mycelial_contact_filtration(
             source_parameter_micros: parameter_micros(fusion.source_t),
             target_parameter_micros: parameter_micros(fusion.target_t),
             contact_distance_microunits: quantize(measured_distance),
+            admission_order: None,
             admitted_within_maximum_tolerance: admitted,
         });
         measured_candidates.push((candidate.clone(), measured_distance));
@@ -346,6 +349,20 @@ pub fn build_mycelial_contact_filtration(
             .then_with(|| left.0.fusion.id.cmp(&right.0.fusion.id))
     });
 
+    let maximum_tolerance_microunits = quantize(config.maximum_contact_tolerance_model_units);
+    let mut next_admission_order = 0u32;
+    for (candidate, measured_distance) in &measured_candidates {
+        if quantize(*measured_distance) <= maximum_tolerance_microunits {
+            let index = candidate_observations
+                .binary_search_by_key(&candidate.fusion.id, |value| value.fusion_candidate_id)
+                .map_err(|_| MycelialContactFiltrationError::InvalidFiltration(
+                    "candidate inventory lost an admitted candidate",
+                ))?;
+            candidate_observations[index].admission_order = Some(next_admission_order);
+            next_admission_order = next_admission_order.saturating_add(1);
+        }
+    }
+
     let mut disjoint = DisjointSet::new(baseline.filament_ids.iter().copied());
     let mut adjacency = BTreeMap::<u32, Vec<(u32, Option<u32>)>>::new();
     for filament_id in &baseline.filament_ids {
@@ -366,7 +383,6 @@ pub fn build_mycelial_contact_filtration(
     let baseline_components = disjoint.component_count();
     let baseline_parent_edges = baseline.connections.len();
 
-    let maximum_tolerance_microunits = quantize(config.maximum_contact_tolerance_model_units);
     let mut snapshots = Vec::new();
     let mut component_merges = Vec::new();
     let mut cycle_births = Vec::new();
@@ -541,6 +557,26 @@ impl MycelialContactFiltration {
             .iter()
             .filter(|candidate| candidate.admitted_within_maximum_tolerance)
             .count();
+        let mut admission_orders = BTreeSet::new();
+        if self.candidate_observations.iter().any(|candidate| {
+            if candidate.admitted_within_maximum_tolerance {
+                candidate
+                    .admission_order
+                    .is_none_or(|order| !admission_orders.insert(order))
+            } else {
+                candidate.admission_order.is_some()
+            }
+        }) || admission_orders.len() != self.metrics.candidate_count_in_filtration
+            || admission_orders
+                .iter()
+                .copied()
+                .enumerate()
+                .any(|(expected, actual)| actual as usize != expected)
+        {
+            return Err(MycelialContactFiltrationError::InvalidFiltration(
+                "candidate admission orders are missing, duplicated or non-contiguous",
+            ));
+        }
         if observed_admitted != self.metrics.candidate_count_in_filtration
             || self
                 .candidate_observations
@@ -586,23 +622,39 @@ impl MycelialContactFiltration {
             })
             .collect();
         let mut event_ids = BTreeSet::new();
-        for event in &self.component_merges {
+        let mut previous_merge_order = None;
+        for (merge_index, event) in self.component_merges.iter().enumerate() {
             let candidate = observation_by_id
                 .get(&event.fusion_candidate_id)
                 .ok_or(MycelialContactFiltrationError::InvalidFiltration(
                     "component merge has no candidate observation",
                 ))?;
+            let admission_order = candidate.admission_order.ok_or(
+                MycelialContactFiltrationError::InvalidFiltration(
+                    "component merge candidate has no admission order",
+                ),
+            )?;
+            let admission_order = candidate.admission_order.ok_or(
+                MycelialContactFiltrationError::InvalidFiltration(
+                    "cycle candidate has no admission order",
+                ),
+            )?;
             if !candidate.admitted_within_maximum_tolerance
                 || candidate.source_filament_id != event.source_filament_id
                 || candidate.target_filament_id != event.target_filament_id
                 || candidate.contact_distance_microunits != event.contact_distance_microunits
+                || event.connected_components_after_merge
+                    != self.metrics.baseline_connected_components.saturating_sub(merge_index + 1)
+                || previous_merge_order.is_some_and(|previous| admission_order <= previous)
                 || !event_ids.insert(event.fusion_candidate_id)
             {
                 return Err(MycelialContactFiltrationError::InvalidFiltration(
                     "component merge does not match a unique admitted candidate",
                 ));
             }
+            previous_merge_order = Some(admission_order);
         }
+        let mut previous_cycle_order = None;
         for event in &self.cycle_births {
             let candidate = observation_by_id
                 .get(&event.fusion_candidate_id)
@@ -632,6 +684,7 @@ impl MycelialContactFiltration {
                         Some(prior_id) => observation_by_id.get(&prior_id).is_none_or(|prior| {
                             prior_id == event.fusion_candidate_id
                                 || !prior.admitted_within_maximum_tolerance
+                                || prior.admission_order.is_none_or(|prior_order| prior_order >= admission_order)
                                 || prior.contact_distance_microunits
                                     > event.contact_distance_microunits
                                 || !((prior.source_filament_id == pair.0
@@ -646,6 +699,12 @@ impl MycelialContactFiltration {
                     "cycle birth does not match a unique candidate or has an invalid witness path",
                 ));
             }
+            if previous_cycle_order.is_some_and(|previous| admission_order <= previous) {
+                return Err(MycelialContactFiltrationError::InvalidFiltration(
+                    "cycle-birth events are not in deterministic admission order",
+                ));
+            }
+            previous_cycle_order = Some(admission_order);
         }
         if event_ids.len() != self.metrics.candidate_count_in_filtration {
             return Err(MycelialContactFiltrationError::InvalidFiltration(
@@ -780,6 +839,15 @@ impl MycelialContactFiltration {
             hasher.update(&candidate.source_parameter_micros.to_le_bytes());
             hasher.update(&candidate.target_parameter_micros.to_le_bytes());
             hasher.update(&candidate.contact_distance_microunits.to_le_bytes());
+            match candidate.admission_order {
+                Some(order) => {
+                    hasher.update(&[1]);
+                    hasher.update(&order.to_le_bytes());
+                }
+                None => {
+                    hasher.update(&[0]);
+                }
+            }
             hasher.update(&[u8::from(candidate.admitted_within_maximum_tolerance)]);
         }
         for snapshot in &self.snapshots {
