@@ -1,7 +1,7 @@
 {
   "corpus_version": "0.1.0",
   "corpus_id": "symthaea.leptos-0.8.patterns",
-  "status": "source_observed_reference_checked",
+  "status": "source_observed",
   "framework": {
     "name": "Leptos",
     "api_family": "0.8",
