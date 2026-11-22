@@ -102,7 +102,7 @@ jobs:
           jq -e '.finite_translation_oracle.group_sizes == [2,3,4,5,6]
             and .finite_translation_oracle.group_target_cases == 620
             and .finite_translation_oracle.row_indicator_cases == 1240
-            and .finite_translation_oracle.status == "source_added_exact_head_ci_pending"' \
+            and .finite_translation_oracle.status == "passed_exact_head_ci"' \
             docs/research/RH_MAIN_INEQUALITY_M_MAP_V1.json >/dev/null
 
           echo "RH_PROOF_GRAPH_AND_M_MAP_FIXTURES_PASS"
