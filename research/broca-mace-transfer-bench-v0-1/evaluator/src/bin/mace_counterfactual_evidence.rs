@@ -16,7 +16,7 @@ use std::time::Instant;
 
 use broca_mace_hdc_retrieval::experience_view_digest;
 use broca_mace_policy::{
-    decide, Action, Decision, DecisionNeedV1, Experience, Objective, Policy, Query, Regime, SourceRootDigest,
+    decide, Action, Decision, DecisionNeedV1, Experience, Objective, Policy, Query, Regime, Scope, SourceRootDigest,
 };
 use serde::Serialize;
 use serde_json::{json, Value};
