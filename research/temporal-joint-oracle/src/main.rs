@@ -770,6 +770,27 @@ mod tests {
     }
 
     #[test]
+    fn four_way_interaction_is_separated_from_all_lower_order_terms() {
+        let report = decompose_exact_joint_interactions(&input()).unwrap();
+        let fourth_order = report
+            .interaction_terms
+            .iter()
+            .find(|term| term.subset_mask == 0b1111)
+            .unwrap();
+
+        assert_eq!(fourth_order.interaction_order, 4);
+        // The 4-way fixture is additive for every proper subset. Only the
+        // complete sensing+memory+compute+verification assignment contributes
+        // these additional measured exposure reductions.
+        assert_eq!(fourth_order.exposure_benefit_dividend_us, [72, 61, 53]);
+        assert!(report.interaction_terms
+            .iter()
+            .filter(|term| term.subset_mask != 0b1111)
+            .all(|term| term.interaction_order < 4));
+        assert_eq!(report.interaction_order_summaries[3].term_count, 1);
+    }
+
+    #[test]
     fn interaction_order_summaries_reconstruct_total_joint_effect() {
         let report = decompose_exact_joint_interactions(&three_factor_interaction_input()).unwrap();
         assert_eq!(report.interaction_order_summaries.len(), 3);
