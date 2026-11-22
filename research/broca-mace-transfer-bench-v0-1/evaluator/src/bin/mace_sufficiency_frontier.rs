@@ -188,6 +188,7 @@ fn candidate_identity(
     selected: &[Experience],
     method: &str,
     per_action_top_k: Option<usize>,
+    retrieval_profile_sha256: Option<&str>,
 ) -> (String, String) {
     let mut hasher = Sha256::new();
     hasher.update(b"luminous:mace:sufficiency-candidate-input:v1\0");
@@ -198,6 +199,12 @@ fn candidate_identity(
         .and_then(|value| u64::try_from(value).ok())
         .unwrap_or(u64::MAX);
     hasher.update(budget.to_be_bytes());
+    if let Some(profile) = retrieval_profile_sha256 {
+        hasher.update(b"retrieval-profile:present:v1\0");
+        hasher.update(profile.as_bytes());
+    } else {
+        hasher.update(b"retrieval-profile:absent:v1\0");
+    }
     let mut ids: Vec<&Experience> = selected.iter().collect();
     ids.sort_by_key(|item| item.event_id);
     for item in ids {
@@ -377,6 +384,7 @@ fn select_candidate(
         &selected,
         arm.name(),
         per_action_top_k,
+        profile_sha256.as_deref(),
     );
 
     Ok(CandidatePoint {
