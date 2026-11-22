@@ -1640,6 +1640,11 @@ mod tests {
         assert_eq!(profile.metrics.candidate_count_in_filtration, 2);
         assert_eq!(profile.metrics.cycle_birth_count, 2);
         assert_eq!(profile.metrics.final_cycle_rank, 2);
+        assert_eq!(profile.metrics.contact_conflict_group_count, 1);
+        assert_eq!(profile.metrics.conflicting_candidate_count, 2);
+        assert_eq!(profile.contact_conflict_groups.len(), 1);
+        assert_eq!(profile.contact_conflict_groups[0].filament_id, 2);
+        assert_eq!(profile.contact_conflict_groups[0].candidate_ids, vec![17, 18]);
         assert_eq!(profile.candidate_observations.len(), 2);
         assert_eq!(
             profile.candidate_observations[0].source_filament_id,
