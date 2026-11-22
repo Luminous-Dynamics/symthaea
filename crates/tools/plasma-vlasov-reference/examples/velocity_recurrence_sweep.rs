@@ -41,7 +41,7 @@ fn run_case(
         / initial_field.amplitude().max(f64::MIN_POSITIVE);
 
     println!(
-        "{label},{},{},{:.8},{:.8},{:.8},{:.8},{:.8},{:.12e},{:.12e},{:.6}",
+        "{label},{},{},{:.8},{:.8},{:.8},{:.8},{:.8},{:.8},{:.12e},{:.12e},{:.12e},{:.6}",
         config.nx,
         config.nv,
         config.velocity_min,
