@@ -1,3 +1,4 @@
+pub mod reobservation;
 pub mod salience_learning;
 pub mod salience;
 pub mod memory_budget;

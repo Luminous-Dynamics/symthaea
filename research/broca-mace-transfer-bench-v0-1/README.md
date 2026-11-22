@@ -535,3 +535,9 @@ The evaluator composes raw Session-A ingress evidence with per-model memory-dose
 The `broca-mace-hdc-retrieval` package supplies static ContinuousHV and HDC-LTC zero-input candidate indexes using the existing `symthaea-hdc-ltc` crate. It returns event IDs and ranking diagnostics only; consumers resolve IDs and rerun unchanged MACE qualification. No retrieval, utility or SOTA gain is claimed. See the [adapter README](hdc-retrieval/README.md) and [protocol](../../docs/research/HDC_LTC_MACE_TEMPORAL_RETRIEVAL_ARM_V0_1.md).
 
 HDC retrieval hits now carry a candidate-visible Experience-view digest; canonical resolution rejects hits whose record has changed since index construction. This is a stale-snapshot check, not a source signature or trust attestation.
+
+## Re-observation-aware representation
+
+MACE now has a separate reobservation policy prototype alongside predictive salience. It chooses whether to persist a learned rule/procedure/preference, retain a verified locator for current state, cache a snapshot only through a verified expiry, or discard non-positive-value material. The plan binds source/evidence identity, target-model prediction, source-profile receipt, decision deadline, context cost and re-observation cost.
+
+See [MACE Re-observation-Aware Memory Benchmark v0.1](../../docs/research/MACE_REOBSERVATION_AWARE_MEMORY_BENCHMARK_V0_1.md). This is a candidate representation policy, not a production source adapter or measured performance gain.
