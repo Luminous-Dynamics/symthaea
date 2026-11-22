@@ -115,6 +115,7 @@ pub enum TypedContentError {
     InvalidPropensityBounds { event_id: u32 },
     NonFiniteQuery { field: &'static str },
     InvalidQueryPropensityBounds,
+    InvalidQueryMeasurementError,
 }
 
 impl fmt::Display for TypedContentError {
@@ -141,6 +142,9 @@ impl fmt::Display for TypedContentError {
             Self::NonFiniteQuery { field } => write!(f, "query has non-finite {field}"),
             Self::InvalidQueryPropensityBounds => {
                 write!(f, "query has invalid propensity target bounds")
+            }
+            Self::InvalidQueryMeasurementError => {
+                write!(f, "query has a negative measurement-error target")
             }
         }
     }
@@ -362,13 +366,15 @@ fn validate_query(query: SemanticExperienceQueryV1) -> Result<(), TypedContentEr
         .target_measurement_error_bound
         .is_some_and(|value| value < 0.0)
     {
-        return Err(TypedContentError::NonFiniteQuery {
-            field: "negative target_measurement_error_bound",
-        });
+        return Err(TypedContentError::InvalidQueryMeasurementError);
     }
-    if query.target_propensity_min_bps.zip(query.target_propensity_max_bps).is_some_and(
-        |(minimum, maximum)| minimum > maximum || maximum > 10_000,
-    ) {
+    if query.target_propensity_min_bps.is_some_and(|minimum| minimum > 10_000)
+        || query.target_propensity_max_bps.is_some_and(|maximum| maximum > 10_000)
+        || query
+            .target_propensity_min_bps
+            .zip(query.target_propensity_max_bps)
+            .is_some_and(|(minimum, maximum)| minimum > maximum)
+    {
         return Err(TypedContentError::InvalidQueryPropensityBounds);
     }
     Ok(())
