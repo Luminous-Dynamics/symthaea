@@ -143,6 +143,10 @@ pub struct AdaptiveCampaignAudit {
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct SequentialScenarioAudit {
     pub scenario_id: String,
+    pub search_states_expanded: usize,
+    pub search_memo_hits: usize,
+    pub search_memo_entries: usize,
+    pub policy_tree_nodes: usize,
     pub baseline_terminal_disposition: String,
     pub baseline_worst_case_regret: f64,
     pub myopic: MyopicAudit,
@@ -174,6 +178,50 @@ struct Plan {
     worst_path_resources: Resources,
     node: PolicyNode,
 }
+
+#[derive(Debug, Default, Clone)]
+struct SearchStats {
+    states_expanded: usize,
+    memo_hits: usize,
+}
+
+type MemoKey = (Vec<String>, [u64; 6], usize, Vec<String>, Vec<String>);
+
+fn memo_key(
+    belief: &[String],
+    remaining_budget: &Resources,
+    depth_remaining: usize,
+    used: &BTreeSet<String>,
+    covered_obligations: &BTreeSet<String>,
+) -> MemoKey {
+    let mut canonical_belief = belief.to_vec();
+    canonical_belief.sort();
+    canonical_belief.dedup();
+    (
+        canonical_belief,
+        [
+            remaining_budget.engineering_hours.to_bits(),
+            remaining_budget.compute_core_hours.to_bits(),
+            remaining_budget.facility_hours.to_bits(),
+            remaining_budget.specimen_count as u64,
+            remaining_budget.review_hours.to_bits(),
+            remaining_budget.external_cost_units.to_bits(),
+        ],
+        depth_remaining,
+        used.iter().cloned().collect(),
+        covered_obligations.iter().cloned().collect(),
+    )
+}
+
+fn policy_tree_nodes(node: &PolicyNode) -> usize {
+    match node {
+        PolicyNode::Terminal { .. } | PolicyNode::HumanReview { .. } => 1,
+        PolicyNode::Test { branches, .. } => {
+            1 + branches.values().map(policy_tree_nodes).sum::<usize>()
+        }
+    }
+}
+
 
 fn valid_commit(value: &str) -> bool {
     value.len() == 40
@@ -506,10 +554,27 @@ fn solve(
     depth_remaining: usize,
     used: &BTreeSet<String>,
     covered_obligations: &BTreeSet<String>,
+    memo: &mut BTreeMap<MemoKey, Plan>,
+    stats: &mut SearchStats,
 ) -> Result<Plan, String> {
+    let key = memo_key(
+        belief,
+        remaining_budget,
+        depth_remaining,
+        used,
+        covered_obligations,
+    );
+    if let Some(cached) = memo.get(&key) {
+        stats.memo_hits += 1;
+        return Ok(cached.clone());
+    }
+    stats.states_expanded += 1;
+
     let mut candidates = vec![terminal_plan(scenario, belief, covered_obligations)?];
     if depth_remaining == 0 {
-        return Ok(candidates.remove(0));
+        let result = candidates.remove(0);
+        memo.insert(key, result.clone());
+        return Ok(result);
     }
     for action in &scenario.actions {
         if !eligible_action(scenario, action, remaining_budget, used) {
@@ -559,6 +624,8 @@ fn solve(
                 depth_remaining - 1,
                 &next_used,
                 &next_covered,
+                memo,
+                stats,
             )?;
             worst_case_regret = worst_case_regret.max(child.worst_case_regret);
             if let Some(child_expected) = &child.expected_resources {
@@ -591,7 +658,9 @@ fn solve(
             },
         });
     }
-    select_plan(candidates)
+    let result = select_plan(candidates)?;
+    memo.insert(key, result.clone());
+    Ok(result)
 }
 
 fn myopic_policy(scenario: &SequentialScenario, baseline: f64) -> Result<MyopicAudit, String> {
@@ -893,6 +962,8 @@ fn validate_scenario(scenario: &SequentialScenario) -> Result<SequentialScenario
     let baseline = baseline_plan.worst_case_regret;
     let myopic = myopic_policy(scenario, baseline)?;
     let fixed = fixed_policy(scenario)?;
+    let mut memo = BTreeMap::new();
+    let mut search_stats = SearchStats::default();
     let adaptive = solve(
         scenario,
         &scenario.states,
@@ -900,7 +971,10 @@ fn validate_scenario(scenario: &SequentialScenario) -> Result<SequentialScenario
         scenario.max_actions,
         &BTreeSet::new(),
         &no_obligations,
+        &mut memo,
+        &mut search_stats,
     )?;
+    let tree_nodes = policy_tree_nodes(&adaptive.node);
     let first_action_id = match &adaptive.node {
         PolicyNode::Test { action_id, .. } => Some(action_id.clone()),
         _ => None,
@@ -958,6 +1032,10 @@ fn validate_scenario(scenario: &SequentialScenario) -> Result<SequentialScenario
     }
     Ok(SequentialScenarioAudit {
         scenario_id: scenario.scenario_id.clone(),
+        search_states_expanded: search_stats.states_expanded,
+        search_memo_hits: search_stats.memo_hits,
+        search_memo_entries: memo.len(),
+        policy_tree_nodes: tree_nodes,
         baseline_terminal_disposition,
         baseline_worst_case_regret: baseline,
         myopic,
