@@ -4,6 +4,7 @@ pub mod binary_metrics;
 pub mod dtco_manifest;
 pub mod mf_acquisition;
 pub mod pair_manifest;
+pub mod secom_logistic;
 pub mod secom_missingness;
 pub mod secom_observation_drift;
 pub mod secom_raw;
@@ -19,6 +20,10 @@ pub use pair_manifest::{
 };
 pub use split_manifest::{
     SplitManifestError, SplitManifestV1, SplitValidationReportV1, validate_split_manifest_v1,
+};
+
+pub use secom_logistic::{
+    SecomLogisticError, SecomLogisticReportV1, evaluate_secom_logistic_v1,
 };
 
 pub use secom_missingness::{
