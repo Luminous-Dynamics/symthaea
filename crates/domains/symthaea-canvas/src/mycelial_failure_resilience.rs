@@ -802,6 +802,27 @@ fn splitmix64_next(state: &mut u64) -> u64 {
     value ^ (value >> 31)
 }
 
+fn failure_entity_tie_priority(seed: u64, entity_kind: u8, entity_id: &str) -> u64 {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"symthaea-failure-attack-tie-priority-v1");
+    hasher.update(&seed.to_le_bytes());
+    hasher.update(&[entity_kind]);
+    hash_string(&mut hasher, entity_id);
+    let digest = hasher.finalize();
+    u64::from_le_bytes(digest.as_bytes()[..8].try_into().expect("digest prefix is eight bytes"))
+}
+
+fn failure_entity_order(
+    seed: u64,
+    entity_kind: u8,
+    left: &str,
+    right: &str,
+) -> Ordering {
+    failure_entity_tie_priority(seed, entity_kind, left)
+        .cmp(&failure_entity_tie_priority(seed, entity_kind, right))
+        .then_with(|| left.cmp(right))
+}
+
 fn deterministic_shuffle<T>(values: &mut [T], seed: u64) {
     let mut state = seed;
     for index in (1..values.len()).rev() {
@@ -945,7 +966,7 @@ fn rank_failure_entities(
                 let right_index = indexed.node_index[right];
                 degree[right_index]
                     .cmp(&degree[left_index])
-                    .then_with(|| left.cmp(right))
+                    .then_with(|| failure_entity_order(config.seed, 1, left, right))
             });
         }
         MycelialFailureAttackStrategy::AdaptiveHighestDegreeJunctions => {
@@ -973,7 +994,7 @@ fn rank_failure_entities(
                 let right_index = indexed.node_index[right];
                 degree[left_index]
                     .cmp(&degree[right_index])
-                    .then_with(|| left.cmp(right))
+                    .then_with(|| failure_entity_order(config.seed, 1, left, right))
             });
         }
         MycelialFailureAttackStrategy::DemandPathLoadSegments
@@ -993,7 +1014,14 @@ fn rank_failure_entities(
                 } else {
                     junction_load[indexed.node_index[right]]
                 };
-                right_load.cmp(&left_load).then_with(|| left.cmp(right))
+                right_load.cmp(&left_load).then_with(|| {
+                    failure_entity_order(
+                        config.seed,
+                        if targets_segments { 0 } else { 1 },
+                        left,
+                        right,
+                    )
+                })
             });
         }
         MycelialFailureAttackStrategy::SpatialClusterJunctions => {
@@ -1019,9 +1047,9 @@ fn rank_failure_entities(
                 let right_distance = indexed.positions[indexed.node_index[right]]
                     .sub(seed_position)
                     .length();
-                left_distance
-                    .total_cmp(&right_distance)
-                    .then_with(|| left.cmp(right))
+                left_distance.total_cmp(&right_distance).then_with(|| {
+                    failure_entity_order(config.seed, 1, left, right)
+                })
             });
         }
     }
@@ -1031,6 +1059,7 @@ fn rank_failure_entities(
 fn adaptive_highest_degree_ranking(
     indexed: &IndexedGraph,
     failed_junction_ids: &BTreeSet<String>,
+    seed: u64,
 ) -> Vec<String> {
     let mut degree = vec![0usize; indexed.node_ids.len()];
     let active_nodes: Vec<_> = indexed
@@ -1055,7 +1084,7 @@ fn adaptive_highest_degree_ranking(
         let right_index = indexed.node_index[right];
         degree[right_index]
             .cmp(&degree[left_index])
-            .then_with(|| left.cmp(right))
+            .then_with(|| failure_entity_order(seed, 1, left, right))
     });
     ranked
 }
@@ -1066,6 +1095,7 @@ fn adaptive_demand_path_load_ranking(
     strategy: MycelialFailureAttackStrategy,
     failed_segment_ids: &BTreeSet<String>,
     failed_junction_ids: &BTreeSet<String>,
+    seed: u64,
 ) -> Vec<String> {
     let targets_segments = attack_strategy_targets_segments(strategy);
     let (segment_load, junction_load) = demand_weighted_path_load(
@@ -1100,7 +1130,14 @@ fn adaptive_demand_path_load_ranking(
         } else {
             junction_load[indexed.node_index[right]]
         };
-        right_load.cmp(&left_load).then_with(|| left.cmp(right))
+        right_load.cmp(&left_load).then_with(|| {
+            failure_entity_order(
+                seed,
+                if targets_segments { 0 } else { 1 },
+                left,
+                right,
+            )
+        })
     });
     ranked
 }
@@ -1123,7 +1160,7 @@ fn build_attack_rankings(
     for _ in 0..config.maximum_failure_budget {
         let ranking = match config.strategy {
             MycelialFailureAttackStrategy::AdaptiveHighestDegreeJunctions => {
-                adaptive_highest_degree_ranking(indexed, &failed_junctions)
+                adaptive_highest_degree_ranking(indexed, &failed_junctions, config.seed)
             }
             MycelialFailureAttackStrategy::AdaptiveDemandPathLoadSegments
             | MycelialFailureAttackStrategy::AdaptiveDemandPathLoadJunctions => {
@@ -1133,6 +1170,7 @@ fn build_attack_rankings(
                     config.strategy,
                     &failed_segments,
                     &failed_junctions,
+                    config.seed,
                 )
             }
             _ => base_ranking
