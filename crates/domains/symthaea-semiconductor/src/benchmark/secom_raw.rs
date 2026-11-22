@@ -136,7 +136,7 @@ fn validate_sha256(value: &str, field: &str) -> Result<(), SecomRawDataError> {
     Ok(())
 }
 
-fn parse_features(bytes: &[u8]) -> Result<Vec<SecomSensorRowV1>, SecomRawDataError> {
+pub(crate) fn parse_features(bytes: &[u8]) -> Result<Vec<SecomSensorRowV1>, SecomRawDataError> {
     let text = str::from_utf8(bytes)
         .map_err(|error| SecomRawDataError(format!("feature_file: invalid UTF-8: {error}")))?;
     let mut rows = Vec::new();
@@ -175,7 +175,7 @@ fn parse_features(bytes: &[u8]) -> Result<Vec<SecomSensorRowV1>, SecomRawDataErr
     Ok(rows)
 }
 
-fn parse_labels(bytes: &[u8]) -> Result<Vec<SecomLabelRowV1>, SecomRawDataError> {
+pub(crate) fn parse_labels(bytes: &[u8]) -> Result<Vec<SecomLabelRowV1>, SecomRawDataError> {
     let text = str::from_utf8(bytes)
         .map_err(|error| SecomRawDataError(format!("label_file: invalid UTF-8: {error}")))?;
     let mut rows = Vec::new();
