@@ -44,8 +44,11 @@ requirements. Human-calibrated preference outcomes remain a separate result
 family. Pin judge model/prompt/tool versions and calibration data; adversarial
 page instructions must never alter verdict policy.
 
-Arena's 2026-11-12 Interaction-as-a-Judge research reports improved
-broken-requirement detection (63.0% to 71.1%) and iterative repair (55.4% to
-75.5%) on its own experiments, with released ArenaWebdevPreferences and
-ArenaWebdevCorrectness data. Use these as research references and evaluate
-transferability; they are not SFEB results or proof of oracle correctness.
+The October 13, 2026 Interaction-as-a-Judge paper reports preference
+prediction 65.6% to 69.1%, requirement verification 77.0% to 81.6%, and
+iterative repair 55.4% to 75.5% within five attempts under its own protocol.
+The paper describes 6,858 preference pairs and 222 correctness applications;
+the released dataset cards list 6,390 pairs and 189 app versions with 362
+human-verified requirements. The discrepancy is unresolved; keep paper and
+dataset-card counts separate. These results are not SFEB measurements or proof
+of oracle correctness.
