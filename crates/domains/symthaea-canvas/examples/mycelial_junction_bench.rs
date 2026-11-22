@@ -104,6 +104,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         &root_ids,
         SpatialReferenceDimensionality::ThreeD,
     )?;
+    let euclidean_mst_digest = euclidean_mst.canonical_digest_hex()?;
     let digest = graph.canonical_digest_hex()?;
 
     println!("benchmark: mycelial-junction-hypha-v1");
@@ -240,14 +241,15 @@ fn main() -> Result<(), Box<dyn Error>> {
         "euclidean_mst_source_graph_digest: {}",
         euclidean_mst.source_graph_digest
     );
+    println!("euclidean_mst_report_digest: {euclidean_mst_digest}");
     println!("warmup_runs: {WARMUP_RUNS}");
     println!("samples: {samples}");
     println!(
-        "graph_build_plus_metrics_time_ns_p50: {}",
+        "graph_build_plus_filtration_and_reference_metrics_time_ns_p50: {}",
         percentile(&durations_ns, 50)
     );
     println!(
-        "graph_build_plus_metrics_time_ns_p95: {}",
+        "graph_build_plus_filtration_and_reference_metrics_time_ns_p95: {}",
         percentile(&durations_ns, 95)
     );
     println!("platform_os: {}", std::env::consts::OS);
