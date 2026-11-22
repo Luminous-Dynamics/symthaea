@@ -224,6 +224,154 @@
       "items": {
         "type": "string"
       }
+    },
+    "centering_bridge": {
+      "type": "object",
+      "required": [
+        "paper_section",
+        "source_formulas",
+        "density",
+        "constants",
+        "weighted_recombination",
+        "evidence_status"
+      ],
+      "properties": {
+        "paper_section": {
+          "type": "string"
+        },
+        "source_formulas": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "density": {
+          "type": "object",
+          "required": [
+            "raw_prime_density_per_cell",
+            "weight_coefficient",
+            "weighted_density",
+            "caveat"
+          ],
+          "properties": {
+            "raw_prime_density_per_cell": {
+              "type": "string"
+            },
+            "weight_coefficient": {
+              "type": "string"
+            },
+            "weighted_density": {
+              "type": "string"
+            },
+            "caveat": {
+              "type": "string"
+            }
+          }
+        },
+        "constants": {
+          "type": "object",
+          "required": [
+            "identity",
+            "source_reason",
+            "cell_count"
+          ],
+          "properties": {
+            "identity": {
+              "type": "string"
+            },
+            "source_reason": {
+              "type": "string"
+            },
+            "cell_count": {
+              "type": "string"
+            }
+          }
+        },
+        "weighted_recombination": {
+          "type": "object",
+          "required": [
+            "identity",
+            "main_terms",
+            "logarithmic_part",
+            "linear_constant_part",
+            "conclusion",
+            "precise_M"
+          ],
+          "properties": {
+            "identity": {
+              "type": "string"
+            },
+            "main_terms": {
+              "type": "string"
+            },
+            "logarithmic_part": {
+              "type": "string"
+            },
+            "linear_constant_part": {
+              "type": "string"
+            },
+            "conclusion": {
+              "type": "string"
+            },
+            "precise_M": {
+              "type": "string"
+            }
+          }
+        },
+        "evidence_status": {
+          "type": "string"
+        },
+        "source_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "translation_average": {
+      "type": "object",
+      "required": [
+        "paper_section",
+        "identity",
+        "reason",
+        "weighted_consequence",
+        "residual_consequence",
+        "caveats",
+        "evidence_status"
+      ],
+      "properties": {
+        "paper_section": {
+          "type": "string"
+        },
+        "identity": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "weighted_consequence": {
+          "type": "string"
+        },
+        "residual_consequence": {
+          "type": "string"
+        },
+        "caveats": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "evidence_status": {
+          "type": "string"
+        },
+        "source_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
     }
   }
 }
