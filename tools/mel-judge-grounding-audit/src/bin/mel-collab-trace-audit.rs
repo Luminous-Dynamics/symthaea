@@ -8,9 +8,7 @@ use mel_judge_grounding_audit::collab_trace::parse_and_audit;
 fn run() -> Result<bool, String> {
     let args: Vec<String> = env::args().skip(1).collect();
     if args.len() != 3 || args[0] != "audit" {
-        return Err(
-            "usage: mel-collab-trace-audit audit TRACE.json REPORT.json".to_owned(),
-        );
+        return Err("usage: mel-collab-trace-audit audit TRACE.json REPORT.json".to_owned());
     }
     let input = fs::read_to_string(&args[1])
         .map_err(|error| format!("failed to read {}: {error}", args[1]))?;
