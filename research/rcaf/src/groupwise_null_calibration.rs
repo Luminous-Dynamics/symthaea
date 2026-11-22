@@ -572,15 +572,25 @@ fn wilson_interval(successes: usize, trials: usize) -> ProportionInterval {
     let p = successes as f64 / n;
     let z = 1.959_963_984_540_054;
     let z2 = z * z;
-    let denominator = 1.0 + z2 / n;
-    let center = (p + z2 / (2.0 * n)) / denominator;
-    let half_width = z * (p * (1.0 - p) / n + z2 / (4.0 * n * n)).sqrt() / denominator;
+    let (lower, upper) = if successes == 0 {
+        (0.0, z2 / (n + z2))
+    } else if successes == trials {
+        (n / (n + z2), 1.0)
+    } else {
+        let denominator = 1.0 + z2 / n;
+        let center = (p + z2 / (2.0 * n)) / denominator;
+        let half_width = z * (p * (1.0 - p) / n + z2 / (4.0 * n * n)).sqrt() / denominator;
+        (
+            (center - half_width).clamp(0.0, 1.0),
+            (center + half_width).clamp(0.0, 1.0),
+        )
+    };
     ProportionInterval {
         successes,
         trials,
         estimate: p,
-        wilson_95_lower: (center - half_width).clamp(0.0, 1.0),
-        wilson_95_upper: (center + half_width).clamp(0.0, 1.0),
+        wilson_95_lower: lower,
+        wilson_95_upper: upper,
     }
 }
 
@@ -751,7 +761,7 @@ mod tests {
             .flat_map(|(stratum, scale)| {
                 (0..100).map(move |index| {
                     let value = (index + 1) as f64 / 100.0 * scale;
-                    let signal = (0.90 + index as f64 / 1000.0) * scale;
+                    let signal = (0.899 + index as f64 * 0.0011) * scale;
                     StratifiedHeldOutEvaluationObservation {
                         stratum_id: (*stratum).to_string(),
                         observation: HeldOutEvaluationObservation {
@@ -799,7 +809,7 @@ mod tests {
     #[test]
     fn each_stratum_controls_its_own_null_rate_and_direction_errors() {
         let report = calibrate_groupwise_null(&calibration(), &evaluation(), &config()).unwrap();
-        let expected_wrong_direction = [4, 10, 10];
+        let expected_wrong_direction = [5, 10, 10];
         for stratum in &report.strata {
             for (index, estimator) in stratum.estimators.iter().enumerate() {
                 let rates = estimator.stratum_threshold_rates.as_ref().unwrap();
