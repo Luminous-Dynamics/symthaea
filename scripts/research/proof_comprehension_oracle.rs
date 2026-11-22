@@ -112,10 +112,7 @@ fn or_iff_right_without_hypothesis(a: bool, b: bool) -> bool {
 
 fn translation_count_cyclic(n: usize, t2: &[usize], target_column: usize) -> usize {
     (0..n)
-        .filter(|translate| {
-            t2.iter()
-                .any(|z| (*translate + *z) % n == target_column)
-        })
+        .filter(|translate| t2.iter().any(|z| (*translate + *z) % n == target_column))
         .count()
 }
 
@@ -214,7 +211,6 @@ mod tests {
         assert_ne!(mapped, source);
         assert_eq!(mapped, vec![true]);
     }
-
 
     #[test]
     fn translation_average_selects_each_column_exactly_cardinality_t2_times() {
