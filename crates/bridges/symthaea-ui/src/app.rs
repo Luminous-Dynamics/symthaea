@@ -213,10 +213,9 @@ pub fn App() -> impl IntoView {
     Effect::new(move |_| {
         ws_connected.set(false);
         spawn_local(async move {
-            let retry_attempt = std::rc::Rc::new(std::cell::Cell::new(0_u32));
+            let mut retry_attempt = 0_u32;
             loop {
                 let gw = gateway.get_untracked();
-                let retry_attempt_on_connect = std::rc::Rc::clone(&retry_attempt);
                 api::stream_telemetry(
                     &gw,
                     move |payload| {
@@ -230,19 +229,13 @@ pub fn App() -> impl IntoView {
                             movie_frame.set(0);
                         }
                     },
-                    move |connected| {
-                        ws_connected.set(connected);
-                        if connected {
-                            retry_attempt_on_connect.set(0);
-                        }
-                    },
+                    move |connected| ws_connected.set(connected),
                 )
                 .await;
 
                 ws_connected.set(false);
-                let attempt = retry_attempt.get();
-                let delay_ms = telemetry_retry_delay_ms(attempt);
-                retry_attempt.set(attempt.saturating_add(1));
+                let delay_ms = telemetry_retry_delay_ms(retry_attempt);
+                retry_attempt = retry_attempt.saturating_add(1);
                 gloo_timers::future::TimeoutFuture::new(delay_ms).await;
             }
         });
