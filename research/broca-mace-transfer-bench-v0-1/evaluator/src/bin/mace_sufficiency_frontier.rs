@@ -741,6 +741,99 @@ mod tests {
     use super::*;
 
     #[test]
+    fn candidate_identity_binds_retrieval_profile_and_is_order_invariant() {
+        let case = mace_generated_stress::generated_worlds(1)
+            .into_iter()
+            .next()
+            .expect("one generated world");
+        let selected = &case.memory[..2];
+        let profile_a = "a".repeat(64);
+        let profile_b = "b".repeat(64);
+
+        let identity_a = candidate_identity(
+            case.decision_need,
+            selected,
+            "typed_content_hdc",
+            Some(2),
+            Some(&profile_a),
+        );
+        let identity_repeat = candidate_identity(
+            case.decision_need,
+            selected,
+            "typed_content_hdc",
+            Some(2),
+            Some(&profile_a),
+        );
+        let identity_profile_b = candidate_identity(
+            case.decision_need,
+            selected,
+            "typed_content_hdc",
+            Some(2),
+            Some(&profile_b),
+        );
+        let reversed = vec![selected[1], selected[0]];
+        let identity_reversed = candidate_identity(
+            case.decision_need,
+            &reversed,
+            "typed_content_hdc",
+            Some(2),
+            Some(&profile_a),
+        );
+
+        assert_eq!(identity_a, identity_repeat);
+        assert_ne!(identity_a, identity_profile_b);
+        assert_eq!(identity_a, identity_reversed);
+    }
+
+    #[test]
+    fn random_control_selection_is_invariant_to_memory_order() {
+        let case = mace_generated_stress::generated_worlds(1)
+            .into_iter()
+            .next()
+            .expect("one generated world");
+        let indexes = build_indexes(&case.memory).unwrap();
+        let memory_by_id: BTreeMap<u32, Experience> = case
+            .memory
+            .iter()
+            .map(|item| (item.event_id, *item))
+            .collect();
+        let mut reversed = case.memory.clone();
+        reversed.reverse();
+
+        let first = select_candidate(
+            RetrievalArm::RandomControl,
+            Some(2),
+            &case.memory,
+            &memory_by_id,
+            case.query,
+            case.decision_need,
+            &indexes,
+            557,
+            case.cluster,
+        )
+        .unwrap();
+        let second = select_candidate(
+            RetrievalArm::RandomControl,
+            Some(2),
+            &reversed,
+            &memory_by_id,
+            case.query,
+            case.decision_need,
+            &indexes,
+            557,
+            case.cluster,
+        )
+        .unwrap();
+
+        assert_eq!(
+            first.selected.iter().map(|item| item.event_id).collect::<Vec<_>>(),
+            second.selected.iter().map(|item| item.event_id).collect::<Vec<_>>()
+        );
+        assert_eq!(first.candidate_input_sha256, second.candidate_input_sha256);
+        assert_eq!(first.decision.action, second.decision.action);
+    }
+
+    #[test]
     fn epsilon_sufficiency_rejects_invalid_margins() {
         assert!(epsilon_sufficient(0.005, 0.01));
         assert!(epsilon_sufficient(-0.01, 0.01));
