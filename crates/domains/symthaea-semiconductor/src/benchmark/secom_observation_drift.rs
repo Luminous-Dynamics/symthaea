@@ -108,8 +108,7 @@ fn binary_entropy(probability: f64) -> f64 {
 
 fn bernoulli_js_divergence_bits(left: f64, right: f64) -> f64 {
     let midpoint = 0.5 * (left + right);
-    ((binary_entropy(midpoint) - 0.5 * binary_entropy(left) - 0.5 * binary_entropy(right))
-        / LN_2)
+    ((binary_entropy(midpoint) - 0.5 * binary_entropy(left) - 0.5 * binary_entropy(right)) / LN_2)
         .clamp(0.0, 1.0)
 }
 
@@ -378,7 +377,7 @@ mod tests {
             assignment.positive = label.label == 1;
         }
         evaluate_secom_observation_drift_v1(feature_bytes, label_bytes, &expectations, &split)
-        .expect("synthetic fixture evaluates")
+            .expect("synthetic fixture evaluates")
     }
 
     #[test]
