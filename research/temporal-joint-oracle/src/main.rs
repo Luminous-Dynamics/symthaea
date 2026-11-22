@@ -140,7 +140,10 @@ pub struct FactorialInteractionReport {
     /// Includes first-order main effects and every higher-order interaction.
     pub interaction_terms: Vec<FactorialInteractionTerm>,
     pub interaction_order_summaries: Vec<InteractionOrderSummary>,
-    /// Common denominator for every exact Shapley attribution.\n    pub shapley_common_denominator: u64,\n    pub factor_shapley_attributions: Vec<FactorShapleyAttribution>,\n}\n
+    /// Common denominator for every exact Shapley attribution.
+    pub shapley_common_denominator: u64,
+    pub factor_shapley_attributions: Vec<FactorShapleyAttribution>,
+}\n
 /// Shapley allocation of the complete joint effect to one binary action factor.
 ///
 /// Every numerator is expressed over the report's shared
