@@ -8,13 +8,11 @@ use mel_judge_grounding_audit::transform_qualification::parse_and_qualify;
 fn run() -> Result<bool, String> {
     let args: Vec<String> = env::args().skip(1).collect();
     if args.len() != 5 || args[0] != "audit" {
-        return Err(
-            concat!(
-                "usage: mel-audio-transform-qualification audit MANIFEST.json ",
-                "SOURCE_AUDIO VARIANT_AUDIO REPORT.json"
-            )
-            .to_owned(),
-        );
+        return Err(concat!(
+            "usage: mel-audio-transform-qualification audit MANIFEST.json ",
+            "SOURCE_AUDIO VARIANT_AUDIO REPORT.json"
+        )
+        .to_owned());
     }
     let input = fs::read_to_string(&args[1])
         .map_err(|error| format!("failed to read {}: {error}", args[1]))?;
