@@ -370,3 +370,106 @@ No retrieval gain, decision-utility improvement, official benchmark score, causa
 - MCB / Memory–Clarification Boundary: https://aclanthology.org/2026.nora-1.2/
 - Agentic Abstention, NeurIPS 2026: https://lhannnn.github.io/agentic-abstention/
 - MACE competitive-baseline reproduction issue: https://github.com/Luminous-Dynamics/symthaea/issues/13261
+
+
+---
+
+## 12. Receipt-backed dependency lineage integration (MACE sidecar v1, 2026-11-22)
+
+### Architecture decision
+
+The canonical mace_counterfactual_evidence evaluator and mace_counterfactual_aggregate reducer remain the only benchmark pipeline. The prior standalone knockout executable is not carried forward: event/root/family interventions are now extended in the canonical evaluator, so every retrieval method is evaluated against the same intervention manifest and cluster-first statistical reducer.
+
+MACE does not create a second persistent evidence graph. This is a bounded, run-local projection over ingress-verified lineage records. The canonical ownership remains:
+- #10410 — provider lineage and common-mode source dependencies;
+- #4918 — claim-relative independence and shared failure-domain semantics;
+- #6283 — measurement validity and benchmark-evidence graph principles;
+- #6430 — Mycelix DKG as the authoritative substrate, with deterministic acyclic evidence projections for replay.
+
+The MACE sidecar is a consumer view, not an authority or truth oracle.
+
+### Receipt-backed contract
+
+The ingress VerifiedLineage contract now includes:
+- canonical derived_from_event_ids;
+- a dependency completeness state (Complete, Partial, Unknown);
+- a digest for the exact dependency manifest when the state is Complete or Partial.
+
+Ingress rejects self-references, duplicate or unsorted parent IDs, zero IDs, missing manifest digests for declared dependencies, and contradictory Unknown declarations that carry parents or a digest. The verified fields are copied into EvidenceReceiptBundle, not reconstructed from a caller's Experience booleans.
+
+ConsolidationEvidencePackV1::dependency_sidecar() emits EvidenceDependencySidecarV1 with:
+- the exact (valid_at_ms, known_at_ms) query;
+- event ID, action and scope;
+- verified source family and root;
+- upstream source, artifact and transformation identities;
+- lineage and raw-event receipt digests;
+- the dependency declaration and manifest digest;
+- lifecycle status verified at the same as-known snapshot.
+
+The sidecar is deterministically ordered and has a canonical SHA-256 and JSON interchange representation, governed by data/schemas/mace_evidence_dependency_sidecar_v1.schema.json. Its hash detects content/order changes; it is not a signature. Authenticity and authority remain the responsibility of the actual Mycelix/ingress verifier and trust policy.
+
+### Canonical evaluator integration
+
+The main counterfactual evaluator now accepts an optional ingress sidecar when building its evidence index and candidate observation:
+- sidecar event/action/scope/root/family identities must match the candidate evidence exactly;
+- only receipt-declared, in-pool derived_from edges are followed;
+- event, root, family, unknown-root/family and root-pair interventions expand to known transitive derived descendants;
+- a candidate whose declared parent is outside the selected evidence pool is marked lineage-incomplete and the unresolved parent reference is retained;
+- candidate input/evidence digests bind the sidecar digest; the run identity also binds the sidecar schema digest;
+- matched random controls are stratified by scope/action/estimand, exclude target source roots/families, match post-closure root/family/unknown-identity counts, and are rejected if their expanded dependency closure overlaps or descends from the target knockout.
+
+A candidate without a verified sidecar is not treated as having a complete empty graph: every available event is counted as lineage-incomplete. The existing public generated-world runner has no receipt sidecar input yet, so its results remain diagnostic-only and explicitly lineage-incomplete. The receipt-backed path is exercised by authored synthetic ingress→consolidation→evaluator tests, not by the CLI's generated-world benchmark run.
+
+### Lifecycle boundary
+
+The sidecar records lifecycle status as known at one bitemporal snapshot. Ingress currently admits only records that are active at that snapshot; retracted/superseded records are not silently projected into the transferable candidate memory. A later as-known query must re-run lifecycle verification. The current dependency projection models derived_from closures; it does not infer or claim a complete supersession graph. Full historical lifecycle closure requires an explicit verifier-issued supersession edge/history contract, which is a follow-up integration, not something inferred from event order or a status enum.
+
+### Authored regression coverage
+
+The canonical evaluator test suite now includes a two-event synthetic chain:
+- ingress verifies event 43 as derived from event 42;
+- the consolidation pack exports the exact receipt-backed sidecar;
+- the canonical event-42 knockout removes both 42 and 43;
+- the sidecar digest changes the candidate input identity;
+- removing only event 42 leaves event 43 with an unresolved parent reference and marks it incomplete;
+- cyclic ancestry and sidecar/evidence scope/family/root/action mismatches fail closed.
+
+The sidecar adapter also tests incomplete declarations and receipt digest tampering in the ingress suite. At this handoff, the evaluator has 24 authored unit tests and ingress has 47 authored unit tests. No cargo/rustc/rustfmt is installed in the authoring environment, so these tests are authored, not executed; no compile, format, test, or benchmark pass is claimed.
+
+### Industry benchmark frontier and MACE positioning (2026-11-22)
+
+The Agent Memory Challenge Cycle 2 official results were published on November 19, 2026. The open-method leaders were Resurface (textual 61.22), InsightMem (coding 63.33% overall resolved), and Khipu (multimodal 43.26). MemoraX led the separate commercial/closed-source division (textual 69.26, coding 68.00% resolved, multimodal 53.68). These are separate task tracks and divisions, not a single capability score. AML requires participant-hosted public Add/Search APIs; it does not deploy repository-only submissions. MACE has not entered Cycle 2.
+
+Other distinct research anchors:
+- TimlMemBench (Findings EMNLP 2026): 208 reviewed bilingual samples, 1,566 sessions, 1,715 questions and 1,821 governance/activation cases; raw-native ingestion and governed activation matter in addition to canonical-pool retrieval.
+- FAMA (Findings ACL 2026) explicitly penalizes use of obsolete or invalidated memory. Stale-memory harm should be a separate score, not averaged away by recall.
+- StateMemBench has 234 multi-session state-tracking scenarios. Published same-backbone comparisons show current-state accuracy of 0.205→0.363 for one DeepSeek-V4-Flash setup and 0.149→0.233 for one Qwen-3.5-9B setup. These are protocol-specific results, not general model multipliers.
+- WorldMemArena evaluates 400 multi-session multimodal tasks across write, maintain, retrieve and use stages; good write/storage scores do not guarantee downstream action competence.
+- AMA-Agent reports 57.22% average accuracy on AMA-Bench with an 11.16-point gain over its strongest reported baseline in that paper's protocol.
+- MemoryArena shows why long-context recall cannot stand in for interdependent multi-session environment success.
+
+Sources: AML Cycle 2 results (https://agentmemoryleaderboard.ai/results/cycle-2/) and rules (https://agentmemories.ai/rules); TimlMemBench (https://aclanthology.org/2026.findings-emnlp.507/); FAMA (https://aclanthology.org/2026.findings-acl.1337/); StateMemBench (https://arxiv.org/abs/2608.19652); WorldMemArena (https://arxiv.org/abs/2605.29341); AMA-Bench (https://proceedings.mlr.press/v306/zhao26bs.html); MemoryArena (https://proceedings.mlr.press/v306/he26am.html).
+
+### Next qualification gates (targets, not results)
+
+| Evaluation | Target / claim threshold |
+|---|---|
+| AML textual, coding, multimodal | Enter a future cycle only with a hosted API; aim for ≥3-point improvement over the strongest reproduced open-method baseline on each separately matched track |
+| StateMemBench | ≥95% current-state accuracy on a preregistered subset; zero known-superseded answers on critical cases |
+| TimlMemBench | Zero unauthorized activation on known revoked, wrong-scope and unknown-trust cases; raw-native results reported separately |
+| FAMA | Zero known-invalid reuse on deterministic invalidation controls |
+| MemoryArena | ≥5 pp task-success lift over the strongest reproduced baseline with matched scaffold/model/tool budget |
+| WorldMemArena | No stage regression across write/maintain/retrieve/use; disclose multimodal and action-grounding costs |
+| MACE sufficiency | Upper 95% bound on added regret ≤ preregistered epsilon; paired lower 95% bound for memory-vs-no-memory utility >0 |
+| Dependency qualification | Zero false-independence acceptance on seeded shared-root/declared-ancestor attacks; unknown/partial ancestry never counts as complete |
+| Compression | ≥50% lower all-in storage/context cost with ≤1 pp task-success loss on a preregistered lane |
+
+The industry scores are not directly comparable with MACE's synthetic utility/regret. Keep separate scorecards. For rare integrity failures, publish one-sided exact upper confidence bounds and the independence assumptions; when samples share scenario/root templates, use cluster-level inference rather than counting every intervention row as an independent trial.
+
+### Remaining work
+
+1. Connect a real Mycelix verifier to the ingress trait; mock verifier receipts are not cryptographic attestations.
+2. Make the canonical CLI accept a pinned receipt-backed evidence fixture and sidecar manifest, while keeping the public generated-world lane separately labelled.
+3. Add explicit receipt-bound supersession history/edge semantics for lifecycle knockouts; do not infer them from current status.
+4. Move evaluator labels/seed custody out of the candidate repository and qualify the manifest under a separately held evaluator.
+5. Execute exact-head Rust formatting, compilation and tests on a real toolchain, then publish receipts. Skipped hosted checks remain skipped, not passes.
