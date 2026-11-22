@@ -357,9 +357,10 @@
   ],
   "notes": [
     "Queries are paraphrases and are not copied from the pattern titles.",
-    "Hard negatives deliberately target topics not currently represented by the eight-entry corpus.",
+    "Hard negatives deliberately target topics not currently represented by the seventeen-entry corpus.",
     "Expected empty sets require calibrated abstention, not forced retrieval.",
     "No retrieval scores have been measured.",
-    "Corpus expanded from eight to seventeen source-grounded patterns; the query set now contains two paraphrases per pattern, plus eight hard negatives."
+    "Corpus expanded from eight to seventeen source-grounded patterns; the query set now contains two paraphrases per pattern, plus eight hard negatives.",
+    "Every expected pattern ID is drawn from the checked-in 17-pattern corpus; the eight hard negatives intentionally remain outside this initial knowledge coverage."
   ]
 }
