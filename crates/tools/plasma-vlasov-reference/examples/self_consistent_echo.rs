@@ -179,8 +179,7 @@ fn run_resolution(
     };
     let wrong_prediction =
         plasma_vlasov_reference::echo_analysis::predict_two_pulse_echo(wrong_pulse_pair)?;
-    let echo_horizon =
-        config.velocity_sampling_horizon(prediction.echo_mode as usize)?;
+    let echo_horizon = config.velocity_sampling_horizon(prediction.echo_mode as usize)?;
     let wrong_echo_horizon =
         config.velocity_sampling_horizon(wrong_prediction.echo_mode as usize)?;
     let velocity_spacing = echo_horizon.velocity_spacing;
