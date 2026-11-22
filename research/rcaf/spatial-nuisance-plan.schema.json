@@ -1,0 +1,323 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/rcaf/spatial-nuisance-plan.schema.json",
+  "title": "RCAF spatial nuisance and identifiability plan",
+  "description": "A proposed, predeclared spatial nuisance challenge. This schema validates a plan, not completed simulations or empirical qualification.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "plan_id",
+    "status",
+    "geometry",
+    "target",
+    "counterfactual_cells",
+    "seed_policy",
+    "dose_grid",
+    "nuisance_families",
+    "identifiability_boundary",
+    "required_outputs",
+    "claim_limits"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "rcaf.spatial-nuisance-plan/0.1.0"
+    },
+    "plan_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": ["proposed", "pilot", "confirmatory"]
+    },
+    "geometry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "representation",
+        "source",
+        "interpretation_scope",
+        "roi_labels",
+        "constant_mode_policy",
+        "graph_digest_required_at_execution"
+      ],
+      "properties": {
+        "representation": {
+          "const": "weighted_undirected_graph"
+        },
+        "source": {
+          "enum": [
+            "synthetic_fixture_graph",
+            "atlas_derived_graph",
+            "provided_weighted_adjacency"
+          ]
+        },
+        "interpretation_scope": {
+          "enum": ["synthetic_topology_only", "atlas_geometry"]
+        },
+        "roi_labels": {
+          "type": "array",
+          "minItems": 4,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "constant_mode_policy": {
+          "const": "excluded_in_spatial_v1"
+        },
+        "graph_digest_required_at_execution": {
+          "const": true
+        }
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "roi_labels",
+        "expected_direction",
+        "minimally_meaningful_effect"
+      ],
+      "properties": {
+        "roi_labels": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "expected_direction": {
+          "enum": ["positive", "negative"]
+        },
+        "minimally_meaningful_effect": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "counterfactual_cells": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "clean_null",
+          "signal_only",
+          "nuisance_only",
+          "signal_plus_nuisance"
+        ]
+      }
+    },
+    "seed_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "development_seed",
+        "confirmatory_seed",
+        "pilot_replicates",
+        "screening_replicates",
+        "critical_null_replicates",
+        "matched_nuisance_innovations",
+        "separate_seed_substreams",
+        "exact_zero_dose_equivalence"
+      ],
+      "properties": {
+        "development_seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "confirmatory_seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "pilot_replicates": {
+          "type": "integer",
+          "minimum": 20
+        },
+        "screening_replicates": {
+          "type": "integer",
+          "minimum": 1000
+        },
+        "critical_null_replicates": {
+          "type": "integer",
+          "minimum": 10000
+        },
+        "matched_nuisance_innovations": {
+          "const": true
+        },
+        "separate_seed_substreams": {
+          "const": true
+        },
+        "exact_zero_dose_equivalence": {
+          "const": true
+        }
+      }
+    },
+    "dose_grid": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nuisance_variance_fractions",
+        "spatial_alignment",
+        "temporal_coherence",
+        "temporal_ar1_coefficients",
+        "target_effect_sizes",
+        "participant_response_fractions"
+      ],
+      "properties": {
+        "nuisance_variance_fractions": {
+          "$ref": "#/$defs/unitIntervalGrid"
+        },
+        "spatial_alignment": {
+          "$ref": "#/$defs/unitIntervalGrid"
+        },
+        "temporal_coherence": {
+          "$ref": "#/$defs/unitIntervalGrid"
+        },
+        "temporal_ar1_coefficients": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": -1,
+            "exclusiveMaximum": 1
+          }
+        },
+        "target_effect_sizes": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "participant_response_fractions": {
+          "$ref": "#/$defs/unitIntervalGrid"
+        }
+      }
+    },
+    "nuisance_families": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "family_id",
+          "kind",
+          "rank_points",
+          "spatial_scale_points"
+        ],
+        "properties": {
+          "family_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "enum": [
+              "graph_smooth_low_rank",
+              "heat_kernel_localized"
+            ]
+          },
+          "rank_points": {
+            "$ref": "#/$defs/positiveIntegerGrid"
+          },
+          "spatial_scale_points": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        }
+      }
+    },
+    "identifiability_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "spatial_alignment",
+        "temporal_coherence",
+        "expected_disposition"
+      ],
+      "properties": {
+        "spatial_alignment": {
+          "const": 1.0
+        },
+        "temporal_coherence": {
+          "const": 1.0
+        },
+        "expected_disposition": {
+          "const": "not_identifiable_abstain"
+        }
+      }
+    },
+    "required_outputs": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "classical_null_calibration",
+          "nuisance_only_operational_false_alarm",
+          "clean_directional_recovery",
+          "signal_plus_nuisance_directional_recovery",
+          "wrong_direction_rejection",
+          "effect_bias",
+          "effect_rmse",
+          "interval_coverage",
+          "interval_width",
+          "effect_drift",
+          "artifact_amplification",
+          "correct_abstention",
+          "false_abstention",
+          "data_sufficiency",
+          "participant_attrition",
+          "runtime",
+          "memory",
+          "transportability",
+          "execution_receipt"
+        ]
+      }
+    },
+    "claim_limits": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$defs": {
+    "unitIntervalGrid": {
+      "type": "array",
+      "minItems": 2,
+      "uniqueItems": true,
+      "items": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      }
+    },
+    "positiveIntegerGrid": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "integer",
+        "minimum": 1
+      }
+    }
+  }
+}
