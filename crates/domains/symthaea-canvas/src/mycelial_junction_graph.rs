@@ -736,9 +736,10 @@ impl MycelialJunctionHyphaGraph {
                     .terminal_filament_ids
                     .iter()
                     .any(|id| !junction.incident_filament_ids.contains(id))
-                || junction.incident_filament_ids.iter().any(|id| {
-                    !self.source_filament_ids.contains(id)
-                })
+                || junction
+                    .incident_filament_ids
+                    .iter()
+                    .any(|id| !self.source_filament_ids.contains(id))
                 || node_index.insert(junction.id.as_str(), index).is_some()
             {
                 return Err(MycelialJunctionGraphError::InvalidGraph(
@@ -783,7 +784,11 @@ impl MycelialJunctionHyphaGraph {
                 "junction or segment limit exceeded",
             ));
         }
-        if self.source_filament_ids.windows(2).any(|pair| pair[0] >= pair[1]) {
+        if self
+            .source_filament_ids
+            .windows(2)
+            .any(|pair| pair[0] >= pair[1])
+        {
             return Err(MycelialJunctionGraphError::InvalidGraph(
                 "source filament IDs must be sorted and unique",
             ));
@@ -1520,10 +1525,7 @@ mod tests {
         assert_eq!(global.reachable_pairs, 2);
         assert_eq!(global.unreachable_pairs, 4);
         let root = graph
-            .root_directed_geometric_efficiency(&[
-                "origin:4".to_string(),
-                "origin:5".to_string(),
-            ])
+            .root_directed_geometric_efficiency(&["origin:4".to_string(), "origin:5".to_string()])
             .unwrap();
         assert_eq!(root.eligible_pairs, 2);
         assert_eq!(root.reachable_pairs, 2);
@@ -1629,18 +1631,49 @@ mod tests {
             99,
             None,
             true,
-            SpatialPoint3 { x: -1.0, y: 0.0, z: 0.0 },
-            SpatialPoint3 { x: 2.0, y: 7.0, z: 1.0 },
-            SpatialPoint3 { x: -3.0, y: -4.0, z: 2.0 },
-            SpatialPoint3 { x: 4.0, y: 2.0, z: -1.0 },
+            SpatialPoint3 {
+                x: -1.0,
+                y: 0.0,
+                z: 0.0,
+            },
+            SpatialPoint3 {
+                x: 2.0,
+                y: 7.0,
+                z: 1.0,
+            },
+            SpatialPoint3 {
+                x: -3.0,
+                y: -4.0,
+                z: 2.0,
+            },
+            SpatialPoint3 {
+                x: 4.0,
+                y: 2.0,
+                z: -1.0,
+            },
         );
         let estimated = bezier_arc_length(&curve, 0.0, 1.0);
         let point_at = |t: f64| {
             let u = 1.0 - t;
             let coordinates = [
-                (curve.start.x, curve.control_a.x, curve.control_b.x, curve.end.x),
-                (curve.start.y, curve.control_a.y, curve.control_b.y, curve.end.y),
-                (curve.start.z, curve.control_a.z, curve.control_b.z, curve.end.z),
+                (
+                    curve.start.x,
+                    curve.control_a.x,
+                    curve.control_b.x,
+                    curve.end.x,
+                ),
+                (
+                    curve.start.y,
+                    curve.control_a.y,
+                    curve.control_b.y,
+                    curve.end.y,
+                ),
+                (
+                    curve.start.z,
+                    curve.control_a.z,
+                    curve.control_b.z,
+                    curve.end.z,
+                ),
             ];
             let mut point = [0.0f64; 3];
             for (index, (p0, p1, p2, p3)) in coordinates.into_iter().enumerate() {
