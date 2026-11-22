@@ -1342,6 +1342,73 @@ mod tests {
     }
 
     #[test]
+    fn all_retrieval_modes_share_candidate_inputs_and_resolve_in_scope_evidence() {
+        let case = generated_worlds(1).remove(0);
+        let exact = run_candidate(
+            CandidateMode::ExactScopeScan,
+            case.query,
+            case.decision_need,
+            &case.memory,
+        )
+        .unwrap();
+
+        for mode in CandidateMode::ALL {
+            let candidate = run_candidate(
+                mode,
+                case.query,
+                case.decision_need,
+                &case.memory,
+            )
+            .unwrap();
+            assert_eq!(candidate.input_sha256, exact.input_sha256, "{}", mode.name());
+            assert!(candidate.retrieved_event_ids.iter().all(|event_id| {
+                case.memory.iter().any(|item| {
+                    item.event_id == *event_id
+                        && item.scope == case.query.scope
+                        && case.decision_need.action_alternatives.contains(&item.action)
+                })
+            }), "{}", mode.name());
+            assert!(candidate.decision.evidence_ids.iter().all(|event_id| {
+                candidate.retrieved_event_ids.contains(event_id)
+            }), "{}", mode.name());
+        }
+    }
+
+    #[test]
+    fn event_id_key_value_baseline_is_bounded_per_declared_action() {
+        let case = generated_worlds(1).remove(0);
+        let kv = run_candidate(
+            CandidateMode::EventIdKeyValueTopK,
+            case.query,
+            case.decision_need,
+            &case.memory,
+        )
+        .unwrap();
+        assert!(kv.retrieved_event_ids.len() <= BASELINE_TOP_K * 2);
+        assert!(kv.index_bytes > 0);
+        assert!(kv.retrieval_profile_sha256.is_none());
+    }
+
+    #[test]
+    fn static_hdc_and_zero_input_ltc_revalidate_canonical_views() {
+        let case = generated_worlds(1).remove(0);
+        for mode in [CandidateMode::StaticHdc, CandidateMode::HdcLtcZeroInput] {
+            let candidate = run_candidate(
+                mode,
+                case.query,
+                case.decision_need,
+                &case.memory,
+            )
+            .unwrap();
+            assert!(candidate.retrieval_profile_sha256.is_some(), "{}", mode.name());
+            assert!(candidate.index_bytes > 0, "{}", mode.name());
+            assert!(candidate.retrieved_event_ids.iter().all(|event_id| {
+                case.memory.iter().any(|item| item.event_id == *event_id)
+            }), "{}", mode.name());
+        }
+    }
+
+    #[test]
     fn typed_content_hdc_resolves_only_canonical_in_scope_hits() {
         let case = generated_worlds(1).remove(0);
         let exact = run_candidate(
