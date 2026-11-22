@@ -95,6 +95,7 @@ pub use mycelial_contact_persistence::{
     DEFAULT_MAX_CONTACT_TOLERANCE_MODEL_UNITS, MAX_CONTACT_FILTRATION_CANDIDATES,
     MYCELIAL_CONTACT_FILTRATION_SCHEMA_VERSION, MycelialContactBaselineEdge,
     MycelialContactCandidateObservation, MycelialContactComponentMerge,
+    MycelialContactConflictGroup,
     MycelialContactCycleBirth, MycelialContactFiltration,
     MycelialContactFiltrationConfig, MycelialContactFiltrationError,
     MycelialContactFiltrationMetrics, MycelialContactFiltrationSnapshot,
