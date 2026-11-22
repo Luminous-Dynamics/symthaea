@@ -91,25 +91,40 @@ def expected_from_action(action):
     return expected_resources(action["resource_plan"])
 
 
+def _first_actions(node):
+    if node["node_kind"] == "Test":
+        return [node["action_id"]]
+    if node["node_kind"] == "HumanReview":
+        return list(node["candidate_first_actions"])
+    return []
+
+
 def choose_plan(candidates):
     best_risk = min(plan["risk"] for plan in candidates)
     top = [plan for plan in candidates if abs(plan["risk"] - best_risk) <= TOL]
-    frontier = [
-        candidate for candidate in top
-        if candidate["expected"] is not None and not any(
-            other is not candidate and other["expected"] is not None
-            and resource_dominates(other["expected"], candidate["expected"])
-            for other in top
-        )
-    ]
-    if len(frontier) == 1:
+    unresolved_cost = any(plan["expected"] is None for plan in top)
+    if unresolved_cost:
+        frontier = []
+        review_plans = top
+    else:
+        frontier = [
+            candidate for candidate in top
+            if not any(
+                other is not candidate
+                and resource_dominates(other["expected"], candidate["expected"])
+                for other in top
+            )
+        ]
+        review_plans = frontier
+    if not unresolved_cost and len(frontier) == 1:
         return frontier[0]
     first_actions = sorted({
-        plan["node"]["action_id"] for plan in frontier
-        if plan["node"]["node_kind"] == "Test"
+        action_id
+        for plan in review_plans
+        for action_id in _first_actions(plan["node"])
     })
     max_path = zero_resources()
-    for plan in frontier:
+    for plan in review_plans:
         max_path = resource_max(max_path, plan["worst_path"])
     return {
         "risk": best_risk,
@@ -352,7 +367,53 @@ def audit_scenario(scenario):
     }
 
 
+def self_test_unresolved_child_cost_requires_parent_human_review():
+    unresolved = {
+        "risk": 0.0,
+        "expected": None,
+        "worst_path": {
+            "engineering_hours": 2.0, "compute_core_hours": 0.0,
+            "facility_hours": 2.0, "specimen_count": 1.0,
+            "review_hours": 1.0, "external_cost_units": 1.0,
+        },
+        "node": {
+            "node_kind": "Test",
+            "action_id": "A-PARENT-WITH-UNRESOLVED-CHILD",
+            "branches": {
+                "PASS": {
+                    "node_kind": "HumanReview",
+                    "candidate_first_actions": [
+                        "A-CHILD-LOW-ENGINEERING", "A-CHILD-LOW-FACILITY"
+                    ],
+                    "worst_case_regret": 0.0,
+                }
+            },
+        },
+    }
+    known = {
+        "risk": 0.0,
+        "expected": {
+            "engineering_hours": 0.5, "compute_core_hours": 0.0,
+            "facility_hours": 0.5, "specimen_count": 1.0,
+            "review_hours": 0.25, "external_cost_units": 0.25,
+        },
+        "worst_path": {
+            "engineering_hours": 0.5, "compute_core_hours": 0.0,
+            "facility_hours": 0.5, "specimen_count": 1.0,
+            "review_hours": 0.25, "external_cost_units": 0.25,
+        },
+        "node": {"node_kind": "Test", "action_id": "B-KNOWN-COST-PARENT", "branches": {}},
+    }
+    result = choose_plan([unresolved, known])
+    assert result["node"]["node_kind"] == "HumanReview"
+    assert result["expected"] is None
+    assert result["node"]["candidate_first_actions"] == [
+        "A-PARENT-WITH-UNRESOLVED-CHILD", "B-KNOWN-COST-PARENT"
+    ]
+
+
 def main():
+    self_test_unresolved_child_cost_requires_parent_human_review()
     if len(sys.argv) != 3:
         raise SystemExit("usage: sequential_reference_oracle.py <campaign.json> <40-hex-source-commit>")
     raw = open(sys.argv[1], "rb").read()
