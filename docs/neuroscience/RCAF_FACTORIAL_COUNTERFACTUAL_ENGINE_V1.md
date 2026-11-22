@@ -48,9 +48,19 @@ The current CLI example evaluates four independent nuisance families using the s
 3. **Localized heat-kernel:** calibrated S2 ROI-seeded diffusion field.
 4. **Motion-like transient:** S3 broad and localized event-triggered exponential fields.
 
-All four nuisance families are calibrated against the same clean observations to a requested 10% component-variance fraction using the family-agnostic matrix calibrator. The report preserves requested and realized fractions separately and reports each family’s clean–nuisance covariance, so a calibration miss or different signal alignment remains visible. Equal component fractions do not imply equal physical realism, temporal structure, estimator impact or biological plausibility; this is a synthetic magnitude-matching control only.
+The public `calibrate_nuisance_matrix_to_component_fraction` function calibrates any time × ROI nuisance matrix to a requested 10% component-variance fraction. The spatial-field compatibility wrapper delegates to the same matrix-level implementation and additionally rescales its stored factor series. The factorial suite applies the generic calibrator to all four families against the same clean observations. It records requested and realized fractions separately and reports each family’s clean–nuisance covariance and combined observed variance. Equal component fractions do not imply equal physical realism, temporal structure, estimator impact or biological plausibility; this remains a synthetic magnitude-matching control only.
 
 The exact graph-based nuisance field or event realization is generated once and then passed to the factorial engine. Within each family, all four cells use that same field. Each experiment has a distinct stable nuisance-instance identifier.
+
+### Family-agnostic nuisance variance calibration
+
+All nuisance families use the same pooled within-ROI population-variance definition:
+
+`Var(A) / (Var(X) + Var(A))`
+
+The generic calibrator scales a supplied time × ROI nuisance matrix without mutating the input and reports clean–nuisance covariance separately. It can be used for common-mode, spatial, transient, physiological and future measured nuisance matrices, provided their observation geometry matches the clean data. The spatial-field wrapper delegates to the generic calibrator while retaining graph-basis and factor metadata. Requested and realized fractions remain separate so a calibration miss cannot be hidden by relabelling the result.
+
+Equal component fractions equalize only one aspect of magnitude. They do not equalize temporal structure, spatial support, signal covariance, estimator damage, operator-composition sensitivity or physical realism. Those remain separate challenge dimensions.
 
 ## 4. Full experiment surface to build next
 
