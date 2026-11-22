@@ -509,7 +509,7 @@ mod tests {
     }
 
     fn nuisance() -> Vec<Vec<f64>> {
-        (0..48)
+        (0usize..48)
             .map(|time| {
                 (0..4)
                     .map(|roi| {
