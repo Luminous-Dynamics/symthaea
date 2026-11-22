@@ -16,7 +16,6 @@ const SECOND_TIME: f64 = 2.0;
 const FINAL_TIME: f64 = 12.0;
 const INITIAL_AMPLITUDE: f64 = 1.0e-3;
 const THERMAL_SPEED: f64 = 1.0;
-const IMPULSE_AMPLITUDE: f64 = 5.0e-2;
 const ECHO_SIGNAL_FLOOR: f64 = 1.0e-9;
 const FLUX_X_MODE_CUTOFF: usize = 3;
 const FLUX_VELOCITY_MODE_CUTOFF: usize = 2;
