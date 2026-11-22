@@ -26,6 +26,10 @@ cargo test --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p
 
 No external service, GPU, database or model API is required. The current verifier used by tests is synthetic, not a production Mycelix adapter.
 
+## Decision-sufficient memory architecture
+
+The broader research thesis and qualification ladder are documented in [MACE Decision-Sufficient Memory Architecture v0.1](../../docs/research/MACE_DECISION_SUFFICIENT_MEMORY_ARCHITECTURE_V0_1.md). It defines decision capsules, representation choice (persist/locator/snapshot/discard), use-time evidence revalidation, the HDC semantic/query-conditioned follow-on, and the external benchmark/industry comparison lanes. It is an integration contract over existing owners, not a second memory store or authority.
+
 ## Paired memory-to-decision intervention runner
 
 A separate executable now schedules the six initial intervention arms over the existing generated MACE worlds: true empty memory, exact-scope scan, deterministic key-value retrieval, static HDC, HDC-LTC, and a same-cluster sibling-task structural placebo. It writes candidate decisions, evaluator-only synthetic scores, and cluster-bootstrap summaries to separate JSONL streams.
