@@ -13,6 +13,7 @@
 #![forbid(unsafe_code)]
 
 pub mod echo_analysis;
+pub mod phase_space_cascade;
 
 use std::error::Error;
 use std::f64::consts::TAU;

@@ -33,6 +33,7 @@ fn run_resolution(
     let initial = maxwellian_perturbation(config, INITIAL_AMPLITUDE, FIRST_MODE, THERMAL_SPEED)?;
     let mut pulsed = VlasovPoisson1d1v::new(config, initial.clone())?;
     let mut no_second_pulse = VlasovPoisson1d1v::new(config, initial)?;
+    let initial_casimir = pulsed.quadratic_casimir_budget()?.total_casimir;
 
     let second_kick: Vec<f64> = (0..config.nx)
         .map(|ix| {
@@ -123,6 +124,43 @@ fn run_resolution(
             }
         }
 
+        let cascade_every = sample_every.saturating_mul(10).max(1);
+        if step % cascade_every == 0 || step == pulse_step || step == total_steps {
+            let pulse_budget = pulsed.quadratic_casimir_budget()?;
+            let control_budget = no_second_pulse.quadratic_casimir_budget()?;
+            let pulse_spectrum = pulsed.joint_phase_space_spectrum()?;
+            let control_spectrum = no_second_pulse.joint_phase_space_spectrum()?;
+            let pulse_scale = pulse_spectrum.spectral_f_strophy.max(f64::MIN_POSITIVE);
+            let control_scale = control_spectrum.spectral_f_strophy.max(f64::MIN_POSITIVE);
+
+            println!(
+                "# cascade,{label},{step},{:.8},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e}",
+                pulsed.time(),
+                pulse_budget.total_casimir,
+                control_budget.total_casimir,
+                (pulse_budget.total_casimir - initial_casimir).abs()
+                    / initial_casimir.max(f64::MIN_POSITIVE),
+                (control_budget.total_casimir - initial_casimir).abs()
+                    / initial_casimir.max(f64::MIN_POSITIVE),
+                pulse_budget.spatial_mean_casimir,
+                pulse_budget.fluctuation_f_strophy,
+                pulse_budget.fluctuation_f_strophy
+                    / pulse_budget.total_casimir.max(f64::MIN_POSITIVE),
+                pulse_spectrum.phase_mixing_f_strophy / pulse_scale,
+                pulse_spectrum.phase_unmixing_f_strophy / pulse_scale,
+                pulse_spectrum.zero_axis_f_strophy / pulse_scale,
+                pulse_spectrum.nyquist_f_strophy / pulse_scale,
+                pulse_spectrum.parseval_relative_residual,
+                control_budget.spatial_mean_casimir,
+                control_budget.fluctuation_f_strophy,
+                control_spectrum.phase_mixing_f_strophy / control_scale,
+                control_spectrum.phase_unmixing_f_strophy / control_scale,
+                control_spectrum.zero_axis_f_strophy / control_scale,
+                control_spectrum.nyquist_f_strophy / control_scale,
+                control_spectrum.parseval_relative_residual,
+            );
+        }
+
         if step < total_steps {
             pulsed.step(dt)?;
             no_second_pulse.step(dt)?;
@@ -162,6 +200,10 @@ fn run_resolution(
 fn main() -> Result<(), Box<dyn Error>> {
     println!(
         "run,nx,nv,dt,step,time,pulse_echo_real,pulse_echo_imag,pulse_echo_amplitude,control_echo_real,control_echo_imag,control_echo_amplitude,delta_echo_real,delta_echo_imag,delta_echo_amplitude,pulse_second_real,pulse_second_imag,pulse_second_amplitude,control_second_real,control_second_imag,control_second_amplitude,pulse_mass,pulse_momentum,pulse_kinetic_energy,pulse_field_energy,pulse_total_energy,pulse_poisson_residual,pulse_minimum_f,pulse_velocity_boundary_ratio,pulse_x_high_tail_fraction,pulse_v_high_tail_fraction,pulse_x_nyquist_fraction,pulse_v_nyquist_fraction,control_mass,control_momentum,control_total_energy,control_field_energy,control_poisson_residual,control_minimum_f,control_velocity_boundary_ratio,diagnostic_time"
+    );
+
+    println!(
+        "# cascade_columns,run,step,time,pulse_C2,control_C2,pulse_C2_relative_drift,control_C2_relative_drift,pulse_mean_C2,pulse_f_strophy,pulse_f_strophy_fraction,pulse_mixing_fraction,pulse_unmixing_fraction,pulse_zero_axis_fraction,pulse_nyquist_fraction,pulse_parseval_relative,control_mean_C2,control_f_strophy,control_mixing_fraction,control_unmixing_fraction,control_zero_axis_fraction,control_nyquist_fraction,control_parseval_relative"
     );
 
     let common = |nx, nv| VlasovPoissonConfig {
