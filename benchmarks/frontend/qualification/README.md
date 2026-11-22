@@ -110,7 +110,8 @@ SHA-256 values, reads the screenshot/accessibility/layout artifacts and
 recomputes their SHA-256 and byte lengths. It checks PNG dimensions against
 receipt viewport values and the layout JSON viewport against the same receipt.
 It then computes per-category/per-severity mutation kill rates and Wilson
-95% intervals.
+95% intervals, and validates the emitted summary against
+`qualification-summary-v1.schema.json`.
 
 **Still not implemented:** the actual Chromium mutation executor and a trusted
 signed execution attestation. The adjudicator validates report structure,
