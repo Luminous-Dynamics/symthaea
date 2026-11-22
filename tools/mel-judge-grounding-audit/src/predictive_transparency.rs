@@ -1385,7 +1385,10 @@ mod tests {
             serde_json::json!("9999999999999999999999999999999999999999999999999999999999999999");
         successor_closure["output_evidence_sha256"] =
             serde_json::json!("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
-        value["observation_closures"].as_array_mut().unwrap().push(successor_closure);
+        value["observation_closures"]
+            .as_array_mut()
+            .unwrap()
+            .push(successor_closure);
         value["dispositions"][0]["action"] = serde_json::json!("steer");
         value["dispositions"][0]["acted_at_ns"] = serde_json::json!(950_000_000_u64);
         let report = audit(&value).expect("late steer remains reportable");
