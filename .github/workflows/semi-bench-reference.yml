@@ -136,3 +136,22 @@ jobs:
           diff -u \
             /tmp/semi-rust-work/benchmarks/semi-bench-001/reference/fixtures/mf-acquisition-known-answer-v1.expected.json \
             /tmp/semi-rust-mf-acquisition.json
+
+      - name: Run Rust SECOM missingness-only baseline on synthetic known answer
+        run: |
+          cargo run --manifest-path /tmp/semi-rust-work/crates/domains/symthaea-semiconductor/Cargo.toml --bin semi-secom-missingness -- \
+            /tmp/semi-rust-work/benchmarks/semi-bench-001/reference/fixtures/secom-missingness-mini-features-v1.data \
+            /tmp/semi-rust-work/benchmarks/semi-bench-001/reference/fixtures/secom-missingness-mini-labels-v1.data \
+            /tmp/semi-rust-work/benchmarks/semi-bench-001/reference/fixtures/secom-missingness-mini-expectations-v1.json \
+            /tmp/semi-rust-work/benchmarks/semi-bench-001/reference/fixtures/secom-missingness-mini-split-v1.json \
+            > /tmp/semi-rust-secom-missingness.json
+          jq -e '
+            .schema == "luminous.semi-bench.secom-missingness-report.v1" and
+            .training_rows == 4 and
+            .training_failures == 2 and
+            .training_passes == 2 and
+            .held_out.validation.prevalence_only_metrics.ranking_metrics.auroc == 0.5 and
+            .held_out.test.prevalence_only_metrics.ranking_metrics.auroc == 0.5 and
+            .held_out.validation.missingness_only_metrics.ranking_metrics.auroc == 1.0 and
+            .held_out.test.missingness_only_metrics.ranking_metrics.auroc == 1.0
+          ' /tmp/semi-rust-secom-missingness.json > /dev/null
