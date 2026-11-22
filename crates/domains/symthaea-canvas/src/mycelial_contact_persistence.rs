@@ -46,6 +46,12 @@ impl Default for MycelialContactFiltrationConfig {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MycelialContactBaselineEdge {
+    pub source_filament_id: u32,
+    pub target_filament_id: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MycelialContactCandidateObservation {
     pub fusion_candidate_id: u32,
     pub source_filament_id: u32,
@@ -121,6 +127,10 @@ pub struct MycelialContactFiltration {
     pub source_geometry_digest: String,
     pub maximum_contact_tolerance_model_units: f32,
     pub metrics: MycelialContactFiltrationMetrics,
+    /// Complete identity set for the baseline filament vertices.
+    pub source_filament_ids: Vec<u32>,
+    /// Explicit baseline branch edges used to verify cycle witness paths.
+    pub baseline_parent_edges: Vec<MycelialContactBaselineEdge>,
     /// Complete sorted input inventory, including candidates above the sweep cap.
     pub candidate_observations: Vec<MycelialContactCandidateObservation>,
     /// One snapshot after each distinct admitted contact distance.
@@ -449,6 +459,15 @@ pub fn build_mycelial_contact_filtration(
             final_connected_components: final_components,
             final_cycle_rank,
         },
+        source_filament_ids: baseline.filament_ids.clone(),
+        baseline_parent_edges: baseline
+            .connections
+            .iter()
+            .map(|connection| MycelialContactBaselineEdge {
+                source_filament_id: connection.source_filament_id,
+                target_filament_id: connection.target_filament_id,
+            })
+            .collect(),
         candidate_observations,
         snapshots,
         component_merges,
@@ -475,13 +494,43 @@ impl MycelialContactFiltration {
                 "invalid schema, length unit, source digest or maximum tolerance",
             ));
         }
-        if self.candidate_observations.len() != self.metrics.candidate_count_total
+        if self.source_filament_ids.len() != self.metrics.baseline_filament_count
+            || self.source_filament_ids.windows(2).any(|pair| pair[0] >= pair[1])
+            || self.baseline_parent_edges.windows(2).any(|pair| {
+                (pair[0].source_filament_id, pair[0].target_filament_id)
+                    >= (pair[1].source_filament_id, pair[1].target_filament_id)
+            })
+            || self.baseline_parent_edges.iter().any(|edge| {
+                edge.source_filament_id == edge.target_filament_id
+                    || self.source_filament_ids.binary_search(&edge.source_filament_id).is_err()
+                    || self.source_filament_ids.binary_search(&edge.target_filament_id).is_err()
+            })
+            || self.candidate_observations.len() != self.metrics.candidate_count_total
             || self.candidate_observations.windows(2).any(|pair| {
                 pair[0].fusion_candidate_id >= pair[1].fusion_candidate_id
             })
         {
             return Err(MycelialContactFiltrationError::InvalidFiltration(
                 "candidate observation inventory is not complete, unique and sorted",
+            ));
+        }
+        let source_ids: BTreeSet<_> = self.source_filament_ids.iter().copied().collect();
+        if self.candidate_observations.iter().any(|candidate| {
+            candidate.source_filament_id == candidate.target_filament_id
+                || !source_ids.contains(&candidate.source_filament_id)
+                || !source_ids.contains(&candidate.target_filament_id)
+                || candidate.source_parameter_micros != 1_000_000
+                || candidate.target_parameter_micros > 1_000_000
+                || match candidate.kind {
+                    AnastomosisKind::TipToTip => candidate.target_parameter_micros != 1_000_000,
+                    AnastomosisKind::TipToSide => {
+                        candidate.target_parameter_micros <= 50_000
+                            || candidate.target_parameter_micros >= 950_000
+                    }
+                }
+        }) {
+            return Err(MycelialContactFiltrationError::InvalidFiltration(
+                "candidate observations contain invalid endpoint or contact parameters",
             ));
         }
         let observed_admitted = self
@@ -522,6 +571,17 @@ impl MycelialContactFiltration {
             .iter()
             .map(|candidate| (candidate.fusion_candidate_id, candidate))
             .collect();
+        let baseline_edges: BTreeSet<_> = self
+            .baseline_parent_edges
+            .iter()
+            .map(|edge| {
+                if edge.source_filament_id <= edge.target_filament_id {
+                    (edge.source_filament_id, edge.target_filament_id)
+                } else {
+                    (edge.target_filament_id, edge.source_filament_id)
+                }
+            })
+            .collect();
         let mut event_ids = BTreeSet::new();
         for event in &self.component_merges {
             let candidate = observation_by_id
@@ -557,6 +617,26 @@ impl MycelialContactFiltration {
                     != Some(event.target_filament_id)
                 || event.witness_path.windows(2).any(|pair| {
                     pair[0].to_filament_id != pair[1].from_filament_id
+                })
+                || event.witness_path.iter().any(|step| {
+                    let pair = if step.from_filament_id <= step.to_filament_id {
+                        (step.from_filament_id, step.to_filament_id)
+                    } else {
+                        (step.to_filament_id, step.from_filament_id)
+                    };
+                    match step.prior_fusion_candidate_id {
+                        None => !baseline_edges.contains(&pair),
+                        Some(prior_id) => observation_by_id.get(&prior_id).is_none_or(|prior| {
+                            prior_id == event.fusion_candidate_id
+                                || !prior.admitted_within_maximum_tolerance
+                                || prior.contact_distance_microunits
+                                    > event.contact_distance_microunits
+                                || !((prior.source_filament_id == pair.0
+                                    && prior.target_filament_id == pair.1)
+                                    || (prior.source_filament_id == pair.1
+                                        && prior.target_filament_id == pair.0))
+                        }),
+                    }
                 })
             {
                 return Err(MycelialContactFiltrationError::InvalidFiltration(
@@ -625,6 +705,24 @@ impl MycelialContactFiltration {
             previous_components = snapshot.connected_components;
             previous_cycles = snapshot.cycle_rank;
         }
+        if let Some(last) = self.snapshots.last() {
+            if last.admitted_candidate_count != self.metrics.candidate_count_in_filtration
+                || last.connected_components != self.metrics.final_connected_components
+                || last.cycle_rank != self.metrics.final_cycle_rank
+            {
+                return Err(MycelialContactFiltrationError::InvalidFiltration(
+                    "final snapshot does not match final filtration metrics",
+                ));
+            }
+        } else if self.metrics.candidate_count_in_filtration != 0
+            || self.metrics.final_connected_components
+                != self.metrics.baseline_connected_components
+            || self.metrics.final_cycle_rank != 0
+        {
+            return Err(MycelialContactFiltrationError::InvalidFiltration(
+                "empty snapshot sequence disagrees with final metrics",
+            ));
+        }
         for event in &self.cycle_births {
             if event.contact_distance_microunits > event.right_censor_tolerance_microunits
                 || event.right_censor_tolerance_microunits
@@ -660,6 +758,13 @@ impl MycelialContactFiltration {
             self.metrics.final_cycle_rank,
         ] {
             hasher.update(&(value as u64).to_le_bytes());
+        }
+        for filament_id in &self.source_filament_ids {
+            hasher.update(&filament_id.to_le_bytes());
+        }
+        for edge in &self.baseline_parent_edges {
+            hasher.update(&edge.source_filament_id.to_le_bytes());
+            hasher.update(&edge.target_filament_id.to_le_bytes());
         }
         for candidate in &self.candidate_observations {
             hasher.update(&candidate.fusion_candidate_id.to_le_bytes());
