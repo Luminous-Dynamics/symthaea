@@ -76,7 +76,7 @@ pub struct ObservationOutcomeRegretBound {
     /// Evaluator-only minimax-regret-optimal action after this visible outcome.
     pub minimax_regret_action_id: String,
     pub worst_case_regret_ppm: u32,
-    pub regret_within_tolerance: bool,
+    pub information_set_sufficient: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -85,11 +85,15 @@ pub struct RobustDecisionRegretObservationCertificate {
     pub sensor_model_sha256: [u8; 32],
     pub support_evidence_sha256: [u8; 32],
     pub decision_deadline_us: u64,
+    pub decision_regret_tolerance_ppm: u32,
     pub baseline_worst_case_regret_ppm: u32,
     pub post_observation_worst_case_regret_ppm: u32,
-    /// Regret-threshold status only; other hard gates remain independent.
-    pub baseline_regret_within_tolerance: bool,
-    pub post_observation_regret_within_tolerance: bool,
+    /// Whether some deterministic action is within tolerance for the entire
+    /// current information set; this does not qualify the candidate's chosen action.
+    pub baseline_information_set_sufficient: bool,
+    /// Whether every possible observation result leaves an information set
+    /// with at least one deterministic action within the declared tolerance.
+    pub post_observation_information_set_sufficient: bool,
     /// Guaranteed reduction across every outcome in the declared support.
     pub guaranteed_regret_reduction_ppm: u32,
     pub outcomes: Vec<ObservationOutcomeRegretBound>,
@@ -282,7 +286,7 @@ pub fn evaluate_robust_decision_regret_observation(
             possible_world_count,
             minimax_regret_action_id: minimax_action,
             worst_case_regret_ppm: worst_case_regret,
-            regret_within_tolerance: worst_case_regret <= model.decision_regret_tolerance_ppm,
+            information_set_sufficient: worst_case_regret <= model.decision_regret_tolerance_ppm,
         });
     }
 
@@ -296,11 +300,12 @@ pub fn evaluate_robust_decision_regret_observation(
         sensor_model_sha256: model.sensor_model_sha256,
         support_evidence_sha256: model.support_evidence_sha256,
         decision_deadline_us: model.decision_deadline_us,
+        decision_regret_tolerance_ppm: model.decision_regret_tolerance_ppm,
         baseline_worst_case_regret_ppm: baseline.unavoidable_worst_case_regret_ppm,
         post_observation_worst_case_regret_ppm: post_worst_case_regret,
-        baseline_regret_within_tolerance: baseline.unavoidable_worst_case_regret_ppm
+        baseline_information_set_sufficient: baseline.unavoidable_worst_case_regret_ppm
             <= model.decision_regret_tolerance_ppm,
-        post_observation_regret_within_tolerance: post_worst_case_regret
+        post_observation_information_set_sufficient: post_worst_case_regret
             <= model.decision_regret_tolerance_ppm,
         guaranteed_regret_reduction_ppm,
         outcomes: outcome_bounds,
@@ -388,8 +393,8 @@ mod tests {
         assert_eq!(result.baseline_worst_case_regret_ppm, 1_000_000);
         assert_eq!(result.post_observation_worst_case_regret_ppm, 0);
         assert_eq!(result.guaranteed_regret_reduction_ppm, 1_000_000);
-        assert!(!result.baseline_regret_within_tolerance);
-        assert!(result.post_observation_regret_within_tolerance);
+        assert!(!result.baseline_information_set_sufficient);
+        assert!(result.post_observation_information_set_sufficient);
         assert_eq!(result.outcomes.len(), 2);
     }
 
@@ -549,7 +554,7 @@ mod tests {
         let result = evaluate_robust_decision_regret_observation(&class, &model).unwrap();
         assert!(result.baseline_regret_within_tolerance);
         assert!(result.post_observation_regret_within_tolerance);
-        assert!(result.outcomes.iter().all(|outcome| outcome.regret_within_tolerance));
+        assert!(result.outcomes.iter().all(|outcome| outcome.information_set_sufficient));
     }
 
     #[test]
