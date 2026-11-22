@@ -630,3 +630,17 @@ See [2026-multifidelity-optimization-frontier.md](2026-multifidelity-optimizatio
 2026 literature provides concrete method comparators: an analog circuit study reports ~96.5% fewer SPICE calls and ~20× simulation time reduction for surrogate-guided optimization, with ~90% fewer calls for adaptive MFO; an ASP-DAC DTCO paper reports 5× sampling efficiency with CFET/multi-row cell support. These are paper-specific results, not Luminous results.
 
 The new benchmark's primary objective is verified Pareto improvement per expensive evaluation. It compares DOE, high-fidelity-only, surrogate-only, uncertainty-triggered, trust-region / multi-fidelity BO, MOEAs, trust-aware LLM proposals and Symthaea selection. Its research target is ≥90% fewer SPICE calls at ≥99% normalized high-fidelity Pareto hypervolume, with no increase in false-safe hard-constraint predictions. These are targets only.
+
+
+## DTCO lineage gate — uncertainty, stage direction and root identity
+
+The current Rust contract has been strengthened beyond parent/output digest matching:
+- model-prediction evidence requires both a model digest and a prediction-uncertainty artifact digest;
+- a child may not name a later-fidelity stage as its parent;
+- each root run must bind the declared immutable design-input digest;
+- the declared design-constraint digest must be consumed by at least one run;
+- physical measurements still require instrument, calibration and measurement-uncertainty references.
+
+The frozen DTCO fixture now carries the design and constraint digests as root-run inputs (seven distinct artifacts). Eleven DTCO-specific tests cover the known answer and adversarial lineage, stage, uncertainty and binding cases.
+
+Hosted run [#44989349728](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44989349728) passed **35/35 Rust tests** and **46/46 Python reference tests**, Rust fmt and Clippy, plus byte-for-byte output comparisons for Python binary/inspection/pair reports and Rust binary/SECOM/DTCO CLI reports. The root workspace limitation remains isolated from this crate-level run.
