@@ -846,23 +846,23 @@ impl TemporalMycelialCycleProfile {
             || !(1.0e-15..=1.0e-3).contains(&self.config.tcr_epsilon)
             || self.observed_duration_ns != self.complete_duration_ns + self.partial_duration_ns
             || self.snapshot_metrics.is_empty()
-            || self.snapshot_metrics.len() > MAX_TEMPORAL_MYCIELIAL_WINDOWS
+            || self.snapshot_metrics.len() > MAX_TEMPORAL_MYCELIAL_WINDOWS
             || self.source_node_ids.len()
-                > MAX_TEMPORAL_MYCIELIAL_NODES.saturating_mul(self.snapshot_metrics.len())
+                > MAX_TEMPORAL_MYCELIAL_NODES.saturating_mul(self.snapshot_metrics.len())
             || self.source_node_ids.iter().any(|id| !valid_id(id))
             || self.source_node_ids.windows(2).any(|pair| pair[0] >= pair[1])
             || self.snapshot_metrics.iter().any(|snapshot| {
                 !valid_id(&snapshot.snapshot_id)
-                    || snapshot.node_count > MAX_TEMPORAL_MYCIELIAL_NODES
-                    || snapshot.edge_count > MAX_TEMPORAL_MYCIELIAL_EDGES
+                    || snapshot.node_count > MAX_TEMPORAL_MYCELIAL_NODES
+                    || snapshot.edge_count > MAX_TEMPORAL_MYCELIAL_EDGES
                     || snapshot.simple_cycle_count > MAX_TEMPORAL_CYCLES_PER_WINDOW
                     || snapshot.cycle_rank > snapshot.simple_cycle_count
             })
             || self.snapshot_metrics.windows(2).any(|pair| {
                 pair[0].snapshot_id == pair[1].snapshot_id
             })
-            || self.edge_evidence_inventory.len() > MAX_TEMPORAL_MYCIELIAL_WINDOWS
-                .saturating_mul(MAX_TEMPORAL_MYCIELIAL_EDGES)
+            || self.edge_evidence_inventory.len() > MAX_TEMPORAL_MYCELIAL_WINDOWS
+                .saturating_mul(MAX_TEMPORAL_MYCELIAL_EDGES)
             || self.edge_evidence_inventory.iter().any(|edge| !valid_id(&edge.edge_id))
             || self.edge_evidence_inventory.windows(2).any(|pair| {
                 pair[0].edge_id >= pair[1].edge_id
