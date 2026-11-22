@@ -14,7 +14,10 @@ use std::io::{BufWriter, Write};
 use std::mem::size_of;
 use std::time::Instant;
 
-use broca_mace_hdc_retrieval::experience_view_digest;
+use broca_mace_hdc_retrieval::{
+    experience_view_digest,
+    typed_content::{SemanticExperienceQueryV1, TypedContentConfigV1, TypedContentIndexV1},
+};
 use broca_mace_policy::{
     decide, Action, Decision, DecisionNeedV1, Experience, Objective, Policy, Query, Regime, Scope, SourceRootDigest,
 };
@@ -26,6 +29,9 @@ mod mace_generated_stress;
 
 const SCHEMA_VERSION: &str = "mace_counterfactual_evidence_v0_1";
 const ABSTENTION_UTILITY: f64 = 0.0;
+const TYPED_HDC_DIMENSION: usize = 2_048;
+const TYPED_HDC_SEED: u64 = 0x4D41_4345_4844_4301;
+const TYPED_HDC_TOP_K: usize = 2;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -73,6 +79,9 @@ struct EvidenceDependencyIndex {
 enum IndexError {
     DuplicateEventId(u32),
     InvalidDecisionNeed,
+    TypedIndexFailure(String),
+    UnresolvedCandidateId(u32),
+    CanonicalViewMismatch(u32),
 }
 
 impl EvidenceDependencyIndex {
@@ -478,11 +487,33 @@ fn candidate_input_digest(
     hex_digest(Sha256::digest(payload.as_bytes()).as_slice())
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum CandidateMode {
+    ExactScopeScan,
+    TypedContentHdc,
+}
+
+impl CandidateMode {
+    const ALL: [Self; 2] = [Self::ExactScopeScan, Self::TypedContentHdc];
+
+    fn name(self) -> &'static str {
+        match self {
+            Self::ExactScopeScan => "exact_scope_scan",
+            Self::TypedContentHdc => "typed_content_hdc",
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 struct CandidateObservation {
+    mode: CandidateMode,
     decision: Decision,
     input_sha256: String,
     evidence_sha256: String,
+    retrieved_event_ids: Vec<u32>,
+    retrieval_profile_sha256: Option<String>,
+    index_bytes: u64,
     evidence_event_count: usize,
     evidence_root_count: usize,
     evidence_family_count: usize,
@@ -492,6 +523,7 @@ struct CandidateObservation {
 }
 
 fn run_candidate(
+    mode: CandidateMode,
     query: Query,
     decision_need: DecisionNeedV1,
     memory: &[Experience],
@@ -500,22 +532,108 @@ fn run_candidate(
     if !decision_need.is_valid() || decision_need.scope != query.scope {
         return Err(IndexError::InvalidDecisionNeed);
     }
-    let index = EvidenceDependencyIndex::build(memory)?;
-    let evidence_sha256 = index.baseline_evidence_digest();
+
+    let evidence_index = EvidenceDependencyIndex::build(memory)?;
+    let evidence_sha256 = evidence_index.baseline_evidence_digest();
     let input_sha256 = candidate_input_digest(decision_need, &evidence_sha256);
-    let decision = decide(Policy::CausalQualified, memory, query);
+
+    let (policy_memory, retrieved_event_ids, retrieval_profile_sha256, index_bytes) =
+        match mode {
+            CandidateMode::ExactScopeScan => {
+                let eligible: Vec<Experience> = memory
+                    .iter()
+                    .filter(|item| {
+                        item.scope == query.scope
+                            && decision_need.action_alternatives.contains(&item.action)
+                    })
+                    .copied()
+                    .collect();
+                let ids = eligible.iter().map(|item| item.event_id).collect();
+                (eligible, ids, None, 0)
+            }
+            CandidateMode::TypedContentHdc => {
+                if memory.is_empty() {
+                    (Vec::new(), Vec::new(), None, 0)
+                } else {
+                    let config = TypedContentConfigV1 {
+                        dimension: TYPED_HDC_DIMENSION,
+                        seed: TYPED_HDC_SEED,
+                        ..TypedContentConfigV1::default()
+                    };
+                    let typed_index = TypedContentIndexV1::build(memory, config)
+                        .map_err(|error| IndexError::TypedIndexFailure(error.to_string()))?;
+                    let profile_sha256 = typed_index.profile_digest().to_string();
+
+                    let mut hits: Vec<(u32, [u8; 32], usize)> = Vec::new();
+                    for action in decision_need.action_alternatives {
+                        let typed_query =
+                            SemanticExperienceQueryV1::from_decision_need(decision_need, action)
+                                .map_err(|error| IndexError::TypedIndexFailure(error.to_string()))?;
+                        let retrieval = typed_index
+                            .retrieve(typed_query, TYPED_HDC_TOP_K)
+                            .map_err(|error| IndexError::TypedIndexFailure(error.to_string()))?;
+                        for hit in retrieval.candidates {
+                            hits.push((hit.event_id, hit.view_digest, hit.rank));
+                        }
+                    }
+                    hits.sort_by(|left, right| {
+                        left.2
+                            .cmp(&right.2)
+                            .then_with(|| left.0.cmp(&right.0))
+                    });
+
+                    let mut resolved = Vec::with_capacity(hits.len());
+                    let mut retrieved_ids = Vec::with_capacity(hits.len());
+                    let mut seen = BTreeSet::new();
+                    for (event_id, indexed_view_digest, _) in hits {
+                        if !seen.insert(event_id) {
+                            continue;
+                        }
+                        let item = evidence_index
+                            .records
+                            .get(&event_id)
+                            .copied()
+                            .ok_or(IndexError::UnresolvedCandidateId(event_id))?;
+                        if experience_view_digest(&item) != indexed_view_digest
+                            || item.event_id != event_id
+                        {
+                            return Err(IndexError::CanonicalViewMismatch(event_id));
+                        }
+                        retrieved_ids.push(event_id);
+                        resolved.push(item);
+                    }
+                    (
+                        resolved,
+                        retrieved_ids,
+                        Some(profile_sha256),
+                        typed_index.index_payload_bytes(),
+                    )
+                }
+            }
+        };
+
+    let decision = decide(Policy::CausalQualified, &policy_memory, query);
 
     Ok(CandidateObservation {
+        mode,
         decision,
         input_sha256,
         evidence_sha256,
-        evidence_event_count: index.event_count(),
-        evidence_root_count: index.known_root_count(),
-        evidence_family_count: index.known_family_count(),
-        unknown_root_event_count: index.unknown_root_event_count(),
-        unknown_family_event_count: index.unknown_family_event_count(),
+        retrieved_event_ids,
+        retrieval_profile_sha256,
+        index_bytes,
+        evidence_event_count: evidence_index.event_count(),
+        evidence_root_count: evidence_index.known_root_count(),
+        evidence_family_count: evidence_index.known_family_count(),
+        unknown_root_event_count: evidence_index.unknown_root_event_count(),
+        unknown_family_event_count: evidence_index.unknown_family_event_count(),
         latency_ns: u64::try_from(started.elapsed().as_nanos()).unwrap_or(u64::MAX),
     })
+}
+
+fn candidate_observation_id(candidate: &CandidateObservation) -> String {
+    let identity = format!("{}:{}", candidate.mode.name(), candidate.input_sha256);
+    format!("obs-{}", &hex_digest(Sha256::digest(identity.as_bytes()).as_slice())[..16])
 }
 
 fn truth_utility(truth: mace_generated_stress::Truth, action: Option<Action>) -> f64 {
@@ -968,7 +1086,7 @@ mod tests {
         let mut invalid_need = case.decision_need;
         invalid_need.schema_version = 99;
         assert_eq!(
-            run_candidate(case.query, invalid_need, &case.memory).unwrap_err(),
+            run_candidate(CandidateMode::ExactScopeScan, case.query, invalid_need, &case.memory).unwrap_err(),
             IndexError::InvalidDecisionNeed
         );
 
@@ -979,7 +1097,7 @@ mod tests {
             },
         };
         assert_eq!(
-            run_candidate(wrong_scope, case.decision_need, &case.memory).unwrap_err(),
+            run_candidate(CandidateMode::ExactScopeScan, wrong_scope, case.decision_need, &case.memory).unwrap_err(),
             IndexError::InvalidDecisionNeed
         );
     }
