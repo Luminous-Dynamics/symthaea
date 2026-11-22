@@ -70,7 +70,6 @@ struct CandidateForecastV1 {
 #[serde(deny_unknown_fields)]
 struct ScoringPolicyV1 {
     presence_decision_threshold: f64,
-    minimum_probability: f64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -185,6 +184,7 @@ struct RoleAccumulator {
     omitted_positive: usize,
     false_positive: usize,
     true_positive: usize,
+    false_negative: usize,
     presence_brier_sum: f64,
 }
 
@@ -274,6 +274,7 @@ fn score_panel(panel: &EventUniversePanelV1) -> Result<EventUniverseReport, Stri
         if omitted && observed_presence {
             omitted_positive_count += 1;
             false_negative_count += 1;
+            role.false_negative += 1;
             role.omitted_positive += 1;
         } else if prediction_positive && observed_presence {
             true_positive_count += 1;
@@ -285,6 +286,7 @@ fn score_panel(panel: &EventUniversePanelV1) -> Result<EventUniverseReport, Stri
             true_negative_count += 1;
         } else {
             false_negative_count += 1;
+            role.false_negative += 1;
         }
 
         let presence_brier = (presence_probability - if observed_presence { 1.0 } else { 0.0 }).powi(2);
@@ -404,7 +406,7 @@ fn score_panel(panel: &EventUniversePanelV1) -> Result<EventUniverseReport, Stri
             omitted_positive_count: item.omitted_positive,
             false_positive_count: item.false_positive,
             presence_brier_score: average(item.presence_brier_sum, item.scored),
-            recall: ratio(item.true_positive, item.true_positive + item.omitted_positive + false_negative_count_for_role_placeholder()),
+            recall: ratio(item.true_positive, item.true_positive + item.false_negative),
         })
         .collect();
 
@@ -497,9 +499,6 @@ fn validate_header(panel: &EventUniversePanelV1) -> Result<(), String> {
     }
     if !panel.policy.presence_decision_threshold.is_finite()
         || !(0.0..=1.0).contains(&panel.policy.presence_decision_threshold)
-        || !panel.policy.minimum_probability.is_finite()
-        || panel.policy.minimum_probability <= 0.0
-        || panel.policy.minimum_probability >= 1.0
     {
         return Err("invalid event-universe scoring policy".to_owned());
     }
@@ -554,7 +553,7 @@ fn validate_prediction(prediction: &SlotPredictionV1, slot: &OpportunitySlotV1, 
     {
         return Err(format!("slot {} presence probability is invalid", slot.slot_id));
     }
-    if prediction.presence_probability <= policy.minimum_probability {
+    if prediction.presence_probability == 0.0 {
         if !prediction.alternative_probabilities.is_empty() {
             return Err(format!("slot {} near-zero presence probability must not carry conditional alternatives", slot.slot_id));
         }
@@ -721,7 +720,7 @@ mod tests {
     }
 
     #[test]
-    fn candidate_predictions_with_no_event_probability_do_not_require_conditional_labels() {
+    fn zero_presence_prediction_does_not_require_conditional_labels() {
         let mut value = panel();
         value["predictions"][0]["presence_probability"] = serde_json::json!(0.0);
         value["predictions"][0]["alternative_probabilities"] = serde_json::json!([]);
