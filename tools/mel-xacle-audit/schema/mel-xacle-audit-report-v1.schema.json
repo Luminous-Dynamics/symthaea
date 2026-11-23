@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel-xacle-audit-report-v1.schema.json",
+  "title": "MEL XACLE Audit Report v1",
+  "type": "object",
+  "required": ["schema_version", "mode"],
+  "properties": {
+    "schema_version": {"const": "mel-xacle-audit-report-v1"},
+    "mode": {"enum": ["score", "compare", "validate-submission"]},
+    "metadata_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "metadata_id_column": {"type": "string"},
+    "target_score_column": {"type": "string"},
+    "prediction_id_column": {"type": "string"},
+    "baseline_prediction_id_column": {"type": "string"},
+    "candidate_prediction_id_column": {"type": "string"},
+    "evaluation_id_column": {"type": "string"},
+    "evaluation_manifest_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "prediction_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "item_count": {"type": "integer", "minimum": 1},
+    "expected_item_count": {"type": "integer", "minimum": 1},
+    "received_item_count": {"type": "integer", "minimum": 1},
+    "exact_id_coverage": {"type": "boolean"},
+    "metrics": {"$ref": "#/$defs/metrics"},
+    "system": {"$ref": "#/$defs/system"},
+    "baseline": {"$ref": "#/$defs/system"},
+    "candidate": {"$ref": "#/$defs/system"},
+    "candidate_minus_baseline_srcc": {"type": ["number", "null"]},
+    "paired_srcc_delta_interval_95": {"$ref": "#/$defs/interval"},
+    "claim_ceiling": {"type": "array", "items": {"type": "string"}}
+  },
+  "$defs": {
+    "metrics": {
+      "type": "object",
+      "required": ["count", "srcc", "lcc", "kendall_tau_b", "mse"],
+      "properties": {
+        "count": {"type": "integer", "minimum": 0},
+        "srcc": {"type": ["number", "null"]},
+        "lcc": {"type": ["number", "null"]},
+        "kendall_tau_b": {"type": ["number", "null"]},
+        "mse": {"type": ["number", "null"]}
+      }
+    },
+    "interval": {
+      "type": ["object", "null"],
+      "properties": {
+        "lower_95": {"type": "number"},
+        "upper_95": {"type": "number"},
+        "valid_replicates": {"type": "integer", "minimum": 0},
+        "total_replicates": {"type": "integer", "minimum": 0},
+        "seed": {"type": "integer", "minimum": 0},
+        "sampling_unit": {"type": "string"}
+      }
+    },
+    "system": {
+      "type": "object",
+      "required": ["system_name", "prediction_sha256", "metrics", "groups"],
+      "properties": {
+        "system_name": {"type": "string"},
+        "prediction_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "metrics": {"$ref": "#/$defs/metrics"},
+        "srcc_interval_95": {"$ref": "#/$defs/interval"},
+        "groups": {"type": "array"},
+        "worst_group": {"type": ["string", "null"]},
+        "worst_group_srcc": {"type": ["number", "null"]},
+        "worst_group_minimum_items": {"type": "integer", "minimum": 1}
+      }
+    }
+  },
+  "additionalProperties": true
+}
