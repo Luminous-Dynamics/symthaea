@@ -371,7 +371,7 @@ fn candidate_set_digest(evidence: &[CandidateEvidenceV1]) -> String {
                 hasher.update([1]);
                 hasher.update(score.to_bits().to_be_bytes());
             }
-            None => hasher.update([0]),
+            None => { hasher.update([0]); }
         }
         hasher.update((item.parent_evidence_ids.len() as u64).to_be_bytes());
         for parent in &item.parent_evidence_ids {
