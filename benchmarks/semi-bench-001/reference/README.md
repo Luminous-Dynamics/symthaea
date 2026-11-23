@@ -371,3 +371,23 @@ A second fixed arm is now added:
 - **B6-strong-balanced:** class-weighted FTRL with L1=1.0, L2=1.0 and the same training-prior correction.
 
 Both arms report nonzero count and SHA-256 over the binary coefficient-support mask. The exact-head workflow evaluates both on the same chronological split and archives model support and metrics. The stronger setting is preregistered, not selected by test performance. If it produces severe sparsity, predictive collapse or calibration failure, that is a negative result to preserve.
+
+
+## Typed observation states and sensor correspondence
+
+The Rust module \`benchmark::observation_semantics\` represents sensor measurements without collapsing all absent values into one null state.
+
+States:
+- \`observed\`: finite value, explicit unit and uncertainty method / standard uncertainty.
+- \`observed_unqualified\`: finite source value exists, but unit and uncertainty semantics are unavailable. It is not a qualified measurement.
+- \`not_installed\`, \`not_scheduled\`, \`communication_loss\`, \`invalid_reading\`: each requires an evidence reference.
+- \`censored\`: one or two finite bounds, explicit unit, censoring basis and evidence reference. No point value is fabricated.
+- \`unknown_missing_reason\`: source has a missing field and does not say why.
+
+The SECOM adapter deliberately maps finite anonymous columns to \`observed_unqualified\` and NaNs to \`unknown_missing_reason\`. It does not infer physical sensor identity, units, calibration, instrument, sensor failure or installation state. Anonymous sensor IDs are adapter-local labels that preserve column identity only; they are not physical names.
+
+Observation frames bind subject, source clock domain, optional source-local timestamp, sensor-schema digest, raw artifact digest and transformation digest. Frame validation rejects duplicate sensor IDs, malformed digests, non-finite values, incomplete uncertainty and invalid censoring bounds.
+
+The cross-schema correspondence manifest requires stable source and target sensor identities, explicit mapping status and (for matched sensors) an explicit unit transform with evidence. Structural absence and unsupported mapping are different states. Position-only mapping cannot be expressed by the schema and is rejected by validation.
+
+The synthetic Rust tests cover qualified/unqualified observations, conservative SECOM missingness mapping, uncertainty/bound validation, reason evidence, duplicate identities, explicit unit transform, structural absence and unsupported correspondence. Validation establishes representation/integrity only; it does not establish sensor truth, calibration quality, physical cause or fab transfer.
