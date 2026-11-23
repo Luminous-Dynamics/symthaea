@@ -13,6 +13,8 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
+use crate::mycelial_acquisition_domain::MycelialAcquisitionUnitKey;
+
 pub const MYCELIAL_OBSERVATION_COVERAGE_SCHEMA_VERSION: u16 = 1;
 pub const MAX_MYCELIAL_OBSERVATION_COVERAGE_RECORDS: usize = 16_384;
 pub const MAX_MYCELIAL_COVERAGE_CANDIDATES_PER_OBSERVATION: usize = 128;
@@ -60,6 +62,8 @@ pub struct MycelialObservationCoverageRecord {
     pub observation_id: String,
     /// Digest of the exact source observation or bounded observation crop.
     pub observation_digest: String,
+    /// Source acquisition unit that emitted this observation, when raw-domain provenance is available.
+    pub source_unit_key: Option<MycelialAcquisitionUnitKey>,
     /// Groups records that share acquisition conditions or possible common causes.
     pub acquisition_group_id: String,
     /// Biological unit used for leakage-resistant splitting/resampling.
@@ -107,6 +111,7 @@ pub enum MycelialObservationCoverageError {
     DuplicateObservationId(String),
     NonCanonicalObservationOrder,
     ObservationInventoryMismatch,
+    ObservationInventoryDigestMismatch,
     DuplicateCandidateId {
         observation_id: String,
         candidate_id: String,
@@ -171,6 +176,9 @@ impl fmt::Display for MycelialObservationCoverageError {
                     "coverage records do not exactly match the declared observation inventory"
                 )
             }
+            Self::ObservationInventoryDigestMismatch => {
+                write!(f, "declared observation inventory digest does not match its canonical IDs")
+            }
             Self::DuplicateCandidateId {
                 observation_id,
                 candidate_id,
@@ -225,6 +233,18 @@ fn validate_digest(
 
 fn strictly_sorted(values: &[String]) -> bool {
     values.windows(2).all(|pair| pair[0] < pair[1])
+}
+
+/// Canonical digest for a strictly sorted observation-ID inventory.
+/// This digest is reused by extraction receipts to reconcile per-unit outputs.
+pub fn mycelial_observation_id_inventory_digest(ids: &[String]) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"symthaea-mycelial-observation-id-inventory-v1");
+    hasher.update(&(ids.len() as u64).to_le_bytes());
+    for id in ids {
+        hash_string(&mut hasher, id);
+    }
+    hasher.finalize().to_hex().to_string()
 }
 
 impl MycelialObservationCoverageLedger {
@@ -291,6 +311,11 @@ impl MycelialObservationCoverageLedger {
         }
         if !strictly_sorted(&self.declared_observation_ids) {
             return Err(MycelialObservationCoverageError::NonCanonicalObservationOrder);
+        }
+        if mycelial_observation_id_inventory_digest(&self.declared_observation_ids)
+            != self.observation_inventory_digest
+        {
+            return Err(MycelialObservationCoverageError::ObservationInventoryDigestMismatch);
         }
 
         if self.records.len() != self.declared_observation_ids.len() {
@@ -484,6 +509,19 @@ impl MycelialObservationCoverageLedger {
         for record in &self.records {
             hash_string(&mut hasher, &record.observation_id);
             hash_string(&mut hasher, &record.observation_digest);
+            match record.source_unit_key {
+                Some(unit) => {
+                    hasher.update(&[1]);
+                    hasher.update(&unit.tile_x.to_le_bytes());
+                    hasher.update(&unit.tile_y.to_le_bytes());
+                    hasher.update(&unit.z_plane.to_le_bytes());
+                    hasher.update(&unit.channel.to_le_bytes());
+                    hasher.update(&unit.timepoint.to_le_bytes());
+                }
+                None => {
+                    hasher.update(&[0]);
+                }
+            }
             hash_string(&mut hasher, &record.acquisition_group_id);
             hash_string(&mut hasher, &record.biological_replicate_id);
             hash_string(&mut hasher, &record.time_window_id);
@@ -553,7 +591,10 @@ mod tests {
             schema_version: MYCELIAL_OBSERVATION_COVERAGE_SCHEMA_VERSION,
             source_dataset_id: "dataset-001".to_string(),
             source_dataset_digest: digest('a'),
-            observation_inventory_digest: digest('b'),
+            observation_inventory_digest: mycelial_observation_id_inventory_digest(&[
+                "obs-001".to_string(),
+                "obs-002".to_string(),
+            ]),
             declared_observation_ids: vec!["obs-001".to_string(), "obs-002".to_string()],
             coordinate_frame_id: "specimen-frame-v1".to_string(),
             spatial_transform_digest: digest('c'),
@@ -565,6 +606,7 @@ mod tests {
                 MycelialObservationCoverageRecord {
                     observation_id: "obs-001".to_string(),
                     observation_digest: digest('1'),
+                    source_unit_key: None,
                     acquisition_group_id: "acquisition-001".to_string(),
                     biological_replicate_id: "replicate-001".to_string(),
                     time_window_id: "time-001".to_string(),
@@ -575,6 +617,7 @@ mod tests {
                 MycelialObservationCoverageRecord {
                     observation_id: "obs-002".to_string(),
                     observation_digest: digest('2'),
+                    source_unit_key: None,
                     acquisition_group_id: "acquisition-001".to_string(),
                     biological_replicate_id: "replicate-001".to_string(),
                     time_window_id: "time-001".to_string(),
@@ -600,6 +643,30 @@ mod tests {
             ledger.canonical_digest_hex().unwrap(),
             ledger.canonical_digest_hex().unwrap()
         );
+    }
+
+    #[test]
+    fn inventory_digest_must_commit_exact_sorted_ids() {
+        let mut ledger = fixture();
+        ledger.observation_inventory_digest = digest('f');
+        assert_eq!(
+            ledger.validate(),
+            Err(MycelialObservationCoverageError::ObservationInventoryDigestMismatch)
+        );
+    }
+
+    #[test]
+    fn source_unit_identity_changes_ledger_digest() {
+        let mut ledger = fixture();
+        let original = ledger.canonical_digest_hex().unwrap();
+        ledger.records[0].source_unit_key = Some(MycelialAcquisitionUnitKey {
+            tile_x: 1,
+            tile_y: 2,
+            z_plane: 3,
+            channel: 0,
+            timepoint: 4,
+        });
+        assert_ne!(ledger.canonical_digest_hex().unwrap(), original);
     }
 
     #[test]
