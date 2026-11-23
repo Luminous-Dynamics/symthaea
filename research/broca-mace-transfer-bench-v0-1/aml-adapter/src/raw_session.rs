@@ -372,7 +372,7 @@ impl Bm25ProfileV1 {
             || self.k1 <= 0.0
             || !self.b.is_finite()
             || !(0.0..=1.0).contains(&self.b)
-            || self.tokenizer_version.trim().is_empty()
+            || self.tokenizer_version != DEFAULT_TOKENIZER_VERSION
         {
             return Err(RawSessionReject::InvalidBm25Profile);
         }
@@ -1015,6 +1015,23 @@ mod tests {
         let result = index.search("u", "rare target marker", 1, 1).expect("search");
         assert_eq!(result.hits.len(), 1);
         assert!(result.neighbor_context.iter().all(|item| item.chunk.session_id == "s"));
+    }
+
+    #[test]
+    fn bm25_rejects_unknown_tokenizer_version() {
+        let invalid = Bm25ProfileV1 {
+            k1: 1.2,
+            b: 0.75,
+            tokenizer_version: "unimplemented-tokenizer-v2",
+        };
+        assert_eq!(
+            RawSessionBm25IndexV1::build(
+                "u",
+                chunks("u", "s", &[("t1", "user", "test content", 1)]),
+                invalid,
+            ).map(|_| ()),
+            Err(RawSessionReject::InvalidBm25Profile)
+        );
     }
 
     #[test]
