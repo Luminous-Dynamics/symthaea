@@ -57,6 +57,53 @@ Each arm binds:
 - declared causal regime and trajectory origin;
 - a contiguous sequence of integer-tick transitions;
 - pre-state, applied-action, exogenous-input, post-state and observation-delivery digests per tick;
+- decision time and action-application time;
+- delivered evidence event IDs with availability and delivery times;
+- the evidence IDs consumed by each decision;
+- an explicit scored-outcome binding;
+- a driver-execution receipt and an independent replay-audit receipt;
+- explicit complete/incomplete and replay-audit disposition.
+
+Validation enforces:
+1. exactly one receipt per treatment arm;
+2. matching shared roots and the original 13 paired identities;
+3. distinct, non-empty RNG-domain commitments;
+4. common initial state and contiguous tick/state-chain commitments;
+5. common exogenous event-bundle commitments on all overlapping ticks;
+6. no conflicting post-state for an identical tick/pre-state/action/exogenous input tuple;
+7. a shared physical trajectory for open-loop action-invariant arms;
+8. arm-local driver execution for closed-loop action-coupled arms;
+9. decision-time evidence filtration: every consumed ID was delivered to that arm by the decision time and was already available at delivery;
+10. monotonic decision clocks and action application no earlier than the associated decision;
+11. exact binding between the causal trajectory and the decision-regret outcome.
+
+### Binding the causal trajectory to the scored outcome
+
+A valid trajectory and a valid regret vector are not sufficient if they refer to different actions. The `ScoredOutcomeBinding` closes this join:
+
+- `Applied`: binds a world tick, the exact action digest and its application timestamp. All three must match a step in that arm's trajectory.
+- `NotApplied`: binds the task-defined terminal timestamp and explicit reason. It must not precede the final decision time.
+- `validate_causal_pairing_with_interaction`: evaluates the existing #13281 four-arm regret outcomes, validates the four causal trajectories, verifies the complete 13-field identity, and matches every arm's applied/terminal disposition to the corresponding trajectory binding.
+
+It returns a combined `CausalDecisionValueCertificate` containing both the causal pairing certificate and the decision-value interaction certificate. This is a join adapter, not a new regret formula or causal inference system.
+
+
+The Rust reference is in:
+
+`research/decision-value-interaction-001/src/causal_pairing.rs`
+
+The common identity binds:
+- the existing 13-field `PairedRunIdentity`;
+- dynamics-model and simulator-build digests;
+- exogenous-schedule and clock-profile digests;
+- initial world tick;
+- distinct world-disturbance, policy-RNG, sensor-noise and evaluator-RNG domain commitments.
+
+Each arm binds:
+- one of the four treatment arms;
+- declared causal regime and trajectory origin;
+- a contiguous sequence of integer-tick transitions;
+- pre-state, applied-action, exogenous-input, post-state and observation-delivery digests per tick;
 - a driver-execution receipt and an independent replay-audit receipt;
 - explicit complete/incomplete and replay-audit disposition.
 
