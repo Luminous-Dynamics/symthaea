@@ -14,8 +14,7 @@ use thiserror::Error;
 
 pub const CALIBRATION_CERTIFICATE_SCHEMA_V1: &str =
     "luminous.semi-bench.calibration-certificate.v1";
-pub const MEASUREMENT_EVIDENCE_SCHEMA_V1: &str =
-    "luminous.semi-bench.measurement-evidence.v1";
+pub const MEASUREMENT_EVIDENCE_SCHEMA_V1: &str = "luminous.semi-bench.measurement-evidence.v1";
 pub const QUALIFICATION_POLICY_SCHEMA_V1: &str =
     "luminous.semi-bench.measurement-qualification-policy.v1";
 pub const QUALIFICATION_REPORT_SCHEMA_V1: &str =
@@ -192,7 +191,8 @@ fn measurement_digest(
     measurement: &MeasurementEvidenceV1,
 ) -> Result<String, MeasurementQualificationErrorV1> {
     let mut material = measurement.clone();
-    material.uncertainty_components
+    material
+        .uncertainty_components
         .sort_by(|left, right| left.component_id.cmp(&right.component_id));
     json_sha256(&material)
 }
@@ -228,7 +228,10 @@ fn validate_measurement_shape(
         ));
     }
     for (field, value) in [
-        ("measurement_event_id", measurement.measurement_event_id.as_str()),
+        (
+            "measurement_event_id",
+            measurement.measurement_event_id.as_str(),
+        ),
         ("instrument_id", measurement.instrument_id.as_str()),
         ("measurand_id", measurement.measurand_id.as_str()),
         ("unit", measurement.unit.as_str()),
@@ -261,8 +264,14 @@ fn validate_measurement_shape(
     }
     let mut component_ids = BTreeSet::new();
     for (index, component) in measurement.uncertainty_components.iter().enumerate() {
-        require_text(&component.component_id, &format!("uncertainty_components[{index}].component_id"))?;
-        require_text(&component.source_ref, &format!("uncertainty_components[{index}].source_ref"))?;
+        require_text(
+            &component.component_id,
+            &format!("uncertainty_components[{index}].component_id"),
+        )?;
+        require_text(
+            &component.source_ref,
+            &format!("uncertainty_components[{index}].source_ref"),
+        )?;
         if !valid_sha256(&component.source_sha256)
             || !component.standard_uncertainty.is_finite()
             || component.standard_uncertainty < 0.0
@@ -286,12 +295,18 @@ fn validate_certificate_shape(
     }
     for (field, value) in [
         ("certificate_id", certificate.certificate_id.as_str()),
-        ("issuing_authority_ref", certificate.issuing_authority_ref.as_str()),
+        (
+            "issuing_authority_ref",
+            certificate.issuing_authority_ref.as_str(),
+        ),
         ("instrument_id", certificate.instrument_id.as_str()),
         ("measurand_id", certificate.measurand_id.as_str()),
         ("unit", certificate.unit.as_str()),
         ("method_revision", certificate.method_revision.as_str()),
-        ("reference_standard_id", certificate.reference_standard_id.as_str()),
+        (
+            "reference_standard_id",
+            certificate.reference_standard_id.as_str(),
+        ),
     ] {
         require_text(value, &format!("calibration.{field}"))?;
     }
@@ -374,16 +389,13 @@ pub fn qualify_measurement_evidence_v1(
     if certificate.calibration_performed_at_unix_seconds > certificate.issued_at_unix_seconds
         || certificate.issued_at_unix_seconds > certificate.valid_from_unix_seconds
         || certificate.valid_from_unix_seconds >= certificate.valid_until_unix_seconds
-        || certificate.calibration_performed_at_unix_seconds
-            > certificate.valid_until_unix_seconds
+        || certificate.calibration_performed_at_unix_seconds > certificate.valid_until_unix_seconds
     {
         reasons.push(MeasurementQualificationReasonV1::InvalidCalibrationChronology);
         status = MeasurementQualificationStatusV1::Rejected;
     }
 
-    if certificate.calibration_performed_at_unix_seconds
-        > measurement.measured_at_unix_seconds
-    {
+    if certificate.calibration_performed_at_unix_seconds > measurement.measured_at_unix_seconds {
         reasons.push(MeasurementQualificationReasonV1::CalibrationNotYetPerformed);
         status = MeasurementQualificationStatusV1::Rejected;
     }
@@ -505,7 +517,8 @@ fn finish_report(
         policy_sha256,
         corrected_value: measurement.corrected_value,
         conservative_standard_uncertainty_upper_bound: uncertainty_upper_bound,
-        expanded_uncertainty_upper_bound: uncertainty_upper_bound.map(|value| value * coverage_factor),
+        expanded_uncertainty_upper_bound: uncertainty_upper_bound
+            .map(|value| value * coverage_factor),
         uncertainty_combination_method:
             "fully_correlated_upper_bound_sum; no independence assumption".into(),
         report_sha256: String::new(),
@@ -605,8 +618,7 @@ mod tests {
 
     #[test]
     fn missing_calibration_returns_unknown_not_qualified() {
-        let report =
-            qualify_measurement_evidence_v1(&measurement(), None, &policy()).unwrap();
+        let report = qualify_measurement_evidence_v1(&measurement(), None, &policy()).unwrap();
         assert_eq!(report.status, MeasurementQualificationStatusV1::Unknown);
         assert!(
             report
@@ -702,7 +714,10 @@ mod tests {
             qualify_measurement_evidence_v1(&first, Some(&certificate()), &policy()).unwrap();
         let second_report =
             qualify_measurement_evidence_v1(&second, Some(&certificate()), &policy()).unwrap();
-        assert_eq!(first_report.measurement_sha256, second_report.measurement_sha256);
+        assert_eq!(
+            first_report.measurement_sha256,
+            second_report.measurement_sha256
+        );
         assert_eq!(first_report.report_sha256, second_report.report_sha256);
         // Retain mutability to ensure the test is about canonical ordering only.
         first.uncertainty_components.swap(0, 1);
@@ -745,18 +760,11 @@ mod tests {
         let mut second_certificate = certificate();
         second_certificate.calibration_standard_uncertainty = 0.05;
 
-        let first = qualify_measurement_evidence_v1(
-            &measured,
-            Some(&first_certificate),
-            &policy(),
-        )
-        .unwrap();
-        let second = qualify_measurement_evidence_v1(
-            &measured,
-            Some(&second_certificate),
-            &policy(),
-        )
-        .unwrap();
+        let first = qualify_measurement_evidence_v1(&measured, Some(&first_certificate), &policy())
+            .unwrap();
+        let second =
+            qualify_measurement_evidence_v1(&measured, Some(&second_certificate), &policy())
+                .unwrap();
 
         assert_eq!(
             first.calibration_certificate_sha256,
