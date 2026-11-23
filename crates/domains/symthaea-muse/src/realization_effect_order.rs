@@ -58,7 +58,9 @@ impl CounterbalancedOrderPlanV1 {
     }
 }
 
-fn validate_order_plan_payload_v1(payload: &CounterbalancedOrderPlanPayloadV1) -> Result<(), String> {
+fn validate_order_plan_payload_v1(
+    payload: &CounterbalancedOrderPlanPayloadV1,
+) -> Result<(), String> {
     if payload.schema_version != REALIZATION_EFFECT_ORDER_SCHEMA_VERSION_V1 {
         return Err("unsupported control-effect order-plan schema version".to_owned());
     }
@@ -138,7 +140,9 @@ pub fn validate_counterbalanced_order_plan_assignment_v1(
         .get(usize::from(plan.payload.block_index))
         .ok_or_else(|| "order plan block index is out of range".to_owned())?;
     if assigned.payload.arm_order != plan.payload.arm_order {
-        return Err("order plan is not the preregistered hash-ranked order for its block index".to_owned());
+        return Err(
+            "order plan is not the preregistered hash-ranked order for its block index".to_owned(),
+        );
     }
     Ok(())
 }
@@ -184,12 +188,12 @@ pub fn validate_counterbalanced_order_block_v1(
         &probe_ids,
     )?;
     if expected != ordered {
-        return Err("counterbalanced block does not match its preregistered hash-ranked schedule".to_owned());
+        return Err(
+            "counterbalanced block does not match its preregistered hash-ranked schedule"
+                .to_owned(),
+        );
     }
-    let permutations: BTreeSet<_> = ordered
-        .iter()
-        .map(|plan| plan.payload.arm_order)
-        .collect();
+    let permutations: BTreeSet<_> = ordered.iter().map(|plan| plan.payload.arm_order).collect();
     if permutations.len() != CONTROL_PROBE_ARM_PERMUTATIONS_V1 {
         return Err("counterbalanced block does not contain all 24 arm permutations".to_owned());
     }
@@ -287,16 +291,19 @@ impl SessionTransitionReceiptV1 {
     }
 }
 
-fn validate_transition_payload_v1(payload: &SessionTransitionReceiptPayloadV1) -> Result<(), String> {
+fn validate_transition_payload_v1(
+    payload: &SessionTransitionReceiptPayloadV1,
+) -> Result<(), String> {
     if payload.schema_version != REALIZATION_EFFECT_ORDER_SCHEMA_VERSION_V1 {
         return Err("unsupported session transition receipt schema version".to_owned());
     }
-    if payload.session_id.trim().is_empty()
-        || payload.baseline_observer_id.trim().is_empty()
-    {
+    if payload.session_id.trim().is_empty() || payload.baseline_observer_id.trim().is_empty() {
         return Err("session transition requires session and baseline observer IDs".to_owned());
     }
-    require_sha256(&payload.baseline_observation_sha256, "pre-arm baseline observation digest")?;
+    require_sha256(
+        &payload.baseline_observation_sha256,
+        "pre-arm baseline observation digest",
+    )?;
     require_sha256(
         &payload.baseline_observer_identity_sha256,
         "baseline observer identity digest",
@@ -310,25 +317,43 @@ fn validate_transition_payload_v1(payload: &SessionTransitionReceiptPayloadV1) -
         (Some(_), Some(_), Some(digest)) => {
             require_sha256(digest, "previous output artifact digest")?;
         }
-        _ => return Err("transition predecessor arm, epoch and output digest must be bound together".to_owned()),
+        _ => {
+            return Err(
+                "transition predecessor arm, epoch and output digest must be bound together"
+                    .to_owned(),
+            );
+        }
     }
     if payload.reset_applied {
         if payload.reset_event_sha256.is_none()
-            || payload.reset_observer_id.as_deref().unwrap_or("").trim().is_empty()
+            || payload
+                .reset_observer_id
+                .as_deref()
+                .unwrap_or("")
+                .trim()
+                .is_empty()
             || payload.reset_observer_identity_sha256.is_none()
         {
             return Err("applied session reset requires an event digest and independent reset observer identity".to_owned());
         }
-        require_sha256(payload.reset_event_sha256.as_deref().unwrap_or(""), "session reset event digest")?;
         require_sha256(
-            payload.reset_observer_identity_sha256.as_deref().unwrap_or(""),
+            payload.reset_event_sha256.as_deref().unwrap_or(""),
+            "session reset event digest",
+        )?;
+        require_sha256(
+            payload
+                .reset_observer_identity_sha256
+                .as_deref()
+                .unwrap_or(""),
             "session reset observer identity digest",
         )?;
     } else if payload.reset_event_sha256.is_some()
         || payload.reset_observer_id.is_some()
         || payload.reset_observer_identity_sha256.is_some()
     {
-        return Err("non-applied reset must not carry a reset event or observer receipt".to_owned());
+        return Err(
+            "non-applied reset must not carry a reset event or observer receipt".to_owned(),
+        );
     }
     Ok(())
 }
@@ -357,29 +382,58 @@ pub struct OrderedControlEffectArmReceiptV1 {
 pub enum ControlEffectOrderIssueV1 {
     InvalidSpec,
     InvalidOrderPlan(String),
-    WrongArmCount { expected: usize, found: usize },
+    WrongArmCount {
+        expected: usize,
+        found: usize,
+    },
     ArmOrderMismatch {
         index: u8,
         expected: ControlProbeArmKindV1,
         found: ControlProbeArmKindV1,
     },
-    SequenceIndexMismatch { expected: u8, found: u8 },
-    TransitionReceiptInvalid { arm: ControlProbeArmKindV1, detail: String },
-    TransitionTargetMismatch { arm: ControlProbeArmKindV1 },
-    SessionIdentityMismatch { arm: ControlProbeArmKindV1 },
-    PreviousArmMismatch { arm: ControlProbeArmKindV1 },
-    PreviousOutputMismatch { arm: ControlProbeArmKindV1 },
-    StateEpochMismatch { arm: ControlProbeArmKindV1 },
-    StateEpochNotIncreasing { arm: ControlProbeArmKindV1 },
-    ExplicitResetMissing { arm: ControlProbeArmKindV1 },
-    WashoutTooShort { arm: ControlProbeArmKindV1 },
+    SequenceIndexMismatch {
+        expected: u8,
+        found: u8,
+    },
+    TransitionReceiptInvalid {
+        arm: ControlProbeArmKindV1,
+        detail: String,
+    },
+    TransitionTargetMismatch {
+        arm: ControlProbeArmKindV1,
+    },
+    SessionIdentityMismatch {
+        arm: ControlProbeArmKindV1,
+    },
+    PreviousArmMismatch {
+        arm: ControlProbeArmKindV1,
+    },
+    PreviousOutputMismatch {
+        arm: ControlProbeArmKindV1,
+    },
+    StateEpochMismatch {
+        arm: ControlProbeArmKindV1,
+    },
+    StateEpochNotIncreasing {
+        arm: ControlProbeArmKindV1,
+    },
+    ExplicitResetMissing {
+        arm: ControlProbeArmKindV1,
+    },
+    WashoutTooShort {
+        arm: ControlProbeArmKindV1,
+    },
     PreArmCarryoverDetected {
         arm: ControlProbeArmKindV1,
         drift_milli: u128,
         maximum_drift_milli: u64,
     },
-    BaselineObserverIsProducer { arm: ControlProbeArmKindV1 },
-    ResetObserverIsProducer { arm: ControlProbeArmKindV1 },
+    BaselineObserverIsProducer {
+        arm: ControlProbeArmKindV1,
+    },
+    ResetObserverIsProducer {
+        arm: ControlProbeArmKindV1,
+    },
     BaseProbeEvaluation(Vec<ControlEffectIssueV1>),
 }
 
@@ -574,7 +628,9 @@ fn abs_diff(left: i64, right: i64) -> u128 {
 
 fn require_sha256(value: &str, label: &str) -> Result<(), String> {
     if !valid_sha256(value) {
-        return Err(format!("{label} must be a 64-character lowercase SHA-256 digest"));
+        return Err(format!(
+            "{label} must be a 64-character lowercase SHA-256 digest"
+        ));
     }
     Ok(())
 }
@@ -599,12 +655,11 @@ fn sha256_hex(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::realization_effect::{
-        CollateralMetricV1, ControlApplicationV1, ControlEffectDirectionV1,
-        ControlEffectMetricV1, ControlEffectProbeSpecV1,
-        ControlObservationEligibilityV1,
-    };
     use crate::realization_contract::RealizationControlV1;
+    use crate::realization_effect::{
+        CollateralMetricV1, ControlApplicationV1, ControlEffectDirectionV1, ControlEffectMetricV1,
+        ControlEffectProbeSpecV1, ControlObservationEligibilityV1,
+    };
 
     fn digest(byte: u8) -> String {
         format!("{byte:02x}").repeat(32)
@@ -631,32 +686,23 @@ mod tests {
         build_counterbalanced_order_block_v1("block-a", &digest(1), &probe_ids).unwrap()
     }
 
-    fn base_arm(kind: ControlProbeArmKindV1, observed: i64, collateral: i64, output: u8) -> ControlEffectArmReceiptV1 {
+    fn base_arm(
+        kind: ControlProbeArmKindV1,
+        observed: i64,
+        collateral: i64,
+        output: u8,
+    ) -> ControlEffectArmReceiptV1 {
         let (application, requested, accepted, effective) = match kind {
-            ControlProbeArmKindV1::Baseline => (
-                ControlApplicationV1::NoIntervention,
-                None,
-                false,
-                100_000,
-            ),
-            ControlProbeArmKindV1::Sham => (
-                ControlApplicationV1::ShamNoop,
-                None,
-                false,
-                100_000,
-            ),
-            ControlProbeArmKindV1::Active => (
-                ControlApplicationV1::Applied,
-                Some(120_000),
-                true,
-                120_000,
-            ),
-            ControlProbeArmKindV1::Reversal => (
-                ControlApplicationV1::Applied,
-                Some(100_000),
-                true,
-                100_000,
-            ),
+            ControlProbeArmKindV1::Baseline => {
+                (ControlApplicationV1::NoIntervention, None, false, 100_000)
+            }
+            ControlProbeArmKindV1::Sham => (ControlApplicationV1::ShamNoop, None, false, 100_000),
+            ControlProbeArmKindV1::Active => {
+                (ControlApplicationV1::Applied, Some(120_000), true, 120_000)
+            }
+            ControlProbeArmKindV1::Reversal => {
+                (ControlApplicationV1::Applied, Some(100_000), true, 100_000)
+            }
         };
         ControlEffectArmReceiptV1 {
             arm_id: format!("arm-{kind:?}"),
@@ -699,7 +745,8 @@ mod tests {
             (101_000, -16_200, 13),
         ];
         let mut prior: Option<(ControlProbeArmKindV1, u64, String)> = None;
-        plan.payload.arm_order
+        plan.payload
+            .arm_order
             .iter()
             .enumerate()
             .map(|(index, kind)| {
@@ -712,8 +759,8 @@ mod tests {
                 let base = base_arm(*kind, observed, collateral, output);
                 let epoch = 100 + index as u64;
                 let previous = prior.clone();
-                let transition = SessionTransitionReceiptV1::from_payload(
-                    SessionTransitionReceiptPayloadV1 {
+                let transition =
+                    SessionTransitionReceiptV1::from_payload(SessionTransitionReceiptPayloadV1 {
                         schema_version: 1,
                         session_id: base.probe_session_id.clone(),
                         from_arm: previous.as_ref().map(|value| value.0),
@@ -731,8 +778,8 @@ mod tests {
                         baseline_observation_sha256: digest(10 + index as u8),
                         baseline_observer_id: "baseline-observer".to_owned(),
                         baseline_observer_identity_sha256: digest(11),
-                    },
-                ).unwrap();
+                    })
+                    .unwrap();
                 prior = Some((*kind, epoch, base.output_artifact_sha256.clone()));
                 OrderedControlEffectArmReceiptV1 {
                     base_arm_receipt: base,
@@ -818,13 +865,18 @@ mod tests {
         arms[2].transition_receipt.payload.reset_applied = false;
         arms[2].transition_receipt.payload.reset_event_sha256 = None;
         arms[2].transition_receipt.payload.reset_observer_id = None;
-        arms[2].transition_receipt.payload.reset_observer_identity_sha256 = None;
+        arms[2]
+            .transition_receipt
+            .payload
+            .reset_observer_identity_sha256 = None;
         let payload = arms[2].transition_receipt.payload.clone();
         arms[2].transition_receipt = SessionTransitionReceiptV1::from_payload(payload).unwrap();
         let issues = evaluate_ordered_control_effect_probe_v1(&spec, &arms).unwrap_err();
-        assert!(issues.contains(&ControlEffectOrderIssueV1::ExplicitResetMissing {
-            arm: arms[2].base_arm_receipt.arm
-        }));
+        assert!(
+            issues.contains(&ControlEffectOrderIssueV1::ExplicitResetMissing {
+                arm: arms[2].base_arm_receipt.arm
+            })
+        );
     }
 
     #[test]
@@ -836,9 +888,11 @@ mod tests {
         let payload = arms[1].transition_receipt.payload.clone();
         arms[1].transition_receipt = SessionTransitionReceiptV1::from_payload(payload).unwrap();
         let issues = evaluate_ordered_control_effect_probe_v1(&spec, &arms).unwrap_err();
-        assert!(issues.contains(&ControlEffectOrderIssueV1::WashoutTooShort {
-            arm: arms[1].base_arm_receipt.arm
-        }));
+        assert!(
+            issues.contains(&ControlEffectOrderIssueV1::WashoutTooShort {
+                arm: arms[1].base_arm_receipt.arm
+            })
+        );
     }
 
     #[test]
@@ -846,7 +900,10 @@ mod tests {
         let plan = plans().into_iter().next().unwrap();
         let spec = ordered_spec(plan.clone());
         let mut arms = ordered_arms(&plan);
-        arms[3].transition_receipt.payload.pre_arm_target_value_milli = 103_000;
+        arms[3]
+            .transition_receipt
+            .payload
+            .pre_arm_target_value_milli = 103_000;
         let payload = arms[3].transition_receipt.payload.clone();
         arms[3].transition_receipt = SessionTransitionReceiptV1::from_payload(payload).unwrap();
         let issues = evaluate_ordered_control_effect_probe_v1(&spec, &arms).unwrap_err();
@@ -864,13 +921,18 @@ mod tests {
         let plan = plans().into_iter().next().unwrap();
         let spec = ordered_spec(plan.clone());
         let mut arms = ordered_arms(&plan);
-        arms[2].transition_receipt.payload.previous_output_artifact_sha256 = Some(digest(55));
+        arms[2]
+            .transition_receipt
+            .payload
+            .previous_output_artifact_sha256 = Some(digest(55));
         let payload = arms[2].transition_receipt.payload.clone();
         arms[2].transition_receipt = SessionTransitionReceiptV1::from_payload(payload).unwrap();
         let issues = evaluate_ordered_control_effect_probe_v1(&spec, &arms).unwrap_err();
-        assert!(issues.contains(&ControlEffectOrderIssueV1::PreviousOutputMismatch {
-            arm: arms[2].base_arm_receipt.arm
-        }));
+        assert!(
+            issues.contains(&ControlEffectOrderIssueV1::PreviousOutputMismatch {
+                arm: arms[2].base_arm_receipt.arm
+            })
+        );
     }
 
     #[test]
@@ -882,8 +944,10 @@ mod tests {
         let payload = arms[1].transition_receipt.payload.clone();
         arms[1].transition_receipt = SessionTransitionReceiptV1::from_payload(payload).unwrap();
         let issues = evaluate_ordered_control_effect_probe_v1(&spec, &arms).unwrap_err();
-        assert!(issues.contains(&ControlEffectOrderIssueV1::ResetObserverIsProducer {
-            arm: arms[1].base_arm_receipt.arm
-        }));
+        assert!(
+            issues.contains(&ControlEffectOrderIssueV1::ResetObserverIsProducer {
+                arm: arms[1].base_arm_receipt.arm
+            })
+        );
     }
 }
