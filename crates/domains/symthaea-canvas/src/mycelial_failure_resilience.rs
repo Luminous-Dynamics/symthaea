@@ -2820,7 +2820,7 @@ mod tests {
         let demand_pairs = demands();
 
         let degree_graph = adaptive_attack_graph();
-let degree = build_mycelial_failure_attack_plan(
+        let degree = build_mycelial_failure_attack_plan(
             &degree_graph,
             &demand_pairs,
             MycelialFailureAttackConfig {
@@ -3323,10 +3323,7 @@ let degree = build_mycelial_failure_attack_plan(
         let original_digest = first.canonical_digest_hex().unwrap();
         let mut tampered = first.clone();
         tampered.trials[0].realized_failed_segment_ids.clear();
-        assert_ne!(
-            tampered.canonical_digest_hex().unwrap(),
-            original_digest
-        );
+        assert_ne!(tampered.canonical_digest_hex().unwrap(), original_digest);
         assert!(
             tampered
                 .validate_against(&graph, &demand_pairs, &plan)
