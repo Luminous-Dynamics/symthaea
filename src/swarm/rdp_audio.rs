@@ -92,7 +92,9 @@ impl std::fmt::Display for AudioFrameDecodeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::ZeroSampleRate => write!(f, "audio frame sample rate must be non-zero"),
-            Self::ZeroSampleCount => write!(f, "audio frame must contain at least one sample frame"),
+            Self::ZeroSampleCount => {
+                write!(f, "audio frame must contain at least one sample frame")
+            },
             Self::PayloadTooLarge {
                 payload_bytes,
                 max_bytes,
@@ -249,12 +251,12 @@ pub fn encode_audio_frame(
         AudioEncoding::RawI16Stereo => 2 * std::mem::size_of::<i16>(),
         AudioEncoding::MuLawMono => std::mem::size_of::<u8>(),
     };
-    let encoded_len = sample_frames
-        .checked_mul(encoded_bytes_per_frame)
-        .ok_or(AudioFrameEncodeError::PayloadTooLarge {
+    let encoded_len = sample_frames.checked_mul(encoded_bytes_per_frame).ok_or(
+        AudioFrameEncodeError::PayloadTooLarge {
             encoded_bytes: usize::MAX,
             max_bytes: RDP_AUDIO_MAX_CHUNK_BYTES,
-        })?;
+        },
+    )?;
     if encoded_len > RDP_AUDIO_MAX_CHUNK_BYTES {
         return Err(AudioFrameEncodeError::PayloadTooLarge {
             encoded_bytes: encoded_len,
@@ -313,9 +315,7 @@ pub fn encode_audio_frame(
 /// stereo; μ-law is mono and is duplicated into stereo output. Payload length
 /// must exactly match `num_samples` and the encoding, so trailing bytes and
 /// truncated channel frames are rejected rather than silently discarded.
-pub fn decode_audio_frame(
-    frame: &AudioFrame,
-) -> Result<Vec<f32>, AudioFrameDecodeError> {
+pub fn decode_audio_frame(frame: &AudioFrame) -> Result<Vec<f32>, AudioFrameDecodeError> {
     if frame.sample_rate == 0 {
         return Err(AudioFrameDecodeError::ZeroSampleRate);
     }
@@ -446,7 +446,10 @@ mod tests {
         };
         let frame = encode_audio_frame(&chunk, 2, 10, 0.8, 0.0, 0).unwrap();
         assert_eq!(frame.num_samples, 2);
-        assert_eq!(decode_audio_frame(&frame).unwrap(), vec![0.25, 0.25, -0.25, -0.25]);
+        assert_eq!(
+            decode_audio_frame(&frame).unwrap(),
+            vec![0.25, 0.25, -0.25, -0.25]
+        );
     }
 
     #[test]
