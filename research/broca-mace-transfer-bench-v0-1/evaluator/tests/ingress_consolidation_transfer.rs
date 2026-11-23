@@ -27,11 +27,20 @@ use broca_mace_consolidation::memory_budget::{
     MemoryDoseTrialVerifierV1, MemoryDoseTrialV1, ModelBudgetSurfacingReject,
 };
 use broca_mace_consolidation::reobservation::{
-    plan_memory_representation, verify_reobservation_profile, MemoryObjectKindV1,
-    ReobservationAvailabilityV1, ReobservationPolicyV1, ReobservationProposalV1,
-    ReobservationReceiptV1, ReobservationVerifierV1, ReobservationDispositionV1,
-    MemoryAuthorityScopeV1, MemoryPurposeV1,
+    enumerate_memory_representation_options, plan_memory_representation,
+    verify_reobservation_profile, MemoryObjectKindV1, ReobservationAvailabilityV1,
+    ReobservationPolicyV1, ReobservationProposalV1, ReobservationReceiptV1,
+    ReobservationVerifierV1, ReobservationDispositionV1, MemoryAuthorityScopeV1,
+    MemoryPurposeV1,
 };
+use broca_mace_consolidation::portfolio::{
+    optimize_memory_portfolio_exact, optimize_memory_portfolio_pairwise,
+    verify_portfolio_interactions, MemoryPortfolioBudgetV1, MemoryPortfolioOptionV1,
+    PairwiseInteractionEstimateV1, PortfolioInteractionCalibrationReceiptV1,
+    PortfolioInteractionContextV1, PortfolioInteractionProposalV1,
+    PortfolioInteractionVerifierV1,
+};
+use sha2::{Digest, Sha256};
 use broca_mace_consolidation::salience::{
     future_use_prediction_evidence_digest, verify_future_use_prediction,
     FutureUsePredictionV1, MemoryAccessTelemetryV1, MemorySurfacingCandidateV1,
@@ -501,6 +510,186 @@ fn propose_and_release(
     released
 }
 
+
+fn build_portfolio_interaction_option(
+    evidence: &broca_mace_ingress::ConsolidationEvidenceRefV1,
+    target_model: &str,
+    expected_gain_micros: u32,
+) -> MemoryPortfolioOptionV1 {
+    let known = AsKnownQuery {
+        valid_at_ms: 180,
+        known_at_ms: 300,
+    };
+    let prediction = FutureUsePredictionV1::new(
+        evidence.event_id(),
+        target_model,
+        evidence.scope(),
+        295,
+        1_200,
+        10_000,
+        expected_gain_micros,
+        0,
+        "portfolio-interaction-salience",
+        "v1",
+        hex_digest(810_001),
+        hex_digest(810_002),
+        future_use_prediction_evidence_digest(evidence),
+    );
+    let verified_prediction = verify_future_use_prediction(
+        prediction,
+        evidence.scope(),
+        known,
+        &FixtureSalienceVerifier,
+    )
+    .expect("future-use forecast must be independently calibrated");
+
+    let authority = memory_authority_scope();
+    let profile_proposal = ReobservationProposalV1 {
+        event_id: evidence.event_id(),
+        evidence_sha256: future_use_prediction_evidence_digest(evidence),
+        scope: evidence.scope(),
+        authority_scope: authority.clone(),
+        as_known: known,
+        object_kind: MemoryObjectKindV1::CurrentState,
+        availability: ReobservationAvailabilityV1::Available {
+            available_at_ms: 300,
+            locator_sha256: hex_digest(820_000 + evidence.event_id()),
+        },
+        availability_success_probability_bps: 9_900,
+        reobservation_failure_penalty_micros: 20_000,
+        reobservation_latency_ms: 20,
+        reobservation_cost_micros: 5_000,
+        snapshot_context_tokens: 100,
+        snapshot_valid_until_ms: Some(1_200),
+        source_profile_sha256: hex_digest(830_000 + evidence.event_id()),
+    };
+    let verified_profile = verify_reobservation_profile(
+        profile_proposal,
+        evidence.scope(),
+        &authority,
+        known,
+        &FixtureReobservationVerifier,
+    )
+    .expect("source profile must be independently checked");
+
+    let policy = ReobservationPolicyV1 {
+        as_known: known,
+        authority_scope: authority,
+        decision_at_ms: 300,
+        decision_deadline_ms: 800,
+        context_budget_tokens: 512,
+        context_cost_per_token_micros: 100,
+        locator_context_tokens: 8,
+        latency_cost_per_ms_micros: 10,
+        maximum_reobservation_cost_micros: 20_000,
+        minimum_net_value_micros: 0,
+    };
+    let alternatives = enumerate_memory_representation_options(
+        &verified_prediction,
+        &verified_profile,
+        policy.clone(),
+    )
+    .expect("representation alternatives must be re-derived");
+    let plan = alternatives
+        .iter()
+        .find(|option| option.disposition() == ReobservationDispositionV1::StoreLocator)
+        .expect("locator representation must be available");
+
+    MemoryPortfolioOptionV1::from_verified_plan(
+        plan,
+        &verified_prediction,
+        &verified_profile,
+        &policy,
+    )
+    .expect("portfolio option must be re-derived from verified inputs")
+}
+
+fn interaction_option_set_digest(options: &[MemoryPortfolioOptionV1]) -> String {
+    let mut digests: Vec<String> = options
+        .iter()
+        .map(|option| option.option_sha256().to_owned())
+        .collect();
+    digests.sort();
+    let mut hasher = Sha256::new();
+    hasher.update(b"mace:portfolio-interaction-option-set:v1\0");
+    for field in digests {
+        hasher.update((field.len() as u64).to_be_bytes());
+        hasher.update(field.as_bytes());
+    }
+    hasher
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+struct FixturePortfolioInteractionVerifier {
+    receipt: PortfolioInteractionCalibrationReceiptV1,
+}
+
+impl PortfolioInteractionVerifierV1 for FixturePortfolioInteractionVerifier {
+    fn verify(
+        &self,
+        _proposal: &PortfolioInteractionProposalV1,
+    ) -> Option<PortfolioInteractionCalibrationReceiptV1> {
+        Some(self.receipt.clone())
+    }
+}
+
+fn fixture_interaction_calibration_receipt(
+    proposal: &PortfolioInteractionProposalV1,
+) -> PortfolioInteractionCalibrationReceiptV1 {
+    let mut receipt = PortfolioInteractionCalibrationReceiptV1 {
+        proposal_sha256: proposal.proposal_sha256.clone(),
+        target_model_sha256: proposal.target_model_sha256.clone(),
+        baseline_policy_sha256: proposal.baseline_policy_sha256.clone(),
+        task_protocol_sha256: proposal.task_protocol_sha256.clone(),
+        interaction_model_sha256: proposal.interaction_model_sha256.clone(),
+        training_dataset_sha256: proposal.training_dataset_sha256.clone(),
+        calibration_dataset_sha256: proposal.calibration_dataset_sha256.clone(),
+        heldout_evaluation_sha256: proposal.heldout_evaluation_sha256.clone(),
+        task_family_split_sha256: proposal.task_family_split_sha256.clone(),
+        source_root_split_sha256: proposal.source_root_split_sha256.clone(),
+        authority_scope_sha256: proposal.authority_scope_sha256.clone(),
+        training_pair_count: 512,
+        calibration_pair_count: 128,
+        heldout_pair_count: 128,
+        independent_seed_count: 5,
+        task_families_disjoint: true,
+        source_roots_disjoint: true,
+        calibration_mae_micros: 80,
+        base_rate_mae_micros: 120,
+        heldout_mae_micros: 85,
+        heldout_base_rate_mae_micros: 130,
+        heldout_mae_improvement_lower_95_micros: 12,
+        heldout_multi_event_sample_count: 128,
+        heldout_higher_order_residual_micros: 2_500,
+        maximum_allowed_higher_order_residual_micros: 5_000,
+        verified_at_ms: 250,
+        valid_until_ms: 500,
+        verifier_id: "fixture-only-interaction-verifier".into(),
+        receipt_sha256: String::new(),
+    };
+    receipt.receipt_sha256 = receipt.canonical_digest();
+    receipt
+}
+
+fn evaluator_hidden_portfolio_utility(selected_event_ids: &[u32]) -> i64 {
+    let singleton_value: i64 = selected_event_ids
+        .iter()
+        .map(|event_id| match event_id {
+            801 => 94_000,
+            802 | 803 => 74_000,
+            _ => panic!("hidden evaluator does not know this event"),
+        })
+        .sum();
+    if selected_event_ids.contains(&802) && selected_event_ids.contains(&803) {
+        singleton_value + 120_000
+    } else {
+        singleton_value
+    }
+}
+
 #[test]
 fn qualified_memory_dose_and_salience_compose_over_verified_session_a_evidence() {
     let events = vec![
@@ -828,3 +1017,138 @@ fn raw_session_to_governed_consolidation_to_mace_decision_then_correction() {
         .probe
         .is_some());
 }
+
+
+#[test]
+fn interaction_aware_portfolio_beats_additive_selection_on_hidden_joint_utility() {
+    let events = vec![
+        raw_event(801, Action::A, 0.91),
+        raw_event(802, Action::A, 0.89),
+        raw_event(803, Action::A, 0.90),
+    ];
+    let verifier = FixtureVerifier {
+        outcomes: BTreeMap::from([(801, 0.91), (802, 0.89), (803, 0.90)]),
+        retracted_events: BTreeSet::new(),
+        retracted_at_ms: 900,
+    };
+    let batch = ingest_batch_as_known(&events, as_known(300), &verifier)
+        .expect("raw Session-A events must pass receipt-gated ingress");
+    let pack = build_consolidation_evidence_pack(&batch, &[801, 802, 803])
+        .expect("admitted events must retain source evidence");
+    let target_model = hex_digest(840_001);
+    let gains = BTreeMap::from([(801, 100_000), (802, 80_000), (803, 80_000)]);
+    let options: Vec<_> = pack
+        .events()
+        .iter()
+        .map(|evidence| {
+            build_portfolio_interaction_option(
+                evidence,
+                &target_model,
+                *gains.get(&evidence.event_id()).unwrap(),
+            )
+        })
+        .collect();
+
+    let budget = MemoryPortfolioBudgetV1 {
+        context_tokens: 16,
+        reobservation_calls: 2,
+        latency_work_ms: 100,
+        estimated_cost_micros: 100_000,
+        expected_failure_loss_micros: 10_000,
+    };
+    let additive = optimize_memory_portfolio_exact(&options, budget)
+        .expect("additive exact baseline must produce a feasible plan");
+    let mut pairs = Vec::new();
+    for left in 0..options.len() {
+        for right in (left + 1)..options.len() {
+            let left_option = &options[left];
+            let right_option = &options[right];
+            let (left_sha, right_sha) = if left_option.option_sha256()
+                < right_option.option_sha256()
+            {
+                (
+                    left_option.option_sha256().to_owned(),
+                    right_option.option_sha256().to_owned(),
+                )
+            } else {
+                (
+                    right_option.option_sha256().to_owned(),
+                    left_option.option_sha256().to_owned(),
+                )
+            };
+            let ids = (
+                left_option.event_id().min(right_option.event_id()),
+                left_option.event_id().max(right_option.event_id()),
+            );
+            let interaction = if ids == (802, 803) { 120_000 } else { 0 };
+            pairs.push(PairwiseInteractionEstimateV1 {
+                left_option_sha256: left_sha,
+                right_option_sha256: right_sha,
+                interaction_micros: interaction,
+                absolute_error_bound_micros: 10_000,
+            });
+        }
+    }
+    pairs.sort_by(|left, right| {
+        left.left_option_sha256
+            .cmp(&right.left_option_sha256)
+            .then_with(|| left.right_option_sha256.cmp(&right.right_option_sha256))
+    });
+
+    let context = PortfolioInteractionContextV1 {
+        scope: scope(),
+        as_known: as_known(300),
+        budget,
+        target_model_sha256: target_model.clone(),
+        baseline_policy_sha256: hex_digest(840_002),
+        task_protocol_sha256: hex_digest(840_003),
+        authority_scope_sha256: options[0].authority_scope_sha256().to_owned(),
+    };
+    let mut proposal = PortfolioInteractionProposalV1 {
+        scope: context.scope,
+        as_known: context.as_known,
+        budget,
+        authority_scope_sha256: context.authority_scope_sha256.clone(),
+        target_model_sha256: context.target_model_sha256.clone(),
+        baseline_policy_sha256: context.baseline_policy_sha256.clone(),
+        task_protocol_sha256: context.task_protocol_sha256.clone(),
+        interaction_model_sha256: hex_digest(840_004),
+        option_set_sha256: interaction_option_set_digest(&options),
+        training_dataset_sha256: hex_digest(840_005),
+        calibration_dataset_sha256: hex_digest(840_006),
+        heldout_evaluation_sha256: hex_digest(840_007),
+        task_family_split_sha256: hex_digest(840_008),
+        source_root_split_sha256: hex_digest(840_009),
+        pairs,
+        proposal_sha256: String::new(),
+    };
+    proposal.proposal_sha256 = proposal.canonical_digest();
+    let receipt = fixture_interaction_calibration_receipt(&proposal);
+    let verified = verify_portfolio_interactions(
+        proposal,
+        &options,
+        &context,
+        &FixturePortfolioInteractionVerifier { receipt },
+    )
+    .expect("interaction model must pass the held-out calibration contract");
+    let pairwise = optimize_memory_portfolio_pairwise(&options, budget, &verified)
+        .expect("pairwise selector must return a bounded feasible plan");
+
+    let additive_ids: Vec<_> = additive.selected.iter().map(|item| item.event_id).collect();
+    let pairwise_ids: Vec<_> = pairwise
+        .selection
+        .selected
+        .iter()
+        .map(|item| item.event_id)
+        .collect();
+    let additive_utility = evaluator_hidden_portfolio_utility(&additive_ids);
+    let pairwise_utility = evaluator_hidden_portfolio_utility(&pairwise_ids);
+    let oracle_utility = evaluator_hidden_portfolio_utility(&[802, 803]);
+
+    assert!(additive_ids.contains(&801));
+    assert!(pairwise_ids.contains(&802) && pairwise_ids.contains(&803));
+    assert!(pairwise.is_admissible_with(&verified));
+    assert_eq!(pairwise_utility, oracle_utility);
+    assert!(pairwise_utility > additive_utility);
+}
+

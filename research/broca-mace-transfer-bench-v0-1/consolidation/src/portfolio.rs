@@ -18,6 +18,22 @@ use crate::reobservation::{
 };
 use crate::salience::VerifiedFutureUsePredictionV1;
 
+mod interaction;
+pub use interaction::{
+    optimize_memory_portfolio_pairwise,
+    optimize_memory_portfolio_pairwise_with_limit,
+    verify_portfolio_interactions,
+    InteractionAwarePortfolioPlanV1,
+    PairwiseInteractionEstimateV1,
+    PortfolioInteractionCalibrationReceiptV1,
+    PortfolioInteractionContextV1,
+    PortfolioInteractionProposalV1,
+    PortfolioInteractionReject,
+    PortfolioInteractionVerifierV1,
+    SelectedPortfolioInteractionV1,
+    VerifiedPortfolioInteractionSetV1,
+};
+
 const MAX_EVENT_GROUPS: usize = 24;
 const MAX_PORTFOLIO_FRONTIER: usize = 128;
 const DEFAULT_MAX_SEARCH_NODES: u64 = 2_000_000;
@@ -45,6 +61,7 @@ pub enum PortfolioStrategyV1 {
     ExactBounded,
     GreedyHighestNetValue,
     ParetoFrontier,
+    PairwiseInteractionAware,
 }
 
 impl PortfolioStrategyV1 {
@@ -53,6 +70,7 @@ impl PortfolioStrategyV1 {
             Self::ExactBounded => "exact_bounded",
             Self::GreedyHighestNetValue => "greedy_highest_net_value",
             Self::ParetoFrontier => "pareto_frontier",
+            Self::PairwiseInteractionAware => "pairwise_interaction_aware",
         }
     }
 }
@@ -260,6 +278,10 @@ impl MemoryPortfolioOptionV1 {
         &self.option_sha256
     }
 
+    pub fn authority_scope_sha256(&self) -> &str {
+        &self.authority_scope_sha256
+    }
+
     fn canonical_digest(&self) -> String {
         digest_fields(
             b"mace:memory-portfolio-option:v1\0",
@@ -397,7 +419,9 @@ impl MemoryPortfolioPlanV1 {
         }
         if matches!(
             self.strategy,
-            PortfolioStrategyV1::ExactBounded | PortfolioStrategyV1::ParetoFrontier
+            PortfolioStrategyV1::ExactBounded
+                | PortfolioStrategyV1::ParetoFrontier
+                | PortfolioStrategyV1::PairwiseInteractionAware
         ) && self.search_nodes == 0
         {
             return false;
