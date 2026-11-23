@@ -333,3 +333,16 @@ Add the following as separate results, not a combined score:
 Prospective target: at least 95% precision for any system-labelled invalid inference used to block acceptance; zero false acceptance of an altered theorem as the original; report local-to-global consistency with confidence intervals and per-mutation family results. These are goals, not measured Symthaea results.
 
 The executable schema and initial fixture are tracked in [#13338 — MATH-PROOF-PLAN-SCHEMA-001](https://github.com/Luminous-Dynamics/symthaea/issues/13338). The validator's structural result must remain distinct from Lean kernel, expert and human-study results.
+
+
+## 12. Paired local-to-global proof consistency experiment (2026-11-23)
+
+ProofGrid motivates a distinct local-to-global consistency question: a model may reject an invalid inference in isolation yet reuse the same inference in a complete proof. Symthaea's proposed metric is **Context-Induced Reuse Rate (CIRR)**, not ProofGrid's Epistemic Stability Index:
+
+`CIRR = locally rejected, independently invalid warrants reused in global plans / eligible locally rejected, independently invalid warrants`.
+
+The paired protocol binds both stages to the same theorem identity, exact hypothesis set, proposition identities and warrant. Global context may change order, distractors, narrative framing and plan length, but may not silently add assumptions that make the warrant valid. Scope-change cases are a separate control. CIRR is undefined for a zero denominator; report numerator, denominator, cluster-aware intervals, per-condition strata, local false acceptance, global invalid reuse, valid-warrant false rejection, and first-failure localization separately.
+
+The key intervention compares a structured immutable local verdict/evidence envelope supplied to the global planner against ordinary natural-language self-critique or no local-verdict handoff. This tests whether evidence-carrying reasoning state resists contextual regression better than conversational memory.
+
+The full protocol is [PROOF_PLAN_LOCAL_GLOBAL_CONSISTENCY_V1.md](PROOF_PLAN_LOCAL_GLOBAL_CONSISTENCY_V1.md), tracked under [#13326](https://github.com/Luminous-Dynamics/symthaea/issues/13326). No CIRR measurement has been executed; the metric and prospective thresholds are research targets only.
