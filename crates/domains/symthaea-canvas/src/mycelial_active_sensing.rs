@@ -164,7 +164,10 @@ impl fmt::Display for MycelialActiveSensingError {
                 write!(f, "invalid acquisition action or outcome model {id}")
             }
             Self::LossScaleMismatch => {
-                write!(f, "decision losses and acquisition costs use different scales")
+                write!(
+                    f,
+                    "decision losses and acquisition costs use different scales"
+                )
             }
             Self::ResourceBudgetExceeded(count) => write!(
                 f,
@@ -174,7 +177,10 @@ impl fmt::Display for MycelialActiveSensingError {
                 write!(f, "active sensing requires at least one decision option")
             }
             Self::ReportMismatch => {
-                write!(f, "active-sensing report does not match independent recomputation")
+                write!(
+                    f,
+                    "active-sensing report does not match independent recomputation"
+                )
             }
         }
     }
@@ -373,7 +379,8 @@ fn validate_actions(
         ));
     }
     let mut action_ids = BTreeSet::new();
-    let total_evaluations = decisions_evaluations(actions, posterior.hypotheses.len(), decision_count);
+    let total_evaluations =
+        decisions_evaluations(actions, posterior.hypotheses.len(), decision_count);
     if total_evaluations > MAX_MYCELIAL_ACTIVE_SENSING_EVALUATIONS {
         return Err(MycelialActiveSensingError::ResourceBudgetExceeded(
             total_evaluations,
@@ -427,9 +434,10 @@ fn validate_actions(
                 per_hypothesis_totals[index] += row.likelihood;
             }
         }
-        if per_hypothesis_totals.iter().any(|sum| {
-            !sum.is_finite() || (*sum - 1.0).abs() > NORMALIZATION_TOLERANCE
-        }) {
+        if per_hypothesis_totals
+            .iter()
+            .any(|sum| !sum.is_finite() || (*sum - 1.0).abs() > NORMALIZATION_TOLERANCE)
+        {
             return Err(MycelialActiveSensingError::InvalidAction(
                 action.action_id.clone(),
             ));
@@ -468,9 +476,7 @@ fn baseline_decision(
             .hypotheses
             .iter()
             .zip(&decision.losses_by_hypothesis)
-            .map(|(hypothesis, row)| {
-                hypothesis.posterior_probability * row.loss
-            })
+            .map(|(hypothesis, row)| hypothesis.posterior_probability * row.loss)
             .sum();
         if risk < best_risk {
             best_id = decision.decision_id.clone();
@@ -498,9 +504,7 @@ fn evaluate_action(
             .hypotheses
             .iter()
             .zip(&outcome.likelihoods_by_hypothesis)
-            .map(|(hypothesis, row)| {
-                hypothesis.posterior_probability * row.likelihood
-            })
+            .map(|(hypothesis, row)| hypothesis.posterior_probability * row.likelihood)
             .sum();
 
         let mut best_decision_id = None;
@@ -572,33 +576,20 @@ pub fn evaluate_mycelial_active_sensing(
     decisions: &[MycelialAcquisitionDecision],
     actions: &[MycelialAcquisitionAction],
 ) -> Result<MycelialActiveSensingReport, MycelialActiveSensingError> {
-    posterior
-        .validate_against(skeleton, candidates)
-        .map_err(|error: MycelialGraphHypothesisPosteriorError| {
+    posterior.validate_against(skeleton, candidates).map_err(
+        |error: MycelialGraphHypothesisPosteriorError| {
             MycelialActiveSensingError::InvalidPosterior(error.to_string())
-        })?;
-    let loss_scale_id = validate_decisions(posterior, decisions)?;
-    validate_actions(
-        posterior,
-        actions,
-        &loss_scale_id,
-        decisions.len(),
+        },
     )?;
+    let loss_scale_id = validate_decisions(posterior, decisions)?;
+    validate_actions(posterior, actions, &loss_scale_id, decisions.len())?;
 
-    let (baseline_best_decision_id, baseline_bayes_risk) =
-        baseline_decision(posterior, decisions);
+    let (baseline_best_decision_id, baseline_bayes_risk) = baseline_decision(posterior, decisions);
     let mut ordered_actions: Vec<_> = actions.iter().collect();
     ordered_actions.sort_by(|left, right| left.action_id.cmp(&right.action_id));
     let action_values: Vec<_> = ordered_actions
         .iter()
-        .map(|action| {
-            evaluate_action(
-                posterior,
-                decisions,
-                action,
-                baseline_bayes_risk,
-            )
-        })
+        .map(|action| evaluate_action(posterior, decisions, action, baseline_bayes_risk))
         .collect::<Result<_, _>>()?;
     let mut recommended_action_id: Option<String> = None;
     let mut best_net_value = 0.0_f64;
@@ -683,32 +674,56 @@ mod tests {
                 AnnotatedJunction {
                     id: "A".to_string(),
                     kind: AnnotatedJunctionKind::Origin,
-                    position: ReconstructionPoint3 { x: 0.0, y: 0.0, z: 0.0 },
+                    position: ReconstructionPoint3 {
+                        x: 0.0,
+                        y: 0.0,
+                        z: 0.0,
+                    },
                 },
                 AnnotatedJunction {
                     id: "B".to_string(),
                     kind: AnnotatedJunctionKind::Tip,
-                    position: ReconstructionPoint3 { x: 1.0, y: 0.0, z: 0.0 },
+                    position: ReconstructionPoint3 {
+                        x: 1.0,
+                        y: 0.0,
+                        z: 0.0,
+                    },
                 },
                 AnnotatedJunction {
                     id: "C".to_string(),
                     kind: AnnotatedJunctionKind::Origin,
-                    position: ReconstructionPoint3 { x: 10.0, y: 0.0, z: 0.0 },
+                    position: ReconstructionPoint3 {
+                        x: 10.0,
+                        y: 0.0,
+                        z: 0.0,
+                    },
                 },
                 AnnotatedJunction {
                     id: "D".to_string(),
                     kind: AnnotatedJunctionKind::Tip,
-                    position: ReconstructionPoint3 { x: 11.0, y: 0.0, z: 0.0 },
+                    position: ReconstructionPoint3 {
+                        x: 11.0,
+                        y: 0.0,
+                        z: 0.0,
+                    },
                 },
                 AnnotatedJunction {
                     id: "E".to_string(),
                     kind: AnnotatedJunctionKind::Origin,
-                    position: ReconstructionPoint3 { x: 20.0, y: 0.0, z: 0.0 },
+                    position: ReconstructionPoint3 {
+                        x: 20.0,
+                        y: 0.0,
+                        z: 0.0,
+                    },
                 },
                 AnnotatedJunction {
                     id: "F".to_string(),
                     kind: AnnotatedJunctionKind::Tip,
-                    position: ReconstructionPoint3 { x: 21.0, y: 0.0, z: 0.0 },
+                    position: ReconstructionPoint3 {
+                        x: 21.0,
+                        y: 0.0,
+                        z: 0.0,
+                    },
                 },
             ],
             segments: vec![
@@ -734,7 +749,12 @@ mod tests {
         }
     }
 
-    fn candidate(id: &str, source: &str, target: &str, probability: f64) -> MycelialFusionCandidate {
+    fn candidate(
+        id: &str,
+        source: &str,
+        target: &str,
+        probability: f64,
+    ) -> MycelialFusionCandidate {
         MycelialFusionCandidate {
             candidate_id: id.to_string(),
             source_tip_junction_id: source.to_string(),
@@ -754,17 +774,16 @@ mod tests {
 
     fn posterior_one_candidate(
         source: &AnnotatedMycelialSkeleton,
-    ) -> (Vec<MycelialFusionCandidate>, MycelialGraphHypothesisPosterior) {
+    ) -> (
+        Vec<MycelialFusionCandidate>,
+        MycelialGraphHypothesisPosterior,
+    ) {
         let candidates = vec![candidate("bridge", "B", "D", 0.5)];
-        let posterior =
-            evaluate_mycelial_graph_hypothesis_posterior(source, &candidates).unwrap();
+        let posterior = evaluate_mycelial_graph_hypothesis_posterior(source, &candidates).unwrap();
         (candidates, posterior)
     }
 
-    fn loss_row(
-        accepted_candidate_ids: &[String],
-        loss: f64,
-    ) -> MycelialHypothesisLoss {
+    fn loss_row(accepted_candidate_ids: &[String], loss: f64) -> MycelialHypothesisLoss {
         MycelialHypothesisLoss {
             accepted_candidate_ids: accepted_candidate_ids.to_vec(),
             loss,
@@ -781,7 +800,9 @@ mod tests {
         }
     }
 
-    fn binary_decisions(posterior: &MycelialGraphHypothesisPosterior) -> Vec<MycelialAcquisitionDecision> {
+    fn binary_decisions(
+        posterior: &MycelialGraphHypothesisPosterior,
+    ) -> Vec<MycelialAcquisitionDecision> {
         let no_fusion = &posterior.hypotheses[0].accepted_candidate_ids;
         let fusion = &posterior.hypotheses[1].accepted_candidate_ids;
         vec![
@@ -893,8 +914,7 @@ mod tests {
             candidate("one", "B", "D", 0.5),
             candidate("two", "F", "B", 0.5),
         ];
-        let posterior =
-            evaluate_mycelial_graph_hypothesis_posterior(&source, &candidates).unwrap();
+        let posterior = evaluate_mycelial_graph_hypothesis_posterior(&source, &candidates).unwrap();
         let decisions = vec![
             MycelialAcquisitionDecision {
                 decision_id: "accept-one".to_string(),
@@ -905,7 +925,10 @@ mod tests {
                     .map(|hypothesis| {
                         loss_row(
                             &hypothesis.accepted_candidate_ids,
-                            if hypothesis.accepted_candidate_ids.contains(&"one".to_string()) {
+                            if hypothesis
+                                .accepted_candidate_ids
+                                .contains(&"one".to_string())
+                            {
                                 0.0
                             } else {
                                 1.0
@@ -923,7 +946,10 @@ mod tests {
                     .map(|hypothesis| {
                         loss_row(
                             &hypothesis.accepted_candidate_ids,
-                            if hypothesis.accepted_candidate_ids.contains(&"one".to_string()) {
+                            if hypothesis
+                                .accepted_candidate_ids
+                                .contains(&"one".to_string())
+                            {
                                 1.0
                             } else {
                                 0.0
@@ -942,7 +968,10 @@ mod tests {
                     .map(|hypothesis| {
                         likelihood_row(
                             &hypothesis.accepted_candidate_ids,
-                            if hypothesis.accepted_candidate_ids.contains(&"two".to_string()) {
+                            if hypothesis
+                                .accepted_candidate_ids
+                                .contains(&"two".to_string())
+                            {
                                 0.0
                             } else {
                                 1.0
@@ -959,7 +988,10 @@ mod tests {
                     .map(|hypothesis| {
                         likelihood_row(
                             &hypothesis.accepted_candidate_ids,
-                            if hypothesis.accepted_candidate_ids.contains(&"two".to_string()) {
+                            if hypothesis
+                                .accepted_candidate_ids
+                                .contains(&"two".to_string())
+                            {
                                 1.0
                             } else {
                                 0.0
