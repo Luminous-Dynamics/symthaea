@@ -432,12 +432,7 @@ pub fn evaluate_synthetic_metrology_policy_v1(
     let mut weight_sum = 0.0;
     let mut squared_weight_sum = 0.0;
     let mut matured_label_count = 0_usize;
-    let final_horizon = episode
-        .hidden_truth
-        .iter()
-        .map(|truth| truth.label_available_step)
-        .max()
-        .unwrap_or(0);
+    let final_horizon = episode.policy_view.population_count.saturating_sub(1) as u64;
 
     for observed in &episode.policy_view.observations {
         let row = selection_by_id
@@ -714,7 +709,7 @@ mod tests {
         assert_eq!(report.measured_fraction, 0.25);
         assert!(report.horvitz_thompson_prevalence.is_finite());
         assert!(report.horvitz_thompson_absolute_error.is_finite());
-        assert_eq!(report.matured_label_count_at_horizon, 128);
+        assert_eq!(report.matured_label_count_at_horizon, 123);
     }
 
     #[test]
