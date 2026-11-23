@@ -484,11 +484,10 @@ impl AudioPerception {
                 let local_start = usize::try_from(relative_start)
                     .unwrap_or(samples.len())
                     .min(samples.len());
-                let local_end = usize::try_from(
-                    frame_source_end.saturating_sub(source_start_sample),
-                )
-                .unwrap_or(samples.len())
-                .min(samples.len());
+                let local_end =
+                    usize::try_from(frame_source_end.saturating_sub(source_start_sample))
+                        .unwrap_or(samples.len())
+                        .min(samples.len());
                 let source_frame = samples.get(local_start..local_end).unwrap_or(&[]);
                 let rms_source_pcm = if source_frame.is_empty() {
                     0.0
