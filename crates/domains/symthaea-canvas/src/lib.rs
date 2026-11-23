@@ -226,6 +226,8 @@ pub use mycelial_morphogenesis_split::{
     MycelialMorphogenesisPartition, MycelialMorphogenesisSplitError,
     MycelialMorphogenesisSplitManifest, MycelialMorphogenesisSplitUnit,
     MycelialMorphogenesisSplitUnitBasis,
+    mycelial_morphogenesis_evidence_chain_inventory_digest,
+    mycelial_morphogenesis_observation_content_inventory_digest,
 };
 pub use mycelial_network::{
     AnastomosisKind, MAX_MYCELIAL_ANASTOMOSES, MYCELIAL_NETWORK_SCHEMA_VERSION,
