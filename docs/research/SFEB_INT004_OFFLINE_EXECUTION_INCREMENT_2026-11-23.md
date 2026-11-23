@@ -16,7 +16,7 @@ INT-004 has moved from an unauthored brief to a fixture-ready public-pilot task.
 - conflict detection that blocks mutation until explicit clarification is resolved;
 - equivalent semantic outcomes for pointer and keyboard action paths.
 
-The fixture includes six golden scenarios, one pointer/keyboard metamorphic pair, and four negative controls. Event identity, sequence ownership, entity versions, actor permissions and state-machine transitions are independently represented. The event schedule has no live service, wall clock, credentials, or third-party network dependency.
+The fixture includes six golden scenarios, one pointer/keyboard metamorphic pair, and six negative controls. Event identity, sequence ownership, entity versions, actor permissions and state-machine transitions are independently represented. The event schedule has no live service, wall clock, credentials, or third-party network dependency.
 
 ## Executed preflight
 
@@ -24,7 +24,7 @@ The independent JavaScript model was executed against the fixture bytes:
 
 - Golden scenarios: **6/6**
 - Pointer/keyboard metamorphic relation: **1/1**
-- Adversarial negative controls rejected: **4/4**
+- Adversarial negative controls rejected: **6/6**
 - Event deliveries represented in golden traces: **17**
 - Fixture SHA-256: `b3c09e0a7c343c058d271e97c24f576ad64e2b52a5f8d84c354b7d570e26a703`
 
