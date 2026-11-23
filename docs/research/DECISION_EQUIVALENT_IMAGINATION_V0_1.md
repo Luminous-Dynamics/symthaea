@@ -356,3 +356,28 @@ A candidate-visible decision-stability assertion is not a cryptographic or scien
 ## Claim ceiling
 
 This specification does not establish a learned decision-equivalent representation, an adaptive compute policy, a better robot policy, physical safety, general world completeness or SOTA. A document/fixture pass establishes only the finite contract it checks. Benchmark claims require exact source/checkpoint/data/runtime pins, matched native protocols, held-out task/world clusters, full failure accounting, independently controlled evaluation and reproduced end-to-end outcomes.
+
+
+## Additional November 2026 synthesis: more inference compute can help, and search can still hurt
+
+Two results that appear contradictory are useful together:
+
+- **World-In-World (ICLR 2026 Oral)** reports that allocating more inference-time compute can substantially improve closed-loop performance in its four embodied environments. It also finds that controllability and action-observation post-training matter more than visual quality alone. https://world-in-world.github.io/ and https://proceedings.iclr.cc/paper_files/paper/2026/hash/5b4263be85820683d78675cc18d2efc7-Abstract-Conference.html
+- **MRS.Q (ICML 2026)** finds that search can reduce performance even when the predictive model is accurate. Its method addresses overestimation using the minimum over an ensemble of value functions; this is a value-aggregation method, not evidence that a collection of dynamics models is independent or physically complete. https://proceedings.mlr.press/v306/chang26a.html
+
+The implication is not "always use less compute" or "always use more compute." It is to allocate extra computation where it changes a decision, while separately controlling the optimism and distribution shift introduced by search.
+
+This suggests a useful experiment not to be collapsed into a static average budget:
+- Compare fixed compute per episode with adaptive compute per decision.
+- Hold total episode compute (and, separately, wall-clock deadline) matched.
+- Report where extra inference improves the chosen action, where it only improves prediction metrics, and where search makes realized decisions worse.
+- Compare greedy predicted-value ranking with pessimistic value-ensemble and calibrated/risk-sensitive selection.
+- Report compute allocation by task phase and decision-boundary sensitivity, not only episode-wide totals.
+
+The practical architectural principle from *World Models for Robotic Manipulation: A Survey* is to use the cheapest predictive mechanism that addresses the active bottleneck: auxiliary prediction, candidate filtering, short-horizon MPC, or a learned environment should be chosen according to the decision problem and available system budget. https://onlinelibrary.wiley.com/doi/10.1002/smb2.70053
+
+### Benchmark track addition: World-In-World
+
+Add World-In-World as a separate closed-loop visual/embodied track alongside (not pooled with) RoboDyna, LIBERO-Dynamic, RoboTwin and H2RBench. Its four task families are Active Recognition, Active Embodied QA, Image-Goal Navigation and Robotic Manipulation. Preserve its native API, planner, scene/task population, checkpoint, inference budget and metric definitions.
+
+This benchmark is particularly relevant to the adaptive-compute hypothesis because it varies world-model inference compute in closed-loop tasks. It does not replace RoboDyna's dynamic manipulation stress, LIBERO-Dynamic's contact/time/latency protocol, RoboWM-Bench's video-to-executable-action bridge, or H2RBench's sim-to-real transfer analysis.
