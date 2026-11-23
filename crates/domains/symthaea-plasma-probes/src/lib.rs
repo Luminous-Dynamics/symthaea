@@ -181,8 +181,8 @@ struct Provenance {
 impl PulseFamilyContract {
     /// Parse JSON and apply semantic checks that JSON Schema cannot express.
     pub fn parse_json(input: &str) -> Result<Self, ContractError> {
-        let contract: Self =
-            serde_json::from_str(input).map_err(|error| ContractError::JsonParse(error.to_string()))?;
+        let contract: Self = serde_json::from_str(input)
+            .map_err(|error| ContractError::JsonParse(error.to_string()))?;
         contract.validate()?;
         Ok(contract)
     }
@@ -429,13 +429,22 @@ impl PulseFamilyContract {
         update_f64(&mut hasher, self.physics_cohort.spatial_domain.maximum);
         update_f64(&mut hasher, self.physics_cohort.velocity_domain.minimum);
         update_f64(&mut hasher, self.physics_cohort.velocity_domain.maximum);
-        update_length_prefixed(&mut hasher, self.physics_cohort.velocity_domain.velocity_unit.as_bytes());
+        update_length_prefixed(
+            &mut hasher,
+            self.physics_cohort.velocity_domain.velocity_unit.as_bytes(),
+        );
         update_length_prefixed(&mut hasher, self.physics_cohort.time_unit.as_bytes());
         update_f64(&mut hasher, self.physics_cohort.maximum_time);
         update_length_prefixed(&mut hasher, self.intervention_operator.operator_id.as_bytes());
         update_length_prefixed(&mut hasher, self.intervention_operator.definition.as_bytes());
-        update_length_prefixed(&mut hasher, self.intervention_operator.amplitude_semantics.as_bytes());
-        update_length_prefixed(&mut hasher, self.intervention_operator.application_semantics.as_bytes());
+        update_length_prefixed(
+            &mut hasher,
+            self.intervention_operator.amplitude_semantics.as_bytes(),
+        );
+        update_length_prefixed(
+            &mut hasher,
+            self.intervention_operator.application_semantics.as_bytes(),
+        );
         hasher.update(&[u8::from(self.physics_cohort.spatial_domain.periodic)]);
         update_f64(&mut hasher, self.evaluation_policy.minimum_post_pulse_observation_duration);
         hasher.update(&self.admissible_controls.spatial_mode.minimum.to_le_bytes());
@@ -444,10 +453,16 @@ impl PulseFamilyContract {
         update_f64(&mut hasher, self.admissible_controls.phase_rad.maximum);
         update_f64(&mut hasher, self.admissible_controls.kick_amplitude.minimum);
         update_f64(&mut hasher, self.admissible_controls.kick_amplitude.maximum);
-        update_length_prefixed(&mut hasher, self.admissible_controls.kick_amplitude.unit.as_bytes());
+        update_length_prefixed(
+            &mut hasher,
+            self.admissible_controls.kick_amplitude.unit.as_bytes(),
+        );
         update_f64(&mut hasher, self.admissible_controls.application_time.minimum);
         update_f64(&mut hasher, self.admissible_controls.application_time.maximum);
-        update_length_prefixed(&mut hasher, self.admissible_controls.application_time.unit.as_bytes());
+        update_length_prefixed(
+            &mut hasher,
+            self.admissible_controls.application_time.unit.as_bytes(),
+        );
         update_length_prefixed(&mut hasher, self.provenance.initial_state_sha256.as_bytes());
         update_length_prefixed(&mut hasher, self.provenance.reference_solver_revision.as_bytes());
         hasher.update(&self.provenance.generator_seed.to_le_bytes());
