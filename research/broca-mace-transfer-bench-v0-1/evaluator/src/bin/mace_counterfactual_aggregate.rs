@@ -180,6 +180,26 @@ fn required_u64(record: &Value, field: &str) -> Result<u64, String> {
         .ok_or_else(|| format!("missing or invalid unsigned integer field {field}"))
 }
 
+fn nullable_u64(record: &Value, field: &str) -> Result<Option<u64>, String> {
+    match record.get(field) {
+        Some(Value::Null) => Ok(None),
+        Some(value) => value
+            .as_u64()
+            .map(Some)
+            .ok_or_else(|| format!("field {field} must be an unsigned integer or null")),
+        None => Err(format!("missing field {field}")),
+    }
+}
+
+fn nullable_sha256(record: &Value, field: &str) -> Result<Option<String>, String> {
+    match record.get(field) {
+        Some(Value::Null) => Ok(None),
+        Some(Value::String(value)) if valid_sha256(value) => Ok(Some(value.clone())),
+        Some(_) => Err(format!("field {field} must be a SHA-256 string or null")),
+        None => Err(format!("missing field {field}")),
+    }
+}
+
 fn parse_manifest(record: &Value) -> Result<(InputProvenance, String), String> {
     ensure_known_fields(
         record,
@@ -491,6 +511,8 @@ fn parse_score(record: &Value) -> Result<(TaskKey, MethodKind, Metrics), String>
             "regret_gap_vs_full_method", "decision_is_optimal", "abstained",
             "evaluation_validity", "invalidity_reason", "method", "retrieved_event_ids",
             "index_bytes", "retrieval_profile_sha256",
+            "candidate_execution_boundary", "candidate_artifact_sha256",
+            "candidate_process_startup_ns", "candidate_process_wall_ns",
         ],
         "evaluator score",
     )?;
@@ -542,6 +564,27 @@ fn parse_score(record: &Value) -> Result<(TaskKey, MethodKind, Metrics), String>
         return Err("evaluator regret values must be non-negative".to_string());
     }
     optional_sha256(record, "retrieval_profile_sha256")?;
+    let candidate_execution_boundary = required_string(record, "candidate_execution_boundary")?;
+    if !matches!(
+        candidate_execution_boundary,
+        "detached_subprocess_stream" | "legacy_in_process"
+    ) {
+        return Err("unsupported evaluator score candidate_execution_boundary".to_string());
+    }
+    let candidate_artifact_sha256 = nullable_sha256(record, "candidate_artifact_sha256")?;
+    let candidate_process_startup_ns = nullable_u64(record, "candidate_process_startup_ns")?;
+    let candidate_process_wall_ns = nullable_u64(record, "candidate_process_wall_ns")?;
+    match candidate_execution_boundary {
+        "detached_subprocess_stream"
+            if candidate_artifact_sha256.is_some()
+                && candidate_process_startup_ns.is_some()
+                && candidate_process_wall_ns.is_some() => {}
+        "legacy_in_process"
+            if candidate_artifact_sha256.is_none()
+                && candidate_process_startup_ns.is_none()
+                && candidate_process_wall_ns.is_none() => {}
+        _ => return Err("evaluator score execution-boundary metadata is inconsistent".to_string()),
+    }
     let method = required_string(record, "method")?.to_string();
     if !supported_method(&method) {
         return Err(format!("unsupported evaluator method {method}"));
@@ -772,6 +815,10 @@ struct CandidateReceipt {
     retrieved_event_ids: Vec<u32>,
     index_bytes: u64,
     retrieval_profile_sha256: Option<String>,
+    candidate_execution_boundary: String,
+    candidate_artifact_sha256: Option<String>,
+    candidate_process_startup_ns: Option<u64>,
+    candidate_process_wall_ns: Option<u64>,
 }
 
 fn expected_candidate_observation_id(
@@ -821,7 +868,9 @@ fn parse_candidate_receipt(record: &Value) -> Result<((String, String), Candidat
             "available_experience_struct_bytes", "available_known_root_count",
             "available_known_family_count", "unknown_root_event_count",
             "unknown_family_event_count", "index_bytes", "latency_ns",
-            "retrieval_profile_sha256",
+            "retrieval_profile_sha256", "candidate_execution_boundary",
+            "candidate_artifact_sha256", "candidate_process_startup_ns",
+            "candidate_process_wall_ns",
         ],
         "candidate decision receipt",
     )?;
@@ -893,6 +942,28 @@ fn parse_candidate_receipt(record: &Value) -> Result<((String, String), Candidat
     let index_bytes = required_u64(record, "index_bytes")?;
     let retrieval_profile_sha256 =
         optional_sha256(record, "retrieval_profile_sha256")?;
+    let candidate_execution_boundary =
+        required_string(record, "candidate_execution_boundary")?.to_string();
+    if !matches!(
+        candidate_execution_boundary.as_str(),
+        "detached_subprocess_stream" | "legacy_in_process"
+    ) {
+        return Err("unsupported candidate_execution_boundary".to_string());
+    }
+    let candidate_artifact_sha256 = nullable_sha256(record, "candidate_artifact_sha256")?;
+    let candidate_process_startup_ns = nullable_u64(record, "candidate_process_startup_ns")?;
+    let candidate_process_wall_ns = nullable_u64(record, "candidate_process_wall_ns")?;
+    match candidate_execution_boundary.as_str() {
+        "detached_subprocess_stream"
+            if candidate_artifact_sha256.is_some()
+                && candidate_process_startup_ns.is_some()
+                && candidate_process_wall_ns.is_some() => {}
+        "legacy_in_process"
+            if candidate_artifact_sha256.is_none()
+                && candidate_process_startup_ns.is_none()
+                && candidate_process_wall_ns.is_none() => {}
+        _ => return Err("candidate execution boundary metadata is inconsistent".to_string()),
+    }
 
     Ok((
         (pair_block_id, candidate_observation_id),
@@ -905,6 +976,10 @@ fn parse_candidate_receipt(record: &Value) -> Result<((String, String), Candidat
             retrieved_event_ids,
             index_bytes,
             retrieval_profile_sha256,
+            candidate_execution_boundary,
+            candidate_artifact_sha256,
+            candidate_process_startup_ns,
+            candidate_process_wall_ns,
         },
     ))
 }
@@ -944,6 +1019,17 @@ fn validate_score_against_candidate(
     let score_pair_block = required_string(score, "pair_block_id")?;
     if score_pair_block != pair_block_id {
         return Err("evaluator score pair_block_id differs from candidate key".to_string());
+    }
+    if required_string(score, "candidate_execution_boundary")?
+        != candidate.candidate_execution_boundary
+        || nullable_sha256(score, "candidate_artifact_sha256")?
+            != candidate.candidate_artifact_sha256
+        || nullable_u64(score, "candidate_process_startup_ns")?
+            != candidate.candidate_process_startup_ns
+        || nullable_u64(score, "candidate_process_wall_ns")?
+            != candidate.candidate_process_wall_ns
+    {
+        return Err("evaluator score candidate execution metadata differs from candidate receipt".to_string());
     }
     Ok(())
 }
