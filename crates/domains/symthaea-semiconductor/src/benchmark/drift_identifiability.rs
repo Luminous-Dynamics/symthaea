@@ -493,6 +493,10 @@ mod tests {
         action("witness-a", [0.0, 1.0, 0.0, 1.0], state, cost, 1)
     }
 
+    fn wafer_b(state: DriftActionEvidenceStateV1, cost: u64) -> DriftObservationActionV1 {
+        action("wafer-b", [1.0, 0.0, 1.0, 1.0], state, cost, 2)
+    }
+
     fn witness_b(state: DriftActionEvidenceStateV1, cost: u64) -> DriftObservationActionV1 {
         action("witness-b", [0.0, 0.0, 1.0, 1.0], state, cost, 1)
     }
@@ -706,6 +710,36 @@ mod tests {
         let report_b = plan_drift_identifiability_v1(&input(actions_b, target, 10)).unwrap();
         assert_eq!(report_a.input_sha256, report_b.input_sha256);
         assert_eq!(report_a.report_sha256, report_b.report_sha256);
+    }
+
+    #[test]
+    fn gauge_b_crossover_requires_independent_common_mode_monitor() {
+        let value = input(
+            vec![
+                wafer_b(DriftActionEvidenceStateV1::ObservedQualified, 1),
+                witness_b(DriftActionEvidenceStateV1::ObservedQualified, 1),
+                common_monitor(DriftActionEvidenceStateV1::AvailableQualified, 2),
+            ],
+            vec![
+                DriftAttributionTargetV1::ProcessShift,
+                DriftAttributionTargetV1::InstrumentBBias,
+                DriftAttributionTargetV1::SharedCommonMode,
+            ],
+            10,
+        );
+
+        let report = plan_drift_identifiability_v1(&value).unwrap();
+        assert_eq!(
+            report.plan_status,
+            DriftIdentifiabilityPlanStatusV1::DiscriminatingPlanFound
+        );
+        assert_eq!(report.selected_action_ids, vec!["common-monitor"]);
+        assert!(
+            report
+                .target_status
+                .iter()
+                .all(|target| target.identifiable_after_plan)
+        );
     }
 
     #[test]
