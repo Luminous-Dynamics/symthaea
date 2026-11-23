@@ -97,7 +97,7 @@ The referenced bundle must preserve the full event-candidate inventories, event 
 The responsibilities remain deliberately split:
 
 - Symtropy [#3690](https://github.com/Luminous-Dynamics/symtropy/pull/3690) owns correspondence-conditioned semantic draw-address projection and the Philox draw bundle.
-- Symtropy [#3755](https://github.com/Luminous-Dynamics/symtropy/pull/3755) owns independent semantic re-derivation of the complete correspondence-to-address projection, event partition coverage and Philox receipts.
+- Symtropy [#3743](https://github.com/Luminous-Dynamics/symtropy/pull/3743) owns independent semantic re-derivation of the complete correspondence-to-address projection, event partition coverage and Philox receipts.
 - Symthaea #13375 / this module requires and binds the per-arm bundle, verifier-profile and verification-receipt references, and requires an affirmative external-verification disposition. It does **not** parse the bundle, resolve Philox, choose correspondence hypotheses, authenticate the verifier receipt or prove event/source causal invariance.
 
 A missing/empty bundle reference, verifier identity or verification receipt rejects. A false semantic-verification disposition rejects. A bundle whose candidate universe or hypothesis search is incomplete must remain incomplete in the externally verified receipt and cannot be promoted to a complete causal trajectory by the DVPC reference. Event correspondence is not itself proof that the corresponding stochastic source is invariant. Hashes are commitments to bytes; semantic validity comes from independently re-running the Symtropy verifier and reviewing source evidence.
@@ -166,7 +166,7 @@ The source test suite contains positive and negative controls for these cases, p
 - #8764 owns the general open-loop/action-coupled causal replay distinction.
 - #8732 owns driver-owned clocks, per-tick delivered evidence and decision-time information views.
 - Symtropy #3387 owns scenario execution/replay; #3471/#3502 own action-conditioned actor response and its execution adapter where relevant.
-- Symtropy #3690 owns correspondence-conditioned stochastic draw-address plans and Philox bundles; #3755 independently re-derives and verifies the full projection and receipt bundle. DVPC stores only the verified bundle's digest reference.
+- Symtropy #3690 owns correspondence-conditioned stochastic draw-address plans and Philox bundles; #3743 independently re-derives and verifies the full projection and receipt bundle. DVPC stores only the verified bundle's digest reference.
 - #13281 owns four-arm regret arithmetic and the cluster adapter.
 - #13282 owns the compute×observation experiment design.
 - #8578 owns independent-cluster inference.
