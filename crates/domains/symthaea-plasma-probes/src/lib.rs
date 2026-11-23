@@ -1547,6 +1547,17 @@ pub fn validate_kird_record_value(
             ));
         }
     }
+    if is_physical {
+        let reference_digest = kird_string(value, "provenance.reference_bundle_sha256")?;
+        if !is_sha256_hex(reference_digest)
+            || reference_digest.bytes().all(|byte| byte == b'0')
+        {
+            return Err(kird_error(
+                "provenance.reference_bundle_sha256",
+                "physical measurements require a non-placeholder reference digest",
+            ));
+        }
+    }
 
     let byte_fields = [
         "storage.state_payload_bytes",
@@ -1659,7 +1670,7 @@ pub fn validate_kird_record_value(
         "distortion.macroscopic_qoi",
         "distortion.sensitivity",
     ] {
-        validate_kird_distortion_tier(value, tier)?;
+        validate_kird_distortion_tier(value, tier, is_physical)?;
     }
     validate_kird_response_tier(value)?;
 
@@ -1732,6 +1743,7 @@ pub fn validate_kird_record_value(
 fn validate_kird_distortion_tier(
     root: &serde_json::Value,
     field: &'static str,
+    is_physical: bool,
 ) -> Result<(), ContractError> {
     let status = kird_string(root, field)?;
     if !matches!(status, "PASS" | "FAIL" | "UNKNOWN" | "UNSUPPORTED") {
@@ -1761,8 +1773,13 @@ fn validate_kird_distortion_tier(
         }
         let digest_path = kird_join_field(field, "evidence_sha256");
         let digest = kird_string(root, digest_path)?;
-        if !is_sha256_hex(digest) {
-            return Err(kird_error(digest_path, "requires a lowercase SHA-256 digest"));
+        if !is_sha256_hex(digest)
+            || (is_physical && digest.bytes().all(|byte| byte == b'0'))
+        {
+            return Err(kird_error(
+                digest_path,
+                "requires a valid, non-placeholder SHA-256 digest for physical evidence",
+            ));
         }
     }
     Ok(())
@@ -1785,10 +1802,16 @@ fn validate_kird_response_tier(root: &serde_json::Value) -> Result<(), ContractE
             "distortion.intervention_response.worst_confirmed_normalized_error",
         )?;
         let evidence = kird_string(root, "distortion.intervention_response.evidence_sha256")?;
-        if normalized > 1.0 || missing != 0 || misassociated != 0 || !is_sha256_hex(evidence) {
+        if normalized > 1.0
+            || missing != 0
+            || misassociated != 0
+            || !is_sha256_hex(evidence)
+            || (kird_string(root, "record_status")? == "physical_measurement"
+                && evidence.bytes().all(|byte| byte == b'0'))
+        {
             return Err(kird_error(
                 "distortion.intervention_response",
-                "PASS requires error <= 1, zero missing/misassociated branches and evidence digest",
+                "PASS requires error <= 1, zero missing/misassociated branches and non-placeholder evidence",
             ));
         }
     }
@@ -1825,10 +1848,10 @@ fn kird_join_field(parent: &'static str, child: &'static str) -> &'static str {
     }
 }
 
-fn kird_value<'a>(
-    root: &'a serde_json::Value,
+fn kird_value(
+    root: &serde_json::Value,
     field: &'static str,
-) -> Result<&'a serde_json::Value, ContractError> {
+) -> Result<&serde_json::Value, ContractError> {
     let mut current = root;
     for segment in field.split('.') {
         current = current
@@ -1838,10 +1861,10 @@ fn kird_value<'a>(
     Ok(current)
 }
 
-fn kird_string<'a>(
-    root: &'a serde_json::Value,
+fn kird_string(
+    root: &serde_json::Value,
     field: &'static str,
-) -> Result<&'a str, ContractError> {
+) -> Result<&str, ContractError> {
     kird_value(root, field)?
         .as_str()
         .ok_or_else(|| kird_error(field, "must be a string"))
@@ -1889,10 +1912,10 @@ fn kird_optional_number(
     Ok(Some(number))
 }
 
-fn kird_array<'a>(
-    root: &'a serde_json::Value,
+fn kird_array(
+    root: &serde_json::Value,
     field: &'static str,
-) -> Result<&'a [serde_json::Value], ContractError> {
+) -> Result<&[serde_json::Value], ContractError> {
     kird_value(root, field)?
         .as_array()
         .map(Vec::as_slice)
