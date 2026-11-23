@@ -376,6 +376,52 @@
         "Imaging plane, scale and calibration metadata",
         "Author permission for full raw image series if requested"
       ]
+    },
+    {
+      "dataset_id": "agaricus_cordogenesis_2026",
+      "title": "The mycelial network organization adapts to facilitate new substrate colonization and fruiting in Agaricus bisporus",
+      "publication_doi": "https://doi.org/10.1016/j.funbio.2026.101799",
+      "artifact_urls": [
+        "https://figshare.com/s/b241753378d5252ff808"
+      ],
+      "access_status": "public_source_data",
+      "data_rights": {
+        "status": "per_artifact_review_required",
+        "license_label": "Article: CC BY (Utrecht University research portal)",
+        "notes": "The article is listed as CC BY by the Utrecht University research portal. Confirm the raw Figshare record's own license, file-level terms and any third-party image/metadata rights before reuse or redistribution."
+      },
+      "ingestion_status": "metadata_only_not_ingested",
+      "published_sample_summary": "Longitudinal imaging of Agaricus bisporus vegetative colonization and fructification. Optical grayscale intensity is used as a proxy for substrate colonization density; cord abundance is quantified by surface area, with cord widening observed during mushroom development. Directional extension into newly encountered substrate and cord formation in new and pre-existing regions are reported.",
+      "benchmark_tasks": [
+        "longitudinal mycelial-density proxy",
+        "cord-area fraction and abundance",
+        "cord-width distribution and widening events",
+        "directional growth into new substrate",
+        "demand-responsive morphogenesis forecasting",
+        "cross-validation against independent isotope source-to-sink outcomes"
+      ],
+      "independent_unit": "Recover the biological replicate, cultivation box, substrate region and imaging-series mapping from the raw data and methods before splitting; do not treat frames or image crops as independent units.",
+      "split_requirements": [
+        "Keep every image/timepoint/region from one biological replicate and cultivation box together unless the published design defines a different independent randomization unit.",
+        "Do not split repeated scans, crops or multiple substrate regions from the same cultivation unit across train/test.",
+        "Use held-out cultivation replicate and, separately, held-out substrate/demand condition for transfer evaluation.",
+        "Keep isotope transfer outcomes from the companion study as a separate outcome family and match replicate identity only where the experimental design supports it."
+      ],
+      "known_limitations": [
+        "Grayscale intensity is a colonization proxy, not a direct measurement of fungal biomass.",
+        "Cord area and width are structural measurements, not direct conductance or flux observations.",
+        "The reported association between demand/development and cord formation does not establish a causal effect.",
+        "Raw Figshare artifact rights and replicate mapping must be verified before ingestion."
+      ],
+      "source_manifest_requirements": [
+        "Figshare record/version and per-file content digests",
+        "File-level license and rights verification",
+        "Cultivation unit/replicate and substrate-region map",
+        "Image acquisition timepoint and stage labels",
+        "Spatial calibration, scale and coordinate transforms",
+        "Analysis code/version and cord segmentation/area/width methods",
+        "Missing, censored and unavailable image regions"
+      ]
     }
   ]
 }
