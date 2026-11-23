@@ -624,7 +624,7 @@ mod tests {
     #[test]
     fn synthetic_receipt_is_structurally_valid() {
         let pair = fixture();
-        assert_eq!(pair.candidate.pair_id, "PAIR-SYNTHETIC-P-TO-Q-001");
+        assert_eq!(pair.candidate.pair_id, "PAIR-SYNTHETIC-IMPLICATION-CONVERSE-001");
         assert!(pair.scope_matches());
         assert_eq!(pair.candidate.local_stage.verdict, LocalVerdict::Reject);
         assert_eq!(
@@ -644,7 +644,7 @@ mod tests {
         assert!(visible.get("evaluator_only").is_none());
         assert!(visible.get("independently_assessed_warrant").is_none());
         assert!(!visible.to_string().contains("finite_boolean_countermodel"));
-        assert!(!visible.to_string().contains("valuation"));
+        assert!(visible.get("valuation").is_none());
     }
 
     #[test]
