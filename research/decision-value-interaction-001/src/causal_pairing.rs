@@ -378,9 +378,11 @@ fn validate_steps(receipt: &CausalTrajectoryReceipt) -> Result<(), CausalPairing
         if index == 0 && step.pre_state_sha256 != receipt.identity.paired.initial_state_sha256 {
             return Err(CausalPairingError::InitialStateMismatch { arm: receipt.arm });
         }
-        expected_tick = expected_tick
-            .checked_add(1)
-            .ok_or(CausalPairingError::TickOverflow { arm: receipt.arm })?;
+        if index + 1 < receipt.steps.len() {
+            expected_tick = expected_tick
+                .checked_add(1)
+                .ok_or(CausalPairingError::TickOverflow { arm: receipt.arm })?;
+        }
     }
     Ok(())
 }
@@ -475,17 +477,14 @@ pub fn validate_causal_pairing(
         [u8; 32],
     > = BTreeMap::new();
 
-    let baseline_steps: BTreeMap<u64, &TrajectoryStepCommitment> = baseline
-        .steps
-        .iter()
-        .map(|step| (step.world_tick, step))
-        .collect();
+    let mut exogenous_by_tick: BTreeMap<u64, [u8; 32]> = BTreeMap::new();
 
     for receipt in &ordered {
         for step in &receipt.steps {
-            let baseline_step = baseline_steps.get(&step.world_tick).copied();
-            if let Some(reference) = baseline_step {
-                if step.exogenous_input_sha256 != reference.exogenous_input_sha256 {
+            if let Some(reference) =
+                exogenous_by_tick.insert(step.world_tick, step.exogenous_input_sha256)
+            {
+                if reference != step.exogenous_input_sha256 {
                     return Err(CausalPairingError::ExogenousInputMismatch {
                         world_tick: step.world_tick,
                     });
