@@ -54,7 +54,7 @@ fn fixture_graph() -> MycelialJunctionHyphaGraph {
         schema_version: MYCELIAL_JUNCTION_GRAPH_SCHEMA_VERSION,
         source_model_version: MYCELIAL_MODEL_VERSION,
         length_unit: JunctionLengthUnit::OrganismLocalModelUnit,
-        source_model_digest: "a".repeat(64),
+        source_geometry_digest: "a".repeat(64),
         source_filament_ids: vec![1, 2, 3],
         maximum_junction_gap_model_units: 0.0,
         junctions: vec![
