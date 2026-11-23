@@ -264,3 +264,159 @@ fn main() {
         }
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn fixture_root(label: &str) -> PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let root = env::temp_dir().join(format!(
+            "mace-lmev2-sidecar-{label}-{}-{nonce}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&root).expect("fixture root");
+        root
+    }
+
+    fn fixture_config(root: PathBuf) -> Config {
+        Config {
+            domain: "web".to_owned(),
+            dataset_root: root,
+            top_k: 4,
+            slice_radius: 0,
+            neighbor_radius: 0,
+            profile: Bm25ProfileV1 {
+                k1: 1.2,
+                b: 0.75,
+                tokenizer_version: "unicode_alphanumeric_v1",
+            },
+        }
+    }
+
+    fn fixture_trajectory(root: &Path, image_bytes: &[u8]) -> Value {
+        let trajectory_dir = root.join("trajectory-1");
+        fs::create_dir_all(&trajectory_dir).expect("trajectory fixture directory");
+        fs::write(trajectory_dir.join("state.png"), image_bytes).expect("image fixture");
+        json!({
+            "id": "trajectory-1",
+            "domain": "web",
+            "goal": "Create an order for Ada",
+            "start_url": "https://shop.example/",
+            "outcome": "success",
+            "states": [{
+                "url": "https://shop.example/orders/42",
+                "action": "submit order",
+                "thoughts": "Order submitted",
+                "accessibility_tree": "Order details. Customer Ada. Status pending.",
+                "screenshot": "trajectory-1/state.png",
+                "state_index": 42,
+                "step": 1,
+                "mace_screenshot_sha256": sha256_hex(image_bytes)
+            }]
+        })
+    }
+
+    #[test]
+    fn official_memory_api_request_returns_text_and_verified_image_context_items() {
+        let root = fixture_root("context");
+        let image_bytes = b"verified screenshot bytes";
+        let trajectory = fixture_trajectory(&root, image_bytes);
+        let expected_image = fs::canonicalize(root.join("trajectory-1/state.png"))
+            .expect("canonical fixture image");
+        let config = fixture_config(root.clone());
+        let mut trajectories = Vec::new();
+        let mut index = None;
+
+        let inserted = handle_request(
+            json!({"op": "insert", "trajectory": trajectory}),
+            &config,
+            &mut trajectories,
+            &mut index,
+        ).expect("insert");
+        assert_eq!(inserted["ok"], true);
+        assert_eq!(inserted["inserted"], 1);
+
+        let response = handle_request(
+            json!({
+                "op": "query",
+                "query": "customer Ada pending order",
+                "query_image": "/private/query-image.png"
+            }),
+            &config,
+            &mut trajectories,
+            &mut index,
+        ).expect("query");
+        assert_eq!(response["ok"], true);
+        assert_eq!(response["query_image_used"], false);
+        assert_eq!(response["retrieval_mode"], "text_bm25_with_original_image_evidence");
+        let items = response["items"].as_array().expect("context items");
+        assert!(items.iter().any(|item| {
+            item["type"] == "text" && item["value"].as_str()
+                .is_some_and(|value| value.contains("Customer Ada"))
+        }));
+        assert!(items.iter().any(|item| {
+            item["type"] == "image" && item["value"].as_str()
+                == expected_image.to_str()
+        }));
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn duplicate_insert_is_rejected_before_reindexing() {
+        let root = fixture_root("duplicate");
+        let trajectory = fixture_trajectory(&root, b"image bytes");
+        let config = fixture_config(root.clone());
+        let mut trajectories = Vec::new();
+        let mut index = None;
+
+        handle_request(
+            json!({"op": "insert", "trajectory": trajectory.clone()}),
+            &config,
+            &mut trajectories,
+            &mut index,
+        ).expect("first insert");
+        let result = handle_request(
+            json!({"op": "insert", "trajectory": trajectory}),
+            &config,
+            &mut trajectories,
+            &mut index,
+        );
+        assert!(result.is_err());
+        assert_eq!(trajectories.len(), 1);
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn screenshot_byte_replacement_fails_before_image_context_is_returned() {
+        let root = fixture_root("digest-mismatch");
+        let trajectory = fixture_trajectory(&root, b"original bytes");
+        let config = fixture_config(root.clone());
+        let image_path = root.join("trajectory-1/state.png");
+        let mut trajectories = Vec::new();
+        let mut index = None;
+
+        handle_request(
+            json!({"op": "insert", "trajectory": trajectory}),
+            &config,
+            &mut trajectories,
+            &mut index,
+        ).expect("insert");
+        fs::write(&image_path, b"replaced bytes").expect("tamper image bytes");
+
+        let result = handle_request(
+            json!({"op": "query", "query": "customer Ada pending order"}),
+            &config,
+            &mut trajectories,
+            &mut index,
+        );
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("ScreenshotDigestMismatch"));
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+}
