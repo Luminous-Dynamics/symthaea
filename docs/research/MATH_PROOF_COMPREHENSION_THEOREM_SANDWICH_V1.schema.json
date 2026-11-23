@@ -50,7 +50,8 @@
         "model_version",
         "statement_text",
         "statement_formula",
-        "visible_assumptions"
+        "visible_assumptions",
+        "statement_context"
       ],
       "properties": {
         "task_id": {
@@ -90,6 +91,12 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/nonEmpty"
+          }
+        },
+        "statement_context": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/booleanFormula"
           }
         }
       }
@@ -134,7 +141,11 @@
         "stronger_obligations",
         "corollary_obligations",
         "adjudication_authority",
-        "adjudication_refs"
+        "adjudication_refs",
+        "target_statement_context",
+        "translation_assessment",
+        "translation_assessor",
+        "translation_review_refs"
       ],
       "properties": {
         "target_statement_formula": {
@@ -158,6 +169,32 @@
           "$ref": "#/$defs/nonEmpty"
         },
         "adjudication_refs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/nonEmpty"
+          }
+        },
+        "target_statement_context": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/booleanFormula"
+          }
+        },
+        "translation_assessment": {
+          "enum": [
+            "aligned",
+            "partially_aligned",
+            "misaligned",
+            "unknown",
+            "not_reviewed"
+          ]
+        },
+        "translation_assessor": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "translation_review_refs": {
           "type": "array",
           "minItems": 1,
           "uniqueItems": true,

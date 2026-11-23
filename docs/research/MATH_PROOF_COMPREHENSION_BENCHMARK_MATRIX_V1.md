@@ -107,3 +107,10 @@ For human studies, compare raw proof, strongest baseline explanation, structured
 ## Claim boundary
 
 The current extracted Mathlib seed contains four theorems and demonstrates deterministic, source-pinned extraction and merged-closure reconciliation. It does not establish that edges are mathematically essential, plans are expert-correct, models perform well, CIRR is low, or humans learn more. Those claims require the later benchmark tiers.
+
+### Context-aware formalization and translation validity
+
+The theorem-sandwich evaluator treats theorem statements as sequents \`Γ ⊢ P\`, not only as propositions \`P\`. Formal assumptions are a typed AST list and are conjoined into the sequent semantics; free-text assumption descriptions do not participate in entailment. A separate evaluator-only translation-alignment receipt prevents a formally valid but semantically mis-translated AST from being counted as a statement match. Misalignment becomes \`incomparable_or_translation_mismatch\`; partial, unknown or unreviewed translation remains \`unknown\`.
+
+This is still only a bounded propositional control. Lean's dependent binder contexts, typeclass parameters, universe parameters, implicit arguments and non-propositional structures require elaborated Lean-level comparison and independent review.
+

@@ -37,6 +37,9 @@ pub struct CandidateStatementV1 {
     pub model_version: String,
     pub statement_text: String,
     pub statement_formula: BooleanFormula,
+    /// Formal assumptions in the sequent Γ ⊢ statement_formula.
+    pub statement_context: Vec<BooleanFormula>,
+    /// Human-readable context description only; not used as the logical context.
     pub visible_assumptions: Vec<String>,
 }
 
@@ -44,10 +47,25 @@ pub struct CandidateStatementV1 {
 #[serde(deny_unknown_fields)]
 pub struct EvaluatorOnlyV1 {
     pub target_statement_formula: BooleanFormula,
+    /// Hidden formal assumptions for the target sequent Γ* ⊢ P*.
+    pub target_statement_context: Vec<BooleanFormula>,
     pub stronger_obligations: Vec<StrongerObligationV1>,
     pub corollary_obligations: Vec<CorollaryObligationV1>,
+    pub translation_assessment: TranslationAssessment,
+    pub translation_assessor: String,
+    pub translation_review_refs: Vec<String>,
     pub adjudication_authority: String,
     pub adjudication_refs: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum TranslationAssessment {
+    Aligned,
+    PartiallyAligned,
+    Misaligned,
+    Unknown,
+    NotReviewed,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -128,6 +146,9 @@ pub struct TheoremSandwichReportV1 {
     pub lower_obligations: Vec<ObligationResult>,
     pub classification: SandwichClassification,
     pub claim_ceiling: String,
+    pub candidate_context_assumption_count: usize,
+    pub target_context_assumption_count: usize,
+    pub translation_assessment: TranslationAssessment,
 }
 
 impl TheoremSandwichReceiptV1 {
@@ -168,6 +189,36 @@ fn validate_formula(formula: &BooleanFormula, label: &str, errors: &mut Vec<Stri
     }
 }
 
+
+/// Interpret a formal theorem statement as a sequent Γ ⊢ P, whose classical
+/// propositional meaning is (∧ Γ) → P. Human-readable assumption strings are
+/// deliberately not parsed or trusted as logical premises.
+fn sequent_formula(context: &[BooleanFormula], conclusion: &BooleanFormula) -> BooleanFormula {
+    let Some(first) = context.first() else {
+        return conclusion.clone();
+    };
+
+    let antecedent = context
+        .iter()
+        .skip(1)
+        .cloned()
+        .fold(first.clone(), |left, right| BooleanFormula::And {
+            left: Box::new(left),
+            right: Box::new(right),
+        });
+
+    BooleanFormula::Implies {
+        left: Box::new(antecedent),
+        right: Box::new(conclusion.clone()),
+    }
+}
+
+fn validate_context(context: &[BooleanFormula], label: &str, errors: &mut Vec<String>) {
+    for (index, formula) in context.iter().enumerate() {
+        validate_formula(formula, &format!("{label}[{index}]"), errors);
+    }
+}
+
 pub fn validate_receipt(receipt: &TheoremSandwichReceiptV1) -> Vec<String> {
     let mut errors = Vec::new();
     if receipt.schema_version != "1.0.0" {
@@ -201,6 +252,11 @@ pub fn validate_receipt(receipt: &TheoremSandwichReceiptV1) -> Vec<String> {
     validate_formula(
         &candidate.statement_formula,
         "candidate.statement_formula",
+        &mut errors,
+    );
+    validate_context(
+        &candidate.statement_context,
+        "candidate.statement_context",
         &mut errors,
     );
 
@@ -266,6 +322,30 @@ pub fn validate_receipt(receipt: &TheoremSandwichReceiptV1) -> Vec<String> {
             "evaluator target statement",
             &mut errors,
         );
+        validate_context(
+            &evaluator.target_statement_context,
+            "evaluator target_statement_context",
+            &mut errors,
+        );
+        if !non_empty(&evaluator.translation_assessor) {
+            errors.push("evaluator_only.translation_assessor must be non-empty".to_owned());
+        }
+        if evaluator.translation_review_refs.is_empty()
+            || evaluator.translation_review_refs.iter().any(|value| !non_empty(value))
+        {
+            errors.push(
+                "evaluator_only.translation_review_refs must contain non-empty references"
+                    .to_owned(),
+            );
+        }
+        let mut translation_refs = HashSet::new();
+        if evaluator
+            .translation_review_refs
+            .iter()
+            .any(|value| !translation_refs.insert(value))
+        {
+            errors.push("evaluator_only.translation_review_refs must be unique".to_owned());
+        }
     }
     errors
 }
@@ -345,6 +425,15 @@ pub fn evaluate_receipt(
         ]);
     };
 
+    let target_sequent = sequent_formula(
+        &evaluator.target_statement_context,
+        &evaluator.target_statement_formula,
+    );
+    let candidate_sequent = sequent_formula(
+        &receipt.candidate.statement_context,
+        &receipt.candidate.statement_formula,
+    );
+
     let mut evaluator_controls = Vec::new();
     for item in &evaluator.stronger_obligations {
         evaluator_controls.push(
@@ -352,7 +441,7 @@ pub fn evaluate_receipt(
                 &format!("CONTROL-{}", item.id),
                 ObligationDirection::StrongerImpliesTarget,
                 std::slice::from_ref(&item.stronger_formula),
-                &evaluator.target_statement_formula,
+                &target_sequent,
             )
             .map_err(|error| vec![format!("evaluator stronger control {}: {error}", item.id)])?,
         );
@@ -362,7 +451,7 @@ pub fn evaluate_receipt(
             evaluate_obligation(
                 &format!("CONTROL-{}", item.id),
                 ObligationDirection::TargetImpliesCorollary,
-                std::slice::from_ref(&evaluator.target_statement_formula),
+                std::slice::from_ref(&target_sequent),
                 &item.corollary_formula,
             )
             .map_err(|error| vec![format!("evaluator corollary control {}: {error}", item.id)])?,
@@ -376,7 +465,7 @@ pub fn evaluate_receipt(
                 &item.id,
                 ObligationDirection::StrongerImpliesCandidate,
                 std::slice::from_ref(&item.stronger_formula),
-                &receipt.candidate.statement_formula,
+                &candidate_sequent,
             )
             .map_err(|error| vec![format!("upper obligation {}: {error}", item.id)])?,
         );
@@ -388,7 +477,7 @@ pub fn evaluate_receipt(
             evaluate_obligation(
                 &item.id,
                 ObligationDirection::CandidateImpliesCorollary,
-                std::slice::from_ref(&receipt.candidate.statement_formula),
+                std::slice::from_ref(&candidate_sequent),
                 &item.corollary_formula,
             )
             .map_err(|error| vec![format!("lower obligation {}: {error}", item.id)])?,
@@ -397,7 +486,13 @@ pub fn evaluate_receipt(
 
     let classification = if any_fail(&evaluator_controls) {
         SandwichClassification::InvalidEvaluatorControls
-    } else if any_unknown(&evaluator_controls) || any_unknown(&upper) || any_unknown(&lower) {
+    } else if evaluator.translation_assessment == TranslationAssessment::Misaligned {
+        SandwichClassification::IncomparableOrTranslationMismatch
+    } else if evaluator.translation_assessment != TranslationAssessment::Aligned
+        || any_unknown(&evaluator_controls)
+        || any_unknown(&upper)
+        || any_unknown(&lower)
+    {
         SandwichClassification::Unknown
     } else {
         match (
@@ -420,8 +515,11 @@ pub fn evaluate_receipt(
         lower_obligations: lower,
         classification,
         claim_ceiling:
-            "finite_propositional_selected_controls_only_not_full_equivalence_or_lean_kernel_proof"
+            "finite_propositional_context_indexed_selected_controls_only_translation_reviewed_not_full_equivalence_or_lean_kernel_proof"
                 .to_owned(),
+        candidate_context_assumption_count: receipt.candidate.statement_context.len(),
+        target_context_assumption_count: evaluator.target_statement_context.len(),
+        translation_assessment: evaluator.translation_assessment,
     })
 }
 
@@ -578,6 +676,98 @@ mod tests {
             validate_receipt(&receipt)
                 .iter()
                 .any(|error| { error.contains("invalid or duplicate stronger obligation ID") })
+        );
+    }
+
+    #[test]
+    fn moving_a_hypothesis_between_context_and_implication_preserves_sequent_meaning() {
+        let mut receipt = fixture();
+        receipt.candidate.statement_formula = atom("q");
+        receipt.candidate.statement_context = vec![atom("p")];
+        let report = evaluate_receipt(&receipt).expect("well-formed candidate sequent");
+        assert_eq!(
+            report.classification,
+            SandwichClassification::ConsistentWithSelectedControls
+        );
+        assert_eq!(report.candidate_context_assumption_count, 1);
+        assert_eq!(report.target_context_assumption_count, 0);
+    }
+
+    #[test]
+    fn adding_an_extra_candidate_assumption_can_make_a_statement_too_weak() {
+        let mut receipt = fixture();
+        receipt.candidate.statement_context = vec![atom("r")];
+        let report = evaluate_receipt(&receipt).expect("well-formed candidate sequent");
+        assert_eq!(
+            report.classification,
+            SandwichClassification::CandidateMayBeTooWeak
+        );
+        assert!(any_fail(&report.lower_obligations));
+    }
+
+    #[test]
+    fn removing_a_required_context_assumption_can_make_a_statement_too_strong() {
+        let mut receipt = fixture();
+        let evaluator = receipt.evaluator_only.as_mut().unwrap();
+        evaluator.target_statement_formula = atom("q");
+        evaluator.target_statement_context = vec![atom("p")];
+        evaluator.stronger_obligations[0].stronger_formula = implies(atom("p"), atom("q"));
+        evaluator.corollary_obligations[0].corollary_formula =
+            implies(and(atom("p"), atom("r")), atom("q"));
+        evaluator.corollary_obligations[1].corollary_formula =
+            implies(and(atom("p"), BooleanFormula::Not { arg: Box::new(atom("r")) }), atom("q"));
+        receipt.candidate.statement_formula = atom("q");
+        receipt.candidate.statement_context.clear();
+
+        let report = evaluate_receipt(&receipt).expect("well-formed context mutation");
+        assert_eq!(
+            report.classification,
+            SandwichClassification::CandidateMayBeTooStrong
+        );
+        assert!(any_fail(&report.upper_obligations));
+    }
+
+    #[test]
+    fn a_misaligned_text_to_formula_translation_blocks_semantic_acceptance() {
+        let mut receipt = fixture();
+        receipt
+            .evaluator_only
+            .as_mut()
+            .unwrap()
+            .translation_assessment = TranslationAssessment::Misaligned;
+        let report = evaluate_receipt(&receipt).expect("valid but misaligned candidate receipt");
+        assert_eq!(
+            report.classification,
+            SandwichClassification::IncomparableOrTranslationMismatch
+        );
+    }
+
+    #[test]
+    fn partial_or_unreviewed_translation_is_unknown_not_a_pass() {
+        for status in [
+            TranslationAssessment::PartiallyAligned,
+            TranslationAssessment::Unknown,
+            TranslationAssessment::NotReviewed,
+        ] {
+            let mut receipt = fixture();
+            receipt
+                .evaluator_only
+                .as_mut()
+                .unwrap()
+                .translation_assessment = status;
+            let report = evaluate_receipt(&receipt).expect("valid unresolved translation receipt");
+            assert_eq!(report.classification, SandwichClassification::Unknown);
+        }
+    }
+
+    #[test]
+    fn malformed_candidate_context_formula_is_rejected() {
+        let mut receipt = fixture();
+        receipt.candidate.statement_context = vec![atom("  ")];
+        assert!(
+            validate_receipt(&receipt)
+                .iter()
+                .any(|error| error.contains("candidate.statement_context[0]"))
         );
     }
 

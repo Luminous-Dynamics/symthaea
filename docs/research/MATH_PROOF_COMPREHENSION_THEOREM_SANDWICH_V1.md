@@ -28,3 +28,32 @@ The target statement is p implies q. The hidden stronger control is (p implies q
     cargo run --manifest-path scripts/research/proof-plan-contract/Cargo.toml --bin theorem-sandwich -- docs/research/MATH_PROOF_COMPREHENSION_THEOREM_SANDWICH_V1.json
 
 Successful execution establishes structural validity and finite truth-table outcomes for the synthetic Boolean fixture only. It does not establish model accuracy, general mathematical semantics, LPBench performance, theorem equivalence, or human comprehension.
+
+## Context-indexed theorem semantics and translation review
+
+The theorem-sandwich contract now compares **sequents**, not isolated propositions. A candidate statement is represented as:
+
+\`Γ ⊢ P\`
+
+where \`statement_context\` is the formal list of assumptions and \`statement_formula\` is the conclusion. The finite propositional evaluator gives this sequent the meaning \`(∧ Γ) → P\`. The hidden target has its own \`target_statement_context\`; it is not inferred from the candidate's free-text assumption descriptions.
+
+This prevents two common formalization errors from disappearing into metadata:
+- dropping a required assumption can make the candidate proposition too strong;
+- adding an unnecessary assumption can make the candidate theorem too weak.
+
+The free-text \`visible_assumptions\` field is explanatory metadata only. It is not used as a logical premise. Each assumption that should affect theorem meaning must appear in the formal context AST.
+
+### Translation review is a separate gate
+
+A machine can check the supplied Boolean AST exactly and still evaluate the wrong translation of the natural-language statement. The evaluator-only partition now records \`translation_assessment\`, \`translation_assessor\` and \`translation_review_refs\`.
+
+- \`aligned\`: eligible for selected-control classification, subject to all other checks.
+- \`misaligned\`: classification is \`incomparable_or_translation_mismatch\`, never accepted as a semantic match.
+- \`partially_aligned\`, \`unknown\`, or \`not_reviewed\`: classification is \`unknown\`, not a pass.
+
+The translation assessment must be held out of the candidate-visible projection. The synthetic fixture stipulates an exact text/formula pairing only to test the contract; it is not independent mathematical review or model evaluation.
+
+### New adversarial controls
+
+Six tests cover moving an assumption between context and implication, adding an extra assumption, removing a required assumption, explicit text/formula mismatch, unreviewed translation abstention, and malformed context formulas. These demonstrate the new scope semantics on finite propositional examples only.
+

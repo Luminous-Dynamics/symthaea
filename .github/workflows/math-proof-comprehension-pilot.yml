@@ -90,6 +90,12 @@ jobs:
             jq -e . "$file" >/dev/null
           done
 
+          jq -e '.candidate.statement_context == []
+            and .evaluator_only.target_statement_context == []
+            and .evaluator_only.translation_assessment == "aligned"
+            and (.evaluator_only.translation_review_refs | length) > 0' \
+            docs/research/MATH_PROOF_COMPREHENSION_THEOREM_SANDWICH_V1.json >/dev/null
+
           jq -e '.task_count == (.tasks | length) and .task_count == 6 and .status == "source_pinned_seed_not_gold"' \
             docs/research/MATH_PROOF_COMPREHENSION_PILOT_V1.json >/dev/null
 
