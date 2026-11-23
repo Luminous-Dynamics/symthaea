@@ -949,8 +949,8 @@ pub fn evaluate_synthetic_metrology_policy_v1(
     let escaped_defect_count = true_positive_count.saturating_sub(selected_positive_count);
     let defect_capture_fraction = (true_positive_count > 0)
         .then(|| selected_positive_count as f64 / true_positive_count as f64);
-    let escaped_defect_fraction = (true_positive_count > 0)
-        .then(|| escaped_defect_count as f64 / true_positive_count as f64);
+    let escaped_defect_fraction =
+        (true_positive_count > 0).then(|| escaped_defect_count as f64 / true_positive_count as f64);
     let cost_per_defect_captured = (selected_positive_count > 0)
         .then(|| selection.total_selected_cost as f64 / selected_positive_count as f64);
     let true_defect_prevalence = true_positive_count as f64 / population_count as f64;
