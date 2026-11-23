@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mace_raw_session_v0_1.schema.json",
+  "title": "MACE raw session JSONL event v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "user_id",
+    "session_id",
+    "turn_id",
+    "role",
+    "timestamp_ms",
+    "text"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "user_id": { "type": "string", "minLength": 1 },
+    "session_id": { "type": "string", "minLength": 1 },
+    "turn_id": { "type": "string", "minLength": 1 },
+    "role": { "enum": ["user", "assistant"] },
+    "timestamp_ms": { "type": "integer", "minimum": 0 },
+    "text": { "type": "string", "minLength": 1 }
+  }
+}
