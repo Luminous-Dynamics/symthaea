@@ -49,6 +49,7 @@ pub struct VmSnapshotLabelEvidenceV1 {
     pub label: MetrologyLabelV1,
     pub calibration_input: CalibrationRequalificationInputV1,
     /// Required only where the label entered through a metrology audit policy.
+    pub selection_receipt_required: bool,
     pub selection_receipt_sha256: Option<String>,
 }
 
@@ -259,6 +260,12 @@ fn validate_label_time(
     label: &MetrologyLabelV1,
     cutoff: &PredictionInformationCutoffV1,
 ) -> Result<(), VmSnapshotEvidenceErrorV1> {
+    if !matches!(&cutoff.clock_basis, ClockBasisV1::OffsetAware) {
+        return Err(VmSnapshotEvidenceErrorV1(
+            "source-local timestamps require an explicit clock mapping before comparison with Unix calibration bounds"
+                .into(),
+        ));
+    }
     if label.measurement_clock_domain_id != cutoff.clock_domain_id
         || label.availability_clock_domain_id != cutoff.clock_domain_id
         || label.measurement_clock_basis != cutoff.clock_basis
@@ -428,6 +435,12 @@ pub fn build_vm_training_snapshot_manifest_v1(
         if packet.calibration_input.measurement.measurement_event_id != label.measurement_event_id {
             return Err(VmSnapshotEvidenceErrorV1(format!(
                 "label {} does not bind to its calibration evidence measurement event",
+                label.label_id
+            )));
+        }
+        if packet.selection_receipt_required && packet.selection_receipt_sha256.is_none() {
+            return Err(VmSnapshotEvidenceErrorV1(format!(
+                "label {} requires a metrology selection receipt but none was supplied",
                 label.label_id
             )));
         }
@@ -756,6 +769,7 @@ mod tests {
         VmSnapshotLabelEvidenceV1 {
             calibration_input: calibration_input(&label.measurement_event_id, &digest('c')),
             label,
+            selection_receipt_required: true,
             selection_receipt_sha256: Some(digest('e')),
         }
     }
@@ -912,6 +926,27 @@ mod tests {
         let mut successor = label("label-002", "measurement-002", "wafer-002");
         successor.supersedes_label_id = Some("label-001".into());
         input.consumed_labels.push(packet(successor));
+        assert!(build_vm_training_snapshot_manifest_v1(&input).is_err());
+    }
+
+    #[test]
+    fn required_but_missing_selection_receipt_is_rejected() {
+        let mut input = snapshot_input();
+        input.consumed_labels[0].selection_receipt_sha256 = None;
+        assert!(build_vm_training_snapshot_manifest_v1(&input).is_err());
+    }
+
+    #[test]
+    fn source_local_naive_clock_is_not_compared_to_unix_calibration_time() {
+        let mut input = snapshot_input();
+        input.cutoff.clock_basis = ClockBasisV1::SourceLocalNaive;
+        input.consumed_labels[0].label.measurement_clock_basis =
+            ClockBasisV1::SourceLocalNaive;
+        input.consumed_labels[0].label.availability_clock_basis =
+            ClockBasisV1::SourceLocalNaive;
+        input.cutoff.cutoff_time = "2028-12-09T18:40:00".into();
+        input.consumed_labels[0].label.measurement_time = "2028-08-16T00:53:20".into();
+        input.consumed_labels[0].label.available_at = "2028-08-16T00:58:20".into();
         assert!(build_vm_training_snapshot_manifest_v1(&input).is_err());
     }
 
