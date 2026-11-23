@@ -339,7 +339,7 @@ Only compare methods on matched equations, initial conditions, boundary conditio
 | ADEPT | Differentiable JAX/Diffrax plasma framework; the original compact hidden-variable closure reports about 14x on its own kinetic-closure task | Reproduce the original task separately; compare matched 1D1V cohorts and gradient costs without transferring the 14x headline to unrelated solvers |
 | VlasovTT.jl | Fully spectral tensor-train / MPS Vlasov–Poisson with tensor-cross interpolation and dense reference path | Match dense vs compressed path; sweep rank, truncation and TCI tolerance; include reconstruction, Poisson and conversion cost |
 | Adaptive Hermite spectral method (2026) | Dynamically scaled Hermite coordinates with conservative projection designed to preserve mass, momentum, energy and L2 norm | Compare coefficient-tail indicators and conservative basis changes against response loss and a common dense reference |
-| NEOPIC (2026) | Particle-measure neural field operator; no mesh/deposition in its stated method; separates sampling, learning and time-stepping error | Compare on a particle-matched cohort; include particle noise, field error and total particle-workflow cost |
+| NEOPIC (2026) | Particle-measure neural field operator; no mesh/deposition in its stated method; claims O(Np) evaluation and separates sampling, learning and time-stepping error | Compare on a particle-matched cohort; include particle-noise scaling, inference/training particle-count transfer, field error and complete particle-workflow cost |
 | Smilei 5.1 | Production PIC with GPU support and locally adaptive scalar/vectorized particle operators; published examples report workload-specific speedups | Use as an industry baseline only on matching physics and hardware; measure deposition/gather, communication and diagnostics |
 | WarpX 26.11 | Production AMReX PIC with GPU-aware particle sorting/deposition and profiling options | Measure full run and scaling; include sorting, deposition and communication, not only the field solve |
 | Dense spectral reference | High-resolution equation-matched reference for small 1D1V cohorts | Treat as reference, not as an assumed best production method |
@@ -351,6 +351,18 @@ Primary sources:
 - [ADEPT repository](https://github.com/ergodicio/adept) and [solver documentation](https://ergodicio.github.io/adept/solvers.html)
 - [Smilei 5.1 GPU documentation](https://smileipic.github.io/Smilei/Understand/GPU_offloading.html), [adaptive vectorization documentation](https://smileipic.github.io/Smilei/Understand/vectorization.html)
 - [WarpX 26.11 parameters and profiling](https://warpx.readthedocs.io/en/26.11/usage/parameters.html)
+
+### What production PIC already adapts
+
+We should not claim that local adaptive execution itself is novel:
+
+- Smilei 5.1 already switches locally between scalar and vectorized particle operators by patch/species and particle occupancy. Its documentation reports workload- and architecture-dependent gains: roughly 1.9–2.8× in listed architecture tests and up to around 3× in some examples above the particle-per-cell crossover. This is established kernel/execution adaptivity, not a future-response fidelity guarantee.
+- WarpX 26.11 uses GPU particle sorting to improve memory locality and deposition; its documentation explicitly notes that the best choice and shared-memory deposition benefit depend on particle occupancy and GPU architecture.
+- NEOPIC goes further in the particle representation: it applies a learned field operator directly to empirical particle measures, claims O(Np) complexity, and derives separate sampling, learning and time-stepping error contributions.
+
+Our differentiation must therefore be **physical-information adaptivity**: choosing the cheapest state representation that preserves the declared future intervention/QoI envelope, with independent physical and response qualification. Kernel occupancy adaptation and response-aware representation adaptation should be measured as complementary layers, not presented as substitutes.
+
+The fair industry comparison should include at least two cost regimes: (1) identical hardware and matched physics for head-to-head comparisons; (2) each production framework's best documented hardware path, reported separately. Do not transfer speedups from one machine, particle occupancy or geometry to another.
 
 ### VlasovTT reproduction guard
 
