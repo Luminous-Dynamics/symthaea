@@ -30,7 +30,9 @@ function simulate(order) {
     operation: null,
     sideEffects: [],
     outcomeUnknown: false,
+    controllerKnowsResult: false,
     reconciled: false,
+    confirmedByReplay: false,
     attempts: [],
   };
   const fixed = {
@@ -102,7 +104,7 @@ function simulate(order) {
       case 'worker_a_commit_response_lost': {
         const r = commit('worker-A', fixed.workerAEpoch, fixed.workerAGrantRevision, stepIndex, op);
         // The transport response is lost whether the sink committed or rejected.
-        state.outcomeUnknown = true;
+        if (!state.controllerKnowsResult) state.outcomeUnknown = true;
         if (r.operation) state.observedLostOperationId = r.operation.operationId;
         break;
       }
@@ -111,11 +113,19 @@ function simulate(order) {
           state.attempts.push({ worker: 'worker-B', result: 'no-lease' });
           break;
         }
-        commit('worker-B', 2, state.permissionRevision, stepIndex, op);
+        {
+          const r = commit('worker-B', 2, state.permissionRevision, stepIndex, op);
+          if (r.operation) {
+            state.controllerKnowsResult = true;
+            state.outcomeUnknown = false;
+            if (r.result === 'replayed') state.confirmedByReplay = true;
+          }
+        }
         break;
       case 'reconcile_operation':
         if (state.operation) {
           state.reconciled = true;
+          state.controllerKnowsResult = true;
           state.outcomeUnknown = false;
         }
         // A missing result is not proof of non-commit; preserve outcome_unknown.
@@ -155,6 +165,7 @@ let permissionRejects = 0;
 let expiryRejects = 0;
 let idempotentReplays = 0;
 let reconciliations = 0;
+let replayConfirmations = 0;
 let unknownAtEnd = 0;
 const examples = [];
 
@@ -168,6 +179,7 @@ for (const order of permutations(OPERATIONS)) {
   expiryRejects += state.attempts.filter(x => x.result === 'receipt-expired').length;
   idempotentReplays += state.attempts.filter(x => x.result === 'idempotent-replay').length;
   if (state.reconciled) reconciliations += 1;
+  if (state.confirmedByReplay) replayConfirmations += 1;
   if (state.outcomeUnknown) unknownAtEnd += 1;
   if (examples.length < 5 && state.sideEffects.length === 0) examples.push({ order, attempts: state.attempts });
 }
@@ -197,6 +209,7 @@ console.log(JSON.stringify({
     receipt_expiry_rejections: expiryRejects,
     idempotent_replays: idempotentReplays,
     schedules_with_successful_reconciliation: reconciliations,
+    schedules_confirmed_by_idempotent_replay: replayConfirmations,
     schedules_still_outcome_unknown_at_end: unknownAtEnd,
   },
   example_zero_effect_schedules: examples,
