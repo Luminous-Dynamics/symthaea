@@ -50,7 +50,7 @@ pub struct CalibrationCertificateV1 {
     pub method_revision: String,
     pub reference_standard_id: String,
     /// Digest of the certificate for the reference standard/artifact.
-    pub reference_certificate_sha256: String,
+    pub reference_certificate_sha256: Option<String>,
     /// A source declaration, not independent proof of a traceability chain.
     pub traceability_declaration: TraceabilityDeclarationV1,
     pub calibration_performed_at_unix_seconds: i64,
@@ -144,6 +144,8 @@ pub struct MeasurementQualificationReportV1 {
     pub measurement_event_id: String,
     pub measurement_sha256: String,
     pub calibration_certificate_sha256: Option<String>,
+    /// Digest of the structured certificate fields used by the gate.
+    pub calibration_record_sha256: Option<String>,
     pub policy_sha256: String,
     pub corrected_value: f64,
     pub conservative_standard_uncertainty_upper_bound: Option<f64>,
@@ -294,10 +296,13 @@ fn validate_certificate_shape(
         require_text(value, &format!("calibration.{field}"))?;
     }
     if !valid_sha256(&certificate.certificate_sha256)
-        || !valid_sha256(&certificate.reference_certificate_sha256)
+        || certificate
+            .reference_certificate_sha256
+            .as_ref()
+            .is_some_and(|digest| !valid_sha256(digest))
     {
         return Err(MeasurementQualificationErrorV1(
-            "calibration certificate and reference certificate require lowercase SHA-256 digests"
+            "calibration certificate and any reference certificate digest must be lowercase SHA-256"
                 .into(),
         ));
     }
@@ -343,6 +348,7 @@ pub fn qualify_measurement_evidence_v1(
         return finish_report(
             measurement,
             None,
+            None,
             policy_sha256,
             measurement_sha256,
             status,
@@ -354,6 +360,7 @@ pub fn qualify_measurement_evidence_v1(
 
     validate_certificate_shape(certificate)?;
     let certificate_digest = certificate.certificate_sha256.clone();
+    let certificate_record_digest = json_sha256(certificate)?;
 
     if certificate.instrument_id != measurement.instrument_id
         || certificate.measurand_id != measurement.measurand_id
@@ -414,7 +421,10 @@ pub fn qualify_measurement_evidence_v1(
         }
     }
     if policy.require_reference_certificate_digest
-        && !valid_sha256(&certificate.reference_certificate_sha256)
+        && certificate
+            .reference_certificate_sha256
+            .as_ref()
+            .is_none_or(|digest| !valid_sha256(digest))
     {
         reasons.push(MeasurementQualificationReasonV1::ReferenceCertificateMissing);
         if status == MeasurementQualificationStatusV1::Qualified {
@@ -430,6 +440,7 @@ pub fn qualify_measurement_evidence_v1(
         return finish_report(
             measurement,
             Some(certificate_digest),
+            Some(certificate_record_digest),
             policy_sha256,
             measurement_sha256,
             status,
@@ -458,6 +469,7 @@ pub fn qualify_measurement_evidence_v1(
     finish_report(
         measurement,
         Some(certificate_digest),
+        Some(certificate_record_digest),
         policy_sha256,
         measurement_sha256,
         status,
@@ -470,6 +482,7 @@ pub fn qualify_measurement_evidence_v1(
 fn finish_report(
     measurement: &MeasurementEvidenceV1,
     calibration_certificate_sha256: Option<String>,
+    calibration_record_sha256: Option<String>,
     policy_sha256: String,
     measurement_sha256: String,
     status: MeasurementQualificationStatusV1,
@@ -488,6 +501,7 @@ fn finish_report(
         measurement_event_id: measurement.measurement_event_id.clone(),
         measurement_sha256,
         calibration_certificate_sha256,
+        calibration_record_sha256,
         policy_sha256,
         corrected_value: measurement.corrected_value,
         conservative_standard_uncertainty_upper_bound: uncertainty_upper_bound,
@@ -527,7 +541,7 @@ mod tests {
             unit: "nm".into(),
             method_revision: "film-method-3".into(),
             reference_standard_id: "traceable-step-height-std-02".into(),
-            reference_certificate_sha256: "b".repeat(64),
+            reference_certificate_sha256: Some("b".repeat(64)),
             traceability_declaration: TraceabilityDeclarationV1::ClaimedTraceable,
             calibration_performed_at_unix_seconds: 1_800_000_000,
             issued_at_unix_seconds: 1_800_000_100,
