@@ -84,7 +84,7 @@ pub struct PitchTrackScoreConfigV1 {
 impl Default for PitchTrackScoreConfigV1 {
     fn default() -> Self {
         Self {
-            timestamp_tolerance_ns: 2_500_000,
+            timestamp_tolerance_ns: 2_000_000,
             gross_pitch_error_ratio: DEFAULT_GROSS_PITCH_ERROR_RATIO,
             octave_ratio_tolerance: DEFAULT_OCTAVE_RATIO_TOLERANCE,
         }
@@ -175,8 +175,8 @@ pub fn score_pitch_tracks(
     config: PitchTrackScoreConfigV1,
 ) -> Result<PitchTrackMetricsV1, PitchTrackEvaluationError> {
     validate_score_config(config)?;
-    validate_pitch_track(reference, "reference")?;
-    validate_pitch_track(estimated, "estimated")?;
+    validate_pitch_track(reference, "reference", config.timestamp_tolerance_ns)?;
+    validate_pitch_track(estimated, "estimated", config.timestamp_tolerance_ns)?;
 
     if reference.source != estimated.source {
         return Err(PitchTrackEvaluationError::new(
@@ -219,48 +219,6 @@ pub fn score_pitch_tracks(
             .abs_diff(ref_frame.source_timestamp_ns);
 
         if timestamp_delta <= config.timestamp_tolerance_ns {
-            // When more than one observation lies inside the tolerance, prefer
-            // the locally closest monotonic pair instead of accepting the first
-            // in-tolerance frame. This prevents a jittered duplicate from
-            // displacing an exact timestamp match.
-            let next_estimated_delta = estimated
-                .frames
-                .get(est_index + 1)
-                .map(|frame| {
-                    frame
-                        .source_timestamp_ns
-                        .abs_diff(ref_frame.source_timestamp_ns)
-                })
-                .filter(|delta| *delta <= config.timestamp_tolerance_ns);
-            let next_reference_delta = reference
-                .frames
-                .get(ref_index + 1)
-                .map(|frame| {
-                    frame
-                        .source_timestamp_ns
-                        .abs_diff(est_frame.source_timestamp_ns)
-                })
-                .filter(|delta| *delta <= config.timestamp_tolerance_ns);
-
-            if next_estimated_delta.is_some_and(|delta| delta < timestamp_delta)
-                && next_estimated_delta.unwrap() <= next_reference_delta.unwrap_or(u64::MAX)
-            {
-                metrics.unmatched_estimated_frame_count += 1;
-                if est_frame.f0_hz.is_some() {
-                    metrics.voiced_false_positive += 1;
-                }
-                est_index += 1;
-                continue;
-            }
-            if next_reference_delta.is_some_and(|delta| delta < timestamp_delta) {
-                metrics.missing_estimated_frame_count += 1;
-                if ref_frame.f0_hz.is_some() {
-                    metrics.voiced_false_negative += 1;
-                }
-                ref_index += 1;
-                continue;
-            }
-
             metrics.aligned_frame_count += 1;
             score_aligned_frame(ref_frame, est_frame, config, &mut metrics, &mut f0_errors);
             ref_index += 1;
@@ -402,6 +360,7 @@ fn validate_score_config(config: PitchTrackScoreConfigV1) -> Result<(), PitchTra
 fn validate_pitch_track(
     track: &PitchTrackV1,
     label: &str,
+    timestamp_tolerance_ns: u64,
 ) -> Result<(), PitchTrackEvaluationError> {
     if track.schema_version != PITCH_TRACK_EVALUATION_SCHEMA_V1 {
         return Err(PitchTrackEvaluationError::new(format!(
@@ -460,6 +419,15 @@ fn validate_pitch_track(
         }
         previous_timestamp = Some(frame.source_timestamp_ns);
         previous_index = Some(frame.frame_index);
+    }
+    let minimum_unambiguous_spacing = timestamp_tolerance_ns.saturating_mul(2);
+    if track.frames.windows(2).any(|pair| {
+        pair[1].source_timestamp_ns - pair[0].source_timestamp_ns
+            <= minimum_unambiguous_spacing
+    }) {
+        return Err(PitchTrackEvaluationError::new(format!(
+            "{label} frame spacing must exceed twice the timestamp tolerance for unambiguous one-to-one alignment"
+        )));
     }
     Ok(())
 }
@@ -587,22 +555,18 @@ mod tests {
     }
 
     #[test]
-    fn ambiguous_in_tolerance_frames_choose_the_closest_monotonic_pair() {
-        let mut reference = track("reference", &[Some(100.0)]);
-        reference.frames[0].source_timestamp_ns = 10_000_000;
-        let mut estimated = track("estimated", &[Some(80.0), Some(100.0)]);
-        estimated.frames[0].source_timestamp_ns = 9_000_000;
-        estimated.frames[0].frame_index = 0;
-        estimated.frames[1].source_timestamp_ns = 10_000_000;
-        estimated.frames[1].frame_index = 1;
-
-        let metrics =
-            score_pitch_tracks(&reference, &estimated, PitchTrackScoreConfigV1::default()).unwrap();
-
-        assert_eq!(metrics.aligned_frame_count, 1);
-        assert_eq!(metrics.unmatched_estimated_frame_count, 1);
-        assert_eq!(metrics.f0_rmse_hz, Some(0.0));
-        assert_eq!(metrics.gross_pitch_error_rate, Some(0.0));
+    fn overlapping_timestamp_tolerances_are_rejected_before_alignment() {
+        let reference = track("reference", &[Some(100.0), Some(110.0)]);
+        let mut estimated = track("estimated", &[Some(100.0), Some(110.0)]);
+        estimated.frames[1].source_timestamp_ns = 3_000_000;
+        assert!(
+            score_pitch_tracks(
+                &reference,
+                &estimated,
+                PitchTrackScoreConfigV1::default()
+            )
+            .is_err()
+        );
     }
 
     #[test]
