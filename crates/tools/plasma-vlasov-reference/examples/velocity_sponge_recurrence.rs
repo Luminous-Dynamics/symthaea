@@ -162,7 +162,10 @@ fn run_case(
             .max(f64::MIN_POSITIVE);
     // Normalize field-energy change by total initial energy. The initial
     // electric energy may be nearly zero for a homogeneous equilibrium.
-    let total_energy_scale = initial_diagnostics.total_energy.abs().max(f64::MIN_POSITIVE);
+    let total_energy_scale = initial_diagnostics
+        .total_energy
+        .abs()
+        .max(f64::MIN_POSITIVE);
     let total_energy_relative_delta =
         (final_diagnostics.total_energy - initial_diagnostics.total_energy) / total_energy_scale;
     let field_energy_delta_over_total_energy =
