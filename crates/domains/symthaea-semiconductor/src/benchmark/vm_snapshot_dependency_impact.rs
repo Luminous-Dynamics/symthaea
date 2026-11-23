@@ -1125,7 +1125,10 @@ mod tests {
             .iter()
             .find(|entry| entry.snapshot_id == "ensemble")
             .unwrap();
-        assert_eq!(entry.state, VmSnapshotImpactStateV1::InheritedRebuildRequired);
+        assert_eq!(
+            entry.state,
+            VmSnapshotImpactStateV1::InheritedRebuildRequired
+        );
         assert_eq!(entry.inherited_from_snapshot_ids, vec!["left".to_string()]);
         assert!(entry.rebuild_candidate);
     }
