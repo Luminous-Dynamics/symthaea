@@ -1278,7 +1278,9 @@ mod tests {
         .expect("causal trajectories and regret outcomes share the same actions");
         assert_eq!(certificate.decision_value.interaction_ppm, 230_000);
         assert_eq!(
-            certificate.causal_pairing.stochastic_draw_bundle_verifier_sha256[0],
+            certificate
+                .causal_pairing
+                .stochastic_draw_bundle_verifier_sha256[0],
             digest(130)
         );
         assert_eq!(
