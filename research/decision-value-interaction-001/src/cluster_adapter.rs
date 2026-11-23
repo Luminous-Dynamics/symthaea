@@ -328,10 +328,17 @@ pub fn export_cluster_deltas(
     for assignment in assignments {
         valid_token(&assignment.cluster_id, "cluster_id")?;
         if digest_is_empty(&assignment.initial_state_sha256) {
-            return Err(fail("cluster assignment initial-state digest must not be zero-filled"));
+            return Err(fail(
+                "cluster assignment initial-state digest must not be zero-filled",
+            ));
         }
-        if assignment_by_episode.insert(assignment.episode_id, assignment).is_some() {
-            return Err(fail("duplicate episode_id in frozen cluster-assignment manifest"));
+        if assignment_by_episode
+            .insert(assignment.episode_id, assignment)
+            .is_some()
+        {
+            return Err(fail(
+                "duplicate episode_id in frozen cluster-assignment manifest",
+            ));
         }
     }
     if assignment_by_episode.is_empty() {
@@ -354,10 +361,14 @@ pub fn export_cluster_deltas(
             .get(&certificate.episode_id)
             .ok_or_else(|| fail("episode is absent from frozen cluster-assignment manifest"))?;
         if assignment.cluster_id != row.cluster_id {
-            return Err(fail("outcome cluster_id disagrees with frozen cluster-assignment manifest"));
+            return Err(fail(
+                "outcome cluster_id disagrees with frozen cluster-assignment manifest",
+            ));
         }
         if assignment.initial_state_sha256 != identity.initial_state_sha256 {
-            return Err(fail("episode initial-state digest disagrees with frozen cluster-assignment manifest"));
+            return Err(fail(
+                "episode initial-state digest disagrees with frozen cluster-assignment manifest",
+            ));
         }
         used_assignments.insert(certificate.episode_id);
 
@@ -671,7 +682,8 @@ mod tests {
 
     #[test]
     fn exports_one_row_per_independent_cluster_and_contrast() {
-        let result = export_cluster_deltas(&fixture(), &assignments(), &metadata()).expect("valid cluster export");
+        let result = export_cluster_deltas(&fixture(), &assignments(), &metadata())
+            .expect("valid cluster export");
         assert_eq!(result.independent_cluster_count, 6);
         assert_eq!(result.episode_count, 12);
         assert_eq!(result.hidden_world_observation_count, 24);
