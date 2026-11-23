@@ -679,7 +679,7 @@ fn main() {
         Err(error) => {
             eprintln!(
                 "REJECT\treason\t{}",
-                error.replace('\t', " ").replace('\n', " ")
+                error.replace(['\t', '\n'], " ")
             );
             std::process::exit(2);
         }
