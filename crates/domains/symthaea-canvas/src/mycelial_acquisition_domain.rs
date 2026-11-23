@@ -16,9 +16,7 @@ use std::fmt;
 use serde::{Deserialize, Serialize};
 
 use crate::mycelial_observation_coverage::{
-    MycelialObservationCoverageLedger, MycelialObservationCoverageRecord,
-    MycelialObservationCoverageState, MycelialObservationResidualKind,
-    mycelial_observation_id_inventory_digest,
+    MycelialObservationCoverageLedger, mycelial_observation_id_inventory_digest,
 };
 
 pub const MYCELIAL_ACQUISITION_DOMAIN_SCHEMA_VERSION: u16 = 1;
