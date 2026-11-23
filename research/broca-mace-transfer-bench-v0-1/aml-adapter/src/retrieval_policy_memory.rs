@@ -26,6 +26,7 @@ pub const MAX_EVIDENCE_IDS_PER_TRACE_V1: usize = 10_000;
 pub const MAX_IDENTIFIER_BYTES_V1: usize = 256;
 pub const MAX_DOMAIN_ID_BYTES_V1: usize = 512;
 pub const MAX_EVIDENCE_ID_BYTES_V1: usize = 1_024;
+pub const MAX_RECORDED_TRACES_V1: usize = 100_000;
 pub const MAX_STRATEGY_TTL_SECONDS_V1: u64 = 30 * 24 * 60 * 60;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
@@ -130,6 +131,140 @@ impl RetrievalTraceReceiptV1 {
         trace_receipt_digest(self)
     }
 
+    /// Strictly decode a trace receipt JSON object and verify its content commitment.
+    pub fn from_json_value(value: &Value) -> Result<Self, RetrievalPolicyRejectV1> {
+        let object = value
+            .as_object()
+            .ok_or(RetrievalPolicyRejectV1::InvalidJson)?;
+        if object.len() != 17
+            || object.get("schema_version").and_then(Value::as_str)
+                != Some("mace_retrieval_trace_receipt_v1")
+        {
+            return Err(RetrievalPolicyRejectV1::InvalidJson);
+        }
+
+        let required_string = |field: &str| -> Result<String, RetrievalPolicyRejectV1> {
+            object
+                .get(field)
+                .and_then(Value::as_str)
+                .map(str::to_owned)
+                .ok_or(RetrievalPolicyRejectV1::InvalidJson)
+        };
+        let required_u64 = |field: &str| -> Result<u64, RetrievalPolicyRejectV1> {
+            object
+                .get(field)
+                .and_then(Value::as_u64)
+                .ok_or(RetrievalPolicyRejectV1::InvalidJson)
+        };
+        let required_u32 = |field: &str| -> Result<u32, RetrievalPolicyRejectV1> {
+            let value = required_u64(field)?;
+            u32::try_from(value).map_err(|_| RetrievalPolicyRejectV1::InvalidJson)
+        };
+        let required_bool = |field: &str| -> Result<bool, RetrievalPolicyRejectV1> {
+            object
+                .get(field)
+                .and_then(Value::as_bool)
+                .ok_or(RetrievalPolicyRejectV1::InvalidJson)
+        };
+
+        let candidate_set_sha256 = match object.get("candidate_set_sha256") {
+            Some(Value::Null) => None,
+            Some(Value::String(value)) => Some(value.clone()),
+            _ => return Err(RetrievalPolicyRejectV1::InvalidJson),
+        };
+        let stop_reason = match required_string("stop_reason")?.as_str() {
+            "evidence_sufficient" => RetrievalStopReasonV1::EvidenceSufficient,
+            "budget_exhausted" => RetrievalStopReasonV1::BudgetExhausted,
+            "no_candidate_evidence" => RetrievalStopReasonV1::NoCandidateEvidence,
+            "tool_error" => RetrievalStopReasonV1::ToolError,
+            "abstained" => RetrievalStopReasonV1::Abstained,
+            _ => return Err(RetrievalPolicyRejectV1::InvalidJson),
+        };
+
+        let operation_values = object
+            .get("operations")
+            .and_then(Value::as_array)
+            .ok_or(RetrievalPolicyRejectV1::InvalidJson)?;
+        let mut operations = Vec::with_capacity(operation_values.len());
+        for value in operation_values {
+            let operation = value
+                .as_object()
+                .ok_or(RetrievalPolicyRejectV1::InvalidJson)?;
+            if operation.len() != 8 {
+                return Err(RetrievalPolicyRejectV1::InvalidJson);
+            }
+            let operation_string = |field: &str| -> Result<String, RetrievalPolicyRejectV1> {
+                operation
+                    .get(field)
+                    .and_then(Value::as_str)
+                    .map(str::to_owned)
+                    .ok_or(RetrievalPolicyRejectV1::InvalidJson)
+            };
+            let operation_u64 = |field: &str| -> Result<u64, RetrievalPolicyRejectV1> {
+                operation
+                    .get(field)
+                    .and_then(Value::as_u64)
+                    .ok_or(RetrievalPolicyRejectV1::InvalidJson)
+            };
+            let outcome = match operation_string("outcome")?.as_str() {
+                "evidence_observed" => RetrievalOperationOutcomeV1::EvidenceObserved,
+                "no_evidence" => RetrievalOperationOutcomeV1::NoEvidence,
+                "tool_error" => RetrievalOperationOutcomeV1::ToolError,
+                _ => return Err(RetrievalPolicyRejectV1::InvalidJson),
+            };
+            let evidence_ids = operation
+                .get("observed_evidence_ids")
+                .and_then(Value::as_array)
+                .ok_or(RetrievalPolicyRejectV1::InvalidJson)?
+                .iter()
+                .map(|value| {
+                    value.as_str()
+                        .map(str::to_owned)
+                        .ok_or(RetrievalPolicyRejectV1::InvalidJson)
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            operations.push(RetrievalOperationV1 {
+                tool_id: operation_string("tool_id")?,
+                tool_revision_sha256: operation_string("tool_revision_sha256")?,
+                action_template_sha256: operation_string("action_template_sha256")?,
+                observed_evidence_ids: evidence_ids,
+                outcome,
+                elapsed_ns: operation_u64("elapsed_ns")?,
+                inspected_bytes: operation_u64("inspected_bytes")?,
+                inspected_bytes_measured: operation
+                    .get("inspected_bytes_measured")
+                    .and_then(Value::as_bool)
+                    .ok_or(RetrievalPolicyRejectV1::InvalidJson)?,
+            });
+        }
+
+        let trace = Self {
+            run_id: required_string("run_id")?,
+            query_invocation_id: required_string("query_invocation_id")?,
+            domain_id: required_string("domain_id")?,
+            environment_revision_sha256: required_string("environment_revision_sha256")?,
+            tool_profile_sha256: required_string("tool_profile_sha256")?,
+            query_sha256: required_string("query_sha256")?,
+            candidate_set_sha256,
+            operations,
+            stop_reason,
+            tool_call_budget: required_u32("tool_call_budget")?,
+            tool_calls_used: required_u32("tool_calls_used")?,
+            elapsed_ns: required_u64("elapsed_ns")?,
+            inspected_bytes: required_u64("inspected_bytes")?,
+            inspected_bytes_complete: required_bool("inspected_bytes_complete")?,
+            created_at_unix: required_u64("created_at_unix")?,
+        };
+        validate_trace(&trace)?;
+        let supplied_receipt = required_string("receipt_sha256")?;
+        if !valid_sha256(&supplied_receipt)
+            || supplied_receipt != trace.receipt_sha256()
+        {
+            return Err(RetrievalPolicyRejectV1::InvalidDigest);
+        }
+        Ok(trace)
+    }
+
     /// JSON projection for an audit/replay envelope. The receipt digest commits
     /// to the typed fields using the separate canonical binary encoding.
     pub fn to_json_value(&self) -> Value {
@@ -196,6 +331,8 @@ pub struct RetrievalStrategyNoteV1 {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RetrievalPolicyRejectV1 {
+    InvalidJson,
+    TooManyTraces,
     InvalidIdentifier,
     InvalidDigest,
     EmptyOperations,
@@ -510,6 +647,9 @@ impl RetrievalPolicyMemoryV1 {
             }
             return Ok(existing.receipt_sha256.clone());
         }
+        if self.traces.len() >= MAX_RECORDED_TRACES_V1 {
+            return Err(RetrievalPolicyRejectV1::TooManyTraces);
+        }
         self.traces.insert(
             key,
             StoredRetrievalTraceV1 {
@@ -519,6 +659,16 @@ impl RetrievalPolicyMemoryV1 {
             },
         );
         Ok(receipt_sha256)
+    }
+
+    /// Restore a previously committed JSON receipt using the same strict
+    /// decoder and trace validation path as a newly recorded operation.
+    pub fn restore_trace_json_value(
+        &mut self,
+        value: &Value,
+    ) -> Result<String, RetrievalPolicyRejectV1> {
+        let trace = RetrievalTraceReceiptV1::from_json_value(value)?;
+        self.record_trace(trace)
     }
 
     pub fn trace_receipt_sha256(
@@ -996,6 +1146,67 @@ mod tests {
         assert_eq!(
             receipt.receipt_sha256(),
             "e818d458148b2edd093a95d45afffb3d86b65291ee1b399149abf4ca4d18edb6"
+        );
+    }
+
+    #[test]
+    fn strict_json_trace_decoder_round_trips_and_rejects_tampering() {
+        let receipt = trace(
+            "restore-invocation",
+            "b191919191919191919191919191919191919191919191919191919191919191",
+            "web-shop-a",
+            ENV_A,
+            TOOL_PROFILE_A,
+            ACTION_SEARCH,
+        );
+        let value = receipt.to_json_value();
+        let decoded = RetrievalTraceReceiptV1::from_json_value(&value)
+            .expect("strict JSON round-trip");
+        assert_eq!(decoded, receipt);
+
+        let mut memory = RetrievalPolicyMemoryV1::default();
+        let digest = memory
+            .restore_trace_json_value(&value)
+            .expect("restore receipt");
+        assert_eq!(digest, receipt.receipt_sha256());
+        assert_eq!(
+            memory.restore_trace_json_value(&value),
+            Ok(digest.clone())
+        );
+
+        let mut tampered = value.clone();
+        tampered["elapsed_ns"] = json!(receipt.elapsed_ns + 1);
+        assert_eq!(
+            RetrievalTraceReceiptV1::from_json_value(&tampered),
+            Err(RetrievalPolicyRejectV1::InvalidDigest)
+        );
+        tampered["unexpected"] = json!(true);
+        assert_eq!(
+            RetrievalTraceReceiptV1::from_json_value(&tampered),
+            Err(RetrievalPolicyRejectV1::InvalidJson)
+        );
+    }
+
+    #[test]
+    fn restored_invocation_id_cannot_be_rebound_to_different_trace() {
+        let receipt = trace(
+            "restore-rebind",
+            "b292929292929292929292929292929292929292929292929292929292929292",
+            "web-shop-a",
+            ENV_A,
+            TOOL_PROFILE_A,
+            ACTION_SEARCH,
+        );
+        let mut memory = RetrievalPolicyMemoryV1::default();
+        let value = receipt.to_json_value();
+        memory.restore_trace_json_value(&value).expect("restore trace");
+
+        let mut changed = receipt;
+        changed.elapsed_ns += 1;
+        changed.operations[0].elapsed_ns += 1;
+        assert_eq!(
+            memory.record_trace(changed),
+            Err(RetrievalPolicyRejectV1::InvocationAlreadyBound)
         );
     }
 

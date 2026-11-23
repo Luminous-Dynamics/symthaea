@@ -883,6 +883,7 @@ class MaceLongMemEvalV2Memory(Memory):
                 "MACE_LMEV2_RUN_ID": self.run_id,
                 "MACE_LMEV2_ENVIRONMENT_REVISION_SHA256": self.environment_revision_sha256,
                 "MACE_LMEV2_BACKEND_REVISION_SHA256": self.backend_revision_sha256,
+                "MACE_LMEV2_POLICY_TRACE_DIR": str(self.retrieval_trace_dir.resolve()),
                 "MACE_LMEV2_DATASET_ROOT": str(self.asset_root.resolve()),
                 "MACE_LMEV2_TOP_K": str(self.top_k),
                 "MACE_LMEV2_SLICE_RADIUS": str(self.slice_radius),
@@ -953,6 +954,11 @@ class MaceLongMemEvalV2Memory(Memory):
                 ) from error
             if isinstance(response, dict) and response.get("ok") is False:
                 message = response.get("error", "request rejected")
+                if isinstance(message, str) and "outcome may be unknown" in message:
+                    self._poison_sidecar()
+                    raise RuntimeError(
+                        "MACE sidecar mutation outcome is unknown; process poisoned until reload/reconciliation"
+                    )
                 raise RuntimeError(f"MACE Rust sidecar rejected request: {message}")
             if not isinstance(response, dict) or response.get("ok") is not True:
                 self._poison_sidecar()
@@ -1175,8 +1181,14 @@ class MaceLongMemEvalV2Memory(Memory):
                 "candidate_id": candidate_id,
             }
         )
-        self._persist_candidate_envelope(candidate_id, query, response)
-        self._persist_retrieval_trace(candidate_id, query, response)
+        try:
+            self._persist_candidate_envelope(candidate_id, query, response)
+            self._persist_retrieval_trace(candidate_id, query, response)
+        except Exception:
+            # The sidecar may already have durably recorded the trace. Do not
+            # continue serving queries on a partially reconciled invocation.
+            self._poison_sidecar()
+            raise
         items = response.get("items")
         if not isinstance(items, list):
             self._poison_sidecar()

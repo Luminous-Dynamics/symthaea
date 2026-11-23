@@ -28,6 +28,7 @@ use broca_aml_adapter::retrieval_policy_memory::{
     RetrievalOperationOutcomeV1, RetrievalOperationV1, RetrievalPolicyMemoryV1,
     RetrievalStopReasonV1, RetrievalTraceReceiptV1,
 };
+use broca_aml_adapter::retrieval_policy_store::RetrievalPolicyTraceFileStoreV1;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
@@ -36,6 +37,7 @@ struct Config {
     run_id: String,
     environment_revision_sha256: String,
     backend_revision_sha256: String,
+    policy_trace_dir: PathBuf,
     dataset_root: PathBuf,
     top_k: usize,
     slice_radius: usize,
@@ -60,6 +62,13 @@ impl Config {
         if !valid_sha256(&environment_revision_sha256) {
             return Err("MACE_LMEV2_ENVIRONMENT_REVISION_SHA256 must be lowercase SHA-256".into());
         }
+        let policy_trace_dir = env::var("MACE_LMEV2_POLICY_TRACE_DIR")
+            .map_err(|_| "MACE_LMEV2_POLICY_TRACE_DIR is required".to_string())?;
+        let policy_trace_dir = PathBuf::from(policy_trace_dir);
+        fs::create_dir_all(&policy_trace_dir)
+            .map_err(|error| format!("create policy trace directory: {error}"))?;
+        let policy_trace_dir = fs::canonicalize(policy_trace_dir)
+            .map_err(|error| format!("canonicalize policy trace directory: {error}"))?;
         let backend_revision_sha256 = env::var("MACE_LMEV2_BACKEND_REVISION_SHA256")
             .map_err(|_| "MACE_LMEV2_BACKEND_REVISION_SHA256 is required".to_string())?;
         if !valid_sha256(&backend_revision_sha256) {
@@ -110,6 +119,7 @@ impl Config {
             run_id,
             environment_revision_sha256,
             backend_revision_sha256,
+            policy_trace_dir,
             dataset_root,
             top_k,
             slice_radius,
@@ -193,6 +203,7 @@ fn handle_request(
     trajectories: &mut Vec<LongMemEvalV2TrajectoryV1>,
     index: &mut Option<LongMemEvalV2Bm25IndexV1>,
     policy_memory: &mut RetrievalPolicyMemoryV1,
+    policy_trace_store: &RetrievalPolicyTraceFileStoreV1,
 ) -> Result<Value, String> {
     let operation = request
         .get("op")
@@ -368,9 +379,9 @@ fn handle_request(
                 inspected_bytes_complete: false,
                 created_at_unix,
             };
-            let retrieval_trace_sha256 = policy_memory
-                .record_trace(trace.clone())
-                .map_err(|error| format!("record retrieval policy trace: {error:?}"))?;
+            let retrieval_trace_sha256 = policy_trace_store
+                .record_trace(policy_memory, &trace)
+                .map_err(|error| format!("persist retrieval policy trace: {error}"))?;
             let retrieval_trace_json = trace.to_json_value();
 
             Ok(json!({
@@ -404,9 +415,18 @@ fn main() {
     let stdin = io::stdin();
     let stdout = io::stdout();
     let mut writer = BufWriter::new(stdout.lock());
+    let policy_trace_store = RetrievalPolicyTraceFileStoreV1::open(&config.policy_trace_dir)
+        .unwrap_or_else(|error| {
+            eprintln!("mace_lmev2_stdio policy trace store error: {error}");
+            std::process::exit(2);
+        });
+    let mut policy_memory = RetrievalPolicyMemoryV1::default();
+    policy_trace_store.load_into(&mut policy_memory).unwrap_or_else(|error| {
+        eprintln!("mace_lmev2_stdio policy trace replay error: {error}");
+        std::process::exit(2);
+    });
     let mut trajectories = Vec::<LongMemEvalV2TrajectoryV1>::new();
     let mut index = None;
-    let mut policy_memory = RetrievalPolicyMemoryV1::default();
 
     for line in stdin.lock().lines() {
         let response = match line {
@@ -417,6 +437,7 @@ fn main() {
                     &mut trajectories,
                     &mut index,
                     &mut policy_memory,
+                    &policy_trace_store,
                 )
                     .unwrap_or_else(|error| json!({"ok": false, "error": error})),
                 Err(error) => json!({"ok": false, "error": format!("invalid request JSON: {error}")}),
@@ -457,11 +478,12 @@ mod tests {
             domain: "web".to_owned(),
             run_id: "fixture-run".to_owned(),
             backend_revision_sha256: "1111111111111111111111111111111111111111111111111111111111111111".to_owned(),
-            dataset_root: root,
+            dataset_root: root.clone(),
             top_k: 4,
             slice_radius: 0,
             neighbor_radius: 0,
             environment_revision_sha256: "2222222222222222222222222222222222222222222222222222222222222222".to_owned(),
+            policy_trace_dir: root.join(".policy-traces"),
             profile: Bm25ProfileV1 {
                 k1: 1.2,
                 b: 0.75,
@@ -501,6 +523,8 @@ mod tests {
         let expected_image = fs::canonicalize(root.join("trajectory-1/state.png"))
             .expect("canonical fixture image");
         let config = fixture_config(root.clone());
+        let policy_trace_store = RetrievalPolicyTraceFileStoreV1::open(&config.policy_trace_dir)
+            .expect("open policy trace store");
         let mut trajectories = Vec::new();
         let mut index = None;
         let mut policy_memory = RetrievalPolicyMemoryV1::default();
@@ -511,6 +535,7 @@ mod tests {
             &mut trajectories,
             &mut index,
             &mut policy_memory,
+            &policy_trace_store,
         ).expect("insert");
         assert_eq!(inserted["ok"], true);
         assert_eq!(inserted["inserted"], 1);
@@ -526,6 +551,7 @@ mod tests {
             &mut trajectories,
             &mut index,
             &mut policy_memory,
+            &policy_trace_store,
         ).expect("query");
         assert_eq!(response["ok"], true);
         assert_eq!(response["query_image_used"], false);
@@ -540,6 +566,22 @@ mod tests {
         assert_eq!(response["retrieval_trace"]["inspected_bytes_complete"], false);
         assert!(response["retrieval_trace_sha256"].as_str().is_some());
         assert_eq!(response["policy_trace_count"], 1);
+        assert_eq!(
+            fs::read_dir(&config.policy_trace_dir).expect("trace store directory").count(),
+            1
+        );
+        let reopened_store = RetrievalPolicyTraceFileStoreV1::open(&config.policy_trace_dir)
+            .expect("reopen durable policy trace store");
+        let mut restored_policy_memory = RetrievalPolicyMemoryV1::default();
+        assert_eq!(
+            reopened_store.load_into(&mut restored_policy_memory).expect("restore policy traces"),
+            1
+        );
+        assert_eq!(restored_policy_memory.trace_count(), 1);
+        assert_eq!(
+            restored_policy_memory.trace_receipt_sha256("fixture-run", "query-invocation-1"),
+            response["retrieval_trace_sha256"].as_str()
+        );
         let items = response["items"].as_array().expect("context items");
         assert!(items.iter().any(|item| {
             item["type"] == "text" && item["value"].as_str()
@@ -557,6 +599,8 @@ mod tests {
         let root = fixture_root("duplicate");
         let trajectory = fixture_trajectory(&root, b"image bytes");
         let config = fixture_config(root.clone());
+        let policy_trace_store = RetrievalPolicyTraceFileStoreV1::open(&config.policy_trace_dir)
+            .expect("open policy trace store");
         let mut trajectories = Vec::new();
         let mut index = None;
         let mut policy_memory = RetrievalPolicyMemoryV1::default();
@@ -567,6 +611,7 @@ mod tests {
             &mut trajectories,
             &mut index,
             &mut policy_memory,
+            &policy_trace_store,
         ).expect("first insert");
         let result = handle_request(
             json!({"op": "insert", "trajectory": trajectory}),
@@ -574,6 +619,7 @@ mod tests {
             &mut trajectories,
             &mut index,
             &mut policy_memory,
+            &policy_trace_store,
         );
         assert!(result.is_err());
         assert_eq!(trajectories.len(), 1);
@@ -585,6 +631,8 @@ mod tests {
         let root = fixture_root("digest-mismatch");
         let trajectory = fixture_trajectory(&root, b"original bytes");
         let config = fixture_config(root.clone());
+        let policy_trace_store = RetrievalPolicyTraceFileStoreV1::open(&config.policy_trace_dir)
+            .expect("open policy trace store");
         let image_path = root.join("trajectory-1/state.png");
         let mut trajectories = Vec::new();
         let mut index = None;
@@ -596,6 +644,7 @@ mod tests {
             &mut trajectories,
             &mut index,
             &mut policy_memory,
+            &policy_trace_store,
         ).expect("insert");
         fs::write(&image_path, b"replaced bytes").expect("tamper image bytes");
 
@@ -605,6 +654,7 @@ mod tests {
             &mut trajectories,
             &mut index,
             &mut policy_memory,
+            &policy_trace_store,
         );
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("ScreenshotDigestMismatch"));
