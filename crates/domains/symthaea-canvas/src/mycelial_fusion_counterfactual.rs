@@ -34,6 +34,7 @@ pub const MAX_MYCELIAL_FUSION_DISRUPTION_SCENARIOS: usize = 768;
 pub const MAX_MYCELIAL_FUSION_ID_BYTES: usize = 128;
 pub const MAX_MYCELIAL_FUSION_TOTAL_DEMAND_WEIGHT: u128 = 9_007_199_254_740_992;
 pub const MAX_MYCELIAL_FUSION_DEMAND_EVALUATIONS: usize = 65_536;
+pub const MAX_MYCELIAL_FUSION_GRAPH_VIEW_EVALUATIONS: usize = 8_192;
 pub const MIN_SIDE_CONTACT_FRACTION_MICROS: u32 = 50_000;
 pub const MAX_SIDE_CONTACT_FRACTION_MICROS: u32 = 950_000;
 const PARAMETER_SCALE: f64 = 1_000_000.0;
@@ -204,6 +205,7 @@ pub enum MycelialFusionCounterfactualError {
     TooManyDemandPairs(usize),
     TooManyDisruptionScenarios(usize),
     DemandEvaluationBudgetExceeded(usize),
+    GraphViewEvaluationBudgetExceeded(usize),
     ResourceLimitExceeded,
     InvalidCandidate(String),
     DuplicateCandidateId(String),
@@ -243,6 +245,10 @@ impl fmt::Display for MycelialFusionCounterfactualError {
             Self::DemandEvaluationBudgetExceeded(count) => write!(
                 f,
                 "fusion counterfactual demand evaluations {count} exceed {MAX_MYCELIAL_FUSION_DEMAND_EVALUATIONS}"
+            ),
+            Self::GraphViewEvaluationBudgetExceeded(count) => write!(
+                f,
+                "fusion counterfactual graph-view evaluations {count} exceed {MAX_MYCELIAL_FUSION_GRAPH_VIEW_EVALUATIONS}"
             ),
             Self::ResourceLimitExceeded => {
                 write!(f, "counterfactual graph exceeds resource limits")
@@ -1137,19 +1143,27 @@ fn validate_inputs(
             demands.len(),
         ));
     }
-    let demand_evaluations = candidates
-        .len()
-        .saturating_mul(disruptions.len().saturating_add(1))
-        .saturating_mul(demands.len().max(1));
-    if demand_evaluations > MAX_MYCELIAL_FUSION_DEMAND_EVALUATIONS {
-        return Err(MycelialFusionCounterfactualError::DemandEvaluationBudgetExceeded(
-            demand_evaluations,
-        ));
-    }
     if disruptions.len() > MAX_MYCELIAL_FUSION_DISRUPTION_SCENARIOS {
         return Err(
             MycelialFusionCounterfactualError::TooManyDisruptionScenarios(disruptions.len()),
         );
+    }
+    let graph_view_evaluations = candidates
+        .len()
+        .saturating_mul(disruptions.len().saturating_add(1))
+        .saturating_mul(2);
+    if graph_view_evaluations > MAX_MYCELIAL_FUSION_GRAPH_VIEW_EVALUATIONS {
+        return Err(
+            MycelialFusionCounterfactualError::GraphViewEvaluationBudgetExceeded(
+                graph_view_evaluations,
+            ),
+        );
+    }
+    let demand_evaluations = graph_view_evaluations.saturating_mul(demands.len());
+    if demand_evaluations > MAX_MYCELIAL_FUSION_DEMAND_EVALUATIONS {
+        return Err(MycelialFusionCounterfactualError::DemandEvaluationBudgetExceeded(
+            demand_evaluations,
+        ));
     }
     let mut candidate_ids = BTreeSet::new();
     for candidate in candidates {
