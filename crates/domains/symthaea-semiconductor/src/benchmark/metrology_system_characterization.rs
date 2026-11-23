@@ -11,12 +11,10 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
 
-pub const SYNTHETIC_MSA_SCENARIO_SCHEMA_V1: &str =
-    "luminous.semi-bench.synthetic-msa-scenario.v1";
+pub const SYNTHETIC_MSA_SCENARIO_SCHEMA_V1: &str = "luminous.semi-bench.synthetic-msa-scenario.v1";
 pub const SYNTHETIC_MSA_POLICY_VIEW_SCHEMA_V1: &str =
     "luminous.semi-bench.synthetic-msa-policy-view.v1";
-pub const SYNTHETIC_MSA_REPORT_SCHEMA_V1: &str =
-    "luminous.semi-bench.synthetic-msa-report.v1";
+pub const SYNTHETIC_MSA_REPORT_SCHEMA_V1: &str = "luminous.semi-bench.synthetic-msa-report.v1";
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SyntheticMsaScenarioConfigV1 {
@@ -252,9 +250,8 @@ pub fn generate_synthetic_msa_episode_v1(
     let appraiser_effects: Vec<f64> = (0..config.appraiser_count)
         .map(|_| config.appraiser_effect_stddev * rng.centered_noise())
         .collect();
-    let mut observations = Vec::with_capacity(
-        config.part_count * config.appraiser_count * config.replicates_per_cell,
-    );
+    let mut observations =
+        Vec::with_capacity(config.part_count * config.appraiser_count * config.replicates_per_cell);
 
     for part_index in 0..config.part_count {
         let part_id = format!("artifact-{part_index:04}");
@@ -262,8 +259,7 @@ pub fn generate_synthetic_msa_episode_v1(
             config.reference_value_start + part_index as f64 * config.reference_value_step;
         for appraiser_index in 0..config.appraiser_count {
             let appraiser_id = format!("appraiser-{appraiser_index:03}");
-            let interaction =
-                config.part_appraiser_interaction_stddev * rng.centered_noise();
+            let interaction = config.part_appraiser_interaction_stddev * rng.centered_noise();
             for replicate_index in 0..config.replicates_per_cell {
                 let repeatability_error = config.repeatability_stddev * rng.centered_noise();
                 let measured_value = reference_value
@@ -271,8 +267,9 @@ pub fn generate_synthetic_msa_episode_v1(
                     + appraiser_effects[appraiser_index]
                     + interaction
                     + repeatability_error;
-                let observation_id =
-                    format!("measurement-{part_index:04}-{appraiser_index:03}-{replicate_index:03}");
+                let observation_id = format!(
+                    "measurement-{part_index:04}-{appraiser_index:03}-{replicate_index:03}"
+                );
                 observations.push(SyntheticMsaObservationV1 {
                     observation_id,
                     part_id: part_id.clone(),
@@ -344,7 +341,9 @@ pub fn evaluate_synthetic_msa_episode_v1(
         ));
     }
     if view.part_count < 2 || view.appraiser_count < 2 || view.replicates_per_cell < 2 {
-        return Err(SyntheticMsaError("MSA design degrees of freedom are insufficient".into()));
+        return Err(SyntheticMsaError(
+            "MSA design degrees of freedom are insufficient".into(),
+        ));
     }
     if json_sha256(&view.observations)? != view.observation_packet_sha256 {
         return Err(SyntheticMsaError(
@@ -503,15 +502,13 @@ pub fn evaluate_synthetic_msa_episode_v1(
     let df_part = (part_count - 1) as f64;
     let df_appraiser = (appraiser_count - 1) as f64;
     let df_interaction = ((part_count - 1) * (appraiser_count - 1)) as f64;
-    let df_repeatability =
-        (part_count * appraiser_count * (replicate_count - 1)) as f64;
+    let df_repeatability = (part_count * appraiser_count * (replicate_count - 1)) as f64;
     let ms_repeatability = ss_repeatability / df_repeatability;
     let ms_interaction = replicate_count as f64 * ss_interaction / df_interaction;
     let ms_part = (appraiser_count * replicate_count) as f64 * ss_part / df_part;
     let ms_appraiser = (part_count * replicate_count) as f64 * ss_appraiser / df_appraiser;
 
-    let estimated_interaction_raw =
-        (ms_interaction - ms_repeatability) / replicate_count as f64;
+    let estimated_interaction_raw = (ms_interaction - ms_repeatability) / replicate_count as f64;
     let estimated_appraiser_raw =
         (ms_appraiser - ms_interaction) / (part_count * replicate_count) as f64;
     let estimated_part_raw =
@@ -520,23 +517,23 @@ pub fn evaluate_synthetic_msa_episode_v1(
     let estimated_interaction = estimated_interaction_raw.max(0.0);
     let estimated_appraiser = estimated_appraiser_raw.max(0.0);
     let estimated_part = estimated_part_raw.max(0.0);
-    let estimated_gauge_rr =
-        estimated_appraiser + estimated_interaction + ms_repeatability;
+    let estimated_gauge_rr = estimated_appraiser + estimated_interaction + ms_repeatability;
     let reference_values: Vec<f64> = part_references
         .into_iter()
         .map(|value| value.expect("balanced design validates every part reference"))
         .collect();
-    let true_part_variance =
-        sample_variance(&reference_values).unwrap_or(0.0);
+    let true_part_variance = sample_variance(&reference_values).unwrap_or(0.0);
     let estimated_total_variance = estimated_part + estimated_gauge_rr;
-    let percent_gauge_rr_contribution = (estimated_total_variance > 0.0)
-        .then(|| estimated_gauge_rr / estimated_total_variance);
-    let ndc_unrounded = (estimated_gauge_rr > 0.0)
-        .then(|| 1.41 * (estimated_part / estimated_gauge_rr).sqrt());
+    let percent_gauge_rr_contribution =
+        (estimated_total_variance > 0.0).then(|| estimated_gauge_rr / estimated_total_variance);
+    let ndc_unrounded =
+        (estimated_gauge_rr > 0.0).then(|| 1.41 * (estimated_part / estimated_gauge_rr).sqrt());
     let mean_bias = bias_values.iter().sum::<f64>() / bias_values.len() as f64;
     let bias_sample_stddev = sample_variance(&bias_values).map(f64::sqrt);
     let known_appraiser_variance = episode.known_model.known_appraiser_variance;
-    let known_interaction_variance = episode.known_model.known_part_appraiser_interaction_variance;
+    let known_interaction_variance = episode
+        .known_model
+        .known_part_appraiser_interaction_variance;
     let known_repeatability_variance = episode.known_model.known_repeatability_variance;
     let known_gauge_rr_variance =
         known_appraiser_variance + known_interaction_variance + known_repeatability_variance;
@@ -626,10 +623,8 @@ mod tests {
 
     #[test]
     fn fixed_seed_reproduces_observations_and_msa_report() {
-        let first =
-            generate_synthetic_msa_episode_v1(&config(42)).unwrap();
-        let second =
-            generate_synthetic_msa_episode_v1(&config(42)).unwrap();
+        let first = generate_synthetic_msa_episode_v1(&config(42)).unwrap();
+        let second = generate_synthetic_msa_episode_v1(&config(42)).unwrap();
         let first_report = evaluate_synthetic_msa_episode_v1(&first).unwrap();
         let second_report = evaluate_synthetic_msa_episode_v1(&second).unwrap();
         assert_eq!(
@@ -652,10 +647,7 @@ mod tests {
             (report.estimated_repeatability_variance - report.known_repeatability_variance).abs()
                 < 0.03
         );
-        assert!(
-            (report.estimated_gauge_rr_variance - report.known_gauge_rr_variance).abs()
-                < 0.20
-        );
+        assert!((report.estimated_gauge_rr_variance - report.known_gauge_rr_variance).abs() < 0.20);
         assert!(report.mean_bias > 0.0);
     }
 
@@ -666,9 +658,10 @@ mod tests {
         scenario.appraiser_effect_stddev = 0.0;
         scenario.part_appraiser_interaction_stddev = 0.0;
         scenario.repeatability_stddev = 0.0;
-        let report =
-            evaluate_synthetic_msa_episode_v1(&generate_synthetic_msa_episode_v1(&scenario).unwrap())
-                .unwrap();
+        let report = evaluate_synthetic_msa_episode_v1(
+            &generate_synthetic_msa_episode_v1(&scenario).unwrap(),
+        )
+        .unwrap();
         assert_eq!(report.estimated_gauge_rr_variance, 0.0);
         assert_eq!(report.estimated_repeatability_variance, 0.0);
         assert!(report.ndc_unrounded.is_none());
@@ -678,8 +671,7 @@ mod tests {
 
     #[test]
     fn evaluator_rejects_a_missing_measurement_cell_even_after_resealing_packet() {
-        let mut episode =
-            generate_synthetic_msa_episode_v1(&config(19)).unwrap();
+        let mut episode = generate_synthetic_msa_episode_v1(&config(19)).unwrap();
         episode.policy_view.observations.pop();
         episode.policy_view.observation_packet_sha256 =
             json_sha256(&episode.policy_view.observations).unwrap();
@@ -688,8 +680,7 @@ mod tests {
 
     #[test]
     fn evaluator_rejects_duplicate_measurement_identity() {
-        let mut episode =
-            generate_synthetic_msa_episode_v1(&config(23)).unwrap();
+        let mut episode = generate_synthetic_msa_episode_v1(&config(23)).unwrap();
         episode.policy_view.observations[1].observation_id =
             episode.policy_view.observations[0].observation_id.clone();
         episode.policy_view.observation_packet_sha256 =
