@@ -1093,15 +1093,39 @@ mod tests {
         quota_per_stratum: usize,
         seed: u64,
     ) -> SyntheticMetrologyPolicyConfigV1 {
+        policy_config_with_weights(
+            policy_view,
+            policy_id,
+            exploit_budget,
+            audit_budget,
+            quota_per_stratum,
+            seed,
+            1.0,
+            0.0,
+            0.0,
+        )
+    }
+
+    fn policy_config_with_weights(
+        policy_view: &SyntheticFabPolicyViewV1,
+        policy_id: &str,
+        exploit_budget: u64,
+        audit_budget: u64,
+        quota_per_stratum: usize,
+        seed: u64,
+        risk_weight: f64,
+        uncertainty_weight: f64,
+        evsi_weight: f64,
+    ) -> SyntheticMetrologyPolicyConfigV1 {
         SyntheticMetrologyPolicyConfigV1 {
             policy_id: policy_id.into(),
             seed,
             total_cost_budget: exploit_budget + audit_budget,
             exploit_cost_budget: exploit_budget,
             audit_cost_budget: audit_budget,
-            risk_weight: 1.0,
-            uncertainty_weight: 0.0,
-            evsi_weight: 0.0,
+            risk_weight,
+            uncertainty_weight,
+            evsi_weight,
             audit_quota_by_stratum: policy_quotas(policy_view, quota_per_stratum),
         }
     }
@@ -1329,6 +1353,47 @@ mod tests {
         assert!(risk_run.evaluation.escaped_defect_fraction.is_some());
         assert!(risk_run.evaluation.cost_per_defect_captured.is_some());
         assert_eq!(risk_run.evaluation.measurement_reduction_fraction, 0.75);
+    }
+
+    #[test]
+    fn risk_uncertainty_and_evsi_proxy_policies_run_at_matched_budgets() {
+        let episode = generate_synthetic_fab_episode_v1(&config(
+            SyntheticFabRegimeV1::GradualProcessDrift,
+            37,
+        ))
+        .unwrap();
+        let view = episode.policy_view();
+        let semantics = synthetic_defect_semantics_v1(0.62).unwrap();
+        let policy_specs = [
+            ("risk-only", 1.0, 0.0, 0.0),
+            ("uncertainty-only", 0.0, 1.0, 0.0),
+            ("evsi-proxy-only", 0.0, 0.0, 1.0),
+        ];
+
+        for (policy_id, risk, uncertainty, evsi) in policy_specs {
+            let policy = policy_config_with_weights(
+                view,
+                policy_id,
+                16,
+                16,
+                4,
+                53,
+                risk,
+                uncertainty,
+                evsi,
+            );
+            let run = run_synthetic_metrology_policy_v1(
+                &episode,
+                view,
+                &semantics,
+                &policy,
+            )
+            .unwrap();
+            assert_eq!(run.selection.total_selected_cost, 32);
+            assert_eq!(run.selection.exploit_count, 16);
+            assert_eq!(run.selection.randomized_audit_count, 16);
+            assert!(run.evaluation.design_variance_qualified);
+        }
     }
 
     #[test]
