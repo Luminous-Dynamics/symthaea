@@ -68,7 +68,7 @@ cargo test --manifest-path research/mace-memory-lifecycle-kernel/Cargo.toml
 cargo clippy --manifest-path research/mace-memory-lifecycle-kernel/Cargo.toml --all-targets -- -D warnings
 ```
 
-The authored tests cover restart persistence, tombstone round-trip, stale writer conflict, concurrent publication, tamper detection, generation-gap rejection and ignoring an interrupted pending temporary file. They have not been executed here.
+The nine authored tests cover restart persistence, tombstone round-trip, stale writer conflict, concurrent publication, tombstone regression rejection, malformed-name rejection, tamper detection, generation-gap rejection, and interrupted pending files. An additional end-to-end T10 fixture commits a protected record, takes a stale pre-erasure data backup, erases the record, reopens the current file witness and verifies that reconciliation removes the resurrected record. The same fixture restores both the pre-erasure data and pre-erasure local witness and demonstrates that the pair is mutually consistent again: the erased record is accepted. This is an explicit test of the adapter's common-rollback-domain limitation, not a security pass. The tests have not been executed here.
 
 ## Next gates
 
