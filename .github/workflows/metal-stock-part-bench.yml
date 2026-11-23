@@ -1,0 +1,93 @@
+name: Metal Stock-to-Part Benchmark
+
+on:
+  push:
+    branches: ["feat/metal-stock-part-bench-v0-1"]
+    paths:
+      - "docs/tech/METAL_STOCK_TO_PART_BENCHMARK_V0_1.md"
+      - "docs/tech/metal-stock-part-corpus-v0.1.json"
+      - "tools/metal-stock-part-bench/**"
+      - ".github/workflows/metal-stock-part-bench.yml"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "docs/tech/METAL_STOCK_TO_PART_BENCHMARK_V0_1.md"
+      - "docs/tech/metal-stock-part-corpus-v0.1.json"
+      - "tools/metal-stock-part-bench/**"
+      - ".github/workflows/metal-stock-part-bench.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: metal-stock-part-bench-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          components: rustfmt
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/metal-stock-part-bench/Cargo.toml -- --check
+      - name: Run contract and adversarial tests
+        run: cargo test --manifest-path tools/metal-stock-part-bench/Cargo.toml
+      - name: Validate corpus at the exact source commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_commit="$(git rev-parse HEAD)"
+          test "$source_commit" = "${{ github.event.pull_request.head.sha || github.sha }}"
+          cargo run --quiet --manifest-path tools/metal-stock-part-bench/Cargo.toml -- \
+            docs/tech/metal-stock-part-corpus-v0.1.json \
+            --source-commit "$source_commit" > metal-stock-part-receipt.json
+          jq -e '
+            .result == "validated"
+            and .scenario_count == 24
+            and .expected_controls_matched == 24
+            and (.corpus_sha256 | test("^[0-9a-f]{64}$"))
+            and (.source_commit | test("^[0-9a-f]{40}$"))
+            and ([.scenarios[].scenario_id] == [
+              "SYNTHETIC_VALID_VIRGIN_STOCK_TO_MACHINED_PART",
+              "SYNTHETIC_MIXED_SCRAP_CANNOT_SATISFY_EXACT_ALLOY",
+              "SYNTHETIC_LOT_LINEAGE_MISMATCH",
+              "SYNTHETIC_REQUIRED_HEAT_TREATMENT_NOT_EXECUTED",
+              "SYNTHETIC_SIMULATION_IS_NOT_INSPECTION",
+              "SYNTHETIC_STALE_METROLOGY_CALIBRATION",
+              "SYNTHETIC_MASS_CREATION",
+              "SYNTHETIC_CHIPS_NOT_CLEAN_OFFCUT_CREDIT",
+              "SYNTHETIC_REQUIRED_MACHINE_CAPABILITY_UNAVAILABLE",
+              "SYNTHETIC_PART_OUT_OF_TOLERANCE",
+              "SYNTHETIC_QUALIFIED_SECONDARY_FEEDSTOCK",
+              "SYNTHETIC_SECONDARY_CONTAMINATION_UNKNOWN",
+              "SYNTHETIC_STOCK_SOURCE_REFERENCE_MISSING",
+              "SYNTHETIC_GRADE_EVIDENCE_MISSING",
+              "SYNTHETIC_MATERIAL_STATE_MISMATCH",
+              "SYNTHETIC_PROCESS_RUN_RECORD_MISSING",
+              "SYNTHETIC_VALID_REPAIR_REMANUFACTURE",
+              "SYNTHETIC_REPAIR_SCOPE_MISSING",
+              "SYNTHETIC_INSPECTION_RECORD_MISSING",
+              "SYNTHETIC_FEEDSTOCK_KIND_UNKNOWN",
+              "SYNTHETIC_CURRENT_CALIBRATION_WITHOUT_RECORD",
+              "SYNTHETIC_MEASUREMENT_UNCERTAINTY_MISSING",
+              "SYNTHETIC_UNCERTAINTY_EXCEEDS_TOLERANCE_MARGIN",
+              "SYNTHETIC_REQUIRED_OPERATION_NOT_PLANNED_BUT_EXECUTED"
+            ])
+            and ([.scenarios[].actual_disposition] == [
+              "pass", "reject", "reject", "reject", "reject",
+              "reject", "reject", "reject", "reject", "reject",
+              "pass", "reject", "reject", "reject", "reject",
+              "reject", "pass", "reject", "reject", "reject",
+              "reject", "reject", "reject", "reject"
+            ])
+          ' metal-stock-part-receipt.json
