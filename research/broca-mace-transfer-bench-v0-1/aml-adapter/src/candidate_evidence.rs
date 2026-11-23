@@ -16,6 +16,8 @@ use sha2::{Digest, Sha256};
 
 pub const CANDIDATE_EVIDENCE_SCHEMA: &str = "mace_candidate_evidence_v0_1";
 pub const MAX_CANDIDATE_EVIDENCE_RECORDS: usize = 10_000;
+pub const MAX_CANDIDATE_EVIDENCE_RECORD_BYTES: usize = 256 * 1024;
+pub const MAX_CANDIDATE_EVIDENCE_BATCH_BYTES: usize = 16 * 1024 * 1024;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum EvidenceModalityV1 {
@@ -106,6 +108,8 @@ pub enum CandidateEvidenceReject {
     MissingDerivationReceipt,
     EmptyBatch,
     TooManyRecords,
+    RecordTooLarge,
+    BatchTooLarge,
     MixedCandidateIdentity,
     DuplicateEvidenceId,
     DuplicateChannelRank,
@@ -290,8 +294,14 @@ fn parse_record(line: &str) -> Result<CandidateEvidenceV1, CandidateEvidenceReje
 pub fn parse_candidate_evidence_jsonl(
     input: &str,
 ) -> Result<CandidateEvidenceBatchV1, CandidateEvidenceReject> {
+    if input.len() > MAX_CANDIDATE_EVIDENCE_BATCH_BYTES {
+        return Err(CandidateEvidenceReject::BatchTooLarge);
+    }
     let mut evidence = Vec::new();
     for line in input.lines().filter(|line| !line.trim().is_empty()) {
+        if line.len() > MAX_CANDIDATE_EVIDENCE_RECORD_BYTES {
+            return Err(CandidateEvidenceReject::RecordTooLarge);
+        }
         if evidence.len() >= MAX_CANDIDATE_EVIDENCE_RECORDS {
             return Err(CandidateEvidenceReject::TooManyRecords);
         }
@@ -567,6 +577,20 @@ mod tests {
         assert_eq!(
             parse_candidate_evidence_jsonl(&jsonl(&[score])),
             Err(CandidateEvidenceReject::InvalidScore)
+        );
+    }
+
+    #[test]
+    fn rejects_oversized_records_and_batches_before_parsing() {
+        let oversized_record = " ".repeat(MAX_CANDIDATE_EVIDENCE_RECORD_BYTES + 1);
+        assert_eq!(
+            parse_candidate_evidence_jsonl(&oversized_record),
+            Err(CandidateEvidenceReject::BatchTooLarge)
+        );
+        let oversized_batch = " ".repeat(MAX_CANDIDATE_EVIDENCE_BATCH_BYTES + 1);
+        assert_eq!(
+            parse_candidate_evidence_jsonl(&oversized_batch),
+            Err(CandidateEvidenceReject::BatchTooLarge)
         );
     }
 
