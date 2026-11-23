@@ -19,19 +19,20 @@ This is a deliberately narrow first family. It avoids ambiguities about pulse-en
 - `akpd-pulse-family-v0.1.schema.json`: JSON Schema Draft 2020-12 for family bounds, physics cohort, search budget, control policy, split role and provenance.
 - `fixtures/synthetic-pulse-family-v0.1.json`: synthetic wire-format fixture only. Its all-zero initial-state digest and placeholder solver revisions are intentionally nonphysical. `physical_execution_authorized=false`.
 
-## Fail-closed semantic checks still required
+## Implemented validation boundary
 
-JSON Schema validates field shape and local numeric ranges. A runtime validator must additionally reject:
-- minimum values greater than maximum values;
-- pulse time outside the declared physical horizon;
-- amplitude beyond the declared kick cap;
-- inconsistent units or normalization;
-- initial-state / source / solver identity mismatches;
-- a sealed-test contract with acquisition enabled;
-- missing or non-independent confirmation references;
-- invalid energy / momentum accounting or an unqualified physical reference.
+JSON Schema validates the wire shape and local numeric ranges. The `symthaea-plasma-probes` Rust crate adds semantic checks for ordered physical/control ranges, unit agreement, the declared time horizon, a positive post-pulse observation window, mandatory controls and response metrics, sealed-test acquisition lockout, pinned confirmation identity for confirmation/sealed roles, and synthetic-fixture physical-execution lockout.
 
-The schema alone does not prove physical admissibility or numerical convergence. A selected intervention is only a *candidate witness*. It becomes a confirmed physical counterexample only after independent replay and spatial, velocity-domain and timestep refinement.
+The Rust crate also provides deterministic bounded grid enumeration and a BLAKE3 identity:
+- phase is wrapped to [-pi, pi);
+- signed zero is canonicalized;
+- zero-amplitude candidates collapse to one no-op identity;
+- the family fingerprint binds the physics cohort, control bounds, initial-state digest, reference solver revision, generator seed and source-record references;
+- candidate-representation revision is intentionally excluded so the same physical pulse can be matched across representation competitors.
+
+The schema and validator still do **not** prove that a referenced commit or data digest exists, that two references are truly independent, that an intervention is physically justified for a particular checkpoint, or that energy/momentum accounting is correct. Those require the run/evidence layer and an independent reference.
+
+A selected intervention remains a *candidate witness*. It becomes a confirmed physical counterexample only after independent replay and spatial, velocity-domain and timestep refinement.
 
 A finite search provides empirical intervention coverage; it is not a continuous worst-case certificate without a separate, justified covering or regularity argument.
 
