@@ -46,3 +46,20 @@ This crate does not implement a candidate controller, scheduler, sensor policy, 
 ## Verification boundary
 
 Fourteen deterministic Rust unit tests are authored and passed on exact source head 0e5f80ca51541711752869d8d6bfe0304df1496d (workflow run 45086902847, Rust 1.96.0): changed-crate formatting passed, 14/14 tests passed, strict Clippy passed. This qualifies only bounded arithmetic, arm pairing, identity checks and signed contrast semantics for supplied records. It does not validate the evaluator's loss oracle, causal treatment design, support completeness, statistical significance, physical latency, energy, or deployment readiness.
+
+
+## Cluster-level inference handoff
+
+The evaluator now retains the complete validated `PairedRunIdentity` inside each per-world certificate and exposes `cluster_adapter`.
+
+`export_cluster_deltas()` converts those evaluator-produced certificates into the exact `VIS-DVPC-CLUSTER-DELTAS-001-v1` input consumed by [#8578 — VIS-DVPC-014](https://github.com/Luminous-Dynamics/symthaea/pull/8578). It does not implement a second statistical engine.
+
+Aggregation is hierarchical and deterministic:
+1. Validate each certificate by recomputing the four signed effects from the raw four-arm regrets.
+2. Average hidden-world outcomes within an episode.
+3. Average episode means within each preregistered independent cluster.
+4. Emit one cluster delta for each of four contrasts: compute benefit, observation benefit, joint benefit and compute×observation interaction.
+
+The adapter rejects duplicated cluster/episode/world rows, an episode assigned to multiple clusters, context drift, initial-state/seed drift within an episode, and hidden-world cohort/digest changes across episodes within a cluster. It requires at least five independent clusters as a mechanics floor, not a scientific sample-size recommendation.
+
+#8578 alone owns cluster-bootstrap intervals, sign-flip diagnostics and Bonferroni adjustment. Those outputs remain approximate/assumption-dependent and do not establish a universal SOTA result.
