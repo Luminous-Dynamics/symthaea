@@ -15,6 +15,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import stat
 import subprocess
 import tempfile
 import threading
@@ -65,6 +66,18 @@ class MaceLongMemEvalV2Memory(Memory):
 
         self.source_screenshot_root = Path(source_root_value).expanduser().resolve(strict=True)
         require(self.source_screenshot_root.is_dir(), "source_screenshot_root must be a directory")
+        require(
+            hasattr(os, "O_NOFOLLOW") and hasattr(os, "O_DIRECTORY"),
+            "secure screenshot ingress requires O_NOFOLLOW and O_DIRECTORY support",
+        )
+        root_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+        if hasattr(os, "O_CLOEXEC"):
+            root_flags |= os.O_CLOEXEC
+        self._source_root_fd = os.open(self.source_screenshot_root, root_flags)
+        require(
+            stat.S_ISDIR(os.fstat(self._source_root_fd).st_mode),
+            "pinned screenshot root descriptor is not a directory",
+        )
         self.workspace_dir = Path(workspace_value).expanduser().resolve()
         self.workspace_dir.mkdir(parents=True, exist_ok=True)
         self.asset_root = self.workspace_dir / "assets"
@@ -219,6 +232,99 @@ class MaceLongMemEvalV2Memory(Memory):
             return resolved
         raise RuntimeError(f"Could not resolve screenshot under configured source root: {reference}")
 
+    def _read_source_screenshot(self, resolved: Path) -> bytes:
+        """Read an image through the pinned root fd without following swapped symlinks."""
+        try:
+            relative = resolved.relative_to(self.source_screenshot_root)
+        except ValueError as error:
+            raise RuntimeError("Resolved screenshot is outside the pinned source root") from error
+        parts = relative.parts
+        require(
+            bool(parts) and all(part not in {"", ".", ".."} for part in parts),
+            "Resolved screenshot has unsafe path components",
+        )
+        require(
+            getattr(self, "_source_root_fd", -1) >= 0,
+            "Pinned screenshot root descriptor is unavailable",
+        )
+
+        directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+        file_flags = os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_NONBLOCK", 0)
+        if hasattr(os, "O_CLOEXEC"):
+            directory_flags |= os.O_CLOEXEC
+            file_flags |= os.O_CLOEXEC
+
+        opened_directories: list[int] = []
+        current_directory_fd = self._source_root_fd
+        try:
+            for component in parts[:-1]:
+                next_fd = os.open(
+                    component,
+                    directory_flags,
+                    dir_fd=current_directory_fd,
+                )
+                opened_directories.append(next_fd)
+                current_directory_fd = next_fd
+
+            image_fd = os.open(
+                parts[-1],
+                file_flags,
+                dir_fd=current_directory_fd,
+            )
+            try:
+                before = os.fstat(image_fd)
+                require(stat.S_ISREG(before.st_mode), "Screenshot is not a regular file")
+                require(
+                    before.st_size <= MAX_SCREENSHOT_BYTES,
+                    f"Screenshot exceeds {MAX_SCREENSHOT_BYTES} bytes",
+                )
+
+                chunks: list[bytes] = []
+                total = 0
+                while total <= MAX_SCREENSHOT_BYTES:
+                    chunk = os.read(
+                        image_fd,
+                        min(1024 * 1024, MAX_SCREENSHOT_BYTES + 1 - total),
+                    )
+                    if not chunk:
+                        break
+                    chunks.append(chunk)
+                    total += len(chunk)
+                require(
+                    total <= MAX_SCREENSHOT_BYTES,
+                    f"Screenshot exceeds {MAX_SCREENSHOT_BYTES} bytes",
+                )
+
+                after = os.fstat(image_fd)
+                before_identity = (
+                    before.st_dev,
+                    before.st_ino,
+                    before.st_size,
+                    before.st_mtime_ns,
+                    before.st_ctime_ns,
+                )
+                after_identity = (
+                    after.st_dev,
+                    after.st_ino,
+                    after.st_size,
+                    after.st_mtime_ns,
+                    after.st_ctime_ns,
+                )
+                require(
+                    before_identity == after_identity and total == before.st_size,
+                    "Screenshot changed while it was being read",
+                )
+                return b"".join(chunks)
+            finally:
+                os.close(image_fd)
+        except OSError as error:
+            raise RuntimeError(
+                "Screenshot path changed or could not be opened safely without following links"
+            ) from error
+        finally:
+            for directory_fd in reversed(opened_directories):
+                os.close(directory_fd)
+
     def _prepare_trajectory(self, trajectory: dict[str, object]) -> tuple[str, str, str]:
         require(isinstance(trajectory, dict), "trajectory must be an object")
         trajectory_id = trajectory.get("id")
@@ -259,16 +365,7 @@ class MaceLongMemEvalV2Memory(Memory):
                     f"trajectory state {ordinal} requires a screenshot reference",
                 )
                 source = self._resolve_source_screenshot(screenshot_value)
-                source_size = source.stat().st_size
-                require(
-                    source_size <= MAX_SCREENSHOT_BYTES,
-                    f"screenshot {ordinal} exceeds {MAX_SCREENSHOT_BYTES} bytes",
-                )
-                image_bytes = source.read_bytes()
-                require(
-                    len(image_bytes) == source_size,
-                    f"screenshot {ordinal} changed while it was being copied",
-                )
+                image_bytes = self._read_source_screenshot(source)
                 total_screenshot_bytes += len(image_bytes)
                 require(
                     total_screenshot_bytes <= MAX_TRAJECTORY_SCREENSHOT_BYTES,
@@ -382,20 +479,23 @@ class MaceLongMemEvalV2Memory(Memory):
             self._closed = True
             process = self._process
             self._process = None
-            if process is None:
-                return
-            if process.stdin is not None:
+            if process is not None:
+                if process.stdin is not None:
+                    try:
+                        process.stdin.close()
+                    except OSError:
+                        pass
                 try:
-                    process.stdin.close()
-                except OSError:
-                    pass
-            try:
-                process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                process.terminate()
-                try:
-                    process.wait(timeout=2)
+                    process.wait(timeout=5)
                 except subprocess.TimeoutExpired:
-                    process.kill()
-                    process.wait()
+                    process.terminate()
+                    try:
+                        process.wait(timeout=2)
+                    except subprocess.TimeoutExpired:
+                        process.kill()
+                        process.wait()
+            root_fd = getattr(self, "_source_root_fd", -1)
+            if root_fd >= 0:
+                os.close(root_fd)
+                self._source_root_fd = -1
 
