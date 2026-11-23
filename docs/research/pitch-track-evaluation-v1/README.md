@@ -26,7 +26,7 @@ A metric is `None` when its denominator is empty or it cannot be estimated. We d
 - Frame indices must be strictly increasing.
 - F0 is either a finite positive frequency or `None`; zero Hz is not an unvoiced sentinel.
 - Optional periodicity is constrained to [0, 1] but is not interpreted as a calibrated probability.
-- One-to-one monotonic timestamp alignment uses the configured maximum difference (default 2.5 ms; adjust and freeze it for other frame cadences). If multiple estimates fall within tolerance, the scorer prefers the locally closest pair; displaced observations remain in the unmatched denominator.
+- One-to-one monotonic timestamp alignment uses the configured maximum difference (default 2 ms; adjust and freeze it for other frame cadences). To guarantee unique matches, adjacent timestamps within either input track must be separated by strictly more than twice the tolerance; otherwise the scorer rejects the comparison rather than guessing or silently sacrificing coverage.
 
 ## Known-answer tests
 
