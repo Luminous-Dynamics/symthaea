@@ -700,6 +700,7 @@ mod tests {
         let verifier = PinnedEd25519QualificationVerifierV1::from_pinned_profile(
             &profile,
             &pin,
+            profile.profile_version,
         ).expect("profile pin");
         let mut receipt = receipt();
         receipt.key_id = key_id;
@@ -740,6 +741,7 @@ mod tests {
         let verifier = PinnedEd25519QualificationVerifierV1::from_pinned_profile(
             &profile,
             &pin,
+            profile.profile_version,
         ).expect("pinned profile records revocation");
         let mut receipt = receipt();
         receipt.key_id = key_id;
