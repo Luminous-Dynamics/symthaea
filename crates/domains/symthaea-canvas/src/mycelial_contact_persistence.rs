@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::mycelial_model::{MycelialFilament, MycelialModel, SpatialPoint3};
 use crate::mycelial_network::{
-    AnastomosisKind, MycelialAnastomosis, MycelialAnastomosisCandidate, MycelialNetworkConfig,
+    AnastomosisKind, MycelialAnastomosisCandidate, MycelialNetworkConfig,
     build_mycelial_network_graph,
 };
 
