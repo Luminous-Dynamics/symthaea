@@ -281,6 +281,12 @@ class MaceLongMemEvalV2IngressTests(unittest.TestCase):
                 receipt["candidate_jsonl_sha256"],
                 hashlib.sha256(candidate_jsonl.encode("utf-8")).hexdigest(),
             )
+            memory._verify_persisted_candidate_evidence()
+
+            candidate_path = next(path for path in files if path.suffix == ".jsonl")
+            candidate_path.write_text(candidate_jsonl + "\\n", encoding="utf-8")
+            with self.assertRaisesRegex(RuntimeError, "JSONL digest mismatch"):
+                memory._verify_persisted_candidate_evidence()
 
             changed = dict(candidate)
             changed["payload_sha256"] = "e" * 64
@@ -290,6 +296,28 @@ class MaceLongMemEvalV2IngressTests(unittest.TestCase):
                 memory._persist_candidate_envelope(
                     "opaque-invocation-1", query, changed_response
                 )
+
+    def test_restore_verifier_rejects_orphan_candidate_payload(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            memory = self.make_memory(root)
+            memory.run_id = "run-orphan"
+            memory.sidecar_binary_sha256 = "a" * 64
+            memory.candidate_evidence_dir = root / "workspace" / "candidate_evidence"
+            memory._persist_candidate_envelope(
+                "opaque-invocation",
+                "query",
+                {
+                    "candidate_evidence_jsonl": "",
+                    "candidate_record_count": 0,
+                    "candidate_set_sha256": None,
+                },
+            )
+            (memory.candidate_evidence_dir / "orphan.jsonl").write_text(
+                "orphan", encoding="utf-8"
+            )
+            with self.assertRaisesRegex(RuntimeError, "orphan or unreferenced"):
+                memory._verify_persisted_candidate_evidence()
 
     def test_zero_candidate_query_still_persists_an_empty_result_receipt(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
