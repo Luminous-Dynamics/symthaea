@@ -53,7 +53,7 @@ The paper reports strong low-label results, including 10-label cases, while also
 
 Do not merge correction recommendation, inspection allocation and process actuation into one leaderboard. They have different action spaces, loss functions and authority requirements.
 
-The Rust prototype now includes a paired multi-seed tournament runner. It applies every policy template to the same scenario seeds, requires one common total measurement budget, derives policy selection seeds deterministically from scenario and template seeds, and emits per-seed receipts plus per-policy means/sample standard deviations and support counts. The current test fixture covers stable, gradual-drift and abrupt-shift regimes with randomized audit, risk-prioritized exploit/audit and uncertainty-prioritized exploit/audit. These are executable synthetic comparisons, not evidence that one policy wins in an industrial fab.
+The Rust prototype now includes a paired multi-seed tournament runner. It applies every policy template to the same scenario seeds, requires one common total measurement budget and a shared selection seed, and emits per-seed receipts plus per-policy means/sample standard deviations and support counts. It also requires a named reference policy and reports paired per-scenario deltas for detection capture, total undetected-defect fraction and assay-adjusted prevalence error. The current test fixture covers stable, gradual-drift and abrupt-shift regimes with randomized audit, risk-prioritized exploit/audit and uncertainty-prioritized exploit/audit. These are executable synthetic comparisons, not evidence that one policy wins in an industrial fab.
 
 ## Standards and architecture alignment: NIST TIDAL
 
