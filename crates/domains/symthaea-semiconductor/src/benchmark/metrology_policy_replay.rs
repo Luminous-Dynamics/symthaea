@@ -846,6 +846,84 @@ pub fn build_synthetic_metrology_policy_v1(
     })
 }
 
+/// Builds an observation-only policy whose EVSI score is the exact one-step
+/// expected reduction in binary decision loss under the declared assay model.
+/// Candidates with non-positive net value after measurement cost receive an
+/// EVSI priority of zero. The supplied assay profile and loss model are bound
+/// into the policy and prediction digests; the policy still receives no hidden
+/// outcome or realized assay result.
+pub fn build_synthetic_decision_evsi_policy_v1(
+    policy_view: &SyntheticFabPolicyViewV1,
+    semantics: &BinaryMeasurandSemanticsV1,
+    metrology_characteristics: SyntheticMetrologyCharacteristicsV1,
+    decision_loss: SyntheticBinaryDecisionLossV1,
+    config: &SyntheticMetrologyPolicyConfigV1,
+) -> Result<MetrologyAuditPolicyV1, SyntheticFabReplayError> {
+    if config.evsi_weight <= 0.0 {
+        return Err(SyntheticFabReplayError(
+            "decision-theoretic EVSI policy requires a positive EVSI weight".into(),
+        ));
+    }
+    let mut policy = build_synthetic_metrology_policy_v1(policy_view, semantics, config)?;
+    for candidate in &mut policy.candidates {
+        let evsi = calculate_synthetic_binary_evsi_v1(
+            candidate.predicted_defect_probability,
+            metrology_characteristics,
+            decision_loss,
+        )?;
+        candidate.expected_value_of_information = evsi.normalized_net_value_score;
+    }
+    let model_material = (
+        SYNTHETIC_HEURISTIC_MODEL_V1,
+        "synthetic-binary-decision-evsi.v1",
+        metrology_characteristics,
+        decision_loss,
+    );
+    policy.model_sha256 = json_sha256(&model_material)?;
+    policy.prediction_packet_sha256 = json_sha256(&policy.candidates)?;
+    let observation_packet_sha256 = json_sha256(&policy_view.observations)?;
+    policy.policy_config_sha256 = json_sha256(&(
+        config,
+        observation_packet_sha256,
+        metrology_characteristics,
+        decision_loss,
+        "synthetic-binary-decision-evsi.v1",
+    ))?;
+    Ok(policy)
+}
+
+/// Runs the decision-theoretic EVSI challenger. The assay profile and loss
+/// model are declared policy inputs; only the final evaluator receives the
+/// episode's hidden outcomes.
+pub fn run_synthetic_decision_evsi_policy_v1(
+    episode: &SyntheticFabEpisodeV1,
+    policy_view: &SyntheticFabPolicyViewV1,
+    semantics: &BinaryMeasurandSemanticsV1,
+    metrology_characteristics: SyntheticMetrologyCharacteristicsV1,
+    decision_loss: SyntheticBinaryDecisionLossV1,
+    config: &SyntheticMetrologyPolicyConfigV1,
+) -> Result<SyntheticMetrologyPolicyRunV1, SyntheticFabReplayError> {
+    if json_sha256(&policy_view.observations)? != episode.observation_packet_sha256 {
+        return Err(SyntheticFabReplayError(
+            "policy view does not belong to the hidden-truth episode".into(),
+        ));
+    }
+    let policy = build_synthetic_decision_evsi_policy_v1(
+        policy_view,
+        semantics,
+        metrology_characteristics,
+        decision_loss,
+        config,
+    )?;
+    let selection = select_metrology_audit_v1(&policy)
+        .map_err(|error| SyntheticFabReplayError(format!("policy selection rejected: {error}")))?;
+    let evaluation = evaluate_synthetic_metrology_policy_v1(episode, &selection)?;
+    Ok(SyntheticMetrologyPolicyRunV1 {
+        selection,
+        evaluation,
+    })
+}
+
 /// Runs the existing audited selection mechanism and hidden-truth evaluator.
 /// A policy cannot access the episode or hidden truth during candidate building.
 pub fn run_synthetic_metrology_policy_v1(
