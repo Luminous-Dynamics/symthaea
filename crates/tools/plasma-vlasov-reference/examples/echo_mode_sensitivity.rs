@@ -21,7 +21,7 @@ const SECOND_TIME: f64 = 2.0;
 const OBSERVATION_TIME: f64 = 7.2;
 const INITIAL_AMPLITUDE: f64 = 1.0e-3;
 const IMPULSE_AMPLITUDE: f64 = 5.0e-2;
-const PERTURBATION_AMPLITUDE: f64 = 1.0e-3;
+const PERTURBATION_AMPLITUDES: [f64; 2] = [1.0e-3, 5.0e-4];
 const SIGNED_VELOCITY_MODES: [isize; 12] = [-56, -40, -24, -16, -8, -4, 4, 8, 16, 24, 40, 56];
 
 #[derive(Debug, Clone, Copy)]
@@ -196,52 +196,72 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     println!(
-        "signed_velocity_mode,spatial_mode,observation_time,perturbation_epsilon,baseline_response_real,baseline_response_imag,baseline_response_amplitude,derivative_real,derivative_imag,derivative_amplitude,relative_sensitivity,epsilon_scaled_response_effect,derivative_phase_radians,even_order_residual_fraction,pre_pulse_density_change_max,perturbed_mass_change_relative"
+        "signed_velocity_mode,spatial_mode,observation_time,perturbation_epsilon,baseline_response_real,baseline_response_imag,baseline_response_amplitude,derivative_real,derivative_imag,derivative_amplitude,relative_sensitivity,epsilon_scaled_response_effect,derivative_phase_radians,even_order_residual_fraction,derivative_epsilon_convergence_relative,pre_pulse_density_change_max,perturbed_mass_change_relative"
     );
 
     for signed_mode in SIGNED_VELOCITY_MODES {
-        let positive_distribution = density_preserving_mode_perturbation(
-            &pre_pulse_distribution,
-            config,
-            signed_mode,
-            PERTURBATION_AMPLITUDE,
-        )?;
-        let negative_distribution = density_preserving_mode_perturbation(
-            &pre_pulse_distribution,
-            config,
-            signed_mode,
-            -PERTURBATION_AMPLITUDE,
-        )?;
+        let mut previous_derivative: Option<ComplexResponse> = None;
+        for epsilon in PERTURBATION_AMPLITUDES {
+            let positive_distribution = density_preserving_mode_perturbation(
+                &pre_pulse_distribution,
+                config,
+                signed_mode,
+                epsilon,
+            )?;
+            let negative_distribution = density_preserving_mode_perturbation(
+                &pre_pulse_distribution,
+                config,
+                signed_mode,
+                -epsilon,
+            )?;
 
-        let positive_response =
-            response_for_initial_state(config, &positive_distribution, &kick, post_pulse_steps)?;
-        let negative_response =
-            response_for_initial_state(config, &negative_distribution, &kick, post_pulse_steps)?;
+            let positive_response = response_for_initial_state(
+                config,
+                &positive_distribution,
+                &kick,
+                post_pulse_steps,
+            )?;
+            let negative_response = response_for_initial_state(
+                config,
+                &negative_distribution,
+                &kick,
+                post_pulse_steps,
+            )?;
 
-        let derivative = positive_response
-            .difference(negative_response)
-            .scale(0.5 / PERTURBATION_AMPLITUDE);
-        let midpoint = positive_response.midpoint(negative_response);
-        let even_order_residual =
-            midpoint.difference(baseline_response).amplitude() / baseline_amplitude;
-        let relative_sensitivity = derivative.amplitude() / baseline_amplitude;
-        let epsilon_scaled_response_effect = PERTURBATION_AMPLITUDE * relative_sensitivity;
+            let derivative = positive_response
+                .difference(negative_response)
+                .scale(0.5 / epsilon);
+            let midpoint = positive_response.midpoint(negative_response);
+            let even_order_residual =
+                midpoint.difference(baseline_response).amplitude() / baseline_amplitude;
+            let relative_sensitivity = derivative.amplitude() / baseline_amplitude;
+            let epsilon_scaled_response_effect = epsilon * relative_sensitivity;
+            let derivative_epsilon_convergence_relative = previous_derivative
+                .map(|previous| {
+                    derivative.difference(previous).amplitude()
+                        / previous.amplitude().max(f64::MIN_POSITIVE)
+                })
+                .unwrap_or(f64::NAN);
 
-        println!(
-            "{signed_mode},{FIRST_MODE},{OBSERVATION_TIME:.8},{PERTURBATION_AMPLITUDE:.8},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.8},{:.12e},{:.12e},{:.12e}",
-            baseline_response.real,
-            baseline_response.imaginary,
-            baseline_amplitude,
-            derivative.real,
-            derivative.imaginary,
-            derivative.amplitude(),
-            relative_sensitivity,
-            epsilon_scaled_response_effect,
-            derivative.imaginary.atan2(derivative.real),
-            even_order_residual,
-            density_change_max(&pre_pulse_distribution, &positive_distribution, config),
-            mass_change_relative(&pre_pulse_distribution, &positive_distribution, config),
-        );
+            println!(
+                "{signed_mode},{FIRST_MODE},{OBSERVATION_TIME:.8},{epsilon:.8},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.8},{:.12e},{:.12e},{:.12e},{:.12e}",
+                baseline_response.real,
+                baseline_response.imaginary,
+                baseline_amplitude,
+                derivative.real,
+                derivative.imaginary,
+                derivative.amplitude(),
+                relative_sensitivity,
+                epsilon_scaled_response_effect,
+                derivative.imaginary.atan2(derivative.real),
+                even_order_residual,
+                derivative_epsilon_convergence_relative,
+                density_change_max(&pre_pulse_distribution, &positive_distribution, config),
+                mass_change_relative(&pre_pulse_distribution, &positive_distribution, config),
+            );
+
+            previous_derivative = Some(derivative);
+        }
     }
 
     Ok(())
