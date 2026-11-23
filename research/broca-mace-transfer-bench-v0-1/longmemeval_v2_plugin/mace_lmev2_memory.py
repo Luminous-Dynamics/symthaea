@@ -109,6 +109,26 @@ class MaceLongMemEvalV2Memory(Memory):
         require(self.bm25_k1 > 0.0, "bm25_k1 must be greater than zero")
         require(self.bm25_b <= 1.0, "bm25_b must be <= 1")
 
+        self.backend_revision_sha256 = hashlib.sha256(
+            json.dumps(
+                {
+                    "schema_version": "mace_lmev2_backend_profile_v1",
+                    "memory_type": self.memory_type,
+                    "domain": self.domain,
+                    "sidecar_binary_sha256": self.sidecar_binary_sha256,
+                    "top_k": self.top_k,
+                    "slice_radius": self.slice_radius,
+                    "neighbor_radius": self.neighbor_radius,
+                    "bm25_k1": self.bm25_k1,
+                    "bm25_b": self.bm25_b,
+                    "tokenizer_version": "unicode_alphanumeric_v1",
+                    "retrieval_mode": "text_bm25_with_original_image_evidence",
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        ).hexdigest()
+
         self._lock = threading.RLock()
         self._process: subprocess.Popen[str] | None = None
         self._poisoned = False
@@ -278,8 +298,8 @@ class MaceLongMemEvalV2Memory(Memory):
                     "candidate backend ID mismatch",
                 )
                 require(
-                    record.get("backend_revision_sha256") == self.sidecar_binary_sha256,
-                    "candidate backend binary digest mismatch",
+                    record.get("backend_revision_sha256") == self.backend_revision_sha256,
+                    "candidate backend execution-profile digest mismatch",
                 )
                 require(record.get("query_sha256") == query_sha256, "candidate query digest mismatch")
                 require(
@@ -297,7 +317,8 @@ class MaceLongMemEvalV2Memory(Memory):
             "query_sha256": query_sha256,
             "domain": self.domain,
             "backend_id": "mace_lmev2_bm25_text",
-            "backend_revision_sha256": self.sidecar_binary_sha256,
+            "backend_revision_sha256": self.backend_revision_sha256,
+            "sidecar_binary_sha256": self.sidecar_binary_sha256,
             "candidate_record_count": record_count,
             "candidate_set_sha256": candidate_set_sha256,
             "candidate_jsonl_sha256": hashlib.sha256(candidate_bytes).hexdigest(),
@@ -355,7 +376,9 @@ class MaceLongMemEvalV2Memory(Memory):
             require(receipt.get("domain") == self.domain, "saved candidate receipt domain mismatch")
             require(receipt.get("backend_id") == "mace_lmev2_bm25_text",
                     "saved candidate receipt backend mismatch")
-            require(receipt.get("backend_revision_sha256") == self.sidecar_binary_sha256,
+            require(receipt.get("backend_revision_sha256") == self.backend_revision_sha256,
+                    "saved candidate receipt execution-profile digest mismatch")
+            require(receipt.get("sidecar_binary_sha256") == self.sidecar_binary_sha256,
                     "saved candidate receipt binary digest mismatch")
             require(receipt.get("candidate_file") == expected_payload_name,
                     "saved candidate receipt payload filename mismatch")
@@ -413,8 +436,8 @@ class MaceLongMemEvalV2Memory(Memory):
                 require(record.get("candidate_id") == candidate_id, "saved candidate record ID mismatch")
                 require(record.get("query_sha256") == receipt["query_sha256"],
                         "saved candidate record query digest mismatch")
-                require(record.get("backend_revision_sha256") == self.sidecar_binary_sha256,
-                        "saved candidate record backend digest mismatch")
+                require(record.get("backend_revision_sha256") == self.backend_revision_sha256,
+                        "saved candidate record execution-profile digest mismatch")
                 require(record.get("backend_id") == "mace_lmev2_bm25_text",
                         "saved candidate record backend mismatch")
                 require(record.get("query_scope") == f"longmemeval-v2:domain:{self.domain}",
@@ -465,7 +488,7 @@ class MaceLongMemEvalV2Memory(Memory):
             {
                 "MACE_LMEV2_DOMAIN": self.domain,
                 "MACE_LMEV2_RUN_ID": self.run_id,
-                "MACE_LMEV2_BACKEND_REVISION_SHA256": self.sidecar_binary_sha256,
+                "MACE_LMEV2_BACKEND_REVISION_SHA256": self.backend_revision_sha256,
                 "MACE_LMEV2_DATASET_ROOT": str(self.asset_root.resolve()),
                 "MACE_LMEV2_TOP_K": str(self.top_k),
                 "MACE_LMEV2_SLICE_RADIUS": str(self.slice_radius),
