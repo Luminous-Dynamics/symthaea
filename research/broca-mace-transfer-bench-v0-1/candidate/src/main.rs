@@ -148,7 +148,7 @@ fn decode_hex(value: u8) -> Option<u8> {
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct SemanticEstimandWire {
     schema_version: u16,
@@ -183,7 +183,7 @@ impl SemanticEstimandWire {
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct DecisionNeedWire {
     schema_version: u16,
@@ -217,7 +217,7 @@ impl DecisionNeedWire {
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct CausalIdentificationWire {
     method: IdentificationMethodWire,
@@ -245,7 +245,7 @@ impl CausalIdentificationWire {
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct ExperienceWire {
     event_id: u32,
@@ -299,7 +299,7 @@ impl ExperienceWire {
         })
     }
 
-    fn propensity_bounds_invalid(self) -> bool {
+    fn propensity_bounds_invalid(&self) -> bool {
         self.causal_identification.propensity_min_bps > 10_000
             || self.causal_identification.propensity_max_bps > 10_000
             || self.causal_identification.propensity_min_bps
@@ -337,7 +337,6 @@ struct CandidateEnvelopeV1 {
 }
 
 #[derive(Debug, Serialize)]
-#[serde(deny_unknown_fields)]
 struct CandidateReceiptV1 {
     schema_version: &'static str,
     run_id: String,
@@ -449,7 +448,6 @@ fn run_candidate(
     need: DecisionNeedV1,
     memory: &[Experience],
 ) -> Result<(Vec<u32>, Option<String>, u64, broca_mace_policy::Decision), String> {
-    let started = Instant::now();
     let by_id: BTreeMap<u32, Experience> = memory.iter().map(|item| (item.event_id, *item)).collect();
     let mut retrieved: Vec<(u32, [u8; 32], usize)> = Vec::new();
     let mut profile_sha256 = None;
@@ -517,18 +515,7 @@ fn run_candidate(
         &resolved,
         Query { scope: need.scope },
     );
-    let elapsed = u64::try_from(started.elapsed().as_nanos()).unwrap_or(u64::MAX);
-    Ok((retrieved_ids, profile_sha256, index_payload_bytes, decision.with_latency_placeholder(elapsed)))
-}
-
-trait DecisionLatencyPlaceholder {
-    fn with_latency_placeholder(self, _elapsed_ns: u64) -> Self;
-}
-
-impl DecisionLatencyPlaceholder for broca_mace_policy::Decision {
-    fn with_latency_placeholder(self, _elapsed_ns: u64) -> Self {
-        self
-    }
+    Ok((retrieved_ids, profile_sha256, index_payload_bytes, decision))
 }
 
 fn decision_name(action: Option<Action>) -> &'static str {
@@ -754,7 +741,7 @@ mod tests {
     #[test]
     fn out_of_range_evidence_is_rejected_not_silently_clamped() {
         let mut value = envelope_value();
-        let mut item = serde_json::json!({
+        let item = serde_json::json!({
             "event_id": 5,
             "source_family": 1,
             "source_root_id": 1,
@@ -793,7 +780,6 @@ mod tests {
             "delayed_horizon_complete": true
         });
         value["candidate_evidence"] = serde_json::json!([item]);
-        item["observed_utility"] = serde_json::json!(0.5);
         assert!(execute_request(&serde_json::to_vec(&value).unwrap())
             .unwrap_err()
             .contains("observed_utility"));
@@ -846,8 +832,47 @@ mod tests {
             .contains("duplicate candidate event_id"));
 
         let mut value = envelope_value();
+        let mut value = envelope_value();
+        let sample = serde_json::json!({
+            "event_id": 6,
+            "source_family": 1,
+            "source_root_id": 1,
+            "source_root_sha256": HASH_A,
+            "scope": {"regime": "baseline", "objective": "quality"},
+            "action": "a",
+            "observed_utility": 0.5,
+            "measurement_error_bound": 0.1,
+            "causal_identification": {
+                "method": "randomized_controlled_trial",
+                "design_sha256": HASH_A,
+                "estimand_sha256": HASH_A,
+                "semantic_estimand": {
+                    "schema_version": 1,
+                    "population_spec_sha256": HASH_A,
+                    "treatment_version_sha256": HASH_A,
+                    "comparator_version_sha256": HASH_A,
+                    "outcome_definition_sha256": HASH_A,
+                    "outcome_unit_sha256": HASH_A,
+                    "follow_up_horizon_ms": 1000,
+                    "censoring_strategy_sha256": HASH_A,
+                    "intercurrent_event_strategy_sha256": HASH_A,
+                    "target_weighting_sha256": HASH_A
+                },
+                "propensity_min_bps": 500,
+                "propensity_max_bps": 9500,
+                "max_standardized_mean_difference_micros": 100000,
+                "interference_controlled": true
+            },
+            "intervention": true,
+            "prediction_pre_registered": true,
+            "outcome_reconciled": true,
+            "source_trusted": true,
+            "source_retracted": false,
+            "confounders_controlled": true,
+            "delayed_horizon_complete": true
+        });
         value["candidate_evidence"] =
-            serde_json::json!(vec![serde_json::Value::Null; MAX_EVIDENCE_RECORDS + 1]);
+            serde_json::json!(vec![sample; MAX_EVIDENCE_RECORDS + 1]);
         assert!(execute_request(&serde_json::to_vec(&value).unwrap())
             .unwrap_err()
             .contains("exceeds"));
