@@ -53,6 +53,8 @@ The paper reports strong low-label results, including 10-label cases, while also
 
 Do not merge correction recommendation, inspection allocation and process actuation into one leaderboard. They have different action spaces, loss functions and authority requirements.
 
+The Rust prototype now includes a paired multi-seed tournament runner. It applies every policy template to the same scenario seeds, requires one common total measurement budget, derives policy selection seeds deterministically from scenario and template seeds, and emits per-seed receipts plus per-policy means/sample standard deviations and support counts. The current test fixture covers stable, gradual-drift and abrupt-shift regimes with randomized audit, risk-prioritized exploit/audit and uncertainty-prioritized exploit/audit. These are executable synthetic comparisons, not evidence that one policy wins in an industrial fab.
+
 ## Standards and architecture alignment: NIST TIDAL
 
 NIST's ongoing 2026 **Super Intelligence for Manufacturing** programme organizes research around TIDAL: Teamed, Integrated, Digital-twin-assured and Layered Intelligence. Its threads include trustworthy-manufacturing fundamentals, human-machine teaming, contextualized manufacturing data, digital-twin VVUQ, and an integration/test-bench programme spanning industrial information architectures and benchmark studies. This is a useful direction-of-travel signal, not a claim that our project has been endorsed or validated by NIST.
