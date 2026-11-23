@@ -15,7 +15,7 @@ use std::hint::black_box;
 use std::time::Instant;
 
 use symthaea_canvas::{
-    MAX_TEMPORAL_CYCLE_SEARCH_STEPS, MycelialTemporalCycleConfig, TemporalEdgeEvidence,
+    MAX_TEMPORAL_CYCLE_SEARCH_STEPS, TemporalEdgeEvidence, TemporalMycelialCycleConfig,
     TemporalMycelialEdge, TemporalMycelialSequence, TemporalMycelialSnapshot,
     TemporalWindowCoverage, build_temporal_mycelial_cycle_profile,
 };
@@ -64,6 +64,7 @@ fn fixture() -> TemporalMycelialSequence {
         session_id: "synthetic-mycelial-temporal-fixture-v1".to_string(),
         coordinate_frame_id: "synthetic-organism-frame".to_string(),
         calibration_digest: "c".repeat(64),
+        observation_scope_id: "synthetic-whole-domain-v1".to_string(),
         snapshots: vec![
             snapshot(
                 "window-001",
