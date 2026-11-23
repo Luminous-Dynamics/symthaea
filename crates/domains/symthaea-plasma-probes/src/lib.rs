@@ -1055,7 +1055,9 @@ mod tests {
 
         // W = 2*[1,2][1,2]^T + 0.5*[0,1][0,1]^T
         //   = [[2,4],[4,8.5]]
-        assert_eq!(gramian.apply(&[3.0, 4.0]).unwrap(), vec![22.0, 46.0]);
+        let applied = gramian.apply(&[3.0, 4.0]).unwrap();
+        assert!((applied[0] - 22.0).abs() < 1.0e-12);
+        assert!((applied[1] - 46.0).abs() < 1.0e-12);
         assert!((gramian.quadratic_form(&[3.0, 4.0]).unwrap() - 250.0).abs() < 1.0e-12);
         assert!((gramian.trace().unwrap() - 10.5).abs() < 1.0e-12);
         assert_eq!(gramian.factor_count(), 2);
