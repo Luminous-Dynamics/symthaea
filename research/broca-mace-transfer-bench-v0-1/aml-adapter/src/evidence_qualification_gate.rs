@@ -797,7 +797,7 @@ mod tests {
             &binding,
             &verifier,
         ).expect("real Ed25519 signature over exact receipt digest");
-        assert_eq!(verified.admissible_evidence_ids_at(150).expect("fresh"), &["evidence-a".to_owned()]);
+        assert_eq!(verified.admissible_evidence_ids_for_use(&binding).expect("fresh"), &["evidence-a".to_owned()]);
     }
 
     #[test]
@@ -851,7 +851,7 @@ mod tests {
         let verified = VerifiedEvidenceQualificationV1::verify_and_bind(
             &receipt, &binding, &TestSignatureVerifier,
         ).expect("valid scoped receipt");
-        assert_eq!(verified.admissible_evidence_ids_at(150).expect("still valid"), &["evidence-a".to_owned()]);
+        assert_eq!(verified.admissible_evidence_ids_for_use(&binding).expect("still valid"), &["evidence-a".to_owned()]);
         assert_eq!(verified.rejected_evidence_ids(), &["evidence-b".to_owned()]);
         assert_eq!(verified.indeterminate_evidence_ids(), &["evidence-c".to_owned()]);
         assert_eq!(verified.expires_at_unix(), 200);
@@ -995,9 +995,70 @@ mod tests {
         let verified = VerifiedEvidenceQualificationV1::verify_and_bind(
             &receipt, &binding, &TestSignatureVerifier,
         ).expect("valid at issuance");
+        let mut expired_binding = binding;
+        expired_binding.now_unix = 200;
         assert_eq!(
-            verified.admissible_evidence_ids_at(200),
+            verified.admissible_evidence_ids_for_use(&expired_binding),
             Err(EvidenceQualificationRejectV1::ReceiptExpired)
+        );
+    }
+
+    #[test]
+    fn verified_token_cannot_be_rebound_to_another_purpose_or_subject_at_use() {
+        let receipt = signed_receipt();
+        let ids = candidate_ids();
+        let original = binding(&receipt, &ids, 150);
+        let verified = VerifiedEvidenceQualificationV1::verify_and_bind(
+            &receipt, &original, &TestSignatureVerifier,
+        ).expect("valid receipt");
+
+        let changed_purpose = digest('6');
+        let mut wrong_purpose = binding_for_test(&receipt, &ids, 150);
+        wrong_purpose.purpose_sha256 = &changed_purpose;
+        assert_eq!(
+            verified.admissible_evidence_ids_for_use(&wrong_purpose),
+            Err(EvidenceQualificationRejectV1::BindingMismatch)
+        );
+
+        let changed_subject = digest('8');
+        let mut wrong_subject = binding_for_test(&receipt, &ids, 150);
+        wrong_subject.subject_scope_sha256 = &changed_subject;
+        assert_eq!(
+            verified.admissible_evidence_ids_for_use(&wrong_subject),
+            Err(EvidenceQualificationRejectV1::BindingMismatch)
+        );
+    }
+
+    #[test]
+    fn verified_token_cannot_be_rebound_to_a_different_candidate_id_set_at_use() {
+        let receipt = signed_receipt();
+        let ids = candidate_ids();
+        let original = binding(&receipt, &ids, 150);
+        let verified = VerifiedEvidenceQualificationV1::verify_and_bind(
+            &receipt, &original, &TestSignatureVerifier,
+        ).expect("valid receipt");
+
+        let changed_ids = vec!["evidence-a".to_owned(), "evidence-b".to_owned()];
+        let wrong_candidates = binding_for_test(&receipt, &changed_ids, 150);
+        assert_eq!(
+            verified.admissible_evidence_ids_for_use(&wrong_candidates),
+            Err(EvidenceQualificationRejectV1::BindingMismatch)
+        );
+    }
+
+    #[test]
+    fn verified_token_rejects_use_before_issuance_time() {
+        let receipt = signed_receipt();
+        let ids = candidate_ids();
+        let original = binding(&receipt, &ids, 150);
+        let verified = VerifiedEvidenceQualificationV1::verify_and_bind(
+            &receipt, &original, &TestSignatureVerifier,
+        ).expect("valid receipt");
+
+        let before_issue = binding_for_test(&receipt, &ids, 99);
+        assert_eq!(
+            verified.admissible_evidence_ids_for_use(&before_issue),
+            Err(EvidenceQualificationRejectV1::ReceiptNotYetValid)
         );
     }
 
@@ -1062,7 +1123,7 @@ mod tests {
             &TestSignatureVerifier,
         ).expect("external qualification result is validly bound");
         assert!(verified.is_empty());
-        assert!(verified.admissible_evidence_ids_at(150).expect("fresh token").is_empty());
+        assert!(verified.admissible_evidence_ids_for_use(&binding).expect("fresh token").is_empty());
         assert!(policy_memory.applicable_notes("web", &digest('b'), &digest('c'), 130)
             .iter().any(|candidate| candidate.note_sha256 == note.note_sha256));
     }
@@ -1078,6 +1139,6 @@ mod tests {
             &receipt, &binding, &TestSignatureVerifier,
         ).expect("valid receipt can qualify zero candidates");
         assert!(verified.is_empty());
-        assert!(verified.admissible_evidence_ids_at(150).expect("still valid").is_empty());
+        assert!(verified.admissible_evidence_ids_for_use(&binding).expect("still valid").is_empty());
     }
 }
