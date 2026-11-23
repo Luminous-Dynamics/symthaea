@@ -31,6 +31,14 @@ pub enum SyntheticFabRegimeV1 {
     PrevalenceShift,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SyntheticFabMissingnessMechanismV1 {
+    Mcar,
+    Mar,
+    Mnar,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SyntheticFabScenarioConfigV1 {
     pub schema: String,
@@ -40,6 +48,7 @@ pub struct SyntheticFabScenarioConfigV1 {
     pub tool_count: usize,
     pub chamber_count: usize,
     pub regime: SyntheticFabRegimeV1,
+    pub missingness_mechanism: SyntheticFabMissingnessMechanismV1,
     pub sensor_dropout_probability: f64,
     pub measurement_noise_stddev: f64,
     pub defect_threshold: f64,
@@ -423,6 +432,25 @@ fn process_shift(regime: SyntheticFabRegimeV1, fraction: f64) -> f64 {
     }
 }
 
+fn conditional_dropout_probability(
+    mechanism: SyntheticFabMissingnessMechanismV1,
+    base_probability: f64,
+    observed_tool_fraction: f64,
+    latent_defect_positive: bool,
+) -> f64 {
+    match mechanism {
+        SyntheticFabMissingnessMechanismV1::Mcar => base_probability,
+        SyntheticFabMissingnessMechanismV1::Mar => {
+            (base_probability + 0.45 * observed_tool_fraction).min(1.0)
+        }
+        SyntheticFabMissingnessMechanismV1::Mnar => {
+            (base_probability
+                + if latent_defect_positive { 0.55 } else { 0.0 })
+            .min(1.0)
+        }
+    }
+}
+
 fn sensor_observation(value: f64, state: SyntheticSensorStateV1) -> SyntheticSensorObservationV1 {
     SyntheticSensorObservationV1 {
         state,
@@ -474,7 +502,18 @@ pub fn generate_synthetic_fab_episode_v1(
             + config.measurement_noise_stddev * rng.centered_noise()
             - 0.5 * calibration_offset;
 
-        let sensor_a_state = if rng.unit_interval() < config.sensor_dropout_probability {
+        let observed_tool_fraction = if config.tool_count <= 1 {
+            0.0
+        } else {
+            tool_index as f64 / (config.tool_count - 1) as f64
+        };
+        let dropout_probability = conditional_dropout_probability(
+            config.missingness_mechanism,
+            config.sensor_dropout_probability,
+            observed_tool_fraction,
+            defect_positive,
+        );
+        let sensor_a_state = if rng.unit_interval() < dropout_probability {
             SyntheticSensorStateV1::CommunicationLoss
         } else {
             SyntheticSensorStateV1::Observed
@@ -485,7 +524,7 @@ pub fn generate_synthetic_fab_episode_v1(
             && (index / 8) % 5 == 2;
         let sensor_b_random_dropout = !sensor_b_not_installed
             && !sensor_b_correlated_dropout
-            && rng.unit_interval() < config.sensor_dropout_probability;
+            && rng.unit_interval() < dropout_probability;
         let sensor_b_state = if sensor_b_not_installed {
             SyntheticSensorStateV1::NotInstalled
         } else if sensor_b_correlated_dropout || sensor_b_random_dropout {
@@ -790,6 +829,7 @@ mod tests {
             tool_count: 2,
             chamber_count: 2,
             regime,
+            missingness_mechanism: SyntheticFabMissingnessMechanismV1::Mcar,
             sensor_dropout_probability: 0.12,
             measurement_noise_stddev: 0.08,
             defect_threshold: 0.62,
