@@ -64,6 +64,7 @@ pub enum ReferenceDriftReasonV1 {
     InvalidModelParameters,
     InvalidParameterCovariance,
     CorrectionAnchorMismatch,
+    CorrectionAnchorTimeMismatch,
     PredictionUncertaintyExceedsPolicy,
     MeasurementTimeBoundsInvalid,
     BaseMeasurementQualificationUnknown,
@@ -426,6 +427,12 @@ pub fn predict_reference_standard_drift_v1(
         reasons.push(ReferenceDriftReasonV1::MeasurementScopeMismatch);
         status = ReferenceDriftPredictionStatusV1::Rejected;
     }
+    if input.model.anchor_time_unix_seconds
+        != input.calibration_certificate.calibration_performed_at_unix_seconds
+    {
+        reasons.push(ReferenceDriftReasonV1::CorrectionAnchorTimeMismatch);
+        status = ReferenceDriftPredictionStatusV1::Rejected;
+    }
     if (input.model.beta_0_correction - input.calibration_certificate.correction).abs()
         > input.policy.correction_anchor_tolerance
     {
@@ -587,7 +594,7 @@ mod tests {
             measurand_id: "film-thickness".into(),
             unit: "nm".into(),
             method_revision: "film-method-3".into(),
-            measured_at_unix_seconds: 1_850_000_000,
+            measured_at_unix_seconds: 1_800_864_000,
             raw_value: 12.50,
             correction_applied: -0.05,
             corrected_value: 12.45,
@@ -645,12 +652,12 @@ mod tests {
             reference_certificate_sha256: "b".repeat(64),
             measurand_id: "film-thickness".into(),
             unit: "nm".into(),
-            anchor_time_unix_seconds: 1_849_136_000,
-            fit_start_unix_seconds: 1_830_000_000,
-            fit_end_unix_seconds: 1_849_136_000,
-            prediction_valid_from_unix_seconds: 1_830_000_000,
+            anchor_time_unix_seconds: 1_800_000_000,
+            fit_start_unix_seconds: 1_790_000_000,
+            fit_end_unix_seconds: 1_800_000_000,
+            prediction_valid_from_unix_seconds: 1_790_000_000,
             prediction_valid_until_unix_seconds: 1_900_000_000,
-            model_available_at_unix_seconds: 1_849_200_000,
+            model_available_at_unix_seconds: 1_800_000_100,
             fit_calibration_epoch_count: 8,
             history_manifest_sha256: "d".repeat(64),
             holdout_validation_manifest_sha256: Some("e".repeat(64)),
@@ -693,8 +700,8 @@ mod tests {
             measurement_qualification_policy: static_policy,
             measurement_qualification_report: qualification,
             measurement_time_bounds: MeasurementTimeBoundsV1 {
-                earliest_measured_at_unix_seconds: 1_850_000_000,
-                latest_measured_at_unix_seconds: 1_850_000_000,
+                earliest_measured_at_unix_seconds: 1_800_864_000,
+                latest_measured_at_unix_seconds: 1_800_864_000,
             },
             as_known_at_unix_seconds: 1_860_000_000,
             model: model(),
@@ -750,7 +757,7 @@ mod tests {
     #[test]
     fn model_not_available_at_selected_knowledge_frontier_is_unknown() {
         let mut value = input();
-        value.as_known_at_unix_seconds = 1_845_000_000;
+        value.as_known_at_unix_seconds = 1_800_000_000;
         let report = predict_reference_standard_drift_v1(&value).unwrap();
         assert_eq!(report.status, ReferenceDriftPredictionStatusV1::Unknown);
         assert!(
@@ -764,7 +771,7 @@ mod tests {
     #[test]
     fn prediction_outside_declared_horizon_is_unknown() {
         let mut value = input();
-        value.model.prediction_valid_until_unix_seconds = 1_849_999_999;
+        value.model.prediction_valid_until_unix_seconds = 1_800_863_999;
         reseal(&mut value);
         let report = predict_reference_standard_drift_v1(&value).unwrap();
         assert_eq!(report.status, ReferenceDriftPredictionStatusV1::Unknown);
@@ -813,6 +820,22 @@ mod tests {
             no_holdout_report
                 .reasons
                 .contains(&ReferenceDriftReasonV1::MissingHoldoutValidationManifest)
+        );
+    }
+
+    #[test]
+    fn model_anchor_must_match_certificate_calibration_time() {
+        let mut value = input();
+        value.model.anchor_time_unix_seconds -= 86_400;
+        value.model.fit_start_unix_seconds -= 86_400;
+        value.model.fit_end_unix_seconds -= 86_400;
+        reseal(&mut value);
+        let report = predict_reference_standard_drift_v1(&value).unwrap();
+        assert_eq!(report.status, ReferenceDriftPredictionStatusV1::Rejected);
+        assert!(
+            report
+                .reasons
+                .contains(&ReferenceDriftReasonV1::CorrectionAnchorTimeMismatch)
         );
     }
 
