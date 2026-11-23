@@ -88,6 +88,14 @@ pub enum ContractError {
     StorageByteCountOverflow,
     #[error("asset amortization requires at least one rollout")]
     ZeroAmortizationRollouts,
+    #[error("min-max normalization sample is empty")]
+    EmptyNormalizationSample,
+    #[error("min-max normalization support is degenerate or non-finite")]
+    InvalidNormalizationSupport,
+    #[error("min-max normalization output interval is invalid")]
+    InvalidNormalizationOutputInterval,
+    #[error("normalization coordinate is non-finite")]
+    NonFiniteNormalizationCoordinate,
 }
 
 /// A parsed and semantically checked v0.1 pulse-family contract.
@@ -1094,6 +1102,101 @@ impl KineticStorageAccounting {
     }
 }
 
+/// Affine min-max coordinate map fitted to one sample's observed support.
+///
+/// The input/output intervals are explicit so an audit can distinguish the
+/// sample-dependent support from the coordinate convention. This primitive
+/// is a normalization mechanism, not an endorsement of per-sample min-max
+/// normalization for open or periodic physical domains.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct MinMaxCoordinateMap {
+    input_minimum: f64,
+    input_maximum: f64,
+    output_minimum: f64,
+    output_maximum: f64,
+}
+
+impl MinMaxCoordinateMap {
+    /// Fit an affine min-max map from finite sample coordinates.
+    pub fn fit(
+        positions: &[f64],
+        output_minimum: f64,
+        output_maximum: f64,
+    ) -> Result<Self, ContractError> {
+        if positions.is_empty() {
+            return Err(ContractError::EmptyNormalizationSample);
+        }
+        if positions.iter().any(|value| !value.is_finite()) {
+            return Err(ContractError::NonFiniteNormalizationCoordinate);
+        }
+        let input_minimum = positions.iter().copied().fold(f64::INFINITY, f64::min);
+        let input_maximum = positions
+            .iter()
+            .copied()
+            .fold(f64::NEG_INFINITY, f64::max);
+        Self::new(
+            input_minimum,
+            input_maximum,
+            output_minimum,
+            output_maximum,
+        )
+    }
+
+    /// Construct a map from explicit finite, strictly increasing intervals.
+    pub fn new(
+        input_minimum: f64,
+        input_maximum: f64,
+        output_minimum: f64,
+        output_maximum: f64,
+    ) -> Result<Self, ContractError> {
+        let input_width = input_maximum - input_minimum;
+        let output_width = output_maximum - output_minimum;
+        if !input_minimum.is_finite()
+            || !input_maximum.is_finite()
+            || !input_width.is_finite()
+            || input_width <= 0.0
+        {
+            return Err(ContractError::InvalidNormalizationSupport);
+        }
+        if !output_minimum.is_finite()
+            || !output_maximum.is_finite()
+            || !output_width.is_finite()
+            || output_width <= 0.0
+        {
+            return Err(ContractError::InvalidNormalizationOutputInterval);
+        }
+        Ok(Self {
+            input_minimum,
+            input_maximum,
+            output_minimum,
+            output_maximum,
+        })
+    }
+
+    /// Apply the affine map; values outside the fitted support extrapolate.
+    pub fn apply(self, position: f64) -> Result<f64, ContractError> {
+        if !position.is_finite() {
+            return Err(ContractError::NonFiniteNormalizationCoordinate);
+        }
+        let input_width = self.input_maximum - self.input_minimum;
+        let output_width = self.output_maximum - self.output_minimum;
+        let normalized = self.output_minimum
+            + (position - self.input_minimum) / input_width * output_width;
+        if !normalized.is_finite() {
+            return Err(ContractError::InvalidNormalizationSupport);
+        }
+        Ok(normalized)
+    }
+
+    pub fn input_support(self) -> (f64, f64) {
+        (self.input_minimum, self.input_maximum)
+    }
+
+    pub fn output_interval(self) -> (f64, f64) {
+        (self.output_minimum, self.output_maximum)
+    }
+}
+
 /// One intervention in a frozen pulse family.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct PulseCandidate {
@@ -1727,6 +1830,66 @@ mod tests {
         assert_eq!(
             accounting.persistent_asset_bytes(),
             Err(ContractError::StorageByteCountOverflow)
+        );
+    }
+
+    #[test]
+    fn minmax_normalization_exposes_global_inlier_drift_from_low_weight_outlier_witness() {
+        let inliers = [0.1, 0.3, 0.5, 0.7, 0.9];
+        let augmented = [0.0, 0.1, 0.3, 0.5, 0.7, 0.9];
+        let before =
+            MinMaxCoordinateMap::fit(&inliers, -PI, PI).expect("base sample has support");
+        let after =
+            MinMaxCoordinateMap::fit(&augmented, -PI, PI).expect("augmented sample has support");
+
+        let before_coordinates = inliers
+            .iter()
+            .map(|position| before.apply(*position).unwrap())
+            .collect::<Vec<_>>();
+        let after_coordinates = inliers
+            .iter()
+            .map(|position| after.apply(*position).unwrap())
+            .collect::<Vec<_>>();
+        let displacements = before_coordinates
+            .iter()
+            .zip(&after_coordinates)
+            .map(|(left, right)| (right - left).abs())
+            .collect::<Vec<_>>();
+        let maximum = displacements.iter().copied().fold(0.0_f64, f64::max);
+        let mean = displacements.iter().sum::<f64>() / displacements.len() as f64;
+
+        assert!((maximum - 0.698_131_700_797_731_9).abs() < 1.0e-12);
+        assert!((mean - 0.349_065_850_398_865_84).abs() < 1.0e-12);
+        assert_eq!(before.input_support(), (0.1, 0.9));
+        assert_eq!(after.input_support(), (0.0, 0.9));
+    }
+
+    #[test]
+    fn minmax_normalization_rejects_empty_degenerate_and_non_finite_samples() {
+        assert_eq!(
+            MinMaxCoordinateMap::fit(&[], -1.0, 1.0),
+            Err(ContractError::EmptyNormalizationSample)
+        );
+        assert_eq!(
+            MinMaxCoordinateMap::fit(&[0.5, 0.5], -1.0, 1.0),
+            Err(ContractError::InvalidNormalizationSupport)
+        );
+        assert_eq!(
+            MinMaxCoordinateMap::fit(&[0.0, f64::NAN], -1.0, 1.0),
+            Err(ContractError::NonFiniteNormalizationCoordinate)
+        );
+        assert_eq!(
+            MinMaxCoordinateMap::fit(&[0.0, 1.0], 1.0, 1.0),
+            Err(ContractError::InvalidNormalizationOutputInterval)
+        );
+    }
+
+    #[test]
+    fn minmax_normalization_reports_non_finite_application() {
+        let map = MinMaxCoordinateMap::new(0.0, 1.0, -1.0, 1.0).unwrap();
+        assert_eq!(
+            map.apply(f64::INFINITY),
+            Err(ContractError::NonFiniteNormalizationCoordinate)
         );
     }
 
