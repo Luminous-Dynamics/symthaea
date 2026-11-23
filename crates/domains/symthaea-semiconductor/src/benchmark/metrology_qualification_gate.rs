@@ -724,6 +724,52 @@ mod tests {
     }
 
     #[test]
+    fn missing_reference_certificate_preserves_unknown_status() {
+        let mut cert = certificate();
+        cert.reference_certificate_sha256 = None;
+        let report =
+            qualify_measurement_evidence_v1(&measurement(), Some(&cert), &policy()).unwrap();
+        assert_eq!(report.status, MeasurementQualificationStatusV1::Unknown);
+        assert!(
+            report
+                .reasons
+                .contains(&MeasurementQualificationReasonV1::ReferenceCertificateMissing)
+        );
+        assert!(report.calibration_record_sha256.is_some());
+    }
+
+    #[test]
+    fn structured_certificate_mutation_changes_record_digest() {
+        let measured = measurement();
+        let mut first_certificate = certificate();
+        let mut second_certificate = certificate();
+        second_certificate.calibration_standard_uncertainty = 0.05;
+
+        let first = qualify_measurement_evidence_v1(
+            &measured,
+            Some(&first_certificate),
+            &policy(),
+        )
+        .unwrap();
+        let second = qualify_measurement_evidence_v1(
+            &measured,
+            Some(&second_certificate),
+            &policy(),
+        )
+        .unwrap();
+
+        assert_eq!(
+            first.calibration_certificate_sha256,
+            second.calibration_certificate_sha256
+        );
+        assert_ne!(
+            first.calibration_record_sha256,
+            second.calibration_record_sha256
+        );
+        assert_ne!(first.report_sha256, second.report_sha256);
+    }
+
+    #[test]
     fn missing_uncertainty_components_is_unknown() {
         let mut measured = measurement();
         measured.uncertainty_components.clear();
