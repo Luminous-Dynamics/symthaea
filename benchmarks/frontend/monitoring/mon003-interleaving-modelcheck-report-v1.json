@@ -4,8 +4,8 @@
   "runtime": {
     "node_version": "v22.16.0",
     "source_path": "benchmarks/frontend/monitoring/mon003-interleaving-modelcheck-v1.mjs",
-    "source_git_blob_sha": "88f08084fcf596b8ab499d77d2cc7d91129b7e49",
-    "source_sha256": "457853ee59e6b66c5bdd8a2188c2554ce05c7ba8cd52e2fefc0748d0ae386371"
+    "source_git_blob_sha": "ebf2c1a4a289c11c06876925c7207c203c14cd56",
+    "source_sha256": "c8e8fa9b34d7b314cdb20b45d3a1ea017bacd765d8cb8d70576de422c1f6b95a"
   },
   "operations": [
     "replace_worker",
@@ -33,7 +33,8 @@
     "receipt_expiry_rejections": 108,
     "idempotent_replays": 108,
     "schedules_with_successful_reconciliation": 174,
-    "schedules_still_outcome_unknown_at_end": 558
+    "schedules_confirmed_by_idempotent_replay": 72,
+    "schedules_still_outcome_unknown_at_end": 516
   },
   "limitations": [
     "Bounded in-memory sequential interleaving model, not a concurrent memory-model proof.",
