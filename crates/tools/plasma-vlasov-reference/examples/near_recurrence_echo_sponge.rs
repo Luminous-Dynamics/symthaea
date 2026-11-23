@@ -513,7 +513,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         (sponge_peak.fwhm - fine_peak.fwhm) / fine_peak.fwhm.abs().max(f64::MIN_POSITIVE);
     let sponge_amplitude_relative_error = (sponge_peak.amplitude - fine_peak.amplitude)
         / fine_peak.amplitude.abs().max(f64::MIN_POSITIVE);
-    let sponge_minimum_f = sponge_final_diagnostics.minimum_distribution;
     let sponge_boundary_ratio = sponge_final_diagnostics.velocity_boundary_ratio;
     let control_total_energy_relative_delta = relative_delta(
         sponge_control_final_diagnostics.total_energy,
