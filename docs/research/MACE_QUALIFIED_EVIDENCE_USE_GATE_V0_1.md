@@ -79,7 +79,7 @@ The exact candidate-ID-set digest is recomputed by the module over the sorted ev
 
 The follow-on Rust module `qualification_trust.rs` now provides `PinnedEd25519QualificationVerifierV1`. It implements the external signature-verifier interface using Ed25519 (`ed25519-dalek = 2.1.0`).
 
-The trust profile is a directly pinned leaf-key set. Its versioned digest commits to the verifier ID, profile version, public keys, derived key IDs, key status and validity intervals. The constructor requires an expected profile digest supplied out-of-band; it rejects a changed profile, malformed/duplicate keys, noncanonical key ordering and invalid public keys. Key IDs are derived from a domain-separated SHA-256 preimage rather than accepted as arbitrary labels.
+The trust profile is a directly pinned leaf-key set. Its versioned digest commits to the verifier ID, profile version, public keys, derived key IDs, key status and validity intervals. The constructor requires both an expected profile digest and a minimum profile version supplied out-of-band; it rejects a changed profile, a version below the external monotonic floor, malformed/duplicate keys, noncanonical key ordering and invalid public keys. Key IDs are derived from a domain-separated SHA-256 preimage rather than accepted as arbitrary labels.
 
 At verification the implementation:
 - rejects unknown or revoked keys;
@@ -89,7 +89,7 @@ At verification the implementation:
 
 The signed bytes are the ASCII representation of `signing_payload_sha256()` (64 lowercase hexadecimal bytes). That method uses a domain-separated, length-prefixed encoding of the typed receipt. This is a versioned MACE signature contract, **not DSSE**. We should adopt a standard DSSE/in-toto or COSE binding in a later wire-format revision rather than describe this custom signature input as interoperable with those formats.
 
-The trust profile pin must be delivered through a trust channel outside the candidate backend and the memory store's rollback domain. A profile digest read from the same mutable store as the profile is not an independent pin. Key revocation takes effect when consumers receive and pin the updated profile; remote profile distribution, transparency logging and rollback-resistant pin updates remain future work.
+The trust profile pin must be delivered through a trust channel outside the candidate backend and the memory store's rollback domain. A profile digest read from the same mutable store as the profile is not an independent pin. Key revocation takes effect when consumers receive and pin the updated profile; remote profile distribution, transparency logging and rollback-resistant pin updates remain future work. The minimum profile version must be held by an independent monotonic configuration/witness domain; storing that floor beside the trust profile defeats the rollback protection.
 
 The trust profile is a verifier trust root, not a source-authority registry. It authenticates the qualification service's statement. The signed qualification policy, purpose, subject-scope, domain, candidate and lifecycle bindings still determine what that verifier is attesting to; live authorization remains the executor's responsibility.
 
@@ -117,7 +117,7 @@ The Ed25519 verification algorithm and direct pinned leaf-key profile are now im
 
 ## 7. Test inventory
 
-Sixteen Rust unit tests in the qualification gate and nine in the pinned-trust module are authored:
+Sixteen Rust unit tests in the qualification gate and ten in the pinned-trust module are authored:
 
 1. Only independently admissible evidence IDs cross the gate.
 2. DecisionNeed binding cannot be changed.
@@ -136,6 +136,7 @@ Sixteen Rust unit tests in the qualification gate and nine in the pinned-trust m
 15. A pinned Ed25519 profile verifies a complete qualification receipt using a real signature.
 16. A changed trust profile, revoked key, unknown key, invalid key window or altered signature is rejected by the pinned verifier.
 17. Trust profiles with reordered, duplicated or aliased keys are rejected.
+18. A correctly hashed but older profile is rejected below the independently supplied minimum profile version.
 
 The qualification-gate protocol unit tests retain a deterministic signature-verifier double for isolated binding tests. The pinned-trust module additionally tests real Ed25519 signing and strict verification with deterministic test keys. Both sets are authored but unexecuted.
 
@@ -194,7 +195,7 @@ These are distinct tasks and scoring protocols. Do not pool their scores with AM
 
 ## 10. Next integration milestones
 
-1. Provision the pinned Ed25519 trust profile through an external trust channel, define rotation/revocation publication and independently protect the expected trust-profile digest.
+1. Provision the pinned Ed25519 trust profile through an external trust channel, define rotation/revocation publication and independently protect both the expected trust-profile digest and monotonic minimum profile version.
 2. Decide the standard wire binding: DSSE/in-toto or COSE, with JCS canonical JSON and test vectors. Keep the present domain-separated typed digest as the internal receipt commitment, not a claim of DSSE interoperability.
 3. Independently recompute the complete candidate-evidence envelope digest and verify the transitive source/derivation closure before signing a qualification receipt.
 4. Connect authenticated source-observation receipts and rights/purpose checks to the qualification service.
