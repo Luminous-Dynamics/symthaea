@@ -84,6 +84,10 @@ pub enum ContractError {
     ZeroResponseReferenceNorm,
     #[error("finite-amplitude response estimator requires positive finite pulse amplitudes")]
     InvalidResponseAmplitude,
+    #[error("storage byte-count arithmetic overflowed")]
+    StorageByteCountOverflow,
+    #[error("asset amortization requires at least one rollout")]
+    ZeroAmortizationRollouts,
 }
 
 /// A parsed and semantically checked v0.1 pulse-family contract.
@@ -1006,6 +1010,90 @@ pub fn wrapped_phase_difference(
     Some((difference + PI).rem_euclid(TAU) - PI)
 }
 
+/// Serialized bytes required to store one checkpoint and its interpretation metadata.
+///
+/// These counters are caller-supplied byte lengths from the actual serialization.
+/// The ledger intentionally separates representation payload from the metadata
+/// required to decode, transfer, validate and replay the state.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct StateStorageBreakdown {
+    pub state_payload_bytes: u64,
+    pub basis_or_codec_metadata_bytes: u64,
+    pub coordinate_and_normalization_bytes: u64,
+    pub component_and_lineage_bytes: u64,
+    pub residual_memory_bytes: u64,
+    pub uncertainty_and_validity_bytes: u64,
+    pub provenance_and_contract_bytes: u64,
+}
+
+impl StateStorageBreakdown {
+    /// Sum all serialized checkpoint bytes, including required interpretation metadata.
+    pub fn total_state_bytes(self) -> Result<u64, ContractError> {
+        [
+            self.state_payload_bytes,
+            self.basis_or_codec_metadata_bytes,
+            self.coordinate_and_normalization_bytes,
+            self.component_and_lineage_bytes,
+            self.residual_memory_bytes,
+            self.uncertainty_and_validity_bytes,
+            self.provenance_and_contract_bytes,
+        ]
+        .into_iter()
+        .try_fold(0_u64, |total, bytes| {
+            total
+                .checked_add(bytes)
+                .ok_or(ContractError::StorageByteCountOverflow)
+        })
+    }
+}
+
+/// Separately accounted persistent model assets and peak execution memory.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct KineticStorageAccounting {
+    pub checkpoint: StateStorageBreakdown,
+    pub model_asset_bytes: u64,
+    pub decoder_asset_bytes: u64,
+    pub peak_working_set_bytes: u64,
+}
+
+impl KineticStorageAccounting {
+    /// Checkpoint bytes only; excludes model / decoder assets and working memory.
+    pub fn checkpoint_bytes(self) -> Result<u64, ContractError> {
+        self.checkpoint.total_state_bytes()
+    }
+
+    /// Persistent model / decoder assets, not repeated for each checkpoint.
+    pub fn persistent_asset_bytes(self) -> Result<u64, ContractError> {
+        self.model_asset_bytes
+            .checked_add(self.decoder_asset_bytes)
+            .ok_or(ContractError::StorageByteCountOverflow)
+    }
+
+    /// Average model / decoder asset bytes allocated to one rollout.
+    pub fn amortized_asset_bytes_per_rollout(
+        self,
+        rollout_count: u64,
+    ) -> Result<f64, ContractError> {
+        if rollout_count == 0 {
+            return Err(ContractError::ZeroAmortizationRollouts);
+        }
+        Ok(self.persistent_asset_bytes()? as f64 / rollout_count as f64)
+    }
+
+    /// Checkpoint bytes plus amortized model / decoder bytes per rollout.
+    ///
+    /// Peak working-set memory is reported separately and is not added to
+    /// persistent storage, because it is a runtime resource rather than a
+    /// checkpoint or model artifact.
+    pub fn amortized_persistent_bytes_per_rollout(
+        self,
+        rollout_count: u64,
+    ) -> Result<f64, ContractError> {
+        Ok(self.checkpoint_bytes()? as f64
+            + self.amortized_asset_bytes_per_rollout(rollout_count)?)
+    }
+}
+
 /// One intervention in a frozen pulse family.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct PulseCandidate {
@@ -1563,6 +1651,77 @@ mod tests {
         assert_eq!(
             wrapped_phase_difference(ComplexResponse::default(), reference),
             None
+        );
+    }
+
+    #[test]
+    fn storage_ledger_counts_payload_and_required_metadata() {
+        let state = StateStorageBreakdown {
+            state_payload_bytes: 1_000,
+            basis_or_codec_metadata_bytes: 100,
+            coordinate_and_normalization_bytes: 40,
+            component_and_lineage_bytes: 20,
+            residual_memory_bytes: 200,
+            uncertainty_and_validity_bytes: 30,
+            provenance_and_contract_bytes: 50,
+        };
+        assert_eq!(state.total_state_bytes().unwrap(), 1_440);
+    }
+
+    #[test]
+    fn storage_ledger_rejects_byte_count_overflow() {
+        let state = StateStorageBreakdown {
+            state_payload_bytes: u64::MAX,
+            basis_or_codec_metadata_bytes: 1,
+            ..StateStorageBreakdown::default()
+        };
+        assert_eq!(
+            state.total_state_bytes(),
+            Err(ContractError::StorageByteCountOverflow)
+        );
+    }
+
+    #[test]
+    fn storage_accounting_separates_checkpoint_assets_and_working_set() {
+        let accounting = KineticStorageAccounting {
+            checkpoint: StateStorageBreakdown {
+                state_payload_bytes: 1_000,
+                basis_or_codec_metadata_bytes: 100,
+                ..StateStorageBreakdown::default()
+            },
+            model_asset_bytes: 8_000,
+            decoder_asset_bytes: 2_000,
+            peak_working_set_bytes: 50_000,
+        };
+        assert_eq!(accounting.checkpoint_bytes().unwrap(), 1_100);
+        assert_eq!(accounting.persistent_asset_bytes().unwrap(), 10_000);
+        assert_eq!(accounting.amortized_asset_bytes_per_rollout(10).unwrap(), 1_000.0);
+        assert_eq!(
+            accounting.amortized_persistent_bytes_per_rollout(10).unwrap(),
+            2_100.0
+        );
+        assert_eq!(accounting.peak_working_set_bytes, 50_000);
+    }
+
+    #[test]
+    fn storage_accounting_rejects_zero_rollout_amortization() {
+        let accounting = KineticStorageAccounting::default();
+        assert_eq!(
+            accounting.amortized_asset_bytes_per_rollout(0),
+            Err(ContractError::ZeroAmortizationRollouts)
+        );
+    }
+
+    #[test]
+    fn storage_asset_sum_rejects_overflow() {
+        let accounting = KineticStorageAccounting {
+            model_asset_bytes: u64::MAX,
+            decoder_asset_bytes: 1,
+            ..KineticStorageAccounting::default()
+        };
+        assert_eq!(
+            accounting.persistent_asset_bytes(),
+            Err(ContractError::StorageByteCountOverflow)
         );
     }
 
