@@ -88,6 +88,10 @@ jobs:
 
           jq -e '.task_count == (.tasks | length) and .task_count == 4 and .status == "source_pinned_seed_not_gold"' \
             docs/research/MATHLIB_PROOF_COMPREHENSION_PILOT_V1.json >/dev/null
+          jq -e '.source_snapshot.lean_toolchain == "leanprover/lean4:v4.37.0-rc1"
+            and .source_snapshot.lean_core_revision == "0b77e12952ad39077d80d8bd6b66d601f225c321"
+            and .source_snapshot.lean_core_commit_url == "https://github.com/leanprover/lean4/commit/0b77e12952ad39077d80d8bd6b66d601f225c321"' \
+            docs/research/MATHLIB_PROOF_COMPREHENSION_PILOT_V1.json >/dev/null
 
           jq -e '.finite_oracle.source_satisfying_assignments == 5
             and .finite_oracle.correct_encoded_satisfying_assignments == 5

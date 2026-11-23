@@ -139,3 +139,24 @@ Only after this smoke test should we add 3–5 dependency-rich Mathlib theorems.
 - HDC/CfC retrieval is not proof authority.
 
 The extractor should reuse Lean's own environment and dependency conventions, but the explanation and reviewer layers remain explicit and independently testable.
+
+## 9. Toolchain identities are cohort-specific
+
+A source-pin audit on 2026-11-23 found that the two pilot cohorts use different Lean revisions and must not share one environment identity:
+
+- **Lean-core cohort:** exact source snapshot `leanprover/lean4@a9b5b8a25c4b932be8029426c2abd34685b078f0` (commit date 2026-11-22 18:20 UTC). Its repository `lean-toolchain` file says `build/release/stage1`, so reproducing this cohort requires building that exact Lean source snapshot; it is not a released toolchain name.
+- **Mathlib cohort:** exact Mathlib snapshot `leanprover-community/mathlib4@6ebcce37335bcb6bca64596e5d57bb3035648030`. Its own `lean-toolchain` file says `leanprover/lean4:v4.37.0-rc1`, and that Lean tag resolves to commit `0b77e12952ad39077d80d8bd6b66d601f225c321` (2026-11-18 11:12 UTC).
+
+The revisions `a9b5b8a…` and `0b77e12…` are not interchangeable: GitHub's compare endpoint reports a diverged history (87 commits ahead / 1 behind for the compared direction). The Mathlib seed's former `lean_core_revision: a9b5b8a…` value was therefore incorrect for that snapshot. It is corrected in `MATHLIB_PROOF_COMPREHENSION_PILOT_V1.json`, required by its schema, and asserted in the focused workflow.
+
+The core pilot remains pinned to `a9b5b8a…`; the Mathlib pilot is now pinned to the actual toolchain `v4.37.0-rc1` / commit `0b77e12…`. This cohort split is part of the dataset identity, not a cosmetic metadata correction.
+
+For the two revisions inspected, the source blob for `Lean/Util/FoldConsts.lean` was identical (`5429906b…`) and the source blob for `Lake/Check/Util.lean` was identical (`56ade87a…`). The `Lean/Declaration.lean` and `Lean/Environment.lean` blobs differed, so API inspection for each cohort must still be performed against its own pinned revision. The relevant APIs in the Mathlib cohort's exact Lean pin were verified:
+
+- `Expr.getUsedConstants` folds over elaborated `Expr` constants; the projection case adds the projection's type name as well as recursively visiting its body.
+- `ConstantInfo.value? (allowOpaque := true)` exposes values for definitions, theorems and opaque declarations; axioms, inductives, constructors and recursors do not receive a generic value from this accessor.
+- `ConstantInfo.getUsedConstantsAsSet` unions type and value names, so it is useful as a closure cross-check but not as the source of separately typed `type_dependency` and `proof_dependency` edges.
+- `Environment.find?` resolves fully qualified `Name` values in the imported environment. Preserve the full `Name`; do not key by short names.
+- `Lake.Check.runForUsedConsts` visits type references, the declaration's own name, value references, and additional inductive/constructor/recursor relations. Its traversal is a useful compatibility baseline, but because it emits a flat stream of names it does not replace our typed-edge serializer.
+
+A source-level API match is not a built or executed extractor. The Mathlib `lake build`, native extraction run, and byte-identical replay remain pending.

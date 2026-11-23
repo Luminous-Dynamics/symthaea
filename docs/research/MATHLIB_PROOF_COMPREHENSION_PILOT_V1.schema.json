@@ -44,7 +44,10 @@
         "repository",
         "commit",
         "commit_date",
-        "files"
+        "files",
+        "lean_toolchain",
+        "lean_core_revision",
+        "lean_core_commit_url"
       ],
       "properties": {
         "repository": {
@@ -86,6 +89,17 @@
               }
             }
           }
+        },
+        "lean_toolchain": {
+          "const": "leanprover/lean4:v4.37.0-rc1"
+        },
+        "lean_core_revision": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "lean_core_commit_url": {
+          "type": "string",
+          "format": "uri"
         }
       }
     },

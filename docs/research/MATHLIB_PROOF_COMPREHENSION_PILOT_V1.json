@@ -9,7 +9,7 @@
     "commit": "6ebcce37335bcb6bca64596e5d57bb3035648030",
     "commit_url": "https://github.com/leanprover-community/mathlib4/commit/6ebcce37335bcb6bca64596e5d57bb3035648030",
     "commit_date": "2026-11-22T12:53:55Z",
-    "lean_core_revision": "a9b5b8a25c4b932be8029426c2abd34685b078f0",
+    "lean_core_revision": "0b77e12952ad39077d80d8bd6b66d601f225c321",
     "files": [
       {
         "path": "Mathlib/Data/Nat/Choose/Basic.lean",
@@ -31,7 +31,9 @@
         "blob_sha": "3d75a047ffb84825e78e37b984c64dca90e5014c",
         "url": "https://github.com/leanprover-community/mathlib4/blob/6ebcce37335bcb6bca64596e5d57bb3035648030/Mathlib/Data/Finset/Card.lean"
       }
-    ]
+    ],
+    "lean_toolchain": "leanprover/lean4:v4.37.0-rc1",
+    "lean_core_commit_url": "https://github.com/leanprover/lean4/commit/0b77e12952ad39077d80d8bd6b66d601f225c321"
   },
   "task_count": 4,
   "tasks": [
