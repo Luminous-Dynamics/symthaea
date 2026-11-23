@@ -22,9 +22,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: clippy, rustfmt
+      - name: Formatting
+        working-directory: research/cmaq-006
+        run: cargo fmt --manifest-path Cargo.toml -- --check
       - name: Unit tests
         working-directory: research/cmaq-006
         run: cargo test --locked
+      - name: Strict Clippy
+        working-directory: research/cmaq-006
+        run: cargo clippy --locked --all-targets -- -D warnings
       - name: Decision ledger known-answer fixture
         working-directory: research/cmaq-006
         shell: bash
