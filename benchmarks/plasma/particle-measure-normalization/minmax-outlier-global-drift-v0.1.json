@@ -31,7 +31,22 @@
       "415-423"
     ],
     "source_transform_matches_neopic": true,
-    "test_case_coverage": "source_faithful_unweighted_sample_case_plus_separate_weighted_measure_extension"
+    "test_case_coverage": "source_faithful_unweighted_sample_case_plus_separate_weighted_measure_extension",
+    "paper_coordinate_description": "The paper writes the torus coordinate as zeta = -pi + 2*pi*xi in [-pi,pi), while Appendix A.1 states that the implementation normalizes xi=(x-a_X)/(b_X-a_X) in [0,1] and evaluates Fourier characters exp(2*pi*i*k*xi). These are equivalent periodic coordinates up to an origin shift.",
+    "paper_torus_coordinate_interval": [
+      -3.141592653589793,
+      3.141592653589793
+    ],
+    "implementation_coordinate_interval": [
+      0,
+      1
+    ],
+    "fourier_character": "exp(2*pi*i*k*xi)",
+    "linear_lifting_is_periodic": false,
+    "periodic_lift_seam_note": "Appendix A.1 states the linear lifting acts on xi itself rather than on a periodic function of xi, so particles crossing the periodic seam can change lifted features discontinuously.",
+    "code_application_lines": [
+      "291-298"
+    ]
   },
   "base_cloud": {
     "positions": [
@@ -120,7 +135,7 @@
     "empirical_measure_change": "There are two distinct examples: the source-faithful unweighted case adds one equally weighted particle; the weighted extension adds a 1e-12-mass support point while leaving original inlier mass essentially unchanged. The tagged normalization code ignores weights in both cases.",
     "normalization_change": "The exact NEOPIC arXiv v1 transform independently maps each sample to [0,1]. In either example, support changes from [0.1,0.9] to [0,0.9], shifting every original inlier except the upper endpoint.",
     "expected_disposition": "Detect and report normalization-induced global coordinate drift separately from sampling / learned-operator error.",
-    "scope_limit": "The normalization formula and [0,1] output interval match the pinned NEOPIC arXiv v1 code. The equal-weight example matches its unweighted particle-position input convention. The weighted example is an extension to weighted particle measures, not the paper's native input interface. Neither example is a learned field-output error or kinetic simulation."
+    "scope_limit": "The normalization formula and [0,1] coordinate interval match the pinned NEOPIC arXiv v1 preprocessing. The paper expresses the same torus coordinate as [-pi,pi) and states that Fourier characters use exp(2*pi*i*k*xi). The source implementation's unweighted sample min/max and per-coordinate application are pinned. This remains a synthetic coordinate/lifting-input witness, not a learned field-output error, kinetic simulation or proof of failure in the published model."
   },
   "source_faithful_unweighted_case": {
     "description": "Source-faithful unweighted particle-position sample: every listed particle contributes equally to the empirical measure.",
