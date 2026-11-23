@@ -810,13 +810,17 @@ mod tests {
         };
         crate::benchmark::metrology_semantics::seal_binary_measurand_semantics_v1(&mut semantics)
             .expect("synthetic semantics should seal");
+        let mut position_by_stratum = BTreeMap::<String, usize>::new();
         let rows = episode
             .policy_view
             .observations
             .iter()
-            .enumerate()
-            .map(|(index, observed)| {
-                let selected = index % 4 == 0;
+            .map(|observed| {
+                let position = position_by_stratum
+                    .entry(observed.stratum_id.clone())
+                    .or_default();
+                let selected = *position % 4 == 0;
+                *position += 1;
                 MetrologyAuditSelectionRowV1 {
                     candidate_id: observed.candidate_id.clone(),
                     subject_id: observed.subject_id.clone(),
@@ -837,6 +841,16 @@ mod tests {
                 }
             })
             .collect::<Vec<_>>();
+        let mut residual_population_by_stratum = BTreeMap::<String, usize>::new();
+        for observed in &episode.policy_view.observations {
+            *residual_population_by_stratum
+                .entry(observed.stratum_id.clone())
+                .or_default() += 1;
+        }
+        let audit_quota_by_stratum = residual_population_by_stratum
+            .iter()
+            .map(|(stratum, population)| (stratum.clone(), population / 4))
+            .collect();
         let mut selection = MetrologyAuditSelectionReportV1 {
             schema: crate::benchmark::metrology_audit::SELECTION_SCHEMA_V1.into(),
             policy_id: "synthetic-test-policy".into(),
@@ -855,8 +869,8 @@ mod tests {
             population_count: episode.policy_view.population_count,
             exploit_count: 0,
             randomized_audit_count: 32,
-            residual_population_by_stratum: BTreeMap::new(),
-            audit_quota_by_stratum: BTreeMap::new(),
+            residual_population_by_stratum,
+            audit_quota_by_stratum,
             rows,
             selection_sha256: String::new(),
         };
@@ -937,6 +951,9 @@ mod tests {
         assert_eq!(report.measured_fraction, 0.25);
         assert!(report.horvitz_thompson_prevalence.is_finite());
         assert!(report.horvitz_thompson_absolute_error.is_finite());
+        assert!(report.design_variance_qualified);
+        assert!(report.standard_error_ht_prevalence.is_some());
+        assert!(report.standard_error_ht_mean_brier.is_some());
         assert_eq!(report.matured_label_count_at_horizon, 123);
     }
 
