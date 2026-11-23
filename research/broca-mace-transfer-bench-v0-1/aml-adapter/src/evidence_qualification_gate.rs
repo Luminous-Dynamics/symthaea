@@ -217,7 +217,7 @@ impl VerifiedEvidenceQualificationV1 {
                 receipt.issued_at_unix,
                 binding.now_unix,
             )
-            .map_err(|_| EvidenceQualificationRejectV1::SignatureRejected)?;
+             ?;
 
         let mut admissible = Vec::new();
         let mut rejected = Vec::new();
@@ -552,6 +552,14 @@ mod tests {
         RetrievalTraceReceiptV1,
         RetrievalTraceRefV1,
     };
+    use crate::qualification_trust::{
+        PinnedEd25519QualificationVerifierV1,
+        QualificationKeyStatusV1,
+        QualificationTrustKeyV1,
+        QualificationTrustProfileV1,
+        qualification_key_id_v1,
+    };
+    use ed25519_dalek::{Signer, SigningKey};
 
     struct TestSignatureVerifier;
 
@@ -669,6 +677,88 @@ mod tests {
             verifier_profile_sha256: &receipt.verifier_profile_sha256,
             now_unix: now,
         }
+    }
+
+    #[test]
+    fn pinned_ed25519_profile_verifies_the_complete_qualification_gate() {
+        let signing_key = SigningKey::from_bytes(&[42; 32]);
+        let public_key = signing_key.verifying_key().to_bytes();
+        let key_id = qualification_key_id_v1(&public_key);
+        let profile = QualificationTrustProfileV1 {
+            schema_version: 1,
+            verifier_id: "mace-independent-qualifier".to_owned(),
+            profile_version: 1,
+            keys: vec![QualificationTrustKeyV1 {
+                key_id: key_id.clone(),
+                public_key,
+                status: QualificationKeyStatusV1::Active,
+                not_before_unix: 10,
+                not_after_unix: 1_000,
+            }],
+        };
+        let pin = profile.profile_sha256().expect("canonical trust-profile digest");
+        let verifier = PinnedEd25519QualificationVerifierV1::from_pinned_profile(
+            &profile,
+            &pin,
+        ).expect("profile pin");
+        let mut receipt = receipt();
+        receipt.key_id = key_id;
+        receipt.verifier_profile_sha256 = pin.clone();
+        receipt.signature = signing_key
+            .sign(receipt.signing_payload_sha256().as_bytes())
+            .to_bytes()
+            .to_vec();
+
+        let ids = candidate_ids();
+        let binding = binding(&receipt, &ids, 150);
+        let verified = VerifiedEvidenceQualificationV1::verify_and_bind(
+            &receipt,
+            &binding,
+            &verifier,
+        ).expect("real Ed25519 signature over exact receipt digest");
+        assert_eq!(verified.admissible_evidence_ids_at(150).expect("fresh"), &["evidence-a".to_owned()]);
+    }
+
+    #[test]
+    fn pinned_ed25519_profile_revocation_survives_a_valid_old_signature() {
+        let signing_key = SigningKey::from_bytes(&[43; 32]);
+        let public_key = signing_key.verifying_key().to_bytes();
+        let key_id = qualification_key_id_v1(&public_key);
+        let profile = QualificationTrustProfileV1 {
+            schema_version: 1,
+            verifier_id: "mace-independent-qualifier".to_owned(),
+            profile_version: 2,
+            keys: vec![QualificationTrustKeyV1 {
+                key_id: key_id.clone(),
+                public_key,
+                status: QualificationKeyStatusV1::Revoked,
+                not_before_unix: 10,
+                not_after_unix: 1_000,
+            }],
+        };
+        let pin = profile.profile_sha256().expect("revoked profile digest");
+        let verifier = PinnedEd25519QualificationVerifierV1::from_pinned_profile(
+            &profile,
+            &pin,
+        ).expect("pinned profile records revocation");
+        let mut receipt = receipt();
+        receipt.key_id = key_id;
+        receipt.verifier_profile_sha256 = pin;
+        receipt.signature = signing_key
+            .sign(receipt.signing_payload_sha256().as_bytes())
+            .to_bytes()
+            .to_vec();
+
+        let ids = candidate_ids();
+        let binding = binding(&receipt, &ids, 150);
+        assert_eq!(
+            VerifiedEvidenceQualificationV1::verify_and_bind(
+                &receipt,
+                &binding,
+                &verifier,
+            ),
+            Err(EvidenceQualificationRejectV1::RevokedKey)
+        );
     }
 
     #[test]
