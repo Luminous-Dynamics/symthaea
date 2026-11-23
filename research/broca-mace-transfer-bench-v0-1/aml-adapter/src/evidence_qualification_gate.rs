@@ -372,7 +372,7 @@ fn validate_receipt_shape(receipt: &EvidenceQualificationReceiptV1)
 
 fn candidate_ids_sha256(ids: &[String]) -> String {
     let mut hasher = Sha256::new();
-    hasher.update(b"luminous:mace:candidate-evidence-ids:v1\\0");
+    hasher.update(b"luminous:mace:candidate-evidence-ids:v1\0");
     hasher.update((ids.len() as u64).to_be_bytes());
     for id in ids { hash_field(&mut hasher, id); }
     hex_digest(&hasher.finalize())
