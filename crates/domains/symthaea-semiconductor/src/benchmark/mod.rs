@@ -1,8 +1,8 @@
 //! Versioned benchmark protocols and independent scoring primitives.
 
 pub mod binary_metrics;
-pub mod drift_identifiability;
 pub mod calibration_requalification;
+pub mod drift_identifiability;
 pub mod dtco_manifest;
 pub mod metrology_audit;
 pub mod metrology_qualification_gate;
@@ -112,8 +112,8 @@ pub use calibration_requalification::{
 
 pub use drift_identifiability::{
     DRIFT_IDENTIFIABILITY_DIMENSIONS_V1, DRIFT_IDENTIFIABILITY_INPUT_SCHEMA_V1,
-    DRIFT_IDENTIFIABILITY_REPORT_SCHEMA_V1, DriftActionEvidenceStateV1,
-    DriftAttributionTargetV1, DriftIdentifiabilityErrorV1, DriftIdentifiabilityInputV1,
-    DriftIdentifiabilityPlanStatusV1, DriftIdentifiabilityReportV1,
-    DriftObservationActionV1, DriftTargetIdentifiabilityV1, plan_drift_identifiability_v1,
+    DRIFT_IDENTIFIABILITY_REPORT_SCHEMA_V1, DriftActionEvidenceStateV1, DriftAttributionTargetV1,
+    DriftIdentifiabilityErrorV1, DriftIdentifiabilityInputV1, DriftIdentifiabilityPlanStatusV1,
+    DriftIdentifiabilityReportV1, DriftObservationActionV1, DriftTargetIdentifiabilityV1,
+    plan_drift_identifiability_v1,
 };
