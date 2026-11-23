@@ -12,6 +12,7 @@ from __future__ import annotations
 import atexit
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import shutil
@@ -70,6 +71,8 @@ class MaceLongMemEvalV2Memory(Memory):
         self.sidecar_binary = Path(sidecar_value).expanduser().resolve(strict=True)
         require(self.sidecar_binary.is_file(), "sidecar_binary must be a file")
         require(os.access(self.sidecar_binary, os.X_OK), "sidecar_binary must be executable")
+        self._sidecar_binary_stat = self.sidecar_binary.stat()
+        require(stat.S_ISREG(self._sidecar_binary_stat.st_mode), "sidecar_binary must be a regular file")
         self.sidecar_binary_sha256 = self._sha256_file(self.sidecar_binary)
 
         self.source_screenshot_root = Path(source_root_value).expanduser().resolve(strict=True)
@@ -114,6 +117,31 @@ class MaceLongMemEvalV2Memory(Memory):
         self._inserted_ids: set[str] = set()
         super().__init__(memory_params)
         atexit.register(self.close)
+
+    def _verify_sidecar_binary(self) -> None:
+        current = self.sidecar_binary.stat()
+        identity_before = (
+            self._sidecar_binary_stat.st_dev,
+            self._sidecar_binary_stat.st_ino,
+            self._sidecar_binary_stat.st_size,
+            self._sidecar_binary_stat.st_mtime_ns,
+            self._sidecar_binary_stat.st_ctime_ns,
+        )
+        identity_now = (
+            current.st_dev,
+            current.st_ino,
+            current.st_size,
+            current.st_mtime_ns,
+            current.st_ctime_ns,
+        )
+        require(
+            stat.S_ISREG(current.st_mode) and identity_now == identity_before,
+            "sidecar binary changed after its backend revision was pinned",
+        )
+        require(
+            self._sha256_file(self.sidecar_binary) == self.sidecar_binary_sha256,
+            "sidecar binary digest changed after backend revision pinning",
+        )
 
     @staticmethod
     def _sha256_file(path: Path) -> str:
@@ -212,6 +240,37 @@ class MaceLongMemEvalV2Memory(Memory):
                 except json.JSONDecodeError as error:
                     raise RuntimeError(f"invalid candidate JSONL record {ordinal}: {error}") from error
                 require(isinstance(record, dict), f"candidate JSONL record {ordinal} must be an object")
+                require(
+                    record.get("schema_version") == "mace_candidate_evidence_v0_1"
+                    and record.get("record_type") == "candidate_evidence",
+                    "candidate record schema/type mismatch",
+                )
+                require(record.get("modality") in {"text", "image", "audio", "video", "structured"},
+                        "candidate modality is invalid")
+                require(
+                    isinstance(record.get("evidence_id"), str) and record["evidence_id"].strip()
+                    and isinstance(record.get("source_id"), str) and record["source_id"].strip()
+                    and isinstance(record.get("payload_ref"), str) and record["payload_ref"].strip(),
+                    "candidate evidence identity/reference is invalid",
+                )
+                for digest_field in ("backend_revision_sha256", "query_sha256", "source_sha256", "payload_sha256"):
+                    digest_value = record.get(digest_field)
+                    require(
+                        isinstance(digest_value, str)
+                        and len(digest_value) == 64
+                        and all(character in "0123456789abcdef" for character in digest_value),
+                        f"candidate {digest_field} is invalid",
+                    )
+                rank = record.get("retrieval_rank")
+                require(isinstance(rank, int) and not isinstance(rank, bool) and rank > 0,
+                        "candidate retrieval_rank is invalid")
+                score = record.get("retrieval_score")
+                require(
+                    score is None
+                    or (isinstance(score, (int, float)) and not isinstance(score, bool)
+                        and math.isfinite(float(score))),
+                    "candidate retrieval_score is invalid",
+                )
                 require(record.get("run_id") == self.run_id, "candidate run_id mismatch")
                 require(record.get("candidate_id") == candidate_id, "candidate invocation ID mismatch")
                 require(
@@ -284,6 +343,7 @@ class MaceLongMemEvalV2Memory(Memory):
                 return
             raise RuntimeError("MACE Rust sidecar exited unexpectedly; refusing silent restart")
 
+        self._verify_sidecar_binary()
         env = os.environ.copy()
         env.update(
             {
