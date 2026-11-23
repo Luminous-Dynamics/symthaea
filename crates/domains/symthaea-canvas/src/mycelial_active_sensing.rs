@@ -1024,8 +1024,8 @@ mod tests {
             &actions,
         )
         .unwrap();
-        close(report.baseline_bayes_risk, 0.5);
-        close(report.actions[0].expected_posterior_bayes_risk, 0.5);
+        close(report.baseline_bayes_risk, 1.0 / 3.0);
+        close(report.actions[0].expected_posterior_bayes_risk, 1.0 / 3.0);
         close(report.actions[0].gross_value_of_information, 0.0);
         assert_eq!(report.recommended_action_id, None);
     }
