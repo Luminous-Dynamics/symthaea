@@ -44,6 +44,14 @@ pub struct MycelialGraphImageReference {
     pub frame_id: String,
     pub coordinate_frame_id: String,
     pub calibration_digest: String,
+    /// OME-NGFF version, populated for OME-Zarr sources.
+    pub ome_ngff_version: Option<String>,
+    /// Name of the NGFF coordinate system to which graph coordinates are bound.
+    pub ome_ngff_coordinate_system_name: Option<String>,
+    /// Relative NGFF metadata path identifying the transform-chain declaration.
+    pub ome_ngff_coordinate_transform_path: Option<String>,
+    /// Digest of the exact NGFF transform chain used by this graph.
+    pub ome_ngff_coordinate_transform_digest: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -240,6 +248,57 @@ impl MycelialGraphSidecar {
         {
             return Err(MycelialGraphSidecarError::InvalidSourceReference);
         }
+        match self.source.container_format {
+            MycelialGraphImageContainerFormat::OmeZarrNgff => {
+                let valid_ngff_coordinates = self
+                    .source
+                    .ome_ngff_version
+                    .as_deref()
+                    .is_some_and(valid_id)
+                    && self
+                        .source
+                        .ome_ngff_coordinate_transform_digest
+                        .as_deref()
+                        .is_some_and(valid_digest);
+                let has_system = self.source.ome_ngff_coordinate_system_name.is_some();
+                let has_path = self.source.ome_ngff_coordinate_transform_path.is_some();
+                let valid_named_system = if self.source.ome_ngff_version.as_deref() == Some("0.6") {
+                    self.source
+                        .ome_ngff_coordinate_system_name
+                        .as_deref()
+                        .is_some_and(valid_id)
+                        && self
+                            .source
+                            .ome_ngff_coordinate_transform_path
+                            .as_deref()
+                            .is_some_and(valid_dataset_path)
+                } else {
+                    has_system == has_path
+                        && self
+                            .source
+                            .ome_ngff_coordinate_system_name
+                            .as_deref()
+                            .is_none_or(valid_id)
+                        && self
+                            .source
+                            .ome_ngff_coordinate_transform_path
+                            .as_deref()
+                            .is_none_or(valid_dataset_path)
+                };
+                if !valid_ngff_coordinates || !valid_named_system {
+                    return Err(MycelialGraphSidecarError::InvalidSourceReference);
+                }
+            }
+            MycelialGraphImageContainerFormat::N5 | MycelialGraphImageContainerFormat::Other => {
+                if self.source.ome_ngff_version.is_some()
+                    || self.source.ome_ngff_coordinate_system_name.is_some()
+                    || self.source.ome_ngff_coordinate_transform_path.is_some()
+                    || self.source.ome_ngff_coordinate_transform_digest.is_some()
+                {
+                    return Err(MycelialGraphSidecarError::InvalidSourceReference);
+                }
+            }
+        }
         self.graph
             .validate()
             .map_err(|error: MycelialReconstructionError| {
@@ -331,6 +390,42 @@ impl MycelialGraphSidecar {
         hash_string(&mut hasher, &self.source.frame_id);
         hash_string(&mut hasher, &self.source.coordinate_frame_id);
         hash_string(&mut hasher, &self.source.calibration_digest);
+        match &self.source.ome_ngff_version {
+            Some(value) => {
+                hasher.update(&[1]);
+                hash_string(&mut hasher, value);
+            }
+            None => {
+                hasher.update(&[0]);
+            }
+        }
+        match &self.source.ome_ngff_coordinate_system_name {
+            Some(value) => {
+                hasher.update(&[1]);
+                hash_string(&mut hasher, value);
+            }
+            None => {
+                hasher.update(&[0]);
+            }
+        }
+        match &self.source.ome_ngff_coordinate_transform_path {
+            Some(value) => {
+                hasher.update(&[1]);
+                hash_string(&mut hasher, value);
+            }
+            None => {
+                hasher.update(&[0]);
+            }
+        }
+        match &self.source.ome_ngff_coordinate_transform_digest {
+            Some(value) => {
+                hasher.update(&[1]);
+                hash_string(&mut hasher, value);
+            }
+            None => {
+                hasher.update(&[0]);
+            }
+        }
         hash_string(&mut hasher, &self.producer.tool_id);
         hash_string(&mut hasher, &self.producer.tool_version);
         hash_string(&mut hasher, &self.producer.adapter_id);
@@ -613,6 +708,10 @@ mod tests {
                 frame_id: graph.frame_id.clone(),
                 coordinate_frame_id: graph.coordinate_frame_id.clone(),
                 calibration_digest: graph.calibration_digest.clone(),
+                ome_ngff_version: Some("0.6".to_string()),
+                ome_ngff_coordinate_system_name: Some("physical".to_string()),
+                ome_ngff_coordinate_transform_path: Some("scene/physical-transform".to_string()),
+                ome_ngff_coordinate_transform_digest: Some(digest('e')),
             },
             producer: MycelialGraphSidecarProducer {
                 tool_id: "snt".to_string(),
@@ -653,6 +752,22 @@ mod tests {
         assert_eq!(
             detached.validate().unwrap_err(),
             MycelialGraphSidecarError::SourceGraphBindingMismatch
+        );
+    }
+
+    #[test]
+    fn ngff_06_named_coordinate_system_and_transform_digest_are_mandatory() {
+        let mut value = sidecar();
+        value.source.ome_ngff_coordinate_transform_digest = None;
+        assert_eq!(
+            value.validate().unwrap_err(),
+            MycelialGraphSidecarError::InvalidSourceReference
+        );
+        let mut no_name = sidecar();
+        no_name.source.ome_ngff_coordinate_system_name = None;
+        assert_eq!(
+            no_name.validate().unwrap_err(),
+            MycelialGraphSidecarError::InvalidSourceReference
         );
     }
 
