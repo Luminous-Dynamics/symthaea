@@ -169,7 +169,8 @@ fn handle_request(
             let _query_image = request.get("query_image").and_then(Value::as_str);
 
             let build_started = Instant::now();
-            if index.is_none() {
+            let needs_build = index.is_none();
+            if needs_build {
                 let built = LongMemEvalV2Bm25IndexV1::build(
                     config.domain.clone(),
                     trajectories,
@@ -179,7 +180,7 @@ fn handle_request(
                 .map_err(|error| format!("build trajectory BM25 index: {error:?}"))?;
                 *index = Some(built);
             }
-            let index_build_ns = if index.is_some() {
+            let index_build_ns = if needs_build {
                 u64::try_from(build_started.elapsed().as_nanos()).unwrap_or(u64::MAX)
             } else {
                 0
@@ -219,13 +220,12 @@ fn handle_request(
                     }
                 }
             }
-            let receipt = index_ref.resource_receipt();
             Ok(json!({
                 "ok": true,
                 "items": items,
                 "hit_count": result.hits.len(),
                 "neighbor_count": result.neighbor_context.len(),
-                "index_build_ns": receipt.index_build_latency_ns.max(index_build_ns),
+                "index_build_ns": index_build_ns,
                 "search_latency_ns": result.search_latency_ns,
                 "query_image_used": false,
                 "retrieval_mode": "text_bm25_with_original_image_evidence"
