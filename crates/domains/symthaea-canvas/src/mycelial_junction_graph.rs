@@ -469,10 +469,10 @@ pub fn build_mycelial_junction_hypha_graph(
             filament.end,
             config.maximum_junction_gap_model_units,
         )?;
-        if end_kind == JunctionKind::Tip {
-            if let Some(node) = nodes.get_mut(&end_id) {
-                node.terminal_filament_ids.push(filament_id);
-            }
+        if end_kind == JunctionKind::Tip
+            && let Some(node) = nodes.get_mut(&end_id)
+        {
+            node.terminal_filament_ids.push(filament_id);
         }
 
         let mut breakpoints = vec![(0u32, start_id)];
@@ -924,8 +924,7 @@ impl MycelialJunctionHyphaGraph {
             / 2;
         for source in 0..self.junctions.len() {
             let distances = shortest_path_distances(&adjacency, source);
-            for target in (source + 1)..self.junctions.len() {
-                let path_length = distances[target];
+            for (target, &path_length) in distances.iter().enumerate().skip(source + 1) {
                 if !path_length.is_finite() {
                     continue;
                 }
