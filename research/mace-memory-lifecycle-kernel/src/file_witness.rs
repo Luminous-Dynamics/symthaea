@@ -652,6 +652,49 @@ mod tests {
     }
 
     #[test]
+    fn append_cannot_remove_previously_committed_tombstones() {
+        let root = temporary_directory("tombstone-regression");
+        let mut store = FileBackedWitnessStore::open(&root).expect("open");
+        let genesis = store.latest_checkpoint().expect("genesis");
+        let revoked = BTreeSet::from(["revoked-root".to_owned()]);
+        let first = next_checkpoint(
+            &genesis,
+            &"1".repeat(64),
+            revoked,
+            BTreeSet::new(),
+        );
+        store
+            .append_checkpoint(&genesis.checkpoint_sha256, first.clone())
+            .expect("first append");
+
+        let regression = next_checkpoint(
+            &first,
+            &"2".repeat(64),
+            BTreeSet::new(),
+            BTreeSet::new(),
+        );
+        assert_eq!(
+            store.append_checkpoint(&first.checkpoint_sha256, regression),
+            Err(LifecycleError::WitnessHistoryRegression)
+        );
+        assert_eq!(store.latest_checkpoint().expect("latest"), first);
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn malformed_final_checkpoint_name_fails_closed() {
+        let root = temporary_directory("malformed-name");
+        let store = FileBackedWitnessStore::open(&root).expect("open");
+        fs::write(root.join("checkpoint-2.macew"), b"not a checkpoint")
+            .expect("malformed final file");
+        assert_eq!(
+            store.latest_checkpoint(),
+            Err(LifecycleError::WitnessCheckpointInvalid)
+        );
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
     fn tampered_checkpoint_is_rejected_on_reopen() {
         let root = temporary_directory("tamper");
         let store = FileBackedWitnessStore::open(&root).expect("open witness");
