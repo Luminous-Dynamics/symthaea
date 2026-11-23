@@ -85,7 +85,7 @@ let semantic_candidate = qualified.value();
 // Preserve qualified.evidence_event_id() alongside downstream use.
 ~~~
 
-A caller should require the wrapper at a decision/action boundary and carry its event ID into the decision receipt. This type is an API-level marker, not a sandbox: callers can deliberately unwrap the value. The authoritative enforcement remains in the consumer and external qualification gate.
+A caller should require the wrapper at a decision/action boundary and carry its event ID into the decision receipt. The wrapper is not serializable/deserializable; it must be minted through EvidenceLedger::bind at the use boundary. A caller can still deliberately unwrap the value, so this is an API-level discipline rather than a sandbox. The authoritative enforcement remains in the consumer and external qualification gate.
 
 ## Security and claim boundaries
 
@@ -127,7 +127,7 @@ The module contains tests for:
 17. rejection of source observations after the system's knowledge time;
 18. rejection of retractions carrying an invalid consent identifier.
 
-These tests are authored but have not been compiled or executed in this environment.
+Ledger deserialization uses a custom validating implementation: decoded snapshots pass the same cross-event checks as EvidenceLedger::new. EvidenceBound<T> is deliberately not deserializable. Two codec tests cover valid ledger round-trip and rejection of a serialized correction with a missing target. These 20 tests are authored but have not been compiled or executed in this environment.
 
 ## Benchmark plan and comparison
 
