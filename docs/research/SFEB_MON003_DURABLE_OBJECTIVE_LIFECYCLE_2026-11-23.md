@@ -3,7 +3,7 @@
 **Date:** 2026-11-23  
 **Parent:** [MON-003 issue #13398](https://github.com/Luminous-Dynamics/symthaea/issues/13398)  
 **Related:** [MON-001 issue #13392](https://github.com/Luminous-Dynamics/symthaea/issues/13392), [MON-002 issue #13394](https://github.com/Luminous-Dynamics/symthaea/issues/13394)  
-**Status:** architecture and failure model specified; deterministic reference-kernel slice planned; no production qualification claimed
+**Status:** specification committed; 8-case deterministic JavaScript reference kernel committed and executed under Node.js v22.16.0; production qualification pending
 
 ## 1. Research thesis
 
@@ -253,4 +253,23 @@ Zero observed failures is not a probability-zero guarantee. Publish complete den
 
 ## 11. Qualification boundary
 
-This document specifies a research direction and acceptance contract. It is not an implementation, benchmark result, cryptographic qualification, scheduler measurement or production authorization system. MON-001's reference evidence remains distinct from committed Node CLI execution. MON-002's in-memory V8 claims remain distinct from a retrievable committed fixture/verifier bundle. The 30-task pilot stays at `runnable_task_count = 0`.
+This document specifies a research direction and acceptance contract; the companion JavaScript file is a pure in-memory reference model, not a production service. It is not a benchmark result, cryptographic qualification, scheduler measurement or production authorization system. MON-001's reference evidence remains distinct from committed Node CLI execution. MON-002's in-memory V8 claims remain distinct from a retrievable committed fixture/verifier bundle. The 30-task pilot stays at `runnable_task_count = 0`.
+
+
+## 12. Executed reference-kernel increment (2026-11-23)
+
+Companion source: `benchmarks/frontend/monitoring/mon003-objective-kernel-v1.mjs`
+
+Exact local execution:
+```sh
+node --check benchmarks/frontend/monitoring/mon003-objective-kernel-v1.mjs
+node benchmarks/frontend/monitoring/mon003-objective-kernel-v1.mjs
+```
+
+Runtime: Node.js v22.16.0. Source SHA-256: `eee472accbff167138e71791448a782ec73e36c271e69f412c8a4fd5a5c5e182`.
+
+**Executed result: 8/8 deterministic cases passed.** Coverage: durable edge receipt after current level fell false; stale worker A rejected after worker B obtained the higher fence; permission revocation after grant issuance; expired receipt; revoked receipt; sink commit with response lost followed by reconciliation using the same key; same idempotency key with a different request digest; wrong-target grant substitution; fabricated receipt lookup rejected by the source/authority path.
+
+The lost-response case produced exactly one mock side effect and recovered the original operation receipt by the same idempotency key. The negative controls produced no side effect.
+
+This is a Node.js execution of the newly committed pure reference kernel, not a run of the pre-existing MON-001 verifier and not a real database, broker, signed receipt issuer, external authorization plane, action sink, browser, scheduler or independent verifier. The mock sink's atomicity is a model assumption; production transactionality remains an open gate.
