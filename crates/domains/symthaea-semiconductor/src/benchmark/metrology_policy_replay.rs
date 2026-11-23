@@ -1238,20 +1238,10 @@ mod tests {
     fn fake_selection(episode: &SyntheticFabEpisodeV1) -> MetrologyAuditSelectionReportV1 {
         let semantics = synthetic_defect_semantics_v1(episode.defect_threshold)
             .expect("synthetic target semantics should seal");
-        let config = policy_config(
-            episode.policy_view(),
-            "synthetic-test-policy",
-            0,
-            32,
-            8,
-            7,
-        );
-        let policy = build_synthetic_metrology_policy_v1(
-            episode.policy_view(),
-            &semantics,
-            &config,
-        )
-        .expect("synthetic policy should build");
+        let config = policy_config(episode.policy_view(), "synthetic-test-policy", 0, 32, 8, 7);
+        let policy =
+            build_synthetic_metrology_policy_v1(episode.policy_view(), &semantics, &config)
+                .expect("synthetic policy should build");
         select_metrology_audit_v1(&policy).expect("seeded audit selection should validate")
     }
 
@@ -1491,9 +1481,7 @@ mod tests {
         selection.rows[unselected_index].selected = true;
         selection.rows[unselected_index].method = MetrologySelectionMethodV1::RandomizedAudit;
         seal_selection_for_test(&mut selection);
-        assert!(
-            evaluate_synthetic_metrology_policy_v1(&episode, &selection).is_err()
-        );
+        assert!(evaluate_synthetic_metrology_policy_v1(&episode, &selection).is_err());
     }
 
     #[test]
