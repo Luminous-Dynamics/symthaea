@@ -370,7 +370,10 @@ class MaceLongMemEvalV2Memory(Memory):
             trajectory = json.loads(line)
             trajectory_id = trajectory.get("id")
             require(isinstance(trajectory_id, str), "saved trajectory ID is invalid")
-            self._rpc({"op": "insert", "trajectory": trajectory})
+            acknowledgement = self._rpc({"op": "insert", "trajectory": trajectory})
+            if acknowledgement.get("inserted") != 1:
+                self._poison_sidecar()
+                raise RuntimeError("MACE sidecar replay acknowledgement is not exact")
             self._inserted_ids.add(trajectory_id)
             self._trajectory_lines.append(line)
 
