@@ -233,3 +233,22 @@ The graph-interoperation work must not collapse proof understanding into depende
 A proof-plan graph records goal states, mathematical actions, justifications, side conditions, generated subgoals, witnesses/constructions, invariants and unresolved steps. Typed edges include `transforms`, `justified_by`, `requires`, `creates_subgoal`, `preserves`, `discharges`, `constructs`, `alternative_to`, and `evidenced_by`. This is not inferred mechanically from Lean dependency edges: the relationship is many-to-many and the mathematical action labels require review.
 
 The same theorem may have several valid plans. Benchmarking must accept distinct valid routes and compare their side-condition burden, explanatory clarity and cost without turning one proof route into a claim of mathematical necessity. See [#13326 — MATH-PROOF-PLAN-001](https://github.com/Luminous-Dynamics/symthaea/issues/13326).
+
+
+## 10. Proof verification / reasoning baselines (2026-11-23)
+
+### ProofGrid
+
+[ProofGrid](https://arxiv.org/abs/2605.12524) provides 15 machine-checkable tasks for proof writing, checking, masking and gap-filling in minimal natural-deduction notation. It instruments proof checking to identify the first substantive reasoning failure, and introduces an Epistemic Stability Index plus item-response / task-discrimination analysis.
+
+Symthaea should use ProofGrid as a diagnostic comparator for local proof-step competence. It should not be described as measuring human comprehension or delayed transfer. Add an independent local-to-global consistency test: does a model that locally rejects a corrupted inference also avoid relying on it in a reconstructed global proof plan?
+
+### Generative proof verification
+
+Mahdavi et al., ICML 2026, [*Scaling Generative Verifiers For Natural Language Mathematical Proof Verification And Selection*](https://proceedings.mlr.press/v306/mahdavi26a.html), finds that GenSelect + LLM-as-a-Judge is a useful verification/selection combination, but judge prompt choice materially changes performance. Proof-level improvements do not automatically imply final-answer precision improvements.
+
+The human-study and machine-evaluation protocol must therefore report judge calibration, prompt sensitivity, false-acceptance / false-rejection and abstention. LLM judge votes remain advisory; Lean and checked witnesses remain the machine-level authorities.
+
+### Explanation is not automatically useful prover context
+
+The 2026 FormalMATH study reports that human-written natural-language solutions can degrade proof-generation performance in evaluated settings ([FormalMATH](https://aclanthology.org/2026.findings-emnlp.579/)). Consequently, Symthaea must distinguish the value of a proof plan as a teaching artifact from its value as context for a proof generator. Test both outcomes rather than assume the same representation improves both.
