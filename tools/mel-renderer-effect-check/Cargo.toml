@@ -1,0 +1,11 @@
+[package]
+name = "mel-renderer-effect-check"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+serde = { version = "=1.0.228", features = ["derive"] }
+serde_json = { version = "=1.0.150", features = ["preserve_order"] }
+sha2 = "=0.10.9"
+
