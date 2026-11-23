@@ -114,7 +114,7 @@ fn screenshot_derivation_receipt(
     screenshot_reference: &str,
 ) -> String {
     let material = format!(
-        "luminous:mace:lmev2:screenshot-binding:v1\\0{state_sha256}\\0{image_sha256}\\0{screenshot_reference}"
+        "luminous:mace:lmev2:screenshot-binding:v1\0{state_sha256}\0{image_sha256}\0{screenshot_reference}"
     );
     sha256_hex(material.as_bytes())
 }
