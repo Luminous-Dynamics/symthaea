@@ -243,16 +243,16 @@ pub fn estimate_total_effect(
     // Identical task-family counts prevent different task mixes from looking
     // like a policy effect. Every randomized profile is scored on the same
     // frozen schedule.
-    let mut reference_schedule: Option<BTreeMap<String, usize>> = None;
+    let mut reference_schedule: Option<BTreeSet<(String, String)>> = None;
     let mut profile_means = Vec::with_capacity(assignments.len());
     for (profile_id, episodes) in grouped {
-        let mut schedule = BTreeMap::new();
+        let mut schedule = BTreeSet::new();
         for row in &episodes {
-            *schedule.entry(row.task_family.clone()).or_insert(0_usize) += 1;
+            schedule.insert((row.task_family.clone(), row.episode_id.clone()));
         }
         if let Some(reference) = &reference_schedule {
             if reference != &schedule {
-                return Err(format!("task-family schedule differs for {}", profile_id));
+                return Err(format!("task identity schedule differs for {}", profile_id));
             }
         } else {
             reference_schedule = Some(schedule);
@@ -467,6 +467,10 @@ mod tests {
     #[test]
     fn rejects_unequal_task_schedules_and_missing_outcomes() {
         let assignments = make_assignments();
+        let mut outcomes = make_outcomes(&assignments);
+        outcomes[0].episode_id = "different-task".into();
+        assert!(estimate_total_effect(&assignments, &outcomes).is_err());
+
         let mut outcomes = make_outcomes(&assignments);
         outcomes[0].task_family = "other".into();
         assert!(estimate_total_effect(&assignments, &outcomes).is_err());
