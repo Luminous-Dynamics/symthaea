@@ -1,0 +1,636 @@
+{
+  "manifest_id": "SYMTHAEA-CRIME-ECONOMICS-SIM-001",
+  "schema_version": 1,
+  "version": "0.3.0",
+  "status": "research_fixture",
+  "generated_on": "2026-10-15",
+  "purpose": "Pin source identity and document the synthetic crime-economics evaluator plus a separate non-compensatory aggregate lawful-alternative viability contract.",
+  "model_dimensions": {
+    "weeks": 52,
+    "replications_per_scenario_policy_cell": 32,
+    "scenario_count": 8,
+    "policy_count": 5,
+    "expected_data_rows": 1280,
+    "expected_tsv_lines_including_header": 1281,
+    "uses_person_level_records": false,
+    "network_access": false,
+    "external_effects": false,
+    "household_equivalents": 1000
+  },
+  "files": [
+    {
+      "path": "tools/crime-economics-sim/Cargo.toml",
+      "git_blob_sha1": "8d5b9d11a85d76becfbebf38cce53106a8b250e6"
+    },
+    {
+      "path": "tools/crime-economics-sim/Cargo.lock",
+      "git_blob_sha1": "c5598e573d7969e0e1c4cef95e7b76634147a964"
+    },
+    {
+      "path": "tools/crime-economics-sim/src/lib.rs",
+      "git_blob_sha1": "36ea39f15c7bc6b8253c4fc5391b681462d38f02"
+    },
+    {
+      "path": "tools/crime-economics-sim/src/bin/simulate.rs",
+      "git_blob_sha1": "31518909a08a1d5684790efa3e998e48d4c8998b"
+    },
+    {
+      "path": "tools/crime-economics-sim/src/bin/verify.rs",
+      "git_blob_sha1": "3b353caacb0192953efff0bc8aec0d3a108f59bb"
+    },
+    {
+      "path": "tools/crime-economics-sim/README.md",
+      "git_blob_sha1": "23251b969f442abb56d7f0ab4132f91f343ebd28"
+    },
+    {
+      "path": ".github/workflows/crime-economics-synthetic-evaluator.yml",
+      "git_blob_sha1": "15b3714e67e38124a26e0c4545f3105fae6725b7"
+    },
+    {
+      "path": "tools/crime-economics-sim/src/viability.rs",
+      "git_blob_sha1": "f155492ac0914b354199a724fe316a4a8e28b121"
+    },
+    {
+      "path": "tools/crime-economics-sim/src/bin/assess_viability.rs",
+      "git_blob_sha1": "d6bbda4af37b8d5f8dea63f43b8f4290542dfd3d"
+    },
+    {
+      "path": "tools/crime-economics-sim/src/bin/verify_viability.rs",
+      "git_blob_sha1": "31056e3e4231c6321a9c21e2a427fa2483d7d40d"
+    }
+  ],
+  "scenario_ids": [
+    "reference",
+    "high_displacement",
+    "reporting_suppression",
+    "concentrated_automation",
+    "high_robot_compromise",
+    "unequal_essential_access",
+    "low_robot_effectiveness",
+    "zero_quality_work_effect"
+  ],
+  "policy_ids": [
+    "baseline",
+    "essentials",
+    "quality_work",
+    "robot_protection",
+    "combined"
+  ],
+  "output_schema": [
+    "schema_version",
+    "scenario_id",
+    "seed",
+    "policy_id",
+    "population",
+    "model_weeks",
+    "need_property_events_local",
+    "opportunity_property_events_local",
+    "non_economic_harm_events",
+    "displaced_property_events",
+    "simulated_harm_events_total",
+    "reported_harm_events",
+    "false_alarms",
+    "robot_compromise_weeks",
+    "robot_safety_incidents",
+    "annualized_cost_units",
+    "essential_access_gain_bps",
+    "essential_access_gap_bps",
+    "privacy_burden_points",
+    "benefit_concentration_bps"
+  ],
+  "claim_ceiling": [
+    "Source blob pinning detects unreviewed byte drift only; it is not a signature or source-authenticity proof.",
+    "Rust tests verify selected implementation invariants only.",
+    "The independent verifier validates artifact structure and specific cross-scenario relationships only.",
+    "No causal crime-reduction effect, model calibration, real-world validity, robot safety qualification, or jurisdictional generalization is established.",
+    "All outcome-generating parameters have explicit synthetic-assumption labels; no parameter in the register is an empirically estimated local coefficient.",
+    "The zero-quality-work-effect scenario tests behavior when the assumed work effect is disabled; neither setting is an empirical effect estimate.",
+    "The viability fixture evaluates synthetic gates only; it is not evidence that a real population has viable lawful alternatives.",
+    "Viability status is not a criminal-risk, individual eligibility, legal compliance, or causal crime-reduction score.",
+    "Stats SA QLFS descriptive statistics and ILO measurement frameworks are not used as crime-effect coefficients or as justification for synthetic numeric gates.",
+    "One cohort failing a floor or a group-gap gate cannot be compensated by a high aggregate mean.",
+    "The viability measurement dictionary defines a proposed operationalization; it is not a validated instrument until reviewed with affected communities, labour/statistical experts, and jurisdiction-specific specialists.",
+    "Low/high fixture bounds are not statistical confidence intervals.",
+    "Opportunity coverage must not be operationalized as vacancy count alone; quality criteria and its target-population denominator must be pre-registered."
+  ],
+  "parameter_registry_version": "0.2.0",
+  "parameter_registry_status": "all_parameters_are_synthetic_assumptions",
+  "parameter_registry": [
+    {
+      "parameter_id": "POPULATION_AND_TIME",
+      "values": {
+        "household_equivalents": 1000,
+        "weeks": 52,
+        "replications_per_cell": 32
+      },
+      "unit": "synthetic model dimensions",
+      "source_class": "synthetic_assumption",
+      "evidence_status": "not_empirical",
+      "limitation": "Defines simulation size and observation window only; not a claim about any real community."
+    },
+    {
+      "parameter_id": "COHORT_ALLOCATION",
+      "values": {
+        "cohort_sizes": [
+          100,
+          200,
+          300,
+          250,
+          150
+        ]
+      },
+      "unit": "synthetic household-equivalents per aggregate cohort",
+      "source_class": "synthetic_assumption",
+      "evidence_status": "not_empirical",
+      "limitation": "Cohorts are anonymous aggregate cells with no person records or inferred individual attributes."
+    },
+    {
+      "parameter_id": "BASE_ACCESS_RATES",
+      "values": {
+        "by_cohort": [
+          0.45,
+          0.58,
+          0.7,
+          0.8,
+          0.9
+        ]
+      },
+      "unit": "fraction between 0 and 1",
+      "source_class": "synthetic_assumption",
+      "evidence_status": "not_empirical",
+      "limitation": "Illustrative starting conditions, not local housing, food, utilities, or benefits-access measurements."
+    },
+    {
+      "parameter_id": "BASE_INCIDENT_EVENT_RATES",
+      "values": {
+        "need_related_property": 0.00055,
+        "opportunity_related_property": 0.0011,
+        "non_economic_harm": 0.00065
+      },
+      "unit": "event probability per synthetic household-week",
+      "source_class": "synthetic_assumption",
+      "evidence_status": "not_empirical",
+      "limitation": "The rates are not estimates of actual crime, violence, victimization, or offending."
+    },
+    {
+      "parameter_id": "COHORT_EVENT_MULTIPLIERS",
+      "values": {
+        "need_related_property": [
+          2.4,
+          1.8,
+          1.25,
+          0.8,
+          0.45
+        ],
+        "opportunity_related_property": [
+          1.35,
+          1.2,
+          1,
+          0.85,
+          0.7
+        ],
+        "non_economic_harm": [
+          1.2,
+          1.1,
+          1,
+          0.9,
+          0.8
+        ]
+      },
+      "unit": "dimensionless multiplier by aggregate cohort",
+      "source_class": "synthetic_assumption",
+      "evidence_status": "not_empirical",
+      "limitation": "These multipliers are illustrative heterogeneity controls, not proof that socioeconomic status or group membership predicts individual behavior."
+    },
+    {
+      "parameter_id": "ESSENTIALS_ACCESS_GAIN",
+      "values": {
+        "by_cohort": [
+          0.28,
+          0.24,
+          0.18,
+          0.1,
+          0.04
+        ]
+      },
+      "unit": "fractional-access gain before bounded access calculation",
+      "source_class": "synthetic_assumption",
+      "evidence_status": "not_empirical",
+      "limitation": "Assumed programme effects, not a forecast of real service uptake or delivered access."
+    },
+    {
+      "parameter_id": "QUALITY_WORK_EFFECT",
+      "values": {
+        "need_related_property_rate_reduction": 0.12,
+        "opportunity_related_property_rate_reduction": 0.08,
+        "zero_effect_scenario_multiplier": 0
+      },
+      "unit": "fractional reduction in modeled event probability",
+      "source_class": "synthetic_assumption",
+      "evidence_status": "not_empirical",
+      "limitation": "Fixed toy-model elasticities are not estimated from NIJ or review evidence and are not transferable effect sizes. A zero-effect scenario is included as a null sensitivity control; no local or universal effect is established."
+    },
+    {
+      "parameter_id": "ROBOT_PROTECTION_EFFECT",
+      "values": {
+        "reference_effect_probability": 0.24192,
+        "low_effectiveness_scenario_multiplier": 0.25
+      },
+      "unit": "modeled probability per eligible property-event opportunity",
+      "source_class": "synthetic_assumption",
+      "evidence_status": "not_empirical",
+      "limitation": "Not a tested robot success rate. The low-effectiveness case tests monotonic sensitivity only."
+    },
+    {
+      "parameter_id": "REPORTING_PROBABILITY",
+      "values": {
+        "reference": 0.78,
+        "reporting_suppression": 0.35
+      },
+      "unit": "probability that a simulated harm event is marked reported",
+      "source_class": "synthetic_assumption",
+      "evidence_status": "not_empirical",
+      "limitation": "Not a real reporting rate. This parameter exists specifically to demonstrate that reports and underlying harm differ."
+    },
+    {
+      "parameter_id": "DISPLACEMENT_PROBABILITY",
+      "values": {
+        "reference": 0.3,
+        "high_displacement": 0.9
+      },
+      "unit": "probability that a modeled prevented local property event reappears in the adjacent ring",
+      "source_class": "synthetic_assumption",
+      "evidence_status": "not_empirical",
+      "limitation": "The adjacent ring is represented by an aggregate counter, not a spatial network or geographic forecast."
+    },
+    {
+      "parameter_id": "ROBOT_COMPROMISE_PROBABILITY",
+      "values": {
+        "reference": 0.01,
+        "high_robot_compromise": 0.18
+      },
+      "unit": "probability of one modeled system compromise per week",
+      "source_class": "synthetic_assumption",
+      "evidence_status": "not_empirical",
+      "limitation": "Not a vulnerability rate, threat forecast, or robot reliability statistic."
+    },
+    {
+      "parameter_id": "ROBOT_FALSE_ALARM_AND_SAFETY_EFFECTS",
+      "values": {
+        "false_alarm_probability_per_household_week": 0.00002,
+        "safety_harm_probability_given_compromise": 0.1
+      },
+      "unit": "synthetic probabilities",
+      "source_class": "synthetic_assumption",
+      "evidence_status": "not_empirical",
+      "limitation": "Not human-safety, false-positive, or cybersecurity performance evidence."
+    },
+    {
+      "parameter_id": "AUTOMATION_LIVELIHOOD_SHOCK",
+      "values": {
+        "concentrated_automation_need_event_multiplier": 0.35,
+        "quality_work_mitigation_fraction": 0.45
+      },
+      "unit": "dimensionless toy-model shock and mitigation",
+      "source_class": "synthetic_assumption",
+      "evidence_status": "not_empirical",
+      "limitation": "Explicit adverse sensitivity case, not a forecast of automation-driven unemployment or work support efficacy."
+    },
+    {
+      "parameter_id": "POLICY_COST_UNITS",
+      "values": {
+        "baseline": 0,
+        "essentials": 40000,
+        "quality_work": 60000,
+        "robot_protection": 100000,
+        "combined": 190000
+      },
+      "unit": "fictional annualized accounting units",
+      "source_class": "synthetic_assumption",
+      "evidence_status": "not_empirical",
+      "limitation": "Not US dollars, rand, budget estimates, total-cost-of-ownership analysis, or measured cost-effectiveness."
+    },
+    {
+      "parameter_id": "GOVERNANCE_AND_DISTRIBUTION_PROXIES",
+      "values": {
+        "robot_privacy_burden_points": 120,
+        "reference_benefit_concentration_bps": 4500,
+        "concentrated_automation_benefit_concentration_bps": 8500,
+        "quality_work_concentration_adjustment_bps": -1500
+      },
+      "unit": "unvalidated index points and basis-point proxies",
+      "source_class": "synthetic_assumption",
+      "evidence_status": "not_empirical",
+      "limitation": "Not privacy valuations, inequality measurements, fairness scores, or a single policy-ranking objective."
+    }
+  ],
+  "viability_dimensions": {
+    "schema_version": 1,
+    "scenario_count": 10,
+    "cohort_count": 5,
+    "expected_data_rows": 50,
+    "expected_tsv_lines_including_header": 51,
+    "uses_person_level_records": false,
+    "feeds_crime_rate_model": false,
+    "network_access": false,
+    "external_effects": false
+  },
+  "viability_scenario_ids": [
+    "baseline",
+    "high_mean_low_floor",
+    "opportunity_without_quality",
+    "high_access_friction",
+    "threshold_straddle",
+    "stale_source_data",
+    "conflicted_sources",
+    "missing_data",
+    "wide_uncertainty",
+    "opportunity_gap_hidden_by_mean"
+  ],
+  "viability_cohort_ids": [
+    "cohort_01",
+    "cohort_02",
+    "cohort_03",
+    "cohort_04",
+    "cohort_05"
+  ],
+  "viability_output_schema": [
+    "schema_version",
+    "scenario_id",
+    "cohort_id",
+    "evidence_class",
+    "evidence_status",
+    "evidence_age_days",
+    "essentials_access_low",
+    "essentials_access_high",
+    "lawful_opportunity_coverage_low",
+    "lawful_opportunity_coverage_high",
+    "fair_pay_adequacy_low",
+    "fair_pay_adequacy_high",
+    "safe_work_low",
+    "safe_work_high",
+    "work_stability_low",
+    "work_stability_high",
+    "social_protection_coverage_low",
+    "social_protection_coverage_high",
+    "lawful_access_time_minutes_low",
+    "lawful_access_time_minutes_high",
+    "cohort_gate_status",
+    "scenario_gate_status"
+  ],
+  "viability_gate_registry": [
+    {
+      "gate_id": "MIN_ESSENTIALS_ACCESS",
+      "value": 0.9,
+      "unit": "fraction",
+      "constraint": "high_is_better",
+      "source_class": "synthetic_policy_gate",
+      "evidence_status": "not_empirical",
+      "limitation": "Illustrative contract value for adversarial fixtures only; not a legal rule, measured service target, or universal norm."
+    },
+    {
+      "gate_id": "MIN_LAWFUL_OPPORTUNITY_COVERAGE",
+      "value": 0.8,
+      "unit": "fraction",
+      "constraint": "high_is_better",
+      "source_class": "synthetic_policy_gate",
+      "evidence_status": "not_empirical",
+      "limitation": "Illustrative contract value for adversarial fixtures only; not a legal rule, measured service target, or universal norm."
+    },
+    {
+      "gate_id": "MIN_FAIR_PAY_ADEQUACY",
+      "value": 0.8,
+      "unit": "fraction",
+      "constraint": "high_is_better",
+      "source_class": "synthetic_policy_gate",
+      "evidence_status": "not_empirical",
+      "limitation": "Illustrative contract value for adversarial fixtures only; not a legal rule, measured service target, or universal norm."
+    },
+    {
+      "gate_id": "MIN_SAFE_WORK",
+      "value": 0.9,
+      "unit": "fraction",
+      "constraint": "high_is_better",
+      "source_class": "synthetic_policy_gate",
+      "evidence_status": "not_empirical",
+      "limitation": "Illustrative contract value for adversarial fixtures only; not a legal rule, measured service target, or universal norm."
+    },
+    {
+      "gate_id": "MIN_WORK_STABILITY",
+      "value": 0.75,
+      "unit": "fraction",
+      "constraint": "high_is_better",
+      "source_class": "synthetic_policy_gate",
+      "evidence_status": "not_empirical",
+      "limitation": "Illustrative contract value for adversarial fixtures only; not a legal rule, measured service target, or universal norm."
+    },
+    {
+      "gate_id": "MIN_SOCIAL_PROTECTION",
+      "value": 0.75,
+      "unit": "fraction",
+      "constraint": "high_is_better",
+      "source_class": "synthetic_policy_gate",
+      "evidence_status": "not_empirical",
+      "limitation": "Illustrative contract value for adversarial fixtures only; not a legal rule, measured service target, or universal norm."
+    },
+    {
+      "gate_id": "MAX_LAWFUL_ACCESS_TIME_MINUTES",
+      "value": 60,
+      "unit": "minutes",
+      "constraint": "low_is_better",
+      "source_class": "synthetic_policy_gate",
+      "evidence_status": "not_empirical",
+      "limitation": "Illustrative contract value for adversarial fixtures only; not a legal rule, measured service target, or universal norm."
+    },
+    {
+      "gate_id": "MAX_COHORT_COVERAGE_GAP",
+      "value": 0.15,
+      "unit": "fraction",
+      "constraint": "maximum_interval_gap",
+      "source_class": "synthetic_policy_gate",
+      "evidence_status": "not_empirical",
+      "limitation": "Illustrative contract value for adversarial fixtures only; not a legal rule, measured service target, or universal norm."
+    },
+    {
+      "gate_id": "MAX_INTERVAL_WIDTH",
+      "value": 0.2,
+      "unit": "fraction",
+      "constraint": "maximum_uncertainty_width",
+      "source_class": "synthetic_policy_gate",
+      "evidence_status": "not_empirical",
+      "limitation": "Illustrative contract value for adversarial fixtures only; not a legal rule, measured service target, or universal norm."
+    },
+    {
+      "gate_id": "MAX_TIME_INTERVAL_WIDTH_MINUTES",
+      "value": 20,
+      "unit": "minutes",
+      "constraint": "maximum_uncertainty_width",
+      "source_class": "synthetic_policy_gate",
+      "evidence_status": "not_empirical",
+      "limitation": "Illustrative contract value for adversarial fixtures only; not a legal rule, measured service target, or universal norm."
+    },
+    {
+      "gate_id": "MAX_EVIDENCE_AGE_DAYS",
+      "value": 180,
+      "unit": "days",
+      "constraint": "freshness_ceiling",
+      "source_class": "synthetic_policy_gate",
+      "evidence_status": "not_empirical",
+      "limitation": "Illustrative contract value for adversarial fixtures only; not a legal rule, measured service target, or universal norm."
+    }
+  ],
+  "evidence_context_sources": [
+    {
+      "source_id": "STATSSA-QLFS-Q2-2026",
+      "title": "Quarterly Labour Force Survey, Quarter 2 2026 — key findings",
+      "uri": "https://www.statssa.gov.za/?PPN=P0211&SCH=74512&page_id=1856",
+      "publication_date": "2026-08-11",
+      "source_class": "official_descriptive_statistics",
+      "used_as_crime_effect_parameter": false,
+      "relevance": "Provides current national labour-market context and official definitions/series for employment and underutilisation.",
+      "limitation": "The 33.6% national unemployment statistic is not a causal crime estimate, a local pilot baseline, a parameter for the synthetic crime model, or evidence that unemployment predicts an individual."
+    },
+    {
+      "source_id": "ILO-DECENT-WORK-INDICATORS",
+      "title": "Decent Work Indicators — Concepts and Definitions",
+      "uri": "https://www.ilo.org/publications/decent-work-indicators-concepts-and-definitions",
+      "publication_date": "2013-12-18",
+      "source_class": "measurement_framework",
+      "used_as_crime_effect_parameter": false,
+      "relevance": "Supports a multidimensional measurement design spanning earnings, work safety, stability/security, and social protection.",
+      "limitation": "A measurement framework does not validate this prototype's thresholds or supply causal effects on crime."
+    },
+    {
+      "source_id": "ILO-MEASUREMENT-FRAMEWORK",
+      "title": "The ILO Framework on the Measurement of Decent Work",
+      "uri": "https://www.ilo.org/resource/ilo-framework-measurement-decent-work",
+      "publication_date": "2010-06-28",
+      "source_class": "measurement_framework",
+      "used_as_crime_effect_parameter": false,
+      "relevance": "Context for structuring labour and decent-work indicators.",
+      "limitation": "Used for construct coverage only; not an empirical parameter source for the simulation."
+    },
+    {
+      "source_id": "STATSSA-GPSJS-2025-26",
+      "title": "Governance, Public Safety and Justice Survey 2025/26 — Victims of Crime Release",
+      "uri": "https://www.statssa.gov.za/?PPN=P0341&SCH=74591&page_id=1856",
+      "publication_date": "2026-09-01",
+      "source_class": "official_descriptive_victimization_and_reporting_statistics",
+      "used_as_crime_effect_parameter": false,
+      "relevance": "Latest national victimization survey release; distinguishes incident counts, affected households, and the share reporting some or all incidents to police.",
+      "limitation": "National descriptive survey estimates are not Johannesburg pilot data, a causal effect coefficient, or an individual risk signal. Incident counts, affected-household counts, and reporting proportions are distinct measures. Technical notes report 85.57% national response, 76.97% for Gauteng, 73.72% for the City of Johannesburg, and 67.54% for the City of Tshwane; four geographic areas were below the cited 80% minimum-acceptable response rate. Response rates are quality diagnostics, not significance tests or proof every estimate in a lower-response area is invalid. Empirical comparisons must retain survey design and weights, indicator definitions and denominators, time comparability, geographic fit, and estimate-specific uncertainty information where available. Table 41's 3% coefficients of variation apply to household housebreaking experience (43.1% in 2024/25; 46.0% in 2025/26), not the distinct 43.4% to 48.2% police-reporting proportion. These CVs and rounded differences alone do not establish statistical significance; these are descriptive context, not model inputs.",
+      "indicator_precision_examples": [
+        {
+          "release": "GPSJS 2024/25",
+          "table": "Table 41",
+          "indicator_id": "household_housebreaking_experience_past_12_months",
+          "estimate_percent": 43.1,
+          "coefficient_of_variation_percent": 3,
+          "source_uri": "https://www.statssa.gov.za/publications/P0341/P03412025.pdf",
+          "not_precision_for_reporting_rate_change": true,
+          "used_as_model_parameter": false
+        },
+        {
+          "release": "GPSJS 2025/26",
+          "table": "Table 41",
+          "indicator_id": "household_housebreaking_experience_past_12_months",
+          "estimate_percent": 46,
+          "coefficient_of_variation_percent": 3,
+          "source_uri": "https://www.statssa.gov.za/publications/P0341/P03412026.pdf",
+          "not_precision_for_reporting_rate_change": true,
+          "used_as_model_parameter": false
+        }
+      ],
+      "precision_scope_limits": {
+        "prevalence_indicator_id": "household_housebreaking_experience_past_12_months",
+        "distinct_reporting_indicator_id": "households_reporting_some_or_all_housebreaking_incidents_to_police",
+        "reporting_share_change_percent_points": 4.8,
+        "table_41_cvs_are_precision_for_reporting_share_change": false,
+        "cv_alone_establishes_statistical_significance": false,
+        "year_over_year_significance_established": false,
+        "reporting_share_change_is_causal_effect": false
+      }
+    }
+  ],
+  "viability_measure_definitions": [
+    {
+      "measure_id": "ESSENTIALS_ACCESS",
+      "unit": "fraction of the pre-registered eligible cohort",
+      "numerator": "Eligible households whose locally specified essential basket is actually available, affordable under the declared affordability rule, and reliably delivered over the reference period.",
+      "denominator": "All eligible household-equivalents observed or represented in the same cohort and reference period, including people who did not successfully use an inaccessible service.",
+      "required_data": "Defined essentials basket; service availability and interruption; local price/cost burden; eligible population and reference period.",
+      "non_substitution_rule": "Nominal enrollment, benefit eligibility, or a nearby facility does not by itself establish actual access.",
+      "person_level_scoring_allowed": false
+    },
+    {
+      "measure_id": "LAWFUL_OPPORTUNITY_COVERAGE",
+      "unit": "fraction of the pre-registered target population",
+      "numerator": "Members for whom at least one attainable lawful work or productive-participation option satisfies the predeclared access, fair-pay, safety, stability, and skills/accessibility criteria.",
+      "denominator": "The full pre-registered target population for the service-area study, not merely the number of posted vacancies or people who succeeded in applying.",
+      "required_data": "Opportunity inventory; eligibility/access rules; pay, safety, stability and accessibility characteristics; transport/time barrier; reference period.",
+      "non_substitution_rule": "Vacancy totals or job-placement counts cannot substitute for attainable, quality-qualified options.",
+      "person_level_scoring_allowed": false
+    },
+    {
+      "measure_id": "FAIR_PAY_ADEQUACY",
+      "unit": "fraction of relevant opportunities meeting predeclared pay criteria",
+      "numerator": "Relevant lawful opportunities that meet applicable legal pay obligations and a locally defined, publicly reviewable adequacy benchmark for the reference context.",
+      "denominator": "All relevant opportunities in the pre-registered opportunity inventory with sufficient pay and hours information; missing pay data must be reported rather than assumed adequate.",
+      "required_data": "Applicable legal pay rules; transparent adequacy benchmark; gross/net treatment; paid hours; deductions and documented uncertainty.",
+      "non_substitution_rule": "Employment counts or median pay alone do not establish that the available opportunities meet the declared adequacy floor.",
+      "person_level_scoring_allowed": false
+    },
+    {
+      "measure_id": "SAFE_WORK",
+      "unit": "fraction of relevant opportunities meeting applicable safety criteria",
+      "numerator": "Relevant opportunities with evidence of satisfying applicable workplace safety duties and the study's declared worker-protection criteria.",
+      "denominator": "All relevant opportunities assessed, with unassessed or missing safety information retained as unknown rather than passed.",
+      "required_data": "Applicable jurisdiction-specific requirements; documented hazard controls; complaint/incident and inspection coverage; review period.",
+      "non_substitution_rule": "An employer certificate or standards reference alone does not prove the work is safe in practice.",
+      "person_level_scoring_allowed": false
+    },
+    {
+      "measure_id": "WORK_STABILITY",
+      "unit": "fraction of relevant opportunities meeting predeclared stability criteria",
+      "numerator": "Opportunities meeting the study's explicit thresholds for predictable hours/earnings and a declared minimum duration or continuity measure.",
+      "denominator": "All relevant opportunities in the target inventory with sufficient contract, hours and duration data.",
+      "required_data": "Declared stability definition; job tenure/contract type; volatility in hours and earnings; seasonal/temporary treatment; missing-data rate.",
+      "non_substitution_rule": "A single snapshot of employment status cannot establish secure or stable work.",
+      "person_level_scoring_allowed": false
+    },
+    {
+      "measure_id": "SOCIAL_PROTECTION_COVERAGE",
+      "unit": "fraction of eligible workers or opportunities with actual protection access",
+      "numerator": "Eligible workers/opportunities for which the applicable protection exists and can practically be accessed under the declared scheme definition.",
+      "denominator": "The population eligible for those protections under the applicable rules, with ineligible cases and unobserved eligibility reported separately.",
+      "required_data": "Applicable scheme/rules; eligibility; registration and contribution status; claimability/access barriers; reference period.",
+      "non_substitution_rule": "Formal entitlement or a registry entry alone does not establish effective access to benefits.",
+      "person_level_scoring_allowed": false
+    },
+    {
+      "measure_id": "LAWFUL_ACCESS_TIME",
+      "unit": "minutes, with travel mode and statistic specified",
+      "numerator": "A travel-time estimate to at least one opportunity that already satisfies the defined lawful-opportunity quality criteria.",
+      "denominator": "The pre-registered target-area aggregate and reference period, with routes/options inaccessible to relevant participants excluded or separately flagged.",
+      "required_data": "Travel mode; origin/accessibility assumptions; cost as well as time; p50/p90 or other declared statistic; temporal variability and safety/accessibility constraints.",
+      "non_substitution_rule": "Fast access to a poor-quality, unsafe or unattainable vacancy cannot make lawful alternatives viable.",
+      "person_level_scoring_allowed": false
+    }
+  ],
+  "viability_uncertainty_semantics": {
+    "low_high_values": "Illustrative fixture bounds for sensitivity and gate testing, not estimated sampling confidence intervals, statistical credible intervals, or uncertainty calibrated to South African data.",
+    "real_data_requirement": "For an empirical pilot, pre-register the source, denominator, reference period, missingness and uncertainty method for each measure; distinguish sampling error, measurement error, model uncertainty and disagreement between sources."
+  },
+  "viability_status_semantics": {
+    "fixture_pass": "Every synthetic gate is satisfied for a fixture; this is not a finding about a real population or a legal determination.",
+    "fixture_fail": "At least one synthetic minimum, cap or cross-cohort coverage-gap rule is clearly violated.",
+    "fixture_indeterminate": "Missing, stale, conflicted or overly broad/threshold-straddling evidence prevents a pass/fail finding."
+  },
+  "non_compensatory_rules": [
+    "Any clearly failed cohort floor vetoes scenario-level pass regardless of the cohort or population mean.",
+    "Fair pay, safe work, stability, and social protection are separate gates; opportunity count cannot compensate for a failure in any of them.",
+    "Conservative cohort coverage-gap rules are evaluated after per-cohort gate checks and cannot be averaged away.",
+    "Unusable evidence, source age above the declared synthetic limit, missing measurements, or a threshold-straddling interval never defaults to pass.",
+    "No person-level risk score, eligibility action, criminal propensity inference, or enforcement decision is generated."
+  ]
+}

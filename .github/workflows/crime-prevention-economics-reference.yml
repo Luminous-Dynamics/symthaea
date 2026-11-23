@@ -1,0 +1,69 @@
+name: crime-prevention-economics-reference
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/crime-prevention-economics-reference.yml"
+      - "docs/research/life-civic/CRIME_ECONOMICS_ROBOTICS_RESEARCH.md"
+      - "docs/research/life-civic/crime-prevention-reference-scenarios.json"
+      - "docs/research/life-civic/crime-prevention-reference-scenarios.manifest.json"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/crime-prevention-economics-reference.yml"
+      - "docs/research/life-civic/CRIME_ECONOMICS_ROBOTICS_RESEARCH.md"
+      - "docs/research/life-civic/crime-prevention-reference-scenarios.json"
+      - "docs/research/life-civic/crime-prevention-reference-scenarios.manifest.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-research-fixture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse JSON
+        run: jq empty docs/research/life-civic/crime-prevention-reference-scenarios.json
+      - name: Verify exact Git blob identity
+        shell: bash
+        run: |
+          manifest="docs/research/life-civic/crime-prevention-reference-scenarios.manifest.json"
+          scenario_file="$(jq -r '.scenario_file' "$manifest")"
+          jq -e '
+            .suite_id == "SYM-LIFE-CIVIC-CRIME-ECONOMICS-001" and
+            .version == "0.1.0" and
+            .status == "research_fixture" and
+            .scenario_file == "docs/research/life-civic/crime-prevention-reference-scenarios.json" and
+            (.scenario_git_blob_sha1 | test("^[0-9a-f]{40}$"))
+          ' "$manifest"
+          test "$scenario_file" = "docs/research/life-civic/crime-prevention-reference-scenarios.json"
+          expected="$(jq -r '.scenario_git_blob_sha1' "$manifest")"
+          actual="$(git hash-object "$scenario_file")"
+          test "$actual" = "$expected"
+      - name: Check scenario identity and non-effect invariants
+        run: |
+          jq -e '
+            .suite_id == "SYM-LIFE-CIVIC-CRIME-ECONOMICS-001" and
+            .version == "0.1.0" and
+            .status == "research_fixture" and
+            (.cases | length) >= 10 and
+            ([.cases[].case_id] | unique | length) == (.cases | length) and
+            all(.cases[];
+              .expected.effects_requested == false and
+              .expected.human_review_required == true and
+              (.expected.must_distinguish | length) > 0 and
+              (.expected.prohibited_claims | length) > 0
+            ) and
+            ([.cases[].case_id] | index("SYM-LCCE-003") != null) and
+            ([.cases[].case_id] | index("SYM-LCCE-005") != null) and
+            ([.cases[].case_id] | index("SYM-LCCE-007") != null) and
+            ([.cases[].case_id] | index("SYM-LCCE-009") != null) and
+            ([.cases[].case_id] | index("SYM-LCCE-010") != null) and
+            (.scoring.critical_failures | length) >= 5 and
+            (.scoring.non_scoring_note | type) == "string"
+          ' docs/research/life-civic/crime-prevention-reference-scenarios.json
+      - name: State claim ceiling
+        run: |
+          echo "Structural fixture checks only; no causal, criminological, legal, safety, or reasoning qualification is implied."

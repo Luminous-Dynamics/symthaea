@@ -1,0 +1,103 @@
+name: life-civic-reference-scenarios
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/life-civic-reference-scenarios.yml"
+      - "docs/research/LIFE_CIVIC_DOMAIN_MASTERY_PLAN.md"
+      - "docs/research/life-civic/reference-scenarios.json"
+      - "docs/research/life-civic/reference-scenarios.manifest.json"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/life-civic-reference-scenarios.yml"
+      - "docs/research/LIFE_CIVIC_DOMAIN_MASTERY_PLAN.md"
+      - "docs/research/life-civic/reference-scenarios.json"
+      - "docs/research/life-civic/reference-scenarios.manifest.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-reference-scenarios:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Assert exact source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+          printf 'Qualified source revision: %s\\n' "$actual"
+      - name: Parse scenario JSON
+        run: jq empty docs/research/life-civic/reference-scenarios.json
+      - name: Verify pinned Git blob identity
+        shell: bash
+        run: |
+          manifest="docs/research/life-civic/reference-scenarios.manifest.json"
+          scenario_file="$(jq -r '.scenario_file' "$manifest")"
+          jq -e '
+            .suite_id == "SYM-LIFE-CIVIC-REFERENCE-001" and
+            .corresponding_mycelix_corpus == "MYC-LIFE-CIVIC-APPLICABILITY-001@0.5.0" and
+            .version == "0.4.0" and
+            .status == "research_fixture" and
+            .scenario_file == "docs/research/life-civic/reference-scenarios.json" and
+            (.scenario_git_blob_sha1 | test("^[0-9a-f]{40}$"))
+          ' "$manifest"
+          expected="$(jq -r '.scenario_git_blob_sha1' "$manifest")"
+          test "$scenario_file" = "docs/research/life-civic/reference-scenarios.json"
+          actual="$(git hash-object "$scenario_file")"
+          test "$actual" = "$expected"
+
+      - name: Check suite identity and safety invariants
+        run: |
+          jq -e '
+            .suite_id == "SYM-LIFE-CIVIC-REFERENCE-001" and
+            .status == "research_fixture" and
+            .version == "0.4.0" and
+            ([.required_outputs[]] | index("source_retrieval_state_and_timestamp") != null) and
+            all(.cases[]; (.expected.must_distinguish | index("source retrieval time versus publication/event time") != null)) and
+            (.cases | length) >= 15 and
+            ([.cases[].case_id] | unique | length) == (.cases | length) and
+            all(.cases[];
+              .expected.effects_requested == false and
+              (.expected.prohibited_claims | length) > 0
+            ) and
+            ([.cases[].case_id] | index("SYM-LC-002") != null) and
+            ([.cases[].case_id] | index("SYM-LC-003") != null) and
+            ([.cases[].case_id] | index("SYM-LC-006") != null) and
+            ([.cases[].case_id] | index("SYM-LC-007") != null) and
+            ([.cases[].case_id] | index("SYM-LC-008") != null) and
+            ([.cases[].case_id] | index("SYM-LC-009") != null) and
+            ([.cases[].case_id] | index("SYM-LC-010") != null) and
+            ([.cases[].case_id] | index("SYM-LC-011") != null) and
+            ([.cases[].case_id] | index("SYM-LC-012") != null) and
+            ([.cases[].case_id] | index("SYM-LC-013") != null) and
+            ([.cases[].case_id] | index("SYM-LC-014") != null) and
+            ([.cases[].case_id] | index("SYM-LC-015") != null) and
+            (
+              [.cases[] | select(.case_id == "SYM-LC-012") | .expected.must_distinguish[]]
+              | index("final close-out and stated outstanding testing/commissioning versus full operational readiness") != null
+            ) and
+            (
+              [.cases[] | select(.case_id == "SYM-LC-013") | .expected.prohibited_claims[]]
+              | index("the announcement independently proves a safety or accessibility outcome") != null
+            ) and
+            (
+              [.cases[] | select(.case_id == "SYM-LC-014") | .expected.prohibited_claims[]]
+              | index("Malvern Clinic is open, fully staffed or adequately supplied today based only on the announcement") != null
+            ) and
+            (
+              [.cases[] | select(.case_id == "SYM-LC-015") | .expected.prohibited_claims[]]
+              | index("the 3% Table 41 coefficient of variation establishes precision or significance for the 43.4% to 48.2% police-reporting change") != null
+            ) and
+            (
+              [.cases[] | select(.case_id == "SYM-LC-015") | .expected.must_distinguish[]]
+              | index("survey response-rate diagnostics versus an estimate-specific standard error, confidence interval, coefficient of variation, design effect or official precision note") != null
+            )
+          ' docs/research/life-civic/reference-scenarios.json
