@@ -83,6 +83,8 @@ class MaceLongMemEvalV2Memory(Memory):
 
         self._lock = threading.RLock()
         self._process: subprocess.Popen[str] | None = None
+        self._poisoned = False
+        self._closed = False
         self._trajectory_lines: list[str] = []
         self._inserted_ids: set[str] = set()
         super().__init__(memory_params)
@@ -106,6 +108,12 @@ class MaceLongMemEvalV2Memory(Memory):
         return normalized
 
     def _start_sidecar(self) -> None:
+        if self._closed:
+            raise RuntimeError("MACE sidecar has been closed")
+        if self._poisoned:
+            raise RuntimeError(
+                "MACE sidecar outcome is unknown; refusing further operations until reload/reconciliation"
+            )
         if self._process is not None:
             if self._process.poll() is None:
                 return
@@ -135,6 +143,22 @@ class MaceLongMemEvalV2Memory(Memory):
             bufsize=1,
         )
 
+    def _poison_sidecar(self) -> None:
+        """Stop an ambiguous sidecar and forbid silent reuse or restart."""
+        self._poisoned = True
+        process = self._process
+        if process is None or process.poll() is not None:
+            return
+        try:
+            process.terminate()
+            process.wait(timeout=2)
+        except (OSError, subprocess.TimeoutExpired):
+            try:
+                process.kill()
+                process.wait(timeout=2)
+            except (OSError, subprocess.TimeoutExpired):
+                pass
+
     def _rpc(self, request: dict[str, object]) -> dict[str, Any]:
         with self._lock:
             self._start_sidecar()
@@ -142,21 +166,37 @@ class MaceLongMemEvalV2Memory(Memory):
             assert self._process.stdin is not None
             assert self._process.stdout is not None
             if self._process.poll() is not None:
+                self._poisoned = True
                 raise RuntimeError("MACE Rust sidecar is not running")
-            self._process.stdin.write(
-                json.dumps(request, ensure_ascii=False, separators=(",", ":")) + "\n"
-            )
-            self._process.stdin.flush()
-            response_line = self._process.stdout.readline()
+            try:
+                self._process.stdin.write(
+                    json.dumps(request, ensure_ascii=False, separators=(",", ":")) + "\n"
+                )
+                self._process.stdin.flush()
+                response_line = self._process.stdout.readline()
+            except (OSError, ValueError, UnicodeError) as error:
+                self._poison_sidecar()
+                raise RuntimeError(
+                    "MACE sidecar RPC outcome is unknown; refusing further operations"
+                ) from error
             if not response_line:
-                raise RuntimeError("MACE Rust sidecar closed its response stream")
+                self._poison_sidecar()
+                raise RuntimeError(
+                    "MACE sidecar closed its response stream; operation outcome is unknown"
+                )
             try:
                 response = json.loads(response_line)
             except json.JSONDecodeError as error:
-                raise RuntimeError(f"MACE Rust sidecar returned invalid JSON: {error}") from error
-            if not isinstance(response, dict) or response.get("ok") is not True:
-                message = response.get("error", "unknown sidecar error") if isinstance(response, dict) else "invalid response"
+                self._poison_sidecar()
+                raise RuntimeError(
+                    f"MACE Rust sidecar returned invalid JSON; outcome is unknown: {error}"
+                ) from error
+            if isinstance(response, dict) and response.get("ok") is False:
+                message = response.get("error", "request rejected")
                 raise RuntimeError(f"MACE Rust sidecar rejected request: {message}")
+            if not isinstance(response, dict) or response.get("ok") is not True:
+                self._poison_sidecar()
+                raise RuntimeError("MACE Rust sidecar returned an invalid acknowledgement")
             return response
 
     def _resolve_source_screenshot(self, reference: str) -> Path:
@@ -261,7 +301,10 @@ class MaceLongMemEvalV2Memory(Memory):
                 shutil.rmtree(self.asset_root / trajectory_key, ignore_errors=True)
                 raise RuntimeError(f"Duplicate trajectory insert attempted: {trajectory_id}")
             try:
-                self._rpc({"op": "insert", "trajectory": json.loads(serialized)})
+                acknowledgement = self._rpc({"op": "insert", "trajectory": json.loads(serialized)})
+                if acknowledgement.get("inserted") != 1:
+                    self._poison_sidecar()
+                    raise RuntimeError("MACE sidecar insert acknowledgement is not exact")
             except Exception:
                 shutil.rmtree(self.asset_root / trajectory_key, ignore_errors=True)
                 raise
@@ -282,7 +325,9 @@ class MaceLongMemEvalV2Memory(Memory):
             }
         )
         items = response.get("items")
-        require(isinstance(items, list), "sidecar response items must be a list")
+        if not isinstance(items, list):
+            self._poison_sidecar()
+            raise RuntimeError("MACE sidecar query acknowledgement has no item list")
         validated: list[MemoryContextItem] = []
         for index, item in enumerate(items):
             require(isinstance(item, dict), f"sidecar context item {index} must be an object")
@@ -331,12 +376,16 @@ class MaceLongMemEvalV2Memory(Memory):
 
     def close(self) -> None:
         with self._lock:
+            self._closed = True
             process = self._process
             self._process = None
             if process is None:
                 return
             if process.stdin is not None:
-                process.stdin.close()
+                try:
+                    process.stdin.close()
+                except OSError:
+                    pass
             try:
                 process.wait(timeout=5)
             except subprocess.TimeoutExpired:
