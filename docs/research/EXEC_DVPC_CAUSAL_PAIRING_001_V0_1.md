@@ -61,6 +61,7 @@ Each arm binds:
 - delivered evidence event IDs with availability and delivery times;
 - the evidence IDs consumed by each decision;
 - an explicit scored-outcome binding;
+- a required digest reference to the complete Symtropy correspondence-conditioned stochastic draw bundle for this arm;
 - a driver-execution receipt and an independent replay-audit receipt;
 - explicit complete/incomplete and replay-audit disposition.
 
@@ -86,6 +87,18 @@ A valid trajectory and a valid regret vector are not sufficient if they refer to
 - `validate_causal_pairing_with_interaction`: evaluates the existing #13281 four-arm regret outcomes, validates the four causal trajectories, verifies the complete 13-field identity, and matches every arm's applied/terminal disposition to the corresponding trajectory binding.
 
 It returns a combined `CausalDecisionValueCertificate` containing both the causal pairing certificate and the decision-value interaction certificate. This is a join adapter, not a new regret formula or causal inference system.
+
+### Stochastic correspondence evidence is referenced, not reimplemented
+
+Each arm now requires a non-empty `stochastic_draw_bundle_sha256`. It commits the DVPC execution receipt to the Symtropy-produced, hypothesis-scoped correspondence/draw bundle. This bundle must preserve the full event-candidate inventories, event scopes, all admissible correspondence hypotheses, the separate causal-invariance disposition for each mapped stochastic source, semantic draw-address plans and the resulting Philox receipts.
+
+The responsibilities remain deliberately split:
+
+- Symtropy [#3690](https://github.com/Luminous-Dynamics/symtropy/pull/3690) owns correspondence-conditioned semantic draw-address projection and the Philox draw bundle.
+- Symtropy [#3755](https://github.com/Luminous-Dynamics/symtropy/pull/3755) owns independent semantic re-derivation of the complete correspondence-to-address projection, event partition coverage and Philox receipts from retained structured inputs.
+- Symthaea #13375 / this module requires and binds the per-arm bundle digest, but does **not** parse the bundle, resolve Philox, choose correspondence hypotheses, or prove event/source causal invariance.
+
+A missing/empty bundle reference rejects. A bundle whose candidate universe or hypothesis search is incomplete must remain incomplete in the externally verified receipt and cannot be promoted to a complete causal trajectory by the DVPC digest reference. Event correspondence is not itself proof that the corresponding stochastic source is invariant. A valid hash is a commitment to bytes; semantic validity comes from the separate Symtropy verifier and source-evidence review.
 
 
 ## 4. Decision-time information filtration
@@ -151,6 +164,7 @@ The source test suite contains positive and negative controls for these cases, p
 - #8764 owns the general open-loop/action-coupled causal replay distinction.
 - #8732 owns driver-owned clocks, per-tick delivered evidence and decision-time information views.
 - Symtropy #3387 owns scenario execution/replay; #3471/#3502 own action-conditioned actor response and its execution adapter where relevant.
+- Symtropy #3690 owns correspondence-conditioned stochastic draw-address plans and Philox bundles; #3755 independently re-derives and verifies the full projection and receipt bundle. DVPC stores only the verified bundle's digest reference.
 - #13281 owns four-arm regret arithmetic and the cluster adapter.
 - #13282 owns the compute×observation experiment design.
 - #8578 owns independent-cluster inference.
