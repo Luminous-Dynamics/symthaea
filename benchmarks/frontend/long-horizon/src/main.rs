@@ -451,6 +451,10 @@ fn digest_hex(bytes: &[u8]) -> String {
     hex::encode(Sha256::digest(bytes))
 }
 
+fn is_hex_digest(value: &str, lengths: &[usize]) -> bool {
+    lengths.contains(&value.len()) && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
 fn verify_policy(policy: &Value) -> Result<(), String> {
     if field_str(policy, "schema")? != "sfeb-event-oracle-policy-v1"
         || field_str(policy, "task_id")? != "SFEB-PILOT-INT-004" {
@@ -644,7 +648,8 @@ fn verify_event_trace_values(
         if !passed { any_failed = true; }
         let canonical_rule = serde_jcs::to_vec(rule)
             .map_err(|error| format!("cannot canonicalize event oracle rule: {error}"))?;
-        let event_digests: Result<Vec<String>, String> = evidence_event_ids.iter().map(|id| {
+        let unique_event_ids: BTreeSet<String> = evidence_event_ids.iter().cloned().collect();
+        let event_digests: Result<Vec<String>, String> = unique_event_ids.iter().map(|id| {
             let event = event_map.get(id).ok_or_else(|| format!("missing evidence event: {id}"))?;
             let canonical_event = serde_jcs::to_vec(event)
                 .map_err(|error| format!("cannot canonicalize evidence event: {error}"))?;
