@@ -1,0 +1,15 @@
+[package]
+name = "symthaea-evidence-attestation"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Strict JSON/JCS and DSSE Ed25519 source-receipt verification for Symthaea evidence contracts"
+
+[dependencies]
+base64 = "0.22.1"
+ed25519-dalek = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_json_canonicalizer = "=0.4.1"
+sha2 = { workspace = true }
+thiserror = { workspace = true }
