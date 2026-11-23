@@ -89,7 +89,7 @@ No signature algorithm, key custody, issuer registry, remote source-observation 
 
 ## 6. Test inventory
 
-Twelve Rust unit tests are authored in the module:
+Thirteen Rust unit tests are authored in the module:
 
 1. Only independently admissible evidence IDs cross the gate.
 2. DecisionNeed binding cannot be changed.
@@ -103,6 +103,7 @@ Twelve Rust unit tests are authored in the module:
 10. Candidate-ID-set commitment must match the exact sorted IDs.
 11. A verified qualification token cannot be used after expiry.
 12. Consumer/tenant scope cannot be rebound.
+13. Three candidate-producing traces may promote an advisory search strategy, while the independent evidence gate still rejects the poisoned candidate and yields no admissible evidence.
 
 The module's test verifier is intentionally a deterministic test double; it is not a production signature scheme.
 
