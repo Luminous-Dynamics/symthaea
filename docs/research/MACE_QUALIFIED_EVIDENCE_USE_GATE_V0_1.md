@@ -27,6 +27,8 @@ The module defines:
 
 The consumer binding includes:
 
+The consuming runtime must supply a trusted current time; callers cannot treat the token as perpetual after verification.
+
 - run ID, opaque query invocation ID and domain;
 - environment revision and tool-profile digests;
 - exact query digest;
@@ -85,7 +87,7 @@ No signature algorithm, key custody, issuer registry, remote source-observation 
 
 ## 6. Test inventory
 
-Nine Rust unit tests are authored in the module:
+Eleven Rust unit tests are authored in the module:
 
 1. Only independently admissible evidence IDs cross the gate.
 2. DecisionNeed binding cannot be changed.
@@ -97,6 +99,7 @@ Nine Rust unit tests are authored in the module:
 8. Environment revision cannot be rebound.
 9. A zero-admissible outcome remains an abstention signal.
 10. Candidate-ID-set commitment must match the exact sorted IDs.
+11. A verified qualification token cannot be used after expiry.
 
 The module's test verifier is intentionally a deterministic test double; it is not a production signature scheme.
 
