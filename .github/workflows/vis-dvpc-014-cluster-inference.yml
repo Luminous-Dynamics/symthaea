@@ -68,7 +68,28 @@ jobs:
           grep -F $'ANALYSIS\tstatus\tCLUSTER_LEVEL_INFERENCE_ONLY' /tmp/vis-dvpc-014-receipt.tsv
           grep -F $'ANALYSIS\tperformance_claim\tNONE' /tmp/vis-dvpc-014-receipt.tsv
           grep -F $'ANALYSIS\tcluster_assignment_manifest_sha256\t'"$CLUSTER_MANIFEST_SHA256" /tmp/vis-dvpc-014-receipt.tsv
-          test "$(grep -c '^RESULT' /tmp/vis-dvpc-014-receipt.tsv)" -eq 4
+          test "$(grep -c 
+          test "$(grep -F $'ANALYSIS\tindependent_clusters\t6' /tmp/vis-dvpc-014-receipt.tsv | wc -l)" -eq 1
+
+      - name: Verify deterministic replay
+        run: |
+          /tmp/vis-dvpc-014 fixtures/vis-dvpc-compute-observation-cluster-deltas-v0.1.tsv aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa "$CLUSTER_MANIFEST_SHA256" > /tmp/vis-dvpc-014-receipt-repeat.tsv
+          cmp /tmp/vis-dvpc-014-receipt.tsv /tmp/vis-dvpc-014-receipt-repeat.tsv
+
+      - name: Verify external bundle-lock mismatch is rejected
+        run: |
+          if /tmp/vis-dvpc-014 fixtures/vis-dvpc-compute-observation-cluster-deltas-v0.1.tsv bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb "$CLUSTER_MANIFEST_SHA256" > /tmp/vis-dvpc-014-invalid-lock.tsv 2>&1; then
+            echo "analyzer accepted a mismatched external bundle lock" >&2
+            exit 1
+          fi
+
+      - name: Verify cluster-assignment digest mismatch is rejected
+        run: |
+          if /tmp/vis-dvpc-014 fixtures/vis-dvpc-compute-observation-cluster-deltas-v0.1.tsv aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc > /tmp/vis-dvpc-014-invalid-clusters.tsv 2>&1; then
+            echo "analyzer accepted a mismatched cluster-assignment manifest digest" >&2
+            exit 1
+          fi
+^RESULT\t' /tmp/vis-dvpc-014-receipt.tsv)" -eq 4
           test "$(grep -F $'ANALYSIS\tindependent_clusters\t6' /tmp/vis-dvpc-014-receipt.tsv | wc -l)" -eq 1
 
       - name: Verify deterministic replay
