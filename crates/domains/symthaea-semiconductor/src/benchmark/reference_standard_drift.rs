@@ -455,26 +455,56 @@ pub fn predict_reference_standard_drift_v1(
         }
     }
 
-    let midpoint = lower + (upper - lower) / 2;
-    let midpoint_days =
-        (midpoint - input.model.anchor_time_unix_seconds) as f64 / 86_400.0;
-    let lower_days =
-        (lower - input.model.anchor_time_unix_seconds) as f64 / 86_400.0;
-    let upper_days =
-        (upper - input.model.anchor_time_unix_seconds) as f64 / 86_400.0;
-    let extrapolation_days = [
-        0.0_f64,
-        (input.model.fit_start_unix_seconds - lower).max(0) as f64 / 86_400.0,
-        (upper - input.model.fit_end_unix_seconds).max(0) as f64 / 86_400.0,
-    ]
-    .into_iter()
-    .fold(0.0_f64, f64::max);
+    let time_span = upper.checked_sub(lower).ok_or_else(|| {
+        ReferenceDriftErrorV1("measurement time interval overflows signed seconds".into())
+    })?;
+    let midpoint = lower.checked_add(time_span / 2).ok_or_else(|| {
+        ReferenceDriftErrorV1("measurement time midpoint overflows signed seconds".into())
+    })?;
+    let midpoint_days = midpoint
+        .checked_sub(input.model.anchor_time_unix_seconds)
+        .ok_or_else(|| ReferenceDriftErrorV1("midpoint/anchor time delta overflows".into()))?
+        as f64
+        / 86_400.0;
+    let lower_days = lower
+        .checked_sub(input.model.anchor_time_unix_seconds)
+        .ok_or_else(|| ReferenceDriftErrorV1("lower/anchor time delta overflows".into()))?
+        as f64
+        / 86_400.0;
+    let upper_days = upper
+        .checked_sub(input.model.anchor_time_unix_seconds)
+        .ok_or_else(|| ReferenceDriftErrorV1("upper/anchor time delta overflows".into()))?
+        as f64
+        / 86_400.0;
+    let days_before_fit = input
+        .model
+        .fit_start_unix_seconds
+        .checked_sub(lower)
+        .ok_or_else(|| ReferenceDriftErrorV1("fit-start time delta overflows".into()))?
+        .max(0);
+    let days_after_fit = upper
+        .checked_sub(input.model.fit_end_unix_seconds)
+        .ok_or_else(|| ReferenceDriftErrorV1("fit-end time delta overflows".into()))?
+        .max(0);
+    let extrapolation_days =
+        days_before_fit.max(days_after_fit) as f64 / 86_400.0;
 
     if extrapolation_days > input.policy.maximum_extrapolation_days {
         reasons.push(ReferenceDriftReasonV1::ExtrapolationLimitExceeded);
         if status != ReferenceDriftPredictionStatusV1::Rejected {
             status = ReferenceDriftPredictionStatusV1::Unknown;
         }
+    }
+
+    // Never expose a usable correction from a model that is unknown, not yet
+    // available at the requested frontier, or outside its qualified support.
+    if status != ReferenceDriftPredictionStatusV1::Qualified {
+        reasons.sort();
+        reasons.dedup();
+        let mut report = blank_report(input, status, reasons);
+        report.extrapolation_days_upper_bound = Some(extrapolation_days);
+        report.report_sha256 = report_digest(&report)?;
+        return Ok(report);
     }
 
     let predicted_correction =
@@ -811,7 +841,7 @@ mod tests {
     }
 
     #[test]
-    fn static_gate_unknown_blocks_dynamic_prediction() {
+    fn static_gate_rejection_blocks_dynamic_prediction() {
         let mut value = input();
         value.measurement_qualification_policy.maximum_standard_uncertainty = 0.001;
         value.measurement_qualification_report = qualify_measurement_evidence_v1(
