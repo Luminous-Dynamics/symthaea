@@ -528,3 +528,313 @@ pub fn predict_reference_standard_drift_v1(
     Ok(report)
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::benchmark::calibration_requalification::MeasurementTimeBoundsV1;
+    use crate::benchmark::metrology_qualification_gate::{
+        CALIBRATION_CERTIFICATE_SCHEMA_V1, MEASUREMENT_EVIDENCE_SCHEMA_V1,
+        QUALIFICATION_POLICY_SCHEMA_V1, MeasurementUncertaintyComponentV1,
+        MeasurementQualificationPolicyV1, TraceabilityDeclarationV1,
+        UncertaintyComponentKindV1, qualify_measurement_evidence_v1,
+    };
+
+    fn measurement() -> MeasurementEvidenceV1 {
+        MeasurementEvidenceV1 {
+            schema: MEASUREMENT_EVIDENCE_SCHEMA_V1.into(),
+            measurement_event_id: "measurement-drift-001".into(),
+            source_record_sha256: "c".repeat(64),
+            instrument_id: "ellipsometer-07".into(),
+            measurand_id: "film-thickness".into(),
+            unit: "nm".into(),
+            method_revision: "film-method-3".into(),
+            measured_at_unix_seconds: 1_850_000_000,
+            raw_value: 12.50,
+            correction_applied: -0.05,
+            corrected_value: 12.45,
+            uncertainty_components: vec![MeasurementUncertaintyComponentV1 {
+                component_id: "repeatability".into(),
+                source_ref: "msa-study-2026-11".into(),
+                source_sha256: "d".repeat(64),
+                kind: UncertaintyComponentKindV1::TypeA,
+                standard_uncertainty: 0.02,
+            }],
+        }
+    }
+
+    fn certificate() -> CalibrationCertificateV1 {
+        CalibrationCertificateV1 {
+            schema: CALIBRATION_CERTIFICATE_SCHEMA_V1.into(),
+            certificate_id: "cal-cert-drift-001".into(),
+            certificate_sha256: "a".repeat(64),
+            issuing_authority_ref: "metrology-lab-01".into(),
+            instrument_id: "ellipsometer-07".into(),
+            measurand_id: "film-thickness".into(),
+            unit: "nm".into(),
+            method_revision: "film-method-3".into(),
+            reference_standard_id: "step-height-standard-02".into(),
+            reference_certificate_sha256: Some("b".repeat(64)),
+            traceability_declaration: TraceabilityDeclarationV1::ClaimedTraceable,
+            calibration_performed_at_unix_seconds: 1_800_000_000,
+            issued_at_unix_seconds: 1_800_000_100,
+            valid_from_unix_seconds: 1_800_000_100,
+            valid_until_unix_seconds: 1_900_000_000,
+            revoked_at_unix_seconds: None,
+            correction: -0.05,
+            calibration_standard_uncertainty: 0.01,
+            coverage_factor: 2.0,
+        }
+    }
+
+    fn qualification_policy() -> MeasurementQualificationPolicyV1 {
+        MeasurementQualificationPolicyV1 {
+            schema: QUALIFICATION_POLICY_SCHEMA_V1.into(),
+            policy_id: "strict-static-calibration.v1".into(),
+            revision: 1,
+            maximum_standard_uncertainty: 0.20,
+            required_coverage_factor: 2.0,
+            require_claimed_traceability: true,
+            require_reference_certificate_digest: true,
+        }
+    }
+
+    fn model() -> ReferenceStandardDriftModelV1 {
+        let mut model = ReferenceStandardDriftModelV1 {
+            schema: REFERENCE_DRIFT_MODEL_SCHEMA_V1.into(),
+            model_id: "reference-linear-drift-001".into(),
+            reference_standard_id: "step-height-standard-02".into(),
+            reference_certificate_sha256: "b".repeat(64),
+            measurand_id: "film-thickness".into(),
+            unit: "nm".into(),
+            anchor_time_unix_seconds: 1_840_000_000,
+            fit_start_unix_seconds: 1_830_000_000,
+            fit_end_unix_seconds: 1_845_000_000,
+            prediction_valid_from_unix_seconds: 1_830_000_000,
+            prediction_valid_until_unix_seconds: 1_900_000_000,
+            model_available_at_unix_seconds: 1_846_000_000,
+            fit_observation_count: 8,
+            history_manifest_sha256: "d".repeat(64),
+            holdout_validation_manifest_sha256: Some("e".repeat(64)),
+            qualification: ReferenceDriftModelQualificationV1::Qualified,
+            beta_0_correction: -0.05,
+            beta_1_correction_per_day: 0.0001,
+            parameter_covariance: [[0.0001, 0.0], [0.0, 0.000001]],
+            residual_standard_uncertainty: 0.002,
+            model_standard_uncertainty: 0.003,
+            model_sha256: String::new(),
+        };
+        model.model_sha256 = seal_reference_standard_drift_model_v1(&model).unwrap();
+        model
+    }
+
+    fn policy() -> ReferenceDriftPredictionPolicyV1 {
+        ReferenceDriftPredictionPolicyV1 {
+            schema: REFERENCE_DRIFT_POLICY_SCHEMA_V1.into(),
+            policy_id: "reference-time-drift-policy.v1".into(),
+            revision: 1,
+            minimum_history_epochs: 3,
+            maximum_extrapolation_days: 20.0,
+            maximum_standard_uncertainty: 0.10,
+            required_coverage_factor: 2.0,
+            correction_anchor_tolerance: 1.0e-9,
+        }
+    }
+
+    fn input() -> ReferenceDriftPredictionInputV1 {
+        let measured = measurement();
+        let cert = certificate();
+        let static_policy = qualification_policy();
+        let qualification =
+            qualify_measurement_evidence_v1(&measured, Some(&cert), &static_policy).unwrap();
+        ReferenceDriftPredictionInputV1 {
+            schema: REFERENCE_DRIFT_INPUT_SCHEMA_V1.into(),
+            input_id: "reference-drift-prediction-input-001".into(),
+            measurement: measured,
+            calibration_certificate: cert,
+            measurement_qualification_policy: static_policy,
+            measurement_qualification_report: qualification,
+            measurement_time_bounds: MeasurementTimeBoundsV1 {
+                earliest_measured_at_unix_seconds: 1_850_000_000,
+                latest_measured_at_unix_seconds: 1_850_000_000,
+            },
+            as_known_at_unix_seconds: 1_860_000_000,
+            model: model(),
+            policy: policy(),
+        }
+    }
+
+    fn reseal(input: &mut ReferenceDriftPredictionInputV1) {
+        input.model.model_sha256 =
+            seal_reference_standard_drift_model_v1(&input.model).unwrap();
+    }
+
+    #[test]
+    fn linear_drift_updates_correction_at_measurement_time() {
+        let report = predict_reference_standard_drift_v1(&input()).unwrap();
+        assert_eq!(report.status, ReferenceDriftPredictionStatusV1::Qualified);
+        assert!((report.predicted_additive_correction.unwrap() - (-0.049)).abs() < 1.0e-12);
+        assert!((report.predicted_corrected_measurement.unwrap() - 12.451).abs() < 1.0e-12);
+        assert!(report.expanded_uncertainty_upper_bound.unwrap() > 0.0);
+        assert!(!report.source_authenticity_proven);
+        assert!(!report.calibration_certificate_mutated);
+        assert!(!report.equipment_control_authority);
+    }
+
+    #[test]
+    fn prediction_uncertainty_includes_covariance_residual_and_model_terms() {
+        let report = predict_reference_standard_drift_v1(&input()).unwrap();
+        let parameter = (0.0001_f64 + 100.0 * 0.000001).sqrt();
+        let expected = parameter + 0.002 + 0.003;
+        assert!(
+            (report.predictive_standard_uncertainty_upper_bound.unwrap() - expected).abs()
+                < 1.0e-12
+        );
+        assert!(
+            (report.expanded_uncertainty_upper_bound.unwrap() - expected * 2.0).abs()
+                < 1.0e-12
+        );
+    }
+
+    #[test]
+    fn uncertain_measurement_time_adds_a_conservative_slope_bound() {
+        let mut value = input();
+        value.measurement_time_bounds = MeasurementTimeBoundsV1 {
+            earliest_measured_at_unix_seconds: 1_849_956_800,
+            latest_measured_at_unix_seconds: 1_850_043_200,
+        };
+        let point = predict_reference_standard_drift_v1(&input()).unwrap();
+        let interval = predict_reference_standard_drift_v1(&value).unwrap();
+        assert!(interval.predictive_standard_uncertainty_upper_bound
+            > point.predictive_standard_uncertainty_upper_bound);
+    }
+
+    #[test]
+    fn model_not_available_at_selected_knowledge_frontier_is_unknown() {
+        let mut value = input();
+        value.as_known_at_unix_seconds = 1_845_000_000;
+        let report = predict_reference_standard_drift_v1(&value).unwrap();
+        assert_eq!(report.status, ReferenceDriftPredictionStatusV1::Unknown);
+        assert!(
+            report
+                .reasons
+                .contains(&ReferenceDriftReasonV1::ModelQualificationUnknown)
+        );
+        assert!(report.predicted_additive_correction.is_some());
+    }
+
+    #[test]
+    fn prediction_outside_declared_horizon_is_unknown() {
+        let mut value = input();
+        value.model.prediction_valid_until_unix_seconds = 1_849_999_999;
+        reseal(&mut value);
+        let report = predict_reference_standard_drift_v1(&value).unwrap();
+        assert_eq!(report.status, ReferenceDriftPredictionStatusV1::Unknown);
+        assert!(
+            report
+                .reasons
+                .contains(&ReferenceDriftReasonV1::PredictionOutsideValidityHorizon)
+        );
+    }
+
+    #[test]
+    fn excessive_extrapolation_is_unknown_even_inside_model_horizon() {
+        let mut value = input();
+        value.policy.maximum_extrapolation_days = 2.0;
+        let report = predict_reference_standard_drift_v1(&value).unwrap();
+        assert_eq!(report.status, ReferenceDriftPredictionStatusV1::Unknown);
+        assert!(
+            report
+                .reasons
+                .contains(&ReferenceDriftReasonV1::ExtrapolationLimitExceeded)
+        );
+    }
+
+    #[test]
+    fn insufficient_history_and_missing_holdout_leave_model_unknown() {
+        let mut too_few = input();
+        too_few.model.fit_observation_count = 2;
+        reseal(&mut too_few);
+        let few_report = predict_reference_standard_drift_v1(&too_few).unwrap();
+        assert_eq!(few_report.status, ReferenceDriftPredictionStatusV1::Unknown);
+        assert!(
+            few_report
+                .reasons
+                .contains(&ReferenceDriftReasonV1::InsufficientHistoryEpochs)
+        );
+
+        let mut no_holdout = input();
+        no_holdout.model.holdout_validation_manifest_sha256 = None;
+        reseal(&mut no_holdout);
+        let no_holdout_report = predict_reference_standard_drift_v1(&no_holdout).unwrap();
+        assert_eq!(no_holdout_report.status, ReferenceDriftPredictionStatusV1::Unknown);
+        assert!(
+            no_holdout_report
+                .reasons
+                .contains(&ReferenceDriftReasonV1::MissingHoldoutValidationManifest)
+        );
+    }
+
+    #[test]
+    fn certificate_anchor_mismatch_is_rejected() {
+        let mut value = input();
+        value.model.beta_0_correction = -0.04;
+        reseal(&mut value);
+        let report = predict_reference_standard_drift_v1(&value).unwrap();
+        assert_eq!(report.status, ReferenceDriftPredictionStatusV1::Rejected);
+        assert!(
+            report
+                .reasons
+                .contains(&ReferenceDriftReasonV1::CorrectionAnchorMismatch)
+        );
+    }
+
+    #[test]
+    fn reference_standard_or_measurand_identity_mismatch_is_rejected() {
+        let mut value = input();
+        value.model.reference_standard_id = "different-standard".into();
+        reseal(&mut value);
+        let report = predict_reference_standard_drift_v1(&value).unwrap();
+        assert_eq!(report.status, ReferenceDriftPredictionStatusV1::Rejected);
+        assert!(
+            report
+                .reasons
+                .contains(&ReferenceDriftReasonV1::ReferenceCertificateMismatch)
+        );
+    }
+
+    #[test]
+    fn malformed_covariance_is_rejected_before_prediction() {
+        let mut value = input();
+        value.model.parameter_covariance[0][1] = 0.01;
+        reseal(&mut value);
+        assert!(predict_reference_standard_drift_v1(&value).is_err());
+    }
+
+    #[test]
+    fn static_gate_unknown_blocks_dynamic_prediction() {
+        let mut value = input();
+        value.measurement_qualification_policy.maximum_standard_uncertainty = 0.001;
+        value.measurement_qualification_report = qualify_measurement_evidence_v1(
+            &value.measurement,
+            Some(&value.calibration_certificate),
+            &value.measurement_qualification_policy,
+        )
+        .unwrap();
+
+        let report = predict_reference_standard_drift_v1(&value).unwrap();
+        assert_eq!(report.status, ReferenceDriftPredictionStatusV1::Rejected);
+        assert!(
+            report
+                .reasons
+                .contains(&ReferenceDriftReasonV1::BaseMeasurementQualificationRejected)
+        );
+    }
+
+    #[test]
+    fn same_frozen_inputs_produce_identical_prediction_receipts() {
+        let value = input();
+        let a = predict_reference_standard_drift_v1(&value).unwrap();
+        let b = predict_reference_standard_drift_v1(&value).unwrap();
+        assert_eq!(a.report_sha256, b.report_sha256);
+    }
+}
