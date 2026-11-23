@@ -1,0 +1,63 @@
+{
+  "schema_version": "0.1.0",
+  "artifact_kind": "bh_egb_exact_covariance_redundancy_verification_receipt",
+  "checked_utc": "2026-11-24",
+  "result": "pass_exact_synthetic_fixture_and_negative_controls",
+  "repository_context": {
+    "repository": "Luminous-Dynamics/symthaea",
+    "branch": "research/bh-egb-symthaea-campaign-2026-11-23",
+    "script_commit": "c98e97b2e0598eb002f4d8522006f420beedefb0",
+    "methodology_commit": "37fecf7a32722b0bcdf25df0b4d2064ac04b8c9a"
+  },
+  "inputs": {
+    "fixture_path": "docs/research/BH_EGB_COVARIANCE_REDUNDANCY_CONTROL_V0_1.json",
+    "fixture_git_blob_sha1": "cf737cf3632464bdc7d816f941027b7eefd796ea",
+    "verifier_path": "docs/research/verify_bh_egb_covariance_fixture.py",
+    "verifier_git_blob_sha1": "8c7ec7194cb735edd9cc96414399aba219b5cf18",
+    "methodology_path": "docs/research/BH_EGB_DECISION_QUALIFIED_DISCOVERY_V0_1.md",
+    "methodology_git_blob_sha1": "b97c17c43eabeb4813de3eaeb3d86dd6c3b60333"
+  },
+  "execution": {
+    "command": "python3 docs/research/verify_bh_egb_covariance_fixture.py docs/research/BH_EGB_COVARIANCE_REDUNDANCY_CONTROL_V0_1.json",
+    "runtime": "Python 3.13.5",
+    "dependencies": "Python standard library only",
+    "arithmetic": "exact fractions.Fraction",
+    "fixture_bytes": "local fixture Git blob SHA-1 exactly matches the declared public fixture blob SHA-1",
+    "exit_code": 0
+  },
+  "checks": {
+    "base_covariance_positive_definite": true,
+    "observable_transform_full_column_rank": true,
+    "augmented_covariance_exactly_transported": true,
+    "augmented_covariance_singular_rank_2_of_3": true,
+    "augmented_mean_within_covariance_support": true,
+    "moore_penrose_A_Aplus_A_identity": true,
+    "moore_penrose_Aplus_A_Aplus_identity": true,
+    "moore_penrose_A_Aplus_symmetry": true,
+    "moore_penrose_Aplus_A_symmetry": true,
+    "base_mahalanobis_squared": "4",
+    "augmented_pseudoinverse_mahalanobis_squared": "4",
+    "redundancy_invariance": true,
+    "naive_diagonal_score_before": "5",
+    "naive_diagonal_score_after_duplicate": "8",
+    "negative_controls_expected_to_reject": 4,
+    "negative_controls_rejected": [
+      "indefinite_base_covariance",
+      "mean_outside_declared_support",
+      "covariance_transport_mismatch",
+      "false_rank_declaration"
+    ]
+  },
+  "claim_ceiling": "The verifier passes one exact synthetic rational linear-algebra fixture and its four embedded hostile mutations. It does not qualify PR #8034, establish a calibrated covariance model, validate a physical EGB response, prove a local branch theorem, execute the Symthaea research policy, or establish SOTA performance.",
+  "not_run_or_not_claimed": [
+    "Rust build or package tests",
+    "hosted CI pass",
+    "PR #8034 qualification",
+    "runtime Stage-A value-of-computation policy",
+    "runtime Stage-B experiment-design selector",
+    "finite-positive-coupling EGB BVP",
+    "interval existence/uniqueness theorem",
+    "branch completeness or hyperbolicity",
+    "external benchmark superiority"
+  ]
+}
