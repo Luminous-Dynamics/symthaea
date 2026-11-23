@@ -1,0 +1,385 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mace_candidate_envelope_v1.schema.json",
+  "title": "MACE Candidate Envelope v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "pair_block_id",
+    "observation_sequence",
+    "task_nonce",
+    "method",
+    "decision_need",
+    "candidate_evidence"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mace_candidate_envelope_v1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_.:-]+$"
+    },
+    "pair_block_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9_.:-]+$"
+    },
+    "observation_sequence": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709552000
+    },
+    "task_nonce": {
+      "type": "string",
+      "minLength": 16,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_-]+$"
+    },
+    "method": {
+      "enum": [
+        "exact_scope_scan",
+        "typed_content_hdc"
+      ]
+    },
+    "decision_need": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "scope",
+        "action_alternatives",
+        "semantic_estimand",
+        "identification_method",
+        "qualification_profile_sha256"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "scope": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "regime",
+            "objective"
+          ],
+          "properties": {
+            "regime": {
+              "enum": [
+                "baseline",
+                "shifted"
+              ]
+            },
+            "objective": {
+              "enum": [
+                "quality",
+                "cost",
+                "speed"
+              ]
+            }
+          }
+        },
+        "action_alternatives": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "a",
+              "b"
+            ]
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "semantic_estimand": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schema_version",
+            "population_spec_sha256",
+            "treatment_version_sha256",
+            "comparator_version_sha256",
+            "outcome_definition_sha256",
+            "outcome_unit_sha256",
+            "follow_up_horizon_ms",
+            "censoring_strategy_sha256",
+            "intercurrent_event_strategy_sha256",
+            "target_weighting_sha256"
+          ],
+          "properties": {
+            "schema_version": {
+              "const": 1
+            },
+            "population_spec_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "treatment_version_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "comparator_version_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "outcome_definition_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "outcome_unit_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "follow_up_horizon_ms": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "censoring_strategy_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "intercurrent_event_strategy_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "target_weighting_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        "identification_method": {
+          "enum": [
+            "randomized_controlled_trial",
+            "quasi_experimental",
+            "observational",
+            "unknown"
+          ]
+        },
+        "qualification_profile_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "candidate_evidence": {
+      "type": "array",
+      "maxItems": 20000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "event_id",
+          "source_family",
+          "source_root_id",
+          "source_root_sha256",
+          "scope",
+          "action",
+          "observed_utility",
+          "measurement_error_bound",
+          "causal_identification",
+          "intervention",
+          "prediction_pre_registered",
+          "outcome_reconciled",
+          "source_trusted",
+          "source_retracted",
+          "confounders_controlled",
+          "delayed_horizon_complete"
+        ],
+        "properties": {
+          "event_id": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          },
+          "source_family": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 65535
+          },
+          "source_root_id": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          },
+          "source_root_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "scope": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "regime",
+              "objective"
+            ],
+            "properties": {
+              "regime": {
+                "enum": [
+                  "baseline",
+                  "shifted"
+                ]
+              },
+              "objective": {
+                "enum": [
+                  "quality",
+                  "cost",
+                  "speed"
+                ]
+              }
+            }
+          },
+          "action": {
+            "enum": [
+              "a",
+              "b"
+            ]
+          },
+          "observed_utility": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "measurement_error_bound": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "causal_identification": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "method",
+              "design_sha256",
+              "estimand_sha256",
+              "semantic_estimand",
+              "propensity_min_bps",
+              "propensity_max_bps",
+              "max_standardized_mean_difference_micros",
+              "interference_controlled"
+            ],
+            "properties": {
+              "method": {
+                "enum": [
+                  "randomized_controlled_trial",
+                  "quasi_experimental",
+                  "observational",
+                  "unknown"
+                ]
+              },
+              "design_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "estimand_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "semantic_estimand": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "schema_version",
+                  "population_spec_sha256",
+                  "treatment_version_sha256",
+                  "comparator_version_sha256",
+                  "outcome_definition_sha256",
+                  "outcome_unit_sha256",
+                  "follow_up_horizon_ms",
+                  "censoring_strategy_sha256",
+                  "intercurrent_event_strategy_sha256",
+                  "target_weighting_sha256"
+                ],
+                "properties": {
+                  "schema_version": {
+                    "const": 1
+                  },
+                  "population_spec_sha256": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  "treatment_version_sha256": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  "comparator_version_sha256": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  "outcome_definition_sha256": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  "outcome_unit_sha256": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  "follow_up_horizon_ms": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "censoring_strategy_sha256": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  "intercurrent_event_strategy_sha256": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  "target_weighting_sha256": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  }
+                }
+              },
+              "propensity_min_bps": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              },
+              "propensity_max_bps": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              },
+              "max_standardized_mean_difference_micros": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4294967295
+              },
+              "interference_controlled": {
+                "type": "boolean"
+              }
+            }
+          },
+          "intervention": {
+            "type": "boolean"
+          },
+          "prediction_pre_registered": {
+            "type": "boolean"
+          },
+          "outcome_reconciled": {
+            "type": "boolean"
+          },
+          "source_trusted": {
+            "type": "boolean"
+          },
+          "source_retracted": {
+            "type": "boolean"
+          },
+          "confounders_controlled": {
+            "type": "boolean"
+          },
+          "delayed_horizon_complete": {
+            "type": "boolean"
+          }
+        }
+      }
+    }
+  }
+}
