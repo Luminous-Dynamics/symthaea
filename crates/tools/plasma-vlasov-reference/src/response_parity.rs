@@ -215,7 +215,11 @@ mod tests {
         .unwrap();
 
         close(result.odd_component, linear.scale(amplitude), 1.0e-14);
-        close(result.even_component, ComplexResponse::new(0.0, 0.0), 1.0e-14);
+        close(
+            result.even_component,
+            ComplexResponse::new(0.0, 0.0),
+            1.0e-14,
+        );
         close(result.odd_per_amplitude, linear, 1.0e-14);
     }
 
@@ -251,8 +255,12 @@ mod tests {
         let odd = ComplexResponse::new(0.0, 0.6);
         let even = ComplexResponse::new(-0.4, 0.0);
         let zero = ComplexResponse::new(0.1, 0.2);
-        let positive = zero.add(odd.scale(amplitude)).add(even.scale(amplitude.powi(2)));
-        let negative = zero.subtract(odd.scale(amplitude)).add(even.scale(amplitude.powi(2)));
+        let positive = zero
+            .add(odd.scale(amplitude))
+            .add(even.scale(amplitude.powi(2)));
+        let negative = zero
+            .subtract(odd.scale(amplitude))
+            .add(even.scale(amplitude.powi(2)));
         let result = decompose_signed_response(
             sample(3, 1.25, negative.real, negative.imaginary),
             sample(3, 1.25, zero.real, zero.imaginary),
@@ -291,7 +299,10 @@ mod tests {
             sample(1, 2.01, 0.0, 0.0),
             0.1,
         );
-        assert!(matches!(result, Err(ResponseParityError::TimeMismatch { .. })));
+        assert!(matches!(
+            result,
+            Err(ResponseParityError::TimeMismatch { .. })
+        ));
     }
 
     #[test]
@@ -369,5 +380,4 @@ mod tests {
             1.0e-12,
         );
     }
-
 }
