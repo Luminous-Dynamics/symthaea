@@ -2105,6 +2105,18 @@ mod tests {
                 .iter()
                 .all(|comparison| comparison.paired_scenario_count == 3)
         );
+        assert!(
+            first
+                .paired_comparisons
+                .iter()
+                .all(|comparison| comparison.detection_capture_support >= 2)
+        );
+        assert!(
+            first
+                .paired_comparisons
+                .iter()
+                .all(|comparison| comparison.undetected_defect_fraction_support >= 2)
+        );
         assert_eq!(first.tournament_sha256, second.tournament_sha256);
         for summary in &first.summaries {
             assert_eq!(summary.run_count, 3);
