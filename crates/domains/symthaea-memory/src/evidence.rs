@@ -167,6 +167,16 @@ pub struct EvidenceLedger {
     events: Vec<EvidenceEvent>,
 }
 
+/// A memory value paired with the evidence event that qualifies its use.
+/// This wrapper lets existing semantic/episodic types adopt provenance
+/// without breaking their public struct-literal constructors.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EvidenceBound<T> {
+    pub value: T,
+    pub evidence_event_id: String,
+}
+
 impl EvidenceLedger {
     pub fn new(events: Vec<EvidenceEvent>) -> Result<Self, String> {
         validate_events(&events)?;
@@ -210,6 +220,26 @@ impl EvidenceLedger {
             return EvidenceDecision::reject(event_id, IneligibilityReason::UnknownEvent, None);
         };
         self.evaluate_inner(event, query, &mut BTreeSet::new())
+    }
+
+    /// Pair an existing memory value with an admissible evidence event.
+    /// Downstream consumers should accept this wrapper, not an unqualified
+    /// value, at decision/action boundaries.
+    pub fn bind<T>(
+        &self,
+        value: T,
+        event_id: &str,
+        query: &EvidenceQuery,
+    ) -> Result<EvidenceBound<T>, EvidenceDecision> {
+        let decision = self.evaluate(event_id, query);
+        if decision.admissible {
+            Ok(EvidenceBound {
+                value,
+                evidence_event_id: event_id.to_string(),
+            })
+        } else {
+            Err(decision)
+        }
     }
 
     /// Return only admissible assertion/correction IDs, in append order.
@@ -292,6 +322,7 @@ impl EvidenceLedger {
             }
             if let Some(revoke) = self.events.iter().find(|candidate| {
                 candidate.kind == EvidenceEventKind::ConsentRevoked
+                    && candidate.issuer_id == grant.issuer_id
                     && candidate.targets.iter().any(|target| target == grant_id)
                     && candidate.known_at_millis <= query.known_at_millis
             }) {
@@ -448,6 +479,9 @@ pub fn validate_events(events: &[EvidenceEvent]) -> Result<(), String> {
                     let grant = prior_event(&ids, target, event.sequence)?;
                     if grant.kind != EvidenceEventKind::ConsentGranted || grant.consent_id != event.consent_id {
                         return Err(format!("revocation target must be a prior matching consent grant: {}", target));
+                    }
+                    if grant.issuer_id != event.issuer_id {
+                        return Err(format!("consent revocation issuer does not match grant issuer: {}", target));
                     }
                 }
             }
@@ -740,6 +774,46 @@ mod tests {
             ledger.evaluate("claim-1", &query(30, 40)).reason,
             Some(IneligibilityReason::ConsentRevoked)
         );
+    }
+
+    #[test]
+    fn unqualified_memory_value_cannot_be_bound() {
+        let event = claim("claim-1", 1, 10, EvidenceEventKind::Assertion, Vec::new());
+        let ledger = EvidenceLedger::new(vec![event]).unwrap();
+        let query = query(20, 20);
+        let bound = ledger.bind("deadline: Friday", "claim-1", &query).unwrap();
+        assert_eq!(bound.value, "deadline: Friday");
+        assert_eq!(bound.evidence_event_id, "claim-1");
+
+        let mut wrong_purpose = query;
+        wrong_purpose.purpose = "unrelated-purpose".to_string();
+        let rejected = ledger.bind("do not expose", "claim-1", &wrong_purpose).unwrap_err();
+        assert_eq!(rejected.reason, Some(IneligibilityReason::PurposeNotPermitted));
+    }
+
+    #[test]
+    fn consent_revocation_requires_the_granting_issuer() {
+        let grant = consent_grant();
+        let revoke = EvidenceEvent {
+            schema_version: SCHEMA_VERSION.to_string(),
+            event_id: "consent-revoke-1".to_string(),
+            sequence: 2,
+            kind: EvidenceEventKind::ConsentRevoked,
+            claim_key: None,
+            source: None,
+            payload_digest: None,
+            issuer_id: "attacker".to_string(),
+            authority_scopes: vec!["user-consent".to_string()],
+            rights: rights(),
+            observed_at_millis: None,
+            known_at_millis: 20,
+            valid_from_millis: 20,
+            valid_until_millis: None,
+            parents: Vec::new(),
+            targets: vec!["consent-1".to_string()],
+            consent_id: Some("consent-alpha".to_string()),
+        };
+        assert!(EvidenceLedger::new(vec![grant, revoke]).is_err());
     }
 
     #[test]
