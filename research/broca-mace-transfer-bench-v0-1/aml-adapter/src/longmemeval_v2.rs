@@ -236,7 +236,7 @@ pub struct LongMemEvalV2ResourceReceiptV1 {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum LongMemEvalV2ContextKind {
     Text,
-    ImageReference,
+    Image,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -258,7 +258,7 @@ pub struct LongMemEvalV2HitV1 {
 
 impl LongMemEvalV2HitV1 {
     /// Projection to the official V2 text/image context-item concept.
-    /// Image items contain source references; this module does not load image pixels.
+    /// Image items contain source paths; this module does not load image pixels.
     pub fn context_items(&self) -> Vec<LongMemEvalV2ContextItemV1> {
         let mut items = vec![LongMemEvalV2ContextItemV1 {
             kind: LongMemEvalV2ContextKind::Text,
