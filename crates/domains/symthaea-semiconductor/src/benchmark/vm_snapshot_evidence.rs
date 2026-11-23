@@ -11,7 +11,7 @@
 use chrono::{DateTime, FixedOffset, NaiveDateTime};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use thiserror::Error;
 
 use super::calibration_requalification::CalibrationRequalificationInputV1;
@@ -300,6 +300,16 @@ fn validate_label_time(
     Ok(())
 }
 
+fn label_measurement_time_micros(
+    label: &MetrologyLabelV1,
+) -> Result<i64, VmSnapshotEvidenceErrorV1> {
+    timestamp_micros(
+        &label.measurement_time,
+        &label.measurement_clock_basis,
+        "label.measurement_time",
+    )
+}
+
 fn validate_label_identity(
     label: &MetrologyLabelV1,
 ) -> Result<(), VmSnapshotEvidenceErrorV1> {
@@ -334,7 +344,13 @@ pub fn build_vm_training_snapshot_manifest_v1(
     let mut superseded_ids = BTreeSet::new();
     let mut entries = Vec::with_capacity(input.consumed_labels.len());
     let mut common_k0: Option<i64> = None;
+    let mut common_k1: Option<i64> = None;
 
+    let cutoff_micros = timestamp_micros(
+        &input.cutoff.cutoff_time,
+        &input.cutoff.clock_basis,
+        "cutoff.cutoff_time",
+    )?;
     for packet in &input.consumed_labels {
         let label = &packet.label;
         validate_label_identity(label)?;
@@ -375,6 +391,39 @@ pub fn build_vm_training_snapshot_manifest_v1(
             ));
         }
         common_k0 = Some(k0);
+        let k1 = packet.calibration_input.k1_unix_seconds;
+        if common_k1.is_some_and(|existing| existing != k1) {
+            return Err(VmSnapshotEvidenceErrorV1(
+                "consumed labels do not share one K1 calibration frontier".into(),
+            ));
+        }
+        common_k1 = Some(k1);
+        if matches!(input.cutoff.clock_basis, ClockBasisV1::OffsetAware)
+            && cutoff_micros / 1_000_000 != k0
+        {
+            return Err(VmSnapshotEvidenceErrorV1(
+                "snapshot cutoff and per-label K0 calibration frontier disagree".into(),
+            ));
+        }
+        let measurement_time_micros = label_measurement_time_micros(label)?;
+        let measured_lower = packet
+            .calibration_input
+            .measurement_time_bounds
+            .earliest_measured_at_unix_seconds
+            .checked_mul(1_000_000)
+            .ok_or_else(|| VmSnapshotEvidenceErrorV1("measurement lower time overflows".into()))?;
+        let measured_upper = packet
+            .calibration_input
+            .measurement_time_bounds
+            .latest_measured_at_unix_seconds
+            .checked_mul(1_000_000)
+            .ok_or_else(|| VmSnapshotEvidenceErrorV1("measurement upper time overflows".into()))?;
+        if measurement_time_micros < measured_lower || measurement_time_micros > measured_upper {
+            return Err(VmSnapshotEvidenceErrorV1(format!(
+                "label {} measurement time is outside its calibration evidence time bounds",
+                label.label_id
+            )));
+        }
 
         if packet.calibration_input.measurement.measurement_event_id != label.measurement_event_id {
             return Err(VmSnapshotEvidenceErrorV1(format!(
@@ -564,7 +613,6 @@ mod tests {
         CalibrationOperatingRangeV1, MeasurementTimeBoundsV1,
         seal_calibration_event_inventory_v1,
     };
-    use crate::benchmark::label_consumption_guard::LABEL_CONSUMPTION_GUARD_SCHEMA_V1;
     use crate::benchmark::metrology_qualification_gate::{
         CALIBRATION_CERTIFICATE_SCHEMA_V1, MEASUREMENT_EVIDENCE_SCHEMA_V1,
         QUALIFICATION_POLICY_SCHEMA_V1, CalibrationCertificateV1, MeasurementEvidenceV1,
@@ -684,10 +732,10 @@ mod tests {
             censoring_upper_bound: None,
             censoring_basis: None,
             status: MetrologyLabelStatusV1::Validated,
-            measurement_time: "2026-11-20T10:00:00Z".into(),
+            measurement_time: "2028-08-16T00:53:20Z".into(),
             measurement_clock_domain_id: "fab-clock".into(),
             measurement_clock_basis: ClockBasisV1::OffsetAware,
-            available_at: "2026-11-20T10:05:00Z".into(),
+            available_at: "2028-08-16T00:58:20Z".into(),
             availability_clock_domain_id: "fab-clock".into(),
             availability_clock_basis: ClockBasisV1::OffsetAware,
             instrument_id: Some("ellipsometer-07".into()),
@@ -719,7 +767,7 @@ mod tests {
             preprocessing_sha256: digest('4'),
             cutoff: PredictionInformationCutoffV1 {
                 cutoff_id: "fab-k0-cutoff".into(),
-                cutoff_time: "2026-11-20T10:10:00Z".into(),
+                cutoff_time: "2028-12-09T18:40:00Z".into(),
                 clock_domain_id: "fab-clock".into(),
                 clock_basis: ClockBasisV1::OffsetAware,
             },
@@ -818,7 +866,7 @@ mod tests {
     #[test]
     fn post_cutoff_label_availability_is_rejected() {
         let mut input = snapshot_input();
-        input.consumed_labels[0].label.available_at = "2026-11-20T10:15:00Z".into();
+        input.consumed_labels[0].label.available_at = "2028-12-09T18:45:00Z".into();
         assert!(build_vm_training_snapshot_manifest_v1(&input).is_err());
     }
 
