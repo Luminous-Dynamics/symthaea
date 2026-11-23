@@ -1,0 +1,212 @@
+{
+  "schema": "sfeb-edge-monitoring-traces-v1",
+  "fixture_id": "SFEB-EDGE-001-v1",
+  "traces": [
+    {
+      "case_id": "durable-edge-receipt-survives-reconnect",
+      "steps": [
+        {
+          "op": "register_watch",
+          "time": 0,
+          "watch_id": "watch-durable-edge-receipt-survives-reconnect"
+        },
+        {
+          "op": "wait_until",
+          "time": 15
+        },
+        {
+          "op": "wake",
+          "time": 15,
+          "message_id": "notice-edge-001",
+          "claimed_receipt_id": "receipt-edge-001"
+        },
+        {
+          "op": "observe",
+          "time": 15,
+          "revision": 3,
+          "authority": "source_of_record"
+        },
+        {
+          "op": "act",
+          "time": 16,
+          "revision": 3,
+          "receipt_id": "receipt-edge-001",
+          "action_id": "edge-act-001",
+          "idempotency_key": "edge-reserve:durable-edge-receipt-survives-reconnect",
+          "action_type": "reserve",
+          "resource_id": "slot-edge-001"
+        },
+        {
+          "op": "act",
+          "time": 17,
+          "revision": 3,
+          "receipt_id": "receipt-edge-001",
+          "action_id": "edge-act-001-replay",
+          "idempotency_key": "edge-reserve:durable-edge-receipt-survives-reconnect",
+          "action_type": "reserve",
+          "resource_id": "slot-edge-001"
+        },
+        {
+          "op": "finish",
+          "time": 17,
+          "claimed_outcome": "triggered"
+        }
+      ],
+      "worker_claims": {
+        "disposition": "accepted",
+        "observed_oracle_ids": [
+          "edge.all_pass"
+        ]
+      }
+    },
+    {
+      "case_id": "edge-receipt-expires-before-reconnect",
+      "steps": [
+        {
+          "op": "register_watch",
+          "time": 0,
+          "watch_id": "watch-edge-receipt-expires-before-reconnect"
+        },
+        {
+          "op": "wait_until",
+          "time": 15
+        },
+        {
+          "op": "wake",
+          "time": 15,
+          "message_id": "notice-edge-001",
+          "claimed_receipt_id": "receipt-edge-001"
+        },
+        {
+          "op": "observe",
+          "time": 15,
+          "revision": 3,
+          "authority": "source_of_record"
+        },
+        {
+          "op": "finish",
+          "time": 15,
+          "claimed_outcome": "receipt_expired"
+        }
+      ],
+      "worker_claims": {
+        "disposition": "accepted",
+        "observed_oracle_ids": [
+          "edge.all_pass"
+        ]
+      }
+    },
+    {
+      "case_id": "edge-receipt-revoked-before-reconnect",
+      "steps": [
+        {
+          "op": "register_watch",
+          "time": 0,
+          "watch_id": "watch-edge-receipt-revoked-before-reconnect"
+        },
+        {
+          "op": "wait_until",
+          "time": 15
+        },
+        {
+          "op": "wake",
+          "time": 15,
+          "message_id": "notice-edge-001",
+          "claimed_receipt_id": "receipt-edge-001"
+        },
+        {
+          "op": "observe",
+          "time": 15,
+          "revision": 4,
+          "authority": "source_of_record"
+        },
+        {
+          "op": "finish",
+          "time": 15,
+          "claimed_outcome": "receipt_revoked"
+        }
+      ],
+      "worker_claims": {
+        "disposition": "accepted",
+        "observed_oracle_ids": [
+          "edge.all_pass"
+        ]
+      }
+    },
+    {
+      "case_id": "edge-permission-revoked-before-reconnect",
+      "steps": [
+        {
+          "op": "register_watch",
+          "time": 0,
+          "watch_id": "watch-edge-permission-revoked-before-reconnect"
+        },
+        {
+          "op": "wait_until",
+          "time": 15
+        },
+        {
+          "op": "wake",
+          "time": 15,
+          "message_id": "notice-edge-001",
+          "claimed_receipt_id": "receipt-edge-001"
+        },
+        {
+          "op": "observe",
+          "time": 15,
+          "revision": 4,
+          "authority": "source_of_record"
+        },
+        {
+          "op": "finish",
+          "time": 15,
+          "claimed_outcome": "not_authorized"
+        }
+      ],
+      "worker_claims": {
+        "disposition": "accepted",
+        "observed_oracle_ids": [
+          "edge.all_pass"
+        ]
+      }
+    },
+    {
+      "case_id": "forged-edge-notification-without-durable-receipt",
+      "steps": [
+        {
+          "op": "register_watch",
+          "time": 0,
+          "watch_id": "watch-forged-edge"
+        },
+        {
+          "op": "wait_until",
+          "time": 5
+        },
+        {
+          "op": "wake",
+          "time": 5,
+          "message_id": "notice-forged-edge",
+          "claimed_receipt_id": "receipt-forged"
+        },
+        {
+          "op": "observe",
+          "time": 5,
+          "revision": 1,
+          "authority": "source_of_record"
+        },
+        {
+          "op": "finish",
+          "time": 30,
+          "claimed_outcome": "missing_receipt"
+        }
+      ],
+      "worker_claims": {
+        "disposition": "accepted",
+        "observed_oracle_ids": [
+          "edge.all_pass"
+        ]
+      }
+    }
+  ],
+  "fixture_sha256": "75a3b305e5b54716a29a4b994d2ff5aab65a1b1de86e75ba27a6005bf7c83784"
+}
