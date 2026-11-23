@@ -341,7 +341,10 @@ pub fn validate_plan(plan: &ProofPlan) -> Vec<String> {
     let mut errors = Vec::new();
 
     if plan.schema_version != "1.0.0" {
-        errors.push(format!("unsupported schema_version: {}", plan.schema_version));
+        errors.push(format!(
+            "unsupported schema_version: {}",
+            plan.schema_version
+        ));
     }
     if plan.plan_id.trim().is_empty() {
         errors.push("plan_id must not be empty".to_owned());
@@ -361,7 +364,10 @@ pub fn validate_plan(plan: &ProofPlan) -> Vec<String> {
         && (plan.theorem.elaborated_type_sha256.is_none()
             || plan.validation.lean_kernel_status != KernelStatus::Accepted)
     {
-        errors.push("kernel_checked theorem identity requires a type digest and accepted kernel status".to_owned());
+        errors.push(
+            "kernel_checked theorem identity requires a type digest and accepted kernel status"
+                .to_owned(),
+        );
     }
     if plan.environment.status == EnvironmentStatus::KernelChecked
         && plan.validation.lean_kernel_status != KernelStatus::Accepted
@@ -393,14 +399,20 @@ pub fn validate_plan(plan: &ProofPlan) -> Vec<String> {
         evidence_by_id.insert(evidence.id.clone(), evidence);
         if let Some(source) = &evidence.source {
             if source.line_start == 0 || source.line_end < source.line_start {
-                errors.push(format!("evidence {} has an invalid source range", evidence.id));
+                errors.push(format!(
+                    "evidence {} has an invalid source range",
+                    evidence.id
+                ));
             }
         }
         if evidence.kind == EvidenceKind::LeanKernelCheck
             && evidence.status == EvidenceStatus::Passed
             && evidence.verdict != Some(CheckerVerdict::Accepted)
         {
-            errors.push(format!("passed Lean kernel evidence {} must have accepted verdict", evidence.id));
+            errors.push(format!(
+                "passed Lean kernel evidence {} must have accepted verdict",
+                evidence.id
+            ));
         }
     }
 
@@ -413,21 +425,46 @@ pub fn validate_plan(plan: &ProofPlan) -> Vec<String> {
     };
 
     for node in &plan.nodes {
-        check_evidence_refs(&format!("node {}", node.id), &node.evidence_refs, &mut errors);
+        check_evidence_refs(
+            &format!("node {}", node.id),
+            &node.evidence_refs,
+            &mut errors,
+        );
         match node.epistemic_class {
             EpistemicClass::FormalFact | EpistemicClass::MathematicalInterpretation => {
                 if node.evidence_refs.is_empty() {
-                    errors.push(format!("{} requires evidence for its epistemic class", node.id));
+                    errors.push(format!(
+                        "{} requires evidence for its epistemic class",
+                        node.id
+                    ));
                 }
             }
             EpistemicClass::Analogy => {
-                if node.analogy_boundary.as_deref().unwrap_or("").trim().is_empty() {
-                    errors.push(format!("analogy node {} requires analogy_boundary", node.id));
+                if node
+                    .analogy_boundary
+                    .as_deref()
+                    .unwrap_or("")
+                    .trim()
+                    .is_empty()
+                {
+                    errors.push(format!(
+                        "analogy node {} requires analogy_boundary",
+                        node.id
+                    ));
                 }
             }
             EpistemicClass::Unknown => {
-                if node.unresolved_reason.as_deref().unwrap_or("").trim().is_empty() {
-                    errors.push(format!("unknown node {} requires unresolved_reason", node.id));
+                if node
+                    .unresolved_reason
+                    .as_deref()
+                    .unwrap_or("")
+                    .trim()
+                    .is_empty()
+                {
+                    errors.push(format!(
+                        "unknown node {} requires unresolved_reason",
+                        node.id
+                    ));
                 }
             }
         }
@@ -435,7 +472,10 @@ pub fn validate_plan(plan: &ProofPlan) -> Vec<String> {
         if node.kind == NodeKind::PlanAction {
             if let Some(action) = &node.action_spec {
                 if action.input_goal_ids.is_empty() {
-                    errors.push(format!("action {} requires at least one input goal", node.id));
+                    errors.push(format!(
+                        "action {} requires at least one input goal",
+                        node.id
+                    ));
                 }
                 if action.rationale.trim().is_empty() {
                     errors.push(format!("action {} requires a rationale", node.id));
@@ -443,12 +483,22 @@ pub fn validate_plan(plan: &ProofPlan) -> Vec<String> {
                 if action.evidence_refs.is_empty() {
                     errors.push(format!("action {} requires evidence_refs", node.id));
                 }
-                check_evidence_refs(&format!("action {}", node.id), &action.evidence_refs, &mut errors);
+                check_evidence_refs(
+                    &format!("action {}", node.id),
+                    &action.evidence_refs,
+                    &mut errors,
+                );
             } else {
-                errors.push(format!("plan_action node {} is missing action_spec", node.id));
+                errors.push(format!(
+                    "plan_action node {} is missing action_spec",
+                    node.id
+                ));
             }
         } else if node.action_spec.is_some() {
-            errors.push(format!("non-action node {} must not have action_spec", node.id));
+            errors.push(format!(
+                "non-action node {} must not have action_spec",
+                node.id
+            ));
         }
     }
 
@@ -471,13 +521,19 @@ pub fn validate_plan(plan: &ProofPlan) -> Vec<String> {
             &mut errors,
         );
         if edge.evidence_refs.is_empty() {
-            errors.push(format!("edge {} -> {} requires evidence_refs", edge.source_id, edge.target_id));
+            errors.push(format!(
+                "edge {} -> {} requires evidence_refs",
+                edge.source_id, edge.target_id
+            ));
         }
     }
 
     match node_kinds.get(&plan.root_goal_id) {
         Some(NodeKind::GoalState) => {}
-        Some(_) => errors.push(format!("root_goal_id {} is not a goal_state node", plan.root_goal_id)),
+        Some(_) => errors.push(format!(
+            "root_goal_id {} is not a goal_state node",
+            plan.root_goal_id
+        )),
         None => errors.push(format!("root_goal_id {} does not exist", plan.root_goal_id)),
     }
 
@@ -489,40 +545,67 @@ pub fn validate_plan(plan: &ProofPlan) -> Vec<String> {
         for goal_id in &action.input_goal_ids {
             match node_kinds.get(goal_id) {
                 Some(NodeKind::GoalState | NodeKind::Subgoal) => {}
-                Some(_) => errors.push(format!("action {} input {} is not a goal/subgoal", node.id, goal_id)),
-                None => errors.push(format!("action {} input goal {} does not exist", node.id, goal_id)),
+                Some(_) => errors.push(format!(
+                    "action {} input {} is not a goal/subgoal",
+                    node.id, goal_id
+                )),
+                None => errors.push(format!(
+                    "action {} input goal {} does not exist",
+                    node.id, goal_id
+                )),
             }
             if !edge_exists(&node.id, goal_id, EdgeRelation::Discharges)
                 && !edge_exists(&node.id, goal_id, EdgeRelation::Transforms)
             {
-                errors.push(format!("action {} input {} lacks a discharges/transforms edge", node.id, goal_id));
+                errors.push(format!(
+                    "action {} input {} lacks a discharges/transforms edge",
+                    node.id, goal_id
+                ));
             }
         }
 
         for subgoal_id in &action.output_subgoal_ids {
             if node_kinds.get(subgoal_id) != Some(&NodeKind::Subgoal) {
-                errors.push(format!("action {} output {} is not a subgoal", node.id, subgoal_id));
+                errors.push(format!(
+                    "action {} output {} is not a subgoal",
+                    node.id, subgoal_id
+                ));
             }
             if !edge_exists(&node.id, subgoal_id, EdgeRelation::CreatesSubgoal) {
-                errors.push(format!("action {} output {} lacks creates_subgoal edge", node.id, subgoal_id));
+                errors.push(format!(
+                    "action {} output {} lacks creates_subgoal edge",
+                    node.id, subgoal_id
+                ));
             }
         }
 
         for condition_id in &action.consumed_side_condition_ids {
             if node_kinds.get(condition_id) != Some(&NodeKind::SideCondition) {
-                errors.push(format!("action {} consumed condition {} is not a side_condition", node.id, condition_id));
+                errors.push(format!(
+                    "action {} consumed condition {} is not a side_condition",
+                    node.id, condition_id
+                ));
             }
             if !edge_exists(&node.id, condition_id, EdgeRelation::Requires) {
-                errors.push(format!("action {} condition {} lacks requires edge", node.id, condition_id));
+                errors.push(format!(
+                    "action {} condition {} lacks requires edge",
+                    node.id, condition_id
+                ));
             }
         }
 
         for justification_id in &action.justification_node_ids {
             if node_kinds.get(justification_id) != Some(&NodeKind::Justification) {
-                errors.push(format!("action {} justification {} is not a justification node", node.id, justification_id));
+                errors.push(format!(
+                    "action {} justification {} is not a justification node",
+                    node.id, justification_id
+                ));
             }
             if !edge_exists(&node.id, justification_id, EdgeRelation::JustifiedBy) {
-                errors.push(format!("action {} justification {} lacks justified_by edge", node.id, justification_id));
+                errors.push(format!(
+                    "action {} justification {} lacks justified_by edge",
+                    node.id, justification_id
+                ));
             }
         }
     }
@@ -536,14 +619,23 @@ pub fn validate_plan(plan: &ProofPlan) -> Vec<String> {
             errors.push(format!("duplicate alternative ID: {}", alternative.id));
         }
         if node_kinds.get(&alternative.root_goal_id) != Some(&NodeKind::GoalState) {
-            errors.push(format!("alternative {} root_goal_id is missing or not a goal_state", alternative.id));
+            errors.push(format!(
+                "alternative {} root_goal_id is missing or not a goal_state",
+                alternative.id
+            ));
         }
         if !alternative.node_ids.contains(&alternative.root_goal_id) {
-            errors.push(format!("alternative {} node_ids must include its root goal", alternative.id));
+            errors.push(format!(
+                "alternative {} node_ids must include its root goal",
+                alternative.id
+            ));
         }
         for node_id in &alternative.node_ids {
             if !node_kinds.contains_key(node_id) {
-                errors.push(format!("alternative {} references missing node {}", alternative.id, node_id));
+                errors.push(format!(
+                    "alternative {} references missing node {}",
+                    alternative.id, node_id
+                ));
             }
         }
     }
@@ -570,16 +662,21 @@ pub fn validate_plan(plan: &ProofPlan) -> Vec<String> {
     }
 
     if plan.validation.expert_review_status == ReviewStatus::Accepted {
-        let accepted_reviewers = plan.reviewers.iter().filter(|reviewer| {
-            reviewer.disposition == ReviewerDisposition::Accepted
-        }).count();
-        let distinct_reviewers: HashSet<&str> =
-            plan.reviewers.iter()
-                .filter(|reviewer| reviewer.disposition == ReviewerDisposition::Accepted)
-                .map(|reviewer| reviewer.reviewer_id.as_str())
-                .collect();
+        let accepted_reviewers = plan
+            .reviewers
+            .iter()
+            .filter(|reviewer| reviewer.disposition == ReviewerDisposition::Accepted)
+            .count();
+        let distinct_reviewers: HashSet<&str> = plan
+            .reviewers
+            .iter()
+            .filter(|reviewer| reviewer.disposition == ReviewerDisposition::Accepted)
+            .map(|reviewer| reviewer.reviewer_id.as_str())
+            .collect();
         if accepted_reviewers < 2 || distinct_reviewers.len() < 2 {
-            errors.push("expert_review_status=accepted requires two distinct accepted reviewers".to_owned());
+            errors.push(
+                "expert_review_status=accepted requires two distinct accepted reviewers".to_owned(),
+            );
         }
     }
 
@@ -626,7 +723,10 @@ mod tests {
         let plan = validate_json(AND_COMM_FIXTURE).expect("valid provisional plan");
         assert_eq!(plan.plan_id, "PROOFPLAN-AND-COMM-001");
         assert_eq!(plan.validation.lean_kernel_status, KernelStatus::NotRun);
-        assert_eq!(plan.validation.expert_review_status, ReviewStatus::NotReviewed);
+        assert_eq!(
+            plan.validation.expert_review_status,
+            ReviewStatus::NotReviewed
+        );
     }
 
     #[test]
@@ -634,113 +734,178 @@ mod tests {
         let mut value = fixture_value();
         let duplicate = value["nodes"][0].clone();
         value["nodes"].as_array_mut().unwrap().push(duplicate);
-        assert!(validate_value(&value).iter().any(|e| e.contains("duplicate node ID")));
+        assert!(
+            validate_value(&value)
+                .iter()
+                .any(|e| e.contains("duplicate node ID"))
+        );
     }
 
     #[test]
     fn dangling_edge_endpoints_are_rejected() {
         let mut value = fixture_value();
         value["edges"][0]["target_id"] = Value::String("MISSING_GOAL".to_owned());
-        assert!(validate_value(&value).iter().any(|e| e.contains("missing target node")));
+        assert!(
+            validate_value(&value)
+                .iter()
+                .any(|e| e.contains("missing target node"))
+        );
     }
 
     #[test]
     fn missing_formal_fact_evidence_is_rejected() {
         let mut value = fixture_value();
         value["nodes"][0]["evidence_refs"] = Value::Array(Vec::new());
-        assert!(validate_value(&value).iter().any(|e| e.contains("requires evidence")));
+        assert!(
+            validate_value(&value)
+                .iter()
+                .any(|e| e.contains("requires evidence"))
+        );
     }
 
     #[test]
     fn dangling_evidence_references_are_rejected() {
         let mut value = fixture_value();
         value["nodes"][0]["evidence_refs"] = serde_json::json!(["EVIDENCE_MISSING"]);
-        assert!(validate_value(&value).iter().any(|e| e.contains("references missing evidence ID")));
+        assert!(
+            validate_value(&value)
+                .iter()
+                .any(|e| e.contains("references missing evidence ID"))
+        );
     }
 
     #[test]
     fn analogy_without_a_boundary_is_rejected() {
         let mut value = fixture_value();
-        let node = value["nodes"].as_array_mut().unwrap()
-            .iter_mut().find(|node| node["id"] == "J_IFF").unwrap();
+        let node = value["nodes"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|node| node["id"] == "J_IFF")
+            .unwrap();
         node["epistemic_class"] = Value::String("analogy".to_owned());
-        assert!(validate_value(&value).iter().any(|e| e.contains("requires analogy_boundary")));
+        assert!(
+            validate_value(&value)
+                .iter()
+                .any(|e| e.contains("requires analogy_boundary"))
+        );
     }
 
     #[test]
     fn action_output_without_subgoal_edge_is_rejected() {
         let mut value = fixture_value();
         let edges = value["edges"].as_array_mut().unwrap();
-        edges.retain(|edge| !(edge["source_id"] == "A_SPLIT_IFF"
-            && edge["target_id"] == "G_FORWARD"
-            && edge["relation"] == "creates_subgoal"));
-        assert!(validate_value(&value).iter().any(|e| e.contains("lacks creates_subgoal edge")));
+        edges.retain(|edge| {
+            !(edge["source_id"] == "A_SPLIT_IFF"
+                && edge["target_id"] == "G_FORWARD"
+                && edge["relation"] == "creates_subgoal")
+        });
+        assert!(
+            validate_value(&value)
+                .iter()
+                .any(|e| e.contains("lacks creates_subgoal edge"))
+        );
     }
 
     #[test]
     fn missing_justification_edge_is_rejected() {
         let mut value = fixture_value();
         let edges = value["edges"].as_array_mut().unwrap();
-        edges.retain(|edge| !(edge["source_id"] == "A_FORWARD"
-            && edge["target_id"] == "J_AND_SYMM"
-            && edge["relation"] == "justified_by"));
-        assert!(validate_value(&value).iter().any(|e| e.contains("lacks justified_by edge")));
+        edges.retain(|edge| {
+            !(edge["source_id"] == "A_FORWARD"
+                && edge["target_id"] == "J_AND_SYMM"
+                && edge["relation"] == "justified_by")
+        });
+        assert!(
+            validate_value(&value)
+                .iter()
+                .any(|e| e.contains("lacks justified_by edge"))
+        );
     }
 
     #[test]
     fn consumed_side_condition_without_requires_edge_is_rejected() {
         let mut value = fixture_value();
-        value["nodes"].as_array_mut().unwrap().push(serde_json::json!({
-            "id":"S_POSITIVE","kind":"side_condition","label":"positivity",
-            "statement":"0 < x","epistemic_class":"mathematical_interpretation",
-            "evidence_refs":["E_SOURCE"]
-        }));
-        let action = value["nodes"].as_array_mut().unwrap()
-            .iter_mut().find(|node| node["id"] == "A_FORWARD").unwrap();
-        action["action_spec"]["consumed_side_condition_ids"] =
-            serde_json::json!(["S_POSITIVE"]);
-        assert!(validate_value(&value).iter().any(|e| e.contains("lacks requires edge")));
+        value["nodes"]
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::json!({
+                "id":"S_POSITIVE","kind":"side_condition","label":"positivity",
+                "statement":"0 < x","epistemic_class":"mathematical_interpretation",
+                "evidence_refs":["E_SOURCE"]
+            }));
+        let action = value["nodes"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|node| node["id"] == "A_FORWARD")
+            .unwrap();
+        action["action_spec"]["consumed_side_condition_ids"] = serde_json::json!(["S_POSITIVE"]);
+        assert!(
+            validate_value(&value)
+                .iter()
+                .any(|e| e.contains("lacks requires edge"))
+        );
     }
 
     #[test]
     fn accepted_kernel_status_requires_kernel_receipt() {
         let mut value = fixture_value();
         value["validation"]["lean_kernel_status"] = Value::String("accepted".to_owned());
-        assert!(validate_value(&value).iter().any(|e| e.contains("requires passed lean_kernel_check evidence")));
+        assert!(
+            validate_value(&value)
+                .iter()
+                .any(|e| e.contains("requires passed lean_kernel_check evidence"))
+        );
     }
 
     #[test]
     fn accepted_plan_requires_kernel_and_independent_review_gates() {
         let mut value = fixture_value();
         value["status"] = Value::String("accepted".to_owned());
-        assert!(validate_value(&value).iter().any(|e| e.contains("status=accepted requires")));
+        assert!(
+            validate_value(&value)
+                .iter()
+                .any(|e| e.contains("status=accepted requires"))
+        );
     }
 
     #[test]
     fn conceptual_cycles_are_not_rejected_by_structure_validator() {
         let mut value = fixture_value();
-        value["edges"].as_array_mut().unwrap().push(serde_json::json!({
-            "source_id":"J_IFF","target_id":"J_AND_SYMM","relation":"alternative_to",
-            "evidence_refs":["E_SOURCE"]
-        }));
-        value["edges"].as_array_mut().unwrap().push(serde_json::json!({
-            "source_id":"J_AND_SYMM","target_id":"J_IFF","relation":"alternative_to",
-            "evidence_refs":["E_SOURCE"]
-        }));
+        value["edges"]
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::json!({
+                "source_id":"J_IFF","target_id":"J_AND_SYMM","relation":"alternative_to",
+                "evidence_refs":["E_SOURCE"]
+            }));
+        value["edges"]
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::json!({
+                "source_id":"J_AND_SYMM","target_id":"J_IFF","relation":"alternative_to",
+                "evidence_refs":["E_SOURCE"]
+            }));
         assert!(validate_value(&value).is_empty());
     }
 
     #[test]
     fn mutation_fixtures_keep_route_change_separate_from_refutation() {
-        let fixtures: Value = serde_json::from_str(MUTATION_FIXTURES).expect("mutation fixture JSON");
+        let fixtures: Value =
+            serde_json::from_str(MUTATION_FIXTURES).expect("mutation fixture JSON");
         let cases = fixtures["cases"].as_array().expect("cases array");
-        let route_only = cases.iter().find(|case| case["id"] == "MUT-ROUTE-ONLY")
+        let route_only = cases
+            .iter()
+            .find(|case| case["id"] == "MUT-ROUTE-ONLY")
             .expect("route-only control");
         assert_eq!(route_only["expected_diagnostic"], "proof_route_changed");
         assert_eq!(route_only["mathematical_disposition"], "not_refuted");
         assert_eq!(route_only["oracle_status"], "not_run");
 
-        let invalid_warrant = cases.iter().find(|case| case["id"] == "MUT-AND-LEFT")
+        let invalid_warrant = cases
+            .iter()
+            .find(|case| case["id"] == "MUT-AND-LEFT")
             .expect("invalid-warrant control");
         assert_eq!(invalid_warrant["mathematical_disposition"], "unknown");
         assert_eq!(invalid_warrant["oracle_status"], "not_run");
@@ -748,14 +913,25 @@ mod tests {
 
     #[test]
     fn local_global_context_control_is_not_a_theorem_refutation() {
-        let fixtures: Value = serde_json::from_str(MUTATION_FIXTURES).expect("mutation fixture JSON");
+        let fixtures: Value =
+            serde_json::from_str(MUTATION_FIXTURES).expect("mutation fixture JSON");
         let cases = fixtures["cases"].as_array().expect("cases array");
-        let context_case = cases.iter().find(|case| case["id"] == "MUT-LOCAL-GLOBAL-CONTEXT")
+        let context_case = cases
+            .iter()
+            .find(|case| case["id"] == "MUT-LOCAL-GLOBAL-CONTEXT")
             .expect("local/global consistency control");
-        assert_eq!(context_case["expected_diagnostic"], "local_global_inconsistency");
+        assert_eq!(
+            context_case["expected_diagnostic"],
+            "local_global_inconsistency"
+        );
         assert_eq!(context_case["mathematical_disposition"], "unknown");
         assert_eq!(context_case["oracle_status"], "not_run");
-        assert!(context_case["claim_ceiling"].as_str().unwrap().contains("does not establish"));
+        assert!(
+            context_case["claim_ceiling"]
+                .as_str()
+                .unwrap()
+                .contains("does not establish")
+        );
     }
 
     #[test]
