@@ -697,3 +697,6 @@ For all retrieval arms, the comparable candidate-visible input is the evidence w
 
 
 **Dependency reproducibility note:** the repository root pins Rust 1.96.0 and Nix inputs, but this nested research workspace has no dedicated Cargo.lock yet. The exact dependency-lock and `--locked` CPU build/test workflow is tracked in [#13364](https://github.com/Luminous-Dynamics/symthaea/issues/13364). Do not treat the current semver dependency declarations as a frozen benchmark environment.
+
+
+**Run provenance preflight:** before the first benchmark, build the candidate package with the pinned Rust toolchain to generate the nested workspace `Cargo.lock`. The runner requires that lock and includes its exact bytes in a length-prefixed source bundle. It requires `MACE_SOURCE_REVISION` to match `git rev-parse HEAD` and rejects dirty tracked files or untracked paths other than that one nested lock while it remains untracked. This is source/lock reproducibility, not a sandbox attestation. See [#13364](https://github.com/Luminous-Dynamics/symthaea/issues/13364) for committing the lock and adding `--locked` build checks.
