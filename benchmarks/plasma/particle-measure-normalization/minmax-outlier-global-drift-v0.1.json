@@ -20,7 +20,6 @@
     "formula": "z(x) = (x-min(X))/(max(X)-min(X))",
     "normalization_is_position_only": true,
     "particle_weights_affect_extrema": false,
-    "source_faithful_to_neopic": true,
     "source_tag": "neopic-arxiv-v1",
     "annotated_tag_object_sha256": "8e872e5fa520843a9c9db4a68d43036a66355c19",
     "peeled_commit_sha": "2cf6a15e0ddb6c408a4ef6d162c31faf1deb9431",
@@ -30,7 +29,9 @@
       "129-139",
       "141-152",
       "415-423"
-    ]
+    ],
+    "source_transform_matches_neopic": true,
+    "test_case_coverage": "source_faithful_unweighted_sample_case_plus_separate_weighted_measure_extension"
   },
   "base_cloud": {
     "positions": [
