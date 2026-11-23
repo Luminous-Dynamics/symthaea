@@ -4,7 +4,7 @@ This fixture isolates one effect in per-sample min–max coordinate normalizatio
 
 Given a particle cloud X, the transform maps its observed minimum and maximum to [0, 1]:
 
-\`z(x) = -pi + 2*pi*(x-min(X))/(max(X)-min(X))\`.
+`z(x) = (x-min(X))/(max(X)-min(X))`.
 
 The base cloud has five inlier positions on the known unit interval. The perturbed cloud preserves those inliers and adds one particle at x=0 with weight 1e-12. The empirical measure therefore changes by at most the tiny outlier mass, but the coordinate-map minimum changes from 0.1 to 0.0. As a result, all inlier normalized coordinates except the upper endpoint move.
 
@@ -12,7 +12,7 @@ The JSON fixture records exact expected values:
 - maximum absolute inlier coordinate displacement: 1/9 of the normalized interval;
 - mean absolute inlier coordinate displacement: 1/18 of the normalized interval.
 
-This is a pure normalization witness using an **illustrative [-pi, pi] output interval**. It is not a paper-faithful reproduction of NEOPIC's exact normalization scale or source implementation. It does not run NEOPIC, does not measure a learned-field error, and does not establish that min–max normalization is universally inappropriate. Pin the exact paper-tag source and transform in #12952 before a source-faithful comparator run. It is an exact synthetic test for the claim that the coordinate transform can move all existing particles when a very low-weight outlier changes the bounding box.
+This is a pure synthetic normalization witness using the exact affine [0,1] sample transform from the pinned NEOPIC arXiv v1 tag. It does not run NEOPIC or measure a learned-field error, and it does not establish that the published field operator fails. It isolates the claim that the coordinate transform can move all existing particles when a very low-weight outlier changes the bounding box.
 
 The physical domain and origin are known in this fixture, so fixed-domain normalization is the direct control. For unknown or moving domains, test robust support maps only with explicit tail coverage / residual metadata: quantile clipping can remove genuine rare-tail information.
 
