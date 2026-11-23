@@ -162,3 +162,17 @@ The programme therefore distinguishes:
 - reader outcomes (statement comprehension, proof validation, plan reconstruction, immediate transfer, delayed transfer and cross-family transfer).
 
 Do not mechanically infer plan actions from a graph edge or tactic trace. Do not force all valid proofs into one canonical plan. Keep alternative proof routes visible. New work is specified in [#13326 — MATH-PROOF-PLAN-001](https://github.com/Luminous-Dynamics/symthaea/issues/13326).
+
+
+## 17. Separate teaching utility from prover-context utility
+
+The updated machine benchmark should include the following distinction. FormalMATH (EMNLP Findings 2026) reports that human-written natural-language solution references can measurably degrade formal proof generation in its evaluated settings ([paper](https://aclanthology.org/2026.findings-emnlp.579/)). This means that a plan optimized for human comprehension is not necessarily an optimal context representation for Lean proof synthesis.
+
+Add two independent experimental tracks:
+
+1. **Teaching intervention:** raw source vs generic summary vs evidence-linked concept explanation vs reviewed proof plan vs minimum-sufficient plan. Measure statement comprehension, proof validation, plan reconstruction, immediate transfer and delayed transfer.
+2. **Prover-context intervention:** no explanation vs dependency graph vs proof plan vs compressed proof plan supplied to an otherwise identical prover under matched token/compute budgets. Measure exact theorem proof success, false theorem/statement drift, tool calls, time and proof checking.
+
+Report whether the proof plan helps, harms or has no detectable effect on each outcome. Do not assume a positive teaching effect transfers to theorem-proving performance, or vice versa.
+
+The machine baselines should include ProofGrid's proof writing/checking/masking/gap-filling and first-failure localization, plus generative verifier prompt-sensitivity/calibration controls from [Mahdavi et al. (ICML 2026)](https://proceedings.mlr.press/v306/mahdavi26a.html). No LLM judge should authorize a formal verdict.
