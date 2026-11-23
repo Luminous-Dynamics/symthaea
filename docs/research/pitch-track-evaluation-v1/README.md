@@ -26,7 +26,7 @@ A metric is `None` when its denominator is empty or it cannot be estimated. We d
 - Frame indices must be strictly increasing.
 - F0 is either a finite positive frequency or `None`; zero Hz is not an unvoiced sentinel.
 - Optional periodicity is constrained to [0, 1] but is not interpreted as a calibrated probability.
-- One-to-one timestamp alignment uses the configured maximum difference (default 5 ms).
+- One-to-one timestamp alignment uses the configured maximum difference (default 2.5 ms; adjust and freeze it for other frame cadences).
 
 ## Known-answer tests
 
