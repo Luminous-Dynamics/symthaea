@@ -137,7 +137,9 @@
                     "time",
                     "revision",
                     "action_id",
-                    "idempotency_key"
+                    "idempotency_key",
+                    "action_type",
+                    "resource_id"
                   ],
                   "properties": {
                     "op": {
@@ -156,6 +158,34 @@
                     },
                     "idempotency_key": {
                       "type": "string"
+                    },
+                    "action_type": {
+                      "type": "string"
+                    },
+                    "resource_id": {
+                      "type": "string"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "op",
+                    "time",
+                    "revision"
+                  ],
+                  "properties": {
+                    "op": {
+                      "const": "poll"
+                    },
+                    "time": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "revision": {
+                      "type": "integer",
+                      "minimum": 1
                     }
                   }
                 },
