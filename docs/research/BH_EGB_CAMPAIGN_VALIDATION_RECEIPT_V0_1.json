@@ -13,7 +13,7 @@
   },
   "inputs": {
     "manifest_path": "docs/research/BH_EGB_CAMPAIGN_EPISODES_V0_1.json",
-    "manifest_git_blob_sha1": "e2f44c570dfc28986a6ce05c35c66a787465f094",
+    "manifest_git_blob_sha1": "05265e2fd9546c9a9567a15ea0a2f39a58e2a1ee",
     "schema_path": "docs/research/BH_EGB_CAMPAIGN_EPISODES_V0_1.schema.json",
     "schema_git_blob_sha1": "963c5d4ff8606bbf3877fa621348752394d8612e"
   },
@@ -29,8 +29,8 @@
     "episode_count": 8,
     "action_count": 10,
     "frozen_negative_control_count": 14,
-    "source_pin_count": 13,
-    "source_pin_matches": 13,
+    "source_pin_count": 14,
+    "source_pin_matches": 14,
     "source_pin_mismatches": 0,
     "confirmatory_preconditions_all_unset": true
   },
@@ -63,7 +63,7 @@
       "repository": "Luminous-Dynamics/symthaea",
       "ref": "research/bh-egb-symthaea-campaign-2026-11-23",
       "path": "docs/research/BH_EGB_SYMTHAEA_CAMPAIGN_V0_1.md",
-      "git_blob_sha1": "6ed3bab896d55d1eabe4563e41b373a7754a7ee7"
+      "git_blob_sha1": "b28966b17062877f892ce2b37b3c827b31ba67ce"
     },
     {
       "repository": "Luminous-Dynamics/symtropy",
@@ -112,6 +112,12 @@
       "ref": "research/spin2-regularized-pivot-2026-11-21",
       "path": "crates/domains/symtropy-lovelock5d/benchmarks/derive_ma_lu_equal_spin_symtropy_gauge.py",
       "git_blob_sha1": "538003f2936e645ef8c7c62f4ffd1f4db00153ae"
+    },
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "ref": "research/bh-egb-symthaea-campaign-2026-11-23",
+      "path": "docs/research/BH_EGB_AGENT_BENCHMARK_LANDSCAPE_2026_11_23.md",
+      "git_blob_sha1": "baebd719f5a2b71e92c6d7a4f5466ba11e928aa7"
     }
   ],
   "exclusions": [
