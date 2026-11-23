@@ -461,6 +461,7 @@ For decision sufficiency, compare memory representations on identical world/task
 | #13354 | Screenshot path resolution and fail-closed context projection | Resolver only; no pixel-aware ranking |
 | #13370 | Backend-neutral candidate evidence envelope | Structural validation, not evidence qualification |
 | #13371 | Official LongMemEval-V2 Memory API shim plus Rust sidecar | Text BM25 with original screenshot evidence; query_image not used for ranking |
+| #13386 | V2 retrieval-to-candidate evidence DAG integration | Explicit state/text/image/neighbor lineage, cross-language candidate-set commitment verification and durable query receipts; no issuer/rights/lifecycle qualification |
 
 No row above should be interpreted as a CI pass or official benchmark score unless a later exact-head run receipt establishes it.
 
@@ -489,7 +490,7 @@ No row above should be interpreted as a CI pass or official benchmark score unle
 - Add genuine query-image retrieval as a separate arm and report image-query capability separately.
 
 ### Stage 4 — Connect evidence qualification
-- Use the candidate evidence envelope across raw session, trajectory, graph, HDC and fact backends.
+- Use the candidate evidence envelope across raw session, trajectory, graph, HDC and fact backends; use #13386 as the first closed-lineage V2 reference adapter.
 - Add independently authenticated issuer profiles, rights/scope verification and signed derivation/correction receipts.
 - Attach lifecycle checkpoint and lineage qualification receipts; backend fields cannot self-authorize.
 - Freeze candidate output before evaluator truth is opened.
