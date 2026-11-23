@@ -13,8 +13,6 @@ const FIRST_MODE: usize = 1;
 const SECOND_MODE: usize = 2;
 const INITIAL_AMPLITUDE: f64 = 1.0e-3;
 const IMPULSE_AMPLITUDE: f64 = 0.10;
-const SPONGE_START: f64 = 0.75;
-const SPONGE_DAMPING: f64 = 0.5;
 
 #[derive(Debug, Clone, Copy)]
 struct Peak {
@@ -218,6 +216,16 @@ fn config(nv: usize) -> VlasovPoissonConfig {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
+    let mut args = std::env::args().skip(1);
+    let sponge_start = args.next().unwrap_or_else(|| "0.75".to_string()).parse::<f64>()?;
+    let sponge_damping = args.next().unwrap_or_else(|| "0.5".to_string()).parse::<f64>()?;
+    if !sponge_start.is_finite() || !(0.0..1.0).contains(&sponge_start) {
+        return Err("sponge start fraction must be finite and in [0, 1)".into());
+    }
+    if !sponge_damping.is_finite() || sponge_damping < 0.0 {
+        return Err("sponge damping rate must be finite and nonnegative".into());
+    }
+
     let coarse_config = config(256);
     let fine_config = config(1024);
     let pulse_pair = EchoPulsePair {
@@ -396,14 +404,14 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             let first_half = sponge_pulse.apply_velocity_fourier_sponge(
                 DT * 0.5,
-                SPONGE_START,
-                SPONGE_DAMPING,
+                sponge_start,
+                sponge_damping,
                 2,
             )?;
             let control_first_half = sponge_control.apply_velocity_fourier_sponge(
                 DT * 0.5,
-                SPONGE_START,
-                SPONGE_DAMPING,
+                sponge_start,
+                sponge_damping,
                 2,
             )?;
             sponge_removed_c2 += first_half.removed_total_casimir;
@@ -414,14 +422,14 @@ fn main() -> Result<(), Box<dyn Error>> {
             sponge_control.step(DT)?;
             let second_half = sponge_pulse.apply_velocity_fourier_sponge(
                 DT * 0.5,
-                SPONGE_START,
-                SPONGE_DAMPING,
+                sponge_start,
+                sponge_damping,
                 2,
             )?;
             let control_second_half = sponge_control.apply_velocity_fourier_sponge(
                 DT * 0.5,
-                SPONGE_START,
-                SPONGE_DAMPING,
+                sponge_start,
+                sponge_damping,
                 2,
             )?;
             sponge_removed_c2 += second_half.removed_total_casimir;
@@ -520,10 +528,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
 
     println!(
-        "summary,case,nv,coarse_t_nyquist,coarse_t_recurrence,fine_t_nyquist,fine_t_recurrence,echo_mode,predicted_rephase_time,coarse_peak_time,coarse_amplitude,coarse_phase,coarse_fwhm,fine_peak_time,fine_amplitude,fine_phase,fine_fwhm,sponge_peak_time,sponge_amplitude,sponge_phase,sponge_fwhm,sponge_to_fine_amplitude_ratio,sponge_amplitude_relative_error,sponge_phase_error,sponge_peak_time_error,sponge_fwhm_relative_error,sponge_pulse_removed_C2_fraction,sponge_C2_closure_error,sponge_pulse_removed_f_strophy,sponge_control_removed_C2_fraction,sponge_control_removed_f_strophy,coarse_C2_relative_delta,fine_C2_relative_delta,sponge_C2_relative_delta,coarse_total_energy_relative_delta,fine_total_energy_relative_delta,sponge_total_energy_relative_delta,coarse_kinetic_energy_relative_delta,fine_kinetic_energy_relative_delta,sponge_kinetic_energy_relative_delta,coarse_field_energy_relative_delta,fine_field_energy_relative_delta,sponge_field_energy_relative_delta,coarse_mass_relative_delta,fine_mass_relative_delta,sponge_mass_relative_delta,coarse_momentum_delta,fine_momentum_delta,sponge_momentum_delta,coarse_minimum_f,coarse_negative_cell_fraction,coarse_negative_mass_fraction,fine_minimum_f,fine_negative_cell_fraction,fine_negative_mass_fraction,sponge_minimum_f,sponge_negative_cell_fraction,sponge_negative_mass_fraction,sponge_velocity_boundary_ratio,control_total_energy_relative_delta,coarse_initial_E,fine_initial_E,sponge_initial_E"
+        "summary,case,sponge_start_fraction,sponge_max_damping_rate,nv,coarse_t_nyquist,coarse_t_recurrence,fine_t_nyquist,fine_t_recurrence,echo_mode,predicted_rephase_time,coarse_peak_time,coarse_amplitude,coarse_phase,coarse_fwhm,fine_peak_time,fine_amplitude,fine_phase,fine_fwhm,sponge_peak_time,sponge_amplitude,sponge_phase,sponge_fwhm,sponge_to_fine_amplitude_ratio,sponge_amplitude_relative_error,sponge_phase_error,sponge_peak_time_error,sponge_fwhm_relative_error,sponge_pulse_removed_C2_fraction,sponge_C2_closure_error,sponge_pulse_removed_f_strophy,sponge_control_removed_C2_fraction,sponge_control_removed_f_strophy,coarse_C2_relative_delta,fine_C2_relative_delta,sponge_C2_relative_delta,coarse_total_energy_relative_delta,fine_total_energy_relative_delta,sponge_total_energy_relative_delta,coarse_kinetic_energy_relative_delta,fine_kinetic_energy_relative_delta,sponge_kinetic_energy_relative_delta,coarse_field_energy_relative_delta,fine_field_energy_relative_delta,sponge_field_energy_relative_delta,coarse_mass_relative_delta,fine_mass_relative_delta,sponge_mass_relative_delta,coarse_momentum_delta,fine_momentum_delta,sponge_momentum_delta,coarse_minimum_f,coarse_negative_cell_fraction,coarse_negative_mass_fraction,fine_minimum_f,fine_negative_cell_fraction,fine_negative_mass_fraction,sponge_minimum_f,sponge_negative_cell_fraction,sponge_negative_mass_fraction,sponge_velocity_boundary_ratio,control_total_energy_relative_delta,coarse_initial_E,fine_initial_E,sponge_initial_E"
     );
     println!(
-        "summary,near_nyquist_echo,{},{:.8},{:.8},{:.8},{:.8},{},{:.8},{:.8},{:.12e},{:.8},{:.8},{:.8},{:.12e},{:.8},{:.8},{:.8},{:.12e},{:.8},{:.8},{:.12e},{:.12e},{:.12e},{:.8},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e}{:.12e}{:.12e}{:.12e}{:.12e}{:.12e}",
+        "summary,near_nyquist_echo,{sponge_start:.8},{sponge_damping:.8},{},{:.8},{:.8},{:.8},{:.8},{},{:.8},{:.8},{:.12e},{:.8},{:.8},{:.8},{:.12e},{:.8},{:.8},{:.8},{:.12e},{:.8},{:.8},{:.12e},{:.12e},{:.12e},{:.8},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e}{:.12e}{:.12e}{:.12e}{:.12e}{:.12e}",
         coarse_config.nv,
         coarse_horizon.nyquist_encounter_time,
         coarse_horizon.discrete_recurrence_time,
