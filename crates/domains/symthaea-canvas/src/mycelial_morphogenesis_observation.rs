@@ -47,9 +47,27 @@ pub enum MycelialDevelopmentStage {
     Unknown,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MycelialMorphogenesisMissingStatus {
+    NotAcquired,
+    UnavailableOrCorrupted,
+    Unmeasurable,
+    OccludedOrOutOfFocus,
+    BelowDetection,
+    RightCensored,
+    LeftCensored,
+    IntervalCensored,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum MycelialMorphogenesisMeasurement {
+    /// Explicit missing/censoring states; never substitute a numeric zero.
+    MeasurementUnavailable {
+        status: MycelialMorphogenesisMissingStatus,
+        reason: String,
+    },
     /// Optical intensity is a colonization proxy, not a direct biomass measure.
     ColonizationDensityProxy {
         mean_intensity: f64,
@@ -129,6 +147,7 @@ pub enum MycelialMorphogenesisObservationError {
     InvalidIdentifier(&'static str),
     InvalidDigest(&'static str),
     InvalidMeasurement(&'static str),
+    InvalidMissingReason,
     EvidenceChainMismatch(&'static str),
     ObservationNotInLedger,
     SourceUnitMismatch,
@@ -149,6 +168,9 @@ impl fmt::Display for MycelialMorphogenesisObservationError {
             }
             Self::InvalidMeasurement(field) => {
                 write!(f, "invalid typed morphogenesis measurement: {field}")
+            }
+            Self::InvalidMissingReason => {
+                write!(f, "missing or censored morphogenesis observation requires a bounded reason")
             }
             Self::EvidenceChainMismatch(field) => {
                 write!(f, "morphogenesis observation disagrees with evidence chain: {field}")
@@ -217,6 +239,19 @@ fn region_kind_tag(kind: MycelialMorphogenesisRegionKind) -> u8 {
         MycelialMorphogenesisRegionKind::HyphalFront => 2,
         MycelialMorphogenesisRegionKind::Primordium => 3,
         MycelialMorphogenesisRegionKind::FruitingBody => 4,
+    }
+}
+
+fn missing_status_tag(status: MycelialMorphogenesisMissingStatus) -> u8 {
+    match status {
+        MycelialMorphogenesisMissingStatus::NotAcquired => 0,
+        MycelialMorphogenesisMissingStatus::UnavailableOrCorrupted => 1,
+        MycelialMorphogenesisMissingStatus::Unmeasurable => 2,
+        MycelialMorphogenesisMissingStatus::OccludedOrOutOfFocus => 3,
+        MycelialMorphogenesisMissingStatus::BelowDetection => 4,
+        MycelialMorphogenesisMissingStatus::RightCensored => 5,
+        MycelialMorphogenesisMissingStatus::LeftCensored => 6,
+        MycelialMorphogenesisMissingStatus::IntervalCensored => 7,
     }
 }
 
@@ -304,6 +339,14 @@ impl MycelialMorphogenesisObservation {
         }
 
         match &self.measurement {
+            MycelialMorphogenesisMeasurement::MeasurementUnavailable { reason, .. } => {
+                if reason.trim().is_empty()
+                    || reason.len() > MAX_MORPHOGENESIS_IDENTIFIER_BYTES * 4
+                    || reason.chars().any(char::is_control)
+                {
+                    return Err(MycelialMorphogenesisObservationError::InvalidMissingReason);
+                }
+            }
             MycelialMorphogenesisMeasurement::ColonizationDensityProxy {
                 mean_intensity,
                 scale_min,
@@ -550,6 +593,10 @@ impl MycelialMorphogenesisObservation {
         hasher.update(&[development_stage_tag(self.development_stage)]);
 
         match &self.measurement {
+            MycelialMorphogenesisMeasurement::MeasurementUnavailable { status, reason } => {
+                hasher.update(&[6, missing_status_tag(*status)]);
+                hash_string(&mut hasher, reason);
+            }
             MycelialMorphogenesisMeasurement::ColonizationDensityProxy {
                 mean_intensity,
                 scale_min,
@@ -664,6 +711,36 @@ mod tests {
             calibration_digest: digest('f'),
             measurement,
         }
+    }
+
+    #[test]
+    fn missing_and_censored_measurements_remain_distinct_from_zero() {
+        let unavailable = fixture(MycelialMorphogenesisMeasurement::MeasurementUnavailable {
+            status: MycelialMorphogenesisMissingStatus::BelowDetection,
+            reason: "cord segmentation below validated detection threshold".to_string(),
+        });
+        let zero_area = fixture(MycelialMorphogenesisMeasurement::CordAreaFraction {
+            fraction: 0.0,
+            analysis_method_id: "cord-segmentation-v1".to_string(),
+        });
+        unavailable.validate().unwrap();
+        zero_area.validate().unwrap();
+        assert_ne!(
+            unavailable.canonical_digest_hex().unwrap(),
+            zero_area.canonical_digest_hex().unwrap()
+        );
+    }
+
+    #[test]
+    fn missing_measurement_requires_a_reason() {
+        let observation = fixture(MycelialMorphogenesisMeasurement::MeasurementUnavailable {
+            status: MycelialMorphogenesisMissingStatus::OccludedOrOutOfFocus,
+            reason: "  ".to_string(),
+        });
+        assert_eq!(
+            observation.validate(),
+            Err(MycelialMorphogenesisObservationError::InvalidMissingReason)
+        );
     }
 
     #[test]
