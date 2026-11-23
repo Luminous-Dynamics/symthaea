@@ -1409,7 +1409,10 @@ mod tests {
             "candidate_execution_boundary": "legacy_in_process",
             "candidate_artifact_sha256": null,
             "candidate_process_startup_ns": null,
-            "candidate_process_wall_ns": null
+            "candidate_process_wall_ns": null,
+            "candidate_request_build_ns": null,
+            "candidate_receipt_validation_ns": null,
+            "candidate_end_to_end_ns": null
         })
     }
 
@@ -1457,7 +1460,10 @@ mod tests {
             "candidate_execution_boundary": "detached_subprocess_stream",
             "candidate_artifact_sha256": "e".repeat(64),
             "candidate_process_startup_ns": 100,
-            "candidate_process_wall_ns": 200
+            "candidate_process_wall_ns": 200,
+            "candidate_request_build_ns": 20,
+            "candidate_receipt_validation_ns": 30,
+            "candidate_end_to_end_ns": 250
         })
     }
 
@@ -1482,7 +1488,10 @@ mod tests {
             "candidate_execution_boundary": candidate.candidate_execution_boundary,
             "candidate_artifact_sha256": candidate.candidate_artifact_sha256,
             "candidate_process_startup_ns": candidate.candidate_process_startup_ns,
-            "candidate_process_wall_ns": candidate.candidate_process_wall_ns
+            "candidate_process_wall_ns": candidate.candidate_process_wall_ns,
+            "candidate_request_build_ns": candidate.candidate_request_build_ns,
+            "candidate_receipt_validation_ns": candidate.candidate_receipt_validation_ns,
+            "candidate_end_to_end_ns": candidate.candidate_end_to_end_ns
         })
     }
 
