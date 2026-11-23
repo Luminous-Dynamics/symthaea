@@ -328,8 +328,8 @@ fn report_digest(
 }
 
 /// Assesses whether a measurement is eligible for a downstream evidence update.
-/// Missing or unverified evidence yields UNKNOWN; contradictions or expired/
-—revoked certificates yield REJECTED. Neither status grants control authority.
+/// Missing or unverified evidence yields UNKNOWN; contradictions or expired
+/// or revoked certificates yield REJECTED. Neither status grants control authority.
 pub fn qualify_measurement_evidence_v1(
     measurement: &MeasurementEvidenceV1,
     calibration: Option<&CalibrationCertificateV1>,
