@@ -9,7 +9,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
-use std::fs::File;
+use std::fs::{self, File};
+use std::path::PathBuf;
 use std::io::{BufWriter, Write};
 use std::mem::size_of;
 use std::process::Command;
@@ -514,9 +515,21 @@ fn valid_git_revision(value: &str) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
-fn verify_source_checkout(expected_revision: &str) -> Result<(), String> {
+fn verify_source_checkout(expected_revision: &str) -> Result<PathBuf, String> {
+    let root = Command::new("git")
+        .args(["rev-parse", "--show-toplevel"])
+        .output()
+        .map_err(|error| format!("locate Git repository root: {error}"))?;
+    if !root.status.success() {
+        return Err("git rev-parse --show-toplevel failed".into());
+    }
+    let root = String::from_utf8(root.stdout)
+        .map_err(|error| format!("git repository root is not UTF-8: {error}"))?;
+    let root = PathBuf::from(root.trim());
+
     let revision = Command::new("git")
         .args(["rev-parse", "HEAD"])
+        .current_dir(&root)
         .output()
         .map_err(|error| format!("read checked-out Git revision: {error}"))?;
     if !revision.status.success() {
@@ -533,15 +546,32 @@ fn verify_source_checkout(expected_revision: &str) -> Result<(), String> {
 
     let status = Command::new("git")
         .args(["status", "--porcelain", "--untracked-files=all"])
+        .current_dir(&root)
         .output()
         .map_err(|error| format!("inspect source checkout status: {error}"))?;
     if !status.status.success() {
         return Err("git status failed; source checkout cleanliness cannot be verified".into());
     }
-    if !status.stdout.is_empty() {
-        return Err("MACE benchmark requires a clean Git working tree; commit or remove local changes first".into());
+    let status = String::from_utf8(status.stdout)
+        .map_err(|error| format!("git status output is not UTF-8: {error}"))?;
+    for line in status.lines() {
+        // Cargo creates this lockfile on the first nested-workspace build.
+        // It is separately hashed below until #13364 checks it into Git.
+        if line == "?? research/broca-mace-transfer-bench-v0-1/Cargo.lock" {
+            continue;
+        }
+        return Err(format!(
+            "MACE benchmark requires a clean Git checkout; unexpected status entry: {line}"
+        ));
     }
-    Ok(())
+    Ok(root)
+}
+
+fn add_bundle_entry(hasher: &mut Sha256, label: &str, bytes: &[u8]) {
+    hasher.update((label.len() as u64).to_be_bytes());
+    hasher.update(label.as_bytes());
+    hasher.update((bytes.len() as u64).to_be_bytes());
+    hasher.update(bytes);
 }
 
 fn action_name(action: Option<Action>) -> &'static str {
@@ -970,45 +1000,41 @@ fn run() -> Result<(), String> {
         .unwrap_or(32);
 
     let cases = mace_generated_stress::generated_worlds(clusters);
+    let nested_cargo_lock_path =
+        repository_root.join("research/broca-mace-transfer-bench-v0-1/Cargo.lock");
+    let nested_cargo_lock = fs::read(&nested_cargo_lock_path)
+        .map_err(|error| format!("read required nested Cargo.lock {}: {error}", nested_cargo_lock_path.display()))?;
     let mut source_bundle_hasher = Sha256::new();
-    source_bundle_hasher.update(b"mace-counterfactual-source-bundle-v2\0");
-    // Evaluator, IPC client, candidate executable source, direct policy/HDC
-    // sources, and all relevant Cargo manifests are bound into one digest.
-    source_bundle_hasher.update(include_bytes!("mace_counterfactual_evidence.rs"));
-    source_bundle_hasher.update(include_bytes!("mace_counterfactual_aggregate.rs"));
-    source_bundle_hasher.update(include_bytes!("../candidate_process.rs"));
-    source_bundle_hasher.update(include_bytes!("../../../candidate/src/main.rs"));
-    source_bundle_hasher.update(include_bytes!("../../../candidate/Cargo.toml"));
-    source_bundle_hasher.update(include_bytes!("../../../policy/src/lib.rs"));
-    source_bundle_hasher.update(include_bytes!("../../../policy/Cargo.toml"));
-    source_bundle_hasher.update(include_bytes!("../../../hdc-retrieval/src/lib.rs"));
-    source_bundle_hasher.update(include_bytes!("../../../hdc-retrieval/src/typed_content.rs"));
-    source_bundle_hasher.update(include_bytes!("../../../hdc-retrieval/Cargo.toml"));
-    source_bundle_hasher.update(include_bytes!("../../Cargo.toml"));
-    source_bundle_hasher.update(include_bytes!("../../../Cargo.toml"));
-    source_bundle_hasher.update(include_bytes!("../../../../../rust-toolchain.toml"));
-    source_bundle_hasher.update(include_bytes!("../../../../../flake.lock"));
+    source_bundle_hasher.update(b"mace-counterfactual-source-bundle-v3\0");
+    add_bundle_entry(&mut source_bundle_hasher, "evaluator/src/bin/mace_counterfactual_evidence.rs", include_bytes!("mace_counterfactual_evidence.rs"));
+    add_bundle_entry(&mut source_bundle_hasher, "evaluator/src/bin/mace_counterfactual_aggregate.rs", include_bytes!("mace_counterfactual_aggregate.rs"));
+    add_bundle_entry(&mut source_bundle_hasher, "evaluator/src/candidate_process.rs", include_bytes!("../candidate_process.rs"));
+    add_bundle_entry(&mut source_bundle_hasher, "candidate/src/main.rs", include_bytes!("../../../candidate/src/main.rs"));
+    add_bundle_entry(&mut source_bundle_hasher, "candidate/Cargo.toml", include_bytes!("../../../candidate/Cargo.toml"));
+    add_bundle_entry(&mut source_bundle_hasher, "policy/src/lib.rs", include_bytes!("../../../policy/src/lib.rs"));
+    add_bundle_entry(&mut source_bundle_hasher, "policy/Cargo.toml", include_bytes!("../../../policy/Cargo.toml"));
+    add_bundle_entry(&mut source_bundle_hasher, "hdc-retrieval/src/lib.rs", include_bytes!("../../../hdc-retrieval/src/lib.rs"));
+    add_bundle_entry(&mut source_bundle_hasher, "hdc-retrieval/src/typed_content.rs", include_bytes!("../../../hdc-retrieval/src/typed_content.rs"));
+    add_bundle_entry(&mut source_bundle_hasher, "hdc-retrieval/Cargo.toml", include_bytes!("../../../hdc-retrieval/Cargo.toml"));
+    add_bundle_entry(&mut source_bundle_hasher, "evaluator/Cargo.toml", include_bytes!("../../Cargo.toml"));
+    add_bundle_entry(&mut source_bundle_hasher, "workspace/Cargo.toml", include_bytes!("../../../Cargo.toml"));
+    add_bundle_entry(&mut source_bundle_hasher, "rust-toolchain.toml", include_bytes!("../../../../../rust-toolchain.toml"));
+    add_bundle_entry(&mut source_bundle_hasher, "flake.lock", include_bytes!("../../../../../flake.lock"));
+    add_bundle_entry(&mut source_bundle_hasher, "Cargo.lock", &nested_cargo_lock);
     let source_code_sha256 = hex_digest(source_bundle_hasher.finalize().as_slice());
     let fixture_sha256 =
         hex_digest(Sha256::digest(include_bytes!("mace_generated_stress.rs")).as_slice());
     let mut schema_bundle_hasher = Sha256::new();
-    schema_bundle_hasher.update(b"mace-counterfactual-schema-bundle-v1\0");
-    schema_bundle_hasher.update(include_bytes!(
-        "../../../../../data/schemas/mace_counterfactual_evidence_v0_1.schema.json"
-    ));
-    schema_bundle_hasher.update(include_bytes!(
-        "../../../../../data/schemas/mace_candidate_envelope_v1.schema.json"
-    ));
-    schema_bundle_hasher.update(include_bytes!(
-        "../../../../../data/schemas/mace_candidate_receipt_v1.schema.json"
-    ));
-    let schema_sha256 = hex_digest(schema_bundle_hasher.finalize().as_slice());
-    let source_revision = env::var("MACE_SOURCE_REVISION")
+    schema_bundle_hasher.update(b"mace-counterfactual-schema-bundle-v2\0");
+    add_bundle_entry(&mut schema_bundle_hasher, "mace_counterfactual_evidence_v0_1.schema.json", include_bytes!("../../../../../data/schemas/mace_counterfactual_evidence_v0_1.schema.json"));
+    add_bundle_entry(&mut schema_bundle_hasher, "mace_candidate_envelope_v1.schema.json", include_bytes!("../../../../../data/schemas/mace_candidate_envelope_v1.schema.json"));
+    add_bundle_entry(&mut schema_bundle_hasher, "mace_candidate_receipt_v1.schema.json", include_bytes!("../../../../../data/schemas/mace_candidate_receipt_v1.schema.json"));
+    let schema_sha256 = hex_digest(schema_bundle_hasher.finalize().as_slice());    let source_revision = env::var("MACE_SOURCE_REVISION")
         .map_err(|_| "MACE_SOURCE_REVISION is required and must be the exact checked-out Git SHA".to_string())?;
     if !valid_git_revision(&source_revision) {
         return Err("MACE_SOURCE_REVISION must be a 40- or 64-character lowercase Git SHA".to_string());
     }
-    verify_source_checkout(&source_revision)?;
+    let repository_root = verify_source_checkout(&source_revision)?;
     let run_identity = format!(
         "{clusters}:{public_seed}:{SCHEMA_VERSION}:{source_code_sha256}:{fixture_sha256}:{schema_sha256}:{source_revision}"
     );
