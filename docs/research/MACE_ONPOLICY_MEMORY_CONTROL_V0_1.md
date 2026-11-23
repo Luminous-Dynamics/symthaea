@@ -320,8 +320,9 @@ Three strict JSON Schema artifacts accompany this specification:
 - [`mace_onpolicy_candidate_event_v1.schema.json`](../../data/schemas/mace_onpolicy_candidate_event_v1.schema.json): candidate-visible prefix events only, with an explicit visibility marker, source/rights profile references, payload digest and predecessor digest. Unknown fields are rejected.
 - [`mace_onpolicy_candidate_action_v1.schema.json`](../../data/schemas/mace_onpolicy_candidate_action_v1.schema.json): candidate-emitted responses, user questions, memory mutations, tool requests and abstentions as explicit action records. The action type determines required fields, and unknown fields are rejected.
 - [`mace_onpolicy_evaluator_outcome_v1.schema.json`](../../data/schemas/mace_onpolicy_evaluator_outcome_v1.schema.json): sealed evaluator-only latent-state, utility, burden, memory-quality, privacy/authority and resource outcomes. This record must never be serialized into the candidate request stream.
+- [`mace_onpolicy_analysis_report_v1.schema.json`](../../data/schemas/mace_onpolicy_analysis_report_v1.schema.json): evaluator-owned report containing the stratified treatment estimate, per-stratum outcomes and BLAKE3 digests for the frozen run manifest, assignments, task schedule and outcomes.
 
-The schemas define wire shape, not authenticity or authorization. The runtime must separately verify digests, source/authority receipts, event sequence, append-only chain continuity, policy assignment and custody. A schema parse is not schema validation, runtime conformance or isolation qualification.
+The schemas define wire shape, not authenticity or authorization. The analysis receipt binds canonical typed inputs and the evaluator report, but a BLAKE3 digest is an integrity commitment—not a signature, trusted timestamp or proof that evaluator source assertions are true. The runtime must separately verify digests, source/authority receipts, event sequence, append-only chain continuity, policy assignment and custody. A schema parse is not schema validation, runtime conformance or isolation qualification.
 
 ## 11. Execution sequence
 
@@ -391,10 +392,11 @@ It adds:
 - validation against a frozen expected task schedule, including exact task identities for every randomized profile;
 - profile-mean aggregation before treatment/control comparison, so repeated episodes do not inflate the independent sample count;
 - a clearly labelled normal-approximation 95% interval and a 30-independent-profiles-per-arm confirmatory floor (each stratum also needs at least two independent profiles per arm for its variance estimate);
+- a digest-bound analysis receipt that canonicalizes and commits the run manifest, assignment table, frozen task schedule and evaluator outcomes before the report is published;
 - separate privacy and unauthorized-action hard gates that cannot be traded against utility.
 
 The primary estimator deliberately has no post-assignment disclosure, transcript-length or turn-count covariates. Those variables may be reported as outcomes or explored in a separately preregistered mediation analysis, but must not be used to adjust the primary total-effect estimate.
 
-Ten unit tests cover allocation balance/repeatability, too-small strata and duplicate profiles, block integrity, stratified weighting (including a deliberately imbalanced treatment/control mix), per-stratum reporting, profile-cluster weighting, non-compensable privacy gates, arm mismatch, frozen-task completeness and invalid utility. **They are authored but not compiled or executed in this environment.** The stratified Wald interval is an exploratory primitive, not a substitute for a preregistered randomization-inference analysis or independent confirmatory analysis.
+Thirteen unit tests cover allocation balance/repeatability, too-small strata and duplicate profiles, block integrity, stratified weighting (including a deliberately imbalanced treatment/control mix), per-stratum reporting, profile-cluster/episode accounting, non-compensable privacy gates, arm mismatch, frozen-task completeness, invalid utility, digest stability under input reordering, outcome-digest sensitivity and malformed manifest-digest rejection. **They are authored but not compiled or executed in this environment.** The stratified Wald interval is an exploratory primitive, not a substitute for a preregistered randomization-inference analysis or independent confirmatory analysis.
 
 See [MACE benchmark landscape and competitive qualification plan](MACE_BENCHMARK_LANDSCAPE_2026-11-23.md) for the current external benchmark crosswalk and prospective targets.
