@@ -468,3 +468,64 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
     Ok(())
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::f64::consts::PI;
+
+    fn synthetic_pair(velocity_mode_sign: f64) -> (VlasovPoissonConfig, VlasovPoisson1d1v, VlasovPoisson1d1v) {
+        let config = VlasovPoissonConfig {
+            nx: 32,
+            nv: 128,
+            domain_length: 2.0 * PI,
+            velocity_min: -3.0,
+            velocity_max: 3.0,
+            charge_to_mass: -1.0,
+            permittivity: 1.0,
+            background_density: 1.0,
+        };
+        let base = maxwellian_perturbation(config, 0.0, 1, 1.0).unwrap();
+        let mut perturbed = base.clone();
+        let x_wave_number = TAU / config.domain_length;
+        let v_wave_number = TAU * 8.0 / (config.velocity_max - config.velocity_min);
+        for ix in 0..config.nx {
+            for iv in 0..config.nv {
+                let phase = x_wave_number * config.x(ix)
+                    + velocity_mode_sign * v_wave_number * config.velocity(iv);
+                perturbed[ix * config.nv + iv] += 1.0e-4 * phase.cos();
+            }
+        }
+        let control = VlasovPoisson1d1v::new(config, base).unwrap();
+        let pulse = VlasovPoisson1d1v::new(config, perturbed).unwrap();
+        (config, pulse, control)
+    }
+
+    #[test]
+    fn positive_k_response_ridge_keeps_positive_velocity_mode_sign() {
+        let (config, pulse, control) = synthetic_pair(1.0);
+        let metrics = response_mode_guardband_metrics(config, &pulse, &control, 1).unwrap();
+        assert!(metrics.total_f_strophy > 0.0);
+        assert!(metrics.signed_velocity_mode_centroid > 0.0);
+        assert!(
+            (metrics.signed_velocity_mode_centroid - 8.0).abs() < 1.0e-10,
+            "positive-k branch centroid = {}",
+            metrics.signed_velocity_mode_centroid
+        );
+        assert!(metrics.guard_075_f_strophy < metrics.total_f_strophy);
+    }
+
+    #[test]
+    fn negative_k_response_ridge_keeps_negative_velocity_mode_sign() {
+        let (config, pulse, control) = synthetic_pair(-1.0);
+        let metrics = response_mode_guardband_metrics(config, &pulse, &control, 1).unwrap();
+        assert!(metrics.total_f_strophy > 0.0);
+        assert!(metrics.signed_velocity_mode_centroid < 0.0);
+        assert!(
+            (metrics.signed_velocity_mode_centroid + 8.0).abs() < 1.0e-10,
+            "negative-k branch centroid = {}",
+            metrics.signed_velocity_mode_centroid
+        );
+    }
+}
