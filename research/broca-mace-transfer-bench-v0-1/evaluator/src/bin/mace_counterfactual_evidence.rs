@@ -592,6 +592,9 @@ struct CandidateObservation {
     candidate_artifact_sha256: Option<String>,
     candidate_process_startup_ns: Option<u64>,
     candidate_process_wall_ns: Option<u64>,
+    candidate_request_build_ns: Option<u64>,
+    candidate_receipt_validation_ns: Option<u64>,
+    candidate_end_to_end_ns: Option<u64>,
 }
 
 fn run_candidate(
@@ -781,6 +784,9 @@ fn run_candidate(
         candidate_artifact_sha256: None,
         candidate_process_startup_ns: None,
         candidate_process_wall_ns: None,
+        candidate_request_build_ns: None,
+        candidate_receipt_validation_ns: None,
+        candidate_end_to_end_ns: None,
     })
 }
 
@@ -836,6 +842,9 @@ fn run_candidate_with_process(
             candidate_artifact_sha256: Some(process.binary_sha256().to_string()),
             candidate_process_startup_ns: Some(process.startup_ns()),
             candidate_process_wall_ns: Some(receipt.process_wall_ns),
+            candidate_request_build_ns: Some(receipt.request_build_ns),
+            candidate_receipt_validation_ns: Some(receipt.receipt_validation_ns),
+            candidate_end_to_end_ns: Some(receipt.end_to_end_ns),
         });
     }
 
@@ -1069,7 +1078,10 @@ fn run() -> Result<(), String> {
                 "candidate_execution_boundary": baseline.candidate_execution_boundary,
                 "candidate_artifact_sha256": baseline.candidate_artifact_sha256,
                 "candidate_process_startup_ns": baseline.candidate_process_startup_ns,
-                "candidate_process_wall_ns": baseline.candidate_process_wall_ns
+                "candidate_process_wall_ns": baseline.candidate_process_wall_ns,
+                "candidate_request_build_ns": baseline.candidate_request_build_ns,
+                "candidate_receipt_validation_ns": baseline.candidate_receipt_validation_ns,
+                "candidate_end_to_end_ns": baseline.candidate_end_to_end_ns
             });
             let mut candidate_record = candidate_record;
             if let Some(profile) = &baseline.retrieval_profile_sha256 {
@@ -1111,7 +1123,10 @@ fn run() -> Result<(), String> {
                 "candidate_execution_boundary": baseline.candidate_execution_boundary,
                 "candidate_artifact_sha256": baseline.candidate_artifact_sha256,
                 "candidate_process_startup_ns": baseline.candidate_process_startup_ns,
-                "candidate_process_wall_ns": baseline.candidate_process_wall_ns
+                "candidate_process_wall_ns": baseline.candidate_process_wall_ns,
+                "candidate_request_build_ns": baseline.candidate_request_build_ns,
+                "candidate_receipt_validation_ns": baseline.candidate_receipt_validation_ns,
+                "candidate_end_to_end_ns": baseline.candidate_end_to_end_ns
             }));
             if let Some(profile) = &baseline.retrieval_profile_sha256 {
                 if let Some(last) = evaluator_records.last_mut() {
@@ -1176,7 +1191,10 @@ fn run() -> Result<(), String> {
                     "candidate_execution_boundary": candidate.candidate_execution_boundary,
                     "candidate_artifact_sha256": candidate.candidate_artifact_sha256,
                     "candidate_process_startup_ns": candidate.candidate_process_startup_ns,
-                    "candidate_process_wall_ns": candidate.candidate_process_wall_ns
+                    "candidate_process_wall_ns": candidate.candidate_process_wall_ns,
+                    "candidate_request_build_ns": candidate.candidate_request_build_ns,
+                    "candidate_receipt_validation_ns": candidate.candidate_receipt_validation_ns,
+                    "candidate_end_to_end_ns": candidate.candidate_end_to_end_ns
                 });
                 let mut candidate_record = candidate_record;
                 if let Some(profile) = &candidate.retrieval_profile_sha256 {
@@ -1220,7 +1238,10 @@ fn run() -> Result<(), String> {
                     "candidate_execution_boundary": candidate.candidate_execution_boundary,
                     "candidate_artifact_sha256": candidate.candidate_artifact_sha256,
                     "candidate_process_startup_ns": candidate.candidate_process_startup_ns,
-                    "candidate_process_wall_ns": candidate.candidate_process_wall_ns
+                    "candidate_process_wall_ns": candidate.candidate_process_wall_ns,
+                    "candidate_request_build_ns": candidate.candidate_request_build_ns,
+                    "candidate_receipt_validation_ns": candidate.candidate_receipt_validation_ns,
+                    "candidate_end_to_end_ns": candidate.candidate_end_to_end_ns
                 });
                 let mut evaluator_record = evaluator_record;
                 if let Some(profile) = &candidate.retrieval_profile_sha256 {
