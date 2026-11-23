@@ -532,7 +532,10 @@ impl MycelialAcquisitionDomainManifest {
             MAX_DOMAIN_IDENTIFIER_BYTES,
         )?;
         validate_digest(&self.declared_scope_digest, "declared_scope_digest")?;
-        validate_digest(&self.instrument_metadata_digest, "instrument_metadata_digest")?;
+        validate_digest(
+            &self.instrument_metadata_digest,
+            "instrument_metadata_digest",
+        )?;
         validate_digest(&self.spatial_transform_digest, "spatial_transform_digest")?;
         validate_digest(&self.calibration_digest, "calibration_digest")?;
         validate_identifier(
@@ -845,9 +848,10 @@ impl MycelialExtractionCoverageReceipt {
             || ledger.coordinate_frame_id != manifest.coordinate_frame_id
             || ledger.spatial_transform_digest != manifest.spatial_transform_digest
             || ledger.calibration_digest != manifest.calibration_digest
-            || ledger.records.iter().any(|record| {
-                record.biological_replicate_id != manifest.biological_replicate_id
-            })
+            || ledger
+                .records
+                .iter()
+                .any(|record| record.biological_replicate_id != manifest.biological_replicate_id)
         {
             return Err(MycelialAcquisitionDomainError::ObservationSourceBindingMismatch);
         }
@@ -857,14 +861,18 @@ impl MycelialExtractionCoverageReceipt {
             BTreeMap::new();
         for record in &ledger.records {
             let Some(unit) = record.source_unit_key else {
-                return Err(MycelialAcquisitionDomainError::ObservationSourceUnitMissing(
-                    record.observation_id.clone(),
-                ));
+                return Err(
+                    MycelialAcquisitionDomainError::ObservationSourceUnitMissing(
+                        record.observation_id.clone(),
+                    ),
+                );
             };
             if in_scope.binary_search(&unit).is_err() {
-                return Err(MycelialAcquisitionDomainError::ObservationSourceUnitOutsideScope(
-                    record.observation_id.clone(),
-                ));
+                return Err(
+                    MycelialAcquisitionDomainError::ObservationSourceUnitOutsideScope(
+                        record.observation_id.clone(),
+                    ),
+                );
             }
             observations_by_unit
                 .entry(unit)
@@ -873,11 +881,11 @@ impl MycelialExtractionCoverageReceipt {
         }
 
         for outcome in &self.units {
-            let ids = observations_by_unit.remove(&outcome.unit).unwrap_or_default();
+            let ids = observations_by_unit
+                .remove(&outcome.unit)
+                .unwrap_or_default();
             let count = u64::try_from(ids.len()).map_err(|_| {
-                MycelialAcquisitionDomainError::ObservationUnitInventoryCountMismatch(
-                    outcome.unit,
-                )
+                MycelialAcquisitionDomainError::ObservationUnitInventoryCountMismatch(outcome.unit)
             })?;
             if outcome.output_observation_count != Some(count) {
                 return Err(
@@ -943,9 +951,7 @@ impl MycelialExtractionCoverageReceipt {
     }
 
     /// Hash exact receipt content independently from semantic validation.
-    pub fn canonical_digest_hex(
-        &self,
-    ) -> Result<String, MycelialAcquisitionDomainError> {
+    pub fn canonical_digest_hex(&self) -> Result<String, MycelialAcquisitionDomainError> {
         if self.units.len() > MAX_MYCELIAL_ACQUISITION_DOMAIN_UNITS {
             return Err(MycelialAcquisitionDomainError::DigestResourceLimitExceeded);
         }
@@ -1123,7 +1129,8 @@ mod tests {
     ) -> MycelialObservationCoverageLedger {
         let ids = vec!["obs-001".to_string(), "obs-002".to_string()];
         MycelialObservationCoverageLedger {
-            schema_version: crate::mycelial_observation_coverage::MYCELIAL_OBSERVATION_COVERAGE_SCHEMA_VERSION,
+            schema_version:
+                crate::mycelial_observation_coverage::MYCELIAL_OBSERVATION_COVERAGE_SCHEMA_VERSION,
             source_dataset_id: manifest.source_artifact_id.clone(),
             source_dataset_digest: manifest.source_artifact_digest.clone(),
             observation_inventory_digest: mycelial_observation_id_inventory_digest(&ids),
@@ -1185,68 +1192,6 @@ mod tests {
         assert_eq!(domain.expected_unit_keys().unwrap().len(), 32);
     }
 
-    fn observation_ledger(
-        manifest: &MycelialAcquisitionDomainManifest,
-        first_unit: MycelialAcquisitionUnitKey,
-        second_unit: MycelialAcquisitionUnitKey,
-    ) -> MycelialObservationCoverageLedger {
-        let ids = vec!["obs-001".to_string(), "obs-002".to_string()];
-        MycelialObservationCoverageLedger {
-            schema_version: crate::mycelial_observation_coverage::MYCELIAL_OBSERVATION_COVERAGE_SCHEMA_VERSION,
-            source_dataset_id: manifest.source_artifact_id.clone(),
-            source_dataset_digest: manifest.source_artifact_digest.clone(),
-            observation_inventory_digest: mycelial_observation_id_inventory_digest(&ids),
-            declared_observation_ids: ids,
-            coordinate_frame_id: manifest.coordinate_frame_id.clone(),
-            spatial_transform_digest: manifest.spatial_transform_digest.clone(),
-            calibration_digest: manifest.calibration_digest.clone(),
-            candidate_generator_id: "mycelial-candidate-generator".to_string(),
-            candidate_generator_version: "0.1.0".to_string(),
-            candidate_generator_digest: digest('e'),
-            records: vec![
-                MycelialObservationCoverageRecord {
-                    observation_id: "obs-001".to_string(),
-                    observation_digest: digest('1'),
-                    source_unit_key: Some(first_unit),
-                    acquisition_group_id: manifest.acquisition_session_id.clone(),
-                    biological_replicate_id: manifest.biological_replicate_id.clone(),
-                    time_window_id: "time-001".to_string(),
-                    state: MycelialObservationCoverageState::CandidateEmitted,
-                    candidate_ids: vec!["candidate-001".to_string()],
-                    residual_kind: None,
-                },
-                MycelialObservationCoverageRecord {
-                    observation_id: "obs-002".to_string(),
-                    observation_digest: digest('2'),
-                    source_unit_key: Some(second_unit),
-                    acquisition_group_id: manifest.acquisition_session_id.clone(),
-                    biological_replicate_id: manifest.biological_replicate_id.clone(),
-                    time_window_id: "time-001".to_string(),
-                    state: MycelialObservationCoverageState::NoCandidateGenerated,
-                    candidate_ids: Vec::new(),
-                    residual_kind: Some(MycelialObservationResidualKind::PossibleContactMissing),
-                },
-            ],
-        }
-    }
-
-    fn bind_receipt_to_ledger_outputs(
-        receipt: &mut MycelialExtractionCoverageReceipt,
-        ledger: &MycelialObservationCoverageLedger,
-    ) {
-        for outcome in &mut receipt.units {
-            let ids: Vec<String> = ledger
-                .records
-                .iter()
-                .filter(|record| record.source_unit_key == Some(outcome.unit))
-                .map(|record| record.observation_id.clone())
-                .collect();
-            outcome.output_observation_count = Some(ids.len() as u64);
-            outcome.output_observation_inventory_digest =
-                Some(mycelial_observation_id_inventory_digest(&ids));
-        }
-    }
-
     #[test]
     fn complete_receipt_validates_and_reports_full_domain() {
         let manifest = manifest();
@@ -1262,7 +1207,6 @@ mod tests {
         assert_eq!(summary.pending_units, 0);
     }
 
-
     #[test]
     fn extraction_receipt_reconciles_per_unit_observation_inventories() {
         let manifest = manifest();
@@ -1270,7 +1214,9 @@ mod tests {
         let ledger = observation_ledger(&manifest, units[0], units[1]);
         let mut receipt = receipt(&manifest);
         bind_receipt_to_ledger_outputs(&mut receipt, &ledger);
-        receipt.validate_observation_ledger(&manifest, &ledger).unwrap();
+        receipt
+            .validate_observation_ledger(&manifest, &ledger)
+            .unwrap();
     }
 
     #[test]
@@ -1283,9 +1229,7 @@ mod tests {
         receipt.units[0].output_observation_inventory_digest = Some(digest('f'));
         assert_eq!(
             receipt.validate_observation_ledger(&manifest, &ledger),
-            Err(MycelialAcquisitionDomainError::ObservationUnitInventoryDigestMismatch(
-                units[0]
-            ))
+            Err(MycelialAcquisitionDomainError::ObservationUnitInventoryDigestMismatch(units[0]))
         );
     }
 
@@ -1299,9 +1243,9 @@ mod tests {
         bind_receipt_to_ledger_outputs(&mut receipt, &ledger);
         assert_eq!(
             receipt.validate_observation_ledger(&manifest, &ledger),
-            Err(MycelialAcquisitionDomainError::ObservationSourceUnitMissing(
-                "obs-001".to_string()
-            ))
+            Err(
+                MycelialAcquisitionDomainError::ObservationSourceUnitMissing("obs-001".to_string())
+            )
         );
     }
 
@@ -1365,65 +1309,6 @@ mod tests {
         assert_eq!(
             receipt.validate_against(&manifest),
             Err(MycelialAcquisitionDomainError::ReceiptUnitInventoryMismatch)
-        );
-    }
-
-    #[test]
-    fn extraction_receipt_reconciles_per_unit_observation_inventories() {
-        let manifest = manifest();
-        let units = manifest.domain.expected_unit_keys().unwrap();
-        let ledger = observation_ledger(&manifest, units[0], units[1]);
-        let mut receipt = receipt(&manifest);
-        bind_receipt_to_ledger_outputs(&mut receipt, &ledger);
-        receipt.validate_observation_ledger(&manifest, &ledger).unwrap();
-    }
-
-    #[test]
-    fn extraction_reconciliation_rejects_per_unit_digest_tampering() {
-        let manifest = manifest();
-        let units = manifest.domain.expected_unit_keys().unwrap();
-        let ledger = observation_ledger(&manifest, units[0], units[1]);
-        let mut receipt = receipt(&manifest);
-        bind_receipt_to_ledger_outputs(&mut receipt, &ledger);
-        receipt.units[0].output_observation_inventory_digest = Some(digest('f'));
-        assert_eq!(
-            receipt.validate_observation_ledger(&manifest, &ledger),
-            Err(MycelialAcquisitionDomainError::ObservationUnitInventoryDigestMismatch(
-                units[0]
-            ))
-        );
-    }
-
-    #[test]
-    fn extraction_reconciliation_requires_source_unit_per_observation() {
-        let manifest = manifest();
-        let units = manifest.domain.expected_unit_keys().unwrap();
-        let mut ledger = observation_ledger(&manifest, units[0], units[1]);
-        ledger.records[0].source_unit_key = None;
-        let mut receipt = receipt(&manifest);
-        bind_receipt_to_ledger_outputs(&mut receipt, &ledger);
-        assert_eq!(
-            receipt.validate_observation_ledger(&manifest, &ledger),
-            Err(MycelialAcquisitionDomainError::ObservationSourceUnitMissing(
-                "obs-001".to_string()
-            ))
-        );
-    }
-
-    #[test]
-    fn partial_extraction_cannot_certify_complete_observation_inventory() {
-        let manifest = manifest();
-        let units = manifest.domain.expected_unit_keys().unwrap();
-        let ledger = observation_ledger(&manifest, units[0], units[1]);
-        let mut receipt = receipt(&manifest);
-        bind_receipt_to_ledger_outputs(&mut receipt, &ledger);
-        receipt.units[0].state = MycelialExtractionUnitState::Pending;
-        receipt.units[0].output_observation_inventory_digest = None;
-        receipt.units[0].output_observation_count = None;
-        receipt.units[0].disposition_reason = Some("pending source review".to_string());
-        assert_eq!(
-            receipt.validate_observation_ledger(&manifest, &ledger),
-            Err(MycelialAcquisitionDomainError::IncompleteExtractionBlocksObservationInventory)
         );
     }
 
@@ -1525,7 +1410,9 @@ mod tests {
         changed.rights_evidence_digest = "not-a-digest".to_string();
         assert!(matches!(
             changed.validate(),
-            Err(MycelialAcquisitionDomainError::InvalidDigest("rights_evidence_digest"))
+            Err(MycelialAcquisitionDomainError::InvalidDigest(
+                "rights_evidence_digest"
+            ))
         ));
     }
 
