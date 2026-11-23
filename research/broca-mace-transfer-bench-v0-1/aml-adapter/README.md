@@ -19,6 +19,7 @@ The source JSONL contract is in `data/schemas/mace_raw_session_v0_1.schema.json`
 - The index is user-scoped. Cross-user ingestion and search are rejected.
 - Neighbor expansion is session-local and returned separately from scored hits. Neighbor chunks are not assigned fabricated relevance scores.
 - Reciprocal-rank fusion accepts externally ranked lists and validates uniqueness/weights. It is ready to fuse a pinned dense backend ranking with BM25, but this crate does not implement or claim a dense embedding model.
+- The BM25 index emits a resource receipt with measured index-build latency, measured per-query latency, source-text bytes, derived index-text bytes and explicit lexical/index metadata payload lower bounds. The byte estimate excludes allocator, tree-node and container overhead, process RSS, filesystem/database overhead, replicas, embeddings and external verification work; it must not be presented as all-in memory cost.
 
 ## Usage
 
@@ -35,6 +36,8 @@ let index = RawSessionBm25IndexV1::build(
     Bm25ProfileV1::default(),
 )?;
 let result = index.search(&session.user_id, "the user's query", 5, 1)?;
+let resource_receipt = index.resource_receipt();
+let query_latency_ns = result.search_latency_ns;
 ```
 
 The concrete word counter must be pinned to the exact AML adapter implementation. The included unit-test counter is intentionally only a fixture.
@@ -53,4 +56,4 @@ It does **not** yet reproduce Redis Remis + Instruct, Agent Zero Memory, AML Cyc
 
 ## Tests
 
-Thirteen deterministic tests are authored for raw text fidelity, strict schema/unknown-field handling, duplicate IDs, session/user isolation, stable chunking, source mutation identity, chunk-metadata tamper detection, BM25 matching, neighbor isolation, invalid input and RRF. They have not been executed here.
+Thirteen deterministic tests are authored for raw text fidelity, strict schema/unknown-field handling, duplicate IDs, session/user isolation, stable chunking, source mutation identity, chunk-metadata tamper detection, BM25 matching, neighbor isolation, lower-bound resource receipts, measured latency fields, invalid input and RRF. They have not been executed here.
