@@ -244,6 +244,7 @@ impl MycelialFunctionalObservationSet {
             || !valid_digest(&self.assay_protocol_digest)
             || !valid_id(&self.timebase_id)
             || self.window_end_ns <= self.window_start_ns
+            || self.observations.is_empty()
         {
             return Err(MycelialFunctionalObservationError::InvalidMetadata);
         }
@@ -302,7 +303,7 @@ impl MycelialFunctionalObservationSet {
                         && *injection_time_ns >= observation.window_start_ns
                         && *injection_time_ns < observation.window_end_ns
                         && arrival_time_ns.is_none_or(|arrival| {
-                            arrival >= *injection_time_ns && arrival <= observation.window_end_ns
+                            arrival >= *injection_time_ns && arrival < observation.window_end_ns
                         })
                         && [injected_quantity, recovered_quantity]
                             .into_iter()
@@ -322,7 +323,7 @@ impl MycelialFunctionalObservationSet {
                         && *transported_cell_count > 0
                         && first_arrival_time_ns.is_none_or(|arrival| {
                             arrival >= observation.window_start_ns
-                                && arrival <= observation.window_end_ns
+                                && arrival < observation.window_end_ns
                         })
                         && liquid_saturation_fraction.is_none_or(|fraction| {
                             fraction.is_finite() && (0.0..=1.0).contains(&fraction)
@@ -442,8 +443,10 @@ impl MycelialFunctionalObservationSet {
                             hasher.update(&[1]);
                             hasher.update(&speed.to_bits().to_le_bytes());
                         }
-                        None => hasher.update(&[0]),
-                    };
+                        None => {
+                            hasher.update(&[0]);
+                        }
+                    }
                     hasher.update(&trajectory_count.to_le_bytes());
                 }
                 MycelialFunctionalMeasurement::TracerTransfer {
@@ -465,7 +468,9 @@ impl MycelialFunctionalObservationSet {
                             hasher.update(&[1]);
                             hasher.update(&arrival.to_le_bytes());
                         }
-                        None => hasher.update(&[0]),
+                        None => {
+                            hasher.update(&[0]);
+                        }
                     }
                     hash_optional_quantity(&mut hasher, *injected_quantity);
                     hash_optional_quantity(&mut hasher, *recovered_quantity);
@@ -486,14 +491,18 @@ impl MycelialFunctionalObservationSet {
                             hasher.update(&[1]);
                             hasher.update(&arrival.to_le_bytes());
                         }
-                        None => hasher.update(&[0]),
+                        None => {
+                            hasher.update(&[0]);
+                        }
                     }
                     match liquid_saturation_fraction {
                         Some(fraction) => {
                             hasher.update(&[1]);
                             hasher.update(&fraction.to_bits().to_le_bytes());
                         }
-                        None => hasher.update(&[0]),
+                        None => {
+                            hasher.update(&[0]);
+                        }
                     }
                 }
             }
