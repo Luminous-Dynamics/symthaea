@@ -18,6 +18,7 @@ pub mod secom_raw;
 pub mod secom_tabular_baselines;
 pub mod split_manifest;
 pub mod stratified_repeat;
+pub mod vm_snapshot_evidence;
 
 pub use binary_metrics::{
     BinaryClassCounts, BinaryMetricReportV1, BinaryMetricsError, BinaryScoreSampleV1,
@@ -115,4 +116,13 @@ pub use label_consumption_guard::{
     LabelConsumptionEligibilityReportV1, LabelConsumptionEligibilityV1,
     LabelConsumptionGuardErrorV1, LabelConsumptionReasonV1, LabelEvidenceFrontierV1,
     assess_label_consumption_eligibility_v1,
+};
+
+pub use vm_snapshot_evidence::{
+    VM_SNAPSHOT_INPUT_SCHEMA_V1, VM_SNAPSHOT_MANIFEST_SCHEMA_V1,
+    VM_SNAPSHOT_REQUALIFICATION_SCHEMA_V1, VmSnapshotCurrentDispositionV1,
+    VmSnapshotEvidenceErrorV1, VmSnapshotInputV1, VmSnapshotLabelCurrentStatusV1,
+    VmSnapshotLabelEvidenceV1, VmSnapshotLabelManifestEntryV1, VmSnapshotPurposeV1,
+    VmSnapshotRequalificationReportV1, VmTrainingSnapshotManifestV1,
+    build_vm_training_snapshot_manifest_v1, requalify_vm_training_snapshot_v1,
 };
