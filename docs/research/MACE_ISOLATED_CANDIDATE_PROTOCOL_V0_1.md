@@ -127,3 +127,58 @@ Negative controls must prove that mutating evaluator truth, permuting interventi
 | 5 | Matched public benchmark submissions, repeated runs, uncertainty and full cost | External comparison under the named protocol |
 
 Do not skip a level in public claims.
+
+
+## Evaluator subprocess integration slice (#13351)
+
+The paired runner now uses `CandidateProcessSession` for the exact-scope and typed-content-HDC arms. The worker is a persistent, line-framed stateless request/receipt process scoped to one task block:
+
+- the parent launches one hash-pinned candidate executable per task block and checks its readiness frame;
+- the parent sends a fresh random 24-byte nonce and one candidate-only JSON envelope per observation;
+- the worker emits one receipt for each request and keeps no cross-request memory state;
+- the parent validates the exact request digest, nonce digest, run/task/sequence/method, DecisionNeed/evidence/input digests and observation ID;
+- support IDs must be a subset of retrieved IDs; every retrieved ID must resolve to a supplied canonical record in the declared scope/action set;
+- evaluator intervention labels and outcome truth remain in the evaluator loop and are not fields in the candidate envelope.
+
+The process session is reused for baseline and ablation observations in the same task block. This avoids a fresh process launch for every ablation while preserving an independent candidate invocation for each observation. The candidate sequence is monotonic within that worker session.
+
+### Build and invoke
+
+From the repository root on Linux:
+
+```bash
+cargo build --release \
+  --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml \
+  -p broca-mace-candidate
+
+export MACE_CANDIDATE_BIN="$PWD/target/release/broca-mace-candidate"
+export MACE_CANDIDATE_BIN_SHA256="$(sha256sum "$MACE_CANDIDATE_BIN" | awk '{print $1}')"
+
+MACE_SOURCE_REVISION="$(git rev-parse HEAD)" \
+cargo run --release \
+  --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml \
+  -p broca-mace-evaluator \
+  --bin mace_counterfactual_evidence \
+  -- 1 /tmp/mace-candidate.jsonl /tmp/mace-evaluator.jsonl
+```
+
+The evaluator requires both `MACE_CANDIDATE_BIN` and `MACE_CANDIDATE_BIN_SHA256`; missing or mismatched values fail closed. The child process runs with a cleared environment and working directory `/`, but remains under the parent user's OS identity.
+
+### Timing contract
+
+Candidate and evaluator records now carry:
+
+- `candidate_process_startup_ns`: worker spawn/readiness time; repeated on each detached observation from the same task-block worker. Aggregate once per distinct `(pair_block_id, candidate_artifact_sha256)`, not once per row.
+- `candidate_request_build_ns`: parent nonce generation, evidence ordering, wire construction/serialization and expected-digest preparation.
+- `candidate_process_wall_ns`: from writing/flushing the request until the response line is received. It includes candidate execution and IPC/scheduling; it is **not** pure network/IPC transport.
+- `candidate_latency_ns` / score-row `latency_ns`: candidate-internal retrieval/policy timing reported by the child after request parse/validation.
+- `candidate_receipt_validation_ns`: parent JSON receipt decoding and semantic/identity validation.
+- `candidate_end_to_end_ns`: parent-side request-build through receipt validation. It excludes worker startup, which is recorded separately.
+
+Three remaining baseline arms—event-ID KV top-k, static HDC and HDC-LTC zero-input—are still explicitly labelled `legacy_in_process`; they have null child-process metadata. The detached exact-scope arm returns all eligible in-scope evidence as a ceiling, whereas typed-content HDC returns its top-k candidate set. Do not describe all five arms as process-isolated or compare them without accounting for their different execution boundaries.
+
+### Updated validation boundary
+
+Static source/schema inspection now covers the child-process launcher, executable digest pinning, readiness and request/response framing, strict receipt validation, support-ID reconciliation, explicit detached/legacy labels and the timing fields. Regression tests are authored in the reducer. **No Rust build, test, runtime child process, sandbox or benchmark run has been executed in this environment.**
+
+This process integration still does not provide OS sandboxing, evaluator custody, candidate source authenticity or sealed truth. The parent evaluator and fixture generator remain public and in the same executable. It is progress toward #13287, not completion of #13287.
