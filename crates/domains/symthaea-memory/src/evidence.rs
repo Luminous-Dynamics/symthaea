@@ -325,6 +325,8 @@ impl EvidenceLedger {
                     && candidate.issuer_id == grant.issuer_id
                     && candidate.targets.iter().any(|target| target == grant_id)
                     && candidate.known_at_millis <= query.known_at_millis
+                    && query.valid_at_millis >= candidate.valid_from_millis
+                    && candidate.valid_until_millis.is_none_or(|until| query.valid_at_millis < until)
             }) {
                 return reject(IneligibilityReason::ConsentRevoked, Some(&revoke.event_id));
             }
@@ -350,15 +352,26 @@ impl EvidenceLedger {
         query: &EvidenceQuery,
     ) -> Option<&'a EvidenceEvent> {
         self.events.iter().find(|candidate| {
+            let temporal_match = candidate.known_at_millis <= query.known_at_millis
+                && query.valid_at_millis >= candidate.valid_from_millis
+                && candidate.valid_until_millis.is_none_or(|until| query.valid_at_millis < until);
+            let scope_match = match candidate.kind {
+                EvidenceEventKind::Correction | EvidenceEventKind::Retraction => {
+                    candidate.authority_scopes.iter().any(|scope| scope == &query.required_authority)
+                        && candidate.rights.allowed_purposes.iter().any(|purpose| purpose == &query.purpose)
+                }
+                // Erasure tombstones are purpose-independent; the caller must
+                // only append them after the external rights/authority verifier
+                // has accepted the erasure receipt.
+                EvidenceEventKind::ErasureTombstone => {
+                    candidate.authority_scopes.iter().any(|scope| scope == "memory-erasure")
+                }
+                _ => false,
+            };
             candidate.sequence > event.sequence
-                && candidate.known_at_millis <= query.known_at_millis
+                && temporal_match
+                && scope_match
                 && candidate.targets.iter().any(|target| target == &event.event_id)
-                && matches!(
-                    candidate.kind,
-                    EvidenceEventKind::Correction
-                        | EvidenceEventKind::Retraction
-                        | EvidenceEventKind::ErasureTombstone
-                )
         })
     }
 }
@@ -369,6 +382,7 @@ pub fn validate_events(events: &[EvidenceEvent]) -> Result<(), String> {
     let mut ids: BTreeMap<&str, &EvidenceEvent> = BTreeMap::new();
     let mut sequences = BTreeSet::new();
     let mut previous_sequence = None;
+    let mut previous_known_at = None;
 
     for (index, event) in events.iter().enumerate() {
         if event.schema_version != SCHEMA_VERSION {
@@ -386,6 +400,10 @@ pub fn validate_events(events: &[EvidenceEvent]) -> Result<(), String> {
             return Err("events must be in strictly increasing sequence order".to_string());
         }
         previous_sequence = Some(event.sequence);
+        if previous_known_at.is_some_and(|previous| event.known_at_millis < previous) {
+            return Err("known_at_millis must be non-decreasing in append order".to_string());
+        }
+        previous_known_at = Some(event.known_at_millis);
 
         validate_scopes(&event.authority_scopes, "authority_scopes")?;
         validate_scopes(&event.rights.allowed_purposes, "allowed_purposes")?;
@@ -487,6 +505,9 @@ pub fn validate_events(events: &[EvidenceEvent]) -> Result<(), String> {
             }
             EvidenceEventKind::ErasureTombstone => {
                 require_control_fields(event)?;
+                if !event.authority_scopes.iter().any(|scope| scope == "memory-erasure") {
+                    return Err(format!("erasure tombstone lacks memory-erasure authority scope: {}", event.event_id));
+                }
                 if event.claim_key.is_some() || event.consent_id.is_some() {
                     return Err(format!("erasure tombstone cannot have claim_key or consent_id: {}", event.event_id));
                 }
@@ -712,6 +733,19 @@ mod tests {
     }
 
     #[test]
+    fn future_validity_correction_does_not_erase_current_past_truth() {
+        let original = claim("claim-1", 1, 10, EvidenceEventKind::Assertion, Vec::new());
+        let mut correction = claim("claim-2", 2, 30, EvidenceEventKind::Correction, vec!["claim-1"]);
+        correction.valid_from_millis = 100;
+        let ledger = EvidenceLedger::new(vec![original, correction]).unwrap();
+        assert!(ledger.evaluate("claim-1", &query(99, 30)).admissible);
+        assert_eq!(
+            ledger.evaluate("claim-1", &query(100, 30)).reason,
+            Some(IneligibilityReason::Superseded)
+        );
+    }
+
+    #[test]
     fn correction_target_must_share_claim_key_and_be_prior() {
         let original = claim("claim-1", 1, 10, EvidenceEventKind::Assertion, Vec::new());
         let mut correction = claim("claim-2", 2, 30, EvidenceEventKind::Correction, vec!["claim-1"]);
@@ -842,6 +876,7 @@ mod tests {
         tombstone.source = None;
         tombstone.payload_digest = None;
         tombstone.observed_at_millis = None;
+        tombstone.authority_scopes = vec!["memory-erasure".to_string()];
         let first = EvidenceLedger::new(vec![original, tombstone]).unwrap();
         assert_eq!(
             first.evaluate("claim-1", &query(20, 30)).reason,
