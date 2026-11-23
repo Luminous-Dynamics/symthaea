@@ -7,8 +7,10 @@
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
 
+#[cfg(test)]
 const AND_COMM_FIXTURE: &str =
     include_str!("../../../../docs/research/PROOF_PLAN_AND_COMM_V1.json");
+#[cfg(test)]
 const MUTATION_FIXTURES: &str =
     include_str!("../../../../docs/research/PROOF_PLAN_MUTATION_FIXTURES_V1.json");
 

@@ -7,6 +7,7 @@ on:
       - "scripts/research/proof_comprehension_oracle.rs"
       - "scripts/research/proof-plan-contract/**"
       - "docs/research/PROOF_PLAN_*.json"
+      - "docs/research/LOCAL_GLOBAL_PAIR_*"
       - "docs/research/PROOF_PLAN_*.md"
       - "docs/research/MATH_PROOF_COMPREHENSION_*.json"
       - "docs/research/MATHLIB_PROOF_COMPREHENSION_PILOT_V1.*"
@@ -68,6 +69,8 @@ jobs:
             docs/research/PROOF_PLAN_AND_COMM_V1.json
             docs/research/PROOF_PLAN_MUTATION_FIXTURES_V1.schema.json
             docs/research/PROOF_PLAN_MUTATION_FIXTURES_V1.json
+            docs/research/LOCAL_GLOBAL_PAIR_V1.schema.json
+            docs/research/LOCAL_GLOBAL_PAIR_SYNTHETIC_V1.json
             docs/research/MATH_PROOF_COMPREHENSION_RECEIPT_V1.schema.json
             docs/research/MATHLIB_PROOF_COMPREHENSION_PILOT_V1.json
             docs/research/MATHLIB_PROOF_COMPREHENSION_PILOT_V1.schema.json
@@ -141,6 +144,16 @@ jobs:
             and ([.cases[] | select(.id == "MUT-LOCAL-GLOBAL-CONTEXT" and .mathematical_disposition == "unknown" and .oracle_status == "not_run")] | length) == 1' \
             docs/research/PROOF_PLAN_MUTATION_FIXTURES_V1.json >/dev/null
 
+          jq -e '.schema_version == "1.0.0"
+            and .candidate.task_class == "synthetic_control_not_model_evaluation"
+            and .candidate.local_stage.verdict == "reject"
+            and .candidate.global_stage.scope_binding == .candidate.local_stage.scope_binding
+            and .evaluator_only.eligibility == "eligible"
+            and .evaluator_only.independently_assessed_warrant == "invalid"
+            and .evaluator_only.global_disposition == "used_directly"' \
+            docs/research/LOCAL_GLOBAL_PAIR_SYNTHETIC_V1.json >/dev/null
+
+          echo "LOCAL_GLOBAL_PAIR_FIXTURE_PASS"
           echo "PROOF_PLAN_FIXTURES_PASS"
           echo "MATH_PROOF_COMPREHENSION_PILOT_FIXTURES_PASS"
           echo "FINITE_TRANSLATION_CASES=67067; ROW_CHECKS=134134"
@@ -154,5 +167,7 @@ jobs:
           set -euo pipefail
           export CARGO_TARGET_DIR="$RUNNER_TEMP/proof-plan-target"
           cargo test --locked --manifest-path scripts/research/proof-plan-contract/Cargo.toml
-          cargo run --locked --manifest-path scripts/research/proof-plan-contract/Cargo.toml -- \
+          cargo run --locked --manifest-path scripts/research/proof-plan-contract/Cargo.toml --bin proof-plan-contract -- \
             docs/research/PROOF_PLAN_AND_COMM_V1.json
+          cargo run --locked --manifest-path scripts/research/proof-plan-contract/Cargo.toml --bin local-global -- \
+            docs/research/LOCAL_GLOBAL_PAIR_SYNTHETIC_V1.json

@@ -7,8 +7,10 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
+#[cfg(test)]
 const SYNTHETIC_FIXTURE: &str =
     include_str!("../../../../docs/research/LOCAL_GLOBAL_PAIR_SYNTHETIC_V1.json");
+#[cfg(test)]
 const SYNTHETIC_SCHEMA: &str =
     include_str!("../../../../docs/research/LOCAL_GLOBAL_PAIR_V1.schema.json");
 
