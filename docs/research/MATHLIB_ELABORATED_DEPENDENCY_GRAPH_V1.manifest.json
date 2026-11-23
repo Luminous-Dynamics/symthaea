@@ -4,17 +4,19 @@
   "execution": {
     "repository": "Luminous-Dynamics/symthaea",
     "branch": "research/math-proof-comprehension-001",
-    "source_head": "2504a533ec972de05973056c3f6645bfb0bd9eb6",
-    "workflow_run_id": 45162506144,
-    "workflow_run_url": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/45162506144",
-    "job_id": 137651174603,
+    "source_head": "66ae219108312c868da42ac77fe468b3f8a880b9",
+    "workflow_run_id": 45194165987,
+    "workflow_run_url": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/45194165987",
+    "job_id": 137760049208,
     "job_name": "Pinned Mathlib elaborated dependency extraction",
     "job_conclusion": "success",
     "artifact_name": "mathlib-elaborated-dependency-graphs",
-    "artifact_id": 14811692104,
-    "artifact_sha256": "67c317889e2a88a0be8351c6b564f7d629218e0ab7489dc20ef63d5dea445b15",
-    "artifact_created_at": "2026-11-23T11:10:31Z",
-    "note": "The sibling finite-reference job in this workflow run failed on stale assertions; the extraction job independently succeeded. Do not infer an overall workflow pass from this job result."
+    "artifact_id": 14827790108,
+    "artifact_sha256": "ddb5abe6a73060c4a6ffd116e8660a84a7fd90dc1ad79fb9aa98212113287b9e",
+    "artifact_created_at": "2026-11-23T14:27:57Z",
+    "note": "Both focused jobs in this exact-head run succeeded: the finite-reference / ProofPlan contract lane and the pinned Mathlib elaborated dependency extraction lane. Broader CI, governance, benchmark, workflow syntax, and showroom workflows were skipped for the draft PR; they are not passes.",
+    "finite_reference_job_id": 137760048256,
+    "finite_reference_job_conclusion": "success"
   },
   "source": {
     "repository": "leanprover-community/mathlib4",

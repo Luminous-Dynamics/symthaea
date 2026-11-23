@@ -358,3 +358,5 @@ The initial seed is source-pinned to Lean 4 core and is explicitly not expert-re
 - [Executable local/global receipt and CIRR contract](LOCAL_GLOBAL_PAIR_V1.schema.json) with a synthetic post-hoc fixture and Rust validator; see [protocol details](PROOF_PLAN_LOCAL_GLOBAL_CONSISTENCY_V1.md).
 
 - [Mathlib elaborated dependency extraction contract](MATHLIB_ELABORATED_DEPENDENCY_GRAPH_V1.schema.json) and [first pinned extraction results](MATHLIB_ELABORATED_DEPENDENCY_GRAPH_V1_RESULTS.md).
+
+- [Mathematical proof-comprehension benchmark matrix](MATH_PROOF_COMPREHENSION_BENCHMARK_MATRIX_V1.md) — current SOTA comparisons, paradigm-shift hypotheses, prospective metrics, controls and execution tiers.

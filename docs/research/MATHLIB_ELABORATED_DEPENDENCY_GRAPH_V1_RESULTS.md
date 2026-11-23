@@ -5,19 +5,20 @@
 ## Execution provenance
 
 - Symthaea branch: research/math-proof-comprehension-001
-- Symthaea commit checked out by extractor job: 2504a533ec972de05973056c3f6645bfb0bd9eb6
-- Workflow run: [#45162506144](https://github.com/Luminous-Dynamics/symthaea/actions/runs/45162506144)
-- Job: Pinned Mathlib elaborated dependency extraction, job ID 137651174603, conclusion **success**
-- Artifact: mathlib-elaborated-dependency-graphs, artifact ID 14811692104
-- GitHub artifact SHA-256: 67c317889e2a88a0be8351c6b564f7d629218e0ab7489dc20ef63d5dea445b15
-- Artifact created: 2026-11-23 11:10:31 UTC
+- Symthaea commit checked out by extractor job: 66ae219108312c868da42ac77fe468b3f8a880b9
+- Workflow run: [#45194165987](https://github.com/Luminous-Dynamics/symthaea/actions/runs/45194165987)
+- Focused finite-reference job: ID 137760048256, conclusion **success**
+- Pinned Mathlib extraction job: ID 137760049208, conclusion **success**
+- Artifact: mathlib-elaborated-dependency-graphs, artifact ID 14827790108
+- GitHub artifact ZIP SHA-256: ddb5abe6a73060c4a6ffd116e8660a84a7fd90dc1ad79fb9aa98212113287b9e
+- Artifact created: 2026-11-23 14:27:57 UTC
 
 Pinned source:
 - Mathlib: leanprover-community/mathlib4@6ebcce37335bcb6bca64596e5d57bb3035648030
 - Lean toolchain: leanprover/lean4:v4.37.0-rc1
 - Lean source revision: 0b77e12952ad39077d80d8bd6b66d601f225c321
 
-The artifact came from a successful extraction job even though the sibling finite-reference job in that same earlier workflow run had two stale test assertions and failed. Do not describe the entire run as green. The finite-reference assertions were corrected on a later branch head; the independent extraction job's success is the evidence recorded here.
+Both focused jobs succeeded on the recorded exact head. Broader CI, PR Governance, Symthaea Benchmark Suite, Workflow Syntax and Showroom Integrity jobs were skipped for this draft PR; they are not passes.
 
 ## Results
 
@@ -61,3 +62,18 @@ Established: the pinned Lean/Mathlib environment emitted machine-readable, prove
 Not established: external TheoremGraph/LeanGraph edge agreement, semantic role correctness, theorem-plan fidelity, human comprehension, delayed transfer, model CIRR, or generality across arbitrary Lean declarations. The four items are a small pilot, not a representative estimate of Mathlib.
 
 Next: compare this edge-role view with Lake's flat used-constant traversal and a pinned LeanGraph/TheoremGraph slice; then add inductive/constructor/recursor calibration tasks and expert-reviewed role labels.
+
+## Elaborated dependencies versus visible source: first differential observations
+
+The four source-pinned declarations were inspected alongside their exact environment-extracted values. These observations concern direct elaborated proof-value references, not mathematical essentiality or complete transitive proof closure.
+
+- Nat.choose_pos: the source visibly has a recursive successor branch, while the compiled theorem value refers to Nat.brecOn and generated helper Nat.choose_pos._f. A source-token parser will not reproduce this compiler/elaborator structure.
+- Set.countable_union: the source says by simp [union_eq_iUnion, and_comm]; the elaborated value contains 32 direct references, including Set.union_eq_iUnion, Set.countable_iUnion_iff._simp_1, and a generated private simplifier helper. and_comm does not appear in the direct reference set. This demonstrates that tactic text and the final proof term are different observation layers; it does not recover the exact internal rewrite trace.
+- Multiset.map_id: proof-value references expose Quot.inductionOn, Setoid.r, List.isSetoid, congr_arg, Quot.mk, and List.map_id, revealing quotient/representative machinery beyond the short source expression.
+- Finset.card_map: Function.Embedding and Finset.map occur in the type side; Multiset.card_map occurs in the proof-value side. This separates the injectivity-bearing interface from the supporting cardinality theorem.
+
+TheoremGraph/LeanGraph report six formal edge categories: proof, sig, def, field, extends, and docref. Our proof_dependency and type_dependency relations correspond conceptually to proof and sig for this theorem-only subset; the pilot serializer does not yet cover the other categories. The correct next step is interoperability and edge-by-edge differential analysis, not a claim to have built a competing corpus-scale extractor.
+
+## Reproducibility and limitation
+
+The four extracted JSON files were byte-identical across the earlier and latest successful extraction artifacts; each per-file SHA-256 remains unchanged. The latest artifact ZIP digest and run identity are recorded in the manifest. External TheoremGraph/LeanGraph edge-level comparison and independent mathematical-role adjudication remain pending.

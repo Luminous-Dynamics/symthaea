@@ -416,3 +416,13 @@ Prospective semantic gate targets:
 - Report theorem-sandwich obligations and successor-test behavior separately, with false alarms and task-family confidence intervals.
 
 These targets remain prospective. LPBench and T² must be run in their own harnesses and source pins; cross-paper headline scores are not directly comparable.
+
+## 14. Updated differentiation and benchmark targets (2026-11-23)
+
+A current benchmark matrix now lives in MATH_PROOF_COMPREHENSION_BENCHMARK_MATRIX_V1.md. It integrates LPBench's 118 research-level tasks and hidden theorem sandwiches; T² successor tests; LeanGraphSearch's high-recall and complete-route retrieval; FormalMATH's semantically validated proving tasks; TheoremGraph/LeanGraph; LeanLean; ProofGrid; and expert-rated ProofBench.
+
+The competitive implication is sharper: do not attempt to out-TheoremGraph TheoremGraph on corpus-scale graph extraction, or to out-LeanGraphSearch LeanGraphSearch at retrieval without a matched benchmark. The novel hypothesis is that a typed formal graph plus an evidence-carrying proof plan, controlled semantic interventions, local/global receipt, and blind delayed human transfer can measure capabilities not captured by retrieval recall, proof completion, successor compilation or proof compression alone.
+
+The first Lean environment extraction has run on four source-pinned Mathlib declarations: 24 type references, 60 proof-value references, 64 unique merged dependencies, 84 role-labelled direct edges, and zero unresolved names. Exact type/value union reconciliation passed for all four declarations. This is a small pilot result, not an external graph comparison or expert-reviewed edge-quality score.
+
+Prospective targets: 100% identity match; ≥95% precision and ≥90% recall for expert-labelled dependencies; ≥80% expert plan acceptance; ≥90% counterfactual disposition accuracy; CIRR ≤5% with a nonzero denominator; +10 percentage points delayed human transfer; and ≥25% explanation compression at matched comprehension. These remain targets, not achievements.
