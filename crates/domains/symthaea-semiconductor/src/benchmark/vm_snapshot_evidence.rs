@@ -21,10 +21,8 @@ use super::label_consumption_guard::{
 };
 use super::process_event_graph::{ClockBasisV1, MetrologyLabelV1, PredictionInformationCutoffV1};
 
-pub const VM_SNAPSHOT_INPUT_SCHEMA_V1: &str =
-    "luminous.semi-bench.vm-snapshot-input.v1";
-pub const VM_SNAPSHOT_MANIFEST_SCHEMA_V1: &str =
-    "luminous.semi-bench.vm-snapshot-manifest.v1";
+pub const VM_SNAPSHOT_INPUT_SCHEMA_V1: &str = "luminous.semi-bench.vm-snapshot-input.v1";
+pub const VM_SNAPSHOT_MANIFEST_SCHEMA_V1: &str = "luminous.semi-bench.vm-snapshot-manifest.v1";
 pub const VM_SNAPSHOT_REQUALIFICATION_SCHEMA_V1: &str =
     "luminous.semi-bench.vm-snapshot-requalification.v1";
 
@@ -229,17 +227,28 @@ fn k0_projection_digest(
 
 fn validate_input_shape(input: &VmSnapshotInputV1) -> Result<(), VmSnapshotEvidenceErrorV1> {
     if input.schema != VM_SNAPSHOT_INPUT_SCHEMA_V1 {
-        return Err(VmSnapshotEvidenceErrorV1("input schema is unsupported".into()));
+        return Err(VmSnapshotEvidenceErrorV1(
+            "input schema is unsupported".into(),
+        ));
     }
     require_text(&input.input_id, "input.input_id")?;
     require_text(&input.snapshot_id, "input.snapshot_id")?;
     require_text(&input.cutoff.cutoff_id, "input.cutoff.cutoff_id")?;
-    require_text(&input.cutoff.clock_domain_id, "input.cutoff.clock_domain_id")?;
+    require_text(
+        &input.cutoff.clock_domain_id,
+        "input.cutoff.clock_domain_id",
+    )?;
 
     for (name, value) in [
-        ("model_artifact_sha256", input.model_artifact_sha256.as_str()),
+        (
+            "model_artifact_sha256",
+            input.model_artifact_sha256.as_str(),
+        ),
         ("model_config_sha256", input.model_config_sha256.as_str()),
-        ("split_manifest_sha256", input.split_manifest_sha256.as_str()),
+        (
+            "split_manifest_sha256",
+            input.split_manifest_sha256.as_str(),
+        ),
         ("preprocessing_sha256", input.preprocessing_sha256.as_str()),
     ] {
         if !valid_sha256(value) {
@@ -317,9 +326,7 @@ fn label_measurement_time_micros(
     )
 }
 
-fn validate_label_identity(
-    label: &MetrologyLabelV1,
-) -> Result<(), VmSnapshotEvidenceErrorV1> {
+fn validate_label_identity(label: &MetrologyLabelV1) -> Result<(), VmSnapshotEvidenceErrorV1> {
     require_text(&label.label_id, "label.label_id")?;
     require_text(&label.measurement_event_id, "label.measurement_event_id")?;
     require_text(&label.subject_id, "label.subject_id")?;
@@ -628,13 +635,12 @@ mod tests {
         CalibrationChangeEventV1, CalibrationChangeKindV1, CalibrationChangeScopeV1,
         CalibrationChangeTargetV1, CalibrationEventFrontierV1, CalibrationEventInventoryStateV1,
         CalibrationEventOrderingStateV1, CalibrationEventQualificationV1,
-        CalibrationOperatingRangeV1, MeasurementTimeBoundsV1,
-        seal_calibration_event_inventory_v1,
+        CalibrationOperatingRangeV1, MeasurementTimeBoundsV1, seal_calibration_event_inventory_v1,
     };
     use crate::benchmark::metrology_qualification_gate::{
-        CALIBRATION_CERTIFICATE_SCHEMA_V1, MEASUREMENT_EVIDENCE_SCHEMA_V1,
-        QUALIFICATION_POLICY_SCHEMA_V1, CalibrationCertificateV1, MeasurementEvidenceV1,
-        MeasurementQualificationPolicyV1, MeasurementUncertaintyComponentV1,
+        CALIBRATION_CERTIFICATE_SCHEMA_V1, CalibrationCertificateV1,
+        MEASUREMENT_EVIDENCE_SCHEMA_V1, MeasurementEvidenceV1, MeasurementQualificationPolicyV1,
+        MeasurementUncertaintyComponentV1, QUALIFICATION_POLICY_SCHEMA_V1,
         TraceabilityDeclarationV1, UncertaintyComponentKindV1, qualify_measurement_evidence_v1,
     };
     use crate::benchmark::process_event_graph::MetrologyLabelStatusV1;
@@ -702,7 +708,10 @@ mod tests {
         }
     }
 
-    fn calibration_input(event_id: &str, event_source_digest: &str) -> CalibrationRequalificationInputV1 {
+    fn calibration_input(
+        event_id: &str,
+        event_source_digest: &str,
+    ) -> CalibrationRequalificationInputV1 {
         let measured = measurement(event_id, event_source_digest);
         let calibrated = certificate();
         let qualification_policy = policy();
@@ -940,10 +949,8 @@ mod tests {
     fn source_local_naive_clock_is_not_compared_to_unix_calibration_time() {
         let mut input = snapshot_input();
         input.cutoff.clock_basis = ClockBasisV1::SourceLocalNaive;
-        input.consumed_labels[0].label.measurement_clock_basis =
-            ClockBasisV1::SourceLocalNaive;
-        input.consumed_labels[0].label.availability_clock_basis =
-            ClockBasisV1::SourceLocalNaive;
+        input.consumed_labels[0].label.measurement_clock_basis = ClockBasisV1::SourceLocalNaive;
+        input.consumed_labels[0].label.availability_clock_basis = ClockBasisV1::SourceLocalNaive;
         input.cutoff.cutoff_time = "2028-12-09T18:40:00".into();
         input.consumed_labels[0].label.measurement_time = "2028-08-16T00:53:20".into();
         input.consumed_labels[0].label.available_at = "2028-08-16T00:58:20".into();
