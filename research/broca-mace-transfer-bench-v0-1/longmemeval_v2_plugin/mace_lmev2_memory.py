@@ -20,7 +20,7 @@ import tempfile
 import threading
 from typing import Any
 
-from memory_modules.memory import Memory, MemoryConfig, MemoryContextItem, register_memory, require
+from memory_modules.memory import Memory, MemoryContextItem, register_memory, require
 
 
 _ALLOWED_PARAMS = {
