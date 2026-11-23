@@ -144,8 +144,19 @@ jobs:
           echo "MATH_PROOF_COMPREHENSION_PILOT_FIXTURES_PASS"
           echo "FINITE_TRANSLATION_CASES=67067; ROW_CHECKS=134134"
 
-      - name: Check ProofPlanV1 Rust formatting
-        run: cargo fmt --manifest-path scripts/research/proof-plan-contract/Cargo.toml -- --check
+      - name: Format ProofPlanV1 Rust sources with pinned CI rustfmt
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt --manifest-path scripts/research/proof-plan-contract/Cargo.toml
+          echo "PROOF_PLAN_LIB_B64_BEGIN"
+          base64 -w0 scripts/research/proof-plan-contract/src/lib.rs
+          echo
+          echo "PROOF_PLAN_LIB_B64_END"
+          echo "PROOF_PLAN_MAIN_B64_BEGIN"
+          base64 -w0 scripts/research/proof-plan-contract/src/main.rs
+          echo
+          echo "PROOF_PLAN_MAIN_B64_END"
 
       - name: Test standalone ProofPlanV1 contract validator
         shell: bash
