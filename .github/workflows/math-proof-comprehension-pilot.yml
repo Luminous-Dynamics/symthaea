@@ -73,8 +73,6 @@ jobs:
             docs/research/PROOF_PLAN_MUTATION_FIXTURES_V1.json
             docs/research/LOCAL_GLOBAL_PAIR_V1.schema.json
             docs/research/LOCAL_GLOBAL_PAIR_SYNTHETIC_V1.json
-          cargo run --manifest-path scripts/research/proof-plan-contract/Cargo.toml --bin theorem-sandwich -- \\
-            docs/research/MATH_PROOF_COMPREHENSION_THEOREM_SANDWICH_V1.json
             docs/research/MATH_PROOF_COMPREHENSION_THEOREM_SANDWICH_V1.schema.json
             docs/research/MATH_PROOF_COMPREHENSION_THEOREM_SANDWICH_V1.json
             docs/research/MATH_PROOF_COMPREHENSION_RECEIPT_V1.schema.json
@@ -190,6 +188,8 @@ jobs:
             docs/research/PROOF_PLAN_AND_COMM_V1.json
           cargo run --manifest-path scripts/research/proof-plan-contract/Cargo.toml --bin local-global -- \
             docs/research/LOCAL_GLOBAL_PAIR_SYNTHETIC_V1.json
+          cargo run --manifest-path scripts/research/proof-plan-contract/Cargo.toml --bin theorem-sandwich -- \
+            docs/research/MATH_PROOF_COMPREHENSION_THEOREM_SANDWICH_V1.json
 
       - name: Export generated Cargo.lock for dependency pinning
         if: success()
