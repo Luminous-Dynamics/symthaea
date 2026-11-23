@@ -226,12 +226,20 @@ pub fn score_pitch_tracks(
             let next_estimated_delta = estimated
                 .frames
                 .get(est_index + 1)
-                .map(|frame| frame.source_timestamp_ns.abs_diff(ref_frame.source_timestamp_ns))
+                .map(|frame| {
+                    frame
+                        .source_timestamp_ns
+                        .abs_diff(ref_frame.source_timestamp_ns)
+                })
                 .filter(|delta| *delta <= config.timestamp_tolerance_ns);
             let next_reference_delta = reference
                 .frames
                 .get(ref_index + 1)
-                .map(|frame| frame.source_timestamp_ns.abs_diff(est_frame.source_timestamp_ns))
+                .map(|frame| {
+                    frame
+                        .source_timestamp_ns
+                        .abs_diff(est_frame.source_timestamp_ns)
+                })
                 .filter(|delta| *delta <= config.timestamp_tolerance_ns);
 
             if next_estimated_delta.is_some_and(|delta| delta < timestamp_delta)
@@ -588,12 +596,8 @@ mod tests {
         estimated.frames[1].source_timestamp_ns = 10_000_000;
         estimated.frames[1].frame_index = 1;
 
-        let metrics = score_pitch_tracks(
-            &reference,
-            &estimated,
-            PitchTrackScoreConfigV1::default(),
-        )
-        .unwrap();
+        let metrics =
+            score_pitch_tracks(&reference, &estimated, PitchTrackScoreConfigV1::default()).unwrap();
 
         assert_eq!(metrics.aligned_frame_count, 1);
         assert_eq!(metrics.unmatched_estimated_frame_count, 1);
