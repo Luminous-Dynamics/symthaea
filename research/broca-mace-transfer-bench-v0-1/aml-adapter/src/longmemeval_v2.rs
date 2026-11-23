@@ -229,7 +229,7 @@ pub struct LongMemEvalV2EvidenceChunkV1 {
     pub state_window: Vec<LongMemEvalV2StateV1>,
     pub screenshot_references: Vec<String>,
     pub chunk_sha256: String,
-    evidence_text: String,
+    pub evidence_text: String,
 }
 
 impl LongMemEvalV2EvidenceChunkV1 {
