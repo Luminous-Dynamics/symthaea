@@ -795,6 +795,57 @@ mod tests {
 
     #[cfg(feature = "voice-stt")]
     #[test]
+    fn prosody_frames_preserve_absolute_source_offset_and_segment() {
+        let mut perception = AudioPerception::new(AudioPerceptionConfig::default()).unwrap();
+        let samples = sine_wave(16_000, 200.0, 0.5);
+        let source_start = 48_000_u64;
+        let segment_index = 7_u64;
+        let source_end = source_start + samples.len() as u64;
+
+        let result = perception
+            .process_samples_at_source_position(
+                &samples,
+                16_000,
+                source_start,
+                segment_index,
+            )
+            .unwrap();
+        let prosody = result.prosody.expect("prosody is enabled by default");
+        assert_eq!(prosody.source_start_sample, source_start);
+        assert_eq!(prosody.source_end_sample, source_end);
+        assert_eq!(prosody.stream_segment_index, segment_index);
+        assert!(!prosody.frames.is_empty());
+        assert!(prosody.frames.iter().all(|frame| {
+            frame.stream_segment_index == segment_index
+                && frame.source_start_sample >= source_start
+                && frame.source_end_sample <= source_end
+                && frame.source_end_sample > frame.source_start_sample
+        }));
+    }
+
+    #[cfg(feature = "voice-stt")]
+    #[test]
+    fn non_finite_pcm_and_source_index_overflow_are_rejected() {
+        let mut perception = AudioPerception::new(AudioPerceptionConfig::default()).unwrap();
+        assert!(
+            perception
+                .process_samples_at_source_position(
+                    &[0.0, f32::NAN, 0.0],
+                    16_000,
+                    0,
+                    0,
+                )
+                .is_err()
+        );
+        assert!(
+            perception
+                .process_samples_at_source_position(&[0.0], 16_000, u64::MAX, 0)
+                .is_err()
+        );
+    }
+
+    #[cfg(feature = "voice-stt")]
+    #[test]
     fn rate_aware_pcm_entry_point_rejects_unresampled_audio() {
         let mut perception = AudioPerception::new(AudioPerceptionConfig::default()).unwrap();
         assert!(
@@ -810,12 +861,28 @@ mod tests {
             schema_version: ACOUSTIC_PROSODY_SCHEMA_VERSION,
             extractor_id: "test-extractor",
             source_sample_rate: 16_000,
+            source_start_sample: 10_000,
+            source_end_sample: 10_400,
+            stream_segment_index: 2,
+            extractor_config: ProsodyExtractorConfigV1 {
+                analysis_sample_rate_hz: 10_000,
+                window_seconds: 0.025,
+                frame_rate_hz: 200.0,
+                lpc_order: 16,
+                preemphasis: 0.97,
+                f0_min_hz: 60.0,
+                f0_max_hz: 400.0,
+                voicing_threshold: 0.3,
+                silence_relative_energy: 0.02,
+            },
             frame_rate_hz: 200.0,
             energy_normalization: ProsodyEnergyNormalization::UtterancePeak,
             frames: vec![AcousticProsodyFrameV1 {
+                stream_segment_index: 2,
                 frame_index: 0,
-                source_start_sample: 0,
-                source_end_sample: 400,
+                status: AcousticProsodyFrameStatusV1::Voiced,
+                source_start_sample: 10_000,
+                source_end_sample: 10_400,
                 time_seconds: 0.0,
                 f0_hz: Some(200.0),
                 periodicity: 0.9,
