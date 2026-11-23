@@ -786,6 +786,64 @@ mod tests {
     }
 
     #[test]
+    fn known_auxiliary_records_reveal_one_unknown_in_per_client_batch() {
+        let population = records();
+        let auxiliary = population[..3].to_vec();
+        let report = evaluate_vm_known_auxiliary_batch_inversion_v1(
+            &population,
+            &auxiliary,
+            &[0.15, -0.2, 0.3],
+            0.1,
+            &config(UpdateVisibilityV1::PerClientBatch),
+        )
+        .unwrap();
+
+        assert_eq!(report.unknown_record_count, 1);
+        assert_eq!(report.reconstructed_record_count, 1);
+        assert_eq!(report.reconstructed_record_ids_for_evaluation, vec!["wafer-004"]);
+        assert_eq!(report.mean_feature_rmse, Some(0.0));
+        assert_eq!(report.label_inference_accuracy, Some(1.0));
+        assert!(!report.formal_differential_privacy_claim);
+    }
+
+    #[test]
+    fn known_auxiliary_records_can_reveal_one_unknown_from_secure_aggregate() {
+        let population = records();
+        let auxiliary = population[..3].to_vec();
+        let report = evaluate_vm_known_auxiliary_batch_inversion_v1(
+            &population,
+            &auxiliary,
+            &[0.15, -0.2, 0.3],
+            0.1,
+            &config(UpdateVisibilityV1::SecureAggregateOnly),
+        )
+        .unwrap();
+
+        assert_eq!(report.unknown_record_count, 1);
+        assert_eq!(report.reconstructed_record_count, 1);
+        assert_eq!(report.reconstructed_record_ids_for_evaluation, vec!["wafer-004"]);
+        assert_eq!(report.mean_feature_rmse, Some(0.0));
+        assert_eq!(report.label_inference_accuracy, Some(1.0));
+    }
+
+    #[test]
+    fn auxiliary_attack_requires_exact_membership_and_values() {
+        let population = records();
+        let mut forged_auxiliary = population[..3].to_vec();
+        forged_auxiliary[0].features[0] += 0.01;
+        assert!(
+            evaluate_vm_known_auxiliary_batch_inversion_v1(
+                &population,
+                &forged_auxiliary,
+                &[0.15, -0.2, 0.3],
+                0.1,
+                &config(UpdateVisibilityV1::SecureAggregateOnly),
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
     fn duplicate_record_identity_and_non_finite_features_are_rejected() {
         let mut duplicated = records();
         duplicated[1].record_id = duplicated[0].record_id.clone();
