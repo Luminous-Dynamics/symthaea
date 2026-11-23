@@ -231,9 +231,10 @@ fn matrix_rank(rows: &[[f64; DRIFT_IDENTIFIABILITY_DIMENSIONS_V1]]) -> usize {
 
         matrix.swap(pivot_row, pivot);
         let pivot_value = matrix[pivot_row][column];
-        for entry in column..DRIFT_IDENTIFIABILITY_DIMENSIONS_V1 {
-            matrix[pivot_row][entry] /= pivot_value;
+        for value in &mut matrix[pivot_row][column..] {
+            *value /= pivot_value;
         }
+        let normalized_pivot_tail = matrix[pivot_row][column..].to_vec();
 
         for row in 0..row_count {
             if row == pivot_row {
@@ -243,8 +244,11 @@ fn matrix_rank(rows: &[[f64; DRIFT_IDENTIFIABILITY_DIMENSIONS_V1]]) -> usize {
             if factor.abs() <= RANK_TOLERANCE_V1 {
                 continue;
             }
-            for entry in column..DRIFT_IDENTIFIABILITY_DIMENSIONS_V1 {
-                matrix[row][entry] -= factor * matrix[pivot_row][entry];
+            for (value, pivot_value) in matrix[row][column..]
+                .iter_mut()
+                .zip(&normalized_pivot_tail)
+            {
+                *value -= factor * pivot_value;
             }
         }
         pivot_row += 1;
