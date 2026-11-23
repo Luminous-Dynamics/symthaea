@@ -485,7 +485,7 @@ fn manifest_receipt_sha256(
     source_code_sha256: &str,
     fixture_sha256: &str,
     schema_sha256: &str,
-    source_revision: Option<&str>,
+    source_revision: &str,
 ) -> String {
     let receipt_payload = serde_json::to_vec(&json!({
         "schema_version": SCHEMA_VERSION,
@@ -972,16 +972,13 @@ fn run() -> Result<(), String> {
         "../../../../../data/schemas/mace_candidate_receipt_v1.schema.json"
     ));
     let schema_sha256 = hex_digest(schema_bundle_hasher.finalize().as_slice());
-    let source_revision = env::var("MACE_SOURCE_REVISION").ok();
-    if source_revision
-        .as_deref()
-        .is_some_and(|revision| !valid_git_revision(revision))
-    {
+    let source_revision = env::var("MACE_SOURCE_REVISION")
+        .map_err(|_| "MACE_SOURCE_REVISION is required and must be the exact checked-out Git SHA".to_string())?;
+    if !valid_git_revision(&source_revision) {
         return Err("MACE_SOURCE_REVISION must be a 40- or 64-character lowercase Git SHA".to_string());
     }
     let run_identity = format!(
-        "{clusters}:{public_seed}:{SCHEMA_VERSION}:{source_code_sha256}:{fixture_sha256}:{schema_sha256}:{}",
-        source_revision.as_deref().unwrap_or("unspecified")
+        "{clusters}:{public_seed}:{SCHEMA_VERSION}:{source_code_sha256}:{fixture_sha256}:{schema_sha256}:{source_revision}"
     );
     let run_id = format!(
         "mace-counterfactual-{}-{}",
@@ -1045,7 +1042,7 @@ fn run() -> Result<(), String> {
             &source_code_sha256,
             &fixture_sha256,
             &schema_sha256,
-            source_revision.as_deref(),
+            source_revision.as_str(),
         );
         evaluator_records.push(json!({
             "schema_version": SCHEMA_VERSION,
