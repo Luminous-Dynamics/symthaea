@@ -111,11 +111,15 @@ impl PinnedEd25519QualificationVerifierV1 {
     pub fn from_pinned_profile(
         profile: &QualificationTrustProfileV1,
         expected_profile_sha256: &str,
+        minimum_profile_version: u64,
     ) -> Result<Self, EvidenceQualificationRejectV1> {
-        if !valid_sha256(expected_profile_sha256) {
+        if !valid_sha256(expected_profile_sha256) || minimum_profile_version == 0 {
             return Err(EvidenceQualificationRejectV1::TrustProfileInvalid);
         }
         let actual = profile.profile_sha256()?;
+        if profile.profile_version < minimum_profile_version {
+            return Err(EvidenceQualificationRejectV1::TrustProfileVersionRollback);
+        }
         if actual != expected_profile_sha256 {
             return Err(EvidenceQualificationRejectV1::TrustProfileDigestMismatch);
         }
@@ -292,7 +296,7 @@ mod tests {
         let profile = profile_with_key(&signer, QualificationKeyStatusV1::Active, 10, 1_000);
         let pin = profile.profile_sha256().expect("profile digest");
         let verifier = PinnedEd25519QualificationVerifierV1::from_pinned_profile(
-            &profile, &pin,
+            &profile, &pin, profile.profile_version,
         ).expect("pinned trust");
         let payload = "a".repeat(64);
         let signature = signed_payload(&signer, &payload);
@@ -307,9 +311,24 @@ mod tests {
         let profile = profile_with_key(&signer, QualificationKeyStatusV1::Active, 10, 1_000);
         assert_eq!(
             PinnedEd25519QualificationVerifierV1::from_pinned_profile(
-                &profile, &"0".repeat(64),
+                &profile, &"0".repeat(64), profile.profile_version,
             ).err(),
             Some(EvidenceQualificationRejectV1::TrustProfileDigestMismatch),
+        );
+    }
+
+    #[test]
+    fn older_but_correctly_pinned_profile_is_rejected_below_external_version_floor() {
+        let signer = signing_key(17);
+        let profile = profile_with_key(&signer, QualificationKeyStatusV1::Active, 10, 1_000);
+        let pin = profile.profile_sha256().expect("profile digest");
+        assert_eq!(
+            PinnedEd25519QualificationVerifierV1::from_pinned_profile(
+                &profile,
+                &pin,
+                profile.profile_version + 1,
+            ).err(),
+            Some(EvidenceQualificationRejectV1::TrustProfileVersionRollback),
         );
     }
 
