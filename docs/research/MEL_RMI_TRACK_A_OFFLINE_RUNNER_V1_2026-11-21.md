@@ -152,3 +152,12 @@ It would **not** establish that:
 7. Only then run randomized, ethically approved human reciprocal interaction under #10088 and agency/consent checks under #11319.
 
 No synthetic result should be represented as a Melothaea result.
+
+
+## Immutable policy identity v2 (23 November 2026)
+
+RMI v2 now binds a content-addressed immutable policy identity separately from the mutable per-trial snapshot. Restored control, treatment, replay and reversed-order instances must match the exact identity receipt—not merely the policy ID/version strings—before any action is invoked. The evaluator also revalidates identity immediately after every agent and partner response, including replay and reversed-order probes, so an adapter cannot swap its checkpoint/configuration during `respond`. Reciprocal reports bind both agent and partner identities.
+
+Built-in synthetic controls identify a rule descriptor only; they do not claim model weights or an executable digest. Production adapters must supply actual checkpoint, tokenizer/grammar (where relevant), adapter, configuration, runtime and backend identities. The receipts are digest-linked, not signed/authenticated; compose DSSE/in-toto signer and execution evidence through #13254.
+
+See [MEL RMI immutable policy identity v2](MEL_RMI_IMMUTABLE_POLICY_IDENTITY_V2_2026-11-23.md) and the [competitive frontier refresh](MEL_MUSIC_COMPETITIVE_FRONTIER_2026-11-23.md).

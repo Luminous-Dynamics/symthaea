@@ -1,0 +1,121 @@
+name: MUSE RMI immutable identity qualification
+
+on:
+  push:
+    branches:
+      - research/rmi-immutable-policy-identity-v1-20261123
+    paths:
+      - "crates/domains/symthaea-muse/src/rmi_benchmark.rs"
+      - "crates/domains/symthaea-muse/src/rmi_track_a_runner.rs"
+      - "docs/research/MEL_RMI_IMMUTABLE_POLICY_IDENTITY_V2_2026-11-23.md"
+      - ".github/workflows/muse-rmi-immutable-identity-qualification.yml"
+  pull_request:
+    branches:
+      - research/rmi-bench-track-a-runner-20261121
+    paths:
+      - "crates/domains/symthaea-muse/src/rmi_benchmark.rs"
+      - "crates/domains/symthaea-muse/src/rmi_track_a_runner.rs"
+      - "docs/research/MEL_RMI_IMMUTABLE_POLICY_IDENTITY_V2_2026-11-23.md"
+      - ".github/workflows/muse-rmi-immutable-identity-qualification.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Exact-head immutable identity and RMI replay
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout exact tested PR head or pushed commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+          printf 'tested_head=%s\n' "$actual"
+
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Check package formatting
+        run: cargo +1.96.0 fmt --manifest-path crates/domains/symthaea-muse/Cargo.toml --check
+
+      - name: Verify committed lock and workspace resolution
+        shell: bash
+        run: |
+          set -euo pipefail
+          git ls-files --error-unmatch Cargo.lock > /dev/null
+          cargo +1.96.0 metadata --locked --no-deps --format-version 1 > "$RUNNER_TEMP/muse-metadata.json"
+
+      - name: Run RMI immutable identity and counterfactual tests
+        run: cargo +1.96.0 test --locked -p symthaea-muse --lib rmi_benchmark::tests
+
+      - name: Run Track A synthetic runner tests
+        run: cargo +1.96.0 test --locked -p symthaea-muse --lib rmi_track_a_runner::tests
+
+      - name: Run fresh-process replay integration test
+        run: cargo +1.96.0 test --locked -p symthaea-muse --test rmi_track_a_replay
+
+      - name: Warnings-denied Clippy
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 clippy --locked --no-deps -p symthaea-muse --lib --message-format=json > "$RUNNER_TEMP/muse-clippy.jsonl"
+          jq -s '
+            [
+              .[]
+              | select(.reason == "compiler-message")
+              | .message
+              | select(.level == "warning" or .level == "error")
+              | select(any(.spans[]?; (.file_name | endswith("rmi_benchmark.rs") or endswith("rmi_track_a_runner.rs"))))
+              | {level, message, code: .code.code, spans: [.spans[] | {file_name, line_start, column_start, line_end, column_end}]}
+            ]
+          ' "$RUNNER_TEMP/muse-clippy.jsonl" > "$RUNNER_TEMP/rmi-target-clippy-diagnostics.json"
+          cat "$RUNNER_TEMP/rmi-target-clippy-diagnostics.json"
+          test "$(jq 'length' "$RUNNER_TEMP/rmi-target-clippy-diagnostics.json")" -eq 0
+
+      - name: Execute v2 Track A suite through the real Cargo package
+        shell: bash
+        run: |
+          set -euo pipefail
+          report="$RUNNER_TEMP/mel-rmi-track-a-v2.json"
+          cargo +1.96.0 run --locked -p symthaea-muse --bin rmi_track_a -- 8 42 "$report"
+          jq -e '.payload.manifest.schema_version == 2 and .payload.manifest.runner_version == "rmi-track-a-offline-runner-v2" and .payload.summary.synthetic_fixture_expectations_satisfied == true and .payload.summary.evaluator_errors == 0 and (.payload.trials | length) == 32 and (.payload.trials[0].synthetic_contingent_agent.Ok.payload.policy_immutable_identity.payload_sha256 | length) == 64' "$report" > /dev/null
+
+      - name: Assemble exact-head evidence
+        if: always()
+        shell: bash
+        run: |
+          set -uo pipefail
+          evidence="$RUNNER_TEMP/muse-rmi-immutable-identity-evidence"
+          mkdir -p "$evidence"
+          printf 'tested_head=%s\n' "$(git rev-parse HEAD)" > "$evidence/source-identity.txt"
+          rustc +1.96.0 --version > "$evidence/rustc-version.txt" 2>&1 || true
+          cargo +1.96.0 --version > "$evidence/cargo-version.txt" 2>&1 || true
+          sha256sum Cargo.lock > "$evidence/cargo-lock.sha256" 2>&1 || true
+          cp crates/domains/symthaea-muse/src/rmi_benchmark.rs "$evidence/"
+          cp crates/domains/symthaea-muse/src/rmi_track_a_runner.rs "$evidence/"
+          cp docs/research/MEL_RMI_IMMUTABLE_POLICY_IDENTITY_V2_2026-11-23.md "$evidence/"
+          if [[ -f "$RUNNER_TEMP/mel-rmi-track-a-v2.json" ]]; then
+            cp "$RUNNER_TEMP/mel-rmi-track-a-v2.json" "$evidence/"
+          fi
+          (cd "$evidence" && find . -maxdepth 1 -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)
+
+      - name: Upload exact-head evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: muse-rmi-immutable-identity-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/muse-rmi-immutable-identity-evidence/
+          if-no-files-found: error
+          retention-days: 90

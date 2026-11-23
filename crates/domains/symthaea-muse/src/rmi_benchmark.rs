@@ -14,12 +14,12 @@
 //! does not receive the intervention label. Exact input/output records are
 //! digested for deterministic replay.
 
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use sha2::{Digest, Sha256};
 use std::fmt::Write as FmtWrite;
 
 /// Wire/schema version for synthetic RMI trial and result records.
-pub const RMI_BENCH_SCHEMA_VERSION: u32 = 1;
+pub const RMI_BENCH_SCHEMA_VERSION: u32 = 2;
 
 /// Which musical dimension is changed by the partner-side intervention.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -71,7 +71,11 @@ pub struct RmiMusicalFeaturesV1 {
 impl RmiMusicalFeaturesV1 {
     fn validation_issues(&self, field_prefix: &str) -> Vec<RmiValidationIssueV1> {
         let mut issues = Vec::new();
-        if self.motif_intervals.iter().any(|value| !(-24..=24).contains(value)) {
+        if self
+            .motif_intervals
+            .iter()
+            .any(|value| !(-24..=24).contains(value))
+        {
             issues.push(RmiValidationIssueV1::MotifIntervalOutOfRange {
                 field: field_prefix.to_string(),
             });
@@ -180,8 +184,9 @@ pub fn validate_rmi_intervention_pair(
     }
     let history_bytes = serde_json::to_vec(&pair.pre_intervention_history);
     match history_bytes {
-        Ok(bytes) if is_lowercase_sha256(&pair.pre_intervention_state_sha256)
-            && sha256_hex(&bytes) == pair.pre_intervention_state_sha256 => {}
+        Ok(bytes)
+            if is_lowercase_sha256(&pair.pre_intervention_state_sha256)
+                && sha256_hex(&bytes) == pair.pre_intervention_state_sha256 => {}
         _ => issues.push(RmiValidationIssueV1::InvalidPreStateDigest),
     }
     for event in &pair.pre_intervention_history {
@@ -229,6 +234,175 @@ pub fn validate_rmi_intervention_pair(
     }
 }
 
+/// Assurance category for the immutable policy/runtime identity supplied to RMI.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RmiPolicyIdentityKindV1 {
+    /// Synthetic oracle only: the artifact digest identifies a declared rule
+    /// descriptor, not the Rust source or a learned model checkpoint.
+    SyntheticRuleFixture,
+    /// Learned policy whose exact model/checkpoint bytes are content-addressed.
+    ContentAddressedModel,
+    /// Compiled policy whose exact executable or bundle is content-addressed.
+    CompiledPolicyArtifact,
+    /// Hosted policy with an immutable deployment/configuration identity.
+    ExternalHostedService,
+}
+
+/// Immutable implementation identity, deliberately separate from mutable
+/// per-episode memory. The identity payload is content-addressed but not signed.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RmiImmutablePolicyIdentityPayloadV1 {
+    pub policy_id: String,
+    pub policy_version: String,
+    pub identity_kind: RmiPolicyIdentityKindV1,
+    /// Checkpoint, executable bundle, deployment artifact, or synthetic rule descriptor.
+    pub artifact_sha256: String,
+    pub weights_sha256: Option<String>,
+    pub tokenizer_sha256: Option<String>,
+    pub grammar_sha256: Option<String>,
+    pub adapter_sha256: String,
+    pub configuration_sha256: String,
+    pub runtime_sha256: String,
+    pub backend_id: String,
+    pub stochasticity_contract: String,
+    pub seed_authority: String,
+    pub source_references: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RmiImmutablePolicyIdentityV1 {
+    pub payload: RmiImmutablePolicyIdentityPayloadV1,
+    pub payload_sha256: String,
+}
+
+impl RmiImmutablePolicyIdentityV1 {
+    pub fn from_payload(payload: RmiImmutablePolicyIdentityPayloadV1) -> Result<Self, String> {
+        validate_immutable_policy_identity_payload_v1(&payload)?;
+        let bytes = serde_json::to_vec(&payload).map_err(|error| error.to_string())?;
+        Ok(Self {
+            payload,
+            payload_sha256: sha256_hex(&bytes),
+        })
+    }
+
+    /// Recompute the identity digest and verify the labels match the policy.
+    pub fn validate_for(&self, policy_id: &str, policy_version: &str) -> Result<(), String> {
+        validate_immutable_policy_identity_payload_v1(&self.payload)?;
+        if self.payload.policy_id != policy_id || self.payload.policy_version != policy_version {
+            return Err(
+                "immutable identity policy ID/version does not match policy instance".to_owned(),
+            );
+        }
+        let bytes = serde_json::to_vec(&self.payload).map_err(|error| error.to_string())?;
+        if self.payload_sha256 != sha256_hex(&bytes) {
+            return Err("immutable policy identity digest does not match its payload".to_owned());
+        }
+        Ok(())
+    }
+}
+
+fn validate_immutable_policy_identity_payload_v1(
+    payload: &RmiImmutablePolicyIdentityPayloadV1,
+) -> Result<(), String> {
+    if payload.policy_id.trim().is_empty() || payload.policy_version.trim().is_empty() {
+        return Err("immutable policy identity requires non-empty ID and version".to_owned());
+    }
+    for (digest, name) in [
+        (&payload.artifact_sha256, "immutable artifact digest"),
+        (&payload.adapter_sha256, "policy adapter digest"),
+        (&payload.configuration_sha256, "policy configuration digest"),
+        (&payload.runtime_sha256, "policy runtime digest"),
+    ] {
+        if !is_lowercase_sha256(digest) {
+            return Err(format!(
+                "{name} must be a 64-character lowercase SHA-256 digest"
+            ));
+        }
+    }
+    for (digest, name) in [
+        (payload.weights_sha256.as_ref(), "model weights digest"),
+        (payload.tokenizer_sha256.as_ref(), "tokenizer digest"),
+        (payload.grammar_sha256.as_ref(), "grammar digest"),
+    ] {
+        if let Some(digest) = digest
+            && !is_lowercase_sha256(digest)
+        {
+            return Err(format!(
+                "{name} must be a 64-character lowercase SHA-256 digest"
+            ));
+        }
+    }
+    if payload.backend_id.trim().is_empty()
+        || payload.stochasticity_contract.trim().is_empty()
+        || payload.seed_authority.trim().is_empty()
+        || payload.source_references.is_empty()
+        || payload
+            .source_references
+            .iter()
+            .any(|value| value.trim().is_empty())
+    {
+        return Err(
+            "immutable identity is missing backend, stochasticity, seed, or source evidence"
+                .to_owned(),
+        );
+    }
+    match payload.identity_kind {
+        RmiPolicyIdentityKindV1::SyntheticRuleFixture => {
+            if payload.weights_sha256.is_some()
+                || payload.tokenizer_sha256.is_some()
+                || payload.grammar_sha256.is_some()
+            {
+                return Err(
+                    "synthetic rule identity must not claim model, tokenizer, or grammar weights"
+                        .to_owned(),
+                );
+            }
+        }
+        RmiPolicyIdentityKindV1::ContentAddressedModel => {
+            if payload.weights_sha256.is_none() {
+                return Err(
+                    "content-addressed model identity requires exact model weights digest"
+                        .to_owned(),
+                );
+            }
+        }
+        RmiPolicyIdentityKindV1::CompiledPolicyArtifact
+        | RmiPolicyIdentityKindV1::ExternalHostedService => {}
+    }
+    Ok(())
+}
+
+/// Identity helper for finite synthetic policies. The descriptor digest is
+/// not a source-code digest; the run manifest separately binds source/compiler/lock.
+pub(crate) fn synthetic_rule_identity_v1<T: Serialize>(
+    policy_id: &str,
+    policy_version: &str,
+    rule_descriptor: &str,
+    configuration: &T,
+) -> Result<RmiImmutablePolicyIdentityV1, String> {
+    let configuration_sha256 = snapshot_sha256_v1(configuration)?;
+    let descriptor = format!("symthaea-muse-rmi-synthetic-rule-v1:{rule_descriptor}");
+    let payload = RmiImmutablePolicyIdentityPayloadV1 {
+        policy_id: policy_id.to_owned(),
+        policy_version: policy_version.to_owned(),
+        identity_kind: RmiPolicyIdentityKindV1::SyntheticRuleFixture,
+        artifact_sha256: sha256_hex(descriptor.as_bytes()),
+        weights_sha256: None,
+        tokenizer_sha256: None,
+        grammar_sha256: None,
+        adapter_sha256: sha256_hex(b"symthaea-muse-rmi-symbolic-adapter-v1"),
+        configuration_sha256,
+        runtime_sha256: sha256_hex(b"symthaea-muse-rmi-rust-runtime-contract-v1"),
+        backend_id: "deterministic-rust-synthetic-rule".to_owned(),
+        stochasticity_contract: "deterministic policy; no undeclared process-global random source"
+            .to_owned(),
+        seed_authority: "RMI paired-trial seed supplied identically to both arms".to_owned(),
+        source_references: vec![format!("synthetic-rule-descriptor:{rule_descriptor}")],
+    };
+    RmiImmutablePolicyIdentityV1::from_payload(payload)
+}
+
 /// Policy interface for controlled Track A evaluation.
 ///
 /// The policy receives the current observation and the same seed in both
@@ -236,11 +410,14 @@ pub fn validate_rmi_intervention_pair(
 /// was manipulated. Production Melothaea adapters can implement this trait
 /// later, after their observation/action boundaries are pinned.
 pub trait RmiPolicyV1: Sized {
-    /// Mutable episode state only. Static weights, binaries and device handles
-    /// are identified separately by policy_id/version and adapter provenance.
+    /// Mutable episode state only. Static weights, binaries, tokenizers, adapters,
+    /// configuration and runtime identity are bound by immutable_identity().
     type Snapshot: Serialize + DeserializeOwned + PartialEq;
     fn policy_id(&self) -> &str;
     fn policy_version(&self) -> &str;
+    /// Immutable model/implementation, adapter, configuration and runtime identity.
+    /// Must exclude mutable episode memory and remain constant across restored arms.
+    fn immutable_identity(&self) -> Result<RmiImmutablePolicyIdentityV1, String>;
     /// Every state field that can influence the next action must be included.
     /// Shared process-global state and external side effects are forbidden.
     fn snapshot_state(&self) -> Result<Self::Snapshot, String>;
@@ -261,6 +438,8 @@ pub trait RmiPartnerPolicyV1: Sized {
     type Snapshot: Serialize + DeserializeOwned + PartialEq;
     fn policy_id(&self) -> &str;
     fn policy_version(&self) -> &str;
+    /// Immutable partner implementation, adapter, configuration and runtime identity.
+    fn immutable_identity(&self) -> Result<RmiImmutablePolicyIdentityV1, String>;
     /// Every state field that can influence the next response must be included.
     /// Shared process-global state and external side effects are forbidden.
     fn snapshot_state(&self) -> Result<Self::Snapshot, String>;
@@ -284,10 +463,26 @@ pub struct FixedPartnerResponsePolicyV1 {
 
 impl RmiPartnerPolicyV1 for FixedPartnerResponsePolicyV1 {
     type Snapshot = Self;
-    fn snapshot_state(&self) -> Result<Self::Snapshot, String> { Ok(self.clone()) }
-    fn restore_from_snapshot(snapshot: &Self::Snapshot) -> Result<Self, String> { Ok(snapshot.clone()) }
-    fn policy_id(&self) -> &str { &self.id }
-    fn policy_version(&self) -> &str { &self.version }
+    fn snapshot_state(&self) -> Result<Self::Snapshot, String> {
+        Ok(self.clone())
+    }
+    fn restore_from_snapshot(snapshot: &Self::Snapshot) -> Result<Self, String> {
+        Ok(snapshot.clone())
+    }
+    fn policy_id(&self) -> &str {
+        &self.id
+    }
+    fn policy_version(&self) -> &str {
+        &self.version
+    }
+    fn immutable_identity(&self) -> Result<RmiImmutablePolicyIdentityV1, String> {
+        synthetic_rule_identity_v1(
+            &self.id,
+            &self.version,
+            "fixed-partner-response-v1",
+            &self.response,
+        )
+    }
 
     fn respond(
         &mut self,
@@ -310,10 +505,26 @@ pub struct SyntheticResponsivePartnerPolicyV1 {
 
 impl RmiPartnerPolicyV1 for SyntheticResponsivePartnerPolicyV1 {
     type Snapshot = Self;
-    fn snapshot_state(&self) -> Result<Self::Snapshot, String> { Ok(self.clone()) }
-    fn restore_from_snapshot(snapshot: &Self::Snapshot) -> Result<Self, String> { Ok(snapshot.clone()) }
-    fn policy_id(&self) -> &str { &self.id }
-    fn policy_version(&self) -> &str { &self.version }
+    fn snapshot_state(&self) -> Result<Self::Snapshot, String> {
+        Ok(self.clone())
+    }
+    fn restore_from_snapshot(snapshot: &Self::Snapshot) -> Result<Self, String> {
+        Ok(snapshot.clone())
+    }
+    fn policy_id(&self) -> &str {
+        &self.id
+    }
+    fn policy_version(&self) -> &str {
+        &self.version
+    }
+    fn immutable_identity(&self) -> Result<RmiImmutablePolicyIdentityV1, String> {
+        synthetic_rule_identity_v1(
+            &self.id,
+            &self.version,
+            "synthetic-responsive-partner-v1",
+            &self.target,
+        )
+    }
 
     fn respond(
         &mut self,
@@ -340,14 +551,21 @@ pub struct FixedResponsePolicyV1 {
 
 impl RmiPolicyV1 for FixedResponsePolicyV1 {
     type Snapshot = Self;
-    fn snapshot_state(&self) -> Result<Self::Snapshot, String> { Ok(self.clone()) }
-    fn restore_from_snapshot(snapshot: &Self::Snapshot) -> Result<Self, String> { Ok(snapshot.clone()) }
+    fn snapshot_state(&self) -> Result<Self::Snapshot, String> {
+        Ok(self.clone())
+    }
+    fn restore_from_snapshot(snapshot: &Self::Snapshot) -> Result<Self, String> {
+        Ok(snapshot.clone())
+    }
     fn policy_id(&self) -> &str {
         &self.id
     }
 
     fn policy_version(&self) -> &str {
         &self.version
+    }
+    fn immutable_identity(&self) -> Result<RmiImmutablePolicyIdentityV1, String> {
+        synthetic_rule_identity_v1(&self.id, &self.version, "fixed-response-v1", &self.response)
     }
 
     fn respond(
@@ -371,14 +589,26 @@ pub struct OneWayPromptPolicyV1 {
 
 impl RmiPolicyV1 for OneWayPromptPolicyV1 {
     type Snapshot = Self;
-    fn snapshot_state(&self) -> Result<Self::Snapshot, String> { Ok(self.clone()) }
-    fn restore_from_snapshot(snapshot: &Self::Snapshot) -> Result<Self, String> { Ok(snapshot.clone()) }
+    fn snapshot_state(&self) -> Result<Self::Snapshot, String> {
+        Ok(self.clone())
+    }
+    fn restore_from_snapshot(snapshot: &Self::Snapshot) -> Result<Self, String> {
+        Ok(snapshot.clone())
+    }
     fn policy_id(&self) -> &str {
         &self.id
     }
 
     fn policy_version(&self) -> &str {
         &self.version
+    }
+    fn immutable_identity(&self) -> Result<RmiImmutablePolicyIdentityV1, String> {
+        synthetic_rule_identity_v1(
+            &self.id,
+            &self.version,
+            "one-way-prompt-v1",
+            &self.frozen_response,
+        )
     }
 
     fn respond(
@@ -402,14 +632,26 @@ pub struct YokedReplayPolicyV1 {
 
 impl RmiPolicyV1 for YokedReplayPolicyV1 {
     type Snapshot = Self;
-    fn snapshot_state(&self) -> Result<Self::Snapshot, String> { Ok(self.clone()) }
-    fn restore_from_snapshot(snapshot: &Self::Snapshot) -> Result<Self, String> { Ok(snapshot.clone()) }
+    fn snapshot_state(&self) -> Result<Self::Snapshot, String> {
+        Ok(self.clone())
+    }
+    fn restore_from_snapshot(snapshot: &Self::Snapshot) -> Result<Self, String> {
+        Ok(snapshot.clone())
+    }
     fn policy_id(&self) -> &str {
         &self.id
     }
 
     fn policy_version(&self) -> &str {
         &self.version
+    }
+    fn immutable_identity(&self) -> Result<RmiImmutablePolicyIdentityV1, String> {
+        synthetic_rule_identity_v1(
+            &self.id,
+            &self.version,
+            "yoked-replay-v1",
+            &self.replayed_response,
+        )
     }
 
     fn respond(
@@ -434,14 +676,26 @@ pub struct ImitationOnlyPolicyV1 {
 
 impl RmiPolicyV1 for ImitationOnlyPolicyV1 {
     type Snapshot = Self;
-    fn snapshot_state(&self) -> Result<Self::Snapshot, String> { Ok(self.clone()) }
-    fn restore_from_snapshot(snapshot: &Self::Snapshot) -> Result<Self, String> { Ok(snapshot.clone()) }
+    fn snapshot_state(&self) -> Result<Self::Snapshot, String> {
+        Ok(self.clone())
+    }
+    fn restore_from_snapshot(snapshot: &Self::Snapshot) -> Result<Self, String> {
+        Ok(snapshot.clone())
+    }
     fn policy_id(&self) -> &str {
         &self.id
     }
 
     fn policy_version(&self) -> &str {
         &self.version
+    }
+    fn immutable_identity(&self) -> Result<RmiImmutablePolicyIdentityV1, String> {
+        synthetic_rule_identity_v1(
+            &self.id,
+            &self.version,
+            "imitation-only-v1",
+            &"copy-current-observation",
+        )
     }
 
     fn respond(
@@ -492,14 +746,26 @@ pub struct SyntheticContingentPolicyV1 {
 
 impl RmiPolicyV1 for SyntheticContingentPolicyV1 {
     type Snapshot = Self;
-    fn snapshot_state(&self) -> Result<Self::Snapshot, String> { Ok(self.clone()) }
-    fn restore_from_snapshot(snapshot: &Self::Snapshot) -> Result<Self, String> { Ok(snapshot.clone()) }
+    fn snapshot_state(&self) -> Result<Self::Snapshot, String> {
+        Ok(self.clone())
+    }
+    fn restore_from_snapshot(snapshot: &Self::Snapshot) -> Result<Self, String> {
+        Ok(snapshot.clone())
+    }
     fn policy_id(&self) -> &str {
         &self.id
     }
 
     fn policy_version(&self) -> &str {
         &self.version
+    }
+    fn immutable_identity(&self) -> Result<RmiImmutablePolicyIdentityV1, String> {
+        synthetic_rule_identity_v1(
+            &self.id,
+            &self.version,
+            "synthetic-contingent-v1",
+            &self.target,
+        )
     }
 
     fn respond(
@@ -538,12 +804,9 @@ pub struct RmiActionDeltaV1 {
 impl RmiActionDeltaV1 {
     fn between(control: &RmiAgentActionV1, treatment: &RmiAgentActionV1) -> Self {
         Self {
-            motif_changed: control.features.motif_intervals
-                != treatment.features.motif_intervals,
-            rhythm_changed: control.features.rhythm_onsets
-                != treatment.features.rhythm_onsets,
-            tempo_changed: control.features.tempo_milli_bpm
-                != treatment.features.tempo_milli_bpm,
+            motif_changed: control.features.motif_intervals != treatment.features.motif_intervals,
+            rhythm_changed: control.features.rhythm_onsets != treatment.features.rhythm_onsets,
+            tempo_changed: control.features.tempo_milli_bpm != treatment.features.tempo_milli_bpm,
             role_changed: control.features.role != treatment.features.role,
         }
     }
@@ -581,6 +844,7 @@ pub struct RmiEvaluationPayloadV1 {
     pub intervention_pair_sha256: String,
     pub policy_id: String,
     pub policy_version: String,
+    pub policy_immutable_identity: RmiImmutablePolicyIdentityV1,
     pub policy_pre_state_sha256: String,
     pub control_policy_post_state_sha256: String,
     pub treatment_policy_post_state_sha256: String,
@@ -614,6 +878,8 @@ pub struct RmiReciprocalEvaluationPayloadV1 {
     pub agent_evaluation_sha256: String,
     pub partner_policy_id: String,
     pub partner_policy_version: String,
+    pub agent_policy_immutable_identity_sha256: String,
+    pub partner_policy_immutable_identity: RmiImmutablePolicyIdentityV1,
     pub partner_policy_pre_state_sha256: String,
     pub control_partner_post_state_sha256: String,
     pub treatment_partner_post_state_sha256: String,
@@ -643,23 +909,109 @@ pub enum RmiEvaluationErrorV1 {
     InvalidIntervention(Vec<RmiValidationIssueV1>),
     EmptyPolicyId,
     EmptyPolicyVersion,
-    InvalidActionId { arm: String },
-    InvalidActionFeatures { arm: String, issues: Vec<RmiValidationIssueV1> },
-    NonDeterministicPolicyOutput { arm: String },
+    InvalidActionId {
+        arm: String,
+    },
+    InvalidActionFeatures {
+        arm: String,
+        issues: Vec<RmiValidationIssueV1>,
+    },
+    NonDeterministicPolicyOutput {
+        arm: String,
+    },
     PolicyStateSnapshotFailure(String),
-    PolicyStateRestoreFailure { arm: String, reason: String },
-    PolicyStateMismatch { arm: String },
-    PolicyIdentityMismatch { arm: String },
+    PolicyStateRestoreFailure {
+        arm: String,
+        reason: String,
+    },
+    PolicyStateMismatch {
+        arm: String,
+    },
+    PolicyIdentityMismatch {
+        arm: String,
+    },
+    PolicyImmutableIdentityFailure(String),
+    InvalidPolicyImmutableIdentity(String),
+    PolicyImmutableIdentityMismatch {
+        arm: String,
+    },
+    PolicyImmutableIdentityChangedDuringResponse {
+        arm: String,
+    },
     EmptyPartnerPolicyId,
     EmptyPartnerPolicyVersion,
-    InvalidPartnerResponseId { arm: String },
-    InvalidPartnerResponseFeatures { arm: String, issues: Vec<RmiValidationIssueV1> },
-    NonDeterministicPartnerOutput { arm: String },
+    InvalidPartnerResponseId {
+        arm: String,
+    },
+    InvalidPartnerResponseFeatures {
+        arm: String,
+        issues: Vec<RmiValidationIssueV1>,
+    },
+    NonDeterministicPartnerOutput {
+        arm: String,
+    },
     PartnerStateSnapshotFailure(String),
-    PartnerStateRestoreFailure { arm: String, reason: String },
-    PartnerStateMismatch { arm: String },
-    PartnerPolicyIdentityMismatch { arm: String },
+    PartnerStateRestoreFailure {
+        arm: String,
+        reason: String,
+    },
+    PartnerStateMismatch {
+        arm: String,
+    },
+    PartnerPolicyIdentityMismatch {
+        arm: String,
+    },
+    PartnerImmutableIdentityFailure(String),
+    InvalidPartnerImmutableIdentity(String),
+    PartnerImmutableIdentityMismatch {
+        arm: String,
+    },
+    PartnerImmutableIdentityChangedDuringResponse {
+        arm: String,
+    },
     SerializationFailure(String),
+}
+
+fn ensure_policy_immutable_identity_unchanged<P: RmiPolicyV1>(
+    policy: &P,
+    expected: &RmiImmutablePolicyIdentityV1,
+    arm: &str,
+) -> Result<(), RmiEvaluationErrorV1> {
+    let current = policy
+        .immutable_identity()
+        .map_err(RmiEvaluationErrorV1::PolicyImmutableIdentityFailure)?;
+    current
+        .validate_for(policy.policy_id(), policy.policy_version())
+        .map_err(RmiEvaluationErrorV1::InvalidPolicyImmutableIdentity)?;
+    if &current != expected {
+        return Err(
+            RmiEvaluationErrorV1::PolicyImmutableIdentityChangedDuringResponse {
+                arm: arm.to_owned(),
+            },
+        );
+    }
+    Ok(())
+}
+
+fn ensure_partner_immutable_identity_unchanged<H: RmiPartnerPolicyV1>(
+    partner: &H,
+    expected: &RmiImmutablePolicyIdentityV1,
+    arm: &str,
+) -> Result<(), RmiEvaluationErrorV1> {
+    let current = partner
+        .immutable_identity()
+        .map_err(RmiEvaluationErrorV1::PartnerImmutableIdentityFailure)?;
+    current
+        .validate_for(partner.policy_id(), partner.policy_version())
+        .map_err(RmiEvaluationErrorV1::InvalidPartnerImmutableIdentity)?;
+    if &current != expected {
+        return Err(
+            RmiEvaluationErrorV1::PartnerImmutableIdentityChangedDuringResponse {
+                arm: arm.to_owned(),
+            },
+        );
+    }
+    Ok(())
 }
 
 /// Run both arms with identical policy/seed and produce a digest-bound record.
@@ -677,6 +1029,12 @@ pub fn evaluate_rmi_pair<P: RmiPolicyV1>(
     if policy.policy_version().trim().is_empty() {
         return Err(RmiEvaluationErrorV1::EmptyPolicyVersion);
     }
+    let policy_immutable_identity = policy
+        .immutable_identity()
+        .map_err(RmiEvaluationErrorV1::PolicyImmutableIdentityFailure)?;
+    policy_immutable_identity
+        .validate_for(policy.policy_id(), policy.policy_version())
+        .map_err(RmiEvaluationErrorV1::InvalidPolicyImmutableIdentity)?;
 
     // Snapshot once, then restore independent instances for both counterfactual
     // arms and for deterministic replay. Never run control then treatment on
@@ -684,29 +1042,33 @@ pub fn evaluate_rmi_pair<P: RmiPolicyV1>(
     let policy_snapshot = policy
         .snapshot_state()
         .map_err(RmiEvaluationErrorV1::PolicyStateSnapshotFailure)?;
-    let policy_pre_state_sha256 = snapshot_sha256_v1(&policy_snapshot)
-        .map_err(RmiEvaluationErrorV1::SerializationFailure)?;
+    let policy_pre_state_sha256 =
+        snapshot_sha256_v1(&policy_snapshot).map_err(RmiEvaluationErrorV1::SerializationFailure)?;
 
-    let mut control_policy = P::restore_from_snapshot(&policy_snapshot)
-        .map_err(|reason| RmiEvaluationErrorV1::PolicyStateRestoreFailure {
+    let mut control_policy = P::restore_from_snapshot(&policy_snapshot).map_err(|reason| {
+        RmiEvaluationErrorV1::PolicyStateRestoreFailure {
             arm: "control".into(),
             reason,
-        })?;
-    let mut control_replay = P::restore_from_snapshot(&policy_snapshot)
-        .map_err(|reason| RmiEvaluationErrorV1::PolicyStateRestoreFailure {
+        }
+    })?;
+    let mut control_replay = P::restore_from_snapshot(&policy_snapshot).map_err(|reason| {
+        RmiEvaluationErrorV1::PolicyStateRestoreFailure {
             arm: "control_replay".into(),
             reason,
-        })?;
-    let mut treatment_policy = P::restore_from_snapshot(&policy_snapshot)
-        .map_err(|reason| RmiEvaluationErrorV1::PolicyStateRestoreFailure {
+        }
+    })?;
+    let mut treatment_policy = P::restore_from_snapshot(&policy_snapshot).map_err(|reason| {
+        RmiEvaluationErrorV1::PolicyStateRestoreFailure {
             arm: "treatment".into(),
             reason,
-        })?;
-    let mut treatment_replay = P::restore_from_snapshot(&policy_snapshot)
-        .map_err(|reason| RmiEvaluationErrorV1::PolicyStateRestoreFailure {
+        }
+    })?;
+    let mut treatment_replay = P::restore_from_snapshot(&policy_snapshot).map_err(|reason| {
+        RmiEvaluationErrorV1::PolicyStateRestoreFailure {
             arm: "treatment_replay".into(),
             reason,
-        })?;
+        }
+    })?;
 
     for (arm, restored) in [
         ("control", &control_policy),
@@ -718,6 +1080,17 @@ pub fn evaluate_rmi_pair<P: RmiPolicyV1>(
             || restored.policy_version() != policy.policy_version()
         {
             return Err(RmiEvaluationErrorV1::PolicyIdentityMismatch {
+                arm: arm.to_owned(),
+            });
+        }
+        let restored_identity = restored
+            .immutable_identity()
+            .map_err(RmiEvaluationErrorV1::PolicyImmutableIdentityFailure)?;
+        restored_identity
+            .validate_for(restored.policy_id(), restored.policy_version())
+            .map_err(RmiEvaluationErrorV1::InvalidPolicyImmutableIdentity)?;
+        if restored_identity != policy_immutable_identity {
+            return Err(RmiEvaluationErrorV1::PolicyImmutableIdentityMismatch {
                 arm: arm.to_owned(),
             });
         }
@@ -736,11 +1109,21 @@ pub fn evaluate_rmi_pair<P: RmiPolicyV1>(
         &pair.control_observation,
         pair.seed,
     );
+    ensure_policy_immutable_identity_unchanged(
+        &control_policy,
+        &policy_immutable_identity,
+        "control",
+    )?;
     let control_replay_action = control_replay.respond(
         &pair.pre_intervention_history,
         &pair.control_observation,
         pair.seed,
     );
+    ensure_policy_immutable_identity_unchanged(
+        &control_replay,
+        &policy_immutable_identity,
+        "control_replay",
+    )?;
     let control_policy_post_state = control_policy
         .snapshot_state()
         .map_err(RmiEvaluationErrorV1::PolicyStateSnapshotFailure)?;
@@ -764,11 +1147,21 @@ pub fn evaluate_rmi_pair<P: RmiPolicyV1>(
         &pair.treatment_observation,
         pair.seed,
     );
+    ensure_policy_immutable_identity_unchanged(
+        &treatment_policy,
+        &policy_immutable_identity,
+        "treatment",
+    )?;
     let treatment_replay_action = treatment_replay.respond(
         &pair.pre_intervention_history,
         &pair.treatment_observation,
         pair.seed,
     );
+    ensure_policy_immutable_identity_unchanged(
+        &treatment_replay,
+        &policy_immutable_identity,
+        "treatment_replay",
+    )?;
     let treatment_policy_post_state = treatment_policy
         .snapshot_state()
         .map_err(RmiEvaluationErrorV1::PolicyStateSnapshotFailure)?;
@@ -789,31 +1182,60 @@ pub fn evaluate_rmi_pair<P: RmiPolicyV1>(
 
     // Repeat the pair in reverse order. This catches order-coupled shared
     // process state that is not captured by the policy's serialized snapshot.
-    let mut treatment_order_probe = P::restore_from_snapshot(&policy_snapshot)
-        .map_err(|reason| RmiEvaluationErrorV1::PolicyStateRestoreFailure {
-            arm: "order_swap_treatment".into(),
-            reason,
+    let mut treatment_order_probe =
+        P::restore_from_snapshot(&policy_snapshot).map_err(|reason| {
+            RmiEvaluationErrorV1::PolicyStateRestoreFailure {
+                arm: "order_swap_treatment".into(),
+                reason,
+            }
         })?;
-    let mut control_order_probe = P::restore_from_snapshot(&policy_snapshot)
-        .map_err(|reason| RmiEvaluationErrorV1::PolicyStateRestoreFailure {
+    let mut control_order_probe = P::restore_from_snapshot(&policy_snapshot).map_err(|reason| {
+        RmiEvaluationErrorV1::PolicyStateRestoreFailure {
             arm: "order_swap_control".into(),
             reason,
-        })?;
+        }
+    })?;
     let reverse_treatment_action = treatment_order_probe.respond(
         &pair.pre_intervention_history,
         &pair.treatment_observation,
         pair.seed,
     );
+    ensure_policy_immutable_identity_unchanged(
+        &treatment_order_probe,
+        &policy_immutable_identity,
+        "order_swap_treatment",
+    )?;
     let treatment_order_probe_post_state = treatment_order_probe
         .snapshot_state()
         .map_err(RmiEvaluationErrorV1::PolicyStateSnapshotFailure)?;
     let reverse_treatment_post_state_sha256 = snapshot_sha256_v1(&treatment_order_probe_post_state)
         .map_err(RmiEvaluationErrorV1::SerializationFailure)?;
+    for (arm, restored) in [
+        ("order_swap_treatment", &treatment_order_probe),
+        ("order_swap_control", &control_order_probe),
+    ] {
+        let restored_identity = restored
+            .immutable_identity()
+            .map_err(RmiEvaluationErrorV1::PolicyImmutableIdentityFailure)?;
+        restored_identity
+            .validate_for(restored.policy_id(), restored.policy_version())
+            .map_err(RmiEvaluationErrorV1::InvalidPolicyImmutableIdentity)?;
+        if restored_identity != policy_immutable_identity {
+            return Err(RmiEvaluationErrorV1::PolicyImmutableIdentityMismatch {
+                arm: arm.to_owned(),
+            });
+        }
+    }
     let reverse_control_action = control_order_probe.respond(
         &pair.pre_intervention_history,
         &pair.control_observation,
         pair.seed,
     );
+    ensure_policy_immutable_identity_unchanged(
+        &control_order_probe,
+        &policy_immutable_identity,
+        "order_swap_control",
+    )?;
     let control_order_probe_post_state = control_order_probe
         .snapshot_state()
         .map_err(RmiEvaluationErrorV1::PolicyStateSnapshotFailure)?;
@@ -854,8 +1276,7 @@ pub fn evaluate_rmi_pair<P: RmiPolicyV1>(
 
     let action_delta = RmiActionDeltaV1::between(&control_action, &treatment_action);
     let targeted_input_sensitivity = action_delta.targeted_feature_changed(pair.target);
-    let collateral_changed_feature_count =
-        action_delta.collateral_changed_count(pair.target);
+    let collateral_changed_feature_count = action_delta.collateral_changed_count(pair.target);
 
     let intervention_bytes = serde_json::to_vec(pair)
         .map_err(|error| RmiEvaluationErrorV1::SerializationFailure(error.to_string()))?;
@@ -869,6 +1290,7 @@ pub fn evaluate_rmi_pair<P: RmiPolicyV1>(
         intervention_pair_sha256,
         policy_id: policy.policy_id().to_string(),
         policy_version: policy.policy_version().to_string(),
+        policy_immutable_identity,
         policy_pre_state_sha256,
         control_policy_post_state_sha256,
         treatment_policy_post_state_sha256,
@@ -910,6 +1332,12 @@ where
     if partner_policy.policy_version().trim().is_empty() {
         return Err(RmiEvaluationErrorV1::EmptyPartnerPolicyVersion);
     }
+    let partner_policy_immutable_identity = partner_policy
+        .immutable_identity()
+        .map_err(RmiEvaluationErrorV1::PartnerImmutableIdentityFailure)?;
+    partner_policy_immutable_identity
+        .validate_for(partner_policy.policy_id(), partner_policy.policy_version())
+        .map_err(RmiEvaluationErrorV1::InvalidPartnerImmutableIdentity)?;
 
     // Independently fork partner policy state for control, treatment and
     // repeatability checks, exactly as done for the agent policy above.
@@ -919,25 +1347,31 @@ where
     let partner_policy_pre_state_sha256 = snapshot_sha256_v1(&partner_snapshot)
         .map_err(RmiEvaluationErrorV1::SerializationFailure)?;
 
-    let mut control_partner = H::restore_from_snapshot(&partner_snapshot)
-        .map_err(|reason| RmiEvaluationErrorV1::PartnerStateRestoreFailure {
+    let mut control_partner = H::restore_from_snapshot(&partner_snapshot).map_err(|reason| {
+        RmiEvaluationErrorV1::PartnerStateRestoreFailure {
             arm: "control".into(),
             reason,
+        }
+    })?;
+    let mut control_partner_replay =
+        H::restore_from_snapshot(&partner_snapshot).map_err(|reason| {
+            RmiEvaluationErrorV1::PartnerStateRestoreFailure {
+                arm: "control_replay".into(),
+                reason,
+            }
         })?;
-    let mut control_partner_replay = H::restore_from_snapshot(&partner_snapshot)
-        .map_err(|reason| RmiEvaluationErrorV1::PartnerStateRestoreFailure {
-            arm: "control_replay".into(),
-            reason,
-        })?;
-    let mut treatment_partner = H::restore_from_snapshot(&partner_snapshot)
-        .map_err(|reason| RmiEvaluationErrorV1::PartnerStateRestoreFailure {
+    let mut treatment_partner = H::restore_from_snapshot(&partner_snapshot).map_err(|reason| {
+        RmiEvaluationErrorV1::PartnerStateRestoreFailure {
             arm: "treatment".into(),
             reason,
-        })?;
-    let mut treatment_partner_replay = H::restore_from_snapshot(&partner_snapshot)
-        .map_err(|reason| RmiEvaluationErrorV1::PartnerStateRestoreFailure {
-            arm: "treatment_replay".into(),
-            reason,
+        }
+    })?;
+    let mut treatment_partner_replay =
+        H::restore_from_snapshot(&partner_snapshot).map_err(|reason| {
+            RmiEvaluationErrorV1::PartnerStateRestoreFailure {
+                arm: "treatment_replay".into(),
+                reason,
+            }
         })?;
 
     for (arm, restored) in [
@@ -950,6 +1384,17 @@ where
             || restored.policy_version() != partner_policy.policy_version()
         {
             return Err(RmiEvaluationErrorV1::PartnerPolicyIdentityMismatch {
+                arm: arm.to_owned(),
+            });
+        }
+        let restored_identity = restored
+            .immutable_identity()
+            .map_err(RmiEvaluationErrorV1::PartnerImmutableIdentityFailure)?;
+        restored_identity
+            .validate_for(restored.policy_id(), restored.policy_version())
+            .map_err(RmiEvaluationErrorV1::InvalidPartnerImmutableIdentity)?;
+        if restored_identity != partner_policy_immutable_identity {
+            return Err(RmiEvaluationErrorV1::PartnerImmutableIdentityMismatch {
                 arm: arm.to_owned(),
             });
         }
@@ -968,11 +1413,21 @@ where
         &agent.payload.control_action,
         pair.seed,
     );
+    ensure_partner_immutable_identity_unchanged(
+        &control_partner,
+        &partner_policy_immutable_identity,
+        "control",
+    )?;
     let control_partner_replay_response = control_partner_replay.respond(
         &pair.pre_intervention_history,
         &agent.payload.control_action,
         pair.seed,
     );
+    ensure_partner_immutable_identity_unchanged(
+        &control_partner_replay,
+        &partner_policy_immutable_identity,
+        "control_replay",
+    )?;
     let control_partner_post_state = control_partner
         .snapshot_state()
         .map_err(RmiEvaluationErrorV1::PartnerStateSnapshotFailure)?;
@@ -981,8 +1436,9 @@ where
     let control_partner_replay_post_state = control_partner_replay
         .snapshot_state()
         .map_err(RmiEvaluationErrorV1::PartnerStateSnapshotFailure)?;
-    let control_partner_replay_post_state_sha256 = snapshot_sha256_v1(&control_partner_replay_post_state)
-        .map_err(RmiEvaluationErrorV1::SerializationFailure)?;
+    let control_partner_replay_post_state_sha256 =
+        snapshot_sha256_v1(&control_partner_replay_post_state)
+            .map_err(RmiEvaluationErrorV1::SerializationFailure)?;
     if control_partner_response != control_partner_replay_response
         || control_partner_post_state_sha256 != control_partner_replay_post_state_sha256
     {
@@ -996,11 +1452,21 @@ where
         &agent.payload.treatment_action,
         pair.seed,
     );
+    ensure_partner_immutable_identity_unchanged(
+        &treatment_partner,
+        &partner_policy_immutable_identity,
+        "treatment",
+    )?;
     let treatment_partner_replay_response = treatment_partner_replay.respond(
         &pair.pre_intervention_history,
         &agent.payload.treatment_action,
         pair.seed,
     );
+    ensure_partner_immutable_identity_unchanged(
+        &treatment_partner_replay,
+        &partner_policy_immutable_identity,
+        "treatment_replay",
+    )?;
     let treatment_partner_post_state = treatment_partner
         .snapshot_state()
         .map_err(RmiEvaluationErrorV1::PartnerStateSnapshotFailure)?;
@@ -1009,8 +1475,9 @@ where
     let treatment_partner_replay_post_state = treatment_partner_replay
         .snapshot_state()
         .map_err(RmiEvaluationErrorV1::PartnerStateSnapshotFailure)?;
-    let treatment_partner_replay_post_state_sha256 = snapshot_sha256_v1(&treatment_partner_replay_post_state)
-        .map_err(RmiEvaluationErrorV1::SerializationFailure)?;
+    let treatment_partner_replay_post_state_sha256 =
+        snapshot_sha256_v1(&treatment_partner_replay_post_state)
+            .map_err(RmiEvaluationErrorV1::SerializationFailure)?;
     if treatment_partner_response != treatment_partner_replay_response
         || treatment_partner_post_state_sha256 != treatment_partner_replay_post_state_sha256
     {
@@ -1019,36 +1486,69 @@ where
         });
     }
 
-    let mut treatment_partner_order_probe = H::restore_from_snapshot(&partner_snapshot)
-        .map_err(|reason| RmiEvaluationErrorV1::PartnerStateRestoreFailure {
-            arm: "order_swap_treatment".into(),
-            reason,
+    let mut treatment_partner_order_probe =
+        H::restore_from_snapshot(&partner_snapshot).map_err(|reason| {
+            RmiEvaluationErrorV1::PartnerStateRestoreFailure {
+                arm: "order_swap_treatment".into(),
+                reason,
+            }
         })?;
-    let mut control_partner_order_probe = H::restore_from_snapshot(&partner_snapshot)
-        .map_err(|reason| RmiEvaluationErrorV1::PartnerStateRestoreFailure {
-            arm: "order_swap_control".into(),
-            reason,
+    let mut control_partner_order_probe =
+        H::restore_from_snapshot(&partner_snapshot).map_err(|reason| {
+            RmiEvaluationErrorV1::PartnerStateRestoreFailure {
+                arm: "order_swap_control".into(),
+                reason,
+            }
         })?;
+    for (arm, restored) in [
+        ("order_swap_treatment", &treatment_partner_order_probe),
+        ("order_swap_control", &control_partner_order_probe),
+    ] {
+        let restored_identity = restored
+            .immutable_identity()
+            .map_err(RmiEvaluationErrorV1::PartnerImmutableIdentityFailure)?;
+        restored_identity
+            .validate_for(restored.policy_id(), restored.policy_version())
+            .map_err(RmiEvaluationErrorV1::InvalidPartnerImmutableIdentity)?;
+        if restored_identity != partner_policy_immutable_identity {
+            return Err(RmiEvaluationErrorV1::PartnerImmutableIdentityMismatch {
+                arm: arm.to_owned(),
+            });
+        }
+    }
     let reverse_treatment_partner_response = treatment_partner_order_probe.respond(
         &pair.pre_intervention_history,
         &agent.payload.treatment_action,
         pair.seed,
     );
-    let treatment_partner_order_probe_post_state = treatment_partner_order_probe
-        .snapshot_state()
-        .map_err(RmiEvaluationErrorV1::PartnerStateSnapshotFailure)?;
-    let reverse_treatment_partner_post_state_sha256 = snapshot_sha256_v1(&treatment_partner_order_probe_post_state)
-        .map_err(RmiEvaluationErrorV1::SerializationFailure)?;
+    ensure_partner_immutable_identity_unchanged(
+        &treatment_partner_order_probe,
+        &partner_policy_immutable_identity,
+        "order_swap_treatment",
+    )?;
+    let treatment_partner_order_probe_post_state =
+        treatment_partner_order_probe
+            .snapshot_state()
+            .map_err(RmiEvaluationErrorV1::PartnerStateSnapshotFailure)?;
+    let reverse_treatment_partner_post_state_sha256 =
+        snapshot_sha256_v1(&treatment_partner_order_probe_post_state)
+            .map_err(RmiEvaluationErrorV1::SerializationFailure)?;
     let reverse_control_partner_response = control_partner_order_probe.respond(
         &pair.pre_intervention_history,
         &agent.payload.control_action,
         pair.seed,
     );
+    ensure_partner_immutable_identity_unchanged(
+        &control_partner_order_probe,
+        &partner_policy_immutable_identity,
+        "order_swap_control",
+    )?;
     let control_partner_order_probe_post_state = control_partner_order_probe
         .snapshot_state()
         .map_err(RmiEvaluationErrorV1::PartnerStateSnapshotFailure)?;
-    let reverse_control_partner_post_state_sha256 = snapshot_sha256_v1(&control_partner_order_probe_post_state)
-        .map_err(RmiEvaluationErrorV1::SerializationFailure)?;
+    let reverse_control_partner_post_state_sha256 =
+        snapshot_sha256_v1(&control_partner_order_probe_post_state)
+            .map_err(RmiEvaluationErrorV1::SerializationFailure)?;
     if reverse_treatment_partner_response != treatment_partner_response
         || reverse_treatment_partner_post_state_sha256 != treatment_partner_post_state_sha256
     {
@@ -1092,8 +1592,7 @@ where
             features: treatment_partner_response.features.clone(),
         },
     );
-    let targeted_partner_sensitivity =
-        partner_action_delta.targeted_feature_changed(pair.target);
+    let targeted_partner_sensitivity = partner_action_delta.targeted_feature_changed(pair.target);
     let partner_collateral_changed_feature_count =
         partner_action_delta.collateral_changed_count(pair.target);
 
@@ -1104,6 +1603,12 @@ where
         agent_evaluation_sha256: agent.payload_sha256,
         partner_policy_id: partner_policy.policy_id().to_string(),
         partner_policy_version: partner_policy.policy_version().to_string(),
+        agent_policy_immutable_identity_sha256: agent
+            .payload
+            .policy_immutable_identity
+            .payload_sha256
+            .clone(),
+        partner_policy_immutable_identity,
         partner_policy_pre_state_sha256,
         control_partner_post_state_sha256,
         treatment_partner_post_state_sha256,
@@ -1153,6 +1658,239 @@ mod tests {
 
     thread_local! {
         static UNTRACKED_PROCESS_CALLS: Cell<u32> = const { Cell::new(0) };
+        static IDENTITY_RESTORE_CALLS: Cell<usize> = const { Cell::new(0) };
+        static IDENTITY_RESPOND_CALLS: Cell<usize> = const { Cell::new(0) };
+        static PARTNER_IDENTITY_RESTORE_CALLS: Cell<usize> = const { Cell::new(0) };
+        static PARTNER_IDENTITY_RESPOND_CALLS: Cell<usize> = const { Cell::new(0) };
+    }
+
+    #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+    struct RespondChangesAgentArtifact {
+        responded: bool,
+    }
+
+    impl RmiPolicyV1 for RespondChangesAgentArtifact {
+        // The changed-artifact flag is deliberately absent from the mutable
+        // snapshot to model a checkpoint swap behind an opaque adapter handle.
+        type Snapshot = ();
+
+        fn policy_id(&self) -> &str {
+            "respond-changes-agent-artifact"
+        }
+        fn policy_version(&self) -> &str {
+            "1"
+        }
+        fn immutable_identity(&self) -> Result<RmiImmutablePolicyIdentityV1, String> {
+            let descriptor = if self.responded {
+                "agent-checkpoint-after-response"
+            } else {
+                "agent-checkpoint-before-response"
+            };
+            synthetic_rule_identity_v1(
+                self.policy_id(),
+                self.policy_version(),
+                descriptor,
+                &"frozen-adapter-and-config",
+            )
+        }
+        fn snapshot_state(&self) -> Result<Self::Snapshot, String> {
+            Ok(())
+        }
+        fn restore_from_snapshot(_snapshot: &Self::Snapshot) -> Result<Self, String> {
+            Ok(Self { responded: false })
+        }
+        fn respond(
+            &mut self,
+            _history: &[RmiHistoryEventV1],
+            _observation: &RmiPartnerObservationV1,
+            _seed: u64,
+        ) -> RmiAgentActionV1 {
+            self.responded = true;
+            RmiAgentActionV1 {
+                action_id: "artifact-mutated-during-response".to_owned(),
+                features: base_features(),
+            }
+        }
+    }
+
+    #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+    struct RespondChangesPartnerArtifact {
+        responded: bool,
+    }
+
+    impl RmiPartnerPolicyV1 for RespondChangesPartnerArtifact {
+        // As above, the artifact change is outside the serializable state.
+        type Snapshot = ();
+
+        fn policy_id(&self) -> &str {
+            "respond-changes-partner-artifact"
+        }
+        fn policy_version(&self) -> &str {
+            "1"
+        }
+        fn immutable_identity(&self) -> Result<RmiImmutablePolicyIdentityV1, String> {
+            let descriptor = if self.responded {
+                "partner-checkpoint-after-response"
+            } else {
+                "partner-checkpoint-before-response"
+            };
+            synthetic_rule_identity_v1(
+                self.policy_id(),
+                self.policy_version(),
+                descriptor,
+                &"frozen-adapter-and-config",
+            )
+        }
+        fn snapshot_state(&self) -> Result<Self::Snapshot, String> {
+            Ok(())
+        }
+        fn restore_from_snapshot(_snapshot: &Self::Snapshot) -> Result<Self, String> {
+            Ok(Self { responded: false })
+        }
+        fn respond(
+            &mut self,
+            _history: &[RmiHistoryEventV1],
+            _agent_action: &RmiAgentActionV1,
+            _seed: u64,
+        ) -> RmiPartnerResponseV1 {
+            self.responded = true;
+            RmiPartnerResponseV1 {
+                response_id: "partner-artifact-mutated-during-response".to_owned(),
+                features: base_features(),
+            }
+        }
+    }
+
+    fn content_addressed_identity_payload() -> RmiImmutablePolicyIdentityPayloadV1 {
+        RmiImmutablePolicyIdentityPayloadV1 {
+            policy_id: "model-policy".to_owned(),
+            policy_version: "4.2.1".to_owned(),
+            identity_kind: RmiPolicyIdentityKindV1::ContentAddressedModel,
+            artifact_sha256: "a".repeat(64),
+            weights_sha256: Some("b".repeat(64)),
+            tokenizer_sha256: Some("c".repeat(64)),
+            grammar_sha256: Some("d".repeat(64)),
+            adapter_sha256: "e".repeat(64),
+            configuration_sha256: "f".repeat(64),
+            runtime_sha256: "1".repeat(64),
+            backend_id: "cpu-reference".to_owned(),
+            stochasticity_contract: "seeded deterministic decode".to_owned(),
+            seed_authority: "paired-trial seed from sealed manifest".to_owned(),
+            source_references: vec![
+                "model://sha256/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                    .to_owned(),
+                "adapter://sha256/eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+                    .to_owned(),
+            ],
+        }
+    }
+
+    #[derive(Debug)]
+    struct RestoredIdentityChangingPolicy {
+        restore_ordinal: usize,
+    }
+
+    impl RmiPolicyV1 for RestoredIdentityChangingPolicy {
+        type Snapshot = ();
+
+        fn policy_id(&self) -> &str {
+            "same-human-readable-policy"
+        }
+        fn policy_version(&self) -> &str {
+            "1"
+        }
+        fn immutable_identity(&self) -> Result<RmiImmutablePolicyIdentityV1, String> {
+            let descriptor = if self.restore_ordinal == 3 {
+                "different-static-checkpoint"
+            } else {
+                "original-static-checkpoint"
+            };
+            synthetic_rule_identity_v1(
+                self.policy_id(),
+                self.policy_version(),
+                descriptor,
+                &"same-configuration",
+            )
+        }
+        fn snapshot_state(&self) -> Result<Self::Snapshot, String> {
+            Ok(())
+        }
+        fn restore_from_snapshot(_snapshot: &Self::Snapshot) -> Result<Self, String> {
+            let ordinal = IDENTITY_RESTORE_CALLS.with(|count| {
+                let next = count.get() + 1;
+                count.set(next);
+                next
+            });
+            Ok(Self {
+                restore_ordinal: ordinal,
+            })
+        }
+        fn respond(
+            &mut self,
+            _history: &[RmiHistoryEventV1],
+            _observation: &RmiPartnerObservationV1,
+            _seed: u64,
+        ) -> RmiAgentActionV1 {
+            IDENTITY_RESPOND_CALLS.with(|count| count.set(count.get() + 1));
+            RmiAgentActionV1 {
+                action_id: "must-not-run".to_owned(),
+                features: base_features(),
+            }
+        }
+    }
+
+    #[derive(Debug)]
+    struct RestoredIdentityChangingPartner {
+        restore_ordinal: usize,
+    }
+
+    impl RmiPartnerPolicyV1 for RestoredIdentityChangingPartner {
+        type Snapshot = ();
+
+        fn policy_id(&self) -> &str {
+            "same-human-readable-partner"
+        }
+        fn policy_version(&self) -> &str {
+            "1"
+        }
+        fn immutable_identity(&self) -> Result<RmiImmutablePolicyIdentityV1, String> {
+            let descriptor = if self.restore_ordinal == 3 {
+                "different-static-partner-artifact"
+            } else {
+                "original-static-partner-artifact"
+            };
+            synthetic_rule_identity_v1(
+                self.policy_id(),
+                self.policy_version(),
+                descriptor,
+                &"same-partner-configuration",
+            )
+        }
+        fn snapshot_state(&self) -> Result<Self::Snapshot, String> {
+            Ok(())
+        }
+        fn restore_from_snapshot(_snapshot: &Self::Snapshot) -> Result<Self, String> {
+            let ordinal = PARTNER_IDENTITY_RESTORE_CALLS.with(|count| {
+                let next = count.get() + 1;
+                count.set(next);
+                next
+            });
+            Ok(Self {
+                restore_ordinal: ordinal,
+            })
+        }
+        fn respond(
+            &mut self,
+            _history: &[RmiHistoryEventV1],
+            _agent_action: &RmiAgentActionV1,
+            _seed: u64,
+        ) -> RmiPartnerResponseV1 {
+            PARTNER_IDENTITY_RESPOND_CALLS.with(|count| count.set(count.get() + 1));
+            RmiPartnerResponseV1 {
+                response_id: "must-not-run".to_owned(),
+                features: base_features(),
+            }
+        }
     }
 
     fn base_features() -> RmiMusicalFeaturesV1 {
@@ -1268,11 +2006,27 @@ mod tests {
     }
 
     impl RmiPolicyV1 for TwoCallCounterPolicy {
-    type Snapshot = Self;
-    fn snapshot_state(&self) -> Result<Self::Snapshot, String> { Ok(self.clone()) }
-    fn restore_from_snapshot(snapshot: &Self::Snapshot) -> Result<Self, String> { Ok(snapshot.clone()) }
-        fn policy_id(&self) -> &str { "two-call-counter-agent" }
-        fn policy_version(&self) -> &str { "1" }
+        type Snapshot = Self;
+        fn snapshot_state(&self) -> Result<Self::Snapshot, String> {
+            Ok(self.clone())
+        }
+        fn restore_from_snapshot(snapshot: &Self::Snapshot) -> Result<Self, String> {
+            Ok(snapshot.clone())
+        }
+        fn policy_id(&self) -> &str {
+            "two-call-counter-agent"
+        }
+        fn policy_version(&self) -> &str {
+            "1"
+        }
+        fn immutable_identity(&self) -> Result<RmiImmutablePolicyIdentityV1, String> {
+            synthetic_rule_identity_v1(
+                self.policy_id(),
+                self.policy_version(),
+                "two-call-counter-policy-v1",
+                &"u32-call-counter-snapshot",
+            )
+        }
 
         fn respond(
             &mut self,
@@ -1291,7 +2045,11 @@ mod tests {
                 features.role = RmiRoleV1::Accompaniment;
             }
             RmiAgentActionV1 {
-                action_id: if call >= 2 { "late-state".into() } else { "early-state".into() },
+                action_id: if call >= 2 {
+                    "late-state".into()
+                } else {
+                    "early-state".into()
+                },
                 features,
             }
         }
@@ -1304,8 +2062,7 @@ mod tests {
 
         assert!(!result.payload.targeted_input_sensitivity);
         assert_eq!(
-            result.payload.control_action,
-            result.payload.treatment_action,
+            result.payload.control_action, result.payload.treatment_action,
             "state progression alone must not manufacture partner-to-agent sensitivity"
         );
         assert_eq!(
@@ -1320,11 +2077,27 @@ mod tests {
     struct ProcessGlobalCounterPolicy;
 
     impl RmiPolicyV1 for ProcessGlobalCounterPolicy {
-    type Snapshot = Self;
-    fn snapshot_state(&self) -> Result<Self::Snapshot, String> { Ok(self.clone()) }
-    fn restore_from_snapshot(snapshot: &Self::Snapshot) -> Result<Self, String> { Ok(snapshot.clone()) }
-        fn policy_id(&self) -> &str { "process-global-counter" }
-        fn policy_version(&self) -> &str { "1" }
+        type Snapshot = Self;
+        fn snapshot_state(&self) -> Result<Self::Snapshot, String> {
+            Ok(self.clone())
+        }
+        fn restore_from_snapshot(snapshot: &Self::Snapshot) -> Result<Self, String> {
+            Ok(snapshot.clone())
+        }
+        fn policy_id(&self) -> &str {
+            "process-global-counter"
+        }
+        fn policy_version(&self) -> &str {
+            "1"
+        }
+        fn immutable_identity(&self) -> Result<RmiImmutablePolicyIdentityV1, String> {
+            synthetic_rule_identity_v1(
+                self.policy_id(),
+                self.policy_version(),
+                "process-global-counter-policy-v1",
+                &"thread-local-counter-not-in-snapshot",
+            )
+        }
 
         fn respond(
             &mut self,
@@ -1347,7 +2120,11 @@ mod tests {
                 features.role = RmiRoleV1::Accompaniment;
             }
             RmiAgentActionV1 {
-                action_id: if call % 4 >= 2 { "global-B".into() } else { "global-A".into() },
+                action_id: if call % 4 >= 2 {
+                    "global-B".into()
+                } else {
+                    "global-A".into()
+                },
                 features,
             }
         }
@@ -1371,11 +2148,27 @@ mod tests {
     }
 
     impl RmiPartnerPolicyV1 for TwoCallCounterPartner {
-    type Snapshot = Self;
-    fn snapshot_state(&self) -> Result<Self::Snapshot, String> { Ok(self.clone()) }
-    fn restore_from_snapshot(snapshot: &Self::Snapshot) -> Result<Self, String> { Ok(snapshot.clone()) }
-        fn policy_id(&self) -> &str { "two-call-counter-partner" }
-        fn policy_version(&self) -> &str { "1" }
+        type Snapshot = Self;
+        fn snapshot_state(&self) -> Result<Self::Snapshot, String> {
+            Ok(self.clone())
+        }
+        fn restore_from_snapshot(snapshot: &Self::Snapshot) -> Result<Self, String> {
+            Ok(snapshot.clone())
+        }
+        fn policy_id(&self) -> &str {
+            "two-call-counter-partner"
+        }
+        fn policy_version(&self) -> &str {
+            "1"
+        }
+        fn immutable_identity(&self) -> Result<RmiImmutablePolicyIdentityV1, String> {
+            synthetic_rule_identity_v1(
+                self.policy_id(),
+                self.policy_version(),
+                "two-call-counter-partner-v1",
+                &"u32-call-counter-snapshot",
+            )
+        }
 
         fn respond(
             &mut self,
@@ -1392,7 +2185,11 @@ mod tests {
                 features.role = RmiRoleV1::Accompaniment;
             }
             RmiPartnerResponseV1 {
-                response_id: if call >= 2 { "late-state".into() } else { "early-state".into() },
+                response_id: if call >= 2 {
+                    "late-state".into()
+                } else {
+                    "early-state".into()
+                },
                 features,
             }
         }
@@ -1406,17 +2203,13 @@ mod tests {
             response: fixed_action(),
         };
         let partner = TwoCallCounterPartner { calls: 0 };
-        let result = evaluate_rmi_reciprocal_pair(
-            &agent,
-            &partner,
-            &pair_for(RmiTargetFeatureV1::Role),
-        )
-        .unwrap();
+        let result =
+            evaluate_rmi_reciprocal_pair(&agent, &partner, &pair_for(RmiTargetFeatureV1::Role))
+                .unwrap();
 
         assert!(!result.payload.targeted_partner_sensitivity);
         assert_eq!(
-            result.payload.control_partner_response,
-            result.payload.treatment_partner_response,
+            result.payload.control_partner_response, result.payload.treatment_partner_response,
             "partner state progression alone must not manufacture agent-to-partner influence"
         );
         assert_eq!(
@@ -1521,8 +2314,7 @@ mod tests {
             let result = evaluate_rmi_pair(&policy, &pair_for(target)).unwrap();
             assert!(result.payload.action_delta.targeted_feature_changed(target));
             assert_eq!(
-                result.payload.collateral_changed_feature_count,
-                0,
+                result.payload.collateral_changed_feature_count, 0,
                 "unexpected collateral change for {target:?}"
             );
         }
@@ -1576,6 +2368,23 @@ mod tests {
         assert_eq!(first, second);
         assert_eq!(first.payload_sha256.len(), 64);
         assert!(is_lowercase_sha256(&first.payload_sha256));
+        assert_eq!(first.payload.schema_version, RMI_BENCH_SCHEMA_VERSION);
+        first
+            .payload
+            .policy_immutable_identity
+            .validate_for("synthetic-contingent", "1")
+            .unwrap();
+        assert_eq!(
+            first
+                .payload
+                .policy_immutable_identity
+                .payload
+                .identity_kind,
+            RmiPolicyIdentityKindV1::SyntheticRuleFixture
+        );
+        assert!(is_lowercase_sha256(
+            &first.payload.policy_immutable_identity.payload_sha256
+        ));
     }
 
     #[test]
@@ -1624,6 +2433,123 @@ mod tests {
                 &pair
             ),
             Err(RmiEvaluationErrorV1::InvalidIntervention(_))
+        ));
+    }
+
+    #[test]
+    fn immutable_identity_binds_weights_adapter_configuration_and_runtime() {
+        let first_payload = content_addressed_identity_payload();
+        let first = RmiImmutablePolicyIdentityV1::from_payload(first_payload.clone()).unwrap();
+        first.validate_for("model-policy", "4.2.1").unwrap();
+
+        let mut alternate_payload = first_payload;
+        alternate_payload.adapter_sha256 = "2".repeat(64);
+        let alternate = RmiImmutablePolicyIdentityV1::from_payload(alternate_payload).unwrap();
+
+        assert_eq!(first.payload.policy_id, alternate.payload.policy_id);
+        assert_eq!(
+            first.payload.policy_version,
+            alternate.payload.policy_version
+        );
+        assert_ne!(first.payload_sha256, alternate.payload_sha256);
+        first.validate_for("model-policy", "4.2.1").unwrap();
+        alternate.validate_for("model-policy", "4.2.1").unwrap();
+    }
+
+    #[test]
+    fn tampered_immutable_identity_payload_is_rejected() {
+        let mut identity =
+            RmiImmutablePolicyIdentityV1::from_payload(content_addressed_identity_payload())
+                .unwrap();
+        identity.payload.runtime_sha256 = "2".repeat(64);
+        let error = identity.validate_for("model-policy", "4.2.1").unwrap_err();
+        assert!(error.contains("digest does not match"));
+    }
+
+    #[test]
+    fn content_addressed_model_requires_exact_weight_digest() {
+        let mut payload = content_addressed_identity_payload();
+        payload.weights_sha256 = None;
+        let error = RmiImmutablePolicyIdentityV1::from_payload(payload).unwrap_err();
+        assert!(error.contains("requires exact model weights digest"));
+    }
+
+    #[test]
+    fn restored_agent_with_same_id_and_version_but_different_artifact_is_rejected_before_action() {
+        IDENTITY_RESTORE_CALLS.with(|count| count.set(0));
+        IDENTITY_RESPOND_CALLS.with(|count| count.set(0));
+        let result = evaluate_rmi_pair(
+            &RestoredIdentityChangingPolicy { restore_ordinal: 0 },
+            &pair_for(RmiTargetFeatureV1::Role),
+        );
+        assert!(matches!(
+            result,
+            Err(RmiEvaluationErrorV1::PolicyImmutableIdentityMismatch { ref arm })
+                if arm == "treatment"
+        ));
+        assert_eq!(
+            IDENTITY_RESPOND_CALLS.with(|count| count.get()),
+            0,
+            "no policy action may run after immutable identity mismatch"
+        );
+    }
+
+    #[test]
+    fn restored_partner_with_same_id_and_version_but_different_artifact_is_rejected_before_response()
+     {
+        PARTNER_IDENTITY_RESTORE_CALLS.with(|count| count.set(0));
+        PARTNER_IDENTITY_RESPOND_CALLS.with(|count| count.set(0));
+        let agent = SyntheticContingentPolicyV1 {
+            id: "synthetic-agent".to_owned(),
+            version: "1".to_owned(),
+            target: RmiTargetFeatureV1::Role,
+        };
+        let result = evaluate_rmi_reciprocal_pair(
+            &agent,
+            &RestoredIdentityChangingPartner { restore_ordinal: 0 },
+            &pair_for(RmiTargetFeatureV1::Role),
+        );
+        assert!(matches!(
+            result,
+            Err(RmiEvaluationErrorV1::PartnerImmutableIdentityMismatch { ref arm })
+                if arm == "treatment"
+        ));
+        assert_eq!(
+            PARTNER_IDENTITY_RESPOND_CALLS.with(|count| count.get()),
+            0,
+            "no partner response may run after immutable identity mismatch"
+        );
+    }
+
+    #[test]
+    fn agent_that_changes_immutable_artifact_during_respond_is_rejected() {
+        let result = evaluate_rmi_pair(
+            &RespondChangesAgentArtifact { responded: false },
+            &pair_for(RmiTargetFeatureV1::Role),
+        );
+        assert!(matches!(
+            result,
+            Err(RmiEvaluationErrorV1::PolicyImmutableIdentityChangedDuringResponse { ref arm })
+                if arm == "control"
+        ));
+    }
+
+    #[test]
+    fn partner_that_changes_immutable_artifact_during_respond_is_rejected() {
+        let agent = SyntheticContingentPolicyV1 {
+            id: "synthetic-agent".to_owned(),
+            version: "1".to_owned(),
+            target: RmiTargetFeatureV1::Role,
+        };
+        let result = evaluate_rmi_reciprocal_pair(
+            &agent,
+            &RespondChangesPartnerArtifact { responded: false },
+            &pair_for(RmiTargetFeatureV1::Role),
+        );
+        assert!(matches!(
+            result,
+            Err(RmiEvaluationErrorV1::PartnerImmutableIdentityChangedDuringResponse { ref arm })
+                if arm == "control"
         ));
     }
 }

@@ -47,40 +47,44 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("RMI Track A synthetic fixture suite");
     println!("Trials: {}", report.payload.summary.trials);
-    println!("Evaluator errors: {}", report.payload.summary.evaluator_errors);
+    println!(
+        "Evaluator errors: {}",
+        report.payload.summary.evaluator_errors
+    );
     println!(
         "Fixed-agent false positives: {}",
-        report.payload.summary.trials
-            - report.payload.summary.fixed_agent_zero_sensitivity
+        report.payload.summary.trials - report.payload.summary.fixed_agent_zero_sensitivity
     );
     println!(
         "One-way prompt false positives: {}",
-        report.payload.summary.trials
-            - report.payload.summary.one_way_prompt_zero_sensitivity
+        report.payload.summary.trials - report.payload.summary.one_way_prompt_zero_sensitivity
     );
     println!(
         "Yoked replay false positives: {}",
-        report.payload.summary.trials
-            - report.payload.summary.yoked_replay_zero_sensitivity
+        report.payload.summary.trials - report.payload.summary.yoked_replay_zero_sensitivity
     );
     println!(
         "Wrong-feature target-sensitivity false positives: {}",
         report.payload.summary.trials
-            - report.payload.summary.unrelated_feature_zero_target_sensitivity
+            - report
+                .payload
+                .summary
+                .unrelated_feature_zero_target_sensitivity
     );
     println!(
         "Imitation sensitivity: {}/{}",
-        report.payload.summary.imitation_agent_target_sensitive,
-        report.payload.summary.trials
+        report.payload.summary.imitation_agent_target_sensitive, report.payload.summary.trials
     );
     println!(
         "Synthetic positive control: {}/{}",
-        report.payload.summary.positive_agent_target_sensitive,
-        report.payload.summary.trials
+        report.payload.summary.positive_agent_target_sensitive, report.payload.summary.trials
     );
     println!(
         "Reciprocal positive control: {}/{}",
-        report.payload.summary.reciprocal_positive_control_both_directions,
+        report
+            .payload
+            .summary
+            .reciprocal_positive_control_both_directions,
         report.payload.summary.trials
     );
     println!(
@@ -93,11 +97,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("Report SHA-256: {}", report.payload_sha256);
     println!("Report written to: {}", output_path.display());
 
-    if !report.payload.summary.synthetic_fixture_expectations_satisfied {
-        return Err(std::io::Error::other(
-            "one or more synthetic fixture expectations failed",
-        )
-        .into());
+    if !report
+        .payload
+        .summary
+        .synthetic_fixture_expectations_satisfied
+    {
+        return Err(
+            std::io::Error::other("one or more synthetic fixture expectations failed").into(),
+        );
     }
     Ok(())
 }
