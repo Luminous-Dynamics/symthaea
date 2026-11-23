@@ -1058,6 +1058,203 @@ mod tests {
     }
 
     #[test]
+    fn ensemble_is_impacted_when_any_parent_model_is_blocked() {
+        let left = node(
+            "left",
+            VmModelDerivationKindV1::IndependentRetrain,
+            VmSnapshotPurposeV1::Training,
+            'a',
+            'b',
+        );
+        let right = node(
+            "right",
+            VmModelDerivationKindV1::IndependentRetrain,
+            VmSnapshotPurposeV1::Training,
+            'c',
+            'd',
+        );
+        let ensemble = node(
+            "ensemble",
+            VmModelDerivationKindV1::EnsembleOfParents,
+            VmSnapshotPurposeV1::Training,
+            'e',
+            'f',
+        );
+        let g = graph(
+            vec![left.clone(), right.clone(), ensemble.clone()],
+            vec![
+                edge(
+                    "left-parent",
+                    &left,
+                    &ensemble,
+                    vec![VmDependencyDimensionV1::ModelWeights],
+                ),
+                edge(
+                    "right-parent",
+                    &right,
+                    &ensemble,
+                    vec![VmDependencyDimensionV1::ModelWeights],
+                ),
+            ],
+            true,
+            true,
+        );
+        let report = compute_vm_snapshot_impact_closure_v1(&input(
+            g,
+            vec![
+                requal(
+                    "left",
+                    &left.manifest_sha256,
+                    VmSnapshotCurrentDispositionV1::RebuildRequired,
+                ),
+                requal(
+                    "right",
+                    &right.manifest_sha256,
+                    VmSnapshotCurrentDispositionV1::CurrentEligible,
+                ),
+                requal(
+                    "ensemble",
+                    &ensemble.manifest_sha256,
+                    VmSnapshotCurrentDispositionV1::CurrentEligible,
+                ),
+            ],
+        ))
+        .unwrap();
+        let entry = report
+            .entries
+            .iter()
+            .find(|entry| entry.snapshot_id == "ensemble")
+            .unwrap();
+        assert_eq!(entry.state, VmSnapshotImpactStateV1::InheritedRebuildRequired);
+        assert_eq!(entry.inherited_from_snapshot_ids, vec!["left".to_string()]);
+        assert!(entry.rebuild_candidate);
+    }
+
+    #[test]
+    fn distilled_student_inherits_teacher_model_state_dependency() {
+        let teacher = node(
+            "teacher",
+            VmModelDerivationKindV1::IndependentRetrain,
+            VmSnapshotPurposeV1::Training,
+            'a',
+            'b',
+        );
+        let student = node(
+            "student",
+            VmModelDerivationKindV1::DistilledFromParent,
+            VmSnapshotPurposeV1::Training,
+            'c',
+            'd',
+        );
+        let g = graph(
+            vec![teacher.clone(), student.clone()],
+            vec![edge(
+                "teacher-targets",
+                &teacher,
+                &student,
+                vec![VmDependencyDimensionV1::ModelWeights],
+            )],
+            true,
+            true,
+        );
+        let report = compute_vm_snapshot_impact_closure_v1(&input(
+            g,
+            vec![
+                requal(
+                    "teacher",
+                    &teacher.manifest_sha256,
+                    VmSnapshotCurrentDispositionV1::RebuildRequired,
+                ),
+                requal(
+                    "student",
+                    &student.manifest_sha256,
+                    VmSnapshotCurrentDispositionV1::CurrentEligible,
+                ),
+            ],
+        ))
+        .unwrap();
+        assert_eq!(
+            report.transitive_impact_snapshot_ids,
+            vec!["student".to_string()]
+        );
+    }
+
+    #[test]
+    fn blocked_parent_dominates_unknown_parent_without_losing_source_nodes() {
+        let blocked = node(
+            "blocked",
+            VmModelDerivationKindV1::IndependentRetrain,
+            VmSnapshotPurposeV1::Training,
+            'a',
+            'b',
+        );
+        let unknown = node(
+            "unknown",
+            VmModelDerivationKindV1::IndependentRetrain,
+            VmSnapshotPurposeV1::Training,
+            'c',
+            'd',
+        );
+        let child = node(
+            "child",
+            VmModelDerivationKindV1::EnsembleOfParents,
+            VmSnapshotPurposeV1::Training,
+            'e',
+            'f',
+        );
+        let g = graph(
+            vec![blocked.clone(), unknown.clone(), child.clone()],
+            vec![
+                edge(
+                    "blocked-parent",
+                    &blocked,
+                    &child,
+                    vec![VmDependencyDimensionV1::ModelWeights],
+                ),
+                edge(
+                    "unknown-parent",
+                    &unknown,
+                    &child,
+                    vec![VmDependencyDimensionV1::ModelWeights],
+                ),
+            ],
+            true,
+            true,
+        );
+        let report = compute_vm_snapshot_impact_closure_v1(&input(
+            g,
+            vec![
+                requal(
+                    "blocked",
+                    &blocked.manifest_sha256,
+                    VmSnapshotCurrentDispositionV1::RebuildRequired,
+                ),
+                requal(
+                    "unknown",
+                    &unknown.manifest_sha256,
+                    VmSnapshotCurrentDispositionV1::Indeterminate,
+                ),
+                requal(
+                    "child",
+                    &child.manifest_sha256,
+                    VmSnapshotCurrentDispositionV1::CurrentEligible,
+                ),
+            ],
+        ))
+        .unwrap();
+        let entry = report
+            .entries
+            .iter()
+            .find(|entry| entry.snapshot_id == "child")
+            .unwrap();
+        assert_eq!(entry.state, VmSnapshotImpactStateV1::InheritedRebuildRequired);
+        assert_eq!(
+            entry.inherited_from_snapshot_ids,
+            vec!["blocked".to_string(), "unknown".to_string()]
+        );
+    }
+
+    #[test]
     fn unknown_parent_propagates_unknown_to_declared_dependants() {
         let root = node(
             "root",
