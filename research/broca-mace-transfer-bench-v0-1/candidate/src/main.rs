@@ -591,14 +591,12 @@ fn main() {
         Ok(receipt) => {
             let stdout = io::stdout();
             let mut locked = stdout.lock();
-            if let Err(error) = serde_json::to_writer(&mut locked, &receipt)
-                .and_then(|_| {
-                    locked
-                        .write_all(b"\n")
-                        .map_err(serde_json::Error::io)
-                })
-            {
-                eprintln!("mace_candidate: failed to write receipt: {error}");
+            if let Err(error) = serde_json::to_writer(&mut locked, &receipt) {
+                eprintln!("mace_candidate: failed to serialize receipt: {error}");
+                std::process::exit(3);
+            }
+            if let Err(error) = locked.write_all(b"\n") {
+                eprintln!("mace_candidate: failed to terminate receipt line: {error}");
                 std::process::exit(3);
             }
         }
