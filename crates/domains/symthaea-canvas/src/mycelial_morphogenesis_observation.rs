@@ -493,7 +493,9 @@ impl MycelialMorphogenesisObservation {
                     MAX_MORPHOGENESIS_METHOD_BYTES,
                 )?;
             }
-            MycelialMorphogenesisMeasurement::CordPresence { analysis_method_id, .. } => {
+            MycelialMorphogenesisMeasurement::CordPresence {
+                analysis_method_id, ..
+            } => {
                 validate_identifier(
                     analysis_method_id,
                     "analysis_method_id",
@@ -958,10 +960,10 @@ mod tests {
     #[test]
     fn grayscale_density_is_explicitly_a_proxy_and_validates() {
         let observation = fixture(MycelialMorphogenesisMeasurement::ColonizationDensityProxy {
-                mean_intensity: 0.4,
-                scale_min: 0.0,
-                scale_max: 1.0,
-                intensity_scale_id: "normalized-grayscale-v1".to_string(),
+            mean_intensity: 0.4,
+            scale_min: 0.0,
+            scale_max: 1.0,
+            intensity_scale_id: "normalized-grayscale-v1".to_string(),
             analysis_method_id: "segmentation-v1".to_string(),
         });
         observation.validate().unwrap();
@@ -970,15 +972,13 @@ mod tests {
 
     #[test]
     fn grayscale_proxy_outside_declared_scale_is_rejected() {
-        let observation = fixture(
-            MycelialMorphogenesisMeasurement::ColonizationDensityProxy {
-                mean_intensity: 1.2,
-                scale_min: 0.0,
-                scale_max: 1.0,
-                intensity_scale_id: "normalized-grayscale-v1".to_string(),
-                analysis_method_id: "segmentation-v1".to_string(),
-            },
-        );
+        let observation = fixture(MycelialMorphogenesisMeasurement::ColonizationDensityProxy {
+            mean_intensity: 1.2,
+            scale_min: 0.0,
+            scale_max: 1.0,
+            intensity_scale_id: "normalized-grayscale-v1".to_string(),
+            analysis_method_id: "segmentation-v1".to_string(),
+        });
         assert!(matches!(
             observation.validate(),
             Err(MycelialMorphogenesisObservationError::InvalidMeasurement(_))
