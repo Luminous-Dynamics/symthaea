@@ -171,10 +171,25 @@ pub struct ArmSummary {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct StratumEffect {
+    pub stratum: String,
+    pub control_profiles: usize,
+    pub treatment_profiles: usize,
+    pub control_mean_utility: f64,
+    pub treatment_mean_utility: f64,
+    pub treatment_minus_control: f64,
+    pub standard_error: f64,
+    pub ci95_lower: f64,
+    pub ci95_upper: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct TotalEffectReport {
     pub control: ArmSummary,
     pub treatment: ArmSummary,
     pub utility_effect: EffectEstimate,
+    pub strata: Vec<StratumEffect>,
     pub hard_gates_passed: bool,
     pub confirmatory_cluster_floor_met: bool,
 }
@@ -388,6 +403,7 @@ pub fn estimate_total_effect(
     let total_profiles = profile_means.len() as f64;
     let mut effect = 0.0;
     let mut variance = 0.0;
+    let mut stratum_reports = Vec::with_capacity(profiles_by_stratum.len());
     for (stratum, arms) in &profiles_by_stratum {
         let controls = &arms[0];
         let treatments = &arms[1];
@@ -405,6 +421,18 @@ pub fn estimate_total_effect(
             + sample_variance(&control_values) / control_values.len() as f64;
         effect += weight * stratum_effect;
         variance += weight * weight * stratum_variance;
+        let stratum_se = stratum_variance.sqrt();
+        stratum_reports.push(StratumEffect {
+            stratum: stratum.clone(),
+            control_profiles: controls.len(),
+            treatment_profiles: treatments.len(),
+            control_mean_utility: mean(&control_values),
+            treatment_mean_utility: mean(&treatment_values),
+            treatment_minus_control: stratum_effect,
+            standard_error: stratum_se,
+            ci95_lower: stratum_effect - Z_95 * stratum_se,
+            ci95_upper: stratum_effect + Z_95 * stratum_se,
+        });
     }
     let se = variance.sqrt();
     let confirmatory = control.len() >= MIN_CONFIRMATORY_CLUSTERS_PER_ARM
@@ -426,6 +454,7 @@ pub fn estimate_total_effect(
             treatment_profiles: treatment.len(),
             confirmatory_cluster_floor_met: confirmatory,
         },
+        strata: stratum_reports,
         hard_gates_passed,
         confirmatory_cluster_floor_met: confirmatory,
     })
@@ -530,6 +559,16 @@ mod tests {
     }
 
     #[test]
+    fn allocation_rejects_strata_too_small_for_variance_estimation() {
+        let rows = vec![
+            RandomizationUnit { profile_id: "one".into(), stratum: "small".into() },
+            RandomizationUnit { profile_id: "two".into(), stratum: "small".into() },
+            RandomizationUnit { profile_id: "three".into(), stratum: "small".into() },
+        ];
+        assert!(assign_profiles(&[2_u8; 32], &rows).is_err());
+    }
+
+    #[test]
     fn allocation_rejects_duplicate_profiles() {
         let rows = vec![
             RandomizationUnit { profile_id: "same".into(), stratum: "a".into() },
@@ -595,6 +634,8 @@ mod tests {
             &outcomes,
         ).unwrap();
         assert!((report.utility_effect.treatment_minus_control - 0.1).abs() < 1e-12);
+        assert_eq!(report.strata.len(), 2);
+        assert!(report.strata.iter().all(|row| (row.treatment_minus_control - 0.1).abs() < 1e-12));
     }
 
     #[test]
