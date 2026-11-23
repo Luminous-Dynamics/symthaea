@@ -69,6 +69,12 @@ Seventeen unit tests cover:
 
 Tests are authored; exact-head rustfmt, strict Clippy, crate tests and SEMI-BENCH-001 reference workflow are required before claiming a pass.
 
+## Composed snapshot evidence update
+
+The current snapshot-manifest dependency now sits on the numeric-bound label guard (#13467). Therefore, the upstream snapshot manifest binds the full validated label payload digest (including point value, standard uncertainty, revision and metadata), in addition to its K0 eligibility projection, measurement digest, certificate and model/split/preprocessing identities.
+
+This dependency-closure module consumes the snapshot-level K1 disposition; it does not independently reimplement numeric label qualification. The closure graph is only as complete and trustworthy as the upstream consumed-label manifest and the build receipt that declares each parent edge.
+
 ## Claim ceiling
 
 This is a synthetic dependency-impact index. It does not prove that an actual model build consumed the declared parent, authenticate build-system receipts, retrain or roll back models, establish production model health, or authorize wafer disposition or process control. A dependency edge is only as trustworthy as the independent build provenance that records it.
