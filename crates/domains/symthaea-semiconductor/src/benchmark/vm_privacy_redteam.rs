@@ -827,6 +827,27 @@ mod tests {
     }
 
     #[test]
+    fn secure_aggregate_is_not_inverted_when_two_unknown_records_remain() {
+        let population = records();
+        let auxiliary = population[..2].to_vec();
+        let report = evaluate_vm_known_auxiliary_batch_inversion_v1(
+            &population,
+            &auxiliary,
+            &[0.15, -0.2, 0.3],
+            0.1,
+            &config(UpdateVisibilityV1::SecureAggregateOnly),
+        )
+        .unwrap();
+
+        assert_eq!(report.unknown_record_count, 2);
+        assert_eq!(report.reconstructed_record_count, 0);
+        assert_eq!(
+            report.outcome,
+            AuxiliaryInversionOutcomeV1::NoAggregateWithExactlyOneUnknownRecord
+        );
+    }
+
+    #[test]
     fn auxiliary_attack_requires_exact_membership_and_values() {
         let population = records();
         let mut forged_auxiliary = population[..3].to_vec();
