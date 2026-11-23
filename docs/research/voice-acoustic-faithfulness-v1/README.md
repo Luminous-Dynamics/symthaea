@@ -185,6 +185,16 @@ These are prospective gates, not observed outcomes. Report confidence intervals,
 6. Compose resource/acquisition efficiency into Symtropy #6770/#6860; do not create a competing aggregate-score or EVSI implementation.
 
 
+## Streaming boundary
+
+The current `process_samples_at_source_position` API preserves the caller-supplied absolute sample range and segment identity for each processed block. It does not maintain an internal continuous sample ring, resampler phase, frame-hop accumulator or cross-block analysis window. Therefore:
+- Each call can lose an analysis window at its start/end.
+- The internal linear resampling operation restarts at the start of each call.
+- Utterance-peak normalization is computed for the supplied block, not a stable multi-block stream.
+- The API does not verify that successive `source_start_sample` values are contiguous or that the caller increments a segment index after an overrun.
+
+A production streaming path needs a bounded, phase-continuous resampler and frame assembler with explicit discontinuity receipts, monotonic source offsets and a declared energy normalization policy. Do not infer chunk-boundary invariance from the per-block tests.
+
 ## Southern African speech: a regionally meaningful comparator plan
 
 PazaBench is now an important industry baseline, but it must be interpreted correctly. The August 2026 paper evaluates 52 ASR models across 39 African languages and harmonizes six public corpora; its metric set includes WER, CER and inverse real-time factor. The associated released Paza model family is currently six Kenyan languages (Swahili, Dholuo, Kalenjin, Kikuyu, Maasai and Somali), not isiZulu/isiXhosa/Setswana/Sesotho. The November 5, 2026 MSR Africa seminar describes a 53-model accuracy/efficiency study across the same 39-language scope. We should compare our ASR lane against the public PazaBench splits where language overlap exists, then separately qualify Southern African coverage rather than claiming Paza's model release covers it.
