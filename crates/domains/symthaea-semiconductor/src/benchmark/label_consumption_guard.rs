@@ -688,8 +688,14 @@ mod tests {
             LabelEvidenceFrontierV1::CurrentAtK1,
         )
         .unwrap();
-        assert_ne!(original_report.label_sha256, uncertainty_report.label_sha256);
-        assert_ne!(original_report.report_sha256, uncertainty_report.report_sha256);
+        assert_ne!(
+            original_report.label_sha256,
+            uncertainty_report.label_sha256
+        );
+        assert_ne!(
+            original_report.report_sha256,
+            uncertainty_report.report_sha256
+        );
     }
 
     #[test]
