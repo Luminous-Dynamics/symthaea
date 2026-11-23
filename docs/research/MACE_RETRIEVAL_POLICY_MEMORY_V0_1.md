@@ -122,7 +122,23 @@ Production requires durable write receipts, tenant-aware authorization, source-o
 
 A strategy note is advisory and untrusted. It may propose an action sequence; the execution layer must re-authorize every actual tool call and the evidence layer must qualify every result.
 
-## 8. Rust API
+## 8. LongMemEval-V2 trace capture integration
+
+The companion V2 sidecar now emits one policy trace for each official query invocation:
+
+- tool: `trajectory.bm25.search`;
+- tool revision: deterministic backend execution-profile digest;
+- action template: SHA-256 of the BM25 search operation and its pinned domain/top-k/window/neighbor/k1/b/tokenizer parameters;
+- observed evidence IDs: the candidate-evidence graph records produced for that query;
+- stop reason: candidate-side evidence sufficient or no candidate evidence;
+- latency: measured end-to-end sidecar query work;
+- inspected bytes: explicitly incomplete because the current BM25 index does not expose posting/index bytes read.
+
+The official opaque query invocation ID is used as the trace key. Python persists the receipt with the candidate-evidence receipt, independently recomputes the receipt SHA-256 and verifies that both records carry the same candidate-set digest.
+
+This is **single-operation trace capture**, not multi-step strategy learning. The V2 BM25 adapter does not yet choose alternate tools or promote a search sequence. The Rust policy-memory state remains process-local; Python stores audit/replay receipt JSON but does not restore the in-memory promotion state on process restart. Cross-query consolidation and durable promotion remain future work.
+
+## 9. Rust API
 
 The reference API is in:
 
@@ -134,13 +150,13 @@ research/broca-mace-transfer-bench-v0-1/aml-adapter/src/retrieval_policy_memory.
 
 The nine tests cover invocation idempotency/rebinding, minimum support, duplicate query exclusion, domain/environment/tool-profile/strategy isolation, expiry, resource accounting, invalid success claims, insufficient search budgets and input-size limits.
 
-## 9. Next implementation stages
+## 10. Next implementation stages
 
-1. Compile, rustfmt, Clippy and execute the 8 unit tests at the exact PR head.
+1. Compile, rustfmt, Clippy and execute the 11 policy-memory unit tests at the exact PR head.
 2. Add strict JSONL serialization for trace receipts and strategy notes, plus canonical schema files.
 3. Build a persistent receipt store with create-once invocation binding and atomic promotion.
-4. Connect actual LongMemEval-V2 tool operations to the trace receipt, using the official opaque invocation ID and no evaluator metadata.
+4. Extend the current one-operation V2 trace capture into a multi-step, label-blind tool/controller trace using the official opaque invocation ID and no evaluator metadata.
 5. Run the seven-arm ablation with cold/warm and randomized order; compare AgentRunbook-C V2 Online using its native protocol.
-6. Add independent source-observation receipts and qualification checks before strategy-supported actions can influence consequential decisions.
+6. Restore validated trace receipts into a durable policy service, then add independent source-observation receipts and qualification checks before strategy-supported actions can influence consequential decisions.
 
 **No MACE benchmark result is claimed by this research prototype.**
