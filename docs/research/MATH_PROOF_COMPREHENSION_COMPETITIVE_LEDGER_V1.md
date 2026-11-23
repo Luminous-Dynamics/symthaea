@@ -246,3 +246,38 @@ The next frozen experiment should include:
 - graph-aware explanation plus HDC/CfC.
 
 Match context budget, model, tools, token budget and compute. Compare outputs using proof identity, dependency precision/recall, explanation fact support, reviewer burden, reader comprehension and near-transfer. If HDC/CfC fails against LeanGraphSearch, remove it from this pathway.
+
+
+## 9. TheoremGraph / LeanGraph — formal and informal graph scale is now an external baseline (2026-11-23)
+
+**References:** [TheoremGraph paper](https://arxiv.org/abs/2606.25363), [TheoremSearch project](https://github.com/uw-math-ai/TheoremSearch), [Math-Graph dataset](https://huggingface.co/datasets/uw-math-ai/math-graph), [LeanGraph extractor](https://github.com/aurasoph/lean-graph), [API documentation](https://www.theoremsearch.com/docs).
+
+TheoremGraph reports 11.7M informal mathematical statement nodes, 18.3M candidate informal dependency edges, 388,105 Lean declaration nodes and 11.3M typed formal edges across 25 Lean projects. LeanGraph records distinct signature, proof and definition edges, plus structure inheritance, field-composition and documentation-reference relations. Signature metadata includes binder position/kind, function/argument role and projection use.
+
+### Match-quality caveat
+
+The 47,952 judge-affirmed cross-formality links must not be reported as 47,952 exact formalizations. The November 19, 2026 author rebuttal divides them into 4,765 exact and 43,187 inexact/related pairs. The latter include specializations, generalizations and one-way implications; they are potentially useful for retrieval, but are not proposition equivalence. The reported expert audit is small (20 pairs reviewed by one expert), while a separate 199-pair sample was judged by two LLMs. Judge agreement/κ is repeatability, not semantic truth. Treat all such labels as candidate annotations until independent human adjudication.
+
+### LeanGraph graph-mode caveat
+
+The TheoremSearch corpus records LeanGraph submodule commit `9823e3f8f45036b124905e541c7dc92c39620283`, using Lean 4.29.0. At that revision, the unified graph is filtered and expanded: signature edges are filtered / sometimes parent-redirected; proof and definition dependencies use transitive expansion; structure, field and docstring overlays are added. A later LeanGraph commit `3bf57c70f0326e45b9e84345c8fe7cf520919358` adds a raw graph before the readable-view pass. These are not interchangeable outputs.
+
+### Competitive consequence
+
+Symthaea should not claim novelty for large-scale dependency extraction, semantic theorem retrieval, or graph-based informal/formal linking. LeanGraph / TheoremGraph become mandatory external comparators. The candidate Symthaea contribution is the layer beyond graph construction:
+
+1. source-, toolchain-, universe-, value-availability- and axiom-bound evidence receipts;
+2. explicit distinction between direct kernel edges, filtered/expanded edges, structural overlays and external candidate links;
+3. relation-aware informal/formal matching with direction and exactness (not one generic match score);
+4. independently reviewed mathematical-role graphs;
+5. explanations whose formal facts have claim-level evidence links;
+6. counterfactual diagnosis that separates proof-route sensitivity from theorem truth;
+7. measured human comprehension, proof validation, immediate/delayed transfer and cross-family transfer.
+
+### Required benchmark arms
+
+For the first four Mathlib + six Lean-core pilot declarations, compare historical TheoremGraph graph output, current LeanGraph raw output where compatible, Symthaea's local typed extractor, and manually reviewed role annotations. For retrieval/explanation, include BM25, dense semantic search, LeanSearch v2, LeanGraphSearch-style semantic seeds + dependency PPR + reranking, symbolic/type-directed retrieval, and graph-aware explanation with and without HDC/CfC. Match context and compute budgets.
+
+Report edge precision/recall by edge class, exact-vs-inexact relation classification, theorem identity fidelity, axiom/opaque handling, proof-route-vs-truth disposition, explanation fact support, counterexample validity, human outcomes and resource cost separately. Do not combine them into one aggregate mathematical-intelligence score.
+
+The interoperability work is tracked in [#13325 — MATH-GRAPH-INTEROP-001](https://github.com/Luminous-Dynamics/symthaea/issues/13325). Its figures are external published/project figures, not Symthaea results. No local differential or performance improvement is claimed until executed on pinned artifacts.
