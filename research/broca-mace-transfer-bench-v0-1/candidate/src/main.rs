@@ -47,15 +47,6 @@ impl From<ActionWire> for Action {
     }
 }
 
-impl ActionWire {
-    fn name(self) -> &'static str {
-        match self {
-            Self::A => "action_a",
-            Self::B => "action_b",
-        }
-    }
-}
-
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 enum RegimeWire {
@@ -540,7 +531,10 @@ fn execute_request(bytes: &[u8]) -> Result<CandidateReceiptV1, String> {
     let (need, memory) = validate_envelope(envelope)?;
 
     let request_sha256 = hex_digest(Sha256::digest(bytes).as_slice());
-    let task_nonce_sha256 = hex_digest(Sha256::digest(nonce.as_bytes()).as_slice());
+    let mut nonce_hasher = Sha256::new();
+    nonce_hasher.update(b"mace-candidate-task-nonce-v1\\0");
+    nonce_hasher.update(nonce.as_bytes());
+    let task_nonce_sha256 = hex_digest(nonce_hasher.finalize().as_slice());
     let decision_need_sha256 = need.canonical_digest().to_hex();
     let candidate_evidence_sha256 = evidence_digest(&memory);
     let candidate_input_sha256 = candidate_input_digest(need, &candidate_evidence_sha256);
@@ -831,7 +825,6 @@ mod tests {
             .unwrap_err()
             .contains("duplicate candidate event_id"));
 
-        let mut value = envelope_value();
         let mut value = envelope_value();
         let sample = serde_json::json!({
             "event_id": 6,
