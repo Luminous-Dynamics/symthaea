@@ -491,7 +491,7 @@ pub fn build_vm_training_snapshot_manifest_v1(
         });
     }
 
-    if superseded_ids.iter().any(|id| label_ids.contains(id)) {
+    if superseded_ids.iter().any(|id| label_ids.contains(*id)) {
         return Err(VmSnapshotEvidenceErrorV1(
             "snapshot contains a label and its explicitly superseded predecessor".into(),
         ));
