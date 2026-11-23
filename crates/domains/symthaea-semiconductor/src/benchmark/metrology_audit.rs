@@ -17,8 +17,7 @@ use crate::benchmark::metrology_semantics::{
     validate_binary_measurand_semantics_v1,
 };
 use crate::benchmark::process_event_graph::{
-    MetrologyLabelStatusV1, PredictionInformationCutoffV1, ProcessEventGraphV1,
-    build_information_cutoff_snapshot_v1,
+    PredictionInformationCutoffV1, ProcessEventGraphV1, build_information_cutoff_snapshot_v1,
 };
 
 pub const POLICY_SCHEMA_V1: &str = "luminous.semi-bench.metrology-audit-policy.v1";
@@ -877,7 +876,8 @@ pub fn estimate_metrology_population_v1(
 mod tests {
     use super::*;
     use crate::benchmark::process_event_graph::{
-        ClockBasisV1, MetrologyLabelV1, ProcessEventKindV1, ProcessEventV1,
+        ClockBasisV1, MetrologyLabelStatusV1, MetrologyLabelV1, ProcessEventKindV1,
+        ProcessEventV1,
     };
 
     const SHA_A: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
