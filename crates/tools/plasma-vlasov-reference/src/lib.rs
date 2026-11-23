@@ -15,6 +15,7 @@
 pub mod echo_analysis;
 pub mod phase_space_cascade;
 pub mod phase_space_flux;
+pub mod response_parity;
 
 use std::error::Error;
 use std::f64::consts::TAU;
