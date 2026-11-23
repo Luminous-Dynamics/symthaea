@@ -684,3 +684,150 @@ fn hex_digest(bytes: &[u8]) -> String {
     hex_bytes(bytes)
 }
 
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn valid_receipt_value() -> serde_json::Value {
+        let run_id = "run-1";
+        let pair_block_id = "world-1:task-1";
+        let sequence = 7_u64;
+        let method = "exact_scope_scan";
+        let nonce = "nonce-0123456789abcdef";
+        let request_sha256 = "e".repeat(64);
+        let decision_need_sha256 = "a".repeat(64);
+        let candidate_evidence_sha256 = "b".repeat(64);
+        let candidate_input_sha256 =
+            candidate_input_sha256(&decision_need_sha256, &candidate_evidence_sha256);
+        let candidate_observation_id = observation_id(
+            run_id,
+            pair_block_id,
+            sequence,
+            method,
+            &candidate_input_sha256,
+        );
+        json!({
+            "schema_version": RECEIPT_SCHEMA,
+            "run_id": run_id,
+            "pair_block_id": pair_block_id,
+            "observation_sequence": sequence,
+            "task_nonce_sha256": nonce_digest(nonce),
+            "method": method,
+            "request_sha256": request_sha256,
+            "decision_need_sha256": decision_need_sha256,
+            "candidate_evidence_sha256": candidate_evidence_sha256,
+            "candidate_input_sha256": candidate_input_sha256,
+            "candidate_observation_id": candidate_observation_id,
+            "decision": "abstain",
+            "decision_support_event_ids": [],
+            "retrieved_event_ids": [],
+            "retrieval_profile_sha256": null,
+            "index_payload_bytes": 0,
+            "latency_ns": 10,
+            "probe_requested": false
+        })
+    }
+
+    fn validate_value(value: serde_json::Value) -> Result<(), String> {
+        let receipt: CandidateReceiptWire = serde_json::from_value(value)
+            .map_err(|error| format!("invalid candidate receipt JSON: {error}"))?;
+        let run_id = "run-1";
+        let pair_block_id = "world-1:task-1";
+        let sequence = 7_u64;
+        let method = "exact_scope_scan";
+        let nonce = "nonce-0123456789abcdef";
+        let request_sha256 = "e".repeat(64);
+        let decision_need_sha256 = "a".repeat(64);
+        let candidate_evidence_sha256 = "b".repeat(64);
+        let candidate_input = candidate_input_sha256(
+            &decision_need_sha256,
+            &candidate_evidence_sha256,
+        );
+        let expected_observation = observation_id(
+            run_id,
+            pair_block_id,
+            sequence,
+            method,
+            &candidate_input,
+        );
+        validate_receipt(
+            &receipt,
+            run_id,
+            pair_block_id,
+            sequence,
+            method,
+            &request_sha256,
+            &nonce_digest(nonce),
+            &decision_need_sha256,
+            &candidate_evidence_sha256,
+            &candidate_input,
+            &expected_observation,
+            &[],
+            Scope {
+                regime: Regime::Baseline,
+                objective: Objective::Quality,
+            },
+            [Action::A, Action::B],
+        )
+    }
+
+    #[test]
+    fn candidate_receipt_accepts_exact_request_and_empty_support() {
+        assert!(validate_value(valid_receipt_value()).is_ok());
+    }
+
+    #[test]
+    fn candidate_receipt_rejects_unknown_evaluator_fields() {
+        let mut value = valid_receipt_value();
+        value["truth"] = json!({"optimal_action": "action_b"});
+        assert!(validate_value(value).unwrap_err().contains("unknown field"));
+    }
+
+    #[test]
+    fn candidate_receipt_rejects_duplicate_or_nonretrieved_support_ids() {
+        let mut duplicate = valid_receipt_value();
+        duplicate["retrieved_event_ids"] = json!([1, 1]);
+        duplicate["decision_support_event_ids"] = json!([1]);
+        assert!(validate_value(duplicate).unwrap_err().contains("duplicate event IDs"));
+
+        let mut outside = valid_receipt_value();
+        outside["retrieved_event_ids"] = json!([1]);
+        outside["decision_support_event_ids"] = json!([2]);
+        assert!(validate_value(outside)
+            .unwrap_err()
+            .contains("not a subset of retrieved IDs"));
+    }
+
+    #[test]
+    fn candidate_receipt_rejects_unknown_retrieved_ids() {
+        let mut value = valid_receipt_value();
+        value["retrieved_event_ids"] = json!([42]);
+        value["decision_support_event_ids"] = json!([42]);
+        assert!(validate_value(value).unwrap_err().contains("unknown event ID 42"));
+    }
+
+    #[test]
+    fn candidate_receipt_rejects_wrong_request_nonce_and_observation_identity() {
+        let mut wrong_request = valid_receipt_value();
+        wrong_request["request_sha256"] = json!("f".repeat(64));
+        assert!(validate_value(wrong_request).unwrap_err().contains("exact request"));
+
+        let mut wrong_nonce = valid_receipt_value();
+        wrong_nonce["task_nonce_sha256"] = json!("f".repeat(64));
+        assert!(validate_value(wrong_nonce).unwrap_err().contains("exact request"));
+
+        let mut wrong_identity = valid_receipt_value();
+        wrong_identity["candidate_observation_id"] = json!("obs-0000000000000000");
+        assert!(validate_value(wrong_identity).unwrap_err().contains("exact request"));
+    }
+
+    #[test]
+    fn candidate_artifact_digest_validation_is_canonical() {
+        assert!(valid_sha256(&"a".repeat(64)));
+        assert!(!valid_sha256(&"A".repeat(64)));
+        assert!(!valid_sha256("deadbeef"));
+        assert!(!valid_sha256(&"g".repeat(64)));
+    }
+}
