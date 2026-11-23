@@ -1130,16 +1130,8 @@ impl MinMaxCoordinateMap {
             return Err(ContractError::NonFiniteNormalizationCoordinate);
         }
         let input_minimum = positions.iter().copied().fold(f64::INFINITY, f64::min);
-        let input_maximum = positions
-            .iter()
-            .copied()
-            .fold(f64::NEG_INFINITY, f64::max);
-        Self::new(
-            input_minimum,
-            input_maximum,
-            output_minimum,
-            output_maximum,
-        )
+        let input_maximum = positions.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+        Self::new(input_minimum, input_maximum, output_minimum, output_maximum)
     }
 
     /// Construct a map from explicit finite, strictly increasing intervals.
@@ -1180,8 +1172,8 @@ impl MinMaxCoordinateMap {
         }
         let input_width = self.input_maximum - self.input_minimum;
         let output_width = self.output_maximum - self.output_minimum;
-        let normalized = self.output_minimum
-            + (position - self.input_minimum) / input_width * output_width;
+        let normalized =
+            self.output_minimum + (position - self.input_minimum) / input_width * output_width;
         if !normalized.is_finite() {
             return Err(ContractError::InvalidNormalizationSupport);
         }
@@ -1837,8 +1829,7 @@ mod tests {
     fn minmax_normalization_exposes_global_inlier_drift_from_low_weight_outlier_witness() {
         let inliers = [0.1, 0.3, 0.5, 0.7, 0.9];
         let augmented = [0.0, 0.1, 0.3, 0.5, 0.7, 0.9];
-        let before =
-            MinMaxCoordinateMap::fit(&inliers, -PI, PI).expect("base sample has support");
+        let before = MinMaxCoordinateMap::fit(&inliers, -PI, PI).expect("base sample has support");
         let after =
             MinMaxCoordinateMap::fit(&augmented, -PI, PI).expect("augmented sample has support");
 
