@@ -61,6 +61,8 @@ pub struct ScopeBinding {
     pub conclusion_sha256: String,
     pub warrant_id: String,
     pub warrant_sha256: String,
+    pub finite_boolean_sequent: Option<BooleanSequent>,
+    pub finite_boolean_sequent_sha256: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -123,7 +125,7 @@ pub enum MentionRelation {
     ContextOnly,
     Alternative,
 }
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(tag = "op", rename_all = "snake_case", deny_unknown_fields)]
 pub enum BooleanFormula {
     Atom {
@@ -152,6 +154,13 @@ pub enum BooleanFormula {
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
+pub struct BooleanSequent {
+    pub premises: Vec<BooleanFormula>,
+    pub conclusion: BooleanFormula,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct BooleanAssignment {
     pub atom: String,
     pub value: bool,
@@ -160,8 +169,6 @@ pub struct BooleanAssignment {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct BooleanCountermodel {
-    pub premises: Vec<BooleanFormula>,
-    pub conclusion: BooleanFormula,
     pub valuation: Vec<BooleanAssignment>,
 }
 
@@ -259,49 +266,55 @@ pub fn check_finite_propositional_entailment(
     let assignments_total = 1usize
         .checked_shl(atoms.len() as u32)
         .ok_or_else(|| "Boolean atom count exceeds platform shift width".to_owned())?;
+    let mut assignments_checked = 0usize;
 
-    for mask in 0..assignments_total {
-        let valuation = atoms
-            .iter()
-            .enumerate()
-            .map(|(index, atom)| BooleanAssignment {
-                atom: atom.clone(),
-                value: (mask & (1usize << index)) != 0,
-            })
-            .collect::<Vec<_>>();
-        let values = valuation
-            .iter()
-            .map(|assignment| (assignment.atom.clone(), assignment.value))
-            .collect::<std::collections::HashMap<_, _>>();
-
-        let mut all_premises_true = true;
-        for premise in premises {
-            if !premise.evaluate(&values)? {
-                all_premises_true = false;
-                break;
+    // Prefer the sparsest witness relative to the all-false baseline. Within
+    // each support size, ascending bitmask order gives deterministic ties.
+    for support_size in 0..=atoms.len() {
+        for mask in 0..assignments_total {
+            if mask.count_ones() as usize != support_size {
+                continue;
             }
-        }
+            assignments_checked += 1;
+            let valuation = atoms
+                .iter()
+                .enumerate()
+                .map(|(index, atom)| BooleanAssignment {
+                    atom: atom.clone(),
+                    value: (mask & (1usize << index)) != 0,
+                })
+                .collect::<Vec<_>>();
+            let values = valuation
+                .iter()
+                .map(|assignment| (assignment.atom.clone(), assignment.value))
+                .collect::<std::collections::HashMap<_, _>>();
 
-        if all_premises_true && !conclusion.evaluate(&values)? {
-            return Ok(FiniteTruthTableResult::Countermodel {
-                valuation,
-                assignments_checked: mask + 1,
-            });
+            let mut all_premises_true = true;
+            for premise in premises {
+                if !premise.evaluate(&values)? {
+                    all_premises_true = false;
+                    break;
+                }
+            }
+
+            if all_premises_true && !conclusion.evaluate(&values)? {
+                return Ok(FiniteTruthTableResult::Countermodel {
+                    valuation,
+                    assignments_checked,
+                });
+            }
         }
     }
 
     Ok(FiniteTruthTableResult::NoCountermodelFound {
-        assignments_checked: assignments_total,
+        assignments_checked,
     })
 }
-
 impl BooleanCountermodel {
-    /// Confirm that every premise is true and the conclusion is false under
-    /// one complete valuation. This is a finite semantic witness, not a Lean
-    /// kernel receipt or a proof about non-propositional mathematics.
-    pub fn validate(&self) -> Result<(), String> {
-        if self.premises.is_empty() {
-            return Err("countermodel must contain at least one premise".to_owned());
+    /// Validate the hidden valuation against the exact candidate-visible sequent.
+    pub fn validate(&self, sequent: &BooleanSequent) -> Result<(), String> {
+        if sequent.premises.is_empty() {
+            return Err("candidate finite Boolean sequent must contain at least one premise".to_owned());
         }
 
         let mut values = std::collections::HashMap::new();
@@ -321,22 +334,27 @@ impl BooleanCountermodel {
         }
 
         let mut atoms = HashSet::new();
-        for premise in &self.premises {
+        for premise in &sequent.premises {
             premise.collect_atoms(&mut atoms)?;
         }
-        self.conclusion.collect_atoms(&mut atoms)?;
-        for atom in atoms {
-            if !values.contains_key(&atom) {
+        sequent.conclusion.collect_atoms(&mut atoms)?;
+        for atom in &atoms {
+            if !values.contains_key(atom) {
                 return Err(format!("countermodel has no valuation for atom {atom}"));
             }
         }
+        for atom in values.keys() {
+            if !atoms.contains(atom) {
+                return Err(format!("countermodel contains unused atom {atom}"));
+            }
+        }
 
-        for (index, premise) in self.premises.iter().enumerate() {
+        for (index, premise) in sequent.premises.iter().enumerate() {
             if !premise.evaluate(&values)? {
                 return Err(format!("countermodel premise[{index}] evaluates to false"));
             }
         }
-        if self.conclusion.evaluate(&values)? {
+        if sequent.conclusion.evaluate(&values)? {
             return Err("countermodel conclusion evaluates to true".to_owned());
         }
         Ok(())
@@ -535,6 +553,49 @@ fn validate_scope(scope: &ScopeBinding, errors: &mut Vec<String>, label: &str) {
         &format!("{label}.warrant_sha256"),
         errors,
     );
+
+    match (&scope.finite_boolean_sequent, &scope.finite_boolean_sequent_sha256) {
+        (Some(sequent), Some(digest)) => {
+            if !valid_sha256(digest) {
+                errors.push(format!(
+                    "{label}.finite_boolean_sequent_sha256 must be lowercase SHA-256 hex"
+                ));
+            }
+            if sequent.premises.is_empty() {
+                errors.push(format!(
+                    "{label}.finite_boolean_sequent must contain at least one premise"
+                ));
+            }
+            for (index, premise) in sequent.premises.iter().enumerate() {
+                let mut atoms = HashSet::new();
+                if let Err(error) = premise.collect_atoms(&mut atoms) {
+                    errors.push(format!(
+                        "{label}.finite_boolean_sequent.premises[{index}]: {error}"
+                    ));
+                }
+            }
+            let mut atoms = HashSet::new();
+            if let Err(error) = sequent.conclusion.collect_atoms(&mut atoms) {
+                errors.push(format!(
+                    "{label}.finite_boolean_sequent.conclusion: {error}"
+                ));
+            }
+            validate_preimage_digest(
+                "finite_boolean_sequent",
+                sequent,
+                digest,
+                &format!("{label}.finite_boolean_sequent_sha256"),
+                errors,
+            );
+        }
+        (Some(_), None) => errors.push(format!(
+            "{label}.finite_boolean_sequent_sha256 is required when a finite Boolean sequent is present"
+        )),
+        (None, Some(_)) => errors.push(format!(
+            "{label}.finite_boolean_sequent_sha256 must be absent when no finite Boolean sequent is present"
+        )),
+        (None, None) => {}
+    }
 }
 
 fn validate_execution(execution: &ExecutionRecord, errors: &mut Vec<String>, label: &str) {
@@ -663,10 +724,23 @@ pub fn validate_pair(pair: &LocalGlobalPairV1) -> Vec<String> {
         }
 
         if let Some(countermodel) = &evaluator.finite_boolean_countermodel {
-            if let Err(reason) = countermodel.validate() {
-                errors.push(format!(
-                    "evaluator_only.finite_boolean_countermodel: {reason}"
-                ));
+            match candidate
+                .local_stage
+                .scope_binding
+                .finite_boolean_sequent
+                .as_ref()
+            {
+                Some(sequent) => {
+                    if let Err(reason) = countermodel.validate(sequent) {
+                        errors.push(format!(
+                            "evaluator_only.finite_boolean_countermodel: {reason}"
+                        ));
+                    }
+                }
+                None => errors.push(
+                    "finite Boolean countermodel requires a candidate-visible typed sequent"
+                        .to_owned(),
+                ),
             }
             if evaluator.independently_assessed_warrant != WarrantValidity::Invalid {
                 errors.push(
@@ -675,10 +749,15 @@ pub fn validate_pair(pair: &LocalGlobalPairV1) -> Vec<String> {
             }
         }
         if evaluator.adjudication_authority == "finite_boolean_countermodel"
-            && evaluator.finite_boolean_countermodel.is_none()
+            && (evaluator.finite_boolean_countermodel.is_none()
+                || candidate
+                    .local_stage
+                    .scope_binding
+                    .finite_boolean_sequent
+                    .is_none())
         {
             errors.push(
-                "finite_boolean_countermodel authority requires a finite Boolean witness"
+                "finite_boolean_countermodel authority requires a typed sequent and a finite valuation"
                     .to_owned(),
             );
         }
@@ -918,6 +997,7 @@ mod tests {
         assert!(visible.get("evaluator_only").is_none());
         assert!(visible.get("independently_assessed_warrant").is_none());
         assert!(!visible.to_string().contains("finite_boolean_countermodel"));
+        assert!(visible["local_stage"]["scope_binding"]["finite_boolean_sequent"].is_object());
         assert!(visible.get("valuation").is_none());
     }
 
@@ -958,6 +1038,74 @@ mod tests {
                 },
             ]
         );
+    }
+
+
+    #[test]
+    fn truth_table_prefers_minimum_support_countermodel() {
+        let p = BooleanFormula::Atom {
+            name: "p".to_owned(),
+        };
+        let q = BooleanFormula::Atom {
+            name: "q".to_owned(),
+        };
+        let r = BooleanFormula::Atom {
+            name: "r".to_owned(),
+        };
+        let tautology = BooleanFormula::Or {
+            left: Box::new(p.clone()),
+            right: Box::new(BooleanFormula::Not {
+                arg: Box::new(p.clone()),
+            }),
+        };
+        let premise = BooleanFormula::Or {
+            left: Box::new(tautology),
+            right: Box::new(BooleanFormula::And {
+                left: Box::new(q.clone()),
+                right: Box::new(r.clone()),
+            }),
+        };
+        let conclusion = BooleanFormula::Not {
+            arg: Box::new(BooleanFormula::Or {
+                left: Box::new(BooleanFormula::And {
+                    left: Box::new(p),
+                    right: Box::new(q),
+                }),
+                right: Box::new(r),
+            }),
+        };
+
+        let result = check_finite_propositional_entailment(
+            &[premise],
+            &conclusion,
+            MAX_FINITE_BOOLEAN_ATOMS,
+        )
+        .expect("well-formed propositional formulas");
+        let FiniteTruthTableResult::Countermodel {
+            valuation,
+            assignments_checked,
+        } = result
+        else {
+            panic!("expected a countermodel");
+        };
+        assert_eq!(
+            valuation,
+            vec![
+                BooleanAssignment {
+                    atom: "p".to_owned(),
+                    value: false,
+                },
+                BooleanAssignment {
+                    atom: "q".to_owned(),
+                    value: false,
+                },
+                BooleanAssignment {
+                    atom: "r".to_owned(),
+                    value: true,
+                },
+            ]
+        );
+        assert_eq!(assignments_checked, 4);
     }
 
     #[test]
@@ -1056,8 +1204,15 @@ mod tests {
             .finite_boolean_countermodel
             .as_ref()
             .unwrap();
-        assert!(witness.validate().is_ok());
-        let premise_value = witness.premises[0]
+        let sequent = pair
+            .candidate
+            .local_stage
+            .scope_binding
+            .finite_boolean_sequent
+            .as_ref()
+            .unwrap();
+        assert!(witness.validate(sequent).is_ok());
+        let premise_value = sequent.premises[0]
             .evaluate(
                 &witness
                     .valuation
@@ -1067,6 +1222,64 @@ mod tests {
             )
             .unwrap();
         assert!(premise_value);
+    }
+
+
+    #[test]
+    fn countermodel_is_bound_to_candidate_visible_sequent() {
+        let pair = fixture();
+        let scope = &pair.candidate.local_stage.scope_binding;
+        let sequent = scope.finite_boolean_sequent.as_ref().unwrap();
+        let witness = pair
+            .evaluator_only
+            .as_ref()
+            .unwrap()
+            .finite_boolean_countermodel
+            .as_ref()
+            .unwrap();
+        assert!(witness.validate(sequent).is_ok());
+        assert_eq!(
+            pair.candidate.local_stage.scope_binding.finite_boolean_sequent,
+            pair.candidate.global_stage.scope_binding.finite_boolean_sequent
+        );
+    }
+
+    #[test]
+    fn unrelated_sequent_cannot_reuse_a_valid_countermodel_even_with_new_digest() {
+        let mut pair = fixture();
+        {
+            let scope = &mut pair.candidate.local_stage.scope_binding;
+            let sequent = scope.finite_boolean_sequent.as_mut().unwrap();
+            sequent.conclusion = BooleanFormula::Atom {
+                name: "q".to_owned(),
+            };
+            scope.finite_boolean_sequent_sha256 =
+                Some(domain_separated_sha256("finite_boolean_sequent", sequent).unwrap());
+        }
+        pair.candidate.global_stage.scope_binding =
+            pair.candidate.local_stage.scope_binding.clone();
+
+        assert!(
+            validate_pair(&pair)
+                .iter()
+                .any(|error| error.contains("countermodel conclusion evaluates to true"))
+        );
+    }
+
+    #[test]
+    fn changing_only_typed_sequent_digest_is_rejected() {
+        let mut pair = fixture();
+        pair.candidate
+            .local_stage
+            .scope_binding
+            .finite_boolean_sequent_sha256 = Some(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_owned(),
+        );
+        assert!(
+            validate_pair(&pair)
+                .iter()
+                .any(|error| error.contains("finite_boolean_sequent_sha256 does not match its canonical preimage"))
+        );
     }
 
     #[test]
