@@ -19,6 +19,22 @@ struct Snapshot {
     constant_info_dependency_closure: Vec<String>,
     unresolved_dependencies: Vec<String>,
     edges: Vec<Edge>,
+    #[serde(default)]
+    helper_nodes: Vec<HelperNode>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct HelperNode {
+    root_declaration: String,
+    node_role: String,
+    declaration: String,
+    declaration_kind: String,
+    proof_value_available: bool,
+    type_dependencies: Vec<String>,
+    proof_value_dependencies: Vec<String>,
+    constant_info_dependency_closure: Vec<String>,
+    unresolved_dependencies: Vec<String>,
+    edges: Vec<Edge>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -61,6 +77,9 @@ struct DeclarationDiff {
     candidate_edge_count: usize,
     edge_relation_counts_baseline: BTreeMap<String, usize>,
     edge_relation_counts_candidate: BTreeMap<String, usize>,
+    helper_nodes_baseline: Vec<String>,
+    helper_nodes_candidate: Vec<String>,
+    helper_expanded_proof_dependencies: SetDiff,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -104,6 +123,25 @@ fn closure_reconciles(snapshot: &Snapshot) -> bool {
     let type_refs = string_set(&snapshot.type_dependencies);
     let proof_refs = string_set(&snapshot.proof_value_dependencies);
     let closure = string_set(&snapshot.constant_info_dependency_closure);
+    union_set(&type_refs, &proof_refs) == closure
+}
+
+fn helper_expanded_proof_dependencies(snapshot: &Snapshot) -> BTreeSet<String> {
+    let mut dependencies = string_set(&snapshot.proof_value_dependencies);
+    for helper in &snapshot.helper_nodes {
+        dependencies.extend(helper.proof_value_dependencies.iter().cloned());
+    }
+    dependencies
+}
+
+fn helper_names(snapshot: &Snapshot) -> Vec<String> {
+    snapshot.helper_nodes.iter().map(|helper| helper.declaration.clone()).collect()
+}
+
+fn helper_closure_reconciles(helper: &HelperNode) -> bool {
+    let type_refs = string_set(&helper.type_dependencies);
+    let proof_refs = string_set(&helper.proof_value_dependencies);
+    let closure = string_set(&helper.constant_info_dependency_closure);
     union_set(&type_refs, &proof_refs) == closure
 }
 
@@ -177,6 +215,21 @@ fn load_cohort(path: &Path) -> Result<(CohortIdentity, BTreeMap<String, Snapshot
                 "type/proof dependency union does not reconcile with ConstantInfo closure for {}",
                 snapshot.declaration
             ));
+        }
+        for helper in &snapshot.helper_nodes {
+            if helper.root_declaration != snapshot.declaration
+                || helper.node_role != "generated_or_private_helper"
+                || !helper.proof_value_available
+                || !helper.unresolved_dependencies.is_empty()
+                || !helper_closure_reconciles(helper)
+            {
+                return Err(format!(
+                    "invalid helper-node receipt {} attached to {}",
+                    helper.declaration, snapshot.declaration
+                ));
+            }
+            let _helper_kind = &helper.declaration_kind;
+            let _helper_edges = helper.edges.len();
         }
 
         if snapshots
@@ -256,6 +309,12 @@ fn compare(
             candidate_edge_count: right.edges.len(),
             edge_relation_counts_baseline: relation_counts(left),
             edge_relation_counts_candidate: relation_counts(right),
+            helper_nodes_baseline: helper_names(left),
+            helper_nodes_candidate: helper_names(right),
+            helper_expanded_proof_dependencies: set_diff(
+                &helper_expanded_proof_dependencies(left),
+                &helper_expanded_proof_dependencies(right),
+            ),
         });
     }
 
@@ -409,6 +468,45 @@ mod tests {
                 .intersection_count,
             1
         );
+    }
+
+    #[test]
+    fn helper_node_dependencies_are_included_in_expanded_proof_comparison() {
+        let mut a = snapshot("Nat.choose_pos", &["Nat"], &["helper"]);
+        a.helper_nodes.push(HelperNode {
+            root_declaration: "Nat.choose_pos".to_owned(),
+            node_role: "generated_or_private_helper".to_owned(),
+            declaration: "Nat.choose_pos._f".to_owned(),
+            declaration_kind: "definition".to_owned(),
+            proof_value_available: true,
+            type_dependencies: vec!["Nat".to_owned()],
+            proof_value_dependencies: vec!["A".to_owned(), "B".to_owned()],
+            constant_info_dependency_closure: vec!["A".to_owned(), "B".to_owned(), "Nat".to_owned()],
+            unresolved_dependencies: Vec::new(),
+            edges: Vec::new(),
+        });
+        let mut b = snapshot("Nat.choose_pos", &["Nat"], &["helper"]);
+        b.helper_nodes.push(HelperNode {
+            root_declaration: "Nat.choose_pos".to_owned(),
+            node_role: "generated_or_private_helper".to_owned(),
+            declaration: "_private.Nat.choose_pos.match_1_1".to_owned(),
+            declaration_kind: "definition".to_owned(),
+            proof_value_available: true,
+            type_dependencies: vec!["Nat".to_owned()],
+            proof_value_dependencies: vec!["A".to_owned(), "B".to_owned()],
+            constant_info_dependency_closure: vec!["A".to_owned(), "B".to_owned(), "Nat".to_owned()],
+            unresolved_dependencies: Vec::new(),
+            edges: Vec::new(),
+        });
+        let report = compare(
+            identity("v1", "lean-a"),
+            BTreeMap::from([("Nat.choose_pos".to_owned(), a)]),
+            identity("v2", "lean-b"),
+            BTreeMap::from([("Nat.choose_pos".to_owned(), b)]),
+        ).expect("same root declaration inventory");
+        assert_eq!(report.declarations[0].helper_nodes_baseline.len(), 1);
+        assert_eq!(report.declarations[0].helper_nodes_candidate.len(), 1);
+        assert_eq!(report.declarations[0].helper_expanded_proof_dependencies.jaccard, 1.0);
     }
 
     #[test]

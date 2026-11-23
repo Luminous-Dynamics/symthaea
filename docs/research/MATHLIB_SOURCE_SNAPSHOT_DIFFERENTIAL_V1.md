@@ -48,3 +48,9 @@ This justifies a three-way comparison: Symthaea direct elaborated extraction, Le
 ## Claim boundary
 
 This is a four-declaration source-snapshot differential. It is not a corpus-level estimate, expert assessment of which dependency is mathematically essential, a controlled compiler-only ablation, or a direct LeanGraph raw-export differential. The v4.29 job uses the same Lean toolchain vintage as the pinned LeanGraph dataset and runs Symthaea's direct extractor; it is a comparability cohort, not LeanGraph execution itself.
+
+## Generated-helper boundary analysis
+
+Both pinned Lean extractors now emit nested helper_nodes records for direct proof-value dependencies whose fully qualified Name contains the root theorem's component sequence and has additional suffix components. This preserves exact private/generated helper identity, declaration kind, type and proof-value dependencies, ConstantInfo closure, unresolved names and edge provenance. The helper remains a separate node; its references are not silently flattened into the theorem's direct edge set.
+
+The differential CLI validates helper-node provenance and closure reconciliation, then reports helper names and the union of root plus one-level helper proof-value dependencies. This is a first boundary diagnostic, not yet a recursively expanded transitive closure. If a helper has further generated children, those require their own nodes in a subsequent expansion pass.

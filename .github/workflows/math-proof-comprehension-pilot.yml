@@ -252,7 +252,8 @@ jobs:
               and .lean_revision == "0b77e12952ad39077d80d8bd6b66d601f225c321"
               and .declaration == $declaration
               and (.unresolved_dependencies | length) == 0
-              and (.edges | length) > 0' "$file" >/dev/null
+              and (.edges | length) > 0
+              and (if $declaration == "Nat.choose_pos" then (.helper_nodes | length) > 0 else true end)' "$file" >/dev/null
           done
           echo "MATHLIB_ELABORATED_DEPENDENCY_EXTRACTION_PASS"
 
@@ -313,7 +314,7 @@ jobs:
           for declaration in Nat.choose_pos Set.countable_union Multiset.map_id Finset.card_map; do
             file="proof-comprehension-extract-${declaration}.json"
             test -s "$file"
-            jq -e --arg declaration "$declaration" '.schema_version == "1.0.0" and .source_revision == "8a178386ffc0f5fef0b77738bb5449d50efeea95" and .lean_revision == "98dc76e3c0a9b856c9b98726b713fb04fab16740" and .declaration == $declaration and (.unresolved_dependencies | length) == 0 and (.edges | length) > 0' "$file" >/dev/null
+            jq -e --arg declaration "$declaration" '.schema_version == "1.0.0" and .source_revision == "8a178386ffc0f5fef0b77738bb5449d50efeea95" and .lean_revision == "98dc76e3c0a9b856c9b98726b713fb04fab16740" and .declaration == $declaration and (.unresolved_dependencies | length) == 0 and (.edges | length) > 0 and (if $declaration == "Nat.choose_pos" then (.helper_nodes | length) > 0 else true end)' "$file" >/dev/null
           done
           echo "MATHLIB_V429_DIRECT_EXTRACTION_PASS"
 
@@ -365,7 +366,8 @@ jobs:
             and ([.declarations[] | select(.classification == "identical_type_proof_and_closure_sets")] | length) == 2
             and ([.declarations[] | select(.declaration == "Nat.choose_pos" and .classification == "stable_type_interface_proof_value_drift" and .type_dependencies.jaccard == 1)] | length) == 1
             and ([.declarations[] | select(.declaration == "Set.countable_union" and .classification == "type_and_or_closure_dependency_drift")] | length) == 1
-            and ([.declarations[] | select(.baseline_closure_reconciles == false or .candidate_closure_reconciles == false or .baseline_unresolved_count != 0 or .candidate_unresolved_count != 0)] | length) == 0' \
+            and ([.declarations[] | select(.baseline_closure_reconciles == false or .candidate_closure_reconciles == false or .baseline_unresolved_count != 0 or .candidate_unresolved_count != 0)] | length) == 0
+            and ([.declarations[] | select(.declaration == "Nat.choose_pos" and (.helper_nodes_baseline | length) > 0 and (.helper_nodes_candidate | length) > 0)] | length) == 1' \
             "$RUNNER_TEMP/mathlib-source-snapshot-diff.json" >/dev/null
           cat "$RUNNER_TEMP/mathlib-source-snapshot-diff.json" >> "$GITHUB_STEP_SUMMARY"
           echo "MATHLIB_SOURCE_SNAPSHOT_DIFFERENTIAL_PASS"

@@ -61,6 +61,23 @@ def structuralEdges (source : String) (info : ConstantInfo) : Array Json :=
           recursorInfo.all.toArray)
   | _ => #[]
 
+
+def startsWithNameParts : List Name → List Name → Bool
+  | [], _ => true
+  | _ :: _, [] => false
+  | expected :: expectedTail, actual :: actualTail =>
+      expected == actual && startsWithNameParts expectedTail actualTail
+
+partial def containsNameParts (needle haystack : List Name) : Bool :=
+  match haystack with
+  | [] => false
+  | _ :: rest => startsWithNameParts needle haystack || containsNameParts needle rest
+
+def isGeneratedHelperFor (root candidate : Name) : Bool :=
+  candidate != root
+    && candidate.components.length > root.components.length
+    && containsNameParts root.components candidate.components
+
 elab "#emit_proof_comprehension " declaration:ident : command => do
   let name := declaration.getId
   let env ← getEnv
@@ -82,6 +99,36 @@ elab "#emit_proof_comprehension " declaration:ident : command => do
       proofValueDependencies
     ++ structuralEdges declarationName info
 
+  let mut helperNodes : Array Json := #[]
+  for helperName in proofValueDependencies do
+    if isGeneratedHelperFor name helperName then
+      let some helperInfo := env.find? helperName
+        | throwError "proof-comprehension helper {helperName} referenced by {name} is not in the environment"
+      let helperTypeDependencies := helperInfo.type.getUsedConstantsAsSet.toList.toArray
+      let helperValue? := helperInfo.value? (allowOpaque := true)
+      let helperProofDependencies := helperValue?.map Expr.getUsedConstants |>.getD #[]
+      let helperClosure := helperInfo.getUsedConstantsAsSet.toList.toArray
+      let helperUnresolved :=
+        helperClosure.filter fun dependency => (env.find? dependency).isNone
+      let helperEdges :=
+        nameEdges (toString helperName) "type_dependency" "ConstantInfo.type"
+          helperTypeDependencies
+        ++ nameEdges (toString helperName) "proof_dependency" "ConstantInfo.value?"
+          helperProofDependencies
+        ++ structuralEdges (toString helperName) helperInfo
+      helperNodes := helperNodes.push <| Json.mkObj
+        [ ("root_declaration", toJson declarationName)
+        , ("node_role", toJson "generated_or_private_helper")
+        , ("declaration", toJson (toString helperName))
+        , ("declaration_kind", toJson (constantKind helperInfo))
+        , ("proof_value_available", toJson helperValue?.isSome)
+        , ("type_dependencies", namesJson helperTypeDependencies)
+        , ("proof_value_dependencies", namesJson helperProofDependencies)
+        , ("constant_info_dependency_closure", namesJson helperClosure)
+        , ("unresolved_dependencies", namesJson helperUnresolved)
+        , ("edges", Json.arr helperEdges)
+        ]
+
   let output := Json.mkObj
     [ ("schema_version", toJson "1.0.0")
     , ("source_repository", toJson "leanprover-community/mathlib4")
@@ -97,6 +144,7 @@ elab "#emit_proof_comprehension " declaration:ident : command => do
     , ("constant_info_dependency_closure", namesJson closureDependencies)
     , ("unresolved_dependencies", namesJson unresolvedDependencies)
     , ("edges", Json.arr edges)
+    , ("helper_nodes", Json.arr helperNodes)
     ]
 
   let outputPath := s!"proof-comprehension-extract-{name}.json"

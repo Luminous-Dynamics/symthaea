@@ -18,7 +18,8 @@
     "proof_value_dependencies",
     "constant_info_dependency_closure",
     "unresolved_dependencies",
-    "edges"
+    "edges",
+    "helper_nodes"
   ],
   "properties": {
     "schema_version": {
@@ -123,6 +124,122 @@
           }
         }
       }
+    },
+    "helper_nodes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/helperNode"
+      }
     }
-  }
+  },
+  "$defs": {
+    "helperNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "root_declaration",
+        "node_role",
+        "declaration",
+        "declaration_kind",
+        "proof_value_available",
+        "type_dependencies",
+        "proof_value_dependencies",
+        "constant_info_dependency_closure",
+        "unresolved_dependencies",
+        "edges"
+      ],
+      "properties": {
+        "root_declaration": {
+          "type": "string",
+          "minLength": 1
+        },
+        "node_role": {
+          "const": "generated_or_private_helper"
+        },
+        "declaration": {
+          "type": "string",
+          "minLength": 1
+        },
+        "declaration_kind": {
+          "enum": [
+            "axiom",
+            "definition",
+            "theorem",
+            "opaque",
+            "quotient",
+            "inductive",
+            "constructor",
+            "recursor"
+          ]
+        },
+        "proof_value_available": {
+          "type": "boolean"
+        },
+        "type_dependencies": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "proof_value_dependencies": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "constant_info_dependency_closure": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "unresolved_dependencies": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "source",
+              "target",
+              "relation",
+              "origin"
+            ],
+            "properties": {
+              "source": {
+                "type": "string",
+                "minLength": 1
+              },
+              "target": {
+                "type": "string",
+                "minLength": 1
+              },
+              "relation": {
+                "enum": [
+                  "type_dependency",
+                  "proof_dependency",
+                  "inductive_constructor",
+                  "mutual_inductive_member",
+                  "constructor_of",
+                  "recursor_for_inductive",
+                  "recursor_rule_constructor",
+                  "recursor_reduction_dependency"
+                ]
+              },
+              "origin": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "description": " Includes generated/private helper declarations referenced by the root theorem proof value."
 }
