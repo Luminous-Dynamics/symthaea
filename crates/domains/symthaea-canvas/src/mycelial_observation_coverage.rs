@@ -178,7 +178,10 @@ impl fmt::Display for MycelialObservationCoverageError {
                 )
             }
             Self::ObservationInventoryDigestMismatch => {
-                write!(f, "declared observation inventory digest does not match its canonical IDs")
+                write!(
+                    f,
+                    "declared observation inventory digest does not match its canonical IDs"
+                )
             }
             Self::DuplicateCandidateId {
                 observation_id,
