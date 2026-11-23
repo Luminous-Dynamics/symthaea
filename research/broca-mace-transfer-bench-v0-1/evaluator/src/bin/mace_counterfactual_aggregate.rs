@@ -270,6 +270,95 @@ fn parse_manifest(record: &Value) -> Result<(InputProvenance, String), String> {
 
     Ok((provenance, manifest_sha256))
 }
+fn required_event_ids(record: &Value, field: &str) -> Result<Vec<u32>, String> {
+    let values = record
+        .get(field)
+        .and_then(Value::as_array)
+        .ok_or_else(|| format!("missing or invalid event ID array {field}"))?;
+    values
+        .iter()
+        .map(|value| {
+            let id = value
+                .as_u64()
+                .ok_or_else(|| format!("event ID array {field} contains a non-unsigned integer"))?;
+            u32::try_from(id)
+                .map_err(|_| format!("event ID array {field} contains an out-of-range ID"))
+        })
+        .collect()
+}
+
+fn validate_score_against_manifest(score: &Value, manifest: &Value) -> Result<(), String> {
+    let candidate_observation_id = required_string(score, "candidate_observation_id")?;
+    if candidate_observation_id.len() > 512 {
+        return Err("candidate_observation_id exceeds 512 characters".to_string());
+    }
+    let candidate_input_sha256 = required_string(score, "candidate_input_sha256")?;
+    if !valid_sha256(candidate_input_sha256) {
+        return Err("invalid candidate_input_sha256 in evaluator score".to_string());
+    }
+
+    let score_intervention_id = required_string(score, "intervention_id")?;
+    let score_kind = required_string(score, "intervention_kind")?;
+    let score_method = required_string(score, "method")?;
+    let score_target = required_string(score, "target_key")?;
+    let score_removed = required_event_ids(score, "removed_event_ids")?;
+    let score_matched_to = score
+        .get("matched_to")
+        .cloned()
+        .unwrap_or(Value::Null);
+
+    // Full-evidence reference rows have no knockout entry in the manifest.
+    // Keep this exception narrow and deterministic.
+    if score_kind == "reference" {
+        let expected_id = format!("full_evidence_{score_method}");
+        if score_intervention_id != expected_id
+            || score_target != score_method
+            || !score_removed.is_empty()
+            || !score_matched_to.is_null()
+        {
+            return Err("invalid full-evidence reference row contract".to_string());
+        }
+        return Ok(());
+    }
+
+    let interventions = manifest
+        .get("interventions")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "validated manifest has no interventions array".to_string())?;
+
+    let declared = interventions
+        .iter()
+        .find(|item| {
+            item.get("intervention_id")
+                .and_then(Value::as_str)
+                == Some(score_intervention_id)
+        })
+        .ok_or_else(|| "evaluator score intervention_id is absent from pair-block manifest".to_string())?;
+
+    let declared_kind = required_string(declared, "kind")?;
+    let declared_target = required_string(declared, "target_key")?;
+    let declared_removed = required_event_ids(declared, "removed_event_ids")?;
+    let declared_matched_to = declared
+        .get("matched_to")
+        .cloned()
+        .unwrap_or(Value::Null);
+
+    if score_kind != declared_kind {
+        return Err("evaluator score intervention_kind differs from manifest".to_string());
+    }
+    if score_target != declared_target {
+        return Err("evaluator score target_key differs from manifest".to_string());
+    }
+    if score_removed != declared_removed {
+        return Err("evaluator score removed_event_ids differ from manifest".to_string());
+    }
+    if score_matched_to != declared_matched_to {
+        return Err("evaluator score matched_to differs from manifest".to_string());
+    }
+
+    Ok(())
+}
+
 fn parse_score(record: &Value) -> Result<(TaskKey, MethodKind, Metrics), String> {
     if required_string(record, "schema_version")? != INPUT_SCHEMA {
         return Err("unsupported input schema version".to_string());
@@ -511,6 +600,7 @@ fn reduce(
     let mut manifest_row_count = 0_usize;
     let mut manifest_shas = BTreeSet::new();
     let mut manifest_pair_blocks = BTreeSet::new();
+    let mut manifest_records: BTreeMap<String, Value> = BTreeMap::new();
     let mut input_provenance: Option<InputProvenance> = None;
 
     for (line_index, line) in reader.lines().enumerate() {
@@ -526,9 +616,10 @@ fn reduce(
                     .map_err(|error| format!("line {}: {error}", line_index + 1))?;
                 let manifest_pair_block =
                     required_string(&record, "pair_block_id")?.to_string();
-                if !manifest_pair_blocks.insert(manifest_pair_block) {
+                if !manifest_pair_blocks.insert(manifest_pair_block.clone()) {
                     return Err("duplicate intervention manifest pair_block_id".to_string());
                 }
+                manifest_records.insert(manifest_pair_block, record.clone());
                 if let Some(existing) = &input_provenance {
                     if existing != &provenance {
                         return Err("evaluator stream mixes run IDs or source/schema revisions".to_string());
@@ -555,9 +646,11 @@ fn reduce(
         }
         let (task_key, method_kind, metrics) = parse_score(&record)
             .map_err(|error| format!("line {}: {error}", line_index + 1))?;
-        if !manifest_pair_blocks.contains(&task_key.1) {
-            return Err("evaluator_score has no matching intervention manifest".to_string());
-        }
+        let manifest = manifest_records
+            .get(&task_key.1)
+            .ok_or_else(|| "evaluator_score has no matching intervention manifest".to_string())?;
+        validate_score_against_manifest(&record, manifest)
+            .map_err(|error| format!("line {}: {error}", line_index + 1))?;
         block_rows
             .entry(task_key)
             .or_default()
@@ -791,6 +884,138 @@ mod tests {
             "schema_sha256": "c".repeat(64),
             "source_revision": "d".repeat(40)
         })
+    }
+
+    fn append_intervention(record: &mut Value, intervention: Value) {
+        let mut interventions = record["interventions"]
+            .as_array()
+            .unwrap()
+            .clone();
+        interventions.push(intervention);
+
+        let root_pair_count = interventions
+            .iter()
+            .filter(|item| item["kind"] == "source_root_pair")
+            .count() as u64;
+        let matched_random_count = interventions
+            .iter()
+            .filter(|item| item["kind"] == "matched_random")
+            .count() as u64;
+        let baseline_evidence_sha256 = record["baseline_evidence_sha256"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        let public_seed = record["public_seed"].as_u64().unwrap();
+        let max_root_pairs = record["max_root_pairs"].as_u64().unwrap();
+        let unmatched_random_target_count =
+            record["unmatched_random_target_count"].as_u64().unwrap();
+
+        record["intervention_count"] = json!(interventions.len());
+        record["interventions"] = json!(interventions);
+        record["root_pair_count"] = json!(root_pair_count);
+        record["matched_random_count"] = json!(matched_random_count);
+
+        let payload = serde_json::to_vec(&json!({
+            "schema_version": INPUT_SCHEMA,
+            "seed": public_seed,
+            "baseline_evidence_sha256": baseline_evidence_sha256,
+            "max_root_pairs": max_root_pairs,
+            "root_pair_count": root_pair_count,
+            "matched_random_count": matched_random_count,
+            "unmatched_random_target_count": unmatched_random_target_count,
+            "interventions": record["interventions"]
+        }))
+        .unwrap();
+        record["manifest_sha256"] =
+            json!(hex_digest(Sha256::digest(payload).as_slice()));
+    }
+
+    fn linked_score(intervention_id: &str, kind: &str, target: &str, removed: Value) -> Value {
+        json!({
+            "candidate_observation_id": "observation-1",
+            "candidate_input_sha256": "f".repeat(64),
+            "intervention_id": intervention_id,
+            "intervention_kind": kind,
+            "method": "typed_content_hdc",
+            "target_key": target,
+            "removed_event_ids": removed,
+            "matched_to": null
+        })
+    }
+
+    #[test]
+    fn score_row_must_match_the_digest_verified_manifest_intervention() {
+        let mut manifest = manifest_record("run-1", &"a".repeat(64));
+        append_intervention(&mut manifest, json!({
+            "intervention_id": "event:1:1",
+            "kind": "event",
+            "target_key": "event:1",
+            "removed_event_ids": [1],
+            "matched_to": null
+        }));
+        parse_manifest(&manifest).unwrap();
+
+        let score = linked_score("event:1:1", "event", "event:1", json!([1]));
+        assert!(validate_score_against_manifest(&score, &manifest).is_ok());
+    }
+
+    #[test]
+    fn score_row_rejects_unknown_intervention_id() {
+        let manifest = manifest_record("run-1", &"a".repeat(64));
+        let score = linked_score("event:missing", "event", "event:missing", json!([9]));
+        let error = validate_score_against_manifest(&score, &manifest).unwrap_err();
+        assert!(error.contains("absent from pair-block manifest"));
+    }
+
+    #[test]
+    fn score_row_rejects_mutated_removed_event_set() {
+        let mut manifest = manifest_record("run-1", &"a".repeat(64));
+        append_intervention(&mut manifest, json!({
+            "intervention_id": "event:1:1",
+            "kind": "event",
+            "target_key": "event:1",
+            "removed_event_ids": [1],
+            "matched_to": null
+        }));
+        let score = linked_score("event:1:1", "event", "event:1", json!([2]));
+        let error = validate_score_against_manifest(&score, &manifest).unwrap_err();
+        assert!(error.contains("removed_event_ids differ"));
+    }
+
+    #[test]
+    fn score_row_rejects_kind_and_target_mismatch() {
+        let mut manifest = manifest_record("run-1", &"a".repeat(64));
+        append_intervention(&mut manifest, json!({
+            "intervention_id": "event:1:1",
+            "kind": "event",
+            "target_key": "event:1",
+            "removed_event_ids": [1],
+            "matched_to": null
+        }));
+        let wrong_kind = linked_score("event:1:1", "source_root", "event:1", json!([1]));
+        assert!(validate_score_against_manifest(&wrong_kind, &manifest).unwrap_err().contains("intervention_kind"));
+        let wrong_target = linked_score("event:1:1", "event", "event:2", json!([1]));
+        assert!(validate_score_against_manifest(&wrong_target, &manifest).unwrap_err().contains("target_key"));
+    }
+
+    #[test]
+    fn reference_score_rows_are_limited_to_matching_full_evidence_contract() {
+        let manifest = manifest_record("run-1", &"a".repeat(64));
+        let valid = linked_score(
+            "full_evidence_typed_content_hdc",
+            "reference",
+            "typed_content_hdc",
+            json!([])
+        );
+        assert!(validate_score_against_manifest(&valid, &manifest).is_ok());
+
+        let invalid = linked_score(
+            "full_evidence_event_id_key_value_topk",
+            "reference",
+            "typed_content_hdc",
+            json!([])
+        );
+        assert!(validate_score_against_manifest(&invalid, &manifest).is_err());
     }
 
     #[test]
