@@ -793,7 +793,11 @@ mod tests {
         );
         let mut scaled = baseline.clone();
         for action in &mut scaled.actions {
-            let scale = if action.action_id == "wafer-a" { 1.0e-8 } else { 1.0e8 };
+            let scale = if action.action_id == "wafer-a" {
+                1.0e-8
+            } else {
+                1.0e8
+            };
             for value in &mut action.sensitivity {
                 *value *= scale;
             }
@@ -801,7 +805,10 @@ mod tests {
 
         let baseline_report = plan_drift_identifiability_v1(&baseline).unwrap();
         let scaled_report = plan_drift_identifiability_v1(&scaled).unwrap();
-        assert_eq!(baseline_report.observed_design_rank, scaled_report.observed_design_rank);
+        assert_eq!(
+            baseline_report.observed_design_rank,
+            scaled_report.observed_design_rank
+        );
         assert_eq!(baseline_report.plan_status, scaled_report.plan_status);
         assert_eq!(baseline_report.target_status, scaled_report.target_status);
         // Retain mutable baseline to make the fixture's input ownership explicit.
