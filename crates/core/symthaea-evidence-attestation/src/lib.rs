@@ -9,7 +9,7 @@
 
 use std::collections::{BTreeSet, HashSet};
 
-use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
+use base64::{engine::general_purpose::{STANDARD as BASE64, STANDARD_NO_PAD as BASE64_NO_PAD, URL_SAFE as BASE64_URL, URL_SAFE_NO_PAD as BASE64_URL_NO_PAD}, Engine as _};
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use serde::{
     de::{self, Deserialize, Deserializer, MapAccess, SeqAccess, Visitor},
@@ -416,13 +416,16 @@ pub fn verify_source_receipt(
 }
 
 fn decode_canonical_base64(value: &str, field: &'static str) -> Result<Vec<u8>, AttestationError> {
-    let bytes = BASE64
-        .decode(value)
-        .map_err(|_| AttestationError::InvalidBase64(field))?;
-    if BASE64.encode(&bytes) != value {
-        return Err(AttestationError::InvalidBase64(field));
+    // DSSE requires verifiers to accept standard and URL-safe base64. Each
+    // accepted spelling must be canonical for its selected alphabet/padding.
+    for engine in [&BASE64, &BASE64_NO_PAD, &BASE64_URL, &BASE64_URL_NO_PAD] {
+        if let Ok(bytes) = engine.decode(value) {
+            if engine.encode(&bytes) == value {
+                return Ok(bytes);
+            }
+        }
     }
-    Ok(bytes)
+    Err(AttestationError::InvalidBase64(field))
 }
 
 #[cfg(test)]
@@ -541,6 +544,26 @@ mod tests {
         ).unwrap();
         assert_eq!(verified.claims.event_id, "evt-42");
         assert_eq!(verified.signer_key_ids, vec!["key-prod-1"]);
+    }
+
+    #[test]
+    fn standard_and_url_safe_base64_encodings_are_accepted() {
+        let (signer, store, _env) = fixture();
+        let payload = serde_json::to_vec(&claims()).unwrap();
+        let preimage = pae(SOURCE_RECEIPT_PAYLOAD_TYPE, &payload);
+        let signature = signer.sign(&preimage);
+        let env = DsseEnvelope {
+            payload_type: SOURCE_RECEIPT_PAYLOAD_TYPE.into(),
+            payload: BASE64_URL_NO_PAD.encode(&payload),
+            signatures: vec![DsseSignature {
+                keyid: None,
+                sig: BASE64_URL_NO_PAD.encode(signature.to_bytes()),
+            }],
+        };
+        let bytes = serde_json::to_vec(&env).unwrap();
+        assert!(verify_source_receipt(
+            &bytes, &store, "tenant-A", "urn:example:capacity-service", NOW, 1
+        ).is_ok());
     }
 
     #[test]
