@@ -397,6 +397,34 @@ With zero observed false-safe outcomes, a one-sided exact 95% binomial upper bou
 - Recovery cost: compute and memory needed to restore a richer representation after an unsupported request.
 - Selective risk: error among non-abstained cases, reported with coverage and UNKNOWN rate.
 
+## Kinetic Response Spectroscopy (KRS)
+
+New companion programme: [#13415 — phase-resolved kinetic response spectra and mixed-pulse kernels](https://github.com/Luminous-Dynamics/symthaea/issues/13415).
+
+KRS measures the kinetic state as a controlled multi-input / multi-output response system. In a stationary homogeneous equilibrium, a weak-pulse mode-to-mode transfer matrix can be compared against the analytic dielectric susceptibility / dispersion relation. At a phase-mixed or evolving checkpoint, do **not** assume time-translation invariance; measure a two-time causal kernel tied to the checkpoint and application time.
+
+KRS extends the signed response parity primitive and KRT response map with:
+- complex mode quadratures and cross-mode response matrices;
+- weak first-order impulse response and amplitude-convergence checks;
+- diagonal second-order finite-amplitude coefficients;
+- mixed second-order cross-pulse response from four signed combinations;
+- explicit pulse-order, phase, time and mode identity;
+- reference noise-floor and below-floor dispositions.
+
+For two distinct control coordinates a and b, the mixed coefficient is estimated by
+
+\[
+C_{ab}(a,b,t)=
+\frac{R(+a,+b,t)-R(+a,-b,t)-R(-a,+b,t)+R(-a,-b,t)}
+{4ab}.
+\]
+
+Keep it separate from each first-order contribution and diagonal quadratic term. This estimator does not make a generic nonlinear Volterra kernel identifiable from a finite set of pulses; it measures the registered mixed direction on the declared finite intervention basis.
+
+Ownership remains separated: #13138/#13169 own echo physics and branch graph; #13168 owns phase-aware sampled-trace primitives; #13156 owns risk calibration; #13404 owns adversarial witness search; #13414 owns response-balanced basis construction; #13132 owns qualified discrete adjoints/QoIs; #13104 owns representation tournament. KRS owns the phase-resolved response identification contract and estimators.
+
+The initial validation ladder is analytic Maxwellian susceptibility, manufactured complex MIMO fixtures, weak Landau response, phase-mixed two-time response and then finite-amplitude mixed-pulse cohorts. A pass on linear susceptibility is not evidence of nonlinear echo preservation.
+
 ## Response-balanced kinetic reduction (RBKR)
 
 New companion programme: [#13414 — build response-balanced kinetic reduction](https://github.com/Luminous-Dynamics/symthaea/issues/13414).
