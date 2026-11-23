@@ -103,7 +103,7 @@ fn response_mode_guardband_metrics(
         .distribution()
         .iter()
         .zip(control.distribution())
-        .map(|pulse_value, control_value| pulse_value - control_value)
+        .map(|(pulse_value, control_value)| pulse_value - control_value)
         .collect();
     let response_state = VlasovPoisson1d1v::new(config, response_distribution)?;
     let spectrum: JointPhaseSpaceSpectrum = response_state.joint_phase_space_spectrum()?;
@@ -225,6 +225,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!(
         "trace_columns,time,coarse_real,coarse_imag,fine_real,fine_imag,sponge_real,sponge_imag"
     );
+    println!(
+        "response_spectrum_columns,time,coarse_guard_075,coarse_guard_090,coarse_nyquist,coarse_signed_s_centroid,fine_guard_075,fine_guard_090,fine_nyquist,fine_signed_s_centroid,sponge_guard_075,sponge_guard_090,sponge_nyquist,sponge_signed_s_centroid"
+    );
     for step in 0..=total_steps {
         if step == pulse_step {
             coarse_pulse.apply_velocity_impulse(&second_kick)?;
@@ -234,6 +237,44 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         let time = coarse_pulse.time();
         if step % SAMPLE_EVERY == 0 || step == pulse_step || step == total_steps {
+            if step % (SAMPLE_EVERY * 10) == 0
+                && (prediction.echo_time - 6.0..=FINAL_TIME).contains(&time)
+            {
+                let coarse_metrics = response_mode_guardband_metrics(
+                    coarse_config,
+                    &coarse_pulse,
+                    &coarse_control,
+                    prediction.echo_mode as usize,
+                )?;
+                let fine_metrics = response_mode_guardband_metrics(
+                    fine_config,
+                    &fine_pulse,
+                    &fine_control,
+                    prediction.echo_mode as usize,
+                )?;
+                let sponge_metrics = response_mode_guardband_metrics(
+                    coarse_config,
+                    &sponge_pulse,
+                    &sponge_control,
+                    prediction.echo_mode as usize,
+                )?;
+                println!(
+                    "response_spectrum,{time:.8},{:.12e},{:.12e},{:.12e},{:.8},{:.12e},{:.12e},{:.12e},{:.8},{:.12e},{:.12e},{:.12e},{:.8}",
+                    coarse_metrics.0,
+                    coarse_metrics.1,
+                    coarse_metrics.2,
+                    coarse_metrics.3,
+                    fine_metrics.0,
+                    fine_metrics.1,
+                    fine_metrics.2,
+                    fine_metrics.3,
+                    sponge_metrics.0,
+                    sponge_metrics.1,
+                    sponge_metrics.2,
+                    sponge_metrics.3,
+                );
+            }
+
             let coarse_pulse_mode =
                 coarse_pulse.electric_mode_coefficient(prediction.echo_mode as usize)?;
             let coarse_control_mode =
