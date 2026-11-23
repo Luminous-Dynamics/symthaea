@@ -823,7 +823,7 @@ mod tests {
                 let position = position_by_stratum
                     .entry(observed.stratum_id.clone())
                     .or_default();
-                let selected = *position % 4 == 0;
+                let selected = (*position).is_multiple_of(4);
                 *position += 1;
                 MetrologyAuditSelectionRowV1 {
                     candidate_id: observed.candidate_id.clone(),
