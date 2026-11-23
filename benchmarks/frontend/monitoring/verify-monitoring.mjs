@@ -167,7 +167,105 @@ function evaluateCase(fixtureCase,trace){
   metrics
  };
 }
+
+function validateMonitorInputs(fixture,traces,policy){
+ assertKeys(fixture,['schema','fixture_id','clock','cases'],['schema','fixture_id','clock','cases'],'fixture');
+ assertKeys(fixture.clock,['unit','same_timestamp','notification_role'],['unit','same_timestamp','notification_role'],'clock');
+ if(fixture.clock.unit!=='virtual_seconds'||fixture.clock.notification_role!=='untrusted_wakeup_hint_only')fail('unsupported monitoring clock contract');
+ if(!Array.isArray(fixture.cases)||fixture.cases.length===0)fail('fixture cases must be a non-empty array');
+ const caseIds=new Set();
+ for(const item of fixture.cases){
+  assertKeys(item,['case_id','watch_contract','initial_state','source_events','notifications','expected'],['case_id','watch_contract','initial_state','source_events','notifications','expected'],'fixture case');
+  const caseId=stringField(item,'case_id');
+  if(caseIds.has(caseId))fail('duplicate fixture case ID: '+caseId);caseIds.add(caseId);
+  const c=item.watch_contract;
+  assertKeys(c,['watch_id','deadline','idempotency_key','action','predicate'],['watch_id','deadline','idempotency_key','action','predicate'],caseId+' watch contract');
+  if(typeof c.watch_id!=='string'||!c.watch_id||!Number.isSafeInteger(c.deadline)||c.deadline<1||typeof c.idempotency_key!=='string'||!c.idempotency_key)fail(caseId+': invalid watch contract identity/deadline');
+  assertKeys(c.action,['type','resource_id'],['type','resource_id'],caseId+' action contract');
+  if(typeof c.action.type!=='string'||!c.action.type||typeof c.action.resource_id!=='string'||!c.action.resource_id)fail(caseId+': invalid action contract');
+  const predicate=c.predicate;
+  const predicateKeys=predicate?.mode==='absolute'
+   ? ['mode','provider_status','capacity_gte','requires_permission']
+   : predicate?.mode==='relative'
+    ? ['mode','provider_status','capacity_delta_gte','requires_permission']
+    : [];
+  assertKeys(predicate,predicateKeys,predicateKeys,caseId+' predicate');
+  const threshold=predicate.mode==='absolute'?predicate.capacity_gte:predicate.capacity_delta_gte;
+  if(!['absolute','relative'].includes(predicate.mode)||typeof predicate.provider_status!=='string'||!predicate.provider_status||!Number.isFinite(threshold)||typeof predicate.requires_permission!=='boolean')fail(caseId+': invalid predicate value');
+  assertKeys(item.initial_state,['revision','provider_status','capacity','permission_granted','reserved'],['revision','provider_status','capacity','permission_granted','reserved'],caseId+' initial state');
+  if(!Number.isSafeInteger(item.initial_state.revision)||item.initial_state.revision<1||!Number.isFinite(item.initial_state.capacity)||typeof item.initial_state.provider_status!=='string'||typeof item.initial_state.permission_granted!=='boolean'||typeof item.initial_state.reserved!=='boolean')fail(caseId+': invalid initial state');
+  if(!Array.isArray(item.source_events)||!Array.isArray(item.notifications))fail(caseId+': source_events and notifications must be arrays');
+  const eventIds=new Set(),eventById=new Map();
+  const sortedEvents=[...item.source_events].sort((a,b)=>a.at-b.at||a.sequence-b.sequence);
+  let revision=item.initial_state.revision,previousAt=-1,previousSequence=0;
+  for(const event of sortedEvents){
+   assertKeys(event,['at','sequence','event_id','revision','patch'],['at','sequence','event_id','revision','patch'],caseId+' source event');
+   if(!Number.isSafeInteger(event.at)||event.at<0||event.at>c.deadline||!Number.isSafeInteger(event.sequence)||event.sequence<1||!Number.isSafeInteger(event.revision)||event.revision!==revision+1)fail(caseId+': invalid source event time/sequence/revision');
+   if(typeof event.event_id!=='string'||!event.event_id||eventIds.has(event.event_id))fail(caseId+': duplicate/invalid source event ID');
+   if(event.at<previousAt||(event.at===previousAt&&event.sequence<=previousSequence))fail(caseId+': source events are not deterministically ordered');
+   assertKeys(event.patch,['provider_status','capacity','permission_granted','reserved'],Object.keys(event.patch||{}),caseId+' source event patch');
+   if(!event.patch||Object.keys(event.patch).length===0)fail(caseId+': empty source event patch');
+   if(Object.hasOwn(event.patch,'provider_status')&&typeof event.patch.provider_status!=='string')fail(caseId+': invalid provider status patch');
+   if(Object.hasOwn(event.patch,'capacity')&&!Number.isFinite(event.patch.capacity))fail(caseId+': invalid capacity patch');
+   if(Object.hasOwn(event.patch,'permission_granted')&&typeof event.patch.permission_granted!=='boolean')fail(caseId+': invalid permission patch');
+   if(Object.hasOwn(event.patch,'reserved')&&typeof event.patch.reserved!=='boolean')fail(caseId+': invalid reserved patch');
+   eventIds.add(event.event_id);eventById.set(event.event_id,event);revision=event.revision;previousAt=event.at;previousSequence=event.sequence;
+  }
+  const noticeIds=new Set();
+  for(const notification of item.notifications){
+   assertKeys(notification,['message_id','source_event_id','claimed_revision','issuer','delivery_times'],['message_id','source_event_id','claimed_revision','issuer','delivery_times'],caseId+' notification');
+   if(typeof notification.message_id!=='string'||!notification.message_id||noticeIds.has(notification.message_id)||!Number.isSafeInteger(notification.claimed_revision)||notification.claimed_revision<1||typeof notification.issuer!=='string'||!notification.issuer||!Array.isArray(notification.delivery_times)||notification.delivery_times.length===0)fail(caseId+': invalid notification');
+   if(notification.source_event_id!==null){const source=eventById.get(notification.source_event_id);if(!source||source.revision!==notification.claimed_revision)fail(caseId+': notification source identity/revision mismatch');}
+   let lastDelivery=-1;
+   for(const time of notification.delivery_times){if(!Number.isSafeInteger(time)||time<lastDelivery||time>c.deadline)fail(caseId+': invalid notification delivery timeline');lastDelivery=time;}
+   noticeIds.add(notification.message_id);
+  }
+  assertKeys(item.expected,['outcome','condition_first_true_at','condition_expired_at','action_count','action_at','observation_count','poll_count','unique_wake_count','duplicate_wake_count','safety_pass','liveness_pass'],['outcome','condition_first_true_at','condition_expired_at','action_count','action_at','observation_count','poll_count','unique_wake_count','duplicate_wake_count','safety_pass','liveness_pass'],caseId+' expected result');
+  if(!['triggered','not_triggered','not_authorized','missed_trigger'].includes(item.expected.outcome)||typeof item.expected.safety_pass!=='boolean'||typeof item.expected.liveness_pass!=='boolean')fail(caseId+': invalid expected terminal result');
+ }
+ assertKeys(traces,['schema','fixture_id','fixture_sha256','traces'],['schema','fixture_id','fixture_sha256','traces'],'trace bundle');
+ if(!Array.isArray(traces.traces))fail('trace bundle traces must be an array');
+ const traceIds=new Set();
+ for(const trace of traces.traces){
+  assertKeys(trace,['case_id','steps','worker_claims'],['case_id','steps'],'raw trace');
+  if(typeof trace.case_id!=='string'||traceIds.has(trace.case_id)||!Array.isArray(trace.steps)||trace.steps.length<2||trace.steps.length>10000)fail('invalid/duplicate raw trace case or step count');
+  traceIds.add(trace.case_id);
+  if(Object.hasOwn(trace,'worker_claims')&&(!trace.worker_claims||typeof trace.worker_claims!=='object'||Array.isArray(trace.worker_claims)))fail(trace.case_id+': worker_claims must be an object');
+  const actionIds=new Set();
+  for(const step of trace.steps){
+   const shapes={
+    register_watch:['op','time','watch_id'],
+    wait_until:['op','time'],
+    wake:['op','time','message_id'],
+    observe:['op','time','revision','authority'],
+    poll:['op','time','revision'],
+    act:['op','time','revision','action_id','idempotency_key','action_type','resource_id'],
+    finish:['op','time','claimed_outcome']
+   };
+   const allowed=shapes[step?.op];
+   if(!allowed)fail(trace.case_id+': unsupported trace operation');
+   assertKeys(step,allowed,allowed,trace.case_id+' trace step');
+   if(!Number.isSafeInteger(step.time)||step.time<0)fail(trace.case_id+': invalid trace step time');
+   if(['observe','poll','act'].includes(step.op)&&(!Number.isSafeInteger(step.revision)||step.revision<1))fail(trace.case_id+': invalid trace revision');
+   if(step.op==='act'){
+    if(typeof step.action_id!=='string'||!step.action_id||actionIds.has(step.action_id)||typeof step.idempotency_key!=='string'||!step.idempotency_key||typeof step.action_type!=='string'||!step.action_type||typeof step.resource_id!=='string'||!step.resource_id)fail(trace.case_id+': invalid/duplicate action identity or target');
+    actionIds.add(step.action_id);
+   }
+  }
+ }
+ assertKeys(policy,['schema','policy_id','version','task_id','case_ids','rules'],['schema','policy_id','version','task_id','case_ids','rules'],'monitoring policy');
+ if(!Array.isArray(policy.case_ids)||!Array.isArray(policy.rules))fail('policy case_ids/rules must be arrays');
+ const ruleIds=new Set();
+ for(const rule of policy.rules){
+  assertKeys(rule,['id','severity','required','evaluator','description'],['id','severity','required','evaluator','description'],'policy rule');
+  if(typeof rule.id!=='string'||ruleIds.has(rule.id)||!['critical','high','medium','low'].includes(rule.severity)||rule.required!==true||typeof rule.evaluator!=='string'||!rule.evaluator||typeof rule.description!=='string'||!rule.description)fail('invalid/duplicate policy rule');
+  ruleIds.add(rule.id);
+ }
+ if([...caseIds].sort().join('|')!==[...traceIds].sort().join('|'))fail('fixture/trace case sets differ');
+}
+
 function verifyAll({fixtureBytes,traceBytes,policyBytes,fixture,traces,policy}){
+ validateMonitorInputs(fixture,traces,policy);
  if(sha256(policyBytes)!==PINNED_POLICY_SHA256)fail('monitoring policy digest does not match verifier allowlist');
  if(fixture.schema!=='sfeb-monitoring-fixture-v1'||policy.schema!=='sfeb-monitoring-policy-v1'||traces.schema!=='sfeb-monitoring-reference-traces-v1')fail('unsupported monitoring fixture/policy/trace schema');
  if(policy.task_id!=='SFEB-MON-001'||traces.fixture_id!==fixture.fixture_id)fail('monitoring task/fixture identity mismatch');
@@ -229,16 +327,17 @@ function selfTest(paths){
  if(baseline.oracle_results.some(r=>r.result!=='pass'||!r.non_vacuous))fail('monitoring oracle self-test failed');
  const mutated=clone(input.traces);
  mutated.traces[1].worker_claims={disposition:'rejected',observed_oracle_ids:['fake.fail']};
- const second=verifyAll({...input,traces:mutated});
+ const mutatedBytes=Buffer.from(JSON.stringify(mutated));
+ const second=verifyAll({...input,traces:mutated,traceBytes:mutatedBytes});
  if(JSON.stringify(baseline.case_results)!==JSON.stringify(second.case_results))fail('worker claims influenced monitoring verdict');
  const forged=clone(input.traces);
  const forgedTrace=forged.traces.find(t=>t.case_id==='forged-notification-is-not-authority');
- forgedTrace.steps.splice(4,0,{op:'act',time:5,revision:1,action_id:'forged-act',idempotency_key:'reserve:slot-forged-001'});
+ forgedTrace.steps.splice(4,0,{op:'act',time:5,revision:1,action_id:'forged-act',idempotency_key:'reserve:slot-forged-001',action_type:'reserve',resource_id:'slot-forged-001'});
  let earlyActionRejected=false;
- try{verifyAll({...input,traces:forged});}catch{earlyActionRejected=true;}
+ try{verifyAll({...input,traces:forged,traceBytes:Buffer.from(JSON.stringify(forged))});}catch{earlyActionRejected=true;}
  if(!earlyActionRejected)fail('forged wake produced an accepted mutation');
  const wrongTarget=clone(input.traces);const validTrace=wrongTarget.traces.find(t=>t.case_id==='absolute-threshold-event-wake');validTrace.steps.find(step=>step.op==='act').resource_id='attacker-controlled-resource';
- let wrongTargetRejected=false;try{verifyAll({...input,traces:wrongTarget});}catch{wrongTargetRejected=true;}
+ let wrongTargetRejected=false;try{verifyAll({...input,traces:wrongTarget,traceBytes:Buffer.from(JSON.stringify(wrongTarget))});}catch{wrongTargetRejected=true;}
  if(!wrongTargetRejected)fail('action target outside frozen watch contract was accepted');
  console.log(JSON.stringify({status:'monitoring_reference_preflight_passed',cases:baseline.case_results.length,
   oracle_rules:baseline.oracle_results.length,oracle_rules_passed:baseline.oracle_results.filter(r=>r.result==='pass').length,
