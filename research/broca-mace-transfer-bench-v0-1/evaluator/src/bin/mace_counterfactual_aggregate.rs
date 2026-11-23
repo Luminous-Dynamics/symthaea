@@ -682,6 +682,17 @@ fn expected_candidate_observation_id(
     format!("obs-{}", hex_digest(Sha256::digest(identity.as_bytes()).as_slice()))
 }
 
+fn supported_method(method: &str) -> bool {
+    matches!(
+        method,
+        "exact_scope_scan"
+            | "event_id_key_value_topk"
+            | "static_hdc"
+            | "hdc_ltc_zero_input"
+            | "typed_content_hdc"
+    )
+}
+
 fn expected_candidate_input_sha256(
     decision_need_sha256: &str,
     candidate_evidence_sha256: &str,
@@ -708,6 +719,9 @@ fn parse_candidate_receipt(record: &Value) -> Result<((String, String), Candidat
     let candidate_observation_sequence =
         required_u64(record, "candidate_observation_sequence")?;
     let method = required_string(record, "method")?.to_string();
+    if !supported_method(&method) {
+        return Err(format!("unsupported candidate method {method}"));
+    }
     let candidate_input_sha256 =
         required_string(record, "candidate_input_sha256")?.to_string();
     let decision_need_sha256 =
@@ -824,6 +838,7 @@ fn load_candidate_receipts(
     let stream_sha256 = hex_digest(Sha256::digest(&bytes).as_slice());
 
     let mut receipts = BTreeMap::new();
+    let mut seen_sequences = BTreeSet::new();
     let mut expected_run_id: Option<String> = None;
     let mut record_count = 0_usize;
     for (line_index, line) in content.lines().enumerate() {
@@ -840,6 +855,9 @@ fn load_candidate_receipts(
             }
         } else {
             expected_run_id = Some(receipt.run_id.clone());
+        }
+        if !seen_sequences.insert(receipt.candidate_observation_sequence) {
+            return Err("candidate stream contains duplicate execution sequence values".to_string());
         }
         if receipts.insert(key, receipt).is_some() {
             return Err("candidate stream contains duplicate pair-block/observation identity".to_string());
@@ -1274,6 +1292,25 @@ mod tests {
         assert_eq!(run_id, "run-1");
         assert_eq!(receipts.len(), 1);
         assert_eq!(digest, hex_digest(Sha256::digest(contents.as_bytes()).as_slice()));
+
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn candidate_stream_loader_rejects_duplicate_execution_sequences() {
+        let first = candidate_receipt_record("run-1", "world-1:task-a");
+        let second = candidate_receipt_record("run-1", "world-2:task-b");
+        let line_a = serde_json::to_string(&first).unwrap();
+        let line_b = serde_json::to_string(&second).unwrap();
+        let contents = format!("{line_a}\n{line_b}\n");
+        let path = env::temp_dir().join(format!(
+            "mace-candidate-stream-{}-sequence.jsonl",
+            std::process::id()
+        ));
+        fs::write(&path, contents.as_bytes()).unwrap();
+
+        let error = load_candidate_receipts(path.to_str().unwrap()).unwrap_err();
+        assert!(error.contains("duplicate execution sequence"));
 
         fs::remove_file(path).unwrap();
     }
