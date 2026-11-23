@@ -15,10 +15,8 @@ use crate::benchmark::metrology_audit::{
 };
 use crate::benchmark::metrology_semantics::validate_binary_measurand_semantics_v1;
 
-pub const REPLAY_SCENARIO_SCHEMA_V1: &str =
-    "luminous.semi-bench.synthetic-fab-replay-scenario.v1";
-pub const REPLAY_POLICY_VIEW_SCHEMA_V1: &str =
-    "luminous.semi-bench.synthetic-fab-policy-view.v1";
+pub const REPLAY_SCENARIO_SCHEMA_V1: &str = "luminous.semi-bench.synthetic-fab-replay-scenario.v1";
+pub const REPLAY_POLICY_VIEW_SCHEMA_V1: &str = "luminous.semi-bench.synthetic-fab-policy-view.v1";
 pub const REPLAY_EVALUATION_SCHEMA_V1: &str =
     "luminous.semi-bench.synthetic-fab-policy-evaluation.v1";
 
@@ -195,11 +193,11 @@ fn seal_selection_for_test(selection: &mut MetrologyAuditSelectionReportV1) {
     selection.selection_sha256 = selection_digest(selection).expect("selection should hash");
 }
 
-fn validate_config(
-    config: &SyntheticFabScenarioConfigV1,
-) -> Result<(), SyntheticFabReplayError> {
+fn validate_config(config: &SyntheticFabScenarioConfigV1) -> Result<(), SyntheticFabReplayError> {
     if config.schema != REPLAY_SCENARIO_SCHEMA_V1 {
-        return Err(SyntheticFabReplayError("scenario.schema: unsupported".into()));
+        return Err(SyntheticFabReplayError(
+            "scenario.schema: unsupported".into(),
+        ));
     }
     if config.scenario_id.trim().is_empty() {
         return Err(SyntheticFabReplayError(
@@ -248,10 +246,7 @@ fn process_shift(regime: SyntheticFabRegimeV1, fraction: f64) -> f64 {
     }
 }
 
-fn sensor_observation(
-    value: f64,
-    state: SyntheticSensorStateV1,
-) -> SyntheticSensorObservationV1 {
+fn sensor_observation(value: f64, state: SyntheticSensorStateV1) -> SyntheticSensorObservationV1 {
     SyntheticSensorObservationV1 {
         state,
         value: (state == SyntheticSensorStateV1::Observed).then_some(value),
@@ -411,7 +406,10 @@ pub fn evaluate_synthetic_metrology_policy_v1(
             }
             _ => {}
         }
-        if selection_by_id.insert(row.candidate_id.as_str(), row).is_some() {
+        if selection_by_id
+            .insert(row.candidate_id.as_str(), row)
+            .is_some()
+        {
             return Err(SyntheticFabReplayError(format!(
                 "selection.rows[{index}]: duplicate candidate identity"
             )));
@@ -505,8 +503,7 @@ pub fn evaluate_synthetic_metrology_policy_v1(
     let population_count = episode.policy_view.population_count;
     let escaped_defect_count = true_positive_count.saturating_sub(selected_positive_count);
     let true_defect_prevalence = true_positive_count as f64 / population_count as f64;
-    let selected_sample_prevalence =
-        selected_positive_count as f64 / selected_count as f64;
+    let selected_sample_prevalence = selected_positive_count as f64 / selected_count as f64;
     let horvitz_thompson_prevalence = ht_positive_total / population_count as f64;
     let horvitz_thompson_mean_brier = ht_brier_total / population_count as f64;
     let true_population_mean_brier = true_population_brier_total / population_count as f64;
@@ -670,16 +667,10 @@ mod tests {
 
     #[test]
     fn changed_seed_changes_the_observation_packet_digest() {
-        let first = generate_synthetic_fab_episode_v1(&config(
-            SyntheticFabRegimeV1::Stable,
-            42,
-        ))
-        .unwrap();
-        let second = generate_synthetic_fab_episode_v1(&config(
-            SyntheticFabRegimeV1::Stable,
-            43,
-        ))
-        .unwrap();
+        let first =
+            generate_synthetic_fab_episode_v1(&config(SyntheticFabRegimeV1::Stable, 42)).unwrap();
+        let second =
+            generate_synthetic_fab_episode_v1(&config(SyntheticFabRegimeV1::Stable, 43)).unwrap();
         assert_ne!(
             first.policy_view.observation_packet_sha256,
             second.policy_view.observation_packet_sha256
