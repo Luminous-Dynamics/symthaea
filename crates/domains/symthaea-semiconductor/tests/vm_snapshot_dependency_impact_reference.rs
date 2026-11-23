@@ -387,13 +387,13 @@ fn frozen_dag_matches_independent_fixed_point_impact_oracle() {
 
     let expected_direct: BTreeSet<String> = expected
         .iter()
-        .filter(|(_, (direct, _))| **direct != OracleRisk::None)
+        .filter(|(_, (direct, _))| *direct != OracleRisk::None)
         .map(|(id, _)| id.clone())
         .collect();
     let expected_transitive: BTreeSet<String> = expected
         .iter()
         .filter(|(_, (direct, inherited))| {
-            **direct == OracleRisk::None && **inherited != OracleRisk::None
+            *direct == OracleRisk::None && *inherited != OracleRisk::None
         })
         .map(|(id, _)| id.clone())
         .collect();
@@ -426,7 +426,7 @@ fn frozen_dag_matches_independent_fixed_point_impact_oracle() {
                 .unwrap()
                 .purpose;
             purpose == VmSnapshotPurposeV1::Training
-                && matches!(direct.max(*inherited), OracleRisk::Blocked)
+                && matches!((*direct).max(*inherited), OracleRisk::Blocked)
         })
         .map(|(id, _)| id.clone())
         .collect();
