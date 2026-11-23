@@ -26,14 +26,6 @@ pub enum PolicyArm {
     Treatment,
 }
 
-impl PolicyArm {
-    fn index(self) -> usize {
-        match self {
-            Self::Control => 0,
-            Self::Treatment => 1,
-        }
-    }
-}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -109,6 +101,12 @@ pub fn assign_profiles(
 
     let mut assignments = Vec::with_capacity(units.len());
     for (stratum, mut members) in strata {
+        if members.len() < 4 {
+            return Err(format!(
+                "stratum {} needs at least four profiles to support two clusters per arm",
+                stratum
+            ));
+        }
         members.sort_by(|left, right| {
             rank(seed, &stratum, &left.profile_id)
                 .cmp(&rank(seed, &stratum, &right.profile_id))
@@ -183,6 +181,7 @@ pub struct TotalEffectReport {
 
 #[derive(Debug, Clone)]
 struct ProfileMean {
+    stratum: String,
     arm: PolicyArm,
     episodes: usize,
     utility: f64,
@@ -217,13 +216,57 @@ pub fn estimate_total_effect(
         expected_schedule.insert((task.task_family.clone(), task.episode_id.clone()));
     }
 
-    let mut assigned = BTreeMap::new();
+    let mut assigned: BTreeMap<&str, &PolicyAssignment> = BTreeMap::new();
+    let mut positions_by_stratum: BTreeMap<String, BTreeMap<usize, PolicyArm>> = BTreeMap::new();
     for row in assignments {
         if row.profile_id.trim().is_empty() || row.stratum.trim().is_empty() {
             return Err("assignment profile_id and stratum must not be empty".to_string());
         }
-        if assigned.insert(row.profile_id.as_str(), row.arm).is_some() {
+        if assigned.insert(row.profile_id.as_str(), row).is_some() {
             return Err(format!("duplicate assignment for {}", row.profile_id));
+        }
+        if positions_by_stratum
+            .entry(row.stratum.clone())
+            .or_default()
+            .insert(row.block_position, row.arm)
+            .is_some()
+        {
+            return Err(format!(
+                "duplicate block_position {} in stratum {}",
+                row.block_position, row.stratum
+            ));
+        }
+    }
+
+    // The estimator below is stratified to match the actual blocked design.
+    // Verify that each stratum is represented by contiguous positions and an
+    // alternating sequence; otherwise the caller may have supplied an
+    // allocation that does not match the declared randomization mechanism.
+    for (stratum, positions) in &positions_by_stratum {
+        if positions.len() < 4 {
+            return Err(format!(
+                "stratum {} needs at least four profiles for stratified variance estimation",
+                stratum
+            ));
+        }
+        for (expected_position, (position, arm)) in positions.iter().enumerate() {
+            if *position != expected_position {
+                return Err(format!(
+                    "non-contiguous block positions in stratum {}",
+                    stratum
+                ));
+            }
+            if expected_position > 0 {
+                let previous_arm = positions
+                    .get(&(expected_position - 1))
+                    .ok_or_else(|| format!("missing prior block position in stratum {}", stratum))?;
+                if *previous_arm == *arm {
+                    return Err(format!(
+                        "non-alternating treatment assignment in stratum {}",
+                        stratum
+                    ));
+                }
+            }
         }
     }
 
@@ -236,10 +279,10 @@ pub fn estimate_total_effect(
         {
             return Err("outcome profile_id, episode_id and task_family must not be empty".to_string());
         }
-        let assigned_arm = assigned
+        let assignment = assigned
             .get(row.profile_id.as_str())
             .ok_or_else(|| format!("outcome for unassigned profile {}", row.profile_id))?;
-        if *assigned_arm != row.arm {
+        if assignment.arm != row.arm {
             return Err(format!("outcome arm differs from assignment for {}", row.profile_id));
         }
         if !row.utility.is_finite() || !(0.0..=1.0).contains(&row.utility) {
@@ -294,7 +337,11 @@ pub fn estimate_total_effect(
             privacy += u64::from(row.privacy_violations);
             unauthorized += u64::from(row.unauthorized_actions);
         }
+        let assignment = assigned
+            .get(profile_id.as_str())
+            .ok_or_else(|| format!("missing assignment for profile {}", profile_id))?;
         profile_means.push(ProfileMean {
+            stratum: assignment.stratum.clone(),
             arm: first.arm,
             episodes: episodes.len(),
             utility: utility / n,
@@ -307,23 +354,59 @@ pub fn estimate_total_effect(
         });
     }
 
-    let mut arms: [Vec<&ProfileMean>; 2] = [Vec::new(), Vec::new()];
-    for profile in &profile_means {
-        arms[profile.arm.index()].push(profile);
-    }
-    let control = &arms[PolicyArm::Control.index()];
-    let treatment = &arms[PolicyArm::Treatment.index()];
+    let control: Vec<&ProfileMean> = profile_means
+        .iter()
+        .filter(|profile| profile.arm == PolicyArm::Control)
+        .collect();
+    let treatment: Vec<&ProfileMean> = profile_means
+        .iter()
+        .filter(|profile| profile.arm == PolicyArm::Treatment)
+        .collect();
     if control.len() < 2 || treatment.len() < 2 {
         return Err("at least two independent profiles per arm are required".to_string());
     }
 
-    let control_summary = summarize_arm(control);
-    let treatment_summary = summarize_arm(treatment);
-    let control_values: Vec<f64> = control.iter().map(|p| p.utility).collect();
-    let treatment_values: Vec<f64> = treatment.iter().map(|p| p.utility).collect();
-    let effect = mean(&treatment_values) - mean(&control_values);
-    let se = (sample_variance(&treatment_values) / treatment_values.len() as f64
-        + sample_variance(&control_values) / control_values.len() as f64).sqrt();
+    let control_summary = summarize_arm(&control);
+    let treatment_summary = summarize_arm(&treatment);
+
+    // For a blocked/stratified design, a pooled difference can be biased when
+    // strata have different baselines and odd block sizes yield different
+    // treatment proportions. Estimate each stratum's contrast, weight by its
+    // share of all randomized profiles, then combine stratum variances.
+    let mut profiles_by_stratum: BTreeMap<String, [Vec<&ProfileMean>; 2]> = BTreeMap::new();
+    for profile in &profile_means {
+        let arms = profiles_by_stratum
+            .entry(profile.stratum.clone())
+            .or_insert_with(|| [Vec::new(), Vec::new()]);
+        let arm_index = match profile.arm {
+            PolicyArm::Control => 0,
+            PolicyArm::Treatment => 1,
+        };
+        arms[arm_index].push(profile);
+    }
+
+    let total_profiles = profile_means.len() as f64;
+    let mut effect = 0.0;
+    let mut variance = 0.0;
+    for (stratum, arms) in &profiles_by_stratum {
+        let controls = &arms[0];
+        let treatments = &arms[1];
+        if controls.len() < 2 || treatments.len() < 2 {
+            return Err(format!(
+                "stratum {} needs at least two independent profiles in each arm",
+                stratum
+            ));
+        }
+        let weight = (controls.len() + treatments.len()) as f64 / total_profiles;
+        let control_values: Vec<f64> = controls.iter().map(|profile| profile.utility).collect();
+        let treatment_values: Vec<f64> = treatments.iter().map(|profile| profile.utility).collect();
+        let stratum_effect = mean(&treatment_values) - mean(&control_values);
+        let stratum_variance = sample_variance(&treatment_values) / treatment_values.len() as f64
+            + sample_variance(&control_values) / control_values.len() as f64;
+        effect += weight * stratum_effect;
+        variance += weight * weight * stratum_variance;
+    }
+    let se = variance.sqrt();
     let confirmatory = control.len() >= MIN_CONFIRMATORY_CLUSTERS_PER_ARM
         && treatment.len() >= MIN_CONFIRMATORY_CLUSTERS_PER_ARM;
     let hard_gates_passed = control_summary.privacy_violations == 0
@@ -384,7 +467,7 @@ mod tests {
         (0..8).map(|i| PolicyAssignment {
             profile_id: format!("profile-{i:03}"),
             stratum: "family-a".to_string(),
-            arm: if i < 4 { PolicyArm::Control } else { PolicyArm::Treatment },
+            arm: if i % 2 == 0 { PolicyArm::Control } else { PolicyArm::Treatment },
             block_position: i,
         }).collect()
     }
@@ -465,6 +548,61 @@ mod tests {
         assert!((report.control.mean_utility - 0.35).abs() < 1e-12);
         assert!((report.treatment.mean_utility - 0.9).abs() < 1e-12);
         assert!((report.utility_effect.treatment_minus_control - 0.55).abs() < 1e-12);
+    }
+
+    #[test]
+    fn stratified_effect_is_weighted_by_profile_population_not_pooled_arm_mix() {
+        let mut assignments = Vec::new();
+        for (stratum, treatment_first) in [("high-baseline", true), ("low-baseline", false)] {
+            for position in 0..5 {
+                let treatment = (position % 2 == 0) == treatment_first;
+                assignments.push(PolicyAssignment {
+                    profile_id: format!("{}-{position}", stratum),
+                    stratum: stratum.to_string(),
+                    arm: if treatment { PolicyArm::Treatment } else { PolicyArm::Control },
+                    block_position: position,
+                });
+            }
+        }
+        let mut outcomes = Vec::new();
+        for assignment in &assignments {
+            let high = assignment.stratum == "high-baseline";
+            let treatment = assignment.arm == PolicyArm::Treatment;
+            let utility = match (high, treatment) {
+                (true, true) => 0.9,
+                (true, false) => 0.8,
+                (false, true) => 0.3,
+                (false, false) => 0.2,
+            };
+            outcomes.push(EpisodeOutcome {
+                profile_id: assignment.profile_id.clone(),
+                episode_id: "task-1".to_string(),
+                task_family: "planning".to_string(),
+                arm: assignment.arm,
+                utility,
+                task_success: utility > 0.5,
+                question_count: 1,
+                all_in_cost: 0.1,
+                user_refused: false,
+                privacy_violations: 0,
+                unauthorized_actions: 0,
+            });
+        }
+
+        let report = estimate_total_effect(
+            &assignments,
+            &[ScheduledTask { episode_id: "task-1".into(), task_family: "planning".into() }],
+            &outcomes,
+        ).unwrap();
+        assert!((report.utility_effect.treatment_minus_control - 0.1).abs() < 1e-12);
+    }
+
+    #[test]
+    fn rejects_non_alternating_assignment_blocks() {
+        let mut assignments = make_assignments();
+        assignments[1].arm = PolicyArm::Control;
+        let outcomes = make_outcomes(&assignments);
+        assert!(estimate_total_effect(&assignments, &expected_tasks(), &outcomes).is_err());
     }
 
     #[test]
