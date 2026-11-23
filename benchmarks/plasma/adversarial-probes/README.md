@@ -52,3 +52,18 @@ The symthaea-plasma-probes crate also exposes EmpiricalGramian. It stores weight
 For reachability, factors can be propagated intervention increments. For observability, factors can be pullbacks of output-sensitivity directions to the checkpoint state. The caller must derive these from the actual discrete solver and frozen control/QoI contract.
 
 The current implementation is a positive-semidefinite factorized Gramian primitive only. It does not compute tangent operators, solve adjoints, perform balancing / SVD, certify nonlinear response bounds, or authorize a representation transition. Five additional manufactured small-matrix tests check the factorized operator against the explicit 2x2 Gramian, validate cost / dimension / finiteness guards, and check basis trace capture. These tests are authored but require Rust compilation and execution before being treated as passing.
+
+
+## Phase-resolved response spectroscopy primitives
+
+The crate also exposes:
+- `ComplexResponse`: a finite complex coefficient with explicit real/imaginary quadratures;
+- `ModeResponseMatrix`: output-mode by input-mode coefficients, preserving declared mode order and leaving unmeasured entries as `None`;
+- relative complex Frobenius error only when the mode axes match and both matrices are complete;
+- signed first-order and diagonal second-order finite-amplitude coefficients;
+- mixed second-order coefficients from the four signed combinations;
+- wrapped phase difference, returning no value if either response has zero magnitude.
+
+The diagonal second-order estimator returns the Taylor coefficient multiplying A^2, not the unscaled second derivative. The mixed estimator identifies one registered mixed control direction, not a general Volterra kernel. Neither may be interpreted as an asymptotic derivative until amplitude convergence has been established on independent physical runs.
+
+The response matrix is an analysis primitive, not a Vlasov pulse executor. It does not create the physical input-output data, establish reference convergence, or authorize branch association. It intentionally distinguishes a missing coefficient from a measured zero.
