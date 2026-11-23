@@ -96,6 +96,7 @@
         "run_id",
         "pair_block_id",
         "manifest_sha256",
+        "manifest_payload_sha256",
         "baseline_evidence_sha256",
         "public_seed",
         "intervention_count",
@@ -181,6 +182,9 @@
           ]
         },
         "schema_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "manifest_payload_sha256": {
           "$ref": "#/$defs/sha256"
         }
       }

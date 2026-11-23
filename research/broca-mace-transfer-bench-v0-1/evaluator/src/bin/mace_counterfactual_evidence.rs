@@ -473,6 +473,29 @@ fn build_manifest(
     })
 }
 
+fn manifest_receipt_sha256(
+    run_id: &str,
+    pair_block_id: &str,
+    manifest_payload_sha256: &str,
+    source_code_sha256: &str,
+    fixture_sha256: &str,
+    schema_sha256: &str,
+    source_revision: Option<&str>,
+) -> String {
+    let receipt_payload = serde_json::to_vec(&json!({
+        "schema_version": SCHEMA_VERSION,
+        "run_id": run_id,
+        "pair_block_id": pair_block_id,
+        "manifest_payload_sha256": manifest_payload_sha256,
+        "source_code_sha256": source_code_sha256,
+        "fixture_sha256": fixture_sha256,
+        "schema_sha256": schema_sha256,
+        "source_revision": source_revision
+    }))
+    .expect("candidate manifest receipt is serializable");
+    hex_digest(Sha256::digest(receipt_payload).as_slice())
+}
+
 fn stable_key_seed(key: &str) -> u64 {
     let digest = Sha256::digest(key.as_bytes());
     u64::from_be_bytes(digest[..8].try_into().expect("SHA-256 prefix is eight bytes"))
@@ -867,12 +890,22 @@ fn run() -> Result<(), String> {
             case.decision_need,
             &manifest.baseline_evidence_sha256,
         );
+        let manifest_receipt_sha256 = manifest_receipt_sha256(
+            run_id,
+            &pair_block_id,
+            &manifest.manifest_sha256,
+            &source_code_sha256,
+            &fixture_sha256,
+            &schema_sha256,
+            source_revision.as_deref(),
+        );
         evaluator_records.push(json!({
             "schema_version": SCHEMA_VERSION,
             "record_type": "intervention_manifest",
             "run_id": run_id,
             "pair_block_id": pair_block_id,
-            "manifest_sha256": manifest.manifest_sha256,
+            "manifest_payload_sha256": manifest.manifest_sha256,
+            "manifest_sha256": manifest_receipt_sha256,
             "baseline_evidence_sha256": manifest.baseline_evidence_sha256,
             "public_seed": manifest.seed,
             "intervention_count": manifest.interventions.len(),

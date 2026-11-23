@@ -199,14 +199,20 @@ fn parse_manifest(record: &Value) -> Result<(InputProvenance, String), String> {
         return Err("intervention manifest has invalid source_revision".to_string());
     }
 
+    let pair_block_id = required_string(record, "pair_block_id")?;
+    parse_cluster(pair_block_id)
+        .map_err(|error| format!("invalid intervention manifest pair_block_id: {error}"))?;
+
+    let manifest_payload_sha256 =
+        required_string(record, "manifest_payload_sha256")?.to_string();
+    if !valid_sha256(&manifest_payload_sha256) {
+        return Err("invalid manifest_payload_sha256".to_string());
+    }
     let manifest_sha256 = required_string(record, "manifest_sha256")?.to_string();
     if !valid_sha256(&manifest_sha256) {
         return Err("invalid manifest_sha256".to_string());
     }
 
-    // Reconstruct exactly the candidate runner's hashed payload. Metadata
-    // outside this payload (run ID, pair block, source digests) is separately
-    // validated and bound by the reducer's run-level provenance checks.
     let public_seed = required_u64(record, "public_seed")?;
     let baseline_evidence_sha256 =
         required_string(record, "baseline_evidence_sha256")?.to_string();
@@ -289,6 +295,7 @@ fn parse_manifest(record: &Value) -> Result<(InputProvenance, String), String> {
         return Err("matched_random_count does not match interventions array".to_string());
     }
 
+    // First verify the content-addressed intervention payload.
     let manifest_payload = serde_json::to_vec(&json!({
         "schema_version": INPUT_SCHEMA,
         "seed": public_seed,
@@ -300,10 +307,28 @@ fn parse_manifest(record: &Value) -> Result<(InputProvenance, String), String> {
         "interventions": interventions
     }))
     .map_err(|error| format!("serialize intervention manifest payload: {error}"))?;
-    let computed_manifest_sha256 =
+    let computed_payload_sha256 =
         hex_digest(Sha256::digest(manifest_payload).as_slice());
-    if computed_manifest_sha256 != manifest_sha256 {
-        return Err("intervention manifest digest does not match canonical payload".to_string());
+    if computed_payload_sha256 != manifest_payload_sha256 {
+        return Err("intervention manifest payload digest does not match canonical payload".to_string());
+    }
+
+    // Then bind that payload to its exact run, task block and source provenance.
+    let receipt_payload = serde_json::to_vec(&json!({
+        "schema_version": INPUT_SCHEMA,
+        "run_id": provenance.run_id.as_str(),
+        "pair_block_id": pair_block_id,
+        "manifest_payload_sha256": manifest_payload_sha256,
+        "source_code_sha256": provenance.source_code_sha256.as_str(),
+        "fixture_sha256": provenance.fixture_sha256.as_str(),
+        "schema_sha256": provenance.schema_sha256.as_str(),
+        "source_revision": provenance.source_revision.as_deref()
+    }))
+    .map_err(|error| format!("serialize intervention manifest receipt: {error}"))?;
+    let computed_receipt_sha256 =
+        hex_digest(Sha256::digest(receipt_payload).as_slice());
+    if computed_receipt_sha256 != manifest_sha256 {
+        return Err("intervention manifest receipt digest does not match run/pair-block provenance".to_string());
     }
 
     Ok((provenance, manifest_sha256))
@@ -890,14 +915,18 @@ mod tests {
         })
     }
 
-    fn manifest_record(run_id: &str, source_sha: &str) -> Value {
-        let baseline_evidence_sha256 = "a".repeat(64);
-        let public_seed = 17_u64;
-        let max_root_pairs = 8_u64;
-        let root_pair_count = 0_u64;
-        let matched_random_count = 0_u64;
-        let unmatched_random_target_count = 0_u64;
-        let interventions = Vec::<Value>::new();
+    fn refresh_manifest_digests(record: &mut Value) {
+        let baseline_evidence_sha256 = record["baseline_evidence_sha256"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        let public_seed = record["public_seed"].as_u64().unwrap();
+        let max_root_pairs = record["max_root_pairs"].as_u64().unwrap();
+        let root_pair_count = record["root_pair_count"].as_u64().unwrap();
+        let matched_random_count = record["matched_random_count"].as_u64().unwrap();
+        let unmatched_random_target_count =
+            record["unmatched_random_target_count"].as_u64().unwrap();
+
         let payload = serde_json::to_vec(&json!({
             "schema_version": INPUT_SCHEMA,
             "seed": public_seed,
@@ -906,17 +935,42 @@ mod tests {
             "root_pair_count": root_pair_count,
             "matched_random_count": matched_random_count,
             "unmatched_random_target_count": unmatched_random_target_count,
-            "interventions": interventions
+            "interventions": record["interventions"]
         }))
         .unwrap();
-        let manifest_sha256 = hex_digest(Sha256::digest(payload).as_slice());
+        let payload_sha256 = hex_digest(Sha256::digest(payload).as_slice());
+        record["manifest_payload_sha256"] = json!(payload_sha256);
 
-        json!({
+        let receipt_payload = serde_json::to_vec(&json!({
+            "schema_version": INPUT_SCHEMA,
+            "run_id": record["run_id"],
+            "pair_block_id": record["pair_block_id"],
+            "manifest_payload_sha256": payload_sha256,
+            "source_code_sha256": record["source_code_sha256"],
+            "fixture_sha256": record["fixture_sha256"],
+            "schema_sha256": record["schema_sha256"],
+            "source_revision": record["source_revision"]
+        }))
+        .unwrap();
+        record["manifest_sha256"] =
+            json!(hex_digest(Sha256::digest(receipt_payload).as_slice()));
+    }
+
+    fn manifest_record(run_id: &str, source_sha: &str) -> Value {
+        let baseline_evidence_sha256 = "a".repeat(64);
+        let public_seed = 17_u64;
+        let max_root_pairs = 8_u64;
+        let root_pair_count = 0_u64;
+        let matched_random_count = 0_u64;
+        let unmatched_random_target_count = 0_u64;
+        let interventions = Vec::<Value>::new();
+        let mut record = json!({
             "schema_version": INPUT_SCHEMA,
             "record_type": "intervention_manifest",
             "run_id": run_id,
             "pair_block_id": "world-1:task-manifest-test",
-            "manifest_sha256": manifest_sha256,
+            "manifest_payload_sha256": "0".repeat(64),
+            "manifest_sha256": "0".repeat(64),
             "baseline_evidence_sha256": baseline_evidence_sha256,
             "public_seed": public_seed,
             "intervention_count": 0,
@@ -929,7 +983,9 @@ mod tests {
             "fixture_sha256": "b".repeat(64),
             "schema_sha256": "c".repeat(64),
             "source_revision": "d".repeat(40)
-        })
+        });
+        refresh_manifest_digests(&mut record);
+        record
     }
 
     fn append_intervention(record: &mut Value, intervention: Value) {
@@ -947,33 +1003,12 @@ mod tests {
             .iter()
             .filter(|item| item["kind"] == "matched_random")
             .count() as u64;
-        let baseline_evidence_sha256 = record["baseline_evidence_sha256"]
-            .as_str()
-            .unwrap()
-            .to_string();
-        let public_seed = record["public_seed"].as_u64().unwrap();
-        let max_root_pairs = record["max_root_pairs"].as_u64().unwrap();
-        let unmatched_random_target_count =
-            record["unmatched_random_target_count"].as_u64().unwrap();
 
         record["intervention_count"] = json!(interventions.len());
         record["interventions"] = json!(interventions);
         record["root_pair_count"] = json!(root_pair_count);
         record["matched_random_count"] = json!(matched_random_count);
-
-        let payload = serde_json::to_vec(&json!({
-            "schema_version": INPUT_SCHEMA,
-            "seed": public_seed,
-            "baseline_evidence_sha256": baseline_evidence_sha256,
-            "max_root_pairs": max_root_pairs,
-            "root_pair_count": root_pair_count,
-            "matched_random_count": matched_random_count,
-            "unmatched_random_target_count": unmatched_random_target_count,
-            "interventions": record["interventions"]
-        }))
-        .unwrap();
-        record["manifest_sha256"] =
-            json!(hex_digest(Sha256::digest(payload).as_slice()));
+        refresh_manifest_digests(record);
     }
 
     fn linked_score(intervention_id: &str, kind: &str, target: &str, removed: Value) -> Value {
@@ -1076,6 +1111,38 @@ mod tests {
 
         let invalid = manifest_record("run-1", "not-a-sha");
         assert!(parse_manifest(&invalid).is_err());
+    }
+
+    #[test]
+    fn manifest_receipt_binds_pair_block_identity() {
+        let mut record = manifest_record("run-1", &"a".repeat(64));
+        record["pair_block_id"] = json!("world-2:task-relabeled");
+        let error = parse_manifest(&record).unwrap_err();
+        assert!(error.contains("receipt digest does not match"));
+    }
+
+    #[test]
+    fn manifest_receipt_binds_run_identity() {
+        let mut record = manifest_record("run-1", &"a".repeat(64));
+        record["run_id"] = json!("run-2");
+        let error = parse_manifest(&record).unwrap_err();
+        assert!(error.contains("receipt digest does not match"));
+    }
+
+    #[test]
+    fn manifest_receipt_binds_source_provenance() {
+        let mut record = manifest_record("run-1", &"a".repeat(64));
+        record["source_code_sha256"] = json!("b".repeat(64));
+        let error = parse_manifest(&record).unwrap_err();
+        assert!(error.contains("receipt digest does not match"));
+    }
+
+    #[test]
+    fn manifest_payload_digest_is_separate_from_receipt_digest() {
+        let mut record = manifest_record("run-1", &"a".repeat(64));
+        record["manifest_payload_sha256"] = json!("f".repeat(64));
+        let error = parse_manifest(&record).unwrap_err();
+        assert!(error.contains("payload digest does not match"));
     }
 
     #[test]
