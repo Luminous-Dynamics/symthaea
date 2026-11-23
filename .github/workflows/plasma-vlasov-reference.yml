@@ -56,8 +56,17 @@ jobs:
         run: /usr/bin/time -v -o artifacts/plasma-vlasov-reference/velocity-sponge-echo-resource.txt cargo run --release --locked --manifest-path crates/tools/plasma-vlasov-reference/Cargo.toml --example velocity_sponge_echo > artifacts/plasma-vlasov-reference/velocity-sponge-echo.csv
       - name: Run delayed echo across velocity Nyquist
         run: /usr/bin/time -v -o artifacts/plasma-vlasov-reference/delayed-echo-sponge-resource.txt cargo run --release --locked --manifest-path crates/tools/plasma-vlasov-reference/Cargo.toml --example delayed_echo_recurrence_sponge > artifacts/plasma-vlasov-reference/delayed-echo-sponge.csv
-      - name: Run near-recurrence echo with finer reference
-        run: /usr/bin/time -v -o artifacts/plasma-vlasov-reference/near-recurrence-echo-resource.txt cargo run --release --locked --manifest-path crates/tools/plasma-vlasov-reference/Cargo.toml --example near_recurrence_echo_sponge > artifacts/plasma-vlasov-reference/near-recurrence-echo-sponge.csv
+      - name: Sweep near-recurrence echo sponge thresholds
+        run: |
+          set -euo pipefail
+          cargo run --release --locked --manifest-path crates/tools/plasma-vlasov-reference/Cargo.toml --example near_recurrence_echo_sponge -- 0.90 0.5 > artifacts/plasma-vlasov-reference/near-recurrence-echo-sponge-start090.csv
+          cargo run --release --locked --manifest-path crates/tools/plasma-vlasov-reference/Cargo.toml --example near_recurrence_echo_sponge -- 0.75 0.5 > artifacts/plasma-vlasov-reference/near-recurrence-echo-sponge-start075.csv
+          cargo run --release --locked --manifest-path crates/tools/plasma-vlasov-reference/Cargo.toml --example near_recurrence_echo_sponge -- 0.60 0.5 > artifacts/plasma-vlasov-reference/near-recurrence-echo-sponge-start060.csv
+      - name: Measure near-recurrence threshold sweep resources
+        run: |
+          /usr/bin/time -v -o artifacts/plasma-vlasov-reference/near-recurrence-echo-start090-resource.txt cargo run --release --locked --manifest-path crates/tools/plasma-vlasov-reference/Cargo.toml --example near_recurrence_echo_sponge -- 0.90 0.5 > /dev/null
+          /usr/bin/time -v -o artifacts/plasma-vlasov-reference/near-recurrence-echo-start075-resource.txt cargo run --release --locked --manifest-path crates/tools/plasma-vlasov-reference/Cargo.toml --example near_recurrence_echo_sponge -- 0.75 0.5 > /dev/null
+          /usr/bin/time -v -o artifacts/plasma-vlasov-reference/near-recurrence-echo-start060-resource.txt cargo run --release --locked --manifest-path crates/tools/plasma-vlasov-reference/Cargo.toml --example near_recurrence_echo_sponge -- 0.60 0.5 > /dev/null
       - name: Upload reproducible trajectory traces
         uses: actions/upload-artifact@v4
         with:
