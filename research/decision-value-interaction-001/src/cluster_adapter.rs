@@ -662,7 +662,7 @@ mod tests {
             primary_metric: "signed_decision_regret_effect_ppm".to_owned(),
             bundle_lock_sha256: "a".repeat(64),
             cluster_assignment_manifest_sha256:
-                "b09e820031edb9f7dfe482f999f0d79031ab661c212888c90ae665a524b70425".to_owned(),
+                "8257074ad9d509a144c807fe1eeca8c0f29fb9c5101589a3e220d207236d0aab".to_owned(),
             bootstrap_seed: 42,
             bootstrap_replicates: 10_000,
             familywise_confidence: 0.95,
@@ -695,7 +695,7 @@ mod tests {
         reversed.reverse();
         assert_eq!(
             export_cluster_deltas(&rows, &assignments(), &metadata()).unwrap(),
-            export_cluster_deltas(&reversed, &metadata()).unwrap()
+            export_cluster_deltas(&reversed, &assignments(), &metadata()).unwrap()
         );
     }
 
@@ -753,15 +753,12 @@ mod tests {
     fn missing_and_extra_assignment_manifest_entries_are_rejected() {
         let mut missing = assignments();
         missing.pop();
+        let missing_error = export_cluster_deltas(&fixture(), &missing, &metadata())
+            .unwrap_err()
+            .to_string();
         assert!(
-            export_cluster_deltas(&fixture(), &missing, &metadata())
-                .unwrap_err()
-                .to_string()
-                .contains("absent from frozen cluster-assignment manifest")
-                || export_cluster_deltas(&fixture(), &missing, &metadata())
-                    .unwrap_err()
-                    .to_string()
-                    .contains("manifest contains episodes with no evaluator outcomes")
+            missing_error.contains("absent from frozen cluster-assignment manifest")
+                || missing_error.contains("manifest contains episodes with no evaluator outcomes")
         );
 
         let mut extra = assignments();
