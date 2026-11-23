@@ -1,0 +1,75 @@
+name: VIS-DVPC-014 cluster-level paired inference
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, edited]
+    branches: ["main"]
+    paths:
+      - "tools/vision-dvpc-cluster-inference.rs"
+      - "docs/research/VIS_DVPC_014_CLUSTER_LEVEL_INFERENCE_V1.md"
+      - "fixtures/vis-dvpc-compute-observation-cluster-deltas-v0.1.tsv"
+      - ".github/workflows/vis-dvpc-014-cluster-inference.yml"
+  push:
+    branches: ["research/vis-dvpc-014-cluster-inference-rebuild-20261123"]
+    paths:
+      - "tools/vision-dvpc-cluster-inference.rs"
+      - "docs/research/VIS_DVPC_014_CLUSTER_LEVEL_INFERENCE_V1.md"
+      - "fixtures/vis-dvpc-compute-observation-cluster-deltas-v0.1.tsv"
+      - ".github/workflows/vis-dvpc-014-cluster-inference.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vis-dvpc-014-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: Cluster inference reference (Rust 1.96)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+
+      - name: Set up pinned Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          components: clippy, rustfmt
+
+      - name: Check formatting
+        run: rustfmt --edition 2024 --check tools/vision-dvpc-cluster-inference.rs
+
+      - name: Compile and run adversarial unit tests
+        run: |
+          rustc --edition=2024 --test -D warnings tools/vision-dvpc-cluster-inference.rs -o /tmp/vis-dvpc-014-tests
+          /tmp/vis-dvpc-014-tests
+
+      - name: Strict Clippy on standalone analyzer
+        run: |
+          clippy-driver --edition=2024 --test -D warnings tools/vision-dvpc-cluster-inference.rs -o /tmp/vis-dvpc-014-clippy-tests
+          /tmp/vis-dvpc-014-clippy-tests
+
+      - name: Build optimized standalone analyzer
+        run: rustc --edition=2024 -O -D warnings tools/vision-dvpc-cluster-inference.rs -o /tmp/vis-dvpc-014
+
+      - name: Analyze compute-observation adapter fixture
+        run: |
+          /tmp/vis-dvpc-014 fixtures/vis-dvpc-compute-observation-cluster-deltas-v0.1.tsv aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa > /tmp/vis-dvpc-014-receipt.tsv
+          grep -F $'ANALYSIS\tstatus\tCLUSTER_LEVEL_INFERENCE_ONLY' /tmp/vis-dvpc-014-receipt.tsv
+          grep -F $'ANALYSIS\tperformance_claim\tNONE' /tmp/vis-dvpc-014-receipt.tsv
+          test "$(grep -c '^RESULT\t' /tmp/vis-dvpc-014-receipt.tsv)" -eq 4
+          test "$(grep -F 'ANALYSIS\tindependent_clusters\t6' /tmp/vis-dvpc-014-receipt.tsv | wc -l)" -eq 1
+
+      - name: Verify deterministic replay
+        run: |
+          /tmp/vis-dvpc-014 fixtures/vis-dvpc-compute-observation-cluster-deltas-v0.1.tsv aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa > /tmp/vis-dvpc-014-receipt-repeat.tsv
+          cmp /tmp/vis-dvpc-014-receipt.tsv /tmp/vis-dvpc-014-receipt-repeat.tsv
+
+      - name: Verify external lock mismatch is rejected
+        run: |
+          if /tmp/vis-dvpc-014 fixtures/vis-dvpc-compute-observation-cluster-deltas-v0.1.tsv bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb > /tmp/vis-dvpc-014-invalid.tsv 2>&1; then
+            echo "analyzer accepted a mismatched external bundle lock" >&2
+            exit 1
+          fi
