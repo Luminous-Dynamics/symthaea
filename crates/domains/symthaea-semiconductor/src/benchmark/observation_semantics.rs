@@ -153,12 +153,27 @@ pub enum SensorCorrespondenceStatusV1 {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct SensorAffineTransformUncertaintyV1 {
+    /// Standard uncertainty of the affine scale coefficient.
+    pub scale_standard_uncertainty: f64,
+    /// Standard uncertainty of the affine offset coefficient, in target units.
+    pub offset_standard_uncertainty: f64,
+    /// Covariance between scale and offset coefficients.
+    pub covariance_scale_offset: f64,
+    pub uncertainty_evidence_ref: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SensorUnitTransformV1 {
     pub source_unit: String,
     pub target_unit: String,
     /// target_value = source_value * scale + offset
     pub scale: f64,
     pub offset: f64,
+    /// Optional uncertainty of the conversion coefficients. None preserves
+    /// the legacy exact-coefficient assumption; Some propagates coefficient
+    /// uncertainty into transformed observed values.
+    pub coefficient_uncertainty: Option<SensorAffineTransformUncertaintyV1>,
     pub transform_evidence_ref: String,
 }
 
@@ -545,6 +560,32 @@ pub fn validate_sensor_correspondence_manifest_v1(
                     transform.offset,
                     &format!("correspondences[{index}].unit_transform.offset"),
                 )?;
+                if let Some(uncertainty) = &transform.coefficient_uncertainty {
+                    for (name, value) in [
+                        ("scale_standard_uncertainty", uncertainty.scale_standard_uncertainty),
+                        ("offset_standard_uncertainty", uncertainty.offset_standard_uncertainty),
+                        ("covariance_scale_offset", uncertainty.covariance_scale_offset),
+                    ] {
+                        finite(
+                            value,
+                            &format!("correspondences[{index}].unit_transform.coefficient_uncertainty.{name}"),
+                        )?;
+                    }
+                    if uncertainty.scale_standard_uncertainty < 0.0
+                        || uncertainty.offset_standard_uncertainty < 0.0
+                        || uncertainty.covariance_scale_offset.abs()
+                            > uncertainty.scale_standard_uncertainty
+                                * uncertainty.offset_standard_uncertainty
+                    {
+                        return Err(SensorObservationError(format!(
+                            "correspondences[{index}].unit_transform.coefficient_uncertainty: invalid standard uncertainties or non-positive-semidefinite covariance"
+                        )));
+                    }
+                    require_text(
+                        &uncertainty.uncertainty_evidence_ref,
+                        &format!("correspondences[{index}].unit_transform.coefficient_uncertainty.uncertainty_evidence_ref"),
+                    )?;
+                }
                 require_text(
                     &transform.transform_evidence_ref,
                     &format!("correspondences[{index}].unit_transform.transform_evidence_ref"),
@@ -620,9 +661,32 @@ fn transform_observation_state_v1(
                 ));
             }
             let converted_value = value * transform.scale + transform.offset;
-            let converted_uncertainty = uncertainty.standard_uncertainty * transform.scale.abs();
-            if !converted_value.is_finite() || !converted_uncertainty.is_finite() {
-                return abstain("unit conversion overflowed to a non-finite value".into());
+            let mut converted_variance =
+                (uncertainty.standard_uncertainty * transform.scale).powi(2);
+            let mut method_ref = format!(
+                "{};transform={}",
+                uncertainty.method_ref, transform.transform_evidence_ref
+            );
+            if let Some(coefficient_uncertainty) = &transform.coefficient_uncertainty {
+                let scale_variance = (value * coefficient_uncertainty.scale_standard_uncertainty).powi(2);
+                let offset_variance = coefficient_uncertainty.offset_standard_uncertainty.powi(2);
+                let covariance_term =
+                    2.0 * value * coefficient_uncertainty.covariance_scale_offset;
+                converted_variance += scale_variance + offset_variance + covariance_term;
+                method_ref.push_str(&format!(
+                    ";transform_uncertainty={}",
+                    coefficient_uncertainty.uncertainty_evidence_ref
+                ));
+            }
+            if !converted_value.is_finite()
+                || !converted_variance.is_finite()
+                || converted_variance < -f64::EPSILON * converted_value.abs().max(1.0).powi(2) * 16.0
+            {
+                return abstain("unit conversion or propagated variance is invalid".into());
+            }
+            let converted_uncertainty = converted_variance.max(0.0).sqrt();
+            if !converted_uncertainty.is_finite() {
+                return abstain("unit conversion produced non-finite standard uncertainty".into());
             }
             (
                 SensorObservationStateV1::Observed {
@@ -631,10 +695,7 @@ fn transform_observation_state_v1(
                     uncertainty: MeasurementUncertaintyV1 {
                         standard_uncertainty: converted_uncertainty,
                         coverage_probability: uncertainty.coverage_probability,
-                        method_ref: format!(
-                            "{};transform={}",
-                            uncertainty.method_ref, transform.transform_evidence_ref
-                        ),
+                        method_ref,
                     },
                 },
                 true,
@@ -925,6 +986,7 @@ mod tests {
                         target_unit: "Pa".into(),
                         scale: 1000.0,
                         offset: 0.0,
+                        coefficient_uncertainty: None,
                         transform_evidence_ref: "unit-proof-1".into(),
                     }),
                     evidence_ref: "semantic-map-evidence-1".into(),
@@ -1154,6 +1216,7 @@ mod tests {
                 target_unit: "Pa".into(),
                 scale: 1000.0,
                 offset: 0.0,
+                coefficient_uncertainty: None,
                 transform_evidence_ref: "flow-unit-proof".into(),
             }),
             evidence_ref: "flow-correspondence-evidence".into(),
@@ -1242,6 +1305,7 @@ mod tests {
         transform.target_unit = "corrected_unit".into();
         transform.scale = -2.0;
         transform.offset = 10.0;
+        transform.coefficient_uncertainty = None;
 
         let execution = execute_sensor_correspondence_v1(&source, &manifest).unwrap();
         let target = execution.target_frame.unwrap();
