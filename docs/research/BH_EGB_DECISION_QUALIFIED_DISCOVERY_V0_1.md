@@ -146,3 +146,24 @@ A passing fixture proves only this exact synthetic linear-algebra construction a
 - López-Fidalgo & Wong, “Optimal Designs for Correlated Data,” Annual Review of Statistics and Its Application 13 (2026): https://doi.org/10.1146/annurev-statistics-042324-012947.
 - Tang, Sloman & Kaski, “Representative, Informative, and De-Amplifying…,” AISTATS 2026 / PMLR 300: https://proceedings.mlr.press/v300/tang26d.html.
 - Agurto-Sepúlveda et al., “Neural-Spectral Discovery of Rotating Black Holes Beyond General Relativity,” Phys. Rev. D accepted 12 Nov 2026: https://doi.org/10.1103/3kz2-6dvv.
+
+
+## Open-world model-adequacy regression
+
+A second independent synthetic control now tests a different failure mode: candidate models can be highly distinguishable from each other while *all* fail the same predeclared held-out adequacy gate.
+
+- Fixture: **BH_EGB_OPEN_WORLD_MODEL_ADEQUACY_CONTROL_V0_1.json**.
+- Exact verifier: **verify_bh_egb_open_world_model_adequacy.py**.
+- Replay receipt: **BH_EGB_OPEN_WORLD_MODEL_ADEQUACY_RECEIPT_V0_1.json**.
+
+The frozen held-out observation is \([0,0]\), with identity covariance and maximum admissible squared residual \(1/2\). The two rival models predict \([1,0]\) and \([0,1]\): their pairwise squared separation is \(2\), yet each has held-out residual squared \(1\). The only admissible family-level decision is \`ABSTAIN_AND_EXPAND_MODEL_CLASS\`. An outside-family witness predicts \([0,0]\) and passes with residual zero. Four mutations (post-hoc gate relaxation, held-out observation mutation, candidate mutation, and outside-family witness mutation) are rejected.
+
+This is deterministic exact arithmetic and decision-logic coverage—not a chi-square test, predictive calibration, or physical observation. In actual EGB work, the adequacy channel must be grounded in separately withheld original equation rows, independent derivations, alternate endpoint propagation, Noether/constraint checks, chart and unit metamorphisms, and precision/solver refinement. It must not inspect a holdout selected or scored by the proposing policy.
+
+The two synthetic controls now test orthogonal acquisition invariants:
+
+1. **No fake information from redundancy:** full covariance transport and singular-support-aware pseudoinverse preserve the exact score under a duplicated observable.
+2. **No false confidence from a closed candidate set:** pairwise separation cannot promote any candidate when the entire family fails the frozen adequacy gate.
+
+The first test is an exact rational linear-algebra control; the second is an exact deterministic model-adequacy control. Neither establishes an EGB physical result, policy performance, or SOTA.
+
