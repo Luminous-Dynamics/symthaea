@@ -14,7 +14,7 @@ Existing suites measure complementary capabilities. They should be used as adapt
 | Track | External benchmark / system | What it tests | Fit to ErgoStream | Limitation / correct use |
 |---|---|---|---|---|
 | Ansatz-free scientific discovery | [Unsatz](https://arxiv.org/abs/2611.03713) | Learner proposes variables, hidden state, interactions and measurement/model form, buys experiments and predicts held-out interventions/conditions/horizons | **Closest direct comparator** for structural/model-form discovery | Agent starts with a scientific task and a model-program language; it is not a generic pre-task acquisition benchmark. Reproduce its exact task protocol before comparing |
-| Interactive exploration | [ARC-AGI-3](https://arcprize.org/arc-agi/3) | Explore unfamiliar interactive environments, infer goals/rules, build adaptive world models and learn from actions without natural-language instructions | Strong external probe for acquired structures supporting exploration and transfer | It is task/game-centric and does not independently measure a pre-task structural library. Final ARC Prize 2026 results are scheduled for 2026-12-04; do not treat them as published as of this note |
+| Interactive exploration | [ARC-AGI-3](https://arcprize.org/arc-agi/3) | Explore unfamiliar interactive environments, infer goals/rules, build adaptive world models and learn from actions without natural-language instructions | Strong external probe for acquired structures supporting exploration and transfer | It is task/game-centric and does not independently measure a pre-task structural library. Final the ARC Prize site currently lists GPT-6.2 (Astra/Sol) at 100.00% on its ARC-AGI-3 model-performance table (entry dated 2026-11-17), while the 2026 competition prize results are still scheduled for 2026-12-04. Keep these two reporting surfaces distinct and verify the exact evaluation protocol before using a leaderboard number as a matched result |
 | Visual causal reasoning | [CLEVRER](https://clevrer.csail.mit.edu/) | Descriptive, explanatory, predictive and counterfactual questions over object-interaction videos | Good post-acquisition probe for temporal/event relations and causal predictions | Synthetic, short, object-collision videos; task labels/questions are exposed at evaluation, so this is not task-agnostic acquisition by itself |
 | Interactive physical reasoning | [PHYRE](https://phyre.ai/) | Sample-efficient solving and generalization across 2D physical puzzles | Useful for testing whether discovered dynamics/relations support action selection | Puzzle goals are provided; not a test of open-ended or goal-free acquisition |
 | Real audiovisual grounding | [DCASE 2026 Task 3](https://dcase.community/challenge2026/task-semantic-acoustic-imaging-for-sound-event-localization-and-detection-from-spatial-audio-and-audiovisual-scenes) | Reconstruct semantic spatial acoustic energy maps / dynamic masks from low-channel audio, optionally audiovisual | Strong sensory and cross-modal downstream qualification adapter | Measures a specific sound-imaging task, not broad structural discovery. 2026 challenge reports 29 Task 3 submissions from 8 teams, split audio-only and audiovisual |
@@ -29,11 +29,33 @@ Unsatz (Ji, Wang and Sun, 2026-10-31) evaluates scientific discovery without a s
 
 **Response:** use Unsatz as the direct ansatz-free scientific-discovery comparator within the #11042 lane. ErgoStream adds a separate pre-task acquisition phase and a library snapshot that is tested on later undisclosed probes. Do not reimplement the Unsatz task DSL or claim superiority from a different synthetic task.
 
+### Active causal discovery is a direct comparator, not just a downstream task
+
+The 2026 Active Causal Discovery Benchmark (ACDB) evaluates agents under budgeted hard interventions. On its current six-level linear-Gaussian ladder, the authors report 42.7% directed F1 / SHD 4.79 for PC plus greedy active orientation, 31.7% / 7.25 for Claude Sonnet 4.6 raw active, and 22.9% / 9.27 for GPT-5.4 raw active. A structure-blind random DAG already scores 23.6% directed F1 on the dense v0 ladder, reduced to 16.9% after a density probe. The authors describe the work as a benchmark audit and calibration report, not evidence that current LLMs solve active causal discovery.
+
+**Response:** make ACDB a high-priority Symtropy adapter. Compare the ability to choose discriminating interventions, recover skeletons and directions, account for intervention cost, and abstain under non-identifiability. Include the PC + greedy active baseline and the density-aware random control; a weak random baseline would overstate improvements.
+
+Paper: https://arxiv.org/abs/2609.31675
+
 ### Interactive world models need closed-loop outcome evaluation
 
-The 2026 *Survey of World Model Benchmarks* catalogues 130 representative benchmarks and separates capability, protocol, metric family and data source. Its survey snapshot identifies a marked imbalance between open-loop prediction protocols and closed-loop interaction, and between prediction-level and downstream-outcome metrics.
+The 2026 *Survey of World Model Benchmarks* catalogues 130 representative benchmark records in its final site snapshot and separates capability target, protocol, metric family and data source. The current explorer lists 98 open-loop protocols and 13 closed-loop interaction protocols, 99 prediction-level and 14 downstream-outcome metric assignments. These category totals are not mutually exclusive benchmark counts and should be quoted as survey coding, not as a census of every benchmark in existence.
 
-**Response:** evaluate both whether a system predicts/reconstructs structure and whether that structure improves decisions in environments where actions and inference latency affect outcomes. Prediction accuracy alone is not enough.
+The ICLR 2026 paper *World-In-World: World Models in a Closed-Loop World* makes the complementary case experimentally: it evaluates heterogeneous world models in four closed-loop environments and prioritizes task success. Its abstract reports that visual quality alone does not guarantee task success, that controllability matters, and that more action-observation post-training and inference-time compute can improve closed-loop outcomes.
+
+**Response:** evaluate both whether a system predicts/reconstructs structure and whether that structure improves decisions in environments where actions and inference latency affect outcomes. Prediction accuracy alone is not enough. World-In-World should be a compatible closed-loop adapter; the survey should guide protocol/metric selection.
+
+Papers: https://world-model-benchmarks.github.io/ · https://proceedings.iclr.cc/paper_files/paper/2026/hash/5b4263be85820683d78675cc18d2efc7-Abstract-Conference.html
+
+### Foundation world models set a formidable representation and planning baseline
+
+V-JEPA 2 is pretrained on more than one million hours of internet video and reports 77.3% top-1 on Something-Something v2 and 39.7 recall-at-5 on EPIC-KITCHENS-100. Its action-conditioned V-JEPA 2-AC uses less than 62 hours of unlabeled DROID robot video for post-training and reports zero-shot image-goal pick-and-place planning on Franka arms in two labs, without collecting data in those target labs or using task-specific rewards.
+
+Dreamer 4 represents another important industry direction: a scalable action-conditioned world model trained largely from offline video and used for imagination-based policy learning. Its authors report obtaining diamonds in Minecraft from offline data alone, over a horizon exceeding 20,000 actions.
+
+**Response:** do not attempt to beat these models on their own raw video or robot-planning claims with a small finite graph microcosm. Compare their compatible structural features or downstream decisions only when data, action interface, training and compute can be matched. ErgoStream's distinctive question is whether an explicit, frozen structural library provides lower-cost, more reliable cross-domain transfer—not whether it can outscore a foundation world model on every modality.
+
+References: https://ai.meta.com/research/publications/v-jepa-2-self-supervised-video-models-enable-understanding-prediction-and-planning/ · https://arxiv.org/abs/2509.24527
 
 ### Dynamic robotics is a harder test than frozen-video prediction
 
@@ -43,7 +65,7 @@ RoboDyna reports 20 conceptual dynamic manipulation tasks across five categories
 
 ### Audiovisual grounding is a modality-specific qualification layer
 
-DCASE 2026 Task 3 makes the sensory problem concrete: map four-channel spatial-audio input to a high-resolution semantic acoustic scene, with optional visual input. The challenge received 29 submissions from 8 teams. That is useful for validating source localization, event masks and cross-modal alignment, but it should not be represented as a general intelligence test.
+DCASE 2026 Task 3 makes the sensory problem concrete: map four-channel spatial-audio input to a high-resolution semantic acoustic scene, with optional visual input. The challenge received 29 submissions from 8 teams. That is useful for validating source localization, event masks and cross-modal alignment, but it should not be represented as a general intelligence test. The official Task 3 results list 0.108 macro mAP / 0.3962 macro Pearson r for the leading audio-only system and 0.0131 / 0.4002 for the leading audiovisual system; these values apply to the task's own scoring contract, not to structural-transfer capability.
 
 **Response:** adapt DCASE Task 3 through the AV-STREAM path (#12837) as an external sensory specialist comparison, retaining separate audio-only and audiovisual tracks.
 
@@ -53,9 +75,9 @@ All arms should receive the same stream, split, modality availability, observati
 
 1. **Simple controls:** no-change/persistence, random acquisition, passive next-frame, shuffled temporal order, shuffled modality alignment, and constant/IID-noise controls.
 2. **Acquisition policies:** surprise/prediction-error only, random-network-distillation novelty, learning-progress, information gain, cost-normalized information gain, predictive compression / MDL, and a hybrid acquisition policy.
-3. **Representation controls:** strong modality-specific encoders with event association; frozen dense multimodal embeddings; HDC only; CfC/LTC only; explicit typed graph/hypergraph; bounded symbolic/e-graph; HDC–CfC plus graph/e-graph hybrid.
+3. **Representation controls:** strong modality-specific encoders with event association; frozen dense multimodal embeddings; explicit graph matching / graph-edit baselines; HDC only; CfC/LTC only; explicit typed graph/hypergraph; bounded symbolic/e-graph; HDC–CfC plus graph/e-graph hybrid.
 4. **World-model controls:** object/event-centric recurrent and transformer models; the strongest compatible action-conditioned world model; a no-transfer/fresh-learning control.
-5. **Scientific-discovery controls:** Unsatz-compatible agent/program interface, PySR or another pinned symbolic-regression baseline when the candidate grammar and task class match, SINDy only when its sparse-regression assumptions are satisfied, and exact tiny-world enumeration as evaluator diagnostic only.
+5. **Scientific-discovery and causal controls:** Unsatz-compatible agent/program interface; ACDB-compatible PC + greedy active orientation, density-aware random-DAG and other admitted causal baselines; PySR or another pinned symbolic-regression baseline when the candidate grammar and task class match; SINDy only when its sparse-regression assumptions are satisfied; exact tiny-world enumeration as evaluator diagnostic only.
 6. **Human reference:** where the task supports meaningful human interaction, include a human sample-efficiency / action-efficiency reference. It is not a substitute for a matched machine baseline.
 
 No name-only reproduction. Record exact code commit, weights, model/API revision, prompt, tool access, preprocessing, operator set, task subset, compute, retries, failed runs and licensing/data exclusions. For proprietary APIs, report black-box evaluation conditions and do not imply implementation-level parity.
@@ -122,5 +144,5 @@ These are prospective engineering targets, not external standards or achieved re
 - DCASE 2026 Task 3: https://dcase.community/challenge2026/task-semantic-acoustic-imaging-for-sound-event-localization-and-detection-from-spatial-audio-and-audiovisual-scenes
 - RoboDyna: https://robodyna.github.io/
 - LIBERO-Dynamic: https://arxiv.org/abs/2610.24579
-- Survey of World Model Benchmarks: https://world-model-benchmarks.github.io/
+- Survey of World Model Benchmarks: https://world-model-benchmarks.github.io/\n- ACDB: https://arxiv.org/abs/2609.31675\n- World-In-World (ICLR 2026): https://proceedings.iclr.cc/paper_files/paper/2026/hash/5b4263be85820683d78675cc18d2efc7-Abstract-Conference.html\n- V-JEPA 2: https://ai.meta.com/research/publications/v-jepa-2-self-supervised-video-models-enable-understanding-prediction-and-planning/\n- Dreamer 4: https://arxiv.org/abs/2509.24527
 - Gromov, *Ergostructures, Ergologic and the Universal Learning Problem*: https://www.ihes.fr/~gromov/wp-content/uploads/2018/08/ergologic31.pdf
