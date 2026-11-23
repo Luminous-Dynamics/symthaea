@@ -1,0 +1,63 @@
+{
+  "schema_version": "bh-egb-open-world-model-adequacy-control-v0.1",
+  "artifact_kind": "synthetic_open_world_model_misspecification_regression",
+  "campaign_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13418",
+  "scope": "Exact synthetic decision-logic and rational linear-algebra control only. It is not a physical EGB result or a calibrated statistical test.",
+  "held_out_observation": [
+    "0",
+    "0"
+  ],
+  "held_out_covariance": [
+    [
+      "1",
+      "0"
+    ],
+    [
+      "0",
+      "1"
+    ]
+  ],
+  "maximum_admissible_squared_residual": "1/2",
+  "initial_candidate_family": {
+    "H0": {
+      "predicted_mean": [
+        "1",
+        "0"
+      ]
+    },
+    "H1": {
+      "predicted_mean": [
+        "0",
+        "1"
+      ]
+    }
+  },
+  "expected": {
+    "pairwise_candidate_separation_squared": "2",
+    "H0_squared_held_out_residual": "1",
+    "H1_squared_held_out_residual": "1",
+    "initial_family_disposition": "ABSTAIN_AND_EXPAND_MODEL_CLASS",
+    "frozen_held_out_observation": [
+      "0",
+      "0"
+    ],
+    "frozen_maximum_admissible_squared_residual": "1/2"
+  },
+  "outside_family_witness": {
+    "model_id": "H2",
+    "predicted_mean": [
+      "0",
+      "0"
+    ],
+    "expected_squared_held_out_residual": "0",
+    "expected_expanded_family_disposition": "H2_ADMISSIBLE"
+  },
+  "assertions": [
+    "A large pairwise separation between H0 and H1 does not imply that either model is adequate.",
+    "If every initial candidate exceeds the predeclared held-out residual gate, the policy must abstain and expand the model class.",
+    "The outside-family witness H2 passes the same held-out gate, demonstrating that abstention is not a forced permanent rejection.",
+    "The held-out observation and gate are fixed before candidate scoring; no post-hoc threshold adjustment is allowed.",
+    "This is a deterministic synthetic control, not a calibrated chi-square test or an EGB physics result."
+  ],
+  "claim_ceiling": "This fixture tests a synthetic open-world model-adequacy decision rule only. It does not establish calibrated uncertainty, a physical model, experiment-design superiority, or Symthaea policy performance."
+}
