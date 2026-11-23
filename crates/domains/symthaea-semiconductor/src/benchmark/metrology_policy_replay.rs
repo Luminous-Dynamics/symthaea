@@ -604,6 +604,7 @@ pub fn evaluate_synthetic_metrology_policy_v1(
     let mut true_population_brier_total = 0.0;
     let mut weight_sum = 0.0;
     let mut squared_weight_sum = 0.0;
+    let mut randomized_sample_by_stratum = BTreeMap::<String, Vec<(f64, f64)>>::new();
     let mut matured_label_count = 0_usize;
     let final_horizon = episode.policy_view.population_count.saturating_sub(1) as u64;
 
@@ -648,6 +649,12 @@ pub fn evaluate_synthetic_metrology_policy_v1(
                 ht_positive_total += 1.0 / row.inclusion_probability;
             }
             ht_brier_total += squared_error / row.inclusion_probability;
+            if matches!(&row.method, MetrologySelectionMethodV1::RandomizedAudit) {
+                randomized_sample_by_stratum
+                    .entry(row.stratum_id.clone())
+                    .or_default()
+                    .push((target, squared_error));
+            }
             let weight = 1.0 / row.inclusion_probability;
             weight_sum += weight;
             squared_weight_sum += weight * weight;
@@ -681,6 +688,49 @@ pub fn evaluate_synthetic_metrology_policy_v1(
     } else {
         0.0
     };
+    let mut positive_total_variance = 0.0;
+    let mut brier_total_variance = 0.0;
+    let mut design_variance_qualified = true;
+    for (stratum, residual_population) in &selection.residual_population_by_stratum {
+        let sample_count = selection.audit_quota_by_stratum[stratum];
+        if sample_count == *residual_population {
+            continue;
+        }
+        if sample_count < 2 {
+            design_variance_qualified = false;
+            continue;
+        }
+        let Some(sample) = randomized_sample_by_stratum.get(stratum) else {
+            design_variance_qualified = false;
+            continue;
+        };
+        let positive_values: Vec<f64> = sample.iter().map(|(positive, _)| *positive).collect();
+        let brier_values: Vec<f64> = sample.iter().map(|(_, brier)| *brier).collect();
+        let Some(positive_variance) = finite_population_sample_variance(&positive_values) else {
+            design_variance_qualified = false;
+            continue;
+        };
+        let Some(brier_variance) = finite_population_sample_variance(&brier_values) else {
+            design_variance_qualified = false;
+            continue;
+        };
+        let finite_population_correction =
+            1.0 - sample_count as f64 / *residual_population as f64;
+        positive_total_variance += (*residual_population as f64).powi(2)
+            * finite_population_correction
+            * positive_variance
+            / sample_count as f64;
+        brier_total_variance += (*residual_population as f64).powi(2)
+            * finite_population_correction
+            * brier_variance
+            / sample_count as f64;
+    }
+    let standard_error_ht_prevalence = design_variance_qualified.then(|| {
+        positive_total_variance.sqrt() / population_count as f64
+    });
+    let standard_error_ht_mean_brier = design_variance_qualified.then(|| {
+        brier_total_variance.sqrt() / population_count as f64
+    });
     let hidden_truth_sha256 = json_sha256(&episode.hidden_truth)?;
 
     let mut report = SyntheticFabPolicyEvaluationV1 {
@@ -701,7 +751,10 @@ pub fn evaluate_synthetic_metrology_policy_v1(
         selected_sample_prevalence,
         horvitz_thompson_prevalence,
         horvitz_thompson_absolute_error: (horvitz_thompson_prevalence - true_defect_prevalence).abs(),
+        standard_error_ht_prevalence,
         horvitz_thompson_mean_brier,
+        standard_error_ht_mean_brier,
+        design_variance_qualified,
         true_population_mean_brier,
         measured_fraction,
         effective_sample_size,
