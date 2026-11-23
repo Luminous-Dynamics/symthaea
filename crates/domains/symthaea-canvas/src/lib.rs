@@ -31,6 +31,7 @@ pub mod mycelial_annotation_triage;
 pub mod mycelial_contact_persistence;
 pub mod mycelial_failure_resilience;
 pub mod mycelial_fusion_counterfactual;
+pub mod mycelial_graph_hypothesis_posterior;
 pub mod mycelial_junction_graph;
 pub mod mycelial_mesh;
 pub mod mycelial_model;
@@ -132,6 +133,13 @@ pub use mycelial_fusion_counterfactual::{
     MycelialFusionDisruptionDelta, MycelialFusionDisruptionScenario, MycelialFusionTarget,
     MycelialFusionTopologyEffect, MycelialFusionViewMetrics,
     evaluate_mycelial_fusion_counterfactuals,
+};
+pub use mycelial_graph_hypothesis_posterior::{
+    MAX_MYCELIAL_POSTERIOR_CANDIDATES, MAX_MYCELIAL_POSTERIOR_HYPOTHESES,
+    MYCELIAL_GRAPH_HYPOTHESIS_POSTERIOR_SCHEMA_VERSION, MycelialFusionCandidateMarginal,
+    MycelialFusionConflictPair, MycelialGraphHypothesis, MycelialGraphHypothesisPosterior,
+    MycelialGraphHypothesisPosteriorError, MycelialGraphHypothesisPrior,
+    evaluate_mycelial_graph_hypothesis_posterior,
 };
 
 pub use mycelial_junction_graph::{
