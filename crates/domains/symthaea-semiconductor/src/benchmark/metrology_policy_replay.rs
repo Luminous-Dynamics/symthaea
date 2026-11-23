@@ -1517,6 +1517,51 @@ mod tests {
     }
 
     #[test]
+    fn imperfect_metrology_separates_sampling_escapes_from_assay_errors() {
+        let mut scenario = config(SyntheticFabRegimeV1::Stable, 61);
+        scenario.metrology_characteristics = SyntheticMetrologyCharacteristicsV1 {
+            sensitivity: 0.0,
+            specificity: 0.0,
+        };
+        let episode = generate_synthetic_fab_episode_v1(&scenario).unwrap();
+        let selection = fake_selection(&episode);
+        let report = evaluate_synthetic_metrology_policy_v1(&episode, &selection).unwrap();
+
+        assert_eq!(report.metrology_detected_true_positive_count, 0);
+        assert_eq!(report.metrology_false_negative_count, report.selected_positive_count);
+        assert_eq!(
+            report.metrology_false_positive_count,
+            report.selected_count - report.selected_positive_count
+        );
+        assert_eq!(
+            report.total_undetected_defect_count,
+            report.true_positive_count
+        );
+        assert_eq!(report.metrology_sensitivity, 0.0);
+        assert_eq!(report.metrology_specificity, 0.0);
+        assert_eq!(report.detection_capture_fraction, Some(0.0));
+        assert!(report.assay_estimator_qualified);
+        assert!(report.assay_adjusted_ht_prevalence.is_some());
+    }
+
+    #[test]
+    fn uninformative_assay_does_not_claim_adjusted_population_prevalence() {
+        let mut scenario = config(SyntheticFabRegimeV1::Stable, 63);
+        scenario.metrology_characteristics = SyntheticMetrologyCharacteristicsV1 {
+            sensitivity: 1.0,
+            specificity: 0.0,
+        };
+        let episode = generate_synthetic_fab_episode_v1(&scenario).unwrap();
+        let selection = fake_selection(&episode);
+        let report = evaluate_synthetic_metrology_policy_v1(&episode, &selection).unwrap();
+
+        assert_eq!(report.assay_observed_ht_positive_rate, 1.0);
+        assert!(report.assay_adjusted_ht_prevalence.is_none());
+        assert!(report.assay_adjusted_ht_standard_error.is_none());
+        assert!(!report.assay_estimator_qualified);
+    }
+
+    #[test]
     fn policy_runner_compares_random_audit_and_risk_exploit_at_equal_budget() {
         let episode = generate_synthetic_fab_episode_v1(&config(
             SyntheticFabRegimeV1::GradualProcessDrift,
