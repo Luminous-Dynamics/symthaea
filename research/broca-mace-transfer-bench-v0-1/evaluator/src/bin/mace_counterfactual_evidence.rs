@@ -26,6 +26,10 @@ use serde::Serialize;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
+#[path = "../candidate_process.rs"]
+mod candidate_process;
+use candidate_process::CandidateProcessSession;
+
 mod mace_generated_stress;
 
 const SCHEMA_VERSION: &str = "mace_counterfactual_evidence_v0_1";
@@ -89,6 +93,7 @@ enum IndexError {
     TypedIndexFailure(String),
     UnresolvedCandidateId(u32),
     CanonicalViewMismatch(u32),
+    CandidateProcessFailure(String),
 }
 
 impl EvidenceDependencyIndex {
@@ -581,6 +586,12 @@ struct CandidateObservation {
     unknown_root_event_count: usize,
     unknown_family_event_count: usize,
     latency_ns: u64,
+    candidate_observation_sequence: u64,
+    candidate_observation_id: String,
+    candidate_execution_boundary: &'static str,
+    candidate_artifact_sha256: Option<String>,
+    candidate_process_startup_ns: Option<u64>,
+    candidate_process_wall_ns: Option<u64>,
 }
 
 fn run_candidate(
@@ -764,7 +775,79 @@ fn run_candidate(
         unknown_root_event_count: evidence_index.unknown_root_event_count(),
         unknown_family_event_count: evidence_index.unknown_family_event_count(),
         latency_ns: u64::try_from(started.elapsed().as_nanos()).unwrap_or(u64::MAX),
+        candidate_observation_sequence: 0,
+        candidate_observation_id: String::new(),
+        candidate_execution_boundary: "legacy_in_process",
+        candidate_artifact_sha256: None,
+        candidate_process_startup_ns: None,
+        candidate_process_wall_ns: None,
     })
+}
+
+fn run_candidate_with_process(
+    mode: CandidateMode,
+    query: Query,
+    decision_need: DecisionNeedV1,
+    memory: &[Experience],
+    run_id: &str,
+    pair_block_id: &str,
+    observation_sequence: u64,
+    process: &mut CandidateProcessSession,
+) -> Result<CandidateObservation, IndexError> {
+    if !decision_need.is_valid() || decision_need.scope != query.scope {
+        return Err(IndexError::InvalidDecisionNeed);
+    }
+
+    if matches!(mode, CandidateMode::ExactScopeScan | CandidateMode::TypedContentHdc) {
+        let receipt = process
+            .invoke(
+                run_id,
+                pair_block_id,
+                observation_sequence,
+                mode.name(),
+                decision_need,
+                memory,
+            )
+            .map_err(IndexError::CandidateProcessFailure)?;
+        let index = EvidenceDependencyIndex::build(memory)?;
+        let decision = Decision {
+            action: receipt.action,
+            causal_claim: None,
+            evidence_ids: receipt.support_event_ids,
+            probe: None,
+        };
+        return Ok(CandidateObservation {
+            mode,
+            decision,
+            input_sha256: receipt.candidate_input_sha256,
+            evidence_sha256: receipt.candidate_evidence_sha256,
+            retrieved_event_ids: receipt.retrieved_event_ids,
+            retrieval_profile_sha256: receipt.retrieval_profile_sha256,
+            index_bytes: receipt.index_payload_bytes,
+            evidence_event_count: index.event_count(),
+            evidence_root_count: index.known_root_count(),
+            evidence_family_count: index.known_family_count(),
+            unknown_root_event_count: index.unknown_root_event_count(),
+            unknown_family_event_count: index.unknown_family_event_count(),
+            latency_ns: receipt.candidate_latency_ns,
+            candidate_observation_sequence: observation_sequence,
+            candidate_observation_id: receipt.candidate_observation_id,
+            candidate_execution_boundary: "detached_subprocess_stream",
+            candidate_artifact_sha256: Some(process.binary_sha256().to_string()),
+            candidate_process_startup_ns: Some(process.startup_ns()),
+            candidate_process_wall_ns: Some(receipt.process_wall_ns),
+        });
+    }
+
+    let mut observation = run_candidate(mode, query, decision_need, memory)?;
+    observation.candidate_observation_sequence = observation_sequence;
+    observation.candidate_observation_id = candidate_observation_id(
+        &observation,
+        run_id,
+        pair_block_id,
+        observation_sequence,
+    );
+    Ok(observation)
 }
 
 fn candidate_observation_id(
