@@ -723,9 +723,30 @@ mod tests {
         observations[5].biological_replicate_id = "replicate-c".to_string();
         let mut manifest = manifest(&observations, MycelialMorphogenesisSplitUnitBasis::BiologicalReplicate);
         manifest.units = vec![
-            split_unit("replicate-a", MycelialMorphogenesisPartition::Train),
-            split_unit("replicate-b", MycelialMorphogenesisPartition::Validation),
-            split_unit("replicate-c", MycelialMorphogenesisPartition::Test),
+            MycelialMorphogenesisSplitUnit {
+                independent_unit_id: "replicate-a".to_string(),
+                partition: MycelialMorphogenesisPartition::Train,
+                forecast_origin_ns: 150,
+                horizon_end_ns: 250,
+                context_observation_ids: vec!["a-context".to_string()],
+                target_observation_ids: vec!["a-target".to_string()],
+            },
+            MycelialMorphogenesisSplitUnit {
+                independent_unit_id: "replicate-b".to_string(),
+                partition: MycelialMorphogenesisPartition::Validation,
+                forecast_origin_ns: 150,
+                horizon_end_ns: 250,
+                context_observation_ids: vec!["b-context".to_string()],
+                target_observation_ids: vec!["b-target".to_string()],
+            },
+            MycelialMorphogenesisSplitUnit {
+                independent_unit_id: "replicate-c".to_string(),
+                partition: MycelialMorphogenesisPartition::Test,
+                forecast_origin_ns: 150,
+                horizon_end_ns: 250,
+                context_observation_ids: vec!["c-context".to_string()],
+                target_observation_ids: vec!["c-target".to_string()],
+            },
         ];
         manifest.validate_against(&observations).unwrap();
     }
@@ -738,6 +759,20 @@ mod tests {
         assert!(matches!(
             manifest.validate_against(&observations),
             Err(MycelialMorphogenesisSplitError::ObservationEvidenceMismatch(_))
+        ));
+    }
+
+    #[test]
+    fn observation_not_assigned_to_any_partition_is_rejected() {
+        let mut observations = observations();
+        observations.push(observation("a-target-2", "rep-a", "box-a", 225));
+        let manifest = manifest(
+            &observations,
+            MycelialMorphogenesisSplitUnitBasis::CultivationUnit,
+        );
+        assert!(matches!(
+            manifest.validate_against(&observations),
+            Err(MycelialMorphogenesisSplitError::ObservationNotAssigned(_))
         ));
     }
 
