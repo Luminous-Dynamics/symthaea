@@ -20,6 +20,9 @@ Existing suites measure complementary capabilities. They should be used as adapt
 | Graph OOD generalization | [GOOD](https://github.com/divelab/GOOD) | Covariate and concept shifts across 11 datasets, 17 domain selections and 51 curated splits | Tests whether discovered graph structures survive domain shifts and spurious-motif changes | Node/graph prediction under dataset shifts is not the same as cross-domain structural-analogy discovery |
 | Generalized category discovery | [CoGe-GCD](https://proceedings.mlr.press/v306/tang26ai.html) | Unlabeled known/novel category assignment and unseen combinations of learned primitives with spatial-relation calibration | Adjacent comparator for acquiring reusable primitives and discovering new compositions | Static category discovery; it does not test temporal task-agnostic stream acquisition or false causal transfer |
 | Compositional graph reasoning | [CGGC](https://aclanthology.org/2024.findings-emnlp.492/) | Reasoning graphs with previously unseen combinations of relation types | Useful external probe for recombining acquired relation primitives | Graph-conditioned language generation; not a task-agnostic acquisition test |
+| Compositional visual analogy | [CARV](https://arxiv.org/abs/2603.27958) | 5,500-sample visual analogy set requiring rule extraction from multiple pairs and composition into a new transformation | Direct multimodal analogy baseline and probe for composing acquired transformations | It supplies the analogy task at evaluation; it does not test pre-task, long-lived structural acquisition or action-conditioned dynamics |
+| Latent geometric analogy | [ERD / latent displacement](https://proceedings.mlr.press/v326/dats26a.html) | Shared latent difference vectors and averaged task-level transformations; reports linear rather than quadratic scaling in examples on ARC diagnostics | Low-complexity, interpretable baseline that can falsify the need for a heavier symbolic hybrid | Latent displacement does not itself provide explicit relation ontology, evaluator-owned counterexamples or continuous dynamics transfer |
+| Continual domain-invariant representation | [Janetzky et al. (ICML 2026)](https://proceedings.mlr.press/v306/janetzky26a.html) | Sequential learning of domain-invariant representations, replay and invariance alignment on six benchmark / real-world datasets | Strong baseline for progressive acquisition and transfer to unseen domains | Learns invariance in a continual-learning setup; it does not isolate task-agnostic pre-task acquisition or frozen proof-carrying correspondences |
 | Real audiovisual grounding | [DCASE 2026 Task 3](https://dcase.community/challenge2026/task-semantic-acoustic-imaging-for-sound-event-localization-and-detection-from-spatial-audio-and-audiovisual-scenes) | Reconstruct semantic spatial acoustic energy maps / dynamic masks from low-channel audio, optionally audiovisual | Strong sensory and cross-modal downstream qualification adapter | Measures a specific sound-imaging task, not broad structural discovery. 2026 challenge reports 29 Task 3 submissions from 8 teams, split audio-only and audiovisual |
 | Dynamic manipulation | [RoboDyna](https://robodyna.github.io/robodyna/) | Physically grounded object dynamics and closed-loop manipulation when the world continues evolving during inference | High-value Symtropy probe for whether acquired event/dynamics structure matters to decisions under latency | Robotics task performance is not a direct metric of generic acquisition; retain sync/async, expert-demonstration and human comparisons |
 | Moving-target manipulation | [LIBERO-Dynamic](https://arxiv.org/abs/2610.24579) | Dynamic extension of LIBERO with moving objects, model-specific inference latency and dynamic demonstrations | Complementary test of temporal/embodied transfer and planning under stale observations | Fine-tuning and demonstrations affect results; match data and training budget before attributing benefit to the architecture |
@@ -39,6 +42,38 @@ CoGe-GCD (ICML 2026) tackles unlabeled generalized category discovery by learnin
 **Response:** use its task/data protocol as an adjacent comparison for unsupervised primitive and novel-composition discovery. ErgoStream's distinct addition is temporal acquisition before task revelation, explicit cross-domain relation maps, and rejection of false analogies.
 
 Paper: https://proceedings.mlr.press/v306/tang26ai.html
+
+### Compositional analogy is already benchmarked directly
+
+CARV (2026) introduces a 5,500-sample compositional visual-analogy benchmark. It requires systems to extract symbolic rules from multiple source pairs and compose them into an unseen transformation. The authors report 40.4% for Gemini 2.5 Pro versus 100% human accuracy on their benchmark and identify rule decomposition and robustness as major failure points.
+
+**Response:** CARV should be an external analogical-composition probe, but it is not a test of task-agnostic acquisition. ErgoStream's distinct measurement must be whether structure is acquired before the analogy task is exposed, frozen, then reused across target worlds with explicit uncertainty and false-analogy controls.
+
+Paper: https://arxiv.org/abs/2603.27958
+
+### A lightweight latent-geometry baseline may be enough for some analogies
+
+Dats (2026) studies analogical reasoning as a shared displacement in latent space. An Encoder–Reasoner–Decoder model averages pairwise latent differences to form a task-level transformation and reports improvements over implicit attention-based analogical reasoning on ARC diagnostics, with linear rather than quadratic scaling in the number of examples.
+
+**Response:** include a latent-displacement / linear-map baseline before adding a heavier symbolic, graph or HDC/CfC stack. If it achieves equivalent transfer and calibration at lower cost, the hybrid has not earned its complexity. The research opportunity is not to assume symbolic structure is always superior; it is to test where explicit scope, intervention/dynamics witnesses and counterexample custody add measurable value.
+
+Paper: https://proceedings.mlr.press/v326/dats26a.html
+
+### Continual domain-invariant representation is a strong transfer baseline
+
+Janetzky et al. (ICML 2026) introduce continual learning methods that preserve domain-invariant representations through replay and sequential invariance alignment. They evaluate on six benchmark and real-world datasets and report improved generalization to unseen target domains.
+
+**Response:** include its released methods / protocol as a direct baseline for progressive structural acquisition where feasible. The difference to test is whether a versioned structural library and frozen cross-domain mapping improve transfer diagnostics, non-identifiability handling and action-conditioned dynamics outcomes beyond learned invariant representations.
+
+Paper: https://proceedings.mlr.press/v306/janetzky26a.html
+
+### Structural transfer should be diagnosed, not presumed
+
+The 2026 AAAI paper *Unified Structural Factors for Transfer Learning Generalization with PAC-Bayesian Guarantees* proposes Feature Overlap Rate (FOR) and Effective Task Complexity (ETC) as factors explaining transfer risk. The authors report that their pair explains over 80% of transfer-risk variance across six GLUE transfer pairs. This is a theoretical/representation-level diagnostic, not a standalone structural-discovery benchmark.
+
+**Response:** measure source-target representation overlap and target complexity as covariates. Test whether ErgoStream's explicit structural witnesses explain transfer success or failure beyond ordinary geometric overlap and task-complexity diagnostics. If not, the additional structural machinery may not add value.
+
+Paper: https://doi.org/10.1609/aaai.v40i25.39270
 
 ### Active causal discovery is a direct comparator, not just a downstream task
 
@@ -102,8 +137,8 @@ All arms should receive the same stream, split, modality availability, observati
 
 1. **Simple controls:** no-change/persistence, random acquisition, passive next-frame, shuffled temporal order, shuffled modality alignment, and constant/IID-noise controls.
 2. **Acquisition policies:** surprise/prediction-error only, random-network-distillation novelty, learning-progress, information gain, cost-normalized information gain, predictive compression / MDL, and a hybrid acquisition policy.
-3. **Representation controls:** strong modality-specific encoders with event association; frozen dense multimodal embeddings; explicit graph-isomorphism / graph-edit baselines (VF2-style matching, Nauty/Traces or Bliss where applicable); HDC only; CfC/LTC only; explicit typed graph/hypergraph; bounded symbolic/e-graph; HDC–CfC plus graph/e-graph hybrid.
-4. **Graph transfer controls:** GOOD OOD splits for covariate/concept shifts; CGGC for unseen relation combinations; CoGe-GCD for discovery of primitives and new category compositions; the Heidelberg Graph Matching Benchmark (11 computer-vision / bio-imaging datasets, 451 problem instances) for matching objective quality and runtime; Neuen-Schweitzer stress instances and labeled graph-edit datasets (e.g. IAM / MIVIA) for solver correctness and scaling. The Heidelberg benchmark notes that many popular instances are solvable in under one second and that popular baseline methods can be inferior to stronger available solvers, so include hard/scaling cases and the strongest compatible algorithm rather than only easy toy graphs. These have different purposes: GOOD/CGGC/CoGe-GCD test generalization and composition, while graph-matching suites test algorithmic matching correctness and scaling. None substitutes for intervention-divergent false-analogy worlds.
+3. **Representation controls:** strong modality-specific encoders with event association; frozen dense multimodal embeddings; latent-displacement / linear-map analogy (ERD-style); continual domain-invariant representation learning; explicit graph-isomorphism / graph-edit baselines (VF2-style matching, Nauty/Traces or Bliss where applicable); HDC only; CfC/LTC only; explicit typed graph/hypergraph; bounded symbolic/e-graph; HDC–CfC plus graph/e-graph hybrid.
+4. **Analogy and compositional transfer controls:** CARV for compositional visual analogy; CGGC for unseen relation combinations; CoGe-GCD for discovery of primitives and new category compositions; GOOD for graph OOD shifts; Heidelberg Graph Matching Benchmark, Neuen-Schweitzer and labeled graph-edit datasets for algorithmic matching quality/scaling. Distinguish task-exposed analogy tests from pre-task acquisition; none substitutes for intervention-divergent false-analogy worlds.
 5. **World-model and action-policy controls:** object/event-centric recurrent and transformer models; the strongest compatible action-conditioned world model; a direct reactive/VLA policy with no explicit world model; a no-transfer/fresh-learning control. Report same-budget and best-available tracks separately. The primary question is incremental decision utility from acquired structure, not video fidelity alone.
 6. **Scientific-discovery and causal controls:** Unsatz-compatible agent/program interface; ACDB-compatible PC + greedy active orientation, density-aware random-DAG and other admitted causal baselines; PySR or another pinned symbolic-regression baseline when the candidate grammar and task class match; SINDy only when its sparse-regression assumptions are satisfied; exact tiny-world enumeration as evaluator diagnostic only.
 7. **Human reference:** where the task supports meaningful human interaction, include a human sample-efficiency / action-efficiency reference. It is not a substitute for a matched machine baseline.
@@ -164,6 +199,11 @@ These are prospective engineering targets, not external standards or achieved re
 **Stage 6 — confirmatory study:** six or more generator families, family-held-out test, preregistered uncertainty plan, matched strongest baselines, full resource accounting and external review.
 
 ## 7. References
+- CARV compositional visual analogy: https://arxiv.org/abs/2603.27958
+- ERD / latent displacement analogical reasoning: https://proceedings.mlr.press/v326/dats26a.html
+- Continual Learning of Domain-Invariant Representations (ICML 2026): https://proceedings.mlr.press/v306/janetzky26a.html
+- Unified Structural Factors for Transfer Learning Generalization (AAAI 2026): https://doi.org/10.1609/aaai.v40i25.39270
+- Automated Scientific Discovery survey (2026): https://link.springer.com/article/10.1007/s10994-025-06955-2
 
 - Unsatz: https://arxiv.org/abs/2611.03713
 - ARC-AGI-3: https://arcprize.org/arc-agi/3
