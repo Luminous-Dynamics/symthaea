@@ -33,10 +33,10 @@ pub use pair_manifest::{
 };
 pub use two_stage_metrology::{
     BinaryAssayCharacteristicsV1, BinaryDecisionLossV1, ConfirmationActionV1,
-    EvidenceDispositionV1, ScreenOutcomeV1, TWO_STAGE_INPUT_SCHEMA_V1,
-    TWO_STAGE_REPORT_SCHEMA_V1, TwoStageCandidatePlanV1, TwoStageClaimLimitsV1,
-    TwoStageMetrologyCandidateV1, TwoStageMetrologyErrorV1, TwoStageMetrologyPolicyV1,
-    TwoStageMetrologyReportV1, TwoStageOutcomeBranchV1, plan_two_stage_metrology_v1,
+    EvidenceDispositionV1, ScreenOutcomeV1, TWO_STAGE_INPUT_SCHEMA_V1, TWO_STAGE_REPORT_SCHEMA_V1,
+    TwoStageCandidatePlanV1, TwoStageClaimLimitsV1, TwoStageMetrologyCandidateV1,
+    TwoStageMetrologyErrorV1, TwoStageMetrologyPolicyV1, TwoStageMetrologyReportV1,
+    TwoStageOutcomeBranchV1, plan_two_stage_metrology_v1,
 };
 
 pub use stratified_repeat::{
