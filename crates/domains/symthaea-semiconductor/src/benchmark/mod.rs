@@ -3,6 +3,7 @@
 pub mod binary_metrics;
 pub mod dtco_manifest;
 pub mod metrology_audit;
+pub mod metrology_selection_receipt_v2;
 pub mod metrology_semantics;
 pub mod mf_acquisition;
 pub mod pair_manifest;
@@ -20,6 +21,14 @@ pub use binary_metrics::{
     BinaryClassCounts, BinaryMetricReportV1, BinaryMetricsError, BinaryScoreSampleV1,
     BinaryScoreSubjectV1, score_binary_subject_v1,
 };
+pub use metrology_selection_receipt_v2::{
+    CANONICALIZATION_VERSION_V1, EvsiScoreKindV2, MetrologyScoreProvenanceV2,
+    MetrologySelectionPolicyConfigV2, MetrologySelectionReceiptV2, SEED_DERIVATION_VERSION_V1,
+    SELECTION_POLICY_CONFIG_V2_SCHEMA, SELECTION_RECEIPT_V2_SCHEMA, SELECTOR_ALGORITHM_ID_V1,
+    SELECTOR_ALGORITHM_VERSION_V1, SelectionReceiptAttestationV2, SelectionReceiptV2Error,
+    UncertaintyScoreKindV2, build_selection_receipt_v2, verify_selection_receipt_v2,
+};
+
 pub use process_event_graph::{
     ClockBasisV1, InformationCutoffSnapshotV1, MetrologyLabelStatusV1, MetrologyLabelV1,
     PredictionInformationCutoffV1, ProcessEventEdgeV1, ProcessEventGraphError, ProcessEventGraphV1,
