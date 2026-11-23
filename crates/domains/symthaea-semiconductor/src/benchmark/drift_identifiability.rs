@@ -129,9 +129,7 @@ fn sha256_hex(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
 
-fn json_sha256<T: Serialize + ?Sized>(
-    value: &T,
-) -> Result<String, DriftIdentifiabilityErrorV1> {
+fn json_sha256<T: Serialize + ?Sized>(value: &T) -> Result<String, DriftIdentifiabilityErrorV1> {
     let bytes = serde_json::to_vec(value).map_err(|error| {
         DriftIdentifiabilityErrorV1(format!("canonical JSON serialization failed: {error}"))
     })?;
@@ -188,9 +186,7 @@ fn validate_input(input: &DriftIdentifiabilityInputV1) -> Result<(), DriftIdenti
     for action in &input.actions {
         validate_action(action)?;
         if !action_ids.insert(action.action_id.as_str()) {
-            return Err(DriftIdentifiabilityErrorV1(
-                "duplicate action ID".into()
-            ));
+            return Err(DriftIdentifiabilityErrorV1("duplicate action ID".into()));
         }
     }
 
@@ -198,7 +194,7 @@ fn validate_input(input: &DriftIdentifiabilityInputV1) -> Result<(), DriftIdenti
     for target in &input.required_targets {
         if !targets.insert(*target) {
             return Err(DriftIdentifiabilityErrorV1(
-                "duplicate attribution target".into()
+                "duplicate attribution target".into(),
             ));
         }
     }
@@ -207,9 +203,7 @@ fn validate_input(input: &DriftIdentifiabilityInputV1) -> Result<(), DriftIdenti
 
 /// Computes the row rank of a small sensitivity/design matrix with partial pivoting.
 /// The matrix is a structural identifiability object, not a stochastic covariance model.
-fn matrix_rank(
-    rows: &[[f64; DRIFT_IDENTIFIABILITY_DIMENSIONS_V1]],
-) -> usize {
+fn matrix_rank(rows: &[[f64; DRIFT_IDENTIFIABILITY_DIMENSIONS_V1]]) -> usize {
     if rows.is_empty() {
         return 0;
     }
@@ -283,7 +277,9 @@ fn canonical_input_sha256(
     input: &DriftIdentifiabilityInputV1,
 ) -> Result<String, DriftIdentifiabilityErrorV1> {
     let mut canonical = input.clone();
-    canonical.actions.sort_by(|left, right| left.action_id.cmp(&right.action_id));
+    canonical
+        .actions
+        .sort_by(|left, right| left.action_id.cmp(&right.action_id));
     canonical.required_targets.sort();
     json_sha256(&canonical)
 }
@@ -429,8 +425,7 @@ pub fn plan_drift_identifiability_v1(
     let target_status = observed_target_status
         .into_iter()
         .map(|mut target| {
-            target.identifiable_after_plan =
-                contrast_is_estimable(&final_rows, target.target);
+            target.identifiable_after_plan = contrast_is_estimable(&final_rows, target.target);
             target
         })
         .collect();
@@ -706,7 +701,8 @@ mod tests {
         actions_b.reverse();
 
         let target = vec![DriftAttributionTargetV1::ProcessShift];
-        let report_a = plan_drift_identifiability_v1(&input(actions_a, target.clone(), 10)).unwrap();
+        let report_a =
+            plan_drift_identifiability_v1(&input(actions_a, target.clone(), 10)).unwrap();
         let report_b = plan_drift_identifiability_v1(&input(actions_b, target, 10)).unwrap();
         assert_eq!(report_a.input_sha256, report_b.input_sha256);
         assert_eq!(report_a.report_sha256, report_b.report_sha256);
