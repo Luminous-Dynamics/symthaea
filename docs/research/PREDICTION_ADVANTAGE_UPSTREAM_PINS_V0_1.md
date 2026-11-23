@@ -150,6 +150,36 @@ The #13377 causal pairing certificate must bind each arm's action-conditioned tr
 
 Use #8578 for independent-cluster inference, #13176 for the existing resource/exposure decomposition, and #9437/#8715 for generic evaluator isolation and canonical evidence receipts. No additional factorial engine, world simulator or signing scheme is introduced here.
 
-## 7. Claim boundary
+## 7. Planning horizon and denoised selectable headroom crosswalk
+
+This adapter consumes two existing Symthaea research programmes; it does not create another horizon evaluator or continuation-selection engine.
+
+### Plannable range
+
+Reference: *The Planning Limits of Latent World Models* (2026-09-30), https://arxiv.org/abs/2609.39235.
+
+Keep six distinct variables:
+- (K): imagined world-model rollout horizon in control steps;
+- (L): target lookahead or subgoal distance in control steps;
+- (H_{train}): recursive prediction-training horizon;
+- (A): actions actually committed before feedback;
+- (R): observation-refresh interval;
+- (C): measured compute budget for proposing, imagining, ranking and verifying actions.
+
+The preregistered starting grid in the machine-readable manifest is (K\in\{5,10,20,30\}), (L\in\{1,2,3,5,10,20,\text{task horizon}\}), and candidate-bank count (N\in\{1,2,4,8,16,32,64\}). K is not the number of candidates and K is not the executed action-chunk length A. The study should report expert/action-ranking percentile, empirical (P^*(K)), ranking reversal, predicted-vs-realized regret and closed-loop progress separately. Compare short-horizon MPC plus real feedback, longer imagined rollouts, learned/online subgoals, and evaluator-only expert/demo subgoals. Do not call expert/demo-supplied subgoals deployable.
+
+Symthaea #10257/#10276 owns horizon-conditioned residuals and planner-exploitation audit; #10252 owns ranking stability; #10256 owns predictive-set coverage. The benchmark adapter supplies the task-specific horizon/action traces and consumes those existing evaluators.
+
+### Denoised selectable headroom
+
+Reference: Gao et al., *How Much Can Best-of-N Help a World Action Model?* (2026-10-27), https://arxiv.org/abs/2610.37196.
+
+Keep candidate count (N), selection continuation count (M_{select}), and held-out continuation count (M_{eval}) separate. A candidate bank selected using one lucky rollout is not evidence of held-out improvement. Selection and scoring continuation IDs must be disjoint; common random numbers are event-scoped and only used for causally invariant sources. Negative variance reduction is retained.
+
+CMAQ-018 #10625 and finite reference PR #10735 already own this estimator/oracle. Its v0.1 reference includes a 64-candidate, 17-selection, 17-held-out fixture, paired-versus-independent variance diagnostics and a support-gated reference selector. That reference does not execute physical rollouts and is **not** a learned D3 selector. This adapter should export benchmark episode/continuation inputs and measured cost receipts into that owner; it must not create a second denoised-headroom evaluator or bootstrap engine.
+
+The machine-readable manifest records these owners, variable distinctions, grids and controls in `plannable_range_experiment` and `selectable_headroom_integration`.
+
+## 8. Claim boundary
 
 This document pins source code and protocol artifacts only. It does not mean that either benchmark was installed, its assets downloaded, its model checkpoints acquired, or its results reproduced. No Symthaea performance, physical, latency, energy or SOTA improvement is claimed. The inaccessible LIBERO base-source revision is an explicit unresolved reproduction dependency, not an assumed success.
