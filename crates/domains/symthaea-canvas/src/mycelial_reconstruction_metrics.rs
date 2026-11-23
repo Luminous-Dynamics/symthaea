@@ -589,29 +589,26 @@ pub fn match_junctions_hungarian(
     let forbidden_cost = (matrix_size as f64 + 1.0) * unmatched_cost;
     let mut costs = vec![vec![0.0f64; matrix_size]; matrix_size];
 
-    for prediction_index in 0..prediction_count {
+    for (prediction_index, row) in costs.iter_mut().take(prediction_count).enumerate() {
         for truth_index in 0..truth_count {
             let distance = point_distance(
                 prediction_nodes[prediction_index].position,
                 ground_truth_nodes[truth_index].position,
                 ground_truth.dimensionality,
             );
-            costs[prediction_index][truth_index] = if distance <= maximum_distance {
+            row[truth_index] = if distance <= maximum_distance {
                 distance / maximum_distance
             } else {
                 forbidden_cost
             };
         }
-        for dummy_column in truth_count..matrix_size {
-            costs[prediction_index][dummy_column] = unmatched_cost;
+        for cost in row.iter_mut().skip(truth_count) {
+            *cost = unmatched_cost;
         }
     }
-    for dummy_row in prediction_count..matrix_size {
-        for truth_column in 0..truth_count {
-            costs[dummy_row][truth_column] = unmatched_cost;
-        }
-        for dummy_column in truth_count..matrix_size {
-            costs[dummy_row][dummy_column] = 0.0;
+    for row in costs.iter_mut().skip(prediction_count) {
+        for cost in row.iter_mut().take(truth_count) {
+            *cost = unmatched_cost;
         }
     }
 
