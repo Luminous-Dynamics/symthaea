@@ -849,6 +849,17 @@ mod tests {
     }
 
     #[test]
+    fn existing_semantic_entry_can_be_bound_without_changing_its_layout() {
+        let event = claim("claim-1", 1, 10, EvidenceEventKind::Assertion, Vec::new());
+        let ledger = EvidenceLedger::new(vec![event]).unwrap();
+        let entry = crate::semantic::SemanticEntry::new(vec![0.1, 0.2, 0.3], 42, 0.05);
+        let bound = ledger.bind(entry, "claim-1", &query(50, 50)).unwrap();
+        assert_eq!(bound.value().timestamp, 42);
+        assert_eq!(bound.value().hdc_vector.len(), 3);
+        assert_eq!(bound.evidence_event_id(), "claim-1");
+    }
+
+    #[test]
     fn unqualified_memory_value_cannot_be_bound() {
         let event = claim("claim-1", 1, 10, EvidenceEventKind::Assertion, Vec::new());
         let ledger = EvidenceLedger::new(vec![event]).unwrap();
