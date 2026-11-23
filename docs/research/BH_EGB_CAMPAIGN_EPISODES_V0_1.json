@@ -229,6 +229,28 @@
           "use": "exact synthetic covariance and redundant-observable regression fixture"
         }
       ]
+    },
+    {
+      "role": "symthaea_decision_value_vs_information_gain_synthetic_control",
+      "repository": "Luminous-Dynamics/symthaea",
+      "ref": "research/bh-egb-symthaea-campaign-2026-11-23",
+      "files": [
+        {
+          "path": "docs/research/BH_EGB_DECISION_VALUE_CONTROL_V0_1.json",
+          "git_blob_sha1": "46cd9fac730f7375eaa15b5c84541fb113324ecd",
+          "use": "exact finite-state equal-information, unequal-decision-value control"
+        },
+        {
+          "path": "docs/research/verify_bh_egb_decision_value.py",
+          "git_blob_sha1": "2b0fc3511b13ec4bb545a8e7873f7c6292c51e0e",
+          "use": "exact rational Stage-A decision-value verifier"
+        },
+        {
+          "path": "docs/research/BH_EGB_DECISION_VALUE_VERIFICATION_RECEIPT_V0_1.json",
+          "git_blob_sha1": "23165b2f5093b9a0015f5f4f09541615b00b70b4",
+          "use": "replay receipt for decision-value versus information-gain control"
+        }
+      ]
     }
   ],
   "authority_boundaries": {
