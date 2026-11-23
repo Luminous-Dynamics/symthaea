@@ -22,10 +22,10 @@ pub use binary_metrics::{
     BinaryScoreSubjectV1, score_binary_subject_v1,
 };
 pub use metrology_selection_receipt_v2::{
-    CANONICALIZATION_VERSION_V1, SELECTION_POLICY_CONFIG_V2_SCHEMA, SELECTION_RECEIPT_V2_SCHEMA,
-    SEED_DERIVATION_VERSION_V1, SELECTOR_ALGORITHM_ID_V1, SELECTOR_ALGORITHM_VERSION_V1,
-    EvsiScoreKindV2, MetrologyScoreProvenanceV2, MetrologySelectionPolicyConfigV2,
-    MetrologySelectionReceiptV2, SelectionReceiptAttestationV2, SelectionReceiptV2Error,
+    CANONICALIZATION_VERSION_V1, EvsiScoreKindV2, MetrologyScoreProvenanceV2,
+    MetrologySelectionPolicyConfigV2, MetrologySelectionReceiptV2, SEED_DERIVATION_VERSION_V1,
+    SELECTION_POLICY_CONFIG_V2_SCHEMA, SELECTION_RECEIPT_V2_SCHEMA, SELECTOR_ALGORITHM_ID_V1,
+    SELECTOR_ALGORITHM_VERSION_V1, SelectionReceiptAttestationV2, SelectionReceiptV2Error,
     UncertaintyScoreKindV2, build_selection_receipt_v2, verify_selection_receipt_v2,
 };
 
