@@ -122,8 +122,7 @@ pub use mycelial_failure_resilience::{
     evaluate_mycelial_failure_attack_plan,
 };
 pub use mycelial_functional_benchmark::{
-    MAX_MYCELIAL_FUNCTIONAL_BENCHMARK_ASSIGNMENTS,
-    MYCELIAL_FUNCTIONAL_BENCHMARK_SCHEMA_VERSION,
+    MAX_MYCELIAL_FUNCTIONAL_BENCHMARK_ASSIGNMENTS, MYCELIAL_FUNCTIONAL_BENCHMARK_SCHEMA_VERSION,
     MycelialFunctionalBenchmarkAssignment, MycelialFunctionalBenchmarkError,
     MycelialFunctionalBenchmarkSplit, MycelialFunctionalBenchmarkSplitManifest,
 };
