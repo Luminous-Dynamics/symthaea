@@ -279,8 +279,13 @@ fn validate_selection_design(
             "selection report counts do not reconcile with row-level methods".into(),
         ));
     }
-    if residual_population_by_stratum.keys().collect::<BTreeSet<_>>()
-        != selection.audit_quota_by_stratum.keys().collect::<BTreeSet<_>>()
+    if residual_population_by_stratum
+        .keys()
+        .collect::<BTreeSet<_>>()
+        != selection
+            .audit_quota_by_stratum
+            .keys()
+            .collect::<BTreeSet<_>>()
     {
         return Err(SyntheticFabReplayError(
             "audit quotas do not exactly cover residual strata".into(),
@@ -296,7 +301,10 @@ fn validate_selection_design(
                 "stratum {stratum}: audit quota outside [1, residual population]"
             )));
         }
-        let sampled = randomized_selected_by_stratum.get(stratum).copied().unwrap_or(0);
+        let sampled = randomized_selected_by_stratum
+            .get(stratum)
+            .copied()
+            .unwrap_or(0);
         if sampled != quota {
             return Err(SyntheticFabReplayError(format!(
                 "stratum {stratum}: selected audit count differs from declared quota"
@@ -714,23 +722,19 @@ pub fn evaluate_synthetic_metrology_policy_v1(
             design_variance_qualified = false;
             continue;
         };
-        let finite_population_correction =
-            1.0 - sample_count as f64 / *residual_population as f64;
+        let finite_population_correction = 1.0 - sample_count as f64 / *residual_population as f64;
         positive_total_variance += (*residual_population as f64).powi(2)
             * finite_population_correction
             * positive_variance
             / sample_count as f64;
-        brier_total_variance += (*residual_population as f64).powi(2)
-            * finite_population_correction
-            * brier_variance
-            / sample_count as f64;
+        brier_total_variance +=
+            (*residual_population as f64).powi(2) * finite_population_correction * brier_variance
+                / sample_count as f64;
     }
-    let standard_error_ht_prevalence = design_variance_qualified.then(|| {
-        positive_total_variance.sqrt() / population_count as f64
-    });
-    let standard_error_ht_mean_brier = design_variance_qualified.then(|| {
-        brier_total_variance.sqrt() / population_count as f64
-    });
+    let standard_error_ht_prevalence =
+        design_variance_qualified.then(|| positive_total_variance.sqrt() / population_count as f64);
+    let standard_error_ht_mean_brier =
+        design_variance_qualified.then(|| brier_total_variance.sqrt() / population_count as f64);
     let hidden_truth_sha256 = json_sha256(&episode.hidden_truth)?;
 
     let mut report = SyntheticFabPolicyEvaluationV1 {
