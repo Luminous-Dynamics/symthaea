@@ -1,0 +1,271 @@
+{
+  "schema_version": "1.0.0",
+  "plan_id": "PROOFPLAN-AND-COMM-001",
+  "status": "source_pinned_provisional",
+  "theorem": {
+    "declaration": "And.comm",
+    "statement": "∀ {a b : Prop}, a ∧ b ↔ b ∧ a",
+    "identity_status": "source_pinned_provisional",
+    "source": {
+      "repository": "leanprover/lean4",
+      "revision": "a9b5b8a25c4b932be8029426c2abd34685b078f0",
+      "path": "src/Init/Core.lean",
+      "blob_sha": "2a44fea5380ec12bd026a1d8d62a2acb3fa79736",
+      "line_start": 1060,
+      "line_end": 1060,
+      "url": "https://github.com/leanprover/lean4/blob/a9b5b8a25c4b932be8029426c2abd34685b078f0/src/Init/Core.lean#L1060"
+    },
+    "elaborated_type_sha256": null
+  },
+  "environment": {
+    "status": "source_only",
+    "lean_version": null,
+    "mathlib_revision": null,
+    "lake_manifest_sha256": null
+  },
+  "root_goal_id": "G_MAIN",
+  "nodes": [
+    {
+      "id": "G_MAIN",
+      "kind": "goal_state",
+      "label": "Main iff goal",
+      "statement": "a ∧ b ↔ b ∧ a",
+      "epistemic_class": "formal_fact",
+      "evidence_refs": [
+        "E_SOURCE"
+      ]
+    },
+    {
+      "id": "A_SPLIT_IFF",
+      "kind": "plan_action",
+      "label": "Separate the two directions",
+      "epistemic_class": "mathematical_interpretation",
+      "evidence_refs": [
+        "E_SOURCE"
+      ],
+      "action_spec": {
+        "operation": "split_iff",
+        "input_goal_ids": [
+          "G_MAIN"
+        ],
+        "output_subgoal_ids": [
+          "G_FORWARD",
+          "G_REVERSE"
+        ],
+        "consumed_side_condition_ids": [],
+        "justification_node_ids": [
+          "J_IFF"
+        ],
+        "rationale": "An equivalence is established by proving both implications, one in each direction.",
+        "evidence_refs": [
+          "E_SOURCE"
+        ]
+      }
+    },
+    {
+      "id": "G_FORWARD",
+      "kind": "subgoal",
+      "label": "Forward implication",
+      "statement": "a ∧ b → b ∧ a",
+      "epistemic_class": "mathematical_interpretation",
+      "evidence_refs": [
+        "E_SOURCE"
+      ]
+    },
+    {
+      "id": "G_REVERSE",
+      "kind": "subgoal",
+      "label": "Reverse implication",
+      "statement": "b ∧ a → a ∧ b",
+      "epistemic_class": "mathematical_interpretation",
+      "evidence_refs": [
+        "E_SOURCE"
+      ]
+    },
+    {
+      "id": "J_IFF",
+      "kind": "justification",
+      "label": "Iff introduction",
+      "statement": "The two implication proofs together establish the iff.",
+      "epistemic_class": "mathematical_interpretation",
+      "evidence_refs": [
+        "E_SOURCE"
+      ]
+    },
+    {
+      "id": "J_AND_SYMM",
+      "kind": "justification",
+      "label": "Conjunction symmetry",
+      "statement": "Conjunction symmetry exchanges the two components of a paired proof.",
+      "epistemic_class": "mathematical_interpretation",
+      "evidence_refs": [
+        "E_SOURCE"
+      ]
+    },
+    {
+      "id": "A_FORWARD",
+      "kind": "plan_action",
+      "label": "Apply conjunction symmetry forward",
+      "epistemic_class": "mathematical_interpretation",
+      "evidence_refs": [
+        "E_SOURCE"
+      ],
+      "action_spec": {
+        "operation": "apply_lemma",
+        "input_goal_ids": [
+          "G_FORWARD"
+        ],
+        "output_subgoal_ids": [],
+        "consumed_side_condition_ids": [],
+        "justification_node_ids": [
+          "J_AND_SYMM"
+        ],
+        "rationale": "Map a proof of a ∧ b to a proof of b ∧ a by exchanging its components.",
+        "evidence_refs": [
+          "E_SOURCE"
+        ]
+      }
+    },
+    {
+      "id": "A_REVERSE",
+      "kind": "plan_action",
+      "label": "Apply conjunction symmetry in reverse",
+      "epistemic_class": "mathematical_interpretation",
+      "evidence_refs": [
+        "E_SOURCE"
+      ],
+      "action_spec": {
+        "operation": "apply_lemma",
+        "input_goal_ids": [
+          "G_REVERSE"
+        ],
+        "output_subgoal_ids": [],
+        "consumed_side_condition_ids": [],
+        "justification_node_ids": [
+          "J_AND_SYMM"
+        ],
+        "rationale": "Map a proof of b ∧ a to a proof of a ∧ b by exchanging its components.",
+        "evidence_refs": [
+          "E_SOURCE"
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "source_id": "A_SPLIT_IFF",
+      "target_id": "G_MAIN",
+      "relation": "transforms",
+      "evidence_refs": [
+        "E_SOURCE"
+      ]
+    },
+    {
+      "source_id": "A_SPLIT_IFF",
+      "target_id": "G_FORWARD",
+      "relation": "creates_subgoal",
+      "evidence_refs": [
+        "E_SOURCE"
+      ]
+    },
+    {
+      "source_id": "A_SPLIT_IFF",
+      "target_id": "G_REVERSE",
+      "relation": "creates_subgoal",
+      "evidence_refs": [
+        "E_SOURCE"
+      ]
+    },
+    {
+      "source_id": "A_SPLIT_IFF",
+      "target_id": "J_IFF",
+      "relation": "justified_by",
+      "evidence_refs": [
+        "E_SOURCE"
+      ]
+    },
+    {
+      "source_id": "A_FORWARD",
+      "target_id": "G_FORWARD",
+      "relation": "discharges",
+      "evidence_refs": [
+        "E_SOURCE"
+      ]
+    },
+    {
+      "source_id": "A_FORWARD",
+      "target_id": "J_AND_SYMM",
+      "relation": "justified_by",
+      "evidence_refs": [
+        "E_SOURCE"
+      ]
+    },
+    {
+      "source_id": "A_REVERSE",
+      "target_id": "G_REVERSE",
+      "relation": "discharges",
+      "evidence_refs": [
+        "E_SOURCE"
+      ]
+    },
+    {
+      "source_id": "A_REVERSE",
+      "target_id": "J_AND_SYMM",
+      "relation": "justified_by",
+      "evidence_refs": [
+        "E_SOURCE"
+      ]
+    }
+  ],
+  "evidence": [
+    {
+      "id": "E_SOURCE",
+      "kind": "source_span",
+      "authority": "repository_source_inspection",
+      "status": "observed",
+      "description": "Pinned Lean source line for And.comm; the source expression is Iff.intro And.symm And.symm.",
+      "source": {
+        "repository": "leanprover/lean4",
+        "revision": "a9b5b8a25c4b932be8029426c2abd34685b078f0",
+        "path": "src/Init/Core.lean",
+        "blob_sha": "2a44fea5380ec12bd026a1d8d62a2acb3fa79736",
+        "line_start": 1060,
+        "line_end": 1060,
+        "url": "https://github.com/leanprover/lean4/blob/a9b5b8a25c4b932be8029426c2abd34685b078f0/src/Init/Core.lean#L1060"
+      }
+    }
+  ],
+  "alternatives": [
+    {
+      "id": "ALT_PRIMARY",
+      "label": "Direct conjunction symmetry in both directions",
+      "root_goal_id": "G_MAIN",
+      "node_ids": [
+        "G_MAIN",
+        "A_SPLIT_IFF",
+        "G_FORWARD",
+        "G_REVERSE",
+        "J_IFF",
+        "J_AND_SYMM",
+        "A_FORWARD",
+        "A_REVERSE"
+      ],
+      "status": "primary"
+    }
+  ],
+  "validation": {
+    "graph_structure_status": "not_run",
+    "lean_kernel_status": "not_run",
+    "expert_review_status": "not_reviewed",
+    "human_comprehension_status": "not_run",
+    "validator_version": null
+  },
+  "reviewers": [],
+  "limitations": [
+    "This is a source-pinned provisional proof-plan illustration, not an expert-reviewed gold plan.",
+    "The Lean environment was not built and no kernel replay was performed for this fixture.",
+    "The elaborated theorem type digest, proof-value digest, Lake manifest and imported-module closure are unavailable and intentionally null or omitted.",
+    "The source line documents the theorem and source expression; the action/justification labels are provisional mathematical interpretations.",
+    "Structural validation does not establish that every plan action is mathematically valid."
+  ]
+}
