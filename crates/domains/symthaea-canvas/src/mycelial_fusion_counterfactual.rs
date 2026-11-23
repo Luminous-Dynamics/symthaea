@@ -1006,7 +1006,7 @@ fn build_candidate_impact(
         fusion_probability: candidate.fusion_probability,
         bridge_length_basis: candidate.bridge_length_basis,
         contact_anchor_interpolation_used: matches!(
-            candidate.target,
+            &candidate.target,
             MycelialFusionTarget::HyphaSide { .. }
         ),
         conflict_group_id: candidate.conflict_group_id.clone(),
@@ -1033,6 +1033,55 @@ fn build_candidate_impact(
         demand_deltas,
         disruption_deltas,
     })
+}
+
+/// Return true when two proposal identities cannot both be treated as
+/// independent contact events under the pairwise-fusion contract. Explicit
+/// caller conflict groups take precedence, but common source tips, shared
+/// tip endpoints, and identical tip-to-side contacts are also detected.
+fn candidates_conflict(
+    left: &MycelialFusionCandidate,
+    right: &MycelialFusionCandidate,
+) -> bool {
+    if left.conflict_group_id.is_some()
+        && left.conflict_group_id == right.conflict_group_id
+    {
+        return true;
+    }
+    if left.source_tip_junction_id == right.source_tip_junction_id {
+        return true;
+    }
+    match (&left.target, &right.target) {
+        (
+            MycelialFusionTarget::TipJunction {
+                junction_id: left_target,
+            },
+            MycelialFusionTarget::TipJunction {
+                junction_id: right_target,
+            },
+        ) => {
+            let left_endpoints = [
+                left.source_tip_junction_id.as_str(),
+                left_target.as_str(),
+            ];
+            let right_endpoints = [
+                right.source_tip_junction_id.as_str(),
+                right_target.as_str(),
+            ];
+            left_endpoints.iter().any(|id| right_endpoints.contains(id))
+        }
+        (
+            MycelialFusionTarget::HyphaSide {
+                segment_id: left_segment,
+                arc_length_fraction_micros: left_fraction,
+            },
+            MycelialFusionTarget::HyphaSide {
+                segment_id: right_segment,
+                arc_length_fraction_micros: right_fraction,
+            },
+        ) => left_segment == right_segment && left_fraction == right_fraction,
+        _ => false,
+    }
 }
 
 fn validate_inputs(
@@ -1165,35 +1214,20 @@ pub fn evaluate_mycelial_fusion_counterfactuals(
         MycelialFusionCounterfactualError::InvalidSourceGraph(error.to_string())
     })?;
     let source_view = graph_from_skeleton(skeleton)?;
-    let mut conflicts = BTreeMap::<String, Vec<String>>::new();
-    for candidate in candidates {
-        if let Some(group_id) = &candidate.conflict_group_id {
-            conflicts
-                .entry(group_id.clone())
-                .or_default()
-                .push(candidate.candidate_id.clone());
-        }
-    }
-    for candidate_ids in conflicts.values_mut() {
-        candidate_ids.sort_unstable();
-    }
-
     let mut ordered: Vec<_> = candidates.iter().collect();
     ordered.sort_by(|left, right| left.candidate_id.cmp(&right.candidate_id));
     let mut impacts = Vec::with_capacity(ordered.len());
-    for candidate in ordered {
+    for candidate in &ordered {
         validate_candidate(skeleton, &source_view, candidate)?;
-        let conflicting_candidate_ids = candidate
-            .conflict_group_id
-            .as_ref()
-            .and_then(|group_id| conflicts.get(group_id))
-            .map(|ids| {
-                ids.iter()
-                    .filter(|id| id.as_str() != candidate.candidate_id)
-                    .cloned()
-                    .collect()
+        let mut conflicting_candidate_ids: Vec<_> = ordered
+            .iter()
+            .filter(|other| {
+                other.candidate_id != candidate.candidate_id
+                    && candidates_conflict(candidate, other)
             })
-            .unwrap_or_default();
+            .map(|other| other.candidate_id.clone())
+            .collect();
+        conflicting_candidate_ids.sort_unstable();
         impacts.push(build_candidate_impact(
             skeleton,
             &source_view,
@@ -1429,6 +1463,37 @@ mod tests {
                 .candidates
                 .iter()
                 .all(|impact| impact.accepted_for_analysis.cycle_rank == 1)
+        );
+    }
+
+    #[test]
+    fn candidates_sharing_a_source_tip_are_conflicts_without_a_group_id() {
+        let source = skeleton(
+            vec![
+                junction("A", AnnotatedJunctionKind::Origin, 0.0, 0.0),
+                junction("B", AnnotatedJunctionKind::Tip, 1.0, 0.0),
+                junction("C", AnnotatedJunctionKind::Tip, 0.0, 1.0),
+                junction("D", AnnotatedJunctionKind::Tip, -1.0, 0.0),
+            ],
+            vec![
+                segment("ab", "A", "B", 1.0),
+                segment("ac", "A", "C", 1.0),
+                segment("ad", "A", "D", 1.0),
+            ],
+        );
+        let candidates = vec![
+            candidate_tip_to_tip("one", "B", "C", None),
+            candidate_tip_to_tip("two", "B", "D", None),
+        ];
+        let report =
+            evaluate_mycelial_fusion_counterfactuals(&source, &candidates, &[], &[]).unwrap();
+        assert_eq!(
+            report.candidates[0].conflicting_candidate_ids,
+            vec!["two".to_string()]
+        );
+        assert_eq!(
+            report.candidates[1].conflicting_candidate_ids,
+            vec!["one".to_string()]
         );
     }
 
