@@ -467,6 +467,61 @@ class MaceLongMemEvalV2IngressTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "receipt digest mismatch"):
                 memory._verify_persisted_retrieval_traces()
 
+    def test_ambiguous_durable_trace_publication_poisons_sidecar(self) -> None:
+        class FakePipe:
+            def __init__(self, response: str = "") -> None:
+                self.response = response
+                self.written = ""
+
+            def write(self, value: str) -> None:
+                self.written += value
+
+            def flush(self) -> None:
+                return None
+
+            def readline(self) -> str:
+                return self.response
+
+        class FakeProcess:
+            def __init__(self) -> None:
+                self.stdin = FakePipe()
+                self.stdout = FakePipe(
+                    json.dumps({
+                        "ok": False,
+                        "error": (
+                            "retrieval trace persistence outcome may be unknown; "
+                            "reopen and reconcile before retry"
+                        ),
+                    }) + "\\n"
+                )
+                self.terminated = False
+
+            def poll(self) -> int | None:
+                return 0 if self.terminated else None
+
+            def terminate(self) -> None:
+                self.terminated = True
+
+            def kill(self) -> None:
+                self.terminated = True
+
+            def wait(self, timeout: float | None = None) -> int:
+                _ = timeout
+                return 0
+
+        memory = object.__new__(MaceLongMemEvalV2Memory)
+        memory._lock = threading.RLock()
+        memory._process = FakeProcess()
+        memory._poisoned = False
+        memory._closed = False
+
+        with self.assertRaisesRegex(RuntimeError, "outcome is unknown"):
+            memory._rpc({"op": "query", "query": "must not continue"})
+        self.assertTrue(memory._poisoned)
+        self.assertTrue(memory._process.terminated)
+        with self.assertRaisesRegex(RuntimeError, "until reload/reconciliation"):
+            memory._rpc({"op": "query", "query": "must remain blocked"})
+
     def test_retrieval_trace_restore_rejects_missing_candidate_receipt_pair(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
