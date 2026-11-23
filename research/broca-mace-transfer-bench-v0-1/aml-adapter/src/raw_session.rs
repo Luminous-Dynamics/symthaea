@@ -218,6 +218,8 @@ pub struct RawSessionChunkV1 {
     pub session_id: String,
     pub ordinal: usize,
     pub request_id: String,
+    /// Exact frozen word-counter implementation used to establish chunk boundaries.
+    pub word_counter_version: String,
     pub turn_ids: Vec<String>,
     pub turn_line_sha256: Vec<String>,
     pub messages: Vec<Message>,
@@ -257,6 +259,10 @@ fn chunks_from_plan(
     session: &RawSessionV1,
     plan: TextualChunkPlan,
 ) -> Result<Vec<RawSessionChunkV1>, RawSessionReject> {
+    if plan.word_counter_version.trim().is_empty() {
+        return Err(RawSessionReject::InvalidChunkPlan);
+    }
+    let word_counter_version = plan.word_counter_version.clone();
     let mut source_offset = 0usize;
     let mut chunks = Vec::with_capacity(plan.chunks.len());
 
@@ -311,6 +317,7 @@ fn chunks_from_plan(
             &session.user_id,
             &session.session_id,
             ordinal,
+            &word_counter_version,
             &session.raw_session_sha256,
             &source_payload_sha256,
             &turn_ids,
@@ -323,6 +330,7 @@ fn chunks_from_plan(
             session_id: session.session_id.clone(),
             ordinal,
             request_id: request.request_id.clone(),
+            word_counter_version: word_counter_version.clone(),
             turn_ids,
             turn_line_sha256,
             messages: request.messages,
@@ -700,6 +708,7 @@ fn validate_chunk_integrity(chunk: &RawSessionChunkV1) -> Result<(), RawSessionR
     if chunk.user_id.trim().is_empty()
         || chunk.session_id.trim().is_empty()
         || chunk.request_id.trim().is_empty()
+        || chunk.word_counter_version.trim().is_empty()
         || chunk.messages.is_empty()
         || chunk.messages.len() != chunk.turn_ids.len()
         || chunk.messages.len() != chunk.turn_line_sha256.len()
@@ -738,6 +747,7 @@ fn validate_chunk_integrity(chunk: &RawSessionChunkV1) -> Result<(), RawSessionR
         &chunk.user_id,
         &chunk.session_id,
         chunk.ordinal,
+        &chunk.word_counter_version,
         &chunk.source_session_sha256,
         &chunk.source_payload_sha256,
         &chunk.turn_ids,
@@ -774,6 +784,7 @@ fn chunk_digest(
     user_id: &str,
     session_id: &str,
     ordinal: usize,
+    word_counter_version: &str,
     source_session_sha256: &str,
     source_payload_sha256: &str,
     turn_ids: &[String],
@@ -784,6 +795,7 @@ fn chunk_digest(
     hash_field(&mut hasher, user_id);
     hash_field(&mut hasher, session_id);
     hasher.update((ordinal as u64).to_be_bytes());
+    hash_field(&mut hasher, word_counter_version);
     hash_field(&mut hasher, source_session_sha256);
     hash_field(&mut hasher, source_payload_sha256);
     hasher.update((turn_ids.len() as u64).to_be_bytes());
@@ -941,6 +953,7 @@ mod tests {
         assert_eq!(first, second);
         assert_eq!(first.len(), 2);
         assert_eq!(first[0].turn_ids.len(), 20);
+        assert_eq!(first[0].word_counter_version, "fixture-whitespace-v1");
         assert_eq!(first[1].turn_ids, (20..25).map(|i| format!("t{i}")).collect::<Vec<_>>());
         assert_eq!(first[0].messages[0].content, MessageContent::Text("message 0".into()));
     }

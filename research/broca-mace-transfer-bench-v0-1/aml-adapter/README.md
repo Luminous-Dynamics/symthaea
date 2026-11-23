@@ -14,7 +14,7 @@ The source JSONL contract is in `data/schemas/mace_raw_session_v0_1.schema.json`
 - A parsed batch contains one user and one session only; turn IDs must be unique.
 - Exact source text, role, timestamp, turn ID, raw-line digest and whole-session digest are retained.
 - Chunking uses the existing injected frozen word counter and the AML Textual limits (20 messages / 2,000 words); it never rewrites source messages.
-- Chunk identity binds user, session, ordinal, raw-session SHA-256, Add-payload digest and turn IDs.
+- Chunk identity binds user, session, ordinal, frozen word-counter version, raw-session SHA-256, Add-payload digest, turn IDs and their individual source-line digests.
 - BM25 normalization is used only for the derived index. Original text remains unchanged in the returned evidence chunk.
 - The index is user-scoped. Cross-user ingestion and search are rejected.
 - Neighbor expansion is session-local and returned separately from scored hits. Neighbor chunks are not assigned fabricated relevance scores.
@@ -49,8 +49,8 @@ This enables the raw-session side of the MACE baseline matrix:
 4. Raw evidence plus extracted facts as a combined arm, once a pinned fact extractor is added.
 5. Fixed reader/judge/backbone and all-in cost/latency measurements.
 
-It does **not** yet reproduce Redis Remis + Instruct, Agent Zero Memory, AML Cycle 2, LongMemEval or LoCoMo. Those require their exact chunking, embeddings, prompts, extraction, judge, datasets and resource accounting. The current module is a fair, transparent lexical baseline component—not an SOTA result.
+It does **not** yet reproduce Redis Remis + Instruct, Agent Zero Memory, AML Cycle 2, LongMemEval or LoCoMo. Those require their exact chunking, embeddings, prompts, extraction, judge, datasets and resource accounting. The current module is a fair, transparent lexical baseline component—not an SOTA result. It is a reusable library; it is not yet wired into the canonical #13310 decision-sufficiency frontier runner.
 
 ## Tests
 
-Eleven deterministic tests are authored for raw text fidelity, strict schema/unknown-field handling, duplicate IDs, session/user isolation, stable chunking, source mutation identity, BM25 matching, neighbor isolation, invalid input and RRF. They have not been executed here.
+Thirteen deterministic tests are authored for raw text fidelity, strict schema/unknown-field handling, duplicate IDs, session/user isolation, stable chunking, source mutation identity, chunk-metadata tamper detection, BM25 matching, neighbor isolation, invalid input and RRF. They have not been executed here.
