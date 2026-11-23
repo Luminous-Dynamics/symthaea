@@ -3,7 +3,7 @@
 **Date:** 2026-11-23  
 **Parent:** [MON-003 issue #13398](https://github.com/Luminous-Dynamics/symthaea/issues/13398)  
 **Related:** [MON-001 issue #13392](https://github.com/Luminous-Dynamics/symthaea/issues/13392), [MON-002 issue #13394](https://github.com/Luminous-Dynamics/symthaea/issues/13394)  
-**Status:** specification committed; 9-case fencing/idempotency kernel, 3-case objective-ledger kernel and 8-case tenant-boundary suite committed and executed under Node.js v22.16.0; production qualification pending
+**Status:** specification committed; 9-case fencing/idempotency kernel, 3-case objective-ledger kernel, 8-case tenant-boundary suite, 720-order interleaving model check and 15-case cursor/replay suite committed and executed under Node.js v22.16.0; production qualification pending
 
 ## 1. Research thesis
 
@@ -351,7 +351,7 @@ All modeled invariants passed:
 - a lost response does not imply failure or justify a new key;
 - reconciliation is read-only.
 
-Observed across the 720 schedules: 228 schedules with one effect; 492 with no effect; 324 stale-fence rejections; 312 permission rejections; 108 expiry rejections; 108 idempotent replays; 174 successful reconciliations; and 558 schedules still marked outcome-unknown at the end because the finite event order did not provide a later successful reconciliation.
+Observed across the 720 schedules: 228 schedules with one effect; 492 with no effect; 324 stale-fence rejections; 312 permission rejections; 108 expiry rejections; 108 idempotent replays; 174 explicit successful reconciliations; 72 additional schedules in which a replacement worker learned the original result via idempotent replay; and 516 schedules still outcome-unknown at the end because the finite event order did not provide a later successful read of the operation result.
 
 Exact source Git blob SHA: `ebf2c1a4a289c11c06876925c7207c203c14cd56`.  
 Exact source SHA-256: `c8e8fa9b34d7b314cdb20b45d3a1ea017bacd765d8cb8d70576de422c1f6b95a`.
