@@ -21,6 +21,19 @@ struct Snapshot {
     edges: Vec<Edge>,
     #[serde(default)]
     helper_nodes: Vec<HelperNode>,
+    trust_profile: TrustProfile,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct TrustProfile {
+    closure_status: String,
+    transitive_declaration_count: usize,
+    axiom_declarations: Vec<String>,
+    unsafe_declarations: Vec<String>,
+    partial_declarations: Vec<String>,
+    opaque_declarations: Vec<String>,
+    sorry_ax_present: bool,
+    unresolved_declarations: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -35,6 +48,7 @@ struct HelperNode {
     constant_info_dependency_closure: Vec<String>,
     unresolved_dependencies: Vec<String>,
     edges: Vec<Edge>,
+    trust_profile: TrustProfile,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -80,6 +94,14 @@ struct DeclarationDiff {
     helper_nodes_baseline: Vec<String>,
     helper_nodes_candidate: Vec<String>,
     helper_expanded_proof_dependencies: SetDiff,
+    axiom_declarations: SetDiff,
+    unsafe_declarations: SetDiff,
+    partial_declarations: SetDiff,
+    opaque_declarations: SetDiff,
+    baseline_sorry_ax_present: bool,
+    candidate_sorry_ax_present: bool,
+    baseline_transitive_declaration_count: usize,
+    candidate_transitive_declaration_count: usize,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -220,8 +242,19 @@ fn load_cohort(path: &Path) -> Result<(CohortIdentity, BTreeMap<String, Snapshot
                 snapshot.declaration
             ));
         }
+        if snapshot.trust_profile.closure_status != "complete"
+            || !snapshot.trust_profile.unresolved_declarations.is_empty()
+        {
+            return Err(format!(
+                "incomplete trust profile for {}: {} unresolved declarations",
+                snapshot.declaration,
+                snapshot.trust_profile.unresolved_declarations.len()
+            ));
+        }
         for helper in &snapshot.helper_nodes {
-            if helper.root_declaration != snapshot.declaration
+            if helper.trust_profile.closure_status != "complete"
+                || !helper.trust_profile.unresolved_declarations.is_empty()
+                || helper.root_declaration != snapshot.declaration
                 || helper.node_role != "generated_or_private_helper"
                 || !helper.proof_value_available
                 || !helper.unresolved_dependencies.is_empty()
@@ -319,6 +352,26 @@ fn compare(
                 &helper_expanded_proof_dependencies(left),
                 &helper_expanded_proof_dependencies(right),
             ),
+            axiom_declarations: set_diff(
+                &string_set(&left.trust_profile.axiom_declarations),
+                &string_set(&right.trust_profile.axiom_declarations),
+            ),
+            unsafe_declarations: set_diff(
+                &string_set(&left.trust_profile.unsafe_declarations),
+                &string_set(&right.trust_profile.unsafe_declarations),
+            ),
+            partial_declarations: set_diff(
+                &string_set(&left.trust_profile.partial_declarations),
+                &string_set(&right.trust_profile.partial_declarations),
+            ),
+            opaque_declarations: set_diff(
+                &string_set(&left.trust_profile.opaque_declarations),
+                &string_set(&right.trust_profile.opaque_declarations),
+            ),
+            baseline_sorry_ax_present: left.trust_profile.sorry_ax_present,
+            candidate_sorry_ax_present: right.trust_profile.sorry_ax_present,
+            baseline_transitive_declaration_count: left.trust_profile.transitive_declaration_count,
+            candidate_transitive_declaration_count: right.trust_profile.transitive_declaration_count,
         });
     }
 
@@ -403,6 +456,16 @@ mod tests {
             constant_info_dependency_closure: closure,
             unresolved_dependencies: Vec::new(),
             edges: Vec::new(),
+            trust_profile: TrustProfile {
+                closure_status: "complete".to_owned(),
+                transitive_declaration_count: 3,
+                axiom_declarations: Vec::new(),
+                unsafe_declarations: Vec::new(),
+                partial_declarations: Vec::new(),
+                opaque_declarations: Vec::new(),
+                sorry_ax_present: false,
+                unresolved_declarations: Vec::new(),
+            },
         }
     }
 
@@ -492,6 +555,16 @@ mod tests {
             ],
             unresolved_dependencies: Vec::new(),
             edges: Vec::new(),
+            trust_profile: TrustProfile {
+                closure_status: "complete".to_owned(),
+                transitive_declaration_count: 3,
+                axiom_declarations: Vec::new(),
+                unsafe_declarations: Vec::new(),
+                partial_declarations: Vec::new(),
+                opaque_declarations: Vec::new(),
+                sorry_ax_present: false,
+                unresolved_declarations: Vec::new(),
+            },
         });
         let mut b = snapshot("Nat.choose_pos", &["Nat"], &["helper"]);
         b.helper_nodes.push(HelperNode {
@@ -509,6 +582,16 @@ mod tests {
             ],
             unresolved_dependencies: Vec::new(),
             edges: Vec::new(),
+            trust_profile: TrustProfile {
+                closure_status: "complete".to_owned(),
+                transitive_declaration_count: 3,
+                axiom_declarations: Vec::new(),
+                unsafe_declarations: Vec::new(),
+                partial_declarations: Vec::new(),
+                opaque_declarations: Vec::new(),
+                sorry_ax_present: false,
+                unresolved_declarations: Vec::new(),
+            },
         });
         let report = compare(
             identity("v1", "lean-a"),
