@@ -4,6 +4,9 @@ use std::env;
 use std::fs;
 use std::process::ExitCode;
 
+const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
+const MAX_REORDER_WINDOW: u64 = 1_024;
+const MAX_BUFFERED_EVENTS: usize = 1_024;
 const DEFAULT_FIXTURE: &str = "benchmarks/frontend/long-horizon/event-reconciliation-v1.json";
 
 fn field_str<'a>(value: &'a Value, key: &str) -> Result<&'a str, String> {
@@ -11,6 +14,65 @@ fn field_str<'a>(value: &'a Value, key: &str) -> Result<&'a str, String> {
 }
 fn field_u64(value: &Value, key: &str) -> Result<u64, String> {
     value.get(key).and_then(Value::as_u64).ok_or_else(|| format!("missing unsigned integer field: {key}"))
+}
+
+fn validate_event_shape(event: &Value) -> Result<(), String> {
+    let kind = field_str(event, "type")?;
+    let fields: Vec<&str> = match kind {
+        "job_transition" => vec!["type","event_id","sequence","job_id","expected_version","next_version","from_status","to_status","actor_id","capability","action_id"],
+        "owner_changed" => vec!["type","event_id","sequence","job_id","expected_version","next_version","from_owner","to_owner","actor_id","capability"],
+        "permission_revoked" => vec!["type","event_id","sequence","actor_id","capability"],
+        "clarification_required" => vec!["type","event_id","sequence","job_id","conflict_id"],
+        "clarification_resolved" => vec!["type","event_id","sequence","job_id","conflict_id","resolution"],
+        other => return Err(format!("unsupported event type: {other}")),
+    };
+    let object = event.as_object().ok_or("event must be a JSON object")?;
+    for key in object.keys() {
+        if !fields.contains(&key.as_str()) {
+            return Err(format!("unknown event field: {key}"));
+        }
+    }
+    for key in &fields {
+        if !object.contains_key(*key) {
+            return Err(format!("missing event field: {key}"));
+        }
+    }
+    let event_id = field_str(event, "event_id")?;
+    if event_id.is_empty() || event_id.len() > 128
+        || !event_id.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-')) {
+        return Err("invalid event identity".to_string());
+    }
+    let sequence = field_u64(event, "sequence")?;
+    if sequence == 0 || sequence > MAX_SAFE_INTEGER {
+        return Err("event sequence is outside the safe positive-integer range".to_string());
+    }
+    for key in ["expected_version", "next_version"] {
+        if object.contains_key(key) {
+            let value = field_u64(event, key)?;
+            if value == 0 || value > MAX_SAFE_INTEGER {
+                return Err(format!("{key} is outside the safe positive-integer range"));
+            }
+        }
+    }
+    for key in ["job_id","actor_id","capability","from_status","to_status","from_owner","to_owner","conflict_id","resolution"] {
+        if object.contains_key(key) {
+            let value = field_str(event, key)?;
+            if value.is_empty() || value.len() > 128 {
+                return Err(format!("invalid event string field: {key}"));
+            }
+        }
+    }
+    if object.contains_key("action_id") {
+        let action_id = &event["action_id"];
+        if !action_id.is_null() {
+            let value = action_id.as_str().ok_or("action_id must be null or a string")?;
+            if value.is_empty() || value.len() > 128
+                || !value.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-')) {
+                return Err("invalid action_id".to_string());
+            }
+        }
+    }
+    Ok(())
 }
 fn transition_allowed(from: &str, to: &str) -> bool {
     matches!((from, to),
@@ -47,7 +109,7 @@ impl State {
         for job in initial.get("jobs").and_then(Value::as_array).ok_or("initial_state.jobs must be an array")? {
             let id = field_str(job, "id")?.to_string();
             let version = field_u64(job, "version")?;
-            if id.is_empty() || version == 0 || jobs.insert(id.clone(), job.clone()).is_some() {
+            if id.is_empty() || id.len() > 128 || version == 0 || version > MAX_SAFE_INTEGER || jobs.insert(id.clone(), job.clone()).is_some() {
                 return Err(format!("invalid or duplicate initial job: {id}"));
             }
         }
@@ -150,7 +212,7 @@ impl State {
                 }
                 if let Some(action_id) = event.get("action_id").and_then(Value::as_str) {
                     let pending = self.pending.get(action_id).ok_or_else(|| format!("{event_id}: acknowledgement has no pending action"))?;
-                    if pending.get("job_id").and_then(Value::as_str) != Some(&job_id)
+                    if pending.get("job_id").and_then(Value::as_str) != Some(job_id.as_str())
                         || pending.get("expected_version").and_then(Value::as_u64) != Some(expected_version)
                         || pending.get("to_status").and_then(Value::as_str) != Some(to_status)
                         || pending.get("actor_id").and_then(Value::as_str) != Some(actor)
@@ -192,8 +254,8 @@ impl State {
                 let capability = field_str(event, "capability")?.to_string();
                 if let Some(capabilities) = self.permissions.get_mut(&actor) { capabilities.remove(&capability); }
                 let invalidated: Vec<String> = self.pending.iter()
-                    .filter(|(_, action)| action.get("actor_id").and_then(Value::as_str) == Some(&actor)
-                        && action.get("capability").and_then(Value::as_str) == Some(&capability))
+                    .filter(|(_, action)| action.get("actor_id").and_then(Value::as_str) == Some(actor.as_str())
+                        && action.get("capability").and_then(Value::as_str) == Some(capability.as_str()))
                     .map(|(id, _)| id.clone()).collect();
                 for id in invalidated { self.reject_pending(&id, "permission_revoked"); }
             }
@@ -237,8 +299,14 @@ impl State {
             if previous == event { self.duplicate_deliveries += 1; return Ok(()); }
             return Err(format!("event identity reused with different payload: {event_id}"));
         }
+        validate_event_shape(event)?;
         let sequence = field_u64(event, "sequence")?;
         if sequence <= self.last_sequence { return Err(format!("invalid or replayed sequence: {sequence}")); }
+        let maximum = self.last_sequence.checked_add(MAX_REORDER_WINDOW).unwrap_or(u64::MAX);
+        if sequence > maximum { return Err(format!("event sequence exceeds bounded reorder window: {sequence}")); }
+        if self.buffered.len() >= MAX_BUFFERED_EVENTS {
+            return Err("event reorder buffer is full".to_string());
+        }
         if let Some(owner) = self.sequence_owner.get(&sequence) {
             return Err(format!("sequence {sequence} assigned to both {owner} and {event_id}"));
         }
@@ -402,6 +470,32 @@ mod tests {
         let (id, cases, relations, negatives) = run_fixture(&fixture()).expect("event fixture should pass");
         assert_eq!(id, "SFEB-INT-004-EVENTS-001");
         assert_eq!((cases, relations, negatives), (6, 1, 4));
+    }
+
+    #[test]
+    fn event_shape_rejects_unknown_fields_and_unsafe_sequences() {
+        let f = fixture();
+        let mut state = State::new(&f["initial_state"]).unwrap();
+        let mut unknown = f["events"][0].clone();
+        unknown["worker_disposition"] = json!("accepted");
+        assert!(state.deliver(&unknown).unwrap_err().contains("unknown event field"));
+        let mut unsafe_sequence = f["events"][0].clone();
+        unsafe_sequence["sequence"] = json!(9_007_199_254_740_992u64);
+        assert!(state.deliver(&unsafe_sequence).unwrap_err().contains("safe positive-integer range"));
+    }
+
+    #[test]
+    fn reorder_window_is_bounded_and_rejection_is_atomic() {
+        let f = fixture();
+        let mut state = State::new(&f["initial_state"]).unwrap();
+        let mut far_future = f["events"][0].clone();
+        far_future["sequence"] = json!(MAX_REORDER_WINDOW + 1);
+        assert!(state.deliver(&far_future).unwrap_err().contains("bounded reorder window"));
+        assert!(state.seen_by_id.is_empty());
+        assert!(state.sequence_owner.is_empty());
+        assert!(state.buffered.is_empty());
+        state.deliver(&f["events"][0]).unwrap();
+        assert_eq!(state.last_sequence, 1);
     }
 
     #[test]
