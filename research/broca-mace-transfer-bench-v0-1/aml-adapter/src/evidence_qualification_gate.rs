@@ -55,6 +55,8 @@ pub struct EvidenceQualificationReceiptV1 {
     pub tool_profile_sha256: String,
     pub query_sha256: String,
     pub candidate_set_sha256: String,
+    /// Independently recomputed digest of the exact sorted evidence-ID set.
+    pub candidate_evidence_ids_sha256: String,
     pub decision_need_sha256: String,
     pub purpose_sha256: String,
     pub qualification_policy_sha256: String,
@@ -164,6 +166,9 @@ impl VerifiedEvidenceQualificationV1 {
         if receipt.entries.len() != binding.candidate_evidence_ids.len() {
             return Err(EvidenceQualificationRejectV1::ReceiptEntryCountMismatch);
         }
+        if receipt.candidate_evidence_ids_sha256 != candidate_ids_sha256(binding.candidate_evidence_ids) {
+            return Err(EvidenceQualificationRejectV1::BindingMismatch);
+        }
         for (entry, candidate_id) in receipt.entries.iter().zip(binding.candidate_evidence_ids) {
             if entry.evidence_id.as_str() != candidate_id.as_str() {
                 return Err(EvidenceQualificationRejectV1::BindingMismatch);
@@ -240,6 +245,7 @@ impl EvidenceQualificationReceiptV1 {
             self.tool_profile_sha256.as_str(),
             self.query_sha256.as_str(),
             self.candidate_set_sha256.as_str(),
+            self.candidate_evidence_ids_sha256.as_str(),
             self.decision_need_sha256.as_str(),
             self.purpose_sha256.as_str(),
             self.qualification_policy_sha256.as_str(),
@@ -322,7 +328,7 @@ fn validate_receipt_shape(receipt: &EvidenceQualificationReceiptV1)
     for digest in [
         receipt.environment_revision_sha256.as_str(), receipt.tool_profile_sha256.as_str(),
         receipt.query_sha256.as_str(), receipt.candidate_set_sha256.as_str(),
-        receipt.decision_need_sha256.as_str(), receipt.purpose_sha256.as_str(),
+        receipt.candidate_evidence_ids_sha256.as_str(), receipt.decision_need_sha256.as_str(), receipt.purpose_sha256.as_str(),
         receipt.qualification_policy_sha256.as_str(), receipt.lifecycle_snapshot_sha256.as_str(),
         receipt.verifier_profile_sha256.as_str(),
     ] {
@@ -354,6 +360,14 @@ fn validate_receipt_shape(receipt: &EvidenceQualificationReceiptV1)
         }
     }
     Ok(())
+}
+
+fn candidate_ids_sha256(ids: &[String]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"luminous:mace:candidate-evidence-ids:v1\\0");
+    hasher.update((ids.len() as u64).to_be_bytes());
+    for id in ids { hash_field(&mut hasher, id); }
+    hex_digest(&hasher.finalize())
 }
 
 fn valid_atom(value: &str) -> bool {
@@ -416,6 +430,7 @@ mod tests {
             tool_profile_sha256: digest('c'),
             query_sha256: digest('d'),
             candidate_set_sha256: digest('e'),
+            candidate_evidence_ids_sha256: candidate_ids_sha256(&vec!["evidence-a".to_owned(), "evidence-b".to_owned(), "evidence-c".to_owned()]),
             decision_need_sha256: digest('f'),
             purpose_sha256: digest('1'),
             qualification_policy_sha256: digest('2'),
