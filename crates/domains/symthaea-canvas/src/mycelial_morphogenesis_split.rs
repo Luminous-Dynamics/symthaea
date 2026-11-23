@@ -404,10 +404,10 @@ impl MycelialMorphogenesisSplitManifest {
         }
 
         let mut assigned_observations = BTreeSet::new();
-        let mut assigned_units = BTreeMap::new();
+        let mut assigned_units = BTreeMap::<String, MycelialMorphogenesisPartition>::new();
         for unit in &self.units {
             if assigned_units
-                .insert(&unit.independent_unit_id, unit.partition)
+                .insert(unit.independent_unit_id.clone(), unit.partition)
                 .is_some()
             {
                 return Err(MycelialMorphogenesisSplitError::DuplicateIndependentUnit(
@@ -509,6 +509,226 @@ impl MycelialMorphogenesisSplitManifest {
             }
         }
         Ok(hasher.finalize().to_hex().to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::mycelial_morphogenesis_observation::{
+        MYCELIAL_MORPHOGENESIS_OBSERVATION_SCHEMA_VERSION, MycelialDevelopmentStage,
+        MycelialMorphogenesisMeasurement, MycelialMorphogenesisObservation,
+        MycelialMorphogenesisRegionKind,
+    };
+    use crate::mycelial_acquisition_domain::MycelialAcquisitionUnitKey;
+
+    fn digest(character: char) -> String {
+        std::iter::repeat_n(character, DIGEST_HEX_BYTES).collect()
+    }
+
+    fn observation(
+        id: &str,
+        replicate: &str,
+        cultivation_unit: &str,
+        timestamp_ns: u64,
+    ) -> MycelialMorphogenesisObservation {
+        MycelialMorphogenesisObservation {
+            schema_version: MYCELIAL_MORPHOGENESIS_OBSERVATION_SCHEMA_VERSION,
+            observation_id: id.to_string(),
+            source_observation_digest: digest('1'),
+            source_artifact_id: "agaricus-cordogenesis".to_string(),
+            source_artifact_digest: digest('a'),
+            acquisition_domain_manifest_digest: digest('b'),
+            extraction_coverage_receipt_digest: digest('c'),
+            observation_coverage_ledger_digest: digest('d'),
+            biological_replicate_id: replicate.to_string(),
+            cultivation_unit_id: cultivation_unit.to_string(),
+            acquisition_session_id: "session-001".to_string(),
+            substrate_region_id: "substrate-001".to_string(),
+            region_kind: MycelialMorphogenesisRegionKind::CordSegment,
+            source_unit_key: MycelialAcquisitionUnitKey {
+                tile_x: 0,
+                tile_y: 0,
+                z_plane: 0,
+                channel: 0,
+                timepoint: u32::try_from(timestamp_ns).unwrap(),
+            },
+            timestamp_ns,
+            timebase_id: "monotonic-ns-v1".to_string(),
+            development_stage: MycelialDevelopmentStage::VegetativeColonization,
+            coordinate_frame_id: "specimen-frame-v1".to_string(),
+            spatial_transform_digest: digest('e'),
+            calibration_digest: digest('f'),
+            measurement: MycelialMorphogenesisMeasurement::CordAreaFraction {
+                fraction: 0.25,
+                analysis_method_id: "cord-segmentation-v1".to_string(),
+            },
+        }
+    }
+
+    fn observations() -> Vec<MycelialMorphogenesisObservation> {
+        vec![
+            observation("a-context", "rep-a", "box-a", 100),
+            observation("a-target", "rep-a", "box-a", 200),
+            observation("b-context", "rep-b", "box-b", 100),
+            observation("b-target", "rep-b", "box-b", 200),
+            observation("c-context", "rep-c", "box-c", 100),
+            observation("c-target", "rep-c", "box-c", 200),
+        ]
+    }
+
+    fn split_unit(
+        id: &str,
+        partition: MycelialMorphogenesisPartition,
+    ) -> MycelialMorphogenesisSplitUnit {
+        MycelialMorphogenesisSplitUnit {
+            independent_unit_id: id.to_string(),
+            partition,
+            forecast_origin_ns: 150,
+            horizon_end_ns: 250,
+            context_observation_ids: vec![format!("{id}-context")],
+            target_observation_ids: vec![format!("{id}-target")],
+        }
+    }
+
+    fn manifest(
+        source_observations: &[MycelialMorphogenesisObservation],
+        basis: MycelialMorphogenesisSplitUnitBasis,
+    ) -> MycelialMorphogenesisSplitManifest {
+        let mut ids = source_observations
+            .iter()
+            .map(|observation| observation.observation_id.clone())
+            .collect::<Vec<_>>();
+        ids.sort();
+        MycelialMorphogenesisSplitManifest {
+            schema_version: MYCELIAL_MORPHOGENESIS_SPLIT_SCHEMA_VERSION,
+            dataset_id: "agaricus-cordogenesis-2026".to_string(),
+            source_artifact_id: source_observations[0].source_artifact_id.clone(),
+            source_artifact_digest: source_observations[0].source_artifact_digest.clone(),
+            acquisition_domain_manifest_digest: source_observations[0]
+                .acquisition_domain_manifest_digest
+                .clone(),
+            extraction_coverage_receipt_digest: source_observations[0]
+                .extraction_coverage_receipt_digest
+                .clone(),
+            observation_coverage_ledger_digest: source_observations[0]
+                .observation_coverage_ledger_digest
+                .clone(),
+            morphogenesis_observation_inventory_digest:
+                mycelial_observation_id_inventory_digest(&ids),
+            split_unit_basis: basis,
+            split_protocol_id: "leave-independent-unit-out-forward-time".to_string(),
+            split_protocol_version: "1.0.0".to_string(),
+            split_protocol_digest: digest('9'),
+            units: vec![
+                split_unit("box-a", MycelialMorphogenesisPartition::Train),
+                split_unit("box-b", MycelialMorphogenesisPartition::Validation),
+                split_unit("box-c", MycelialMorphogenesisPartition::Test),
+            ],
+        }
+    }
+
+    #[test]
+    fn replicate_disjoint_forward_time_manifest_validates() {
+        let observations = observations();
+        let manifest = manifest(&observations, MycelialMorphogenesisSplitUnitBasis::CultivationUnit);
+        manifest.validate().unwrap();
+        manifest.validate_against(&observations).unwrap();
+        assert_eq!(manifest.canonical_digest_hex().unwrap().len(), 64);
+    }
+
+    #[test]
+    fn context_observation_after_forecast_origin_is_rejected() {
+        let mut observations = observations();
+        observations[0].timestamp_ns = 175;
+        let manifest = manifest(&observations, MycelialMorphogenesisSplitUnitBasis::CultivationUnit);
+        assert!(matches!(
+            manifest.validate_against(&observations),
+            Err(MycelialMorphogenesisSplitError::ContextAfterForecastOrigin(_))
+        ));
+    }
+
+    #[test]
+    fn target_at_or_before_forecast_origin_is_rejected() {
+        let mut observations = observations();
+        observations[1].timestamp_ns = 150;
+        let manifest = manifest(&observations, MycelialMorphogenesisSplitUnitBasis::CultivationUnit);
+        assert!(matches!(
+            manifest.validate_against(&observations),
+            Err(MycelialMorphogenesisSplitError::TargetOutsideForecastHorizon(_))
+        ));
+    }
+
+    #[test]
+    fn target_after_horizon_is_rejected() {
+        let mut observations = observations();
+        observations[1].timestamp_ns = 300;
+        let manifest = manifest(&observations, MycelialMorphogenesisSplitUnitBasis::CultivationUnit);
+        assert!(matches!(
+            manifest.validate_against(&observations),
+            Err(MycelialMorphogenesisSplitError::TargetOutsideForecastHorizon(_))
+        ));
+    }
+
+    #[test]
+    fn split_manifest_must_assign_every_observation_once() {
+        let observations = observations();
+        let mut manifest = manifest(&observations, MycelialMorphogenesisSplitUnitBasis::CultivationUnit);
+        manifest.units[2].target_observation_ids.clear();
+        assert!(matches!(
+            manifest.validate(),
+            Err(MycelialMorphogenesisSplitError::EmptyContextOrTarget(_))
+        ));
+    }
+
+    #[test]
+    fn observation_assigned_to_more_than_one_role_is_rejected() {
+        let observations = observations();
+        let mut manifest = manifest(&observations, MycelialMorphogenesisSplitUnitBasis::CultivationUnit);
+        manifest.units[0].target_observation_ids = vec!["b-target".to_string()];
+        assert!(matches!(
+            manifest.validate_against(&observations),
+            Err(MycelialMorphogenesisSplitError::ObservationUnitMismatch(_))
+                | Err(MycelialMorphogenesisSplitError::ObservationAssignedMoreThanOnce(_))
+        ));
+    }
+
+    #[test]
+    fn biological_replicate_basis_is_supported() {
+        let mut observations = observations();
+        observations[0].biological_replicate_id = "replicate-a".to_string();
+        observations[1].biological_replicate_id = "replicate-a".to_string();
+        observations[2].biological_replicate_id = "replicate-b".to_string();
+        observations[3].biological_replicate_id = "replicate-b".to_string();
+        observations[4].biological_replicate_id = "replicate-c".to_string();
+        observations[5].biological_replicate_id = "replicate-c".to_string();
+        let mut manifest = manifest(&observations, MycelialMorphogenesisSplitUnitBasis::BiologicalReplicate);
+        manifest.units = vec![
+            split_unit("replicate-a", MycelialMorphogenesisPartition::Train),
+            split_unit("replicate-b", MycelialMorphogenesisPartition::Validation),
+            split_unit("replicate-c", MycelialMorphogenesisPartition::Test),
+        ];
+        manifest.validate_against(&observations).unwrap();
+    }
+
+    #[test]
+    fn source_evidence_mismatch_is_rejected() {
+        let mut observations = observations();
+        observations[5].calibration_digest = digest('7');
+        let manifest = manifest(&observations, MycelialMorphogenesisSplitUnitBasis::CultivationUnit);
+        assert!(matches!(
+            manifest.validate_against(&observations),
+            Err(MycelialMorphogenesisSplitError::ObservationEvidenceMismatch(_))
+        ));
+    }
+
+    #[test]
+    fn unknown_fields_are_rejected() {
+        let observations = observations();
+        let manifest = manifest(&observations, MycelialMorphogenesisSplitUnitBasis::CultivationUnit);
+        let mut value = serde_json::to_value(manifest).unwrap();
+        value["unbound_split_policy"] = serde_json::json!("random frames");
+        assert!(serde_json::from_value::<MycelialMorphogenesisSplitManifest>(value).is_err());
     }
 }
 
