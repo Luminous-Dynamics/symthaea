@@ -1,0 +1,41 @@
+name: Plasma Probe Contract
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "Cargo.lock"
+      - "crates/domains/symthaea-plasma-probes/**"
+      - "benchmarks/plasma/adversarial-probes/**"
+      - ".github/workflows/plasma-probes.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: plasma-probes-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    name: Validate pulse contract and response Gramian primitives
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust 1.96.0
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Check formatting
+        run: cargo fmt --package symthaea-plasma-probes -- --check
+
+      - name: Run unit tests
+        run: cargo test --locked --package symthaea-plasma-probes
+
+      - name: Run strict Clippy
+        run: cargo clippy --locked --package symthaea-plasma-probes --all-targets -- -D warnings
