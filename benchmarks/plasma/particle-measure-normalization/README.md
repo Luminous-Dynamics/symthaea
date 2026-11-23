@@ -12,7 +12,7 @@ The JSON fixture records exact expected values:
 - maximum absolute inlier coordinate displacement: 0.6981317007977319 rad;
 - mean absolute inlier coordinate displacement: 0.34906585039886584 rad.
 
-This is a pure normalization witness. It does not run NEOPIC, does not measure a learned-field error, and does not establish that min–max normalization is universally inappropriate. It is an exact synthetic test for the claim that the coordinate transform can move all existing particles when a very low-weight outlier changes the bounding box.
+This is a pure normalization witness using an **illustrative [-pi, pi] output interval**. It is not a paper-faithful reproduction of NEOPIC's exact normalization scale or source implementation. It does not run NEOPIC, does not measure a learned-field error, and does not establish that min–max normalization is universally inappropriate. Pin the exact paper-tag source and transform in #12952 before a source-faithful comparator run. It is an exact synthetic test for the claim that the coordinate transform can move all existing particles when a very low-weight outlier changes the bounding box.
 
 The physical domain and origin are known in this fixture, so fixed-domain normalization is the direct control. For unknown or moving domains, test robust support maps only with explicit tail coverage / residual metadata: quantile clipping can remove genuine rare-tail information.
 
