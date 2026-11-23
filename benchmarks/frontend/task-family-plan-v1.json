@@ -476,10 +476,10 @@
         "clarification_trace",
         "idempotency_key_audit"
       ],
-      "fixture_status": "not_authored",
-      "oracle_status": "not_authored",
+      "fixture_status": "fixture_ready",
+      "oracle_status": "golden_cases_authored_rust_execution_pending",
       "exposure": "public_pilot",
-      "promotion_status": "planned_not_runnable"
+      "promotion_status": "browser_runner_pending"
     },
     {
       "task_id": "SFEB-PILOT-INT-005",
