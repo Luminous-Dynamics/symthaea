@@ -88,6 +88,7 @@ pub mod confirmatory_readiness;
 pub mod confirmatory_readiness_release;
 #[cfg(feature = "theory")]
 pub mod confirmatory_unblinding;
+pub mod control_effect;
 pub mod critic;
 #[cfg(feature = "theory")]
 pub mod evidence_digest;

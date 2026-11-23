@@ -1,0 +1,101 @@
+name: MUSE renderer control-effect qualification
+
+on:
+  push:
+    branches:
+      - research/mel-control-effect-qualification-v1-20261123
+    paths:
+      - "crates/domains/symthaea-muse/src/control_effect.rs"
+      - "crates/domains/symthaea-muse/src/lib.rs"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "tools/muse-control-effect-qualifier/**"
+      - "docs/research/MEL_MUSIC_COMPETITIVE_FRONTIER_2026-11-23.md"
+      - "docs/research/MEL_CONTROL_EFFECT_QUALIFICATION_V1_2026-11-23.md"
+      - ".github/workflows/muse-control-effect-qualification.yml"
+  pull_request:
+    branches:
+      - research/rmi-immutable-policy-identity-v1-20261123
+    paths:
+      - "crates/domains/symthaea-muse/src/control_effect.rs"
+      - "crates/domains/symthaea-muse/src/lib.rs"
+      - "docs/research/MEL_CONTROL_EFFECT_QUALIFICATION_V1_2026-11-23.md"
+      - ".github/workflows/muse-control-effect-qualification.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Exact-head control-effect conformance
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout exact tested PR head or pushed commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+          printf 'tested_head=%s\n' "$actual"
+
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Check package formatting
+        run: cargo +1.96.0 fmt --manifest-path crates/domains/symthaea-muse/Cargo.toml --check
+
+      - name: Check isolated harness formatting
+        run: cargo +1.96.0 fmt --manifest-path tools/muse-control-effect-qualifier/Cargo.toml --check
+
+      - name: Verify committed lock and workspace resolution
+        shell: bash
+        run: |
+          set -euo pipefail
+          git ls-files --error-unmatch Cargo.lock > /dev/null
+          cargo +1.96.0 metadata --locked --no-deps --format-version 1 > "$RUNNER_TEMP/muse-metadata.json"
+
+      - name: Run control-effect qualification tests
+        run: cargo +1.96.0 test --locked -p symthaea-muse --lib control_effect::tests
+
+      - name: Run isolated control-effect source tests
+        run: cargo +1.96.0 test --locked -p muse-control-effect-qualifier
+
+      - name: Warnings-denied Clippy on exact control-effect source
+        run: cargo +1.96.0 clippy --locked -p muse-control-effect-qualifier --all-targets -- -D warnings
+
+      - name: Assemble exact-head evidence
+        if: always()
+        shell: bash
+        run: |
+          set -uo pipefail
+          evidence="$RUNNER_TEMP/muse-control-effect-evidence"
+          mkdir -p "$evidence"
+          printf 'tested_head=%s\n' "$(git rev-parse HEAD)" > "$evidence/source-identity.txt"
+          rustc +1.96.0 --version > "$evidence/rustc-version.txt" 2>&1 || true
+          cargo +1.96.0 --version > "$evidence/cargo-version.txt" 2>&1 || true
+          sha256sum Cargo.lock > "$evidence/cargo-lock.sha256" 2>&1 || true
+          cp crates/domains/symthaea-muse/src/control_effect.rs "$evidence/"
+          cp crates/domains/symthaea-muse/src/lib.rs "$evidence/"
+          cp docs/research/MEL_CONTROL_EFFECT_QUALIFICATION_V1_2026-11-23.md "$evidence/"
+          cp tools/muse-control-effect-qualifier/Cargo.toml "$evidence/harness-Cargo.toml"
+          cp tools/muse-control-effect-qualifier/src/lib.rs "$evidence/harness-lib.rs"
+          (cd "$evidence" && find . -maxdepth 1 -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)
+
+      - name: Upload exact-head evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: muse-control-effect-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/muse-control-effect-evidence/
+          if-no-files-found: error
+          retention-days: 90

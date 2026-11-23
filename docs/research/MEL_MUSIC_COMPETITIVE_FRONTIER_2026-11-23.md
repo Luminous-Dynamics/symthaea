@@ -21,6 +21,7 @@ Melothaea should not collapse those into one synthetic leaderboard. The stronger
 | Daydream research | 81 ms parameter-change-to-sound; 69% chord-root accuracy; 53% melody pitch-class accuracy; 80% groove-accent F1; 33% accompaniment onset match; 79% human-mix proximity; 100% note-density direction | Vendor-published task-specific realtime control; latency is parameter-to-sound, not musician-to-sound |
 | JAM_BOT / NIME 2026 | Live symbolic MIDI call-and-response, variable tempo and latency compensation | Matched device/tempo/latency experiment; paper's player-piano result is narrow |
 | MIREX 2026 CMI-RewardBench | CloudEar-overall 73.9% pairwise agreement on 249 core items; always-select-B baseline 59.0%; vocal/instrumental extensions separate | Reward-model/human-preference alignment; candidate order and label prevalence must be controlled |
+| TMD-Bench (ICML 2026) | Music–dance co-generation evaluated across unimodal quality, instruction adherence and cross-modal rhythmic alignment | Adjacent cross-modal synchronization benchmark; not a live musician-agent collaboration score |
 | HEARTBEAT 2027 | Streaming WAIT/RESPOND/CONTINUE/YIELD protocol; complete chunk logs including non-responses | Causal turn-taking protocol reference, not a musician benchmark |
 | ICASSP 2027 Audio Editing Challenge (MMAE) | 2,000 public dev examples / 17,741 rubrics; separate 500-example hidden Single Model and Agent tracks; IFR, Consistency Rate and Exact Match Rate | Direct comparator for localized edits, preservation and multi-step editing agents; registered teams' final submission/freeze extended to Nov 28, 2026 (11:59 PM Pacific); registration closed Oct 8 |
 | YuE2 | Readable melody/chord plan expanded into audio tokens and full-song realization | Symbolic planning/audio integration; compare score editability and realized-score consistency |
@@ -30,6 +31,8 @@ Melothaea should not collapse those into one synthetic leaderboard. The stronger
 
 ### Evidence notes
 
+- **Unified evaluation gap:** the 2026 survey *Recent advances in music generation: methods, evaluation, and challenges* identifies fragmented objective metrics, long-range structure, controllability, cross-modal representation and collaboration as open problems. It specifically calls for unified representations spanning event tokens, piano rolls, scores and audio/text embeddings, and interaction-aware measures such as latency, adaptability and agency. This supports a renderer-independent intent representation with separate audio and human-evidence layers, rather than a single audio-only reward. https://link.springer.com/article/10.1007/s10462-026-11582-x
+- **TMD-Bench (ICML 2026):** this music–dance co-generation benchmark evaluates unimodal generation quality, instruction adherence and cross-modal rhythmic alignment. It is adjacent evidence that cross-modal timing should be scored explicitly rather than buried in generic audiovisual similarity. It is not a direct baseline for musician–AI improvisation, so borrow the cross-modal alignment protocol, not its leaderboard rank. https://proceedings.mlr.press/v306/yang26dl.html
 - Artificial Analysis's current 23 November board separates vocal and instrumental Elo. Current top vocal: ACE Music v1 1160±20 (95% interval, 2,128 votes), Suno v6 1145±18 (3,073), Suno v6-mini 1133±18, Mureka V9.5 1101±18. Current top instrumental: Suno v6 1148±22 (2,208), Suno v6-mini 1114±21, Mureka V9.5 1084±21, Mureka V9 1083±21, Lyria 3 Pro 1080±21 and Lyria 3.5 1078±21. These are not cross-modality comparable. The official methodology says ratings use blind pairwise votes on same-prompt, same-modality tracks and Bradley-Terry maximum-likelihood estimation rescaled to Elo, with 95% CIs; voters listen at least 10 seconds, and tracks are loudness-normalized toward -16 LUFS with static gain (boost capped at -1 dBTP), then re-encoded to 320 kbps MP3 at 44.1 kHz with provider metadata/artwork removed. This is a strong matched *finished-track preference* track, not causal interaction or agency. https://artificialanalysis.ai/music/leaderboard/vocals https://artificialanalysis.ai/music/leaderboard/instrumental https://artificialanalysis.ai/methodology/music
 - Taan's numbers are published by Taan. Its task is 250 prompts for 30-second instrumental clips, with timed entries/exits and tempo instructions. ±500 ms is a broad tolerance and should not be conflated with beat-relative phase or real-time human interaction.
 - Daydream describes its latency as time from parameter change to changed sound. That is not musician-input-to-acoustic-onset and is not directly comparable to the loopback endpoint Melothaea is designing.
@@ -79,6 +82,18 @@ For each claimed control:
 
 This is closely related to the observation-closure work: an instruction receipt proves what was sent, while an independent event/audio observation is needed to establish what changed.
 
+### 6. Treat musical intent as a typed, renderer-independent evidence graph
+
+The new integration direction is to make one stable musical intent/event identity span the whole production lifecycle:
+
+`Intent/Score EventId → transform lineage → MIDI/performance event → renderer request and immutable backend identity → output capture → independently observed audio event → human annotation/acceptance`
+
+Each edge is a correspondence claim with its own method, uncertainty and receipt. Do not regenerate EventId from pitch/onset/duration or audio features; keep distinct unison events distinct, and use explicit split/merge/replacement/ornament derivation edges. The observation manifest should point back to EventId only as an independently recovered correspondence with match confidence—not as the source of the ID.
+
+This makes editing, control-effect qualification and reciprocal collaboration share one stable reference frame. It also prevents a common benchmark loophole: a renderer may sound plausible while dropping or changing an approved source event, or an audio detector may report an event that cannot be matched uniquely to the symbolic score. The correct result is matched, missing, ambiguous or not-estimable—not a forced exact match.
+
+Existing owners are [#11399](https://github.com/Luminous-Dynamics/symthaea/issues/11399) for authored EventId and derivation, [#11389](https://github.com/Luminous-Dynamics/symthaea/issues/11389) for score-to-audio conformance, [#13348](https://github.com/Luminous-Dynamics/symthaea/pull/13348) for output observation closure, and [#12981](https://github.com/Luminous-Dynamics/symthaea/issues/12981) for the cross-layer evidence graph.
+
 ## Proposed benchmark portfolio
 
 Do not produce one universal “music intelligence” score. Maintain distinct tracks:
@@ -127,6 +142,8 @@ Keep input material, action budget, number of revisions, instrument, tempo sched
 - ElevenLabs inpainting: https://elevenlabs.io/docs/eleven-api/guides/how-to/music/inpainting
 - Suno MIDI upload: https://help.suno.com/en/articles/14594177
 - Lyria RealTime official streaming guide: https://ai.google.dev/gemini-api/docs/realtime-music-generation
+- 2026 survey on music generation methods/evaluation: https://link.springer.com/article/10.1007/s10462-026-11582-x
+- TMD-Bench (ICML 2026): https://proceedings.mlr.press/v306/yang26dl.html
 - Lyria RealTime community report of BPM control not changing tempo: https://discuss.ai.google.dev/t/bpm-parameter-in-musicgenerationconfig-has-no-effect-on-tempo-lyria-realtime-exp/139309
 - Lyria RealTime community report of an identical output for one scale value: https://discuss.ai.google.dev/t/lyria-realtime-scale-e-flat-major-c-minor-has-no-effect-output-bit-identical-to-scale-unspecified/186831
 
