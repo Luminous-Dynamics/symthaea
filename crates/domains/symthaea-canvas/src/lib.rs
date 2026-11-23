@@ -32,6 +32,7 @@ pub mod mycelial_contact_persistence;
 pub mod mycelial_failure_resilience;
 pub mod mycelial_fusion_counterfactual;
 pub mod mycelial_graph_hypothesis_posterior;
+pub mod mycelial_active_sensing;
 pub mod mycelial_junction_graph;
 pub mod mycelial_mesh;
 pub mod mycelial_model;
@@ -142,6 +143,16 @@ pub use mycelial_graph_hypothesis_posterior::{
     evaluate_mycelial_graph_hypothesis_posterior,
 };
 
+pub use mycelial_active_sensing::{
+    MAX_MYCELIAL_ACQUISITION_ACTIONS, MAX_MYCELIAL_ACQUISITION_DECISIONS,
+    MAX_MYCELIAL_ACQUISITION_OUTCOMES_PER_ACTION,
+    MAX_MYCELIAL_ACTIVE_SENSING_EVALUATIONS,
+    MAX_MYCELIAL_ACTIVE_SENSING_LOSS_UNITS, MYCELIAL_ACTIVE_SENSING_SCHEMA_VERSION,
+    MycelialAcquisitionAction, MycelialAcquisitionActionKind, MycelialAcquisitionActionValue,
+    MycelialAcquisitionDecision, MycelialAcquisitionOutcome,
+    MycelialAcquisitionOutcomeValue, MycelialActiveSensingError, MycelialActiveSensingReport,
+    MycelialHypothesisLikelihood, MycelialHypothesisLoss, evaluate_mycelial_active_sensing,
+};
 pub use mycelial_junction_graph::{
     GeometricEfficiencyReport, JunctionKind, JunctionLengthUnit, MAX_JUNCTION_GRAPH_JUNCTIONS,
     MAX_JUNCTION_GRAPH_SEGMENTS, MYCELIAL_JUNCTION_GRAPH_SCHEMA_VERSION, MycelialHyphaSegment,
