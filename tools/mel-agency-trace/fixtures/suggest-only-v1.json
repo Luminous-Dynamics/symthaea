@@ -1,0 +1,12 @@
+{
+  "schema_version": "mel-agency-transaction-trace-v1",
+  "trace_id": "trace-suggest-preview",
+  "autonomy_mode": "suggest_only",
+  "base_artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "clock_domain_id": "session-monotonic-v1",
+  "clock_origin_id": "origin-001",
+  "events": [
+    {"event_id":"evt-propose","sequence":1,"monotonic_time_ns":10,"previous_event_sha256":"0000000000000000000000000000000000000000000000000000000000000000","event_sha256":"106489c882c28e1ff1241aa0918068e7e6e9990bdf428521210c113bc865b69e","kind":{"event_type":"proposed","payload":{"proposal_id":"proposal-001","subject":{"source_artifact_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","candidate_artifact_sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","scope_sha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","protected_set_sha256":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","requested_change_sha256":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","edit_plan_sha256":"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"},"subject_commitment_sha256":"e27f3258cb140ac4e2f8fa76f523b9c1d395bfdae2bb520a94014bc3202bff61"}}},
+    {"event_id":"evt-preview","sequence":2,"monotonic_time_ns":20,"previous_event_sha256":"106489c882c28e1ff1241aa0918068e7e6e9990bdf428521210c113bc865b69e","event_sha256":"136a7a7b41d8e1a6af25f5af5ba1a17d1ebdb591308ced7b4efea82986557a15","kind":{"event_type":"previewed","payload":{"proposal_id":"proposal-001","subject_commitment_sha256":"e27f3258cb140ac4e2f8fa76f523b9c1d395bfdae2bb520a94014bc3202bff61","preview_receipt_sha256":"1111111111111111111111111111111111111111111111111111111111111111"}}}
+  ]
+}
