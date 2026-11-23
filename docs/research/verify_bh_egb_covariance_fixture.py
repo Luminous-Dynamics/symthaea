@@ -111,6 +111,27 @@ def same(a, b, label):
         raise AssertionError(f"{label}: expected {b}, got {a}")
 
 
+def verify_invertible_transport(base_delta, base_covariance, payload, label):
+    transform = m(payload["transformation_matrix"])
+    transformed_delta = v(payload["transformed_mean_difference"])
+    transformed_covariance = m(payload["transformed_difference_covariance"])
+    n = len(base_delta)
+    if len(transform) != n or any(len(row) != n for row in transform):
+        raise ValueError(f"{label} transform must be square")
+    same(mv(transform, base_delta), transformed_delta, f"{label} transformed mean")
+    same(mm(mm(transform, base_covariance), tr(transform)), transformed_covariance,
+         f"{label} covariance transport")
+    inverse_transform = inv(transform)
+    same(det(transform), F(payload["determinant"]), f"{label} transform determinant")
+    transformed_precision = mm(mm(tr(inverse_transform), inv(base_covariance)), inverse_transform)
+    transformed_score = dot(transformed_delta, mv(transformed_precision, transformed_delta))
+    base_score = dot(base_delta, mv(inv(base_covariance), base_delta))
+    same(transformed_score, F(payload["expected_mahalanobis_squared"]),
+         f"{label} expected Mahalanobis squared")
+    same(transformed_score, base_score, f"{label} Mahalanobis invariance")
+    return transformed_score
+
+
 def verify(p):
     h0 = v(p["competing_hypotheses"]["H0"]["predicted_mean"])
     h1 = v(p["competing_hypotheses"]["H1"]["predicted_mean"])
@@ -155,6 +176,10 @@ def verify(p):
     same(q0, F(expected["covariance_aware_mahalanobis_squared"]), "base Mahalanobis squared")
     same(q1, F(p["redundant_observable_transform"]["expected"]["covariance_aware_pseudoinverse_mahalanobis_squared"]), "augmented Mahalanobis squared")
     same(q1, q0, "redundancy invariance")
+    basis_q = verify_invertible_transport(d, s, p["invertible_basis_transport"], "basis")
+    units_q = verify_invertible_transport(d, s, p["unit_rescaling"], "unit rescaling")
+    same(basis_q, q0, "basis transport preserves base score")
+    same(units_q, q0, "unit rescaling preserves base score")
     same(q0, F(4), "exact known answer")
     same(F(expected["covariance_aware_mahalanobis_distance"])**2, q0, "declared distance")
     same(m(p["exact_derivation"]["inverse_base_covariance"]), precision, "declared inverse")
@@ -200,6 +225,8 @@ def verify(p):
         "augmented_covariance_rank": r,
         "augmented_output_count": k,
         "redundancy_invariance": True,
+        "basis_metamorphic_invariance": True,
+        "unit_rescaling_invariance": True,
         "naive_diagonal_score_before": str(before),
         "naive_diagonal_score_after": str(after),
         "negative_controls_passed": len(rejected),
