@@ -713,6 +713,165 @@ mod tests {
         }
     }
 
+    fn evidence_fixture() -> (
+        MycelialAcquisitionDomainManifest,
+        MycelialExtractionCoverageReceipt,
+        MycelialObservationCoverageLedger,
+        MycelialMorphogenesisObservation,
+    ) {
+        use crate::mycelial_acquisition_domain::{
+            MYCELIAL_ACQUISITION_DOMAIN_SCHEMA_VERSION,
+            MYCELIAL_EXTRACTION_RECEIPT_SCHEMA_VERSION,
+            MycelialAcquisitionAxis, MycelialAcquisitionAxisName,
+            MycelialAcquisitionDomainSpec, MycelialExtractionUnitOutcome,
+            MycelialExtractionUnitState, MycelialSourceRightsStatus,
+        };
+        use crate::mycelial_observation_coverage::{
+            MYCELIAL_OBSERVATION_COVERAGE_SCHEMA_VERSION,
+            MycelialObservationCoverageRecord, MycelialObservationCoverageState,
+            mycelial_observation_id_inventory_digest,
+        };
+
+        let unit = MycelialAcquisitionUnitKey {
+            tile_x: 0,
+            tile_y: 0,
+            z_plane: 0,
+            channel: 0,
+            timepoint: 0,
+        };
+        let manifest = MycelialAcquisitionDomainManifest {
+            schema_version: MYCELIAL_ACQUISITION_DOMAIN_SCHEMA_VERSION,
+            source_artifact_id: "source-001".to_string(),
+            source_artifact_digest: digest('a'),
+            source_rights_status: MycelialSourceRightsStatus::VerifiedForProcessing,
+            rights_evidence_digest: digest('b'),
+            source_format: "ome_tiff".to_string(),
+            acquisition_session_id: "session-001".to_string(),
+            biological_replicate_id: "replicate-001".to_string(),
+            coordinate_frame_id: "specimen-frame-v1".to_string(),
+            declared_scope_digest: digest('c'),
+            instrument_metadata_digest: digest('d'),
+            axes: vec![
+                MycelialAcquisitionAxis {
+                    name: MycelialAcquisitionAxisName::X,
+                    length: 1,
+                    unit: "pixel".to_string(),
+                    origin: 0.0,
+                    physical_scale: Some(0.2),
+                },
+                MycelialAcquisitionAxis {
+                    name: MycelialAcquisitionAxisName::Y,
+                    length: 1,
+                    unit: "pixel".to_string(),
+                    origin: 0.0,
+                    physical_scale: Some(0.2),
+                },
+                MycelialAcquisitionAxis {
+                    name: MycelialAcquisitionAxisName::Z,
+                    length: 1,
+                    unit: "micrometer".to_string(),
+                    origin: 0.0,
+                    physical_scale: Some(0.5),
+                },
+                MycelialAcquisitionAxis {
+                    name: MycelialAcquisitionAxisName::Channel,
+                    length: 1,
+                    unit: "channel_index".to_string(),
+                    origin: 0.0,
+                    physical_scale: None,
+                },
+                MycelialAcquisitionAxis {
+                    name: MycelialAcquisitionAxisName::Time,
+                    length: 1,
+                    unit: "frame".to_string(),
+                    origin: 0.0,
+                    physical_scale: None,
+                },
+            ],
+            domain: MycelialAcquisitionDomainSpec {
+                width_pixels: 1,
+                height_pixels: 1,
+                z_planes: 1,
+                channels: 1,
+                timepoints: 1,
+                tile_width_pixels: 1,
+                tile_height_pixels: 1,
+            },
+            spatial_transform_digest: digest('e'),
+            calibration_digest: digest('f'),
+            manifest_producer_id: "fixture-reader".to_string(),
+            manifest_producer_version: "1.0.0".to_string(),
+            manifest_producer_digest: digest('1'),
+            scope_exclusions: Vec::new(),
+        };
+        manifest.validate().unwrap();
+
+        let observation_ids = vec!["morph-001".to_string()];
+        let id_digest = mycelial_observation_id_inventory_digest(&observation_ids);
+        let receipt = MycelialExtractionCoverageReceipt {
+            schema_version: MYCELIAL_EXTRACTION_RECEIPT_SCHEMA_VERSION,
+            acquisition_domain_manifest_digest: manifest.canonical_digest_hex().unwrap(),
+            extractor_id: "morphogenesis-test-extractor".to_string(),
+            extractor_version: "0.1.0".to_string(),
+            extractor_config_digest: digest('2'),
+            units: vec![MycelialExtractionUnitOutcome {
+                unit,
+                source_unit_digest: digest('3'),
+                state: MycelialExtractionUnitState::Processed,
+                output_observation_inventory_digest: Some(id_digest.clone()),
+                output_observation_count: Some(1),
+                disposition_reason: None,
+            }],
+        };
+
+        let ledger = MycelialObservationCoverageLedger {
+            schema_version: MYCELIAL_OBSERVATION_COVERAGE_SCHEMA_VERSION,
+            source_dataset_id: manifest.source_artifact_id.clone(),
+            source_dataset_digest: manifest.source_artifact_digest.clone(),
+            observation_inventory_digest: id_digest,
+            declared_observation_ids: observation_ids,
+            coordinate_frame_id: manifest.coordinate_frame_id.clone(),
+            spatial_transform_digest: manifest.spatial_transform_digest.clone(),
+            calibration_digest: manifest.calibration_digest.clone(),
+            candidate_generator_id: "fixture-generator".to_string(),
+            candidate_generator_version: "1.0.0".to_string(),
+            candidate_generator_digest: digest('4'),
+            records: vec![MycelialObservationCoverageRecord {
+                observation_id: "morph-001".to_string(),
+                observation_digest: digest('5'),
+                source_unit_key: Some(unit),
+                acquisition_group_id: manifest.acquisition_session_id.clone(),
+                biological_replicate_id: manifest.biological_replicate_id.clone(),
+                time_window_id: "time-000".to_string(),
+                state: MycelialObservationCoverageState::CandidateEmitted,
+                candidate_ids: vec!["candidate-001".to_string()],
+                residual_kind: None,
+            }],
+        };
+
+        let mut observation = fixture(MycelialMorphogenesisMeasurement::CordAreaFraction {
+            fraction: 0.25,
+            analysis_method_id: "cord-segmentation-v1".to_string(),
+        });
+        observation.source_observation_digest = digest('5');
+        observation.source_artifact_id = manifest.source_artifact_id.clone();
+        observation.source_artifact_digest = manifest.source_artifact_digest.clone();
+        observation.acquisition_domain_manifest_digest =
+            manifest.canonical_digest_hex().unwrap();
+        observation.extraction_coverage_receipt_digest =
+            receipt.canonical_digest_hex().unwrap();
+        observation.observation_coverage_ledger_digest =
+            ledger.canonical_digest_hex().unwrap();
+        observation.biological_replicate_id = manifest.biological_replicate_id.clone();
+        observation.acquisition_session_id = manifest.acquisition_session_id.clone();
+        observation.source_unit_key = unit;
+        observation.coordinate_frame_id = manifest.coordinate_frame_id.clone();
+        observation.spatial_transform_digest = manifest.spatial_transform_digest.clone();
+        observation.calibration_digest = manifest.calibration_digest.clone();
+
+        (manifest, receipt, ledger, observation)
+    }
+
     #[test]
     fn missing_and_censored_measurements_remain_distinct_from_zero() {
         let unavailable = fixture(MycelialMorphogenesisMeasurement::MeasurementUnavailable {
@@ -741,6 +900,36 @@ mod tests {
             observation.validate(),
             Err(MycelialMorphogenesisObservationError::InvalidMissingReason)
         );
+    }
+
+    #[test]
+    fn observation_validates_against_complete_acquisition_evidence() {
+        let (manifest, receipt, ledger, observation) = evidence_fixture();
+        observation
+            .validate_against_evidence(&manifest, &receipt, &ledger)
+            .unwrap();
+    }
+
+    #[test]
+    fn observation_source_digest_must_match_ledger_record() {
+        let (manifest, receipt, ledger, mut observation) = evidence_fixture();
+        observation.source_observation_digest = digest('9');
+        assert!(matches!(
+            observation.validate_against_evidence(&manifest, &receipt, &ledger),
+            Err(MycelialMorphogenesisObservationError::EvidenceChainMismatch(
+                "source observation digest"
+            ))
+        ));
+    }
+
+    #[test]
+    fn observation_missing_ledger_unit_binding_fails_closed() {
+        let (manifest, receipt, mut ledger, observation) = evidence_fixture();
+        ledger.records[0].source_unit_key = None;
+        ledger.records[0].observation_coverage_ledger_digest = digest('8');
+        assert!(observation
+            .validate_against_evidence(&manifest, &receipt, &ledger)
+            .is_err());
     }
 
     #[test]
