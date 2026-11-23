@@ -18,6 +18,7 @@ Existing suites measure complementary capabilities. They should be used as adapt
 | Visual causal reasoning | [CLEVRER](https://clevrer.csail.mit.edu/) | Descriptive, explanatory, predictive and counterfactual questions over object-interaction videos | Good post-acquisition probe for temporal/event relations and causal predictions | Synthetic, short, object-collision videos; task labels/questions are exposed at evaluation, so this is not task-agnostic acquisition by itself |
 | Interactive physical reasoning | [PHYRE](https://phyre.ai/) | Sample-efficient solving and generalization across 2D physical puzzles | Useful for testing whether discovered dynamics/relations support action selection | Puzzle goals are provided; not a test of open-ended or goal-free acquisition |
 | Graph OOD generalization | [GOOD](https://github.com/divelab/GOOD) | Covariate and concept shifts across 11 datasets, 17 domain selections and 51 curated splits | Tests whether discovered graph structures survive domain shifts and spurious-motif changes | Node/graph prediction under dataset shifts is not the same as cross-domain structural-analogy discovery |
+| Generalized category discovery | [CoGe-GCD](https://proceedings.mlr.press/v306/tang26ai.html) | Unlabeled known/novel category assignment and unseen combinations of learned primitives with spatial-relation calibration | Adjacent comparator for acquiring reusable primitives and discovering new compositions | Static category discovery; it does not test temporal task-agnostic stream acquisition or false causal transfer |
 | Compositional graph reasoning | [CGGC](https://aclanthology.org/2024.findings-emnlp.492/) | Reasoning graphs with previously unseen combinations of relation types | Useful external probe for recombining acquired relation primitives | Graph-conditioned language generation; not a task-agnostic acquisition test |
 | Real audiovisual grounding | [DCASE 2026 Task 3](https://dcase.community/challenge2026/task-semantic-acoustic-imaging-for-sound-event-localization-and-detection-from-spatial-audio-and-audiovisual-scenes) | Reconstruct semantic spatial acoustic energy maps / dynamic masks from low-channel audio, optionally audiovisual | Strong sensory and cross-modal downstream qualification adapter | Measures a specific sound-imaging task, not broad structural discovery. 2026 challenge reports 29 Task 3 submissions from 8 teams, split audio-only and audiovisual |
 | Dynamic manipulation | [RoboDyna](https://robodyna.github.io/robodyna/) | Physically grounded object dynamics and closed-loop manipulation when the world continues evolving during inference | High-value Symtropy probe for whether acquired event/dynamics structure matters to decisions under latency | Robotics task performance is not a direct metric of generic acquisition; retain sync/async, expert-demonstration and human comparisons |
@@ -31,6 +32,14 @@ Unsatz (Ji, Wang and Sun, 2026-10-31) evaluates scientific discovery without a s
 
 **Response:** use Unsatz as the direct ansatz-free scientific-discovery comparator within the #11042 lane. ErgoStream adds a separate pre-task acquisition phase and a library snapshot that is tested on later undisclosed probes. Do not reimplement the Unsatz task DSL or claim superiority from a different synthetic task.
 
+### Compositional category discovery is an adjacent frontier
+
+CoGe-GCD (ICML 2026) tackles unlabeled generalized category discovery by learning reusable primitives and evaluating unseen primitive combinations. It adds structure-preserving calibration over spatial relations and reports improvements on standard category-discovery metrics with marginal overhead.
+
+**Response:** use its task/data protocol as an adjacent comparison for unsupervised primitive and novel-composition discovery. ErgoStream's distinct addition is temporal acquisition before task revelation, explicit cross-domain relation maps, and rejection of false analogies.
+
+Paper: https://proceedings.mlr.press/v306/tang26ai.html
+
 ### Active causal discovery is a direct comparator, not just a downstream task
 
 The 2026 Active Causal Discovery Benchmark (ACDB) evaluates agents under budgeted hard interventions. On its current six-level linear-Gaussian ladder, the authors report 42.7% directed F1 / SHD 4.79 for PC plus greedy active orientation, 31.7% / 7.25 for Claude Sonnet 4.6 raw active, and 22.9% / 9.27 for GPT-5.4 raw active. A structure-blind random DAG already scores 23.6% directed F1 on the dense v0 ladder, reduced to 16.9% after a density probe. The authors describe the work as a benchmark audit and calibration report, not evidence that current LLMs solve active causal discovery.
@@ -38,6 +47,14 @@ The 2026 Active Causal Discovery Benchmark (ACDB) evaluates agents under budgete
 **Response:** make ACDB a high-priority Symtropy adapter. Compare the ability to choose discriminating interventions, recover skeletons and directions, account for intervention cost, and abstain under non-identifiability. Include the PC + greedy active baseline and the density-aware random control; a weak random baseline would overstate improvements.
 
 Paper: https://arxiv.org/abs/2609.31675
+
+### A newer survey identifies the prediction-to-action gap
+
+The August 30, 2026 survey *Do World Models Make Better Robots?* catalogs 160 web-verified benchmarks across policy suites, embodied agents, world-model evaluation and prediction-to-action bridges. It reports that 138/160 are model-agnostic, only 11 explicitly compare a world model against a VLA policy, and only four convert prediction into executed action; counterfactual capability is nearly unmeasured. This is a different corpus and taxonomy from the separate 130-benchmark *Survey of World Model Benchmarks*.
+
+**Response:** ErgoStream must not only test whether an acquired structure predicts well. It must test whether it improves action selection versus a direct reactive policy and versus a no-transfer / no-world-model control, with the same observations, policy interface and resource budgets. Add prediction-to-action advantage as an explicit evaluation lane; measure task success, regret, recovery, intervention cost and counterfactual validity.
+
+Survey: https://arxiv.org/abs/2609.29669
 
 ### Interactive world models need closed-loop outcome evaluation
 
@@ -59,6 +76,14 @@ Dreamer 4 represents another important industry direction: a scalable action-con
 
 References: https://ai.meta.com/research/publications/v-jepa-2-self-supervised-video-models-enable-understanding-prediction-and-planning/ · https://arxiv.org/abs/2509.24527
 
+### Causal structure does not automatically guarantee better OOD prediction
+
+Nastl and Hardt's NeurIPS 2024 study evaluates 16 tabular prediction tasks with multiple domains. Across these tasks, predictors using all available features outperform predictors restricted to selected causal features on both in-domain and out-of-domain accuracy; the absolute accuracy drop is not better for the causal-only predictors. This does not refute causal discovery or structural transfer in general, but it directly warns against assuming that a more causally motivated representation must generalize better.
+
+**Response:** include ordinary ERM / full-feature, invariant-learning and calibrated shift-detection baselines. Test where a learned mechanism is genuinely transportable, where omitted causes or selection effects break it, and whether structural acquisition improves decisions rather than merely producing a more elegant graph.
+
+Paper: https://proceedings.neurips.cc/paper_files/paper/2024/hash/3792ddbf94b68ff4369f510f7a3e1777-Abstract-Conference.html
+
 ### Dynamic robotics is a harder test than frozen-video prediction
 
 RoboDyna reports 20 conceptual dynamic manipulation tasks across five categories plus 10 household tasks, 3,500 expert demonstrations and synchronous/asynchronous evaluation. Its authors report sub-20% success across evaluated policies, and that inference latency can flip individual episode outcomes. LIBERO-Dynamic similarly makes target motion and policy inference latency explicit across dynamic variants of the LIBERO tasks.
@@ -78,8 +103,8 @@ All arms should receive the same stream, split, modality availability, observati
 1. **Simple controls:** no-change/persistence, random acquisition, passive next-frame, shuffled temporal order, shuffled modality alignment, and constant/IID-noise controls.
 2. **Acquisition policies:** surprise/prediction-error only, random-network-distillation novelty, learning-progress, information gain, cost-normalized information gain, predictive compression / MDL, and a hybrid acquisition policy.
 3. **Representation controls:** strong modality-specific encoders with event association; frozen dense multimodal embeddings; explicit graph-isomorphism / graph-edit baselines (VF2-style matching, Nauty/Traces or Bliss where applicable); HDC only; CfC/LTC only; explicit typed graph/hypergraph; bounded symbolic/e-graph; HDC–CfC plus graph/e-graph hybrid.
-4. **Graph transfer controls:** GOOD OOD splits for covariate/concept shifts; CGGC for unseen relation combinations; graph-isomorphism solver suites (e.g. Neuen-Schweitzer stress instances) and labeled graph-edit datasets (e.g. IAM / MIVIA) as algorithmic matching tests. These have different purposes: GOOD/CGGC test generalization, while solver suites test matching correctness and scaling. Neither substitutes for intervention-divergent false-analogy worlds.
-5. **World-model controls:** object/event-centric recurrent and transformer models; the strongest compatible action-conditioned world model; a no-transfer/fresh-learning control.
+4. **Graph transfer controls:** GOOD OOD splits for covariate/concept shifts; CGGC for unseen relation combinations; CoGe-GCD for discovery of primitives and new category compositions; graph-isomorphism solver suites (e.g. Neuen-Schweitzer stress instances) and labeled graph-edit datasets (e.g. IAM / MIVIA) as algorithmic matching tests. These have different purposes: GOOD/CGGC/CoGe-GCD test generalization and composition, while solver suites test matching correctness and scaling. None substitutes for intervention-divergent false-analogy worlds.
+5. **World-model and action-policy controls:** object/event-centric recurrent and transformer models; the strongest compatible action-conditioned world model; a direct reactive/VLA policy with no explicit world model; a no-transfer/fresh-learning control. Report same-budget and best-available tracks separately. The primary question is incremental decision utility from acquired structure, not video fidelity alone.
 6. **Scientific-discovery and causal controls:** Unsatz-compatible agent/program interface; ACDB-compatible PC + greedy active orientation, density-aware random-DAG and other admitted causal baselines; PySR or another pinned symbolic-regression baseline when the candidate grammar and task class match; SINDy only when its sparse-regression assumptions are satisfied; exact tiny-world enumeration as evaluator diagnostic only.
 7. **Human reference:** where the task supports meaningful human interaction, include a human sample-efficiency / action-efficiency reference. It is not a substitute for a matched machine baseline.
 
@@ -149,3 +174,6 @@ These are prospective engineering targets, not external standards or achieved re
 - LIBERO-Dynamic: https://arxiv.org/abs/2610.24579
 - Survey of World Model Benchmarks: https://world-model-benchmarks.github.io/\n- GOOD Graph OOD benchmark: https://github.com/divelab/GOOD\n- GOOD NeurIPS 2022 paper: https://papers.nips.cc/paper_files/paper/2022/hash/0dc91de822b71c66a7f54fa121d8cbb9-Abstract-Datasets_and_Benchmarks.html\n- CGGC compositional graph reasoning challenge: https://aclanthology.org/2024.findings-emnlp.492/\n- ACDB: https://arxiv.org/abs/2609.31675\n- World-In-World (ICLR 2026): https://proceedings.iclr.cc/paper_files/paper/2026/hash/5b4263be85820683d78675cc18d2efc7-Abstract-Conference.html\n- V-JEPA 2: https://ai.meta.com/research/publications/v-jepa-2-self-supervised-video-models-enable-understanding-prediction-and-planning/\n- Dreamer 4: https://arxiv.org/abs/2509.24527
 - Gromov, *Ergostructures, Ergologic and the Universal Learning Problem*: https://www.ihes.fr/~gromov/wp-content/uploads/2018/08/ergologic31.pdf
+- Do World Models Make Better Robots? (2026): https://arxiv.org/abs/2609.29669
+- Do causal predictors generalize better to new domains? (NeurIPS 2024): https://proceedings.neurips.cc/paper_files/paper/2024/hash/3792ddbf94b68ff4369f510f7a3e1777-Abstract-Conference.html
+- CoGe-GCD (ICML 2026): https://proceedings.mlr.press/v306/tang26ai.html
