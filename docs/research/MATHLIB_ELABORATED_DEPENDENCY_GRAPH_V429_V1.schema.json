@@ -20,6 +20,7 @@
     "unresolved_dependencies",
     "edges",
     "helper_nodes",
+    "trust_profile",
     "trust_profile"
   ],
   "properties": {
@@ -308,5 +309,5 @@
       }
     }
   },
-  "description": " Includes generated/private helper declarations referenced by the root theorem proof value. Includes recursive trust-boundary inventory for every theorem and generated helper."
+  "description": " Includes generated/private helper declarations referenced by the root theorem proof value. Includes recursive trust-boundary inventory for every theorem and generated helper. Includes recursive trust-boundary inventory for theorem and helper declarations."
 }

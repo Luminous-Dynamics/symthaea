@@ -54,3 +54,9 @@ This is a four-declaration source-snapshot differential. It is not a corpus-leve
 Both pinned Lean extractors now emit nested helper_nodes records for direct proof-value dependencies whose fully qualified Name contains the root theorem's component sequence and has additional suffix components. This preserves exact private/generated helper identity, declaration kind, type and proof-value dependencies, ConstantInfo closure, unresolved names and edge provenance. The helper remains a separate node; its references are not silently flattened into the theorem's direct edge set.
 
 The differential CLI validates helper-node provenance and closure reconciliation, then reports helper names and the union of root plus one-level helper proof-value dependencies. This is a first boundary diagnostic, not yet a recursively expanded transitive closure. If a helper has further generated children, those require their own nodes in a subsequent expansion pass.
+
+## Trust-profile interpretation and comparison
+
+Trust profiles are recursively derived from the loaded Lean environment, walking each reachable ConstantInfo type/value/structural dependency. They distinguish kernel axiom dependencies, unsafe declarations, partial definitions, opaque declarations, explicit sorryAx reachability and unresolved names. A complete trust closure means every reachable name resolved under the pinned environment; it does not mean zero axioms. Legitimate Lean axioms such as extensionality or classical choice are disclosed and interpreted as part of the declared foundation, not automatically counted as defects. A reachable sorryAx, unsafe declaration or partial definition is a separate high-salience boundary for expert review.
+
+The comparison report includes set differences for each trust class and exact sorryAx booleans. No claim of proof soundness follows from the trust profile alone; kernel acceptance and theorem-statement fidelity remain separate.
