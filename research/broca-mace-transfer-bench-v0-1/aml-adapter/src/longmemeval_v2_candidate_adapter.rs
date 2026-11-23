@@ -17,7 +17,9 @@ use crate::candidate_evidence::{
     CandidateEvidenceBatchV1, CandidateEvidenceReject, CandidateEvidenceV1,
     EvidenceModalityV1, encode_candidate_evidence_jsonl,
 };
-use crate::longmemeval_v2::LongMemEvalV2HitV1;
+use crate::longmemeval_v2::{
+    LongMemEvalV2HitV1, LongMemEvalV2SearchResultV1,
+};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LongMemEvalV2CandidateIdentityV1 {
@@ -222,6 +224,138 @@ pub fn encode_longmemeval_v2_candidate_evidence_v1(
     encode_candidate_evidence_jsonl(&records).map_err(Into::into)
 }
 
+/// Encode the complete V2 search result, including unscored temporal-neighbor
+/// context. Neighbor records use their own retrieval channel and never inherit
+/// the BM25 score of the hit that caused their expansion.
+pub fn encode_longmemeval_v2_search_candidate_evidence_v1(
+    identity: &LongMemEvalV2CandidateIdentityV1,
+    query: &str,
+    domain: &str,
+    result: &LongMemEvalV2SearchResultV1,
+) -> Result<CandidateEvidenceBatchV1, LongMemEvalV2CandidateReject> {
+    if result.hits.is_empty() {
+        return Err(LongMemEvalV2CandidateReject::EmptyHits);
+    }
+
+    let hit_batch = encode_longmemeval_v2_candidate_evidence_v1(
+        identity,
+        query,
+        domain,
+        &result.hits,
+    )?;
+    let mut records = hit_batch.evidence.clone();
+    let mut seen_image_ids = records
+        .iter()
+        .filter(|item| item.modality == EvidenceModalityV1::Image)
+        .map(|item| item.evidence_id.clone())
+        .collect::<BTreeSet<_>>();
+    let mut image_rank = records
+        .iter()
+        .filter(|item| item.retrieval_channel == "attached_image_evidence")
+        .map(|item| item.retrieval_rank)
+        .max()
+        .unwrap_or(0);
+
+    for (neighbor_index, neighbor) in result.neighbor_context.iter().enumerate() {
+        let chunk = &neighbor.chunk;
+        if chunk.domain != domain
+            || chunk.trajectory_id.trim().is_empty()
+            || chunk.state_window.is_empty()
+            || chunk.evidence_text().trim().is_empty()
+            || !valid_sha256(&chunk.source_trajectory_sha256)
+            || !valid_sha256(&chunk.chunk_sha256)
+        {
+            return Err(LongMemEvalV2CandidateReject::InvalidHit);
+        }
+
+        let mut parents = Vec::with_capacity(chunk.state_window.len());
+        for state in &chunk.state_window {
+            if !valid_sha256(&state.raw_state_sha256) {
+                return Err(LongMemEvalV2CandidateReject::InvalidSourceDigest);
+            }
+            parents.push(state_parent_id(
+                &chunk.trajectory_id,
+                state.source_ordinal,
+                &state.raw_state_sha256,
+            ));
+        }
+
+        let neighbor_rank = u32::try_from(neighbor_index + 1)
+            .map_err(|_| LongMemEvalV2CandidateReject::InvalidRank)?;
+        records.push(CandidateEvidenceV1 {
+            run_id: identity.run_id.clone(),
+            candidate_id: identity.candidate_id.clone(),
+            backend_id: identity.backend_id.clone(),
+            backend_revision_sha256: identity.backend_revision_sha256.clone(),
+            query_scope: format!("longmemeval-v2:domain:{domain}"),
+            query_purpose: "benchmark:memory-context".to_owned(),
+            query_sha256: sha256_hex(query.as_bytes()),
+            evidence_id: format!(
+                "lmev2:neighbor:{}:{}",
+                chunk.trajectory_id, chunk.chunk_sha256
+            ),
+            source_id: chunk.trajectory_id.clone(),
+            source_sha256: chunk.source_trajectory_sha256.clone(),
+            payload_sha256: chunk.chunk_sha256.clone(),
+            payload_ref: format!(
+                "lmev2://{domain}/trajectories/{}/chunks/{}",
+                chunk.trajectory_id, chunk.chunk_sha256
+            ),
+            modality: EvidenceModalityV1::Text,
+            retrieval_channel: "trajectory_neighbor_expansion".to_owned(),
+            retrieval_rank: neighbor_rank,
+            retrieval_score: None,
+            parent_evidence_ids: parents,
+            derivation_receipt_sha256: Some(chunk.chunk_sha256.clone()),
+        });
+
+        for state in &chunk.state_window {
+            let digest = state
+                .screenshot_sha256
+                .as_deref()
+                .ok_or(LongMemEvalV2CandidateReject::MissingScreenshotDigest)?;
+            if !valid_sha256(digest) {
+                return Err(LongMemEvalV2CandidateReject::InvalidSourceDigest);
+            }
+            let evidence_id = format!(
+                "lmev2:image:{}:{}:{}",
+                chunk.trajectory_id, state.source_ordinal, digest
+            );
+            if !seen_image_ids.insert(evidence_id.clone()) {
+                continue;
+            }
+            image_rank = image_rank
+                .checked_add(1)
+                .ok_or(LongMemEvalV2CandidateReject::InvalidRank)?;
+            records.push(CandidateEvidenceV1 {
+                run_id: identity.run_id.clone(),
+                candidate_id: identity.candidate_id.clone(),
+                backend_id: identity.backend_id.clone(),
+                backend_revision_sha256: identity.backend_revision_sha256.clone(),
+                query_scope: format!("longmemeval-v2:domain:{domain}"),
+                query_purpose: "benchmark:memory-context".to_owned(),
+                query_sha256: sha256_hex(query.as_bytes()),
+                evidence_id,
+                source_id: chunk.trajectory_id.clone(),
+                source_sha256: chunk.source_trajectory_sha256.clone(),
+                payload_sha256: digest.to_owned(),
+                payload_ref: format!(
+                    "lmev2://{domain}/trajectories/{}/states/{}/screenshots/{}",
+                    chunk.trajectory_id, state.source_ordinal, digest
+                ),
+                modality: EvidenceModalityV1::Image,
+                retrieval_channel: "attached_image_evidence".to_owned(),
+                retrieval_rank: image_rank,
+                retrieval_score: None,
+                parent_evidence_ids: Vec::new(),
+                derivation_receipt_sha256: None,
+            });
+        }
+    }
+
+    encode_candidate_evidence_jsonl(&records).map_err(Into::into)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -347,6 +481,52 @@ mod tests {
                 .count(),
             2
         );
+    }
+
+    #[test]
+    fn search_result_encoder_includes_neighbors_without_inheriting_bm25_scores() {
+        let hit = hit();
+        let neighbor_chunk = crate::longmemeval_v2::LongMemEvalV2EvidenceChunkV1 {
+            chunk_id: "2222222222222222222222222222222222222222222222222222222222222222".to_owned(),
+            trajectory_id: "trajectory-2".to_owned(),
+            domain: "web".to_owned(),
+            goal: "Find customer Ada's order".to_owned(),
+            start_url: "https://example.test".to_owned(),
+            center_state_ordinal: 3,
+            window_start_ordinal: 3,
+            window_end_ordinal_exclusive: 4,
+            source_trajectory_sha256: "3333333333333333333333333333333333333333333333333333333333333333".to_owned(),
+            state_window: vec![state(
+                3,
+                "4444444444444444444444444444444444444444444444444444444444444444",
+                Some("5555555555555555555555555555555555555555555555555555555555555555"),
+            )],
+            screenshot_references: vec!["trajectory-2/state-3.png".to_owned()],
+            chunk_sha256: "2222222222222222222222222222222222222222222222222222222222222222".to_owned(),
+            evidence_text: "Earlier order workflow state".to_owned(),
+        };
+        let result = LongMemEvalV2SearchResultV1 {
+            hits: vec![hit],
+            neighbor_context: vec![crate::longmemeval_v2::LongMemEvalV2NeighborV1 {
+                chunk: neighbor_chunk,
+                expanded_from_hit_rank: 1,
+                relative_state_offset: -1,
+            }],
+            search_latency_ns: 10,
+        };
+        let batch = encode_longmemeval_v2_search_candidate_evidence_v1(
+            &identity(),
+            "query",
+            "web",
+            &result,
+        )
+        .expect("complete candidate set");
+        let neighbor = batch.evidence.iter()
+            .find(|item| item.retrieval_channel == "trajectory_neighbor_expansion")
+            .expect("neighbor record");
+        assert_eq!(neighbor.retrieval_score, None);
+        assert_eq!(neighbor.retrieval_rank, 1);
+        assert_eq!(neighbor.parent_evidence_ids.len(), 1);
     }
 
     #[test]
