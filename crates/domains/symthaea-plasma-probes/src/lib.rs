@@ -685,7 +685,9 @@ impl EmpiricalGramian {
             }
         }
         let fraction = captured / total;
-        if !fraction.is_finite() || fraction < 0.0 || fraction > 1.0 + ORTHOGONALITY_TOLERANCE {
+        if !fraction.is_finite()
+            || !(0.0..=(1.0 + ORTHOGONALITY_TOLERANCE)).contains(&fraction)
+        {
             return Err(ContractError::InvalidGramianArithmetic);
         }
         Ok(fraction.min(1.0))
