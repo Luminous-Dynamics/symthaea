@@ -127,8 +127,12 @@ pub struct TwoStageMetrologyReportV1 {
     pub candidate_packet_sha256: String,
     pub screening_cost_budget: u64,
     pub screening_cost_used: u64,
+    pub no_measurement_total_cost: u64,
+    pub screen_only_total_cost: u64,
+    pub high_fidelity_only_total_cost: u64,
     pub confirmation_worst_case_cost_budget: u64,
     pub confirmation_worst_case_cost_used: u64,
+    pub total_worst_case_measurement_cost: u64,
     pub confirmation_expected_cost: f64,
     pub total_expected_measurement_cost: f64,
     pub no_measurement_expected_decision_loss: f64,
@@ -451,6 +455,10 @@ pub fn plan_two_stage_metrology_v1(
         .iter()
         .map(|candidate| candidate.screening_cost)
         .sum::<u64>();
+    let high_fidelity_only_total_cost = canonical_candidates
+        .iter()
+        .try_fold(0_u64, |total, candidate| total.checked_add(candidate.confirmation_cost))
+        .ok_or_else(|| TwoStageMetrologyErrorV1("high-fidelity baseline cost overflow".into()))?;
 
     let mut preliminary = Vec::with_capacity(canonical_candidates.len());
     for candidate in &canonical_candidates {
@@ -635,6 +643,9 @@ pub fn plan_two_stage_metrology_v1(
         - confirmation_expected_cost;
     let total_expected_measurement_cost =
         screening_cost_used as f64 + confirmation_expected_cost;
+    let total_worst_case_measurement_cost = screening_cost_used
+        .checked_add(best.cost)
+        .ok_or_else(|| TwoStageMetrologyErrorV1("two-stage worst-case cost overflow".into()))?;
     let selected_confirmation_candidates = best.ids.clone();
 
     let mut report = TwoStageMetrologyReportV1 {
@@ -644,8 +655,12 @@ pub fn plan_two_stage_metrology_v1(
         candidate_packet_sha256,
         screening_cost_budget: policy.screening_cost_budget,
         screening_cost_used,
+        no_measurement_total_cost: 0,
+        screen_only_total_cost: screening_cost_used,
+        high_fidelity_only_total_cost,
         confirmation_worst_case_cost_budget: policy.confirmation_worst_case_cost_budget,
         confirmation_worst_case_cost_used: best.cost,
+        total_worst_case_measurement_cost,
         confirmation_expected_cost,
         total_expected_measurement_cost,
         no_measurement_expected_decision_loss,
@@ -738,7 +753,14 @@ mod tests {
 
         assert_eq!(first.report_sha256, second.report_sha256);
         assert_eq!(first.screening_cost_used, 3);
+        assert_eq!(first.no_measurement_total_cost, 0);
+        assert_eq!(first.screen_only_total_cost, 3);
+        assert_eq!(first.high_fidelity_only_total_cost, 15);
         assert!(first.confirmation_worst_case_cost_used <= 10);
+        assert_eq!(
+            first.total_worst_case_measurement_cost,
+            first.screening_cost_used + first.confirmation_worst_case_cost_used
+        );
         assert_eq!(first.subsets_examined, 8);
         assert_eq!(first.candidates.len(), 3);
         assert!(first.expected_incremental_net_value >= 0.0);
