@@ -22,6 +22,7 @@ const AMPLITUDE_SEMANTICS: &str = "maximum_absolute_delta_v";
 const APPLICATION_SEMANTICS: &str = "instantaneous_canonical_velocity_kick";
 const TAU: f64 = std::f64::consts::TAU;
 const PI: f64 = std::f64::consts::PI;
+const MAX_PERIODIC_LIFT_HARMONICS: usize = 4_096;
 const DIGEST_DOMAIN: &[u8] = b"symthaea.akpd.pulse-candidate.v0.1\0";
 
 /// Errors returned while parsing, validating or enumerating probe contracts.
@@ -1483,7 +1484,7 @@ pub struct PeriodicTorusLift {
 impl PeriodicTorusLift {
     /// Construct a periodic lift with harmonics 1 through max_harmonic.
     pub fn new(max_harmonic: usize) -> Result<Self, ContractError> {
-        if max_harmonic == 0 {
+        if max_harmonic == 0 || max_harmonic > MAX_PERIODIC_LIFT_HARMONICS {
             return Err(ContractError::InvalidHarmonicBudget);
         }
         Ok(Self { max_harmonic })
@@ -2665,6 +2666,14 @@ mod tests {
     }
 
     #[test]
+    fn periodic_torus_lift_rejects_unbounded_harmonic_budgets() {
+        assert_eq!(
+            PeriodicTorusLift::new(MAX_PERIODIC_LIFT_HARMONICS + 1),
+            Err(ContractError::InvalidHarmonicBudget)
+        );
+    }
+
+    #[test]
     fn periodic_torus_lift_rejects_zero_harmonics_and_non_finite_coordinates() {
         assert_eq!(
             PeriodicTorusLift::new(0),
@@ -2740,6 +2749,80 @@ mod tests {
                 ..
             })
         ));
+    }
+
+    #[test]
+    fn kird_audit_rejects_placeholder_physical_reference_bundle_digest() {
+        let mut value: serde_json::Value =
+            serde_json::from_str(KIRD_SYNTHETIC_FIXTURE).unwrap();
+        value["record_status"] = serde_json::json!("physical_measurement");
+        value["provenance"]["physical_execution_authorized"] = serde_json::json!(true);
+        for pointer in [
+            "/cohort/initial_state_sha256",
+            "/task_contract/intervention_family_sha256",
+            "/task_contract/qoi_registry_sha256",
+            "/candidate/configuration_sha256",
+            "/provenance/candidate_output_sha256",
+            "/provenance/run_receipt_sha256",
+        ] {
+            let field = pointer.trim_start_matches('/').replace('/', ".");
+            let mut current = &mut value;
+            let mut parts = field.split('.').peekable();
+            while let Some(part) = parts.next() {
+                if parts.peek().is_none() {
+                    current[part] = serde_json::json!(
+                        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                    );
+                } else {
+                    current = &mut current[part];
+                }
+            }
+        }
+        value["provenance"]["reference_bundle_sha256"] = serde_json::json!(
+            "0000000000000000000000000000000000000000000000000000000000000000"
+        );
+        assert!(matches!(
+            validate_kird_record_value(&value),
+            Err(ContractError::InvalidKirdField {
+                field: "provenance.reference_bundle_sha256",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn valid_physical_kird_record_requires_and_accepts_reference_identity() {
+        let mut value: serde_json::Value =
+            serde_json::from_str(KIRD_SYNTHETIC_FIXTURE).unwrap();
+        value["record_status"] = serde_json::json!("physical_measurement");
+        value["provenance"]["physical_execution_authorized"] = serde_json::json!(true);
+        for pointer in [
+            "/cohort/initial_state_sha256",
+            "/task_contract/intervention_family_sha256",
+            "/task_contract/qoi_registry_sha256",
+            "/candidate/configuration_sha256",
+            "/provenance/candidate_output_sha256",
+            "/provenance/run_receipt_sha256",
+        ] {
+            let field = pointer.trim_start_matches('/').replace('/', ".");
+            let mut current = &mut value;
+            let mut parts = field.split('.').peekable();
+            while let Some(part) = parts.next() {
+                if parts.peek().is_none() {
+                    current[part] = serde_json::json!(
+                        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                    );
+                } else {
+                    current = &mut current[part];
+                }
+            }
+        }
+        value["provenance"]["reference_bundle_sha256"] = serde_json::json!(
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        );
+        let report = validate_kird_record_value(&value).unwrap();
+        assert_eq!(report.record_status, "physical_measurement");
+        assert_eq!(report.physical_gate_status, "UNKNOWN");
     }
 
     #[test]
