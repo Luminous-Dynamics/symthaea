@@ -2036,8 +2036,10 @@ mod tests {
                 .true_defect_prevalence;
 
         let mut ht_estimates = Vec::new();
+        let mut hajek_estimates = Vec::new();
         let mut assay_adjusted_estimates = Vec::new();
         let mut ht_covered = 0_usize;
+        let mut hajek_covered = 0_usize;
         let replay_count = 256_usize;
 
         for seed in 0..replay_count {
@@ -2065,17 +2067,28 @@ mod tests {
                 ht_covered += 1;
             }
             ht_estimates.push(ht);
+
+            let hajek = report.hajek_prevalence;
+            let hajek_se = report.standard_error_hajek_prevalence.unwrap();
+            if (hajek - truth).abs() <= 1.96 * hajek_se {
+                hajek_covered += 1;
+            }
+            hajek_estimates.push(hajek);
             assay_adjusted_estimates.push(report.assay_adjusted_ht_prevalence.unwrap());
         }
 
         let mean_ht = ht_estimates.iter().sum::<f64>() / replay_count as f64;
+        let mean_hajek = hajek_estimates.iter().sum::<f64>() / replay_count as f64;
         let mean_assay_adjusted =
             assay_adjusted_estimates.iter().sum::<f64>() / replay_count as f64;
         let ht_coverage = ht_covered as f64 / replay_count as f64;
+        let hajek_coverage = hajek_covered as f64 / replay_count as f64;
 
         assert!((mean_ht - truth).abs() < 0.02);
+        assert!((mean_hajek - truth).abs() < 0.02);
         assert!((mean_assay_adjusted - truth).abs() < 0.03);
         assert!((0.88..=0.99).contains(&ht_coverage));
+        assert!((0.88..=0.99).contains(&hajek_coverage));
     }
 
     #[test]
