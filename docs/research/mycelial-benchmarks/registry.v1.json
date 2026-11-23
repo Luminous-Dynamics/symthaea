@@ -1,0 +1,249 @@
+{
+  "schema_version": 1,
+  "registry_date": "2026-11-23",
+  "records": [
+    {
+      "dataset_id": "sten_2024_mycelium_2d",
+      "title": "A ridge-based detection algorithm with filament overlap identification for 2D mycelium network analysis",
+      "publication_doi": "https://doi.org/10.1016/j.ecoinf.2024.102670",
+      "artifact_urls": [
+        "https://gitlab.iit.it/oscar.sten/mycelium-network-analysis-tool"
+      ],
+      "code_url": "https://gitlab.iit.it/oscar.sten/mycelium-network-analysis-tool",
+      "software_license": "MIT-style permission notice documented in repository README; verify exact repository snapshot before use",
+      "access_status": "public_repository",
+      "data_rights": {
+        "status": "per_artifact_review_required",
+        "notes": "Repository README says the project contains ground-truth skeletons for Cardini_et_al_images and states software license terms. Underlying source image rights must be checked separately. Repository also documents manual visual assessment/correction for selected branch/crossing cases."
+      },
+      "ingestion_status": "metadata_only_not_ingested",
+      "published_sample_summary": "135 real mycelium images across multiple datasets, species, backgrounds, contrast levels and acquisition systems; reported filament detection F1 0.88–0.94 and crossing F1 0.89.",
+      "benchmark_tasks": [
+        "2D filament detection",
+        "crossing-versus-junction discrimination",
+        "filament length and density",
+        "topology and false-fusion evaluation"
+      ],
+      "independent_unit": "Source specimen/acquisition session; reconcile image-to-specimen mapping before assigning splits.",
+      "split_requirements": [
+        "Keep images from the same specimen and acquisition session in one split.",
+        "Reproduce manual correction/adjudication cases separately from fully automated scoring.",
+        "Use source dataset/species/device group holdouts for domain-shift evaluation."
+      ],
+      "known_limitations": [
+        "Selected branch/crossing evaluation cases require manual visual adjudication/correction according to the repository README.",
+        "2D projection cannot resolve arbitrary z-order or true 3D contacts.",
+        "Software licensing does not establish rights to every embedded source image."
+      ],
+      "source_manifest_requirements": [
+        "Exact Git commit and file digests",
+        "Per-image original publication/source identity",
+        "Annotation revision and manual adjudication receipt",
+        "Specimen and acquisition-group mapping",
+        "File-level data license/permission"
+      ]
+    },
+    {
+      "dataset_id": "sten_2025_mycelium_zstacks",
+      "title": "Three-dimensional graph reconstruction of filamentous structures from z-stack images",
+      "publication_doi": "https://doi.org/10.1016/j.ecoinf.2025.103317",
+      "artifact_urls": [
+        "https://doi.org/10.5281/zenodo.15382388"
+      ],
+      "code_url": "https://doi.org/10.5281/zenodo.15382388",
+      "software_license": "Permissive MIT-style software license text in Zenodo record; verify exact package version and any third-party components",
+      "access_status": "public_package",
+      "data_rights": {
+        "status": "per_artifact_review_required",
+        "notes": "Zenodo record identifies some embedded data subcollections as copyrighted by Oscar Sten and the 2D source images as copyrighted by Cardini et al. (2020). Software license is not a blanket grant for all images, annotations or third-party material."
+      },
+      "ingestion_status": "metadata_only_not_ingested",
+      "published_sample_summary": "Public software package record describes fungal z-stacks, 2D fungal images, time-lapse images, overlap annotations, printed-filament prototypes and source scripts. Paper reports overlap F1 0.91–0.92 on six manually annotated real fungal images; separate 3D printed prototypes provide known-geometry tests.",
+      "benchmark_tasks": [
+        "Z-stack filament reconstruction",
+        "overlap and crossing detection",
+        "3D printed geometry RMSE",
+        "time-lapse consistency"
+      ],
+      "independent_unit": "Biological specimen/stack or printed-prototype/acquisition run; preserve those groups and their repeated frames.",
+      "split_requirements": [
+        "Keep every z-plane and time frame from a specimen/stack in one split.",
+        "Separate printed-prototype geometry from real-fungus evaluation.",
+        "Do not describe six manually annotated overlap images as comprehensive 3D ground truth."
+      ],
+      "known_limitations": [
+        "Overlap F1 0.91–0.92 is reported on six manually annotated real images.",
+        "3D printed known-geometry evaluation is not biological-network ground truth.",
+        "Data subcollections have distinct copyright notices; file-level rights review is required."
+      ],
+      "source_manifest_requirements": [
+        "Zenodo record/version and exact package file digest",
+        "Per-subcollection file list and checksum",
+        "Image/annotation provenance and owner",
+        "Specimen/stack/timepoint grouping",
+        "Prototype dimensions and calibration truth",
+        "Per-file license or explicit permission"
+      ]
+    },
+    {
+      "dataset_id": "amf_travelling_wave_2025",
+      "title": "A travelling-wave strategy for plant–fungal trade",
+      "publication_doi": "https://doi.org/10.1038/s41586-025-08614-x",
+      "artifact_urls": [
+        "https://doi.org/10.6084/M9.FIGSHARE.27889143"
+      ],
+      "code_url": "https://github.com/Cocopyth/AMFTravellingWave",
+      "software_license": "MIT (analysis code, as stated by the paper)",
+      "access_status": "public_source_data",
+      "data_rights": {
+        "status": "per_artifact_review_required",
+        "notes": "Paper states main-analysis and figure source data are on Figshare and analysis code is MIT. Record the data artifact's own license and any third-party restrictions per file before redistribution."
+      },
+      "ingestion_status": "metadata_only_not_ingested",
+      "published_sample_summary": "Study tracked more than 500,000 fungal nodes and linked approximately 100,000 bidirectional cytoplasmic-flow trajectories to growing network coordinates across three AM fungal strains.",
+      "benchmark_tasks": [
+        "dynamic graph growth",
+        "trajectory-to-edge association",
+        "forward/reverse flow speed prediction",
+        "travelling-wave and growth-front prediction",
+        "temporal flow/topology coupling"
+      ],
+      "independent_unit": "Independent fungal network/plate and strain/experimental cohort; exact replicate map must be recovered from source files.",
+      "split_requirements": [
+        "Keep all frames and trajectories from one network/plate in one split.",
+        "Hold out biological replicate and, separately, fungal strain for transfer tests.",
+        "Retain simultaneous antiparallel stream observations as separate directional series."
+      ],
+      "known_limitations": [
+        "Plate-based network growth is constrained to 2D and is not full 3D soil-network truth.",
+        "Figure/source data are not automatically equivalent to all raw microscopy acquisitions.",
+        "No cross-split leakage from tracks, crops or frames from the same network."
+      ],
+      "source_manifest_requirements": [
+        "Figshare article version and file digests",
+        "Git commit/tag of analysis code",
+        "Network/plate/strain/timepoint mapping",
+        "Coordinate systems and trajectory-to-network registration",
+        "Per-file data license"
+      ]
+    },
+    {
+      "dataset_id": "amf_intrinsic_flow_2026",
+      "title": "Cytoplasmic flow dynamics in arbuscular mycorrhizal fungi are intrinsic and independent of plant hosts",
+      "publication_doi": "https://doi.org/10.1016/j.funbio.2026.101775",
+      "artifact_urls": [
+        "https://doi.org/10.1016/j.funbio.2026.101775"
+      ],
+      "access_status": "request_only",
+      "data_rights": {
+        "status": "author_permission_required",
+        "notes": "Article data availability statement says all data are available upon request. Do not treat supplement videos as a complete raw trajectory dataset or assume data reuse rights; request files, metadata, replicate mapping and license terms from authors."
+      },
+      "ingestion_status": "metadata_only_not_ingested",
+      "published_sample_summary": "Article reports 5,000 cytoplasmic-flow videos and approximately 25,000 trajectories from two Rhizophagus irregularis strains.",
+      "benchmark_tasks": [
+        "host-independent cytoplasmic-flow prediction",
+        "flow speed/direction calibration",
+        "strain and treatment generalization",
+        "longitudinal time/space variation"
+      ],
+      "independent_unit": "Biological replicate/network, strain and acquisition series; obtain the mapping from authors before any split.",
+      "split_requirements": [
+        "Keep all videos/trajectories from the same biological network in one split.",
+        "Stratify by strain and treatment after obtaining replicate identity.",
+        "Record unavailable/failed acquisitions and all measurement censoring."
+      ],
+      "known_limitations": [
+        "Raw data are request-only according to the article.",
+        "No public raw dataset should be presumed accessible.",
+        "Flow trajectories are intrahyphal observations, not isotope delivery measurements."
+      ],
+      "source_manifest_requirements": [
+        "Author data-use permission",
+        "Raw video/trajectory files and checksum",
+        "Replicate/strain/treatment map",
+        "Imaging calibration and kymograph protocol",
+        "Data reuse and redistribution terms"
+      ]
+    },
+    {
+      "dataset_id": "agaricus_isotope_transfer_2026",
+      "title": "Feeding of Agaricus bisporus Mushrooms is Impacted by Mycelium Colonization Time and Network Architecture",
+      "publication_doi": "https://doi.org/10.1111/1462-2920.70345",
+      "artifact_urls": [
+        "https://doi.org/10.6084/m9.figshare.30818828"
+      ],
+      "access_status": "public_source_data",
+      "data_rights": {
+        "status": "per_artifact_review_required",
+        "notes": "Article states raw data are available on Figshare and the article is CC BY 4.0. Verify the Figshare artifact's own license, file list and reuse terms independently."
+      },
+      "ingestion_status": "metadata_only_not_ingested",
+      "published_sample_summary": "Stable-isotope source-to-sink analysis in Agaricus bisporus; supplementary table describes 23 fruiting bodies from three independent cultivation boxes in flush one. Individual mushrooms show heterogeneous isotope incorporation.",
+      "benchmark_tasks": [
+        "per-sink tracer uptake prediction",
+        "source attribution",
+        "local depletion and colonization-time effects",
+        "sink-level predictive interval calibration"
+      ],
+      "independent_unit": "Cultivation box (the paper treats box culture as the biological/experimental unit for treatment analyses); mushrooms are subsamples.",
+      "split_requirements": [
+        "Keep all mushrooms, flushes and repeated assays from one cultivation box in one split.",
+        "Use box-level resampling and confidence intervals.",
+        "Preserve missing, censored and below-detection tracer outcomes."
+      ],
+      "known_limitations": [
+        "Individual fruiting bodies within one box can have heterogeneous uptake.",
+        "Graph reachability and spatial proximity are not direct measures of isotope delivery.",
+        "The article's license does not by itself establish the raw Figshare artifact license."
+      ],
+      "source_manifest_requirements": [
+        "Figshare version and file digests",
+        "Cultivation box/flush/mushroom sample map",
+        "Tracer/isotope units and calibration",
+        "Source layer/treatment/colonization-time metadata",
+        "Per-file data license"
+      ]
+    },
+    {
+      "dataset_id": "hyphal_highways_device_2026",
+      "title": "A microfluidic platform reveals the role of liquid movement on the dispersal of Pseudomonas putida via Pythium ultimum hyphal highways",
+      "publication_doi": "https://doi.org/10.1093/femsml/uqag035",
+      "artifact_urls": [
+        "https://doi.org/10.5281/zenodo.20071448"
+      ],
+      "access_status": "public_source_data",
+      "data_rights": {
+        "status": "per_artifact_review_required",
+        "notes": "Article states data are available on Zenodo and analysis macros are included in supplementary material. Verify the exact Zenodo record's file-level license and version before redistribution."
+      },
+      "ingestion_status": "metadata_only_not_ingested",
+      "published_sample_summary": "Hyphal Highways Device study of Pseudomonas putida dispersal along Pythium ultimum under unsaturated conditions; article reports outlet CFUs in 4 of 8 co-inoculated devices, with non-arrival outcomes retained.",
+      "benchmark_tasks": [
+        "bacterial arrival probability and time",
+        "along-channel dispersal signal",
+        "CFU outlet recovery",
+        "liquid saturation/connectivity effects"
+      ],
+      "independent_unit": "Independent device/culture run; verify replicate/device IDs from raw files.",
+      "split_requirements": [
+        "Keep all videos, frames, channels and measurements from one device/culture run in one split.",
+        "Preserve devices without outlet CFUs as non-arrival/censored assay outcomes.",
+        "Do not treat bacterial dispersal as cytoplasmic or nutrient transport."
+      ],
+      "known_limitations": [
+        "The study is a controlled microfluidic assay, not a complete soil-network model.",
+        "Only 4 of 8 co-inoculated devices yielded outlet CFUs; exclude-success-only analysis is biased.",
+        "Liquid distribution and hyphal biomass influence observed bacterial movement."
+      ],
+      "source_manifest_requirements": [
+        "Zenodo record/version and file digests",
+        "Device geometry and condition metadata",
+        "Culture/device replicate mapping",
+        "Image-analysis macro version and calibration",
+        "CFU detection limit and non-arrival coding",
+        "Per-file data license"
+      ]
+    }
+  ]
+}
