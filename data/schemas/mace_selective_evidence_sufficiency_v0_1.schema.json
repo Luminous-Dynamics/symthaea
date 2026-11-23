@@ -1,0 +1,636 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/mace_selective_evidence_sufficiency_v0_1.schema.json",
+  "title": "MACE Selective Evidence Sufficiency v0.1",
+  "description": "Calibration manifests, hierarchical group-conditional risk certificates and per-decision selective evidence sufficiency assessments. Statistical certificates apply only after deterministic evidence/authority/lifecycle gates pass.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/calibration_manifest"
+    },
+    {
+      "$ref": "#/$defs/group_certificate"
+    },
+    {
+      "$ref": "#/$defs/decision_assessment"
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "risk_status": {
+      "type": "string",
+      "enum": [
+        "certified",
+        "not_estimable_no_calibration_clusters",
+        "not_estimable_insufficient_calibration_clusters",
+        "unsupported_distribution_shift",
+        "parent_group_fallback",
+        "rejected_hard_gate"
+      ]
+    },
+    "threshold": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "risk_bound": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "calibration_manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "record_type",
+        "run_id",
+        "calibration_data_sha256",
+        "calibration_split_sha256",
+        "calibration_cluster_count",
+        "calibration_example_count",
+        "group_hierarchy_sha256",
+        "sufficiency_score_definition_sha256",
+        "decision_loss_definition_sha256",
+        "decision_policy_sha256",
+        "candidate_code_sha256",
+        "evaluator_code_sha256",
+        "calibration_method",
+        "risk_target_alpha",
+        "multiplicity_method",
+        "resampling_unit",
+        "exchangeability_status",
+        "threshold_selection",
+        "evaluator_custody"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mace_selective_evidence_sufficiency_v0_1"
+        },
+        "record_type": {
+          "const": "calibration_manifest"
+        },
+        "run_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "calibration_data_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "calibration_split_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "calibration_cluster_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "calibration_example_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "group_hierarchy_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "sufficiency_score_definition_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "decision_loss_definition_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "decision_policy_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "candidate_code_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "evaluator_code_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "calibration_method": {
+          "type": "string",
+          "enum": [
+            "global_risk_control",
+            "category_conditioned",
+            "hierarchical_group_conditional_crc",
+            "conformalized_abstention_policy",
+            "fixed_sequence_confidence_bound"
+          ]
+        },
+        "risk_target_alpha": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "multiplicity_method": {
+          "type": "string",
+          "enum": [
+            "none_single_primary_group",
+            "bonferroni",
+            "holm",
+            "hierarchical_fallback",
+            "other_preregistered"
+          ]
+        },
+        "resampling_unit": {
+          "type": "string",
+          "enum": [
+            "independent_world_cluster",
+            "independent_source_cluster",
+            "independent_user_cluster",
+            "independent_task_cluster",
+            "other_preregistered"
+          ]
+        },
+        "exchangeability_status": {
+          "type": "string",
+          "enum": [
+            "justified_by_sampling_design",
+            "assumed_not_verified",
+            "not_established"
+          ]
+        },
+        "threshold_selection": {
+          "const": "calibration_split_only"
+        },
+        "evaluator_custody": {
+          "type": "string",
+          "enum": [
+            "sealed_external_evaluator",
+            "independent_reviewer",
+            "public_diagnostic_only"
+          ]
+        }
+      }
+    },
+    "group_certificate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "record_type",
+        "certificate_sha256",
+        "calibration_manifest_sha256",
+        "group_id",
+        "group_path",
+        "status",
+        "calibration_cluster_count",
+        "calibration_example_count",
+        "accepted_example_count",
+        "risk_target_alpha",
+        "threshold",
+        "empirical_selective_risk",
+        "risk_upper_bound",
+        "coverage",
+        "multiplicity_adjustment",
+        "risk_bound_method",
+        "certificate_scope",
+        "distribution_shift_detected",
+        "minimum_cluster_requirement"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mace_selective_evidence_sufficiency_v0_1"
+        },
+        "record_type": {
+          "const": "group_certificate"
+        },
+        "certificate_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "calibration_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "group_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "group_path": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/identifier"
+          },
+          "minItems": 1
+        },
+        "parent_group_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status": {
+          "$ref": "#/$defs/risk_status"
+        },
+        "calibration_cluster_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "calibration_example_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "accepted_example_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "risk_target_alpha": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "threshold": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/threshold"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "empirical_selective_risk": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/risk_bound"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "risk_upper_bound": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/risk_bound"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "coverage": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/risk_bound"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "multiplicity_adjustment": {
+          "oneOf": [
+            {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "risk_bound_method": {
+          "type": "string",
+          "enum": [
+            "clopper_pearson",
+            "hoeffding",
+            "empirical_bernstein",
+            "conformal_risk_control",
+            "cluster_bootstrap_upper_bound",
+            "not_estimable"
+          ]
+        },
+        "certificate_scope": {
+          "type": "string",
+          "enum": [
+            "marginal",
+            "group_conditional",
+            "parent_fallback"
+          ]
+        },
+        "parent_fallback_group_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "failure_reason": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 1024
+        },
+        "distribution_shift_detected": {
+          "type": "boolean"
+        },
+        "minimum_cluster_requirement": {
+          "type": "integer",
+          "minimum": 2
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "certified"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "threshold": {
+                "$ref": "#/$defs/threshold"
+              },
+              "risk_upper_bound": {
+                "$ref": "#/$defs/risk_bound"
+              },
+              "coverage": {
+                "$ref": "#/$defs/risk_bound"
+              },
+              "calibration_cluster_count": {
+                "minimum": 2
+              },
+              "distribution_shift_detected": {
+                "const": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "not_estimable_no_calibration_clusters",
+                  "not_estimable_insufficient_calibration_clusters",
+                  "unsupported_distribution_shift",
+                  "rejected_hard_gate"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "risk_upper_bound": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "parent_group_fallback"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "certificate_scope": {
+                "const": "parent_fallback"
+              },
+              "parent_fallback_group_id": {
+                "$ref": "#/$defs/identifier"
+              }
+            },
+            "required": [
+              "parent_fallback_group_id"
+            ]
+          }
+        }
+      ]
+    },
+    "decision_assessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "record_type",
+        "assessment_sha256",
+        "decision_need_sha256",
+        "evidence_capsule_sha256",
+        "calibration_manifest_sha256",
+        "group_certificate_sha256",
+        "sufficiency_score",
+        "hard_gates_pass",
+        "action",
+        "status",
+        "risk_target_alpha",
+        "risk_upper_bound",
+        "policy_sha256"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mace_selective_evidence_sufficiency_v0_1"
+        },
+        "record_type": {
+          "const": "decision_assessment"
+        },
+        "assessment_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "decision_need_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "evidence_capsule_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "calibration_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "group_certificate_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "sufficiency_score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "hard_gates_pass": {
+          "type": "boolean"
+        },
+        "action": {
+          "type": "string",
+          "enum": [
+            "accept_and_act",
+            "acquire_evidence",
+            "retrieve_more",
+            "abstain",
+            "escalate"
+          ]
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "accepted_under_certificate",
+            "acquisition_recommended",
+            "retrieval_recommended",
+            "abstained_not_estimable",
+            "abstained_risk_exceeds_target",
+            "rejected_hard_gate",
+            "certificate_suspended_shift"
+          ]
+        },
+        "risk_target_alpha": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "risk_upper_bound": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/risk_bound"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "policy_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "unresolved_evidence_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "missing_dependency_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "distribution_shift_detected": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": "string",
+          "maxLength": 2048
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "hard_gates_pass": {
+                "const": false
+              }
+            },
+            "required": [
+              "hard_gates_pass"
+            ]
+          },
+          "then": {
+            "properties": {
+              "action": {
+                "enum": [
+                  "abstain",
+                  "escalate"
+                ]
+              },
+              "status": {
+                "const": "rejected_hard_gate"
+              },
+              "risk_upper_bound": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "abstained_not_estimable"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "action": {
+                "const": "abstain"
+              },
+              "risk_upper_bound": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "accepted_under_certificate"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "group_certificate_sha256"
+            ],
+            "properties": {
+              "hard_gates_pass": {
+                "const": true
+              },
+              "action": {
+                "const": "accept_and_act"
+              },
+              "group_certificate_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "risk_upper_bound": {
+                "$ref": "#/$defs/risk_bound"
+              },
+              "distribution_shift_detected": {
+                "const": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "distribution_shift_detected": {
+                "const": true
+              },
+              "hard_gates_pass": {
+                "const": true
+              }
+            },
+            "required": [
+              "distribution_shift_detected",
+              "hard_gates_pass"
+            ]
+          },
+          "then": {
+            "properties": {
+              "status": {
+                "const": "certificate_suspended_shift"
+              },
+              "action": {
+                "enum": [
+                  "acquire_evidence",
+                  "retrieve_more",
+                  "abstain",
+                  "escalate"
+                ]
+              },
+              "risk_upper_bound": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
