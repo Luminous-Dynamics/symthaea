@@ -67,3 +67,12 @@ The translation alignment verdict is no longer a single evaluator-supplied statu
 
 A missing second reviewer or duplicated reviewer ID invalidates the receipt. This enforces the shape of a dual-review protocol; it does not cryptographically prove reviewer independence or expertise. The synthetic fixture uses stipulated reviewer IDs solely to test this structure. A real benchmark requires independently recruited/blinded reviewers and adjudication of disagreement before gold labels are frozen.
 
+### Additional classification controls
+
+The adversarial suite now includes:
+- **Incomparable candidate:** \`p\` fails the hidden stronger-side and corollary-side obligations, and must not be mislabeled as only too strong or too weak.
+- **Equivalent rewrite:** \`p → q\` and \`¬p ∨ q\` have the same propositional meaning and must pass the same selected controls.
+- **Context-order invariance:** reordering the formal assumption list must not change the sequent result.
+
+These are exact finite truth-table controls; they do not test arbitrary quantifier or dependent-type equivalence.
+

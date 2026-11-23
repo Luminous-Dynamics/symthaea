@@ -896,6 +896,55 @@ mod tests {
     }
 
     #[test]
+    fn incomparable_candidate_fails_both_sides_of_the_hidden_bracket() {
+        let mut receipt = fixture();
+        receipt.candidate.statement_formula = atom("p");
+        let report = evaluate_receipt(&receipt).expect("well-formed incomparable candidate");
+        assert_eq!(
+            report.classification,
+            SandwichClassification::IncomparableOrTranslationMismatch
+        );
+        assert!(any_fail(&report.upper_obligations));
+        assert!(any_fail(&report.lower_obligations));
+    }
+
+    #[test]
+    fn propositionally_equivalent_rewrite_passes_the_same_hidden_controls() {
+        let mut receipt = fixture();
+        receipt.candidate.statement_formula = BooleanFormula::Or {
+            left: Box::new(BooleanFormula::Not {
+                arg: Box::new(atom("p")),
+            }),
+            right: Box::new(atom("q")),
+        };
+        let report = evaluate_receipt(&receipt).expect("equivalent propositional rewrite");
+        assert_eq!(
+            report.classification,
+            SandwichClassification::ConsistentWithSelectedControls
+        );
+        assert!(all_pass(&report.upper_obligations));
+        assert!(all_pass(&report.lower_obligations));
+    }
+
+    #[test]
+    fn reordering_context_assumptions_preserves_sequent_semantics() {
+        let mut first = fixture();
+        first.candidate.statement_formula = atom("q");
+        first.candidate.statement_context = vec![atom("p"), atom("r")];
+
+        let mut second = first.clone();
+        second.candidate.statement_context.reverse();
+
+        let first_report = evaluate_receipt(&first).expect("valid first context ordering");
+        let second_report = evaluate_receipt(&second).expect("valid second context ordering");
+        assert_eq!(
+            first_report.classification,
+            SandwichClassification::ConsistentWithSelectedControls
+        );
+        assert_eq!(first_report.classification, second_report.classification);
+    }
+
+    #[test]
     fn malformed_candidate_context_formula_is_rejected() {
         let mut receipt = fixture();
         receipt.candidate.statement_context = vec![atom("  ")];

@@ -120,3 +120,5 @@ Report raw direct type/proof edge changes and generated-helper-expanded overlap 
 
 The translation review is a post-hoc two-reviewer gate: all reviewers must agree on alignment for a task to be counted as aligned; explicit disagreement is reported as disputed/unknown, and two misaligned reviews block semantic acceptance. Reviewer IDs and evidence references are structurally distinct, but actual independence, expertise and blinding must be established by the study process, not inferred from distinct strings.
 
+The theorem-sandwich validation set also includes incomparable statements, equivalent surface rewrites (\`p → q\` versus \`¬p ∨ q\`), and context-order permutations. These are exact finite propositional controls for classification correctness; they are not substitutes for Lean's dependent-context equivalence or expert translation review.
+
