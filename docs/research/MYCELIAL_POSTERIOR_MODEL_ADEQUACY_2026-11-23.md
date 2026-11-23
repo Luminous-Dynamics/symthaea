@@ -208,23 +208,38 @@ Report denominators, missingness, assay failure, confidence intervals, effect si
 
 ## 10. External comparison and interoperability position
 
-### Reconstruction and microscopy
+### Reconstruction and microscopy benchmarks
 
-- Sten et al. (2024), 135 fungal microscopy samples, reported filament-detection F1 0.88–0.94 and crossing/overlap F1 0.89: https://doi.org/10.1016/j.ecoinf.2024.102670.
-- Sten et al. (2025), 3D z-stack reconstruction reported overlap-detection F1 0.91–0.92 on six manually annotated real fungal images: https://doi.org/10.1016/j.ecoinf.2025.103317. This is a narrow overlap result, not a universal graph-reconstruction SOTA.
-- Fiji SNT provides established tracing and analysis, including non-neuronal filament use, and should be an interoperability partner rather than a target to replace.
-- Imaris and ZEISS arivis provide commercial 3D analysis/visualization and AI workflow capabilities. Symthaea should consume or reference their traces, preserve foreign object IDs and add evidence qualification, alternatives, counterfactuals and functional validation—not claim to replace mature image viewers.
+- Sten et al. (2024) evaluated 135 real mycelium images across varied datasets/acquisition conditions. They reported filament-detection F1 0.88–0.94 and crossing F1 0.89: https://doi.org/10.1016/j.ecoinf.2024.102670. Their released data/source provide a reproducible starting point.
+- Sten et al. (2025) introduced z-stack-based 3D filament reconstruction and reported overlap-detection F1 0.91–0.92 on six manually annotated real fungal images: https://doi.org/10.1016/j.ecoinf.2025.103317. The small annotated real-image subset makes this a narrow baseline, not a universal 3D graph-reconstruction SOTA.
+- Do not compare our proposed F1 ≥0.94 target to either result without reproducing their exact task, annotation rules, denominators, image conditions and split protocol. Then expand to replicate-held-out 3D geometry, topology and calibrated false-fusion outcomes.
 
-### Independent biology
+### Industry and adjacent open-source platforms
 
-- The 2025 plant–fungal trade study linked ~100,000 cytoplasmic-flow trajectories to a growing network with >500,000 tracked nodes: https://doi.org/10.1038/s41586-025-08614-x. Its Petri-plate setup is an important dynamic benchmark, not full 3D soil truth.
-- The 2026 AM-fungal study reports ~25,000 flow trajectories from 5,000 videos; its data are described as available upon request, so ingestion requires author permission: https://doi.org/10.1016/j.funbio.2026.101775.
-- The 2026 Agaricus stable-isotope study provides a distinct source-to-sink resource-transfer benchmark conditioned on colonization time and network architecture: https://doi.org/10.1111/1462-2920.70345.
-- The September 2026 Hyphal Highways Device study provides a controlled bacterial dispersal assay along Pythium hyphae and explicitly varies liquid movement/unsaturated conditions: https://doi.org/10.1093/femsml/uqag035.
+- **ZEISS arivis Pro 4.6** (released 2 October 2026) supports externally trained ONNX models for volumetric semantic segmentation, plus a guided training workflow and segment-contact handling (merge, overlap, touch). Official release notes: https://knowledge.zeiss.com/rms/en/arivis-pro/release-notes/arivis-pro-4-6.
+- **Imaris 11.1** (released 8 September 2026) adds the Training Hub, extended file-type recognition and native CZI reader integration. Official release notes: https://imaris.oxinst.com/support/imaris-release-notes/.
+- **Fiji SNT** already provides multidimensional tracing, semi-automated/automated workflows, batch processing and analysis of non-neuronal filamentous structures. Its documentation recommends TRACES over SWC for some 4D/5D workflows because TRACES retains channel/time-frame context: https://imagej.net/plugins/snt/ and https://imagej.net/plugins/snt/faq.
+- These systems are strong in microscopy workflows, tracing, segmentation, visualization, learning and file handling. Their public feature pages do not establish whether every evidence-assurance capability proposed here is absent from their products. A fair comparison requires pinned versions, matched data and recorded workflows.
 
-### Interchange
+**Competitive recommendation:** do not rebuild the viewers or claim superior segmentation. Integrate with arivis, Imaris and SNT, preserve foreign object IDs and their provenance, and compete on a different axis: alternative graph hypotheses, source-bound evidence, explicit information loss, model-adequacy/abstention, decision-value acquisition, counterfactual resilience and independent functional/interventional qualification.
 
-Maintain the canonical graph sidecar independently from SWC. SNT's TRACES format can preserve some 4D/5D and metadata that SWC does not. OME-NGFF spatial transforms should be bound by digest; vendor object IDs remain foreign identity mappings. Do not claim a vendor round trip until an actual import/export has been executed against pinned versions and source files.
+### Independent biological evidence
+
+- The 2025 plant–fungal trade study linked ~100,000 cytoplasmic-flow trajectories to a growing network with >500,000 tracked nodes: https://doi.org/10.1038/s41586-025-08614-x. It reports simultaneous antiparallel particle streams within individual hyphae and time/space variation. Its Petri-plate network is constrained to 2D growth, so it is a valuable dynamic benchmark rather than full 3D soil truth.
+- The 2026 AM-fungal study reports ~25,000 flow trajectories from 5,000 videos; its data are available upon request, so ingestion requires author permission: https://doi.org/10.1016/j.funbio.2026.101775.
+- The 2026 *Agaricus bisporus* stable-isotope study provides source-to-sink uptake measurements conditioned by colonization time, substrate depletion and network architecture: https://doi.org/10.1111/1462-2920.70345.
+- The 21 September 2026 Hyphal Highways Device study provides a distinct bacterial-dispersal assay along *Pythium* hyphae under unsaturated conditions and demonstrates the role of liquid movement: https://doi.org/10.1093/femsml/uqag035.
+
+### Interchange and OME-NGFF status
+
+Maintain the canonical mycelial graph sidecar independently from SWC. SWC is useful for tree-like projections but cannot preserve every cyclic graph or assay-specific property. SNT's TRACES format can retain channel/time-frame context for 4D/5D tracings.
+
+Bind OME-NGFF coordinate systems and spatial transforms by digest. As of the current NGFF RFC index:
+- RFC-5, Coordinate systems and transformations: S3 (Implementation), associated with OME-Zarr 0.6;
+- RFC-8, Collections: R1 (Under review);
+- RFC-7, Channel provenance: D1 (Initial idea).
+
+The current status list is authoritative here: https://ngff.openmicroscopy.org/rfc/. Do not describe RFC-8 as D1; that status belongs to RFC-7. Do not claim vendor round-trip validation until a real import/export has been executed against pinned versions, source files and metadata.
 
 ## 11. Implementation sequence
 
