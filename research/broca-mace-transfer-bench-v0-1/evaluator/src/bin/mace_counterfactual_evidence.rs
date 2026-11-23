@@ -934,7 +934,7 @@ fn run() -> Result<(), String> {
 
     let cases = mace_generated_stress::generated_worlds(clusters);
     let mut source_bundle_hasher = Sha256::new();
-    source_bundle_hasher.update(b"mace-counterfactual-runner-source-bundle-v1\\0");
+    source_bundle_hasher.update(b"mace-counterfactual-runner-source-bundle-v1\0");
     source_bundle_hasher.update(include_bytes!("mace_counterfactual_evidence.rs"));
     source_bundle_hasher.update(include_bytes!("../candidate_process.rs"));
     let source_code_sha256 = hex_digest(source_bundle_hasher.finalize().as_slice());
