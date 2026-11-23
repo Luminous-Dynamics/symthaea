@@ -406,11 +406,18 @@ fn main() {
     let mut writer = BufWriter::new(stdout.lock());
     let mut trajectories = Vec::<LongMemEvalV2TrajectoryV1>::new();
     let mut index = None;
+    let mut policy_memory = RetrievalPolicyMemoryV1::default();
 
     for line in stdin.lock().lines() {
         let response = match line {
             Ok(line) => match serde_json::from_str::<Value>(&line) {
-                Ok(request) => handle_request(request, &config, &mut trajectories, &mut index)
+                Ok(request) => handle_request(
+                    request,
+                    &config,
+                    &mut trajectories,
+                    &mut index,
+                    &mut policy_memory,
+                )
                     .unwrap_or_else(|error| json!({"ok": false, "error": error})),
                 Err(error) => json!({"ok": false, "error": format!("invalid request JSON: {error}")}),
             },
@@ -496,12 +503,14 @@ mod tests {
         let config = fixture_config(root.clone());
         let mut trajectories = Vec::new();
         let mut index = None;
+        let mut policy_memory = RetrievalPolicyMemoryV1::default();
 
         let inserted = handle_request(
             json!({"op": "insert", "trajectory": trajectory}),
             &config,
             &mut trajectories,
             &mut index,
+            &mut policy_memory,
         ).expect("insert");
         assert_eq!(inserted["ok"], true);
         assert_eq!(inserted["inserted"], 1);
@@ -516,6 +525,7 @@ mod tests {
             &config,
             &mut trajectories,
             &mut index,
+            &mut policy_memory,
         ).expect("query");
         assert_eq!(response["ok"], true);
         assert_eq!(response["query_image_used"], false);
@@ -525,6 +535,11 @@ mod tests {
         assert_eq!(response["candidate_record_count"], 2);
         assert!(response["candidate_set_sha256"].as_str().is_some());
         assert!(response["candidate_evidence_jsonl"].as_str().unwrap().contains("lmev2:text:"));
+        assert_eq!(response["retrieval_trace"]["run_id"], "fixture-run");
+        assert_eq!(response["retrieval_trace"]["query_invocation_id"], "query-invocation-1");
+        assert_eq!(response["retrieval_trace"]["inspected_bytes_complete"], false);
+        assert!(response["retrieval_trace_sha256"].as_str().is_some());
+        assert_eq!(response["policy_trace_count"], 1);
         let items = response["items"].as_array().expect("context items");
         assert!(items.iter().any(|item| {
             item["type"] == "text" && item["value"].as_str()
@@ -544,18 +559,21 @@ mod tests {
         let config = fixture_config(root.clone());
         let mut trajectories = Vec::new();
         let mut index = None;
+        let mut policy_memory = RetrievalPolicyMemoryV1::default();
 
         handle_request(
             json!({"op": "insert", "trajectory": trajectory.clone()}),
             &config,
             &mut trajectories,
             &mut index,
+            &mut policy_memory,
         ).expect("first insert");
         let result = handle_request(
             json!({"op": "insert", "trajectory": trajectory}),
             &config,
             &mut trajectories,
             &mut index,
+            &mut policy_memory,
         );
         assert!(result.is_err());
         assert_eq!(trajectories.len(), 1);
@@ -570,12 +588,14 @@ mod tests {
         let image_path = root.join("trajectory-1/state.png");
         let mut trajectories = Vec::new();
         let mut index = None;
+        let mut policy_memory = RetrievalPolicyMemoryV1::default();
 
         handle_request(
             json!({"op": "insert", "trajectory": trajectory}),
             &config,
             &mut trajectories,
             &mut index,
+            &mut policy_memory,
         ).expect("insert");
         fs::write(&image_path, b"replaced bytes").expect("tamper image bytes");
 
@@ -584,6 +604,7 @@ mod tests {
             &config,
             &mut trajectories,
             &mut index,
+            &mut policy_memory,
         );
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("ScreenshotDigestMismatch"));
