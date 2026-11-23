@@ -963,7 +963,6 @@ mod tests {
         ));
     }
 
-
     #[test]
     fn closed_loop_checks_exogenous_overlap_even_beyond_baseline_termination() {
         let mut runs = receipts(
