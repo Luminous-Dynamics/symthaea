@@ -152,8 +152,15 @@ pub struct CausalTrajectoryReceipt {
     pub driver_execution_receipt_sha256: [u8; 32],
     pub independent_replay_audit_sha256: [u8; 32],
     pub independent_replay_audit_passed: bool,
+    /// Digest of the complete Symtropy correspondence-conditioned stochastic
+    /// draw bundle (hypothesis-scoped semantic addresses plus Philox receipts).
+    /// The referenced bundle must be independently verified by the existing
+    /// Symtropy correspondence-receipt verifier; this module does not resolve
+    /// PRNG outputs or infer event correspondence.
+    pub stochastic_draw_bundle_sha256: [u8; 32],
     /// True only when the driver reports that the complete declared episode
-    /// (including a terminal disposition) is represented by this receipt.
+    /// (including a terminal disposition and complete draw correspondence set)
+    /// is represented by this receipt.
     pub complete: bool,
 }
 
@@ -200,6 +207,7 @@ pub enum CausalDigestField {
     PostState,
     ObservationDelivery,
     EvidenceEventIdentity,
+    StochasticDrawBundle,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -667,6 +675,11 @@ fn validate_steps(
         &receipt.independent_replay_audit_sha256,
         Some(receipt.arm),
         CausalDigestField::IndependentReplayAudit,
+    )?;
+    require_digest(
+        &receipt.stochastic_draw_bundle_sha256,
+        Some(receipt.arm),
+        CausalDigestField::StochasticDrawBundle,
     )?;
 
     let mut expected_tick = receipt.identity.initial_world_tick;
@@ -1180,6 +1193,7 @@ mod tests {
                     },
                     driver_execution_receipt_sha256: digest(90 + index as u8),
                     independent_replay_audit_sha256: digest(100 + index as u8),
+                    stochastic_draw_bundle_sha256: digest(120 + index as u8),
                     independent_replay_audit_passed: true,
                     complete: true,
                 }
@@ -1543,6 +1557,23 @@ mod tests {
             validate_causal_pairing(&runs),
             Err(CausalPairingError::OfflineLoggedPolicyEvaluationUnsupported)
         );
+    }
+
+    #[test]
+    fn missing_correspondence_draw_bundle_receipt_is_rejected() {
+        let mut runs = receipts(
+            CausalReplayRegime::ClosedLoopActionCoupled,
+            TrajectoryOrigin::ArmLocalDriverExecution,
+            true,
+        );
+        runs[1].stochastic_draw_bundle_sha256 = digest(0);
+        assert!(matches!(
+            validate_causal_pairing(&runs),
+            Err(CausalPairingError::EmptyDigest {
+                arm: Some(TreatmentArm::ComputeOnly),
+                field: CausalDigestField::StochasticDrawBundle
+            })
+        ));
     }
 
     #[test]
