@@ -5,6 +5,9 @@ on:
     branches: [main]
     paths:
       - "scripts/research/proof_comprehension_oracle.rs"
+      - "scripts/research/proof-plan-contract/**
+"
+      - "docs/research/PROOF_PLAN_*.json"
       - "docs/research/MATH_PROOF_COMPREHENSION_*.json"
       - "docs/research/MATHLIB_PROOF_COMPREHENSION_PILOT_V1.*"
       - "docs/research/ETH_REDUCTION_COMPREHENSION_TOY_V1.*"
@@ -61,6 +64,10 @@ jobs:
           files=(
             docs/research/MATH_PROOF_COMPREHENSION_PILOT_V1.json
             docs/research/MATH_PROOF_COMPREHENSION_PILOT_V1.schema.json
+            docs/research/PROOF_PLAN_V1.schema.json
+            docs/research/PROOF_PLAN_AND_COMM_V1.json
+            docs/research/PROOF_PLAN_MUTATION_FIXTURES_V1.schema.json
+            docs/research/PROOF_PLAN_MUTATION_FIXTURES_V1.json
             docs/research/MATH_PROOF_COMPREHENSION_RECEIPT_V1.schema.json
             docs/research/MATHLIB_PROOF_COMPREHENSION_PILOT_V1.json
             docs/research/MATHLIB_PROOF_COMPREHENSION_PILOT_V1.schema.json
@@ -119,5 +126,33 @@ jobs:
           test -s docs/research/MATH_PROOF_COMPREHENSION_HUMAN_STUDY_PREREG_V1.md
           grep -F "No human study has been run" docs/research/MATH_PROOF_COMPREHENSION_HUMAN_STUDY_PREREG_V1.md >/dev/null
           grep -F "Scores and budgets are not directly comparable" docs/research/MATH_PROOF_COMPREHENSION_COMPETITIVE_LEDGER_V1.md >/dev/null
+          jq -e '.schema_version == "1.0.0"
+            and .status == "source_pinned_provisional"
+            and .theorem.elaborated_type_sha256 == null
+            and .environment.status == "source_only"
+            and .validation.lean_kernel_status == "not_run"
+            and (.nodes | length) == 8
+            and (.edges | length) == 8' \
+            docs/research/PROOF_PLAN_AND_COMM_V1.json >/dev/null
+
+          jq -e '.schema_version == "1.0.0"
+            and (.cases | length) == 6
+            and ([.cases[] | select(.id == "MUT-ROUTE-ONLY" and .mathematical_disposition == "not_refuted")] | length) == 1
+            and ([.cases[] | select(.id == "MUT-LOCAL-GLOBAL-CONTEXT" and .mathematical_disposition == "unknown" and .oracle_status == "not_run")] | length) == 1' \
+            docs/research/PROOF_PLAN_MUTATION_FIXTURES_V1.json >/dev/null
+
+          echo "PROOF_PLAN_FIXTURES_PASS"
           echo "MATH_PROOF_COMPREHENSION_PILOT_FIXTURES_PASS"
           echo "FINITE_TRANSLATION_CASES=67067; ROW_CHECKS=134134"
+
+      - name: Check ProofPlanV1 Rust formatting
+        run: cargo fmt --manifest-path scripts/research/proof-plan-contract/Cargo.toml -- --check
+
+      - name: Test standalone ProofPlanV1 contract validator
+        shell: bash
+        run: |
+          set -euo pipefail
+          export CARGO_TARGET_DIR="$RUNNER_TEMP/proof-plan-target"
+          cargo test --manifest-path scripts/research/proof-plan-contract/Cargo.toml
+          cargo run --manifest-path scripts/research/proof-plan-contract/Cargo.toml -- \
+            docs/research/PROOF_PLAN_AND_COMM_V1.json
