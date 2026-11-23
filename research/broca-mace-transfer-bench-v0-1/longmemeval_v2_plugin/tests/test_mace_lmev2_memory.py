@@ -11,6 +11,7 @@ import hashlib
 import json
 from pathlib import Path
 import tempfile
+import threading
 import unittest
 
 from memory_modules.mace_lmev2_memory import (
@@ -137,6 +138,55 @@ class MaceLongMemEvalV2IngressTests(unittest.TestCase):
 
             with self.assertRaises(RuntimeError):
                 memory._prepare_trajectory(self.trajectory("large.png"))
+
+    def test_unknown_sidecar_outcome_poisons_instance_and_blocks_reuse(self) -> None:
+        class FakePipe:
+            def __init__(self, response: str = "") -> None:
+                self.response = response
+                self.written = ""
+                self.closed = False
+
+            def write(self, value: str) -> None:
+                self.written += value
+
+            def flush(self) -> None:
+                return None
+
+            def readline(self) -> str:
+                return self.response
+
+        class FakeProcess:
+            def __init__(self) -> None:
+                self.stdin = FakePipe()
+                self.stdout = FakePipe("")
+                self.terminated = False
+                self.killed = False
+
+            def poll(self) -> int | None:
+                return 0 if self.terminated or self.killed else None
+
+            def terminate(self) -> None:
+                self.terminated = True
+
+            def kill(self) -> None:
+                self.killed = True
+
+            def wait(self, timeout: float | None = None) -> int:
+                _ = timeout
+                return 0
+
+        memory = object.__new__(MaceLongMemEvalV2Memory)
+        memory._lock = threading.RLock()
+        memory._process = FakeProcess()
+        memory._poisoned = False
+        memory._closed = False
+
+        with self.assertRaisesRegex(RuntimeError, "outcome is unknown"):
+            memory._rpc({"op": "insert", "trajectory": {"id": "ambiguous"}})
+        self.assertTrue(memory._poisoned)
+        self.assertTrue(memory._process.terminated)
+        with self.assertRaisesRegex(RuntimeError, "until reload/reconciliation"):
+            memory._rpc({"op": "query", "query": "must not execute"})
 
     def test_domain_mismatch_is_rejected_before_asset_creation(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
