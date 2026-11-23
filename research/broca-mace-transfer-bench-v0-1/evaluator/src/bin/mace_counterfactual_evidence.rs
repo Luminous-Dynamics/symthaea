@@ -581,6 +581,7 @@ struct CandidateObservation {
     retrieval_profile_sha256: Option<String>,
     index_bytes: u64,
     evidence_event_count: usize,
+    candidate_visible_event_count: usize,
     evidence_root_count: usize,
     evidence_family_count: usize,
     unknown_root_event_count: usize,
@@ -609,21 +610,23 @@ fn run_candidate(
     }
 
     let evidence_index = EvidenceDependencyIndex::build(memory)?;
-    let evidence_sha256 = evidence_index.baseline_evidence_digest();
+    let candidate_visible_memory: Vec<Experience> = evidence_index
+        .records
+        .values()
+        .filter(|item| {
+            item.scope == query.scope && decision_need.action_alternatives.contains(&item.action)
+        })
+        .copied()
+        .collect();
+    let candidate_visible_index = EvidenceDependencyIndex::build(&candidate_visible_memory)?;
+    let evidence_sha256 = candidate_visible_index.baseline_evidence_digest();
     let input_sha256 = candidate_input_digest(decision_need, &evidence_sha256);
 
     let (policy_memory, retrieved_event_ids, retrieval_profile_sha256, index_bytes) =
         match mode {
             CandidateMode::ExactScopeScan => {
-                let eligible: Vec<Experience> = evidence_index
-                    .records
-                    .values()
-                    .filter(|item| {
-                        item.scope == query.scope
-                            && decision_need.action_alternatives.contains(&item.action)
-                    })
-                    .copied()
-                    .collect();
+                let eligible: Vec<Experience> =
+                    candidate_visible_index.records.values().copied().collect();
                 let ids = eligible.iter().map(|item| item.event_id).collect();
                 (eligible, ids, None, 0)
             }
@@ -631,10 +634,10 @@ fn run_candidate(
                 let mut resolved = Vec::new();
                 let mut ids = Vec::new();
                 for action in decision_need.action_alternatives {
-                    let mut candidates: Vec<&Experience> = evidence_index
+                    let mut candidates: Vec<&Experience> = candidate_visible_index
                         .records
                         .values()
-                        .filter(|item| item.scope == query.scope && item.action == action)
+                        .filter(|item| item.action == action)
                         .collect();
                     candidates.sort_by_key(|item| item.event_id);
                     for item in candidates.into_iter().take(BASELINE_TOP_K) {
@@ -647,7 +650,7 @@ fn run_candidate(
                 (resolved, ids, None, 0)
             }
             CandidateMode::StaticHdc | CandidateMode::HdcLtcZeroInput => {
-                if memory.is_empty() {
+                if candidate_visible_memory.is_empty() {
                     (Vec::new(), Vec::new(), None, 0)
                 } else {
                     let profile = match mode {
@@ -662,7 +665,7 @@ fn run_candidate(
                         _ => unreachable!("matched HDC modes only"),
                     };
                     let index = CandidateIndex::build(
-                        memory,
+                        &candidate_visible_memory,
                         IndexConfig {
                             dimension: EVENT_ID_HDC_DIMENSION,
                             codebook_seed: EVENT_ID_HDC_SEED,
@@ -702,7 +705,7 @@ fn run_candidate(
                 }
             }
             CandidateMode::TypedContentHdc => {
-                if memory.is_empty() {
+                if candidate_visible_memory.is_empty() {
                     (Vec::new(), Vec::new(), None, 0)
                 } else {
                     let config = TypedContentConfigV1 {
@@ -710,7 +713,7 @@ fn run_candidate(
                         seed: TYPED_HDC_SEED,
                         ..TypedContentConfigV1::default()
                     };
-                    let typed_index = TypedContentIndexV1::build(memory, config)
+                    let typed_index = TypedContentIndexV1::build(&candidate_visible_memory, config)
                         .map_err(|error| IndexError::TypedIndexFailure(error.to_string()))?;
                     let profile_sha256 = typed_index.profile_digest().to_string();
 
@@ -773,6 +776,7 @@ fn run_candidate(
         retrieval_profile_sha256,
         index_bytes,
         evidence_event_count: evidence_index.event_count(),
+        candidate_visible_event_count: candidate_visible_memory.len(),
         evidence_root_count: evidence_index.known_root_count(),
         evidence_family_count: evidence_index.known_family_count(),
         unknown_root_event_count: evidence_index.unknown_root_event_count(),
@@ -831,6 +835,8 @@ fn run_candidate_with_process(
             retrieval_profile_sha256: receipt.retrieval_profile_sha256,
             index_bytes: receipt.index_payload_bytes,
             evidence_event_count: index.event_count(),
+            candidate_visible_event_count: usize::try_from(receipt.candidate_visible_event_count)
+                .unwrap_or(usize::MAX),
             evidence_root_count: index.known_root_count(),
             evidence_family_count: index.known_family_count(),
             unknown_root_event_count: index.unknown_root_event_count(),
@@ -1071,6 +1077,7 @@ fn run() -> Result<(), String> {
                 "support_known_family_count": support.2,
                 "support_unresolved_count": support.3,
                 "available_event_count": baseline.evidence_event_count,
+                "candidate_visible_event_count": baseline.candidate_visible_event_count,
                 "available_experience_struct_bytes": baseline.evidence_event_count.saturating_mul(size_of::<Experience>()),
                 "available_known_root_count": baseline.evidence_root_count,
                 "available_known_family_count": baseline.evidence_family_count,
@@ -1185,6 +1192,7 @@ fn run() -> Result<(), String> {
                     "support_known_family_count": support.2,
                     "support_unresolved_count": support.3,
                     "available_event_count": candidate.evidence_event_count,
+                    "candidate_visible_event_count": candidate.candidate_visible_event_count,
                     "available_experience_struct_bytes": candidate.evidence_event_count.saturating_mul(size_of::<Experience>()),
                     "available_known_root_count": candidate.evidence_root_count,
                     "available_known_family_count": candidate.evidence_family_count,
