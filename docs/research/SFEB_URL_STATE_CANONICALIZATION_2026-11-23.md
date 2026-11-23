@@ -1,7 +1,7 @@
 # SFEB URL-state canonicalization and cross-language conformance
 
 **Date:** 2026-11-23  
-**Status:** Rust/JavaScript source changes and shared vectors authored; execution not yet claimed  
+**Status:** JavaScript model logic executed in a shimmed isolated V8 harness; Rust, WASM and browser execution pending  
 **Task:** SFEB-L2-005  
 **Related:** [#13329](https://github.com/Luminous-Dynamics/symthaea/issues/13329), [PR #13162](https://github.com/Luminous-Dynamics/symthaea/pull/13162)
 
@@ -74,6 +74,21 @@ cargo test --manifest-path benchmarks/frontend/solutions/sfeb-l2-search-filter-r
 ```
 
 The independent JavaScript oracle includes shared-vector assertions. Rust tests load the exact same JSON file. Browser validation is still required for the invalid deep-link alert and fresh-session URL restoration.
+
+### 2026-11-23 V8 preflight (JavaScript logic only)
+
+The committed JavaScript oracle body was executed in an isolated V8 harness after replacing only its Node file-loading/assertion/UTF-8 bootstrap with local equivalents and injecting the exact repository dataset, golden cases and shared URL vectors. The model logic produced:
+
+- 11/11 golden cases;
+- 5,000/5,000 deterministic generated states;
+- 9/9 pre-existing semantic fault models;
+- 8/8 URL-field omission controls;
+- 14/14 new URL-state conformance vectors (3 valid, 6 invalid state objects, 5 invalid URL components).
+
+The first run exposed an obsolete omission-control assumption: a strict decoder now rejects a missing state field rather than defaulting it, so the mutation test itself needed to count a thrown rejection as a detected omission. That test harness was corrected and the full V8 logic run then passed.
+
+This is an executed JavaScript-model preflight in V8 with a compatibility shim, not a stock Node.js CLI run and not a Rust, Leptos/WASM, Chromium, trusted-executor or independent-verifier receipt. The standard reproduction commands remain the intended repository commands and should be run in the pinned host environment.
+
 
 ## Current evidence boundary
 

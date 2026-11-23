@@ -228,7 +228,15 @@ faultResults.push({ id: 'MUT-SORT-005', killed_by: JSON.stringify(tiedOriginal) 
 const urlInput = { q: 'pump & sensor', category: 'Power', available_only: true, min_price_cents: 5000, max_price_cents: 250000, sort: 'price_desc', page: 3, page_size: 10 };
 const omitted = STATE_FIELDS.map((field) => {
   const broken = { ...urlInput }; delete broken[field];
-  return { field, detected: JSON.stringify(decodeStateUrl(`?state=${percentEncodeUtf8(JSON.stringify(broken))}`)) !== JSON.stringify(orderedState(urlInput)) };
+  const brokenUrl = `?state=${percentEncodeUtf8(JSON.stringify(broken))}`;
+  let detected = false;
+  try {
+    detected = JSON.stringify(decodeStateUrl(brokenUrl)) !== JSON.stringify(orderedState(urlInput));
+  } catch {
+    // Strict state decoders must reject incomplete state rather than defaulting fields.
+    detected = true;
+  }
+  return { field, detected };
 });
 faultResults.push({ id: 'MUT-URL-007', killed_by: omitted.every((item) => item.detected) ? 'all eight state-field omissions' : null });
 const pageOnly = { ...DEFAULT, page: urlInput.page, page_size: urlInput.page_size };
