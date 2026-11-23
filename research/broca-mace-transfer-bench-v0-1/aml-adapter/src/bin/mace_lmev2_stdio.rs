@@ -85,6 +85,18 @@ impl Config {
     }
 }
 
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let digest = Sha256::digest(bytes);
+    let mut output = String::with_capacity(digest.len() * 2);
+    for byte in digest {
+        output.push(HEX[usize::from(byte >> 4)] as char);
+        output.push(HEX[usize::from(byte & 0x0f)] as char);
+    }
+    output
+}
+
 fn context_json(item: LongMemEvalV2ContextItemV1) -> Value {
     let kind = match item.kind {
         LongMemEvalV2ContextKind::Text => "text",
@@ -196,7 +208,7 @@ fn handle_request(
                     if let Some(expected_digest) = &state.screenshot_sha256 {
                         let bytes = fs::read(&resolved)
                             .map_err(|_| "neighbor screenshot is missing after resolution")?;
-                        let actual_digest = format!("{:x}", Sha256::digest(&bytes));
+                        let actual_digest = sha256_hex(&bytes);
                         if actual_digest != *expected_digest {
                             return Err("neighbor screenshot digest mismatch".into());
                         }
