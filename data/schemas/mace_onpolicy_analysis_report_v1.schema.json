@@ -154,14 +154,10 @@
           "minimum": 0
         },
         "ci95_lower": {
-          "type": "number",
-          "minimum": -1,
-          "maximum": 1
+          "type": "number"
         },
         "ci95_upper": {
-          "type": "number",
-          "minimum": -1,
-          "maximum": 1
+          "type": "number"
         },
         "control_profiles": {
           "type": "integer",
@@ -223,14 +219,10 @@
           "minimum": 0
         },
         "ci95_lower": {
-          "type": "number",
-          "minimum": -1,
-          "maximum": 1
+          "type": "number"
         },
         "ci95_upper": {
-          "type": "number",
-          "minimum": -1,
-          "maximum": 1
+          "type": "number"
         }
       }
     }
