@@ -51,6 +51,8 @@ pub struct EvidenceQualificationReceiptV1 {
     pub run_id: String,
     pub query_invocation_id: String,
     pub domain_id: String,
+    /// Digest of the effective tenant/consumer authorization scope.
+    pub subject_scope_sha256: String,
     pub environment_revision_sha256: String,
     pub tool_profile_sha256: String,
     pub query_sha256: String,
@@ -77,6 +79,7 @@ pub struct EvidenceQualificationBindingV1<'a> {
     pub run_id: &'a str,
     pub query_invocation_id: &'a str,
     pub domain_id: &'a str,
+    pub subject_scope_sha256: &'a str,
     pub environment_revision_sha256: &'a str,
     pub tool_profile_sha256: &'a str,
     pub query_sha256: &'a str,
@@ -148,6 +151,7 @@ impl VerifiedEvidenceQualificationV1 {
             (receipt.run_id.as_str(), binding.run_id),
             (receipt.query_invocation_id.as_str(), binding.query_invocation_id),
             (receipt.domain_id.as_str(), binding.domain_id),
+            (receipt.subject_scope_sha256.as_str(), binding.subject_scope_sha256),
             (receipt.environment_revision_sha256.as_str(), binding.environment_revision_sha256),
             (receipt.tool_profile_sha256.as_str(), binding.tool_profile_sha256),
             (receipt.query_sha256.as_str(), binding.query_sha256),
@@ -249,6 +253,7 @@ impl EvidenceQualificationReceiptV1 {
             self.run_id.as_str(),
             self.query_invocation_id.as_str(),
             self.domain_id.as_str(),
+            self.subject_scope_sha256.as_str(),
             self.environment_revision_sha256.as_str(),
             self.tool_profile_sha256.as_str(),
             self.query_sha256.as_str(),
@@ -294,7 +299,7 @@ fn validate_binding(binding: &EvidenceQualificationBindingV1<'_>)
         }
     }
     for digest in [
-        binding.environment_revision_sha256, binding.tool_profile_sha256,
+        binding.subject_scope_sha256, binding.environment_revision_sha256, binding.tool_profile_sha256,
         binding.query_sha256, binding.candidate_set_sha256, binding.decision_need_sha256,
         binding.purpose_sha256, binding.qualification_policy_sha256,
         binding.lifecycle_snapshot_sha256, binding.verifier_profile_sha256,
@@ -334,7 +339,7 @@ fn validate_receipt_shape(receipt: &EvidenceQualificationReceiptV1)
         }
     }
     for digest in [
-        receipt.environment_revision_sha256.as_str(), receipt.tool_profile_sha256.as_str(),
+        receipt.subject_scope_sha256.as_str(), receipt.environment_revision_sha256.as_str(), receipt.tool_profile_sha256.as_str(),
         receipt.query_sha256.as_str(), receipt.candidate_set_sha256.as_str(),
         receipt.candidate_evidence_ids_sha256.as_str(), receipt.decision_need_sha256.as_str(), receipt.purpose_sha256.as_str(),
         receipt.qualification_policy_sha256.as_str(), receipt.lifecycle_snapshot_sha256.as_str(),
@@ -434,6 +439,7 @@ mod tests {
             run_id: "run-1".to_owned(),
             query_invocation_id: "invocation-1".to_owned(),
             domain_id: "web".to_owned(),
+            subject_scope_sha256: digest('7'),
             environment_revision_sha256: digest('b'),
             tool_profile_sha256: digest('c'),
             query_sha256: digest('d'),
@@ -473,6 +479,7 @@ mod tests {
             run_id: &receipt.run_id,
             query_invocation_id: &receipt.query_invocation_id,
             domain_id: &receipt.domain_id,
+            subject_scope_sha256: &receipt.subject_scope_sha256,
             environment_revision_sha256: &receipt.environment_revision_sha256,
             tool_profile_sha256: &receipt.tool_profile_sha256,
             query_sha256: &receipt.query_sha256,
@@ -505,7 +512,7 @@ mod tests {
     fn decision_need_and_purpose_are_part_of_the_binding() {
         let receipt = signed_receipt();
         let ids = candidate_ids();
-        let changed_need = digest('5');
+        let changed_need = digest('6');
         let mut binding = binding(&receipt, &ids, 150);
         binding.decision_need_sha256 = &changed_need;
         assert_eq!(
@@ -534,6 +541,19 @@ mod tests {
         receipt.signature = receipt.signing_payload_sha256().into_bytes();
         let ids = candidate_ids();
         let binding = binding(&receipt, &ids, 150);
+        assert_eq!(
+            VerifiedEvidenceQualificationV1::verify_and_bind(&receipt, &binding, &TestSignatureVerifier),
+            Err(EvidenceQualificationRejectV1::BindingMismatch)
+        );
+    }
+
+    #[test]
+    fn subject_scope_cannot_be_rebound_across_tenants_or_consumers() {
+        let receipt = signed_receipt();
+        let ids = candidate_ids();
+        let changed_scope = digest('8');
+        let mut binding = binding(&receipt, &ids, 150);
+        binding.subject_scope_sha256 = &changed_scope;
         assert_eq!(
             VerifiedEvidenceQualificationV1::verify_and_bind(&receipt, &binding, &TestSignatureVerifier),
             Err(EvidenceQualificationRejectV1::BindingMismatch)
