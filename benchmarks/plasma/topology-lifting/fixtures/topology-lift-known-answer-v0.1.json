@@ -1,0 +1,122 @@
+{
+  "schema_version": "0.1",
+  "cases": [
+    {
+      "case_id": "periodic-torus-fourier-lift-known-answer-v1",
+      "boundary": {
+        "kind": "periodic"
+      },
+      "physical_domain": {
+        "minimum": 0,
+        "maximum": 1,
+        "length_unit": "L",
+        "topology": "torus"
+      },
+      "coordinate_convention": {
+        "normalized_interval": [
+          0,
+          1
+        ],
+        "wrap_modulo_one": true
+      },
+      "lift": {
+        "family": "periodic_fourier_characters",
+        "max_harmonic": 2,
+        "raw_coordinate_included": false,
+        "boundary_distances_included": false
+      },
+      "known_answers": {
+        "xi_zero_features": [
+          1,
+          0,
+          1,
+          0
+        ],
+        "xi_one_features": [
+          1,
+          0,
+          1,
+          0
+        ],
+        "xi_zero_derivative": [
+          0,
+          6.283185307179586,
+          0,
+          12.566370614359172
+        ],
+        "xi_one_derivative": [
+          0,
+          6.283185307179586,
+          0,
+          12.566370614359172
+        ],
+        "translation": {
+          "xi": 0.125,
+          "shift": 0.25,
+          "translated_xi": 0.375,
+          "features_before": [
+            0.7071067811865476,
+            0.7071067811865475,
+            0,
+            1
+          ],
+          "features_after": [
+            -0.7071067811865475,
+            0.7071067811865476,
+            0,
+            -1
+          ]
+        },
+        "near_seam": {
+          "epsilon": 1e-9,
+          "max_harmonic": 2,
+          "max_feature_gap_upper_bound": 2.6e-8,
+          "max_derivative_gap_upper_bound": 2e-7
+        }
+      }
+    },
+    {
+      "case_id": "open-interval-boundary-distance-known-answer-v1",
+      "boundary": {
+        "kind": "open"
+      },
+      "physical_domain": {
+        "minimum": -2,
+        "maximum": 3,
+        "length_unit": "L",
+        "topology": "interval"
+      },
+      "coordinate_convention": {
+        "normalized_interval": [
+          0,
+          1
+        ],
+        "wrap_modulo_one": false
+      },
+      "lift": {
+        "family": "open_boundary_distances",
+        "raw_coordinate_included": true,
+        "boundary_distances_included": true
+      },
+      "known_answers": {
+        "xi_zero_features": {
+          "coordinate": 0,
+          "distance_to_lower_boundary": 0,
+          "distance_to_upper_boundary": 1
+        },
+        "xi_one_features": {
+          "coordinate": 1,
+          "distance_to_lower_boundary": 1,
+          "distance_to_upper_boundary": 0
+        },
+        "out_of_domain_disposition": "UNKNOWN_OR_UNSUPPORTED"
+      }
+    }
+  ],
+  "claim_boundary": {
+    "status": "synthetic_analytic_contract_only",
+    "no_neural_operator_evaluated": true,
+    "no_physical_plasma_run": true,
+    "boundary_type_is_explicit_not_inferred_from_particle_sample": true
+  }
+}
