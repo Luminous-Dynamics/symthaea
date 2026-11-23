@@ -85,7 +85,7 @@ let semantic_candidate = qualified.value();
 // Preserve qualified.evidence_event_id() alongside downstream use.
 ~~~
 
-A caller should require the wrapper at a decision/action boundary and carry its event ID into the decision receipt. The wrapper is not serializable/deserializable; it must be minted through EvidenceLedger::bind at the use boundary. A caller can still deliberately unwrap the value, so this is an API-level discipline rather than a sandbox. The authoritative enforcement remains in the consumer and external qualification gate.
+A caller should require the wrapper at a decision/action boundary and carry its event ID into the decision receipt. The wrapper is not serializable/deserializable; it must be minted through EvidenceLedger::bind at the actual use boundary. It is a query-specific admissibility snapshot, not a reusable authorization token: re-evaluate before each later use because consent, retention, validity or erasure state can change. A caller can still deliberately unwrap the value, so this is an API-level discipline rather than a sandbox. The authoritative enforcement remains in the consumer and external qualification gate.
 
 ## Security and claim boundaries
 
