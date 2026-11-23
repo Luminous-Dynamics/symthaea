@@ -33,7 +33,7 @@ The report produces expected decision-loss baselines for:
 - high-fidelity-only;
 - the selected two-stage screen/confirm plan.
 
-It also reports low-stage cost, expected high-fidelity cost, total expected spend and worst-case confirmation spend. For fair comparisons, external benchmark runs must additionally match target-label draws, actual throughput/queue capacity and escaped-defect risk constraints.
+It reports no-measurement, screen-only and high-fidelity-only total resource costs alongside two-stage expected spend, expected confirmation cost and total worst-case spend. For fair comparisons, external benchmark runs must additionally match target-label draws, actual throughput/queue capacity and escaped-defect risk constraints.
 
 ## Integrity and deterministic replay
 
