@@ -143,13 +143,51 @@ pub enum ProsodyEnergyNormalization {
     UtterancePeak,
 }
 
+/// Extractor output class; this is an acoustic estimate, not a phonetic label.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AcousticProsodyFrameStatusV1 {
+    /// The extractor found periodicity above its voicing threshold.
+    Voiced,
+    /// The frame had signal energy but no valid periodic F0 estimate.
+    Unvoiced,
+    /// The extractor's relative energy floor classified the frame as silent.
+    Silent,
+}
+
+/// Fully disclosed parameter set for the current acoustic feature extractor.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ProsodyExtractorConfigV1 {
+    /// Internal analysis sample rate after the extractor's resampling step.
+    pub analysis_sample_rate_hz: u32,
+    /// Analysis window duration in seconds.
+    pub window_seconds: f32,
+    /// Analysis frame rate in Hz.
+    pub frame_rate_hz: f32,
+    /// LPC order used by the current combined formant/F0 extractor.
+    pub lpc_order: usize,
+    /// Pre-emphasis coefficient used by the formant branch.
+    pub preemphasis: f32,
+    /// Lower F0 search limit.
+    pub f0_min_hz: f32,
+    /// Upper F0 search limit.
+    pub f0_max_hz: f32,
+    /// Periodicity threshold used for the voiced estimate.
+    pub voicing_threshold: f32,
+    /// Relative energy floor used for the silent estimate.
+    pub silence_relative_energy: f32,
+}
+
 /// One frame of measurable acoustic prosody evidence.
 ///
 /// The F0 field is absent for unvoiced/low-periodicity frames. The periodicity
 /// field is an estimator score, not a calibrated probability of voicing.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AcousticProsodyFrameV1 {
+    /// Stream segment identity supplied by the upstream sample owner.
+    pub stream_segment_index: u64,
     pub frame_index: u64,
+    /// Estimator classification; not a phoneme or emotion label.
+    pub status: AcousticProsodyFrameStatusV1,
     /// Half-open sample interval in the original input stream.
     pub source_start_sample: u64,
     pub source_end_sample: u64,
@@ -173,6 +211,12 @@ pub struct ProsodyFeatures {
     pub schema_version: u32,
     pub extractor_id: &'static str,
     pub source_sample_rate: u32,
+    /// Absolute source sample support of this processed block.
+    pub source_start_sample: u64,
+    pub source_end_sample: u64,
+    /// Segment index is incremented by the stream owner after discontinuity.
+    pub stream_segment_index: u64,
+    pub extractor_config: ProsodyExtractorConfigV1,
     pub frame_rate_hz: f32,
     pub energy_normalization: ProsodyEnergyNormalization,
     pub frames: Vec<AcousticProsodyFrameV1>,
@@ -293,14 +337,57 @@ impl AudioPerception {
 
     /// Process mono PCM samples at `AudioPerceptionConfig::sample_rate`.
     ///
-    /// Callers with a known source rate should prefer process_samples_at_rate().
+    /// This convenience method assumes the sample block begins at source
+    /// sample zero and segment zero. Streaming callers should use
+    /// process_samples_at_source_position() so overruns/resets cannot erase
+    /// absolute source continuity.
     pub fn process_samples(&mut self, samples: &[f32]) -> Result<AudioPerceptionResult> {
+        let sample_rate = self.config.sample_rate;
+        self.process_samples_at_source_position(samples, sample_rate, 0, 0)
+    }
+
+    /// Reject PCM whose source sample rate does not match the configured HDC frontend.
+    fn validate_sample_rate(&self, sample_rate: u32) -> Result<()> {
+        if sample_rate == self.config.sample_rate && sample_rate > 0 {
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!(
+                "audio sample-rate mismatch: received {sample_rate} Hz, perception is configured for {} Hz; resample explicitly before processing",
+                self.config.sample_rate
+            ))
+        }
+    }
+
+    /// Validate rate, source position and sample finiteness, then process mono PCM.
+    ///
+    /// `source_start_sample` is the absolute first sample in the immutable
+    /// source clock. `stream_segment_index` must advance when the caller
+    /// declares a discontinuity; features never bridge segments.
+    pub fn process_samples_at_source_position(
+        &mut self,
+        samples: &[f32],
+        sample_rate: u32,
+        source_start_sample: u64,
+        stream_segment_index: u64,
+    ) -> Result<AudioPerceptionResult> {
+        self.validate_sample_rate(sample_rate)?;
+        if let Some(invalid_index) = samples.iter().position(|sample| !sample.is_finite()) {
+            return Err(anyhow::anyhow!(
+                "audio sample at block offset {invalid_index} is not finite"
+            ));
+        }
+        let sample_count = u64::try_from(samples.len())
+            .map_err(|_| anyhow::anyhow!("audio sample count exceeds source index range"))?;
+        let source_end_sample = source_start_sample
+            .checked_add(sample_count)
+            .ok_or_else(|| anyhow::anyhow!("audio source sample interval overflows u64"))?;
+
         let start = std::time::Instant::now();
 
-        // Project through LTC
+        // Project through LTC.
         let hvs = self.projector.project(samples);
 
-        // Decode phonemes
+        // Decode phonemes.
         let (phonemes, confidences) = if self.has_prototypes {
             let mut ph = Vec::new();
             let mut cf = Vec::new();
@@ -317,9 +404,15 @@ impl AudioPerception {
 
         let processing_time = start.elapsed().as_secs_f64() * 1000.0;
 
-        // Extract prosody if enabled
+        // Extract prosody if enabled.
         let prosody = if self.config.enable_prosody {
-            Some(self.extract_prosody(samples, self.config.sample_rate))
+            Some(self.extract_prosody(
+                samples,
+                sample_rate,
+                source_start_sample,
+                source_end_sample,
+                stream_segment_index,
+            ))
         } else {
             None
         };
@@ -333,62 +426,75 @@ impl AudioPerception {
         })
     }
 
-    /// Reject PCM whose source sample rate does not match the configured HDC frontend.
-    fn validate_sample_rate(&self, sample_rate: u32) -> Result<()> {
-        if sample_rate == self.config.sample_rate && sample_rate > 0 {
-            Ok(())
-        } else {
-            Err(anyhow::anyhow!(
-                "audio sample-rate mismatch: received {sample_rate} Hz, perception is configured for {} Hz; resample explicitly before processing",
-                self.config.sample_rate
-            ))
-        }
-    }
-
-    /// Validate source rate when known, then process mono PCM.
+    /// Validate source rate when known, then process mono PCM starting at sample zero.
     pub fn process_samples_at_rate(
         &mut self,
         samples: &[f32],
         sample_rate: u32,
     ) -> Result<AudioPerceptionResult> {
-        self.validate_sample_rate(sample_rate)?;
-        self.process_samples(samples)
+        self.process_samples_at_source_position(samples, sample_rate, 0, 0)
     }
 
     /// Extract frame-aligned F0, periodicity and normalized RMS evidence.
     ///
     /// The existing formant extractor internally resamples to its configured
-    /// analysis rate. Its F1–F3 fallback peaks are deliberately not surfaced
-    /// here as measured formants; this API only exports F0/voicing/energy fields
-    /// whose validity can be stated without confusing fallback values with
-    /// observed spectral peaks.
-    fn extract_prosody(&self, samples: &[f32], sample_rate: u32) -> ProsodyFeatures {
+    /// analysis rate. Its F1-F3 fallback peaks are deliberately not surfaced
+    /// here as measured formants.
+    fn extract_prosody(
+        &self,
+        samples: &[f32],
+        sample_rate: u32,
+        source_start_sample: u64,
+        source_end_sample: u64,
+        stream_segment_index: u64,
+    ) -> ProsodyFeatures {
         use symthaea_vocal_tract::formant_extraction::{ExtractionConfig, extract_formant_frames};
+        use symthaea_vocal_tract::types::SourceType;
 
         const EXTRACTOR_ID: &str = "symthaea-vocal-tract.lpc-autocorrelation.v1";
         let extraction_config = ExtractionConfig::default();
         let extracted = extract_formant_frames(samples, sample_rate, &extraction_config);
         let window_samples = (extraction_config.window_secs * sample_rate as f32).round() as u64;
+        let extractor_config = ProsodyExtractorConfigV1 {
+            analysis_sample_rate_hz: extraction_config.analysis_sr,
+            window_seconds: extraction_config.window_secs,
+            frame_rate_hz: extraction_config.frame_rate,
+            lpc_order: extraction_config.lpc_order,
+            preemphasis: extraction_config.preemphasis,
+            f0_min_hz: extraction_config.f0_min,
+            f0_max_hz: extraction_config.f0_max,
+            voicing_threshold: extraction_config.voicing_threshold,
+            silence_relative_energy: extraction_config.silence_rel_energy,
+        };
 
         let frames: Vec<AcousticProsodyFrameV1> = extracted
             .iter()
             .enumerate()
             .map(|(index, frame)| {
-                let source_start_sample = (frame.time.max(0.0) * sample_rate as f32).round() as u64;
-                let source_end_sample = source_start_sample
+                let relative_start =
+                    (frame.time.max(0.0) * sample_rate as f32).round() as u64;
+                let frame_source_start = source_start_sample.saturating_add(relative_start);
+                let frame_source_end = frame_source_start
                     .saturating_add(window_samples)
-                    .min(samples.len() as u64);
+                    .min(source_end_sample);
                 let f0_hz =
                     if frame.f0 > 0.0 && frame.voicing >= extraction_config.voicing_threshold {
                         Some(frame.f0)
                     } else {
                         None
                     };
+                let status = match frame.source_type {
+                    SourceType::Silent => AcousticProsodyFrameStatusV1::Silent,
+                    SourceType::Vowel if f0_hz.is_some() => AcousticProsodyFrameStatusV1::Voiced,
+                    _ => AcousticProsodyFrameStatusV1::Unvoiced,
+                };
 
                 AcousticProsodyFrameV1 {
+                    stream_segment_index,
                     frame_index: index as u64,
-                    source_start_sample,
-                    source_end_sample,
+                    status,
+                    source_start_sample: frame_source_start,
+                    source_end_sample: frame_source_end,
                     time_seconds: frame.time,
                     f0_hz,
                     periodicity: frame.voicing.clamp(0.0, 1.0),
@@ -431,6 +537,10 @@ impl AudioPerception {
             schema_version: ACOUSTIC_PROSODY_SCHEMA_VERSION,
             extractor_id: EXTRACTOR_ID,
             source_sample_rate: sample_rate,
+            source_start_sample,
+            source_end_sample,
+            stream_segment_index,
+            extractor_config,
             frame_rate_hz: extraction_config.frame_rate,
             energy_normalization: ProsodyEnergyNormalization::UtterancePeak,
             frames,
@@ -474,6 +584,16 @@ impl AudioPerception {
         &mut self,
         _samples: &[f32],
         _sample_rate: u32,
+    ) -> Result<AudioPerceptionResult> {
+        Err(anyhow!("Audio perception requires 'voice-stt' feature"))
+    }
+
+    pub fn process_samples_at_source_position(
+        &mut self,
+        _samples: &[f32],
+        _sample_rate: u32,
+        _source_start_sample: u64,
+        _stream_segment_index: u64,
     ) -> Result<AudioPerceptionResult> {
         Err(anyhow!("Audio perception requires 'voice-stt' feature"))
     }
