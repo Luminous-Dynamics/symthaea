@@ -17,6 +17,8 @@
 
 #![forbid(unsafe_code)]
 
+pub mod causal_pairing;
+
 use std::collections::BTreeMap;
 use std::fmt;
 
