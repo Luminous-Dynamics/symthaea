@@ -177,6 +177,7 @@ pub enum MycelialAcquisitionDomainError {
     ManifestDigestMismatch,
     ReceiptUnitInventoryMismatch,
     InvalidUnitDisposition { reason: &'static str },
+    InvalidExclusionReason,
     DigestResourceLimitExceeded,
 }
 
@@ -223,6 +224,9 @@ impl fmt::Display for MycelialAcquisitionDomainError {
             Self::InvalidDispositionReason => {
                 write!(f, "acquisition disposition requires a bounded non-empty reason")
             }
+            Self::InvalidExclusionReason => {
+                write!(f, "scope exclusion requires a bounded reason and decision digest")
+            }
             Self::ManifestDigestMismatch => {
                 write!(f, "extraction receipt does not bind to the supplied acquisition manifest")
             }
@@ -255,14 +259,10 @@ fn validate_identifier(
     Ok(())
 }
 
-fn validate_reason(value: &str) -> Result<(), MycelialAcquisitionDomainError> {
-    if value.trim().is_empty()
-        || value.len() > MAX_DOMAIN_REASON_BYTES
-        || value.chars().any(char::is_control)
-    {
-        return Err(MycelialAcquisitionDomainError::InvalidDispositionReason);
-    }
-    Ok(())
+fn reason_is_valid(value: &str) -> bool {
+    !value.trim().is_empty()
+        && value.len() <= MAX_DOMAIN_REASON_BYTES
+        && !value.chars().any(char::is_control)
 }
 
 fn validate_digest(
@@ -475,7 +475,9 @@ impl MycelialAcquisitionDomainManifest {
             if expected_units.binary_search(&exclusion.unit).is_err() {
                 return Err(MycelialAcquisitionDomainError::ExcludedUnitOutsideDomain);
             }
-            validate_reason(&exclusion.reason)?;
+            if !reason_is_valid(&exclusion.reason) {
+                return Err(MycelialAcquisitionDomainError::InvalidExclusionReason);
+            }
             validate_digest(
                 &exclusion.scope_decision_digest,
                 "scope_decision_digest",
@@ -506,6 +508,11 @@ impl MycelialAcquisitionDomainManifest {
     pub fn canonical_digest_hex(
         &self,
     ) -> Result<String, MycelialAcquisitionDomainError> {
+        if self.axes.len() > 5
+            || self.scope_exclusions.len() > MAX_MYCELIAL_ACQUISITION_DOMAIN_UNITS
+        {
+            return Err(MycelialAcquisitionDomainError::DigestResourceLimitExceeded);
+        }
         let mut string_bytes = 0usize;
         let mut account = |value: &str| {
             string_bytes = string_bytes.saturating_add(value.len());
@@ -538,12 +545,6 @@ impl MycelialAcquisitionDomainManifest {
                 return Err(MycelialAcquisitionDomainError::DigestResourceLimitExceeded);
             }
         }
-        if self.axes.len() > 5
-            || self.scope_exclusions.len() > MAX_MYCELIAL_ACQUISITION_DOMAIN_UNITS
-        {
-            return Err(MycelialAcquisitionDomainError::DigestResourceLimitExceeded);
-        }
-
         let mut hasher = blake3::Hasher::new();
         hasher.update(b"symthaea-mycelial-acquisition-domain-manifest-v1");
         hasher.update(&self.schema_version.to_le_bytes());
@@ -640,7 +641,9 @@ impl MycelialExtractionCoverageReceipt {
                         reason: "non-processed unit requires an explicit disposition reason",
                     });
                 };
-                validate_reason(reason)?;
+                if !reason_is_valid(reason) {
+                    return Err(MycelialAcquisitionDomainError::InvalidDispositionReason);
+                }
             }
         }
         Ok(())
@@ -1117,6 +1120,34 @@ mod tests {
             receipt.validate_against(&manifest),
             Err(MycelialAcquisitionDomainError::ManifestDigestMismatch)
         );
+    }
+
+    #[test]
+    fn manifest_digest_changes_when_axis_origin_changes() {
+        let original = manifest();
+        let original_digest = original.canonical_digest_hex().unwrap();
+        let mut changed = original;
+        changed.axes[0].origin = 12.5;
+        assert_ne!(changed.canonical_digest_hex().unwrap(), original_digest);
+        changed.axes[0].origin = f64::NAN;
+        assert!(matches!(
+            changed.validate(),
+            Err(MycelialAcquisitionDomainError::InvalidAxisMetadata(_))
+        ));
+    }
+
+    #[test]
+    fn source_unit_digest_is_committed_and_validated() {
+        let manifest = manifest();
+        let mut receipt = receipt(&manifest);
+        let original_digest = receipt.canonical_digest_hex().unwrap();
+        receipt.units[0].source_unit_digest = digest('7');
+        assert_ne!(receipt.canonical_digest_hex().unwrap(), original_digest);
+        receipt.units[0].source_unit_digest = "not-a-digest".to_string();
+        assert!(matches!(
+            receipt.validate_against(&manifest),
+            Err(MycelialAcquisitionDomainError::InvalidDigest("source_unit_digest"))
+        ));
     }
 
     #[test]
