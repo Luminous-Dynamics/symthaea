@@ -35,6 +35,15 @@ pub enum MycelialAcquisitionAxisName {
     Time,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MycelialSourceRightsStatus {
+    VerifiedForProcessing,
+    AuthorPermissionRequired,
+    Restricted,
+    Unknown,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct MycelialAcquisitionAxis {
@@ -85,6 +94,7 @@ pub struct MycelialAcquisitionDomainManifest {
     pub schema_version: u16,
     pub source_artifact_id: String,
     pub source_artifact_digest: String,
+    pub source_rights_status: MycelialSourceRightsStatus,
     pub source_format: String,
     pub acquisition_session_id: String,
     pub biological_replicate_id: String,
@@ -164,6 +174,7 @@ pub enum MycelialAcquisitionDomainError {
     InvalidSchemaVersion(u16),
     InvalidIdentifier(&'static str),
     InvalidDigest(&'static str),
+    SourceRightsNotCleared(MycelialSourceRightsStatus),
     InvalidDomainDimensions,
     DomainResourceLimitExceeded(usize),
     InvalidAxisLayout,
@@ -192,6 +203,9 @@ impl fmt::Display for MycelialAcquisitionDomainError {
             }
             Self::InvalidDigest(field) => {
                 write!(f, "invalid acquisition evidence digest: {field}")
+            }
+            Self::SourceRightsNotCleared(status) => {
+                write!(f, "source artifact is not cleared for processing: {status:?}")
             }
             Self::InvalidDomainDimensions => {
                 write!(f, "acquisition dimensions and tile dimensions must be nonzero")
@@ -302,6 +316,15 @@ fn axis_tag(axis: MycelialAcquisitionAxisName) -> u8 {
     }
 }
 
+fn rights_status_tag(status: MycelialSourceRightsStatus) -> u8 {
+    match status {
+        MycelialSourceRightsStatus::VerifiedForProcessing => 0,
+        MycelialSourceRightsStatus::AuthorPermissionRequired => 1,
+        MycelialSourceRightsStatus::Restricted => 2,
+        MycelialSourceRightsStatus::Unknown => 3,
+    }
+}
+
 fn extraction_state_tag(state: MycelialExtractionUnitState) -> u8 {
     match state {
         MycelialExtractionUnitState::Processed => 0,
@@ -391,6 +414,11 @@ impl MycelialAcquisitionDomainManifest {
             MAX_DOMAIN_IDENTIFIER_BYTES,
         )?;
         validate_digest(&self.source_artifact_digest, "source_artifact_digest")?;
+        if self.source_rights_status != MycelialSourceRightsStatus::VerifiedForProcessing {
+            return Err(MycelialAcquisitionDomainError::SourceRightsNotCleared(
+                self.source_rights_status,
+            ));
+        }
         validate_identifier(&self.source_format, "source_format", MAX_DOMAIN_VERSION_BYTES)?;
         validate_identifier(
             &self.acquisition_session_id,
@@ -518,6 +546,7 @@ impl MycelialAcquisitionDomainManifest {
             string_bytes = string_bytes.saturating_add(value.len());
             string_bytes <= MAX_CANONICAL_DOMAIN_STRING_BYTES
         };
+        hasher.update(&[rights_status_tag(self.source_rights_status)]);
         for value in [
             self.source_artifact_id.as_str(),
             self.source_artifact_digest.as_str(),
@@ -818,6 +847,7 @@ mod tests {
             schema_version: MYCELIAL_ACQUISITION_DOMAIN_SCHEMA_VERSION,
             source_artifact_id: "source-001".to_string(),
             source_artifact_digest: digest('a'),
+            source_rights_status: MycelialSourceRightsStatus::VerifiedForProcessing,
             source_format: "ome_tiff".to_string(),
             acquisition_session_id: "session-001".to_string(),
             biological_replicate_id: "replicate-001".to_string(),
@@ -1046,6 +1076,27 @@ mod tests {
     }
 
     #[test]
+    fn source_rights_must_be_cleared_before_extraction() {
+        let mut manifest = manifest();
+        manifest.source_rights_status = MycelialSourceRightsStatus::AuthorPermissionRequired;
+        assert_eq!(
+            manifest.validate(),
+            Err(MycelialAcquisitionDomainError::SourceRightsNotCleared(
+                MycelialSourceRightsStatus::AuthorPermissionRequired
+            ))
+        );
+    }
+
+    #[test]
+    fn source_rights_status_is_committed_by_manifest_digest() {
+        let original = manifest();
+        let original_digest = original.canonical_digest_hex().unwrap();
+        let mut changed = original;
+        changed.source_rights_status = MycelialSourceRightsStatus::Unknown;
+        assert_ne!(changed.canonical_digest_hex().unwrap(), original_digest);
+    }
+
+    #[test]
     fn axis_dimension_mismatch_is_rejected() {
         let mut manifest = manifest();
         manifest.axes[2].length = 3;
@@ -1060,11 +1111,11 @@ mod tests {
     #[test]
     fn duplicate_axis_is_rejected() {
         let mut manifest = manifest();
-        manifest.axes[4].name = MycelialAcquisitionAxisName::Time;
+        manifest.axes[4].name = MycelialAcquisitionAxisName::Channel;
         assert!(matches!(
             manifest.validate(),
             Err(MycelialAcquisitionDomainError::DuplicateAxis(
-                MycelialAcquisitionAxisName::Time
+                MycelialAcquisitionAxisName::Channel
             ))
         ));
     }
