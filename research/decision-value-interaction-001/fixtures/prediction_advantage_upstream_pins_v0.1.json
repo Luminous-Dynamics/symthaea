@@ -337,7 +337,10 @@
       "purpose": "Action-coupled trajectory pairing, per-decision information filtration and scored-action binding",
       "stochastic_draw_owners": {
         "symtropy_correspondence_and_draw_bundle_pr": 3690,
-        "symtropy_semantic_bundle_verifier_pr": 3755
+        "symtropy_semantic_bundle_verifier_pr": 3743,
+        "symtropy_semantic_bundle_verifier_issue": 3741,
+        "superseded_reference_pr": 3755,
+        "current_verifier_status": "DRAFT_PENDING_EXACT_HEAD_FOCUSED_VERIFICATION"
       },
       "use": "Bind exact draw-bundle and semantic-verification receipt digests per arm; do not implement a second PRNG or correspondence verifier."
     },
