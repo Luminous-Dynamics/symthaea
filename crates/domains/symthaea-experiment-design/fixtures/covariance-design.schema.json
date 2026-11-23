@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/crates/domains/symthaea-experiment-design/fixtures/covariance-design.schema.json",
+  "title": "Covariance-aware physics experiment design input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "target", "hypothesis_ids", "experiments"],
+  "properties": {
+    "schema_version": {
+      "const": "physics-experiment-design-covariance-v0.1"
+    },
+    "target": {
+      "type": "string",
+      "minLength": 1
+    },
+    "hypothesis_ids": {
+      "type": "array",
+      "minItems": 2,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "experiments": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/experiment"
+      }
+    }
+  },
+  "$defs": {
+    "setting": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["parameter_id", "value", "unit"],
+      "properties": {
+        "parameter_id": {"type": "string", "minLength": 1},
+        "value": {"type": "number"},
+        "unit": {"type": "string", "minLength": 1}
+      }
+    },
+    "observable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["observable_id", "unit"],
+      "properties": {
+        "observable_id": {"type": "string", "minLength": 1},
+        "unit": {"type": "string", "minLength": 1}
+      }
+    },
+    "prediction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hypothesis_id", "model_descriptor", "model_digest_sha256", "means"],
+      "properties": {
+        "hypothesis_id": {"type": "string", "minLength": 1},
+        "model_descriptor": {"type": "string", "minLength": 1},
+        "model_digest_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "means": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "number"}
+        }
+      }
+    },
+    "pairwise_difference_covariance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "first_hypothesis_id",
+        "second_hypothesis_id",
+        "covariance",
+        "covariance_descriptor",
+        "covariance_descriptor_digest_sha256",
+        "covariance_matrix_digest_sha256"
+      ],
+      "properties": {
+        "first_hypothesis_id": {"type": "string", "minLength": 1},
+        "second_hypothesis_id": {"type": "string", "minLength": 1},
+        "covariance": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "array",
+            "minItems": 1,
+            "items": {"type": "number"}
+          }
+        },
+        "covariance_descriptor": {"type": "string", "minLength": 1},
+        "covariance_descriptor_digest_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "covariance_matrix_digest_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "experiment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "experiment_id",
+        "description",
+        "settings",
+        "cost_units",
+        "duration_hours",
+        "observables",
+        "predictions",
+        "pairwise_difference_covariances"
+      ],
+      "properties": {
+        "experiment_id": {"type": "string", "minLength": 1},
+        "description": {"type": "string", "minLength": 1},
+        "settings": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/setting"}
+        },
+        "cost_units": {"type": "number", "exclusiveMinimum": 0},
+        "duration_hours": {"type": "number", "minimum": 0},
+        "observables": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/observable"}
+        },
+        "predictions": {
+          "type": "array",
+          "minItems": 2,
+          "items": {"$ref": "#/$defs/prediction"}
+        },
+        "pairwise_difference_covariances": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/pairwise_difference_covariance"}
+        }
+      }
+    }
+  }
+}
