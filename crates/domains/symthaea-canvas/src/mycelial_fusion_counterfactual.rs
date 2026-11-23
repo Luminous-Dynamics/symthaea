@@ -14,7 +14,6 @@
 //! Bezier parameters. A measured bridge length and explicit length unit are
 //! required; no straight-line distance is silently treated as hyphal material.
 
-use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::error::Error;
 use std::fmt;
@@ -475,12 +474,16 @@ fn validate_candidate(
                     *arc_length_fraction_micros,
                 ));
             }
-            if !view.segments.iter().any(|segment| segment.id == *segment_id) {
-                return Err(MycelialFusionCounterfactualError::UnknownTargetSegment(
-                    segment_id.clone(),
-                ));
-            }
-            if candidate.source_tip_junction_id == *segment_id {
+            let target_segment = view
+                .segments
+                .iter()
+                .find(|segment| segment.id == *segment_id)
+                .ok_or_else(|| {
+                    MycelialFusionCounterfactualError::UnknownTargetSegment(segment_id.clone())
+                })?;
+            if candidate.source_tip_junction_id == target_segment.start_junction_id
+                || candidate.source_tip_junction_id == target_segment.end_junction_id
+            {
                 return Err(MycelialFusionCounterfactualError::InvalidCandidate(
                     candidate.candidate_id.clone(),
                 ));
@@ -514,12 +517,20 @@ fn split_target_segment(
             MycelialFusionCounterfactualError::UnknownTargetSegment(segment_id.clone())
         })?;
     let original = view.segments.remove(index);
-    let start = view.nodes.get(&original.start_junction_id).ok_or_else(|| {
-        MycelialFusionCounterfactualError::UnknownTargetSegment(segment_id.clone())
-    })?;
-    let end = view.nodes.get(&original.end_junction_id).ok_or_else(|| {
-        MycelialFusionCounterfactualError::UnknownTargetSegment(segment_id.clone())
-    })?;
+    let start_position = view
+        .nodes
+        .get(&original.start_junction_id)
+        .ok_or_else(|| {
+            MycelialFusionCounterfactualError::UnknownTargetSegment(segment_id.clone())
+        })?
+        .position;
+    let end_position = view
+        .nodes
+        .get(&original.end_junction_id)
+        .ok_or_else(|| {
+            MycelialFusionCounterfactualError::UnknownTargetSegment(segment_id.clone())
+        })?
+        .position;
     let fraction = f64::from(*arc_length_fraction_micros) / PARAMETER_SCALE;
     let split_junction_id = format!("fusion-split:{}", candidate.candidate_id);
     if !valid_id(&split_junction_id) || view.nodes.contains_key(&split_junction_id) {
@@ -532,7 +543,7 @@ fn split_target_segment(
         ViewNode {
             // The source contract has no centerline points. This is an explicit
             // linear display anchor, not a measured point on the hypha.
-            position: interpolate(start.position, end.position, fraction),
+            position: interpolate(start_position, end_position, fraction),
         },
     );
     let left_length = original.length * fraction;
@@ -598,8 +609,8 @@ fn graph_view_digest(view: &CounterfactualView) -> String {
 
 fn active_graph<'a>(
     view: &'a CounterfactualView,
-    failed_segment_ids: &'a BTreeSet<String>,
-    failed_junction_ids: &'a BTreeSet<String>,
+    failed_segment_ids: &BTreeSet<String>,
+    failed_junction_ids: &BTreeSet<String>,
 ) -> (BTreeSet<&'a str>, Vec<&'a ViewSegment>) {
     let nodes: BTreeSet<_> = view
         .nodes
@@ -709,10 +720,10 @@ fn shortest_path_length(
                 }
                 let candidate = distance + *weight;
                 let replace = distances
-                    .get(neighbour)
+                    .get(*neighbour)
                     .is_none_or(|previous| candidate < *previous);
                 if replace {
-                    distances.insert(neighbour, candidate);
+                    distances.insert(*neighbour, candidate);
                 }
             }
         }
@@ -1320,8 +1331,8 @@ mod tests {
         ];
         let report = evaluate_mycelial_fusion_counterfactuals(&source, &candidates, &[], &[]).unwrap();
         assert_eq!(report.candidates.len(), 2);
-        assert_eq!(report.candidates[0].conflicting_candidate_ids, vec!["two"]);
-        assert_eq!(report.candidates[1].conflicting_candidate_ids, vec!["one"]);
+        assert_eq!(report.candidates[0].conflicting_candidate_ids, vec!["two".to_string()]);
+        assert_eq!(report.candidates[1].conflicting_candidate_ids, vec!["one".to_string()]);
         assert!(report.candidates.iter().all(|impact| impact.accepted_for_analysis.cycle_rank == 1));
     }
 
