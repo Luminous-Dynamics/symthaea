@@ -77,6 +77,11 @@ impl std::error::Error for AudioFrameEncodeError {}
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AudioFrameDecodeError {
     ZeroSampleRate,
+    ZeroSampleCount,
+    PayloadTooLarge {
+        payload_bytes: usize,
+        max_bytes: usize,
+    },
     PayloadLengthMismatch {
         expected_bytes: usize,
         actual_bytes: usize,
@@ -87,6 +92,14 @@ impl std::fmt::Display for AudioFrameDecodeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::ZeroSampleRate => write!(f, "audio frame sample rate must be non-zero"),
+            Self::ZeroSampleCount => write!(f, "audio frame must contain at least one sample frame"),
+            Self::PayloadTooLarge {
+                payload_bytes,
+                max_bytes,
+            } => write!(
+                f,
+                "audio frame payload is {payload_bytes} bytes; maximum is {max_bytes}"
+            ),
             Self::PayloadLengthMismatch {
                 expected_bytes,
                 actual_bytes,
@@ -307,12 +320,22 @@ pub fn decode_audio_frame(
         return Err(AudioFrameDecodeError::ZeroSampleRate);
     }
 
+    if frame.num_samples == 0 {
+        return Err(AudioFrameDecodeError::ZeroSampleCount);
+    }
+
     let sample_frames = usize::from(frame.num_samples);
     let expected_len = match frame.encoding {
         AudioEncoding::RawF32Stereo => sample_frames * 2 * std::mem::size_of::<f32>(),
         AudioEncoding::RawI16Stereo => sample_frames * 2 * std::mem::size_of::<i16>(),
         AudioEncoding::MuLawMono => sample_frames * std::mem::size_of::<u8>(),
     };
+    if expected_len > RDP_AUDIO_MAX_CHUNK_BYTES {
+        return Err(AudioFrameDecodeError::PayloadTooLarge {
+            payload_bytes: expected_len,
+            max_bytes: RDP_AUDIO_MAX_CHUNK_BYTES,
+        });
+    }
     if frame.data.len() != expected_len {
         return Err(AudioFrameDecodeError::PayloadLengthMismatch {
             expected_bytes: expected_len,
@@ -543,6 +566,41 @@ mod tests {
         assert!(matches!(
             encode_audio_frame(&chunk, 1, 0, 0.2, 0.0, 0),
             Err(AudioFrameEncodeError::TooManySampleFrames { .. })
+        ));
+    }
+
+    #[test]
+    fn decoder_rejects_zero_sample_and_oversized_metadata() {
+        let empty = AudioFrame {
+            audio_seq: 1,
+            timestamp_ms: 0,
+            sample_rate: 48_000,
+            num_samples: 0,
+            data: Vec::new(),
+            encoding: AudioEncoding::MuLawMono,
+            consciousness_level: 0.2,
+            allostatic_load: 0.0,
+            dominant_harmony: 0,
+        };
+        assert!(matches!(
+            decode_audio_frame(&empty),
+            Err(AudioFrameDecodeError::ZeroSampleCount)
+        ));
+
+        let oversized = AudioFrame {
+            audio_seq: 2,
+            timestamp_ms: 20,
+            sample_rate: 48_000,
+            num_samples: 2_049,
+            data: vec![0; 2_049 * 8],
+            encoding: AudioEncoding::RawF32Stereo,
+            consciousness_level: 0.8,
+            allostatic_load: 0.0,
+            dominant_harmony: 0,
+        };
+        assert!(matches!(
+            decode_audio_frame(&oversized),
+            Err(AudioFrameDecodeError::PayloadTooLarge { .. })
         ));
     }
 
