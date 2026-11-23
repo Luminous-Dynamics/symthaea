@@ -112,7 +112,7 @@ The current `formant_extraction` implementation computes per-frame RMS, then nor
 - Preserve raw RMS before normalization as a separate measurement.
 - Treat relative dynamics, microphone gain and calibrated sound-pressure level as separate quantities.
 - Cross-device or cross-recording loudness comparisons require known gain/calibration metadata and a defined microphone/reference procedure; otherwise report uncalibrated amplitude only.
-- Add a metamorphic test: multiply the same waveform by a known gain factor. Normalized energy shape should remain approximately invariant, while raw RMS should scale predictably. The evaluation must not accidentally call this gain invariance an emotion or arousal estimate.
+- The frame-aligned implementation in [#12892](https://github.com/Luminous-Dynamics/symthaea/pull/12892) now carries both raw source-PCM RMS (`rms_source_pcm`, in input units and not calibrated SPL) and utterance-peak-normalized RMS. Its gain-scaling metamorphic test requires a known 0.5 input gain factor to halve raw RMS while normalized energy remains approximately invariant. The current exact-head workflow is still pending; this is not yet a qualified measurement result.
 
 The default autocorrelation F0 range is also bounded to 60–400 Hz; speaker ranges outside that band will be truncated/undefined under current configuration. Evaluate octave errors and pitch-range coverage against a pinned reference before using the feature for human speech. This is an audit target, not evidence that the extractor is inaccurate on all speakers.
 
