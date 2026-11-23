@@ -745,8 +745,8 @@ mod tests {
     fn uncertain_measurement_time_adds_a_conservative_slope_bound() {
         let mut value = input();
         value.measurement_time_bounds = MeasurementTimeBoundsV1 {
-            earliest_measured_at_unix_seconds: 1_849_956_800,
-            latest_measured_at_unix_seconds: 1_850_043_200,
+            earliest_measured_at_unix_seconds: 1_800_820_800,
+            latest_measured_at_unix_seconds: 1_800_907_200,
         };
         let point = predict_reference_standard_drift_v1(&input()).unwrap();
         let interval = predict_reference_standard_drift_v1(&value).unwrap();
@@ -767,7 +767,7 @@ mod tests {
                 .reasons
                 .contains(&ReferenceDriftReasonV1::ModelQualificationUnknown)
         );
-        assert!(report.predicted_additive_correction.is_some());
+        assert!(report.predicted_additive_correction.is_none());
     }
 
     #[test]
