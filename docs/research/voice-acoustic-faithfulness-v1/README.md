@@ -185,6 +185,18 @@ These are prospective gates, not observed outcomes. Report confidence intervals,
 6. Compose resource/acquisition efficiency into Symtropy #6770/#6860; do not create a competing aggregate-score or EVSI implementation.
 
 
+## Stream and ingress ownership
+
+This prosody slice consumes already canonicalized mono PCM. It is not a second capture, decoder, resampler or bounded ring implementation.
+
+- **#10813** owns live CPAL device negotiation, channel conversion/downmix, stateful resampling, and capture loss/discontinuity receipts.
+- **#10894** owns absolute frame continuity through bounded-buffer overflow, exact lost-range accounting, and segment/LTC reset semantics.
+- **#10976** owns offline WAV/FLAC decode integrity, native-rate/channel interpretation and canonical resampling.
+- **#10910/#10912** own live/offline HDC encoder-space identity and parity.
+- This PR's source-position API accepts a mono block only after the relevant ingress path has declared and validated its sample rate. It preserves caller-supplied offsets/segment identity but does not certify those inputs or bridge arbitrary callback chunks.
+
+The per-block limitation below is therefore intentional: a later streaming implementation must reuse #10813/#10894's clock, resampler and discontinuity receipts, then add a bounded continuous frame assembler without creating a parallel stream timeline.
+
 ## Streaming boundary
 
 The current `process_samples_at_source_position` API preserves the caller-supplied absolute sample range and segment identity for each processed block. The raw RMS calculation now accumulates squared samples in f64 so finite large f32 inputs do not overflow during squaring; this is a numeric safety property, not an amplitude calibration. It does not maintain an internal continuous sample ring, resampler phase, frame-hop accumulator or cross-block analysis window. Therefore:
