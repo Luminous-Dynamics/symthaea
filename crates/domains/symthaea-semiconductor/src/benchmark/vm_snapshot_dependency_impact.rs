@@ -465,7 +465,6 @@ fn inherited_risk(
         matches!(
             dimension,
             VmDependencyDimensionV1::ModelWeights
-                | VmDependencyDimensionV1::FeatureSchema
                 | VmDependencyDimensionV1::CalibrationState
         )
     }) {
@@ -481,14 +480,22 @@ fn inherited_risk(
     propagated
 }
 
-fn impact_state(risk: ImpactRiskV1, direct: bool) -> VmSnapshotImpactStateV1 {
-    match (risk, direct) {
-        (ImpactRiskV1::None, _) => VmSnapshotImpactStateV1::Unaffected,
-        (ImpactRiskV1::Blocked, true) => VmSnapshotImpactStateV1::DirectRebuildRequired,
-        (ImpactRiskV1::Blocked, false) => VmSnapshotImpactStateV1::InheritedRebuildRequired,
-        (ImpactRiskV1::Unknown, true) => VmSnapshotImpactStateV1::DirectIndeterminate,
-        (ImpactRiskV1::Unknown, false) => VmSnapshotImpactStateV1::InheritedIndeterminate,
-        (ImpactRiskV1::Historical, _) => VmSnapshotImpactStateV1::HistoricalOnly,
+fn impact_state(
+    direct_risk: ImpactRiskV1,
+    inherited_risk: ImpactRiskV1,
+) -> VmSnapshotImpactStateV1 {
+    let overall = direct_risk.max(inherited_risk);
+    match overall {
+        ImpactRiskV1::None => VmSnapshotImpactStateV1::Unaffected,
+        ImpactRiskV1::Blocked if direct_risk == ImpactRiskV1::Blocked => {
+            VmSnapshotImpactStateV1::DirectRebuildRequired
+        }
+        ImpactRiskV1::Blocked => VmSnapshotImpactStateV1::InheritedRebuildRequired,
+        ImpactRiskV1::Unknown if direct_risk == ImpactRiskV1::Unknown => {
+            VmSnapshotImpactStateV1::DirectIndeterminate
+        }
+        ImpactRiskV1::Unknown => VmSnapshotImpactStateV1::InheritedIndeterminate,
+        ImpactRiskV1::Historical => VmSnapshotImpactStateV1::HistoricalOnly,
     }
 }
 
@@ -603,7 +610,8 @@ pub fn compute_vm_snapshot_impact_closure_v1(
         }
     }
 
-    let mut risks: BTreeMap<String, ImpactRiskV1> = BTreeMap::new();
+    let mut direct_risks: BTreeMap<String, ImpactRiskV1> = BTreeMap::new();
+    let mut inherited_risks: BTreeMap<String, ImpactRiskV1> = BTreeMap::new();
     let mut direct_statuses: BTreeMap<String, VmSnapshotCurrentDispositionV1> = BTreeMap::new();
     let mut inherited_from: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
 
@@ -611,13 +619,13 @@ pub fn compute_vm_snapshot_impact_closure_v1(
         let report = requalification_by_snapshot
             .get(snapshot_id.as_str())
             .expect("coverage is complete");
-        let direct = direct_risk(report.current_disposition);
+        direct_risks.insert(snapshot_id.clone(), direct_risk(report.current_disposition));
+        inherited_risks.insert(snapshot_id.clone(), ImpactRiskV1::None);
         direct_statuses.insert(snapshot_id.clone(), report.current_disposition);
-        risks.insert(snapshot_id.clone(), direct);
     }
 
     for parent_id in &topological {
-        let parent_risk = risks[parent_id];
+        let parent_risk = direct_risks[parent_id].max(inherited_risks[parent_id]);
         if parent_risk == ImpactRiskV1::None {
             continue;
         }
@@ -627,17 +635,16 @@ pub fn compute_vm_snapshot_impact_closure_v1(
             .iter()
             .filter(|edge| edge.parent_snapshot_id == *parent_id)
         {
-            let child = &nodes[&edge.child_snapshot_id];
             let propagated = inherited_risk(parent_risk, &edge.inherited_dimensions);
             if propagated == ImpactRiskV1::None {
                 continue;
             }
-            let current = risks[&child.snapshot_id];
+            let current = inherited_risks[&edge.child_snapshot_id];
             if propagated > current {
-                risks.insert(child.snapshot_id.clone(), propagated);
+                inherited_risks.insert(edge.child_snapshot_id.clone(), propagated);
             }
             inherited_from
-                .entry(child.snapshot_id.clone())
+                .entry(edge.child_snapshot_id.clone())
                 .or_default()
                 .insert(parent_id.clone());
         }
@@ -649,17 +656,18 @@ pub fn compute_vm_snapshot_impact_closure_v1(
     let mut rebuild_candidates = BTreeSet::new();
 
     for snapshot_id in &topological {
-        let risk = risks[snapshot_id];
+        let direct_risk = direct_risks[snapshot_id];
+        let inherited_risk = inherited_risks[snapshot_id];
         let disposition = direct_statuses[snapshot_id];
-        let direct = risk == direct_risk(disposition);
-        let state = impact_state(risk, direct);
+        let state = impact_state(direct_risk, inherited_risk);
         let inherited: Vec<String> = inherited_from
             .get(snapshot_id)
             .map(|values| values.iter().cloned().collect())
             .unwrap_or_default();
-        if direct && risk != ImpactRiskV1::None {
+        if direct_risk != ImpactRiskV1::None {
             direct_impact_snapshot_ids.push(snapshot_id.clone());
-        } else if !direct && risk != ImpactRiskV1::None {
+        }
+        if inherited_risk != ImpactRiskV1::None && direct_risk == ImpactRiskV1::None {
             transitive_impact_snapshot_ids.push(snapshot_id.clone());
         }
         let node = &nodes[snapshot_id];
@@ -675,8 +683,12 @@ pub fn compute_vm_snapshot_impact_closure_v1(
         entries.push(VmSnapshotImpactEntryV1 {
             snapshot_id: snapshot_id.clone(),
             state,
-            directly_impacted: direct && risk != ImpactRiskV1::None,
-            direct_label_status: if direct { Some(disposition) } else { None },
+            directly_impacted: direct_risk != ImpactRiskV1::None,
+            direct_label_status: if direct_risk != ImpactRiskV1::None {
+                Some(disposition)
+            } else {
+                None
+            },
             inherited_from_snapshot_ids: inherited,
             rebuild_candidate,
         });
