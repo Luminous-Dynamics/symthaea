@@ -90,15 +90,17 @@ It returns a combined `CausalDecisionValueCertificate` containing both the causa
 
 ### Stochastic correspondence evidence is referenced, not reimplemented
 
-Each arm now requires a non-empty `stochastic_draw_bundle_sha256`. It commits the DVPC execution receipt to the Symtropy-produced, hypothesis-scoped correspondence/draw bundle. This bundle must preserve the full event-candidate inventories, event scopes, all admissible correspondence hypotheses, the separate causal-invariance disposition for each mapped stochastic source, semantic draw-address plans and the resulting Philox receipts.
+Each arm carries four linked stochastic-evidence fields: `stochastic_draw_bundle_sha256`, `stochastic_draw_bundle_verifier_sha256`, `stochastic_draw_bundle_verification_receipt_sha256`, and `stochastic_draw_bundle_semantically_verified`. The causal certificate retains the four bundle digests and the four external verification-receipt digests in canonical arm order. An empty bundle, verifier identity or verification receipt is rejected; a false semantic-verification disposition is rejected.
+
+The referenced bundle must preserve the full event-candidate inventories, event scopes, all admissible correspondence hypotheses, the separate causal-invariance disposition for each mapped stochastic source, semantic draw-address plans and the resulting Philox receipts. The external verifier receipt must identify the exact bundle digest and verifier profile that were checked. Downstream admission must retrieve and independently validate that receipt/artifact, rather than trusting the caller's boolean or a non-empty hash string.
 
 The responsibilities remain deliberately split:
 
 - Symtropy [#3690](https://github.com/Luminous-Dynamics/symtropy/pull/3690) owns correspondence-conditioned semantic draw-address projection and the Philox draw bundle.
-- Symtropy [#3755](https://github.com/Luminous-Dynamics/symtropy/pull/3755) owns independent semantic re-derivation of the complete correspondence-to-address projection, event partition coverage and Philox receipts from retained structured inputs.
-- Symthaea #13375 / this module requires and binds the per-arm bundle digest, but does **not** parse the bundle, resolve Philox, choose correspondence hypotheses, or prove event/source causal invariance.
+- Symtropy [#3755](https://github.com/Luminous-Dynamics/symtropy/pull/3755) owns independent semantic re-derivation of the complete correspondence-to-address projection, event partition coverage and Philox receipts.
+- Symthaea #13375 / this module requires and binds the per-arm bundle, verifier-profile and verification-receipt references, and requires an affirmative external-verification disposition. It does **not** parse the bundle, resolve Philox, choose correspondence hypotheses, authenticate the verifier receipt or prove event/source causal invariance.
 
-A missing/empty bundle reference rejects. A bundle whose candidate universe or hypothesis search is incomplete must remain incomplete in the externally verified receipt and cannot be promoted to a complete causal trajectory by the DVPC digest reference. Event correspondence is not itself proof that the corresponding stochastic source is invariant. A valid hash is a commitment to bytes; semantic validity comes from the separate Symtropy verifier and source-evidence review.
+A missing/empty bundle reference, verifier identity or verification receipt rejects. A false semantic-verification disposition rejects. A bundle whose candidate universe or hypothesis search is incomplete must remain incomplete in the externally verified receipt and cannot be promoted to a complete causal trajectory by the DVPC reference. Event correspondence is not itself proof that the corresponding stochastic source is invariant. Hashes are commitments to bytes; semantic validity comes from independently re-running the Symtropy verifier and reviewing source evidence.
 
 
 ## 4. Decision-time information filtration
