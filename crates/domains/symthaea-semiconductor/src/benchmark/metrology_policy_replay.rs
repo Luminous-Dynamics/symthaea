@@ -123,6 +123,12 @@ pub struct SyntheticFabPolicyEvaluationV1 {
     pub metrology_detected_true_positive_count: usize,
     pub metrology_false_positive_count: usize,
     pub metrology_false_negative_count: usize,
+    pub metrology_true_negative_count: usize,
+    pub metrology_observed_positive_count: usize,
+    pub metrology_empirical_sensitivity: Option<f64>,
+    pub metrology_empirical_specificity: Option<f64>,
+    pub metrology_positive_predictive_value: Option<f64>,
+    pub metrology_negative_predictive_value: Option<f64>,
     /// Total defects not detected: unselected defects plus assay false negatives.
     pub total_undetected_defect_count: usize,
     pub total_undetected_defect_fraction: Option<f64>,
@@ -1150,6 +1156,23 @@ pub fn evaluate_synthetic_metrology_policy_v1(
     let escaped_defect_count = true_positive_count.saturating_sub(selected_positive_count);
     let total_undetected_defect_count =
         escaped_defect_count.saturating_add(metrology_false_negative_count);
+    let metrology_true_negative_count =
+        (selected_count - selected_positive_count).saturating_sub(metrology_false_positive_count);
+    let metrology_observed_positive_count =
+        metrology_detected_true_positive_count + metrology_false_positive_count;
+    let metrology_observed_negative_count = selected_count - metrology_observed_positive_count;
+    let metrology_empirical_sensitivity = (selected_positive_count > 0).then(|| {
+        metrology_detected_true_positive_count as f64 / selected_positive_count as f64
+    });
+    let metrology_empirical_specificity = (selected_count > selected_positive_count).then(|| {
+        metrology_true_negative_count as f64 / (selected_count - selected_positive_count) as f64
+    });
+    let metrology_positive_predictive_value = (metrology_observed_positive_count > 0).then(|| {
+        metrology_detected_true_positive_count as f64 / metrology_observed_positive_count as f64
+    });
+    let metrology_negative_predictive_value = (metrology_observed_negative_count > 0).then(|| {
+        metrology_true_negative_count as f64 / metrology_observed_negative_count as f64
+    });
     let total_undetected_defect_fraction = (true_positive_count > 0)
         .then(|| total_undetected_defect_count as f64 / true_positive_count as f64);
     let detection_capture_fraction = (true_positive_count > 0)
@@ -1272,6 +1295,12 @@ pub fn evaluate_synthetic_metrology_policy_v1(
         metrology_detected_true_positive_count,
         metrology_false_positive_count,
         metrology_false_negative_count,
+        metrology_true_negative_count,
+        metrology_observed_positive_count,
+        metrology_empirical_sensitivity,
+        metrology_empirical_specificity,
+        metrology_positive_predictive_value,
+        metrology_negative_predictive_value,
         total_undetected_defect_count,
         total_undetected_defect_fraction,
         detection_capture_fraction,
