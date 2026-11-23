@@ -532,7 +532,7 @@ fn execute_request(bytes: &[u8]) -> Result<CandidateReceiptV1, String> {
 
     let request_sha256 = hex_digest(Sha256::digest(bytes).as_slice());
     let mut nonce_hasher = Sha256::new();
-    nonce_hasher.update(b"mace-candidate-task-nonce-v1\\0");
+    nonce_hasher.update(b"mace-candidate-task-nonce-v1\0");
     nonce_hasher.update(nonce.as_bytes());
     let task_nonce_sha256 = hex_digest(nonce_hasher.finalize().as_slice());
     let decision_need_sha256 = need.canonical_digest().to_hex();
