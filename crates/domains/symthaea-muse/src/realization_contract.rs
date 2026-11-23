@@ -559,6 +559,10 @@ impl MusicalRealizationReceiptV1 {
         manifest.validate()?;
         request.validate()?;
         validate_receipt_payload_v1(&self.payload)?;
+        let admission = admit_realization_v1(manifest, request)?;
+        if !admission.may_execute_without_user_downgrade() {
+            return Err("receipt cannot validate for a request that was not admitted at its declared guarantee level".to_owned());
+        }
         let bytes = serde_json::to_vec(&self.payload).map_err(|error| error.to_string())?;
         if self.payload_sha256 != sha256_hex(&bytes) {
             return Err("realization receipt digest does not match its payload".to_owned());
@@ -590,7 +594,13 @@ impl MusicalRealizationReceiptV1 {
             if outcome.requested_value.to_bits() != requested.requested_value.to_bits() {
                 return Err(format!("receipt requested value mismatch for {}", outcome.control_id));
             }
+            if request.payload.require_independent_capture && outcome.independent_observation.is_none() {
+                return Err(format!("independent capture is required but missing for {}", outcome.control_id));
+            }
             if let Some(observation) = &outcome.independent_observation {
+                if !observation.observer_independent || !observation.complete_window {
+                    return Err(format!("independent observation is unqualified or incomplete for {}", outcome.control_id));
+                }
                 if observation.capture_sha256 != self.payload.output_artifact_sha256 {
                     return Err(format!("observation capture is not the exact realization output for {}", outcome.control_id));
                 }
@@ -700,7 +710,15 @@ pub fn assess_control_effect_v1(
     let Some(observation) = &outcome.independent_observation else {
         return ControlEffectAssessmentV1::EvidenceInsufficient;
     };
-    if !observation.observer_independent || !observation.complete_window {
+    if !observation.observer_independent
+        || !observation.complete_window
+        || !observation.baseline_value.is_finite()
+        || !observation.treatment_value.is_finite()
+        || !observation.sham_delta.is_finite()
+        || require_sha256(&observation.capture_sha256, "captured output digest").is_err()
+        || require_sha256(&observation.observer_manifest_sha256, "observer manifest digest").is_err()
+        || require_sha256(&observation.observer_identity_sha256, "observer identity digest").is_err()
+    {
         return ControlEffectAssessmentV1::EvidenceInsufficient;
     }
     let delta = observation.treatment_value - observation.baseline_value;
@@ -954,6 +972,19 @@ mod tests {
             assess_control_effect_v1(&requested, &outcome),
             ControlEffectAssessmentV1::EvidenceInsufficient
         );
+        let mut malformed = outcome;
+        malformed.independent_observation.as_mut().unwrap().capture_sha256 = "not-a-digest".to_owned();
+        assert_eq!(
+            assess_control_effect_v1(&requested, &malformed),
+            ControlEffectAssessmentV1::EvidenceInsufficient
+        );
+    }
+
+    #[test]
+    fn hard_capability_without_independent_conformance_evidence_is_rejected() {
+        let mut payload = manifest(ControlGuaranteeV1::Hard).payload;
+        payload.controls[0].evidence_level = CapabilityEvidenceLevelV1::ProviderDocumentation;
+        assert!(BackendCapabilityManifestV1::from_payload(payload).is_err());
     }
 
     #[test]
