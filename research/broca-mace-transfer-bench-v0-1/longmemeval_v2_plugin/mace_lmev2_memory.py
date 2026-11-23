@@ -355,7 +355,7 @@ class MaceLongMemEvalV2Memory(Memory):
     @staticmethod
     def _retrieval_trace_digest_from_json(trace: dict[str, Any]) -> str:
         digest = hashlib.sha256()
-        digest.update(b"luminous:mace:retrieval-trace:v1\\0")
+        digest.update(b"luminous:mace:retrieval-trace:v1\0")
 
         def hash_field(value: str) -> None:
             encoded = value.encode("utf-8")
@@ -376,10 +376,10 @@ class MaceLongMemEvalV2Memory(Memory):
 
         candidate_set = trace.get("candidate_set_sha256")
         if candidate_set is None:
-            digest.update(b"\\x00")
+            digest.update(b"\x00")
         else:
             require(isinstance(candidate_set, str), "retrieval trace candidate digest must be a string")
-            digest.update(b"\\x01")
+            digest.update(b"\x01")
             hash_field(candidate_set)
 
         stop_tags = {
@@ -410,7 +410,7 @@ class MaceLongMemEvalV2Memory(Memory):
         integer_field("inspected_bytes")
         complete = trace.get("inspected_bytes_complete")
         require(isinstance(complete, bool), "retrieval trace byte-accounting flag must be boolean")
-        digest.update(b"\\x01" if complete else b"\\x00")
+        digest.update(b"\x01" if complete else b"\x00")
         integer_field("created_at_unix")
 
         operations = trace.get("operations")
@@ -443,7 +443,7 @@ class MaceLongMemEvalV2Memory(Memory):
             measured = operation.get("inspected_bytes_measured")
             require(isinstance(measured, bool), "retrieval operation byte-accounting flag is invalid")
             all_bytes_measured = all_bytes_measured and measured
-            digest.update(b"\\x01" if measured else b"\\x00")
+            digest.update(b"\x01" if measured else b"\x00")
             evidence_ids = operation.get("observed_evidence_ids")
             require(isinstance(evidence_ids, list), "retrieval operation evidence IDs must be a list")
             require(all(isinstance(item, str) for item in evidence_ids),
