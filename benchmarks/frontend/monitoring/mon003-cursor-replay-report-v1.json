@@ -4,10 +4,10 @@
   "runtime": {
     "node_version": "v22.16.0",
     "source_path": "benchmarks/frontend/monitoring/mon003-cursor-replay-v1.mjs",
-    "source_git_blob_sha": "5afddb6a1a647e200e836b0427bab1517fe3b8d1",
-    "source_sha256": "77919e99612be1253f9524b160cf9c43796f2c8d57c7b53ab8cfee59dcbdb032"
+    "source_git_blob_sha": "e6ce9dd6906564ce4c3ca9e312caee19df45a8fa",
+    "source_sha256": "6ab77037f7d33e8b008b07a6a220f811bccfe597508af291dfff3da60fbc3881"
   },
-  "deterministic_cases": 15,
+  "deterministic_cases": 16,
   "cases": [
     {
       "name": "out-of-order event never advances over a missing prefix",
@@ -27,6 +27,10 @@
     },
     {
       "name": "same source+id with changed payload is rejected",
+      "result": "pass"
+    },
+    {
+      "name": "source+id reused on another partition quarantines both partitions",
       "result": "pass"
     },
     {
@@ -73,6 +77,7 @@
   "invariants": {
     "no_cursor_advance_past_gap": "pass",
     "source_scoped_identity": "pass",
+    "cross_partition_identity_reuse_quarantine": "pass",
     "sequence_fork_quarantine": "pass",
     "partition_cursor_isolation": "pass",
     "monotonic_high_watermark": "pass",
