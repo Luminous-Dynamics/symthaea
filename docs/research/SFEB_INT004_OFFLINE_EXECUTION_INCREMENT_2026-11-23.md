@@ -26,13 +26,13 @@ The independent JavaScript model was executed against the fixture bytes:
 - Pointer/keyboard metamorphic relation: **1/1**
 - Adversarial negative controls rejected: **4/4**
 - Event deliveries represented in golden traces: **17**
-- Fixture SHA-256: `10bbb083fbf7cfa4923552cd592c1425ee6d520e589394519617cf13711f5859`
+- Fixture SHA-256: `12dbf68797439c88c36042a067b11d6a2e870a699325052181013c2f4632d2db`
 
 This is a reference-model result. It does not demonstrate that a browser candidate behaves correctly.
 
 ## Rust and browser qualification boundary
 
-A standalone Rust reference model and four authored unit tests are included. They have **not** been compiled or executed in this authoring environment because `rustc`/`cargo` are unavailable. The task still requires a Leptos candidate, fixture-local streaming adapter, real pointer and keyboard browser journeys, full accessibility-tree checks, deterministic Chromium execution, egress isolation, and a verifier in a separate trust domain.
+A standalone Rust reference model and five authored unit tests are included. Event delivery is transactional: a rejected event cannot reserve its identity or sequence, alter the buffer, or poison a later valid retry. They have **not** been compiled or executed in this authoring environment because `rustc`/`cargo` are unavailable. The task still requires a Leptos candidate, fixture-local streaming adapter, real pointer and keyboard browser journeys, full accessibility-tree checks, deterministic Chromium execution, egress isolation, and a verifier in a separate trust domain.
 
 The task-family ledger records INT-004 as `fixture_ready`, `golden_cases_authored_rust_execution_pending`, and `browser_runner_pending`. The portfolio's `runnable_task_count` remains **0**. Public pilot cases are not hidden holdouts and are not used as comparative leaderboard evidence.
 
