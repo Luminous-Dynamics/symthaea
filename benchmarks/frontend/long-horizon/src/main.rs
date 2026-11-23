@@ -267,7 +267,7 @@ impl State {
                 }
                 self.conflicts.insert(job_id.clone(), conflict_id);
                 let invalidated: Vec<String> = self.pending.iter()
-                    .filter(|(_, action)| action.get("job_id").and_then(Value::as_str) == Some(&job_id))
+                    .filter(|(_, action)| action.get("job_id").and_then(Value::as_str) == Some(job_id.as_str()))
                     .map(|(id, _)| id.clone()).collect();
                 for id in invalidated { self.reject_pending(&id, "clarification_required"); }
             }
