@@ -957,13 +957,35 @@ fn run() -> Result<(), String> {
     for case in &cases {
         let manifest = build_manifest(&case.memory, public_seed, max_root_pairs)
             .map_err(|error| format!("dependency index failed: {error:?}"))?;
-        let baseline_observations: Vec<CandidateObservation> = CandidateMode::ALL
-            .iter()
-            .map(|mode| {
-                run_candidate(*mode, case.query, case.decision_need, &case.memory)
-                    .map_err(|error| format!("{} baseline failed: {error:?}", mode.name()))
-            })
-            .collect::<Result<_, _>>()?;
+        // Opaque pair identity: do not expose generated evaluator scenario
+        // family labels (for example, retraction or common-cause attack).
+        let pair_block_id = candidate_pair_block_id(
+            case.cluster,
+            case.decision_need,
+            &manifest.baseline_evidence_sha256,
+        );
+        // One stateless candidate worker per task block amortizes process startup
+        // while keeping the evaluator's intervention/truth state out of its requests.
+        let mut candidate_process = CandidateProcessSession::from_environment()?;
+        let mut baseline_observations = Vec::with_capacity(CandidateMode::ALL.len());
+        for mode in CandidateMode::ALL {
+            let observation_sequence = next_candidate_observation_sequence;
+            next_candidate_observation_sequence = next_candidate_observation_sequence
+                .checked_add(1)
+                .ok_or_else(|| "candidate observation sequence overflow".to_string())?;
+            let observation = run_candidate_with_process(
+                mode,
+                case.query,
+                case.decision_need,
+                &case.memory,
+                &run_id,
+                &pair_block_id,
+                observation_sequence,
+                &mut candidate_process,
+            )
+            .map_err(|error| format!("{} baseline failed: {error:?}", mode.name()))?;
+            baseline_observations.push(observation);
+        }
         let baseline_regrets: BTreeMap<CandidateMode, f64> = baseline_observations
             .iter()
             .map(|observation| {
@@ -978,14 +1000,6 @@ fn run() -> Result<(), String> {
             .find(|observation| observation.mode == CandidateMode::ExactScopeScan)
             .ok_or_else(|| "exact-scope baseline missing".to_string())?;
         let baseline_exact_regret = baseline_regrets[&CandidateMode::ExactScopeScan];
-
-        // Opaque pair identity: do not expose generated evaluator scenario
-        // family labels (for example, retraction or common-cause attack).
-        let pair_block_id = candidate_pair_block_id(
-            case.cluster,
-            case.decision_need,
-            &manifest.baseline_evidence_sha256,
-        );
         let manifest_receipt_sha256 = manifest_receipt_sha256(
             run_id,
             &pair_block_id,
@@ -1021,19 +1035,11 @@ fn run() -> Result<(), String> {
         }));
 
         for baseline in &baseline_observations {
-            let observation_sequence = next_candidate_observation_sequence;
-            next_candidate_observation_sequence = next_candidate_observation_sequence
-                .checked_add(1)
-                .ok_or_else(|| "candidate observation sequence overflow".to_string())?;
+            let observation_sequence = baseline.candidate_observation_sequence;
+            let observation_id = &baseline.candidate_observation_id;
             let support = EvidenceDependencyIndex::build(&case.memory)
                 .map_err(|error| format!("dependency index failed: {error:?}"))?
                 .support_closure_counts(&baseline.decision.evidence_ids);
-            let observation_id = candidate_observation_id(
-                baseline,
-                &run_id,
-                &pair_block_id,
-                observation_sequence,
-            );
             let candidate_record = json!({
                 "schema_version": SCHEMA_VERSION,
                 "record_type": "candidate_decision",
@@ -1059,7 +1065,11 @@ fn run() -> Result<(), String> {
                 "unknown_root_event_count": baseline.unknown_root_event_count,
                 "unknown_family_event_count": baseline.unknown_family_event_count,
                 "index_bytes": baseline.index_bytes,
-                "latency_ns": baseline.latency_ns
+                "latency_ns": baseline.latency_ns,
+                "candidate_execution_boundary": baseline.candidate_execution_boundary,
+                "candidate_artifact_sha256": baseline.candidate_artifact_sha256,
+                "candidate_process_startup_ns": baseline.candidate_process_startup_ns,
+                "candidate_process_wall_ns": baseline.candidate_process_wall_ns
             });
             let mut candidate_record = candidate_record;
             if let Some(profile) = &baseline.retrieval_profile_sha256 {
@@ -1097,7 +1107,11 @@ fn run() -> Result<(), String> {
                 "decision_is_optimal": baseline.decision.action == Some(case.truth.optimal_action()),
                 "abstained": baseline.decision.action.is_none(),
                 "evaluation_validity": "diagnostic_only",
-                "invalidity_reason": "public synthetic fixture and co-located evaluator"
+                "invalidity_reason": "public synthetic fixture and detached/legacy candidate execution as recorded",
+                "candidate_execution_boundary": baseline.candidate_execution_boundary,
+                "candidate_artifact_sha256": baseline.candidate_artifact_sha256,
+                "candidate_process_startup_ns": baseline.candidate_process_startup_ns,
+                "candidate_process_wall_ns": baseline.candidate_process_wall_ns
             }));
             if let Some(profile) = &baseline.retrieval_profile_sha256 {
                 if let Some(last) = evaluator_records.last_mut() {
@@ -1112,26 +1126,26 @@ fn run() -> Result<(), String> {
             let retained = index.retain_without(&intervention.removed_event_ids);
 
             for mode in CandidateMode::ALL {
-                let candidate = run_candidate(
+                let observation_sequence = next_candidate_observation_sequence;
+                next_candidate_observation_sequence = next_candidate_observation_sequence
+                    .checked_add(1)
+                    .ok_or_else(|| "candidate observation sequence overflow".to_string())?;
+                let candidate = run_candidate_with_process(
                     mode,
                     case.query,
                     case.decision_need,
                     &retained,
+                    &run_id,
+                    &pair_block_id,
+                    observation_sequence,
+                    &mut candidate_process,
                 )
                 .map_err(|error| format!("intervention candidate failed: {error:?}"))?;
                 let support = EvidenceDependencyIndex::build(&retained)
                     .map_err(|error| format!("retained evidence index failed: {error:?}"))?
                     .support_closure_counts(&candidate.decision.evidence_ids);
-                let observation_sequence = next_candidate_observation_sequence;
-                next_candidate_observation_sequence = next_candidate_observation_sequence
-                    .checked_add(1)
-                    .ok_or_else(|| "candidate observation sequence overflow".to_string())?;
-                let observation_id = candidate_observation_id(
-                    &candidate,
-                    &run_id,
-                    &pair_block_id,
-                    observation_sequence,
-                );
+                let observation_sequence = candidate.candidate_observation_sequence;
+                let observation_id = &candidate.candidate_observation_id;
 
                 let candidate_record = json!({
                     "schema_version": SCHEMA_VERSION,
@@ -1158,7 +1172,11 @@ fn run() -> Result<(), String> {
                     "unknown_root_event_count": candidate.unknown_root_event_count,
                     "unknown_family_event_count": candidate.unknown_family_event_count,
                     "index_bytes": candidate.index_bytes,
-                    "latency_ns": candidate.latency_ns
+                    "latency_ns": candidate.latency_ns,
+                    "candidate_execution_boundary": candidate.candidate_execution_boundary,
+                    "candidate_artifact_sha256": candidate.candidate_artifact_sha256,
+                    "candidate_process_startup_ns": candidate.candidate_process_startup_ns,
+                    "candidate_process_wall_ns": candidate.candidate_process_wall_ns
                 });
                 let mut candidate_record = candidate_record;
                 if let Some(profile) = &candidate.retrieval_profile_sha256 {
@@ -1198,7 +1216,11 @@ fn run() -> Result<(), String> {
                     "decision_is_optimal": candidate.decision.action == Some(case.truth.optimal_action()),
                     "abstained": candidate.decision.action.is_none(),
                     "evaluation_validity": "diagnostic_only",
-                    "invalidity_reason": "public synthetic fixture and co-located evaluator"
+                    "invalidity_reason": "public synthetic fixture and detached/legacy candidate execution as recorded",
+                    "candidate_execution_boundary": candidate.candidate_execution_boundary,
+                    "candidate_artifact_sha256": candidate.candidate_artifact_sha256,
+                    "candidate_process_startup_ns": candidate.candidate_process_startup_ns,
+                    "candidate_process_wall_ns": candidate.candidate_process_wall_ns
                 });
                 let mut evaluator_record = evaluator_record;
                 if let Some(profile) = &candidate.retrieval_profile_sha256 {
