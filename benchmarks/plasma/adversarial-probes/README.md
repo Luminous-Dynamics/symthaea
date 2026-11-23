@@ -76,3 +76,10 @@ The crate exposes StateStorageBreakdown and KineticStorageAccounting for the KIR
 Persistent model and decoder assets are accounted separately and can be amortized across a declared rollout count. Peak working-set memory is recorded separately, not added to persistent checkpoint storage. Overflow and zero-rollout amortization fail closed.
 
 This is byte accounting, not a rate–distortion evaluator. It does not calculate physical response distortion or a qualified R(D) curve; those depend on the independently referenced response/fidelity measurements and gates.
+
+
+## Sample-support normalization primitive
+
+The crate exposes MinMaxCoordinateMap as a testable affine min–max transform. Its fitted input support and caller-selected output interval are explicit; empty samples, degenerate support, non-finite coordinates and invalid output intervals fail closed. Values outside the fitted interval extrapolate and are not silently clipped.
+
+A synthetic Rust regression test adds a point at x=0 to the inlier set [0.1, 0.3, 0.5, 0.7, 0.9] and measures the resulting displacement of every existing inlier under the illustrative [-pi, pi] output interval. This validates the coordinate-map mechanism only; it does not reproduce NEOPIC's exact tagged source configuration, train/evaluate its operator, or establish a learned field error. See [#13416](https://github.com/Luminous-Dynamics/symthaea/issues/13416) and [the normalization-only fixture PR #13417](https://github.com/Luminous-Dynamics/symthaea/pull/13417).
