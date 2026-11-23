@@ -115,7 +115,7 @@ The downstream executor must perform live authorization and lifecycle checks aga
 
 The Ed25519 verification algorithm and direct pinned leaf-key profile are now implemented, but private-key custody, remote key provisioning/revocation, issuer/source-authority registry, remote source-observation API, rights engine, tenant-isolation service, transparency log, one-time action-consumption ledger and external rollback witness are not implemented. The subject-scope digest must commit to the effective authorization-scope manifest; it must not be treated as a raw user/tenant identifier or as a substitute for live access control.
 
-## 6. Test inventory
+## 7. Test inventory
 
 Sixteen Rust unit tests in the qualification gate and seven in the pinned-trust module are authored:
 
@@ -142,7 +142,7 @@ The module's test verifier is intentionally a deterministic test double; it is n
 
 **Independent schema preflight:** the Draft 2020-12 schema definition was checked with Python `jsonschema` 4.26.0. One valid receipt fixture was accepted and three negative controls (unknown top-level field, invalid disposition, signature octet above 255) were rejected. This validates the schema definition only; it does not execute the Rust codec or verify cryptographic signatures.
 
-## 7. Relationship to the current MACE architecture
+## 8. Relationship to the current MACE architecture
 
 The intended flow is:
 
@@ -162,7 +162,7 @@ It does not feed the qualification service an authority decision. It merely infl
 
 The current LongMemEval-V2 sidecar still performs one BM25 search operation per query. This module is not wired into that sidecar and does not yet implement the multi-step retrieval controller.
 
-## 8. Competitive and benchmark implications
+## 9. Competitive and benchmark implications
 
 The gate addresses a gap that ordinary retrieval scores do not measure: whether evidence returned by a memory backend is independently admissible for a specific use.
 
@@ -191,7 +191,7 @@ Other current benchmarks expose additional gaps that the MACE comparison matrix 
 
 These are distinct tasks and scoring protocols. Do not pool their scores with AML, LongMemEval-V2 or each other. Use them as separate benchmark adapters and as guides to MACE's own cross-protocol assurance axes. In particular, StateMem's reported gains from explicit supersession/state structure and TimlMemBench's raw-native governance failures reinforce that MACE needs current-at-use qualification, not only high-quality storage and recall.
 
-## 12. Next integration milestones
+## 10. Next integration milestones
 
 1. Provision the pinned Ed25519 trust profile through an external trust channel, define rotation/revocation publication and independently protect the expected trust-profile digest.
 2. Decide the standard wire binding: DSSE/in-toto or COSE, with JCS canonical JSON and test vectors. Keep the present domain-separated typed digest as the internal receipt commitment, not a claim of DSSE interoperability.
@@ -228,7 +228,7 @@ These references describe different evaluation protocols. Published scores, samp
 This PR adds a Rust interface prototype and authored unit tests only. It does not qualify any actual source, authenticate an issuer, authorize a tool call, secure a benchmark sandbox, prevent whole-store rollback, prove erasure, change the LongMemEval-V2 result, or establish any SOTA advantage. The next proof must include a real external verifier, executed tests, an exact-head integration run and independent counterfactual evaluation.
 
 
-## 14. Fresh benchmark findings — 2026-11-23
+## 13. Fresh benchmark findings — 2026-11-23
 
 - The current LongMemEval-V2 benchmark description reports 451 questions, up to 500 web-agent trajectories and 25M–115M tokens, with five abilities: static state recall, dynamic state tracking, workflow knowledge, environment gotchas and premise awareness. The released AgentRunbook-C baseline is 74.9% / 108.3s on Small and 70.1% / 139.9s on Medium. The current public page's dynamic leaderboard section may be refreshed separately; do not treat cached search snapshots as a stable official table. Compare under a frozen page/repository revision and retain the fixed Reader / Insert / Query contract.
 - AMA-Bench's ICML 2026 paper reports AMA-Agent at 57.22% and an 11.16 percentage-point gain over its strongest baseline. Its tasks use long-horizon agent/environment trajectories, not ordinary dialogue recall. This is a useful external research result, but not numerically comparable with AML or LongMemEval-V2.
