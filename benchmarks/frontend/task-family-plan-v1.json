@@ -1,7 +1,7 @@
 {
   "schema": "sfeb-task-family-plan-v1",
   "plan_id": "SFEB-TASK-PLAN-001",
-  "as_of": "2026-11-22",
+  "as_of": "2026-11-23",
   "status": "fixtures_in_progress",
   "candidate_task_count": 30,
   "runnable_task_count": 0,
@@ -437,28 +437,44 @@
       "task_id": "SFEB-PILOT-INT-004",
       "level": "interactive_multiroute",
       "family": "board_workflow",
-      "title": "Keyboard-accessible work board",
-      "objective": "Implement status transitions, keyboard alternatives to drag/drop, optimistic updates, rollback and activity history.",
+      "title": "Keyboard-accessible work board with dynamic state reconciliation",
+      "objective": "Implement a work board with status transitions, keyboard alternatives to drag/drop, optimistic updates and rollback, authoritative event history, idempotent duplicate delivery, and reconciliation when a late server event changes the valid transition while the user is interacting.",
       "required_oracle_families": [
         "state_transition",
         "keyboard_action",
         "optimistic_rollback",
-        "audit_history"
+        "audit_history",
+        "late_event_reconciliation",
+        "stale_action_rejection",
+        "idempotent_event_delivery",
+        "conflict_disambiguation",
+        "explicit_clarification_gate"
       ],
       "seeded_defect_families": [
         "invalid_transition",
         "drag_only_control",
-        "optimistic_state_not_rolled_back"
+        "optimistic_state_not_rolled_back",
+        "late_authoritative_event_ignored",
+        "duplicate_event_applied_twice",
+        "ambiguous_conflict_committed_without_clarification"
       ],
       "metamorphic_controls": [
         "pointer_keyboard_equivalence",
-        "duplicate_event_idempotency"
+        "duplicate_event_idempotency",
+        "late_event_replay_idempotency",
+        "nonconflicting_event_permutation",
+        "stream_resume_reconciliation"
       ],
       "required_evidence": [
         "interface_contract",
         "browser_trace",
         "screenshot_accessibility_layout_bundle",
-        "independent_oracle_result"
+        "independent_oracle_result",
+        "authoritative_event_log",
+        "pre_and_post_state_snapshot",
+        "reconciliation_receipt",
+        "clarification_trace",
+        "idempotency_key_audit"
       ],
       "fixture_status": "not_authored",
       "oracle_status": "not_authored",

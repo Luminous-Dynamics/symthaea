@@ -6,7 +6,8 @@
     "Store the observation date, model/harness context, task denominator, uncertainty interval and live-versus-historical page state for every result.",
     "Treat browser-tool benchmarks as tool-operation evidence, not frontend code-generation evidence.",
     "Reproduce native task splits and scorers before making superiority claims; preserve failed, blocked and unparseable runs in denominators.",
-    "Qualify each benchmark task with a two-sided witness-patch/no-op gate, prompt-to-test traceability and clean-room regrading where the task format permits."
+    "Qualify each benchmark task with a two-sided witness-patch/no-op gate, prompt-to-test traceability and clean-room regrading where the task format permits.",
+    "For long-horizon computer-use benchmarks, preserve the exact task horizon, step budget, binary-completion metric and partial-score metric as separate observations; never substitute one leaderboard snapshot for a paper's primary result."
   ],
   "comparators": [
     {
@@ -565,7 +566,7 @@
       "name": "FrontierCode 2.0",
       "scope": "Maintainer-oriented repository software engineering and patch mergeability, including correctness, scope discipline, design, test quality and codebase conventions; adjacent comparator for SFEB's full-stack/maintenance lane.",
       "task_count": 132,
-      "snapshot_status": "methodology_only",
+      "snapshot_status": "historical_published_snapshot",
       "observations": [
         {
           "kind": "benchmark_scope",
@@ -584,12 +585,49 @@
         {
           "kind": "release_date",
           "observed_date": "2026-10-27"
+        },
+        {
+          "kind": "official_release_model_score",
+          "observed_date": "2026-10-27",
+          "model": "Claude Opus 5.5",
+          "reasoning_effort": "best reported effort",
+          "weighted_score_percent": 47.3,
+          "interpretation": "Official launch comparison score; rubric score is weighted and any failed blocking criterion zeros the task."
+        },
+        {
+          "kind": "official_release_model_score",
+          "observed_date": "2026-10-27",
+          "model": "GPT-6 Astra",
+          "reasoning_effort": "best reported effort",
+          "weighted_score_percent": 44,
+          "interpretation": "Official launch comparison score; not comparable to SFEB completion percentages."
+        },
+        {
+          "kind": "blocker_failure_rates_max_effort",
+          "pooled_models": [
+            "Claude Opus 5.5",
+            "Claude Fable 5.1",
+            "GPT-6.1 Sol",
+            "GPT-6 Astra"
+          ],
+          "failure_percent": {
+            "thoroughness": 15.3,
+            "core_behavior": 12.3,
+            "backwards_compatibility": 5.2,
+            "scope": 4.9,
+            "avoiding_regressions": 2.2,
+            "test_integrity": 1.9,
+            "effective_test_writing": 1.3,
+            "compilation": 0.7,
+            "lint_format_typecheck": 0.5
+          }
         }
       ],
       "limitations": [
         "This evaluates mergeability of repository patches, not visual reconstruction or end-to-end browser journey quality.",
         "The grading rubric includes subjective maintainer criteria; reproduce its native protocol before making numeric comparisons.",
-        "A benchmark score must be associated with its exact model, reasoning effort, agent harness and scoring revision."
+        "A benchmark score must be associated with its exact model, reasoning effort, agent harness and scoring revision.",
+        "The 47.3% Opus 5.5 score is the official October 27 launch snapshot; later leaderboard entries may differ and must be timestamped separately."
       ],
       "sources": [
         "https://cognition.com/blog/frontier-code-2.0",
@@ -605,24 +643,45 @@
       "observations": [
         {
           "kind": "benchmark_scale",
+          "observed_date": "2026-06-28",
           "tasks": 108,
           "self_hosted_websites": 31,
           "tasks_over_one_hour_percent": 69.6,
-          "average_agent_steps_over": 250,
+          "median_human_task_hours": 1.6,
+          "average_agent_tool_calls_opus_4_7_max_effort": 318,
           "average_scoring_checkpoints": 27.25
         },
         {
-          "kind": "leaderboard_snapshot",
-          "observed_date": "2026-11-14",
-          "top_reported_binary_completion_percent": 44.33,
-          "top_reported_model": "Claude Opus 5",
-          "note": "Version/step-budget-specific leaderboard row; do not treat as a universal computer-use success rate."
+          "kind": "paper_reported_primary_metric",
+          "observed_date": "2026-06-28",
+          "model": "Claude Opus 4.8",
+          "reasoning_effort": "maximum thinking with batched tool calls",
+          "step_budget": 500,
+          "binary_completion_percent": 20.6,
+          "partial_score_percent": 54.8
+        },
+        {
+          "kind": "challenge_phenomena",
+          "distribution_over_108_tasks": {
+            "cross_source_reasoning": 46,
+            "visual_spatial_precision": 45,
+            "implicit_state_inference": 43,
+            "multi_item_state_tracking": 43,
+            "conflict_disambiguation": 39,
+            "multimodal_editing": 30,
+            "tutorial_following": 22,
+            "dynamic_environment": 10,
+            "streaming_interaction": 6,
+            "proactive_interaction": 6
+          },
+          "note": "Challenge labels are non-exclusive; counts may overlap."
         }
       ],
       "limitations": [
-        "Measures completion of long-horizon computer-use workflows, not application source-code generation or mergeability.",
-        "Its tasks, step budgets, partial-score metric and environment differ from SFEB and Online-Mind2Web.",
-        "Use it to inform state tracking and interaction stress tests, not to claim direct numeric superiority."
+        "Measures long-horizon computer-use workflow completion, not application source-code generation or mergeability.",
+        "The 20.6% binary-completion result and 54.8% partial score are the paper-reported 500-step results; do not substitute unrelated version/leaderboard percentages.",
+        "Its task set, step budgets, authentic input artifacts and self-hosted applications differ from SFEB and WebdriverIO; do not pool results.",
+        "Use its dynamic-state, conflict-disambiguation, proactive-clarification and hidden-state phenomena to design stress tasks, not to claim direct numeric superiority."
       ],
       "sources": [
         "https://osworld-v2.xlang.ai/",
