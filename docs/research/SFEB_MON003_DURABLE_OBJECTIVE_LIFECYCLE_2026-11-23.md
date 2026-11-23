@@ -3,7 +3,7 @@
 **Date:** 2026-11-23  
 **Parent:** [MON-003 issue #13398](https://github.com/Luminous-Dynamics/symthaea/issues/13398)  
 **Related:** [MON-001 issue #13392](https://github.com/Luminous-Dynamics/symthaea/issues/13392), [MON-002 issue #13394](https://github.com/Luminous-Dynamics/symthaea/issues/13394)  
-**Status:** specification committed; 9-case deterministic JavaScript reference kernel committed and executed under Node.js v22.16.0; production qualification pending
+**Status:** specification committed; 9-case fencing/idempotency kernel, 3-case objective-ledger kernel and 8-case tenant-boundary suite committed and executed under Node.js v22.16.0; production qualification pending
 
 ## 1. Research thesis
 
@@ -180,7 +180,7 @@ All adversarial actions use a non-destructive mock sink. The mock must validate 
 
 ## 8. Benchmark design
 
-### 8.1 Seven matched arms
+### 8.1 Eight matched arms
 
 1. LLM sleep/reload/inspect.
 2. SentinelBench-style one-second `wait_for`.
@@ -188,17 +188,22 @@ All adversarial actions use a non-destructive mock sink. The mock must validate 
 4. Untrusted notification + latest source-of-record reconciliation.
 5. Durable edge receipt + current authorization + idempotent sink.
 6. Existing durable-workflow baseline (e.g. Temporal Workflow History + Signal/Update + idempotent Activity), with the same event source and action sink.
-7. Full durable objective + sink-enforced fencing + signed receipts + independent postcondition verifier.
+7. DBOS PostgreSQL-native durable execution baseline, with the same event source and external action sink.
+8. Full SFEB assurance contract over a durable backend (Temporal and DBOS), with sink-enforced fencing, signed receipts, tenant scope and independent postcondition verifier.
 
-Temporal is a meaningful orchestration baseline, not a strawman: it durably records workflow event history and replays it after worker replacement; its messaging model distinguishes asynchronous Signals from validated, tracked Updates; and its documentation warns that Activities can run more than once and downstream idempotency must be enforced by the called service. The comparison must give this arm equivalent source-event replay and sink capabilities. SFEB's hypothesis is not that it replaces durable workflow orchestration, but that evidence provenance, current authorization, sink-enforced fencing and independent proof deserve explicit semantics above the orchestration layer. Compare the same workflow engine both with and without the SFEB assurance layer where feasible.
+Temporal is a meaningful orchestration baseline, not a strawman: it durably records workflow event history and replays it after worker replacement; its messaging model distinguishes asynchronous Signals from validated, tracked Updates; and its documentation warns that Activities can run more than once and downstream idempotency must be enforced by the called service. DBOS is a distinct database-native baseline: its documentation describes Postgres-backed workflow checkpoints and states that database writes can be made exactly-once when the mutation and checkpoint share one transaction, while external API effects still require idempotency keys. Give both baselines the same source feed, policy semantics and action sink. SFEB's hypothesis is not that it replaces durable workflow orchestration, but that event provenance, tenant scope, current authorization, sink-enforced fencing and independently verified postconditions deserve explicit semantics above the orchestration layer. Compare both backends with and without the SFEB assurance layer where feasible.
 
 Hold model, prompt, browser/tool build, initial task state, source timeline, task deadline, retries and accounting constant. Pair by task/timeline seed; randomize arm order. Publish model tokens, API calls, browser interactions, scheduler events, CPU, network, infrastructure and verifier costs.
 
-### 8.2 Task strata
+### 8.2 Task strata and benchmark sizing
 
-Keep level and edge semantics separate. Include no-op tasks, absolute/relative predicates, transient opportunities, long disconnects, source cursor gaps, event replay, same-tick revocation, receipt expiry, stale workers, sink response loss and cancellation races. Hold out complete event/failure families, not just shuffled cases from the same generator.
+Keep level and edge semantics separate. Include no-op tasks, absolute/relative predicates, transient opportunities, long disconnects, source cursor gaps, event replay, same-tick revocation, receipt expiry, stale workers, sink response loss, cross-tenant transplant and cancellation races. Hold out complete event/failure families, not just shuffled cases from the same generator.
 
-Start with at least 100 controlled tasks and enough repeated event opportunities to estimate per-stratum rates. Expand toward 200 tasks and independent holdout families before broad claims. Reproduce SentinelBench's original wait/sleep comparison separately; its task-success metric is not an SFEB score.
+Start with at least 100 controlled task templates across multiple applications and event families. Expand toward 200+ held-out templates. A task count is not the same as an independent trial count: for critical adversarial claims, separately target at least 300 independently generated race/attack instances per critical failure family. With zero observed failures in 299 independent Bernoulli trials, the one-sided 95% exact upper bound is approximately 1%; repeated replays of the same template do not satisfy independence. Report clustered uncertainty when trials share a task family, application, environment or seed. A target of 2,995 independent zero-failure trials is needed for an approximate 0.1% upper bound under the same assumptions.
+
+Use paired task/timeline comparisons and randomize arm order. Pre-register primary endpoints, exclusions, fault strata and retry budget. Use bootstrap intervals clustered by task family or a multi-facet/generalizability analysis to estimate task, environment, model, harness and interaction variance. Avoid a global leaderboard score that hides specialization; report per-family performance and confidence. A 2026 Stanford student research report on agent evaluation argues that task-by-agent interaction can dominate aggregate leaderboard reliability; treat it as a reason to investigate variance decomposition, not as a settled consensus result.
+
+Reproduce SentinelBench's original wait/sleep comparison separately; its task-success metric is not an SFEB score. In addition, add a realism bridge: sample event inter-arrival times, delivery delay and outage lengths from measured or published operational traces, then keep a synthetic stress lane for rare correlated and adversarial failures. Never let synthetic-only wins stand in for live source/sink qualification.
 
 ### 8.3 Report a metric vector, not a weighted score
 
@@ -256,6 +261,8 @@ Zero observed failures is not a probability-zero guarantee. Publish complete den
 - Temporal Durable Execution and event-history replay: https://docs.temporal.io/durable-execution
 - Temporal Signals, Queries and Updates: https://docs.temporal.io/encyclopedia/workflow-message-passing
 - Temporal Activity idempotency and at-least-once retries: https://docs.temporal.io/activities
+- DBOS Postgres-backed durable workflow recovery: https://docs.dbos.dev/architecture
+- DBOS durable execution and exactly-once database transaction boundary: https://www.dbos.dev/
 
 ## 11. Qualification boundary
 
@@ -299,3 +306,22 @@ Exact source Git blob SHA: `1407b6c5240ca98071e062513588da5e17166ef5`.
 Exact source SHA-256: `f42218fee255b7b5e78c5b7bf0c9fd05e46aa998c63addbcf721bf7d2d090a59`.
 
 This is a separate in-memory state-machine reference test, not persistence or distributed compare-and-swap qualification. The postcondition proof is a fixture token, not a cryptographically verified independent observation.
+
+
+## 14. Tenant-boundary and event-identity negative controls (2026-11-23)
+
+Companion source: `benchmarks/frontend/monitoring/mon003-tenant-boundary-v1.mjs`  
+Machine-readable report: `benchmarks/frontend/monitoring/mon003-tenant-boundary-report-v1.json`
+
+Executed using Node.js v22.16.0:
+```sh
+node --check mon003-tenant-boundary-v1.mjs
+node mon003-tenant-boundary-v1.mjs
+```
+
+**Executed result: 8/8 deterministic cases passed.** Controls reject cross-tenant receipt/grant issuance and transplant, duplicate CloudEvents identity within one source while allowing the same event ID from another source, changed-request idempotency reuse, permission revocation after grant issuance, stale worker epoch and action-target substitution. All negative controls produced zero side effects.
+
+Exact source Git blob SHA: `43d0550304cd6e0e8a003e913cc5241c82421f78`.  
+Exact source SHA-256: `24f80efae77fc4d31f64098febf15d5d4881a646d26e69c6cf4bf5b4f491a6de`.
+
+**Important integration boundary:** this is a companion contract test, not proof that the original 9-case fencing kernel or a production service already enforces tenant scope. The next integration change must carry tenant identity through source receipts, authorization grants, idempotency derivation and sink-side atomic checks. Trust in the test's source/tenant identity is an input assumption; no receipt signature, issuer key revocation or persistent tenant policy store is qualified.
