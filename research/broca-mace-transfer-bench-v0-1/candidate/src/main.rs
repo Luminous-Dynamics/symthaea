@@ -909,4 +909,22 @@ mod tests {
             candidate_input_digest(need, HASH_B)
         );
     }
+    #[test]
+    fn typed_hdc_empty_evidence_abstains_without_building_an_index() {
+        let mut value = envelope_value();
+        value["method"] = serde_json::json!("typed_content_hdc");
+        let receipt = execute_request(&serde_json::to_vec(&value).unwrap()).unwrap();
+        assert_eq!(receipt.decision, "abstain");
+        assert_eq!(receipt.retrieval_profile_sha256, None);
+        assert_eq!(receipt.index_payload_bytes, 0);
+    }
+
+    #[test]
+    fn reversed_action_order_is_rejected_as_a_noncanonical_task_contract() {
+        let mut value = envelope_value();
+        value["decision_need"]["action_alternatives"] = serde_json::json!(["b", "a"]);
+        let error = execute_request(&serde_json::to_vec(&value).unwrap()).unwrap_err();
+        assert!(error.contains("decision_need is invalid"));
+    }
+
 }
