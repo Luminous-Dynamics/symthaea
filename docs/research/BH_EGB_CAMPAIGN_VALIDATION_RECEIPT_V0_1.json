@@ -13,12 +13,12 @@
   },
   "inputs": {
     "manifest_path": "docs/research/BH_EGB_CAMPAIGN_EPISODES_V0_1.json",
-    "manifest_git_blob_sha1": "c2914fb7d7f75bbf16cec35d7d988b9e63cca13a",
+    "manifest_git_blob_sha1": "8a0791e46f93fef37130738242f43ebd0713472c",
     "schema_path": "docs/research/BH_EGB_CAMPAIGN_EPISODES_V0_1.schema.json",
     "schema_git_blob_sha1": "77dd2e9e33f94e33bbe2b930286580f4d43ebf6f",
     "covariance_redundancy_fixture": {
       "path": "docs/research/BH_EGB_COVARIANCE_REDUNDANCY_CONTROL_V0_1.json",
-      "git_blob_sha1": "cf737cf3632464bdc7d816f941027b7eefd796ea"
+      "git_blob_sha1": "8f9ed0654b88376deeee2c7d466682dc37dbc8fd"
     }
   },
   "checks": {
@@ -213,7 +213,7 @@
       "repository": "Luminous-Dynamics/symthaea",
       "ref": "research/bh-egb-symthaea-campaign-2026-11-23",
       "path": "docs/research/BH_EGB_COVARIANCE_REDUNDANCY_CONTROL_V0_1.json",
-      "git_blob_sha1": "cf737cf3632464bdc7d816f941027b7eefd796ea",
+      "git_blob_sha1": "8f9ed0654b88376deeee2c7d466682dc37dbc8fd",
       "role": "symthaea_covariance_redundancy_synthetic_control"
     }
   ],
@@ -256,7 +256,7 @@
       "status": "draft_not_merged"
     },
     "covariance_control": {
-      "status": "synthetic_fixture_authored_known_answers_not_yet_executed_in_a_committed_verifier",
+      "status": "exact_verifier_passed_synthetic_only",
       "base_covariance": [
         [
           "1",
@@ -292,7 +292,22 @@
       ],
       "covariance_aware_augmented_mahalanobis_squared": "4",
       "naive_diagonal_score_before": "5",
-      "naive_diagonal_score_after_duplicate": "8"
+      "naive_diagonal_score_after_duplicate": "8",
+      "fixture_git_blob_sha1": "8f9ed0654b88376deeee2c7d466682dc37dbc8fd",
+      "verifier_path": "docs/research/verify_bh_egb_covariance_fixture.py",
+      "verifier_git_blob_sha1": "8e3fd3ced8efb605385e292cd0281f4e3c0a7255",
+      "verifier_commit": "25bf634e70bc096101a522f02674aa6b4412af7c",
+      "exact_rational_replay": {
+        "base_mahalanobis_squared": "4",
+        "augmented_pseudoinverse_mahalanobis_squared": "4",
+        "naive_diagonal_score_before": "5",
+        "naive_diagonal_score_after": "8",
+        "redundancy_invariance": true,
+        "basis_metamorphic_invariance": true,
+        "unit_rescaling_invariance": true,
+        "negative_controls_rejected": 4
+      },
+      "claim_ceiling": "One exact synthetic rational linear-algebra fixture only; not EGB physics, calibration, selector qualification, or policy performance."
     }
   }
 }
