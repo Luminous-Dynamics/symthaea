@@ -1,4 +1,4 @@
-use serde_json::{json, Map, Value};
+use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fs;
@@ -412,7 +412,7 @@ mod tests {
         state.deliver(event).unwrap();
         state.deliver(event).unwrap();
         assert_eq!(state.last_sequence, 1);
-        assert_eq!(state.audit, vec!["evt-001"]);
+        assert_eq!(state.audit, vec!["evt-001".to_string()]);
         assert_eq!(state.duplicate_deliveries, 1);
     }
 
