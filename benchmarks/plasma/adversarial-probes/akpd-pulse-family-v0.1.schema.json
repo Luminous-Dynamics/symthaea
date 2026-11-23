@@ -24,7 +24,7 @@
     },
     "contract_id": {
       "type": "string",
-      "pattern": "^AKPD-[A-Z0-9][A-Z0-9._-]{2,63}$"
+      "pattern": "^AKPD-[A-Z0-9][A-Z0-9._-]{0,58}$"
     },
     "contract_status": {
       "enum": [
@@ -259,7 +259,8 @@
         "minimum_spatial_refinement_levels",
         "minimum_time_refinement_levels",
         "required_controls",
-        "response_metrics"
+        "response_metrics",
+        "minimum_post_pulse_observation_duration"
       ],
       "properties": {
         "independent_confirmation_required": {
@@ -309,6 +310,10 @@
         "confirmation_reference_id": {
           "type": "string",
           "minLength": 1
+        },
+        "minimum_post_pulse_observation_duration": {
+          "type": "number",
+          "exclusiveMinimum": 0
         }
       }
     },
