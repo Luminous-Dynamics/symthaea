@@ -175,9 +175,7 @@ fn validate_identifier(
     field: &'static str,
     maximum_bytes: usize,
 ) -> Result<(), MycelialObservationCoverageError> {
-    if value.trim().is_empty()
-        || value.len() > maximum_bytes
-        || value.chars().any(char::is_control)
+    if value.trim().is_empty() || value.len() > maximum_bytes || value.chars().any(char::is_control)
     {
         return Err(MycelialObservationCoverageError::InvalidIdentifier(field));
     }
@@ -221,13 +219,21 @@ impl MycelialObservationCoverageLedger {
             ));
         }
 
-        validate_identifier(&self.source_dataset_id, "source_dataset_id", MAX_COVERAGE_ID_BYTES)?;
+        validate_identifier(
+            &self.source_dataset_id,
+            "source_dataset_id",
+            MAX_COVERAGE_ID_BYTES,
+        )?;
         validate_digest(&self.source_dataset_digest, "source_dataset_digest")?;
         validate_digest(
             &self.observation_inventory_digest,
             "observation_inventory_digest",
         )?;
-        validate_identifier(&self.coordinate_frame_id, "coordinate_frame_id", MAX_COVERAGE_ID_BYTES)?;
+        validate_identifier(
+            &self.coordinate_frame_id,
+            "coordinate_frame_id",
+            MAX_COVERAGE_ID_BYTES,
+        )?;
         validate_digest(&self.spatial_transform_digest, "spatial_transform_digest")?;
         validate_digest(&self.calibration_digest, "calibration_digest")?;
         validate_identifier(
@@ -240,10 +246,17 @@ impl MycelialObservationCoverageLedger {
             "candidate_generator_version",
             MAX_COVERAGE_VERSION_BYTES,
         )?;
-        validate_digest(&self.candidate_generator_digest, "candidate_generator_digest")?;
+        validate_digest(
+            &self.candidate_generator_digest,
+            "candidate_generator_digest",
+        )?;
 
         for observation_id in &self.declared_observation_ids {
-            validate_identifier(observation_id, "declared_observation_id", MAX_COVERAGE_ID_BYTES)?;
+            validate_identifier(
+                observation_id,
+                "declared_observation_id",
+                MAX_COVERAGE_ID_BYTES,
+            )?;
         }
         if !strictly_sorted(&self.declared_observation_ids) {
             return Err(MycelialObservationCoverageError::NonCanonicalObservationOrder);
@@ -322,9 +335,8 @@ impl MycelialObservationCoverageLedger {
             let invalid_state = match record.state {
                 MycelialObservationCoverageState::CandidateEmitted
                 | MycelialObservationCoverageState::CandidateRejected
-                | MycelialObservationCoverageState::CandidateUnresolved => {
-                    (!has_candidates).then_some("candidate disposition requires at least one candidate")
-                }
+                | MycelialObservationCoverageState::CandidateUnresolved => (!has_candidates)
+                    .then_some("candidate disposition requires at least one candidate"),
                 MycelialObservationCoverageState::NoCandidateGenerated => {
                     if has_candidates {
                         Some("no-candidate disposition cannot contain candidate IDs")
@@ -366,9 +378,7 @@ impl MycelialObservationCoverageLedger {
 
     /// Hashes exact ledger content. Semantic validation is deliberately separate:
     /// invalid/tampered artifacts still receive a distinct content digest.
-    pub fn canonical_digest_hex(
-        &self,
-    ) -> Result<String, MycelialObservationCoverageError> {
+    pub fn canonical_digest_hex(&self) -> Result<String, MycelialObservationCoverageError> {
         if self.records.len() > MAX_MYCELIAL_OBSERVATION_COVERAGE_RECORDS
             || self.declared_observation_ids.len() > MAX_MYCELIAL_OBSERVATION_COVERAGE_RECORDS
             || self.records.iter().any(|record| {
@@ -500,7 +510,9 @@ mod tests {
     use super::*;
 
     fn digest(character: char) -> String {
-        let digit = character.to_digit(16).expect("fixture character is hexadecimal");
+        let digit = character
+            .to_digit(16)
+            .expect("fixture character is hexadecimal");
         let value = char::from_digit(digit, 16).expect("hex digit");
         std::iter::repeat_n(value, DIGEST_HEX_BYTES).collect()
     }
@@ -537,9 +549,7 @@ mod tests {
                     time_window_id: "time-001".to_string(),
                     state: MycelialObservationCoverageState::NoCandidateGenerated,
                     candidate_ids: Vec::new(),
-                    residual_kind: Some(
-                        MycelialObservationResidualKind::PossibleContactMissing,
-                    ),
+                    residual_kind: Some(MycelialObservationResidualKind::PossibleContactMissing),
                 },
             ],
         }
