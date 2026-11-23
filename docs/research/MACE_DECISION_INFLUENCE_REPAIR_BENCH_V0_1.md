@@ -12,6 +12,9 @@ The memory benchmark landscape now measures several important but different prop
 | Agent Memory Leaderboard Cycle 2 | Textual, coding and multimodal memory task performance across separate divisions | A causal, lifecycle-qualified account of whether the retrieved memory was admissible and changed a decision |
 | LongMemEval-V2 | Evidence acquisition from long multimodal agent histories, scored over an accuracy/latency frontier | Qualified evidence, strategy-memory integrity, decision regret and repair |
 | MemSecBench | Poisoning persistence, execution consequences and selective repair in controlled Write–Execute–Forget cases | Explicit evidence-lineage interventions, retrieval-policy poisoning, authority/rights gates, and replayable decision-impact measurements |
+| MemoryDojo | 155 multi-session, long-horizon trajectories across four domains and five memory systems | Long-horizon propagation adapter; separately measure policy-memory and evidence-DAG behavior |
+| MemPoison | 1,227 cases and 3,681 trigger tasks across L1 direct, L2 compositional and L3 context-triggered attacks | Reuse its threat taxonomy and influence-intervention discipline; add strategy-memory poisoning as a distinct target |
+| MPBench | Memory write-channel and persistent-poisoning attack coverage | Reproduce compatible attack families as a separate lane; do not conflate its protocol or denominators |
 | Agent Memory Integrity Internet-Draft | Storage-level edits, read-path detection, rollback and erasure resurrection | The consequence of those integrity failures after retrieval, admission and downstream decisions |
 
 These are complementary protocols, not interchangeable leaderboards. MACE should publish adapters and side-by-side measurements rather than silently merge their scores.
@@ -243,6 +246,9 @@ Required retrieval baselines:
 Required security/recovery comparators:
 
 - MemSecBench's published Write–Execute–Forget checkpoints and selective-repair measures;
+- MemoryDojo's multi-session poisoning/propagation cases, with its original trajectory and memory-system protocol preserved;
+- MemPoison's L1/L2/L3 taxonomy and record/fragment/context influence interventions;
+- MPBench's compatible write-channel and persistent-poisoning cases, with its adapter limitations disclosed;
 - the applicable T1–T10 Agent Memory Integrity test cases, including T9 whole-store rollback and T10 post-erasure restore;
 - local integrity-only storage as a deliberately weaker negative control;
 - externally witnessed state as the rollback-resistant target configuration.
@@ -336,4 +342,7 @@ No SOTA claim follows from this specification or from authored tests. The first 
 - AgentRunbook-C V2 and online strategy learning: https://xiaowu0162.github.io/longmemeval-v2/agentrunbook-c-v2/
 - LongMemEval-V2 leaderboard package protocol: https://github.com/xiaowu0162/LongMemEval-V2/blob/main/leaderboard/README.md
 - MemSecBench, *Tracking Agent Memory Poisoning from Persistence to Consequence and Repair*, arXiv:2607.27080: https://arxiv.org/abs/2607.27080
+- MemoryDojo, *Benchmarking Poisoning Through LLM Agent Memory*, arXiv:2611.09721 (published 2026-11-06): https://arxiv.org/abs/2611.09721
+- MemPoison, *Uncovering Persistent Memory Threats and Structural Blind Spots in LLM Agents*, arXiv:2607.14651: https://arxiv.org/abs/2607.14651
+- MPBench, *From Untrusted Input to Trusted Memory: A Systematic Study of Memory Poisoning Attacks in LLM Agents*, arXiv:2606.04329: https://arxiv.org/abs/2606.04329
 - Khandelwal, *A Benchmarking Method for the Integrity of AI Agent Memory at Rest*, Internet-Draft (work in progress, published 2026-11-01): https://www.ietf.org/archive/id/draft-khandelwal-bpm-agent-memory-integrity-00.html
