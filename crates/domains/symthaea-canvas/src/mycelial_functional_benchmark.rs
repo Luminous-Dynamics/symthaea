@@ -401,7 +401,8 @@ mod tests {
     #[test]
     fn replicate_cannot_leak_across_train_and_test() {
         let first = set("replicate-1");
-        let second = set("replicate-1");
+        let mut second = set("replicate-1");
+        second.session_id = "session-2".to_string();
         let value = manifest(
             &[first, second],
             &[
@@ -458,15 +459,13 @@ mod tests {
     #[test]
     fn replicate_identity_must_match_the_bound_observation_set() {
         let original = set("replicate-1");
-        let mut altered = original.clone();
-        altered.biological_replicate_id = "replicate-2".to_string();
         let mut value = manifest(
             std::slice::from_ref(&original),
             &[MycelialFunctionalBenchmarkSplit::Train],
         );
         value.assignments[0].biological_replicate_id = "replicate-2".to_string();
         assert!(matches!(
-            value.validate_against(&[altered]),
+            value.validate_against(&[original]),
             Err(MycelialFunctionalBenchmarkError::ReplicateIdentityMismatch { .. })
         ));
     }
