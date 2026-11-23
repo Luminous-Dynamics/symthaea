@@ -224,6 +224,44 @@ fn parse_manifest(record: &Value) -> Result<(InputProvenance, String), String> {
         return Err("intervention_count does not match interventions array length".to_string());
     }
 
+    let mut unique_intervention_ids = BTreeSet::new();
+    for intervention in interventions {
+        let id = required_string(intervention, "intervention_id")?;
+        if !unique_intervention_ids.insert(id.to_string()) {
+            return Err("intervention manifest contains duplicate intervention_id values".to_string());
+        }
+        let kind = required_string(intervention, "kind")?;
+        if !matches!(
+            kind,
+            "event"
+                | "source_root"
+                | "source_family"
+                | "unknown_root"
+                | "unknown_family"
+                | "source_root_pair"
+                | "matched_random"
+                | "no_memory"
+        ) {
+            return Err(format!("unsupported intervention kind {kind}"));
+        }
+        let _target_key = required_string(intervention, "target_key")?;
+        let removed = required_event_ids(intervention, "removed_event_ids")?;
+        let unique_removed: BTreeSet<u32> = removed.iter().copied().collect();
+        if removed.is_empty() || unique_removed.len() != removed.len() {
+            return Err("intervention removed_event_ids must be non-empty and unique".to_string());
+        }
+        if intervention.get("matched_to").is_none() {
+            return Err("intervention is missing matched_to field".to_string());
+        }
+        if intervention
+            .get("matched_to")
+            .and_then(Value::as_str)
+            .is_some_and(str::is_empty)
+        {
+            return Err("intervention matched_to must not be empty".to_string());
+        }
+    }
+
     let count_kind = |kind: &str| -> Result<u64, String> {
         let mut count = 0_u64;
         for intervention in interventions {
@@ -302,6 +340,14 @@ fn validate_score_against_manifest(score: &Value, manifest: &Value) -> Result<()
     let score_method = required_string(score, "method")?;
     let score_target = required_string(score, "target_key")?;
     let score_removed = required_event_ids(score, "removed_event_ids")?;
+    let declared_removed_count = required_u64(score, "removed_event_count")?;
+    if usize::try_from(declared_removed_count).ok() != Some(score_removed.len()) {
+        return Err("removed_event_count does not match removed_event_ids".to_string());
+    }
+    let unique_score_removed: BTreeSet<u32> = score_removed.iter().copied().collect();
+    if unique_score_removed.len() != score_removed.len() {
+        return Err("score removed_event_ids contains duplicate IDs".to_string());
+    }
     let score_matched_to = score
         .get("matched_to")
         .cloned()
@@ -931,6 +977,7 @@ mod tests {
     }
 
     fn linked_score(intervention_id: &str, kind: &str, target: &str, removed: Value) -> Value {
+        let removed_event_count = removed.as_array().unwrap().len();
         json!({
             "candidate_observation_id": "observation-1",
             "candidate_input_sha256": "f".repeat(64),
@@ -939,6 +986,7 @@ mod tests {
             "method": "typed_content_hdc",
             "target_key": target,
             "removed_event_ids": removed,
+            "removed_event_count": removed_event_count,
             "matched_to": null
         })
     }
