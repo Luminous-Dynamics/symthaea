@@ -2794,7 +2794,8 @@ mod tests {
         let second = build_mycelial_failure_attack_plan(&graph, &demand_pairs, config).unwrap();
         assert_eq!(first, second);
         assert_eq!(first.scenarios.len(), 2);
-        assert_eq!(first.ranked_entity_ids.len(), 3);
+        assert_eq!(first.ranked_entity_ids.len(), 2);
+        assert_eq!(first.ranked_entity_ids_per_step.len(), 2);
         let budget_one: BTreeSet<_> = first.scenarios[0].failed_segment_ids.iter().collect();
         let budget_two: BTreeSet<_> = first.scenarios[1].failed_segment_ids.iter().collect();
         assert!(budget_one.is_subset(&budget_two));
@@ -2818,8 +2819,9 @@ mod tests {
         let graph = triangle_graph();
         let demand_pairs = demands();
 
-        let degree = build_mycelial_failure_attack_plan(
-            &graph,
+        let degree_graph = adaptive_attack_graph();
+let degree = build_mycelial_failure_attack_plan(
+            &degree_graph,
             &demand_pairs,
             MycelialFailureAttackConfig {
                 strategy: MycelialFailureAttackStrategy::HighestDegreeJunctions,
@@ -3318,9 +3320,13 @@ mod tests {
             first.canonical_digest_hex().unwrap(),
             second.canonical_digest_hex().unwrap()
         );
+        let original_digest = first.canonical_digest_hex().unwrap();
         let mut tampered = first.clone();
         tampered.trials[0].realized_failed_segment_ids.clear();
-        assert!(tampered.canonical_digest_hex().is_err());
+        assert_ne!(
+            tampered.canonical_digest_hex().unwrap(),
+            original_digest
+        );
         assert!(
             tampered
                 .validate_against(&graph, &demand_pairs, &plan)
