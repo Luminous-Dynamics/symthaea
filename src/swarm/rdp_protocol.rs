@@ -70,9 +70,14 @@ pub enum RdpFrame {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AudioFrame {
     pub audio_seq: u64,
+    /// Capture timestamp in milliseconds; clock-domain calibration is carried out of band.
     pub timestamp_ms: u64,
+    /// Source sample rate in frames per second.
     pub sample_rate: u32,
+    /// Number of sample frames per encoded channel, not scalar interleaved values.
+    /// Encoded channel count is implied by `encoding` (stereo PCM or mono μ-law).
     pub num_samples: u16,
+    /// Exact encoded payload; its length must match `num_samples` and `encoding`.
     pub data: Vec<u8>,
     pub encoding: AudioEncoding,
     pub consciousness_level: f32,
@@ -367,10 +372,34 @@ impl RdpFrame {
             Self::Input(input) => input.validate()?,
             Self::Control(control) => control.validate()?,
             Self::Audio(audio) => {
+                if audio.sample_rate == 0 {
+                    return Err(FrameCodecError::InvalidFrame(
+                        "audio frame sample rate must be non-zero".to_string(),
+                    ));
+                }
+                if audio.num_samples == 0 {
+                    return Err(FrameCodecError::InvalidFrame(
+                        "audio frame must contain at least one sample frame".to_string(),
+                    ));
+                }
                 if audio.data.len() > RDP_AUDIO_MAX_CHUNK_BYTES {
                     return Err(FrameCodecError::InvalidFrame(format!(
                         "audio frame has {} bytes, max {RDP_AUDIO_MAX_CHUNK_BYTES}",
                         audio.data.len()
+                    )));
+                }
+                let bytes_per_sample_frame = match audio.encoding {
+                    AudioEncoding::RawF32Stereo => 2 * std::mem::size_of::<f32>(),
+                    AudioEncoding::RawI16Stereo => 2 * std::mem::size_of::<i16>(),
+                    AudioEncoding::MuLawMono => std::mem::size_of::<u8>(),
+                };
+                let expected_bytes =
+                    usize::from(audio.num_samples) * bytes_per_sample_frame;
+                if audio.data.len() != expected_bytes {
+                    return Err(FrameCodecError::InvalidFrame(format!(
+                        "audio frame has {} payload bytes for {} sample frames; expected {expected_bytes}",
+                        audio.data.len(),
+                        audio.num_samples
                     )));
                 }
             }
@@ -636,6 +665,91 @@ mod tests {
 
         let err = input.to_bin().unwrap_err();
         assert!(matches!(err, FrameCodecError::InvalidFrame(_)));
+    }
+
+    #[test]
+    fn audio_frame_wire_validation_matches_each_encoding_layout() {
+        let cases = [
+            (
+                AudioEncoding::RawF32Stereo,
+                2 * std::mem::size_of::<f32>(),
+            ),
+            (
+                AudioEncoding::RawI16Stereo,
+                2 * std::mem::size_of::<i16>(),
+            ),
+            (AudioEncoding::MuLawMono, std::mem::size_of::<u8>()),
+        ];
+
+        for (encoding, bytes_per_sample_frame) in cases {
+            let frame = RdpFrame::Audio(AudioFrame {
+                audio_seq: 1,
+                timestamp_ms: 10,
+                sample_rate: 48_000,
+                num_samples: 1,
+                data: vec![0; bytes_per_sample_frame],
+                encoding,
+                consciousness_level: 0.5,
+                allostatic_load: 0.0,
+                dominant_harmony: 0,
+            });
+            let wire_bytes = frame.to_bin().expect("valid audio frame");
+            assert!(matches!(
+                RdpFrame::from_bin(&wire_bytes).expect("audio frame round-trip"),
+                RdpFrame::Audio(_)
+            ));
+        }
+    }
+
+    #[test]
+    fn audio_frame_wire_validation_rejects_zero_count_and_payload_drift() {
+        let zero_count = RdpFrame::Audio(AudioFrame {
+            audio_seq: 1,
+            timestamp_ms: 10,
+            sample_rate: 48_000,
+            num_samples: 0,
+            data: Vec::new(),
+            encoding: AudioEncoding::MuLawMono,
+            consciousness_level: 0.2,
+            allostatic_load: 0.0,
+            dominant_harmony: 0,
+        });
+        assert!(matches!(
+            zero_count.to_bin(),
+            Err(FrameCodecError::InvalidFrame(_))
+        ));
+
+        let truncated = RdpFrame::Audio(AudioFrame {
+            audio_seq: 2,
+            timestamp_ms: 20,
+            sample_rate: 48_000,
+            num_samples: 1,
+            data: vec![0; 3],
+            encoding: AudioEncoding::RawI16Stereo,
+            consciousness_level: 0.5,
+            allostatic_load: 0.0,
+            dominant_harmony: 0,
+        });
+        assert!(matches!(
+            truncated.to_bin(),
+            Err(FrameCodecError::InvalidFrame(_))
+        ));
+
+        let oversized_metadata = RdpFrame::Audio(AudioFrame {
+            audio_seq: 3,
+            timestamp_ms: 30,
+            sample_rate: 48_000,
+            num_samples: 2_049,
+            data: vec![0; RDP_AUDIO_MAX_CHUNK_BYTES],
+            encoding: AudioEncoding::RawF32Stereo,
+            consciousness_level: 0.8,
+            allostatic_load: 0.0,
+            dominant_harmony: 0,
+        });
+        assert!(matches!(
+            oversized_metadata.to_bin(),
+            Err(FrameCodecError::InvalidFrame(_))
+        ));
     }
 
     #[test]
