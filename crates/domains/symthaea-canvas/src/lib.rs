@@ -36,6 +36,7 @@ pub mod mycelial_junction_graph;
 pub mod mycelial_mesh;
 pub mod mycelial_model;
 pub mod mycelial_network;
+pub mod mycelial_observation_coverage;
 pub mod mycelial_presence;
 pub mod mycelial_reconstruction_calibration;
 pub mod mycelial_reconstruction_metrics;
@@ -205,6 +206,14 @@ pub use mycelial_network::{
     MycelialAnastomosis, MycelialAnastomosisCandidate, MycelialConnectionKind,
     MycelialNetworkConfig, MycelialNetworkConnection, MycelialNetworkError, MycelialNetworkGraph,
     MycelialNetworkMetrics, build_mycelial_network_graph, detect_anastomosis_candidates,
+};
+pub use mycelial_observation_coverage::{
+    MAX_MYCELIAL_COVERAGE_CANDIDATES_PER_OBSERVATION,
+    MAX_MYCELIAL_OBSERVATION_COVERAGE_RECORDS,
+    MYCELIAL_OBSERVATION_COVERAGE_SCHEMA_VERSION,
+    MycelialObservationCoverageError, MycelialObservationCoverageLedger,
+    MycelialObservationCoverageRecord, MycelialObservationCoverageState,
+    MycelialObservationResidualKind,
 };
 pub use mycelial_presence::{
     build_mycelial_presence, build_mycelial_presence_with_mode, render_mycelial_presence,
