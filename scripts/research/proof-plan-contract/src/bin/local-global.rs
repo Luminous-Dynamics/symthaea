@@ -3,8 +3,8 @@ use std::fs;
 use std::process::ExitCode;
 
 use proof_plan_contract::local_global::{
-    check_finite_propositional_entailment, compute_cirr, validate_pair_json,
-    FiniteTruthTableResult, MAX_FINITE_BOOLEAN_ATOMS,
+    FiniteTruthTableResult, MAX_FINITE_BOOLEAN_ATOMS, check_finite_propositional_entailment,
+    compute_cirr, validate_pair_json,
 };
 
 fn main() -> ExitCode {

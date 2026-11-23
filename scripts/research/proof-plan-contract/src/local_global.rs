@@ -210,7 +210,6 @@ impl BooleanFormula {
     }
 }
 
-
 /// Result of exhaustive enumeration over a finite propositional atom set.
 /// NoCountermodelFound is complete only for this Boolean AST and atom set;
 /// it is not a general Lean proof or a result about arbitrary mathematical types.
@@ -894,11 +893,14 @@ mod tests {
         assert!(visible.get("valuation").is_none());
     }
 
-
     #[test]
     fn truth_table_finds_converse_implication_countermodel() {
-        let p = BooleanFormula::Atom { name: "p".to_owned() };
-        let q = BooleanFormula::Atom { name: "q".to_owned() };
+        let p = BooleanFormula::Atom {
+            name: "p".to_owned(),
+        };
+        let q = BooleanFormula::Atom {
+            name: "q".to_owned(),
+        };
         let result = check_finite_propositional_entailment(
             &[BooleanFormula::Implies {
                 left: Box::new(p.clone()),
@@ -984,8 +986,12 @@ mod tests {
 
     #[test]
     fn truth_table_countermodels_are_deterministic() {
-        let a = BooleanFormula::Atom { name: "a".to_owned() };
-        let z = BooleanFormula::Atom { name: "z".to_owned() };
+        let a = BooleanFormula::Atom {
+            name: "a".to_owned(),
+        };
+        let z = BooleanFormula::Atom {
+            name: "z".to_owned(),
+        };
         let premise = BooleanFormula::Implies {
             left: Box::new(a.clone()),
             right: Box::new(z.clone()),
