@@ -840,7 +840,8 @@ mod tests {
         let result = CandidateProcessSession::spawn(path.clone(), "0".repeat(64));
         let _ = fs::remove_file(path);
         assert!(result
-            .unwrap_err()
+            .err()
+            .unwrap()
             .contains("candidate binary digest mismatch"));
     }
 
