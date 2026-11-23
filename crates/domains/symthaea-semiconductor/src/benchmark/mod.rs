@@ -103,7 +103,6 @@ pub use calibration_requalification::{
     CalibrationChangeKindV1, CalibrationChangeScopeV1, CalibrationChangeTargetV1,
     CalibrationEventFrontierV1, CalibrationEventInventoryStateV1,
     CalibrationEventOrderingStateV1, CalibrationEventQualificationV1,
-    CalibrationMeasurementInventoryStateV1, CalibrationMeasurementOrderingStateV1,
     CalibrationOperatingRangeV1, CalibrationRequalificationErrorV1,
     CalibrationRequalificationFrontierReportV1, CalibrationRequalificationInputV1,
     CalibrationRequalificationReasonV1, CalibrationRequalificationReportV1,
