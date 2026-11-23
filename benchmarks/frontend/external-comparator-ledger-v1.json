@@ -646,9 +646,21 @@
           "source": "two_third_party_leaderboard_snapshots; official_Cognition_page_dynamic_chart",
           "model": "Claude Fable 5.2",
           "harness": "Claude Code",
-          "reasoning_effort": "xhigh",
+          "reasoning_effort": "leaderboard configuration not normalized across mirrors",
           "weighted_score_percent": 50.2,
-          "interpretation": "Cross-checked 2026-11-23 leaderboard mirrors show the public FrontierCode 2.0 weighted-score row at 50.2% for Claude Fable 5.2. Cognition's rendered page exposes weighted-score semantics and scoring revisions but not the individual numeric row in text; treat 50.2 as a mirrored leaderboard snapshot, not a locally reproduced score."
+          "interpretation": "A Nov 23 Priors mirror reports Fable 5.2 at 50.2% on its default leaderboard; another mirror lists a different 49.1% high / 47.6% xhigh breakdown. Cognition's direct leaderboard is interactive and settings-dependent. Do not attribute 50.2% specifically to xhigh or merge these observations into one score."
+        },
+        {
+          "kind": "leaderboard_mirror_configuration_crosscheck",
+          "observed_date": "2026-11-23",
+          "sources": [
+            "https://frontierlog.ai/benchmark/frontiercode-2-0",
+            "https://mypriors.com/benchmarks/frontiercode-2.0-main"
+          ],
+          "priors_reported_fable_5_2_score_percent": 50.2,
+          "frontierlog_reported_fable_5_2_high_score_percent": 49.1,
+          "frontierlog_reported_fable_5_2_xhigh_score_percent": 47.6,
+          "interpretation": "Public mirrors expose different configurations/scores; record each with source and effort label instead of asserting 50.2% is xhigh. Cognition's direct page states weighted score semantics and blocking-zero policy."
         }
       ],
       "limitations": [
@@ -657,7 +669,8 @@
         "A benchmark score must be associated with its exact model, reasoning effort, agent harness and scoring revision.",
         "The 47.3% Opus 5.5 score is the official October 27 launch snapshot; later leaderboard entries may differ and must be timestamped separately.",
         "The official site notes 20+ maintainer-authors spent more than 40 hours per task, uses unit tests, rubrics and verifiers, and zeroes runs that use solution-bearing sources; SFEB should match the rigor and independently qualify its own tasks.",
-        "The 50.2% Claude Fable 5.2 current row is corroborated by third-party leaderboard mirrors; Cognition's direct page is dynamically rendered and its text view states scoring semantics but does not expose the numeric row. Treat the numeric observation as a timestamped external mirror, not a locally reproduced benchmark run."
+        "The 50.2% Claude Fable 5.2 current row is corroborated by third-party leaderboard mirrors; Cognition's direct page is dynamically rendered and its text view states scoring semantics but does not expose the numeric row. Treat the numeric observation as a timestamped external mirror, not a locally reproduced benchmark run.",
+        "Nov 23 mirrors do not normalize Fable 5.2 reasoning effort: Priors lists 50.2% on its default leaderboard, while Frontierlog lists 49.1% high and 47.6% xhigh. Avoid attaching the 50.2% number to xhigh."
       ],
       "sources": [
         "https://cognition.com/frontiercode",
@@ -727,6 +740,89 @@
       "sources": [
         "https://osworld-v2.xlang.ai/",
         "https://arxiv.org/abs/2606.29537"
+      ]
+    },
+    {
+      "id": "sentinelbench",
+      "name": "SentinelBench",
+      "scope": "Long-running monitoring agents operating over time-evolving synthetic web environments; evaluates passive/active and absolute/relative monitoring, no-op abstention, reaction time and resource use.",
+      "task_count": 100,
+      "snapshot_status": "historical_published_snapshot",
+      "observations": [
+        {
+          "kind": "benchmark_scale",
+          "tasks": 100,
+          "synthetic_web_environments": 10,
+          "no_op_tasks": 20,
+          "axes": [
+            "passive_vs_active",
+            "absolute_vs_relative"
+          ]
+        },
+        {
+          "kind": "wait_tool_method",
+          "tool": "wait_for(condition, timeout)",
+          "behavior": "takes baseline textual snapshot then checks for changes once per second; LLM evaluates new diffs"
+        },
+        {
+          "kind": "reported_completion_comparison",
+          "wait_for_correct_tasks": 69,
+          "sleep_correct_tasks": 56,
+          "denominator": 100,
+          "model_family": "three models across two browser-agent variants",
+          "observed_date": "2026-06-08"
+        },
+        {
+          "kind": "reported_cost_comparison",
+          "model": "GPT-5.4",
+          "horizon_minutes": 10,
+          "sleep_median_usd": 1.17,
+          "wait_for_median_usd": 0.23,
+          "cost_reduction_factor": 5.1,
+          "interpretation": "Microsoft reports median cost per task; result is protocol/model-specific, not comparable directly with SFEB."
+        }
+      ],
+      "limitations": [
+        "The wait_for baseline is itself polling-based (one-second page diff), not a push-notification or durable event-cursor implementation.",
+        "The environments are synthetic facades with scripted event timelines; they do not establish production event-bus reliability.",
+        "Current benchmark focuses on persistent conditions and does not fully capture ephemeral must-act-now opportunities.",
+        "MON-001's zero explicit polls are from a synthetic in-memory trace, not a measured production wait service or CPU/network result."
+      ],
+      "sources": [
+        "https://www.microsoft.com/en-us/research/articles/sentinelbench-a-benchmark-for-long-running-monitoring-agents/",
+        "https://www.microsoft.com/en-us/research/publication/sentinelbench-a-benchmark-for-long-running-monitoring-agents/",
+        "https://github.com/microsoft/sentinel_environments"
+      ]
+    },
+    {
+      "id": "odysseys",
+      "name": "Odysseys",
+      "scope": "Realistic long-horizon multi-site web workflows evaluated using multiple graded rubrics and trajectory efficiency; adjacent comparator for sustained computer-use agents.",
+      "task_count": 200,
+      "snapshot_status": "historical_published_snapshot",
+      "observations": [
+        {
+          "kind": "benchmark_scale",
+          "tasks": 200,
+          "mean_graded_rubrics_per_task": 6.1,
+          "evaluation": "rubric-based partial progress over real-world browsing workflows"
+        },
+        {
+          "kind": "published_leading_result",
+          "best_model_success_rate_percent": 44.5,
+          "trajectory_efficiency_percent": 1.15,
+          "trajectory_efficiency_definition": "rubric score per step",
+          "published_date": "2026-04-27"
+        }
+      ],
+      "limitations": [
+        "This is a multi-site web-completion benchmark, not a dedicated monitoring/waiting benchmark.",
+        "Its success and trajectory-efficiency values use its own task set, rubrics, agent/model settings and are not numerically comparable with SFEB.",
+        "SFEB should adapt the emphasis on graded partial outcomes and efficiency while retaining independent state, permission and artifact oracles."
+      ],
+      "sources": [
+        "https://arxiv.org/abs/2604.24964",
+        "https://odysseysbench.com/v1/"
       ]
     }
   ]
