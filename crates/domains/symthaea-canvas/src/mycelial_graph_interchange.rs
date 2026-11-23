@@ -22,7 +22,7 @@ use crate::mycelial_reconstruction_metrics::{
 
 pub const MYCELIAL_GRAPH_INTERCHANGE_SCHEMA_VERSION: u16 = 1;
 pub const MYCELIAL_SWC_PROJECTION_SCHEMA_VERSION: u16 = 1;
-pub const MAX_MYcelial_GRAPH_FOREIGN_BINDINGS: usize = 65_536;
+pub const MAX_MYCELIAL_GRAPH_FOREIGN_BINDINGS: usize = 65_536;
 pub const MAX_MYCELIAL_INTERCHANGE_ID_BYTES: usize = 128;
 pub const MAX_MYCELIAL_SOURCE_URI_BYTES: usize = 2_048;
 pub const MAX_MYCELIAL_SWC_NODES: usize = 65_536;
@@ -187,7 +187,7 @@ impl fmt::Display for MycelialGraphInterchangeError {
                 write!(f, "sidecar topology summary does not match the embedded graph")
             }
             Self::TooManyForeignBindings(count) => {
-                write!(f, "foreign binding count {count} exceeds {MAX_MYcelial_GRAPH_FOREIGN_BINDINGS}")
+                write!(f, "foreign binding count {count} exceeds {MAX_MYCELIAL_GRAPH_FOREIGN_BINDINGS}")
             }
             Self::InvalidForeignBinding(id) => {
                 write!(f, "invalid foreign identity binding {id}")
@@ -273,11 +273,14 @@ fn graph_topology(
         .collect();
 
     fn find(parent: &mut BTreeMap<String, String>, id: &str) -> String {
-        let current = parent.get(id).expect("validated junction ID");
+        let current = parent
+            .get(id)
+            .expect("validated junction ID")
+            .clone();
         if current == id {
-            return current.clone();
+            return current;
         }
-        let root = find(parent, current);
+        let root = find(parent, &current);
         parent.insert(id.to_string(), root.clone());
         root
     }
@@ -385,7 +388,7 @@ impl MycelialGraphInterchangeSidecar {
         if self.connected_components != topology.components || self.cycle_rank != topology.cycle_rank {
             return Err(MycelialGraphInterchangeError::TopologySummaryMismatch);
         }
-        if self.foreign_identity_bindings.len() > MAX_MYcelial_GRAPH_FOREIGN_BINDINGS {
+        if self.foreign_identity_bindings.len() > MAX_MYCELIAL_GRAPH_FOREIGN_BINDINGS {
             return Err(MycelialGraphInterchangeError::TooManyForeignBindings(
                 self.foreign_identity_bindings.len(),
             ));
@@ -564,21 +567,19 @@ pub fn project_mycelial_skeleton_to_swc(
         .iter()
         .map(|junction| (junction.id.as_str(), junction))
         .collect();
-    let mut component_roots = BTreeMap::<String, String>::new();
     let mut visited = BTreeSet::new();
     let mut traversal = Vec::<(String, Option<String>)>::new();
 
     for root_id in sorted_roots {
-        let Some(root) = junctions.get(root_id.as_str()) else {
+        if !junctions.contains_key(root_id.as_str()) {
             return Err(MycelialGraphInterchangeError::InvalidSwcRoots);
-        };
+        }
         if visited.contains(root_id.as_str()) {
             return Err(MycelialGraphInterchangeError::InvalidSwcRoots);
         }
         let mut queue = VecDeque::new();
         queue.push_back((root_id.clone(), None));
         visited.insert(root_id.clone());
-        component_roots.insert(root_id.clone(), root_id.clone());
         while let Some((current_id, parent_id)) = queue.pop_front() {
             traversal.push((current_id.clone(), parent_id));
             for (neighbour_id, _segment_id) in topology
@@ -587,7 +588,6 @@ pub fn project_mycelial_skeleton_to_swc(
                 .expect("topology contains every junction")
             {
                 if visited.insert(neighbour_id.clone()) {
-                    component_roots.insert(neighbour_id.clone(), root_id.clone());
                     queue.push_back((neighbour_id.clone(), Some(current_id.clone())));
                 }
             }
