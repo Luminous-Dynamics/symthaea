@@ -653,6 +653,53 @@ mod tests {
     }
 
 
+    #[test]
+    fn file_witness_rejects_t9_backup_missing_a_newer_committed_write() {
+        let root = temporary_directory("t9-reconciliation");
+        let mut witness = FileBackedWitnessStore::open(root.join("witness"))
+            .expect("open witness");
+        let authority = FixtureAuthority;
+        let mut current = MemorySnapshot::default();
+
+        crate::commit_record(
+            &mut current,
+            &mut witness,
+            crate::MemoryRecord::new(
+                "root",
+                "first committed record",
+                "issuer",
+                "project-x",
+                "planning",
+                Vec::new(),
+            ),
+            &authority,
+        )
+        .expect("commit first record");
+        let stale_backup = current.clone();
+
+        crate::commit_record(
+            &mut current,
+            &mut witness,
+            crate::MemoryRecord::new(
+                "later-write",
+                "newer committed record",
+                "issuer",
+                "project-x",
+                "planning",
+                Vec::new(),
+            ),
+            &authority,
+        )
+        .expect("commit later record");
+
+        assert_eq!(
+            crate::reconcile_snapshot(stale_backup, &witness),
+            Err(LifecycleError::RollbackOrTamperDetected)
+        );
+        assert!(current.contains("later-write"));
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
     #[cfg(unix)]
     #[test]
     fn witness_directory_and_checkpoint_files_are_owner_only() {
