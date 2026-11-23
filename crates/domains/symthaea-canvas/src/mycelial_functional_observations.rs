@@ -139,7 +139,10 @@ impl fmt::Display for MycelialFunctionalObservationError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidSchemaVersion(version) => {
-                write!(f, "unsupported mycelial functional observation schema version {version}")
+                write!(
+                    f,
+                    "unsupported mycelial functional observation schema version {version}"
+                )
             }
             Self::InvalidMetadata => {
                 write!(f, "invalid mycelial functional observation set metadata")
@@ -149,25 +152,43 @@ impl fmt::Display for MycelialFunctionalObservationError {
                 "functional observation count {count} exceeds {MAX_MYCELIAL_FUNCTIONAL_OBSERVATIONS}"
             ),
             Self::DuplicateOrUnorderedObservationId(id) => {
-                write!(f, "functional observation IDs are duplicated or unordered at {id}")
+                write!(
+                    f,
+                    "functional observation IDs are duplicated or unordered at {id}"
+                )
             }
             Self::InvalidObservation(id) => {
                 write!(f, "invalid functional observation {id}")
             }
             Self::GraphDigestMismatch => {
-                write!(f, "functional observations do not bind to the supplied graph digest")
+                write!(
+                    f,
+                    "functional observations do not bind to the supplied graph digest"
+                )
             }
             Self::CoordinateFrameMismatch => {
-                write!(f, "functional observations use a different coordinate frame")
+                write!(
+                    f,
+                    "functional observations use a different coordinate frame"
+                )
             }
             Self::CalibrationDigestMismatch => {
-                write!(f, "functional observations use a different calibration digest")
+                write!(
+                    f,
+                    "functional observations use a different calibration digest"
+                )
             }
             Self::UnknownGraphEdge(id) => {
-                write!(f, "functional flow observation references unknown graph edge {id}")
+                write!(
+                    f,
+                    "functional flow observation references unknown graph edge {id}"
+                )
             }
             Self::UnknownGraphNode(id) => {
-                write!(f, "functional tracer observation references unknown graph node {id}")
+                write!(
+                    f,
+                    "functional tracer observation references unknown graph node {id}"
+                )
             }
         }
     }
@@ -202,10 +223,7 @@ fn hash_optional_string(hasher: &mut blake3::Hasher, value: Option<&str>) {
     }
 }
 
-fn hash_optional_quantity(
-    hasher: &mut blake3::Hasher,
-    value: Option<MycelialFunctionalQuantity>,
-) {
+fn hash_optional_quantity(hasher: &mut blake3::Hasher, value: Option<MycelialFunctionalQuantity>) {
     match value {
         Some(quantity) => {
             hasher.update(&[1]);
@@ -283,9 +301,7 @@ impl MycelialFunctionalObservationSet {
                 } => {
                     valid_id(edge_id)
                         && *trajectory_count > 0
-                        && mean_speed_um_per_s.is_none_or(|speed| {
-                            speed.is_finite() && speed >= 0.0
-                        })
+                        && mean_speed_um_per_s.is_none_or(|speed| speed.is_finite() && speed >= 0.0)
                 }
                 MycelialFunctionalMeasurement::TracerTransfer {
                     source_node_id,
@@ -346,12 +362,14 @@ impl MycelialFunctionalObservationSet {
         skeleton: &AnnotatedMycelialSkeleton,
     ) -> Result<(), MycelialFunctionalObservationError> {
         self.validate()?;
-        skeleton.validate().map_err(|_| {
-            MycelialFunctionalObservationError::GraphDigestMismatch
-        })?;
-        if self.source_graph_digest != skeleton.canonical_digest_hex().map_err(|_| {
-            MycelialFunctionalObservationError::GraphDigestMismatch
-        })? {
+        skeleton
+            .validate()
+            .map_err(|_| MycelialFunctionalObservationError::GraphDigestMismatch)?;
+        if self.source_graph_digest
+            != skeleton
+                .canonical_digest_hex()
+                .map_err(|_| MycelialFunctionalObservationError::GraphDigestMismatch)?
+        {
             return Err(MycelialFunctionalObservationError::GraphDigestMismatch);
         }
         if self.coordinate_frame_id != skeleton.coordinate_frame_id {
@@ -360,10 +378,16 @@ impl MycelialFunctionalObservationSet {
         if self.calibration_digest != skeleton.calibration_digest {
             return Err(MycelialFunctionalObservationError::CalibrationDigestMismatch);
         }
-        let edge_ids: std::collections::BTreeSet<_> =
-            skeleton.segments.iter().map(|segment| segment.id.as_str()).collect();
-        let node_ids: std::collections::BTreeSet<_> =
-            skeleton.junctions.iter().map(|junction| junction.id.as_str()).collect();
+        let edge_ids: std::collections::BTreeSet<_> = skeleton
+            .segments
+            .iter()
+            .map(|segment| segment.id.as_str())
+            .collect();
+        let node_ids: std::collections::BTreeSet<_> = skeleton
+            .junctions
+            .iter()
+            .map(|junction| junction.id.as_str())
+            .collect();
         for observation in &self.observations {
             match &observation.measurement {
                 MycelialFunctionalMeasurement::CytoplasmicFlow { edge_id, .. } => {
@@ -392,9 +416,7 @@ impl MycelialFunctionalObservationSet {
         Ok(())
     }
 
-    pub fn canonical_digest_hex(
-        &self,
-    ) -> Result<String, MycelialFunctionalObservationError> {
+    pub fn canonical_digest_hex(&self) -> Result<String, MycelialFunctionalObservationError> {
         self.validate()?;
         let mut hasher = blake3::Hasher::new();
         hasher.update(b"symthaea-mycelial-functional-observation-set-v1");
@@ -545,12 +567,20 @@ mod tests {
                 AnnotatedJunction {
                     id: "A".to_string(),
                     kind: AnnotatedJunctionKind::Origin,
-                    position: ReconstructionPoint3 { x: 0.0, y: 0.0, z: 0.0 },
+                    position: ReconstructionPoint3 {
+                        x: 0.0,
+                        y: 0.0,
+                        z: 0.0,
+                    },
                 },
                 AnnotatedJunction {
                     id: "B".to_string(),
                     kind: AnnotatedJunctionKind::Tip,
-                    position: ReconstructionPoint3 { x: 10.0, y: 0.0, z: 0.0 },
+                    position: ReconstructionPoint3 {
+                        x: 10.0,
+                        y: 0.0,
+                        z: 0.0,
+                    },
                 },
             ],
             segments: vec![AnnotatedHyphaSegment {
@@ -717,9 +747,9 @@ mod tests {
                 liquid_saturation_fraction: Some(1.2),
             },
         });
-        microbial.observations.sort_by(|left, right| {
-            left.observation_id.cmp(&right.observation_id)
-        });
+        microbial
+            .observations
+            .sort_by(|left, right| left.observation_id.cmp(&right.observation_id));
         assert!(microbial.validate().is_err());
     }
 
@@ -727,9 +757,9 @@ mod tests {
     fn duplicate_observation_ids_are_rejected() {
         let mut observations = set();
         observations.observations[1].observation_id = "flow-001".to_string();
-        observations.observations.sort_by(|left, right| {
-            left.observation_id.cmp(&right.observation_id)
-        });
+        observations
+            .observations
+            .sort_by(|left, right| left.observation_id.cmp(&right.observation_id));
         assert!(matches!(
             observations.validate(),
             Err(MycelialFunctionalObservationError::DuplicateOrUnorderedObservationId(id))
