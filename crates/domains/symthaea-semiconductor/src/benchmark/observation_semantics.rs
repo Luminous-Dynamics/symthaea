@@ -1249,6 +1249,73 @@ mod tests {
     }
 
     #[test]
+    fn affine_coefficient_uncertainty_and_covariance_propagate_to_output_variance() {
+        let source = mapped_source_frame(SensorObservationStateV1::Observed {
+            value: 2.5,
+            unit: "kPa".into(),
+            uncertainty: MeasurementUncertaintyV1 {
+                standard_uncertainty: 0.02,
+                coverage_probability: Some(0.95),
+                method_ref: "gauge-report-4".into(),
+            },
+        });
+        let mut manifest = complete_correspondence_manifest();
+        let transform = manifest.correspondences[0].unit_transform.as_mut().unwrap();
+        transform.coefficient_uncertainty = Some(SensorAffineTransformUncertaintyV1 {
+            scale_standard_uncertainty: 0.5,
+            offset_standard_uncertainty: 2.0,
+            covariance_scale_offset: 0.1,
+            uncertainty_evidence_ref: "conversion-calibration-study-17".into(),
+        });
+
+        let execution = execute_sensor_correspondence_v1(&source, &manifest).unwrap();
+        let target = execution.target_frame.unwrap();
+        let pressure = target
+            .observations
+            .iter()
+            .find(|observation| observation.sensor_id == "target-pressure")
+            .unwrap();
+        match &pressure.state {
+            SensorObservationStateV1::Observed {
+                value,
+                uncertainty,
+                ..
+            } => {
+                assert_eq!(*value, 2500.0);
+                let expected_standard_uncertainty = (406.0625_f64).sqrt();
+                assert!(
+                    (uncertainty.standard_uncertainty - expected_standard_uncertainty).abs()
+                        < 1.0e-12
+                );
+                assert!(uncertainty.method_ref.contains("conversion-calibration-study-17"));
+            }
+            other => panic!("expected transformed qualified observation, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn transform_coefficient_covariance_must_be_positive_semidefinite() {
+        let source = mapped_source_frame(SensorObservationStateV1::Observed {
+            value: 2.5,
+            unit: "kPa".into(),
+            uncertainty: MeasurementUncertaintyV1 {
+                standard_uncertainty: 0.02,
+                coverage_probability: Some(0.95),
+                method_ref: "gauge-report-4".into(),
+            },
+        });
+        let mut manifest = complete_correspondence_manifest();
+        let transform = manifest.correspondences[0].unit_transform.as_mut().unwrap();
+        transform.coefficient_uncertainty = Some(SensorAffineTransformUncertaintyV1 {
+            scale_standard_uncertainty: 0.5,
+            offset_standard_uncertainty: 2.0,
+            covariance_scale_offset: 1.1,
+            uncertainty_evidence_ref: "invalid-conversion-study".into(),
+        });
+        assert!(execute_sensor_correspondence_v1(&source, &manifest).is_err());
+    }
+
+    #[test]
     fn unsupported_mapping_abstains_instead_of_emitting_partial_target_frame() {
         let source = mapped_source_frame(SensorObservationStateV1::Observed {
             value: 2.5,
