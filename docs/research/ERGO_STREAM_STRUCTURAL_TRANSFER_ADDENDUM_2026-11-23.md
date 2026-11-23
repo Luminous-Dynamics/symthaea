@@ -82,13 +82,28 @@ Counterexamples and non-transfer results are reusable knowledge, not discarded e
 
 Keep the current division of responsibility:
 
-- **Symthaea:** proposes units, relations, structural libraries, candidate correspondences, transformation hypotheses, and discriminating experiments.
-- **Symtropy:** owns hidden world generation, available observation streams, permitted interventions, replay, and independent scoring.
+- **Symthaea:** proposes units, relations, structural libraries, candidate correspondences, transformation hypotheses and discriminating experiments. Its accepted scientific model artifacts continue to project into the existing typed ScientificModel / PhysicsIR pathway.
+- **Symtropy:** owns hidden world generation, available observation streams, permitted interventions, replay and independent scoring. The existing blind episode and candidate-model proposal owners remain authoritative.
 - **Independent qualification:** determines which claims are supported in a declared scope; Symthaea cannot self-authorize scientific qualification.
 
-Reuse the current AV-STREAM, Vision Mind, shared-grammar, invariance, symmetry, uncertainty, Symtropy blind-episode and bounded model-proposal work. Do not add a second graph engine, world model, sensor ontology, evidence ledger, or generic query system.
+### Existing owners to compose
 
-Symtropy #7171 adds a first finite validator for a proposed total structure correspondence and a separate qualitative intervention-effect witness. That is an executable contract slice, not an analogy-discovery learner or sealed evaluator.
+| Existing owner | Reuse | ErgoStream-specific extension |
+|---|---|---|
+| Symthaea [#11042](https://github.com/Luminous-Dynamics/symthaea/issues/11042), [#11044](https://github.com/Luminous-Dynamics/symthaea/pull/11044) | Ansätz-free discovery task contract, A0/A2/A3/A4/A5 separation, identifiability and positive/negative mechanism-transfer scope | Freeze and expose a structural library/correspondence as an explicit transfer artifact |
+| Symthaea [#11060](https://github.com/Luminous-Dynamics/symthaea/pull/11060) | Three executable finite world families, public AgentView / AgentAction, parent-runner / child-agent process bridge, seven experiment-selection baselines, evidence-prefix identity and finite paired campaign | Add structural correspondence and action-conditioned dynamics as typed post-acquisition outputs; do not create another JSONL episode runner or acquisition-policy suite |
+| Symtropy [#5990](https://github.com/Luminous-Dynamics/symtropy/issues/5990) | Trusted owner-side interactive episode boundary and private world state | Extend through a typed policy-view adapter for modality-native stream frames; do not fork the episode protocol |
+| Symtropy [#6027](https://github.com/Luminous-Dynamics/symtropy/issues/6027) / [#6065](https://github.com/Luminous-Dynamics/symtropy/pull/6065) | Candidate-independent typed model DSL, bounded interpreter and counterexample foundation | Project finite transition proposals/witnesses into the existing typed model vocabulary rather than inventing a second model DSL |
+| Symtropy [#7149](https://github.com/Luminous-Dynamics/symtropy/issues/7149) | Stream-world provider, learner/evaluator information boundary and hidden structural probes | Supply paired stream worlds and Transfer Atlas cases through the existing owner boundary |
+| Symthaea [#8919](https://github.com/Luminous-Dynamics/symthaea/issues/8919), [#8671](https://github.com/Luminous-Dynamics/symthaea/issues/8671), [#8705](https://github.com/Luminous-Dynamics/symthaea/issues/8705) | Shared grammar recovery, progressive knowledge / negative-transfer evaluation, invariant mechanism transfer | Treat learned grammar/knowledge units as candidate structural libraries and test their transfer scope explicitly |
+| Symthaea [#8669](https://github.com/Luminous-Dynamics/symthaea/issues/8669) | Structural posterior, equivalence classes, support omission and non-identifiability | Keep transfer maps set-valued or unresolved when evidence does not identify a unique map |
+| Symthaea [#12837](https://github.com/Luminous-Dynamics/symthaea/issues/12837) | Causal audiovisual stream continuity, native modality timing, event association and active sensing | Provide AV-STREAM as a downstream acquisition adapter; do not create another sensor/clock/fusion stack |
+| Symthaea [#9094](https://github.com/Luminous-Dynamics/symthaea/issues/9094), [#13389](https://github.com/Luminous-Dynamics/symthaea/issues/13389) | Decision-centric world-model comparison, direct-policy controls, RoboDyna / LIBERO-Dynamic adapters | Evaluate whether transferred structure improves action outcomes under matched budgets |
+| Symthaea [#13375](https://github.com/Luminous-Dynamics/symthaea/issues/13375) / [#13377](https://github.com/Luminous-Dynamics/symthaea/pull/13377) | Causal trajectory pairing, evidence filtration and action/outcome binding | Reuse trajectory provenance for prediction-to-action qualification |
+
+This map matters because several of the difficult pieces already exist. ErgoStream should add the missing cross-world structural and dynamical transfer estimands, plus the narrow adapters needed to connect the owners—not rebuild their world generators, model DSL, learner process, acquisition policies, sensor pipeline, graph engine or evidence ledger.
+
+Symtropy #7173 now adds finite reference validators for a proposed total structural correspondence, qualitative action-effect correspondence, and deterministic finite-state dynamics correspondence. It also includes deliberately simple passive and unique-incidence baselines plus three tiny paired-world cases. This remains an executable contract slice, not an analogy-discovery learner, a sealed evaluator, or a replacement for the richer #11060/#5990 episode systems.
 
 ## 3. Transfer Atlas: internal benchmark design
 
