@@ -2018,7 +2018,7 @@ mod tests {
             assert!(report.design_variance_qualified);
             assert!(report.assay_estimator_qualified);
             assert_eq!(report.assay_measurement_seed, seed as u64);
-            assert!(valid_sha256(&report.assay_outcomes_sha256));
+            assert!(is_lowercase_sha256(&report.assay_outcomes_sha256));
 
             let ht = report.horvitz_thompson_prevalence;
             let ht_se = report.standard_error_ht_prevalence.unwrap();
