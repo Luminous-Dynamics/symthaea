@@ -1601,15 +1601,14 @@ pub fn evaluate_synthetic_metrology_policy_v1(
             hajek_variance_qualified = false;
             continue;
         };
-        let finite_population_correction =
-            1.0 - sample_count as f64 / *residual_population as f64;
+        let finite_population_correction = 1.0 - sample_count as f64 / *residual_population as f64;
         hajek_total_variance += (*residual_population as f64).powi(2)
             * finite_population_correction
             * residual_variance
             / sample_count as f64;
     }
-    let standard_error_hajek_prevalence = hajek_variance_qualified
-        .then(|| hajek_total_variance.sqrt() / weight_sum);
+    let standard_error_hajek_prevalence =
+        hajek_variance_qualified.then(|| hajek_total_variance.sqrt() / weight_sum);
     let standard_error_ht_mean_brier =
         design_variance_qualified.then(|| brier_total_variance.sqrt() / population_count as f64);
 
