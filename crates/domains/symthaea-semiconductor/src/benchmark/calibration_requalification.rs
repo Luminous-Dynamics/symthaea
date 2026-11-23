@@ -244,7 +244,9 @@ pub fn seal_calibration_event_inventory_v1(
     json_sha256(&canonical)
 }
 
-fn validate_scope(scope: &CalibrationChangeScopeV1) -> Result<(), CalibrationRequalificationErrorV1> {
+fn validate_scope(
+    scope: &CalibrationChangeScopeV1,
+) -> Result<(), CalibrationRequalificationErrorV1> {
     match &scope.target {
         CalibrationChangeTargetV1::Certificate {
             certificate_id,
@@ -275,9 +277,7 @@ fn validate_scope(scope: &CalibrationChangeScopeV1) -> Result<(), CalibrationReq
     require_text(&scope.unit, "scope.unit")?;
     require_text(&scope.method_revision, "scope.method_revision")?;
 
-    if let CalibrationOperatingRangeV1::ClosedInterval { lower, upper } =
-        scope.operating_range
-    {
+    if let CalibrationOperatingRangeV1::ClosedInterval { lower, upper } = scope.operating_range {
         if !lower.is_finite() || !upper.is_finite() || lower > upper {
             return Err(CalibrationRequalificationErrorV1(
                 "scope.operating_range: invalid finite closed interval".into(),
@@ -287,7 +287,9 @@ fn validate_scope(scope: &CalibrationChangeScopeV1) -> Result<(), CalibrationReq
     Ok(())
 }
 
-fn validate_event(event: &CalibrationChangeEventV1) -> Result<(), CalibrationRequalificationErrorV1> {
+fn validate_event(
+    event: &CalibrationChangeEventV1,
+) -> Result<(), CalibrationRequalificationErrorV1> {
     if event.schema != CALIBRATION_CHANGE_EVENT_SCHEMA_V1 {
         return Err(CalibrationRequalificationErrorV1(format!(
             "event {} has unsupported schema",
@@ -419,10 +421,7 @@ fn scope_applicability(
         return ApplicabilityV1::Unknown;
     };
 
-    let certificate_target = matches!(
-        &scope.target,
-        CalibrationChangeTargetV1::Certificate { .. }
-    );
+    let certificate_target = matches!(&scope.target, CalibrationChangeTargetV1::Certificate { .. });
     let target_matches = match &scope.target {
         CalibrationChangeTargetV1::Certificate {
             certificate_id,
@@ -436,7 +435,10 @@ fn scope_applicability(
             reference_certificate_sha256,
         } => {
             reference_standard_id == &input.calibration_at_k0.reference_standard_id
-                && input.calibration_at_k0.reference_certificate_sha256.as_ref()
+                && input
+                    .calibration_at_k0
+                    .reference_certificate_sha256
+                    .as_ref()
                     == Some(reference_certificate_sha256)
         }
     };
@@ -488,9 +490,7 @@ fn temporal_applicability(
     }
 }
 
-fn set_unknown(
-    status: &mut MeasurementQualificationStatusV1,
-) {
+fn set_unknown(status: &mut MeasurementQualificationStatusV1) {
     if *status != MeasurementQualificationStatusV1::Rejected {
         *status = MeasurementQualificationStatusV1::Unknown;
     }
@@ -649,7 +649,8 @@ fn assess_frontier(
     Ok(CalibrationRequalificationFrontierReportV1 {
         frontier_input_sha256: frontier_input_sha256(input, frontier, cutoff)?,
         status,
-        downstream_consumption_allowed_at_frontier: status == MeasurementQualificationStatusV1::Qualified,
+        downstream_consumption_allowed_at_frontier: status
+            == MeasurementQualificationStatusV1::Qualified,
         reason_codes: reasons.into_iter().collect(),
         potentially_applicable_event_ids: potentially_applicable.into_iter().collect(),
         applied_event_ids: applied,
@@ -711,8 +712,8 @@ mod tests {
     use super::*;
     use crate::benchmark::metrology_qualification_gate::{
         CALIBRATION_CERTIFICATE_SCHEMA_V1, MEASUREMENT_EVIDENCE_SCHEMA_V1,
-        QUALIFICATION_POLICY_SCHEMA_V1, TraceabilityDeclarationV1,
-        UncertaintyComponentKindV1, MeasurementUncertaintyComponentV1,
+        MeasurementUncertaintyComponentV1, QUALIFICATION_POLICY_SCHEMA_V1,
+        TraceabilityDeclarationV1, UncertaintyComponentKindV1,
     };
 
     fn policy() -> MeasurementQualificationPolicyV1 {
@@ -823,12 +824,8 @@ mod tests {
         let measured = measurement();
         let calibration = certificate();
         let policy_value = policy();
-        let original = qualify_measurement_evidence_v1(
-            &measured,
-            Some(&calibration),
-            &policy_value,
-        )
-        .unwrap();
+        let original =
+            qualify_measurement_evidence_v1(&measured, Some(&calibration), &policy_value).unwrap();
         CalibrationRequalificationInputV1 {
             schema: CALIBRATION_REQUALIFICATION_INPUT_SCHEMA_V1.into(),
             input_id: "cal-requal-001".into(),
@@ -861,8 +858,7 @@ mod tests {
         input: &mut CalibrationRequalificationInputV1,
         events: Vec<CalibrationChangeEventV1>,
     ) {
-        input.owner_event_inventory_sha256 =
-            seal_calibration_event_inventory_v1(&events).unwrap();
+        input.owner_event_inventory_sha256 = seal_calibration_event_inventory_v1(&events).unwrap();
         input.k0.materialized_event_ids = events
             .iter()
             .filter(|event| event.observed_at_unix_seconds <= input.k0_unix_seconds)
@@ -899,7 +895,11 @@ mod tests {
             report.current_at_k1.status,
             MeasurementQualificationStatusV1::Rejected
         );
-        assert!(!report.current_at_k1.downstream_consumption_allowed_at_frontier);
+        assert!(
+            !report
+                .current_at_k1
+                .downstream_consumption_allowed_at_frontier
+        );
         assert!(!report.source_authenticity_proven);
         assert!(!report.equipment_control_authority);
     }
@@ -989,7 +989,11 @@ mod tests {
             report.current_at_k1.status,
             MeasurementQualificationStatusV1::Qualified
         );
-        assert!(report.current_at_k1.downstream_consumption_allowed_at_frontier);
+        assert!(
+            report
+                .current_at_k1
+                .downstream_consumption_allowed_at_frontier
+        );
     }
 
     #[test]
@@ -1002,11 +1006,10 @@ mod tests {
             1_870_000_000,
             1,
         );
-        unrelated.scope.as_mut().unwrap().target =
-            CalibrationChangeTargetV1::Certificate {
-                certificate_id: "other-certificate".into(),
-                certificate_sha256: "9".repeat(64),
-            };
+        unrelated.scope.as_mut().unwrap().target = CalibrationChangeTargetV1::Certificate {
+            certificate_id: "other-certificate".into(),
+            certificate_sha256: "9".repeat(64),
+        };
         install_events(&mut input, vec![unrelated]);
 
         let report = requalify_calibration_measurement_v1(&input).unwrap();
@@ -1037,9 +1040,10 @@ mod tests {
             MeasurementQualificationStatusV1::Unknown
         );
         assert!(
-            report.current_at_k1.reason_codes.contains(
-                &CalibrationRequalificationReasonV1::CalibrationCorrected
-            )
+            report
+                .current_at_k1
+                .reason_codes
+                .contains(&CalibrationRequalificationReasonV1::CalibrationCorrected)
         );
     }
 
@@ -1062,9 +1066,10 @@ mod tests {
             MeasurementQualificationStatusV1::Unknown
         );
         assert!(
-            report.current_at_k1.reason_codes.contains(
-                &CalibrationRequalificationReasonV1::UnknownEventScope
-            )
+            report
+                .current_at_k1
+                .reason_codes
+                .contains(&CalibrationRequalificationReasonV1::UnknownEventScope)
         );
     }
 
@@ -1114,9 +1119,10 @@ mod tests {
             MeasurementQualificationStatusV1::Unknown
         );
         assert!(
-            report.current_at_k1.reason_codes.contains(
-                &CalibrationRequalificationReasonV1::RelevantEventNotMaterialized
-            )
+            report
+                .current_at_k1
+                .reason_codes
+                .contains(&CalibrationRequalificationReasonV1::RelevantEventNotMaterialized)
         );
     }
 
@@ -1156,9 +1162,10 @@ mod tests {
             MeasurementQualificationStatusV1::Unknown
         );
         assert!(
-            report.current_at_k1.reason_codes.contains(
-                &CalibrationRequalificationReasonV1::MeasurementTimeBoundaryUncertain
-            )
+            report
+                .current_at_k1
+                .reason_codes
+                .contains(&CalibrationRequalificationReasonV1::MeasurementTimeBoundaryUncertain)
         );
     }
 
@@ -1181,9 +1188,10 @@ mod tests {
             MeasurementQualificationStatusV1::Unknown
         );
         assert!(
-            report.current_at_k1.reason_codes.contains(
-                &CalibrationRequalificationReasonV1::EventSourceNotQualified
-            )
+            report
+                .current_at_k1
+                .reason_codes
+                .contains(&CalibrationRequalificationReasonV1::EventSourceNotQualified)
         );
     }
 
@@ -1215,11 +1223,9 @@ mod tests {
             report.current_at_k1.status,
             MeasurementQualificationStatusV1::Unknown
         );
-        assert!(
-            report.current_at_k1.reason_codes.contains(
-                &CalibrationRequalificationReasonV1::CalibrationReinstatedRequiresNewEvidence
-            )
-        );
+        assert!(report.current_at_k1.reason_codes.contains(
+            &CalibrationRequalificationReasonV1::CalibrationReinstatedRequiresNewEvidence
+        ));
     }
 
     #[test]
@@ -1232,11 +1238,10 @@ mod tests {
             1_870_000_000,
             1,
         );
-        shared.scope.as_mut().unwrap().target =
-            CalibrationChangeTargetV1::ReferenceStandard {
-                reference_standard_id: "traceable-step-height-std-02".into(),
-                reference_certificate_sha256: "b".repeat(64),
-            };
+        shared.scope.as_mut().unwrap().target = CalibrationChangeTargetV1::ReferenceStandard {
+            reference_standard_id: "traceable-step-height-std-02".into(),
+            reference_certificate_sha256: "b".repeat(64),
+        };
         install_events(&mut input, vec![shared]);
 
         let report = requalify_calibration_measurement_v1(&input).unwrap();
@@ -1303,7 +1308,10 @@ mod tests {
 
         let report_a = requalify_calibration_measurement_v1(&a).unwrap();
         let report_b = requalify_calibration_measurement_v1(&b).unwrap();
-        assert_eq!(report_a.canonical_input_sha256, report_b.canonical_input_sha256);
+        assert_eq!(
+            report_a.canonical_input_sha256,
+            report_b.canonical_input_sha256
+        );
         assert_eq!(report_a.report_sha256, report_b.report_sha256);
     }
 
