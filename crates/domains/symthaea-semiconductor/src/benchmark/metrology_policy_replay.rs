@@ -280,6 +280,29 @@ fn build_synthetic_candidates(
         .observations
         .iter()
         .map(|observed| {
+            for (sensor_name, sensor) in [
+                ("sensor_a", &observed.sensor_a),
+                ("sensor_b", &observed.sensor_b),
+            ] {
+                let observed_state = sensor.state == SyntheticSensorStateV1::Observed;
+                if observed_state != sensor.value.is_some()
+                    || sensor.unit != semantics.unit
+                    || sensor.value.is_some_and(|value| !value.is_finite())
+                {
+                    return Err(SyntheticFabReplayError(format!(
+                        "{}.{sensor_name}: invalid state/value/unit contract",
+                        observed.candidate_id
+                    )));
+                }
+            }
+            if observed.candidate_id.trim().is_empty()
+                || observed.subject_id.trim().is_empty()
+                || observed.stratum_id.trim().is_empty()
+            {
+                return Err(SyntheticFabReplayError(
+                    "observation contains an empty candidate, subject or stratum ID".into(),
+                ));
+            }
             let sensor_a = observed.sensor_a.value;
             let sensor_b_normalized = observed.sensor_b.value.map(|value| value / 0.72);
             let readings: Vec<f64> = [sensor_a, sensor_b_normalized]
