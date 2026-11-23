@@ -1250,7 +1250,10 @@ mod tests {
             .iter()
             .find(|entry| entry.snapshot_id == "child")
             .unwrap();
-        assert_eq!(entry.state, VmSnapshotImpactStateV1::InheritedRebuildRequired);
+        assert_eq!(
+            entry.state,
+            VmSnapshotImpactStateV1::InheritedRebuildRequired
+        );
         assert_eq!(
             entry.inherited_from_snapshot_ids,
             vec!["blocked".to_string(), "unknown".to_string()]
