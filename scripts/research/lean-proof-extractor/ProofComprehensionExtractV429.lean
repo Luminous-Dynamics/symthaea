@@ -78,6 +78,51 @@ def isGeneratedHelperFor (root candidate : Name) : Bool :=
     && candidate.components.length > root.components.length
     && containsNameParts root.components candidate.components
 
+def trustProfileJson (env : Environment) (roots : Array Name) : Json := Id.run do
+  let mut pending := roots.toList
+  let mut visited : Array Name := #[]
+  let mut axioms : Array Name := #[]
+  let mut unsafeDecls : Array Name := #[]
+  let mut partialDecls : Array Name := #[]
+  let mut opaqueDecls : Array Name := #[]
+  let mut unresolved : Array Name := #[]
+  let mut sorryAxPresent := false
+
+  while !pending.isEmpty do
+    match pending with
+    | [] => pure ()
+    | current :: rest =>
+        pending := rest
+        if !visited.contains current then
+          visited := visited.push current
+          if toString current == "sorryAx" then
+            sorryAxPresent := true
+          match env.find? current with
+          | none =>
+              unresolved := unresolved.push current
+          | some info =>
+              if info.isUnsafe then
+                unsafeDecls := unsafeDecls.push current
+              if info.isPartial then
+                partialDecls := partialDecls.push current
+              if (match info with | .axiomInfo _ => true | _ => false) then
+                axioms := axioms.push current
+              if (match info with | .opaqueInfo _ => true | _ => false) then
+                opaqueDecls := opaqueDecls.push current
+              for dependency in info.getUsedConstantsAsSet.toList do
+                pending := dependency :: pending
+
+  Json.mkObj
+    [ ("closure_status", toJson (if unresolved.isEmpty then "complete" else "unresolved"))
+    , ("transitive_declaration_count", toJson visited.size)
+    , ("axiom_declarations", namesJson axioms)
+    , ("unsafe_declarations", namesJson unsafeDecls)
+    , ("partial_declarations", namesJson partialDecls)
+    , ("opaque_declarations", namesJson opaqueDecls)
+    , ("sorry_ax_present", toJson sorryAxPresent)
+    , ("unresolved_declarations", namesJson unresolved)
+    ]
+
 elab "#emit_proof_comprehension " declaration:ident : command => do
   let name := declaration.getId
   let env ← getEnv
@@ -127,6 +172,7 @@ elab "#emit_proof_comprehension " declaration:ident : command => do
         , ("constant_info_dependency_closure", namesJson helperClosure)
         , ("unresolved_dependencies", namesJson helperUnresolved)
         , ("edges", Json.arr helperEdges)
+        , ("trust_profile", trustProfileJson env helperClosure)
         ]
 
   let output := Json.mkObj
@@ -145,6 +191,7 @@ elab "#emit_proof_comprehension " declaration:ident : command => do
     , ("unresolved_dependencies", namesJson unresolvedDependencies)
     , ("edges", Json.arr edges)
     , ("helper_nodes", Json.arr helperNodes)
+    , ("trust_profile", trustProfileJson env closureDependencies)
     ]
 
   let outputPath := s!"proof-comprehension-extract-{name}.json"
