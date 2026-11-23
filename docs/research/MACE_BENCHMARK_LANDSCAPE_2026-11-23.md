@@ -165,3 +165,77 @@ Every result card should include:
 ## Qualification boundary
 
 This document is a research crosswalk and proposed benchmark plan. The external scores above are published source values, not MACE measurements. The new Rust allocation/estimation source is authored but has not been compiled or executed in this environment. No external benchmark has been run and no MACE SOTA claim is made.
+
+
+## 2026-11-23 update: Cycle 2 results and agentic trajectory memory
+
+### New industry/competition baseline: Agent Memory Leaderboard Cycle 2
+
+The Cycle 2 results were released on **November 19, 2026**, so the earlier Cycle 1 numbers in the initial research plan are no longer the best current competition reference. The published first-place results are:
+
+| Track / division | First place | Score | Interpretation |
+|---|---|---:|---|
+| Textual · Open-source Methods | Resurface | 61.22 | Overall score |
+| Textual · Commercial Products | MemoraX | 69.26 | Overall score |
+| Textual · Closed-source Methods | MemoraX | 69.26 | Overall score |
+| Multimodal · Open-source Methods | Khipu | 43.26 | Overall score |
+| Multimodal · Commercial Products | MemoraX | 53.68 | Overall score |
+| Coding · Open-source Methods | InsightMem | 63.33% | Overall resolved |
+| Coding · Commercial Products | MemoraX | 68.00% | Overall resolved |
+
+The top open-source textual submission, Resurface, scored 61.22 overall with 76.55 in Memory Governance, 68.59 in Epistemic Safety & Privacy and 49.65 in Streaming. The leading closed/commercial entry, MemoraX, scored 69.26 overall, including 78.10 in Memory Governance, 81.98 in Epistemic Safety & Privacy and 63.11 in Streaming. Treat these as separate divisions and the coding resolved metric as a different outcome—not as a common cross-board ranking. The competition's exact official task and adapter rules govern any reproduction.
+
+Cycle 2 is already closed. Entries must supply participant-hosted Add/Search APIs; a public repository or Docker image alone does not count as a submission. The platform says open-source Add components must use `gpt-4o-mini` for LLM-related components and `text-embedding-v4` for embeddings; rerankers are unrestricted. This is an integration target for a future cycle, not something to claim as submitted or completed now. Any preparation should pin the API version and frozen system commit, run the organizer's smoke path, then keep a fixed evaluation version online.
+
+### New agentic track: AMA-Bench
+
+AMA-Bench is a particularly important addition to the MACE benchmark portfolio. Its ICML 2026 paper argues that real agent memory consists of state/action/observation/tool-output trajectories, not only conversations. The public benchmark site describes 207 samples, 2,482 QA pairs, six domains and four capabilities: recall, causal inference, state updating and state abstraction. The domains include text-to-SQL, open-world tool QA, web-task execution, gaming, embodied AI and software engineering. The paper reports AMA-Agent at 57.22% accuracy, 11.16 percentage points above its strongest baseline.
+
+This shifts the priority: MACE should not be only an improved user-memory retriever. It should qualify the ability to reconstruct **objective state and causal preconditions** from long-running agent-environment interactions, then use that knowledge in a later action. We should reproduce AMA-Bench's public split/scoring before proposing any extension, and report its 57.22% result only in the benchmark's own protocol.
+
+### Repository audit: an evidence spine is a missing integration contract
+
+A scoped source inspection of the existing `crates/domains/symthaea-memory` types found:
+
+- `SemanticEntry` stores an HDC vector, cycle timestamp, optional category, prediction error and encoding confidence.
+- `GraduationEvent` carries a label, survival/activation signals, source enum and `is_verified` boolean.
+- `MemorySource` distinguishes internal, web research, user interaction, action feedback, semantic eviction and social sources.
+- `MemoryTrace` in the hippocampus has timestamp, embedding, content and tags.
+
+Those structures are useful and should be extended, not duplicated. In the inspected types, however, there is no common evidence-event identifier, source digest, explicit valid-time interval, supersession/retraction reference, purpose/consent scope or independently verifiable authority receipt. A source enum and `is_verified` flag are not a complete provenance proof. This is a scoped finding about these inspected types, not a claim that no such controls exist elsewhere in the repository.
+
+### Paradigm shift: memory as a temporal evidence graph
+
+Proposed integration pattern—keep HDC/CfC and existing episodic/semantic tiers, but add a minimal evidence spine as the authority for memory claims:
+
+1. **Append-only observation events:** capture the source identity, source event/revision, observed-at time, valid-time interval, payload digest, rights/purpose/consent scope and verifier receipt. Candidate memory may only see events authorized for its current purpose.
+2. **Derived belief projections:** a claim points to its evidence events, superseded claims, contradiction relations and (where supported) causal preconditions/outcomes. Projections can be rebuilt; evidence events remain immutable except for privacy-preserving erasure/redaction obligations.
+3. **Bitemporal queries:** distinguish when a fact was valid in the world from when the system learned it. Support current-state, as-of, changed-since and historical-reconstruction queries.
+4. **Correction as a transition:** updates create explicit supersession/retraction events; do not silently overwrite the old value. Current answers must not surface superseded state as current, but historical answers may return it with its validity interval and provenance.
+5. **Rights-aware forgetting:** consent withdrawal, purpose expiry and erasure create revocation/tombstone events that invalidate downstream projections, embeddings, caches and replay snapshots. A deleted fact must not reappear after compaction, restart or backup restore.
+6. **Causal objective memory:** capture action preconditions, action, environment transition and observed outcome. Do not infer causality from similarity or co-occurrence alone; require intervention, temporal/structural evidence or an explicit uncertainty label.
+7. **Fail-closed retrieval:** apply authority, purpose, consent, temporal validity and revocation as hard gates before semantic/causal ranking. Semantic similarity selects among eligible evidence; it must not override the gates.
+
+This is a memory *governance and truth-maintenance* layer, not another vector database or parallel memory stack. The existing HDC index remains a fast candidate generator; the evidence spine decides what is admissible and current.
+
+### Additional MACE benchmark families to author
+
+| Family | Critical fault injection | Primary measurement |
+|---|---|---|
+| Objective-state reconstruction | hidden state changes after agent action; noisy tool outputs | current objective state accuracy and causal precondition recall |
+| Bitemporal correctness | delayed reports, backdated validity, late-arriving correction | current and as-of answer accuracy |
+| Supersession / retraction | corrections after consolidation, conflict from unequal authorities | stale-current-state action rate |
+| Rights lifecycle | consent revocation, purpose expiry, erasure after index build | post-revocation retrieval/use and resurrection count |
+| Causal transfer | same causal structure, different surface language/domain | action precondition/outcome generalization |
+| Streaming memory | event arrives during query; reorder/duplicate/gap | event-to-projection latency and update consistency |
+| Adversarial evidence | poisoned source, forged ID, hash substitution, injection in retrieved text | invalid-evidence acceptance and unauthorized side effects |
+
+Targets for the hard-gate families should be zero confirmed unauthorized use, zero stale-current-state actions after an explicit correction, zero post-erasure resurrection, and zero acceptance of unverifiable evidence. These are correctness gates, not score trade-offs. For utility/recall, compare against the exact official baselines and measure a cost/quality frontier.
+
+## Current source register additions
+
+- [Agent Memory Leaderboard Cycle 2 official results, published 19 November 2026](https://agentmemoryleaderboard.ai/results/cycle-2/)
+- [Cycle 2 textual closed-source board and metric breakdown](https://agentmemoryleaderboard.ai/leaderboard/industry/textual)
+- [AMA-Bench ICML 2026 paper](https://proceedings.mlr.press/v306/zhao26bs.html)
+- [AMA-Bench benchmark site, dataset size/domains/capabilities](https://ama-bench.github.io/)
+
