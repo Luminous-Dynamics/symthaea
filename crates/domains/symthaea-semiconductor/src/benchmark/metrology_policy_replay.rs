@@ -265,7 +265,7 @@ fn is_lowercase_sha256(value: &str) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
-fn json_sha256<T: Serialize>(value: &T) -> Result<String, SyntheticFabReplayError> {
+fn json_sha256<T: Serialize + ?Sized>(value: &T) -> Result<String, SyntheticFabReplayError> {
     let bytes = serde_json::to_vec(value).map_err(|error| {
         SyntheticFabReplayError(format!("canonical JSON serialization failed: {error}"))
     })?;
