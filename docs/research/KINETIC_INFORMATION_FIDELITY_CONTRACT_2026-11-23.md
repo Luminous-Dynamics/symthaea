@@ -397,6 +397,18 @@ With zero observed false-safe outcomes, a one-sided exact 95% binomial upper bou
 - Recovery cost: compute and memory needed to restore a richer representation after an unsupported request.
 - Selective risk: error among non-abstained cases, reported with coverage and UNKNOWN rate.
 
+## Support-stable particle-measure normalization
+
+New companion programme: [#13416 — support-stable particle-measure normalization and particle-count transfer](https://github.com/Luminous-Dynamics/symthaea/issues/13416).
+
+The NEOPIC preprint (Muralikrishnan et al., arXiv:2610.40528) is an important particle-measure competitor: its operator acts directly on empirical particle measures, avoids grid deposition/aliasing in its field input, reports O(Np) evaluation and separates sampling, learning and time-stepping error contributions. However, the paper's Appendix A.1 explicitly notes that the implemented per-sample min–max coordinate normalization depends on the extreme particles, is Lipschitz in the maximum particle displacement rather than the average displacement used in the main error argument, and introduces an additional particle-count dependence of the bounding box not covered by the fixed-normalization error analysis.
+
+This is a well-defined qualification opportunity, not a claim that NEOPIC's main results fail. Reproduce its paper-faithful normalization in #12952, then separate (a) particle sampling variation, (b) normalization-induced coordinate-map variation and (c) learned field-operator error. Test independent samples / Np changes, single extreme particles, periodic seam translations, particle permutations and split/merge operations. Compare against known physical-domain normalization, support-aware alternatives and robust maps with explicit tail metadata.
+
+Fixed-domain normalization is valid when physical domain and origin are known. Robust quantiles can reduce outlier sensitivity but may discard rare physical tails; any such tail loss must be measured and cannot silently become a successful representation change. #13416 owns this normalization stability experiment; #12952 retains source-faithful NEOPIC reproduction, and #12944 owns active selection of expensive kinetic runs.
+
+Source: [NEOPIC, arXiv:2610.40528](https://arxiv.org/abs/2610.40528), particularly §§4.2 and 5 and Appendix A.1.
+
 ## Kinetic Response Spectroscopy (KRS)
 
 New companion programme: [#13415 — phase-resolved kinetic response spectra and mixed-pulse kernels](https://github.com/Luminous-Dynamics/symthaea/issues/13415).
