@@ -313,6 +313,45 @@ class MaceLongMemEvalV2IngressTests(unittest.TestCase):
                     "opaque-invocation-1", query, changed_response
                 )
 
+    def test_memory_restore_rejects_missing_candidate_evidence_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            input_dir = root / "input"
+            state_dir = input_dir / "mace_lmev2"
+            state_dir.mkdir(parents=True)
+            (state_dir / "assets").mkdir()
+            (state_dir / "trajectories.jsonl").write_text("", encoding="utf-8")
+
+            memory = object.__new__(MaceLongMemEvalV2Memory)
+            memory.asset_root = root / "workspace" / "assets"
+            memory.candidate_evidence_dir = root / "workspace" / "candidate_evidence"
+            memory.retrieval_trace_dir = root / "workspace" / "retrieval_traces"
+
+            with self.assertRaisesRegex(RuntimeError, "saved candidate evidence root is missing"):
+                memory._load_backend(input_dir)
+
+    def test_memory_restore_rejects_missing_retrieval_trace_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            input_dir = root / "input"
+            state_dir = input_dir / "mace_lmev2"
+            state_dir.mkdir(parents=True)
+            (state_dir / "assets").mkdir()
+            (state_dir / "candidate_evidence").mkdir()
+            (state_dir / "trajectories.jsonl").write_text("", encoding="utf-8")
+
+            memory = object.__new__(MaceLongMemEvalV2Memory)
+            memory.asset_root = root / "workspace" / "assets"
+            memory.candidate_evidence_dir = root / "workspace" / "candidate_evidence"
+            memory.retrieval_trace_dir = root / "workspace" / "retrieval_traces"
+            memory.run_id = "run-missing-trace"
+            memory.domain = "web"
+            memory.backend_revision_sha256 = "b" * 64
+            memory.sidecar_binary_sha256 = "a" * 64
+
+            with self.assertRaisesRegex(RuntimeError, "saved retrieval trace root is missing"):
+                memory._load_backend(input_dir)
+
     def test_restore_verifier_rejects_orphan_candidate_payload(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
