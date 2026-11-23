@@ -97,7 +97,6 @@ pub enum MycelialMorphogenesisSplitError {
     TargetOutsideForecastHorizon(String),
     ObservationAssignedMoreThanOnce(String),
     ObservationNotAssigned(String),
-    ObservationUnitCrossesPartitions(String),
 }
 
 impl fmt::Display for MycelialMorphogenesisSplitError {
@@ -282,8 +281,15 @@ impl MycelialMorphogenesisSplitManifest {
             validate_identifier(&unit.independent_unit_id, "independent_unit_id")?;
             total_string_bytes = total_string_bytes
                 .saturating_add(unit.independent_unit_id.len());
-            if previous_unit.is_some_and(|previous| previous >= unit.independent_unit_id.as_str()) {
-                return Err(MycelialMorphogenesisSplitError::NonCanonicalUnitOrder);
+            if let Some(previous) = previous_unit {
+                if previous == unit.independent_unit_id {
+                    return Err(MycelialMorphogenesisSplitError::DuplicateIndependentUnit(
+                        unit.independent_unit_id.clone(),
+                    ));
+                }
+                if previous > unit.independent_unit_id.as_str() {
+                    return Err(MycelialMorphogenesisSplitError::NonCanonicalUnitOrder);
+                }
             }
             previous_unit = Some(&unit.independent_unit_id);
 
@@ -423,13 +429,13 @@ impl MycelialMorphogenesisSplitManifest {
                         observation_id.clone(),
                     ));
                 }
-                if observation.timestamp_ns > unit.forecast_origin_ns {
-                    return Err(MycelialMorphogenesisSplitError::ContextAfterForecastOrigin(
+                if !assigned_observations.insert(observation_id.as_str()) {
+                    return Err(MycelialMorphogenesisSplitError::ObservationAssignedMoreThanOnce(
                         observation_id.clone(),
                     ));
                 }
-                if !assigned_observations.insert(observation_id.as_str()) {
-                    return Err(MycelialMorphogenesisSplitError::ObservationAssignedMoreThanOnce(
+                if observation.timestamp_ns > unit.forecast_origin_ns {
+                    return Err(MycelialMorphogenesisSplitError::ContextAfterForecastOrigin(
                         observation_id.clone(),
                     ));
                 }
@@ -443,15 +449,15 @@ impl MycelialMorphogenesisSplitManifest {
                         observation_id.clone(),
                     ));
                 }
+                if !assigned_observations.insert(observation_id.as_str()) {
+                    return Err(MycelialMorphogenesisSplitError::ObservationAssignedMoreThanOnce(
+                        observation_id.clone(),
+                    ));
+                }
                 if observation.timestamp_ns <= unit.forecast_origin_ns
                     || observation.timestamp_ns > unit.horizon_end_ns
                 {
                     return Err(MycelialMorphogenesisSplitError::TargetOutsideForecastHorizon(
-                        observation_id.clone(),
-                    ));
-                }
-                if !assigned_observations.insert(observation_id.as_str()) {
-                    return Err(MycelialMorphogenesisSplitError::ObservationAssignedMoreThanOnce(
                         observation_id.clone(),
                     ));
                 }
@@ -685,11 +691,24 @@ mod tests {
     fn observation_assigned_to_more_than_one_role_is_rejected() {
         let observations = observations();
         let mut manifest = manifest(&observations, MycelialMorphogenesisSplitUnitBasis::CultivationUnit);
-        manifest.units[0].target_observation_ids = vec!["b-target".to_string()];
+        manifest.units[0].target_observation_ids = vec!["a-context".to_string()];
         assert!(matches!(
             manifest.validate_against(&observations),
-            Err(MycelialMorphogenesisSplitError::ObservationUnitMismatch(_))
-                | Err(MycelialMorphogenesisSplitError::ObservationAssignedMoreThanOnce(_))
+            Err(MycelialMorphogenesisSplitError::ObservationAssignedMoreThanOnce(_))
+        ));
+    }
+
+    #[test]
+    fn independent_unit_cannot_be_assigned_to_two_partitions() {
+        let observations = observations();
+        let mut manifest = manifest(&observations, MycelialMorphogenesisSplitUnitBasis::CultivationUnit);
+        manifest.units = vec![
+            split_unit("box-a", MycelialMorphogenesisPartition::Train),
+            split_unit("box-a", MycelialMorphogenesisPartition::Validation),
+        ];
+        assert!(matches!(
+            manifest.validate(),
+            Err(MycelialMorphogenesisSplitError::DuplicateIndependentUnit(_))
         ));
     }
 
