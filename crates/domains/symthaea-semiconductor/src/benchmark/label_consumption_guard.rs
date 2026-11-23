@@ -320,9 +320,7 @@ mod tests {
         CALIBRATION_CERTIFICATE_SCHEMA_V1, MEASUREMENT_EVIDENCE_SCHEMA_V1,
         QUALIFICATION_POLICY_SCHEMA_V1, qualify_measurement_evidence_v1,
     };
-    use crate::benchmark::process_event_graph::{
-        ClockBasisV1, MetrologyLabelStatusV1,
-    };
+    use crate::benchmark::process_event_graph::{ClockBasisV1, MetrologyLabelStatusV1};
 
     fn policy() -> MeasurementQualificationPolicyV1 {
         MeasurementQualificationPolicyV1 {
@@ -396,12 +394,9 @@ mod tests {
         let measured = measurement();
         let calibrated = certificate();
         let qualification_policy = policy();
-        let qualification = qualify_measurement_evidence_v1(
-            &measured,
-            Some(&calibrated),
-            &qualification_policy,
-        )
-        .unwrap();
+        let qualification =
+            qualify_measurement_evidence_v1(&measured, Some(&calibrated), &qualification_policy)
+                .unwrap();
         CalibrationRequalificationInputV1 {
             schema: CALIBRATION_REQUALIFICATION_INPUT_SCHEMA_V1.into(),
             input_id: "label-consumption-input-001".into(),
@@ -507,8 +502,14 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(k0.eligibility, LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy);
-        assert_eq!(k1.eligibility, LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy);
+        assert_eq!(
+            k0.eligibility,
+            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy
+        );
+        assert_eq!(
+            k1.eligibility,
+            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy
+        );
         assert!(k0.downstream_consumption_allowed);
         assert!(k1.downstream_consumption_allowed);
         assert_no_authority(&k0);
@@ -518,7 +519,10 @@ mod tests {
     #[test]
     fn provisional_and_censored_labels_are_not_promoted_as_point_labels() {
         let input = input();
-        for status in [MetrologyLabelStatusV1::Provisional, MetrologyLabelStatusV1::Censored] {
+        for status in [
+            MetrologyLabelStatusV1::Provisional,
+            MetrologyLabelStatusV1::Censored,
+        ] {
             let mut candidate = label();
             candidate.status = status;
             candidate.value = None;
@@ -547,8 +551,16 @@ mod tests {
         .unwrap();
 
         assert_eq!(report.eligibility, LabelConsumptionEligibilityV1::Unknown);
-        assert!(report.reasons.contains(&LabelConsumptionReasonV1::LabelInstrumentMissing));
-        assert!(report.reasons.contains(&LabelConsumptionReasonV1::LabelCalibrationReferenceMissing));
+        assert!(
+            report
+                .reasons
+                .contains(&LabelConsumptionReasonV1::LabelInstrumentMissing)
+        );
+        assert!(
+            report
+                .reasons
+                .contains(&LabelConsumptionReasonV1::LabelCalibrationReferenceMissing)
+        );
     }
 
     #[test]
@@ -565,8 +577,16 @@ mod tests {
         .unwrap();
 
         assert_eq!(report.eligibility, LabelConsumptionEligibilityV1::Blocked);
-        assert!(report.reasons.contains(&LabelConsumptionReasonV1::MeasurementEventMismatch));
-        assert!(report.reasons.contains(&LabelConsumptionReasonV1::LabelCalibrationReferenceMismatch));
+        assert!(
+            report
+                .reasons
+                .contains(&LabelConsumptionReasonV1::MeasurementEventMismatch)
+        );
+        assert!(
+            report
+                .reasons
+                .contains(&LabelConsumptionReasonV1::LabelCalibrationReferenceMismatch)
+        );
     }
 
     #[test]
@@ -584,9 +604,21 @@ mod tests {
         .unwrap();
 
         assert_eq!(report.eligibility, LabelConsumptionEligibilityV1::Blocked);
-        assert!(report.reasons.contains(&LabelConsumptionReasonV1::LabelInstrumentMismatch));
-        assert!(report.reasons.contains(&LabelConsumptionReasonV1::LabelMeasurandMismatch));
-        assert!(report.reasons.contains(&LabelConsumptionReasonV1::LabelUnitMismatch));
+        assert!(
+            report
+                .reasons
+                .contains(&LabelConsumptionReasonV1::LabelInstrumentMismatch)
+        );
+        assert!(
+            report
+                .reasons
+                .contains(&LabelConsumptionReasonV1::LabelMeasurandMismatch)
+        );
+        assert!(
+            report
+                .reasons
+                .contains(&LabelConsumptionReasonV1::LabelUnitMismatch)
+        );
     }
 
     #[test]
@@ -600,7 +632,10 @@ mod tests {
             LabelEvidenceFrontierV1::CurrentAtK1,
         )
         .unwrap();
-        assert_eq!(invalid_report.eligibility, LabelConsumptionEligibilityV1::Blocked);
+        assert_eq!(
+            invalid_report.eligibility,
+            LabelConsumptionEligibilityV1::Blocked
+        );
 
         let mut unknown = label();
         unknown.status = MetrologyLabelStatusV1::Unknown;
@@ -610,7 +645,10 @@ mod tests {
             LabelEvidenceFrontierV1::CurrentAtK1,
         )
         .unwrap();
-        assert_eq!(unknown_report.eligibility, LabelConsumptionEligibilityV1::Unknown);
+        assert_eq!(
+            unknown_report.eligibility,
+            LabelConsumptionEligibilityV1::Unknown
+        );
     }
 
     #[test]
@@ -636,7 +674,10 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(k0.eligibility, LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy);
+        assert_eq!(
+            k0.eligibility,
+            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy
+        );
         assert_eq!(k1.eligibility, LabelConsumptionEligibilityV1::Blocked);
         assert!(!k1.downstream_consumption_allowed);
     }
@@ -657,9 +698,11 @@ mod tests {
         .unwrap();
 
         assert_eq!(report.eligibility, LabelConsumptionEligibilityV1::Unknown);
-        assert!(report.reasons.contains(
-            &LabelConsumptionReasonV1::RelevantCalibrationEventNotMaterialized
-        ));
+        assert!(
+            report
+                .reasons
+                .contains(&LabelConsumptionReasonV1::RelevantCalibrationEventNotMaterialized)
+        );
         assert!(!report.downstream_consumption_allowed);
     }
 
@@ -667,12 +710,14 @@ mod tests {
     fn stale_original_qualification_receipt_is_rejected() {
         let mut input = input();
         input.original_qualification_at_k0.report_sha256 = "0".repeat(64);
-        assert!(assess_label_consumption_eligibility_v1(
-            &label(),
-            &input,
-            LabelEvidenceFrontierV1::CurrentAtK1
-        )
-        .is_err());
+        assert!(
+            assess_label_consumption_eligibility_v1(
+                &label(),
+                &input,
+                LabelEvidenceFrontierV1::CurrentAtK1
+            )
+            .is_err()
+        );
     }
 
     #[test]
