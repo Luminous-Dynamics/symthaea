@@ -956,12 +956,13 @@ fn load_candidate_receipts(
         } else {
             expected_run_id = Some(receipt.run_id.clone());
         }
+        if receipts.contains_key(&key) {
+            return Err("candidate stream contains duplicate pair-block/observation identity".to_string());
+        }
         if !seen_sequences.insert(receipt.candidate_observation_sequence) {
             return Err("candidate stream contains duplicate execution sequence values".to_string());
         }
-        if receipts.insert(key, receipt).is_some() {
-            return Err("candidate stream contains duplicate pair-block/observation identity".to_string());
-        }
+        receipts.insert(key, receipt);
         record_count += 1;
     }
     let run_id = expected_run_id
