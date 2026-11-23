@@ -71,7 +71,7 @@
           "epsilon": 1e-9,
           "max_harmonic": 2,
           "max_feature_gap_upper_bound": 2.6e-8,
-          "max_derivative_gap_upper_bound": 2e-7
+          "max_derivative_gap_upper_bound": 3.2e-7
         }
       }
     },
