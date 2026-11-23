@@ -1330,7 +1330,7 @@ fn reduce(
         record["input_source_code_sha256"] = json!(provenance.source_code_sha256.as_str());
         record["input_fixture_sha256"] = json!(provenance.fixture_sha256.as_str());
         record["input_schema_sha256"] = json!(provenance.schema_sha256.as_str());
-        record["input_source_revision"] = json!(provenance.source_revision.as_deref());
+        record["input_source_revision"] = json!(provenance.source_revision.as_str());
         record["aggregation_code_sha256"] = json!(aggregation_code_sha256.as_str());
         record["bootstrap_seed"] = json!(seed);
         record["input_manifest_count"] = json!(manifest_row_count);
@@ -1926,7 +1926,7 @@ mod tests {
         let valid = manifest_record("run-1", &"a".repeat(64));
         let (provenance, manifest_sha) = parse_manifest(&valid).unwrap();
         assert_eq!(provenance.run_id, "run-1");
-        assert_eq!(provenance.source_revision.as_deref().map(str::len), Some(40));
+        assert_eq!(provenance.source_revision.len(), 40);
         assert!(valid_sha256(&manifest_sha));
 
         let invalid = manifest_record("run-1", "not-a-sha");
