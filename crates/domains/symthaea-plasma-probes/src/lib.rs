@@ -3045,8 +3045,7 @@ mod tests {
 
     #[test]
     fn kird_audit_rejects_placeholder_physical_reference_bundle_digest() {
-        let mut value: serde_json::Value =
-            serde_json::from_str(KIRD_SYNTHETIC_FIXTURE).unwrap();
+        let mut value: serde_json::Value = serde_json::from_str(KIRD_SYNTHETIC_FIXTURE).unwrap();
         value["record_status"] = serde_json::json!("physical_measurement");
         value["provenance"]["physical_execution_authorized"] = serde_json::json!(true);
         for pointer in [
@@ -3083,8 +3082,7 @@ mod tests {
 
     #[test]
     fn valid_physical_kird_record_requires_and_accepts_reference_identity() {
-        let mut value: serde_json::Value =
-            serde_json::from_str(KIRD_SYNTHETIC_FIXTURE).unwrap();
+        let mut value: serde_json::Value = serde_json::from_str(KIRD_SYNTHETIC_FIXTURE).unwrap();
         value["record_status"] = serde_json::json!("physical_measurement");
         value["provenance"]["physical_execution_authorized"] = serde_json::json!(true);
         for pointer in [
