@@ -107,6 +107,10 @@ jobs:
           Draft202012Validator(schema).validate(fixture)
           assert fixture["record_status"] == "synthetic_fixture_only"
           assert fixture["provenance"]["physical_execution_authorized"] is False
+          invalid_physical = json.loads(json.dumps(fixture))
+          invalid_physical["record_status"] = "physical_measurement"
+          invalid_physical["provenance"]["physical_execution_authorized"] = True
+          assert not Draft202012Validator(schema).is_valid(invalid_physical)
           print("kird_schema_validation=PASS")
           PY
 
