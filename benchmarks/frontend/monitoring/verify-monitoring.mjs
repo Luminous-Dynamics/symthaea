@@ -115,6 +115,7 @@ function evaluateCase(fixtureCase,trace){
     if(!currentCondition())fail(fixtureCase.case_id+': action attempted while predicate is false');
     if(contract.predicate.requires_permission&&state.permission_granted!==true)fail(fixtureCase.case_id+': action attempted without current permission');
     if(step.revision!==state.revision)fail(fixtureCase.case_id+': action revision is stale');
+    if(step.action_type!==contract.action.type||step.resource_id!==contract.action.resource_id)fail(fixtureCase.case_id+': action target differs from frozen watch contract');
     if(step.idempotency_key!==contract.idempotency_key)fail(fixtureCase.case_id+': action idempotency key does not match watch contract');
     const prior=actionKeys.get(step.idempotency_key);
     if(prior){
@@ -193,7 +194,7 @@ function verifyAll({fixtureBytes,traceBytes,policyBytes,fixture,traces,policy}){
   {oracle_id:'observation.latest_revision',result:results.every(r=>r.metrics.final_revision>=1&&r.metrics.observation_count<=r.metrics.unique_wake_count)?'pass':'fail',non_vacuous:true},
   {oracle_id:'action.predicate_guard',result:triggered.every(r=>r.metrics.condition_first_true_at!==null&&r.metrics.action_at>=r.metrics.condition_first_true_at)?'pass':'fail',non_vacuous:triggered.length>0},
   {oracle_id:'action.permission_guard',result:revoked.metrics.action_count===0&&revoked.metrics.final_permission_granted===false?'pass':'fail',non_vacuous:true},
-  {oracle_id:'action.idempotency',result:byId.get('absolute-threshold-event-wake').metrics.action_count===1&&byId.get('absolute-threshold-event-wake').metrics.duplicate_wake_count===1?'pass':'fail',non_vacuous:true},
+  {oracle_id:'action.idempotency',result:byId.get('absolute-threshold-event-wake').metrics.action_count===1&&byId.get('absolute-threshold-event-wake').metrics.duplicate_wake_count===1&&byId.get('absolute-threshold-event-wake').metrics.duplicate_action_attempts===1?'pass':'fail',non_vacuous:true},
   {oracle_id:'no_op.abstention',result:noop.metrics.action_count===0&&noop.metrics.outcome==='not_triggered'?'pass':'fail',non_vacuous:true},
   {oracle_id:'reconnect.stale_revalidation',result:stale.metrics.final_revision===3&&stale.metrics.stale_hint_count===1&&stale.metrics.action_count===0?'pass':'fail',non_vacuous:true},
   {oracle_id:'wait.monotonic_bounded',result:results.every(r=>r.metrics.virtual_wait_seconds>=0)?'pass':'fail',non_vacuous:true},
@@ -236,6 +237,9 @@ function selfTest(paths){
  let earlyActionRejected=false;
  try{verifyAll({...input,traces:forged});}catch{earlyActionRejected=true;}
  if(!earlyActionRejected)fail('forged wake produced an accepted mutation');
+ const wrongTarget=clone(input.traces);const validTrace=wrongTarget.traces.find(t=>t.case_id==='absolute-threshold-event-wake');validTrace.steps.find(step=>step.op==='act').resource_id='attacker-controlled-resource';
+ let wrongTargetRejected=false;try{verifyAll({...input,traces:wrongTarget});}catch{wrongTargetRejected=true;}
+ if(!wrongTargetRejected)fail('action target outside frozen watch contract was accepted');
  console.log(JSON.stringify({status:'monitoring_reference_preflight_passed',cases:baseline.case_results.length,
   oracle_rules:baseline.oracle_results.length,oracle_rules_passed:baseline.oracle_results.filter(r=>r.result==='pass').length,
   worker_claim_mutation:'no effect',forged_notification_action:'rejected',
