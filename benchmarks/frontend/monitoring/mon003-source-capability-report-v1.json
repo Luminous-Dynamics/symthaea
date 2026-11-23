@@ -4,70 +4,81 @@
   "runtime": {
     "node_version": "v22.16.0",
     "source_path": "benchmarks/frontend/monitoring/mon003-source-capability-v1.mjs",
-    "source_git_blob_sha": "9e4ac2f9c0933db13ce09a865ed09c9139f604df",
-    "source_sha256": "2112746978e4759292f49900d6c7692c430fac17606451211c9804cefa21574e"
+    "source_git_blob_sha": "4605567b0aac7816ec9dd27dd11186ac52484465",
+    "source_sha256": "d2d02cb523abd2a315fd16c737b32f8ee4183e73863f38d0f68395cb6bbec58b"
   },
-  "deterministic_cases": 12,
+  "deterministic_cases": 15,
   "cases": [
     {
-      "name": "polling-only source does not claim transient edge recovery",
+      "name": "poll only cannot guarantee transient edge recovery",
       "result": "pass"
     },
     {
-      "name": "best-effort push source is only a wake hint, not replayable evidence",
+      "name": "best effort push is only a wake hint",
       "result": "pass"
     },
     {
-      "name": "durable partitioned replay with adequate retention supports bounded recovery",
+      "name": "complete durable replay supports bounded authenticated recovery",
       "result": "pass"
     },
     {
-      "name": "durable replay with insufficient retention cannot claim the outage horizon",
+      "name": "retention shorter than disconnect horizon degrades claim",
       "result": "pass"
     },
     {
-      "name": "durable log without partition sequence and high watermark is not a complete cursor contract",
+      "name": "missing partition sequence or high watermark disables replay claim",
       "result": "pass"
     },
     {
-      "name": "signature without issuer-scope and key-revocation validation is not trusted provenance",
+      "name": "issuer scope and key revocation checks are required for provenance",
       "result": "pass"
     },
     {
-      "name": "current permission must be rechecked at the sink",
+      "name": "signature presence without verification is not authenticated provenance",
       "result": "pass"
     },
     {
-      "name": "unknown source capability fields fail closed",
+      "name": "current sink permission revision is a separate requirement",
       "result": "pass"
     },
     {
-      "name": "missing replay-retention value is not silently defaulted",
+      "name": "poll interval cannot be attached to a push source",
       "result": "pass"
     },
     {
-      "name": "negative replay retention fails validation",
+      "name": "unknown fields fail closed",
       "result": "pass"
     },
     {
-      "name": "push delivery with signed events but no durable replay cannot claim event recall",
+      "name": "missing retention is not defaulted",
       "result": "pass"
     },
     {
-      "name": "high watermark alone cannot qualify replay without stable source identity",
+      "name": "negative retention is invalid",
+      "result": "pass"
+    },
+    {
+      "name": "signed best-effort push does not imply event recall",
+      "result": "pass"
+    },
+    {
+      "name": "high watermark without stable event identity is incomplete",
+      "result": "pass"
+    },
+    {
+      "name": "invalid poll interval fails closed",
       "result": "pass"
     }
   ],
   "invariants": {
     "no_recall_claim_without_replay": "pass",
-    "retention_horizon_is_explicit": "pass",
-    "authenticated_provenance_requires_trust_profile": "pass",
-    "sink_authority_is_separate_from_event_receipt": "pass",
+    "retention_horizon_explicit": "pass",
+    "signature_verification_and_trust_profile_required": "pass",
+    "sink_authority_separate": "pass",
     "invalid_profiles_fail_closed": "pass"
   },
   "limitations": [
-    "Pure in-memory capability classifier; does not probe or authenticate a live source adapter.",
-    "Capability claims depend on the truth of the source profile supplied by an integration owner.",
-    "A source may change behavior after classification; production adapters need periodic conformance probes and signed capability/version receipts."
+    "In-memory profile classifier; no live source probe, authentication or production adapter is exercised.",
+    "Capability declarations are integration-owner inputs and can drift; production use needs conformance probes and signed profile/version receipts."
   ]
 }
