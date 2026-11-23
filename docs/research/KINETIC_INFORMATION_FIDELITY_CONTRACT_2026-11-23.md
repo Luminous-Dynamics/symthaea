@@ -540,6 +540,41 @@ The nonlinear extension must separately qualify tangent response, signed finite-
 
 Success means greater held-out intervention-response fidelity per retained byte/rank at matched total construction and simulation cost, without worsening mandatory physical gates. It does not mean a good singular-value capture plot, nor does it imply a universal nonlinear error bound.
 
+## Certified Intervention Coverage (CIC)
+
+New companion programme: [#13452 — certify compact intervention covers with validated response bounds](https://github.com/Luminous-Dynamics/symthaea/issues/13452).
+
+The contract continues to distinguish:
+- \`finite_empirical\`: the tested interventions passed, but the continuous supremum is unknown;
+- \`certified_global\`: a verified mathematical cover and response-regularity proof bound the entire declared compact intervention space.
+
+For a compact intervention metric space \((\mathcal U,d)\), let \(e(u)\) be the frozen normalized candidate/reference response error. If a verified global Lipschitz constant \(L\) satisfies
+
+\[
+|e(u)-e(v)|\leq L\,d(u,v)
+\]
+
+and the confirmed probe set \(P\) is a verified \(r\)-net of \(\mathcal U\), then
+
+\[
+\sup_{u\in\mathcal U}e(u)
+\leq
+\max_{p\in P}e(p)+Lr.
+\]
+
+Include separately justified reference, candidate and measurement uncertainty in \(\eta\):
+
+\[
+E_{\rm upper}=\max_{p\in P}\widehat e(p)+Lr+
+\eta_{\rm ref}+\eta_{\rm candidate}+\eta_{\rm measurement}.
+\]
+
+The first KIRD semantic implementation in [PR #13405](https://github.com/Luminous-Dynamics/symthaea/pull/13405) requires the cover metric, radius, verified Lipschitz constant, three uncertainty terms, maximum sampled error, conservative global bound, cover-set digest, branch-stability flag/evidence, proof digest and independent checker revision. It verifies the upper-bound arithmetic and refuses certification if branch identity is unstable or if a response PASS has a global bound above one.
+
+**Critical assumptions:** an empirical finite-difference slope is not a verified global Lipschitz bound. Phase uses geodesic circle distance; integer modes and intervention families are separate strata. Echo branch creation/cancellation or misassociation can make the response map non-smooth; partition into certified branch-stable regions, prove separate bounds, or return UNKNOWN. If any assumption is missing, the record remains \`finite_empirical\`.
+
+The checked-in [synthetic certified-cover fixture](https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/plasma/rate-distortion/fixtures/synthetic-kird-certified-cover-v0.1.json) uses \(U=[0,0.1]\), \(e(u)=0.5+2u\), one probe at zero, \(r=0.1\), \(L=2\), and \(\eta=0.05\), giving an upper bound of 0.75. This validates the arithmetic and semantic auditor only; it does not establish a Lipschitz property for nonlinear Vlasov–Poisson or any plasma echo.
+
 ## Hamiltonian response-balanced kinetic reduction (HRBKR)
 
 New structural extension: [#13448 — combine response-balanced reduction with Hamiltonian structure preservation](https://github.com/Luminous-Dynamics/symthaea/issues/13448).
