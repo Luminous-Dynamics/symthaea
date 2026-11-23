@@ -1,0 +1,29 @@
+# TheoremSandwichReceiptV1 — finite control pilot
+
+**Status:** executable synthetic control; no model evaluation and no Lean kernel proof.
+
+## Contract
+
+The candidate partition contains source/task identity, model identity, visible assumptions, and the formal statement the candidate proposes. The evaluator-only partition contains a hidden target statement, stronger obligations and required corollaries. The evaluator-only partition is post-hoc only; the model receives candidate_view and never receives hidden gold or witnesses.
+
+For each stronger obligation S_i, the evaluator checks S_i implies candidate_statement. This is an upper-side guard against candidates that are stronger than the selected hidden controls support. For each corollary C_j, it checks candidate_statement implies C_j. This is a lower-side guard against candidates that are too weak to imply required consequences.
+
+Classification:
+- consistent_with_selected_controls: every finite upper and lower obligation passes.
+- candidate_may_be_too_strong: an upper obligation fails while lower controls pass.
+- candidate_may_be_too_weak: upper controls pass while a lower corollary fails.
+- incomparable_or_translation_mismatch: both sides fail.
+- unknown: a finite truth-table atom budget is exceeded.
+
+These labels are diagnostic classes over selected obligations, not proof of complete equivalence. A candidate that passes is only consistent with this finite control set; expert semantic review and Lean kernel replay remain separate authorities.
+
+## Synthetic task
+
+The target statement is p implies q. The hidden stronger control is (p implies q) and r, and the hidden corollaries are (p and r) implies q and (p and not r) implies q. The exact candidate p implies q passes all selected obligations. A deliberately over-strengthened candidate (p implies q) and s fails the upper obligation. A deliberately weakened candidate r implies (p implies q) passes the upper control but fails the corollary for not-r.
+
+## Commands
+
+    cargo test --locked --manifest-path scripts/research/proof-plan-contract/Cargo.toml
+    cargo run --manifest-path scripts/research/proof-plan-contract/Cargo.toml --bin theorem-sandwich -- docs/research/MATH_PROOF_COMPREHENSION_THEOREM_SANDWICH_V1.json
+
+Successful execution establishes structural validity and finite truth-table outcomes for the synthetic Boolean fixture only. It does not establish model accuracy, general mathematical semantics, LPBench performance, theorem equivalence, or human comprehension.

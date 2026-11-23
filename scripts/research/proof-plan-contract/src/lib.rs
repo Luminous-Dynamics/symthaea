@@ -946,3 +946,5 @@ mod tests {
 }
 
 pub mod local_global;
+
+pub mod semantic_contract;

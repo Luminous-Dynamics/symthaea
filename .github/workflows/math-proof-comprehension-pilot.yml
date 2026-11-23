@@ -73,6 +73,10 @@ jobs:
             docs/research/PROOF_PLAN_MUTATION_FIXTURES_V1.json
             docs/research/LOCAL_GLOBAL_PAIR_V1.schema.json
             docs/research/LOCAL_GLOBAL_PAIR_SYNTHETIC_V1.json
+          cargo run --manifest-path scripts/research/proof-plan-contract/Cargo.toml --bin theorem-sandwich -- \\
+            docs/research/MATH_PROOF_COMPREHENSION_THEOREM_SANDWICH_V1.json
+            docs/research/MATH_PROOF_COMPREHENSION_THEOREM_SANDWICH_V1.schema.json
+            docs/research/MATH_PROOF_COMPREHENSION_THEOREM_SANDWICH_V1.json
             docs/research/MATH_PROOF_COMPREHENSION_RECEIPT_V1.schema.json
             docs/research/MATHLIB_PROOF_COMPREHENSION_PILOT_V1.json
             docs/research/MATHLIB_PROOF_COMPREHENSION_PILOT_V1.schema.json
@@ -163,6 +167,11 @@ jobs:
             and .evaluator_only.finite_boolean_countermodel.valuation == [{ "atom": "p", "value": false }, { "atom": "q", "value": true }]' \
             docs/research/LOCAL_GLOBAL_PAIR_SYNTHETIC_V1.json >/dev/null
 
+          jq -e '.schema_version == "1.0.0"
+            and .candidate.task_id == "SYNTHETIC-SANDWICH-IMPLICATION-001"
+            and .evaluator_only.stronger_obligations[0].id == "UPPER-STRONGER-P-IMPLIES-Q-AND-R"
+            and (.evaluator_only.corollary_obligations | length) == 2' \\
+            docs/research/MATH_PROOF_COMPREHENSION_THEOREM_SANDWICH_V1.json >/dev/null
           echo "LOCAL_GLOBAL_PAIR_FIXTURE_PASS"
           echo "PROOF_PLAN_FIXTURES_PASS"
           echo "MATH_PROOF_COMPREHENSION_PILOT_FIXTURES_PASS"

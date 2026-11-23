@@ -1,0 +1,117 @@
+{
+  "schema_version": "1.0.0",
+  "candidate": {
+    "task_id": "SYNTHETIC-SANDWICH-IMPLICATION-001",
+    "theorem_id": "SYNTHETIC-P-IMPLIES-Q",
+    "source_repository": "symthaea.synthetic",
+    "source_revision": "fixture-v1",
+    "source_path": "truth_tables/p_implies_q.json",
+    "declaration": "synthetic.target.p_implies_q",
+    "model_provider": "synthetic_fixture",
+    "model_name": "stipulated_candidate",
+    "model_version": "1",
+    "statement_text": "p implies q",
+    "statement_formula": {
+      "op": "implies",
+      "left": {
+        "op": "atom",
+        "name": "p"
+      },
+      "right": {
+        "op": "atom",
+        "name": "q"
+      }
+    },
+    "visible_assumptions": [
+      "classical propositional variables p, q, r"
+    ]
+  },
+  "evaluator_only": {
+    "target_statement_formula": {
+      "op": "implies",
+      "left": {
+        "op": "atom",
+        "name": "p"
+      },
+      "right": {
+        "op": "atom",
+        "name": "q"
+      }
+    },
+    "stronger_obligations": [
+      {
+        "id": "UPPER-STRONGER-P-IMPLIES-Q-AND-R",
+        "stronger_formula": {
+          "op": "and",
+          "left": {
+            "op": "implies",
+            "left": {
+              "op": "atom",
+              "name": "p"
+            },
+            "right": {
+              "op": "atom",
+              "name": "q"
+            }
+          },
+          "right": {
+            "op": "atom",
+            "name": "r"
+          }
+        }
+      }
+    ],
+    "corollary_obligations": [
+      {
+        "id": "LOWER-COROLLARY-PR-IMPLIES-Q",
+        "corollary_formula": {
+          "op": "implies",
+          "left": {
+            "op": "and",
+            "left": {
+              "op": "atom",
+              "name": "p"
+            },
+            "right": {
+              "op": "atom",
+              "name": "r"
+            }
+          },
+          "right": {
+            "op": "atom",
+            "name": "q"
+          }
+        }
+      },
+      {
+        "id": "LOWER-COROLLARY-P-NOT-R-IMPLIES-Q",
+        "corollary_formula": {
+          "op": "implies",
+          "left": {
+            "op": "and",
+            "left": {
+              "op": "atom",
+              "name": "p"
+            },
+            "right": {
+              "op": "not",
+              "arg": {
+                "op": "atom",
+                "name": "r"
+              }
+            }
+          },
+          "right": {
+            "op": "atom",
+            "name": "q"
+          }
+        }
+      }
+    ],
+    "adjudication_authority": "finite_truth_table_synthetic",
+    "adjudication_refs": [
+      "SYNTHETIC-TRUTH-TABLE-CONTROLS",
+      "SYNTHETIC-NON-EMPIRICAL-RECEIPT"
+    ]
+  }
+}

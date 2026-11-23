@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/MATH_PROOF_COMPREHENSION_THEOREM_SANDWICH_V1.schema.json",
+  "title": "Math proof comprehension TheoremSandwichReceiptV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "candidate",
+    "evaluator_only"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "candidate": {
+      "$ref": "#/$defs/candidate"
+    },
+    "evaluator_only": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/evaluator"
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "nonEmpty": {
+      "type": "string",
+      "minLength": 1
+    },
+    "booleanFormula": {
+      "$ref": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/LOCAL_GLOBAL_PAIR_V1.schema.json#/$defs/booleanFormula"
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_id",
+        "theorem_id",
+        "source_repository",
+        "source_revision",
+        "source_path",
+        "declaration",
+        "model_provider",
+        "model_name",
+        "model_version",
+        "statement_text",
+        "statement_formula",
+        "visible_assumptions"
+      ],
+      "properties": {
+        "task_id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "theorem_id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "source_repository": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "source_revision": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "source_path": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "declaration": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "model_provider": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "model_name": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "model_version": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "statement_text": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "statement_formula": {
+          "$ref": "#/$defs/booleanFormula"
+        },
+        "visible_assumptions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/nonEmpty"
+          }
+        }
+      }
+    },
+    "strongerObligation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "stronger_formula"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "stronger_formula": {
+          "$ref": "#/$defs/booleanFormula"
+        }
+      }
+    },
+    "corollaryObligation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "corollary_formula"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "corollary_formula": {
+          "$ref": "#/$defs/booleanFormula"
+        }
+      }
+    },
+    "evaluator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target_statement_formula",
+        "stronger_obligations",
+        "corollary_obligations",
+        "adjudication_authority",
+        "adjudication_refs"
+      ],
+      "properties": {
+        "target_statement_formula": {
+          "$ref": "#/$defs/booleanFormula"
+        },
+        "stronger_obligations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/strongerObligation"
+          }
+        },
+        "corollary_obligations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/corollaryObligation"
+          }
+        },
+        "adjudication_authority": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "adjudication_refs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/nonEmpty"
+          }
+        }
+      }
+    }
+  }
+}

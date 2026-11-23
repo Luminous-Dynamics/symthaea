@@ -267,3 +267,7 @@ The SHA-256 dependency is introduced in this commit. The focused workflow tempor
 ## 14. Exhaustive finite propositional oracle
 
 The Rust receipt validator now includes a bounded truth-table checker for the Boolean formula AST. It enumerates all assignments for at most 16 distinct propositional atoms, sorts atom names for deterministic witnesses, and returns one of three explicit outcomes: a concrete countermodel, no countermodel found over the complete finite truth table, or `AtomBudgetExceeded` (unknown). The budget result is never treated as proof or refutation. Tests cover the invalid converse implication, valid modus ponens, deterministic witness ordering, and the budget boundary. This is a complete decision procedure only for the supported classical propositional AST within the declared atom budget; it is not a general mathematical theorem prover, dependent-type checker, or Lean kernel receipt.
+
+## 15. Theorem-sandwich control pilot
+
+The executable TheoremSandwichReceiptV1 lane implements two one-sided finite propositional checks: hidden stronger statement implies candidate statement, and candidate statement implies hidden corollaries. These controls are intentionally asymmetric so an over-strengthened candidate can fail the upper obligation while a weakened candidate can fail a lower corollary. Evaluator-only obligations are excluded from candidate_view. Passing selected controls is not full equivalence, Lean kernel proof, or expert confirmation. See MATH_PROOF_COMPREHENSION_THEOREM_SANDWICH_V1.md.

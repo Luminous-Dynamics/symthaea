@@ -360,3 +360,5 @@ The initial seed is source-pinned to Lean 4 core and is explicitly not expert-re
 - [Mathlib elaborated dependency extraction contract](MATHLIB_ELABORATED_DEPENDENCY_GRAPH_V1.schema.json) and [first pinned extraction results](MATHLIB_ELABORATED_DEPENDENCY_GRAPH_V1_RESULTS.md).
 
 - [Mathematical proof-comprehension benchmark matrix](MATH_PROOF_COMPREHENSION_BENCHMARK_MATRIX_V1.md) — current SOTA comparisons, paradigm-shift hypotheses, prospective metrics, controls and execution tiers.
+
+- [Theorem-sandwich finite control contract](MATH_PROOF_COMPREHENSION_THEOREM_SANDWICH_V1.md) with [schema](MATH_PROOF_COMPREHENSION_THEOREM_SANDWICH_V1.schema.json) and a hidden-evaluator synthetic fixture.
