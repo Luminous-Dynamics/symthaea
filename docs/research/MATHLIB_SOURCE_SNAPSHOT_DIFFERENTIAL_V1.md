@@ -53,7 +53,7 @@ This is a four-declaration source-snapshot differential. It is not a corpus-leve
 
 Both pinned Lean extractors now emit nested helper_nodes records for direct proof-value dependencies whose fully qualified Name contains the root theorem's component sequence and has additional suffix components. This preserves exact private/generated helper identity, declaration kind, type and proof-value dependencies, ConstantInfo closure, unresolved names and edge provenance. The helper remains a separate node; its references are not silently flattened into the theorem's direct edge set.
 
-The differential CLI validates helper-node provenance and closure reconciliation, then reports helper names and the union of root plus one-level helper proof-value dependencies. This is a first boundary diagnostic, not yet a recursively expanded transitive closure. If a helper has further generated children, those require their own nodes in a subsequent expansion pass.
+The differential CLI now validates the complete generated-helper worklist per root declaration and reports helper names plus the union of root and recursively discovered helper proof-value dependencies. The extraction uses fully qualified Lean Name components, a visited set and explicit helper-to-helper references; it does not flatten helper edges into the root's direct edge set. This captures generated-helper boundary depth while retaining a typed node graph. Non-generated dependencies remain direct targets; their own general recursive trust dependencies are reported separately in the trust profile.
 
 ## Trust-profile interpretation and comparison
 

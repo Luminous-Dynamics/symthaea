@@ -145,35 +145,45 @@ elab "#emit_proof_comprehension " declaration:ident : command => do
     ++ structuralEdges declarationName info
 
   let mut helperNodes : Array Json := #[]
-  for helperName in proofValueDependencies do
-    if isGeneratedHelperFor name helperName then
-      let some helperInfo := env.find? helperName
-        | throwError "proof-comprehension helper {helperName} referenced by {name} is not in the environment"
-      let helperTypeDependencies := helperInfo.type.getUsedConstantsAsSet.toList.toArray
-      let helperValue? := helperInfo.value? (allowOpaque := true)
-      let helperProofDependencies := helperValue?.map Expr.getUsedConstants |>.getD #[]
-      let helperClosure := helperInfo.getUsedConstantsAsSet.toList.toArray
-      let helperUnresolved :=
-        helperClosure.filter fun dependency => (env.find? dependency).isNone
-      let helperEdges :=
-        nameEdges (toString helperName) "type_dependency" "ConstantInfo.type"
-          helperTypeDependencies
-        ++ nameEdges (toString helperName) "proof_dependency" "ConstantInfo.value?"
-          helperProofDependencies
-        ++ structuralEdges (toString helperName) helperInfo
-      helperNodes := helperNodes.push <| Json.mkObj
-        [ ("root_declaration", toJson declarationName)
-        , ("node_role", toJson "generated_or_private_helper")
-        , ("declaration", toJson (toString helperName))
-        , ("declaration_kind", toJson (constantKind helperInfo))
-        , ("proof_value_available", toJson helperValue?.isSome)
-        , ("type_dependencies", namesJson helperTypeDependencies)
-        , ("proof_value_dependencies", namesJson helperProofDependencies)
-        , ("constant_info_dependency_closure", namesJson helperClosure)
-        , ("unresolved_dependencies", namesJson helperUnresolved)
-        , ("edges", Json.arr helperEdges)
-        , ("trust_profile", trustProfileJson env helperClosure)
-        ]
+  let mut pendingHelpers := proofValueDependencies.toList
+  let mut visitedHelpers : NameSet := {}
+  while !pendingHelpers.isEmpty do
+    match pendingHelpers with
+    | [] => pure ()
+    | helperName :: rest =>
+        pendingHelpers := rest
+        if isGeneratedHelperFor name helperName && !visitedHelpers.contains helperName then
+          visitedHelpers := visitedHelpers.insert helperName
+          let some helperInfo := env.find? helperName
+            | throwError "proof-comprehension helper {helperName} referenced by {name} is not in the environment"
+          let helperTypeDependencies := helperInfo.type.getUsedConstantsAsSet.toList.toArray
+          let helperValue? := helperInfo.value? (allowOpaque := true)
+          let helperProofDependencies := helperValue?.map Expr.getUsedConstants |>.getD #[]
+          let helperClosure := helperInfo.getUsedConstantsAsSet.toList.toArray
+          let helperUnresolved :=
+            helperClosure.filter fun dependency => (env.find? dependency).isNone
+          for dependency in helperProofDependencies do
+            if isGeneratedHelperFor name dependency then
+              pendingHelpers := dependency :: pendingHelpers
+          let helperEdges :=
+            nameEdges (toString helperName) "type_dependency" "ConstantInfo.type"
+              helperTypeDependencies
+            ++ nameEdges (toString helperName) "proof_dependency" "ConstantInfo.value?"
+              helperProofDependencies
+            ++ structuralEdges (toString helperName) helperInfo
+          helperNodes := helperNodes.push <| Json.mkObj
+            [ ("root_declaration", toJson declarationName)
+            , ("node_role", toJson "generated_or_private_helper")
+            , ("declaration", toJson (toString helperName))
+            , ("declaration_kind", toJson (constantKind helperInfo))
+            , ("proof_value_available", toJson helperValue?.isSome)
+            , ("type_dependencies", namesJson helperTypeDependencies)
+            , ("proof_value_dependencies", namesJson helperProofDependencies)
+            , ("constant_info_dependency_closure", namesJson helperClosure)
+            , ("unresolved_dependencies", namesJson helperUnresolved)
+            , ("edges", Json.arr helperEdges)
+            , ("trust_profile", trustProfileJson env helperClosure)
+            ]
 
   let output := Json.mkObj
     [ ("schema_version", toJson "1.0.0")
