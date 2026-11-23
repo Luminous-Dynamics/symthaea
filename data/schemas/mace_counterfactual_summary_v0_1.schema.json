@@ -41,7 +41,10 @@
       ]
     },
     "ci": {
-      "type": "array",
+      "type": [
+        "array",
+        "null"
+      ],
       "items": {
         "type": "number"
       },
@@ -81,7 +84,9 @@
         "mean_decision_changed",
         "mean_decision_optimal",
         "mean_abstained",
-        "task_block_aggregation"
+        "task_block_aggregation",
+        "regret_gap_vs_full_evidence_ci_status",
+        "regret_gap_vs_full_method_ci_status"
       ],
       "properties": {
         "schema_version": {
@@ -190,6 +195,12 @@
         "input_manifest_count": {
           "type": "integer",
           "minimum": 1
+        },
+        "regret_gap_vs_full_evidence_ci_status": {
+          "$ref": "#/$defs/ci_status"
+        },
+        "regret_gap_vs_full_method_ci_status": {
+          "$ref": "#/$defs/ci_status"
         }
       }
     },
@@ -220,7 +231,9 @@
         "mean_regret_delta_vs_exact_scope",
         "utility_delta_cluster_bootstrap_95pct_ci",
         "regret_delta_cluster_bootstrap_95pct_ci",
-        "paired_task_block_aggregation"
+        "paired_task_block_aggregation",
+        "utility_delta_ci_status",
+        "regret_delta_ci_status"
       ],
       "properties": {
         "schema_version": {
@@ -301,8 +314,22 @@
         "input_manifest_count": {
           "type": "integer",
           "minimum": 1
+        },
+        "utility_delta_ci_status": {
+          "$ref": "#/$defs/ci_status"
+        },
+        "regret_delta_ci_status": {
+          "$ref": "#/$defs/ci_status"
         }
       }
+    },
+    "ci_status": {
+      "type": "string",
+      "enum": [
+        "not_estimable_no_clusters",
+        "not_estimable_single_cluster",
+        "cluster_bootstrap_percentile"
+      ]
     }
   }
 }

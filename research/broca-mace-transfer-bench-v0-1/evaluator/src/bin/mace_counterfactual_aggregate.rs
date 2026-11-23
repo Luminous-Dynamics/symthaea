@@ -270,12 +270,11 @@ fn stable_seed(seed: u64, key: &str, metric: &str) -> u64 {
     u64::from_be_bytes(digest[..8].try_into().expect("SHA-256 prefix is eight bytes")).max(1)
 }
 
-fn bootstrap_ci(values: &[f64], seed: u64) -> (f64, f64) {
-    if values.is_empty() {
-        return (f64::NAN, f64::NAN);
-    }
-    if values.len() == 1 {
-        return (values[0], values[0]);
+fn bootstrap_ci(values: &[f64], seed: u64) -> Option<(f64, f64)> {
+    // A cluster bootstrap cannot estimate between-cluster uncertainty from
+    // zero or one independent cluster. Do not emit a degenerate interval.
+    if values.len() < 2 {
+        return None;
     }
 
     let mut state = seed.max(1);
@@ -289,7 +288,15 @@ fn bootstrap_ci(values: &[f64], seed: u64) -> (f64, f64) {
         means.push(total / values.len() as f64);
     }
     means.sort_by(f64::total_cmp);
-    (percentile(&means, 0.025), percentile(&means, 0.975))
+    Some((percentile(&means, 0.025), percentile(&means, 0.975)))
+}
+
+fn bootstrap_ci_status(values: &[f64]) -> &'static str {
+    match values.len() {
+        0 => "not_estimable_no_clusters",
+        1 => "not_estimable_single_cluster",
+        _ => "cluster_bootstrap_percentile",
+    }
 }
 
 fn cluster_means(
@@ -348,14 +355,16 @@ fn summary_record(
 
     let gap_method_values = cluster_values_for("regret_gap_vs_full_method");
     let gap_evidence_values = cluster_values_for("regret_gap_vs_full_evidence");
-    let (gap_method_lower, gap_method_upper) = bootstrap_ci(
+    let gap_method_ci = bootstrap_ci(
         &gap_method_values,
         stable_seed(seed, method, intervention_kind),
-    );
-    let (gap_evidence_lower, gap_evidence_upper) = bootstrap_ci(
+    )
+    .map(|(lower, upper)| vec![lower, upper]);
+    let gap_evidence_ci = bootstrap_ci(
         &gap_evidence_values,
         stable_seed(seed ^ 0x9E37_79B9, method, intervention_kind),
-    );
+    )
+    .map(|(lower, upper)| vec![lower, upper]);
 
     json!({
         "schema_version": OUTPUT_SCHEMA,
@@ -369,8 +378,10 @@ fn summary_record(
         "mean_regret": means.regret,
         "mean_regret_gap_vs_full_evidence": means.regret_gap_vs_full_evidence,
         "mean_regret_gap_vs_full_method": means.regret_gap_vs_full_method,
-        "regret_gap_vs_full_evidence_cluster_bootstrap_95pct_ci": [gap_evidence_lower, gap_evidence_upper],
-        "regret_gap_vs_full_method_cluster_bootstrap_95pct_ci": [gap_method_lower, gap_method_upper],
+        "regret_gap_vs_full_evidence_cluster_bootstrap_95pct_ci": gap_evidence_ci,
+        "regret_gap_vs_full_evidence_ci_status": bootstrap_ci_status(&gap_evidence_values),
+        "regret_gap_vs_full_method_cluster_bootstrap_95pct_ci": gap_method_ci,
+        "regret_gap_vs_full_method_ci_status": bootstrap_ci_status(&gap_method_values),
         "mean_decision_agreement_with_full": means.decision_agreement,
         "mean_decision_changed": means.decision_changed,
         "mean_decision_optimal": means.decision_optimal,
@@ -397,14 +408,16 @@ fn paired_record(
         .divide(cluster_metrics.len().max(1) as f64);
     let utility_values: Vec<f64> = cluster_values.values().map(|value| value.utility).collect();
     let regret_values: Vec<f64> = cluster_values.values().map(|value| value.regret).collect();
-    let (utility_lower, utility_upper) = bootstrap_ci(
+    let utility_ci = bootstrap_ci(
         &utility_values,
         stable_seed(seed, method, intervention_kind),
-    );
-    let (regret_lower, regret_upper) = bootstrap_ci(
+    )
+    .map(|(lower, upper)| vec![lower, upper]);
+    let regret_ci = bootstrap_ci(
         &regret_values,
         stable_seed(seed ^ 0xD1B5_4A32, method, intervention_kind),
-    );
+    )
+    .map(|(lower, upper)| vec![lower, upper]);
 
     json!({
         "schema_version": OUTPUT_SCHEMA,
@@ -416,8 +429,10 @@ fn paired_record(
         "paired_task_block_count": task_block_count,
         "mean_utility_delta_vs_exact_scope": means.utility,
         "mean_regret_delta_vs_exact_scope": means.regret,
-        "utility_delta_cluster_bootstrap_95pct_ci": [utility_lower, utility_upper],
-        "regret_delta_cluster_bootstrap_95pct_ci": [regret_lower, regret_upper],
+        "utility_delta_cluster_bootstrap_95pct_ci": utility_ci,
+        "utility_delta_ci_status": bootstrap_ci_status(&utility_values),
+        "regret_delta_cluster_bootstrap_95pct_ci": regret_ci,
+        "regret_delta_ci_status": bootstrap_ci_status(&regret_values),
         "resampling_unit": "independent_world_cluster",
         "paired_task_block_aggregation": "mean_within_cluster_before_bootstrap",
         "bootstrap_replicates": BOOTSTRAP_REPLICATES,
@@ -746,12 +761,27 @@ mod tests {
     #[test]
     fn cluster_bootstrap_is_deterministic_and_bounded_by_sample_extrema() {
         let values = vec![-2.0, 0.0, 3.0, 4.0];
-        let first = bootstrap_ci(&values, 1234);
-        let second = bootstrap_ci(&values, 1234);
+        let first = bootstrap_ci(&values, 1234).unwrap();
+        let second = bootstrap_ci(&values, 1234).unwrap();
         assert_eq!(first, second);
         assert!(first.0 >= -2.0);
         assert!(first.1 <= 4.0);
         assert!(first.0 <= first.1);
+    }
+
+    #[test]
+    fn singleton_or_empty_cluster_samples_do_not_emit_confidence_intervals() {
+        assert_eq!(bootstrap_ci(&[], 1234), None);
+        assert_eq!(bootstrap_ci(&[0.5], 1234), None);
+        assert_eq!(bootstrap_ci_status(&[]), "not_estimable_no_clusters");
+        assert_eq!(
+            bootstrap_ci_status(&[0.5]),
+            "not_estimable_single_cluster"
+        );
+        assert_eq!(
+            bootstrap_ci_status(&[0.2, 0.8]),
+            "cluster_bootstrap_percentile"
+        );
     }
 
     #[test]
