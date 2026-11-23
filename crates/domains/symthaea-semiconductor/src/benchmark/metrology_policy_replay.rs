@@ -51,6 +51,44 @@ pub struct SyntheticMetrologyCharacteristicsV1 {
     pub specificity: f64,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SyntheticBinaryDecisionV1 {
+    Accept,
+    Hold,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct SyntheticBinaryDecisionLossV1 {
+    pub false_negative_cost: f64,
+    pub false_positive_cost: f64,
+    /// Cost of acquiring one physical measurement, in the same loss units.
+    pub measurement_cost: f64,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct SyntheticBinaryEvsiReportV1 {
+    pub prior_defect_probability: f64,
+    pub probability_assay_positive: f64,
+    pub probability_assay_negative: f64,
+    pub posterior_defect_given_positive: Option<f64>,
+    pub posterior_defect_given_negative: Option<f64>,
+    pub decision_without_measurement: SyntheticBinaryDecisionV1,
+    pub decision_after_positive: Option<SyntheticBinaryDecisionV1>,
+    pub decision_after_negative: Option<SyntheticBinaryDecisionV1>,
+    pub expected_loss_without_measurement: f64,
+    pub expected_loss_after_measurement: f64,
+    /// Gross decision-theoretic EVSI before acquisition cost.
+    pub expected_value_of_sample_information: f64,
+    pub measurement_cost: f64,
+    pub net_value_after_measurement_cost: f64,
+    /// Gross EVSI scaled by max(false-negative, false-positive loss), in [0, 1].
+    pub normalized_evsi_score: f64,
+    /// Net-positive hurdle score; zero means the measurement does not justify
+    /// its declared acquisition cost under this decision model.
+    pub normalized_net_value_score: f64,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SyntheticFabScenarioConfigV1 {
     pub schema: String,
@@ -1130,6 +1168,113 @@ fn validate_config(config: &SyntheticFabScenarioConfigV1) -> Result<(), Syntheti
         ));
     }
     Ok(())
+}
+
+fn optimal_binary_disposition(
+    defect_probability: f64,
+    loss: SyntheticBinaryDecisionLossV1,
+) -> (SyntheticBinaryDecisionV1, f64) {
+    let accept_loss = defect_probability * loss.false_negative_cost;
+    let hold_loss = (1.0 - defect_probability) * loss.false_positive_cost;
+    if accept_loss <= hold_loss {
+        (SyntheticBinaryDecisionV1::Accept, accept_loss)
+    } else {
+        (SyntheticBinaryDecisionV1::Hold, hold_loss)
+    }
+}
+
+/// Computes exact one-step model-implied EVSI for a binary physical assay.
+///
+/// The result is conditional on the supplied defect probability, fixed assay
+/// sensitivity/specificity and declared binary decision losses. It is not an
+/// empirical or calibrated fab EVSI unless those inputs are independently
+/// qualified. Gross EVSI is reported separately from measurement cost.
+pub fn calculate_synthetic_binary_evsi_v1(
+    prior_defect_probability: f64,
+    characteristics: SyntheticMetrologyCharacteristicsV1,
+    loss: SyntheticBinaryDecisionLossV1,
+) -> Result<SyntheticBinaryEvsiReportV1, SyntheticFabReplayError> {
+    if !prior_defect_probability.is_finite()
+        || !(0.0..=1.0).contains(&prior_defect_probability)
+        || !characteristics.sensitivity.is_finite()
+        || !(0.0..=1.0).contains(&characteristics.sensitivity)
+        || !characteristics.specificity.is_finite()
+        || !(0.0..=1.0).contains(&characteristics.specificity)
+    {
+        return Err(SyntheticFabReplayError(
+            "EVSI probabilities must be finite and lie in [0, 1]".into(),
+        ));
+    }
+    if !loss.false_negative_cost.is_finite()
+        || loss.false_negative_cost < 0.0
+        || !loss.false_positive_cost.is_finite()
+        || loss.false_positive_cost < 0.0
+        || !loss.measurement_cost.is_finite()
+        || loss.measurement_cost < 0.0
+        || loss.false_negative_cost.max(loss.false_positive_cost) <= 0.0
+    {
+        return Err(SyntheticFabReplayError(
+            "EVSI decision losses must be finite and non-negative, with at least one positive loss"
+                .into(),
+        ));
+    }
+
+    let prior = prior_defect_probability;
+    let probability_positive = prior * characteristics.sensitivity
+        + (1.0 - prior) * (1.0 - characteristics.specificity);
+    let probability_negative = (1.0 - probability_positive).clamp(0.0, 1.0);
+
+    let posterior_positive = (probability_positive > 0.0).then(|| {
+        (prior * characteristics.sensitivity / probability_positive).clamp(0.0, 1.0)
+    });
+    let posterior_negative = (probability_negative > 0.0).then(|| {
+        (prior * (1.0 - characteristics.sensitivity) / probability_negative).clamp(0.0, 1.0)
+    });
+
+    let (decision_without_measurement, expected_loss_without_measurement) =
+        optimal_binary_disposition(prior, loss);
+
+    let (decision_after_positive, positive_conditional_loss) =
+        posterior_positive.map_or((None, 0.0), |posterior| {
+            let (decision, conditional_loss) = optimal_binary_disposition(posterior, loss);
+            (Some(decision), conditional_loss)
+        });
+    let (decision_after_negative, negative_conditional_loss) =
+        posterior_negative.map_or((None, 0.0), |posterior| {
+            let (decision, conditional_loss) = optimal_binary_disposition(posterior, loss);
+            (Some(decision), conditional_loss)
+        });
+
+    let expected_loss_after_measurement = probability_positive * positive_conditional_loss
+        + probability_negative * negative_conditional_loss;
+    let gross_evsi =
+        (expected_loss_without_measurement - expected_loss_after_measurement).max(0.0);
+    let net_value_after_measurement_cost = gross_evsi - loss.measurement_cost;
+    let maximum_decision_loss = loss.false_negative_cost.max(loss.false_positive_cost);
+    let normalized_evsi_score = (gross_evsi / maximum_decision_loss).clamp(0.0, 1.0);
+    let normalized_net_value_score = if net_value_after_measurement_cost > 0.0 {
+        (net_value_after_measurement_cost / maximum_decision_loss).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+
+    Ok(SyntheticBinaryEvsiReportV1 {
+        prior_defect_probability: prior,
+        probability_assay_positive: probability_positive,
+        probability_assay_negative: probability_negative,
+        posterior_defect_given_positive: posterior_positive,
+        posterior_defect_given_negative: posterior_negative,
+        decision_without_measurement,
+        decision_after_positive,
+        decision_after_negative,
+        expected_loss_without_measurement,
+        expected_loss_after_measurement,
+        expected_value_of_sample_information: gross_evsi,
+        measurement_cost: loss.measurement_cost,
+        net_value_after_measurement_cost,
+        normalized_evsi_score,
+        normalized_net_value_score,
+    })
 }
 
 fn process_shift(regime: SyntheticFabRegimeV1, fraction: f64) -> f64 {
