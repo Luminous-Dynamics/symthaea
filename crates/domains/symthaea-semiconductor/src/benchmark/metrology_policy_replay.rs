@@ -923,6 +923,31 @@ mod tests {
     }
 
     #[test]
+    fn mcar_mar_and_mnar_apply_distinct_dropout_mechanisms() {
+        let mcar = conditional_dropout_probability(
+            SyntheticFabMissingnessMechanismV1::Mcar,
+            0.12,
+            1.0,
+            true,
+        );
+        let mar = conditional_dropout_probability(
+            SyntheticFabMissingnessMechanismV1::Mar,
+            0.12,
+            1.0,
+            false,
+        );
+        let mnar = conditional_dropout_probability(
+            SyntheticFabMissingnessMechanismV1::Mnar,
+            0.12,
+            0.0,
+            true,
+        );
+        assert!((mcar - 0.12).abs() < 1.0e-12);
+        assert!((mar - 0.57).abs() < 1.0e-12);
+        assert!((mnar - 0.67).abs() < 1.0e-12);
+    }
+
+    #[test]
     fn fixed_seed_reproduces_observation_packet_and_truth_digests() {
         let first = generate_synthetic_fab_episode_v1(&config(
             SyntheticFabRegimeV1::GradualProcessDrift,
