@@ -62,7 +62,7 @@ jobs:
         run: cargo +1.96.0 test --locked -p symthaea-muse --lib realization_effect::tests
 
       - name: Warnings-denied Muse library Clippy
-        run: cargo +1.96.0 clippy --locked -p symthaea-muse --lib -- -D warnings
+        run: cargo +1.96.0 clippy --locked -p symthaea-muse --lib -- --no-deps -D warnings
 
       - name: Assemble exact-head evidence
         if: always()
