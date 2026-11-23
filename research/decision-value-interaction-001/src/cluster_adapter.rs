@@ -231,6 +231,18 @@ fn validate_certificate(
             "certificate signed effects do not recompute from the four arm regrets",
         ));
     }
+    let expected_sign = if expected[3] > 0 {
+        super::InteractionSign::Complementary
+    } else if expected[3] < 0 {
+        super::InteractionSign::Antagonistic
+    } else {
+        super::InteractionSign::AdditiveOrNeutral
+    };
+    if certificate.interaction_sign != expected_sign {
+        return Err(fail(
+            "certificate interaction sign disagrees with recomputed interaction",
+        ));
+    }
     Ok(expected)
 }
 
@@ -666,7 +678,7 @@ mod tests {
     fn too_few_clusters_fail_closed() {
         let rows: Vec<_> = fixture()
             .into_iter()
-            .filter(|row| row.cluster_id <= "scene-02")
+            .filter(|row| row.cluster_id.as_str() <= "scene-02")
             .collect();
         assert!(
             export_cluster_deltas(&rows, &metadata())
