@@ -62,7 +62,7 @@ The receipt binds:
 - decision and support/retrieval event IDs;
 - retrieval-profile digest, index payload bytes and candidate-process latency.
 
-The receipt also records the candidate-visible event count separately from the full available-event count in the parent-authored candidate/evaluator rows. This makes the scope projection auditable. The run's source-bundle digest binds the evaluator runner and reducer, process client, candidate source, direct policy/HDC sources, package/workspace manifests, Rust toolchain file and Nix lock. A separate schema-bundle digest binds the three JSON schemas. The observation identity follows the same canonical formula as the paired evaluator receipt contract in PR #13331. A digest establishes byte identity, not who supplied the bytes.
+The receipt also records the candidate-visible event count separately from the full available-event count in the parent-authored candidate/evaluator rows. This makes the scope projection auditable. The run's source-bundle digest binds the evaluator runner and reducer, process client, candidate source, direct policy/HDC sources, evaluator/candidate/policy/HDC/workspace manifests, Rust 1.96.0 toolchain file and root Nix lock. A separate schema-bundle digest binds the counterfactual evidence, candidate envelope and candidate receipt schemas. The nested research workspace still lacks a dedicated Cargo.lock; see [#13364](https://github.com/Luminous-Dynamics/symthaea/issues/13364). The observation identity follows the same canonical formula as the paired evaluator receipt contract in PR #13331. A digest establishes byte identity, not who supplied the bytes.
 
 ## Invocation
 
