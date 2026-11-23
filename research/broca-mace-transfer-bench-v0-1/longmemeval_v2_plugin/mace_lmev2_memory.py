@@ -9,6 +9,7 @@ does not use query-image pixels for retrieval.
 
 from __future__ import annotations
 
+import atexit
 import hashlib
 import json
 import os
@@ -83,6 +84,7 @@ class MaceLongMemEvalV2Memory(Memory):
         self._trajectory_lines: list[str] = []
         self._inserted_ids: set[str] = set()
         super().__init__(memory_params)
+        atexit.register(self.close)
 
     @staticmethod
     def _bounded_int(value: object, name: str, minimum: int, maximum: int) -> int:
