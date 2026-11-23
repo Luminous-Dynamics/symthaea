@@ -684,7 +684,7 @@ MACE_SOURCE_REVISION="$(git rev-parse HEAD)" cargo run --release \
 
 The evaluator starts one persistent stateless worker per generated task block and reuses it across that block's baseline/intervention requests. Each request gets a new nonce and monotonic observation sequence. Exact scan remains the all-evidence reference ceiling; typed-content HDC is the top-k retrieval method. Three other methods (event-ID KV top-k, static HDC, HDC-LTC zero-input) remain `legacy_in_process` and are visibly labelled as such in candidate and evaluator rows.
 
-The timing record separates worker startup, request construction, request/response wall time, child-internal retrieval/policy time, receipt validation, and end-to-end parent-side request time. Startup is repeated on rows from a task-block worker; aggregate it once per pair block and artifact digest, not by summing every row.
+The timing record separates worker startup, request construction, request/response wall time, child-internal retrieval/policy time, receipt validation, and end-to-end parent-side request time. Startup is repeated on rows from the run-scoped worker; aggregate it once per run and artifact digest, not by summing every row.
 
 The evaluator now cross-checks both retrieved IDs and the exact decision-support IDs emitted by the candidate. A valid retrieval list cannot silently substitute for a different support set in evaluator scoring.
 
