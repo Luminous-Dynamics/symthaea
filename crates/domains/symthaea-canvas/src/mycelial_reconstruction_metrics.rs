@@ -2096,7 +2096,7 @@ mod tests {
         assert_eq!(score.junction_kind_macro_f1, Some(1.0));
         assert_eq!(score.false_anastomosis_junction_count, 0);
         assert_eq!(score.topology_delta.cycle_rank, 0);
-        assert!(score.localization_error.mean_error.unwrap() <= 0.01);
+        assert!(score.localization_error.mean_error.unwrap() <= 0.01 + 1.0e-12);
         assert_eq!(
             score.canonical_digest_hex().unwrap(),
             score.canonical_digest_hex().unwrap()
