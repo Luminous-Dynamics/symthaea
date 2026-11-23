@@ -95,6 +95,7 @@ function submitAction(state, action) {
   else if (job.status !== action.from_status) reason = 'stale_status';
   else if (!hasPermission(state,action.actor_id,action.capability)) reason = 'permission_denied';
   else if (!transitionAllowed(job.status,action.to_status)) reason = 'invalid_transition';
+  else if ([...state.pending.values()].some(pending=>pending.job_id===action.job_id)) reason = 'action_already_pending';
   if (reason) { state.actions.set(action.action_id,{status:'rejected',reason}); return; }
   state.pending.set(action.action_id,clone(action));
   state.actions.set(action.action_id,{status:'pending'});
