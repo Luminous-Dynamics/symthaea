@@ -79,7 +79,9 @@ impl fmt::Display for MycelialFunctionalBenchmarkError {
                 f,
                 "unsupported mycelial functional benchmark schema version {version}"
             ),
-            Self::InvalidMetadata => write!(f, "invalid mycelial functional benchmark split metadata"),
+            Self::InvalidMetadata => {
+                write!(f, "invalid mycelial functional benchmark split metadata")
+            },
             Self::TooManyAssignments(count) => write!(
                 f,
                 "functional benchmark assignment count {count} exceeds {MAX_MYCELIAL_FUNCTIONAL_BENCHMARK_ASSIGNMENTS}"
@@ -117,7 +119,10 @@ impl fmt::Display for MycelialFunctionalBenchmarkError {
                 "functional benchmark manifest contains unprovided observation set {digest}"
             ),
             Self::InvalidObservationSet(reason) => {
-                write!(f, "invalid functional observation set in benchmark: {reason}")
+                write!(
+                    f,
+                    "invalid functional observation set in benchmark: {reason}"
+                )
             }
         }
     }
@@ -163,8 +168,7 @@ impl MycelialFunctionalBenchmarkSplitManifest {
             ));
         }
 
-        let mut replicate_splits =
-            BTreeMap::<&str, MycelialFunctionalBenchmarkSplit>::new();
+        let mut replicate_splits = BTreeMap::<&str, MycelialFunctionalBenchmarkSplit>::new();
         let mut previous_digest: Option<&str> = None;
         for assignment in &self.assignments {
             if !valid_digest(&assignment.observation_set_digest)
@@ -182,7 +186,9 @@ impl MycelialFunctionalBenchmarkSplitManifest {
                 );
             }
             previous_digest = Some(&assignment.observation_set_digest);
-            if let Some(first_split) = replicate_splits.get(assignment.biological_replicate_id.as_str()) {
+            if let Some(first_split) =
+                replicate_splits.get(assignment.biological_replicate_id.as_str())
+            {
                 if *first_split != assignment.split {
                     return Err(MycelialFunctionalBenchmarkError::ReplicateLeakage {
                         biological_replicate_id: assignment.biological_replicate_id.clone(),
@@ -212,9 +218,10 @@ impl MycelialFunctionalBenchmarkSplitManifest {
 
         let mut provided = BTreeMap::<String, &MycelialFunctionalObservationSet>::new();
         for set in observation_sets {
-            set.validate().map_err(|error: MycelialFunctionalObservationError| {
-                MycelialFunctionalBenchmarkError::InvalidObservationSet(error.to_string())
-            })?;
+            set.validate()
+                .map_err(|error: MycelialFunctionalObservationError| {
+                    MycelialFunctionalBenchmarkError::InvalidObservationSet(error.to_string())
+                })?;
             let digest = set.canonical_digest_hex().map_err(|error| {
                 MycelialFunctionalBenchmarkError::InvalidObservationSet(error.to_string())
             })?;
@@ -232,11 +239,13 @@ impl MycelialFunctionalBenchmarkSplitManifest {
                 ));
             };
             if set.biological_replicate_id != assignment.biological_replicate_id {
-                return Err(MycelialFunctionalBenchmarkError::ReplicateIdentityMismatch {
-                    observation_set_digest: assignment.observation_set_digest.clone(),
-                    expected: assignment.biological_replicate_id.clone(),
-                    actual: set.biological_replicate_id.clone(),
-                });
+                return Err(
+                    MycelialFunctionalBenchmarkError::ReplicateIdentityMismatch {
+                        observation_set_digest: assignment.observation_set_digest.clone(),
+                        expected: assignment.biological_replicate_id.clone(),
+                        actual: set.biological_replicate_id.clone(),
+                    },
+                );
             }
         }
         if let Some(missing_digest) = provided.keys().next() {
@@ -299,9 +308,9 @@ mod tests {
         MycelialFunctionalObservation, MycelialFunctionalObservationSet,
     };
     use crate::mycelial_reconstruction_metrics::{
-        AnnotatedHyphaSegment, AnnotatedJunction, AnnotatedJunctionKind,
-        MYCELIAL_RECONSTRUCTION_SCHEMA_VERSION, AnnotatedMycelialSkeleton,
-        ReconstructionDimensionality, ReconstructionLengthUnit, ReconstructionPoint3,
+        AnnotatedHyphaSegment, AnnotatedJunction, AnnotatedJunctionKind, AnnotatedMycelialSkeleton,
+        MYCELIAL_RECONSTRUCTION_SCHEMA_VERSION, ReconstructionDimensionality,
+        ReconstructionLengthUnit, ReconstructionPoint3,
     };
 
     fn digest(character: char) -> String {
@@ -323,12 +332,20 @@ mod tests {
                 AnnotatedJunction {
                     id: "A".to_string(),
                     kind: AnnotatedJunctionKind::Origin,
-                    position: ReconstructionPoint3 { x: 0.0, y: 0.0, z: 0.0 },
+                    position: ReconstructionPoint3 {
+                        x: 0.0,
+                        y: 0.0,
+                        z: 0.0,
+                    },
                 },
                 AnnotatedJunction {
                     id: "B".to_string(),
                     kind: AnnotatedJunctionKind::Tip,
-                    position: ReconstructionPoint3 { x: 10.0, y: 0.0, z: 0.0 },
+                    position: ReconstructionPoint3 {
+                        x: 10.0,
+                        y: 0.0,
+                        z: 0.0,
+                    },
                 },
             ],
             segments: vec![AnnotatedHyphaSegment {
@@ -369,7 +386,10 @@ mod tests {
         }
     }
 
-    fn assignment(set: &MycelialFunctionalObservationSet, split: MycelialFunctionalBenchmarkSplit) -> MycelialFunctionalBenchmarkAssignment {
+    fn assignment(
+        set: &MycelialFunctionalObservationSet,
+        split: MycelialFunctionalBenchmarkSplit,
+    ) -> MycelialFunctionalBenchmarkAssignment {
         MycelialFunctionalBenchmarkAssignment {
             observation_set_digest: set.canonical_digest_hex().unwrap(),
             biological_replicate_id: set.biological_replicate_id.clone(),
@@ -387,7 +407,8 @@ mod tests {
             .map(|(set, split)| assignment(set, *split))
             .collect();
         assignments.sort_by(|left, right| {
-            left.observation_set_digest.cmp(&right.observation_set_digest)
+            left.observation_set_digest
+                .cmp(&right.observation_set_digest)
         });
         MycelialFunctionalBenchmarkSplitManifest {
             schema_version: MYCELIAL_FUNCTIONAL_BENCHMARK_SCHEMA_VERSION,
@@ -445,7 +466,9 @@ mod tests {
                 MycelialFunctionalBenchmarkSplit::Test,
             ],
         );
-        value.validate_against(&[first.clone(), second.clone()]).unwrap();
+        value
+            .validate_against(&[first.clone(), second.clone()])
+            .unwrap();
 
         let mut altered = second;
         altered.treatment_id = Some("different-treatment".to_string());
