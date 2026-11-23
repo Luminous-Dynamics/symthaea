@@ -172,7 +172,14 @@ These are prospective engineering targets, not external standards or achieved re
 - DCASE 2026 Task 3: https://dcase.community/challenge2026/task-semantic-acoustic-imaging-for-sound-event-localization-and-detection-from-spatial-audio-and-audiovisual-scenes
 - RoboDyna: https://robodyna.github.io/
 - LIBERO-Dynamic: https://arxiv.org/abs/2610.24579
-- Survey of World Model Benchmarks: https://world-model-benchmarks.github.io/\n- GOOD Graph OOD benchmark: https://github.com/divelab/GOOD\n- GOOD NeurIPS 2022 paper: https://papers.nips.cc/paper_files/paper/2022/hash/0dc91de822b71c66a7f54fa121d8cbb9-Abstract-Datasets_and_Benchmarks.html\n- CGGC compositional graph reasoning challenge: https://aclanthology.org/2024.findings-emnlp.492/\n- ACDB: https://arxiv.org/abs/2609.31675\n- World-In-World (ICLR 2026): https://proceedings.iclr.cc/paper_files/paper/2026/hash/5b4263be85820683d78675cc18d2efc7-Abstract-Conference.html\n- V-JEPA 2: https://ai.meta.com/research/publications/v-jepa-2-self-supervised-video-models-enable-understanding-prediction-and-planning/\n- Dreamer 4: https://arxiv.org/abs/2509.24527
+- Survey of World Model Benchmarks: https://world-model-benchmarks.github.io/
+- GOOD Graph OOD benchmark: https://github.com/divelab/GOOD
+- GOOD NeurIPS 2022 paper: https://papers.nips.cc/paper_files/paper/2022/hash/0dc91de822b71c66a7f54fa121d8cbb9-Abstract-Datasets_and_Benchmarks.html
+- CGGC compositional graph reasoning challenge: https://aclanthology.org/2024.findings-emnlp.492/
+- ACDB: https://arxiv.org/abs/2609.31675
+- World-In-World (ICLR 2026): https://proceedings.iclr.cc/paper_files/paper/2026/hash/5b4263be85820683d78675cc18d2efc7-Abstract-Conference.html
+- V-JEPA 2: https://ai.meta.com/research/publications/v-jepa-2-self-supervised-video-models-enable-understanding-prediction-and-planning/
+- Dreamer 4: https://arxiv.org/abs/2509.24527
 - Gromov, *Ergostructures, Ergologic and the Universal Learning Problem*: https://www.ihes.fr/~gromov/wp-content/uploads/2018/08/ergologic31.pdf
 - Do World Models Make Better Robots? (2026): https://arxiv.org/abs/2609.29669
 - Do causal predictors generalize better to new domains? (NeurIPS 2024): https://proceedings.neurips.cc/paper_files/paper/2024/hash/3792ddbf94b68ff4369f510f7a3e1777-Abstract-Conference.html
