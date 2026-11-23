@@ -48,6 +48,12 @@ pub enum LabelConsumptionReasonV1 {
     LabelInstrumentMismatch,
     LabelMeasurandMismatch,
     LabelUnitMismatch,
+    LabelValueMissing,
+    LabelValueMismatch,
+    LabelUncertaintyMissing,
+    LabelUncertaintyNonFinite,
+    LabelUncertaintyUnderstatesQualifiedBound,
+    QualifiedUncertaintyBoundMissing,
     LabelCalibrationReferenceMissing,
     LabelCalibrationReferenceMismatch,
     MeasurementEventMismatch,
@@ -69,7 +75,10 @@ pub struct LabelConsumptionEligibilityReportV1 {
     /// Eligibility only; this is not authority to mutate a model or training set.
     pub downstream_consumption_allowed: bool,
     pub reasons: Vec<LabelConsumptionReasonV1>,
+    pub label_sha256: String,
     pub measurement_sha256: String,
+    pub qualified_corrected_value: f64,
+    pub qualified_standard_uncertainty_upper_bound: Option<f64>,
     pub qualification_report_sha256: String,
     pub requalification_report_sha256: String,
     pub requalification_frontier_sha256: String,
@@ -151,6 +160,22 @@ pub fn assess_label_consumption_eligibility_v1(
     let certificate = &input.calibration_at_k0;
 
     let measurement_sha256 = json_sha256(measurement)?;
+    if label.value.is_some_and(|value| !value.is_finite())
+        || label
+            .standard_uncertainty
+            .is_some_and(|value| !value.is_finite() || value < 0.0)
+        || label
+            .censoring_lower_bound
+            .is_some_and(|value| !value.is_finite())
+        || label
+            .censoring_upper_bound
+            .is_some_and(|value| !value.is_finite())
+    {
+        return Err(LabelConsumptionGuardErrorV1(
+            "label contains non-finite numeric value or uncertainty metadata".into(),
+        ));
+    }
+    let label_sha256 = json_sha256(label)?;
     let qualification = qualify_measurement_evidence_v1(
         measurement,
         Some(certificate),
@@ -198,6 +223,44 @@ pub fn assess_label_consumption_eligibility_v1(
     if label.unit != measurement.unit {
         reasons.push(LabelConsumptionReasonV1::LabelUnitMismatch);
         eligibility = LabelConsumptionEligibilityV1::Blocked;
+    }
+
+    if label.status == MetrologyLabelStatusV1::Validated {
+        match label.value {
+            Some(value) if value == qualification.corrected_value => {}
+            Some(_) => {
+                reasons.push(LabelConsumptionReasonV1::LabelValueMismatch);
+                eligibility = LabelConsumptionEligibilityV1::Blocked;
+            }
+            None => {
+                reasons.push(LabelConsumptionReasonV1::LabelValueMissing);
+                eligibility = LabelConsumptionEligibilityV1::Blocked;
+            }
+        }
+
+        match (
+            label.standard_uncertainty,
+            qualification.conservative_standard_uncertainty_upper_bound,
+        ) {
+            (Some(label_uncertainty), Some(qualified_bound))
+                if label_uncertainty >= qualified_bound => {}
+            (Some(_), Some(_)) => {
+                reasons.push(LabelConsumptionReasonV1::LabelUncertaintyUnderstatesQualifiedBound);
+                eligibility = LabelConsumptionEligibilityV1::Blocked;
+            }
+            (None, _) => {
+                reasons.push(LabelConsumptionReasonV1::LabelUncertaintyMissing);
+                if eligibility != LabelConsumptionEligibilityV1::Blocked {
+                    eligibility = LabelConsumptionEligibilityV1::Unknown;
+                }
+            }
+            (Some(_), None) => {
+                reasons.push(LabelConsumptionReasonV1::QualifiedUncertaintyBoundMissing);
+                if eligibility != LabelConsumptionEligibilityV1::Blocked {
+                    eligibility = LabelConsumptionEligibilityV1::Unknown;
+                }
+            }
+        }
     }
 
     match label.calibration_ref.as_deref() {
@@ -287,7 +350,11 @@ pub fn assess_label_consumption_eligibility_v1(
         downstream_consumption_allowed: eligibility
             == LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
         reasons,
+        label_sha256,
         measurement_sha256,
+        qualified_corrected_value: qualification.corrected_value,
+        qualified_standard_uncertainty_upper_bound: qualification
+            .conservative_standard_uncertainty_upper_bound,
         qualification_report_sha256: qualification.report_sha256,
         requalification_report_sha256: requalification.report_sha256,
         requalification_frontier_sha256: qualified_frontier.frontier_input_sha256.clone(),
@@ -511,6 +578,150 @@ mod tests {
         assert!(k1.downstream_consumption_allowed);
         assert_no_authority(&k0);
         assert_no_authority(&k1);
+    }
+
+    #[test]
+    fn validated_label_point_value_must_match_qualified_measurement() {
+        let input = input();
+        let mut candidate = label();
+        candidate.value = Some(12.46);
+        let report = assess_label_consumption_eligibility_v1(
+            &candidate,
+            &input,
+            LabelEvidenceFrontierV1::CurrentAtK1,
+        )
+        .unwrap();
+        assert_eq!(report.eligibility, LabelConsumptionEligibilityV1::Blocked);
+        assert!(
+            report
+                .reasons
+                .contains(&LabelConsumptionReasonV1::LabelValueMismatch)
+        );
+        assert!(!report.downstream_consumption_allowed);
+    }
+
+    #[test]
+    fn validated_label_requires_a_point_value_and_qualified_uncertainty() {
+        let input = input();
+        let mut missing_value = label();
+        missing_value.value = None;
+        let value_report = assess_label_consumption_eligibility_v1(
+            &missing_value,
+            &input,
+            LabelEvidenceFrontierV1::CurrentAtK1,
+        )
+        .unwrap();
+        assert_eq!(
+            value_report.eligibility,
+            LabelConsumptionEligibilityV1::Blocked
+        );
+        assert!(
+            value_report
+                .reasons
+                .contains(&LabelConsumptionReasonV1::LabelValueMissing)
+        );
+
+        let mut missing_uncertainty = label();
+        missing_uncertainty.standard_uncertainty = None;
+        let uncertainty_report = assess_label_consumption_eligibility_v1(
+            &missing_uncertainty,
+            &input,
+            LabelEvidenceFrontierV1::CurrentAtK1,
+        )
+        .unwrap();
+        assert_eq!(
+            uncertainty_report.eligibility,
+            LabelConsumptionEligibilityV1::Unknown
+        );
+        assert!(
+            uncertainty_report
+                .reasons
+                .contains(&LabelConsumptionReasonV1::LabelUncertaintyMissing)
+        );
+    }
+
+    #[test]
+    fn label_uncertainty_may_not_understate_the_qualified_uncertainty_bound() {
+        let input = input();
+        let mut candidate = label();
+        candidate.standard_uncertainty = Some(0.001);
+        let report = assess_label_consumption_eligibility_v1(
+            &candidate,
+            &input,
+            LabelEvidenceFrontierV1::CurrentAtK1,
+        )
+        .unwrap();
+        assert_eq!(report.eligibility, LabelConsumptionEligibilityV1::Blocked);
+        assert!(
+            report
+                .reasons
+                .contains(&LabelConsumptionReasonV1::LabelUncertaintyUnderstatesQualifiedBound)
+        );
+    }
+
+    #[test]
+    fn numeric_label_edits_change_the_label_and_eligibility_receipt_digests() {
+        let input = input();
+        let original = label();
+        let original_report = assess_label_consumption_eligibility_v1(
+            &original,
+            &input,
+            LabelEvidenceFrontierV1::CurrentAtK1,
+        )
+        .unwrap();
+        let mut changed = original;
+        changed.value = Some(12.46);
+        let changed_report = assess_label_consumption_eligibility_v1(
+            &changed,
+            &input,
+            LabelEvidenceFrontierV1::CurrentAtK1,
+        )
+        .unwrap();
+        assert_ne!(original_report.label_sha256, changed_report.label_sha256);
+        assert_ne!(original_report.report_sha256, changed_report.report_sha256);
+
+        let mut uncertainty_changed = label();
+        uncertainty_changed.standard_uncertainty = Some(0.10);
+        let uncertainty_report = assess_label_consumption_eligibility_v1(
+            &uncertainty_changed,
+            &input,
+            LabelEvidenceFrontierV1::CurrentAtK1,
+        )
+        .unwrap();
+        assert_ne!(
+            original_report.label_sha256,
+            uncertainty_report.label_sha256
+        );
+        assert_ne!(
+            original_report.report_sha256,
+            uncertainty_report.report_sha256
+        );
+    }
+
+    #[test]
+    fn non_finite_label_numeric_metadata_is_rejected_before_receipt() {
+        let input = input();
+        let mut value = label();
+        value.value = Some(f64::NAN);
+        assert!(
+            assess_label_consumption_eligibility_v1(
+                &value,
+                &input,
+                LabelEvidenceFrontierV1::CurrentAtK1
+            )
+            .is_err()
+        );
+
+        let mut uncertainty = label();
+        uncertainty.standard_uncertainty = Some(f64::INFINITY);
+        assert!(
+            assess_label_consumption_eligibility_v1(
+                &uncertainty,
+                &input,
+                LabelEvidenceFrontierV1::CurrentAtK1
+            )
+            .is_err()
+        );
     }
 
     #[test]
