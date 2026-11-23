@@ -10,7 +10,7 @@
 //! source graph's organism-local coordinate unit.
 
 use std::cmp::Ordering;
-use std::collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap, VecDeque};
+use std::collections::{BTreeSet, BinaryHeap, HashMap, VecDeque};
 use std::error::Error;
 use std::fmt;
 
