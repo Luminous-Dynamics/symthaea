@@ -19,6 +19,7 @@ pub const MAX_MYCELIAL_COVERAGE_CANDIDATES_PER_OBSERVATION: usize = 128;
 const MAX_COVERAGE_ID_BYTES: usize = 128;
 const MAX_COVERAGE_VERSION_BYTES: usize = 64;
 const DIGEST_HEX_BYTES: usize = 64;
+const MAX_CANONICAL_COVERAGE_STRING_BYTES: usize = 8 * 1024 * 1024;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -322,7 +323,7 @@ impl MycelialObservationCoverageLedger {
                 MycelialObservationCoverageState::CandidateEmitted
                 | MycelialObservationCoverageState::CandidateRejected
                 | MycelialObservationCoverageState::CandidateUnresolved => {
-                    !has_candidates.then_some("candidate disposition requires at least one candidate")
+                    (!has_candidates).then_some("candidate disposition requires at least one candidate")
                 }
                 MycelialObservationCoverageState::NoCandidateGenerated => {
                     if has_candidates {
@@ -375,6 +376,49 @@ impl MycelialObservationCoverageLedger {
             })
         {
             return Err(MycelialObservationCoverageError::DigestResourceLimitExceeded);
+        }
+        let mut total_string_bytes = 0usize;
+        let mut account_string = |value: &str| {
+            total_string_bytes = total_string_bytes.saturating_add(value.len());
+            total_string_bytes <= MAX_CANONICAL_COVERAGE_STRING_BYTES
+        };
+        for value in [
+            self.source_dataset_id.as_str(),
+            self.source_dataset_digest.as_str(),
+            self.observation_inventory_digest.as_str(),
+            self.coordinate_frame_id.as_str(),
+            self.spatial_transform_digest.as_str(),
+            self.calibration_digest.as_str(),
+            self.candidate_generator_id.as_str(),
+            self.candidate_generator_version.as_str(),
+            self.candidate_generator_digest.as_str(),
+        ] {
+            if !account_string(value) {
+                return Err(MycelialObservationCoverageError::DigestResourceLimitExceeded);
+            }
+        }
+        for observation_id in &self.declared_observation_ids {
+            if !account_string(observation_id) {
+                return Err(MycelialObservationCoverageError::DigestResourceLimitExceeded);
+            }
+        }
+        for record in &self.records {
+            for value in [
+                record.observation_id.as_str(),
+                record.observation_digest.as_str(),
+                record.acquisition_group_id.as_str(),
+                record.biological_replicate_id.as_str(),
+                record.time_window_id.as_str(),
+            ] {
+                if !account_string(value) {
+                    return Err(MycelialObservationCoverageError::DigestResourceLimitExceeded);
+                }
+            }
+            for candidate_id in &record.candidate_ids {
+                if !account_string(candidate_id) {
+                    return Err(MycelialObservationCoverageError::DigestResourceLimitExceeded);
+                }
+            }
         }
 
         let mut hasher = blake3::Hasher::new();
