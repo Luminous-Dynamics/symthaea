@@ -1,7 +1,7 @@
 {
   "schema_version": "0.1.0",
   "artifact_kind": "bh_egb_campaign_manifest_structural_replay",
-  "checked_utc": "2026-11-23",
+  "checked_utc": "2026-11-24",
   "result": "pass_structural_source_pin_replay_only",
   "repository_context": {
     "symthaea_repository": "Luminous-Dynamics/symthaea",
