@@ -17,12 +17,13 @@ pub use binary_metrics::{
     BinaryScoreSubjectV1, score_binary_subject_v1,
 };
 pub use observation_semantics::{
-    MeasurementUncertaintyV1, ObservationStateCountsV1, SensorCorrespondenceManifestV1,
+    MeasurementUncertaintyV1, ObservationStateCountsV1, SensorCorrespondenceExecutionReportV1,
+    SensorCorrespondenceExecutionV1, SensorCorrespondenceManifestV1,
     SensorCorrespondenceReportV1, SensorCorrespondenceStatusV1, SensorCorrespondenceV1,
     SensorObservationError, SensorObservationFrameV1, SensorObservationReportV1,
     SensorObservationStateV1, SensorObservationV1, SensorUnitTransformV1,
-    adapt_secom_row_to_observation_frame_v1, validate_sensor_correspondence_manifest_v1,
-    validate_sensor_observation_frame_v1,
+    adapt_secom_row_to_observation_frame_v1, execute_sensor_correspondence_v1,
+    validate_sensor_correspondence_manifest_v1, validate_sensor_observation_frame_v1,
 };
 
 pub use pair_manifest::{
