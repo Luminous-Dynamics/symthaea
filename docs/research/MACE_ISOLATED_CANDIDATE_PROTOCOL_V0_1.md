@@ -133,14 +133,14 @@ Do not skip a level in public claims.
 
 The paired runner now uses `CandidateProcessSession` for the exact-scope and typed-content-HDC arms. The worker is a persistent, line-framed stateless request/receipt process scoped to one task block:
 
-- the parent launches one hash-pinned candidate executable per task block and checks its readiness frame;
+- the parent launches one hash-pinned candidate executable per benchmark run and checks its readiness frame;
 - the parent sends a fresh random 24-byte nonce and one candidate-only JSON envelope per observation;
 - the worker emits one receipt for each request and keeps no cross-request memory state;
 - the parent validates the exact request digest, nonce digest, run/task/sequence/method, DecisionNeed/evidence/input digests and observation ID;
 - support IDs must be a subset of retrieved IDs; every retrieved ID must resolve to a supplied canonical record in the declared scope/action set;
 - evaluator intervention labels and outcome truth remain in the evaluator loop and are not fields in the candidate envelope.
 
-The process session is reused for baseline and ablation observations in the same task block. This avoids a fresh process launch for every ablation while preserving an independent candidate invocation for each observation. The candidate sequence is monotonic within that worker session.
+The process session is reused for baseline and ablation observations in the same benchmark run. This avoids a fresh process launch for every ablation while preserving an independent candidate invocation for each observation. The candidate sequence is monotonic within that worker session across the whole run.
 
 ### Build and invoke
 
@@ -168,7 +168,7 @@ The evaluator requires both `MACE_CANDIDATE_BIN` and `MACE_CANDIDATE_BIN_SHA256`
 
 Candidate and evaluator records now carry:
 
-- `candidate_process_startup_ns`: worker spawn/readiness time; repeated on each detached observation from the same task-block worker. Aggregate once per distinct `(pair_block_id, candidate_artifact_sha256)`, not once per row.
+- `candidate_process_startup_ns`: worker spawn/readiness time; repeated on each detached observation from the same run-scoped worker. Aggregate once per distinct `(run_id, candidate_artifact_sha256)`, not once per row.
 - `candidate_request_build_ns`: parent nonce generation, evidence ordering, wire construction/serialization and expected-digest preparation.
 - `candidate_process_wall_ns`: from writing/flushing the request until the response line is received. It includes candidate execution and IPC/scheduling; it is **not** pure network/IPC transport.
 - `candidate_latency_ns` / score-row `latency_ns`: candidate-internal retrieval/policy timing reported by the child after request parse/validation.
