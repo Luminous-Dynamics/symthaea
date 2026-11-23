@@ -1,14 +1,110 @@
+use serde::de::{self, MapAccess, SeqAccess, Visitor};
+use serde::Deserialize;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fs;
+use std::fmt;
 use std::process::ExitCode;
 
 const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
 const MAX_REORDER_WINDOW: u64 = 1_024;
 const MAX_BUFFERED_EVENTS: usize = 1_024;
 const DEFAULT_FIXTURE: &str = "benchmarks/frontend/long-horizon/event-reconciliation-v1.json";
+
+struct UniqueJson(Value);
+
+impl<'de> Deserialize<'de> for UniqueJson {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct UniqueVisitor;
+
+        impl<'de> Visitor<'de> for UniqueVisitor {
+            type Value = UniqueJson;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                formatter.write_str("a JSON value with unique object keys")
+            }
+
+            fn visit_bool<E>(self, value: bool) -> Result<Self::Value, E> {
+                Ok(UniqueJson(Value::Bool(value)))
+            }
+
+            fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E> {
+                Ok(UniqueJson(Value::from(value)))
+            }
+
+            fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E> {
+                Ok(UniqueJson(Value::from(value)))
+            }
+
+            fn visit_f64<E>(self, value: f64) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                let number = serde_json::Number::from_f64(value)
+                    .ok_or_else(|| E::custom("non-finite JSON number"))?;
+                Ok(UniqueJson(Value::Number(number)))
+            }
+
+            fn visit_str<E>(self, value: &str) -> Result<Self::Value, E> {
+                Ok(UniqueJson(Value::String(value.to_string())))
+            }
+
+            fn visit_string<E>(self, value: String) -> Result<Self::Value, E> {
+                Ok(UniqueJson(Value::String(value)))
+            }
+
+            fn visit_none<E>(self) -> Result<Self::Value, E> {
+                Ok(UniqueJson(Value::Null))
+            }
+
+            fn visit_unit<E>(self) -> Result<Self::Value, E> {
+                Ok(UniqueJson(Value::Null))
+            }
+
+            fn visit_seq<A>(self, mut sequence: A) -> Result<Self::Value, A::Error>
+            where
+                A: SeqAccess<'de>,
+            {
+                let mut values = Vec::new();
+                while let Some(value) = sequence.next_element::<UniqueJson>()? {
+                    values.push(value.0);
+                }
+                Ok(UniqueJson(Value::Array(values)))
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: MapAccess<'de>,
+            {
+                let mut values = serde_json::Map::new();
+                while let Some(key) = map.next_key::<String>()? {
+                    if values.contains_key(&key) {
+                        return Err(de::Error::custom(format!("duplicate JSON object key: {key}")));
+                    }
+                    let value = map.next_value::<UniqueJson>()?;
+                    values.insert(key, value.0);
+                }
+                Ok(UniqueJson(Value::Object(values)))
+            }
+        }
+
+        deserializer.deserialize_any(UniqueVisitor)
+    }
+}
+
+fn parse_unique_json(bytes: &[u8]) -> Result<Value, String> {
+    let mut deserializer = serde_json::Deserializer::from_slice(bytes);
+    let value = UniqueJson::deserialize(&mut deserializer)
+        .map_err(|error| format!("invalid JSON or duplicate object key: {error}"))?;
+    deserializer.end()
+        .map_err(|error| format!("trailing data after JSON value: {error}"))?;
+    Ok(value.0)
+}
 
 fn field_str<'a>(value: &'a Value, key: &str) -> Result<&'a str, String> {
     value.get(key).and_then(Value::as_str).ok_or_else(|| format!("missing string field: {key}"))
@@ -694,9 +790,9 @@ fn run_event_trace_verification(
     let trace_bytes = fs::read(trace_path).map_err(|error| format!("cannot read trace {trace_path}: {error}"))?;
     let fixture_bytes = fs::read(fixture_path).map_err(|error| format!("cannot read fixture {fixture_path}: {error}"))?;
     let policy_bytes = fs::read(policy_path).map_err(|error| format!("cannot read policy {policy_path}: {error}"))?;
-    let trace: Value = serde_json::from_slice(&trace_bytes).map_err(|error| format!("invalid trace JSON: {error}"))?;
-    let fixture: Value = serde_json::from_slice(&fixture_bytes).map_err(|error| format!("invalid fixture JSON: {error}"))?;
-    let policy: Value = serde_json::from_slice(&policy_bytes).map_err(|error| format!("invalid policy JSON: {error}"))?;
+    let trace = parse_unique_json(&trace_bytes)?;
+    let fixture = parse_unique_json(&fixture_bytes)?;
+    let policy = parse_unique_json(&policy_bytes)?;
     let report = verify_event_trace_values(&fixture,&fixture_bytes,&policy,&policy_bytes,&trace,&trace_bytes)?;
     println!("{}",serde_json::to_string_pretty(&report).map_err(|error|error.to_string())?);
     if report.get("semantic_decision").and_then(Value::as_str) != Some("accepted") {
@@ -814,9 +910,19 @@ mod tests {
         assert!(state.seen_by_id.is_empty());
         state.deliver(&original).unwrap();
         assert_eq!(state.last_sequence, 1);
-        assert_eq!(state.audit, vec!["evt-001"]);
+        assert_eq!(state.audit, vec!["evt-001".to_string()]);
     }
 
+
+    #[test]
+    fn unique_json_parser_rejects_duplicate_keys_at_any_depth() {
+        assert!(parse_unique_json(br#"{"case_id":"a","case_id":"b"}"#)
+            .unwrap_err().contains("duplicate JSON object key"));
+        assert!(parse_unique_json(br#"{"outer":{"event_id":"evt-1","event_id":"evt-2"}}"#)
+            .unwrap_err().contains("duplicate JSON object key"));
+        let valid = parse_unique_json(br#"{"event_id":"evt-1","sequence":1}"#).unwrap();
+        assert_eq!(valid["event_id"], "evt-1");
+    }
 
     #[test]
     fn independent_event_verifier_ignores_worker_claims() {
