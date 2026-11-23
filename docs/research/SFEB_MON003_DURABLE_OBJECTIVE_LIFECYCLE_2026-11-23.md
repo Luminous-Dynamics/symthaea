@@ -374,10 +374,10 @@ node --check mon003-cursor-replay-v1.mjs
 node mon003-cursor-replay-v1.mjs
 ```
 
-**Executed result: 15/15 deterministic cases passed.** Cases cover out-of-order delivery without cursor leap, replay gap closure, duplicate pending/committed delivery, source-scoped `(source,id)` identity, changed-content ID reuse, partition isolation, sequence forks and quarantine, high-watermark gap reporting, gap recovery, watermark rollback below committed cursor, watermark rollback while the consumer is behind, committed-sequence rewrite, high-watermark-without-evidence and malformed cursors.
+**Executed result: 16/16 deterministic cases passed.** Cases cover out-of-order delivery without cursor leap, replay gap closure, duplicate pending/committed delivery, source-scoped `(source,id)` identity, changed-content ID reuse, cross-partition identity reuse quarantining both partitions, partition isolation, sequence forks and quarantine, high-watermark gap reporting, gap recovery, watermark rollback below committed cursor, watermark rollback while the consumer is behind, committed-sequence rewrite, high-watermark-without-evidence and malformed cursors.
 
-Exact source Git blob SHA: `5afddb6a1a647e200e836b0427bab1517fe3b8d1`.  
-Exact source SHA-256: `77919e99612be1253f9524b160cf9c43796f2c8d57c7b53ab8cfee59dcbdb032`.
+Exact source Git blob SHA: `e6ce9dd6906564ce4c3ca9e312caee19df45a8fa`.  
+Exact source SHA-256: `6ab77037f7d33e8b008b07a6a220f811bccfe597508af291dfff3da60fbc3881`.
 
 A source high-watermark cannot regress behind either the committed cursor or a previously trusted high-watermark. Only the contiguous committed prefix is eligible as source-event evidence; a notification or high-watermark alone cannot create an eligible event.
 
