@@ -9,8 +9,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
-use std::fs::File;
-use std::io::{BufRead, BufReader, BufWriter, Write};
+use std::fs::{self, File};
+use std::io::{BufRead, BufReader, BufWriter, Cursor, Write};
 
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -104,6 +104,26 @@ fn required_string<'a>(record: &'a Value, field: &str) -> Result<&'a str, String
         .ok_or_else(|| format!("missing or invalid string field {field}"))
 }
 
+fn ensure_known_fields(record: &Value, allowed: &[&str], context: &str) -> Result<(), String> {
+    let object = record
+        .as_object()
+        .ok_or_else(|| format!("{context} must be a JSON object"))?;
+    for field in object.keys() {
+        if !allowed.contains(&field.as_str()) {
+            return Err(format!("{context} contains unsupported field {field}"));
+        }
+    }
+    Ok(())
+}
+
+fn optional_sha256(record: &Value, field: &str) -> Result<Option<String>, String> {
+    match record.get(field) {
+        None => Ok(None),
+        Some(Value::String(value)) if valid_sha256(value) => Ok(Some(value.clone())),
+        Some(_) => Err(format!("optional digest field {field} must be omitted or a valid SHA-256 string")),
+    }
+}
+
 fn required_number(record: &Value, field: &str) -> Result<f64, String> {
     let value = record
         .get(field)
@@ -161,6 +181,18 @@ fn required_u64(record: &Value, field: &str) -> Result<u64, String> {
 }
 
 fn parse_manifest(record: &Value) -> Result<(InputProvenance, String), String> {
+    ensure_known_fields(
+        record,
+        &[
+            "schema_version", "record_type", "run_id", "pair_block_id",
+            "manifest_sha256", "manifest_payload_sha256", "baseline_evidence_sha256",
+            "public_seed", "intervention_count", "interventions", "known_root_count",
+            "candidate_validity", "max_root_pairs", "root_pair_count",
+            "matched_random_count", "unmatched_random_target_count",
+            "source_code_sha256", "fixture_sha256", "source_revision", "schema_sha256",
+        ],
+        "intervention manifest",
+    )?;
     if required_string(record, "schema_version")? != INPUT_SCHEMA {
         return Err("unsupported intervention manifest schema version".to_string());
     }
@@ -169,10 +201,11 @@ fn parse_manifest(record: &Value) -> Result<(InputProvenance, String), String> {
         source_code_sha256: required_string(record, "source_code_sha256")?.to_string(),
         fixture_sha256: required_string(record, "fixture_sha256")?.to_string(),
         schema_sha256: required_string(record, "schema_sha256")?.to_string(),
-        source_revision: record
-            .get("source_revision")
-            .and_then(Value::as_str)
-            .map(str::to_string),
+        source_revision: match record.get("source_revision") {
+            Some(Value::Null) => None,
+            Some(Value::String(value)) => Some(value.clone()),
+            _ => return Err("source_revision must be present as a string or null".to_string()),
+        },
     };
     for (field, digest) in [
         ("source_code_sha256", provenance.source_code_sha256.as_str()),
@@ -202,6 +235,10 @@ fn parse_manifest(record: &Value) -> Result<(InputProvenance, String), String> {
     let pair_block_id = required_string(record, "pair_block_id")?;
     parse_cluster(pair_block_id)
         .map_err(|error| format!("invalid intervention manifest pair_block_id: {error}"))?;
+    required_u64(record, "known_root_count")?;
+    if required_string(record, "candidate_validity")? != "diagnostic_only" {
+        return Err("unsupported candidate_validity in intervention manifest".to_string());
+    }
 
     let manifest_payload_sha256 =
         required_string(record, "manifest_payload_sha256")?.to_string();
@@ -232,6 +269,11 @@ fn parse_manifest(record: &Value) -> Result<(InputProvenance, String), String> {
 
     let mut unique_intervention_ids = BTreeSet::new();
     for intervention in interventions {
+        ensure_known_fields(
+            intervention,
+            &["intervention_id", "kind", "target_key", "removed_event_ids", "matched_to"],
+            "intervention",
+        )?;
         let id = required_string(intervention, "intervention_id")?;
         if !unique_intervention_ids.insert(id.to_string()) {
             return Err("intervention manifest contains duplicate intervention_id values".to_string());
@@ -338,7 +380,7 @@ fn required_event_ids(record: &Value, field: &str) -> Result<Vec<u32>, String> {
         .get(field)
         .and_then(Value::as_array)
         .ok_or_else(|| format!("missing or invalid event ID array {field}"))?;
-    values
+    let parsed: Vec<u32> = values
         .iter()
         .map(|value| {
             let id = value
@@ -347,7 +389,12 @@ fn required_event_ids(record: &Value, field: &str) -> Result<Vec<u32>, String> {
             u32::try_from(id)
                 .map_err(|_| format!("event ID array {field} contains an out-of-range ID"))
         })
-        .collect()
+        .collect::<Result<_, _>>()?;
+    let unique: BTreeSet<u32> = parsed.iter().copied().collect();
+    if unique.len() != parsed.len() {
+        return Err(format!("event ID array {field} contains duplicate IDs"));
+    }
+    Ok(parsed)
 }
 
 fn validate_score_against_manifest(score: &Value, manifest: &Value) -> Result<(), String> {
@@ -431,6 +478,22 @@ fn validate_score_against_manifest(score: &Value, manifest: &Value) -> Result<()
 }
 
 fn parse_score(record: &Value) -> Result<(TaskKey, MethodKind, Metrics), String> {
+    ensure_known_fields(
+        record,
+        &[
+            "schema_version", "record_type", "run_id", "pair_block_id",
+            "candidate_observation_id", "candidate_observation_sequence",
+            "candidate_input_sha256", "intervention_id", "intervention_kind",
+            "target_key", "matched_to", "removed_event_ids", "removed_event_count",
+            "removed_experience_struct_bytes", "decision", "full_evidence_decision",
+            "decision_agrees_with_full", "decision_changed", "utility", "regret",
+            "full_evidence_regret", "regret_gap_vs_full_evidence",
+            "regret_gap_vs_full_method", "decision_is_optimal", "abstained",
+            "evaluation_validity", "invalidity_reason", "method", "retrieved_event_ids",
+            "index_bytes", "retrieval_profile_sha256",
+        ],
+        "evaluator score",
+    )?;
     if required_string(record, "schema_version")? != INPUT_SCHEMA {
         return Err("unsupported input schema version".to_string());
     }
@@ -440,7 +503,49 @@ fn parse_score(record: &Value) -> Result<(TaskKey, MethodKind, Metrics), String>
 
     let pair_block_id = required_string(record, "pair_block_id")?;
     let cluster = parse_cluster(pair_block_id)?;
+    let _run_id = required_string(record, "run_id")?;
+    required_string(record, "candidate_observation_id")?;
+    required_u64(record, "candidate_observation_sequence")?;
+    let candidate_input_sha256 = required_string(record, "candidate_input_sha256")?;
+    if !valid_sha256(candidate_input_sha256) {
+        return Err("invalid candidate_input_sha256 in evaluator score".to_string());
+    }
+    required_string(record, "intervention_id")?;
+    required_string(record, "target_key")?;
+    let decision = required_string(record, "decision")?;
+    let full_evidence_decision = required_string(record, "full_evidence_decision")?;
+    if !matches!(decision, "action_a" | "action_b" | "abstain")
+        || !matches!(full_evidence_decision, "action_a" | "action_b" | "abstain")
+    {
+        return Err("evaluator score contains unsupported decision value".to_string());
+    }
+    let decision_agrees_with_full = required_bool(record, "decision_agrees_with_full")?;
+    let decision_changed = required_bool(record, "decision_changed")?;
+    if decision_agrees_with_full != (decision == full_evidence_decision)
+        || decision_changed == decision_agrees_with_full
+    {
+        return Err("evaluator score decision agreement flags are inconsistent".to_string());
+    }
+    if required_bool(record, "abstained")? != (decision == "abstain") {
+        return Err("evaluator score abstained flag does not match decision".to_string());
+    }
+    if !matches!(required_string(record, "evaluation_validity")?, "diagnostic_only") {
+        return Err("unsupported evaluation_validity in evaluator score".to_string());
+    }
+    required_string(record, "invalidity_reason")?;
+    required_event_ids(record, "retrieved_event_ids")?;
+    required_u64(record, "index_bytes")?;
+    required_u64(record, "removed_event_count")?;
+    required_u64(record, "removed_experience_struct_bytes")?;
+    let full_evidence_regret = required_number(record, "full_evidence_regret")?;
+    if full_evidence_regret < 0.0 || required_number(record, "regret")? < 0.0 {
+        return Err("evaluator regret values must be non-negative".to_string());
+    }
+    optional_sha256(record, "retrieval_profile_sha256")?;
     let method = required_string(record, "method")?.to_string();
+    if !supported_method(&method) {
+        return Err(format!("unsupported evaluator method {method}"));
+    }
     let intervention_kind = required_string(record, "intervention_kind")?.to_string();
     let metrics = Metrics {
         utility: required_number(record, "utility")?,
@@ -657,14 +762,249 @@ fn paired_record(
     })
 }
 
+#[derive(Clone, Debug)]
+struct CandidateReceipt {
+    run_id: String,
+    method: String,
+    candidate_observation_sequence: u64,
+    candidate_input_sha256: String,
+    decision: String,
+    retrieved_event_ids: Vec<u32>,
+    index_bytes: u64,
+    retrieval_profile_sha256: Option<String>,
+}
+
+fn expected_candidate_observation_id(
+    run_id: &str,
+    pair_block_id: &str,
+    observation_sequence: u64,
+    method: &str,
+    candidate_input_sha256: &str,
+) -> String {
+    let identity = format!(
+        "mace-candidate-observation-v1|run={run_id}|pair={pair_block_id}|sequence={observation_sequence}|method={method}|input={candidate_input_sha256}"
+    );
+    format!("obs-{}", hex_digest(Sha256::digest(identity.as_bytes()).as_slice()))
+}
+
+fn supported_method(method: &str) -> bool {
+    matches!(
+        method,
+        "exact_scope_scan"
+            | "event_id_key_value_topk"
+            | "static_hdc"
+            | "hdc_ltc_zero_input"
+            | "typed_content_hdc"
+    )
+}
+
+fn expected_candidate_input_sha256(
+    decision_need_sha256: &str,
+    candidate_evidence_sha256: &str,
+) -> String {
+    let payload = format!(
+        "mace-candidate-input-v1|need={decision_need_sha256}|evidence={candidate_evidence_sha256}"
+    );
+    hex_digest(Sha256::digest(payload.as_bytes()).as_slice())
+}
+
+fn parse_candidate_receipt(record: &Value) -> Result<((String, String), CandidateReceipt), String> {
+    ensure_known_fields(
+        record,
+        &[
+            "schema_version", "record_type", "run_id", "pair_block_id",
+            "candidate_observation_id", "candidate_observation_sequence", "method",
+            "candidate_input_sha256", "decision_need_sha256", "candidate_evidence_sha256",
+            "retrieved_event_ids", "decision", "decision_support_event_ids",
+            "support_event_count", "support_known_root_count", "support_known_family_count",
+            "support_unresolved_count", "available_event_count",
+            "available_experience_struct_bytes", "available_known_root_count",
+            "available_known_family_count", "unknown_root_event_count",
+            "unknown_family_event_count", "index_bytes", "latency_ns",
+            "retrieval_profile_sha256",
+        ],
+        "candidate decision receipt",
+    )?;
+    if required_string(record, "schema_version")? != INPUT_SCHEMA {
+        return Err("unsupported candidate stream schema version".to_string());
+    }
+    if required_string(record, "record_type")? != "candidate_decision" {
+        return Err("expected candidate_decision record".to_string());
+    }
+    let run_id = required_string(record, "run_id")?.to_string();
+    let pair_block_id = required_string(record, "pair_block_id")?.to_string();
+    parse_cluster(&pair_block_id)
+        .map_err(|error| format!("invalid candidate pair_block_id: {error}"))?;
+    let candidate_observation_id =
+        required_string(record, "candidate_observation_id")?.to_string();
+    let candidate_observation_sequence =
+        required_u64(record, "candidate_observation_sequence")?;
+    let method = required_string(record, "method")?.to_string();
+    if !supported_method(&method) {
+        return Err(format!("unsupported candidate method {method}"));
+    }
+    let candidate_input_sha256 =
+        required_string(record, "candidate_input_sha256")?.to_string();
+    let decision_need_sha256 =
+        required_string(record, "decision_need_sha256")?.to_string();
+    let candidate_evidence_sha256 =
+        required_string(record, "candidate_evidence_sha256")?.to_string();
+
+    for (field, digest) in [
+        ("candidate_input_sha256", candidate_input_sha256.as_str()),
+        ("decision_need_sha256", decision_need_sha256.as_str()),
+        ("candidate_evidence_sha256", candidate_evidence_sha256.as_str()),
+    ] {
+        if !valid_sha256(digest) {
+            return Err(format!("invalid {field} in candidate receipt"));
+        }
+    }
+    if expected_candidate_input_sha256(&decision_need_sha256, &candidate_evidence_sha256)
+        != candidate_input_sha256
+    {
+        return Err("candidate_input_sha256 does not bind DecisionNeed and evidence digests".to_string());
+    }
+    if expected_candidate_observation_id(
+        &run_id,
+        &pair_block_id,
+        candidate_observation_sequence,
+        &method,
+        &candidate_input_sha256,
+    ) != candidate_observation_id
+    {
+        return Err("candidate_observation_id does not match run/task/sequence/method/input identity".to_string());
+    }
+
+    let decision = required_string(record, "decision")?.to_string();
+    if !matches!(decision.as_str(), "action_a" | "action_b" | "abstain") {
+        return Err("candidate receipt contains unsupported decision value".to_string());
+    }
+    let retrieved_event_ids = required_event_ids(record, "retrieved_event_ids")?;
+    required_event_ids(record, "decision_support_event_ids")?;
+    for field in [
+        "support_event_count", "support_known_root_count", "support_known_family_count",
+        "support_unresolved_count", "available_event_count",
+        "available_experience_struct_bytes", "available_known_root_count",
+        "available_known_family_count", "unknown_root_event_count",
+        "unknown_family_event_count", "latency_ns",
+    ] {
+        required_u64(record, field)?;
+    }
+    let index_bytes = required_u64(record, "index_bytes")?;
+    let retrieval_profile_sha256 =
+        optional_sha256(record, "retrieval_profile_sha256")?;
+
+    Ok((
+        (pair_block_id, candidate_observation_id),
+        CandidateReceipt {
+            run_id,
+            method,
+            candidate_observation_sequence,
+            candidate_input_sha256,
+            decision,
+            retrieved_event_ids,
+            index_bytes,
+            retrieval_profile_sha256,
+        },
+    ))
+}
+
+fn validate_score_against_candidate(
+    score: &Value,
+    pair_block_id: &str,
+    candidate: &CandidateReceipt,
+) -> Result<(), String> {
+    if required_string(score, "run_id")? != candidate.run_id {
+        return Err("evaluator score run_id differs from candidate receipt".to_string());
+    }
+    if required_string(score, "method")? != candidate.method {
+        return Err("evaluator score method differs from candidate receipt".to_string());
+    }
+    if required_u64(score, "candidate_observation_sequence")?
+        != candidate.candidate_observation_sequence
+    {
+        return Err("evaluator score candidate_observation_sequence differs from candidate receipt".to_string());
+    }
+    if required_string(score, "candidate_input_sha256")? != candidate.candidate_input_sha256 {
+        return Err("evaluator score candidate_input_sha256 differs from candidate receipt".to_string());
+    }
+    if required_string(score, "decision")? != candidate.decision {
+        return Err("evaluator score decision differs from candidate receipt".to_string());
+    }
+    if required_event_ids(score, "retrieved_event_ids")? != candidate.retrieved_event_ids {
+        return Err("evaluator score retrieved_event_ids differ from candidate receipt".to_string());
+    }
+    if required_u64(score, "index_bytes")? != candidate.index_bytes {
+        return Err("evaluator score index_bytes differ from candidate receipt".to_string());
+    }
+    let score_profile = optional_sha256(score, "retrieval_profile_sha256")?;
+    if score_profile != candidate.retrieval_profile_sha256 {
+        return Err("evaluator score retrieval_profile_sha256 differs from candidate receipt".to_string());
+    }
+    let score_pair_block = required_string(score, "pair_block_id")?;
+    if score_pair_block != pair_block_id {
+        return Err("evaluator score pair_block_id differs from candidate key".to_string());
+    }
+    Ok(())
+}
+
+fn load_candidate_receipts(
+    path: &str,
+) -> Result<(BTreeMap<(String, String), CandidateReceipt>, String, usize, String), String> {
+    let bytes = fs::read(path)
+        .map_err(|error| format!("read candidate stream {path}: {error}"))?;
+    let content = std::str::from_utf8(&bytes)
+        .map_err(|error| format!("candidate stream is not UTF-8: {error}"))?;
+    let stream_sha256 = hex_digest(Sha256::digest(&bytes).as_slice());
+
+    let mut receipts = BTreeMap::new();
+    let mut seen_sequences = BTreeSet::new();
+    let mut expected_run_id: Option<String> = None;
+    let mut record_count = 0_usize;
+    for (line_index, line) in content.lines().enumerate() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let record: Value = serde_json::from_str(line)
+            .map_err(|error| format!("parse candidate JSONL line {}: {error}", line_index + 1))?;
+        let (key, receipt) = parse_candidate_receipt(&record)
+            .map_err(|error| format!("candidate JSONL line {}: {error}", line_index + 1))?;
+        if let Some(run_id) = &expected_run_id {
+            if run_id != &receipt.run_id {
+                return Err("candidate stream mixes run IDs".to_string());
+            }
+        } else {
+            expected_run_id = Some(receipt.run_id.clone());
+        }
+        if receipts.contains_key(&key) {
+            return Err("candidate stream contains duplicate pair-block/observation identity".to_string());
+        }
+        if !seen_sequences.insert(receipt.candidate_observation_sequence) {
+            return Err("candidate stream contains duplicate execution sequence values".to_string());
+        }
+        receipts.insert(key, receipt);
+        record_count += 1;
+    }
+    let run_id = expected_run_id
+        .ok_or_else(|| "candidate stream contains no candidate_decision records".to_string())?;
+    Ok((receipts, stream_sha256, record_count, run_id))
+}
+
 fn reduce(
-    input_path: &str,
+    candidate_path: &str,
+    evaluator_path: &str,
     output_path: &str,
     seed: u64,
 ) -> Result<(usize, usize), String> {
-    let input = File::open(input_path)
-        .map_err(|error| format!("open evaluator input {input_path}: {error}"))?;
-    let reader = BufReader::new(input);
+    let (candidate_receipts, candidate_stream_sha256, candidate_record_count, candidate_run_id) =
+        load_candidate_receipts(candidate_path)?;
+    // Read once so the digest is over exactly the bytes parsed below; do not
+    // reopen the path after parsing and accidentally attest to a different file.
+    let evaluator_bytes = fs::read(evaluator_path)
+        .map_err(|error| format!("read evaluator input {evaluator_path}: {error}"))?;
+    let evaluator_stream_sha256 =
+        hex_digest(Sha256::digest(&evaluator_bytes).as_slice());
+    let reader = BufReader::new(Cursor::new(evaluator_bytes.as_slice()));
 
     let mut block_rows: BTreeMap<TaskKey, BTreeMap<MethodKind, Accumulator>> = BTreeMap::new();
     let mut intervention_row_count = 0_usize;
@@ -672,6 +1012,7 @@ fn reduce(
     let mut manifest_shas = BTreeSet::new();
     let mut manifest_pair_blocks = BTreeSet::new();
     let mut manifest_records: BTreeMap<String, Value> = BTreeMap::new();
+    let mut consumed_candidate_keys: BTreeSet<(String, String)> = BTreeSet::new();
     let mut input_provenance: Option<InputProvenance> = None;
 
     for (line_index, line) in reader.lines().enumerate() {
@@ -689,6 +1030,9 @@ fn reduce(
                     required_string(&record, "pair_block_id")?.to_string();
                 if !manifest_pair_blocks.insert(manifest_pair_block.clone()) {
                     return Err("duplicate intervention manifest pair_block_id".to_string());
+                }
+                if provenance.run_id != candidate_run_id {
+                    return Err("candidate and evaluator streams have different run IDs".to_string());
                 }
                 manifest_records.insert(manifest_pair_block, record.clone());
                 if let Some(existing) = &input_provenance {
@@ -722,6 +1066,18 @@ fn reduce(
             .ok_or_else(|| "evaluator_score has no matching intervention manifest".to_string())?;
         validate_score_against_manifest(&record, manifest)
             .map_err(|error| format!("line {}: {error}", line_index + 1))?;
+
+        let candidate_observation_id =
+            required_string(&record, "candidate_observation_id")?.to_string();
+        let candidate_key = (task_key.1.clone(), candidate_observation_id);
+        let candidate_receipt = candidate_receipts
+            .get(&candidate_key)
+            .ok_or_else(|| "evaluator score has no matching candidate decision receipt".to_string())?;
+        validate_score_against_candidate(&record, &task_key.1, candidate_receipt)
+            .map_err(|error| format!("line {}: {error}", line_index + 1))?;
+        if !consumed_candidate_keys.insert(candidate_key) {
+            return Err("candidate decision receipt is referenced by more than one evaluator score".to_string());
+        }
         block_rows
             .entry(task_key)
             .or_default()
@@ -737,8 +1093,13 @@ fn reduce(
     if manifest_row_count == 0 || manifest_shas.is_empty() {
         return Err("evaluator stream contains no intervention manifest receipts".to_string());
     }
+    if consumed_candidate_keys.len() != candidate_receipts.len() {
+        let orphan_count = candidate_receipts.len().saturating_sub(consumed_candidate_keys.len());
+        return Err(format!("candidate stream contains {orphan_count} decision receipts without evaluator scores"));
+    }
     let provenance = input_provenance
         .ok_or_else(|| "evaluator stream has no run provenance".to_string())?;
+    let evaluator_record_count = manifest_row_count + intervention_row_count;
     let manifest_set_payload = manifest_shas.iter().cloned().collect::<Vec<_>>().join("\n");
     let input_manifest_set_sha256 =
         hex_digest(Sha256::digest(manifest_set_payload.as_bytes()).as_slice());
@@ -828,6 +1189,10 @@ fn reduce(
 
     for record in &mut output_records {
         record["input_run_id"] = json!(provenance.run_id.as_str());
+        record["input_candidate_stream_sha256"] = json!(candidate_stream_sha256.as_str());
+        record["input_candidate_record_count"] = json!(candidate_record_count);
+        record["input_evaluator_stream_sha256"] = json!(evaluator_stream_sha256.as_str());
+        record["input_evaluator_record_count"] = json!(evaluator_record_count);
         record["input_manifest_set_sha256"] = json!(input_manifest_set_sha256.as_str());
         record["input_source_code_sha256"] = json!(provenance.source_code_sha256.as_str());
         record["input_fixture_sha256"] = json!(provenance.fixture_sha256.as_str());
@@ -863,16 +1228,15 @@ fn reduce(
 
 fn main() {
     let args: Vec<String> = env::args().skip(1).collect();
-    let Some(input_path) = args.first() else {
-        eprintln!("usage: mace_counterfactual_aggregate <evaluator.jsonl> <summary.jsonl> [seed]");
+    if args.len() < 3 {
+        eprintln!("usage: mace_counterfactual_aggregate <candidate.jsonl> <evaluator.jsonl> <summary.jsonl> [seed]");
         std::process::exit(2);
-    };
-    let output_path = args
-        .get(1)
-        .map(String::as_str)
-        .unwrap_or("mace_counterfactual_summary.jsonl");
+    }
+    let candidate_path = &args[0];
+    let evaluator_path = &args[1];
+    let output_path = &args[2];
     let seed = args
-        .get(2)
+        .get(3)
         .map(|value| value.parse::<u64>().map_err(|error| error.to_string()))
         .transpose()
         .unwrap_or_else(|error| {
@@ -881,7 +1245,7 @@ fn main() {
         })
         .unwrap_or(0x4d41_4345_5354_4154);
 
-    if let Err(error) = reduce(input_path, output_path, seed) {
+    if let Err(error) = reduce(candidate_path, evaluator_path, output_path, seed) {
         eprintln!("mace_counterfactual_aggregate: {error}");
         std::process::exit(1);
     }
@@ -901,18 +1265,273 @@ mod tests {
         json!({
             "schema_version": INPUT_SCHEMA,
             "record_type": "evaluator_score",
+            "run_id": "run-1",
             "pair_block_id": pair_block_id,
-            "method": method,
+            "candidate_observation_id": "obs-test",
+            "candidate_observation_sequence": 0,
+            "candidate_input_sha256": "f".repeat(64),
+            "intervention_id": format!("test-{kind}"),
             "intervention_kind": kind,
-            "utility": utility,
-            "regret": regret,
-            "regret_gap_vs_full_evidence": regret,
-            "regret_gap_vs_full_method": regret,
+            "target_key": "test-target",
+            "matched_to": null,
+            "removed_event_ids": [],
+            "removed_event_count": 0,
+            "removed_experience_struct_bytes": 0,
+            "method": method,
+            "retrieved_event_ids": [],
+            "index_bytes": 0,
+            "decision": "action_a",
+            "full_evidence_decision": "action_a",
             "decision_agrees_with_full": true,
             "decision_changed": false,
+            "utility": utility,
+            "regret": regret,
+            "full_evidence_regret": regret,
+            "regret_gap_vs_full_evidence": regret,
+            "regret_gap_vs_full_method": regret,
             "decision_is_optimal": true,
-            "abstained": false
+            "abstained": false,
+            "evaluation_validity": "diagnostic_only",
+            "invalidity_reason": "unit test fixture"
         })
+    }
+
+    fn candidate_receipt_record(run_id: &str, pair_block_id: &str) -> Value {
+        let method = "typed_content_hdc";
+        let decision_need_sha256 = "a".repeat(64);
+        let candidate_evidence_sha256 = "b".repeat(64);
+        let candidate_input_sha256 =
+            expected_candidate_input_sha256(&decision_need_sha256, &candidate_evidence_sha256);
+        let candidate_observation_sequence = 7_u64;
+        let candidate_observation_id = expected_candidate_observation_id(
+            run_id,
+            pair_block_id,
+            candidate_observation_sequence,
+            method,
+            &candidate_input_sha256,
+        );
+        json!({
+            "schema_version": INPUT_SCHEMA,
+            "record_type": "candidate_decision",
+            "run_id": run_id,
+            "pair_block_id": pair_block_id,
+            "candidate_observation_id": candidate_observation_id,
+            "candidate_observation_sequence": candidate_observation_sequence,
+            "method": method,
+            "candidate_input_sha256": candidate_input_sha256,
+            "decision_need_sha256": decision_need_sha256,
+            "candidate_evidence_sha256": candidate_evidence_sha256,
+            "retrieved_event_ids": [3, 7],
+            "decision": "action_a",
+            "index_bytes": 2048,
+            "retrieval_profile_sha256": "c".repeat(64)
+        })
+    }
+
+    fn evaluator_receipt_record(candidate: &CandidateReceipt, pair_block_id: &str) -> Value {
+        json!({
+            "run_id": candidate.run_id,
+            "pair_block_id": pair_block_id,
+            "candidate_observation_id": expected_candidate_observation_id(
+                &candidate.run_id,
+                pair_block_id,
+                candidate.candidate_observation_sequence,
+                &candidate.method,
+                &candidate.candidate_input_sha256
+            ),
+            "candidate_observation_sequence": candidate.candidate_observation_sequence,
+            "method": candidate.method,
+            "candidate_input_sha256": candidate.candidate_input_sha256,
+            "decision": candidate.decision,
+            "retrieved_event_ids": candidate.retrieved_event_ids,
+            "index_bytes": candidate.index_bytes,
+            "retrieval_profile_sha256": candidate.retrieval_profile_sha256
+        })
+    }
+
+    #[test]
+    fn optional_digest_fields_reject_null_and_wrong_json_types() {
+        let mut candidate = candidate_receipt_record("run-1", "world-1:task-a");
+        candidate["retrieval_profile_sha256"] = json!(null);
+        assert!(parse_candidate_receipt(&candidate)
+            .unwrap_err()
+            .contains("optional digest field"));
+
+        let mut manifest = manifest_record("run-1", &"a".repeat(64));
+        manifest["source_revision"] = json!(7);
+        assert!(parse_manifest(&manifest)
+            .unwrap_err()
+            .contains("source_revision"));
+
+        let mut missing_revision = manifest_record("run-1", &"a".repeat(64));
+        missing_revision.as_object_mut().unwrap().remove("source_revision");
+        assert!(parse_manifest(&missing_revision)
+            .unwrap_err()
+            .contains("source_revision"));
+    }
+
+    #[test]
+    fn evaluator_score_rejects_inconsistent_decision_and_abstention_flags() {
+        let mut changed_without_disagreement =
+            score_record("world-1:task-a", "typed_content_hdc", "event", 0.5, 0.5);
+        changed_without_disagreement["decision_changed"] = json!(true);
+        assert!(parse_score(&changed_without_disagreement)
+            .unwrap_err()
+            .contains("agreement flags"));
+
+        let mut false_abstention =
+            score_record("world-1:task-a", "typed_content_hdc", "event", 0.5, 0.5);
+        false_abstention["abstained"] = json!(true);
+        assert!(parse_score(&false_abstention)
+            .unwrap_err()
+            .contains("abstained flag"));
+    }
+
+    #[test]
+    fn evaluator_score_rejects_unknown_schema_fields() {
+        let mut score = score_record("world-1:task-a", "typed_content_hdc", "event", 0.5, 0.5);
+        score["candidate_intervention_label"] = json!("hidden");
+        assert!(parse_score(&score)
+            .unwrap_err()
+            .contains("unsupported field candidate_intervention_label"));
+    }
+
+    #[test]
+    fn strict_record_allowlists_reject_candidate_evaluator_and_manifest_extras() {
+        let candidate = candidate_receipt_record("run-1", "world-1:task-a");
+        let mut candidate_with_label = candidate;
+        candidate_with_label["intervention_id"] = json!("event:1:1");
+        assert!(parse_candidate_receipt(&candidate_with_label)
+            .unwrap_err()
+            .contains("unsupported field intervention_id"));
+
+        let manifest = manifest_record("run-1", &"a".repeat(64));
+        let mut manifest_with_extra = manifest;
+        manifest_with_extra["debug_truth"] = json!("forbidden");
+        assert!(parse_manifest(&manifest_with_extra)
+            .unwrap_err()
+            .contains("unsupported field debug_truth"));
+    }
+
+    #[test]
+    fn candidate_receipt_recomputes_input_and_observation_identities() {
+        let record = candidate_receipt_record("run-1", "world-1:task-a");
+        let (key, receipt) = parse_candidate_receipt(&record).unwrap();
+        assert_eq!(key.0, "world-1:task-a");
+        assert_eq!(receipt.run_id, "run-1");
+
+        let mut bad_observation = record.clone();
+        bad_observation["candidate_observation_id"] = json!("obs-0000000000000000");
+        assert!(parse_candidate_receipt(&bad_observation)
+            .unwrap_err()
+            .contains("candidate_observation_id"));
+
+        let mut bad_input = record;
+        bad_input["candidate_input_sha256"] = json!("d".repeat(64));
+        assert!(parse_candidate_receipt(&bad_input)
+            .unwrap_err()
+            .contains("candidate_input_sha256"));
+    }
+
+    #[test]
+    fn evaluator_score_must_match_candidate_decision_receipt() {
+        let record = candidate_receipt_record("run-1", "world-1:task-a");
+        let (key, receipt) = parse_candidate_receipt(&record).unwrap();
+        let valid = evaluator_receipt_record(&receipt, &key.0);
+        assert!(validate_score_against_candidate(&valid, &key.0, &receipt).is_ok());
+
+        let mut wrong_decision = valid.clone();
+        wrong_decision["decision"] = json!("action_b");
+        assert!(validate_score_against_candidate(&wrong_decision, &key.0, &receipt)
+            .unwrap_err()
+            .contains("decision differs"));
+
+        let mut wrong_retrieved = valid.clone();
+        wrong_retrieved["retrieved_event_ids"] = json!([3]);
+        assert!(validate_score_against_candidate(&wrong_retrieved, &key.0, &receipt)
+            .unwrap_err()
+            .contains("retrieved_event_ids"));
+
+        let mut wrong_size = valid.clone();
+        wrong_size["index_bytes"] = json!(999);
+        assert!(validate_score_against_candidate(&wrong_size, &key.0, &receipt)
+            .unwrap_err()
+            .contains("index_bytes"));
+
+        let mut wrong_profile = valid.clone();
+        wrong_profile["retrieval_profile_sha256"] = json!("d".repeat(64));
+        assert!(validate_score_against_candidate(&wrong_profile, &key.0, &receipt)
+            .unwrap_err()
+            .contains("retrieval_profile_sha256"));
+
+        let mut wrong_run = valid.clone();
+        wrong_run["run_id"] = json!("run-2");
+        assert!(validate_score_against_candidate(&wrong_run, &key.0, &receipt)
+            .unwrap_err()
+            .contains("run_id"));
+
+        let mut wrong_sequence = valid;
+        wrong_sequence["candidate_observation_sequence"] = json!(8);
+        assert!(validate_score_against_candidate(&wrong_sequence, &key.0, &receipt)
+            .unwrap_err()
+            .contains("candidate_observation_sequence"));
+    }
+
+    #[test]
+    fn candidate_stream_loader_binds_bytes_count_and_run_id() {
+        let record = candidate_receipt_record("run-1", "world-1:task-a");
+        let line = serde_json::to_string(&record).unwrap();
+        let contents = format!("{line}\n");
+        let path = env::temp_dir().join(format!(
+            "mace-candidate-stream-{}-valid.jsonl",
+            std::process::id()
+        ));
+        fs::write(&path, contents.as_bytes()).unwrap();
+
+        let (receipts, digest, count, run_id) =
+            load_candidate_receipts(path.to_str().unwrap()).unwrap();
+        assert_eq!(count, 1);
+        assert_eq!(run_id, "run-1");
+        assert_eq!(receipts.len(), 1);
+        assert_eq!(digest, hex_digest(Sha256::digest(contents.as_bytes()).as_slice()));
+
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn candidate_stream_loader_rejects_duplicate_execution_sequences() {
+        let first = candidate_receipt_record("run-1", "world-1:task-a");
+        let second = candidate_receipt_record("run-1", "world-2:task-b");
+        let line_a = serde_json::to_string(&first).unwrap();
+        let line_b = serde_json::to_string(&second).unwrap();
+        let contents = format!("{line_a}\n{line_b}\n");
+        let path = env::temp_dir().join(format!(
+            "mace-candidate-stream-{}-sequence.jsonl",
+            std::process::id()
+        ));
+        fs::write(&path, contents.as_bytes()).unwrap();
+
+        let error = load_candidate_receipts(path.to_str().unwrap()).unwrap_err();
+        assert!(error.contains("duplicate execution sequence"));
+
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn candidate_stream_loader_rejects_duplicate_pair_block_observation_keys() {
+        let record = candidate_receipt_record("run-1", "world-1:task-a");
+        let line = serde_json::to_string(&record).unwrap();
+        let contents = format!("{line}\n{line}\n");
+        let path = env::temp_dir().join(format!(
+            "mace-candidate-stream-{}-duplicate.jsonl",
+            std::process::id()
+        ));
+        fs::write(&path, contents.as_bytes()).unwrap();
+
+        let error = load_candidate_receipts(path.to_str().unwrap()).unwrap_err();
+        assert!(error.contains("duplicate pair-block/observation identity"));
+
+        fs::remove_file(path).unwrap();
     }
 
     fn refresh_manifest_digests(record: &mut Value) {
