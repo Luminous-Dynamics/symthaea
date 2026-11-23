@@ -263,7 +263,8 @@ function selfTest(paths){
  if(!nonEdgeReceiptRejected)fail('receipt bound to a non-qualifying source event was accepted');
  const reactivatedFixture=clone(input.fixture);
  const revokedCase=reactivatedFixture.cases.find(c=>c.case_id==='edge-receipt-revoked-before-reconnect');
- revokedCase.source_events.find(e=>e.event_id==='evt-receipt-revoked').patch.trigger_receipts[0].status='active';
+ const revokedReceipt=revokedCase.source_events.find(e=>e.event_id==='evt-receipt-revoked').patch.trigger_receipts[0];
+ revokedCase.source_events.push({at:16,sequence:4,event_id:'evt-receipt-reactivated',revision:5,patch:{trigger_receipts:[{...revokedReceipt,status:'active'}]}});
  let reactivatedReceiptRejected=false;
  try{validateInputs(reactivatedFixture,input.traces,input.policy);}catch{reactivatedReceiptRejected=true;}
  if(!reactivatedReceiptRejected)fail('revoked durable receipt was reactivated');
