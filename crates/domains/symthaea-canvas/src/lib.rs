@@ -223,6 +223,7 @@ pub use mycelial_observation_coverage::{
     MYCELIAL_OBSERVATION_COVERAGE_SCHEMA_VERSION, MycelialObservationCoverageError,
     MycelialObservationCoverageLedger, MycelialObservationCoverageRecord,
     MycelialObservationCoverageState, MycelialObservationResidualKind,
+    mycelial_observation_id_inventory_digest,
 };
 pub use mycelial_presence::{
     build_mycelial_presence, build_mycelial_presence_with_mode, render_mycelial_presence,
