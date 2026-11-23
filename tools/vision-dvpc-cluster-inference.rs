@@ -930,8 +930,12 @@ DELTA_HEADER\tcomparison_id\tcandidate_id\tbaseline_id\tcluster_id\tdelta\n",
             // no other data mutation
             let _ = line;
         }
-        // Keep four clusters by removing seq-006 too.
-        lines.retain(|line| !line.contains("\tseq-006\t"));
+        // Leave four independent clusters: seq-000 through seq-003.
+        lines.retain(|line| {
+            !["seq-004", "seq-005", "seq-006", "seq-007"]
+                .iter()
+                .any(|cluster| line.contains(&format!("\t{cluster}\t")))
+        });
         let broken = lines.join("\n") + "\n";
         assert!(
             analyze(&broken, LOCK)
