@@ -1,0 +1,85 @@
+{
+  "run_id": 44894225928,
+  "artifact_id": 14702877947,
+  "artifact_sha256": "794602594082b5f13e32919fe3c456efdbdb1692aeee4479de79f84ea7f8bf86",
+  "source_commit": "98215ac7b1931416b900feaa437a282b8c7ded23",
+  "source_branch": "research/plasma-vp-spectral-reference-v0-1",
+  "workflow": "Plasma Vlasov reference solver",
+  "toolchain": "Rust 1.96.0",
+  "runner": "ubuntu-latest",
+  "target": "x86_64-unknown-linux-gnu",
+  "workflow_conclusion": "success",
+  "gates": {
+    "strict_format": true,
+    "unit_tests": {
+      "passed": 11,
+      "failed": 0
+    },
+    "strict_clippy": true,
+    "landau_reference_example": true,
+    "refinement_probe_example": true,
+    "artifact_upload": true
+  },
+  "measurement_limits": {
+    "wall_time_recorded": false,
+    "peak_memory_recorded": false,
+    "energy_to_solution_recorded": false,
+    "independent_physical_validation": false,
+    "external_baseline_comparison": false,
+    "damping_rate_fit": false
+  },
+  "files": {
+    "landau_trace": "landau-reference.csv",
+    "refinement_probe": "refinement-probe.csv"
+  },
+  "numerical_run": {
+    "landau": {
+      "nx": 64,
+      "nv": 128,
+      "domain_length": 12.566370614359172,
+      "velocity_interval": [
+        -6,
+        6
+      ],
+      "alpha": 0.001,
+      "spatial_mode": 1,
+      "thermal_speed": 1,
+      "dt": 0.01,
+      "steps": 200,
+      "sampled_every_steps": 10,
+      "final_time": 2
+    },
+    "refinement": {
+      "common_final_time": 1,
+      "space_nx": [
+        32,
+        64,
+        128
+      ],
+      "velocity_nv": [
+        64,
+        128,
+        256
+      ],
+      "velocity_max": [
+        4,
+        6,
+        8
+      ],
+      "timestep": [
+        0.04,
+        0.02,
+        0.01,
+        0.005
+      ]
+    }
+  },
+  "caveats": [
+    "The run is a reference-prototype diagnostic, not a continuum accuracy certification.",
+    "The Landau trace reports only the magnitude of the electric Fourier coefficient; it is not suitable for a phase-aware damping-rate fit.",
+    "The finite numerical velocity interval is periodic and truncated.",
+    "The velocity endpoint ratio is a warning indicator, not a rigorous tail-error bound.",
+    "A tiny spectral Poisson residual certifies only the exact spectral operator used by this solver.",
+    "No production solver speed, memory or energy comparison was measured."
+  ]
+}

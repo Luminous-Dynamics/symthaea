@@ -1,0 +1,47 @@
+name: Plasma Vlasov reference solver
+
+on:
+  push:
+    paths:
+      - "crates/tools/plasma-vlasov-reference/**"
+      - ".github/workflows/plasma-vlasov-reference.yml"
+  pull_request:
+    paths:
+      - "crates/tools/plasma-vlasov-reference/**"
+      - ".github/workflows/plasma-vlasov-reference.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reference:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v4
+      - name: Install Rust 1.96 toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Strict format check
+        run: cargo fmt --manifest-path crates/tools/plasma-vlasov-reference/Cargo.toml -- --check
+      - name: Unit tests
+        run: cargo test --locked --manifest-path crates/tools/plasma-vlasov-reference/Cargo.toml
+      - name: Strict Clippy
+        run: cargo clippy --locked --manifest-path crates/tools/plasma-vlasov-reference/Cargo.toml --all-targets -- -D warnings
+      - name: Create reproducible trajectory artifacts
+        run: mkdir -p artifacts/plasma-vlasov-reference
+      - name: Run weak-Landau reference trajectory
+        run: cargo run --release --locked --manifest-path crates/tools/plasma-vlasov-reference/Cargo.toml --example landau_reference > artifacts/plasma-vlasov-reference/landau-reference.csv
+      - name: Run independent resolution and timestep probes
+        run: cargo run --release --locked --manifest-path crates/tools/plasma-vlasov-reference/Cargo.toml --example refinement_probe > artifacts/plasma-vlasov-reference/refinement-probe.csv
+      - name: Run matched Landau amplitude sweep
+        run: cargo run --release --locked --manifest-path crates/tools/plasma-vlasov-reference/Cargo.toml --example landau_amplitude_sweep > artifacts/plasma-vlasov-reference/landau-amplitude-sweep.csv
+      - name: Upload reproducible trajectory traces
+        uses: actions/upload-artifact@v4
+        with:
+          name: plasma-vlasov-reference-${{ github.sha }}
+          path: artifacts/plasma-vlasov-reference/*.csv
+          if-no-files-found: error
+          retention-days: 30
