@@ -151,6 +151,10 @@
               "type": "boolean"
             }
           }
+        },
+        "known_answers": {
+          "type": "object",
+          "minProperties": 1
         }
       },
       "allOf": [
