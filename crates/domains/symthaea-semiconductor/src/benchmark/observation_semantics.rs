@@ -562,13 +562,24 @@ pub fn validate_sensor_correspondence_manifest_v1(
                 )?;
                 if let Some(uncertainty) = &transform.coefficient_uncertainty {
                     for (name, value) in [
-                        ("scale_standard_uncertainty", uncertainty.scale_standard_uncertainty),
-                        ("offset_standard_uncertainty", uncertainty.offset_standard_uncertainty),
-                        ("covariance_scale_offset", uncertainty.covariance_scale_offset),
+                        (
+                            "scale_standard_uncertainty",
+                            uncertainty.scale_standard_uncertainty,
+                        ),
+                        (
+                            "offset_standard_uncertainty",
+                            uncertainty.offset_standard_uncertainty,
+                        ),
+                        (
+                            "covariance_scale_offset",
+                            uncertainty.covariance_scale_offset,
+                        ),
                     ] {
                         finite(
                             value,
-                            &format!("correspondences[{index}].unit_transform.coefficient_uncertainty.{name}"),
+                            &format!(
+                                "correspondences[{index}].unit_transform.coefficient_uncertainty.{name}"
+                            ),
                         )?;
                     }
                     if uncertainty.scale_standard_uncertainty < 0.0
@@ -583,7 +594,9 @@ pub fn validate_sensor_correspondence_manifest_v1(
                     }
                     require_text(
                         &uncertainty.uncertainty_evidence_ref,
-                        &format!("correspondences[{index}].unit_transform.coefficient_uncertainty.uncertainty_evidence_ref"),
+                        &format!(
+                            "correspondences[{index}].unit_transform.coefficient_uncertainty.uncertainty_evidence_ref"
+                        ),
                     )?;
                 }
                 require_text(
@@ -668,10 +681,10 @@ fn transform_observation_state_v1(
                 uncertainty.method_ref, transform.transform_evidence_ref
             );
             if let Some(coefficient_uncertainty) = &transform.coefficient_uncertainty {
-                let scale_variance = (value * coefficient_uncertainty.scale_standard_uncertainty).powi(2);
+                let scale_variance =
+                    (value * coefficient_uncertainty.scale_standard_uncertainty).powi(2);
                 let offset_variance = coefficient_uncertainty.offset_standard_uncertainty.powi(2);
-                let covariance_term =
-                    2.0 * value * coefficient_uncertainty.covariance_scale_offset;
+                let covariance_term = 2.0 * value * coefficient_uncertainty.covariance_scale_offset;
                 converted_variance += scale_variance + offset_variance + covariance_term;
                 method_ref.push_str(&format!(
                     ";transform_uncertainty={}",
@@ -680,7 +693,8 @@ fn transform_observation_state_v1(
             }
             if !converted_value.is_finite()
                 || !converted_variance.is_finite()
-                || converted_variance < -f64::EPSILON * converted_value.abs().max(1.0).powi(2) * 16.0
+                || converted_variance
+                    < -f64::EPSILON * converted_value.abs().max(1.0).powi(2) * 16.0
             {
                 return abstain("unit conversion or propagated variance is invalid".into());
             }
@@ -1276,18 +1290,18 @@ mod tests {
             .find(|observation| observation.sensor_id == "target-pressure")
             .unwrap();
         match &pressure.state {
-            SensorObservationStateV1::Observed {
-                value,
-                uncertainty,
-                ..
-            } => {
+            SensorObservationStateV1::Observed { value, uncertainty, .. } => {
                 assert_eq!(*value, 2500.0);
                 let expected_standard_uncertainty = (406.0625_f64).sqrt();
                 assert!(
                     (uncertainty.standard_uncertainty - expected_standard_uncertainty).abs()
                         < 1.0e-12
                 );
-                assert!(uncertainty.method_ref.contains("conversion-calibration-study-17"));
+                assert!(
+                    uncertainty
+                        .method_ref
+                        .contains("conversion-calibration-study-17")
+                );
             }
             other => panic!("expected transformed qualified observation, got {other:?}"),
         }
