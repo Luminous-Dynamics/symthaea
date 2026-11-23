@@ -258,10 +258,8 @@ pub fn score_pitch_tracks(
         + metrics.voiced_false_positive
         + metrics.voiced_false_negative
         + metrics.unvoiced_true_negative;
-    let predicted_voiced =
-        metrics.voiced_true_positive + metrics.voiced_false_positive;
-    let reference_voiced =
-        metrics.voiced_true_positive + metrics.voiced_false_negative;
+    let predicted_voiced = metrics.voiced_true_positive + metrics.voiced_false_positive;
+    let reference_voiced = metrics.voiced_true_positive + metrics.voiced_false_negative;
     metrics.voicing_precision = if predicted_voiced > 0 {
         ratio(metrics.voiced_true_positive, predicted_voiced)
     } else if reference_voiced > 0 {
@@ -281,16 +279,12 @@ pub fn score_pitch_tracks(
         metrics.voiced_false_positive + metrics.voiced_false_negative,
         scored_decisions,
     );
-    metrics.frame_coverage = ratio(
-        metrics.aligned_frame_count,
-        metrics.reference_frame_count,
-    );
+    metrics.frame_coverage = ratio(metrics.aligned_frame_count, metrics.reference_frame_count);
 
     if metrics.jointly_voiced_frame_count > 0 {
         let count = metrics.jointly_voiced_frame_count as f64;
         metrics.f0_rmse_hz = Some((f0_errors.squared_hz_error / count).sqrt());
-        metrics.median_absolute_f0_error_cents =
-            Some(median(&mut f0_errors.absolute_cents_error));
+        metrics.median_absolute_f0_error_cents = Some(median(&mut f0_errors.absolute_cents_error));
         metrics.mean_signed_f0_error_cents =
             Some(f0_errors.signed_cents_error.iter().sum::<f64>() / count);
         metrics.gross_pitch_error_rate = Some(f0_errors.gross_pitch_errors as f64 / count);
@@ -343,9 +337,7 @@ fn score_aligned_frame(
     }
 }
 
-fn validate_score_config(
-    config: PitchTrackScoreConfigV1,
-) -> Result<(), PitchTrackEvaluationError> {
+fn validate_score_config(config: PitchTrackScoreConfigV1) -> Result<(), PitchTrackEvaluationError> {
     if !config.gross_pitch_error_ratio.is_finite()
         || config.gross_pitch_error_ratio <= 0.0
         || config.gross_pitch_error_ratio >= 1.0
@@ -500,12 +492,8 @@ mod tests {
     fn perfect_pitch_and_voicing_track_has_zero_error() {
         let reference = track("reference", &[Some(100.0), Some(110.0), None, Some(120.0)]);
         let estimated = track("estimated", &[Some(100.0), Some(110.0), None, Some(120.0)]);
-        let metrics = score_pitch_tracks(
-            &reference,
-            &estimated,
-            PitchTrackScoreConfigV1::default(),
-        )
-        .unwrap();
+        let metrics =
+            score_pitch_tracks(&reference, &estimated, PitchTrackScoreConfigV1::default()).unwrap();
         assert_eq!(metrics.aligned_frame_count, 4);
         assert_eq!(metrics.frame_coverage, Some(1.0));
         assert_eq!(metrics.voicing_f1, Some(1.0));
@@ -519,12 +507,8 @@ mod tests {
     fn octave_error_is_counted_separately_from_f0_error() {
         let reference = track("reference", &[Some(100.0), Some(200.0)]);
         let estimated = track("estimated", &[Some(200.0), Some(100.0)]);
-        let metrics = score_pitch_tracks(
-            &reference,
-            &estimated,
-            PitchTrackScoreConfigV1::default(),
-        )
-        .unwrap();
+        let metrics =
+            score_pitch_tracks(&reference, &estimated, PitchTrackScoreConfigV1::default()).unwrap();
         assert_eq!(metrics.jointly_voiced_frame_count, 2);
         assert_eq!(metrics.octave_error_rate, Some(1.0));
         assert_eq!(metrics.gross_pitch_error_rate, Some(1.0));
@@ -534,12 +518,8 @@ mod tests {
     fn voiced_unvoiced_confusion_is_scored_without_zero_hz_fabrication() {
         let reference = track("reference", &[Some(120.0), None, Some(150.0), None]);
         let estimated = track("estimated", &[None, Some(90.0), Some(150.0), None]);
-        let metrics = score_pitch_tracks(
-            &reference,
-            &estimated,
-            PitchTrackScoreConfigV1::default(),
-        )
-        .unwrap();
+        let metrics =
+            score_pitch_tracks(&reference, &estimated, PitchTrackScoreConfigV1::default()).unwrap();
         assert_eq!(metrics.voiced_true_positive, 1);
         assert_eq!(metrics.voiced_false_positive, 1);
         assert_eq!(metrics.voiced_false_negative, 1);
@@ -556,12 +536,8 @@ mod tests {
         let mut estimated = track("estimated", &[Some(100.0), Some(120.0)]);
         estimated.frames[1].source_timestamp_ns = 20_000_000;
         estimated.frames[1].frame_index = 2;
-        let metrics = score_pitch_tracks(
-            &reference,
-            &estimated,
-            PitchTrackScoreConfigV1::default(),
-        )
-        .unwrap();
+        let metrics =
+            score_pitch_tracks(&reference, &estimated, PitchTrackScoreConfigV1::default()).unwrap();
         assert_eq!(metrics.aligned_frame_count, 2);
         assert_eq!(metrics.missing_estimated_frame_count, 1);
         assert_eq!(metrics.frame_coverage, Some(2.0 / 3.0));
@@ -574,12 +550,8 @@ mod tests {
         let mut estimated = track("estimated", &[Some(100.0), Some(110.0)]);
         estimated.frames[0].source_timestamp_ns += 2_000_000;
         estimated.frames[1].source_timestamp_ns += 2_000_000;
-        let metrics = score_pitch_tracks(
-            &reference,
-            &estimated,
-            PitchTrackScoreConfigV1::default(),
-        )
-        .unwrap();
+        let metrics =
+            score_pitch_tracks(&reference, &estimated, PitchTrackScoreConfigV1::default()).unwrap();
         assert_eq!(metrics.aligned_frame_count, 2);
     }
 
@@ -588,21 +560,15 @@ mod tests {
         let reference = track("reference", &[Some(100.0)]);
         let mut estimated = track("estimated", &[Some(100.0)]);
         estimated.source.source_content_sha256 = "b".repeat(64);
-        assert!(score_pitch_tracks(
-            &reference,
-            &estimated,
-            PitchTrackScoreConfigV1::default()
-        )
-        .is_err());
+        assert!(
+            score_pitch_tracks(&reference, &estimated, PitchTrackScoreConfigV1::default()).is_err()
+        );
 
         let mut estimated = track("estimated", &[Some(100.0)]);
         estimated.source.clock_generation += 1;
-        assert!(score_pitch_tracks(
-            &reference,
-            &estimated,
-            PitchTrackScoreConfigV1::default()
-        )
-        .is_err());
+        assert!(
+            score_pitch_tracks(&reference, &estimated, PitchTrackScoreConfigV1::default()).is_err()
+        );
     }
 
     #[test]
@@ -610,21 +576,15 @@ mod tests {
         let reference = track("reference", &[Some(100.0)]);
         let mut estimated = track("estimated", &[Some(100.0)]);
         estimated.frames[0].f0_hz = Some(0.0);
-        assert!(score_pitch_tracks(
-            &reference,
-            &estimated,
-            PitchTrackScoreConfigV1::default()
-        )
-        .is_err());
+        assert!(
+            score_pitch_tracks(&reference, &estimated, PitchTrackScoreConfigV1::default()).is_err()
+        );
 
         let mut estimated = track("estimated", &[Some(100.0)]);
         estimated.frames[0].periodicity = Some(1.1);
-        assert!(score_pitch_tracks(
-            &reference,
-            &estimated,
-            PitchTrackScoreConfigV1::default()
-        )
-        .is_err());
+        assert!(
+            score_pitch_tracks(&reference, &estimated, PitchTrackScoreConfigV1::default()).is_err()
+        );
     }
 
     #[test]
@@ -632,12 +592,8 @@ mod tests {
         let reference = track("reference", &[Some(100.0), Some(110.0)]);
         let mut estimated = track("estimated", &[Some(100.0), Some(110.0)]);
         estimated.frames.clear();
-        let metrics = score_pitch_tracks(
-            &reference,
-            &estimated,
-            PitchTrackScoreConfigV1::default(),
-        )
-        .unwrap();
+        let metrics =
+            score_pitch_tracks(&reference, &estimated, PitchTrackScoreConfigV1::default()).unwrap();
         assert_eq!(metrics.voicing_precision, Some(0.0));
         assert_eq!(metrics.voicing_recall, Some(0.0));
         assert_eq!(metrics.voicing_f1, Some(0.0));
@@ -650,33 +606,23 @@ mod tests {
         let reference = track("reference", &[Some(100.0), Some(110.0)]);
         let mut estimated = track("estimated", &[Some(100.0), Some(110.0)]);
         estimated.frames[1].source_timestamp_ns = estimated.frames[0].source_timestamp_ns;
-        assert!(score_pitch_tracks(
-            &reference,
-            &estimated,
-            PitchTrackScoreConfigV1::default()
-        )
-        .is_err());
+        assert!(
+            score_pitch_tracks(&reference, &estimated, PitchTrackScoreConfigV1::default()).is_err()
+        );
 
         let mut estimated = track("estimated", &[Some(100.0)]);
         estimated.frames[0].source_timestamp_ns = estimated.source.source_end_ns;
-        assert!(score_pitch_tracks(
-            &reference,
-            &estimated,
-            PitchTrackScoreConfigV1::default()
-        )
-        .is_err());
+        assert!(
+            score_pitch_tracks(&reference, &estimated, PitchTrackScoreConfigV1::default()).is_err()
+        );
     }
 
     #[test]
     fn non_estimable_pitch_metrics_are_none_not_zero() {
         let reference = track("reference", &[None, None]);
         let estimated = track("estimated", &[None, None]);
-        let metrics = score_pitch_tracks(
-            &reference,
-            &estimated,
-            PitchTrackScoreConfigV1::default(),
-        )
-        .unwrap();
+        let metrics =
+            score_pitch_tracks(&reference, &estimated, PitchTrackScoreConfigV1::default()).unwrap();
         assert_eq!(metrics.voicing_f1, None);
         assert_eq!(metrics.f0_rmse_hz, None);
         assert_eq!(metrics.gross_pitch_error_rate, None);
