@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/mace_onpolicy_run_manifest_v1.schema.json",
+  "title": "MACE On-Policy Memory Control Run Manifest v1",
+  "description": "Public, non-secret configuration manifest for an on-policy or off-policy MACE run. Secret assignment seeds and evaluator-only labels are represented only by commitments and remain in evaluator custody.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_type",
+    "run_id",
+    "benchmark_id",
+    "benchmark_release",
+    "dataset_revision",
+    "evaluation_track",
+    "split",
+    "agent_model_sha256",
+    "prompt_sha256",
+    "tool_schema_sha256",
+    "memory_policy_sha256",
+    "candidate_artifact_sha256",
+    "simulator_revision_sha256",
+    "evaluator_revision_sha256",
+    "scoring_profile_sha256",
+    "assignment_commitment_sha256",
+    "budget"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mace_onpolicy_run_manifest_v1"
+    },
+    "record_type": {
+      "const": "run_manifest"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "benchmark_id": {
+      "enum": [
+        "amemgym_official",
+        "mace_onpolicy_fixture"
+      ]
+    },
+    "benchmark_release": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "dataset_revision": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "evaluation_track": {
+      "enum": [
+        "off_policy_replay",
+        "on_policy_interaction",
+        "policy_adaptation"
+      ]
+    },
+    "split": {
+      "enum": [
+        "train",
+        "calibration",
+        "held_out",
+        "public_test",
+        "sealed_test"
+      ]
+    },
+    "agent_model_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "prompt_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "tool_schema_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "memory_policy_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "candidate_artifact_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "simulator_revision_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "evaluator_revision_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "scoring_profile_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "assignment_commitment_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_turns",
+        "max_input_tokens",
+        "max_output_tokens",
+        "max_tool_calls",
+        "wall_clock_ms"
+      ],
+      "properties": {
+        "max_turns": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_input_tokens": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_output_tokens": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_tool_calls": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "wall_clock_ms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_memory_bytes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "cluster_unit": {
+      "const": "latent_profile_task_generator"
+    },
+    "notes": {
+      "type": "string",
+      "maxLength": 4096
+    }
+  }
+}
