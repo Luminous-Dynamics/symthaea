@@ -21,6 +21,7 @@ use broca_aml_adapter::longmemeval_v2::{
 };
 use broca_aml_adapter::raw_session::Bm25ProfileV1;
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 
 struct Config {
     domain: String,
@@ -186,9 +187,20 @@ fn handle_request(
                     "type": "text",
                     "value": neighbor.chunk.evidence_text()
                 }));
-                for reference in &neighbor.chunk.screenshot_references {
-                    let resolved = resolve_screenshot_reference(&config.dataset_root, reference)
-                        .map_err(|error| format!("resolve neighbor screenshot: {error:?}"))?;
+                for state in &neighbor.chunk.state_window {
+                    let resolved = resolve_screenshot_reference(
+                        &config.dataset_root,
+                        &state.screenshot_reference,
+                    )
+                    .map_err(|error| format!("resolve neighbor screenshot: {error:?}"))?;
+                    if let Some(expected_digest) = &state.screenshot_sha256 {
+                        let bytes = fs::read(&resolved)
+                            .map_err(|_| "neighbor screenshot is missing after resolution")?;
+                        let actual_digest = format!("{:x}", Sha256::digest(&bytes));
+                        if actual_digest != *expected_digest {
+                            return Err("neighbor screenshot digest mismatch".into());
+                        }
+                    }
                     let value = resolved.to_string_lossy().into_owned();
                     if seen_images.insert(value.clone()) {
                         items.push(json!({"type":"image","value":value}));
