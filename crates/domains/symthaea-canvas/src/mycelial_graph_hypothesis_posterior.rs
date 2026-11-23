@@ -132,10 +132,7 @@ fn log_bernoulli_probability(probability: f64, accepted: bool) -> f64 {
 }
 
 fn log_sum_exp(values: &[f64]) -> f64 {
-    let maximum = values
-        .iter()
-        .copied()
-        .fold(f64::NEG_INFINITY, f64::max);
+    let maximum = values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
     if !maximum.is_finite() {
         return maximum;
     }
@@ -174,10 +171,7 @@ fn conflict_pairs_from_impacts(
 pub fn evaluate_mycelial_graph_hypothesis_posterior(
     skeleton: &AnnotatedMycelialSkeleton,
     candidates: &[MycelialFusionCandidate],
-) -> Result<
-    MycelialGraphHypothesisPosterior,
-    MycelialGraphHypothesisPosteriorError,
-> {
+) -> Result<MycelialGraphHypothesisPosterior, MycelialGraphHypothesisPosteriorError> {
     if candidates.len() > MAX_MYCELIAL_POSTERIOR_CANDIDATES {
         return Err(MycelialGraphHypothesisPosteriorError::TooManyCandidates(
             candidates.len(),
@@ -186,13 +180,8 @@ pub fn evaluate_mycelial_graph_hypothesis_posterior(
 
     // Reuse the existing counterfactual validator and conflict detector. This
     // keeps candidate semantics and incompatibility rules in one authoritative place.
-    let counterfactual = evaluate_mycelial_fusion_counterfactuals(
-        skeleton,
-        candidates,
-        &[],
-        &[],
-    )
-    .map_err(|error: MycelialFusionCounterfactualError| {
+    let counterfactual = evaluate_mycelial_fusion_counterfactuals(skeleton, candidates, &[], &[])
+        .map_err(|error: MycelialFusionCounterfactualError| {
         MycelialGraphHypothesisPosteriorError::InvalidFusionCandidates(error.to_string())
     })?;
 
@@ -292,13 +281,15 @@ pub fn evaluate_mycelial_graph_hypothesis_posterior(
         .iter()
         .zip(probabilities.iter())
         .zip(candidate_marginal_mass.iter())
-        .map(|((candidate_id, prior_probability), posterior_probability)| {
-            MycelialFusionCandidateMarginal {
-                candidate_id: candidate_id.clone(),
-                prior_probability: *prior_probability,
-                posterior_probability: *posterior_probability,
-            }
-        })
+        .map(
+            |((candidate_id, prior_probability), posterior_probability)| {
+                MycelialFusionCandidateMarginal {
+                    candidate_id: candidate_id.clone(),
+                    prior_probability: *prior_probability,
+                    posterior_probability: *posterior_probability,
+                }
+            },
+        )
         .collect();
 
     Ok(MycelialGraphHypothesisPosterior {
@@ -325,8 +316,7 @@ impl MycelialGraphHypothesisPosterior {
         skeleton: &AnnotatedMycelialSkeleton,
         candidates: &[MycelialFusionCandidate],
     ) -> Result<(), MycelialGraphHypothesisPosteriorError> {
-        let expected =
-            evaluate_mycelial_graph_hypothesis_posterior(skeleton, candidates)?;
+        let expected = evaluate_mycelial_graph_hypothesis_posterior(skeleton, candidates)?;
         if self != &expected {
             return Err(MycelialGraphHypothesisPosteriorError::ReportMismatch);
         }
@@ -365,42 +355,74 @@ mod tests {
                 AnnotatedJunction {
                     id: "A".to_string(),
                     kind: AnnotatedJunctionKind::Origin,
-                    position: ReconstructionPoint3 { x: 0.0, y: 0.0, z: 0.0 },
+                    position: ReconstructionPoint3 {
+                        x: 0.0,
+                        y: 0.0,
+                        z: 0.0,
+                    },
                 },
                 AnnotatedJunction {
                     id: "B".to_string(),
                     kind: AnnotatedJunctionKind::Tip,
-                    position: ReconstructionPoint3 { x: 1.0, y: 0.0, z: 0.0 },
+                    position: ReconstructionPoint3 {
+                        x: 1.0,
+                        y: 0.0,
+                        z: 0.0,
+                    },
                 },
                 AnnotatedJunction {
                     id: "C".to_string(),
                     kind: AnnotatedJunctionKind::Origin,
-                    position: ReconstructionPoint3 { x: 10.0, y: 0.0, z: 0.0 },
+                    position: ReconstructionPoint3 {
+                        x: 10.0,
+                        y: 0.0,
+                        z: 0.0,
+                    },
                 },
                 AnnotatedJunction {
                     id: "D".to_string(),
                     kind: AnnotatedJunctionKind::Tip,
-                    position: ReconstructionPoint3 { x: 11.0, y: 0.0, z: 0.0 },
+                    position: ReconstructionPoint3 {
+                        x: 11.0,
+                        y: 0.0,
+                        z: 0.0,
+                    },
                 },
                 AnnotatedJunction {
                     id: "E".to_string(),
                     kind: AnnotatedJunctionKind::Origin,
-                    position: ReconstructionPoint3 { x: 20.0, y: 0.0, z: 0.0 },
+                    position: ReconstructionPoint3 {
+                        x: 20.0,
+                        y: 0.0,
+                        z: 0.0,
+                    },
                 },
                 AnnotatedJunction {
                     id: "F".to_string(),
                     kind: AnnotatedJunctionKind::Tip,
-                    position: ReconstructionPoint3 { x: 21.0, y: 0.0, z: 0.0 },
+                    position: ReconstructionPoint3 {
+                        x: 21.0,
+                        y: 0.0,
+                        z: 0.0,
+                    },
                 },
                 AnnotatedJunction {
                     id: "G".to_string(),
                     kind: AnnotatedJunctionKind::Origin,
-                    position: ReconstructionPoint3 { x: 30.0, y: 0.0, z: 0.0 },
+                    position: ReconstructionPoint3 {
+                        x: 30.0,
+                        y: 0.0,
+                        z: 0.0,
+                    },
                 },
                 AnnotatedJunction {
                     id: "H".to_string(),
                     kind: AnnotatedJunctionKind::Tip,
-                    position: ReconstructionPoint3 { x: 31.0, y: 0.0, z: 0.0 },
+                    position: ReconstructionPoint3 {
+                        x: 31.0,
+                        y: 0.0,
+                        z: 0.0,
+                    },
                 },
             ],
             segments: vec![
@@ -432,7 +454,13 @@ mod tests {
         }
     }
 
-    fn candidate(id: &str, source: &str, target: &str, probability: f64, group: Option<&str>) -> MycelialFusionCandidate {
+    fn candidate(
+        id: &str,
+        source: &str,
+        target: &str,
+        probability: f64,
+        group: Option<&str>,
+    ) -> MycelialFusionCandidate {
         MycelialFusionCandidate {
             candidate_id: id.to_string(),
             source_tip_junction_id: source.to_string(),
@@ -461,12 +489,14 @@ mod tests {
             candidate("one", "B", "D", 0.2, None),
             candidate("two", "F", "H", 0.7, None),
         ];
-        let report =
-            evaluate_mycelial_graph_hypothesis_posterior(&source, &candidates).unwrap();
+        let report = evaluate_mycelial_graph_hypothesis_posterior(&source, &candidates).unwrap();
         assert_eq!(report.total_hypothesis_count, 4);
         assert_eq!(report.feasible_hypothesis_count, 4);
         assert_eq!(report.infeasible_hypothesis_count, 0);
-        assert_eq!(report.candidate_ids, vec!["one".to_string(), "two".to_string()]);
+        assert_eq!(
+            report.candidate_ids,
+            vec!["one".to_string(), "two".to_string()]
+        );
         close(report.candidate_marginals[0].posterior_probability, 0.2);
         close(report.candidate_marginals[1].posterior_probability, 0.7);
         close(report.hypotheses[0].posterior_probability, 0.24);
@@ -483,23 +513,34 @@ mod tests {
             candidate("one", "B", "D", 0.8, Some("same-contact")),
             candidate("two", "D", "B", 0.6, Some("same-contact")),
         ];
-        let report =
-            evaluate_mycelial_graph_hypothesis_posterior(&source, &candidates).unwrap();
+        let report = evaluate_mycelial_graph_hypothesis_posterior(&source, &candidates).unwrap();
         assert_eq!(report.total_hypothesis_count, 4);
         assert_eq!(report.feasible_hypothesis_count, 3);
         assert_eq!(report.infeasible_hypothesis_count, 1);
         assert_eq!(report.conflicts.len(), 1);
-        close(report.candidate_marginals[0].posterior_probability, 0.6153846153846154);
-        close(report.candidate_marginals[1].posterior_probability, 0.23076923076923078);
-        close(report.hypotheses.iter().map(|hypothesis| hypothesis.posterior_probability).sum(), 1.0);
+        close(
+            report.candidate_marginals[0].posterior_probability,
+            0.6153846153846154,
+        );
+        close(
+            report.candidate_marginals[1].posterior_probability,
+            0.23076923076923078,
+        );
+        close(
+            report
+                .hypotheses
+                .iter()
+                .map(|hypothesis| hypothesis.posterior_probability)
+                .sum(),
+            1.0,
+        );
     }
 
     #[test]
     fn feasible_zero_prior_hypothesis_keeps_its_complete_candidate_set() {
         let source = skeleton();
         let candidates = vec![candidate("never", "B", "D", 0.0, None)];
-        let report =
-            evaluate_mycelial_graph_hypothesis_posterior(&source, &candidates).unwrap();
+        let report = evaluate_mycelial_graph_hypothesis_posterior(&source, &candidates).unwrap();
         assert_eq!(report.hypotheses.len(), 2);
         assert_eq!(
             report.hypotheses[1].accepted_candidate_ids,
@@ -519,8 +560,7 @@ mod tests {
             candidate("four", "D", "F", 0.8, None),
             candidate("two", "F", "H", 0.4, None),
         ];
-        let report =
-            evaluate_mycelial_graph_hypothesis_posterior(&source, &candidates).unwrap();
+        let report = evaluate_mycelial_graph_hypothesis_posterior(&source, &candidates).unwrap();
         assert_eq!(report.total_hypothesis_count, 16);
         assert_eq!(report.feasible_hypothesis_count, 7);
 
@@ -528,7 +568,12 @@ mod tests {
         let candidate_ids = &report.candidate_ids;
         let probabilities: BTreeMap<_, _> = candidates
             .iter()
-            .map(|candidate| (candidate.candidate_id.as_str(), candidate.fusion_probability))
+            .map(|candidate| {
+                (
+                    candidate.candidate_id.as_str(),
+                    candidate.fusion_probability,
+                )
+            })
             .collect();
         let indices: BTreeMap<_, _> = candidate_ids
             .iter()
@@ -585,8 +630,7 @@ mod tests {
 
     #[test]
     fn empty_candidate_inventory_has_one_empty_graph_hypothesis() {
-        let report =
-            evaluate_mycelial_graph_hypothesis_posterior(&skeleton(), &[]).unwrap();
+        let report = evaluate_mycelial_graph_hypothesis_posterior(&skeleton(), &[]).unwrap();
         assert_eq!(report.total_hypothesis_count, 1);
         assert_eq!(report.feasible_hypothesis_count, 1);
         assert!(report.hypotheses[0].accepted_candidate_ids.is_empty());
