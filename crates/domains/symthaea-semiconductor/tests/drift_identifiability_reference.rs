@@ -2,13 +2,14 @@
 
 use serde::Deserialize;
 use symthaea_semiconductor::benchmark::{
-    DRIFT_IDENTIFIABILITY_INPUT_SCHEMA_V1, DriftActionEvidenceStateV1,
-    DriftAttributionTargetV1, DriftIdentifiabilityInputV1, DriftIdentifiabilityPlanStatusV1,
-    DriftIdentifiabilityReportV1, DriftObservationActionV1, plan_drift_identifiability_v1,
+    DRIFT_IDENTIFIABILITY_INPUT_SCHEMA_V1, DriftActionEvidenceStateV1, DriftAttributionTargetV1,
+    DriftIdentifiabilityInputV1, DriftIdentifiabilityPlanStatusV1, DriftIdentifiabilityReportV1,
+    DriftObservationActionV1, plan_drift_identifiability_v1,
 };
 
-const CORPUS: &str =
-    include_str!("../../../../benchmarks/semi-bench-001/reference/fixtures/drift-identifiability-known-answer-v1.json");
+const CORPUS: &str = include_str!(
+    "../../../../benchmarks/semi-bench-001/reference/fixtures/drift-identifiability-known-answer-v1.json"
+);
 const DIMENSIONS: usize = 4;
 const ORACLE_TOLERANCE: f64 = 1.0e-9;
 
@@ -96,10 +97,7 @@ fn orthonormal_row_basis(rows: &[[f64; DIMENSIONS]]) -> Vec<[f64; DIMENSIONS]> {
     basis
 }
 
-fn oracle_estimable(
-    rows: &[[f64; DIMENSIONS]],
-    target: DriftAttributionTargetV1,
-) -> bool {
+fn oracle_estimable(rows: &[[f64; DIMENSIONS]], target: DriftAttributionTargetV1) -> bool {
     let basis = orthonormal_row_basis(rows);
     let mut residual = target_contrast(target);
     for basis_row in &basis {
@@ -122,9 +120,7 @@ fn oracle_plan(case: &FixtureCaseV1) -> OraclePlanV1 {
     let mut observed_actions: Vec<&DriftObservationActionV1> = case
         .actions
         .iter()
-        .filter(|action| {
-            action.evidence_state == DriftActionEvidenceStateV1::ObservedQualified
-        })
+        .filter(|action| action.evidence_state == DriftActionEvidenceStateV1::ObservedQualified)
         .collect();
     observed_actions.sort_by(|left, right| left.action_id.cmp(&right.action_id));
     let observed_rows: Vec<[f64; DIMENSIONS]> = observed_actions
@@ -145,9 +141,7 @@ fn oracle_plan(case: &FixtureCaseV1) -> OraclePlanV1 {
     let mut candidates: Vec<&DriftObservationActionV1> = case
         .actions
         .iter()
-        .filter(|action| {
-            action.evidence_state == DriftActionEvidenceStateV1::AvailableQualified
-        })
+        .filter(|action| action.evidence_state == DriftActionEvidenceStateV1::AvailableQualified)
         .collect();
     candidates.sort_by(|left, right| left.action_id.cmp(&right.action_id));
 
@@ -180,8 +174,7 @@ fn oracle_plan(case: &FixtureCaseV1) -> OraclePlanV1 {
 
         let candidate = (cost, delay, action_ids, rows);
         let should_replace = best.as_ref().is_none_or(|current| {
-            (&candidate.0, &candidate.1, &candidate.2)
-                < (&current.0, &current.1, &current.2)
+            (&candidate.0, &candidate.1, &candidate.2) < (&current.0, &current.1, &current.2)
         });
         if should_replace {
             best = Some(candidate);
@@ -231,15 +224,42 @@ fn assert_report_matches_independent_oracle(
         .map(|action| action.sensitivity)
         .collect();
 
-    assert_eq!(report.observed_design_rank, orthonormal_row_basis(&observed_rows).len(), "{}", case.id);
+    assert_eq!(
+        report.observed_design_rank,
+        orthonormal_row_basis(&observed_rows).len(),
+        "{}",
+        case.id
+    );
     assert_eq!(report.plan_status, oracle.status, "{}", case.id);
-    assert_eq!(report.selected_action_ids, oracle.selected_action_ids, "{}", case.id);
+    assert_eq!(
+        report.selected_action_ids, oracle.selected_action_ids,
+        "{}",
+        case.id
+    );
     assert_eq!(report.incremental_cost_units, oracle.cost, "{}", case.id);
-    assert_eq!(report.conservative_sequential_delay_units, oracle.delay, "{}", case.id);
-    assert_eq!(report.final_design_rank, orthonormal_row_basis(&oracle.final_rows).len(), "{}", case.id);
+    assert_eq!(
+        report.conservative_sequential_delay_units, oracle.delay,
+        "{}",
+        case.id
+    );
+    assert_eq!(
+        report.final_design_rank,
+        orthonormal_row_basis(&oracle.final_rows).len(),
+        "{}",
+        case.id
+    );
 
-    assert_eq!(report.target_status.len(), case.required_targets.len(), "{}", case.id);
-    for (actual, expected) in report.target_status.iter().zip(&case.expected.target_status) {
+    assert_eq!(
+        report.target_status.len(),
+        case.required_targets.len(),
+        "{}",
+        case.id
+    );
+    for (actual, expected) in report
+        .target_status
+        .iter()
+        .zip(&case.expected.target_status)
+    {
         assert_eq!(actual.target, expected.target, "{}", case.id);
         assert_eq!(
             actual.identifiable_from_observed,
@@ -256,22 +276,28 @@ fn assert_report_matches_independent_oracle(
             actual.target
         );
         assert_eq!(
-            actual.identifiable_from_observed,
-            expected.identifiable_from_observed,
+            actual.identifiable_from_observed, expected.identifiable_from_observed,
             "{} fixture observed target",
             case.id
         );
         assert_eq!(
-            actual.identifiable_after_plan,
-            expected.identifiable_after_plan,
+            actual.identifiable_after_plan, expected.identifiable_after_plan,
             "{} fixture planned target",
             case.id
         );
     }
 
     assert_eq!(report.plan_status, case.expected.plan_status, "{}", case.id);
-    assert_eq!(report.selected_action_ids, case.expected.selected_action_ids, "{}", case.id);
-    assert_eq!(report.incremental_cost_units, case.expected.incremental_cost_units, "{}", case.id);
+    assert_eq!(
+        report.selected_action_ids, case.expected.selected_action_ids,
+        "{}",
+        case.id
+    );
+    assert_eq!(
+        report.incremental_cost_units, case.expected.incremental_cost_units,
+        "{}",
+        case.id
+    );
     assert_eq!(
         report.conservative_sequential_delay_units,
         case.expected.conservative_sequential_delay_units,
@@ -279,8 +305,7 @@ fn assert_report_matches_independent_oracle(
         case.id
     );
     assert_eq!(
-        report.observed_design_rank,
-        case.expected.observed_design_rank,
+        report.observed_design_rank, case.expected.observed_design_rank,
         "{}",
         case.id
     );
@@ -289,10 +314,21 @@ fn assert_report_matches_independent_oracle(
 
 #[test]
 fn frozen_cases_match_known_answers_and_independent_rank_plan_oracle() {
-    let corpus: CorpusV1 = serde_json::from_str(CORPUS).expect("valid frozen source-attribution corpus");
-    assert_eq!(corpus.schema_version, "semi-cause-identifiability-known-answer-v0.1");
-    assert_eq!(corpus.status, "frozen_synthetic_structural_identifiability_cases");
-    assert!(corpus.claim_ceiling.contains("no physical fault attribution"));
+    let corpus: CorpusV1 =
+        serde_json::from_str(CORPUS).expect("valid frozen source-attribution corpus");
+    assert_eq!(
+        corpus.schema_version,
+        "semi-cause-identifiability-known-answer-v0.1"
+    );
+    assert_eq!(
+        corpus.status,
+        "frozen_synthetic_structural_identifiability_cases"
+    );
+    assert!(
+        corpus
+            .claim_ceiling
+            .contains("no physical fault attribution")
+    );
     assert_eq!(
         corpus.dimension_order,
         vec![
@@ -314,7 +350,8 @@ fn frozen_cases_match_known_answers_and_independent_rank_plan_oracle() {
 
 #[test]
 fn reordering_actions_preserves_input_and_report_digests() {
-    let corpus: CorpusV1 = serde_json::from_str(CORPUS).expect("valid frozen source-attribution corpus");
+    let corpus: CorpusV1 =
+        serde_json::from_str(CORPUS).expect("valid frozen source-attribution corpus");
     for case in &corpus.cases {
         let original = plan_drift_identifiability_v1(&production_input(case)).unwrap();
         let mut permuted = case.clone();
@@ -322,6 +359,10 @@ fn reordering_actions_preserves_input_and_report_digests() {
         let reordered = plan_drift_identifiability_v1(&production_input(&permuted)).unwrap();
 
         assert_eq!(original.input_sha256, reordered.input_sha256, "{}", case.id);
-        assert_eq!(original.report_sha256, reordered.report_sha256, "{}", case.id);
+        assert_eq!(
+            original.report_sha256, reordered.report_sha256,
+            "{}",
+            case.id
+        );
     }
 }
