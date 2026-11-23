@@ -1490,6 +1490,9 @@ mod tests {
         assert!(!serialized.contains("scenario_id"));
         assert!(!serialized.contains("scenario_config_sha256"));
         assert!(!serialized.contains("observation_packet_sha256"));
+        assert!(!serialized.contains("metrology_characteristics"));
+        assert!(!serialized.contains("sensitivity"));
+        assert!(!serialized.contains("specificity"));
     }
 
     #[test]
@@ -1551,6 +1554,21 @@ mod tests {
         assert_eq!(report.detection_capture_fraction, Some(0.0));
         assert!(report.assay_estimator_qualified);
         assert!(report.assay_adjusted_ht_prevalence.is_some());
+    }
+
+    #[test]
+    fn simulated_metrology_results_and_evaluation_digests_are_reproducible() {
+        let episode =
+            generate_synthetic_fab_episode_v1(&config(SyntheticFabRegimeV1::Stable, 65)).unwrap();
+        let selection = fake_selection(&episode);
+        let first = evaluate_synthetic_metrology_policy_v1(&episode, &selection).unwrap();
+        let second = evaluate_synthetic_metrology_policy_v1(&episode, &selection).unwrap();
+
+        assert_eq!(first.metrology_detected_true_positive_count, second.metrology_detected_true_positive_count);
+        assert_eq!(first.metrology_false_positive_count, second.metrology_false_positive_count);
+        assert_eq!(first.metrology_false_negative_count, second.metrology_false_negative_count);
+        assert_eq!(first.assay_adjusted_ht_prevalence, second.assay_adjusted_ht_prevalence);
+        assert_eq!(first.evaluation_sha256, second.evaluation_sha256);
     }
 
     #[test]
