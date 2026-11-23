@@ -60,6 +60,24 @@ pub struct TemporalMycelialEdge {
     pub evidence: TemporalEdgeEvidence,
 }
 
+/// Immutable, sorted edge identity and provenance inventory retained by a profile.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TemporalMycelialEdgeEvidenceRecord {
+    pub edge_id: String,
+    pub source_node_id: String,
+    pub target_node_id: String,
+    pub evidence: TemporalEdgeEvidence,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TemporalMycelialEdgeEvidenceCounts {
+    pub total_edge_observations: usize,
+    pub directly_observed_hypha_observations: usize,
+    pub accepted_parent_branch_observations: usize,
+    pub accepted_anastomosis_observations: usize,
+    pub synthetic_fixture_observations: usize,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TemporalMycelialSnapshot {
     pub snapshot_id: String,
@@ -201,6 +219,8 @@ pub struct TemporalMycelialSequence {
     pub coordinate_frame_id: String,
     /// Digest of the fixed calibration manifest shared by all windows.
     pub calibration_digest: String,
+    /// Fixed ROI / declared graph scope shared by all snapshots.
+    pub observation_scope_id: String,
     /// Sorted, non-overlapping observations. Gaps are unobserved time, not absent edges.
     pub snapshots: Vec<TemporalMycelialSnapshot>,
 }
@@ -215,6 +235,8 @@ pub struct TemporalMycelialCycleConfig {
     pub minimum_known_duration_fraction: f64,
     /// Small positive constant for the TCR degree-exposure denominator.
     pub tcr_epsilon: f64,
+    /// Synthetic fixture evidence is opt-in and cannot be mistaken for observations.
+    pub allow_synthetic_evidence: bool,
 }
 
 impl Default for TemporalMycelialCycleConfig {
@@ -225,6 +247,7 @@ impl Default for TemporalMycelialCycleConfig {
             minimum_persistence_fraction: 0.5,
             minimum_known_duration_fraction: 0.8,
             tcr_epsilon: 1.0e-12,
+            allow_synthetic_evidence: false,
         }
     }
 }
@@ -267,6 +290,10 @@ pub struct TemporalMycelialCycleRecord {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TemporalMycelialSnapshotMetrics {
     pub snapshot_id: String,
+    pub duration_ns: u64,
+    pub coverage: TemporalWindowCoverage,
+    pub node_ids: Vec<String>,
+    pub edge_ids: Vec<String>,
     pub node_count: usize,
     pub edge_count: usize,
     pub connected_components: usize,
@@ -308,6 +335,9 @@ pub struct TemporalMycelialCycleProfile {
     pub config: TemporalMycelialCycleConfig,
     /// Complete sorted node identity inventory over every snapshot.
     pub source_node_ids: Vec<String>,
+    /// Complete sorted edge identity / provenance inventory over every snapshot.
+    pub edge_evidence_inventory: Vec<TemporalMycelialEdgeEvidenceRecord>,
+    pub edge_evidence_counts: TemporalMycelialEdgeEvidenceCounts,
     pub snapshot_metrics: Vec<TemporalMycelialSnapshotMetrics>,
     pub cycles: Vec<TemporalMycelialCycleRecord>,
     /// Persistent cycles represented as higher-order hyperedges over their nodes.
@@ -359,6 +389,7 @@ pub enum MycelialTemporalCycleError {
     UnstableNodeIdentity(String),
     UnstableEdgeIdentity(String),
     InvalidProfile(&'static str),
+    SyntheticEvidenceNotAllowed(usize),
 }
 
 impl fmt::Display for MycelialTemporalCycleError {
@@ -450,6 +481,10 @@ impl fmt::Display for MycelialTemporalCycleError {
                 )
             }
             Self::InvalidProfile(reason) => write!(f, "invalid temporal cycle profile: {reason}"),
+            Self::SyntheticEvidenceNotAllowed(count) => write!(
+                f,
+                "profile contains {count} synthetic edge observations without explicit fixture opt-in"
+            ),
         }
     }
 }
@@ -594,6 +629,7 @@ impl TemporalMycelialSequence {
         hash_string(&mut hasher, &self.session_id);
         hash_string(&mut hasher, &self.coordinate_frame_id);
         hasher.update(self.calibration_digest.as_bytes());
+        hash_string(&mut hasher, &self.observation_scope_id);
         hasher.update(&(self.snapshots.len() as u64).to_le_bytes());
         for snapshot in &self.snapshots {
             hasher.update(snapshot.canonical_digest_hex()?.as_bytes());
@@ -751,6 +787,17 @@ pub fn build_temporal_mycelial_cycle_profile(
     config: TemporalMycelialCycleConfig,
 ) -> Result<TemporalMycelialCycleProfile, MycelialTemporalCycleError> {
     sequence.validate()?;
+    let synthetic_observation_count = sequence
+        .snapshots
+        .iter()
+        .flat_map(|snapshot| snapshot.edges.iter())
+        .filter(|edge| edge.evidence == TemporalEdgeEvidence::SyntheticFixture)
+        .count();
+    if synthetic_observation_count > 0 && !config.allow_synthetic_evidence {
+        return Err(MycelialTemporalCycleError::SyntheticEvidenceNotAllowed(
+            synthetic_observation_count,
+        ));
+    }
     if config.minimum_present_windows == 0
         || config.minimum_present_duration_ns == 0
         || !config.minimum_persistence_fraction.is_finite()
@@ -787,6 +834,10 @@ pub fn build_temporal_mycelial_cycle_profile(
         let (connected_components, cycle_rank) = snapshot_topology(snapshot);
         snapshot_metrics.push(TemporalMycelialSnapshotMetrics {
             snapshot_id: snapshot.snapshot_id.clone(),
+            duration_ns: snapshot.duration_ns(),
+            coverage: snapshot.coverage,
+            node_ids: snapshot.node_ids.clone(),
+            edge_ids: snapshot.edges.iter().map(|edge| edge.id.clone()).collect(),
             node_count: snapshot.node_ids.len(),
             edge_count: snapshot.edges.len(),
             connected_components,
@@ -915,6 +966,41 @@ pub fn build_temporal_mycelial_cycle_profile(
         all_node_ids.extend(snapshot.node_ids.iter().cloned());
     }
     let source_node_ids: Vec<_> = all_node_ids.iter().cloned().collect();
+    let mut evidence_by_id = BTreeMap::<String, TemporalMycelialEdgeEvidenceRecord>::new();
+    let mut edge_evidence_counts = TemporalMycelialEdgeEvidenceCounts::default();
+    for snapshot in &sequence.snapshots {
+        for edge in &snapshot.edges {
+            let (source_node_id, target_node_id) =
+                if edge.source_node_id <= edge.target_node_id {
+                    (edge.source_node_id.clone(), edge.target_node_id.clone())
+                } else {
+                    (edge.target_node_id.clone(), edge.source_node_id.clone())
+                };
+            let record = TemporalMycelialEdgeEvidenceRecord {
+                edge_id: edge.id.clone(),
+                source_node_id,
+                target_node_id,
+                evidence: edge.evidence,
+            };
+            evidence_by_id.entry(edge.id.clone()).or_insert(record);
+            edge_evidence_counts.total_edge_observations += 1;
+            match edge.evidence {
+                TemporalEdgeEvidence::DirectlyObservedHypha => {
+                    edge_evidence_counts.directly_observed_hypha_observations += 1;
+                }
+                TemporalEdgeEvidence::AcceptedParentBranch => {
+                    edge_evidence_counts.accepted_parent_branch_observations += 1;
+                }
+                TemporalEdgeEvidence::AcceptedAnastomosis => {
+                    edge_evidence_counts.accepted_anastomosis_observations += 1;
+                }
+                TemporalEdgeEvidence::SyntheticFixture => {
+                    edge_evidence_counts.synthetic_fixture_observations += 1;
+                }
+            }
+        }
+    }
+    let edge_evidence_inventory: Vec<_> = evidence_by_id.into_values().collect();
     let mut node_metrics = Vec::with_capacity(all_node_ids.len());
     for node_id in all_node_ids {
         let tcn_duration_ns = tcn.get(&node_id).copied().unwrap_or(0);
@@ -940,10 +1026,12 @@ pub fn build_temporal_mycelial_cycle_profile(
         session_id: sequence.session_id.clone(),
         coordinate_frame_id: sequence.coordinate_frame_id.clone(),
         calibration_digest: sequence.calibration_digest.clone(),
-        observation_scope_id: sequence.snapshots[0].observation_scope_id.clone(),
+        observation_scope_id: sequence.observation_scope_id.clone(),
         sequence_digest,
         config,
         source_node_ids,
+        edge_evidence_inventory,
+        edge_evidence_counts,
         snapshot_metrics,
         cycles: cycle_records,
         persistent_cycle_hyperedges: hyperedges,
@@ -1459,6 +1547,7 @@ impl TemporalMycelialCycleProfile {
                 .to_le_bytes(),
         );
         hasher.update(&self.config.tcr_epsilon.to_bits().to_le_bytes());
+        hasher.update(&[u8::from(self.config.allow_synthetic_evidence)]);
         hasher.update(&(self.source_node_ids.len() as u64).to_le_bytes());
         for node_id in &self.source_node_ids {
             hash_string(&mut hasher, node_id);
@@ -1466,6 +1555,8 @@ impl TemporalMycelialCycleProfile {
         hasher.update(&(self.edge_evidence_inventory.len() as u64).to_le_bytes());
         for edge in &self.edge_evidence_inventory {
             hash_string(&mut hasher, &edge.edge_id);
+            hash_string(&mut hasher, &edge.source_node_id);
+            hash_string(&mut hasher, &edge.target_node_id);
             hasher.update(&[match edge.evidence {
                 TemporalEdgeEvidence::DirectlyObservedHypha => 0,
                 TemporalEdgeEvidence::AcceptedParentBranch => 1,
@@ -1486,6 +1577,17 @@ impl TemporalMycelialCycleProfile {
         }
         for snapshot in &self.snapshot_metrics {
             hash_string(&mut hasher, &snapshot.snapshot_id);
+            hasher.update(&snapshot.duration_ns.to_le_bytes());
+            hasher.update(&[match snapshot.coverage {
+                TemporalWindowCoverage::CompleteWithinDeclaredScope => 0,
+                TemporalWindowCoverage::PartialOrOccluded => 1,
+            }]);
+            for node_id in &snapshot.node_ids {
+                hash_string(&mut hasher, node_id);
+            }
+            for edge_id in &snapshot.edge_ids {
+                hash_string(&mut hasher, edge_id);
+            }
             hasher.update(&(snapshot.node_count as u64).to_le_bytes());
             hasher.update(&(snapshot.edge_count as u64).to_le_bytes());
             hasher.update(&(snapshot.connected_components as u64).to_le_bytes());
@@ -1625,6 +1727,7 @@ mod tests {
             session_id: "session:1".to_string(),
             coordinate_frame_id: "organism-frame".to_string(),
             calibration_digest: digest('b'),
+            observation_scope_id: "scope:whole-domain-v1".to_string(),
             snapshots,
         }
     }
@@ -1741,6 +1844,8 @@ mod tests {
         let annotation = annotated_fixture();
         let evidence = vec![TemporalMycelialEdgeEvidenceRecord {
             edge_id: "wrong-segment-id".to_string(),
+            source_node_id: "A".to_string(),
+            target_node_id: "B".to_string(),
             evidence: TemporalEdgeEvidence::DirectlyObservedHypha,
         }];
         assert!(matches!(
@@ -1762,7 +1867,13 @@ mod tests {
             edge("e-ab", "A", "B"),
             edge("e-ac", "A", "C"),
             edge("e-bc", "B", "C"),
-        ];
+        ]
+        .into_iter()
+        .map(|mut edge| {
+            edge.evidence = TemporalEdgeEvidence::SyntheticFixture;
+            edge
+        })
+        .collect();
         let input = sequence(vec![snapshot(
             "w1",
             0,
