@@ -287,7 +287,7 @@ Tracking issue: #13279. The crate requires exactly one baseline, compute-only, o
 
 Fourteen Rust unit tests are authored for positive complementarity (+230,000 PPM), zero/additive interaction, negative antagonism (−170,000 PPM), harmful compute escalation, row-order independence, distinct application times, missing/duplicate arms and identity/range failures.
 
-This reference does not replace #13176. #13176 remains responsible for exposure and resource factorial attribution; the new crate supplies only the paired decision-regret contrast, which is not in the current #13176 outcome schema. Exact-head Rust 1.96 verification passed on 14d92e51787b8836c8e9ac2e5d9e6f9c2029ae57: formatting passed, 14 tests passed, and strict Clippy passed (workflow run 45086268384). This is evaluator qualification, not a RoboDyna or external benchmark result.
+This reference does not replace #13176. #13176 remains responsible for exposure and resource factorial attribution; the new crate supplies only the paired decision-regret contrast, which is not in the current #13176 outcome schema. Exact-head Rust 1.96 verification passed on 0e5f80ca51541711752869d8d6bfe0304df1496d: formatting passed, 14 tests passed, and strict Clippy passed (workflow run 45086902847). This is evaluator qualification, not a RoboDyna or external benchmark result.
 
 ## 17. RoboDyna replication profile: paired episode identity, not just average async loss
 
