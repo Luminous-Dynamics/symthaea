@@ -339,6 +339,9 @@ Only compare methods on matched equations, initial conditions, boundary conditio
 | ADEPT | Differentiable JAX/Diffrax plasma framework; the original compact hidden-variable closure reports about 14x on its own kinetic-closure task | Reproduce the original task separately; compare matched 1D1V cohorts and gradient costs without transferring the 14x headline to unrelated solvers |
 | VlasovTT.jl | Fully spectral tensor-train / MPS Vlasov–Poisson with tensor-cross interpolation and dense reference path | Match dense vs compressed path; sweep rank, truncation and TCI tolerance; include reconstruction, Poisson and conversion cost |
 | Adaptive Hermite spectral method (2026) | Dynamically scaled Hermite coordinates with conservative projection designed to preserve mass, momentum, energy and L2 norm | Compare coefficient-tail indicators and conservative basis changes against response loss and a common dense reference |
+| Local solution-manifold decomposition ROM (Tsai et al.; arXiv 2023, CPC 2026) | Time-windowed and electric-energy-windowed local POD bases with a precomputed tensorial nonlinear update; 1D1V two-stream study reports approximately 280× online speedup for TW-ROM with up to 13% test final-state error, and about 90× for EW-ROM with 11% test error | Required collisionless 1D1V baseline; match its four-corner training design, time windows, tensor storage and cost amortization; score full trajectory, growth, phase and echo response—not only final-state L2 or energy |
+| Adaptive Fourier spectral VP (Cho & Russo 2026) | High-order splitting with spectral-tail-triggered zero-padding instead of artificial filtering; fixed sufficiently large velocity domain to avoid periodic wraparound; reports mass preservation and effective L2 preservation on resolved scales | Compare refinement triggers, memory growth, high-k retention and echo-response fidelity against static resolution and response-aware refinement; count zero-padding and full high-order split cost |
+| High-field VPFP micro–macro Micro-ROM (Zhang & Hu 2026) | Retains density at full spatial order, applies POD–Galerkin only to nonequilibrium fluctuation (g) in (f=M+\varepsilon g); exploits Chebyshev field maps and separable collision blocks for online complexity independent of (N_v), with a discrete mass-conservation result and formal high-field limit | Required baseline on a separate collisional high-field VPFP cohort; compare AP-limit fidelity, mass balance, fluctuation/QoI error and total offline/online cost; do not mix with collisionless VP Landau/echo cohorts |
 | NEOPIC (2026) | Particle-measure neural field operator; no mesh/deposition in its stated method; claims O(Np) evaluation and separates sampling, learning and time-stepping error | Compare on a particle-matched cohort; include particle-noise scaling, inference/training particle-count transfer, field error and complete particle-workflow cost |
 | Smilei 5.1 | Production PIC with GPU support and locally adaptive scalar/vectorized particle operators; published examples report workload-specific speedups | Use as an industry baseline only on matching physics and hardware; measure deposition/gather, communication and diagnostics |
 | WarpX 26.11 | Production AMReX PIC with GPU-aware particle sorting/deposition and profiling options | Measure full run and scaling; include sorting, deposition and communication, not only the field solve |
@@ -348,6 +351,11 @@ Primary sources:
 - [VlasovTT paper, JCP (2026), DOI 10.1016/j.jcp.2026.115330](https://doi.org/10.1016/j.jcp.2026.115330)
 - [Adaptive Hermite spectral method, arXiv:2605.17820](https://arxiv.org/abs/2605.17820)
 - [NEOPIC, arXiv:2610.40528](https://arxiv.org/abs/2610.40528)
+- [Local reduced-order modeling / solution-manifold decomposition, arXiv:2310.18493](https://arxiv.org/abs/2310.18493); published as Computer Physics Communications 322 (2026), 110039, DOI 10.1016/j.cpc.2026.110039
+- [Adaptive Fourier spectral method for Vlasov–Poisson, arXiv:2607.12368](https://arxiv.org/abs/2607.12368)
+- [High-field VPFP micro–macro Micro-ROM, arXiv:2610.25569](https://arxiv.org/abs/2610.25569)
+- [Vlasov–Poisson instability suppression objective study, JCP 115169 (1 Nov 2026), DOI 10.1016/j.jcp.2026.115169](https://doi.org/10.1016/j.jcp.2026.115169)
+- [Einkemmer et al., constrained Vlasov–Poisson field control, JCP 498 (2024), 112662](https://doi.org/10.1016/j.jcp.2023.112662)
 - [ADEPT repository](https://github.com/ergodicio/adept) and [solver documentation](https://ergodicio.github.io/adept/solvers.html)
 - [Smilei 5.1 GPU documentation](https://smileipic.github.io/Smilei/Understand/GPU_offloading.html), [adaptive vectorization documentation](https://smileipic.github.io/Smilei/Understand/vectorization.html)
 - [WarpX 26.11 parameters and profiling](https://warpx.readthedocs.io/en/26.11/usage/parameters.html)
@@ -539,6 +547,14 @@ RBKR must be tested against:
 The nonlinear extension must separately qualify tangent response, signed finite-amplitude response, second-order cross-pulse effects and finite pulse-graph branch association. A tangent Gramian cannot be assumed to capture nonlinear echo creation.
 
 Success means greater held-out intervention-response fidelity per retained byte/rank at matched total construction and simulation cost, without worsening mandatory physical gates. It does not mean a good singular-value capture plot, nor does it imply a universal nonlinear error bound.
+
+## Robust kinetic stabilization objectives
+
+New companion programme: [#13457 — optimize robust kinetic stabilization objectives](https://github.com/Luminous-Dynamics/symthaea/issues/13457).
+
+The November 2026 study by Guerra, Li, Yue & Zepeda-Núñez (JCP 115169) compares objectives for suppressing Vlasov–Poisson instability. Its numerical experiments report that time-integrated objectives can have smoother, more useful optimization landscapes around the target basin than objectives evaluated only at terminal time; electric-energy-only objectives can also exhibit flat unphysical minima outside that basin. This is a result for its tested control parameterization, not a universal convexity theorem.
+
+Our controller benchmark will compare terminal, time-integrated, modal-growth, phase-space/entropy and robust sampled-worst-case objectives, using dispersion-derived initialization, discrete adjoints and independent full-order replay. It must detect delayed instability and energy transfer to unregistered modes, and must count control energy / smoothness / amplitude constraints. #13452 is required before converting a finite perturbation campaign into a global robustness claim.
 
 ## Certified Intervention Coverage (CIC)
 
