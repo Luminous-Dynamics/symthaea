@@ -35,6 +35,8 @@ _ALLOWED_PARAMS = {
     "bm25_b",
 }
 _ALLOWED_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif"}
+MAX_SCREENSHOT_BYTES = 32 * 1024 * 1024
+MAX_TRAJECTORY_SCREENSHOT_BYTES = 512 * 1024 * 1024
 
 
 @register_memory
@@ -205,7 +207,9 @@ class MaceLongMemEvalV2Memory(Memory):
             normalized = json.loads(json.dumps(trajectory, ensure_ascii=False))
             normalized["domain"] = self.domain
             normalized["mace_original_trajectory_sha256"] = original_digest
+            normalized["mace_original_trajectory_json"] = canonical_original.decode("utf-8")
             normalized_states: list[dict[str, object]] = []
+            total_screenshot_bytes = 0
             for ordinal, original_state in enumerate(states_value):
                 require(isinstance(original_state, dict), f"trajectory state {ordinal} must be an object")
                 state = dict(original_state)
@@ -215,7 +219,21 @@ class MaceLongMemEvalV2Memory(Memory):
                     f"trajectory state {ordinal} requires a screenshot reference",
                 )
                 source = self._resolve_source_screenshot(screenshot_value)
+                source_size = source.stat().st_size
+                require(
+                    source_size <= MAX_SCREENSHOT_BYTES,
+                    f"screenshot {ordinal} exceeds {MAX_SCREENSHOT_BYTES} bytes",
+                )
                 image_bytes = source.read_bytes()
+                require(
+                    len(image_bytes) == source_size,
+                    f"screenshot {ordinal} changed while it was being copied",
+                )
+                total_screenshot_bytes += len(image_bytes)
+                require(
+                    total_screenshot_bytes <= MAX_TRAJECTORY_SCREENSHOT_BYTES,
+                    f"trajectory screenshots exceed {MAX_TRAJECTORY_SCREENSHOT_BYTES} bytes",
+                )
                 image_digest = hashlib.sha256(image_bytes).hexdigest()
                 suffix = source.suffix.lower()
                 if suffix not in _ALLOWED_IMAGE_SUFFIXES:
