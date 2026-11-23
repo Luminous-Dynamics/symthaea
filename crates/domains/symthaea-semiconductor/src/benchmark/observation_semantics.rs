@@ -1134,6 +1134,58 @@ mod tests {
     }
 
     #[test]
+    fn reasoned_missing_and_unknown_states_survive_correspondence_execution() {
+        let mut source = mapped_source_frame(SensorObservationStateV1::CommunicationLoss {
+            evidence_ref: "transport-gap-22".into(),
+        });
+        source.observations.push(SensorObservationV1 {
+            sensor_id: "source-flow".into(),
+            state: SensorObservationStateV1::UnknownMissingReason,
+            instrument_id: None,
+            calibration_ref: None,
+        });
+        let mut manifest = complete_correspondence_manifest();
+        manifest.correspondences.push(SensorCorrespondenceV1 {
+            target_sensor_id: "target-flow-meter".into(),
+            status: SensorCorrespondenceStatusV1::Matched,
+            source_sensor_id: Some("source-flow".into()),
+            unit_transform: Some(SensorUnitTransformV1 {
+                source_unit: "kPa".into(),
+                target_unit: "Pa".into(),
+                scale: 1000.0,
+                offset: 0.0,
+                transform_evidence_ref: "flow-unit-proof".into(),
+            }),
+            evidence_ref: "flow-correspondence-evidence".into(),
+        });
+
+        let execution = execute_sensor_correspondence_v1(&source, &manifest).unwrap();
+        let target = execution.target_frame.unwrap();
+        let pressure = target
+            .observations
+            .iter()
+            .find(|observation| observation.sensor_id == "target-pressure")
+            .unwrap();
+        let flow = target
+            .observations
+            .iter()
+            .find(|observation| observation.sensor_id == "target-flow-meter")
+            .unwrap();
+        assert!(matches!(
+            &pressure.state,
+            SensorObservationStateV1::CommunicationLoss {
+                evidence_ref
+            } if evidence_ref == "transport-gap-22"
+        ));
+        assert!(matches!(
+            &flow.state,
+            SensorObservationStateV1::UnknownMissingReason
+        ));
+        assert!(!execution.report.abstain_required);
+        assert_eq!(execution.report.copied_non_point_state_count, 2);
+    }
+
+    #[test]
     fn unsupported_mapping_abstains_instead_of_emitting_partial_target_frame() {
         let source = mapped_source_frame(SensorObservationStateV1::Observed {
             value: 2.5,
