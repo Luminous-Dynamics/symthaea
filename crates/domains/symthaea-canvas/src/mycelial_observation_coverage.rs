@@ -54,6 +54,7 @@ pub enum MycelialObservationResidualKind {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct MycelialObservationCoverageRecord {
     /// Stable identity in the source observation inventory.
     pub observation_id: String,
@@ -73,6 +74,7 @@ pub struct MycelialObservationCoverageRecord {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct MycelialObservationCoverageLedger {
     pub schema_version: u16,
     pub source_dataset_id: String,
@@ -673,6 +675,20 @@ mod tests {
         let tampered_digest = tampered.canonical_digest_hex().unwrap();
         assert_ne!(tampered_digest, original_digest);
         assert!(tampered.validate().is_err());
+    }
+
+    #[test]
+    fn deserialization_rejects_unbound_top_level_fields() {
+        let mut value = serde_json::to_value(fixture()).unwrap();
+        value["unbound_note"] = serde_json::json!("not included in the canonical digest");
+        assert!(serde_json::from_value::<MycelialObservationCoverageLedger>(value).is_err());
+    }
+
+    #[test]
+    fn deserialization_rejects_unbound_record_fields() {
+        let mut value = serde_json::to_value(fixture()).unwrap();
+        value["records"][0]["unbound_geometry_claim"] = serde_json::json!(true);
+        assert!(serde_json::from_value::<MycelialObservationCoverageLedger>(value).is_err());
     }
 
     #[test]
