@@ -580,7 +580,8 @@ mod tests {
 
     #[test]
     fn ambiguous_in_tolerance_frames_choose_the_closest_monotonic_pair() {
-        let reference = track("reference", &[Some(100.0)]);
+        let mut reference = track("reference", &[Some(100.0)]);
+        reference.frames[0].source_timestamp_ns = 10_000_000;
         let mut estimated = track("estimated", &[Some(80.0), Some(100.0)]);
         estimated.frames[0].source_timestamp_ns = 9_000_000;
         estimated.frames[0].frame_index = 0;
