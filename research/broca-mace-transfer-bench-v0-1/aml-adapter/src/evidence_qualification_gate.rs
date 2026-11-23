@@ -12,6 +12,7 @@
 //! inject a verifier backed by separately governed trust roots and re-check
 //! live authorization at the consequential use.
 
+use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
 pub const MAX_QUALIFICATION_ENTRIES_V1: usize = 10_000;
@@ -108,6 +109,7 @@ pub trait EvidenceQualificationSignatureVerifierV1 {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum EvidenceQualificationRejectV1 {
+    InvalidJson,
     InvalidIdentifier,
     InvalidDigest,
     EmptyCandidateSet,
@@ -277,6 +279,127 @@ impl EvidenceQualificationReceiptV1 {
             hash_field(&mut hasher, &entry.basis_receipt_sha256);
         }
         hex_digest(&hasher.finalize())
+    }
+
+
+    /// Strictly decode the versioned JSON wire representation. This validates
+    /// structure and digests but does not establish signer trust; callers must
+    /// still invoke verify_and_bind with an external signature verifier.
+    pub fn from_json_value(value: &Value) -> Result<Self, EvidenceQualificationRejectV1> {
+        let object = value.as_object().ok_or(EvidenceQualificationRejectV1::InvalidJson)?;
+        if object.len() != 20
+            || object.get("schema_version").and_then(Value::as_str)
+                != Some("mace_evidence_qualification_receipt_v1")
+        {
+            return Err(EvidenceQualificationRejectV1::InvalidJson);
+        }
+
+        let required_string = |field: &str| -> Result<String, EvidenceQualificationRejectV1> {
+            object.get(field).and_then(Value::as_str).map(str::to_owned)
+                .ok_or(EvidenceQualificationRejectV1::InvalidJson)
+        };
+        let required_u64 = |field: &str| -> Result<u64, EvidenceQualificationRejectV1> {
+            object.get(field).and_then(Value::as_u64)
+                .ok_or(EvidenceQualificationRejectV1::InvalidJson)
+        };
+
+        let entry_values = object.get("entries").and_then(Value::as_array)
+            .ok_or(EvidenceQualificationRejectV1::InvalidJson)?;
+        let mut entries = Vec::with_capacity(entry_values.len());
+        for value in entry_values {
+            let item = value.as_object().ok_or(EvidenceQualificationRejectV1::InvalidJson)?;
+            if item.len() != 3 {
+                return Err(EvidenceQualificationRejectV1::InvalidJson);
+            }
+            let evidence_id = item.get("evidence_id").and_then(Value::as_str)
+                .ok_or(EvidenceQualificationRejectV1::InvalidJson)?.to_owned();
+            let basis_receipt_sha256 = item.get("basis_receipt_sha256").and_then(Value::as_str)
+                .ok_or(EvidenceQualificationRejectV1::InvalidJson)?.to_owned();
+            let disposition = match item.get("disposition").and_then(Value::as_str) {
+                Some("admissible") => EvidenceDispositionV1::Admissible,
+                Some("rejected") => EvidenceDispositionV1::Rejected,
+                Some("indeterminate") => EvidenceDispositionV1::Indeterminate,
+                _ => return Err(EvidenceQualificationRejectV1::InvalidJson),
+            };
+            entries.push(EvidenceQualificationEntryV1 {
+                evidence_id,
+                disposition,
+                basis_receipt_sha256,
+            });
+        }
+
+        let signature_values = object.get("signature").and_then(Value::as_array)
+            .ok_or(EvidenceQualificationRejectV1::InvalidJson)?;
+        if signature_values.len() > MAX_SIGNATURE_BYTES_V1 {
+            return Err(EvidenceQualificationRejectV1::SignatureTooLarge);
+        }
+        let mut signature = Vec::with_capacity(signature_values.len());
+        for value in signature_values {
+            let byte = value.as_u64().ok_or(EvidenceQualificationRejectV1::InvalidJson)?;
+            signature.push(u8::try_from(byte).map_err(|_| EvidenceQualificationRejectV1::InvalidJson)?);
+        }
+
+        let receipt = Self {
+            run_id: required_string("run_id")?,
+            query_invocation_id: required_string("query_invocation_id")?,
+            domain_id: required_string("domain_id")?,
+            subject_scope_sha256: required_string("subject_scope_sha256")?,
+            environment_revision_sha256: required_string("environment_revision_sha256")?,
+            tool_profile_sha256: required_string("tool_profile_sha256")?,
+            query_sha256: required_string("query_sha256")?,
+            candidate_set_sha256: required_string("candidate_set_sha256")?,
+            candidate_evidence_ids_sha256: required_string("candidate_evidence_ids_sha256")?,
+            decision_need_sha256: required_string("decision_need_sha256")?,
+            purpose_sha256: required_string("purpose_sha256")?,
+            qualification_policy_sha256: required_string("qualification_policy_sha256")?,
+            lifecycle_snapshot_sha256: required_string("lifecycle_snapshot_sha256")?,
+            verifier_profile_sha256: required_string("verifier_profile_sha256")?,
+            key_id: required_string("key_id")?,
+            issued_at_unix: required_u64("issued_at_unix")?,
+            expires_at_unix: required_u64("expires_at_unix")?,
+            entries,
+            signature,
+        };
+        validate_receipt_shape(&receipt)?;
+        Ok(receipt)
+    }
+
+    /// Deterministic typed projection for the versioned JSON wire schema.
+    /// Signature bytes are represented as an array of unsigned octets.
+    pub fn to_json_value(&self) -> Value {
+        json!({
+            "schema_version": "mace_evidence_qualification_receipt_v1",
+            "run_id": self.run_id,
+            "query_invocation_id": self.query_invocation_id,
+            "domain_id": self.domain_id,
+            "subject_scope_sha256": self.subject_scope_sha256,
+            "environment_revision_sha256": self.environment_revision_sha256,
+            "tool_profile_sha256": self.tool_profile_sha256,
+            "query_sha256": self.query_sha256,
+            "candidate_set_sha256": self.candidate_set_sha256,
+            "candidate_evidence_ids_sha256": self.candidate_evidence_ids_sha256,
+            "decision_need_sha256": self.decision_need_sha256,
+            "purpose_sha256": self.purpose_sha256,
+            "qualification_policy_sha256": self.qualification_policy_sha256,
+            "lifecycle_snapshot_sha256": self.lifecycle_snapshot_sha256,
+            "verifier_profile_sha256": self.verifier_profile_sha256,
+            "key_id": self.key_id,
+            "issued_at_unix": self.issued_at_unix,
+            "expires_at_unix": self.expires_at_unix,
+            "entries": self.entries.iter().map(|entry| {
+                let disposition = match entry.disposition {
+                    EvidenceDispositionV1::Admissible => "admissible",
+                    EvidenceDispositionV1::Rejected => "rejected",
+                    EvidenceDispositionV1::Indeterminate => "indeterminate",
+                };
+                json!({
+                    "evidence_id": entry.evidence_id,
+                    "disposition": disposition,
+                    "basis_receipt_sha256": entry.basis_receipt_sha256,
+                })
+            }).collect::<Vec<_>>(),
+            "signature": self.signature,
+        })
     }
 
     /// Full commitment includes the signature bytes as well as its payload.
@@ -631,6 +754,26 @@ mod tests {
         assert_eq!(
             VerifiedEvidenceQualificationV1::verify_and_bind(&receipt, &binding, &TestSignatureVerifier),
             Err(EvidenceQualificationRejectV1::DuplicateCandidateId)
+        );
+    }
+
+    #[test]
+    fn receipt_json_round_trips_and_rejects_unknown_fields() {
+        let receipt = signed_receipt();
+        let value = receipt.to_json_value();
+        let decoded = EvidenceQualificationReceiptV1::from_json_value(&value)
+            .expect("strict JSON round trip");
+        assert_eq!(decoded, receipt);
+        assert_eq!(decoded.receipt_sha256(), receipt.receipt_sha256());
+
+        let mut extended = value;
+        extended.as_object_mut().expect("object").insert(
+            "unrecognized".to_owned(),
+            Value::Bool(true),
+        );
+        assert_eq!(
+            EvidenceQualificationReceiptV1::from_json_value(&extended),
+            Err(EvidenceQualificationRejectV1::InvalidJson)
         );
     }
 
