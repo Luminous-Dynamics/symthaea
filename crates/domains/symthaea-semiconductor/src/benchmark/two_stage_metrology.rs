@@ -462,7 +462,9 @@ pub fn plan_two_stage_metrology_v1(
         .sum::<u64>();
     let high_fidelity_only_total_cost = canonical_candidates
         .iter()
-        .try_fold(0_u64, |total, candidate| total.checked_add(candidate.confirmation_cost))
+        .try_fold(0_u64, |total, candidate| {
+            total.checked_add(candidate.confirmation_cost)
+        })
         .ok_or_else(|| TwoStageMetrologyErrorV1("high-fidelity baseline cost overflow".into()))?;
 
     let mut preliminary = Vec::with_capacity(canonical_candidates.len());
