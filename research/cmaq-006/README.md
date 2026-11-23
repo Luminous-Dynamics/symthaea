@@ -9,7 +9,7 @@
 
 When should an intelligent system trust a learned world model for the next decision—and when should it fall back to a simpler policy?
 
-CMAQ-006 composes shift/freshness evidence, held-out adequacy, decision-value lift and independent action authorization. Version 0.2 removes the single aggregate `adequacy_status=PASS` input. Model use now requires eight separately typed evidence dimensions, each of which must be `PASS`.
+CMAQ-006 composes shift/freshness evidence, held-out adequacy, decision-value lift and independent action authorization. Version 0.2 removes the single aggregate `adequacy_status=PASS` input. Model use now requires ten separately typed evidence dimensions, each of which must be `PASS`.
 
 ## Decision rule
 
@@ -23,12 +23,14 @@ The minimum net-lift margin remains code-pinned to **0.02 utility units**. Untru
 6. The lower 95% bound on cost-adjusted net decision lift must strictly exceed 0.02.
 7. Only when all conditions pass does the gate emit **USE_MODEL**.
 
-The eight dimensions are independent and conjunctive; they are not averaged into a confidence score:
+The ten dimensions are independent and conjunctive; they are not averaged into a confidence score:
 
 | Input field | Evidence obligation | Existing owner / source |
 |---|---|---|
 | `physics_adherence_status` | Physical coherence and physics-law evidence | MiraBench-inspired diagnostics; Symtropy physical/reference evidence |
 | `action_fidelity_status` | Predicted outcome follows the commanded action and task intent | MiraBench action-following diagnostics |
+| `constraint_compliance_status` | Predicted behavior preserves object identity, spatial/trajectory constraints, obstacles, and task-specific restrictions | RoboTrustBench constraint-sensitive scenarios |
+| `counterfactual_grounding_status` | Predictions remain grounded when instructions conflict with scene facts or physical feasibility; no invented objects/attributes | RoboTrustBench counterfactual scenarios |
 | `failure_preservation_status` | Failure-inducing actions remain failures rather than being overwritten with success | MiraBench optimism-bias / failure-preservation diagnostics |
 | `horizon_support_status` | Requested target distance is within the supported `P*(K)` range for this model/family/shift regime | #10257 / #10276 |
 | `latent_rollout_fidelity_status` | Horizon-wise latent rollout consistency for the exact encoder/model/action history | #10257 LRC crosswalk |
@@ -42,6 +44,22 @@ MiraBench reports a 906-video human annotation corpus with 16,704 structured dec
 
 The current v0.2 profile deliberately accepts only `PASS`, `FAIL`, and `UNKNOWN`. `NOT_APPLICABLE` is not accepted as an episode-level escape hatch. A genuinely different task/model class requires a separately reviewed, versioned adequacy profile with its own predeclared applicability obligations.
 
+
+
+### Constraint and counterfactual grounding are separate obligations
+
+RoboTrustBench (EMNLP 2026 Findings; arXiv:2606.01600) uses 1,207 expert-validated image–instruction samples drawn from real DROID episodes: 533 normal, 345 constraint-sensitive, 228 counterfactual, and 101 adversarial. Its constraint-sensitive cases include distractors, occlusion, obstacles, underspecified references and trajectory constraints. Its counterfactual cases include object/attribute contradictions, geometric impossibility, infeasible interaction, object absence and wrong location.
+
+These are not equivalent to nominal action-following or failure preservation. A prediction can respond to an action while still violating a trajectory/placement constraint; it can preserve one failure while hallucinating a missing object or changing its attributes to satisfy an instruction. Therefore v0.2 requires separate constraint-compliance and counterfactual-grounding evidence.
+
+Project page: https://huiqiongli.github.io/RoboTrustBench/
+Dataset: https://huggingface.co/datasets/Huiqiong0124/RoboTrustBench_Dataset
+Paper: https://arxiv.org/abs/2606.01600
+
+The published dataset card exposes the 1,207 image–instruction records and companion metadata. The complete model-output evaluation materials, human-evaluation instructions and rubric must still be verified and pinned before claiming an official benchmark reproduction. The dataset viewer does not by itself prove that every scorer, prompt and baseline asset is published.
+
+**Unsafe-instruction suppression remains independent.** The model cannot self-certify a harmful instruction as safe. The model-action and direct-action authorization inputs must be produced by a separately controlled action-authority/RTA layer. A passing physics, constraint, counterfactual or other model-evidence status never grants physical authority.
+
 ## CLI
 
 This is a dependency-free Rust crate pinned to Rust 1.96.0.
@@ -51,7 +69,7 @@ Run from the repository root:
     cargo test --locked --manifest-path research/cmaq-006/Cargo.toml
     cargo run --quiet --locked --manifest-path research/cmaq-006/Cargo.toml -- --input research/cmaq-006/fixtures/cases.tsv
 
-Input is a strict 18-column TSV containing model/evidence digests, epochs, shift status, eight evidence statuses, net-lift lower bound and independent action authorizations. The CLI emits a deterministic 22-column decision ledger.
+Input is a strict 20-column TSV containing model/evidence digests, epochs, shift status, ten evidence statuses, net-lift lower bound and independent action authorizations. The CLI emits a deterministic 24-column decision ledger.
 
 Unknown labels, missing fields, malformed rows, duplicate case IDs, non-finite numbers, invalid booleans, invalid digests and header drift fail closed.
 
@@ -67,10 +85,10 @@ The fixed fixtures are public known-answer controls, not hidden qualification. T
 
 ## Known-answer controls
 
-The 17-row fixture covers:
+The 19-row fixture covers:
 - eligible model -> USE_MODEL;
 - shift alarm and stale epoch -> DIRECT_FALLBACK;
-- each of the eight dimensions independently set to FAIL or UNKNOWN -> DIRECT_FALLBACK;
+- each of the ten dimensions independently set to FAIL or UNKNOWN -> DIRECT_FALLBACK;
 - insufficient net-lift bound -> DIRECT_FALLBACK;
 - predictive/utility digest mismatch and malformed model digest -> DIRECT_FALLBACK;
 - unauthorized model action with authorized fallback -> DIRECT_FALLBACK;
