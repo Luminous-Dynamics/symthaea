@@ -51,6 +51,16 @@ This is an evidence-lineage and pairing check only. It does not validate simulat
 
 Protocol: [Symthaea #13375](https://github.com/Luminous-Dynamics/symthaea/issues/13375). Generic replay regimes: [#8764](https://github.com/Luminous-Dynamics/symthaea/issues/8764). Driver-owned decision-time evidence: [#8732](https://github.com/Luminous-Dynamics/symthaea/issues/8732).
 
+The pairing certificate also validates the arm-local decision-time information filtration:
+
+- each decision binds its driver-clock decision time and actual action-application time;
+- each delivered event carries its stable event identity, availability time and delivery time;
+- consumed event IDs must be present in that arm's delivered prefix by the decision time;
+- earlier delivered evidence may be reused, but future, unavailable, late, duplicated or empty event references are rejected;
+- decision clocks may not regress, and actions may not apply before their proposals.
+
+This is a DVPC semantic adapter over driver-supplied event references. Generic canonical event encoding, SHA-256 hash-chain receipts, oracle isolation and signing remain with #9437/#8715; the driver-owned information ledger remains with #8732. The validator does not prove policy non-anticipativity without an actual driver replay and future-suffix mutation test.
+
 ## Run
 
     cargo fmt --manifest-path research/decision-value-interaction-001/Cargo.toml -- --check
