@@ -406,6 +406,263 @@ pub fn evaluate_vm_update_inversion_v1(
     Ok(report)
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AuxiliaryInversionOutcomeV1 {
+    SingleUnknownRecordReconstructed,
+    NoAggregateWithExactlyOneUnknownRecord,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct VmAuxiliaryInversionReportV1 {
+    pub schema: String,
+    pub run_id: String,
+    pub visibility: UpdateVisibilityV1,
+    pub outcome: AuxiliaryInversionOutcomeV1,
+    pub total_record_count: usize,
+    pub known_auxiliary_record_count: usize,
+    pub unknown_record_count: usize,
+    pub reconstructed_record_count: usize,
+    pub reconstructed_record_ids_for_evaluation: Vec<String>,
+    pub mean_feature_rmse: Option<f64>,
+    pub label_inference_accuracy: Option<f64>,
+    pub update_payload_sha256: String,
+    pub report_sha256: String,
+    pub formal_differential_privacy_claim: bool,
+    pub claim_limits: Vec<String>,
+}
+
+fn sum_gradients(
+    gradients: impl Iterator<Item = Vec<f64>>,
+    dimension: usize,
+) -> Vec<f64> {
+    let mut sum = vec![0.0; dimension];
+    for gradient in gradients {
+        for (target, value) in sum.iter_mut().zip(gradient) {
+            *target += value;
+        }
+    }
+    sum
+}
+
+fn attempt_single_record_inversion(
+    residual_gradient: &[f64],
+    model_dimension: usize,
+    true_record: &SyntheticPrivacyRecordV1,
+    minimum_bias_gradient_magnitude: f64,
+) -> Option<(f64, bool)> {
+    let bias_gradient = residual_gradient[model_dimension];
+    if bias_gradient.abs() < minimum_bias_gradient_magnitude {
+        return None;
+    }
+    let squared_error = true_record
+        .features
+        .iter()
+        .enumerate()
+        .map(|(index, feature)| {
+            (residual_gradient[index] / bias_gradient - feature).powi(2)
+        })
+        .sum::<f64>()
+        / model_dimension as f64;
+    let inferred_label = bias_gradient < 0.0;
+    Some((squared_error.sqrt(), inferred_label == true_record.label))
+}
+
+/// Simulates a stronger auxiliary-knowledge attacker against aggregate updates.
+/// The attacker knows the exact features and labels of all auxiliary records,
+/// subtracts their per-record gradients from a visible batch/secure aggregate,
+/// and attempts inversion when exactly one unknown record remains in a group.
+///
+/// This tests an important limit: aggregation hides individual messages, but
+/// does not automatically prevent deconvolution when the attacker knows all
+/// but one contributing record. The assumption that cohort membership/counts
+/// are visible is explicit in this synthetic protocol.
+pub fn evaluate_vm_known_auxiliary_batch_inversion_v1(
+    records: &[SyntheticPrivacyRecordV1],
+    known_auxiliary_records: &[SyntheticPrivacyRecordV1],
+    model_weights: &[f64],
+    model_bias: f64,
+    config: &VmPrivacyAttackConfigV1,
+) -> Result<VmAuxiliaryInversionReportV1, VmPrivacyAttackErrorV1> {
+    validate_inputs(records, model_weights, model_bias, config)?;
+    if config.visibility == UpdateVisibilityV1::PerRecord {
+        return Err(VmPrivacyAttackErrorV1(
+            "auxiliary batch inversion requires per-client or secure aggregate visibility"
+                .into(),
+        ));
+    }
+
+    let records_by_id: BTreeMap<_, _> = records
+        .iter()
+        .map(|record| (record.record_id.as_str(), record))
+        .collect();
+    let mut known_ids = std::collections::BTreeSet::new();
+    for (index, known) in known_auxiliary_records.iter().enumerate() {
+        let Some(actual) = records_by_id.get(known.record_id.as_str()) else {
+            return Err(VmPrivacyAttackErrorV1(format!(
+                "known_auxiliary_records[{index}]: record ID is not in the contributing population"
+            )));
+        };
+        if *actual != known || !known_ids.insert(known.record_id.as_str()) {
+            return Err(VmPrivacyAttackErrorV1(format!(
+                "known_auxiliary_records[{index}]: record is inconsistent or duplicated"
+            )));
+        }
+    }
+    if known_auxiliary_records.len() >= records.len() {
+        return Err(VmPrivacyAttackErrorV1(
+            "at least one contributing record must remain unknown".into(),
+        ));
+    }
+
+    let dimension = model_weights.len() + 1;
+    let mut gradients_by_id = BTreeMap::<&str, Vec<f64>>::new();
+    for record in records {
+        let mut gradient =
+            logistic_gradient(&record.features, record.label, model_weights, model_bias);
+        clip_gradient(&mut gradient, config.clipping_norm);
+        gradients_by_id.insert(record.record_id.as_str(), gradient);
+    }
+
+    let mut rng = PrivacySplitMix64::new(config.seed);
+    let mut payload = Vec::<(String, Vec<f64>, usize)>::new();
+    match config.visibility {
+        UpdateVisibilityV1::PerClientBatch => {
+            let mut grouped_ids = BTreeMap::<String, Vec<&SyntheticPrivacyRecordV1>>::new();
+            for record in records {
+                grouped_ids
+                    .entry(record.client_id.clone())
+                    .or_default()
+                    .push(record);
+            }
+            for (client_id, group) in grouped_ids {
+                let gradient_sum = sum_gradients(
+                    group
+                        .iter()
+                        .map(|record| gradients_by_id[record.record_id.as_str()].clone()),
+                    dimension,
+                );
+                let mut mean_gradient: Vec<f64> = gradient_sum
+                    .into_iter()
+                    .map(|value| value / group.len() as f64)
+                    .collect();
+                add_noise(&mut mean_gradient, config.gaussian_noise_stddev, &mut rng);
+                payload.push((client_id, mean_gradient, group.len()));
+            }
+        }
+        UpdateVisibilityV1::SecureAggregateOnly => {
+            let gradient_sum = sum_gradients(
+                records
+                    .iter()
+                    .map(|record| gradients_by_id[record.record_id.as_str()].clone()),
+                dimension,
+            );
+            let mut mean_gradient: Vec<f64> = gradient_sum
+                .into_iter()
+                .map(|value| value / records.len() as f64)
+                .collect();
+            add_noise(&mut mean_gradient, config.gaussian_noise_stddev, &mut rng);
+            payload.push(("secure-aggregate".into(), mean_gradient, records.len()));
+        }
+        UpdateVisibilityV1::PerRecord => unreachable!("rejected above"),
+    }
+
+    let update_payload_sha256 = json_sha256(&payload)?;
+    let mut reconstructed_record_ids = Vec::new();
+    let mut feature_squared_errors = Vec::new();
+    let mut correct_labels = 0_usize;
+
+    for (group_id, observed_mean, group_count) in &payload {
+        let group_records: Vec<_> = records
+            .iter()
+            .filter(|record| {
+                config.visibility == UpdateVisibilityV1::SecureAggregateOnly
+                    || &record.client_id == group_id
+            })
+            .collect();
+        let known_in_group: Vec<_> = group_records
+            .iter()
+            .filter(|record| known_ids.contains(record.record_id.as_str()))
+            .collect();
+        let unknown_in_group: Vec<_> = group_records
+            .iter()
+            .filter(|record| !known_ids.contains(record.record_id.as_str()))
+            .collect();
+        if unknown_in_group.len() != 1 {
+            continue;
+        }
+
+        // Undo mean aggregation using the visible cohort count, then subtract
+        // known per-record gradients. Scalar multiplicative normalization
+        // would cancel in the feature/bias ratio, but sum form is explicit.
+        let mut residual = observed_mean
+            .iter()
+            .map(|value| value * *group_count as f64)
+            .collect::<Vec<_>>();
+        let known_gradient_sum = sum_gradients(
+            known_in_group
+                .iter()
+                .map(|record| gradients_by_id[record.record_id.as_str()].clone()),
+            dimension,
+        );
+        for (value, known_value) in residual.iter_mut().zip(known_gradient_sum) {
+            *value -= known_value;
+        }
+
+        let target = unknown_in_group[0];
+        if let Some((rmse, label_correct)) = attempt_single_record_inversion(
+            &residual,
+            model_weights.len(),
+            target,
+            config.minimum_bias_gradient_magnitude,
+        ) {
+            reconstructed_record_ids.push(target.record_id.clone());
+            feature_squared_errors.push(rmse.powi(2));
+            if label_correct {
+                correct_labels += 1;
+            }
+        }
+    }
+
+    let reconstructed_record_count = reconstructed_record_ids.len();
+    let outcome = if reconstructed_record_count > 0 {
+        AuxiliaryInversionOutcomeV1::SingleUnknownRecordReconstructed
+    } else {
+        AuxiliaryInversionOutcomeV1::NoAggregateWithExactlyOneUnknownRecord
+    };
+    let mut report = VmAuxiliaryInversionReportV1 {
+        schema: "luminous.semi-bench.vm-auxiliary-batch-inversion-report.v1".into(),
+        run_id: config.run_id.clone(),
+        visibility: config.visibility,
+        outcome,
+        total_record_count: records.len(),
+        known_auxiliary_record_count: known_auxiliary_records.len(),
+        unknown_record_count: records.len() - known_auxiliary_records.len(),
+        reconstructed_record_count,
+        reconstructed_record_ids_for_evaluation: reconstructed_record_ids,
+        mean_feature_rmse: (!feature_squared_errors.is_empty()).then(|| {
+            (feature_squared_errors.iter().sum::<f64>()
+                / feature_squared_errors.len() as f64)
+                .sqrt()
+        }),
+        label_inference_accuracy: (reconstructed_record_count > 0).then(|| {
+            correct_labels as f64 / reconstructed_record_count as f64
+        }),
+        update_payload_sha256,
+        report_sha256: String::new(),
+        formal_differential_privacy_claim: false,
+        claim_limits: vec![
+            "Synthetic logistic-model known-auxiliary attack only".into(),
+            "Assumes attacker knows exact features/labels of auxiliary records and visible cohort counts".into(),
+            "Only groups with exactly one unknown record are inverted".into(),
+            "A failed attack does not establish privacy for other auxiliary knowledge or attack families".into(),
+            "No formal differential-privacy guarantee is computed".into(),
+        ],
+    };
+    report.report_sha256 = json_sha256(&report)?;
+    Ok(report)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
