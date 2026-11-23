@@ -620,8 +620,7 @@ fn transform_observation_state_v1(
                 ));
             }
             let converted_value = value * transform.scale + transform.offset;
-            let converted_uncertainty =
-                uncertainty.standard_uncertainty * transform.scale.abs();
+            let converted_uncertainty = uncertainty.standard_uncertainty * transform.scale.abs();
             if !converted_value.is_finite() || !converted_uncertainty.is_finite() {
                 return abstain("unit conversion overflowed to a non-finite value".into());
             }
@@ -725,7 +724,9 @@ pub fn execute_sensor_correspondence_v1(
         .correspondences
         .sort_by(|left, right| left.target_sensor_id.cmp(&right.target_sensor_id));
     let manifest_bytes = serde_json::to_vec(&canonical_manifest).map_err(|error| {
-        SensorObservationError(format!("correspondence manifest serialization failed: {error}"))
+        SensorObservationError(format!(
+            "correspondence manifest serialization failed: {error}"
+        ))
     })?;
     let source_frame_sha256 = sha256_hex(&source_frame_bytes);
     let correspondence_manifest_sha256 = sha256_hex(&manifest_bytes);
@@ -736,9 +737,8 @@ pub fn execute_sensor_correspondence_v1(
         .collect();
 
     let mut ordered_correspondences: Vec<_> = manifest.correspondences.iter().collect();
-    ordered_correspondences.sort_by(|left, right| {
-        left.target_sensor_id.cmp(&right.target_sensor_id)
-    });
+    ordered_correspondences
+        .sort_by(|left, right| left.target_sensor_id.cmp(&right.target_sensor_id));
 
     let mapped_source_ids: BTreeSet<&str> = manifest
         .correspondences
@@ -825,11 +825,10 @@ pub fn execute_sensor_correspondence_v1(
             source_frame.transform_sha256.as_str(),
             correspondence_manifest_sha256.as_str(),
         );
-        let transform_sha256 = sha256_hex(
-            &serde_json::to_vec(&transform_material).map_err(|error| {
+        let transform_sha256 =
+            sha256_hex(&serde_json::to_vec(&transform_material).map_err(|error| {
                 SensorObservationError(format!("transform digest serialization failed: {error}"))
-            })?,
-        );
+            })?);
         let frame = SensorObservationFrameV1 {
             schema: OBSERVATION_FRAME_SCHEMA_V1.into(),
             frame_id: format!("{}::{}", source_frame.frame_id, manifest.mapping_id),
@@ -873,11 +872,9 @@ pub fn execute_sensor_correspondence_v1(
     };
     let mut material = report.clone();
     material.report_sha256.clear();
-    report.report_sha256 = sha256_hex(
-        &serde_json::to_vec(&material).map_err(|error| {
-            SensorObservationError(format!("execution report serialization failed: {error}"))
-        })?,
-    );
+    report.report_sha256 = sha256_hex(&serde_json::to_vec(&material).map_err(|error| {
+        SensorObservationError(format!("execution report serialization failed: {error}"))
+    })?);
     Ok(SensorCorrespondenceExecutionV1 {
         target_frame,
         report,
@@ -1128,9 +1125,12 @@ mod tests {
         }
         assert_eq!(pressure.instrument_id.as_deref(), Some("instrument-1"));
         assert_eq!(pressure.calibration_ref.as_deref(), Some("calibration-1"));
-        assert!(target.observations.iter().all(|observation| {
-            observation.sensor_id.starts_with("target-")
-        }));
+        assert!(
+            target
+                .observations
+                .iter()
+                .all(|observation| { observation.sensor_id.starts_with("target-") })
+        );
     }
 
     #[test]
@@ -1212,12 +1212,10 @@ mod tests {
 
     #[test]
     fn unqualified_numeric_observation_cannot_cross_unit_mapping() {
-        let source = mapped_source_frame(SensorObservationStateV1::ObservedUnqualified {
-            value: 2.5,
-        });
+        let source =
+            mapped_source_frame(SensorObservationStateV1::ObservedUnqualified { value: 2.5 });
         let execution =
-            execute_sensor_correspondence_v1(&source, &complete_correspondence_manifest())
-                .unwrap();
+            execute_sensor_correspondence_v1(&source, &complete_correspondence_manifest()).unwrap();
         assert!(execution.report.abstain_required);
         assert!(execution.target_frame.is_none());
         assert!(
@@ -1239,10 +1237,7 @@ mod tests {
             evidence_ref: "censoring-record-8".into(),
         });
         let mut manifest = complete_correspondence_manifest();
-        let transform = manifest.correspondences[0]
-            .unit_transform
-            .as_mut()
-            .unwrap();
+        let transform = manifest.correspondences[0].unit_transform.as_mut().unwrap();
         transform.source_unit = "raw_unit".into();
         transform.target_unit = "corrected_unit".into();
         transform.scale = -2.0;
@@ -1282,8 +1277,7 @@ mod tests {
             },
         });
         let execution =
-            execute_sensor_correspondence_v1(&source, &complete_correspondence_manifest())
-                .unwrap();
+            execute_sensor_correspondence_v1(&source, &complete_correspondence_manifest()).unwrap();
         assert!(execution.report.abstain_required);
         assert!(execution.target_frame.is_none());
         assert!(
@@ -1317,7 +1311,10 @@ mod tests {
             first.report.correspondence_manifest_sha256,
             second.report.correspondence_manifest_sha256
         );
-        assert_eq!(first.report.target_frame_sha256, second.report.target_frame_sha256);
+        assert_eq!(
+            first.report.target_frame_sha256,
+            second.report.target_frame_sha256
+        );
         assert_eq!(first.report.report_sha256, second.report.report_sha256);
     }
 
@@ -1339,22 +1336,13 @@ mod tests {
             calibration_ref: None,
         });
         let execution =
-            execute_sensor_correspondence_v1(&source, &complete_correspondence_manifest())
-                .unwrap();
+            execute_sensor_correspondence_v1(&source, &complete_correspondence_manifest()).unwrap();
         assert!(!execution.report.abstain_required);
         assert_eq!(
             execution.report.unmapped_source_sensor_ids,
             vec!["source-extra-temperature".to_string()]
         );
-        assert_eq!(
-            execution
-                .target_frame
-                .as_ref()
-                .unwrap()
-                .observations
-                .len(),
-            2
-        );
+        assert_eq!(execution.target_frame.as_ref().unwrap().observations.len(), 2);
     }
 
     #[test]
