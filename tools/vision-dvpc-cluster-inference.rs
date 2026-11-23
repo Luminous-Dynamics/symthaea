@@ -22,8 +22,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
-use std::fs;
 use std::fmt::Write as FmtWrite;
+use std::fs;
 
 const FORMAT_VERSION: &str = "VIS-DVPC-CLUSTER-DELTAS-001-v1";
 const RECEIPT_VERSION: &str = "VIS-DVPC-CLUSTER-INFERENCE-001-v1";
