@@ -689,3 +689,8 @@ The timing record separates worker startup, request construction, request/respon
 The evaluator now cross-checks both retrieved IDs and the exact decision-support IDs emitted by the candidate. A valid retrieval list cannot silently substitute for a different support set in evaluator scoring.
 
 **No Rust build/tests or runtime benchmark have been executed here.** The process is launched with a cleared environment and fixed executable digest, but still runs under the same OS identity and has no filesystem/network sandbox. The evaluator, synthetic fixture generator and hidden labels remain public/co-located; all scores remain diagnostic-only. See [MACE Isolated Candidate Protocol v0.1](../../docs/research/MACE_ISOLATED_CANDIDATE_PROTOCOL_V0_1.md).
+
+
+### Task-scoped candidate projection
+
+For all retrieval arms, the comparable candidate-visible input is the evidence whose exact scope matches `DecisionNeedV1.scope` and whose action belongs to `DecisionNeedV1.action_alternatives`. The detached parent constructs this projection before serialization; the candidate parser independently rejects any record outside it. Runner candidate/evaluator rows preserve both `available_event_count` (whole task memory before projection) and `candidate_visible_event_count` (the actual candidate input size). The full evidence set is still retained only by the evaluator for intervention planning and score calculation. This prevents unrelated regimes/actions from leaking into candidate execution and keeps the exact-scan, KV and HDC arms on the same candidate-visible evidence contract.
