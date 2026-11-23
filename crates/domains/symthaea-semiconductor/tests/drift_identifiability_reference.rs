@@ -232,9 +232,7 @@ fn assert_report_matches_independent_oracle(
     let observed_rows: Vec<[f64; DIMENSIONS]> = case
         .actions
         .iter()
-        .filter(|action| {
-            action.evidence_state == DriftActionEvidenceStateV1::ObservedQualified
-        })
+        .filter(|action| action.evidence_state == DriftActionEvidenceStateV1::ObservedQualified)
         .map(|action| action.sensitivity)
         .collect();
 
