@@ -146,15 +146,15 @@ impl VerifiedEvidenceQualificationV1 {
             (receipt.run_id.as_str(), binding.run_id),
             (receipt.query_invocation_id.as_str(), binding.query_invocation_id),
             (receipt.domain_id.as_str(), binding.domain_id),
-            (&receipt.environment_revision_sha256, binding.environment_revision_sha256),
-            (&receipt.tool_profile_sha256, binding.tool_profile_sha256),
-            (&receipt.query_sha256, binding.query_sha256),
-            (&receipt.candidate_set_sha256, binding.candidate_set_sha256),
-            (&receipt.decision_need_sha256, binding.decision_need_sha256),
-            (&receipt.purpose_sha256, binding.purpose_sha256),
-            (&receipt.qualification_policy_sha256, binding.qualification_policy_sha256),
-            (&receipt.lifecycle_snapshot_sha256, binding.lifecycle_snapshot_sha256),
-            (&receipt.verifier_profile_sha256, binding.verifier_profile_sha256),
+            (receipt.environment_revision_sha256.as_str(), binding.environment_revision_sha256),
+            (receipt.tool_profile_sha256.as_str(), binding.tool_profile_sha256),
+            (receipt.query_sha256.as_str(), binding.query_sha256),
+            (receipt.candidate_set_sha256.as_str(), binding.candidate_set_sha256),
+            (receipt.decision_need_sha256.as_str(), binding.decision_need_sha256),
+            (receipt.purpose_sha256.as_str(), binding.purpose_sha256),
+            (receipt.qualification_policy_sha256.as_str(), binding.qualification_policy_sha256),
+            (receipt.lifecycle_snapshot_sha256.as_str(), binding.lifecycle_snapshot_sha256),
+            (receipt.verifier_profile_sha256.as_str(), binding.verifier_profile_sha256),
         ] {
             if actual != expected {
                 return Err(EvidenceQualificationRejectV1::BindingMismatch);
@@ -165,7 +165,7 @@ impl VerifiedEvidenceQualificationV1 {
             return Err(EvidenceQualificationRejectV1::ReceiptEntryCountMismatch);
         }
         for (entry, candidate_id) in receipt.entries.iter().zip(binding.candidate_evidence_ids) {
-            if entry.evidence_id != *candidate_id {
+            if entry.evidence_id.as_str() != candidate_id.as_str() {
                 return Err(EvidenceQualificationRejectV1::BindingMismatch);
             }
         }
