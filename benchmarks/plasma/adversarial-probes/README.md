@@ -67,3 +67,12 @@ The crate also exposes:
 The diagonal second-order estimator returns the Taylor coefficient multiplying A^2, not the unscaled second derivative. The mixed estimator identifies one registered mixed control direction, not a general Volterra kernel. Neither may be interpreted as an asymptotic derivative until amplitude convergence has been established on independent physical runs.
 
 The response matrix is an analysis primitive, not a Vlasov pulse executor. It does not create the physical input-output data, establish reference convergence, or authorize branch association. It intentionally distinguishes a missing coefficient from a measured zero.
+
+
+## Intervention-conditioned storage accounting
+
+The crate exposes StateStorageBreakdown and KineticStorageAccounting for the KIRD programme (#13420). The ledger sums actual serialized checkpoint payload bytes together with basis/codec, coordinate/normalization, component/lineage, residual-memory, uncertainty/validity and provenance/contract metadata.
+
+Persistent model and decoder assets are accounted separately and can be amortized across a declared rollout count. Peak working-set memory is recorded separately, not added to persistent checkpoint storage. Overflow and zero-rollout amortization fail closed.
+
+This is byte accounting, not a rate–distortion evaluator. It does not calculate physical response distortion or a qualified R(D) curve; those depend on the independently referenced response/fidelity measurements and gates.
