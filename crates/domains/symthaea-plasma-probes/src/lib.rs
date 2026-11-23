@@ -849,8 +849,7 @@ pub struct GridSpec {
 
 impl GridSpec {
     pub fn validate(self) -> Result<(), ContractError> {
-        if self.phase_steps == 0 || self.amplitude_steps == 0 || self.application_time_steps == 0
-        {
+        if self.phase_steps == 0 || self.amplitude_steps == 0 || self.application_time_steps == 0 {
             return Err(ContractError::InvalidGrid);
         }
         Ok(())
