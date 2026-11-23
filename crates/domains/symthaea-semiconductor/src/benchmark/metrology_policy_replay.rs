@@ -188,6 +188,7 @@ fn selection_digest(
     json_sha256(&material)
 }
 
+#[cfg(test)]
 fn seal_selection_for_test(selection: &mut MetrologyAuditSelectionReportV1) {
     selection.selection_sha256.clear();
     selection.selection_sha256 = selection_digest(selection).expect("selection should hash");
@@ -302,13 +303,16 @@ pub fn generate_synthetic_fab_episode_v1(
         } else {
             SyntheticSensorStateV1::Observed
         };
-        let sensor_b_state = if tool_index + 1 == config.tool_count {
+        let sensor_b_not_installed = tool_index + 1 == config.tool_count;
+        let sensor_b_correlated_dropout = !sensor_b_not_installed
+            && config.regime == SyntheticFabRegimeV1::CorrelatedSensorOutage
+            && (index / 8) % 5 == 2;
+        let sensor_b_random_dropout = !sensor_b_not_installed
+            && !sensor_b_correlated_dropout
+            && rng.unit_interval() < config.sensor_dropout_probability;
+        let sensor_b_state = if sensor_b_not_installed {
             SyntheticSensorStateV1::NotInstalled
-        } else if config.regime == SyntheticFabRegimeV1::CorrelatedSensorOutage
-            && (index / 8) % 5 == 2
-        {
-            SyntheticSensorStateV1::CommunicationLoss
-        } else if rng.unit_interval() < config.sensor_dropout_probability {
+        } else if sensor_b_correlated_dropout || sensor_b_random_dropout {
             SyntheticSensorStateV1::CommunicationLoss
         } else {
             SyntheticSensorStateV1::Observed
