@@ -1152,9 +1152,8 @@ pub fn evaluate_synthetic_metrology_policy_v1(
         escaped_defect_count.saturating_add(metrology_false_negative_count);
     let total_undetected_defect_fraction = (true_positive_count > 0)
         .then(|| total_undetected_defect_count as f64 / true_positive_count as f64);
-    let detection_capture_fraction = (true_positive_count > 0).then(|| {
-        metrology_detected_true_positive_count as f64 / true_positive_count as f64
-    });
+    let detection_capture_fraction = (true_positive_count > 0)
+        .then(|| metrology_detected_true_positive_count as f64 / true_positive_count as f64);
     let defect_capture_fraction = (true_positive_count > 0)
         .then(|| selected_positive_count as f64 / true_positive_count as f64);
     let escaped_defect_fraction =
@@ -1215,14 +1214,12 @@ pub fn evaluate_synthetic_metrology_policy_v1(
     let standard_error_ht_mean_brier =
         design_variance_qualified.then(|| brier_total_variance.sqrt() / population_count as f64);
 
-    let assay_observed_ht_positive_rate =
-        assay_ht_positive_total / population_count as f64;
+    let assay_observed_ht_positive_rate = assay_ht_positive_total / population_count as f64;
     let assay_informativeness = episode.metrology_characteristics.sensitivity
         + episode.metrology_characteristics.specificity
         - 1.0;
     let assay_adjusted_ht_prevalence = (assay_informativeness.abs() > 1.0e-12).then(|| {
-        (assay_observed_ht_positive_rate
-            - (1.0 - episode.metrology_characteristics.specificity))
+        (assay_observed_ht_positive_rate - (1.0 - episode.metrology_characteristics.specificity))
             / assay_informativeness
     });
 
@@ -1246,19 +1243,18 @@ pub fn evaluate_synthetic_metrology_policy_v1(
             continue;
         };
         let finite_population_correction = 1.0 - sample_count as f64 / *residual_population as f64;
-        assay_positive_total_variance += (*residual_population as f64).powi(2)
-            * finite_population_correction
-            * sample_variance
-            / sample_count as f64;
+        assay_positive_total_variance +=
+            (*residual_population as f64).powi(2) * finite_population_correction * sample_variance
+                / sample_count as f64;
     }
-    let assay_estimator_qualified = assay_design_variance_qualified
-        && assay_informativeness.abs() > 1.0e-12;
+    let assay_estimator_qualified =
+        assay_design_variance_qualified && assay_informativeness.abs() > 1.0e-12;
     let assay_adjusted_ht_standard_error = assay_estimator_qualified.then(|| {
         assay_positive_total_variance.sqrt()
             / (population_count as f64 * assay_informativeness.abs())
     });
-    let assay_adjusted_ht_absolute_error = assay_adjusted_ht_prevalence
-        .map(|estimate| (estimate - true_defect_prevalence).abs());
+    let assay_adjusted_ht_absolute_error =
+        assay_adjusted_ht_prevalence.map(|estimate| (estimate - true_defect_prevalence).abs());
     let hidden_truth_sha256 = json_sha256(&episode.hidden_truth)?;
 
     let mut report = SyntheticFabPolicyEvaluationV1 {
@@ -1540,7 +1536,10 @@ mod tests {
         let report = evaluate_synthetic_metrology_policy_v1(&episode, &selection).unwrap();
 
         assert_eq!(report.metrology_detected_true_positive_count, 0);
-        assert_eq!(report.metrology_false_negative_count, report.selected_positive_count);
+        assert_eq!(
+            report.metrology_false_negative_count,
+            report.selected_positive_count
+        );
         assert_eq!(
             report.metrology_false_positive_count,
             report.selected_count - report.selected_positive_count
