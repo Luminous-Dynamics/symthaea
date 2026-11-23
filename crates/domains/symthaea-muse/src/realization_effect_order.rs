@@ -900,12 +900,17 @@ mod tests {
         let plan = plans().into_iter().next().unwrap();
         let spec = ordered_spec(plan.clone());
         let mut arms = ordered_arms(&plan);
-        arms[3]
+        let reversal_index = arms
+            .iter()
+            .position(|arm| arm.base_arm_receipt.arm == ControlProbeArmKindV1::Reversal)
+            .expect("the four-arm order contains a reversal arm");
+        arms[reversal_index]
             .transition_receipt
             .payload
             .pre_arm_target_value_milli = 103_000;
-        let payload = arms[3].transition_receipt.payload.clone();
-        arms[3].transition_receipt = SessionTransitionReceiptV1::from_payload(payload).unwrap();
+        let payload = arms[reversal_index].transition_receipt.payload.clone();
+        arms[reversal_index].transition_receipt =
+            SessionTransitionReceiptV1::from_payload(payload).unwrap();
         let issues = evaluate_ordered_control_effect_probe_v1(&spec, &arms).unwrap_err();
         assert!(issues.iter().any(|issue| matches!(
             issue,
