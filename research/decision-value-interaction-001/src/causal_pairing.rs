@@ -15,7 +15,10 @@
 //! is physically true or complete. Independent execution isolation and replay
 //! audit remain required (#9437, #8732, and the Symtropy scenario owners).
 
-use crate::{InteractionError, PairedRunIdentity, TreatmentArm};
+use crate::{
+    ApplicationDisposition, DecisionValueInteractionCertificate, InteractionError,
+    NonApplicationReason, PairedRunIdentity, TreatmentArm,
+};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
@@ -121,6 +124,22 @@ pub struct TrajectoryStepCommitment {
     pub observation_delivery_sha256: [u8; 32],
 }
 
+/// Which action/outcome from this trajectory is scored by the paired regret
+/// evaluator. This prevents a valid causal trace from being paired with a
+/// regret value from a different action or terminal disposition.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ScoredOutcomeBinding {
+    Applied {
+        world_tick: u64,
+        action_sha256: [u8; 32],
+        applied_at_us: u64,
+    },
+    NotApplied {
+        terminal_at_us: u64,
+        reason: NonApplicationReason,
+    },
+}
+
 /// Driver and independent replay evidence for one treatment arm.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CausalTrajectoryReceipt {
@@ -129,6 +148,7 @@ pub struct CausalTrajectoryReceipt {
     pub origin: TrajectoryOrigin,
     pub arm: TreatmentArm,
     pub steps: Vec<TrajectoryStepCommitment>,
+    pub scored_outcome: ScoredOutcomeBinding,
     pub driver_execution_receipt_sha256: [u8; 32],
     pub independent_replay_audit_sha256: [u8; 32],
     pub independent_replay_audit_passed: bool,
@@ -142,6 +162,10 @@ pub struct CausalTrajectoryReceipt {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CausalPairingCertificate {
     pub regime: CausalReplayRegime,
+    /// The full 13-field pairing root used by all four arms.
+    pub paired_run_identity: PairedRunIdentity,
+    /// Scored outcome bindings in baseline, compute, observation, joint order.
+    pub scored_outcome_bindings: [ScoredOutcomeBinding; 4],
     /// Number of decisions checked across all four arms.
     pub validated_decision_count: u64,
     /// Number of evidence references consumed across all four arms.
@@ -218,6 +242,31 @@ pub enum CausalPairingError {
         arm: TreatmentArm,
         world_tick: u64,
     },
+    ScoredActionTickMissing {
+        arm: TreatmentArm,
+        world_tick: u64,
+    },
+    ScoredActionDigestMismatch {
+        arm: TreatmentArm,
+        world_tick: u64,
+    },
+    ScoredActionTimeMismatch {
+        arm: TreatmentArm,
+        expected_us: u64,
+        actual_us: u64,
+    },
+    ScoredTerminalBeforeDecision {
+        arm: TreatmentArm,
+        terminal_at_us: u64,
+        last_decision_at_us: u64,
+    },
+    ScoredOutcomeDispositionMismatch {
+        arm: TreatmentArm,
+    },
+    ScoredOutcomeIdentityMismatch {
+        field: crate::IdentityField,
+    },
+    DecisionValueInteraction(InteractionError),
     TickOverflow {
         arm: TreatmentArm,
     },
@@ -347,6 +396,41 @@ impl fmt::Display for CausalPairingError {
                 formatter,
                 "arm {arm:?} has a discontinuous world-state chain at tick {world_tick}"
             ),
+            Self::ScoredActionTickMissing { arm, world_tick } => write!(
+                formatter,
+                "scored action for arm {arm:?} references missing world tick {world_tick}"
+            ),
+            Self::ScoredActionDigestMismatch { arm, world_tick } => write!(
+                formatter,
+                "scored action digest for arm {arm:?} does not match its trajectory at tick {world_tick}"
+            ),
+            Self::ScoredActionTimeMismatch {
+                arm,
+                expected_us,
+                actual_us,
+            } => write!(
+                formatter,
+                "scored action time for arm {arm:?} is {actual_us}, trajectory records {expected_us}"
+            ),
+            Self::ScoredTerminalBeforeDecision {
+                arm,
+                terminal_at_us,
+                last_decision_at_us,
+            } => write!(
+                formatter,
+                "terminal disposition for arm {arm:?} at {terminal_at_us} precedes final decision at {last_decision_at_us}"
+            ),
+            Self::ScoredOutcomeDispositionMismatch { arm } => write!(
+                formatter,
+                "scored outcome disposition for arm {arm:?} differs from its paired regret outcome"
+            ),
+            Self::ScoredOutcomeIdentityMismatch { field } => write!(
+                formatter,
+                "scored regret outcome does not match causal trajectory identity field {field:?}"
+            ),
+            Self::DecisionValueInteraction(error) => {
+                write!(formatter, "paired decision-regret evaluation failed: {error}")
+            }
             Self::TickOverflow { arm } => {
                 write!(
                     formatter,
@@ -508,6 +592,55 @@ fn validate_common_identity(identity: &CausalPairingIdentity) -> Result<(), Caus
 struct StepValidationSummary {
     decision_count: u64,
     consumed_evidence_reference_count: u64,
+}
+
+fn validate_scored_outcome_binding(
+    receipt: &CausalTrajectoryReceipt,
+) -> Result<(), CausalPairingError> {
+    match receipt.scored_outcome {
+        ScoredOutcomeBinding::Applied {
+            world_tick,
+            action_sha256,
+            applied_at_us,
+        } => {
+            let step = receipt
+                .steps
+                .iter()
+                .find(|step| step.world_tick == world_tick)
+                .ok_or(CausalPairingError::ScoredActionTickMissing {
+                    arm: receipt.arm,
+                    world_tick,
+                })?;
+            if step.applied_action_sha256 != action_sha256 {
+                return Err(CausalPairingError::ScoredActionDigestMismatch {
+                    arm: receipt.arm,
+                    world_tick,
+                });
+            }
+            if step.action_applied_at_us != applied_at_us {
+                return Err(CausalPairingError::ScoredActionTimeMismatch {
+                    arm: receipt.arm,
+                    expected_us: step.action_applied_at_us,
+                    actual_us: applied_at_us,
+                });
+            }
+        }
+        ScoredOutcomeBinding::NotApplied { terminal_at_us, .. } => {
+            let last_decision_at_us = receipt
+                .steps
+                .last()
+                .map(|step| step.decision_at_us)
+                .ok_or(CausalPairingError::EmptyTrajectory { arm: receipt.arm })?;
+            if terminal_at_us < last_decision_at_us {
+                return Err(CausalPairingError::ScoredTerminalBeforeDecision {
+                    arm: receipt.arm,
+                    terminal_at_us,
+                    last_decision_at_us,
+                });
+            }
+        }
+    }
+    Ok(())
 }
 
 fn validate_steps(
@@ -707,6 +840,7 @@ pub fn validate_causal_pairing(
 
     for receipt in &ordered {
         validate_common_identity(&receipt.identity)?;
+        validate_scored_outcome_binding(receipt)?;
         crate::validate_pair(&baseline.identity.paired, &receipt.identity.paired)
             .map_err(CausalPairingError::PairedIdentity)?;
         if receipt.identity != baseline.identity {
@@ -826,8 +960,17 @@ pub fn validate_causal_pairing(
         ordered[3].origin,
     ];
 
+    let scored_outcome_bindings = [
+        ordered[0].scored_outcome,
+        ordered[1].scored_outcome,
+        ordered[2].scored_outcome,
+        ordered[3].scored_outcome,
+    ];
+
     Ok(CausalPairingCertificate {
         regime,
+        paired_run_identity: baseline.identity.paired.clone(),
+        scored_outcome_bindings,
         validated_decision_count,
         consumed_evidence_reference_count,
         episode_id: baseline.identity.paired.episode_id,
@@ -837,6 +980,80 @@ pub fn validate_causal_pairing(
         terminal_state_sha256,
         trajectory_origins,
     })
+}
+
+/// Combined certificate joining four causal trajectories to the exact
+/// four-arm decision-regret outcomes scored at action-application time.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CausalDecisionValueCertificate {
+    pub causal_pairing: CausalPairingCertificate,
+    pub decision_value: DecisionValueInteractionCertificate,
+}
+
+/// Validate that the causal trajectory receipts and the scored decision-regret
+/// outcomes refer to the same paired identity, treatment arm, action digest,
+/// application timestamp, or terminal non-application disposition.
+///
+/// This is the join boundary between #13375 and #13281. It prevents a caller
+/// from attaching a valid regret vector to unrelated but individually valid
+/// trajectory receipts.
+pub fn validate_causal_pairing_with_interaction(
+    receipts: &[CausalTrajectoryReceipt],
+    outcomes: &[crate::ArmOutcome],
+) -> Result<CausalDecisionValueCertificate, CausalPairingError> {
+    let decision_value = crate::evaluate_decision_value_interaction(outcomes)
+        .map_err(CausalPairingError::DecisionValueInteraction)?;
+    let causal_pairing = validate_causal_pairing(receipts)?;
+
+    for outcome in outcomes {
+        crate::validate_pair(&causal_pairing.paired_run_identity, &outcome.identity).map_err(
+            |error| match error {
+                InteractionError::IdentityMismatch { field } => {
+                    CausalPairingError::ScoredOutcomeIdentityMismatch { field }
+                }
+                other => CausalPairingError::DecisionValueInteraction(other),
+            },
+        )?;
+
+        let index = arm_index_for_pairing(outcome.arm);
+        let binding = causal_pairing.scored_outcome_bindings[index];
+        let disposition_matches = match (binding, outcome.disposition) {
+            (
+                ScoredOutcomeBinding::Applied { applied_at_us, .. },
+                ApplicationDisposition::Applied { at_us },
+            ) => applied_at_us == at_us,
+            (
+                ScoredOutcomeBinding::NotApplied {
+                    terminal_at_us: expected_terminal_at_us,
+                    reason: expected_reason,
+                },
+                ApplicationDisposition::NotApplied {
+                    terminal_at_us,
+                    reason,
+                },
+            ) => expected_terminal_at_us == terminal_at_us && expected_reason == reason,
+            _ => false,
+        };
+        if !disposition_matches {
+            return Err(CausalPairingError::ScoredOutcomeDispositionMismatch {
+                arm: outcome.arm,
+            });
+        }
+    }
+
+    Ok(CausalDecisionValueCertificate {
+        causal_pairing,
+        decision_value,
+    })
+}
+
+fn arm_index_for_pairing(arm: TreatmentArm) -> usize {
+    match arm {
+        TreatmentArm::Baseline => 0,
+        TreatmentArm::ComputeOnly => 1,
+        TreatmentArm::ObservationOnly => 2,
+        TreatmentArm::Joint => 3,
+    }
 }
 
 #[cfg(test)]
@@ -904,6 +1121,24 @@ mod tests {
         }
     }
 
+    fn arm_outcomes(regrets: [u32; 4]) -> Vec<crate::ArmOutcome> {
+        let arms = [
+            TreatmentArm::Baseline,
+            TreatmentArm::ComputeOnly,
+            TreatmentArm::ObservationOnly,
+            TreatmentArm::Joint,
+        ];
+        arms.into_iter()
+            .enumerate()
+            .map(|(index, arm)| crate::ArmOutcome {
+                identity: paired_identity(),
+                arm,
+                realized_regret_ppm: regrets[index],
+                disposition: ApplicationDisposition::Applied { at_us: 2_100 },
+            })
+            .collect()
+    }
+
     fn receipts(
         regime: CausalReplayRegime,
         origin: TrajectoryOrigin,
@@ -937,6 +1172,11 @@ mod tests {
                             80 + index as u8,
                         ),
                     ],
+                    scored_outcome: ScoredOutcomeBinding::Applied {
+                        world_tick: 101,
+                        action_sha256: digest(70 + index as u8),
+                        applied_at_us: 2_100,
+                    },
                     driver_execution_receipt_sha256: digest(90 + index as u8),
                     independent_replay_audit_sha256: digest(100 + index as u8),
                     independent_replay_audit_passed: true,
