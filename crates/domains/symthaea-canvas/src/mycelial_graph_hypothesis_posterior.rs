@@ -511,6 +511,66 @@ mod tests {
     }
 
     #[test]
+    fn four_candidate_posterior_matches_independent_exhaustive_oracle() {
+        let source = skeleton();
+        let candidates = vec![
+            candidate("three", "B", "H", 0.6, None),
+            candidate("one", "B", "D", 0.25, None),
+            candidate("four", "D", "F", 0.8, None),
+            candidate("two", "F", "H", 0.4, None),
+        ];
+        let report =
+            evaluate_mycelial_graph_hypothesis_posterior(&source, &candidates).unwrap();
+        assert_eq!(report.total_hypothesis_count, 16);
+        assert_eq!(report.feasible_hypothesis_count, 7);
+
+        // Independent exhaustive oracle over the published canonical conflict pairs.
+        let candidate_ids = &report.candidate_ids;
+        let probabilities: BTreeMap<_, _> = candidates
+            .iter()
+            .map(|candidate| (candidate.candidate_id.as_str(), candidate.fusion_probability))
+            .collect();
+        let indices: BTreeMap<_, _> = candidate_ids
+            .iter()
+            .enumerate()
+            .map(|(index, candidate_id)| (candidate_id.as_str(), index))
+            .collect();
+        let mut expected_weights = BTreeMap::<Vec<String>, f64>::new();
+        let mut normalizer = 0.0;
+        for mask in 0..(1usize << candidate_ids.len()) {
+            let feasible = report.conflicts.iter().all(|pair| {
+                let left = indices[pair.first_candidate_id.as_str()];
+                let right = indices[pair.second_candidate_id.as_str()];
+                mask & (1usize << left) == 0 || mask & (1usize << right) == 0
+            });
+            if !feasible {
+                continue;
+            }
+            let mut accepted_ids = Vec::new();
+            let mut weight = 1.0;
+            for (index, candidate_id) in candidate_ids.iter().enumerate() {
+                let probability = probabilities[candidate_id.as_str()];
+                if mask & (1usize << index) != 0 {
+                    accepted_ids.push(candidate_id.clone());
+                    weight *= probability;
+                } else {
+                    weight *= 1.0 - probability;
+                }
+            }
+            normalizer += weight;
+            expected_weights.insert(accepted_ids, weight);
+        }
+
+        close(normalizer, report.log_feasible_prior_mass.exp());
+        for hypothesis in &report.hypotheses {
+            let expected = expected_weights
+                .get(&hypothesis.accepted_candidate_ids)
+                .expect("every feasible hypothesis has an oracle row");
+            close(hypothesis.posterior_probability, expected / normalizer);
+        }
+    }
+
+    #[test]
     fn hard_conflicting_probabilities_with_no_feasible_prior_mass_fail_closed() {
         let source = skeleton();
         let candidates = vec![
