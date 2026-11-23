@@ -21,6 +21,10 @@ use sha2::{Digest, Sha256};
 pub const MIN_SUPPORTING_TRACES_V1: usize = 3;
 pub const MAX_SUPPORTING_TRACES_V1: usize = 128;
 pub const MAX_TOOL_CALLS_PER_TRACE_V1: usize = 256;
+pub const MAX_EVIDENCE_IDS_PER_TRACE_V1: usize = 10_000;
+pub const MAX_IDENTIFIER_BYTES_V1: usize = 256;
+pub const MAX_DOMAIN_ID_BYTES_V1: usize = 512;
+pub const MAX_EVIDENCE_ID_BYTES_V1: usize = 1_024;
 pub const MAX_STRATEGY_TTL_SECONDS_V1: u64 = 30 * 24 * 60 * 60;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
@@ -176,6 +180,10 @@ fn valid_atom(value: &str) -> bool {
         && !value.chars().any(char::is_control)
 }
 
+fn valid_atom_with_limit(value: &str, maximum_bytes: usize) -> bool {
+    valid_atom(value) && value.len() <= maximum_bytes
+}
+
 fn valid_sha256(value: &str) -> bool {
     value.len() == 64
         && value
@@ -294,14 +302,11 @@ fn note_digest(note: &RetrievalStrategyNoteV1) -> String {
 }
 
 fn validate_trace(trace: &RetrievalTraceReceiptV1) -> Result<(), RetrievalPolicyRejectV1> {
-    for value in [
-        trace.run_id.as_str(),
-        trace.query_invocation_id.as_str(),
-        trace.domain_id.as_str(),
-    ] {
-        if !valid_atom(value) {
-            return Err(RetrievalPolicyRejectV1::InvalidIdentifier);
-        }
+    if !valid_atom_with_limit(&trace.run_id, MAX_IDENTIFIER_BYTES_V1)
+        || !valid_atom_with_limit(&trace.query_invocation_id, MAX_IDENTIFIER_BYTES_V1)
+        || !valid_atom_with_limit(&trace.domain_id, MAX_DOMAIN_ID_BYTES_V1)
+    {
+        return Err(RetrievalPolicyRejectV1::InvalidIdentifier);
     }
     for value in [
         trace.environment_revision_sha256.as_str(),
@@ -332,11 +337,11 @@ fn validate_trace(trace: &RetrievalTraceReceiptV1) -> Result<(), RetrievalPolicy
 
     let mut elapsed_sum = 0_u64;
     let mut bytes_sum = 0_u64;
-    let mut all_observed = BTreeSet::new();
+    let mut total_evidence_ids = 0_usize;
     let mut observed_any = false;
     let mut saw_tool_error = false;
     for operation in &trace.operations {
-        if !valid_atom(&operation.tool_id)
+        if !valid_atom_with_limit(&operation.tool_id, MAX_IDENTIFIER_BYTES_V1)
             || !valid_sha256(&operation.tool_revision_sha256)
             || !valid_sha256(&operation.action_template_sha256)
         {
@@ -349,6 +354,12 @@ fn validate_trace(trace: &RetrievalTraceReceiptV1) -> Result<(), RetrievalPolicy
             .checked_add(operation.inspected_bytes)
             .ok_or(RetrievalPolicyRejectV1::InvalidResourceAccounting)?;
         let mut local_ids = BTreeSet::new();
+        total_evidence_ids = total_evidence_ids
+            .checked_add(operation.observed_evidence_ids.len())
+            .ok_or(RetrievalPolicyRejectV1::InvalidOperation)?;
+        if total_evidence_ids > MAX_EVIDENCE_IDS_PER_TRACE_V1 {
+            return Err(RetrievalPolicyRejectV1::InvalidOperation);
+        }
         match operation.outcome {
             RetrievalOperationOutcomeV1::EvidenceObserved => {
                 if operation.observed_evidence_ids.is_empty() {
@@ -366,13 +377,12 @@ fn validate_trace(trace: &RetrievalTraceReceiptV1) -> Result<(), RetrievalPolicy
             saw_tool_error = true;
         }
         for evidence_id in &operation.observed_evidence_ids {
-            if !valid_atom(evidence_id) {
+            if !valid_atom_with_limit(evidence_id, MAX_EVIDENCE_ID_BYTES_V1) {
                 return Err(RetrievalPolicyRejectV1::InvalidOperation);
             }
             if !local_ids.insert(evidence_id) {
                 return Err(RetrievalPolicyRejectV1::DuplicateEvidenceId);
             }
-            all_observed.insert(evidence_id.clone());
         }
     }
     if elapsed_sum != trace.elapsed_ns || bytes_sum != trace.inspected_bytes {
@@ -481,7 +491,9 @@ impl RetrievalPolicyMemoryV1 {
         let mut seen_queries = BTreeSet::new();
         let mut selected = Vec::with_capacity(references.len());
         for reference in references {
-            if !valid_atom(&reference.run_id) || !valid_atom(&reference.query_invocation_id) {
+            if !valid_atom_with_limit(&reference.run_id, MAX_IDENTIFIER_BYTES_V1)
+                || !valid_atom_with_limit(&reference.query_invocation_id, MAX_IDENTIFIER_BYTES_V1)
+            {
                 return Err(RetrievalPolicyRejectV1::InvalidIdentifier);
             }
             let key = (
