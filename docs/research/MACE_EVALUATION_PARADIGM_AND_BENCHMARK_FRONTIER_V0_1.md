@@ -83,7 +83,7 @@ This is a deliberately stronger test than "HDC vs vector retrieval." MACE should
 
 ## 2B. Deployment is part of the benchmark, not an afterthought
 
-The AML Cycle 2 participation contract requires participant-hosted, stable Add and Search endpoints, API authentication/capacity details and an integration smoke test. A public repository or Docker image alone does not constitute an eligible deployment. Cycle 2's published submission windows are already closed as of November 23, 2026; the strategic use of this requirement is to prepare a repeatable deployment package for the next cycle, not to suggest that this cycle can still be entered.
+The [AML Cycle 2 participation contract](https://agentmemories.ai/rules) requires participant-hosted, stable Add and Search endpoints, API authentication/capacity details and an integration smoke test. A public repository or Docker image alone does not constitute an eligible deployment. Cycle 2's published submission windows are already closed as of November 23, 2026; the strategic use of this requirement is to prepare a repeatable deployment package for the next cycle, not to suggest that this cycle can still be entered.
 
 MACE therefore needs a provider-neutral production Add/Search service, not just a research runner:
 - idempotent, bounded Add with immutable request IDs and explicit completion/abandon receipts;
@@ -110,7 +110,7 @@ The AMA-Bench paper reports 57.22% for AMA-Agent and an 11.16-point improvement 
 
 ## 2D. Model-conditioned memory dosage is now a research priority
 
-IBM Research's November 19, 2026 paper, *How Much Should an Agent Remember?*, reports that useful memory quantity depends on target-agent model capability. In its AppWorld experiments, the weaker gpt-oss-120b baseline was 39.9% task-completion; all 199 guidelines raised it to 51.2%, but a selected subset of about 29 reached 55.4% (mean of two runs). DeepSeek-V3.2 improved with the full 191-guideline set. The authors also report failure modes including dropped provenance during consolidation and swallowed tool/API errors that produced plausible logs.
+IBM Research's November 19, 2026 paper, [*How Much Should an Agent Remember?*](https://arxiv.org/abs/2611.26361), reports that useful memory quantity depends on target-agent model capability. In its AppWorld experiments, the weaker gpt-oss-120b baseline was 39.9% task-completion; all 199 guidelines raised it to 51.2%, but a selected subset of about 29 reached 55.4% (mean of two runs). DeepSeek-V3.2 improved with the full 191-guideline set. The authors also report failure modes including dropped provenance during consolidation and swallowed tool/API errors that produced plausible logs.
 
 MACE already has a model-conditioned memory budget prototype (v0.16) and a receipt-gated qualification path. The next step is not to hard-code 29 or 191 as universal budgets. Instead:
 1. estimate a target-model-specific memory dose-response curve on calibration clusters;
@@ -234,8 +234,11 @@ Every capability report should separate: **implemented**, **source-inspected**, 
 
 ## References
 
-- Agent Memory Leaderboard, [Cycle 2 official results](https://agentmemoryleaderboard.ai/results/cycle-2/), published 2026-11-19.
+- Agent Memory Leaderboard, [Cycle 2 official results](https://agentmemoryleaderboard.ai/results/cycle-2/), published 2026-11-19; [Cycle 2 participation rules and Add/Search API guide](https://agentmemories.ai/rules).
 - He et al., [MemoryArena](https://proceedings.mlr.press/v306/he26am.html), ICML 2026.
-- Zhao et al., [AMA-Bench](https://proceedings.mlr.press/v306/zhao26bs.html), ICML 2026.
+- Zhao et al., [AMA-Bench](https://ama-bench.github.io/), ICML 2026.
 - Liu et al., [WorldMemArena](https://worldmemarena-mem.github.io/), 2026 benchmark site and paper.
-- Luminous Dynamics, [MACE evaluator-custody qualification issue #13287](https://github.com/Luminous-Dynamics/symthaea/issues/13287) and [candidate extraction issue #13350](https://github.com/Luminous-Dynamics/symthaea/issues/13350).
+- IBM Research, [How Much Should an Agent Remember?](https://arxiv.org/abs/2611.26361), arXiv, 2026-11-19.
+- [Learning to remember: advances in memory mechanisms for large language models](https://link.springer.com/article/10.1007/s44336-026-00044-1), 2026-11-09.
+- Redis, [Remis + Instruct LongMemEval report](https://redis.io/resources/agent-memory-benchmark-report/), 2026-09-21; [June research reproduction](https://redis.github.io/redis-ai-research-public/longmemeval-agent-memory/).
+- Luminous Dynamics, [MACE evaluator-custody qualification issue #13287](https://github.com/Luminous-Dynamics/symthaea/issues/13287), [candidate extraction #13350](https://github.com/Luminous-Dynamics/symthaea/pull/13350), and [candidate subprocess integration #13351](https://github.com/Luminous-Dynamics/symthaea/issues/13351).
