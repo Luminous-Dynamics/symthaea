@@ -367,7 +367,8 @@ pub fn build_synthetic_metrology_policy_v1(
     let candidates = build_synthetic_candidates(policy_view, semantics)?;
     let model_sha256 = sha256_hex(SYNTHETIC_HEURISTIC_MODEL_V1.as_bytes());
     let prediction_packet_sha256 = json_sha256(&candidates)?;
-    let policy_config_sha256 = json_sha256(config)?;
+    let observation_packet_sha256 = json_sha256(&policy_view.observations)?;
+    let policy_config_sha256 = json_sha256(&(config, observation_packet_sha256))?;
     Ok(MetrologyAuditPolicyV1 {
         schema: POLICY_SCHEMA_V1.into(),
         policy_id: config.policy_id.clone(),
@@ -395,6 +396,11 @@ pub fn run_synthetic_metrology_policy_v1(
     semantics: &BinaryMeasurandSemanticsV1,
     config: &SyntheticMetrologyPolicyConfigV1,
 ) -> Result<SyntheticMetrologyPolicyRunV1, SyntheticFabReplayError> {
+    if json_sha256(&policy_view.observations)? != episode.observation_packet_sha256 {
+        return Err(SyntheticFabReplayError(
+            "policy view does not belong to the hidden-truth episode".into(),
+        ));
+    }
     let policy = build_synthetic_metrology_policy_v1(policy_view, semantics, config)?;
     let selection = select_metrology_audit_v1(&policy)
         .map_err(|error| SyntheticFabReplayError(format!("policy selection rejected: {error}")))?;
@@ -1304,6 +1310,25 @@ mod tests {
         assert_eq!(risk_run.selection.randomized_audit_count, 16);
         assert!(random_run.evaluation.design_variance_qualified);
         assert!(risk_run.evaluation.design_variance_qualified);
+    }
+
+    #[test]
+    fn policy_runner_rejects_an_observation_packet_from_another_episode() {
+        let first =
+            generate_synthetic_fab_episode_v1(&config(SyntheticFabRegimeV1::Stable, 51)).unwrap();
+        let second =
+            generate_synthetic_fab_episode_v1(&config(SyntheticFabRegimeV1::Stable, 52)).unwrap();
+        let semantics = synthetic_defect_semantics_v1(0.62).unwrap();
+        let policy = policy_config(first.policy_view(), "mismatched-packet", 0, 32, 8, 9);
+        assert!(
+            run_synthetic_metrology_policy_v1(
+                &first,
+                second.policy_view(),
+                &semantics,
+                &policy
+            )
+            .is_err()
+        );
     }
 
     #[test]
