@@ -402,6 +402,15 @@ pub fn run_synthetic_metrology_policy_tournament_v1(
             "all tournament policies must share one positive total cost budget".into(),
         ));
     }
+    let shared_policy_seed = policy_templates[0].seed;
+    if policy_templates
+        .iter()
+        .any(|policy| policy.seed != shared_policy_seed)
+    {
+        return Err(SyntheticFabReplayError(
+            "paired tournament policies must share one selection seed".into(),
+        ));
+    }
 
     let mut scenario_keys = BTreeSet::new();
     let mut policy_ids = BTreeSet::new();
@@ -2102,6 +2111,24 @@ mod tests {
             assert_eq!(summary.measurement_reduction_mean, 0.75);
             assert_eq!(summary.measurement_reduction_sample_stddev, 0.0);
         }
+    }
+
+    #[test]
+    fn paired_tournament_rejects_unmatched_selection_seeds() {
+        let scenario = config(SyntheticFabRegimeV1::Stable, 77);
+        let episode = generate_synthetic_fab_episode_v1(&scenario).unwrap();
+        let view = episode.policy_view();
+        let first = policy_config(view, "seed-a", 0, 32, 8, 101);
+        let second = policy_config(view, "seed-b", 0, 32, 8, 102);
+        assert!(
+            run_synthetic_metrology_policy_tournament_v1(
+                "unmatched-seed-test",
+                "seed-a",
+                &[scenario],
+                &[first, second]
+            )
+            .is_err()
+        );
     }
 
     #[test]
