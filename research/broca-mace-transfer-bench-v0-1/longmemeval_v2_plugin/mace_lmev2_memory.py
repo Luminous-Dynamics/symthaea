@@ -314,6 +314,120 @@ class MaceLongMemEvalV2Memory(Memory):
             receipt_bytes,
         )
 
+    def _verify_persisted_candidate_evidence(self) -> None:
+        """Validate saved candidate files against their run-bound local receipts.
+
+        This detects partial writes and accidental/tampering edits to one side
+        of the pair. The receipt and payload share a workspace and are not an
+        independent signature or protection against an attacker rewriting both.
+        """
+        directory = self.candidate_evidence_dir
+        metadata = directory.lstat()
+        require(stat.S_ISDIR(metadata.st_mode), "candidate evidence root must be a real directory")
+        os.chmod(directory, 0o700)
+
+        receipts: dict[str, dict[str, Any]] = {}
+        expected_candidate_files: set[str] = set()
+        for path in directory.iterdir():
+            entry = path.lstat()
+            require(not stat.S_ISLNK(entry.st_mode), "candidate evidence directory contains a symlink")
+            require(stat.S_ISREG(entry.st_mode), "candidate evidence directory contains a non-file entry")
+            require(path.name.endswith(".receipt.json"), "candidate evidence directory contains an unknown file")
+            receipt_bytes = path.read_bytes()
+            try:
+                receipt = json.loads(receipt_bytes)
+            except json.JSONDecodeError as error:
+                raise RuntimeError(f"saved candidate receipt is invalid JSON: {path.name}") from error
+            require(isinstance(receipt, dict), "saved candidate receipt must be an object")
+            candidate_id = receipt.get("candidate_id")
+            require(isinstance(candidate_id, str) and candidate_id.strip(),
+                    "saved candidate receipt has no candidate_id")
+            invocation_digest = hashlib.sha256(candidate_id.encode("utf-8")).hexdigest()
+            expected_receipt_name = f"{invocation_digest}.receipt.json"
+            expected_payload_name = f"{invocation_digest}.jsonl"
+            require(path.name == expected_receipt_name, "saved candidate receipt filename does not match ID")
+            require(candidate_id not in receipts, "duplicate saved candidate invocation receipt")
+            require(receipt.get("schema_version") == "mace_lmev2_candidate_receipt_v1",
+                    "saved candidate receipt schema mismatch")
+            require(receipt.get("run_id") == self.run_id, "saved candidate receipt run mismatch")
+            require(receipt.get("domain") == self.domain, "saved candidate receipt domain mismatch")
+            require(receipt.get("backend_id") == "mace_lmev2_bm25_text",
+                    "saved candidate receipt backend mismatch")
+            require(receipt.get("backend_revision_sha256") == self.sidecar_binary_sha256,
+                    "saved candidate receipt binary digest mismatch")
+            require(receipt.get("candidate_file") == expected_payload_name,
+                    "saved candidate receipt payload filename mismatch")
+            require(receipt.get("retrieval_mode") == "text_bm25_with_original_image_evidence",
+                    "saved candidate receipt retrieval mode mismatch")
+            require(
+                isinstance(receipt.get("query_sha256"), str)
+                and len(receipt["query_sha256"]) == 64
+                and all(character in "0123456789abcdef" for character in receipt["query_sha256"]),
+                "saved candidate query digest is invalid",
+            )
+            require(
+                isinstance(receipt.get("candidate_jsonl_sha256"), str)
+                and len(receipt["candidate_jsonl_sha256"]) == 64
+                and all(character in "0123456789abcdef" for character in receipt["candidate_jsonl_sha256"]),
+                "saved candidate payload digest is invalid",
+            )
+            count = receipt.get("candidate_record_count")
+            require(isinstance(count, int) and not isinstance(count, bool) and count >= 0,
+                    "saved candidate record count is invalid")
+            candidate_set_sha256 = receipt.get("candidate_set_sha256")
+            if count == 0:
+                require(candidate_set_sha256 is None, "empty saved candidate set must not have a digest")
+            else:
+                require(
+                    isinstance(candidate_set_sha256, str)
+                    and len(candidate_set_sha256) == 64
+                    and all(character in "0123456789abcdef" for character in candidate_set_sha256),
+                    "saved candidate-set digest is invalid",
+                )
+
+            payload_path = directory / expected_payload_name
+            try:
+                payload_stat = payload_path.lstat()
+            except FileNotFoundError as error:
+                raise RuntimeError("saved candidate receipt refers to a missing payload") from error
+            require(stat.S_ISREG(payload_stat.st_mode), "saved candidate payload is not a regular file")
+            payload = payload_path.read_bytes()
+            require(
+                hashlib.sha256(payload).hexdigest() == receipt["candidate_jsonl_sha256"],
+                "saved candidate JSONL digest mismatch",
+            )
+            lines = [line for line in payload.decode("utf-8").splitlines() if line.strip()]
+            require(len(lines) == count, "saved candidate JSONL count mismatch")
+            for ordinal, line in enumerate(lines):
+                try:
+                    record = json.loads(line)
+                except json.JSONDecodeError as error:
+                    raise RuntimeError(f"saved candidate JSONL record {ordinal} is invalid") from error
+                require(isinstance(record, dict), "saved candidate JSONL record must be an object")
+                require(record.get("schema_version") == "mace_candidate_evidence_v0_1"
+                        and record.get("record_type") == "candidate_evidence",
+                        "saved candidate record schema/type mismatch")
+                require(record.get("run_id") == self.run_id, "saved candidate record run mismatch")
+                require(record.get("candidate_id") == candidate_id, "saved candidate record ID mismatch")
+                require(record.get("query_sha256") == receipt["query_sha256"],
+                        "saved candidate record query digest mismatch")
+                require(record.get("backend_revision_sha256") == self.sidecar_binary_sha256,
+                        "saved candidate record backend digest mismatch")
+                require(record.get("backend_id") == "mace_lmev2_bm25_text",
+                        "saved candidate record backend mismatch")
+                require(record.get("query_scope") == f"longmemeval-v2:domain:{self.domain}",
+                        "saved candidate record scope mismatch")
+            receipts[candidate_id] = receipt
+            expected_candidate_files.add(expected_payload_name)
+
+        actual_candidate_files = {
+            path.name for path in directory.iterdir() if path.name.endswith(".jsonl")
+        }
+        require(
+            actual_candidate_files == expected_candidate_files,
+            "candidate evidence directory contains orphan or unreferenced payloads",
+        )
+
     @staticmethod
     def _bounded_int(value: object, name: str, minimum: int, maximum: int) -> int:
         require(isinstance(value, int) and not isinstance(value, bool), f"{name} must be an integer")
@@ -687,9 +801,13 @@ class MaceLongMemEvalV2Memory(Memory):
         shutil.copytree(saved_assets, self.asset_root)
         saved_evidence = state_dir / "candidate_evidence"
         if saved_evidence.is_dir():
+            saved_evidence_stat = saved_evidence.lstat()
+            require(stat.S_ISDIR(saved_evidence_stat.st_mode),
+                    "saved candidate evidence root must be a real directory")
             if self.candidate_evidence_dir.exists():
                 shutil.rmtree(self.candidate_evidence_dir)
             shutil.copytree(saved_evidence, self.candidate_evidence_dir)
+            self._verify_persisted_candidate_evidence()
         self._trajectory_lines = []
         self._inserted_ids = set()
         for line in trajectories_path.read_text(encoding="utf-8").splitlines():
