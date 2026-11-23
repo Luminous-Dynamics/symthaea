@@ -539,7 +539,11 @@ fn render_receipt(
         config.family_size
     );
     let _ = writeln!(output, "ANALYSIS\tbootstrap_seed\t{}", config.seed);
-    let _ = writeln!(output, "ANALYSIS\tbootstrap_replicates\t{}", config.bootstrap_replicates);
+    let _ = writeln!(
+        output,
+        "ANALYSIS\tbootstrap_replicates\t{}",
+        config.bootstrap_replicates
+    );
     let _ = writeln!(
         output,
         "ANALYSIS\tfamilywise_confidence\t{}",
