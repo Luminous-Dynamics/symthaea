@@ -189,7 +189,6 @@ fn validate_formula(formula: &BooleanFormula, label: &str, errors: &mut Vec<Stri
     }
 }
 
-
 /// Interpret a formal theorem statement as a sequent Γ ⊢ P, whose classical
 /// propositional meaning is (∧ Γ) → P. Human-readable assumption strings are
 /// deliberately not parsed or trusted as logical premises.
@@ -331,7 +330,10 @@ pub fn validate_receipt(receipt: &TheoremSandwichReceiptV1) -> Vec<String> {
             errors.push("evaluator_only.translation_assessor must be non-empty".to_owned());
         }
         if evaluator.translation_review_refs.is_empty()
-            || evaluator.translation_review_refs.iter().any(|value| !non_empty(value))
+            || evaluator
+                .translation_review_refs
+                .iter()
+                .any(|value| !non_empty(value))
         {
             errors.push(
                 "evaluator_only.translation_review_refs must contain non-empty references"
@@ -714,8 +716,15 @@ mod tests {
         evaluator.stronger_obligations[0].stronger_formula = implies(atom("p"), atom("q"));
         evaluator.corollary_obligations[0].corollary_formula =
             implies(and(atom("p"), atom("r")), atom("q"));
-        evaluator.corollary_obligations[1].corollary_formula =
-            implies(and(atom("p"), BooleanFormula::Not { arg: Box::new(atom("r")) }), atom("q"));
+        evaluator.corollary_obligations[1].corollary_formula = implies(
+            and(
+                atom("p"),
+                BooleanFormula::Not {
+                    arg: Box::new(atom("r")),
+                },
+            ),
+            atom("q"),
+        );
         receipt.candidate.statement_formula = atom("q");
         receipt.candidate.statement_context.clear();
 
