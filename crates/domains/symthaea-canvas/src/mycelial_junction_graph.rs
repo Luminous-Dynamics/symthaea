@@ -924,12 +924,7 @@ impl MycelialJunctionHyphaGraph {
             / 2;
         for source in 0..self.junctions.len() {
             let distances = shortest_path_distances(&adjacency, source);
-            for (target, path_length) in distances
-                .iter()
-                .copied()
-                .enumerate()
-                .skip(source + 1)
-            {
+            for (target, path_length) in distances.iter().copied().enumerate().skip(source + 1) {
                 if !path_length.is_finite() {
                     continue;
                 }
