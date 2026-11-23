@@ -199,14 +199,20 @@ fn parse_manifest(record: &Value) -> Result<(InputProvenance, String), String> {
         return Err("intervention manifest has invalid source_revision".to_string());
     }
 
+    let pair_block_id = required_string(record, "pair_block_id")?;
+    parse_cluster(pair_block_id)
+        .map_err(|error| format!("invalid intervention manifest pair_block_id: {error}"))?;
+
+    let manifest_payload_sha256 =
+        required_string(record, "manifest_payload_sha256")?.to_string();
+    if !valid_sha256(&manifest_payload_sha256) {
+        return Err("invalid manifest_payload_sha256".to_string());
+    }
     let manifest_sha256 = required_string(record, "manifest_sha256")?.to_string();
     if !valid_sha256(&manifest_sha256) {
         return Err("invalid manifest_sha256".to_string());
     }
 
-    // Reconstruct exactly the candidate runner's hashed payload. Metadata
-    // outside this payload (run ID, pair block, source digests) is separately
-    // validated and bound by the reducer's run-level provenance checks.
     let public_seed = required_u64(record, "public_seed")?;
     let baseline_evidence_sha256 =
         required_string(record, "baseline_evidence_sha256")?.to_string();
@@ -289,6 +295,7 @@ fn parse_manifest(record: &Value) -> Result<(InputProvenance, String), String> {
         return Err("matched_random_count does not match interventions array".to_string());
     }
 
+    // First verify the content-addressed intervention payload.
     let manifest_payload = serde_json::to_vec(&json!({
         "schema_version": INPUT_SCHEMA,
         "seed": public_seed,
@@ -300,10 +307,28 @@ fn parse_manifest(record: &Value) -> Result<(InputProvenance, String), String> {
         "interventions": interventions
     }))
     .map_err(|error| format!("serialize intervention manifest payload: {error}"))?;
-    let computed_manifest_sha256 =
+    let computed_payload_sha256 =
         hex_digest(Sha256::digest(manifest_payload).as_slice());
-    if computed_manifest_sha256 != manifest_sha256 {
-        return Err("intervention manifest digest does not match canonical payload".to_string());
+    if computed_payload_sha256 != manifest_payload_sha256 {
+        return Err("intervention manifest payload digest does not match canonical payload".to_string());
+    }
+
+    // Then bind that payload to its exact run, task block and source provenance.
+    let receipt_payload = serde_json::to_vec(&json!({
+        "schema_version": INPUT_SCHEMA,
+        "run_id": provenance.run_id.as_str(),
+        "pair_block_id": pair_block_id,
+        "manifest_payload_sha256": manifest_payload_sha256,
+        "source_code_sha256": provenance.source_code_sha256.as_str(),
+        "fixture_sha256": provenance.fixture_sha256.as_str(),
+        "schema_sha256": provenance.schema_sha256.as_str(),
+        "source_revision": provenance.source_revision.as_deref()
+    }))
+    .map_err(|error| format!("serialize intervention manifest receipt: {error}"))?;
+    let computed_receipt_sha256 =
+        hex_digest(Sha256::digest(receipt_payload).as_slice());
+    if computed_receipt_sha256 != manifest_sha256 {
+        return Err("intervention manifest receipt digest does not match run/pair-block provenance".to_string());
     }
 
     Ok((provenance, manifest_sha256))
