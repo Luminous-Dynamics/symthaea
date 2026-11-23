@@ -580,6 +580,11 @@ mod tests {
         assert!(images.iter().all(|item| item.retrieval_channel == "attached_image_evidence"));
         assert!(images.iter().all(|item| item.parent_evidence_ids.len() == 1
             && item.derivation_receipt_sha256.is_some()));
+        for candidate in &batch.evidence {
+            for parent in &candidate.parent_evidence_ids {
+                assert!(batch.evidence.iter().any(|item| &item.evidence_id == parent));
+            }
+        }
     }
 
     #[test]
