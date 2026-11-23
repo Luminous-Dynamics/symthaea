@@ -1990,14 +1990,11 @@ mod tests {
         };
         let base_episode = generate_synthetic_fab_episode_v1(&scenario).unwrap();
         let semantics = synthetic_defect_semantics_v1(scenario.defect_threshold).unwrap();
-        let base_observation_digest =
-            json_sha256(&base_episode.policy_view.observations).unwrap();
-        let truth = evaluate_synthetic_metrology_policy_v1(
-            &base_episode,
-            &fake_selection(&base_episode),
-        )
-        .unwrap()
-        .true_defect_prevalence;
+        let base_observation_digest = json_sha256(&base_episode.policy_view.observations).unwrap();
+        let truth =
+            evaluate_synthetic_metrology_policy_v1(&base_episode, &fake_selection(&base_episode))
+                .unwrap()
+                .true_defect_prevalence;
 
         let mut ht_estimates = Vec::new();
         let mut assay_adjusted_estimates = Vec::new();
@@ -2007,21 +2004,16 @@ mod tests {
         for seed in 0..replay_count {
             let mut replicate_scenario = scenario.clone();
             replicate_scenario.measurement_seed = seed as u64;
-            let replicate_episode =
-                generate_synthetic_fab_episode_v1(&replicate_scenario).unwrap();
+            let replicate_episode = generate_synthetic_fab_episode_v1(&replicate_scenario).unwrap();
             assert_eq!(
                 json_sha256(&replicate_episode.policy_view.observations).unwrap(),
                 base_observation_digest
             );
             let view = replicate_episode.policy_view();
             let policy = policy_config(view, "stratified-random", 0, 32, 8, seed as u64);
-            let run = run_synthetic_metrology_policy_v1(
-                &replicate_episode,
-                view,
-                &semantics,
-                &policy,
-            )
-            .unwrap();
+            let run =
+                run_synthetic_metrology_policy_v1(&replicate_episode, view, &semantics, &policy)
+                    .unwrap();
             let report = run.evaluation;
             assert!(report.design_variance_qualified);
             assert!(report.assay_estimator_qualified);
