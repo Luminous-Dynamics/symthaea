@@ -80,6 +80,7 @@ pub struct SyntheticBinaryEvsiReportV1 {
     pub expected_loss_after_measurement: f64,
     /// Gross decision-theoretic EVSI before acquisition cost.
     pub expected_value_of_sample_information: f64,
+    pub evsi_numerical_zero_tolerance: f64,
     pub measurement_cost: f64,
     pub net_value_after_measurement_cost: f64,
     /// Gross EVSI scaled by max(false-negative, false-positive loss), in [0, 1].
@@ -1375,7 +1376,17 @@ pub fn calculate_synthetic_binary_evsi_v1(
 
     let expected_loss_after_measurement = probability_positive * positive_conditional_loss
         + probability_negative * negative_conditional_loss;
-    let gross_evsi = (expected_loss_without_measurement - expected_loss_after_measurement).max(0.0);
+    let gross_evsi_raw = expected_loss_without_measurement - expected_loss_after_measurement;
+    let evsi_numerical_zero_tolerance = 1.0e-12
+        * expected_loss_without_measurement
+            .abs()
+            .max(expected_loss_after_measurement.abs())
+            .max(1.0);
+    let gross_evsi = if gross_evsi_raw > evsi_numerical_zero_tolerance {
+        gross_evsi_raw
+    } else {
+        0.0
+    };
     let net_value_after_measurement_cost = gross_evsi - loss.measurement_cost;
     let maximum_decision_loss = loss.false_negative_cost.max(loss.false_positive_cost);
     let normalized_evsi_score = (gross_evsi / maximum_decision_loss).clamp(0.0, 1.0);
@@ -1397,6 +1408,7 @@ pub fn calculate_synthetic_binary_evsi_v1(
         expected_loss_without_measurement,
         expected_loss_after_measurement,
         expected_value_of_sample_information: gross_evsi,
+        evsi_numerical_zero_tolerance,
         measurement_cost: loss.measurement_cost,
         net_value_after_measurement_cost,
         normalized_evsi_score,
@@ -2457,6 +2469,27 @@ mod tests {
             },
         );
         assert!(evaluate_synthetic_binary_evsi_sensitivity_v1(0.1, &assumptions).is_err());
+    }
+
+    #[test]
+    fn uninformative_assay_has_exactly_zero_evsi_with_zero_measurement_cost() {
+        let report = calculate_synthetic_binary_evsi_v1(
+            0.4,
+            SyntheticMetrologyCharacteristicsV1 {
+                sensitivity: 0.7,
+                specificity: 0.3,
+            },
+            SyntheticBinaryDecisionLossV1 {
+                false_negative_cost: 100.0,
+                false_positive_cost: 5.0,
+                measurement_cost: 0.0,
+            },
+        )
+        .unwrap();
+        assert_eq!(report.expected_value_of_sample_information, 0.0);
+        assert_eq!(report.net_value_after_measurement_cost, 0.0);
+        assert_eq!(report.normalized_evsi_score, 0.0);
+        assert!(report.evsi_numerical_zero_tolerance > 0.0);
     }
 
     #[test]
