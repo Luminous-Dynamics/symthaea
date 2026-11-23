@@ -17,7 +17,8 @@ use crate::benchmark::metrology_semantics::{
     validate_binary_measurand_semantics_v1,
 };
 use crate::benchmark::process_event_graph::{
-    PredictionInformationCutoffV1, ProcessEventGraphV1, build_information_cutoff_snapshot_v1,
+    MetrologyLabelStatusV1, PredictionInformationCutoffV1, ProcessEventGraphV1,
+    build_information_cutoff_snapshot_v1,
 };
 
 pub const POLICY_SCHEMA_V1: &str = "luminous.semi-bench.metrology-audit-policy.v1";
