@@ -1,6 +1,6 @@
 # Decision-value Compute × Observation Interaction Reference
 
-Owner: Symthaea issue #13279. Benchmark protocol: #13216 and DECISION_VALUE_COMPUTE_OBSERVATION_TOURNAMENT_V0_1.md.
+Owner: Symthaea issues #13279 and #13375. Benchmark protocol: #13216 and DECISION_VALUE_COMPUTE_OBSERVATION_TOURNAMENT_V0_1.md.
 
 This standalone Rust crate evaluates the signed interaction in evaluator-measured decision regret across exactly four paired runs:
 
@@ -36,6 +36,20 @@ Each score must be evaluator-supplied and lie within [0, 1,000,000] PPM. Missing
 - #9437 still requires evaluator process isolation. This crate is not a security boundary.
 
 This crate does not implement a candidate controller, scheduler, sensor policy, belief model, task-loss oracle, resource allocator or action authority.
+
+## Causal trajectory pairing (#13375)
+
+The `causal_pairing` module validates the four arms' trajectory lineage after execution. It reuses the generic replay-regime distinction in #8764 rather than defining a second replay engine.
+
+- **Open-loop action-invariant:** the arms may share a recorded future world trajectory. The validator requires matching world-state and exogenous-input commitments at every tick; observation-delivery commitments may differ by treatment.
+- **Closed-loop action-coupled:** every arm must carry its own driver-executed trajectory and independent replay-audit receipt. The arms share the initial state, dynamics/simulator/clock roots, exogenous schedule and RNG-domain commitments, while state and observation traces may legitimately diverge as actions change the world.
+- **Offline logged-policy evaluation:** rejected by this simulator-pairing validator because it needs a separate support and estimand contract.
+
+The validator also checks contiguous integer ticks, a continuous pre/post state chain, common exogenous event commitments on every overlapping tick, separated policy/world/sensor/evaluator RNG domains, and deterministic transition consistency when two arms present the same tick/state/action/exogenous inputs.
+
+This is an evidence-lineage and pairing check only. It does not validate simulator physics, prove exogenous schedule completeness, establish offline counterfactual identification, or authorize actions. In particular, a shared exogenous digest is not proof that the environment model is true.
+
+Protocol: [Symthaea #13375](https://github.com/Luminous-Dynamics/symthaea/issues/13375). Generic replay regimes: [#8764](https://github.com/Luminous-Dynamics/symthaea/issues/8764). Driver-owned decision-time evidence: [#8732](https://github.com/Luminous-Dynamics/symthaea/issues/8732).
 
 ## Run
 
