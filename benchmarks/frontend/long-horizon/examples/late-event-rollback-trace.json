@@ -3,7 +3,7 @@
   "trace_id": "SFEB-INT004-COMPOSITE-ALL-RULES-001",
   "case_id": "composite-independent-oracle-all-families",
   "fixture_id": "SFEB-INT-004-EVENTS-001",
-  "fixture_sha256": "ac98b22042929f4ddc546df0b0b83b693a3422f66c6e3eb173c223c5c10ad6fa",
+  "fixture_sha256": "f93030379f3698680ff89703c42f29f10973e1deafb5e84610dbbdd24cbb2d79",
   "steps": [
     {
       "op": "submit",
