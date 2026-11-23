@@ -65,7 +65,7 @@ The model's declared `Qualified` state and manifest digests do not authenticate 
 
 ## Authored tests
 
-Twelve Rust tests cover:
+Thirteen Rust tests cover:
 1. known linear drift correction at measurement time;
 2. parameter covariance, residual and model uncertainty propagation;
 3. time-interval-width uncertainty;
