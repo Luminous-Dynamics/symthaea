@@ -783,7 +783,7 @@ mod tests {
 
     #[test]
     fn row_scaling_does_not_change_structural_identifiability() {
-        let mut baseline = input(
+        let baseline = input(
             vec![
                 wafer_a(DriftActionEvidenceStateV1::ObservedQualified, 1),
                 witness_a(DriftActionEvidenceStateV1::ObservedQualified, 1),
@@ -811,13 +811,11 @@ mod tests {
         );
         assert_eq!(baseline_report.plan_status, scaled_report.plan_status);
         assert_eq!(baseline_report.target_status, scaled_report.target_status);
-        // Retain mutable baseline to make the fixture's input ownership explicit.
-        baseline.actions.reverse();
     }
 
     #[test]
     fn permuting_requested_targets_preserves_report_digest_and_order() {
-        let mut first = input(
+        let first = input(
             vec![
                 wafer_a(DriftActionEvidenceStateV1::ObservedQualified, 1),
                 witness_a(DriftActionEvidenceStateV1::ObservedQualified, 1),
@@ -838,7 +836,6 @@ mod tests {
         assert_eq!(report_a.input_sha256, report_b.input_sha256);
         assert_eq!(report_a.report_sha256, report_b.report_sha256);
         assert_eq!(report_a.target_status, report_b.target_status);
-        first.required_targets.reverse();
     }
 
     #[test]
