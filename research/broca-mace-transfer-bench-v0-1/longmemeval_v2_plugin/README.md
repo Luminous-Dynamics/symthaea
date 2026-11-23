@@ -114,6 +114,18 @@ The Python bridge independently recomputes the Rust trace-receipt SHA-256 using 
 
 The trace store inside the Rust sidecar is process-local and is not restored as live promotion state from Python receipts. The receipts survive in the saved benchmark state for audit/replay, but multi-query policy consolidation across restarts remains future work. An external durable, access-controlled policy service is still needed for cross-run promotion.
 
+## Label-blind retrieval trace receipts
+
+Each query now emits a typed retrieval trace receipt alongside its candidate-evidence envelope. The Rust sidecar records the official opaque query invocation ID, run, domain, environment revision, execution-profile digest, exact query digest, candidate-set digest, operation/tool/action-template identities, observed evidence IDs, stop reason and query wall time.
+
+The sidecar's current V2 arm executes **one operation**: `trajectory.bm25.search`. It records this real single-step trace in the process-local RetrievalPolicyMemoryV1 reference store. It does not automatically promote a strategy note or select alternative search tools; this is trace capture, not an online multi-step policy learner and not an AgentRunbook-C V2 replication.
+
+The BM25 adapter does not expose posting/index bytes read. The trace explicitly records `inspected_bytes_measured=false` and `inspected_bytes_complete=false`; the corresponding zero is an unmeasured placeholder, not zero cost. Query latency is measured. Full index I/O/RSS and total infrastructure cost remain pending instrumentation.
+
+The Python bridge independently recomputes the Rust trace-receipt SHA-256 using the versioned binary encoding and checks a fixed cross-language reference vector. It persists one create-once trace JSON per invocation under `workspace_dir/retrieval_traces/`, pairs it with the candidate receipt, and verifies the pair and digest again during save/load. Query text is not included; only its SHA-256 is retained. The environment revision is a required run input and must be identical when replaying the trace.
+
+The trace store inside the Rust sidecar is process-local and is not restored as live promotion state from Python receipts. The receipts survive in the saved benchmark state for audit/replay, but multi-query policy consolidation across restarts remains future work. An external durable, access-controlled policy service is still needed for cross-run promotion.
+
 ## Retrieval and accounting
 
 The sidecar exposes build and search timings, hit counts and neighbor counts in its internal response. The official harness's measured `Memory.query` wall-clock includes RPC overhead, lazy index construction on the first query, screenshot digest verification and context assembly.
