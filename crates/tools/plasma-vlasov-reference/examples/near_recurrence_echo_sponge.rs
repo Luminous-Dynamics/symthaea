@@ -178,10 +178,7 @@ struct PositivityMetrics {
     negative_mass_fraction: f64,
 }
 
-fn positivity_metrics(
-    distribution: &[f64],
-    config: VlasovPoissonConfig,
-) -> PositivityMetrics {
+fn positivity_metrics(distribution: &[f64], config: VlasovPoissonConfig) -> PositivityMetrics {
     let mut minimum = f64::INFINITY;
     let mut negative_cells = 0usize;
     let mut positive_mass = 0.0;
@@ -451,10 +448,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let coarse_c2_relative_delta =
         relative_delta(coarse_final_budget.total_casimir, coarse_initial_c2);
-    let fine_c2_relative_delta =
-        relative_delta(fine_final_budget.total_casimir, fine_initial_c2);
-    let sponge_c2_relative_delta =
-        relative_delta(sponge_final_budget.total_casimir, initial_c2);
+    let fine_c2_relative_delta = relative_delta(fine_final_budget.total_casimir, fine_initial_c2);
+    let sponge_c2_relative_delta = relative_delta(sponge_final_budget.total_casimir, initial_c2);
 
     let coarse_total_energy_relative_delta = relative_delta(
         coarse_final_diagnostics.total_energy,
@@ -506,8 +501,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
     let coarse_momentum_delta =
         coarse_final_diagnostics.momentum - coarse_initial_diagnostics.momentum;
-    let fine_momentum_delta =
-        fine_final_diagnostics.momentum - fine_initial_diagnostics.momentum;
+    let fine_momentum_delta = fine_final_diagnostics.momentum - fine_initial_diagnostics.momentum;
     let sponge_momentum_delta =
         sponge_final_diagnostics.momentum - sponge_initial_diagnostics.momentum;
     let c2_closure_error =
