@@ -1,0 +1,546 @@
+{
+  "schema_version": "0.1.0",
+  "campaign_id": "BH-EGB-SYMTHAEA-001",
+  "title": "Symthaea research policy for Symtropy's 5D equal-spin EGB response atlas",
+  "updated_utc": "2026-11-23",
+  "campaign_state": "design_frozen_execution_not_started",
+  "claim_ceiling": "No Symthaea performance, finite-coupling EGB solution, interval theorem, branch completeness, dynamical stability, or PDE hyperbolicity result is claimed by this manifest.",
+  "owners": {
+    "discovery_and_research_policy": "Luminous-Dynamics/symthaea",
+    "equation_and_numerical_physics": "Luminous-Dynamics/symtropy",
+    "independent_qualification": "Existing exact-source, interval, formal, and held-out verification owners; not the proposing policy",
+    "human_scientific_authority": "Human researchers"
+  },
+  "source_pins": [
+    {
+      "role": "symthaea_source_audit",
+      "repository": "Luminous-Dynamics/symthaea",
+      "ref": "main",
+      "commit": "e2c81a55b39d0a3601b0ef2940be29a7525a3082",
+      "files": [
+        {
+          "path": "crates/core/symthaea-core/src/physics/general_relativity.rs",
+          "git_blob_sha1": "cae917e114407316bf263065d13a59dda9794e49",
+          "use": "semantic HDC encoding only; exploratory module"
+        },
+        {
+          "path": "crates/bridges/symthaea-physics-bridge/src/integrated_discovery.rs",
+          "git_blob_sha1": "e840a4e316b8770dd0293154e9e116f30c049b9b",
+          "use": "factorial design precedent; do not inherit energy-law task semantics"
+        },
+        {
+          "path": "src/language/research_plugin.rs",
+          "git_blob_sha1": "9aa62780576f9937ce6310c9c0176fbfa51bb9d5",
+          "use": "research query and entity extraction front-end"
+        },
+        {
+          "path": "src/z3_bridge.rs",
+          "git_blob_sha1": "28b802030718c299105f6e337be3a94db699f1f7",
+          "use": "finite symbolic/logic checks only; not continuous analysis"
+        }
+      ]
+    },
+    {
+      "role": "symthaea_campaign_protocol",
+      "repository": "Luminous-Dynamics/symthaea",
+      "ref": "research/bh-egb-symthaea-campaign-2026-11-23",
+      "commit": "c98881471ddd929dfe97e9bb5c5d0e3ff71a790f",
+      "files": [
+        {
+          "path": "docs/research/BH_EGB_SYMTHAEA_CAMPAIGN_V0_1.md",
+          "git_blob_sha1": "6ed3bab896d55d1eabe4563e41b373a7754a7ee7",
+          "use": "campaign protocol and source audit"
+        }
+      ],
+      "pr": "https://github.com/Luminous-Dynamics/symthaea/pull/13407",
+      "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13406",
+      "workflow_state": "all_associated_runs_skipped"
+    },
+    {
+      "role": "symtropy_response_operator",
+      "repository": "Luminous-Dynamics/symtropy",
+      "ref": "research/spin2-regularized-pivot-2026-11-21",
+      "commit": "ef5a006023300086e134ba6d39ca4fc3e859872f",
+      "files": [
+        {
+          "path": "crates/domains/symtropy-lovelock5d/benchmarks/spin2_boundary_response_operator_protocol_v1.md",
+          "git_blob_sha1": "435e86f3d6852b5e4df16d4a2068c62df8d50eda",
+          "use": "response matrix, basis covariance, event and interval protocol"
+        },
+        {
+          "path": "crates/domains/symtropy-lovelock5d/benchmarks/verify_spin2_response_basis_covariance.py",
+          "git_blob_sha1": "5c5a973f06da5f18a6c6b8e0e75611746bcb2161",
+          "use": "exact synthetic 2x2 algebra verifier; not EGB physics"
+        },
+        {
+          "path": "crates/domains/symtropy-lovelock5d/benchmarks/spin2_response_basis_covariance_v1.json",
+          "git_blob_sha1": "1063012ae7480858f9283671ac05843c89d5791a",
+          "use": "synthetic exact replay receipt"
+        },
+        {
+          "path": "crates/domains/symtropy-lovelock5d/benchmarks/spin2_coupling_sensitivity_continuation_contract_v1.md",
+          "git_blob_sha1": "f89fdb2fe19cafd13327ae44231485bc9874accf",
+          "use": "J0/J1/offset sensitivity contract"
+        }
+      ],
+      "issues": [
+        "https://github.com/Luminous-Dynamics/symtropy/issues/6805",
+        "https://github.com/Luminous-Dynamics/symtropy/issues/7131",
+        "https://github.com/Luminous-Dynamics/symtropy/issues/7135"
+      ]
+    },
+    {
+      "role": "akribiea_einstein_limit_comparator",
+      "repository": "Luminous-Dynamics/symtropy",
+      "ref": "research/spin2-regularized-pivot-2026-11-21",
+      "files": [
+        {
+          "path": "crates/domains/symtropy-lovelock5d/benchmarks/akribiea_5d_mp_exact_fixture_v1.json",
+          "git_blob_sha1": "2cf5847556925aea7a376dadd6d4b4861d6d8bb8",
+          "use": "pinned exact 5D Myers-Perry control fixture"
+        },
+        {
+          "path": "crates/domains/symtropy-lovelock5d/benchmarks/akribiea_5d_mp_exact_reference.py",
+          "git_blob_sha1": "fc461ceb18d219ac7a0a97beee488bc1fb094ce7",
+          "use": "existing reference calculation; re-execute and independently inspect before promoting"
+        }
+      ],
+      "publication": "https://doi.org/10.1103/3kz2-6dvv",
+      "publication_status": "Physical Review D accepted 2026-11-12",
+      "comparison_ceiling": "Einstein-limit reference only until geometry, spin order, coupling, ensemble, gauges, observables and resource budgets are matched"
+    },
+    {
+      "role": "ma_lu_parameter_map",
+      "repository": "Luminous-Dynamics/symtropy",
+      "ref": "research/spin2-regularized-pivot-2026-11-21",
+      "files": [
+        {
+          "path": "crates/domains/symtropy-lovelock5d/benchmarks/derive_ma_lu_equal_spin_parameter_map.py",
+          "git_blob_sha1": "30616c178a051f0a2fd120aba8a9d03dfc8c865e",
+          "use": "parameter conversion derivation"
+        },
+        {
+          "path": "crates/domains/symtropy-lovelock5d/benchmarks/derive_ma_lu_equal_spin_symtropy_gauge.py",
+          "git_blob_sha1": "538003f2936e645ef8c7c62f4ffd1f4db00153ae",
+          "use": "fixed Symtropy gauge comparison"
+        }
+      ],
+      "issue": "https://github.com/Luminous-Dynamics/symtropy/issues/6915"
+    }
+  ],
+  "authority_boundaries": {
+    "hdc": "retrieve semantic and structural analogies only; preserve exact AST, units, assumptions, source digests and endpoint bases out of band",
+    "ramanujan": "propose conjectures and alternative derivations; proposals are not evidence",
+    "cfc": "optional campaign-history predictor only; never solve the radial equations or blend unlike residual series",
+    "fep_voc": "propose a prospective next action and forecast before observing its result",
+    "symtropy": "execute exact model and numerical physics tasks; report original rows, constraints, endpoint maps and solver provenance",
+    "independent_verifier": "qualify exact source replay, mathematical proof, interval enclosures and held-out results",
+    "human": "retain scientific priority and final claim adjudication"
+  },
+  "action_catalog": [
+    {
+      "id": "A01",
+      "kind": "source_replay",
+      "description": "Replay the action-derived equation-row extractor against the pinned O(lambda a^2) fixture",
+      "cost_class": "low",
+      "decision_outputs": [
+        "source_fixture_match",
+        "J1_replay_eligibility"
+      ]
+    },
+    {
+      "id": "A02",
+      "kind": "exact_derivation",
+      "description": "Independently derive one homogeneous response sensitivity column",
+      "cost_class": "medium",
+      "decision_outputs": [
+        "symbolic_identity",
+        "row_residuals",
+        "Noether_derivative"
+      ]
+    },
+    {
+      "id": "A03",
+      "kind": "negative_control",
+      "description": "Apply a predeclared sign, basis, horizon normalization or forbidden-projector mutation",
+      "cost_class": "low",
+      "decision_outputs": [
+        "mutation_detection",
+        "claim_disposition"
+      ]
+    },
+    {
+      "id": "A04",
+      "kind": "numerical_bvp",
+      "description": "Correct a small-positive-coupling O(a^2) BVP",
+      "cost_class": "high",
+      "decision_outputs": [
+        "profile",
+        "response_matrix",
+        "original_rows",
+        "Noether_residual"
+      ]
+    },
+    {
+      "id": "A05",
+      "kind": "numerical_refinement",
+      "description": "Increase spectral resolution or arithmetic precision on a frozen case",
+      "cost_class": "medium",
+      "decision_outputs": [
+        "convergence_rate",
+        "tail_estimate",
+        "residual_change"
+      ]
+    },
+    {
+      "id": "A06",
+      "kind": "independent_transport",
+      "description": "Compare horizon-outward transport with infinity-inward matching",
+      "cost_class": "high",
+      "decision_outputs": [
+        "response_matrix",
+        "overlap_defect",
+        "basis_conditioning"
+      ]
+    },
+    {
+      "id": "A07",
+      "kind": "asymptotic_analysis",
+      "description": "Derive finite-coupling endpoint indicial recurrences and mode counts",
+      "cost_class": "medium",
+      "decision_outputs": [
+        "mode_count",
+        "log_compatibility",
+        "Fredholm_inputs"
+      ]
+    },
+    {
+      "id": "A08",
+      "kind": "formal_obligation",
+      "description": "Formalize an exact algebraic lemma or finite-dimensional implication",
+      "cost_class": "medium",
+      "decision_outputs": [
+        "statement_fidelity",
+        "kernel_checked_proof_or_counterexample"
+      ]
+    },
+    {
+      "id": "A09",
+      "kind": "interval_validation",
+      "description": "Attempt interval enclosure of a finite-coupling response matrix or residual",
+      "cost_class": "very_high",
+      "decision_outputs": [
+        "invertibility_margin_or_inconclusive_box"
+      ]
+    },
+    {
+      "id": "A10",
+      "kind": "literature_crosscheck",
+      "description": "Reconcile an observable or coupling convention with the pinned Ma-Lu source",
+      "cost_class": "low",
+      "decision_outputs": [
+        "parameter_map_identity",
+        "ensemble_compatibility"
+      ]
+    }
+  ],
+  "episodes": [
+    {
+      "id": "EGB-001-SOURCE-INTEGRITY",
+      "state": "blocked_on_action_row_extractor_replay",
+      "question": "Do the committed spin-2 rows and first-sensitivity fixture reproduce from the current action-derived extractor?",
+      "allowed_actions": [
+        "A01",
+        "A03"
+      ],
+      "expected_oracles": [
+        "exact source and fixture digests",
+        "all four original equation rows",
+        "differentiated Noether identity"
+      ],
+      "promotion_gate": "No J1 action-source replay promotion unless exact current extractor output matches the pinned fixture and independent replay reproduces it.",
+      "non_claim": "A symbolic derivation or fixture-only rational check is not current-source replay."
+    },
+    {
+      "id": "EGB-002-EINSTEIN-BOUNDARY-MAP",
+      "state": "exact_anchor_reported_replay_required",
+      "question": "Does the independent endpoint basis recover the Einstein-limit boundary matrix?",
+      "allowed_actions": [
+        "A02",
+        "A06",
+        "A07"
+      ],
+      "expected_oracles": [
+        "J0=[[1/2,0],[0,2]]",
+        "p0=[-4,1]",
+        "endpoint mode count and forbidden-amplitude definitions"
+      ],
+      "promotion_gate": "Both homogeneous endpoint columns and endpoint normalization independently reproduce the exact J0 matrix.",
+      "non_claim": "Recovering a 2x2 matrix alone does not prove no hidden modes or a zero-coupling function-space theorem."
+    },
+    {
+      "id": "EGB-003-FIRST-COUPLING-SENSITIVITY",
+      "state": "formal_values_reported_source_replay_pending",
+      "question": "Do both homogeneous response columns yield the full coupling derivative, distinct from the affine offset derivative?",
+      "allowed_actions": [
+        "A01",
+        "A02",
+        "A03",
+        "A07"
+      ],
+      "expected_oracles": [
+        "J1=[[1/2,19-2*pi^2],[0,67-6*pi^2]]",
+        "offset_derivative=[-53/9,28/3]",
+        "p_star_prime=[106/9,-14/3]"
+      ],
+      "promotion_gate": "All original differentiated rows, Noether derivative, normalization derivatives and independent source replay agree.",
+      "non_claim": "The affine offset derivative is not J1; reported formal values remain below full action-source replay until gate passes."
+    },
+    {
+      "id": "EGB-004-BASIS-COVARIANCE",
+      "state": "synthetic_exact_replay_receipt_available",
+      "question": "Can the campaign distinguish a genuine response change from a coordinate/basis change?",
+      "allowed_actions": [
+        "A03",
+        "A08"
+      ],
+      "expected_oracles": [
+        "determinant zero set invariant under nonsingular basis changes",
+        "metric-aware generalized spectrum invariant under metric transport",
+        "raw Euclidean singular values can change"
+      ],
+      "promotion_gate": "Synthetic exact controls replay from pinned source; physical endpoint metrics are then separately specified and transported.",
+      "non_claim": "The synthetic 2x2 control is not a physical EGB response calculation."
+    },
+    {
+      "id": "EGB-005-AKRIBIEA-MP-CONTROL",
+      "state": "reference_fixture_pinned_reproduction_required",
+      "question": "Can the exact 5D Myers-Perry Einstein-limit reference be reproduced under the same declared conventions?",
+      "allowed_actions": [
+        "A05",
+        "A08",
+        "A10"
+      ],
+      "expected_oracles": [
+        "pinned fixture values",
+        "independent metric/profile and observable checks",
+        "convergence and resource report"
+      ],
+      "promotion_gate": "Run pinned source and independent evaluator; compare observables, not only output norm.",
+      "non_claim": "Einstein-limit recovery does not establish finite-coupling superiority over Akribeia."
+    },
+    {
+      "id": "EGB-006-MA-LU-ENSEMBLE",
+      "state": "parameter_map_artifacts_pinned_replay_required",
+      "question": "Are the paper's equal-spin parameter and charge series correctly re-expressed in Symtropy's fixed horizon/angular-velocity ensemble?",
+      "allowed_actions": [
+        "A08",
+        "A10"
+      ],
+      "expected_oracles": [
+        "chi=a/sqrt(mu) paper convention",
+        "both angular-axis factors",
+        "fixed-background versus fixed-(R_H,Omega_H) distinction",
+        "mass correction through declared chi order"
+      ],
+      "promotion_gate": "Reproduce original series then perform an independently checked parameter/ensemble transformation.",
+      "non_claim": "Thermodynamic-series agreement is not a finite-spin metric-solution comparison."
+    },
+    {
+      "id": "EGB-007-FINITE-POSITIVE-LAMBDA",
+      "state": "not_yet_executed",
+      "question": "Do independent small-positive-coupling BVP corrections converge to the exact first-sensitivity prediction?",
+      "allowed_actions": [
+        "A04",
+        "A05",
+        "A06",
+        "A09"
+      ],
+      "expected_oracles": [
+        "at least three decreasing positive lambda corrections",
+        "both response columns",
+        "original unscaled equations and Noether residual",
+        "independent endpoint overlap"
+      ],
+      "promotion_gate": "Three or more corrected points exhibit the predicted first-order convergence, with full residual and failure accounting; interval validation is a separate subsequent gate.",
+      "non_claim": "A sampled derivative match does not prove branch completeness, existence, uniqueness or hyperbolicity."
+    },
+    {
+      "id": "EGB-008-LOCAL-OA2-THEOREM",
+      "state": "theorem_obligations_open",
+      "question": "Can an analytic Fredholm / implicit-function theorem establish the local fixed-gauge O(a^2) perturbative branch?",
+      "allowed_actions": [
+        "A02",
+        "A07",
+        "A08",
+        "A09"
+      ],
+      "expected_oracles": [
+        "common function space and operator domain",
+        "analytic coefficient/operator family",
+        "finite-lambda endpoint mode counts",
+        "Fredholm index zero and no hidden gauge kernel",
+        "invertibility at lambda=0"
+      ],
+      "promotion_gate": "Independent proof of every theorem assumption and conclusion, with a quantitative interval radius if available.",
+      "non_claim": "This is not a fully nonlinear finite-spin rotating-black-hole theorem."
+    }
+  ],
+  "policy_arms": [
+    {
+      "id": "P00",
+      "name": "researcher_directed",
+      "features": [
+        "human_selected_actions"
+      ]
+    },
+    {
+      "id": "P01",
+      "name": "fixed_schedule",
+      "features": [
+        "preregistered_action_order"
+      ]
+    },
+    {
+      "id": "P02",
+      "name": "random_matched_cost",
+      "features": [
+        "random_action_from_legal_set"
+      ]
+    },
+    {
+      "id": "P03",
+      "name": "static_threshold",
+      "features": [
+        "fixed_residual_uncertainty_threshold"
+      ]
+    },
+    {
+      "id": "P04",
+      "name": "active_selector",
+      "features": [
+        "existing_experiment_selector"
+      ],
+      "eligibility": "only_after_exact_implementation_qualification"
+    },
+    {
+      "id": "P05",
+      "name": "symthaea_policy_incumbent",
+      "features": [
+        "actual_research_policy"
+      ],
+      "eligibility": "must pin callable, model, prompts, tools and policy source"
+    },
+    {
+      "id": "P06",
+      "name": "symthaea_without_hdc",
+      "features": [
+        "policy_incumbent",
+        "hdc_disabled"
+      ]
+    },
+    {
+      "id": "P07",
+      "name": "symthaea_without_cfc",
+      "features": [
+        "policy_incumbent",
+        "cfc_disabled"
+      ]
+    },
+    {
+      "id": "P08",
+      "name": "symthaea_without_voc",
+      "features": [
+        "policy_incumbent",
+        "prospective_voc_sham"
+      ]
+    },
+    {
+      "id": "P09",
+      "name": "tiny_world_oracle",
+      "features": [
+        "enumerated_outcome_oracle"
+      ],
+      "eligibility": "upper-bound diagnostic only"
+    }
+  ],
+  "confirmatory_preconditions": {
+    "policy_source_and_model_pins": null,
+    "prompt_and_tool_manifest": null,
+    "solver_budget": null,
+    "agent_compute_budget": null,
+    "maximum_actions_per_episode": null,
+    "hidden_holdout_manifest_digest": null,
+    "sample_size_and_power_plan": null,
+    "stopping_rule": null,
+    "evaluator_identity": null,
+    "note": "Null preconditions make the manifest design-only and block confirmatory performance claims until all are frozen."
+  },
+  "primary_metrics": [
+    "false_promotion_rate",
+    "frozen_negative_control_detection",
+    "exact_source_replay_disposition",
+    "independent_derivation_and_theorem_obligation_completion",
+    "cost_to_first_independent_replay",
+    "cost_to_first_interval_or_theorem_result",
+    "falsification_power_by_mutation_class",
+    "prospective_action_forecast_calibration",
+    "realized_action_utility_and_regret",
+    "numerical_branch_coverage_vs_interval_validated_arclength",
+    "candidate_rejection_and_negative_transfer_rates",
+    "CPU_GPU_wall_time_solver_calls_precision_memory_tokens_and_cost"
+  ],
+  "frozen_negative_controls": [
+    "stale_action_extractor_source",
+    "fixture_mutated_without_source_revision",
+    "wrong_sign_in_one_original_equation_row",
+    "swapped_horizon_mode_coordinates",
+    "changed_forbidden_infinity_projector",
+    "singular_endpoint_basis_change",
+    "basis_change_without_Gram_metric_transport",
+    "affine_offset_mislabelled_as_J1",
+    "Noether_identity_dropped",
+    "hidden_endpoint_logarithmic_mode",
+    "solver_exit_zero_with_nonconverged_bvp",
+    "sampled_determinant_zero_claimed_as_certified_root",
+    "response_map_singularity_misclassified_as_nonlinear_fold",
+    "stationary_bvp_pass_misclassified_as_PDE_hyperbolicity"
+  ],
+  "external_benchmarks": [
+    {
+      "name": "SciWorkBench",
+      "url": "https://arxiv.org/abs/2611.22490",
+      "published": "2026-11-17",
+      "reported_result": "best mean 57.38/100 on 98 real scientific workflow tasks",
+      "use": "whole workflow and task-procedure benchmark; preprint result"
+    },
+    {
+      "name": "FIRE-Bench",
+      "url": "https://proceedings.mlr.press/v306/wang26d.html",
+      "published": "2026-07",
+      "reported_result": "best tested agent below 50 F1 with high run-to-run variance",
+      "use": "verifiable rediscovery and atomic claim scoring"
+    },
+    {
+      "name": "AstaBench E2E-Bench",
+      "url": "https://allenai.org/asta/bench",
+      "published": "living benchmark",
+      "reported_result": "distinct end-to-end discovery benchmark family; do not pool with coding/retrieval scores",
+      "use": "external scientific workflow harness comparator"
+    },
+    {
+      "name": "DiscoveryAgent",
+      "url": "https://arxiv.org/abs/2611.21950",
+      "published": "2026-11-16",
+      "reported_result": "checkpointed audit-agent and scientist-steering architecture; 14x error-detection claim is specific to its reported study",
+      "use": "checkpointing, independent audit and scientist steering design comparator"
+    },
+    {
+      "name": "Akribeia",
+      "url": "https://doi.org/10.1103/3kz2-6dvv",
+      "published": "Physical Review D accepted 2026-11-12",
+      "reported_result": "neural discovery plus pseudo-spectral refinement for higher-curvature rotating black-hole families",
+      "use": "matched 5D Einstein-limit and later same-model numerical comparator"
+    }
+  ]
+}
