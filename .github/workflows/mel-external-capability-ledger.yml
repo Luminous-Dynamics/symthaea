@@ -1,0 +1,112 @@
+name: MEL External Capability Ledger
+
+on:
+  push:
+    branches:
+      - research/mel-external-capability-ledger-20261121
+    paths:
+      - "benchmarks/mel/external-capability-ledger-2026-11-21.json"
+      - "benchmarks/mel/schemas/external-capability-ledger-v1.schema.json"
+      - "tools/mel-external-capability-ledger-validator/**"
+      - "docs/research/MEL_BENCH_001_EXTERNAL_CAPABILITY_LEDGER_V1_2026-11-21.md"
+      - ".github/workflows/mel-external-capability-ledger.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "benchmarks/mel/external-capability-ledger-2026-11-21.json"
+      - "benchmarks/mel/schemas/external-capability-ledger-v1.schema.json"
+      - "tools/mel-external-capability-ledger-validator/**"
+      - "docs/research/MEL_BENCH_001_EXTERNAL_CAPABILITY_LEDGER_V1_2026-11-21.md"
+      - ".github/workflows/mel-external-capability-ledger.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mel-external-capability-ledger-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Exact-head ledger validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact tested head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+          echo "exact source head: $actual"
+
+      - name: Verify pinned Rust toolchain
+        run: |
+          rustc --version
+          cargo --version
+          rustfmt --version
+
+      - name: Resolve standalone validator lockfile
+        run: cargo generate-lockfile --manifest-path tools/mel-external-capability-ledger-validator/Cargo.toml
+
+      - name: Preserve original validator source
+        run: cp tools/mel-external-capability-ledger-validator/src/main.rs "$RUNNER_TEMP/validator-main.source.rs"
+
+      - name: Normalize temporary checkout formatting and check
+        run: |
+          cargo fmt --manifest-path tools/mel-external-capability-ledger-validator/Cargo.toml
+          cargo fmt --manifest-path tools/mel-external-capability-ledger-validator/Cargo.toml --check
+
+
+      - name: Run strict validator tests
+        run: cargo test --locked --manifest-path tools/mel-external-capability-ledger-validator/Cargo.toml
+
+      - name: Validate committed dated ledger
+        run: cargo run --locked --manifest-path tools/mel-external-capability-ledger-validator/Cargo.toml
+
+      - name: Record exact-head evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/mel-external-capability-ledger-evidence"
+          mkdir -p "$evidence"
+          cp benchmarks/mel/external-capability-ledger-2026-11-21.json "$evidence/external-capability-ledger.json"
+          cp benchmarks/mel/schemas/external-capability-ledger-v1.schema.json "$evidence/external-capability-ledger.schema.json"
+          cp tools/mel-external-capability-ledger-validator/Cargo.toml "$evidence/Cargo.toml"
+          cp tools/mel-external-capability-ledger-validator/Cargo.lock "$evidence/Cargo.lock"
+          cp "$RUNNER_TEMP/validator-main.source.rs" "$evidence/validator-main.source.rs"
+          cp tools/mel-external-capability-ledger-validator/src/main.rs "$evidence/validator-main.formatted.rs"
+          cp docs/research/MEL_BENCH_001_EXTERNAL_CAPABILITY_LEDGER_V1_2026-11-21.md "$evidence/ledger-research.md"
+          printf 'exact_head=%s\nsource_main_sha256=%s\nformatted_main_sha256=%s\n' \
+            "$(git rev-parse HEAD)" \
+            "$(sha256sum "$evidence/validator-main.source.rs" | awk '{print $1}')" \
+            "$(sha256sum "$evidence/validator-main.formatted.rs" | awk '{print $1}')" \
+            > "$evidence/source-identities.txt"
+          (
+            cd "$evidence"
+            sha256sum \
+              external-capability-ledger.json \
+              external-capability-ledger.schema.json \
+              Cargo.toml \
+              Cargo.lock \
+              validator-main.source.rs \
+              validator-main.formatted.rs \
+              ledger-research.md \
+              source-identities.txt > SHA256SUMS
+          )
+
+      - name: Upload exact-head ledger evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: mel-external-capability-ledger-${{ github.sha }}
+          path: ${{ runner.temp }}/mel-external-capability-ledger-evidence/
+          if-no-files-found: error
+          retention-days: 90

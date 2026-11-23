@@ -1,0 +1,1742 @@
+{
+  "schema_version": "mel-external-capability-ledger-v1",
+  "ledger_id": "melothaea-external-capability-snapshot-2026-11-21",
+  "as_of": "2026-11-21",
+  "sources": [
+    {
+      "source_id": "aa-music-instrumental",
+      "title": "Artificial Analysis Music Generation Leaderboard — Instrumental",
+      "url": "https://artificialanalysis.ai/music/leaderboard/instrumental",
+      "source_class": "benchmark_leaderboard",
+      "published_or_observed_at": "2026-11-21 snapshot",
+      "retrieved_at": "2026-11-21",
+      "scope": "Blind pairwise human-preference ranking of generated instrumental audio.",
+      "version_snapshot": "AA-Music Instrumental v1.1 observed 2026-11-21",
+      "limitations": [
+        "Elo is task- and cohort-specific.",
+        "Does not measure score edit correctness, collaboration, causal reciprocity, user agency, rights, or event-level control."
+      ]
+    },
+    {
+      "source_id": "aa-music-vocal",
+      "title": "Artificial Analysis Music Generation Leaderboard — Vocals",
+      "url": "https://artificialanalysis.ai/embed/music-generation-leaderboard/leaderboard/vocals",
+      "source_class": "benchmark_leaderboard",
+      "published_or_observed_at": "2026-11-21 snapshot",
+      "retrieved_at": "2026-11-21",
+      "scope": "Blind pairwise human-preference ranking of generated vocal music.",
+      "version_snapshot": "AA-Music Vocal board observed 2026-11-21",
+      "limitations": [
+        "Separate board and task from instrumental ranking.",
+        "Does not measure score edit correctness, collaboration, causal reciprocity, user agency, or rights."
+      ]
+    },
+    {
+      "source_id": "mirex-2026-symbolic",
+      "title": "MIREX 2026 Symbolic Music Generation Results",
+      "url": "https://futuremirex.com/mirex/wiki/2026%3ASymbolic_Music_Generation_Results",
+      "source_class": "benchmark_leaderboard",
+      "published_or_observed_at": "2026-11-21 snapshot",
+      "retrieved_at": "2026-11-21",
+      "scope": "Human ratings of symbolic music generation/continuation on coherence, structure, creativity and musicality.",
+      "version_snapshot": "MIREX 2026 symbolic generation result page",
+      "limitations": [
+        "Small reported panel: 8 prompts, 12 participants and 38 ratings per model.",
+        "Selected samples from eight candidates; do not compare to audio Elo.",
+        "Does not measure reciprocal interaction or exact-edit preservation."
+      ]
+    },
+    {
+      "source_id": "smebench-2026",
+      "title": "SMEBench: Benchmarking Instruction Following for Music Editing",
+      "url": "https://arxiv.org/abs/2610.36715",
+      "source_class": "preprint",
+      "published_or_observed_at": "2026-10-27",
+      "retrieved_at": "2026-11-21",
+      "scope": "Paired source/target music edits across 12 edit operations, with synthetic/constructed and real-audio cohorts.",
+      "version_snapshot": "arXiv:2610.36715 snapshot as observed 2026-11-21",
+      "limitations": [
+        "Dataset scope is not a single scalar model ranking.",
+        "Target agreement, source preservation and text compatibility must remain separate."
+      ]
+    },
+    {
+      "source_id": "suno-studio-2",
+      "title": "Suno Studio 2.0 — official help documentation",
+      "url": "https://help.suno.com/en/articles/13670529",
+      "source_class": "official_product_documentation",
+      "published_or_observed_at": "2026-08-13 product announcement / current documentation observed 2026-11-21",
+      "retrieved_at": "2026-11-21",
+      "scope": "Documented generative music production workflow and editing capabilities.",
+      "version_snapshot": "Suno Studio 2.0",
+      "limitations": [
+        "Product documentation is capability evidence, not independent benchmark performance.",
+        "Capabilities can change; verify availability and regional/account conditions when testing."
+      ]
+    },
+    {
+      "source_id": "google-lyria-realtime",
+      "title": "Google Lyria RealTime API documentation",
+      "url": "https://ai.google.dev/gemini-api/docs/realtime-music-generation",
+      "source_class": "official_api_documentation",
+      "published_or_observed_at": "2026-11-21 documentation snapshot",
+      "retrieved_at": "2026-11-21",
+      "scope": "Persistent streaming audio generation with live prompt and configuration steering.",
+      "version_snapshot": "Lyria RealTime experimental API as documented 2026-11-21",
+      "limitations": [
+        "Streaming audio controls are not equivalent to symbolic note/event editing.",
+        "Do not score note-level control where the API does not expose note-level events.",
+        "Configuration transitions and reset semantics must be included in timing/continuity tests."
+      ]
+    },
+    {
+      "source_id": "yue2-2026",
+      "title": "YuE2: Agentic Score Planning and Editing for Music Generation",
+      "url": "https://arxiv.org/abs/2609.33757",
+      "source_class": "preprint",
+      "published_or_observed_at": "2026-09-27",
+      "retrieved_at": "2026-11-21",
+      "scope": "Score-first full-song planning and realization, with conversational score/arrangement editing described in the research release.",
+      "version_snapshot": "YuE2 September 2026 paper/repository snapshot",
+      "limitations": [
+        "Research capability description is not a matched independent preference result.",
+        "Score-first planning is not itself proof of persistent event identity, reversible edits, causal collaboration or preservation guarantees."
+      ]
+    },
+    {
+      "source_id": "google-mage-2026",
+      "title": "MAGE: Modality-Agnostic Music Generation and Mixture-Grounded Editing",
+      "url": "https://arxiv.org/abs/2604.09803",
+      "source_class": "preprint",
+      "published_or_observed_at": "2026-04-10",
+      "retrieved_at": "2026-11-21",
+      "scope": "Multimodal conditional music generation and mixture-grounded target-source editing.",
+      "version_snapshot": "MAGE 2026 preprint snapshot",
+      "limitations": [
+        "Generation/source-extraction comparison, not general symbolic score-edit correctness.",
+        "Do not infer arbitrary score-level event identity or protected-region guarantees from mixture-grounded source extraction."
+      ]
+    },
+    {
+      "source_id": "jam-bot-nime-2026",
+      "title": "JAM_BOT: Expressive Human–AI Musical Improvisation",
+      "url": "https://nime.org/proc/nime2026_73/index.html",
+      "source_class": "peer_reviewed_or_conference_paper",
+      "published_or_observed_at": "NIME 2026",
+      "retrieved_at": "2026-11-21",
+      "scope": "Real-time symbolic and expressive human–AI improvisation, with variable-tempo call-and-response and MIDI timing work.",
+      "version_snapshot": "JAM_BOT NIME 2026 follow-up",
+      "limitations": [
+        "Closest live symbolic-interaction comparator, but not a matched result against Muse yet.",
+        "Performance depends on instrument, clock, MIDI interface, buffering and latency compensation."
+      ]
+    },
+    {
+      "source_id": "taan-timingbench-2026",
+      "title": "TimingBench: Are you rushing or dragging? A benchmark for temporal controllability in text-to-music generation",
+      "url": "https://taan.ai/research/rushing-or-dragging/",
+      "source_class": "benchmark_dataset",
+      "published_or_observed_at": "August 2026",
+      "retrieved_at": "2026-11-21",
+      "scope": "250 prompts for 30-second instrumental clips: 100 single-event, 100 timed-sequence, 50 global-tempo prompts; 399 timestamped events and 50 tempo targets across about 40 style descriptors and nine instrument families.",
+      "version_snapshot": "TimingBench August 2026 public benchmark snapshot",
+      "limitations": [
+        "The public result is published by Taan, one of the evaluated systems; independent replication is not established by this snapshot.",
+        "Its 128-event detector validation sample is development data and reports 4 false credits and 6 false positives.",
+        "A separate planned 300-clip annotation study was unfinished at the reported evaluation cutoff.",
+        "Detector localization floors vary substantially by event family; a single timing tolerance must not be interpreted as equally precise for drums, bass, vocals, and whole-mix events.",
+        "The benchmark uses a ±500 ms timed-event criterion; this is not equivalent to MIDI beat-phase precision, sub-100-ms timing, or live system latency.",
+        "FAD measures distribution similarity under a fixed VGGish/GTZAN procedure, not listener preference or reciprocal collaboration."
+      ]
+    },
+    {
+      "source_id": "cmi-rewardbench-icml-2026",
+      "title": "CMI-RewardBench: Evaluating Music Reward Models with Compositional Multimodal Instruction — official results and toolkit",
+      "url": "https://github.com/Haiwen-Xia/CMI-RewardBench",
+      "source_class": "benchmark_leaderboard",
+      "published_or_observed_at": "ICML 2026; official repository snapshot observed 21 November 2026",
+      "retrieved_at": "2026-11-21",
+      "scope": "Reward-model evaluation for generated music conditioned on text, lyrics and reference audio. Public result tables report musicality correlations/accuracy and compositional alignment accuracy for CMI-RM, SongEval-RM, Gemini 3 Pro and CLAP.",
+      "version_snapshot": "CMI-RewardBench ICML 2026 official release repository snapshot",
+      "limitations": [
+        "This evaluates reward models/judges, not music generators; scores are not generation quality or a direct comparison to audio Elo.",
+        "The 110k CMIPref-Pseudo items are pseudo-labelled, not 110k human preference labels.",
+        "The CMI-Pref corpus is human annotated; the author and institutional materials report roughly 4,027 human preference labels, but do not assume that is the sample size for every displayed metric.",
+        "The README gives selected competitive metrics; use the paper and official evaluation script for full reproduction, split definitions, confidence intervals and subgroup analysis.",
+        "Reward-model outputs can be biased or miscalibrated and must not authorize edits or substitute for artist preference."
+      ]
+    },
+    {
+      "source_id": "mirex-2026-cmi-rewardbench-results",
+      "title": "MIREX 2026 Music Evaluation via CMI-RewardBench — results",
+      "url": "https://music-ir.org/mirex/wiki/2026%3AMusic_Evaluation_via_CMI-RewardBench_Results",
+      "source_class": "benchmark_leaderboard",
+      "published_or_observed_at": "2026 MIREX results snapshot; observed 21 November 2026",
+      "retrieved_at": "2026-11-21",
+      "scope": "Pairwise preference prediction for text prompts and generated audio pairs. Public table reports a 249-sample core set plus vocal and instrumental extension subsets of 300+ samples each.",
+      "version_snapshot": "MIREX 2026 results page observed 2026-11-21",
+      "limitations": [
+        "This measures agreement with pairwise human preference labels, not generation quality, edit fidelity, musician agency, or live collaboration.",
+        "The core test set contains 249 comparisons; subgroup extensions are shown as 300+ rather than exact counts on the results table.",
+        "A row labelled Random guess (always B) obtains 59.0% on the core set, demonstrating label imbalance; this is not a balanced 50% random-choice baseline.",
+        "Submission labels and score tables do not alone establish open weights, code availability, evaluation-cost parity or independent replication.",
+        "Do not treat these preference accuracies as CMI-RM's native correlation metrics or as audio-generation Elo."
+      ]
+    },
+    {
+      "source_id": "muse-audio-midi-perception-2026",
+      "title": "LLMs can read music, but struggle to hear it: an evaluation of core music perception tasks",
+      "url": "https://proceedings.mlr.press/v303/carone26a.html",
+      "source_class": "peer_reviewed_or_conference_paper",
+      "published_or_observed_at": "PMLR 303, 2026; observed 21 November 2026",
+      "retrieved_at": "2026-11-21",
+      "scope": "MUSE music-perception study contrasts audio and symbolic-MIDI inputs for syncopation scoring, melody transposition detection and chord-quality identification, across Gemini 2.5 Pro, Gemini 2.5 Flash and Qwen2.5-Omni; also compares zero/few-shot and Standalone/CoT/LogicLM prompting.",
+      "version_snapshot": "PMLR volume 303 published version",
+      "limitations": [
+        "Published figures report model/task/modality-specific accuracy; several values entered in this ledger are approximate visual estimates from Figure 2, not exact Table 1 raw counts.",
+        "The reported perceptual gap is model- and task-dependent: Gemini Pro approaches parity on transposition, but audio performance remains much weaker for syncopation and chord quality.",
+        "The study uses short, controlled excerpts; it is not a benchmark of full-length composition, free-form improvisation or commercial music production.",
+        "MIDI accuracy is symbolic-input performance and must never be reported as audio-native listening competence."
+      ]
+    }
+  ],
+  "observations": [
+    {
+      "observation_id": "suno-v6-instrumental-aa-2026-11-21",
+      "source_id": "aa-music-instrumental",
+      "system": "Suno",
+      "system_version": "v6",
+      "capability_area": "audio_generation",
+      "evidence_kind": "blind_preference_leaderboard",
+      "task_scope": "Instrumental audio generation on the Artificial Analysis AA-Music Instrumental v1.1 board.",
+      "metrics": [
+        {
+          "name": "human_pairwise_preference_elo",
+          "value": 1148,
+          "unit": "Elo",
+          "plus_minus": 22,
+          "scope": "Instrumental board snapshot observed 2026-11-21."
+        }
+      ],
+      "capabilities": [
+        "Frontier-quality instrumental music generation in a blind pairwise preference setting."
+      ],
+      "limitations": [
+        "This Elo is not a score-edit, agency, rights, live-interaction or causal-reciprocity score.",
+        "Do not compare with vocal leaderboard entries or symbolic-generation ratings."
+      ],
+      "comparability_group": "aa-music-instrumental-v1.1",
+      "directly_comparable_to_audio_elo": true,
+      "claim_ceiling": "Dated instrumental human-preference reference only; not evidence of superior controllability, collaboration or editing."
+    },
+    {
+      "observation_id": "ace-music-v1-vocal-aa-2026-11-21",
+      "source_id": "aa-music-vocal",
+      "system": "ACE Music",
+      "system_version": "v1",
+      "capability_area": "audio_generation",
+      "evidence_kind": "blind_preference_leaderboard",
+      "task_scope": "Vocal music generation on the Artificial Analysis vocal leaderboard.",
+      "metrics": [
+        {
+          "name": "human_pairwise_preference_elo",
+          "value": 1160,
+          "unit": "Elo",
+          "plus_minus": 20,
+          "scope": "Vocal board snapshot observed 2026-11-21."
+        }
+      ],
+      "capabilities": [
+        "Vocal audio generation in a blind pairwise preference setting."
+      ],
+      "limitations": [
+        "Separate evaluation board from instrumental generation.",
+        "Does not measure score edit correctness, collaboration, agency or rights."
+      ],
+      "comparability_group": "aa-music-vocal-current",
+      "directly_comparable_to_audio_elo": true,
+      "claim_ceiling": "Dated vocal human-preference reference only."
+    },
+    {
+      "observation_id": "suno-v6-vocal-aa-2026-11-21",
+      "source_id": "aa-music-vocal",
+      "system": "Suno",
+      "system_version": "v6",
+      "capability_area": "audio_generation",
+      "evidence_kind": "blind_preference_leaderboard",
+      "task_scope": "Vocal music generation on the Artificial Analysis vocal leaderboard.",
+      "metrics": [
+        {
+          "name": "human_pairwise_preference_elo",
+          "value": 1145,
+          "unit": "Elo",
+          "plus_minus": 18,
+          "scope": "Vocal board snapshot observed 2026-11-21."
+        }
+      ],
+      "capabilities": [
+        "Vocal audio generation in a blind pairwise preference setting."
+      ],
+      "limitations": [
+        "Separate evaluation board from instrumental generation.",
+        "Does not measure score edit correctness, collaboration, agency or rights."
+      ],
+      "comparability_group": "aa-music-vocal-current",
+      "directly_comparable_to_audio_elo": true,
+      "claim_ceiling": "Dated vocal human-preference reference only."
+    },
+    {
+      "observation_id": "mirex-damn-2026",
+      "source_id": "mirex-2026-symbolic",
+      "system": "DAMN",
+      "system_version": "MIREX 2026 submission",
+      "capability_area": "symbolic_generation",
+      "evidence_kind": "human_rating_study",
+      "task_scope": "Symbolic music generation/continuation; human ratings on the published MIREX 2026 study.",
+      "metrics": [
+        {
+          "name": "coherence",
+          "value": 3.68,
+          "unit": "rating_0_to_5",
+          "scope": "MIREX 2026 symbolic evaluation."
+        },
+        {
+          "name": "structure",
+          "value": 3.39,
+          "unit": "rating_0_to_5",
+          "scope": "MIREX 2026 symbolic evaluation."
+        },
+        {
+          "name": "creativity",
+          "value": 3.18,
+          "unit": "rating_0_to_5",
+          "scope": "MIREX 2026 symbolic evaluation."
+        },
+        {
+          "name": "musicality",
+          "value": 3.47,
+          "unit": "rating_0_to_5",
+          "scope": "MIREX 2026 symbolic evaluation."
+        }
+      ],
+      "capabilities": [
+        "Symbolic music continuation/generation under a constrained human-rating protocol."
+      ],
+      "limitations": [
+        "Reported study is small and selected samples from eight candidates.",
+        "Not comparable to audio Elo or live collaboration measures."
+      ],
+      "comparability_group": "mirex-2026-symbolic-human-ratings",
+      "directly_comparable_to_audio_elo": false,
+      "claim_ceiling": "Reference means for the native symbolic continuation task only; Muse must reproduce the same task and scorer before a direct claim."
+    },
+    {
+      "observation_id": "anticipatory-music-transformer-mirex-2026",
+      "source_id": "mirex-2026-symbolic",
+      "system": "Anticipatory Music Transformer",
+      "system_version": "MIREX 2026 submission",
+      "capability_area": "symbolic_generation",
+      "evidence_kind": "human_rating_study",
+      "task_scope": "Symbolic music generation/continuation; published MIREX musicality rating.",
+      "metrics": [
+        {
+          "name": "musicality",
+          "value": 3.61,
+          "unit": "rating_0_to_5",
+          "scope": "MIREX 2026 symbolic evaluation."
+        }
+      ],
+      "capabilities": [
+        "Anticipatory symbolic music generation."
+      ],
+      "limitations": [
+        "Only the reported musicality mean is entered here; do not infer missing dimensions.",
+        "Not comparable to audio Elo or live collaboration."
+      ],
+      "comparability_group": "mirex-2026-symbolic-human-ratings",
+      "directly_comparable_to_audio_elo": false,
+      "claim_ceiling": "One MIREX dimension only; not a full capability ranking."
+    },
+    {
+      "observation_id": "smebench-dataset-scope-2026",
+      "source_id": "smebench-2026",
+      "system": "SMEBench",
+      "system_version": "2026 preprint",
+      "capability_area": "dataset_or_benchmark",
+      "evidence_kind": "published_dataset_statistics",
+      "task_scope": "Music editing benchmark dataset with paired source/target examples and real-audio complement.",
+      "metrics": [
+        {
+          "name": "paired_source_target_examples",
+          "value": 11160,
+          "unit": "examples",
+          "scope": "Full benchmark dataset."
+        },
+        {
+          "name": "balanced_test_examples",
+          "value": 3600,
+          "unit": "examples",
+          "scope": "Reported balanced test set."
+        },
+        {
+          "name": "real_audio_pairs",
+          "value": 416,
+          "unit": "pairs",
+          "scope": "Real-audio complement."
+        },
+        {
+          "name": "edit_operations",
+          "value": 12,
+          "unit": "operation_types",
+          "scope": "Benchmark operation taxonomy."
+        }
+      ],
+      "capabilities": [
+        "Paired source/target evaluation across multiple edit operations.",
+        "Separate measurement of source preservation, target agreement and text compatibility."
+      ],
+      "limitations": [
+        "Dataset statistics are not a model score.",
+        "Use official split and scorer; do not re-label the dataset as a human-collaboration benchmark."
+      ],
+      "comparability_group": "smebench-2026-native-editing",
+      "directly_comparable_to_audio_elo": false,
+      "claim_ceiling": "Benchmark scale and task taxonomy only; model performance must be evaluated separately."
+    },
+    {
+      "observation_id": "suno-studio-2-workflow",
+      "source_id": "suno-studio-2",
+      "system": "Suno Studio",
+      "system_version": "2.0",
+      "capability_area": "music_editing",
+      "evidence_kind": "documented_product_capability",
+      "task_scope": "Browser-based generative music production and timeline editing.",
+      "metrics": [],
+      "capabilities": [
+        "Chat-driven generation and arrangement workflow.",
+        "Audio and MIDI tracks, including MIDI recording/editing.",
+        "Timeline arrangement and automation.",
+        "Audio effects, synths and custom plugins.",
+        "Stem separation and production workflow."
+      ],
+      "limitations": [
+        "Official documentation is capability evidence, not independent benchmark performance.",
+        "Does not establish exact score-level event lineage or zero-collateral preservation guarantees."
+      ],
+      "comparability_group": "product-capability-not-score",
+      "directly_comparable_to_audio_elo": false,
+      "claim_ceiling": "Documented production-workflow capabilities only."
+    },
+    {
+      "observation_id": "lyria-realtime-streaming",
+      "source_id": "google-lyria-realtime",
+      "system": "Google Lyria RealTime",
+      "system_version": "Experimental API",
+      "capability_area": "live_music_interaction",
+      "evidence_kind": "documented_api_capability",
+      "task_scope": "Persistent low-latency audio generation stream with live prompt/configuration steering.",
+      "metrics": [],
+      "capabilities": [
+        "Persistent bidirectional WebSocket streaming.",
+        "Weighted-prompt steering.",
+        "Live BPM, density, brightness and scale configuration.",
+        "48 kHz stereo 16-bit PCM output."
+      ],
+      "limitations": [
+        "Audio-stream configuration is not note-level symbolic control.",
+        "Record API reset/transition semantics and actual end-to-end latency in matched tests.",
+        "No independent Muse-versus-Lyria interaction result is claimed."
+      ],
+      "comparability_group": "live-audio-stream-control",
+      "directly_comparable_to_audio_elo": false,
+      "claim_ceiling": "Documented API controls and output format only; no quality or human-collaboration ranking."
+    },
+    {
+      "observation_id": "yue2-score-first-2026",
+      "source_id": "yue2-2026",
+      "system": "YuE2",
+      "system_version": "September 2026 research release",
+      "capability_area": "symbolic_generation",
+      "evidence_kind": "research_prototype",
+      "task_scope": "Score-first full-song planning and realization, including conversational score/arrangement editing described in the research release.",
+      "metrics": [],
+      "capabilities": [
+        "Readable melody/chord planning before full-song audio realization.",
+        "Score-level arrangement/editing workflow described in the paper/repository.",
+        "Separation of symbolic planning from final audio realization."
+      ],
+      "limitations": [
+        "Research prototype capability description, not a matched independent benchmark result.",
+        "Score planning alone does not prove persistent event identity, reversible edits or preservation correctness."
+      ],
+      "comparability_group": "score-first-generation-and-editing",
+      "directly_comparable_to_audio_elo": false,
+      "claim_ceiling": "Published method/capability reference only; score editing must be measured on matched paired edits."
+    },
+    {
+      "observation_id": "mage-multimodal-grounded-editing-2026",
+      "source_id": "google-mage-2026",
+      "system": "MAGE",
+      "system_version": "2026 preprint",
+      "capability_area": "music_editing",
+      "evidence_kind": "research_prototype",
+      "task_scope": "Modality-agnostic conditional music generation and mixture-grounded target-source editing.",
+      "metrics": [],
+      "capabilities": [
+        "Cross-modal music conditioning.",
+        "Mixture-grounded target-source extraction/editing.",
+        "Temporal alignment across modalities."
+      ],
+      "limitations": [
+        "Not a general symbolic score editing benchmark result.",
+        "Do not infer score event identity or protected region guarantees from mixture-grounded source separation."
+      ],
+      "comparability_group": "multimodal-audio-editing",
+      "directly_comparable_to_audio_elo": false,
+      "claim_ceiling": "Research capability reference only."
+    },
+    {
+      "observation_id": "jam-bot-expressive-improvisation-2026",
+      "source_id": "jam-bot-nime-2026",
+      "system": "JAM_BOT",
+      "system_version": "NIME 2026 follow-up",
+      "capability_area": "live_music_interaction",
+      "evidence_kind": "research_prototype",
+      "task_scope": "Expressive symbolic human–AI improvisation and real-time MIDI interaction.",
+      "metrics": [],
+      "capabilities": [
+        "Expressive velocity control.",
+        "Free-form call-and-response across varying tempi.",
+        "Increased throughput in the follow-up system.",
+        "External MIDI latency compensation."
+      ],
+      "limitations": [
+        "Closest research comparator for live symbolic interaction, but no matched Muse result is available.",
+        "Live latency must be measured on a common device, instrument and clock path."
+      ],
+      "comparability_group": "live-symbolic-improvisation",
+      "directly_comparable_to_audio_elo": false,
+      "claim_ceiling": "Published research capability reference only; no numerical Muse comparison yet."
+    },
+    {
+      "observation_id": "taan-timingbench",
+      "source_id": "taan-timingbench-2026",
+      "system": "Taan",
+      "system_version": "TimingBench August 2026 submission",
+      "capability_area": "audio_generation",
+      "evidence_kind": "temporal_control_benchmark",
+      "task_scope": "250-prompt temporal-controllability benchmark; fixed 30-second instrumental clips and timestamped entrance/exit/silence/pause/energy events, with global tempo prompts scored separately.",
+      "metrics": [
+        {
+          "name": "overall_instruction_success",
+          "value": 96.1,
+          "unit": "percent",
+          "lower_bound": 93.3,
+          "upper_bound": 99.2,
+          "confidence_level": 0.95,
+          "sample_size": 250,
+          "scope": "TimingBench August 2026 overall success; includes timing and tempo."
+        },
+        {
+          "name": "timed_events_within_tolerance",
+          "value": 91.3,
+          "unit": "percent",
+          "sample_size": 399,
+          "scope": "Timestamped events accepted within ±500 ms."
+        },
+        {
+          "name": "tempo_accuracy",
+          "value": 92,
+          "unit": "percent",
+          "sample_size": 50,
+          "scope": "Separate global tempo prompts."
+        },
+        {
+          "name": "frechet_audio_distance",
+          "value": 4.8,
+          "unit": "FAD",
+          "sample_size": 250,
+          "scope": "VGGish features against the fixed GTZAN reference; lower is closer under this distribution metric."
+        }
+      ],
+      "capabilities": [
+        "Timestamped event/tempo instruction following evaluated through a versioned event detector and timing tolerance."
+      ],
+      "limitations": [
+        "Benchmark results are from the August 2026 TimingBench publication and should be reproduced before a new competitive claim.",
+        "Overall instruction success, per-event timing, tempo accuracy and FAD are distinct measures.",
+        "Detector calibration limits and the incomplete follow-up annotation must be reported alongside the result."
+      ],
+      "comparability_group": "timingbench-2026-v1",
+      "directly_comparable_to_audio_elo": false,
+      "claim_ceiling": "Published temporal-control result only; not general musical quality, human preference, exact symbolic-event editing, or live latency."
+    },
+    {
+      "observation_id": "elevenlabs-v2-timingbench",
+      "source_id": "taan-timingbench-2026",
+      "system": "ElevenLabs Music",
+      "system_version": "v2 (TimingBench August 2026)",
+      "capability_area": "audio_generation",
+      "evidence_kind": "temporal_control_benchmark",
+      "task_scope": "Same 250-prompt temporal-controllability benchmark and scoring apparatus.",
+      "metrics": [
+        {
+          "name": "overall_instruction_success",
+          "value": 28.9,
+          "unit": "percent",
+          "lower_bound": 25.3,
+          "upper_bound": 32.5,
+          "confidence_level": 0.95,
+          "sample_size": 250,
+          "scope": "TimingBench August 2026 overall success; includes timing and tempo."
+        },
+        {
+          "name": "timed_events_within_tolerance",
+          "value": 12.8,
+          "unit": "percent",
+          "sample_size": 399,
+          "scope": "Timestamped events accepted within ±500 ms."
+        },
+        {
+          "name": "tempo_accuracy",
+          "value": 87,
+          "unit": "percent",
+          "sample_size": 50,
+          "scope": "Separate global tempo prompts."
+        },
+        {
+          "name": "frechet_audio_distance",
+          "value": 3.5,
+          "unit": "FAD",
+          "sample_size": 250,
+          "scope": "VGGish features against the fixed GTZAN reference; lower is closer under this distribution metric."
+        }
+      ],
+      "capabilities": [
+        "Timestamped event/tempo instruction following evaluated through a versioned event detector and timing tolerance."
+      ],
+      "limitations": [
+        "Benchmark results are from the August 2026 TimingBench publication and should be reproduced before a new competitive claim.",
+        "Overall instruction success, per-event timing, tempo accuracy and FAD are distinct measures.",
+        "Detector calibration limits and the incomplete follow-up annotation must be reported alongside the result."
+      ],
+      "comparability_group": "timingbench-2026-v1",
+      "directly_comparable_to_audio_elo": false,
+      "claim_ceiling": "Published temporal-control comparator only; not general musical quality or human preference."
+    },
+    {
+      "observation_id": "google-lyria-timingbench",
+      "source_id": "taan-timingbench-2026",
+      "system": "Google Lyria",
+      "system_version": "TimingBench August 2026 snapshot",
+      "capability_area": "audio_generation",
+      "evidence_kind": "temporal_control_benchmark",
+      "task_scope": "Same 250-prompt temporal-controllability benchmark and scoring apparatus.",
+      "metrics": [
+        {
+          "name": "overall_instruction_success",
+          "value": 23.9,
+          "unit": "percent",
+          "lower_bound": 20.3,
+          "upper_bound": 27.5,
+          "confidence_level": 0.95,
+          "sample_size": 250,
+          "scope": "TimingBench August 2026 overall success; includes timing and tempo."
+        },
+        {
+          "name": "timed_events_within_tolerance",
+          "value": 8.6,
+          "unit": "percent",
+          "sample_size": 399,
+          "scope": "Timestamped events accepted within ±500 ms."
+        },
+        {
+          "name": "tempo_accuracy",
+          "value": 89.7,
+          "unit": "percent",
+          "sample_size": 50,
+          "scope": "Separate global tempo prompts."
+        },
+        {
+          "name": "frechet_audio_distance",
+          "value": 2.6,
+          "unit": "FAD",
+          "sample_size": 250,
+          "scope": "VGGish features against the fixed GTZAN reference; lower is closer under this distribution metric."
+        }
+      ],
+      "capabilities": [
+        "Timestamped event/tempo instruction following evaluated through a versioned event detector and timing tolerance."
+      ],
+      "limitations": [
+        "Benchmark results are from the August 2026 TimingBench publication and should be reproduced before a new competitive claim.",
+        "Overall instruction success, per-event timing, tempo accuracy and FAD are distinct measures.",
+        "Detector calibration limits and the incomplete follow-up annotation must be reported alongside the result."
+      ],
+      "comparability_group": "timingbench-2026-v1",
+      "directly_comparable_to_audio_elo": false,
+      "claim_ceiling": "Published temporal-control comparator only; the FAD score is not a preference score."
+    },
+    {
+      "observation_id": "elevenlabs-v1-timingbench",
+      "source_id": "taan-timingbench-2026",
+      "system": "ElevenLabs Music",
+      "system_version": "v1 (TimingBench August 2026)",
+      "capability_area": "audio_generation",
+      "evidence_kind": "temporal_control_benchmark",
+      "task_scope": "Same 250-prompt temporal-controllability benchmark and scoring apparatus.",
+      "metrics": [
+        {
+          "name": "overall_instruction_success",
+          "value": 25.4,
+          "unit": "percent",
+          "lower_bound": 21.9,
+          "upper_bound": 29.2,
+          "confidence_level": 0.95,
+          "sample_size": 250,
+          "scope": "TimingBench August 2026 overall success; includes timing and tempo."
+        },
+        {
+          "name": "timed_events_within_tolerance",
+          "value": 8,
+          "unit": "percent",
+          "sample_size": 399,
+          "scope": "Timestamped events accepted within ±500 ms."
+        },
+        {
+          "name": "tempo_accuracy",
+          "value": 93,
+          "unit": "percent",
+          "sample_size": 50,
+          "scope": "Separate global tempo prompts."
+        },
+        {
+          "name": "frechet_audio_distance",
+          "value": 3.5,
+          "unit": "FAD",
+          "sample_size": 250,
+          "scope": "VGGish features against the fixed GTZAN reference; lower is closer under this distribution metric."
+        }
+      ],
+      "capabilities": [
+        "Timestamped event/tempo instruction following evaluated through a versioned event detector and timing tolerance."
+      ],
+      "limitations": [
+        "Benchmark results are from the August 2026 TimingBench publication and should be reproduced before a new competitive claim.",
+        "Overall instruction success, per-event timing, tempo accuracy and FAD are distinct measures.",
+        "Detector calibration limits and the incomplete follow-up annotation must be reported alongside the result."
+      ],
+      "comparability_group": "timingbench-2026-v1",
+      "directly_comparable_to_audio_elo": false,
+      "claim_ceiling": "Published temporal-control comparator only; not general musical quality or human preference."
+    },
+    {
+      "observation_id": "suno-timingbench",
+      "source_id": "taan-timingbench-2026",
+      "system": "Suno",
+      "system_version": "TimingBench August 2026 snapshot",
+      "capability_area": "audio_generation",
+      "evidence_kind": "temporal_control_benchmark",
+      "task_scope": "Same 250-prompt temporal-controllability benchmark and scoring apparatus.",
+      "metrics": [
+        {
+          "name": "overall_instruction_success",
+          "value": 22,
+          "unit": "percent",
+          "lower_bound": 18.7,
+          "upper_bound": 25.6,
+          "confidence_level": 0.95,
+          "sample_size": 250,
+          "scope": "TimingBench August 2026 overall success; includes timing and tempo."
+        },
+        {
+          "name": "timed_events_within_tolerance",
+          "value": 6.8,
+          "unit": "percent",
+          "sample_size": 399,
+          "scope": "Timestamped events accepted within ±500 ms."
+        },
+        {
+          "name": "tempo_accuracy",
+          "value": 86.7,
+          "unit": "percent",
+          "sample_size": 50,
+          "scope": "Separate global tempo prompts."
+        },
+        {
+          "name": "frechet_audio_distance",
+          "value": 3.1,
+          "unit": "FAD",
+          "sample_size": 250,
+          "scope": "VGGish features against the fixed GTZAN reference; lower is closer under this distribution metric."
+        }
+      ],
+      "capabilities": [
+        "Timestamped event/tempo instruction following evaluated through a versioned event detector and timing tolerance."
+      ],
+      "limitations": [
+        "Benchmark results are from the August 2026 TimingBench publication and should be reproduced before a new competitive claim.",
+        "Overall instruction success, per-event timing, tempo accuracy and FAD are distinct measures.",
+        "Detector calibration limits and the incomplete follow-up annotation must be reported alongside the result."
+      ],
+      "comparability_group": "timingbench-2026-v1",
+      "directly_comparable_to_audio_elo": false,
+      "claim_ceiling": "Published temporal-control comparator only; not general musical quality or human preference."
+    },
+    {
+      "observation_id": "cmi-rm-musicality-icml2026",
+      "system": "CMI-RM",
+      "system_version": "ICML 2026 official release",
+      "capability_area": "music_understanding",
+      "evidence_kind": "human_rating_study",
+      "task_scope": "Reward-model scoring of generated music for musicality on PAM-Music, MusicEval, Music Arena and CMI-Pref.",
+      "comparability_group": "cmi-rewardbench-2026-musicality",
+      "metrics": [
+        {
+          "name": "pam_music_spearman_rho",
+          "value": 0.6606,
+          "unit": "spearman_rho",
+          "scope": "Correlation with human musicality ratings."
+        },
+        {
+          "name": "musiceval_spearman_rho",
+          "value": 0.8266,
+          "unit": "spearman_rho",
+          "scope": "Correlation with human musicality ratings."
+        },
+        {
+          "name": "music_arena_preference_accuracy",
+          "value": 73.43,
+          "unit": "percent_accuracy",
+          "scope": "Pairwise preference agreement on Music Arena."
+        },
+        {
+          "name": "cmi_pref_preference_accuracy",
+          "value": 78.2,
+          "unit": "percent_accuracy",
+          "scope": "Pairwise preference agreement on CMI-Pref."
+        }
+      ],
+      "capabilities": [
+        "Specialized reward model supports musicality scoring and inference-time top-k candidate filtering."
+      ],
+      "limitations": [
+        "Reward-model evaluation only; not a generation model result.",
+        "No single score establishes human preference, edit correctness or agency."
+      ],
+      "claim_ceiling": "A reported reward-model agreement/correlation result on its native benchmark only.",
+      "source_id": "cmi-rewardbench-icml-2026",
+      "directly_comparable_to_audio_elo": false
+    },
+    {
+      "observation_id": "songeval-rm-musicality-icml2026",
+      "system": "SongEval-RM",
+      "system_version": "CMI-RewardBench comparison baseline",
+      "capability_area": "music_understanding",
+      "evidence_kind": "human_rating_study",
+      "task_scope": "Reward-model scoring of generated music for musicality on PAM-Music, MusicEval, Music Arena and CMI-Pref.",
+      "comparability_group": "cmi-rewardbench-2026-musicality",
+      "metrics": [
+        {
+          "name": "pam_music_spearman_rho",
+          "value": 0.6977,
+          "unit": "spearman_rho",
+          "scope": "Correlation with human musicality ratings."
+        },
+        {
+          "name": "musiceval_spearman_rho",
+          "value": 0.6949,
+          "unit": "spearman_rho",
+          "scope": "Correlation with human musicality ratings."
+        },
+        {
+          "name": "music_arena_preference_accuracy",
+          "value": 73.88,
+          "unit": "percent_accuracy",
+          "scope": "Pairwise preference agreement on Music Arena."
+        },
+        {
+          "name": "cmi_pref_preference_accuracy",
+          "value": 72.4,
+          "unit": "percent_accuracy",
+          "scope": "Pairwise preference agreement on CMI-Pref."
+        }
+      ],
+      "capabilities": [
+        "Specialized reward model baseline for musicality evaluation."
+      ],
+      "limitations": [
+        "Reward-model evaluation only; not a generation model result.",
+        "It leads CMI-RM on PAM-Music correlation and Music Arena accuracy, showing that model rankings differ by metric."
+      ],
+      "claim_ceiling": "A reported reward-model baseline on its native benchmark only.",
+      "source_id": "cmi-rewardbench-icml-2026",
+      "directly_comparable_to_audio_elo": false
+    },
+    {
+      "observation_id": "gemini3-pro-musicality-icml2026",
+      "system": "Gemini 3 Pro",
+      "system_version": "CMI-RewardBench comparison baseline",
+      "capability_area": "music_understanding",
+      "evidence_kind": "human_rating_study",
+      "task_scope": "General multimodal-model scoring of generated music for musicality on PAM-Music, MusicEval, Music Arena and CMI-Pref.",
+      "comparability_group": "cmi-rewardbench-2026-musicality",
+      "metrics": [
+        {
+          "name": "pam_music_spearman_rho",
+          "value": 0.5967,
+          "unit": "spearman_rho",
+          "scope": "Correlation with human musicality ratings."
+        },
+        {
+          "name": "musiceval_spearman_rho",
+          "value": 0.6018,
+          "unit": "spearman_rho",
+          "scope": "Correlation with human musicality ratings."
+        },
+        {
+          "name": "music_arena_preference_accuracy",
+          "value": 68.85,
+          "unit": "percent_accuracy",
+          "scope": "Pairwise preference agreement on Music Arena."
+        },
+        {
+          "name": "cmi_pref_preference_accuracy",
+          "value": 65.8,
+          "unit": "percent_accuracy",
+          "scope": "Pairwise preference agreement on CMI-Pref."
+        }
+      ],
+      "capabilities": [
+        "General multimodal-model baseline for musicality scoring."
+      ],
+      "limitations": [
+        "Reward-model/judge evaluation only; not a generation model result.",
+        "Does not establish that general multimodal models are uniformly weak across music tasks."
+      ],
+      "claim_ceiling": "A reported general-model judge baseline on its native benchmark only.",
+      "source_id": "cmi-rewardbench-icml-2026",
+      "directly_comparable_to_audio_elo": false
+    },
+    {
+      "observation_id": "cmi-rm-compositional-alignment-icml2026",
+      "system": "CMI-RM",
+      "system_version": "ICML 2026 official release",
+      "capability_area": "music_understanding",
+      "evidence_kind": "human_rating_study",
+      "task_scope": "Compositional instruction alignment on CMI-Pref, separately evaluated for text-only, text+lyrics, text+audio and text+lyrics+audio conditions.",
+      "comparability_group": "cmi-rewardbench-2026-compositional-alignment",
+      "metrics": [
+        {
+          "name": "pam_alignment_spearman_rho",
+          "value": 0.4321,
+          "unit": "spearman_rho",
+          "scope": "Correlation with human text/music alignment judgments."
+        },
+        {
+          "name": "text_only_preference_accuracy",
+          "value": 67.6,
+          "unit": "percent_accuracy",
+          "scope": "CMI-Pref text-only condition."
+        },
+        {
+          "name": "text_plus_lyrics_preference_accuracy",
+          "value": 72.8,
+          "unit": "percent_accuracy",
+          "scope": "CMI-Pref text+lyrics condition."
+        },
+        {
+          "name": "text_plus_audio_preference_accuracy",
+          "value": 76.4,
+          "unit": "percent_accuracy",
+          "scope": "CMI-Pref text+reference-audio condition."
+        },
+        {
+          "name": "text_lyrics_audio_preference_accuracy",
+          "value": 79.2,
+          "unit": "percent_accuracy",
+          "scope": "CMI-Pref compositional text+lyrics+audio condition."
+        }
+      ],
+      "capabilities": [
+        "Fine-grained alignment scoring across compositional multimodal instruction inputs."
+      ],
+      "limitations": [
+        "Reward-model evaluation only; not a generator result.",
+        "The PAM alignment correlation is not the same scale as CMI-Pref pairwise accuracy."
+      ],
+      "claim_ceiling": "A reported reward-model alignment result on its native CMI-Pref conditions only.",
+      "source_id": "cmi-rewardbench-icml-2026",
+      "directly_comparable_to_audio_elo": false
+    },
+    {
+      "observation_id": "gemini3-pro-compositional-alignment-icml2026",
+      "system": "Gemini 3 Pro",
+      "system_version": "CMI-RewardBench comparison baseline",
+      "capability_area": "music_understanding",
+      "evidence_kind": "human_rating_study",
+      "task_scope": "Compositional instruction alignment on CMI-Pref, separately evaluated for text-only, text+lyrics, text+audio and text+lyrics+audio conditions.",
+      "comparability_group": "cmi-rewardbench-2026-compositional-alignment",
+      "metrics": [
+        {
+          "name": "pam_alignment_spearman_rho",
+          "value": 0.5373,
+          "unit": "spearman_rho",
+          "scope": "Correlation with human text/music alignment judgments."
+        },
+        {
+          "name": "text_only_preference_accuracy",
+          "value": 67.2,
+          "unit": "percent_accuracy",
+          "scope": "CMI-Pref text-only condition."
+        },
+        {
+          "name": "text_plus_lyrics_preference_accuracy",
+          "value": 60.8,
+          "unit": "percent_accuracy",
+          "scope": "CMI-Pref text+lyrics condition."
+        },
+        {
+          "name": "text_plus_audio_preference_accuracy",
+          "value": 68.8,
+          "unit": "percent_accuracy",
+          "scope": "CMI-Pref text+reference-audio condition."
+        },
+        {
+          "name": "text_lyrics_audio_preference_accuracy",
+          "value": 64.8,
+          "unit": "percent_accuracy",
+          "scope": "CMI-Pref compositional text+lyrics+audio condition."
+        }
+      ],
+      "capabilities": [
+        "General multimodal-model baseline for compositional music alignment scoring."
+      ],
+      "limitations": [
+        "Reward-model/judge evaluation only; not a generation model result.",
+        "It has a higher PAM alignment correlation than CMI-RM while CMI-RM wins on the three-way compositional accuracy metric."
+      ],
+      "claim_ceiling": "A reported general-model judge baseline on its native CMI-Pref conditions only.",
+      "source_id": "cmi-rewardbench-icml-2026",
+      "directly_comparable_to_audio_elo": false
+    },
+    {
+      "observation_id": "mirex-2026-cmi-pref-cloudear-overall",
+      "source_id": "mirex-2026-cmi-rewardbench-results",
+      "system": "CloudEar-overall",
+      "system_version": "MIREX 2026 submission",
+      "capability_area": "music_understanding",
+      "evidence_kind": "human_rating_study",
+      "task_scope": "Predict which of two generated audio candidates better matches a text prompt and human pairwise preference.",
+      "metrics": [
+        {
+          "name": "pairwise_preference_accuracy_core",
+          "value": 73.9,
+          "unit": "percent",
+          "sample_size": 249,
+          "scope": "Public 249-sample core evaluation set."
+        },
+        {
+          "name": "pairwise_preference_accuracy_vocal_extension",
+          "value": 60.9,
+          "unit": "percent",
+          "scope": "Public vocal extension subset; results table reports 300+ samples."
+        },
+        {
+          "name": "pairwise_preference_accuracy_instrumental_extension",
+          "value": 72.6,
+          "unit": "percent",
+          "scope": "Public instrumental extension subset; results table reports 300+ samples."
+        }
+      ],
+      "capabilities": [
+        "Predicts pairwise human preference from a text prompt and two generated music clips."
+      ],
+      "limitations": [
+        "This is a preference-evaluator result rather than a music-generator result.",
+        "The results table reports 249 core samples and 300+ per extended vocal/instrumental subset.",
+        "Pairwise accuracy is not directly comparable to reward-model Spearman correlation, audio Elo, or symbolic accuracy."
+      ],
+      "comparability_group": "mirex-2026-cmi-rewardbench-results",
+      "directly_comparable_to_audio_elo": false,
+      "claim_ceiling": "Dated pairwise human-preference agreement on MIREX 2026's public CMI-RewardBench test sets only."
+    },
+    {
+      "observation_id": "mirex-2026-cmi-pref-songeval-average",
+      "source_id": "mirex-2026-cmi-rewardbench-results",
+      "system": "SongEval (Average)",
+      "system_version": "MIREX 2026 submission",
+      "capability_area": "music_understanding",
+      "evidence_kind": "human_rating_study",
+      "task_scope": "Predict which of two generated audio candidates better matches a text prompt and human pairwise preference.",
+      "metrics": [
+        {
+          "name": "pairwise_preference_accuracy_core",
+          "value": 72.7,
+          "unit": "percent",
+          "sample_size": 249,
+          "scope": "Public 249-sample core evaluation set."
+        },
+        {
+          "name": "pairwise_preference_accuracy_vocal_extension",
+          "value": 62,
+          "unit": "percent",
+          "scope": "Public vocal extension subset; results table reports 300+ samples."
+        },
+        {
+          "name": "pairwise_preference_accuracy_instrumental_extension",
+          "value": 72,
+          "unit": "percent",
+          "scope": "Public instrumental extension subset; results table reports 300+ samples."
+        }
+      ],
+      "capabilities": [
+        "Predicts pairwise human preference from a text prompt and two generated music clips."
+      ],
+      "limitations": [
+        "This is a preference-evaluator result rather than a music-generator result.",
+        "The results table reports 249 core samples and 300+ per extended vocal/instrumental subset.",
+        "Pairwise accuracy is not directly comparable to reward-model Spearman correlation, audio Elo, or symbolic accuracy."
+      ],
+      "comparability_group": "mirex-2026-cmi-rewardbench-results",
+      "directly_comparable_to_audio_elo": false,
+      "claim_ceiling": "Dated pairwise human-preference agreement on MIREX 2026's public CMI-RewardBench test sets only."
+    },
+    {
+      "observation_id": "mirex-2026-cmi-pref-first-submission",
+      "source_id": "mirex-2026-cmi-rewardbench-results",
+      "system": "first_submission",
+      "system_version": "MIREX 2026 submission",
+      "capability_area": "music_understanding",
+      "evidence_kind": "human_rating_study",
+      "task_scope": "Predict which of two generated audio candidates better matches a text prompt and human pairwise preference.",
+      "metrics": [
+        {
+          "name": "pairwise_preference_accuracy_core",
+          "value": 72.3,
+          "unit": "percent",
+          "sample_size": 249,
+          "scope": "Public 249-sample core evaluation set."
+        },
+        {
+          "name": "pairwise_preference_accuracy_vocal_extension",
+          "value": 63.3,
+          "unit": "percent",
+          "scope": "Public vocal extension subset; results table reports 300+ samples."
+        },
+        {
+          "name": "pairwise_preference_accuracy_instrumental_extension",
+          "value": 75.4,
+          "unit": "percent",
+          "scope": "Public instrumental extension subset; results table reports 300+ samples."
+        }
+      ],
+      "capabilities": [
+        "Predicts pairwise human preference from a text prompt and two generated music clips."
+      ],
+      "limitations": [
+        "This is a preference-evaluator result rather than a music-generator result.",
+        "The results table reports 249 core samples and 300+ per extended vocal/instrumental subset.",
+        "Pairwise accuracy is not directly comparable to reward-model Spearman correlation, audio Elo, or symbolic accuracy."
+      ],
+      "comparability_group": "mirex-2026-cmi-rewardbench-results",
+      "directly_comparable_to_audio_elo": false,
+      "claim_ceiling": "Dated pairwise human-preference agreement on MIREX 2026's public CMI-RewardBench test sets only."
+    },
+    {
+      "observation_id": "mirex-2026-cmi-pref-cloudear-musicality",
+      "source_id": "mirex-2026-cmi-rewardbench-results",
+      "system": "CloudEar (Musicality)",
+      "system_version": "MIREX 2026 submission",
+      "capability_area": "music_understanding",
+      "evidence_kind": "human_rating_study",
+      "task_scope": "Predict which of two generated audio candidates better matches a text prompt and human pairwise preference.",
+      "metrics": [
+        {
+          "name": "pairwise_preference_accuracy_core",
+          "value": 69.9,
+          "unit": "percent",
+          "sample_size": 249,
+          "scope": "Public 249-sample core evaluation set."
+        },
+        {
+          "name": "pairwise_preference_accuracy_vocal_extension",
+          "value": 60.6,
+          "unit": "percent",
+          "scope": "Public vocal extension subset; results table reports 300+ samples."
+        },
+        {
+          "name": "pairwise_preference_accuracy_instrumental_extension",
+          "value": 70.7,
+          "unit": "percent",
+          "scope": "Public instrumental extension subset; results table reports 300+ samples."
+        }
+      ],
+      "capabilities": [
+        "Predicts pairwise human preference from a text prompt and two generated music clips."
+      ],
+      "limitations": [
+        "This is a preference-evaluator result rather than a music-generator result.",
+        "The results table reports 249 core samples and 300+ per extended vocal/instrumental subset.",
+        "Pairwise accuracy is not directly comparable to reward-model Spearman correlation, audio Elo, or symbolic accuracy."
+      ],
+      "comparability_group": "mirex-2026-cmi-rewardbench-results",
+      "directly_comparable_to_audio_elo": false,
+      "claim_ceiling": "Dated pairwise human-preference agreement on MIREX 2026's public CMI-RewardBench test sets only."
+    },
+    {
+      "observation_id": "mirex-2026-cmi-pref-cloudear-alignment",
+      "source_id": "mirex-2026-cmi-rewardbench-results",
+      "system": "CloudEar (Alignment)",
+      "system_version": "MIREX 2026 submission",
+      "capability_area": "music_understanding",
+      "evidence_kind": "human_rating_study",
+      "task_scope": "Predict which of two generated audio candidates better matches a text prompt and human pairwise preference.",
+      "metrics": [
+        {
+          "name": "pairwise_preference_accuracy_core",
+          "value": 69.5,
+          "unit": "percent",
+          "sample_size": 249,
+          "scope": "Public 249-sample core evaluation set."
+        },
+        {
+          "name": "pairwise_preference_accuracy_vocal_extension",
+          "value": 61.6,
+          "unit": "percent",
+          "scope": "Public vocal extension subset; results table reports 300+ samples."
+        },
+        {
+          "name": "pairwise_preference_accuracy_instrumental_extension",
+          "value": 69.5,
+          "unit": "percent",
+          "scope": "Public instrumental extension subset; results table reports 300+ samples."
+        }
+      ],
+      "capabilities": [
+        "Predicts pairwise human preference from a text prompt and two generated music clips."
+      ],
+      "limitations": [
+        "This is a preference-evaluator result rather than a music-generator result.",
+        "The results table reports 249 core samples and 300+ per extended vocal/instrumental subset.",
+        "Pairwise accuracy is not directly comparable to reward-model Spearman correlation, audio Elo, or symbolic accuracy."
+      ],
+      "comparability_group": "mirex-2026-cmi-rewardbench-results",
+      "directly_comparable_to_audio_elo": false,
+      "claim_ceiling": "Dated pairwise human-preference agreement on MIREX 2026's public CMI-RewardBench test sets only."
+    },
+    {
+      "observation_id": "mirex-2026-cmi-pref-songbench-musicality",
+      "source_id": "mirex-2026-cmi-rewardbench-results",
+      "system": "SongBench (Musicality)",
+      "system_version": "MIREX 2026 submission",
+      "capability_area": "music_understanding",
+      "evidence_kind": "human_rating_study",
+      "task_scope": "Predict which of two generated audio candidates better matches a text prompt and human pairwise preference.",
+      "metrics": [
+        {
+          "name": "pairwise_preference_accuracy_core",
+          "value": 69.1,
+          "unit": "percent",
+          "sample_size": 249,
+          "scope": "Public 249-sample core evaluation set."
+        },
+        {
+          "name": "pairwise_preference_accuracy_vocal_extension",
+          "value": 62,
+          "unit": "percent",
+          "scope": "Public vocal extension subset; results table reports 300+ samples."
+        },
+        {
+          "name": "pairwise_preference_accuracy_instrumental_extension",
+          "value": 68.8,
+          "unit": "percent",
+          "scope": "Public instrumental extension subset; results table reports 300+ samples."
+        }
+      ],
+      "capabilities": [
+        "Predicts pairwise human preference from a text prompt and two generated music clips."
+      ],
+      "limitations": [
+        "This is a preference-evaluator result rather than a music-generator result.",
+        "The results table reports 249 core samples and 300+ per extended vocal/instrumental subset.",
+        "Pairwise accuracy is not directly comparable to reward-model Spearman correlation, audio Elo, or symbolic accuracy."
+      ],
+      "comparability_group": "mirex-2026-cmi-rewardbench-results",
+      "directly_comparable_to_audio_elo": false,
+      "claim_ceiling": "Dated pairwise human-preference agreement on MIREX 2026's public CMI-RewardBench test sets only."
+    },
+    {
+      "observation_id": "mirex-2026-cmi-pref-songbench-average",
+      "source_id": "mirex-2026-cmi-rewardbench-results",
+      "system": "SongBench (Average)",
+      "system_version": "MIREX 2026 submission",
+      "capability_area": "music_understanding",
+      "evidence_kind": "human_rating_study",
+      "task_scope": "Predict which of two generated audio candidates better matches a text prompt and human pairwise preference.",
+      "metrics": [
+        {
+          "name": "pairwise_preference_accuracy_core",
+          "value": 69.1,
+          "unit": "percent",
+          "sample_size": 249,
+          "scope": "Public 249-sample core evaluation set."
+        },
+        {
+          "name": "pairwise_preference_accuracy_vocal_extension",
+          "value": 59.6,
+          "unit": "percent",
+          "scope": "Public vocal extension subset; results table reports 300+ samples."
+        },
+        {
+          "name": "pairwise_preference_accuracy_instrumental_extension",
+          "value": 72.6,
+          "unit": "percent",
+          "scope": "Public instrumental extension subset; results table reports 300+ samples."
+        }
+      ],
+      "capabilities": [
+        "Predicts pairwise human preference from a text prompt and two generated music clips."
+      ],
+      "limitations": [
+        "This is a preference-evaluator result rather than a music-generator result.",
+        "The results table reports 249 core samples and 300+ per extended vocal/instrumental subset.",
+        "Pairwise accuracy is not directly comparable to reward-model Spearman correlation, audio Elo, or symbolic accuracy."
+      ],
+      "comparability_group": "mirex-2026-cmi-rewardbench-results",
+      "directly_comparable_to_audio_elo": false,
+      "claim_ceiling": "Dated pairwise human-preference agreement on MIREX 2026's public CMI-RewardBench test sets only."
+    },
+    {
+      "observation_id": "mirex-2026-cmi-pref-cmi-rm",
+      "source_id": "mirex-2026-cmi-rewardbench-results",
+      "system": "Baseline: CMI-RM",
+      "system_version": "MIREX 2026 submission",
+      "capability_area": "music_understanding",
+      "evidence_kind": "human_rating_study",
+      "task_scope": "Predict which of two generated audio candidates better matches a text prompt and human pairwise preference.",
+      "metrics": [
+        {
+          "name": "pairwise_preference_accuracy_core",
+          "value": 65.9,
+          "unit": "percent",
+          "sample_size": 249,
+          "scope": "Public 249-sample core evaluation set."
+        },
+        {
+          "name": "pairwise_preference_accuracy_vocal_extension",
+          "value": 57.2,
+          "unit": "percent",
+          "scope": "Public vocal extension subset; results table reports 300+ samples."
+        },
+        {
+          "name": "pairwise_preference_accuracy_instrumental_extension",
+          "value": 69.2,
+          "unit": "percent",
+          "scope": "Public instrumental extension subset; results table reports 300+ samples."
+        }
+      ],
+      "capabilities": [
+        "Predicts pairwise human preference from a text prompt and two generated music clips."
+      ],
+      "limitations": [
+        "This is a preference-evaluator result rather than a music-generator result.",
+        "The results table reports 249 core samples and 300+ per extended vocal/instrumental subset.",
+        "Pairwise accuracy is not directly comparable to reward-model Spearman correlation, audio Elo, or symbolic accuracy."
+      ],
+      "comparability_group": "mirex-2026-cmi-rewardbench-results",
+      "directly_comparable_to_audio_elo": false,
+      "claim_ceiling": "Dated pairwise human-preference agreement on MIREX 2026's public CMI-RewardBench test sets only."
+    },
+    {
+      "observation_id": "mirex-2026-cmi-pref-aimusic",
+      "source_id": "mirex-2026-cmi-rewardbench-results",
+      "system": "aimusic",
+      "system_version": "MIREX 2026 submission",
+      "capability_area": "music_understanding",
+      "evidence_kind": "human_rating_study",
+      "task_scope": "Predict which of two generated audio candidates better matches a text prompt and human pairwise preference.",
+      "metrics": [
+        {
+          "name": "pairwise_preference_accuracy_core",
+          "value": 65.5,
+          "unit": "percent",
+          "sample_size": 249,
+          "scope": "Public 249-sample core evaluation set."
+        },
+        {
+          "name": "pairwise_preference_accuracy_vocal_extension",
+          "value": 55.9,
+          "unit": "percent",
+          "scope": "Public vocal extension subset; results table reports 300+ samples."
+        },
+        {
+          "name": "pairwise_preference_accuracy_instrumental_extension",
+          "value": 70.7,
+          "unit": "percent",
+          "scope": "Public instrumental extension subset; results table reports 300+ samples."
+        }
+      ],
+      "capabilities": [
+        "Predicts pairwise human preference from a text prompt and two generated music clips."
+      ],
+      "limitations": [
+        "This is a preference-evaluator result rather than a music-generator result.",
+        "The results table reports 249 core samples and 300+ per extended vocal/instrumental subset.",
+        "Pairwise accuracy is not directly comparable to reward-model Spearman correlation, audio Elo, or symbolic accuracy."
+      ],
+      "comparability_group": "mirex-2026-cmi-rewardbench-results",
+      "directly_comparable_to_audio_elo": false,
+      "claim_ceiling": "Dated pairwise human-preference agreement on MIREX 2026's public CMI-RewardBench test sets only."
+    },
+    {
+      "observation_id": "mirex-2026-cmi-pref-tunejury",
+      "source_id": "mirex-2026-cmi-rewardbench-results",
+      "system": "TuneJury",
+      "system_version": "MIREX 2026 submission",
+      "capability_area": "music_understanding",
+      "evidence_kind": "human_rating_study",
+      "task_scope": "Predict which of two generated audio candidates better matches a text prompt and human pairwise preference.",
+      "metrics": [
+        {
+          "name": "pairwise_preference_accuracy_core",
+          "value": 64.3,
+          "unit": "percent",
+          "sample_size": 249,
+          "scope": "Public 249-sample core evaluation set."
+        },
+        {
+          "name": "pairwise_preference_accuracy_vocal_extension",
+          "value": 53.9,
+          "unit": "percent",
+          "scope": "Public vocal extension subset; results table reports 300+ samples."
+        },
+        {
+          "name": "pairwise_preference_accuracy_instrumental_extension",
+          "value": 66,
+          "unit": "percent",
+          "scope": "Public instrumental extension subset; results table reports 300+ samples."
+        }
+      ],
+      "capabilities": [
+        "Predicts pairwise human preference from a text prompt and two generated music clips."
+      ],
+      "limitations": [
+        "This is a preference-evaluator result rather than a music-generator result.",
+        "The results table reports 249 core samples and 300+ per extended vocal/instrumental subset.",
+        "Pairwise accuracy is not directly comparable to reward-model Spearman correlation, audio Elo, or symbolic accuracy."
+      ],
+      "comparability_group": "mirex-2026-cmi-rewardbench-results",
+      "directly_comparable_to_audio_elo": false,
+      "claim_ceiling": "Dated pairwise human-preference agreement on MIREX 2026's public CMI-RewardBench test sets only."
+    },
+    {
+      "observation_id": "mirex-2026-cmi-pref-random-always-b",
+      "source_id": "mirex-2026-cmi-rewardbench-results",
+      "system": "Random guess (always B)",
+      "system_version": "MIREX 2026 submission",
+      "capability_area": "music_understanding",
+      "evidence_kind": "human_rating_study",
+      "task_scope": "Predict which of two generated audio candidates better matches a text prompt and human pairwise preference.",
+      "metrics": [
+        {
+          "name": "pairwise_preference_accuracy_core",
+          "value": 59,
+          "unit": "percent",
+          "sample_size": 249,
+          "scope": "Public 249-sample core evaluation set."
+        },
+        {
+          "name": "pairwise_preference_accuracy_vocal_extension",
+          "value": 55.2,
+          "unit": "percent",
+          "scope": "Public vocal extension subset; results table reports 300+ samples."
+        },
+        {
+          "name": "pairwise_preference_accuracy_instrumental_extension",
+          "value": 56.1,
+          "unit": "percent",
+          "scope": "Public instrumental extension subset; results table reports 300+ samples."
+        }
+      ],
+      "capabilities": [
+        "Predicts pairwise human preference from a text prompt and two generated music clips."
+      ],
+      "limitations": [
+        "This is a preference-evaluator result rather than a music-generator result.",
+        "The results table reports 249 core samples and 300+ per extended vocal/instrumental subset.",
+        "Pairwise accuracy is not directly comparable to reward-model Spearman correlation, audio Elo, or symbolic accuracy."
+      ],
+      "comparability_group": "mirex-2026-cmi-rewardbench-results",
+      "directly_comparable_to_audio_elo": false,
+      "claim_ceiling": "Dated pairwise human-preference agreement on MIREX 2026's public CMI-RewardBench test sets only."
+    },
+    {
+      "observation_id": "mirex-2026-cmi-pref-musecritic",
+      "source_id": "mirex-2026-cmi-rewardbench-results",
+      "system": "MuseCritic",
+      "system_version": "MIREX 2026 submission",
+      "capability_area": "music_understanding",
+      "evidence_kind": "human_rating_study",
+      "task_scope": "Predict which of two generated audio candidates better matches a text prompt and human pairwise preference.",
+      "metrics": [
+        {
+          "name": "pairwise_preference_accuracy_core",
+          "value": 55.4,
+          "unit": "percent",
+          "sample_size": 249,
+          "scope": "Public 249-sample core evaluation set."
+        },
+        {
+          "name": "pairwise_preference_accuracy_vocal_extension",
+          "value": 59.9,
+          "unit": "percent",
+          "scope": "Public vocal extension subset; results table reports 300+ samples."
+        },
+        {
+          "name": "pairwise_preference_accuracy_instrumental_extension",
+          "value": 46.7,
+          "unit": "percent",
+          "scope": "Public instrumental extension subset; results table reports 300+ samples."
+        }
+      ],
+      "capabilities": [
+        "Predicts pairwise human preference from a text prompt and two generated music clips."
+      ],
+      "limitations": [
+        "This is a preference-evaluator result rather than a music-generator result.",
+        "The results table reports 249 core samples and 300+ per extended vocal/instrumental subset.",
+        "Pairwise accuracy is not directly comparable to reward-model Spearman correlation, audio Elo, or symbolic accuracy."
+      ],
+      "comparability_group": "mirex-2026-cmi-rewardbench-results",
+      "directly_comparable_to_audio_elo": false,
+      "claim_ceiling": "Dated pairwise human-preference agreement on MIREX 2026's public CMI-RewardBench test sets only."
+    },
+    {
+      "observation_id": "mirex-2026-cmi-pref-systasys-resource-lite-v2",
+      "source_id": "mirex-2026-cmi-rewardbench-results",
+      "system": "SYSTASYS Resource-Lite V2 - Blind Freeze 2026",
+      "system_version": "MIREX 2026 submission",
+      "capability_area": "music_understanding",
+      "evidence_kind": "human_rating_study",
+      "task_scope": "Predict which of two generated audio candidates better matches a text prompt and human pairwise preference.",
+      "metrics": [
+        {
+          "name": "pairwise_preference_accuracy_core",
+          "value": 39.8,
+          "unit": "percent",
+          "sample_size": 249,
+          "scope": "Public 249-sample core evaluation set."
+        },
+        {
+          "name": "pairwise_preference_accuracy_vocal_extension",
+          "value": 43.4,
+          "unit": "percent",
+          "scope": "Public vocal extension subset; results table reports 300+ samples."
+        },
+        {
+          "name": "pairwise_preference_accuracy_instrumental_extension",
+          "value": 40.2,
+          "unit": "percent",
+          "scope": "Public instrumental extension subset; results table reports 300+ samples."
+        }
+      ],
+      "capabilities": [
+        "Predicts pairwise human preference from a text prompt and two generated music clips."
+      ],
+      "limitations": [
+        "This is a preference-evaluator result rather than a music-generator result.",
+        "The results table reports 249 core samples and 300+ per extended vocal/instrumental subset.",
+        "Pairwise accuracy is not directly comparable to reward-model Spearman correlation, audio Elo, or symbolic accuracy."
+      ],
+      "comparability_group": "mirex-2026-cmi-rewardbench-results",
+      "directly_comparable_to_audio_elo": false,
+      "claim_ceiling": "Dated pairwise human-preference agreement on MIREX 2026's public CMI-RewardBench test sets only."
+    },
+    {
+      "observation_id": "muse-perception-audio-midi-gemini-2-5-flash-2026",
+      "source_id": "muse-audio-midi-perception-2026",
+      "system": "Gemini 2.5 Flash",
+      "system_version": "2026 published paper study configuration",
+      "capability_area": "music_understanding",
+      "evidence_kind": "published_dataset_statistics",
+      "task_scope": "Paired audio and symbolic-MIDI accuracy across syncopation scoring, transposition detection and chord-quality identification. Values are approximate visual estimates from Figure 2's estimated marginal means.",
+      "metrics": [
+        {
+          "name": "syncopation_audio_accuracy",
+          "value": 29,
+          "unit": "percent_approx",
+          "scope": "Audio modality; estimated from Figure 2."
+        },
+        {
+          "name": "syncopation_midi_accuracy",
+          "value": 98,
+          "unit": "percent_approx",
+          "scope": "Symbolic MIDI modality; estimated from Figure 2."
+        },
+        {
+          "name": "transposition_audio_accuracy",
+          "value": 71,
+          "unit": "percent_approx",
+          "scope": "Audio modality; estimated from Figure 2."
+        },
+        {
+          "name": "transposition_midi_accuracy",
+          "value": 98,
+          "unit": "percent_approx",
+          "scope": "Symbolic MIDI modality; estimated from Figure 2."
+        },
+        {
+          "name": "chord_quality_audio_accuracy",
+          "value": 20,
+          "unit": "percent_approx",
+          "scope": "Audio modality; estimated from Figure 2."
+        },
+        {
+          "name": "chord_quality_midi_accuracy",
+          "value": 87,
+          "unit": "percent_approx",
+          "scope": "Symbolic MIDI modality; estimated from Figure 2."
+        }
+      ],
+      "capabilities": [
+        "Evaluated on three controlled relational music-perception tasks with an explicit audio-versus-MIDI modality contrast."
+      ],
+      "limitations": [
+        "Approximate visual estimates from Figure 2, not exact raw counts or Table 1 cell values.",
+        "Short controlled excerpts; not full-song music understanding or generative collaboration.",
+        "MIDI performance must not be described as audio listening competence."
+      ],
+      "comparability_group": "muse-perception-audio-midi-2026",
+      "directly_comparable_to_audio_elo": false,
+      "claim_ceiling": "Approximate published audio-versus-symbolic modality reference for the three MUSE perception tasks only."
+    },
+    {
+      "observation_id": "muse-perception-audio-midi-gemini-2-5-pro-2026",
+      "source_id": "muse-audio-midi-perception-2026",
+      "system": "Gemini 2.5 Pro",
+      "system_version": "2026 published paper study configuration",
+      "capability_area": "music_understanding",
+      "evidence_kind": "published_dataset_statistics",
+      "task_scope": "Paired audio and symbolic-MIDI accuracy across syncopation scoring, transposition detection and chord-quality identification. Values are approximate visual estimates from Figure 2's estimated marginal means.",
+      "metrics": [
+        {
+          "name": "syncopation_audio_accuracy",
+          "value": 41,
+          "unit": "percent_approx",
+          "scope": "Audio modality; estimated from Figure 2."
+        },
+        {
+          "name": "syncopation_midi_accuracy",
+          "value": 100,
+          "unit": "percent_approx",
+          "scope": "Symbolic MIDI modality; estimated from Figure 2."
+        },
+        {
+          "name": "transposition_audio_accuracy",
+          "value": 95,
+          "unit": "percent_approx",
+          "scope": "Audio modality; estimated from Figure 2."
+        },
+        {
+          "name": "transposition_midi_accuracy",
+          "value": 100,
+          "unit": "percent_approx",
+          "scope": "Symbolic MIDI modality; estimated from Figure 2."
+        },
+        {
+          "name": "chord_quality_audio_accuracy",
+          "value": 35,
+          "unit": "percent_approx",
+          "scope": "Audio modality; estimated from Figure 2."
+        },
+        {
+          "name": "chord_quality_midi_accuracy",
+          "value": 99,
+          "unit": "percent_approx",
+          "scope": "Symbolic MIDI modality; estimated from Figure 2."
+        }
+      ],
+      "capabilities": [
+        "Evaluated on three controlled relational music-perception tasks with an explicit audio-versus-MIDI modality contrast."
+      ],
+      "limitations": [
+        "Approximate visual estimates from Figure 2, not exact raw counts or Table 1 cell values.",
+        "Short controlled excerpts; not full-song music understanding or generative collaboration.",
+        "MIDI performance must not be described as audio listening competence."
+      ],
+      "comparability_group": "muse-perception-audio-midi-2026",
+      "directly_comparable_to_audio_elo": false,
+      "claim_ceiling": "Approximate published audio-versus-symbolic modality reference for the three MUSE perception tasks only."
+    },
+    {
+      "observation_id": "muse-perception-audio-midi-qwen-2-5-omni-2026",
+      "source_id": "muse-audio-midi-perception-2026",
+      "system": "Qwen2.5-Omni",
+      "system_version": "2026 published paper study configuration",
+      "capability_area": "music_understanding",
+      "evidence_kind": "published_dataset_statistics",
+      "task_scope": "Paired audio and symbolic-MIDI accuracy across syncopation scoring, transposition detection and chord-quality identification. Values are approximate visual estimates from Figure 2's estimated marginal means.",
+      "metrics": [
+        {
+          "name": "syncopation_audio_accuracy",
+          "value": 22,
+          "unit": "percent_approx",
+          "scope": "Audio modality; estimated from Figure 2."
+        },
+        {
+          "name": "syncopation_midi_accuracy",
+          "value": 47,
+          "unit": "percent_approx",
+          "scope": "Symbolic MIDI modality; estimated from Figure 2."
+        },
+        {
+          "name": "transposition_audio_accuracy",
+          "value": 62,
+          "unit": "percent_approx",
+          "scope": "Audio modality; estimated from Figure 2."
+        },
+        {
+          "name": "transposition_midi_accuracy",
+          "value": 46,
+          "unit": "percent_approx",
+          "scope": "Symbolic MIDI modality; estimated from Figure 2."
+        },
+        {
+          "name": "chord_quality_audio_accuracy",
+          "value": 24,
+          "unit": "percent_approx",
+          "scope": "Audio modality; estimated from Figure 2."
+        },
+        {
+          "name": "chord_quality_midi_accuracy",
+          "value": 51,
+          "unit": "percent_approx",
+          "scope": "Symbolic MIDI modality; estimated from Figure 2."
+        }
+      ],
+      "capabilities": [
+        "Evaluated on three controlled relational music-perception tasks with an explicit audio-versus-MIDI modality contrast."
+      ],
+      "limitations": [
+        "Approximate visual estimates from Figure 2, not exact raw counts or Table 1 cell values.",
+        "Short controlled excerpts; not full-song music understanding or generative collaboration.",
+        "MIDI performance must not be described as audio listening competence."
+      ],
+      "comparability_group": "muse-perception-audio-midi-2026",
+      "directly_comparable_to_audio_elo": false,
+      "claim_ceiling": "Approximate published audio-versus-symbolic modality reference for the three MUSE perception tasks only."
+    }
+  ],
+  "comparison_rules": [
+    "Only compare scores within the same benchmark, version, split, modality, task definition and metric implementation.",
+    "Never compare instrumental Elo, vocal Elo, symbolic 0–5 ratings, editing accuracy or reciprocal-interaction effects as if they shared a scale.",
+    "Reproduce the external baseline on its official split before tuning or claiming improvement.",
+    "Pin exact model/API version, date, prompt set, decoding, retries, compute budget, renderer and scorer digest for every new result.",
+    "Retain every attempt, parse failure, timeout, abstention and invalid output in the denominator or report it explicitly.",
+    "A product feature list is not benchmark performance; a benchmark score is not proof of agency, authorship, rights or collaboration.",
+    "Use matched capability surfaces. For audio-only APIs, do not fabricate note-level or score-level controls.",
+    "Publish quality, exact editing, preservation, latency, recovery, agency, rights/provenance and cost as separate dimensions; do not collapse them into a composite score.",
+    "All numerical targets for Muse are prospective qualification objectives until a pinned, exact-head result and independent evaluation evidence exist."
+  ]
+}

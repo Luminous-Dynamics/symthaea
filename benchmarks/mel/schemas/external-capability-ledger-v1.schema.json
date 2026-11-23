@@ -1,0 +1,247 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel-external-capability-ledger-v1.schema.json",
+  "title": "Melothaea External Capability Ledger v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "ledger_id",
+    "as_of",
+    "sources",
+    "observations",
+    "comparison_rules"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mel-external-capability-ledger-v1"
+    },
+    "ledger_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "as_of": {
+      "type": "string",
+      "format": "date"
+    },
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/source"
+      }
+    },
+    "observations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/observation"
+      }
+    },
+    "comparison_rules": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$defs": {
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_id",
+        "title",
+        "url",
+        "source_class",
+        "published_or_observed_at",
+        "retrieved_at",
+        "scope"
+      ],
+      "properties": {
+        "source_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{2,80}$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "source_class": {
+          "enum": [
+            "official_product_documentation",
+            "official_api_documentation",
+            "peer_reviewed_or_conference_paper",
+            "preprint",
+            "benchmark_leaderboard",
+            "benchmark_dataset"
+          ]
+        },
+        "published_or_observed_at": {
+          "type": "string",
+          "minLength": 4
+        },
+        "retrieved_at": {
+          "type": "string",
+          "format": "date"
+        },
+        "scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version_snapshot": {
+          "type": "string"
+        },
+        "limitations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "value",
+        "unit",
+        "scope"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "value": {
+          "type": "number"
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "plus_minus": {
+          "type": "number",
+          "minimum": 0
+        },
+        "sample_size": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "lower_bound": {
+          "type": "number"
+        },
+        "upper_bound": {
+          "type": "number"
+        },
+        "confidence_level": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
+        }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observation_id",
+        "source_id",
+        "system",
+        "system_version",
+        "capability_area",
+        "evidence_kind",
+        "task_scope",
+        "metrics",
+        "capabilities",
+        "limitations",
+        "comparability_group",
+        "directly_comparable_to_audio_elo",
+        "claim_ceiling"
+      ],
+      "properties": {
+        "observation_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{2,100}$"
+        },
+        "source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "system": {
+          "type": "string",
+          "minLength": 1
+        },
+        "system_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "capability_area": {
+          "enum": [
+            "audio_generation",
+            "symbolic_generation",
+            "music_editing",
+            "live_music_interaction",
+            "music_understanding",
+            "dataset_or_benchmark"
+          ]
+        },
+        "evidence_kind": {
+          "enum": [
+            "blind_preference_leaderboard",
+            "human_rating_study",
+            "published_dataset_statistics",
+            "documented_product_capability",
+            "documented_api_capability",
+            "research_prototype",
+            "temporal_control_benchmark"
+          ]
+        },
+        "task_scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "metrics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/metric"
+          }
+        },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "limitations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "comparability_group": {
+          "type": "string",
+          "minLength": 1
+        },
+        "directly_comparable_to_audio_elo": {
+          "type": "boolean"
+        },
+        "claim_ceiling": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}
