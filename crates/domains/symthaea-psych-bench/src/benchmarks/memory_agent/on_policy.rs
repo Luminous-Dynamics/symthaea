@@ -263,9 +263,9 @@ pub fn estimate_total_effect(
         }
     }
 
-    // Identical task-family counts prevent different task mixes from looking
-    // like a policy effect. Every randomized profile is scored on the same
-    // frozen schedule.
+    // Exact task identities prevent omissions from disappearing symmetrically
+    // across arms. Every randomized profile is scored on the same frozen task
+    // schedule, not merely the same number of tasks.
     let mut profile_means = Vec::with_capacity(assignments.len());
     for (profile_id, episodes) in grouped {
         let mut schedule = BTreeSet::new();
@@ -497,6 +497,12 @@ mod tests {
         outcomes[0].task_family = "other".into();
         assert!(estimate_total_effect(&assignments, &expected_tasks(), &outcomes).is_err());
         assert!(estimate_total_effect(&assignments, &expected_tasks(), &make_outcomes(&assignments[..7])).is_err());
+
+        let duplicated_expected = vec![
+            ScheduledTask { episode_id: "task-1".into(), task_family: "planning".into() },
+            ScheduledTask { episode_id: "task-1".into(), task_family: "planning".into() },
+        ];
+        assert!(estimate_total_effect(&assignments, &duplicated_expected, &make_outcomes(&assignments)).is_err());
 
         let mut missing_same_task_in_both_arms = make_outcomes(&assignments);
         missing_same_task_in_both_arms.retain(|row| row.episode_id == "task-1");
