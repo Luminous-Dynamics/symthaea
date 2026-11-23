@@ -1,0 +1,111 @@
+{
+  "schema_version": "0.1",
+  "test_id": "NEOPIC-MINMAX-OUTLIER-GLOBAL-DRIFT-001",
+  "status": "synthetic_normalization_only",
+  "physical_cohort": {
+    "coordinate_domain": [
+      0,
+      1
+    ],
+    "domain_known": true,
+    "boundary": "nonperiodic_unit_interval",
+    "coordinate_unit": "L"
+  },
+  "normalization": {
+    "method": "per_sample_minmax_to_periodic_interval",
+    "output_interval": [
+      -3.141592653589793,
+      3.141592653589793
+    ],
+    "formula": "z(x) = -pi + 2*pi*(x-min(X))/(max(X)-min(X))",
+    "normalization_is_position_only": true,
+    "particle_weights_affect_extrema": false
+  },
+  "base_cloud": {
+    "positions": [
+      0.1,
+      0.3,
+      0.5,
+      0.7,
+      0.9
+    ],
+    "weights": [
+      0.2,
+      0.2,
+      0.2,
+      0.2,
+      0.2
+    ],
+    "normalized_positions": [
+      -3.141592653589793,
+      -1.5707963267948966,
+      0,
+      1.5707963267948966,
+      3.141592653589793
+    ]
+  },
+  "perturbed_cloud": {
+    "positions": [
+      0,
+      0.1,
+      0.3,
+      0.5,
+      0.7,
+      0.9
+    ],
+    "weights": [
+      1e-12,
+      0.1999999999998,
+      0.1999999999998,
+      0.1999999999998,
+      0.1999999999998,
+      0.1999999999998
+    ],
+    "normalized_positions": [
+      -3.141592653589793,
+      -2.443460952792061,
+      -1.0471975511965979,
+      0.34906585039886595,
+      1.7453292519943293,
+      3.141592653589793
+    ]
+  },
+  "matched_inlier_comparison": {
+    "physical_positions": [
+      0.1,
+      0.3,
+      0.5,
+      0.7,
+      0.9
+    ],
+    "normalized_before": [
+      -3.141592653589793,
+      -1.5707963267948966,
+      0,
+      1.5707963267948966,
+      3.141592653589793
+    ],
+    "normalized_after": [
+      -2.443460952792061,
+      -1.0471975511965979,
+      0.34906585039886595,
+      1.7453292519943293,
+      3.141592653589793
+    ],
+    "signed_displacement": [
+      0.6981317007977319,
+      0.5235987755982987,
+      0.34906585039886595,
+      0.17453292519943275,
+      0
+    ],
+    "max_absolute_displacement_rad": 0.6981317007977319,
+    "mean_absolute_displacement_rad": 0.34906585039886584
+  },
+  "interpretation": {
+    "empirical_measure_change": "At most the mass assigned to the added outlier (1e-12) before renormalization.",
+    "normalization_change": "The min/max support changes from [0.1,0.9] to [0,0.9], remapping every inlier position except the upper endpoint.",
+    "expected_disposition": "Detect and report normalization-induced global coordinate drift separately from sampling / learned-operator error.",
+    "scope_limit": "This is an analytic synthetic normalization witness, not a NEOPIC model-output error, kinetic simulation, or claim that all physical particle clouds contain such outliers."
+  }
+}
