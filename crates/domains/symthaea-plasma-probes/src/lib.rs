@@ -826,12 +826,11 @@ mod tests {
 
     #[test]
     fn rejects_inverted_spatial_mode_range() {
-        let input = SYNTHETIC_FIXTURE.replace(
-            "\"minimum\": 1, \"maximum\": 4",
-            "\"minimum\": 4, \"maximum\": 1",
-        );
+        let mut value = fixture_value();
+        value["admissible_controls"]["spatial_mode"]["minimum"] = serde_json::json!(4);
+        value["admissible_controls"]["spatial_mode"]["maximum"] = serde_json::json!(1);
         assert!(matches!(
-            PulseFamilyContract::parse_json(&input),
+            parse_value(&value),
             Err(ContractError::InvalidField {
                 field: "admissible_controls.spatial_mode",
                 ..
@@ -841,12 +840,10 @@ mod tests {
 
     #[test]
     fn rejects_time_range_beyond_declared_horizon() {
-        let input = SYNTHETIC_FIXTURE.replace(
-            "\"maximum\": 20.0, \"unit\": \"omega_pe^-1\"",
-            "\"maximum\": 31.0, \"unit\": \"omega_pe^-1\"",
-        );
+        let mut value = fixture_value();
+        value["admissible_controls"]["application_time"]["maximum"] = serde_json::json!(31.0);
         assert!(matches!(
-            PulseFamilyContract::parse_json(&input),
+            parse_value(&value),
             Err(ContractError::InvalidField {
                 field: "admissible_controls.application_time",
                 ..
@@ -856,12 +853,10 @@ mod tests {
 
     #[test]
     fn rejects_insufficient_post_pulse_observation_window() {
-        let input = SYNTHETIC_FIXTURE.replace(
-            "\"maximum\": 20.0, \"unit\": \"omega_pe^-1\"",
-            "\"maximum\": 29.0, \"unit\": \"omega_pe^-1\"",
-        );
+        let mut value = fixture_value();
+        value["admissible_controls"]["application_time"]["maximum"] = serde_json::json!(29.0);
         assert!(matches!(
-            PulseFamilyContract::parse_json(&input),
+            parse_value(&value),
             Err(ContractError::InvalidField {
                 field: "evaluation_policy",
                 ..
@@ -871,34 +866,30 @@ mod tests {
 
     #[test]
     fn rejects_sealed_test_acquisition() {
-        let input = SYNTHETIC_FIXTURE
-            .replace("\"split_role\": \"development\"", "\"split_role\": \"sealed_test\"");
+        let mut value = fixture_value();
+        value["split_role"] = serde_json::json!("sealed_test");
         assert_eq!(
-            PulseFamilyContract::parse_json(&input).unwrap_err(),
+            parse_value(&value).unwrap_err(),
             ContractError::SealedTestAcquisition
         );
     }
 
     #[test]
     fn rejects_synthetic_fixture_physical_execution() {
-        let input = SYNTHETIC_FIXTURE.replace(
-            "\"physical_execution_authorized\": false",
-            "\"physical_execution_authorized\": true",
-        );
+        let mut value = fixture_value();
+        value["provenance"]["physical_execution_authorized"] = serde_json::json!(true);
         assert_eq!(
-            PulseFamilyContract::parse_json(&input).unwrap_err(),
+            parse_value(&value).unwrap_err(),
             ContractError::SyntheticExecutionAuthorized
         );
     }
 
     #[test]
     fn requires_complex_phase_and_waveform_metrics() {
-        let input = SYNTHETIC_FIXTURE.replace(
-            "\"complex_amplitude\", \"wrapped_phase\", \"waveform_error\", ",
-            "",
-        );
+        let mut value = fixture_value();
+        value["evaluation_policy"]["response_metrics"] = serde_json::json!(["peak_time"]);
         assert!(matches!(
-            PulseFamilyContract::parse_json(&input),
+            parse_value(&value),
             Err(ContractError::InvalidField {
                 field: "evaluation_policy.response_metrics",
                 ..
@@ -1026,11 +1017,9 @@ mod tests {
     #[test]
     fn digest_is_scoped_to_contract_and_physics_identity() {
         let first_family = contract();
-        let second_input = SYNTHETIC_FIXTURE.replace(
-            "AKPD-SYNTHETIC-PULSE-FAMILY-001",
-            "AKPD-SYNTHETIC-PULSE-FAMILY-002",
-        );
-        let second_family = PulseFamilyContract::parse_json(&second_input).unwrap();
+        let mut second_input = fixture_value();
+        second_input["contract_id"] = serde_json::json!("AKPD-SYNTHETIC-PULSE-FAMILY-002");
+        let second_family = parse_value(&second_input).unwrap();
         let pulse = candidate(2, 0.2, 0.01, 3.0);
         assert_ne!(
             pulse.canonical_digest(&first_family).unwrap(),
@@ -1047,12 +1036,10 @@ mod tests {
 
     #[test]
     fn confirmation_role_requires_an_independent_reference_identity() {
-        let input = SYNTHETIC_FIXTURE.replace(
-            "\\"split_role\\": \\"development\\"",
-            "\\"split_role\\": \\"confirmation\\"",
-        );
+        let mut value = fixture_value();
+        value["split_role"] = serde_json::json!("confirmation");
         assert!(matches!(
-            PulseFamilyContract::parse_json(&input),
+            parse_value(&value),
             Err(ContractError::InvalidField {
                 field: "evaluation_policy.confirmation_reference_id",
                 ..
@@ -1062,12 +1049,13 @@ mod tests {
 
     #[test]
     fn rejects_unknown_fields_in_wire_contract() {
-        let input = SYNTHETIC_FIXTURE.replace(
-            "\"contract_status\": \"synthetic_fixture_only\"",
-            "\"contract_status\": \"synthetic_fixture_only\", \"unreviewed_override\": true",
-        );
+        let mut value = fixture_value();
+        value
+            .as_object_mut()
+            .expect("fixture root must be an object")
+            .insert("unreviewed_override".to_owned(), serde_json::json!(true));
         assert!(matches!(
-            PulseFamilyContract::parse_json(&input),
+            parse_value(&value),
             Err(ContractError::JsonParse(_))
         ));
     }
