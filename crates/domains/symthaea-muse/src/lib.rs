@@ -123,6 +123,7 @@ pub mod melody;
 pub mod methodology_plan;
 pub mod midi;
 pub mod realization_contract;
+pub mod realization_effect;
 pub mod midi_loader;
 #[cfg(feature = "theory")]
 pub mod musical_policy;
