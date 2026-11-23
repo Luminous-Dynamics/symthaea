@@ -198,6 +198,7 @@
         "run_id",
         "pair_block_id",
         "candidate_observation_id",
+        "candidate_observation_sequence",
         "candidate_input_sha256",
         "decision_need_sha256",
         "candidate_evidence_sha256",
@@ -242,9 +243,6 @@
         },
         "candidate_evidence_sha256": {
           "$ref": "#/$defs/sha256"
-        },
-        "intervention_id": {
-          "$ref": "#/$defs/id"
         },
         "decision": {
           "$ref": "#/$defs/decision"
@@ -308,6 +306,10 @@
         },
         "retrieval_profile_sha256": {
           "$ref": "#/$defs/sha256"
+        },
+        "candidate_observation_sequence": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     },
@@ -320,6 +322,7 @@
         "run_id",
         "pair_block_id",
         "candidate_observation_id",
+        "candidate_observation_sequence",
         "candidate_input_sha256",
         "intervention_id",
         "intervention_kind",
@@ -441,6 +444,10 @@
         },
         "retrieval_profile_sha256": {
           "$ref": "#/$defs/sha256"
+        },
+        "candidate_observation_sequence": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     },
