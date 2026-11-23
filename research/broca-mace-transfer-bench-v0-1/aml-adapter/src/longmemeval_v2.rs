@@ -229,7 +229,7 @@ pub struct LongMemEvalV2EvidenceChunkV1 {
     pub state_window: Vec<LongMemEvalV2StateV1>,
     pub screenshot_references: Vec<String>,
     pub chunk_sha256: String,
-    evidence_text: String,
+    pub evidence_text: String,
 }
 
 impl LongMemEvalV2EvidenceChunkV1 {
@@ -271,12 +271,17 @@ pub struct LongMemEvalV2ContextItemV1 {
 pub struct LongMemEvalV2HitV1 {
     pub chunk_id: String,
     pub trajectory_id: String,
+    pub domain: String,
+    /// Digest of the exact original trajectory JSON record.
+    pub source_trajectory_sha256: String,
     pub center_state_ordinal: usize,
     pub score: f64,
     pub rank: usize,
     pub evidence_text: String,
     pub screenshot_references: Vec<String>,
     pub screenshot_sha256s: Vec<Option<String>>,
+    /// Exact source states from which the text chunk and attached images were projected.
+    pub state_window: Vec<LongMemEvalV2StateV1>,
 }
 
 impl LongMemEvalV2HitV1 {
@@ -579,12 +584,15 @@ impl LongMemEvalV2Bm25IndexV1 {
                 hits.push(LongMemEvalV2HitV1 {
                     chunk_id: item.chunk.chunk_id.clone(),
                     trajectory_id: item.chunk.trajectory_id.clone(),
+                    domain: item.chunk.domain.clone(),
+                    source_trajectory_sha256: item.chunk.source_trajectory_sha256.clone(),
                     center_state_ordinal: item.chunk.center_state_ordinal,
                     score, rank: 0,
                     evidence_text: item.chunk.evidence_text.clone(),
                     screenshot_references: item.chunk.screenshot_references.clone(),
                     screenshot_sha256s: item.chunk.state_window.iter()
                         .map(|state| state.screenshot_sha256.clone()).collect(),
+                    state_window: item.chunk.state_window.clone(),
                 });
             }
         }

@@ -20,11 +20,17 @@ use broca_aml_adapter::longmemeval_v2::{
     LongMemEvalV2TrajectoryV1, resolve_screenshot_reference,
 };
 use broca_aml_adapter::raw_session::Bm25ProfileV1;
+use broca_aml_adapter::longmemeval_v2_candidate_adapter::{
+    LongMemEvalV2CandidateIdentityV1,
+    encode_longmemeval_v2_search_candidate_evidence_v1,
+};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
 struct Config {
     domain: String,
+    run_id: String,
+    backend_revision_sha256: String,
     dataset_root: PathBuf,
     top_k: usize,
     slice_radius: usize,
@@ -38,6 +44,16 @@ impl Config {
             .map_err(|_| "MACE_LMEV2_DOMAIN is required".to_string())?;
         if domain != "web" && domain != "enterprise" {
             return Err("MACE_LMEV2_DOMAIN must be web or enterprise".into());
+        }
+        let run_id = env::var("MACE_LMEV2_RUN_ID")
+            .map_err(|_| "MACE_LMEV2_RUN_ID is required".to_string())?;
+        if run_id.trim().is_empty() || run_id.chars().any(char::is_control) {
+            return Err("MACE_LMEV2_RUN_ID must be a non-empty printable identifier".into());
+        }
+        let backend_revision_sha256 = env::var("MACE_LMEV2_BACKEND_REVISION_SHA256")
+            .map_err(|_| "MACE_LMEV2_BACKEND_REVISION_SHA256 is required".to_string())?;
+        if !valid_sha256(&backend_revision_sha256) {
+            return Err("MACE_LMEV2_BACKEND_REVISION_SHA256 must be lowercase SHA-256".into());
         }
         let root = env::var("MACE_LMEV2_DATASET_ROOT")
             .map_err(|_| "MACE_LMEV2_DATASET_ROOT is required".to_string())?;
@@ -80,11 +96,25 @@ impl Config {
             return Err("invalid BM25 k1/b profile".into());
         }
         Ok(Self {
-            domain, dataset_root, top_k, slice_radius, neighbor_radius, profile,
+            domain,
+            run_id,
+            backend_revision_sha256,
+            dataset_root,
+            top_k,
+            slice_radius,
+            neighbor_radius,
+            profile,
         })
     }
 }
 
+
+fn valid_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
 
 fn sha256_hex(bytes: &[u8]) -> String {
     const HEX: &[u8; 16] = b"0123456789abcdef";
@@ -164,6 +194,11 @@ fn handle_request(
                 .and_then(Value::as_str)
                 .filter(|value| !value.trim().is_empty())
                 .ok_or_else(|| "query request requires non-empty query".to_string())?;
+            let candidate_id = request
+                .get("candidate_id")
+                .and_then(Value::as_str)
+                .filter(|value| !value.trim().is_empty())
+                .ok_or_else(|| "query request requires opaque candidate_id".to_string())?;
             // Accepted for API compatibility. The lexical baseline does not
             // inspect or rank the question image; this is not multimodal search.
             let _query_image = request.get("query_image").and_then(Value::as_str);
@@ -220,9 +255,46 @@ fn handle_request(
                     }
                 }
             }
+            let candidate_evidence = if result.hits.is_empty() {
+                None
+            } else {
+                let identity = LongMemEvalV2CandidateIdentityV1 {
+                    run_id: config.run_id.clone(),
+                    candidate_id: candidate_id.to_owned(),
+                    backend_id: "mace_lmev2_bm25_text".to_owned(),
+                    backend_revision_sha256: config.backend_revision_sha256.clone(),
+                };
+                Some(
+                    encode_longmemeval_v2_search_candidate_evidence_v1(
+                        &identity,
+                        query,
+                        &config.domain,
+                        &result,
+                    )
+                    .map_err(|error| format!("candidate evidence projection: {error:?}"))?
+                )
+            };
+            let candidate_evidence_jsonl = match &candidate_evidence {
+                Some(batch) => batch
+                    .to_jsonl()
+                    .map_err(|error| format!("candidate evidence serialization: {error:?}"))?,
+                None => String::new(),
+            };
+            let candidate_set_sha256 = candidate_evidence
+                .as_ref()
+                .map(|batch| batch.candidate_set_sha256.clone());
+            let candidate_record_count = candidate_evidence
+                .as_ref()
+                .map_or(0, |batch| batch.evidence.len());
+
             Ok(json!({
                 "ok": true,
                 "items": items,
+                "candidate_evidence_jsonl": candidate_evidence_jsonl,
+                "candidate_set_sha256": candidate_set_sha256,
+                "candidate_record_count": candidate_record_count,
+                "run_id": config.run_id,
+                "candidate_id": candidate_id,
                 "hit_count": result.hits.len(),
                 "neighbor_count": result.neighbor_context.len(),
                 "index_build_ns": index_build_ns,
@@ -287,6 +359,8 @@ mod tests {
     fn fixture_config(root: PathBuf) -> Config {
         Config {
             domain: "web".to_owned(),
+            run_id: "fixture-run".to_owned(),
+            backend_revision_sha256: "1111111111111111111111111111111111111111111111111111111111111111".to_owned(),
             dataset_root: root,
             top_k: 4,
             slice_radius: 0,
@@ -346,7 +420,8 @@ mod tests {
             json!({
                 "op": "query",
                 "query": "customer Ada pending order",
-                "query_image": "/private/query-image.png"
+                "query_image": "/private/query-image.png",
+                "candidate_id": "query-invocation-1"
             }),
             &config,
             &mut trajectories,
@@ -355,6 +430,11 @@ mod tests {
         assert_eq!(response["ok"], true);
         assert_eq!(response["query_image_used"], false);
         assert_eq!(response["retrieval_mode"], "text_bm25_with_original_image_evidence");
+        assert_eq!(response["run_id"], "fixture-run");
+        assert_eq!(response["candidate_id"], "query-invocation-1");
+        assert_eq!(response["candidate_record_count"], 2);
+        assert!(response["candidate_set_sha256"].as_str().is_some());
+        assert!(response["candidate_evidence_jsonl"].as_str().unwrap().contains("lmev2:text:"));
         let items = response["items"].as_array().expect("context items");
         assert!(items.iter().any(|item| {
             item["type"] == "text" && item["value"].as_str()
