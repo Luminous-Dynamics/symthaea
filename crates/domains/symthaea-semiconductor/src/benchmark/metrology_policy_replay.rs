@@ -1288,13 +1288,8 @@ mod tests {
         let view = episode.policy_view();
 
         let random_policy = policy_config(view, "stratified-random", 0, 32, 8, 41);
-        let random_run = run_synthetic_metrology_policy_v1(
-            &episode,
-            view,
-            &semantics,
-            &random_policy,
-        )
-        .unwrap();
+        let random_run =
+            run_synthetic_metrology_policy_v1(&episode, view, &semantics, &random_policy).unwrap();
 
         let risk_policy = policy_config(view, "risk-plus-audit", 16, 16, 4, 41);
         let risk_run =
@@ -1342,8 +1337,7 @@ mod tests {
         )
         .unwrap();
         for row in &mut selection.rows {
-            row.class_semantics_sha256 =
-                selection.binary_semantics.semantics_sha256.clone();
+            row.class_semantics_sha256 = selection.binary_semantics.semantics_sha256.clone();
         }
         seal_selection_for_test(&mut selection);
         assert!(evaluate_synthetic_metrology_policy_v1(&episode, &selection).is_err());
