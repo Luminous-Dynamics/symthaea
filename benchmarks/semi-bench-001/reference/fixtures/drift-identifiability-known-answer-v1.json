@@ -1,0 +1,646 @@
+{
+  "schema_version": "semi-cause-identifiability-known-answer-v0.1",
+  "status": "frozen_synthetic_structural_identifiability_cases",
+  "claim_ceiling": "declared sensitivity-matrix structural identifiability; no physical fault attribution",
+  "dimension_order": [
+    "process_shift",
+    "instrument_a_bias",
+    "instrument_b_bias",
+    "shared_common_mode"
+  ],
+  "tie_break_order": [
+    "minimum_incremental_cost",
+    "minimum_sequential_delay",
+    "lexicographic_sorted_action_ids"
+  ],
+  "cases": [
+    {
+      "id": "CAUSE-001-PROCESS-GAUGE-A-CONFOUNDED",
+      "actions": [
+        {
+          "action_id": "wafer-a",
+          "evidence_origin_id": "origin-wafer-a",
+          "sensitivity": [
+            1,
+            1,
+            0,
+            1
+          ],
+          "evidence_state": "observed_qualified",
+          "cost_units": 1,
+          "delay_units": 2
+        }
+      ],
+      "required_targets": [
+        "process_shift",
+        "instrument_a_bias"
+      ],
+      "maximum_incremental_cost_units": 10,
+      "maximum_candidate_actions": 20,
+      "expected": {
+        "observed_design_rank": 1,
+        "plan_status": "not_identifiable_within_budget",
+        "selected_action_ids": [],
+        "incremental_cost_units": 0,
+        "conservative_sequential_delay_units": 0,
+        "target_status": [
+          {
+            "target": "process_shift",
+            "identifiable_from_observed": false,
+            "identifiable_after_plan": false
+          },
+          {
+            "target": "instrument_a_bias",
+            "identifiable_from_observed": false,
+            "identifiable_after_plan": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "CAUSE-002-PROCESS-IDENTIFIED-BY-WITNESS-A",
+      "actions": [
+        {
+          "action_id": "wafer-a",
+          "evidence_origin_id": "origin-wafer-a",
+          "sensitivity": [
+            1,
+            1,
+            0,
+            1
+          ],
+          "evidence_state": "observed_qualified",
+          "cost_units": 1,
+          "delay_units": 2
+        },
+        {
+          "action_id": "witness-a",
+          "evidence_origin_id": "origin-witness-a",
+          "sensitivity": [
+            0,
+            1,
+            0,
+            1
+          ],
+          "evidence_state": "observed_qualified",
+          "cost_units": 1,
+          "delay_units": 1
+        }
+      ],
+      "required_targets": [
+        "process_shift"
+      ],
+      "maximum_incremental_cost_units": 10,
+      "maximum_candidate_actions": 20,
+      "expected": {
+        "observed_design_rank": 2,
+        "plan_status": "already_identifiable",
+        "selected_action_ids": [],
+        "incremental_cost_units": 0,
+        "conservative_sequential_delay_units": 0,
+        "target_status": [
+          {
+            "target": "process_shift",
+            "identifiable_from_observed": true,
+            "identifiable_after_plan": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "CAUSE-003-GAUGE-A-SHARED-CAUSE-DISCRIMINATION",
+      "actions": [
+        {
+          "action_id": "wafer-a",
+          "evidence_origin_id": "origin-wafer-a",
+          "sensitivity": [
+            1,
+            1,
+            0,
+            1
+          ],
+          "evidence_state": "observed_qualified",
+          "cost_units": 1,
+          "delay_units": 2
+        },
+        {
+          "action_id": "witness-a",
+          "evidence_origin_id": "origin-witness-a",
+          "sensitivity": [
+            0,
+            1,
+            0,
+            1
+          ],
+          "evidence_state": "observed_qualified",
+          "cost_units": 1,
+          "delay_units": 1
+        },
+        {
+          "action_id": "common-monitor",
+          "evidence_origin_id": "origin-common-monitor",
+          "sensitivity": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "evidence_state": "available_qualified",
+          "cost_units": 2,
+          "delay_units": 1
+        }
+      ],
+      "required_targets": [
+        "instrument_a_bias",
+        "shared_common_mode"
+      ],
+      "maximum_incremental_cost_units": 5,
+      "maximum_candidate_actions": 20,
+      "expected": {
+        "observed_design_rank": 2,
+        "plan_status": "discriminating_plan_found",
+        "selected_action_ids": [
+          "common-monitor"
+        ],
+        "incremental_cost_units": 2,
+        "conservative_sequential_delay_units": 1,
+        "target_status": [
+          {
+            "target": "instrument_a_bias",
+            "identifiable_from_observed": false,
+            "identifiable_after_plan": true
+          },
+          {
+            "target": "shared_common_mode",
+            "identifiable_from_observed": false,
+            "identifiable_after_plan": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "CAUSE-004-GAUGE-B-SHARED-CAUSE-DISCRIMINATION",
+      "actions": [
+        {
+          "action_id": "wafer-b",
+          "evidence_origin_id": "origin-wafer-b",
+          "sensitivity": [
+            1,
+            0,
+            1,
+            1
+          ],
+          "evidence_state": "observed_qualified",
+          "cost_units": 1,
+          "delay_units": 2
+        },
+        {
+          "action_id": "witness-b",
+          "evidence_origin_id": "origin-witness-b",
+          "sensitivity": [
+            0,
+            0,
+            1,
+            1
+          ],
+          "evidence_state": "observed_qualified",
+          "cost_units": 1,
+          "delay_units": 1
+        },
+        {
+          "action_id": "common-monitor",
+          "evidence_origin_id": "origin-common-monitor",
+          "sensitivity": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "evidence_state": "available_qualified",
+          "cost_units": 3,
+          "delay_units": 1
+        }
+      ],
+      "required_targets": [
+        "instrument_b_bias",
+        "shared_common_mode"
+      ],
+      "maximum_incremental_cost_units": 5,
+      "maximum_candidate_actions": 20,
+      "expected": {
+        "observed_design_rank": 2,
+        "plan_status": "discriminating_plan_found",
+        "selected_action_ids": [
+          "common-monitor"
+        ],
+        "incremental_cost_units": 3,
+        "conservative_sequential_delay_units": 1,
+        "target_status": [
+          {
+            "target": "instrument_b_bias",
+            "identifiable_from_observed": false,
+            "identifiable_after_plan": true
+          },
+          {
+            "target": "shared_common_mode",
+            "identifiable_from_observed": false,
+            "identifiable_after_plan": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "CAUSE-005-BUDGET-BLOCKS-CROSSOVER",
+      "actions": [
+        {
+          "action_id": "wafer-a",
+          "evidence_origin_id": "origin-wafer-a",
+          "sensitivity": [
+            1,
+            1,
+            0,
+            1
+          ],
+          "evidence_state": "observed_qualified",
+          "cost_units": 1,
+          "delay_units": 2
+        },
+        {
+          "action_id": "witness-a",
+          "evidence_origin_id": "origin-witness-a",
+          "sensitivity": [
+            0,
+            1,
+            0,
+            1
+          ],
+          "evidence_state": "available_qualified",
+          "cost_units": 4,
+          "delay_units": 1
+        }
+      ],
+      "required_targets": [
+        "process_shift"
+      ],
+      "maximum_incremental_cost_units": 3,
+      "maximum_candidate_actions": 20,
+      "expected": {
+        "observed_design_rank": 1,
+        "plan_status": "not_identifiable_within_budget",
+        "selected_action_ids": [],
+        "incremental_cost_units": 0,
+        "conservative_sequential_delay_units": 0,
+        "target_status": [
+          {
+            "target": "process_shift",
+            "identifiable_from_observed": false,
+            "identifiable_after_plan": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "CAUSE-006-UNQUALIFIED-WITNESS-IS-NOT-COUNTED",
+      "actions": [
+        {
+          "action_id": "wafer-a",
+          "evidence_origin_id": "origin-wafer-a",
+          "sensitivity": [
+            1,
+            1,
+            0,
+            1
+          ],
+          "evidence_state": "observed_qualified",
+          "cost_units": 1,
+          "delay_units": 2
+        },
+        {
+          "action_id": "witness-a",
+          "evidence_origin_id": "origin-witness-a",
+          "sensitivity": [
+            0,
+            1,
+            0,
+            1
+          ],
+          "evidence_state": "unknown",
+          "cost_units": 1,
+          "delay_units": 1
+        },
+        {
+          "action_id": "rejected-monitor",
+          "evidence_origin_id": "origin-rejected-monitor",
+          "sensitivity": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "evidence_state": "rejected",
+          "cost_units": 1,
+          "delay_units": 1
+        }
+      ],
+      "required_targets": [
+        "process_shift"
+      ],
+      "maximum_incremental_cost_units": 10,
+      "maximum_candidate_actions": 20,
+      "expected": {
+        "observed_design_rank": 1,
+        "plan_status": "not_identifiable_within_budget",
+        "selected_action_ids": [],
+        "incremental_cost_units": 0,
+        "conservative_sequential_delay_units": 0,
+        "target_status": [
+          {
+            "target": "process_shift",
+            "identifiable_from_observed": false,
+            "identifiable_after_plan": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "CAUSE-007-ALL-SOURCE-CONTRASTS-IDENTIFIABLE",
+      "actions": [
+        {
+          "action_id": "wafer-a",
+          "evidence_origin_id": "origin-wafer-a",
+          "sensitivity": [
+            1,
+            1,
+            0,
+            1
+          ],
+          "evidence_state": "observed_qualified",
+          "cost_units": 1,
+          "delay_units": 2
+        },
+        {
+          "action_id": "witness-a",
+          "evidence_origin_id": "origin-witness-a",
+          "sensitivity": [
+            0,
+            1,
+            0,
+            1
+          ],
+          "evidence_state": "observed_qualified",
+          "cost_units": 1,
+          "delay_units": 1
+        },
+        {
+          "action_id": "wafer-b",
+          "evidence_origin_id": "origin-wafer-b",
+          "sensitivity": [
+            1,
+            0,
+            1,
+            1
+          ],
+          "evidence_state": "observed_qualified",
+          "cost_units": 1,
+          "delay_units": 2
+        },
+        {
+          "action_id": "common-monitor",
+          "evidence_origin_id": "origin-common-monitor",
+          "sensitivity": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "evidence_state": "observed_qualified",
+          "cost_units": 1,
+          "delay_units": 1
+        }
+      ],
+      "required_targets": [
+        "process_shift",
+        "instrument_a_bias",
+        "instrument_b_bias",
+        "shared_common_mode"
+      ],
+      "maximum_incremental_cost_units": 10,
+      "maximum_candidate_actions": 20,
+      "expected": {
+        "observed_design_rank": 4,
+        "plan_status": "already_identifiable",
+        "selected_action_ids": [],
+        "incremental_cost_units": 0,
+        "conservative_sequential_delay_units": 0,
+        "target_status": [
+          {
+            "target": "process_shift",
+            "identifiable_from_observed": true,
+            "identifiable_after_plan": true
+          },
+          {
+            "target": "instrument_a_bias",
+            "identifiable_from_observed": true,
+            "identifiable_after_plan": true
+          },
+          {
+            "target": "instrument_b_bias",
+            "identifiable_from_observed": true,
+            "identifiable_after_plan": true
+          },
+          {
+            "target": "shared_common_mode",
+            "identifiable_from_observed": true,
+            "identifiable_after_plan": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "CAUSE-008-MULTI-TARGETS-CANNOT-BE-PARTIALLY-PASSED",
+      "actions": [
+        {
+          "action_id": "wafer-a",
+          "evidence_origin_id": "origin-wafer-a",
+          "sensitivity": [
+            1,
+            1,
+            0,
+            1
+          ],
+          "evidence_state": "observed_qualified",
+          "cost_units": 1,
+          "delay_units": 2
+        },
+        {
+          "action_id": "witness-a",
+          "evidence_origin_id": "origin-witness-a",
+          "sensitivity": [
+            0,
+            1,
+            0,
+            1
+          ],
+          "evidence_state": "observed_qualified",
+          "cost_units": 1,
+          "delay_units": 1
+        }
+      ],
+      "required_targets": [
+        "process_shift",
+        "instrument_a_bias"
+      ],
+      "maximum_incremental_cost_units": 10,
+      "maximum_candidate_actions": 20,
+      "expected": {
+        "observed_design_rank": 2,
+        "plan_status": "not_identifiable_within_budget",
+        "selected_action_ids": [],
+        "incremental_cost_units": 0,
+        "conservative_sequential_delay_units": 0,
+        "target_status": [
+          {
+            "target": "process_shift",
+            "identifiable_from_observed": true,
+            "identifiable_after_plan": true
+          },
+          {
+            "target": "instrument_a_bias",
+            "identifiable_from_observed": false,
+            "identifiable_after_plan": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "CAUSE-009-LEXICOGRAPHIC-TIEBREAK",
+      "actions": [
+        {
+          "action_id": "wafer-a",
+          "evidence_origin_id": "origin-wafer-a",
+          "sensitivity": [
+            1,
+            1,
+            0,
+            1
+          ],
+          "evidence_state": "observed_qualified",
+          "cost_units": 1,
+          "delay_units": 2
+        },
+        {
+          "action_id": "z-witness",
+          "evidence_origin_id": "origin-z-witness",
+          "sensitivity": [
+            0,
+            1,
+            0,
+            1
+          ],
+          "evidence_state": "available_qualified",
+          "cost_units": 1,
+          "delay_units": 2
+        },
+        {
+          "action_id": "a-witness",
+          "evidence_origin_id": "origin-a-witness",
+          "sensitivity": [
+            0,
+            1,
+            0,
+            1
+          ],
+          "evidence_state": "available_qualified",
+          "cost_units": 1,
+          "delay_units": 2
+        }
+      ],
+      "required_targets": [
+        "process_shift"
+      ],
+      "maximum_incremental_cost_units": 2,
+      "maximum_candidate_actions": 20,
+      "expected": {
+        "observed_design_rank": 1,
+        "plan_status": "discriminating_plan_found",
+        "selected_action_ids": [
+          "a-witness"
+        ],
+        "incremental_cost_units": 1,
+        "conservative_sequential_delay_units": 2,
+        "target_status": [
+          {
+            "target": "process_shift",
+            "identifiable_from_observed": false,
+            "identifiable_after_plan": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "CAUSE-010-DELAY-TIEBREAK-AFTER-COST",
+      "actions": [
+        {
+          "action_id": "wafer-a",
+          "evidence_origin_id": "origin-wafer-a",
+          "sensitivity": [
+            1,
+            1,
+            0,
+            1
+          ],
+          "evidence_state": "observed_qualified",
+          "cost_units": 1,
+          "delay_units": 2
+        },
+        {
+          "action_id": "slow-witness",
+          "evidence_origin_id": "origin-slow-witness",
+          "sensitivity": [
+            0,
+            1,
+            0,
+            1
+          ],
+          "evidence_state": "available_qualified",
+          "cost_units": 2,
+          "delay_units": 5
+        },
+        {
+          "action_id": "fast-witness",
+          "evidence_origin_id": "origin-fast-witness",
+          "sensitivity": [
+            0,
+            1,
+            0,
+            1
+          ],
+          "evidence_state": "available_qualified",
+          "cost_units": 2,
+          "delay_units": 1
+        }
+      ],
+      "required_targets": [
+        "process_shift"
+      ],
+      "maximum_incremental_cost_units": 2,
+      "maximum_candidate_actions": 20,
+      "expected": {
+        "observed_design_rank": 1,
+        "plan_status": "discriminating_plan_found",
+        "selected_action_ids": [
+          "fast-witness"
+        ],
+        "incremental_cost_units": 2,
+        "conservative_sequential_delay_units": 1,
+        "target_status": [
+          {
+            "target": "process_shift",
+            "identifiable_from_observed": false,
+            "identifiable_after_plan": true
+          }
+        ]
+      }
+    }
+  ]
+}
