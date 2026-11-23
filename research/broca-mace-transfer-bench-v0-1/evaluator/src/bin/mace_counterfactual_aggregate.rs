@@ -380,7 +380,7 @@ fn required_event_ids(record: &Value, field: &str) -> Result<Vec<u32>, String> {
         .get(field)
         .and_then(Value::as_array)
         .ok_or_else(|| format!("missing or invalid event ID array {field}"))?;
-    values
+    let parsed: Vec<u32> = values
         .iter()
         .map(|value| {
             let id = value
@@ -389,7 +389,12 @@ fn required_event_ids(record: &Value, field: &str) -> Result<Vec<u32>, String> {
             u32::try_from(id)
                 .map_err(|_| format!("event ID array {field} contains an out-of-range ID"))
         })
-        .collect()
+        .collect::<Result<_, _>>()?;
+    let unique: BTreeSet<u32> = parsed.iter().copied().collect();
+    if unique.len() != parsed.len() {
+        return Err(format!("event ID array {field} contains duplicate IDs"));
+    }
+    Ok(parsed)
 }
 
 fn validate_score_against_manifest(score: &Value, manifest: &Value) -> Result<(), String> {
