@@ -187,7 +187,7 @@ These are prospective gates, not observed outcomes. Report confidence intervals,
 
 ## Streaming boundary
 
-The current `process_samples_at_source_position` API preserves the caller-supplied absolute sample range and segment identity for each processed block. It does not maintain an internal continuous sample ring, resampler phase, frame-hop accumulator or cross-block analysis window. Therefore:
+The current `process_samples_at_source_position` API preserves the caller-supplied absolute sample range and segment identity for each processed block. The raw RMS calculation now accumulates squared samples in f64 so finite large f32 inputs do not overflow during squaring; this is a numeric safety property, not an amplitude calibration. It does not maintain an internal continuous sample ring, resampler phase, frame-hop accumulator or cross-block analysis window. Therefore:
 - Each call can lose an analysis window at its start/end.
 - The internal linear resampling operation restarts at the start of each call.
 - Utterance-peak normalization is computed for the supplied block, not a stable multi-block stream.
