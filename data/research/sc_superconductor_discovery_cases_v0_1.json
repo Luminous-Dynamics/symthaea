@@ -1,0 +1,1458 @@
+{
+  "schema_version": "0.1.0",
+  "registry_id": "SC-DISCOVERY-REFERENCE-CASES-2026-11-17",
+  "created_at": "2026-11-17",
+  "purpose": "Small, source-pinned semantic/control corpus for superconductivity discovery benchmarking. This is not a complete candidate database or a model training set.",
+  "claim_ceiling": "Literature-reported experimental observations and computational predictions are recorded separately. No prediction in this file is an experimentally confirmed superconductor.",
+  "units": {
+    "temperature": "K",
+    "pressure": "GPa",
+    "hull_distance": "meV/atom"
+  },
+  "source_register": [
+    {
+      "source_id": "zhou_2026_ambient_nickelate_films",
+      "doi": "10.1093/nsr/nwag151",
+      "url": "https://doi.org/10.1093/nsr/nwag151",
+      "published": "2026-03-10",
+      "source_type": "peer_reviewed_experimental_report",
+      "title": "Superconductivity onset above 60 K in ambient-pressure nickelate films",
+      "primary_claim_boundary": "Ambient-pressure epitaxial thin films; reported onset, zero-resistance and diamagnetic transition temperatures remain distinct."
+    },
+    {
+      "source_id": "liu_2026_bulk_pressurized_nickelate",
+      "doi": "10.1038/s41586-025-09954-4",
+      "url": "https://doi.org/10.1038/s41586-025-09954-4",
+      "published": "2025-12-02",
+      "source_type": "peer_reviewed_experimental_report",
+      "title": "Bulk superconductivity up to 96 K in pressurized nickelate single crystals",
+      "primary_claim_boundary": "Crystals synthesized at ambient pressure; superconducting state measured under approximately 20-22 GPa. Do not call this ambient-pressure operation."
+    },
+    {
+      "source_id": "du_2026_hydrogen_unit_hydrides",
+      "doi": "10.1016/j.mtphys.2026.102142",
+      "url": "https://doi.org/10.1016/j.mtphys.2026.102142",
+      "published": "2026-08",
+      "source_type": "computational_prediction",
+      "title": "High-temperature superconductivity at pressures below 30 GPa via hydrogen-unit metal embedding",
+      "primary_claim_boundary": "Predicted electron-phonon superconductivity; no experimental synthesis or measured transition is encoded."
+    },
+    {
+      "source_id": "gashmard_2026_genome_ai",
+      "doi": "10.1038/s41598-026-76977-w",
+      "url": "https://doi.org/10.1038/s41598-026-76977-w",
+      "published": "2026-10-29",
+      "source_type": "peer_reviewed_early_access_computational_prediction",
+      "title": "Genome-inspired AI for extrapolative discovery of high-temperature superconductors",
+      "primary_claim_boundary": "Model predictions over crystal databases; candidate Tc values are not experimental observations. Early-access article version; data, split and checkpoint reproducibility must be audited."
+    },
+    {
+      "source_id": "bee_net_2026",
+      "doi": "10.1038/s41524-026-01964-8",
+      "url": "https://www.nature.com/articles/s41524-026-01964-8",
+      "published": "2026-01",
+      "source_type": "computational_workflow_with_two_synthesized_candidates",
+      "title": "Developing a complete AI-accelerated workflow for superconductor discovery",
+      "primary_claim_boundary": "BEE-NET's 0.87 K MAE is versus DFT-based Allen-Dynes labels, not measured Tc. The end-to-end workflow is the stronger benchmark: >1.3 million candidate structures screened to 741 DFT-confirmed stable conventional superconductors (86% final precision after 866 high-accuracy alpha2F computations), with two candidate compositions synthesized and characterized; only Be2Hf2Nb had a single bulk-like heat-capacity jump, while Be2HfNb2 showed multiphase evidence.",
+      "publication_type": "peer_reviewed_article",
+      "reported_training_dataset_alpha2f_count": 7000,
+      "reported_train_test_split": "80/20",
+      "reported_architecture": "Bootstrapped ensemble of equivariant graph convolutional networks; CSO (structure only) and CPD (structure plus coarse phonon DOS) variants; six models across MSE, WMSE and EMD losses",
+      "reported_optimization": "100 bootstrapped ensembles for each CSO and CPD model; 62% unique train data sampled, 38% unique points for validation within training split",
+      "reported_pipeline": "1.22 million generated candidates -> 974k Eg screen -> 822k Ef screen -> 15k BEE-NET Tc > 5 K -> 5.6k M3GNet Eh <= 200 meV/atom -> 1.3k DFT-relaxed structures -> 866 high-accuracy alpha2F calculations -> 741 dynamically/thermodynamically stable compounds with DFT Tc > 5 K; final precision 86%",
+      "reported_experimental_candidates": [
+        "Be2Hf2Nb",
+        "Be2HfNb2"
+      ],
+      "limitations": [
+        "BEE-NET is trained on conventional electron-phonon alpha2F data at ambient pressure; do not extrapolate its Tc predictor directly to hydrides or unconventional nickelates.",
+        "Pipeline M3GNet formation-hull filter systematically underpredicted Eh by approximately 140 meV/atom in retrospective analysis; this increased recall at expense of precision and its uncorrected effect must remain explicit.",
+        "Be2HfNb2 showed two distinct specific-heat jumps and evidence for a multiphase sample; do not classify as unambiguous single-phase bulk superconductivity.",
+        "Be2Hf2Nb showed one specific-heat jump with DeltaC/(gamma Tc)=1.44, and the paper reports the sample fully superconducting below approximately 2 K.",
+        "Source repository artifact, dataset, model weight and exact split closure remain under audit in issue #12619."
+      ]
+    },
+    {
+      "source_id": "htsc_2025",
+      "doi": "10.1088/1674-1056/adf042",
+      "url": "https://doi.org/10.1088/1674-1056/adf042",
+      "published": "2025",
+      "source_type": "computational_benchmark_dataset",
+      "title": "HTSC-2025: A benchmark dataset of ambient-pressure high-temperature superconductors for AI-driven critical temperature prediction",
+      "primary_claim_boundary": "155-material benchmark; labels and structural-system splits are computational and must not be merged with specimen-level experimental Tc.",
+      "upstream_repository": "https://huggingface.co/datasets/xiao-qi/HTSC-2025",
+      "upstream_revision": "ab53472",
+      "upstream_files": [
+        {
+          "path": "HTSC-2025.json",
+          "size_reported_bytes": 169984,
+          "license": "not_declared_in_visible_card_metadata"
+        },
+        {
+          "path": "README.md",
+          "size_reported_bytes": null,
+          "license": "not_declared_in_visible_card_metadata"
+        },
+        {
+          "path": ".gitattributes",
+          "size_reported_bytes": null,
+          "license": "not_applicable"
+        }
+      ],
+      "upstream_revision_verified_at": "2026-11-17",
+      "note": "Hugging Face tree displayed verified revision ab53472; dataset README category counts sum to 140 while paper reports 155; do not redistribute until rights clarified."
+    },
+    {
+      "source_id": "matbench_discovery_2025",
+      "doi": "10.1038/s42256-025-01055-1",
+      "url": "https://doi.org/10.1038/s42256-025-01055-1",
+      "published": "2025-06-23",
+      "source_type": "materials_discovery_benchmark_methodology",
+      "title": "A framework to evaluate machine learning crystal stability predictions",
+      "primary_claim_boundary": "Methodological comparator for prospective campaign metrics and budgeted candidate ranking; its crystal-stability DAF values are not superconductivity performance."
+    },
+    {
+      "source_id": "autosupercon_2026",
+      "arxiv_id": "2611.15627",
+      "url": "https://arxiv.org/abs/2611.15627",
+      "published": "2026-11-11",
+      "source_type": "preprint_experimental_parameter_extraction_and_benchmark",
+      "title": "Machine-accelerated extraction of experimental superconducting parameters for physical insight and prediction across thousands of materials",
+      "authors": [
+        "Mihir Manium",
+        "Benjamin Geisler",
+        "Peter J. Hirschfeld",
+        "Amalia I. Coldea"
+      ],
+      "reported_material_count": 6793,
+      "reported_observation_count": 20354,
+      "source_corpus_count": ">47000 arXiv cond-mat.supr-con preprints through March 2026 plus digitized Roberts (1976) measurements",
+      "parameters": [
+        "Tc",
+        "Hc",
+        "Hc1",
+        "Hc2",
+        "Jc",
+        "coherence_length_xi",
+        "penetration_depth_lambda",
+        "superconducting_gap_Delta"
+      ],
+      "extraction_context": [
+        "source_arxiv_id",
+        "measurement_pressure",
+        "sample_form",
+        "measurement_temperature",
+        "magnetic_field_orientation",
+        "measurement_method"
+      ],
+      "extraction_model": "GPT-5-mini structured-output snapshot dated 2025-08-07; multimodal LLM used to transcribe the Roberts (1976) scanned survey",
+      "reported_validation": {
+        "nims_overlap_materials": 2439,
+        "tc_r_squared": 0.96,
+        "median_absolute_tc_deviation_k": 0.25,
+        "median_relative_tc_deviation_percent": 3.5,
+        "roberts_critical_field_matched_values": 24,
+        "critical_field_log_r_squared": 0.9
+      },
+      "reported_pressure_mix": {
+        "ambient_percent": 75,
+        "applied_percent": 25
+      },
+      "paper_status": "arXiv preprint; not independently reproduced by Symthaea",
+      "primary_claim_boundary": "20,354 extracted/curated observations across eight measured superconducting parameters for 6,793 materials. Extraction validation R2=0.96 against NIMS on 2,439 overlapping materials. Reported composition-only prediction is in-family and fails leave-one-family-out for cuprate/iron-based systems; not evidence of novel-family extrapolation. Data access, license, released schema/checkpoints and exact split still require independent audit."
+    },
+    {
+      "source_id": "guided_mat_diffusion_2026",
+      "doi": "10.1038/s41524-026-02117-7",
+      "url": "https://doi.org/10.1038/s41524-026-02117-7",
+      "published": "2026-05-28",
+      "source_type": "peer_reviewed_computational_generation_and_experimental_follow_up",
+      "title": "Guided diffusion for the discovery of new superconductors",
+      "repository": "https://github.com/paprakash/GuidedMatDiffusion",
+      "repository_revision": "6583bb73e7f8c496c094feb6ac4b382ee474bf9d",
+      "dataset": "https://huggingface.co/datasets/paprakash/GuidedMatDiffusion_data",
+      "checkpoint": "https://huggingface.co/paprakash/GuidedMatDiffusion_model",
+      "reported_pipeline": {
+        "generated": 200000,
+        "unique_candidates": 34027,
+        "dft_tc_above_5k": 773,
+        "experimental_attempts": 18,
+        "attempts_with_signal_above_4_2k": 9
+      },
+      "primary_claim_boundary": "773 is a DFT-computed candidate count, not experimental validation. Nine of 18 synthesis attempts showed some signal >4.2 K; intended ordered structures often did not form. Separate signal, target phase, phase purity and bulk confirmation.",
+      "license_status": "Repository root LICENSE is MIT (copyright notice names Rui Jiao, and README is built on DiffCSP); confirm provenance/attribution and any third-party code conditions. Dataset and checkpoint licensing is separately unresolved.",
+      "repository_license_file_sha": "a5a257dc49869363b85aaa7fb41f1953ef7342c2"
+    },
+    {
+      "source_id": "elementsclaw_2026",
+      "doi": "10.48550/arXiv.2604.23758",
+      "arxiv_id": "2604.23758v3",
+      "url": "https://arxiv.org/abs/2604.23758v3",
+      "published": "2026-05-04",
+      "source_type": "preprint_agentic_large_atomic_and_language_model_discovery",
+      "title": "Agentic Fusion of Large Atomic and Language Models to Accelerate Superconductor Discovery",
+      "repository_or_project": "https://developer.damo-academy.com/material",
+      "reported_pipeline": {
+        "rediscovered_superconductors": 66,
+        "screened_equilibrium_crystals": 2400000,
+        "high_confidence_candidates": 68000,
+        "gpu_hours": 28,
+        "claimed_new_experimental_materials": 4
+      },
+      "reported_new_materials": [
+        {
+          "formula": "Zr3ScRe8",
+          "reported_tc_k": 6.5
+        },
+        {
+          "formula": "HfZrRe4",
+          "reported_tc_k": 5.9
+        },
+        {
+          "formula": "Zr4VRe7",
+          "reported_tc_k": 3.5
+        },
+        {
+          "formula": "Hf21Re25",
+          "reported_tc_k": 2.5
+        }
+      ],
+      "primary_claim_boundary": "All pipeline and experimental values are preprint claims; candidate IDs, specimens, raw data, exact model releases, source deduplication and independent experimental evidence must be audited. LLM incremental value requires matched ablation against the LAM alone.",
+      "license_status": "paper and project-page data/model terms require separate review."
+    },
+    {
+      "source_id": "nemad_llm_superconductor_2026",
+      "doi": "10.1016/j.jmmm.2026.174189",
+      "arxiv_id": "2512.10847",
+      "url": "https://doi.org/10.1016/j.jmmm.2026.174189",
+      "published": "2026-08-15",
+      "source_type": "peer_reviewed_experimental_database_and_llm_prediction_workflow",
+      "title": "Large language models for superconductor discovery",
+      "repository": "https://github.com/sumanitani/LLM_for_Superconductors",
+      "repository_revision": "8008870e0229bf2001c04a946e306d25617fd4b9",
+      "database": "https://www.nemad.org",
+      "model_hub": "https://huggingface.co/sumanitani",
+      "reported_record_count_abstract": 78203,
+      "reported_record_count_methods": 78204,
+      "reported_unique_compositions": 19058,
+      "primary_claim_boundary": "Literature-extracted experimental and non-superconductor records with multiple LLM tasks. GNoME Tc>10 K candidates remain predictions. The exact count, row provenance, data license and train/test split require reconciliation.",
+      "repository_readme_blob_sha": "71ec1b961a6231b21c6745b63dc8f774cd7ecbed",
+      "repository_license_status": "No LICENSE file was listed in inspected repository root; code reuse rights and data/checkpoint terms require author clarification."
+    },
+    {
+      "source_id": "stgi_translation_gap_2026",
+      "doi": "10.1016/j.nxmate.2026.103138",
+      "url": "https://doi.org/10.1016/j.nxmate.2026.103138",
+      "published": "2026-10",
+      "source_type": "peer_reviewed_engineering_translation_review",
+      "title": "From critical temperature to engineering reality: A quantitative framework for assessing the translation gap in superconducting materials",
+      "benchmark_name": "Superconductor Translation Gap Index (STGI)",
+      "axes": [
+        "temperature_margin_at_target_field",
+        "in_field_engineering_current_density",
+        "cryogenic_accessibility_and_pressure",
+        "mechanical_and_manufacturing_robustness"
+      ],
+      "reported_scores": {
+        "rebco_power_grid_77k": 76,
+        "rebco_high_field_magnet_20k": 64,
+        "hydrides_without_conductor_form": 0
+      },
+      "application_classes": [
+        "high_field_magnets",
+        "power_grid",
+        "electric_aircraft_propulsion"
+      ],
+      "primary_claim_boundary": "Composite scores depend on review-specific weights, application requirements and source data; reproduce inputs and sensitivity before treating as a ranking."
+    },
+    {
+      "source_id": "sclib_jzis_2026",
+      "url": "https://jzis.org/",
+      "repository_url": "https://github.com/JackZH26/SCLib_JZIS",
+      "repository_revision": "80e28f02e07324ff24e0cb08c82a4e2be1cb58bf",
+      "api_base": "https://api.jzis.org/sclib/v1",
+      "dataset_version": "v2026.09.03",
+      "observed_site_version": "be9ecdc",
+      "source_type": "external_versioned_superconductivity_evidence_library",
+      "title": "SCLib by JZIS: superconductivity literature, materials, reported properties and research workflows",
+      "licence": {
+        "code": "Apache-2.0",
+        "data": "CC-BY-4.0 where JZIS has authority",
+        "third_party": "upstream terms remain applicable"
+      },
+      "snapshot_as_of": "2026-11-17",
+      "reported_counts": {
+        "stats_api": {
+          "papers": 75202,
+          "materials": 19042,
+          "stats_refreshed_at": "2026-11-08T15:00:09.712008+00:00"
+        },
+        "stats_page": {
+          "papers": 75202,
+          "materials": 19042,
+          "stats_refreshed_at": "2026-11-17T15:00:00Z"
+        },
+        "public_materials_page": {
+          "reported_tc_results": 13270,
+          "papers": 6118,
+          "material_entries": 7552
+        },
+        "repo_readme_2026_10_09": {
+          "papers": 75202,
+          "stored_material_entries": 11463,
+          "default_public_catalogue_entries": 10507
+        }
+      },
+      "primary_claim_boundary": "External evidence library and API, not an independent validation authority. Public counts have different entity/scope/time bases; the API stats snapshot and website stats page reported different refresh times on 2026-11-17. Snapshot, licence, source revision, query conditions and evidence status must be preserved for every import."
+    },
+    {
+      "source_id": "synthesis_protocol_property_2026",
+      "doi": "10.1088/2515-7639/ae6e72",
+      "arxiv_id": "2605.00313",
+      "url": "https://doi.org/10.1088/2515-7639/ae6e72",
+      "published": "2026-05-29",
+      "source_type": "peer_reviewed_perspective_protocol_first_materials_discovery",
+      "title": "Beyond structure: revolutionising materials discovery via AI-driven synthesis protocol-property relationships",
+      "author": "Guillaume Lambard",
+      "nims_record": "https://mdr.nims.go.jp/datasets/db14c5de-27d9-4758-8395-d61a6204fe42",
+      "licence": "CC BY 4.0",
+      "primary_claim_boundary": "Perspective framework for synthesis-first materials discovery. The cited <2% realisation of >50,000 low-enthalpy phases is a literature-review estimate, not a measured superconductivity-specific synthesis rate. No superconducting recipe or independent experiment is validated by this paper."
+    },
+    {
+      "source_id": "hg1223_pressure_quench_2026",
+      "doi": "10.1073/pnas.2536178123",
+      "url": "https://doi.org/10.1073/pnas.2536178123",
+      "published": "2026-03-09",
+      "source_type": "peer_reviewed_experimental_pressure_quench_metastability",
+      "title": "Ambient-pressure 151-K superconductivity in HgBa2Ca2Cu3O8+δ via pressure quench",
+      "authors": [
+        "Liangzi Deng",
+        "Thacien Habamahoro",
+        "Artin Safezoddeh",
+        "Bishnu Karki",
+        "Sudaice Kazibwe",
+        "Daniel J. Schulze",
+        "Zheng Wu",
+        "Matthew Julian",
+        "Rohit P. Prasankumar",
+        "Hua Zhou",
+        "Jesse S. Smith",
+        "Pavan R. Hosur",
+        "Ching-Wu Chu"
+      ],
+      "material_formula": "HgBa2Ca2Cu3O8+delta",
+      "protocol_name": "pressure-quench protocol (PQP)",
+      "reported_quench_pressure_gpa": [
+        10.1,
+        29.7
+      ],
+      "reported_quench_temperature_k": 4.2,
+      "ambient_pressure_onset_tc_k": 151,
+      "reported_onset_tc_post_quench_range_k": [
+        147,
+        151
+      ],
+      "reported_bulk_magnetic_volume_fraction_percent": 78,
+      "bulk_magnetic_sample_tc_approx_k": 140,
+      "thermal_retention": "~149 K retained inside DAC at 77 K for at least 3 days; thermal cycling to room temperature reduced ~147 K to ~143 K; degradation above 200 K reported",
+      "source_status": "peer-reviewed publication; not independently reproduced by Symthaea",
+      "primary_claim_boundary": "151 K is an ambient-pressure resistive onset after 10-30 GPa PQP at 4.2 K; it is not a 151 K zero-resistance or thermodynamic transition. Separate retrieved sample showed ~78% magnetic volume fraction at approximately 140 K. State is metastable and thermally/temporally limited. A 172 K observation was not reproduced and remains unresolved."
+    },
+    {
+      "source_id": "ynbtizrhf_hea_2026",
+      "doi": "10.1103/k1yr-t59z",
+      "url": "https://doi.org/10.1103/k1yr-t59z",
+      "published": "2026-08-11",
+      "source_type": "peer_reviewed_experimental_high_entropy_superconductor",
+      "title": "Complete superconducting phase diagram and flux pinning mechanisms in the yttrium-containing high-entropy alloy YNbTiZrHf",
+      "authors": [
+        "Rafał Idczak",
+        "Wojciech Nowak",
+        "Adam Pikul"
+      ],
+      "licence": "CC BY 4.0",
+      "formula_nominal": "YNbTiZrHf",
+      "reported_properties": {
+        "Tc_K": 6.1,
+        "Jc_kA_cm2": 45,
+        "upper_critical_field_T": 12.5,
+        "theoretical_depairing_current_density_MA_cm2": 21
+      },
+      "phase_microstructure": "BCC matrix with minor yttrium-rich hexagonal precipitates",
+      "pinning": "dominant surface pinning with secondary point contribution; crossover from delta-Tc to delta-l pinning with increasing field",
+      "primary_claim_boundary": "Bulk type-II superconductivity confirmed by resistivity, magnetization, AC susceptibility and specific heat. Jc and Hc2 are paper-reported, exact test conditions must be extracted before cross-comparison. The estimated depairing current density is theoretical, not an observed engineering current."
+    },
+    {
+      "source_id": "bi2212_shot_noise_pairing_2026",
+      "doi": "10.1126/science.adt3444",
+      "url": "https://doi.org/10.1126/science.adt3444",
+      "published": "2026-11-05",
+      "source_type": "peer_reviewed_local_shot_noise_pairing_spectroscopy",
+      "title": "Equivalence of pseudogap and pairing energy in a cuprate high-temperature superconductor",
+      "authors": [
+        "Jiasen Niu",
+        "Maialen Ortego Larrazabal",
+        "Thomas Gozlinski",
+        "Yudai Sato",
+        "Koen M. Bastiaans",
+        "Tjerk Benschop",
+        "Jian-Feng Ge",
+        "Yaroslav M. Blanter",
+        "Genda Gu",
+        "Ingmar Swart",
+        "Milan P. Allan"
+      ],
+      "material_formula": "Bi2Sr2CaCu2O8+delta",
+      "method": "local shot-noise spectroscopy / noise-STM (electron-pair microscope)",
+      "reported_pairing_energy_mev_max": 70,
+      "primary_claim_boundary": "Science paper reports local shot-noise measurements in Bi2212 at cryogenic STM base temperatures of 4.2 K, 2.3 K and 0.3 K, associating the pseudogap energy with pairing-onset energy and reporting spatially heterogeneous values up to ~70 meV. This is an energy scale, not a transition temperature. Pairing at 300 K is an interpretation/extrapolation, not a direct 300 K measurement. The study does not demonstrate 300 K zero resistance, Meissner response or bulk phase coherence. Local pairing is kept separate from bulk Tc and superfluid stiffness.",
+      "arxiv_id": "2409.15928",
+      "preprint_first_submitted": "2024-09-24",
+      "reported_measurement_temperatures_k": [
+        0.3,
+        2.3,
+        4.2
+      ],
+      "measurement_scope": "local_probe"
+    },
+    {
+      "source_id": "metallic_reservoir_phase_stiffness_2026",
+      "doi": "10.1103/9tsf-lrgd",
+      "arxiv_id": "2604.28187",
+      "url": "https://doi.org/10.1103/9tsf-lrgd",
+      "published": "2026-11-10",
+      "source_type": "peer_reviewed_theoretical_many_body_bilayer_model",
+      "title": "Enhancement of superconducting stiffness in hybrid superconducting-metallic bilayers",
+      "authors": [
+        "J. E. Ebot",
+        "Lorenzo Pizzino",
+        "Sam Mardazad",
+        "Johannes S. Hofmann",
+        "Thierry Giamarchi",
+        "Adrian Kantian"
+      ],
+      "primary_claim_boundary": "Numerical/theoretical study of Kivelson-style pairing subsystem coupled to a metallic reservoir; pairing and stiffness-limited regimes depend on coupling, filling and density imbalance. Not a physical bilayer experiment or demonstrated increase in an actual material Tc."
+    },
+    {
+      "source_id": "multilayer_metallic_screening_cuprates_2026",
+      "doi": "10.1038/s41467-026-75295-z",
+      "url": "https://doi.org/10.1038/s41467-026-75295-z",
+      "published": "2026-07-14",
+      "source_type": "peer_reviewed_experimental_arpes_plus_theory_of_metallic_screening",
+      "title": "Superconducting coherence boosted by outer-layer metallic screening in multilayered cuprates",
+      "authors": [
+        "Junhyeok Jeong",
+        "Kifu Kurokawa",
+        "Shiro Sakai",
+        "Tomotaka Nakayama",
+        "Kotaro Ando",
+        "Naoshi Ogane",
+        "Soonsang Huh",
+        "Matthew D. Watson",
+        "Timur K. Kim",
+        "Cephise Cacho",
+        "Chun Lin",
+        "Makoto Hashimoto",
+        "Donghui Lu",
+        "Takami Tohyama",
+        "Kazuyasu Tokiwa",
+        "Takeshi Kondo"
+      ],
+      "methods": [
+        "angle-resolved photoemission spectroscopy",
+        "model calculations",
+        "in-situ surface doping"
+      ],
+      "materials": [
+        "(Cu,C)Ba2Ca4Cu5Oy",
+        "Ba2Ca2Cu3O6(F,O)2"
+      ],
+      "reported_findings": {
+        "inner_plane_state": "inner CuO2 planes show superconducting signatures while heavily overdoped outer planes remain metallic at low temperature",
+        "proximity": "no detectable superconducting proximity signal in outer planes",
+        "model_localization_percent": 95,
+        "screening_mechanism": "metallic outer planes screen dopant-layer disorder from the inner superconducting plane; model calculations indicate weak interlayer wavefunction mixing",
+        "surface_doped_inner_plane_gap_mev_approx": 60,
+        "screening_metrics_proposed": [
+          "gap-map distribution width",
+          "ARPES quasiparticle peak width / scattering rate"
+        ]
+      },
+      "primary_claim_boundary": "This is a combination of ARPES observations and model calculations, not a demonstrated increase in the transition temperature of the surface-doped crystal. The >95% outer-plane wavefunction confinement is calculated. The paper does not report a newly determined Tc for the surface-doped state; do not substitute bulk baseline Tc values from a different specimen or composition. It is a screening/disorder-control mechanism distinct from direct pair transfer into a metallic reservoir."
+    },
+    {
+      "source_id": "single_cuo2_plane_bi2201_2026",
+      "doi": "10.1038/s41586-026-10857-1",
+      "url": "https://doi.org/10.1038/s41586-026-10857-1",
+      "arxiv_id": null,
+      "published": "2026-08-12",
+      "source_type": "peer_reviewed_experimental_single_plane_cuprate",
+      "title": "Superconducting 2D cuprate with a single CuO2 plane",
+      "authors": [
+        "Hengsheng Luo",
+        "Dongjoon Song",
+        "Yijun Yu",
+        "Liguo Ma",
+        "Peng Cai",
+        "Ruidan Zhong",
+        "Yiwen Chen",
+        "Lin Zhao",
+        "Jian Shen",
+        "Dan Shahar",
+        "Xingjiang Zhou",
+        "Zhengyu Weng",
+        "Xian Hui Chen",
+        "Wei Ruan",
+        "Yuanbo Zhang"
+      ],
+      "material_formula": "Bi2Sr2CuO6+delta",
+      "reported_findings": {
+        "dimensionality": "single CuO2 plane / single-monolayer Bi-2201",
+        "optimal_transition_effect": "approximately 10% reduction in optimal Tc relative to thicker/bulk Bi-2201",
+        "anomalous_metal": "anomalous metallic state observed between insulating and superconducting regimes as temperature approaches zero",
+        "control_knob": "fine oxygenation of single-monolayer specimens"
+      },
+      "data_availability": "datasets available from corresponding authors upon request",
+      "primary_claim_boundary": "This is a dimensionality and quantum phase-transition reference, not a higher-Tc discovery. The ~10% reduction is a reported dimensionality effect. The data are available on request; no local raw data were mirrored."
+    },
+    {
+      "source_id": "local_to_global_phase_coherence_2023",
+      "doi": "10.1038/s41567-023-02100-9",
+      "url": "https://doi.org/10.1038/s41567-023-02100-9",
+      "published": "2023-06-15",
+      "source_type": "peer_reviewed_experimental_stm_phase_ordering",
+      "title": "The emergence of global phase coherence from local pairing in underdoped cuprates",
+      "authors": [
+        "Shusen Ye",
+        "Changwei Zou",
+        "Hongtao Yan",
+        "Yu Ji",
+        "Miao Xu",
+        "Zehao Dong",
+        "Yiwen Chen",
+        "Xingjiang Zhou",
+        "Yayu Wang"
+      ],
+      "material_formula": "Bi2LaxSr2-xCuO6+delta",
+      "method": "scanning tunnelling microscopy and quasiparticle interference",
+      "reported_findings": {
+        "phase_ordering_mechanism": "global phase coherence appears when spatial occupation of a checkerboard plaquette charge-order pattern exceeds a threshold",
+        "local_spectra": "local spectra remain qualitatively similar across the insulator-to-superconductor boundary",
+        "coherence_signature": "quasiparticle interference becomes long-ranged"
+      },
+      "primary_claim_boundary": "This is an experimental local-to-global coherence result in underdoped Bi-La-Sr-Cu-O. The reported threshold is for the studied material and charge-order texture; it is not a universal occupancy constant or a general design recipe."
+    },
+    {
+      "source_id": "field_free_cuprate_stiffness_meter_2019",
+      "doi": "10.1038/s41467-019-10480-x",
+      "url": "https://doi.org/10.1038/s41467-019-10480-x",
+      "published": "2019-06-05",
+      "source_type": "peer_reviewed_experimental_superfluid_stiffness_metrology",
+      "title": "Phase transition in the cuprates from a magnetic-field-free stiffness meter viewpoint",
+      "authors": [
+        "Itzik Kapon",
+        "Zaher Salman",
+        "Itay Mangel",
+        "Thomas Prokscha",
+        "Nir Gavish",
+        "Amit Keren"
+      ],
+      "material_formula": "La1.875Sr0.125CuO4",
+      "method": "field-free superconducting-ring magnetic moment measurement, complemented by low-energy muSR",
+      "reported_findings": {
+        "output": "superfluid stiffness tensor",
+        "comparison": "in-plane current path versus interplane current path",
+        "result": "different transition temperatures for the two current geometries, identifying a range with two-dimensional stiffness",
+        "validation": "low-energy muSR measured stiffness anisotropy below Tc"
+      },
+      "primary_claim_boundary": "A measurement-method reference for extracting anisotropic stiffness; not a new material or room-temperature superconductivity result."
+    },
+    {
+      "source_id": "resonator_kinetic_inductance_stiffness_2024",
+      "doi": "10.1103/PhysRevResearch.6.043245",
+      "url": "https://doi.org/10.1103/PhysRevResearch.6.043245",
+      "published": "2024-12-06",
+      "source_type": "peer_reviewed_experimental_kinetic_inductance_metrology",
+      "title": "Measuring kinetic inductance and superfluid stiffness of two-dimensional superconductors using high-quality transmission-line resonators",
+      "authors": [
+        "Mary Kreidel",
+        "Xuanjing Chu",
+        "Jesse Balgley",
+        "Abhinandan Antony",
+        "Nishchhal Verma",
+        "Julian Ingham",
+        "Leonardo Ranzani",
+        "Raquel Queiroz",
+        "Robert M. Westervelt",
+        "James Hone",
+        "Kin Chung Fong"
+      ],
+      "method": "high-Q superconducting transmission-line resonators; kinetic-inductance and loss measurement",
+      "reported_findings": {
+        "kinetic_inductance_precision": "up to approximately one part per million",
+        "derived_properties": [
+          "superfluid stiffness",
+          "penetration depth",
+          "complex conductivity"
+        ],
+        "validation": "aluminium results compared with BCS theory; demonstrated on multilayer NbSe2"
+      },
+      "primary_claim_boundary": "Kinetic inductance is a useful stiffness metrology observable, but conversion to penetration depth or superfluid stiffness depends on sample geometry, current profile, locality, anisotropy and nonlocal electrodynamics. The paper explicitly discusses these limits; do not use a universal geometry-free conversion."
+    },
+    {
+      "source_id": "gaggl_2025_yru3b2_bulk_superconductivity",
+      "doi": "10.1088/1402-4896/ae3c65",
+      "arxiv_id": "2512.09314",
+      "url": "https://doi.org/10.1088/1402-4896/ae3c65",
+      "published": "2026-02-05; arXiv preprint posted 2025-12-10",
+      "source_type": "peer_reviewed_experimental_report_arxiv_preprint_first_posted_2025_12_10",
+      "title": "Bulk superconductivity in the kagome metal YRu3B2",
+      "primary_claim_boundary": "Gaggl et al. first posted this YRu3B2 report on 10 December 2025 (arXiv:2512.09314) and the journal article appeared online 5 February 2026. It reports Tc near 0.7 K from magnetization, resistivity and heat-capacity measurements. It predates the Mustaf et al. arXiv preprint (16 December 2025) and must be treated as an earlier independent YRu3B2 report; it is not evidence for LuRu3B2."
+    },
+    {
+      "source_id": "mustaf_2026_ml_guided_kagome_superconductors",
+      "doi": "10.1103/lpqj-7hyg",
+      "url": "https://doi.org/10.1103/lpqj-7hyg",
+      "published": "2026-06-17; arXiv preprint posted 2025-12-16",
+      "source_type": "peer_reviewed_machine_learning_guided_prediction_and_experimental_report",
+      "title": "Machine-learning-guided discovery of kagome superconductors YRu3B2 and LuRu3B2",
+      "primary_claim_boundary": "The authors' arXiv preprint was posted 16 December 2025 and the peer-reviewed Physical Review Research article was published 17 June 2026. It reports ML-guided / first-principles discovery and experimental characterization, with Tc=0.81 K for YRu3B2 and 0.95 K for LuRu3B2 and bulk evidence from magnetization, specific heat and electrical transport. The earlier Gaggl et al. YRu3B2 preprint was posted 10 December 2025 and reported approximately 0.7 K, so YRu3B2 is not an unqualified first-discovery claim for this later workflow. LuRu3B2 remains the distinct additional material in the Mustaf report. Neither compound is a high-temperature or room-temperature superconductivity result.",
+      "arxiv_id": "2512.16945"
+    }
+  ],
+  "candidate_records": [
+    {
+      "candidate_id": "SC-EXP-NI-LAPR-FILM-2026",
+      "formula": "(La,Pr)3Ni2O7",
+      "family": "bilayer nickelate",
+      "form": "epitaxial thin film",
+      "source_ids": [
+        "zhou_2026_ambient_nickelate_films"
+      ],
+      "evidence_class": "experimental_report",
+      "operating_pressure_gpa": 0,
+      "synthesis_pressure_gpa": null,
+      "tc_observations": [
+        {
+          "observable": "onset",
+          "value_k": 63,
+          "status": "reported"
+        },
+        {
+          "observable": "zero_resistance",
+          "value_k": 37,
+          "status": "reported"
+        },
+        {
+          "observable": "diamagnetic_transition_onset",
+          "value_k": 23,
+          "status": "reported"
+        }
+      ],
+      "tc_prediction": null,
+      "bulk_thermodynamic_transition_k": null,
+      "sample_identity_resolution": "Paper-level values recorded; exact specimen/batch mapping for each observable must be extracted from full text and supplement before specimen-level fusion.",
+      "phase_and_process_notes": "Compressive epitaxial strain on SrLaAlO4; extreme non-equilibrium gigantic-oxidative atomic-layer-by-layer epitaxy.",
+      "engineering_readiness": "thin-film research result; no long-length conductor or device qualification encoded",
+      "safety_review": "not_assessed_by_this_registry"
+    },
+    {
+      "candidate_id": "SC-EXP-LA2SMNI2O7-PRESSURE-2026",
+      "formula": "La2SmNi2O7-delta",
+      "family": "bilayer nickelate",
+      "form": "bulk single crystal",
+      "source_ids": [
+        "liu_2026_bulk_pressurized_nickelate"
+      ],
+      "evidence_class": "experimental_report",
+      "operating_pressure_gpa": 21.6,
+      "synthesis_pressure_gpa": 0,
+      "tc_observations": [
+        {
+          "observable": "onset",
+          "value_k": 92,
+          "pressure_gpa": 21.6,
+          "status": "reported"
+        },
+        {
+          "observable": "zero_resistance",
+          "value_k": 73,
+          "pressure_gpa": 21.6,
+          "status": "reported"
+        },
+        {
+          "observable": "meissner_response_temperature",
+          "value_k": 60,
+          "pressure_gpa": 20.6,
+          "status": "reported"
+        }
+      ],
+      "tc_prediction": null,
+      "bulk_thermodynamic_transition_k": null,
+      "sample_identity_resolution": "Paper-level composition and pressure values recorded; exact specimen identity across transport and magnetic measurements must be checked in source data.",
+      "phase_and_process_notes": "Ambient-pressure crystal synthesis does not imply ambient-pressure superconducting operation; superconducting observations require approximately 20-22 GPa.",
+      "engineering_readiness": "high-pressure bulk research result; not ambient-pressure conductor",
+      "safety_review": "pressure_equipment_and_material_review_required_for_any_experiment"
+    },
+    {
+      "candidate_id": "SC-PRED-CAAUH6-2026",
+      "formula": "CaAuH6",
+      "family": "metal-embedded hydrogen-unit hydride",
+      "form": "predicted crystal structure",
+      "source_ids": [
+        "du_2026_hydrogen_unit_hydrides"
+      ],
+      "evidence_class": "computational_prediction",
+      "operating_pressure_gpa": null,
+      "synthesis_pressure_gpa": null,
+      "tc_observations": [],
+      "tc_prediction": [
+        {
+          "value_k": 44,
+          "pressure_gpa": 0,
+          "method": "electron_phonon_calculation",
+          "status": "predicted"
+        },
+        {
+          "value_k": 70,
+          "pressure_gpa": 30,
+          "method": "electron_phonon_calculation",
+          "status": "predicted"
+        }
+      ],
+      "hull_distance_mev_atom": null,
+      "dynamical_stability": "source abstract reports ambient-pressure dynamical stability for a subset of screened compounds; candidate-specific evidence must be extracted before admission",
+      "decompression_retention": "not experimentally demonstrated",
+      "engineering_readiness": "computational candidate only",
+      "safety_review": "qualified_hydrogen_and_high_pressure_review_required_before_any_experimental_consideration"
+    },
+    {
+      "candidate_id": "SC-PRED-ACBEH6-2026",
+      "formula": "AcBeH6",
+      "family": "metal-embedded hydrogen-unit hydride",
+      "form": "predicted metastable crystal structure",
+      "source_ids": [
+        "du_2026_hydrogen_unit_hydrides"
+      ],
+      "evidence_class": "computational_prediction",
+      "operating_pressure_gpa": 30,
+      "synthesis_pressure_gpa": 30,
+      "tc_observations": [],
+      "tc_prediction": [
+        {
+          "value_k": 52,
+          "pressure_gpa": 30,
+          "method": "electron_phonon_calculation",
+          "status": "predicted"
+        }
+      ],
+      "hull_distance_mev_atom": 131,
+      "dynamical_stability": "reported metastable R-3m phase at the calculated pressure; not an experimental phase confirmation",
+      "decompression_retention": "not demonstrated",
+      "engineering_readiness": "computational candidate only",
+      "safety_review": "actinium-containing candidate; computational_only_in_general_programme_pending_specialist_institutional_review"
+    },
+    {
+      "candidate_id": "SC-PRED-PU2CO17-GENOME-AI-2026",
+      "formula": "Pu2Co17",
+      "family": "actinide-containing intermetallic",
+      "form": "database structure screened by machine learning",
+      "source_ids": [
+        "gashmard_2026_genome_ai"
+      ],
+      "evidence_class": "machine_learning_prediction",
+      "operating_pressure_gpa": 0,
+      "synthesis_pressure_gpa": null,
+      "tc_observations": [],
+      "tc_prediction": [
+        {
+          "value_k": 89,
+          "pressure_gpa": 0,
+          "method": "genome_inspired_machine_learning",
+          "status": "predicted_approximate"
+        }
+      ],
+      "bulk_thermodynamic_transition_k": null,
+      "decompression_retention": "not_applicable_to_reported_ambient_pressure_prediction_but_not_experimentally_verified",
+      "engineering_readiness": "computational candidate only",
+      "safety_review": "plutonium_containing_radioactive_candidate; exclude from ordinary experimental shortlist; computational_only_pending_specialist_institutional_review"
+    },
+    {
+      "candidate_id": "SC-EXP-BE2HF2NB-BEENET-2026",
+      "formula": "Be2Hf2Nb",
+      "family": "Be-Nb-Hf intermetallic",
+      "form": "polycrystalline bulk sample",
+      "source_ids": [
+        "bee_net_2026"
+      ],
+      "evidence_class": "experimental_report",
+      "operating_pressure_gpa": 0,
+      "synthesis_pressure_gpa": null,
+      "tc_observations": [
+        {
+          "observable": "resistive_onset",
+          "value_k": 3.18,
+          "status": "reported_experimental"
+        }
+      ],
+      "dft_hull_distance_mev_atom": 94,
+      "bulk_thermodynamic_evidence": "Single specific-heat jump; reported DeltaC/(gamma Tc)=1.44, consistent with bulk superconductivity. Authors report sample fully superconducting below approximately 2 K.",
+      "sample_identity_resolution": "Paper links XRD/Rietveld, resistivity and specific-heat characterization to the Be2Hf2Nb sample. Exact physical specimen/batch identifiers and raw data still require supplementary/source audit.",
+      "phase_and_process_notes": "Hf incorporation supported by lattice expansion and Rietveld analysis with Nb/Hf site disorder. Impurity peaks remain; residual resistivity ratio about 1 and no annealing improvement reported.",
+      "engineering_readiness": "new bulk laboratory superconducting material; no conductor, critical-current, high-field, wire/tape, joint or scale qualification",
+      "safety_review": "beryllium-bearing material; any experimental handling requires qualified institutional toxic-material controls; no synthesis procedure included",
+      "tc_calculations": [
+        {
+          "value_k": 14.9,
+          "pressure_gpa": 0,
+          "method": "initial_DFT_Eliashberg",
+          "status": "calculated"
+        },
+        {
+          "value_k": 9.3,
+          "pressure_gpa": 0,
+          "method": "refined_DFT_Eliashberg_mu_star_0_21",
+          "status": "calculated"
+        }
+      ]
+    },
+    {
+      "candidate_id": "SC-EXP-BE2HFNB2-BEENET-2026",
+      "formula": "Be2HfNb2",
+      "family": "Be-Nb-Hf intermetallic",
+      "form": "polycrystalline bulk sample with multiphase evidence",
+      "source_ids": [
+        "bee_net_2026"
+      ],
+      "evidence_class": "experimental_report",
+      "operating_pressure_gpa": 0,
+      "synthesis_pressure_gpa": null,
+      "tc_observations": [
+        {
+          "observable": "resistive_onset",
+          "value_k": 4.24,
+          "status": "reported_experimental"
+        },
+        {
+          "observable": "minor_resistivity_drop",
+          "value_k": 9,
+          "status": "reported_attributed_to_trace_Nb"
+        }
+      ],
+      "dft_hull_distance_mev_atom": 62,
+      "bulk_thermodynamic_evidence": "Two specific-heat jumps of roughly comparable size indicate a multiphase sample with a superconducting secondary phase; not admitted as an unambiguous single-phase bulk superconducting composition.",
+      "sample_identity_resolution": "Paper links XRD/Rietveld, resistivity and specific-heat characterization to the Be2HfNb2 sample. Exact physical specimen/batch identifiers and phase-to-transition linkage require supplementary/source audit.",
+      "phase_and_process_notes": "Hf/Nb site disorder and impurity peaks reported; authors attribute slight resistivity drop near 9 K to trace Nb. Residual resistivity ratio about 1.",
+      "engineering_readiness": "laboratory multiphase superconducting sample; no phase-pure bulk or conductor qualification",
+      "safety_review": "beryllium-bearing material; any experimental handling requires qualified institutional toxic-material controls; no synthesis procedure included",
+      "tc_calculations": [
+        {
+          "value_k": 7.5,
+          "pressure_gpa": 0,
+          "method": "initial_DFT_Eliashberg",
+          "status": "calculated"
+        },
+        {
+          "value_k": 5.1,
+          "pressure_gpa": 0,
+          "method": "refined_DFT_Eliashberg_mu_star_0_21",
+          "status": "calculated"
+        }
+      ]
+    },
+    {
+      "candidate_id": "SC-EXP-BE2NB3-PARENT-2026",
+      "formula": "Be2Nb3",
+      "family": "Be-Nb intermetallic parent",
+      "form": "polycrystalline bulk sample",
+      "source_ids": [
+        "bee_net_2026"
+      ],
+      "evidence_class": "experimental_report",
+      "operating_pressure_gpa": 0,
+      "synthesis_pressure_gpa": null,
+      "tc_observations": [
+        {
+          "observable": "reported_transition",
+          "value_k": 2.3,
+          "status": "known_parent_superconductor_reported_in_source"
+        }
+      ],
+      "bulk_thermodynamic_evidence": "Specific-heat jump DeltaC/(gamma Tc)=1.42 reported, consistent with bulk superconductivity; XRD data also includes small Be2Nb secondary phase.",
+      "sample_identity_resolution": "Parent/control sample is part of same study's experimental characterization; exact specimen/batch-level data mapping requires supplementary/source audit.",
+      "engineering_readiness": "known low-temperature laboratory bulk superconductor; no conductor/engineering qualification in this source",
+      "safety_review": "beryllium-bearing material; any experimental handling requires qualified institutional toxic-material controls; no synthesis procedure included"
+    },
+    {
+      "candidate_id": "SC-EXP-HG1223-PQP-151K-2026",
+      "formula": "HgBa2Ca2Cu3O8+delta",
+      "family": "Hg-based trilayer cuprate",
+      "form": "self-flux-grown single-crystal fragments; pressure-quenched metastable state",
+      "source_ids": [
+        "hg1223_pressure_quench_2026"
+      ],
+      "evidence_class": "experimental_report",
+      "synthesis_pressure_gpa": null,
+      "operating_pressure_gpa": 0,
+      "tc_observations": [
+        {
+          "observable": "resistive_onset",
+          "value_k": 151,
+          "status": "reported_post_quench_ambient_pressure",
+          "sample_id": null,
+          "pressure_gpa": 0,
+          "measurement_direction": "warming",
+          "treatment_pressure_gpa": 18.9,
+          "quench_temperature_k": 4.2,
+          "sample_identity_status": "figure/sample mapping requires source supplement reconciliation"
+        },
+        {
+          "observable": "resistive_onset",
+          "value_k": 150,
+          "status": "reported_post_quench_ambient_pressure",
+          "sample_id": null,
+          "pressure_gpa": 0,
+          "measurement_direction": "cooling",
+          "treatment_pressure_gpa": 18.9,
+          "quench_temperature_k": 4.2,
+          "sample_identity_status": "figure/sample mapping requires source supplement reconciliation"
+        },
+        {
+          "observable": "resistive_onset",
+          "value_k": 147,
+          "status": "reported_post_quench_ambient_pressure",
+          "sample_id": "S2",
+          "pressure_gpa": 0,
+          "measurement_direction": "warming_and_cooling",
+          "treatment_pressure_gpa": 10.1,
+          "quench_temperature_k": 4.2
+        },
+        {
+          "observable": "resistive_onset",
+          "value_k": 149,
+          "status": "reported_post_quench_ambient_pressure",
+          "sample_id": null,
+          "pressure_gpa": 0,
+          "measurement_direction": "warming",
+          "treatment_pressure_gpa": 10.9,
+          "quench_temperature_k": 4.2,
+          "sample_identity_status": "figure/sample mapping requires source supplement reconciliation"
+        }
+      ],
+      "sample_identity_resolution": "The paper uses five 100-130 μm specimens cut from three parent crystals. The record-level sample mapping for the 151 K figure and 78% magnetic-volume specimen must be reconciled against figure and supplement; no exact specimen ID is assumed here.",
+      "phase_and_process_notes": "Rapid decompression after pressure target at 4.2 K. XRD retained tetragonal Hg1223 structure with (200) FWHM broadening 0.12° to 0.20°, consistent with pressure-generated strain/defects. Mechanism unresolved.",
+      "pqp_process": {
+        "quench_pressure_gpa_range": [
+          10.1,
+          29.7
+        ],
+        "quench_temperature_k": 4.2,
+        "result_pressure_gpa": 0,
+        "method": "rapid decompression from DAC; exact dP/dt must be recovered from full methods/supplement",
+        "thermal_lifetime": "~149 K in DAC at 77 K for >=3 days; 147 K->143 K after thermal cycle to room temperature; degradation after >200 K reported"
+      },
+      "bulk_thermodynamic_evidence": "A retrieved PQed specimen showed ~78% superconducting volume fraction by DC magnetization at a lower Tc around 140 K. No 151 K calorimetric transition is claimed.",
+      "engineering_readiness": "micrometre-scale metastable bulk superconducting state; no conductor form, scale-up or engineering qualification",
+      "safety_review": "PQP source uses DAC high-pressure and cryogenic conditions; any experimental replication requires qualified institutional pressure/cryogenic safety review",
+      "property_observations": [
+        {
+          "property": "superconducting_volume_fraction",
+          "value": 78,
+          "unit": "percent",
+          "status": "reported_DC_magnetization",
+          "sample_id": null,
+          "sample_identity_status": "separate retrieved specimen; exact source sample label requires supplement reconciliation",
+          "associated_tc_k": 140,
+          "pressure_gpa": 0,
+          "treatment_pressure_gpa": 10.1,
+          "quench_temperature_k": 4.2
+        }
+      ]
+    },
+    {
+      "candidate_id": "SC-EXP-YNBTIZRHF-HEA-2026",
+      "formula": "YNbTiZrHf",
+      "family": "refractory high-entropy alloy superconductor",
+      "form": "bulk alloy with BCC matrix and minor Y-rich hexagonal precipitates",
+      "source_ids": [
+        "ynbtizrhf_hea_2026"
+      ],
+      "evidence_class": "experimental_report",
+      "operating_pressure_gpa": 0,
+      "synthesis_pressure_gpa": null,
+      "tc_observations": [
+        {
+          "observable": "bulk_superconducting_transition",
+          "value_k": 6.1,
+          "status": "reported_bulk_type_II",
+          "evidence_methods": [
+            "electrical_resistivity",
+            "magnetization",
+            "AC_susceptibility",
+            "specific_heat"
+          ]
+        }
+      ],
+      "property_observations": [
+        {
+          "property": "Jc",
+          "value": 45,
+          "unit": "kA/cm^2",
+          "status": "reported_experimental",
+          "exact_field_temperature_geometry": "source condition extraction required"
+        },
+        {
+          "property": "Hc2",
+          "value": 12.5,
+          "unit": "T",
+          "status": "reported_experimental",
+          "exact_field_temperature_geometry": "source condition extraction required"
+        },
+        {
+          "property": "Jd",
+          "value": 21,
+          "unit": "MA/cm^2",
+          "status": "theoretical_depairing_estimate",
+          "not_an_observed_engineering_current": true
+        }
+      ],
+      "phase_and_process_notes": "BCC matrix with minor Y-rich hexagonal precipitates; reported dominant surface pinning plus secondary point contribution and delta-Tc to delta-l crossover as field increases.",
+      "microstructure_opportunity": "Theoretical depairing-current estimate is >2 orders above measured Jc, indicating a large gap potentially connected to vortex pinning/microstructure and current connectivity; causality remains to be established.",
+      "sample_identity_resolution": "Nominal composition YNbTiZrHf; retrieve actual refined/matrix/precipitate chemistry, sample dimensions and measurement conditions from paper before comparing numerical Jc.",
+      "engineering_readiness": "bulk superconducting HEA research sample; no wire/tape/cable, long-length yield, joint or magnet qualification in the source",
+      "safety_review": "laboratory materials; institutional material/process risk review required before experiments"
+    },
+    {
+      "candidate_id": "SC-REF-CU1245-METALLIC-SCREENING-2026",
+      "formula": "(Cu,C)Ba2Ca4Cu5Oy",
+      "family": "five-layer multilayer cuprate",
+      "form": "five-layer cuprate with inner superconducting planes and metallic outer planes",
+      "source_ids": [
+        "multilayer_metallic_screening_cuprates_2026"
+      ],
+      "evidence_class": "reported_material_reference",
+      "operating_pressure_gpa": 0,
+      "synthesis_pressure_gpa": null,
+      "tc_observations": [],
+      "phase_and_process_notes": "ARPES study finds inner CuO2 planes superconducting while heavily overdoped outer planes are metallic. Model calculations indicate >95% outer-plane wavefunction confinement, so proximity is negligible; metallic outer planes screen dopant disorder. Not a measured Tc increase.",
+      "engineering_readiness": "research-grade multilayer cuprate; no conductor or manufacturing qualification",
+      "sample_identity_resolution": "Preserve the exact five-layer Cu1245 specimen and do not combine data with the separate F0223 composition.",
+      "primary_claim_boundary": "This is a physical layered-screening architecture reference; no new Tc for a surface-doped sample is reported."
+    },
+    {
+      "candidate_id": "SC-REF-F0223-METALLIC-SCREENING-2026",
+      "formula": "Ba2Ca2Cu3O6(F,O)2",
+      "family": "three-layer fluorinated cuprate",
+      "form": "three-layer cuprate with surface-doped inner superconducting plane and metallic outer planes",
+      "source_ids": [
+        "multilayer_metallic_screening_cuprates_2026"
+      ],
+      "evidence_class": "reported_material_reference",
+      "operating_pressure_gpa": 0,
+      "synthesis_pressure_gpa": null,
+      "tc_observations": [],
+      "phase_and_process_notes": "In-situ surface doping produced an inner-plane superconducting gap reported around 60 meV while the outer metallic-plane gap vanished; no surface-doped-state Tc is assigned. The outer metallic planes screen dopant disorder with minimal proximity mixing.",
+      "engineering_readiness": "ARPES / surface-doping research system; no independent conductor/device qualification",
+      "sample_identity_resolution": "Keep surface-doped F0223 data separate from baseline polycrystalline F0223 reports and from five-layer Cu1245.",
+      "primary_claim_boundary": "A local spectral gap is not a measured Tc. The reported surface-doped-state Tc is not determined in this record."
+    },
+    {
+      "candidate_id": "SC-REF-BI2201-SINGLE-CUO2-2026",
+      "formula": "Bi2Sr2CuO6+delta",
+      "family": "single-plane Bi-2201 cuprate",
+      "form": "single-monolayer / single-CuO2-plane specimen",
+      "source_ids": [
+        "single_cuo2_plane_bi2201_2026"
+      ],
+      "evidence_class": "reported_material_reference",
+      "operating_pressure_gpa": 0,
+      "synthesis_pressure_gpa": null,
+      "tc_observations": [],
+      "phase_and_process_notes": "Single-CuO2-plane limit shows about 10% reduction in optimal Tc relative to thicker material and an anomalous metallic state between insulating and superconducting regimes near zero temperature. Fine oxygenation tunes the phase diagram.",
+      "engineering_readiness": "monolayer research specimen, not a practical conductor",
+      "sample_identity_resolution": "Data are available from corresponding authors upon request; no raw dataset is mirrored. Keep single-monolayer and bulk Bi-2201 separate.",
+      "primary_claim_boundary": "Dimensionality-reduction baseline, not a candidate for higher Tc on current evidence."
+    },
+    {
+      "candidate_id": "SC-KAGOME-YRU3B2-BULK-REPRO-2026",
+      "formula": "YRu3B2",
+      "family": "kagome ruthenium boride",
+      "form": "bulk",
+      "source_ids": [
+        "gaggl_2025_yru3b2_bulk_superconductivity",
+        "mustaf_2026_ml_guided_kagome_superconductors"
+      ],
+      "evidence_class": "experimental_report",
+      "operating_pressure_gpa": 0,
+      "synthesis_pressure_gpa": null,
+      "tc_observations": [
+        {
+          "observable": "reported_superconducting_transition",
+          "value_k": 0.7,
+          "pressure_gpa": 0,
+          "status": "reported_by_Gaggl_et_al_arXiv_2512_09314_preprint_2025_12_10_and_Physica_Scripta_2026"
+        },
+        {
+          "observable": "reported_superconducting_transition",
+          "value_k": 0.81,
+          "pressure_gpa": 0,
+          "status": "reported_by_Mustaf_et_al_Physical_Review_Research_2026"
+        }
+      ],
+      "bulk_thermodynamic_transition_k": null,
+      "sample_identity_resolution": "Chronology and source lineage are preserved: Gaggl et al. posted arXiv:2512.09314 on 2025-12-10 and reported approximately 0.70 K; Mustaf et al. posted arXiv:2512.16945 on 2025-12-16 and reported 0.81 K. Their values are not averaged or assumed to be identical-specimen measurements. Exact sample-level/batch mapping, criteria and uncertainty require source/supplement review.",
+      "engineering_readiness": "bulk material evidence only; no qualified wire/tape/conductor/device or industrial process is established",
+      "safety_review": "not_applicable_to_literature_record_only"
+    },
+    {
+      "candidate_id": "SC-KAGOME-LURU3B2-BULK-2026",
+      "formula": "LuRu3B2",
+      "family": "kagome ruthenium boride",
+      "form": "bulk",
+      "source_ids": [
+        "mustaf_2026_ml_guided_kagome_superconductors"
+      ],
+      "evidence_class": "experimental_report",
+      "operating_pressure_gpa": 0,
+      "synthesis_pressure_gpa": null,
+      "tc_observations": [
+        {
+          "observable": "reported_superconducting_transition",
+          "value_k": 0.95,
+          "pressure_gpa": 0,
+          "status": "reported_by_Mustaf_et_al_Physical_Review_Research_2026"
+        }
+      ],
+      "bulk_thermodynamic_transition_k": null,
+      "sample_identity_resolution": "ML-guided study reports LuRu3B2 with magnetization, specific-heat and electrical-transport evidence. Raw specimen/batch IDs, exact criteria and digitized uncertainty are not added here; bulk evidence is source-reported pending full specimen-level extraction and independent reproduction.",
+      "engineering_readiness": "bulk material evidence only; no qualified wire/tape/conductor/device or industrial process is established",
+      "safety_review": "not_applicable_to_literature_record_only"
+    }
+  ],
+  "benchmark_catalogs": [
+    {
+      "catalog_id": "BEE-NET-2026",
+      "source_ids": [
+        "bee_net_2026"
+      ],
+      "reported_record_count": 5241,
+      "reported_test_count": 1049,
+      "reported_metric": {
+        "name": "Tc_MAE_vs_DFT_Allen_Dynes",
+        "value_k": 0.87
+      },
+      "metric_interpretation": "computational-label regression only; not experimental Tc accuracy",
+      "local_reproducibility_status": "not_reproduced; artifact and split closure tracked in Symthaea issue #12619",
+      "reported_alpha2f_training_count": 7000,
+      "readme_inventory_count": 5241,
+      "training_inventory_discrepancy": "Paper method describes 7,000 alpha2F records and an 80/20 split; current public README lists 5,241 records (4,192 train, 1,049 test). Resolve exact dataset version and whether these counts refer to same artifact before reproduction.",
+      "reported_metrics": {
+        "Tc_MAE_vs_DFT_Allen_Dynes_K": 0.87,
+        "true_negative_rate": 0.994,
+        "final_pipeline_precision": 0.86,
+        "final_stable_candidates": 741,
+        "high_accuracy_alpha2f_calculations": 866,
+        "generated_candidate_pool": 1300000,
+        "synthesized_new_compositions": 2
+      }
+    },
+    {
+      "catalog_id": "DataG-Non-Sc-2026",
+      "source_ids": [
+        "gashmard_2026_genome_ai"
+      ],
+      "reported_record_count": 53196,
+      "reported_metric": null,
+      "metric_interpretation": "new non-superconductor dataset in the 29 October 2026 paper; dataset contents, schema, licenses and split manifest are not yet independently ingested",
+      "local_reproducibility_status": "not_reproduced; request exact dataset, model weights, source code, split manifest and negative-label definition"
+    },
+    {
+      "catalog_id": "HTSC-2025",
+      "source_ids": [
+        "htsc_2025"
+      ],
+      "reported_record_count": 155,
+      "reported_metric": null,
+      "metric_interpretation": "computed high-Tc candidate benchmark; do not merge targets with experimental specimen records",
+      "local_reproducibility_status": "not_reproduced; count, license, exact source records, CIFs, label provenance and grouped split manifests unresolved; tracked in #12635",
+      "hosted_readme_record_count": 140,
+      "count_reconciliation": "open_discrepancy: paper text reports 155 samples; current Hugging Face card category counts sum to 140; one top-level JSON object contains material-keyed records. Verify source revision and per-material IDs before admission.",
+      "license_status": "not_declared_in_visible_Hugging_Face_card_metadata; redistribution_not_authorized",
+      "source_snapshot": {
+        "repository": "https://huggingface.co/datasets/xiao-qi/HTSC-2025",
+        "viewed_at": "2026-11-17",
+        "data_file": "HTSC-2025.json",
+        "data_file_size_reported": "166 kB",
+        "card_metadata_warning": "empty_or_missing_yaml_metadata",
+        "material_count_requires_direct_parse": true
+      }
+    },
+    {
+      "catalog_id": "AutoSuperCon-2026",
+      "source_ids": [
+        "autosupercon_2026"
+      ],
+      "reported_record_count": 20354,
+      "reported_material_count": 6793,
+      "reported_metric": {
+        "name": "experimental_parameter_extraction_validation",
+        "nims_tc_r_squared": 0.96,
+        "nims_overlap_materials": 2439,
+        "median_absolute_tc_deviation_k": 0.25,
+        "median_relative_tc_deviation_percent": 3.5,
+        "roberts_hc_log_r_squared": 0.9,
+        "roberts_hc_matched_values": 24,
+        "composition_model_tc_r2_log": 0.83,
+        "composition_model_tc_median_absolute_error_k": 1.6,
+        "composition_model_hc2_r2_log": 0.69
+      },
+      "metric_interpretation": "paper-reported extraction validation against NIMS/Roberts and composition model metrics; AutoSuperCon source data not independently ingested; family extrapolation fails",
+      "local_reproducibility_status": "not_reproduced; data release/license/schema/source spans and exact model splits to be audited in #12642"
+    },
+    {
+      "catalog_id": "GuidedMatDiffusion-2026",
+      "source_ids": [
+        "guided_mat_diffusion_2026"
+      ],
+      "reported_record_count": 200000,
+      "reported_metric": {
+        "unique_generated_candidates": 34027,
+        "dft_tc_gt_5k": 773,
+        "experimental_attempts": 18,
+        "attempts_with_any_signal_gt_4_2k": 9,
+        "dft_hit_rate_percent": 2.27
+      },
+      "metric_interpretation": "paper-reported generative and DFT screening throughput. 9/18 is any signal, not target phase or bulk superconductivity.",
+      "local_reproducibility_status": "not_reproduced; exact commit/checkpoints/all generated and rejected IDs and experiment dossiers tracked in #12646"
+    },
+    {
+      "catalog_id": "ElementsClaw-2026",
+      "source_ids": [
+        "elementsclaw_2026"
+      ],
+      "reported_record_count": 2400000,
+      "reported_metric": {
+        "high_confidence_screened_candidates": 68000,
+        "gpu_hours": 28,
+        "rediscovered_superconductors": 66,
+        "claimed_experimental_new_materials": 4
+      },
+      "metric_interpretation": "preprint-reported LAM+LLM agent screen and experimental follow-ups; contribution of LLM and independent verification not yet reproduced.",
+      "local_reproducibility_status": "not_reproduced; model artifacts, candidate lists, database snapshot, ablations and experiment dossiers tracked in #12647"
+    },
+    {
+      "catalog_id": "NEMAD-Superconductor-LLM-2026",
+      "source_ids": [
+        "nemad_llm_superconductor_2026"
+      ],
+      "reported_record_count": 78203,
+      "reported_metric": {
+        "unique_compositions": 19058,
+        "novel_inverse_design_fraction_percent": 28
+      },
+      "metric_interpretation": "paper-reported literature database and LLM baselines; 28% novel relative to training set only. Record count is inconsistent between abstract/method text.",
+      "local_reproducibility_status": "not_reproduced; data release/rights, record count, checkpoint revisions and split manifests tracked in #12648"
+    },
+    {
+      "catalog_id": "STGI-Translation-Gap-2026",
+      "source_ids": [
+        "stgi_translation_gap_2026"
+      ],
+      "reported_record_count": 7,
+      "reported_metric": {
+        "name": "STGI",
+        "scale": "0-100",
+        "rebco_power_grid_77k": 76,
+        "rebco_high_field_magnet_20k": 64,
+        "hydrides_without_conductor_form": 0
+      },
+      "metric_interpretation": "paper-reported application-specific translation index, not independently reproduced; reproduce exact weights, hard viability gate and source values, then sensitivity/Pareto extensions.",
+      "local_reproducibility_status": "not_reproduced; reconstruct article data and source conditions tracked in #12651"
+    },
+    {
+      "catalog_id": "SCLib-JZIS-2026",
+      "source_ids": [
+        "sclib_jzis_2026"
+      ],
+      "reported_record_count": 13270,
+      "reported_material_count": 7552,
+      "reported_paper_count": 6118,
+      "reported_metric": {
+        "name": "public_coverage_inventory",
+        "api_stats_papers": 75202,
+        "api_stats_materials": 19042,
+        "api_data_version": "v2026.09.03",
+        "public_tc_results": 13270,
+        "public_material_entries": 7552,
+        "discovery_source_candidates": 103
+      },
+      "metric_interpretation": "Scope and entity counts for a versioned external library; not independently verified experimental record counts, not a validated benchmark cohort, and not a count of independent experiments.",
+      "local_reproducibility_status": "not_reproduced; audit snapshot/page/API count bases, source rights, same-record condition semantics and cross-library overlap under #12669"
+    },
+    {
+      "catalog_id": "Synthesis-Protocol-Property-2026",
+      "source_ids": [
+        "synthesis_protocol_property_2026"
+      ],
+      "reported_record_count": 0,
+      "reported_metric": null,
+      "metric_interpretation": "Framework and benchmark-design reference only; not an experimental dataset or performance leaderboard.",
+      "local_reproducibility_status": "not_applicable_as_performance_benchmark; protocol-first P->X->y programme tracked in #12671"
+    },
+    {
+      "catalog_id": "Hg1223-PQP-2026",
+      "source_ids": [
+        "hg1223_pressure_quench_2026"
+      ],
+      "reported_record_count": 5,
+      "reported_metric": {
+        "name": "post_quench_resistive_onset_tc_K",
+        "maximum": 151,
+        "range": [
+          147,
+          151
+        ],
+        "reported_bulk_magnetic_volume_fraction_percent": 78,
+        "magnetization_sample_tc_approx_K": 140,
+        "quench_pressure_gpa": [
+          10.1,
+          29.7
+        ],
+        "quench_temperature_k": 4.2
+      },
+      "metric_interpretation": "Peer-reviewed PQP case study; distinguish onset at 151 K from 78% magnetic volume fraction on a different retrieved specimen around 140 K. The phase is metastable and thermal history dependent.",
+      "local_reproducibility_status": "not_reproduced; protocol, sample-specific records, dP/dt, state lifetime, scale-up and independent-batch replication tracked in #12672"
+    },
+    {
+      "catalog_id": "YNbTiZrHf-HEA-2026",
+      "source_ids": [
+        "ynbtizrhf_hea_2026"
+      ],
+      "reported_record_count": 1,
+      "reported_metric": {
+        "name": "bulk_type_II_he_superconductor",
+        "Tc_K": 6.1,
+        "Jc_kA_cm2": 45,
+        "Hc2_T": 12.5,
+        "theoretical_Jd_MA_cm2": 21
+      },
+      "metric_interpretation": "Peer-reviewed bulk HEA superconductivity with multi-probe evidence; Jd is a theoretical estimate, not measured conductor current. Exact Jc field/temperature/geometry conditions require source extraction.",
+      "local_reproducibility_status": "not_reproduced; microstructure/flux-pinning and in-field engineering comparison tracked in #12673"
+    },
+    {
+      "catalog_id": "Bi2212-Pair-Coherence-2026",
+      "source_ids": [
+        "bi2212_shot_noise_pairing_2026"
+      ],
+      "reported_record_count": 1,
+      "reported_metric": {
+        "name": "local_pairing_energy_scale_meV",
+        "maximum_reported": 70,
+        "measurement": "local_shot_noise_spectroscopy"
+      },
+      "metric_interpretation": "One paper-reported local energy scale and pairing-onset interpretation; not a room-temperature superconducting transition, not zero resistance and not a bulk phase-coherence measurement.",
+      "local_reproducibility_status": "not_reproduced; shot-noise calibration, effective-charge conversion, specimen/doping map, raw spectra and cross-probe validation tracked in #12677"
+    },
+    {
+      "catalog_id": "Metallic-Reservoir-Stiffness-2026",
+      "source_ids": [
+        "metallic_reservoir_phase_stiffness_2026"
+      ],
+      "reported_record_count": 0,
+      "reported_metric": null,
+      "metric_interpretation": "Theoretical many-body numerical benchmark for composite pairing/stiffness subsystems; reproduce model and finite-size behavior, not a physical material leaderboard.",
+      "local_reproducibility_status": "not_reproduced; matched isolated-layer / bilayer parameter sweeps and finite-size checks tracked in #12677"
+    },
+    {
+      "catalog_id": "Multilayer-Metallic-Screening-2026",
+      "source_ids": [
+        "multilayer_metallic_screening_cuprates_2026"
+      ],
+      "reported_record_count": 2,
+      "reported_metric": {
+        "name": "metallic_screening_architecture_reference",
+        "materials": 2,
+        "model_outer_plane_wavefunction_localization_percent": 95,
+        "inner_plane_gap_after_surface_doping_mev_approx": 60
+      },
+      "metric_interpretation": "Two separately tracked multilayer cuprate material systems. The >95% outer-plane localization is a model calculation and the ~60 meV inner-plane quantity is a spectroscopic gap, not Tc. No surface-doped-state Tc increase is claimed.",
+      "local_reproducibility_status": "not reproduced; ARPES raw data, doping state, layer-resolved dispersion and gap-map/scattering metrics require full source reconstruction; see #12677"
+    },
+    {
+      "catalog_id": "Single-CuO2-Plane-2026",
+      "source_ids": [
+        "single_cuo2_plane_bi2201_2026"
+      ],
+      "reported_record_count": 1,
+      "reported_metric": {
+        "name": "dimensionality_effect",
+        "single_plane_optimal_Tc_reduction_percent_approx": 10
+      },
+      "metric_interpretation": "A single-plane dimensionality control and anomalous-metal reference; not a high-Tc candidate. Preserve oxygenation and monolayer state as conditions.",
+      "local_reproducibility_status": "not reproduced; datasets available from corresponding authors upon request; see #12677"
+    },
+    {
+      "catalog_id": "Local-to-Global-Coherence-2023",
+      "source_ids": [
+        "local_to_global_phase_coherence_2023"
+      ],
+      "reported_record_count": 1,
+      "reported_metric": {
+        "name": "phase_ordering_threshold_observation",
+        "system": "Bi2LaxSr2-xCuO6+delta",
+        "threshold_semantics": "qualitative spatial occupation threshold for checkerboard plaquettes; exact source extraction required"
+      },
+      "metric_interpretation": "Experimental precedent that global phase coherence in studied underdoped cuprate emerges with a spatially thresholded charge-order pattern; not a universal percolation law.",
+      "local_reproducibility_status": "not reproduced; STM maps, occupancy extraction and sample/doping metadata require exact reconstruction; see #12677"
+    },
+    {
+      "catalog_id": "Cuprate-Stiffness-Metrology-2019-2024",
+      "source_ids": [
+        "field_free_cuprate_stiffness_meter_2019",
+        "resonator_kinetic_inductance_stiffness_2024"
+      ],
+      "reported_record_count": 2,
+      "reported_metric": {
+        "name": "stiffness_measurement_methods",
+        "modalities": [
+          "field-free superconducting ring magnetic moment plus muSR",
+          "high-Q transmission-line resonator kinetic inductance"
+        ]
+      },
+      "metric_interpretation": "Complementary experimental metrology references. Kinetic inductance to stiffness conversion requires explicit geometry/electrodynamic assumptions; field-free ring method resolves tensor components in the studied LSCO case.",
+      "local_reproducibility_status": "not reproduced; method adapters and calibration/geometry uncertainty requirements tracked in #12677"
+    },
+    {
+      "catalog_id": "KAGOME-ML-BULK-SUPERCONDUCTOR-POSITIVE-CONTROL-2026",
+      "source_ids": [
+        "gaggl_2025_yru3b2_bulk_superconductivity",
+        "mustaf_2026_ml_guided_kagome_superconductors"
+      ],
+      "reported_record_count": 2,
+      "metric_interpretation": "End-to-end ML / first-principles / synthesis / bulk-characterization positive-control cohort. Use YRu3B2 to test pre-existing discovery and cross-source chronology resolution; use LuRu3B2 as the source-reported additional material. Keep the 0.70 K and 0.81 K YRu3B2 observations separate, do not call either result a high-Tc breakthrough, and do not score source-reported Tc values as locally reproduced.",
+      "local_reproducibility_status": "source_inventory_only_not_reproduced"
+    }
+  ],
+  "required_future_fields": [
+    "exact specimen_or_batch_id",
+    "source_revision_and_raw_data_digest",
+    "composition_stoichiometry_and_impurity_inventory",
+    "structure_prototype_and_phase_fraction",
+    "measurement_geometry_and_calibration",
+    "pressure_temperature_field_current_conditions",
+    "uncertainty_and_detection_limits",
+    "independent_replication_lineage",
+    "synthesis_route_and_process_window",
+    "phase_retention_after_pressure_release",
+    "Jc_B_T_theta_and_Je_for_engineering_translation",
+    "manufacturing_length_yield_jointing_and_cost",
+    "safety_and_critical_materials_review"
+  ],
+  "non_goals": [
+    "This registry is not a complete superconductivity database.",
+    "This registry is not a model training set or a leaderboard.",
+    "No experimental synthesis instructions are provided.",
+    "No candidate is authorized for experimental work by appearing here.",
+    "No calculated or machine-learning Tc is an observed transition."
+  ]
+}

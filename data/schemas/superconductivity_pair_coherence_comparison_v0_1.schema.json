@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/superconductivity_pair_coherence_comparison_v0_1.schema.json",
+  "title": "Superconductivity Pairing / Phase-Coherence Comparison v0.1",
+  "description": "A specimen-linked comparison between local pairing evidence and phase-coherence evidence; no energy-to-temperature conversion is implied.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "comparison_id",
+    "material_id",
+    "sample_id",
+    "batch_id",
+    "state_id",
+    "pairing_observation_id",
+    "coherence_observation_id",
+    "matching_basis",
+    "fixed_conditions",
+    "claim_ceiling",
+    "fixture_only"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "comparison_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "fixture_only": {
+      "type": "boolean"
+    },
+    "material_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sample_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "batch_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "state_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "pairing_observation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "coherence_observation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "matching_basis": {
+      "enum": [
+        "same_specimen"
+      ]
+    },
+    "fixed_conditions": {
+      "type": "object",
+      "required": [
+        "pressure",
+        "magnetic_field_t",
+        "doping_state",
+        "strain_state"
+      ],
+      "properties": {
+        "pressure": {
+          "type": "object",
+          "required": [
+            "semantics",
+            "value_gpa"
+          ],
+          "properties": {
+            "semantics": {
+              "enum": [
+                "explicit_ambient",
+                "applied",
+                "chemical",
+                "unknown"
+              ]
+            },
+            "value_gpa": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        },
+        "magnetic_field_t": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "field_orientation": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "doping_state": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "strain_state": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "additionalProperties": false
+}
