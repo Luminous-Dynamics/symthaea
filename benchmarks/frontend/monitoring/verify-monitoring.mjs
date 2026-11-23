@@ -8,6 +8,7 @@ const DEFAULT_FIXTURE='benchmarks/frontend/monitoring/monitoring-fixture-v1.json
 const DEFAULT_TRACES='benchmarks/frontend/monitoring/monitoring-reference-traces-v1.json';
 const DEFAULT_POLICY='benchmarks/frontend/monitoring/monitoring-policy-v1.json';
 const PINNED_POLICY_SHA256='c9fd5036206b117733a54edafdf1450bebc0696f4b20efbc6e266bb874dafab8';
+const PINNED_FIXTURE_SHA256='d15e2fe36d2683618ec939f80f041155a3cfec9ab36230c864c8fcf0f4311d28';
 
 const sha256=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
 const clone=value=>JSON.parse(JSON.stringify(value));
@@ -270,6 +271,7 @@ function validateMonitorInputs(fixture,traces,policy){
 function verifyAll({fixtureBytes,traceBytes,policyBytes,fixture,traces,policy}){
  validateMonitorInputs(fixture,traces,policy);
  if(sha256(policyBytes)!==PINNED_POLICY_SHA256)fail('monitoring policy digest does not match verifier allowlist');
+ if(sha256(fixtureBytes)!==PINNED_FIXTURE_SHA256)fail('monitoring fixture digest does not match verifier allowlist');
  if(fixture.schema!=='sfeb-monitoring-fixture-v1'||policy.schema!=='sfeb-monitoring-policy-v1'||traces.schema!=='sfeb-monitoring-reference-traces-v1')fail('unsupported monitoring fixture/policy/trace schema');
  if(policy.task_id!=='SFEB-MON-001'||traces.fixture_id!==fixture.fixture_id)fail('monitoring task/fixture identity mismatch');
  if(traces.fixture_sha256!==sha256(fixtureBytes))fail('monitoring traces do not bind exact fixture bytes');
@@ -349,9 +351,13 @@ function selfTest(paths){
  const wrongTarget=clone(input.traces);const validTrace=wrongTarget.traces.find(t=>t.case_id==='absolute-threshold-event-wake');validTrace.steps.find(step=>step.op==='act').resource_id='attacker-controlled-resource';
  let wrongTargetRejected=false;try{verifyAll({...input,traces:wrongTarget,traceBytes:Buffer.from(JSON.stringify(wrongTarget))});}catch{wrongTargetRejected=true;}
  if(!wrongTargetRejected)fail('action target outside frozen watch contract was accepted');
+ const alteredFixture=clone(input.fixture);alteredFixture.cases[0].expected.action_count=2;
+ let fixtureMutationRejected=false;
+ try{verifyAll({...input,fixture:alteredFixture,fixtureBytes:Buffer.from(JSON.stringify(alteredFixture))});}catch{fixtureMutationRejected=true;}
+ if(!fixtureMutationRejected)fail('modified fixture bytes were accepted');
  console.log(JSON.stringify({status:'monitoring_reference_preflight_passed',cases:baseline.case_results.length,
   oracle_rules:baseline.oracle_results.length,oracle_rules_passed:baseline.oracle_results.filter(r=>r.result==='pass').length,
-  worker_claim_mutation:'no effect',forged_notification_action:'rejected',
+  worker_claim_mutation:'no effect',forged_notification_action:'rejected',fixture_mutation:'rejected',
   stale_notification:'revalidated against latest source revision',missed_trigger_cases:baseline.missed_trigger_cases,
   limitations:['This self-test is source-authored and must be run with Node.js.','No live browser or production event bus is exercised.']},null,2));
 }
