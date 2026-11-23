@@ -30,6 +30,7 @@ pub const MAX_MYCELIAL_ACQUISITION_ACTIONS: usize = 64;
 pub const MAX_MYCELIAL_ACQUISITION_OUTCOMES_PER_ACTION: usize = 32;
 pub const MAX_MYCELIAL_ACQUISITION_DECISIONS: usize = 128;
 pub const MAX_MYCELIAL_ACTIVE_SENSING_EVALUATIONS: usize = 1_000_000;
+pub const MAX_MYCELIAL_ACTIVE_SENSING_LOSS_UNITS: f64 = 1.0e12;
 const NORMALIZATION_TOLERANCE: f64 = 1.0e-9;
 const MAX_ACTIVE_SENSING_ID_BYTES: usize = 128;
 
@@ -64,9 +65,27 @@ pub struct MycelialAcquisitionOutcome {
     pub likelihoods_by_hypothesis: Vec<MycelialHypothesisLikelihood>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MycelialAcquisitionActionKind {
+    AdditionalZPlane,
+    HighResolutionCrop,
+    AlternateIllumination,
+    NewTimepoint,
+    HumanAnnotation,
+    Other,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MycelialAcquisitionAction {
     pub action_id: String,
+    pub action_kind: MycelialAcquisitionActionKind,
+    pub acquisition_model_id: String,
+    pub acquisition_model_version: String,
+    /// Digest of the calibrated P(outcome | graph hypothesis) model or frozen replay.
+    pub acquisition_model_digest: String,
+    /// Digest of the time / photon-dose / sample-impact cost estimate.
+    pub cost_evidence_digest: String,
     /// Acquisition cost expressed in exactly the same units as decision loss.
     pub cost_in_loss_units: f64,
     pub cost_scale_id: String,
@@ -89,6 +108,11 @@ pub struct MycelialAcquisitionOutcomeValue {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MycelialAcquisitionActionValue {
     pub action_id: String,
+    pub action_kind: MycelialAcquisitionActionKind,
+    pub acquisition_model_id: String,
+    pub acquisition_model_version: String,
+    pub acquisition_model_digest: String,
+    pub cost_evidence_digest: String,
     pub cost_in_loss_units: f64,
     pub expected_posterior_bayes_risk: f64,
     pub gross_value_of_information: f64,
@@ -101,6 +125,7 @@ pub struct MycelialActiveSensingReport {
     pub schema_version: u16,
     pub source_graph_digest: String,
     pub candidate_inventory_digest: String,
+    pub posterior_inventory_digest: String,
     pub posterior_hypothesis_count: usize,
     pub posterior_entropy_nats: f64,
     pub loss_scale_id: String,
@@ -163,6 +188,10 @@ fn valid_id(value: &str) -> bool {
         && value.bytes().all(|byte| !byte.is_ascii_control())
 }
 
+fn valid_digest(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
 fn hash_string(hasher: &mut blake3::Hasher, value: &str) {
     hasher.update(&(value.len() as u64).to_le_bytes());
     hasher.update(value.as_bytes());
@@ -179,9 +208,34 @@ fn hex_digest(bytes: &[u8; 32]) -> String {
 
 fn hypothesis_inventory_digest(posterior: &MycelialGraphHypothesisPosterior) -> String {
     let mut hasher = blake3::Hasher::new();
-    hasher.update(b"symthaea-mycelial-active-sensing-posterior-v1");
+    hasher.update(b"symthaea-mycelial-active-sensing-posterior-v2");
+    hasher.update(&posterior.schema_version.to_le_bytes());
+    hasher.update(&[match posterior.prior {
+        crate::mycelial_graph_hypothesis_posterior::MycelialGraphHypothesisPrior::ConditionalIndependentBernoulli => 0,
+    }]);
     hash_string(&mut hasher, &posterior.source_graph_digest);
     hash_string(&mut hasher, &posterior.candidate_inventory_digest);
+    hasher.update(&(posterior.candidate_ids.len() as u64).to_le_bytes());
+    for id in &posterior.candidate_ids {
+        hash_string(&mut hasher, id);
+    }
+    hasher.update(&(posterior.conflicts.len() as u64).to_le_bytes());
+    for pair in &posterior.conflicts {
+        hash_string(&mut hasher, &pair.first_candidate_id);
+        hash_string(&mut hasher, &pair.second_candidate_id);
+    }
+    hasher.update(&(posterior.total_hypothesis_count as u64).to_le_bytes());
+    hasher.update(&(posterior.feasible_hypothesis_count as u64).to_le_bytes());
+    hasher.update(&(posterior.nonzero_prior_feasible_hypothesis_count as u64).to_le_bytes());
+    hasher.update(&(posterior.infeasible_hypothesis_count as u64).to_le_bytes());
+    hasher.update(&posterior.log_feasible_prior_mass.to_bits().to_le_bytes());
+    hasher.update(&posterior.posterior_entropy_nats.to_bits().to_le_bytes());
+    hasher.update(&(posterior.candidate_marginals.len() as u64).to_le_bytes());
+    for marginal in &posterior.candidate_marginals {
+        hash_string(&mut hasher, &marginal.candidate_id);
+        hasher.update(&marginal.prior_probability.to_bits().to_le_bytes());
+        hasher.update(&marginal.posterior_probability.to_bits().to_le_bytes());
+    }
     hasher.update(&(posterior.hypotheses.len() as u64).to_le_bytes());
     for hypothesis in &posterior.hypotheses {
         hasher.update(&(hypothesis.accepted_candidate_ids.len() as u64).to_le_bytes());
@@ -229,6 +283,18 @@ fn acquisition_action_inventory_digest(actions: &[MycelialAcquisitionAction]) ->
     hasher.update(&(ordered.len() as u64).to_le_bytes());
     for action in ordered {
         hash_string(&mut hasher, &action.action_id);
+        hasher.update(&[match action.action_kind {
+            MycelialAcquisitionActionKind::AdditionalZPlane => 0,
+            MycelialAcquisitionActionKind::HighResolutionCrop => 1,
+            MycelialAcquisitionActionKind::AlternateIllumination => 2,
+            MycelialAcquisitionActionKind::NewTimepoint => 3,
+            MycelialAcquisitionActionKind::HumanAnnotation => 4,
+            MycelialAcquisitionActionKind::Other => 5,
+        }]);
+        hash_string(&mut hasher, &action.acquisition_model_id);
+        hash_string(&mut hasher, &action.acquisition_model_version);
+        hash_string(&mut hasher, &action.acquisition_model_digest);
+        hash_string(&mut hasher, &action.cost_evidence_digest);
         hash_string(&mut hasher, &action.cost_scale_id);
         hasher.update(&action.cost_in_loss_units.to_bits().to_le_bytes());
         hasher.update(&(action.outcomes.len() as u64).to_le_bytes());
@@ -282,6 +348,7 @@ fn validate_decisions(
             if row.accepted_candidate_ids != hypothesis.accepted_candidate_ids
                 || !row.loss.is_finite()
                 || row.loss < 0.0
+                || row.loss > MAX_MYCELIAL_ACTIVE_SENSING_LOSS_UNITS
             {
                 return Err(MycelialActiveSensingError::InvalidDecision(
                     decision.decision_id.clone(),
@@ -313,10 +380,15 @@ fn validate_actions(
 
     for action in actions {
         if !valid_id(&action.action_id)
+            || !valid_id(&action.acquisition_model_id)
+            || !valid_id(&action.acquisition_model_version)
+            || !valid_digest(&action.acquisition_model_digest)
+            || !valid_digest(&action.cost_evidence_digest)
             || !valid_id(&action.cost_scale_id)
             || action.cost_scale_id != loss_scale_id
             || !action.cost_in_loss_units.is_finite()
             || action.cost_in_loss_units < 0.0
+            || action.cost_in_loss_units > MAX_MYCELIAL_ACTIVE_SENSING_LOSS_UNITS
             || !action_ids.insert(action.action_id.as_str())
             || action.outcomes.is_empty()
             || action.outcomes.len() > MAX_MYCELIAL_ACQUISITION_OUTCOMES_PER_ACTION
@@ -417,7 +489,7 @@ fn evaluate_action(
     decisions: &[MycelialAcquisitionDecision],
     action: &MycelialAcquisitionAction,
     baseline_bayes_risk: f64,
-) -> MycelialAcquisitionActionValue {
+) -> Result<MycelialAcquisitionActionValue, MycelialActiveSensingError> {
     let mut ordered_decisions: Vec<_> = decisions.iter().collect();
     ordered_decisions.sort_by(|left, right| left.decision_id.cmp(&right.decision_id));
     let mut outcome_values = Vec::with_capacity(action.outcomes.len());
@@ -474,20 +546,26 @@ fn evaluate_action(
     }
 
     let raw_gross_value = baseline_bayes_risk - expected_posterior_bayes_risk;
-    let gross_value_of_information = if raw_gross_value > 0.0 {
-        raw_gross_value
-    } else {
-        0.0
-    };
+    if raw_gross_value < -NORMALIZATION_TOLERANCE {
+        return Err(MycelialActiveSensingError::InvalidAction(
+            action.action_id.clone(),
+        ));
+    }
+    let gross_value_of_information = raw_gross_value.max(0.0);
     let net_value_of_information = gross_value_of_information - action.cost_in_loss_units;
-    MycelialAcquisitionActionValue {
+    Ok(MycelialAcquisitionActionValue {
         action_id: action.action_id.clone(),
+        action_kind: action.action_kind,
+        acquisition_model_id: action.acquisition_model_id.clone(),
+        acquisition_model_version: action.acquisition_model_version.clone(),
+        acquisition_model_digest: action.acquisition_model_digest.clone(),
+        cost_evidence_digest: action.cost_evidence_digest.clone(),
         cost_in_loss_units: action.cost_in_loss_units,
         expected_posterior_bayes_risk,
         gross_value_of_information,
         net_value_of_information,
         outcomes: outcome_values,
-    }
+    })
 }
 
 pub fn evaluate_mycelial_active_sensing(
@@ -524,21 +602,27 @@ pub fn evaluate_mycelial_active_sensing(
                 baseline_bayes_risk,
             )
         })
-        .collect();
-    let recommended_action_id = action_values
-        .iter()
-        .filter(|action| action.net_value_of_information > 0.0)
-        .max_by(|left, right| {
-            left.net_value_of_information
-                .total_cmp(&right.net_value_of_information)
-                .then_with(|| right.action_id.cmp(&left.action_id))
-        })
-        .map(|action| action.action_id.clone());
+        .collect::<Result<_, _>>()?;
+    let mut recommended_action_id: Option<String> = None;
+    let mut best_net_value = 0.0_f64;
+    for action in &action_values {
+        let is_better = action.net_value_of_information > best_net_value
+            || (action.net_value_of_information == best_net_value
+                && action.net_value_of_information > 0.0
+                && recommended_action_id
+                    .as_ref()
+                    .is_none_or(|best_id| action.action_id < *best_id));
+        if is_better {
+            best_net_value = action.net_value_of_information;
+            recommended_action_id = Some(action.action_id.clone());
+        }
+    }
 
     Ok(MycelialActiveSensingReport {
         schema_version: MYCELIAL_ACTIVE_SENSING_SCHEMA_VERSION,
         source_graph_digest: posterior.source_graph_digest.clone(),
         candidate_inventory_digest: posterior.candidate_inventory_digest.clone(),
+        posterior_inventory_digest: hypothesis_inventory_digest(posterior),
         posterior_hypothesis_count: posterior.hypotheses.len(),
         posterior_entropy_nats: posterior.posterior_entropy_nats,
         loss_scale_id,
@@ -727,6 +811,11 @@ mod tests {
         let actions = vec![
             MycelialAcquisitionAction {
                 action_id: "perfect-depth-stack".to_string(),
+                action_kind: MycelialAcquisitionActionKind::AdditionalZPlane,
+                acquisition_model_id: "retrospective-replay".to_string(),
+                acquisition_model_version: "v1".to_string(),
+                acquisition_model_digest: digest('1'),
+                cost_evidence_digest: digest('2'),
                 cost_in_loss_units: 0.1,
                 cost_scale_id: "review-loss-v1".to_string(),
                 outcomes: vec![
@@ -748,6 +837,11 @@ mod tests {
             },
             MycelialAcquisitionAction {
                 action_id: "uninformative-repeat".to_string(),
+                action_kind: MycelialAcquisitionActionKind::NewTimepoint,
+                acquisition_model_id: "retrospective-replay".to_string(),
+                acquisition_model_version: "v1".to_string(),
+                acquisition_model_digest: digest('1'),
+                cost_evidence_digest: digest('2'),
                 cost_in_loss_units: 0.1,
                 cost_scale_id: "review-loss-v1".to_string(),
                 outcomes: vec![
@@ -804,9 +898,6 @@ mod tests {
         ];
         let posterior =
             evaluate_mycelial_graph_hypothesis_posterior(&source, &candidates).unwrap();
-        let one = |mask: usize| {
-            posterior.hypotheses[mask].accepted_candidate_ids.clone()
-        };
         let decisions = vec![
             MycelialAcquisitionDecision {
                 decision_id: "accept-one".to_string(),
@@ -883,6 +974,11 @@ mod tests {
         ];
         let actions = vec![MycelialAcquisitionAction {
             action_id: "image-only-for-two".to_string(),
+            action_kind: MycelialAcquisitionActionKind::HighResolutionCrop,
+            acquisition_model_id: "retrospective-replay".to_string(),
+            acquisition_model_version: "v1".to_string(),
+            acquisition_model_digest: digest('1'),
+            cost_evidence_digest: digest('2'),
             cost_in_loss_units: 0.0,
             cost_scale_id: "review-loss-v1".to_string(),
             outcomes,
@@ -910,6 +1006,11 @@ mod tests {
         let fusion = &posterior.hypotheses[1].accepted_candidate_ids;
         let actions = vec![MycelialAcquisitionAction {
             action_id: "expensive-perfect-measurement".to_string(),
+            action_kind: MycelialAcquisitionActionKind::AlternateIllumination,
+            acquisition_model_id: "retrospective-replay".to_string(),
+            acquisition_model_version: "v1".to_string(),
+            acquisition_model_digest: digest('1'),
+            cost_evidence_digest: digest('2'),
             cost_in_loss_units: 0.6,
             cost_scale_id: "review-loss-v1".to_string(),
             outcomes: vec![
@@ -951,6 +1052,11 @@ mod tests {
         let fusion = &posterior.hypotheses[1].accepted_candidate_ids;
         let actions = vec![MycelialAcquisitionAction {
             action_id: "invalid-sensor-model".to_string(),
+            action_kind: MycelialAcquisitionActionKind::AdditionalZPlane,
+            acquisition_model_id: "retrospective-replay".to_string(),
+            acquisition_model_version: "v1".to_string(),
+            acquisition_model_digest: digest('1'),
+            cost_evidence_digest: digest('2'),
             cost_in_loss_units: 0.0,
             cost_scale_id: "review-loss-v1".to_string(),
             outcomes: vec![
@@ -992,6 +1098,11 @@ mod tests {
         let fusion = &posterior.hypotheses[1].accepted_candidate_ids;
         let actions = vec![MycelialAcquisitionAction {
             action_id: "perfect".to_string(),
+            action_kind: MycelialAcquisitionActionKind::HumanAnnotation,
+            acquisition_model_id: "retrospective-replay".to_string(),
+            acquisition_model_version: "v1".to_string(),
+            acquisition_model_digest: digest('1'),
+            cost_evidence_digest: digest('2'),
             cost_in_loss_units: 0.1,
             cost_scale_id: "review-loss-v1".to_string(),
             outcomes: vec![
