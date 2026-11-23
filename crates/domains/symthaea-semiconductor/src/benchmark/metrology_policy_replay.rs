@@ -450,9 +450,14 @@ pub fn evaluate_synthetic_metrology_policy_v1(
                     observed.candidate_id
                 ))
             })?;
-        if row.subject_id != observed.subject_id || row.stratum_id != observed.stratum_id {
+        if row.subject_id != observed.subject_id
+            || row.stratum_id != observed.stratum_id
+            || row.target_measurand_id != selection.binary_semantics.target_measurand_id
+            || row.class_semantics_ref != selection.binary_semantics.semantics_id
+            || row.class_semantics_sha256 != selection.binary_semantics.semantics_sha256
+        {
             return Err(SyntheticFabReplayError(format!(
-                "selection receipt identity/stratum mismatch for {}",
+                "selection receipt identity/stratum/semantics mismatch for {}",
                 observed.candidate_id
             )));
         }
