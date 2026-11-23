@@ -277,6 +277,18 @@ NeuroBench 2.4.0 supplies algorithm workloads such as few-shot class-incremental
 - NeuroBench 2.4.0: https://neurobench.readthedocs.io/en/2.4.0/readme.html
 
 The defensible competitive claim is not that Symthaea is more efficient or more intelligent today. It is that this programme is setting up a reproducible comparison of decision quality, temporal application cost, observation-compute interaction and non-fungible resources, while retaining official benchmark metrics where applicable.
+## 16. Executable paired decision-regret reference
+
+The narrow signed paired 2×2 decision-regret contrast is implemented in the standalone crate:
+
+research/decision-value-interaction-001/
+
+Tracking issue: #13279. The crate requires exactly one baseline, compute-only, observation-only and joint result for the same frozen episode/hidden-world/action-loss scope. It binds the common task/loss, evaluator, model/configuration, policy and seed identities; preserves the distinct actual application timestamps; rejects missing/duplicate arms, identity mismatches, empty digests and out-of-range regret; and retains negative marginal benefits and negative interactions. The shared identity now explicitly binds execution environment, action domain and hard resource/deadline envelope.
+
+Fourteen Rust unit tests are authored for positive complementarity (+230,000 PPM), zero/additive interaction, negative antagonism (−170,000 PPM), harmful compute escalation, row-order independence, distinct application times, missing/duplicate arms and identity/range failures.
+
+This reference does not replace #13176. #13176 remains responsible for exposure and resource factorial attribution; the new crate supplies only the paired decision-regret contrast, which is not in the current #13176 outcome schema. Exact-head Rust 1.96 verification passed on 14d92e51787b8836c8e9ac2e5d9e6f9c2029ae57: formatting passed, 14 tests passed, and strict Clippy passed (workflow run 45086268384). This is evaluator qualification, not a RoboDyna or external benchmark result.
+
 ## 17. RoboDyna replication profile: paired episode identity, not just average async loss
 
 RoboDyna is the closest public embodied benchmark for this programme and should be promoted from a background citation to a first external execution target. Its NeurIPS 2026 workshop paper evaluates 20 conceptual dynamic-manipulation tasks across five capability categories plus 10 household tasks, with 3,500 expert demonstrations, held-out compositional difficulty, paired synchronous/asynchronous evaluation on identical seeds, progress score and human controls. The environment uses SAPIEN physics at 250 Hz and an action cadence of 15 simulation steps (60 ms). During asynchronous inference, measured forward-pass wall time is charged to simulated time while the scene continues evolving and the arm holds its last target. The reported mean inference charges are 109 ms for π0.5, 156 ms for X-VLA and 236 ms for FastWAM.
