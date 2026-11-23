@@ -45,7 +45,7 @@ function validateInputs(fixture,traces,policy){
   assertKeys(w.action,['type','resource_id'],['type','resource_id'],'edge action contract');
   if(typeof w.action.type!=='string'||!w.action.type||typeof w.action.resource_id!=='string'||!w.action.resource_id)fail(c.case_id+': invalid action target');
   assertKeys(c.initial_state,['revision','provider_status','capacity','permission_granted','trigger_receipts','reserved'],['revision','provider_status','capacity','permission_granted','trigger_receipts','reserved'],'edge initial state');
-  if(!Number.isSafeInteger(c.initial_state.revision)||c.initial_state.revision<1||!Array.isArray(c.initial_state.trigger_receipts)||!Number.isFinite(c.initial_state.capacity)||typeof c.initial_state.permission_granted!=='boolean')fail(c.case_id+': invalid edge initial state');
+  if(!Number.isSafeInteger(c.initial_state.revision)||c.initial_state.revision<1||!Array.isArray(c.initial_state.trigger_receipts)||c.initial_state.trigger_receipts.length!==0||!Number.isFinite(c.initial_state.capacity)||typeof c.initial_state.permission_granted!=='boolean')fail(c.case_id+': invalid edge initial state; v1 requires source-event-backed receipts, not preloaded claims');
   if(!Array.isArray(c.source_events)||!Array.isArray(c.notifications))fail(c.case_id+': source events and notifications must be arrays');
   const eventIds=new Set(),eventMap=new Map();
   const sorted=[...c.source_events].sort((a,b)=>a.at-b.at||a.sequence-b.sequence);
@@ -70,7 +70,7 @@ function validateInputs(fixture,traces,policy){
    for(const r of e.patch.trigger_receipts){
     assertKeys(r,['receipt_id','event_type','source_event_id','source_revision','occurred_at','valid_until','status','action_type','resource_id','permission_scope'],['receipt_id','event_type','source_event_id','source_revision','occurred_at','valid_until','status','action_type','resource_id','permission_scope'],'edge receipt');
     const source=eventMap.get(r.source_event_id);
-    if(typeof r.receipt_id!=='string'||!r.receipt_id||snapshotIds.has(r.receipt_id)||!source||source.revision!==r.source_revision||r.source_revision>e.revision||r.occurred_at!==source.at||r.valid_until<=r.occurred_at||!['active','revoked'].includes(r.status))fail(c.case_id+': malformed or unbound durable receipt');
+    if(typeof r.receipt_id!=='string'||!r.receipt_id||snapshotIds.has(r.receipt_id)||!source||!Number.isSafeInteger(r.source_revision)||source.revision!==r.source_revision||r.source_revision>e.revision||!Number.isSafeInteger(r.occurred_at)||r.occurred_at!==source.at||!Number.isSafeInteger(r.valid_until)||r.valid_until<=r.occurred_at||!['active','revoked'].includes(r.status))fail(c.case_id+': malformed or unbound durable receipt');
     if(typeof r.event_type!=='string'||typeof r.action_type!=='string'||typeof r.resource_id!=='string'||typeof r.permission_scope!=='string')fail(c.case_id+': invalid receipt binding');
     if(r.event_type==='capacity_threshold_crossed'&&!qualifyingEdgeEvents.has(r.source_event_id))fail(c.case_id+': receipt source event did not prove the watched threshold edge');
     const previous=receiptHistory.get(r.receipt_id);
