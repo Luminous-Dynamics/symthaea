@@ -1321,6 +1321,7 @@ fn run() -> Result<(), String> {
                     "matched_to": intervention.matched_to,
                     "retrieved_event_ids": candidate.retrieved_event_ids,
                     "decision_support_event_ids": candidate.decision.evidence_ids,
+                    "candidate_visible_event_count": candidate.candidate_visible_event_count,
                     "index_bytes": candidate.index_bytes,
                     "removed_event_ids": intervention.removed_event_ids,
                     "removed_event_count": intervention.removed_event_ids.len(),
