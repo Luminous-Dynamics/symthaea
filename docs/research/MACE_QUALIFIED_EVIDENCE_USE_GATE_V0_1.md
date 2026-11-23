@@ -31,7 +31,7 @@ The consumer binding includes:
 
 - an effective subject/tenant authorization-scope commitment (a digest of a canonical scope manifest, not a raw user or tenant identifier);
 
-The consuming runtime must supply a trusted current time; callers cannot treat the token as perpetual after verification.
+The consuming runtime must supply a trusted current time; callers cannot treat the token as perpetual after verification. The verified capability retains the full signed binding, and the sole evidence-use accessor requires the caller to re-present that complete binding at consumption time. A token cannot be used against a different query, candidate batch, subject/tenant scope, DecisionNeed, purpose, policy, lifecycle snapshot, environment, tool profile or verifier profile.
 
 The JSON wire contract is defined in `data/schemas/mace_evidence_qualification_receipt_v1.schema.json`. JSON Schema checks shape only; the Rust strict decoder validates the typed protocol shape, and `verify_and_bind` remains the signature/trust/binding boundary.
 
@@ -117,7 +117,7 @@ The Ed25519 verification algorithm and direct pinned leaf-key profile are now im
 
 ## 7. Test inventory
 
-Sixteen Rust unit tests in the qualification gate and ten in the pinned-trust module are authored:
+Nineteen Rust unit tests in the qualification gate and ten in the pinned-trust module are authored:
 
 1. Only independently admissible evidence IDs cross the gate.
 2. DecisionNeed binding cannot be changed.
@@ -137,8 +137,9 @@ Sixteen Rust unit tests in the qualification gate and ten in the pinned-trust mo
 16. A changed trust profile, revoked key, unknown key, invalid key window or altered signature is rejected by the pinned verifier.
 17. Trust profiles with reordered, duplicated or aliased keys are rejected.
 18. A correctly hashed but older profile is rejected below the independently supplied minimum profile version.
+19. A verified capability cannot be rebound at use to a different purpose, subject/tenant scope or candidate-ID set, nor used before issuance.
 
-The qualification-gate protocol unit tests retain a deterministic signature-verifier double for isolated binding tests. The pinned-trust module additionally tests real Ed25519 signing and strict verification with deterministic test keys. Both sets are authored but unexecuted.
+The qualification-gate protocol unit tests retain a deterministic signature-verifier double for isolated binding tests; the pinned-trust module additionally tests real Ed25519 signing and strict verification with deterministic test keys. The verified capability now requires a full binding at use, not merely a timestamp. All tests are authored but unexecuted.
 
 **Rust execution status:** unexecuted. The environment currently has no `rustc`, `cargo` or `rustfmt`. No compile, Rust unit-test, Clippy, Rust codec, integration or CI pass is claimed. The standalone adapter now directly pins `ed25519-dalek = 2.1.0`; a generated Cargo.lock and exact dependency-graph review remain pending.
 
