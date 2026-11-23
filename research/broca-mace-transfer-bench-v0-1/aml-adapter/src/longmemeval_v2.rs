@@ -233,6 +233,18 @@ pub struct LongMemEvalV2ResourceReceiptV1 {
     pub index_build_latency_ns: u64,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum LongMemEvalV2ContextKind {
+    Text,
+    ImageReference,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct LongMemEvalV2ContextItemV1 {
+    pub kind: LongMemEvalV2ContextKind,
+    pub value: String,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct LongMemEvalV2HitV1 {
     pub chunk_id: String,
@@ -242,6 +254,24 @@ pub struct LongMemEvalV2HitV1 {
     pub rank: usize,
     pub evidence_text: String,
     pub screenshot_references: Vec<String>,
+}
+
+impl LongMemEvalV2HitV1 {
+    /// Projection to the official V2 text/image context-item concept.
+    /// Image items contain source references; this module does not load image pixels.
+    pub fn context_items(&self) -> Vec<LongMemEvalV2ContextItemV1> {
+        let mut items = vec![LongMemEvalV2ContextItemV1 {
+            kind: LongMemEvalV2ContextKind::Text,
+            value: self.evidence_text.clone(),
+        }];
+        items.extend(self.screenshot_references.iter().map(|reference| {
+            LongMemEvalV2ContextItemV1 {
+                kind: LongMemEvalV2ContextKind::ImageReference,
+                value: reference.clone(),
+            }
+        }));
+        items
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -362,7 +392,8 @@ impl LongMemEvalV2Bm25IndexV1 {
                 derived_evidence_text_bytes.saturating_add(chunk.evidence_text.len() as u64);
 
             let tokens = tokenize(&chunk.evidence_text);
-            total_tokens = total_tokens.saturating_add(tokens.len());
+            let token_count = tokens.len();
+            total_tokens = total_tokens.saturating_add(token_count);
             let mut terms = BTreeMap::<String, usize>::new();
             for token in tokens { *terms.entry(token).or_default() += 1; }
             for term in terms.keys() {
@@ -374,10 +405,8 @@ impl LongMemEvalV2Bm25IndexV1 {
             index.push(IndexedChunk {
                 chunk,
                 terms,
-                token_count: tokens_len(&index, &df, total_tokens), // overwritten below
+                token_count,
             });
-            let last = index.last_mut().expect("just pushed");
-            last.token_count = tokenize(&last.chunk.evidence_text).len();
         }
 
         let average_document_length = if index.is_empty() { 0.0 } else {
@@ -617,8 +646,6 @@ fn tokenize(text: &str) -> Vec<String> {
     tokens
 }
 
-fn tokens_len(_index: &[IndexedChunk], _df: &BTreeMap<String, usize>, total: usize) -> usize { total }
-
 fn elapsed_ns(start: Instant) -> u64 {
     start.elapsed().as_nanos().min(u64::MAX as u128) as u64
 }
@@ -710,6 +737,9 @@ mod tests {
         let result = index.search("web", "customer Ada pending order", 5, 0).expect("search");
         assert!(!result.hits.is_empty());
         assert!(result.hits[0].evidence_text.contains("Customer: Ada"));
+        let context = result.hits[0].context_items();
+        assert_eq!(context[0].kind, LongMemEvalV2ContextKind::Text);
+        assert!(context.iter().any(|item| item.kind == LongMemEvalV2ContextKind::ImageReference));
         assert!(result.search_latency_ns > 0);
         assert!(index.resource_receipt().total_payload_bytes_lower_bound > 0);
     }
