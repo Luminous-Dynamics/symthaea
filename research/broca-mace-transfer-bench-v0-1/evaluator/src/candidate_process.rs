@@ -145,7 +145,7 @@ impl CandidateProcessSession {
                 while let Ok(bytes) = request_receiver.recv() {
                     if writer
                         .write_all(&bytes)
-                        .and_then(|_| writer.write_all(b"\\n"))
+                        .and_then(|_| writer.write_all(b"\n"))
                         .and_then(|_| writer.flush())
                         .is_err()
                     {
