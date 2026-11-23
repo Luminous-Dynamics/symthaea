@@ -27,6 +27,8 @@ The module defines:
 
 The consumer binding includes:
 
+- an effective subject/tenant authorization-scope commitment (a digest of a canonical scope manifest, not a raw user or tenant identifier);
+
 The consuming runtime must supply a trusted current time; callers cannot treat the token as perpetual after verification.
 
 - run ID, opaque query invocation ID and domain;
@@ -87,7 +89,7 @@ No signature algorithm, key custody, issuer registry, remote source-observation 
 
 ## 6. Test inventory
 
-Eleven Rust unit tests are authored in the module:
+Twelve Rust unit tests are authored in the module:
 
 1. Only independently admissible evidence IDs cross the gate.
 2. DecisionNeed binding cannot be changed.
@@ -100,6 +102,7 @@ Eleven Rust unit tests are authored in the module:
 9. A zero-admissible outcome remains an abstention signal.
 10. Candidate-ID-set commitment must match the exact sorted IDs.
 11. A verified qualification token cannot be used after expiry.
+12. Consumer/tenant scope cannot be rebound.
 
 The module's test verifier is intentionally a deterministic test double; it is not a production signature scheme.
 
