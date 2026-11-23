@@ -1,0 +1,52 @@
+name: RDP Audio Frame Integrity
+
+on:
+  pull_request:
+    paths:
+      - "src/swarm/rdp_audio.rs"
+      - "src/swarm/rdp_protocol.rs"
+      - ".github/workflows/rdp-audio-integrity.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rdp-audio-integrity-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  focused-rdp-audio:
+    name: Exact-head RDP audio protocol tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CARGO_INCREMENTAL: 0
+      CARGO_TERM_COLOR: always
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Install repository-pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+
+      - name: Assert exact checkout
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+
+      - name: Check formatting for touched Rust modules
+        run: rustfmt --edition 2024 --check src/swarm/rdp_audio.rs src/swarm/rdp_protocol.rs
+
+      - name: Test audio encoder, decoder and payload-boundary controls
+        run: cargo test --locked --lib rdp_audio::tests
+
+      - name: Test RDP wire audio validation and round-trip controls
+        run: cargo test --locked --lib audio_frame_wire_validation
