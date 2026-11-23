@@ -915,14 +915,18 @@ mod tests {
         })
     }
 
-    fn manifest_record(run_id: &str, source_sha: &str) -> Value {
-        let baseline_evidence_sha256 = "a".repeat(64);
-        let public_seed = 17_u64;
-        let max_root_pairs = 8_u64;
-        let root_pair_count = 0_u64;
-        let matched_random_count = 0_u64;
-        let unmatched_random_target_count = 0_u64;
-        let interventions = Vec::<Value>::new();
+    fn refresh_manifest_digests(record: &mut Value) {
+        let baseline_evidence_sha256 = record["baseline_evidence_sha256"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        let public_seed = record["public_seed"].as_u64().unwrap();
+        let max_root_pairs = record["max_root_pairs"].as_u64().unwrap();
+        let root_pair_count = record["root_pair_count"].as_u64().unwrap();
+        let matched_random_count = record["matched_random_count"].as_u64().unwrap();
+        let unmatched_random_target_count =
+            record["unmatched_random_target_count"].as_u64().unwrap();
+
         let payload = serde_json::to_vec(&json!({
             "schema_version": INPUT_SCHEMA,
             "seed": public_seed,
@@ -931,17 +935,42 @@ mod tests {
             "root_pair_count": root_pair_count,
             "matched_random_count": matched_random_count,
             "unmatched_random_target_count": unmatched_random_target_count,
-            "interventions": interventions
+            "interventions": record["interventions"]
         }))
         .unwrap();
-        let manifest_sha256 = hex_digest(Sha256::digest(payload).as_slice());
+        let payload_sha256 = hex_digest(Sha256::digest(payload).as_slice());
+        record["manifest_payload_sha256"] = json!(payload_sha256);
 
-        json!({
+        let receipt_payload = serde_json::to_vec(&json!({
+            "schema_version": INPUT_SCHEMA,
+            "run_id": record["run_id"],
+            "pair_block_id": record["pair_block_id"],
+            "manifest_payload_sha256": payload_sha256,
+            "source_code_sha256": record["source_code_sha256"],
+            "fixture_sha256": record["fixture_sha256"],
+            "schema_sha256": record["schema_sha256"],
+            "source_revision": record["source_revision"]
+        }))
+        .unwrap();
+        record["manifest_sha256"] =
+            json!(hex_digest(Sha256::digest(receipt_payload).as_slice()));
+    }
+
+    fn manifest_record(run_id: &str, source_sha: &str) -> Value {
+        let baseline_evidence_sha256 = "a".repeat(64);
+        let public_seed = 17_u64;
+        let max_root_pairs = 8_u64;
+        let root_pair_count = 0_u64;
+        let matched_random_count = 0_u64;
+        let unmatched_random_target_count = 0_u64;
+        let interventions = Vec::<Value>::new();
+        let mut record = json!({
             "schema_version": INPUT_SCHEMA,
             "record_type": "intervention_manifest",
             "run_id": run_id,
             "pair_block_id": "world-1:task-manifest-test",
-            "manifest_sha256": manifest_sha256,
+            "manifest_payload_sha256": "0".repeat(64),
+            "manifest_sha256": "0".repeat(64),
             "baseline_evidence_sha256": baseline_evidence_sha256,
             "public_seed": public_seed,
             "intervention_count": 0,
@@ -954,7 +983,9 @@ mod tests {
             "fixture_sha256": "b".repeat(64),
             "schema_sha256": "c".repeat(64),
             "source_revision": "d".repeat(40)
-        })
+        });
+        refresh_manifest_digests(&mut record);
+        record
     }
 
     fn append_intervention(record: &mut Value, intervention: Value) {
@@ -972,33 +1003,12 @@ mod tests {
             .iter()
             .filter(|item| item["kind"] == "matched_random")
             .count() as u64;
-        let baseline_evidence_sha256 = record["baseline_evidence_sha256"]
-            .as_str()
-            .unwrap()
-            .to_string();
-        let public_seed = record["public_seed"].as_u64().unwrap();
-        let max_root_pairs = record["max_root_pairs"].as_u64().unwrap();
-        let unmatched_random_target_count =
-            record["unmatched_random_target_count"].as_u64().unwrap();
 
         record["intervention_count"] = json!(interventions.len());
         record["interventions"] = json!(interventions);
         record["root_pair_count"] = json!(root_pair_count);
         record["matched_random_count"] = json!(matched_random_count);
-
-        let payload = serde_json::to_vec(&json!({
-            "schema_version": INPUT_SCHEMA,
-            "seed": public_seed,
-            "baseline_evidence_sha256": baseline_evidence_sha256,
-            "max_root_pairs": max_root_pairs,
-            "root_pair_count": root_pair_count,
-            "matched_random_count": matched_random_count,
-            "unmatched_random_target_count": unmatched_random_target_count,
-            "interventions": record["interventions"]
-        }))
-        .unwrap();
-        record["manifest_sha256"] =
-            json!(hex_digest(Sha256::digest(payload).as_slice()));
+        refresh_manifest_digests(record);
     }
 
     fn linked_score(intervention_id: &str, kind: &str, target: &str, removed: Value) -> Value {
