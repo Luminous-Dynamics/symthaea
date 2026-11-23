@@ -15,6 +15,7 @@ pub mod secom_raw;
 pub mod secom_tabular_baselines;
 pub mod split_manifest;
 pub mod stratified_repeat;
+pub mod vm_privacy_redteam;
 
 pub use binary_metrics::{
     BinaryClassCounts, BinaryMetricReportV1, BinaryMetricsError, BinaryScoreSampleV1,
@@ -30,6 +31,13 @@ pub use process_event_graph::{
 pub use pair_manifest::{
     ContrastivePairManifestV1, PairManifestError, PairValidationReportV1, validate_pair_manifest_v1,
 };
+pub use vm_privacy_redteam::{
+    VM_PRIVACY_ATTACK_SCHEMA_V1, VM_PRIVACY_REPORT_SCHEMA_V1,
+    PrivacyAttackStatusV1, SyntheticPrivacyRecordV1, UpdateVisibilityV1,
+    VmPrivacyAttackConfigV1, VmPrivacyAttackErrorV1, VmPrivacyAttackReportV1,
+    evaluate_vm_update_inversion_v1,
+};
+
 pub use stratified_repeat::{
     StratifiedRepeatManifestV1, StratifiedRepeatReportV1, StratifiedSampleV1,
     StratifiedSplitAssignmentV1, StratifiedSplitError, StratifiedSplitSubjectV1,
