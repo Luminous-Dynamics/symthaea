@@ -3,8 +3,8 @@
 pub mod binary_metrics;
 pub mod dtco_manifest;
 pub mod metrology_audit;
-pub mod metrology_semantics;
 pub mod metrology_policy_replay;
+pub mod metrology_semantics;
 pub mod mf_acquisition;
 pub mod pair_manifest;
 pub mod process_event_graph;
