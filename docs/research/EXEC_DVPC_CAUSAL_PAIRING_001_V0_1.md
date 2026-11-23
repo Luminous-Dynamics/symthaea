@@ -88,38 +88,6 @@ A valid trajectory and a valid regret vector are not sufficient if they refer to
 It returns a combined `CausalDecisionValueCertificate` containing both the causal pairing certificate and the decision-value interaction certificate. This is a join adapter, not a new regret formula or causal inference system.
 
 
-The Rust reference is in:
-
-`research/decision-value-interaction-001/src/causal_pairing.rs`
-
-The common identity binds:
-- the existing 13-field `PairedRunIdentity`;
-- dynamics-model and simulator-build digests;
-- exogenous-schedule and clock-profile digests;
-- initial world tick;
-- distinct world-disturbance, policy-RNG, sensor-noise and evaluator-RNG domain commitments.
-
-Each arm binds:
-- one of the four treatment arms;
-- declared causal regime and trajectory origin;
-- a contiguous sequence of integer-tick transitions;
-- pre-state, applied-action, exogenous-input, post-state and observation-delivery digests per tick;
-- a driver-execution receipt and an independent replay-audit receipt;
-- explicit complete/incomplete and replay-audit disposition.
-
-Validation enforces:
-1. exactly one receipt per treatment arm;
-2. matching shared roots and the original 13 paired identities;
-3. distinct, non-empty RNG-domain commitments;
-4. common initial state and contiguous tick/state-chain commitments;
-5. common exogenous event-bundle commitments on all overlapping ticks;
-6. no conflicting post-state for an identical tick/pre-state/action/exogenous input tuple;
-7. a shared physical trajectory for open-loop action-invariant arms;
-8. arm-local driver execution for closed-loop action-coupled arms;
-9. complete receipts and successful independent replay audits.
-
-The returned certificate reports the regime, episode/world identity, number of ticks common to all arms, each arm's terminal state digest and trajectory origin. It does not compute regret; #13281 remains responsible for application-time regret and signed compute×observation interaction. #8578 remains responsible for downstream cluster-level inference.
-
 ## 4. Decision-time information filtration
 
 Trajectory lineage is not sufficient if a policy can consume an event before the driver actually made it available. The evaluator must distinguish source availability, driver delivery and decision time.
@@ -190,7 +158,7 @@ The source test suite contains positive and negative controls for these cases, p
 
 No new transition simulator, actor policy, resource ledger, factorial decomposition, VOI engine, freshness horizon, statistical engine or action authority is introduced.
 
-## 8. Benchmark sequence and claim ceiling
+## 9. Benchmark sequence and claim ceiling
 
 First run the finite controls, then integrate with the qualified RoboDyna driver. Reproduce the official π0.5, X-VLA and FastWAM baselines under the benchmark's own splits, checkpoints, timing modes and resource protocol before adding Symthaea as a separately labelled decision-layer arm. Keep the open-loop DEEP perception reproduction separate from action-coupled RoboDyna results.
 
