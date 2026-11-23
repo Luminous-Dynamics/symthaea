@@ -43,6 +43,14 @@ pub enum SyntheticFabMissingnessMechanismV1 {
     Mnar,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct SyntheticMetrologyCharacteristicsV1 {
+    /// Probability that a true defect is reported as positive.
+    pub sensitivity: f64,
+    /// Probability that a true non-defect is reported as negative.
+    pub specificity: f64,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SyntheticFabScenarioConfigV1 {
     pub schema: String,
@@ -56,6 +64,7 @@ pub struct SyntheticFabScenarioConfigV1 {
     pub sensor_dropout_probability: f64,
     pub measurement_noise_stddev: f64,
     pub defect_threshold: f64,
+    pub metrology_characteristics: SyntheticMetrologyCharacteristicsV1,
     /// Label availability is retained only in the hidden outcome oracle.
     pub label_delay_steps: u64,
 }
@@ -108,10 +117,20 @@ pub struct SyntheticFabPolicyEvaluationV1 {
     pub true_positive_count: usize,
     pub selected_count: usize,
     pub selected_positive_count: usize,
+    /// Defects not selected for physical metrology.
     pub escaped_defect_count: usize,
+    /// True selected defects detected by the simulated metrology assay.
+    pub metrology_detected_true_positive_count: usize,
+    pub metrology_false_positive_count: usize,
+    pub metrology_false_negative_count: usize,
+    /// Total defects not detected: unselected defects plus assay false negatives.
+    pub total_undetected_defect_count: usize,
+    pub detection_capture_fraction: Option<f64>,
     pub defect_capture_fraction: Option<f64>,
     pub escaped_defect_fraction: Option<f64>,
     pub true_defect_prevalence: f64,
+    pub metrology_sensitivity: f64,
+    pub metrology_specificity: f64,
     pub mean_latent_process_state: f64,
     pub mean_defect_score: f64,
     pub selected_sample_prevalence: f64,
@@ -152,6 +171,8 @@ pub struct SyntheticFabEpisodeV1 {
     scenario_config_sha256: String,
     observation_packet_sha256: String,
     defect_threshold: f64,
+    metrology_characteristics: SyntheticMetrologyCharacteristicsV1,
+    measurement_seed: u64,
     hidden_truth: Vec<SyntheticFabHiddenTruthV1>,
 }
 
@@ -743,6 +764,15 @@ fn validate_config(config: &SyntheticFabScenarioConfigV1) -> Result<(), Syntheti
             "defect_threshold: expected finite value".into(),
         ));
     }
+    if !config.metrology_characteristics.sensitivity.is_finite()
+        || !(0.0..=1.0).contains(&config.metrology_characteristics.sensitivity)
+        || !config.metrology_characteristics.specificity.is_finite()
+        || !(0.0..=1.0).contains(&config.metrology_characteristics.specificity)
+    {
+        return Err(SyntheticFabReplayError(
+            "metrology sensitivity/specificity must be finite values in [0, 1]".into(),
+        ));
+    }
     Ok(())
 }
 
@@ -890,6 +920,8 @@ pub fn generate_synthetic_fab_episode_v1(
         scenario_config_sha256,
         observation_packet_sha256,
         defect_threshold: config.defect_threshold,
+        metrology_characteristics: config.metrology_characteristics,
+        measurement_seed: config.seed ^ 0x5345_4d49_4d45_5452,
         hidden_truth,
     })
 }
@@ -1189,6 +1221,10 @@ mod tests {
             sensor_dropout_probability: 0.12,
             measurement_noise_stddev: 0.08,
             defect_threshold: 0.62,
+            metrology_characteristics: SyntheticMetrologyCharacteristicsV1 {
+                sensitivity: 0.95,
+                specificity: 0.99,
+            },
             label_delay_steps: 5,
         }
     }
