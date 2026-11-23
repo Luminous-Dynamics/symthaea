@@ -217,8 +217,14 @@ fn config(nv: usize) -> VlasovPoissonConfig {
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut args = std::env::args().skip(1);
-    let sponge_start = args.next().unwrap_or_else(|| "0.75".to_string()).parse::<f64>()?;
-    let sponge_damping = args.next().unwrap_or_else(|| "0.5".to_string()).parse::<f64>()?;
+    let sponge_start = args
+        .next()
+        .unwrap_or_else(|| "0.75".to_string())
+        .parse::<f64>()?;
+    let sponge_damping = args
+        .next()
+        .unwrap_or_else(|| "0.5".to_string())
+        .parse::<f64>()?;
     if !sponge_start.is_finite() || !(0.0..1.0).contains(&sponge_start) {
         return Err("sponge start fraction must be finite and in [0, 1)".into());
     }
