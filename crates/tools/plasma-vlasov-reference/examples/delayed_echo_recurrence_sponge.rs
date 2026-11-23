@@ -93,6 +93,67 @@ fn measure_peak(samples: &[(f64, f64, f64)]) -> Peak {
     }
 }
 
+fn response_mode_guardband_metrics(
+    config: VlasovPoissonConfig,
+    pulse: &VlasovPoisson1d1v,
+    control: &VlasovPoisson1d1v,
+    spatial_mode: usize,
+) -> Result<(f64, f64, f64, f64), Box<dyn Error>> {
+    let response_distribution: Vec<f64> = pulse
+        .distribution()
+        .iter()
+        .zip(control.distribution())
+        .map(|pulse_value, control_value| pulse_value - control_value)
+        .collect();
+    let response_state = VlasovPoisson1d1v::new(config, response_distribution)?;
+    let spectrum: JointPhaseSpaceSpectrum = response_state.joint_phase_space_spectrum()?;
+
+    let negative_x_mode = (spectrum.nx - spatial_mode) % spectrum.nx;
+    let mut total = 0.0;
+    let mut guard_075 = 0.0;
+    let mut guard_090 = 0.0;
+    let mut nyquist = 0.0;
+    let mut signed_s_moment = 0.0;
+    let mut non_nyquist_total = 0.0;
+
+    for x_mode in [spatial_mode, negative_x_mode] {
+        for velocity_index in 0..spectrum.nv {
+            let energy = spectrum.mode_energy(x_mode, velocity_index).unwrap_or(0.0);
+            total += energy;
+            if velocity_index == spectrum.nv / 2 {
+                nyquist += energy;
+                continue;
+            }
+
+            let signed_s = spectrum
+                .signed_velocity_mode(velocity_index)
+                .unwrap_or_default();
+            let normalized = signed_s.unsigned_abs() as f64 / (spectrum.nv / 2) as f64;
+            if normalized >= 0.75 {
+                guard_075 += energy;
+            }
+            if normalized >= 0.90 {
+                guard_090 += energy;
+            }
+            signed_s_moment += signed_s as f64 * energy;
+            non_nyquist_total += energy;
+        }
+    }
+
+    let denominator = total.max(f64::MIN_POSITIVE);
+    let centroid = if non_nyquist_total > 0.0 {
+        signed_s_moment / non_nyquist_total
+    } else {
+        0.0
+    };
+    Ok((
+        guard_075 / denominator,
+        guard_090 / denominator,
+        nyquist / denominator,
+        centroid,
+    ))
+}
+
 fn config(nv: usize) -> VlasovPoissonConfig {
     VlasovPoissonConfig {
         nx: 64,
