@@ -695,7 +695,7 @@ fn transform_observation_state_v1(
                 true,
             )
         }
-        other => (other.clone(), false),
+        other => ((*other).clone(), false),
     };
     Ok(state)
 }
@@ -709,8 +709,8 @@ pub fn execute_sensor_correspondence_v1(
     source_frame: &SensorObservationFrameV1,
     manifest: &SensorCorrespondenceManifestV1,
 ) -> Result<SensorCorrespondenceExecutionV1, SensorObservationError> {
-    let source_report = validate_sensor_observation_frame_v1(source_frame)?;
-    let manifest_report = validate_sensor_correspondence_manifest_v1(manifest)?;
+    validate_sensor_observation_frame_v1(source_frame)?;
+    validate_sensor_correspondence_manifest_v1(manifest)?;
     if source_frame.sensor_schema_sha256 != manifest.source_sensor_schema_sha256 {
         return Err(SensorObservationError(
             "source frame sensor schema digest differs from correspondence manifest".into(),
@@ -720,7 +720,11 @@ pub fn execute_sensor_correspondence_v1(
     let source_frame_bytes = serde_json::to_vec(source_frame).map_err(|error| {
         SensorObservationError(format!("source frame serialization failed: {error}"))
     })?;
-    let manifest_bytes = serde_json::to_vec(manifest).map_err(|error| {
+    let mut canonical_manifest = manifest.clone();
+    canonical_manifest
+        .correspondences
+        .sort_by(|left, right| left.target_sensor_id.cmp(&right.target_sensor_id));
+    let manifest_bytes = serde_json::to_vec(&canonical_manifest).map_err(|error| {
         SensorObservationError(format!("correspondence manifest serialization failed: {error}"))
     })?;
     let source_frame_sha256 = sha256_hex(&source_frame_bytes);
@@ -758,7 +762,7 @@ pub fn execute_sensor_correspondence_v1(
     let mut abstention_reasons = Vec::new();
 
     for mapping in ordered_correspondences {
-        match mapping.status {
+        match &mapping.status {
             SensorCorrespondenceStatusV1::Matched => {
                 matched_count += 1;
                 let Some(source_id) = mapping.source_sensor_id.as_deref() else {
@@ -874,7 +878,6 @@ pub fn execute_sensor_correspondence_v1(
             SensorObservationError(format!("execution report serialization failed: {error}"))
         })?,
     );
-    let _ = (source_report, manifest_report);
     Ok(SensorCorrespondenceExecutionV1 {
         target_frame,
         report,
