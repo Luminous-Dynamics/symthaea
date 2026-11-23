@@ -154,3 +154,15 @@ Prospective hard-gate targets: zero stale-current-state uses after an effective 
 ## Qualification boundary
 
 This is a new reusable Rust contract, an initial schema and authored unit tests. No Rust compile, unit-test pass, durable store, production memory integration, external signature verification, human study, privacy certification or benchmark result is claimed.
+
+## Source register
+
+- Agent Memory Leaderboard Cycle 2 official results, released 19 November 2026: https://agentmemoryleaderboard.ai/results/cycle-2/
+- Agent Memory Challenge Cycle 2 participation rules and Add/Search requirements: https://agentmemories.ai/rules
+- Agent Zero Memory, Provenance-Aware Long-Term Memory for LLM Agents (2026): https://arxiv.org/abs/2608.29606
+- AMA-Bench, Proceedings of Machine Learning Research 306 (ICML 2026): https://proceedings.mlr.press/v306/zhao26bs.html
+- MemoryDojo (November 2026): https://arxiv.org/abs/2611.09721
+- MemSecBench (2026): https://arxiv.org/abs/2607.27080
+- MACE decision-scoped evidence qualification gate: PR #13410
+- MACE pinned Ed25519 qualification trust profiles: PR #13436
+- MACE candidate-side source-lineage evidence graph: PR #13386
