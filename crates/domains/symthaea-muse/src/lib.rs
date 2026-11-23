@@ -89,7 +89,6 @@ pub mod confirmatory_readiness_release;
 #[cfg(feature = "theory")]
 pub mod confirmatory_unblinding;
 pub mod critic;
-#[cfg(feature = "theory")]
 pub mod evidence_digest;
 #[cfg(feature = "theory")]
 pub mod experiment_manifest;
@@ -150,6 +149,7 @@ pub mod policy_budget_evidence;
 pub mod post_publication_audit;
 #[cfg(feature = "theory")]
 pub mod ranked_preference_analysis;
+pub mod renderer_effect;
 #[cfg(feature = "theory")]
 pub mod replication_execution;
 #[cfg(feature = "theory")]
