@@ -18,6 +18,7 @@ pub mod secom_raw;
 pub mod secom_tabular_baselines;
 pub mod split_manifest;
 pub mod stratified_repeat;
+pub mod vm_snapshot_dependency_impact;
 pub mod vm_snapshot_evidence;
 
 pub use binary_metrics::{
@@ -125,4 +126,15 @@ pub use vm_snapshot_evidence::{
     VmSnapshotLabelEvidenceV1, VmSnapshotLabelManifestEntryV1, VmSnapshotPurposeV1,
     VmSnapshotRequalificationReportV1, VmTrainingSnapshotManifestV1,
     build_vm_training_snapshot_manifest_v1, requalify_vm_training_snapshot_v1,
+};
+
+pub use vm_snapshot_dependency_impact::{
+    VM_DEPENDENCY_EDGE_SCHEMA_V1, VM_DEPENDENCY_GRAPH_SCHEMA_V1,
+    VM_IMPACT_CLOSURE_INPUT_SCHEMA_V1, VM_IMPACT_CLOSURE_REPORT_SCHEMA_V1,
+    VmDependencyDimensionV1, VmImpactClosureErrorV1, VmImpactClosureInputV1,
+    VmImpactClosureReportV1, VmImpactClosureStatusV1, VmModelDerivationKindV1,
+    VmModelSnapshotNodeV1, VmSnapshotCurrentDispositionV1, VmSnapshotDependencyEdgeV1,
+    VmSnapshotDependencyGraphV1, VmSnapshotImpactEntryV1, VmSnapshotImpactStateV1,
+    compute_vm_snapshot_impact_closure_v1, seal_vm_snapshot_dependency_edge_v1,
+    seal_vm_snapshot_dependency_graph_v1,
 };
