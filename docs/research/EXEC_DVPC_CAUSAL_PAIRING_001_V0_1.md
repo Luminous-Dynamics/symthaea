@@ -233,6 +233,8 @@ Report an **advantage-of-prediction** table by task capability:
 This ties prediction fidelity to executed utility without assuming the two correlate. It also makes model exploitation visible: test the policy against deliberately perturbed or adversarially selected world-model rollouts, then verify in the authoritative environment rather than allowing the learned model to grade its own policy.
 
 
+### Additional prior-art comparison
+
 The closest public results measure different parts of the problem. They should be treated as distinct baselines, not collapsed into one leaderboard score.
 
 | Prior work / benchmark | What it already establishes | Symthaea comparison that remains open |
@@ -242,12 +244,13 @@ The closest public results measure different parts of the problem. They should b
 | *How Can Driving World Models Do Counterfactual Prediction?* (2026-08-12) | Direct action-conditioned prediction can miss factual continuation evidence; the paper formalizes abduction–action–prediction in a short-horizon setup where other agents are not action-coupled. | Require arm-local action-coupled trajectories when the environment responds to actions, and separately audit factual evidence transfer and counterfactual replay. |
 | TempoWAM (2026-08-10) | Progress-monitored adaptive action-chunk execution is prior art; its paper reports 26.9% fewer WAM inferences on easy real-world tasks while maintaining success and a 13.3-point success increase on difficult real-world tasks. | Include fixed-horizon, progress-triggered and TempoWAM-style execution baselines. Symthaea must show added value from joint observation/compute/verification and temporal evidence, not merely replan timing. |
 | RoboDyna (NeurIPS 2026 Workshop; arXiv 2026-11-20) | 30 physically grounded dynamic tasks, synchronous/asynchronous paired execution, task success and progress. Official results report π0.5 18%, X-VLA 11%, and FastWAM 6% overall success; sync-to-async execution flips 5–12% of episode outcomes while average success changes by at most 3 percentage points. | Reproduce the exact checkpoints, seeds, task splits and sync/async protocol first. Then add Symthaea as a separately labelled decision layer and report per-seed flips, progress and application-time regret. |
+| LIBERO-Dynamic (2026) | Latency-aware evaluation across all 40 LIBERO tasks, with contact-driven motion, calibrated inference delay and asynchronous queue execution. | Official fixed-1,800-episode async results range from π0.5 (JAX) 57.8% to OpenVLA-OFT 27.3%; the reported best measured Async Queue strategy is 48.4%, Sync Hold 43.1%, RTC 37.8%, and separately trained VLASH 55.4%. | Use as the controlled latency/motion counterpart to RoboDyna. Reproduce its checkpoints and queue semantics, then evaluate the Symthaea layer on the same episode population. Keep VLASH as a separately trained system reference. |
 | RoboRecover (2026-09-24) | Initial-state policy performance does not determine recovery after execution-induced deviations; its dataset contains 2,000 scenarios across RoboTwin and LIBERO. | Add a recovery arm after controlled deviations. Measure recovery success, time-to-recovery, extra actions, damage/regret and tail failures at matched deviation states. |
 
 ### Recommended campaign
 
-1. **Reproduction before augmentation.** Reproduce DEEP on its official KITTI, nuScenes and open-loop nuPlan settings; separately reproduce RoboDyna's π0.5, X-VLA and FastWAM results. Freeze checkpoints, versions, seeds, task splits, clock mode and resource ceilings.
-2. **Decision-layer isolation.** Keep each foundation policy frozen. Compare the base policy, fixed-budget escalation, random allocation, confidence/entropy routing, DEEP-style decision-value routing, TempoWAM-style progress routing, and Symthaea. This isolates the value of the decision layer from model-scale or task-specific fine-tuning effects.
+1. **Reproduction before augmentation.** Reproduce DEEP on its official KITTI, nuScenes and open-loop nuPlan settings; reproduce RoboDyna's π0.5, X-VLA and FastWAM results; and reproduce LIBERO-Dynamic's released pretrained-policy and execution-strategy baselines. Freeze checkpoints, versions, seeds, task splits, clock mode, latency calibration and resource ceilings.
+2. **Decision-layer isolation.** Keep each foundation policy frozen. On each compatible benchmark, compare the base policy, fixed-budget escalation, random allocation, confidence/entropy routing, DEEP-style decision-value routing, TempoWAM-style progress routing, and Symthaea. This isolates the value of the decision layer from model-scale or task-specific fine-tuning effects.
 3. **Factorial attribution.** Use #13281 for compute×observation regret; use #13176 for its existing resource/exposure decomposition; use #8578 for independent-cluster uncertainty. Add memory and verification only through their existing owners after the four-arm campaign is stable.
 4. **Closed-loop branch correctness.** On action-coupled tasks, the four arms share the initial state and indexed exogenous forcing, not a forced common future state trajectory. Use arm-local execution, action-conditioned actor response and independent replay. Keep open-loop DEEP results separate from closed-loop RoboDyna/RoboRecover results.
 5. **Recovery and temporal integrity.** After baseline reproduction, inject controlled execution deviations and evaluate recovery. Separately compare full state, identity, PCA, random projection, quantization and decision-aware recurrent-state compression across future decision epochs.
@@ -269,6 +272,9 @@ Do not use a composite score to hide trade-offs. Report decision regret, success
 - [Symthaea PR #13281](https://github.com/Luminous-Dynamics/symthaea/pull/13281)
 - [Symthaea PR #13282](https://github.com/Luminous-Dynamics/symthaea/pull/13282)
 - [RoboDyna](https://robodyna.github.io/robodyna/)
+- [LIBERO-Dynamic paper](https://arxiv.org/abs/2610.24579)
+- [LIBERO-Dynamic code and evaluation protocol](https://github.com/renshaojie233/LIBERO-Dynamic)
+- [Do World Models Make Better Robots?](https://arxiv.org/abs/2609.29669)
 - [DEEP](https://arxiv.org/abs/2609.35910)
 - [How Can Driving World Models Do Counterfactual Prediction?](https://arxiv.org/abs/2608.11601)
 - [TempoWAM: Rethink Before You Execute](https://arxiv.org/abs/2608.09492)
