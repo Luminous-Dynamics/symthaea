@@ -1,0 +1,12 @@
+[package]
+name = "symthaea-decision-value-interaction"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+publish = false
+description = "Paired compute-observation decision-regret interaction reference"
+
+[workspace]
+
+[lib]
+path = "src/lib.rs"
