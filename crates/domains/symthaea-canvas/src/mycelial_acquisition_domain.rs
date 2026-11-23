@@ -41,6 +41,8 @@ pub struct MycelialAcquisitionAxis {
     pub name: MycelialAcquisitionAxisName,
     pub length: u32,
     pub unit: String,
+    /// Coordinate origin for index zero in the declared coordinate frame.
+    pub origin: f64,
     /// Physical units per source-axis index. None means uncalibrated/unknown.
     pub physical_scale: Option<f64>,
 }
@@ -113,6 +115,8 @@ pub enum MycelialExtractionUnitState {
 #[serde(deny_unknown_fields)]
 pub struct MycelialExtractionUnitOutcome {
     pub unit: MycelialAcquisitionUnitKey,
+    /// Digest of the exact source subregion represented by this tile/plane/channel/timepoint.
+    pub source_unit_digest: String,
     pub state: MycelialExtractionUnitState,
     /// Present only for successfully processed units, including zero-observation outputs.
     pub output_observation_inventory_digest: Option<String>,
@@ -169,7 +173,7 @@ pub enum MycelialAcquisitionDomainError {
     NonCanonicalExclusionOrder,
     ExcludedUnitOutsideDomain,
     EmptyDeclaredScope,
-    InvalidExclusionReason,
+    InvalidDispositionReason,
     ManifestDigestMismatch,
     ReceiptUnitInventoryMismatch,
     InvalidUnitDisposition { reason: &'static str },
@@ -216,8 +220,8 @@ impl fmt::Display for MycelialAcquisitionDomainError {
             Self::EmptyDeclaredScope => {
                 write!(f, "acquisition manifest must retain at least one in-scope unit")
             }
-            Self::InvalidExclusionReason => {
-                write!(f, "scope exclusion requires a bounded reason and decision digest")
+            Self::InvalidDispositionReason => {
+                write!(f, "acquisition disposition requires a bounded non-empty reason")
             }
             Self::ManifestDigestMismatch => {
                 write!(f, "extraction receipt does not bind to the supplied acquisition manifest")
@@ -256,7 +260,7 @@ fn validate_reason(value: &str) -> Result<(), MycelialAcquisitionDomainError> {
         || value.len() > MAX_DOMAIN_REASON_BYTES
         || value.chars().any(char::is_control)
     {
-        return Err(MycelialAcquisitionDomainError::InvalidExclusionReason);
+        return Err(MycelialAcquisitionDomainError::InvalidDispositionReason);
     }
     Ok(())
 }
@@ -432,6 +436,7 @@ impl MycelialAcquisitionDomainManifest {
             }
             validate_identifier(&axis.unit, "axis_unit", MAX_DOMAIN_VERSION_BYTES)?;
             if axis.length == 0
+                || !axis.origin.is_finite()
                 || axis
                     .physical_scale
                     .is_some_and(|scale| !scale.is_finite() || scale <= 0.0)
@@ -568,6 +573,7 @@ impl MycelialAcquisitionDomainManifest {
             hasher.update(&[axis_tag(axis.name)]);
             hasher.update(&axis.length.to_le_bytes());
             hash_string(&mut hasher, &axis.unit);
+            hasher.update(&axis.origin.to_bits().to_le_bytes());
             match axis.physical_scale {
                 Some(scale) => {
                     hasher.update(&[1]);
@@ -601,6 +607,7 @@ impl MycelialExtractionCoverageReceipt {
     fn validate_unit_outcome(
         outcome: &MycelialExtractionUnitOutcome,
     ) -> Result<(), MycelialAcquisitionDomainError> {
+        validate_digest(&outcome.source_unit_digest, "source_unit_digest")?;
         match outcome.state {
             MycelialExtractionUnitState::Processed => {
                 let Some(digest) = outcome.output_observation_inventory_digest.as_deref() else {
@@ -739,6 +746,7 @@ impl MycelialExtractionCoverageReceipt {
             .saturating_add(self.extractor_version.len())
             .saturating_add(self.extractor_config_digest.len());
         for outcome in &self.units {
+            string_bytes = string_bytes.saturating_add(outcome.source_unit_digest.len());
             if let Some(value) = &outcome.output_observation_inventory_digest {
                 string_bytes = string_bytes.saturating_add(value.len());
             }
@@ -760,6 +768,7 @@ impl MycelialExtractionCoverageReceipt {
         hasher.update(&(self.units.len() as u64).to_le_bytes());
         for outcome in &self.units {
             hash_unit_key(&mut hasher, outcome.unit);
+            hash_string(&mut hasher, &outcome.source_unit_digest);
             hasher.update(&[extraction_state_tag(outcome.state)]);
             match outcome.output_observation_inventory_digest.as_deref() {
                 Some(digest) => {
@@ -815,30 +824,35 @@ mod tests {
                     name: MycelialAcquisitionAxisName::X,
                     length: 8,
                     unit: "pixel".to_string(),
+                    origin: 0.0,
                     physical_scale: Some(0.25),
                 },
                 MycelialAcquisitionAxis {
                     name: MycelialAcquisitionAxisName::Y,
                     length: 6,
                     unit: "pixel".to_string(),
+                    origin: 0.0,
                     physical_scale: Some(0.25),
                 },
                 MycelialAcquisitionAxis {
                     name: MycelialAcquisitionAxisName::Z,
                     length: 2,
                     unit: "micrometer".to_string(),
+                    origin: 0.0,
                     physical_scale: Some(0.8),
                 },
                 MycelialAcquisitionAxis {
                     name: MycelialAcquisitionAxisName::Channel,
                     length: 2,
                     unit: "channel_index".to_string(),
+                    origin: 0.0,
                     physical_scale: None,
                 },
                 MycelialAcquisitionAxis {
                     name: MycelialAcquisitionAxisName::Time,
                     length: 2,
                     unit: "frame".to_string(),
+                    origin: 0.0,
                     physical_scale: None,
                 },
             ],
@@ -871,6 +885,7 @@ mod tests {
             .enumerate()
             .map(|(index, unit)| MycelialExtractionUnitOutcome {
                 unit,
+                source_unit_digest: digest('8'),
                 state: MycelialExtractionUnitState::Processed,
                 output_observation_inventory_digest: Some(digest(
                     char::from_digit((index % 16) as u32, 16).unwrap(),
