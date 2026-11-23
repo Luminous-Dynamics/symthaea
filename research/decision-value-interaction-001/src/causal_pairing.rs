@@ -843,7 +843,6 @@ pub fn validate_causal_pairing(
 
     for receipt in &ordered {
         validate_common_identity(&receipt.identity)?;
-        validate_scored_outcome_binding(receipt)?;
         crate::validate_pair(&baseline.identity.paired, &receipt.identity.paired)
             .map_err(CausalPairingError::PairedIdentity)?;
         if receipt.identity != baseline.identity {
@@ -865,6 +864,7 @@ pub fn validate_causal_pairing(
             );
         }
         let step_summary = validate_steps(receipt)?;
+        validate_scored_outcome_binding(receipt)?;
         validated_decision_count = validated_decision_count
             .checked_add(step_summary.decision_count)
             .ok_or(CausalPairingError::ArithmeticOverflow)?;
@@ -1601,6 +1601,11 @@ mod tests {
             true,
         );
         runs[0].steps.truncate(1);
+        runs[0].scored_outcome = ScoredOutcomeBinding::Applied {
+            world_tick: 100,
+            action_sha256: digest(20),
+            applied_at_us: 1_100,
+        };
         runs[2].steps[1].exogenous_input_sha256 = digest(222);
         runs[3].steps[1].exogenous_input_sha256 = digest(222);
         assert!(matches!(
