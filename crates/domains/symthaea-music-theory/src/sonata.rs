@@ -588,27 +588,43 @@ fn metric_is_verified(metric: &SonataVerificationMetric) -> bool {
             exact_pitch_similarity,
             return_evidence,
             ..
-        } => return_evidence.as_ref().map_or_else(
-            || match transformation {
-                ReturnTransformation::Literal => *exact_pitch_similarity >= 0.999,
-                ReturnTransformation::Transposed
-                | ReturnTransformation::Restored
-                | ReturnTransformation::Augmented
-                | ReturnTransformation::Diminished => *interval_similarity >= 0.999,
-                ReturnTransformation::Inverted | ReturnTransformation::Fragmented => false,
-            },
-            |evidence| {
-                let threshold = match transformation {
-                    ReturnTransformation::Literal | ReturnTransformation::Transposed => 0.95,
-                    ReturnTransformation::Restored => 0.90,
-                    ReturnTransformation::Inverted
+        } => {
+            // Pairwise similarity cannot prove that an identity was first
+            // eroded and then restored. Until the verifier consumes explicit
+            // historical lineage evidence, never let this label fulfil an
+            // obligation — including for legacy records without return-v1.
+            if *transformation == ReturnTransformation::Restored {
+                return false;
+            }
+
+            return_evidence.as_ref().map_or_else(
+                || match transformation {
+                    ReturnTransformation::Literal => *exact_pitch_similarity >= 0.999,
+                    ReturnTransformation::Transposed
                     | ReturnTransformation::Augmented
-                    | ReturnTransformation::Diminished => 0.85,
-                    ReturnTransformation::Fragmented => 0.75,
-                };
-                evidence.meets_threshold(threshold)
-            },
-        ),
+                    | ReturnTransformation::Diminished => *interval_similarity >= 0.999,
+                    ReturnTransformation::Inverted | ReturnTransformation::Fragmented => false,
+                    ReturnTransformation::Restored => false,
+                },
+                |evidence| {
+                    // The evidence must attest to the same transformation as
+                    // the obligation; a high score for a different contract is
+                    // not evidence that this specific obligation was met.
+                    if evidence.expected_transformation != *transformation {
+                        return false;
+                    }
+                    let threshold = match transformation {
+                        ReturnTransformation::Literal | ReturnTransformation::Transposed => 0.95,
+                        ReturnTransformation::Inverted
+                        | ReturnTransformation::Augmented
+                        | ReturnTransformation::Diminished => 0.85,
+                        ReturnTransformation::Fragmented => 0.75,
+                        ReturnTransformation::Restored => 0.90,
+                    };
+                    evidence.meets_threshold(threshold)
+                },
+            )
+        },
         SonataVerificationMetric::ClimaxLocation {
             section_peak_intensity,
             global_peak_intensity,
@@ -909,6 +925,100 @@ mod tests {
                 .find(|item| item.obligation_id == RETURN_PRIMARY_SUBJECT)
                 .unwrap()
                 .verified
+        );
+    }
+
+    #[test]
+    fn restored_return_is_not_verified_from_pairwise_similarity_alone() {
+        let evidence = MotifReturnEvidence {
+            measurement_version: crate::motif_return::MOTIF_RETURN_MEASUREMENT_VERSION.into(),
+            expected_transformation: ReturnTransformation::Restored,
+            detected_transformation: ReturnTransformation::Restored,
+            source_note_count: 4,
+            target_note_count: 4,
+            aligned_note_count: 4,
+            transposition_semitones: 0,
+            literal_pitch_similarity: 1.0,
+            transposed_pitch_similarity: 1.0,
+            interval_similarity: 1.0,
+            inverted_interval_similarity: 1.0,
+            contour_similarity: 1.0,
+            rhythmic_shape_similarity: 1.0,
+            duration_scale: 1.0,
+            duration_scale_consistency: 1.0,
+            inter_onset_scale: 1.0,
+            inter_onset_scale_consistency: 1.0,
+            fragment_similarity: 1.0,
+            fragment_rhythmic_shape_similarity: 0.0,
+            fragment_source_start_note: None,
+            coverage: 1.0,
+            overall_similarity: 1.0,
+        };
+        let with_current_evidence = SonataVerificationMetric::MotifReturn {
+            source: SonataSectionKind::ExpositionPrimary,
+            target: SonataSectionKind::RecapitulationPrimary,
+            transformation: ReturnTransformation::Restored,
+            interval_similarity: 1.0,
+            exact_pitch_similarity: 1.0,
+            return_evidence: Some(evidence),
+        };
+        assert!(
+            !metric_is_verified(&with_current_evidence),
+            "perfect pairwise similarity is not evidence of prior erosion and restoration"
+        );
+
+        let legacy_without_evidence = SonataVerificationMetric::MotifReturn {
+            source: SonataSectionKind::ExpositionPrimary,
+            target: SonataSectionKind::RecapitulationPrimary,
+            transformation: ReturnTransformation::Restored,
+            interval_similarity: 1.0,
+            exact_pitch_similarity: 1.0,
+            return_evidence: None,
+        };
+        assert!(
+            !metric_is_verified(&legacy_without_evidence),
+            "legacy interval similarity must not bypass the history requirement"
+        );
+    }
+
+    #[test]
+    fn motif_return_verification_rejects_mismatched_evidence_transformation() {
+        let evidence = MotifReturnEvidence {
+            measurement_version: crate::motif_return::MOTIF_RETURN_MEASUREMENT_VERSION.into(),
+            expected_transformation: ReturnTransformation::Literal,
+            detected_transformation: ReturnTransformation::Literal,
+            source_note_count: 4,
+            target_note_count: 4,
+            aligned_note_count: 4,
+            transposition_semitones: 0,
+            literal_pitch_similarity: 1.0,
+            transposed_pitch_similarity: 1.0,
+            interval_similarity: 1.0,
+            inverted_interval_similarity: 1.0,
+            contour_similarity: 1.0,
+            rhythmic_shape_similarity: 1.0,
+            duration_scale: 1.0,
+            duration_scale_consistency: 1.0,
+            inter_onset_scale: 1.0,
+            inter_onset_scale_consistency: 1.0,
+            fragment_similarity: 1.0,
+            fragment_rhythmic_shape_similarity: 0.0,
+            fragment_source_start_note: None,
+            coverage: 1.0,
+            overall_similarity: 1.0,
+        };
+        let mismatched = SonataVerificationMetric::MotifReturn {
+            source: SonataSectionKind::ExpositionPrimary,
+            target: SonataSectionKind::RecapitulationPrimary,
+            transformation: ReturnTransformation::Transposed,
+            interval_similarity: 1.0,
+            exact_pitch_similarity: 1.0,
+            return_evidence: Some(evidence),
+        };
+
+        assert!(
+            !metric_is_verified(&mismatched),
+            "literal evidence cannot discharge a differently labelled transposition obligation"
         );
     }
 
