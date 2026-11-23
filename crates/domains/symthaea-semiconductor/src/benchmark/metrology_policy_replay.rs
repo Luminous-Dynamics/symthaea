@@ -897,6 +897,52 @@ pub fn build_synthetic_decision_evsi_policy_v1(
     Ok(policy)
 }
 
+/// Builds a robust EVSI policy from a finite, weighted assumption stress set.
+/// Only the minimum normalized gross EVSI is used, and only when net value is
+/// positive in every declared scenario. A failed robust hurdle yields a zero
+/// EVSI priority; the selector may still select the candidate through its
+/// randomized audit component.
+pub fn build_synthetic_robust_decision_evsi_policy_v1(
+    policy_view: &SyntheticFabPolicyViewV1,
+    semantics: &BinaryMeasurandSemanticsV1,
+    assumption_set: &BTreeMap<String, SyntheticBinaryEvsiAssumptionProfileV1>,
+    config: &SyntheticMetrologyPolicyConfigV1,
+) -> Result<MetrologyAuditPolicyV1, SyntheticFabReplayError> {
+    if config.evsi_weight <= 0.0 {
+        return Err(SyntheticFabReplayError(
+            "robust decision EVSI policy requires a positive EVSI weight".into(),
+        ));
+    }
+    let mut policy = build_synthetic_metrology_policy_v1(policy_view, semantics, config)?;
+    for candidate in &mut policy.candidates {
+        let sensitivity_report = evaluate_synthetic_binary_evsi_sensitivity_v1(
+            candidate.predicted_defect_probability,
+            assumption_set,
+        )?;
+        candidate.expected_value_of_information =
+            if sensitivity_report.robust_measurement_hurdle_pass {
+                sensitivity_report.conservative_normalized_gross_evsi_score
+            } else {
+                0.0
+            };
+    }
+    let model_material = (
+        SYNTHETIC_HEURISTIC_MODEL_V1,
+        "synthetic-robust-binary-decision-evsi.v1",
+        json_sha256(assumption_set)?,
+    );
+    policy.model_sha256 = json_sha256(&model_material)?;
+    policy.prediction_packet_sha256 = json_sha256(&policy.candidates)?;
+    let observation_packet_sha256 = json_sha256(&policy_view.observations)?;
+    policy.policy_config_sha256 = json_sha256(&(
+        config,
+        observation_packet_sha256,
+        assumption_set,
+        "synthetic-robust-binary-decision-evsi.v1",
+    ))?;
+    Ok(policy)
+}
+
 /// Runs the decision-theoretic EVSI challenger. The assay profile and loss
 /// model are declared policy inputs; only the final evaluator receives the
 /// episode's hidden outcomes.
@@ -1390,6 +1436,8 @@ pub struct SyntheticBinaryEvsiSensitivityReportV1 {
     pub robust_measurement_hurdle_pass: bool,
     /// Min of each scenario's normalized net-value score.
     pub conservative_normalized_net_value_score: f64,
+    /// Minimum normalized gross EVSI over the declared assumption set.
+    pub conservative_normalized_gross_evsi_score: f64,
     pub scenarios: Vec<SyntheticBinaryEvsiAssumptionScenarioResultV1>,
 }
 
@@ -1485,6 +1533,10 @@ pub fn evaluate_synthetic_binary_evsi_sensitivity_v1(
         .iter()
         .copied()
         .fold(f64::INFINITY, f64::min);
+    let conservative_normalized_gross_evsi_score = scenarios
+        .iter()
+        .map(|scenario| scenario.report.normalized_evsi_score)
+        .fold(f64::INFINITY, f64::min);
 
     Ok(SyntheticBinaryEvsiSensitivityReportV1 {
         schema: "luminous.semi-bench.synthetic-binary-evsi-sensitivity.v1".into(),
@@ -1501,6 +1553,7 @@ pub fn evaluate_synthetic_binary_evsi_sensitivity_v1(
         weighted_net_positive_fraction,
         robust_measurement_hurdle_pass,
         conservative_normalized_net_value_score,
+        conservative_normalized_gross_evsi_score,
         scenarios,
     })
 }
