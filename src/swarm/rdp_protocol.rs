@@ -393,8 +393,7 @@ impl RdpFrame {
                     AudioEncoding::RawI16Stereo => 2 * std::mem::size_of::<i16>(),
                     AudioEncoding::MuLawMono => std::mem::size_of::<u8>(),
                 };
-                let expected_bytes =
-                    usize::from(audio.num_samples) * bytes_per_sample_frame;
+                let expected_bytes = usize::from(audio.num_samples) * bytes_per_sample_frame;
                 if audio.data.len() != expected_bytes {
                     return Err(FrameCodecError::InvalidFrame(format!(
                         "audio frame has {} payload bytes for {} sample frames; expected {expected_bytes}",
@@ -670,14 +669,8 @@ mod tests {
     #[test]
     fn audio_frame_wire_validation_matches_each_encoding_layout() {
         let cases = [
-            (
-                AudioEncoding::RawF32Stereo,
-                2 * std::mem::size_of::<f32>(),
-            ),
-            (
-                AudioEncoding::RawI16Stereo,
-                2 * std::mem::size_of::<i16>(),
-            ),
+            (AudioEncoding::RawF32Stereo, 2 * std::mem::size_of::<f32>()),
+            (AudioEncoding::RawI16Stereo, 2 * std::mem::size_of::<i16>()),
             (AudioEncoding::MuLawMono, std::mem::size_of::<u8>()),
         ];
 
