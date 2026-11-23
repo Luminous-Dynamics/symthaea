@@ -115,3 +115,71 @@ The current `formant_extraction` implementation computes per-frame RMS, then nor
 - Add a metamorphic test: multiply the same waveform by a known gain factor. Normalized energy shape should remain approximately invariant, while raw RMS should scale predictably. The evaluation must not accidentally call this gain invariance an emotion or arousal estimate.
 
 The default autocorrelation F0 range is also bounded to 60–400 Hz; speaker ranges outside that band will be truncated/undefined under current configuration. Evaluate octave errors and pitch-range coverage against a pinned reference before using the feature for human speech. This is an audit target, not evidence that the extractor is inaccurate on all speakers.
+
+
+## Benchmark strategy refinement — representation quality is not acoustic faithfulness
+
+The external benchmark landscape supports separate comparison planes. Do not collapse them into one leaderboard:
+
+| Plane | Benchmark / reference | What it tests | What it does not establish |
+|---|---|---|---|
+| Representation breadth | [MAEB (2026)](https://arxiv.org/abs/2602.16008) | 30 tasks across speech, music, environmental audio and audio-text reasoning; 100+ languages; 50+ embeddings | Faithfulness under contradictory transcript/prompt context |
+| Acoustic faithfulness | [DEAF (AACL 2026)](https://aclanthology.org/2026.findings-aacl.165/) | 2,700+ conflict stimuli across emotional prosody, background sound and speaker identity, with controlled increases in textual influence | Naturalistic deployment accuracy or untested languages |
+| Adversarial paralinguistic reasoning | [VoxParadox (ICML 2026)](https://voxparadox.github.io/) | 2,000 verified counterfactual examples across 10 tasks that deliberately mismatch transcript semantics and vocal style | General ASR quality or physical sensor integrity |
+| Pitch-estimator correctness | [Praat filtered autocorrelation](https://praat.org/manual/pitch_analysis_by_filtered_autocorrelation.html) | Independent F0 candidates, voicing and temporal-path comparison on the same source samples | Biological ground truth without independent human review |
+| Natural speech / language robustness | Rights-qualified cohorts admitted under #10913/#10942 | Real speakers, recording conditions, language varieties, code-switching and acoustic domain shifts | A replacement for constructed counterfactual challenge data |
+
+MAEB reports that no evaluated embedding dominates all task families: contrastive audio-text encoders can do well on environmental classification but poorly on multilingual speech, while speech-pretrained models can show the opposite pattern. Thus report per-task and per-cohort results; averages can hide near-random performance on an entire modality. MAEB integrates into MTEB and releases 30 core tasks drawn from a broader 98-task collection. Pin its official release, scorer, splits and license before claiming a reproduction.
+
+VoxParadox is a strong warning against transcript-consistent evaluation. Its current published leaderboard lists Qwen2-Audio + PCLM + DPO at 72.30% average VoxParadox and 15.95% adversarial-label rate (lower is better), while the listed unadapted Qwen2-Audio baseline is 14.85% and 70.25%. Audio Flamingo 3 is listed at 17.40% and 70.50% before its adapted variant. These are benchmark-author results for the evaluated setup, not independently reproduced Luminous results or universal rankings.
+
+Praat identifies filtered autocorrelation as its preferred method for speech intonation / vocal-fold frequency: it low-pass filters, generates multiple pitch candidates and selects a temporally coherent path using voicing, octave and octave-jump costs. Our current in-crate path uses a simpler raw-autocorrelation estimate and no comparable candidate-path tracker. Freeze Praat's version and settings, add a secondary YIN/CMND arm, and report disagreement. Neither algorithm is ground truth absent independent review.
+
+### Matched representation arms
+
+Hold source windows, training data, splits, downstream task head, output labels and compute budget constant:
+
+- **R0 — numeric DSP:** F0/voicing, RMS/log-energy, pause/event spans and other individually qualified features.
+- **R1 — compact native HDC:** DirectMelFrameV1 / HV16 with frozen basis and frontend identity.
+- **R2 — dense native HDC:** AudioHdcEncoder / ContinuousHV with exact encoder/config identity.
+- **R3 — pretrained speech representation:** strongest admitted speech-pretrained embedding for the exact task.
+- **R4 — audio-text representation:** strongest admitted contrastive audio/text embedding for the exact task.
+- **R5 — DSP + compact HDC late fusion.**
+- **R6 — HDC + CfC temporal state.**
+- **R7 — transcript-only and transcript + DSP controls:** expose lexical-prior and acoustic-increment effects.
+
+Use source/speaker/session-disjoint splits. Freeze encoder build, frontend/configuration, basis/init, task head, seed, dataset digest, transcript identity and inference budget. Compare at equal compute, while also reporting each arm's native cost. Do not compare embeddings across feature spaces merely because they share a dimension; use #6930's derived-representation receipt.
+
+### Counterfactual scorecard
+
+For each paired fixture family, report separate values:
+
+1. **Acoustic sensitivity:** on same-words/different-delivery pairs, did the delivery description change in the annotated direction?
+2. **Lexical invariance:** on same-delivery/different-words pairs, did lexical meaning follow the audio while delivery measurements remained stable within tolerance?
+3. **Acoustic-over-text preference:** with acoustics fixed, how much does misleading transcript/prompt text change the answer?
+4. **Conflict detection:** did the system identify disagreement rather than silently follow the lexical prior?
+5. **Temporal localization:** event onset/offset error and event-span F1 under a frozen tolerance.
+6. **Missingness / abstention:** risk and coverage under silence, low SNR, clipping, overlap, unsupported rates and dropped input.
+7. **Representation increment:** improvement over DSP + transcript at matched compute, with ablations removing HDC, temporal state and each side channel.
+
+Keep DEAF and VoxParadox official metrics intact for reproductions. This scorecard is for our own paired counterfactual fixtures and must not be relabelled as an official benchmark score.
+
+### Proposed target ladder (research goals, not achieved)
+
+- **P0 — estimator contract:** synthetic known-answer pitch/voicing, absolute sample support, silence/missingness and invalid-rate rejection; source-bound evaluator tests pass.
+- **P1 — independent DSP reference:** freeze Praat filtered-autocorrelation version/settings and a YIN/CMND secondary arm; report F0 median absolute cents error, RMSE, gross pitch error, octave error, voicing F1 and frame coverage by SNR/phonetic stratum.
+- **P2 — controlled acoustic faithfulness:** improve paired acoustic sensitivity and conflict detection over the strongest frozen audio-language baseline while preserving lexical invariance. Initial research target: at least +5 percentage points on the preregistered conflict cohort at matched compute, with a bootstrap 95% confidence interval excluding zero.
+- **P3 — representation value:** HDC/CfC must deliver statistically supported incremental improvement over DSP + transcript and the best admitted pretrained embedding, or a non-dominated quality/resource trade-off; otherwise it should not become a default production dependency.
+- **P4 — resource frontier:** under #6770, seek non-inferior grounded/counterfactual quality within 1 percentage point while reducing measured energy or total audio/model bytes by at least 20% on one preregistered task family.
+- **P5 — domain transfer:** confirm on a separately consented, rights-qualified multilingual/code-switch cohort with speaker/session/domain-disjoint splits and native-speaker review.
+
+These are prospective gates, not observed outcomes. Report confidence intervals, per-task scores, worst-cohort performance, missing/failed runs and measured resource evidence. No composite average should allow easy speech tasks to hide failure on acoustic conflict or nonverbal events.
+
+### Execution order and ownership
+
+1. Qualify frame-aligned prosody under #12887/#10890.
+2. Qualify the reusable source-bound pitch evaluator and independent Praat/YIN adapters; do not add another production F0 extractor until the reference comparison identifies a deficiency.
+3. Use #6930 for source/encoder/feature-space receipts and #12872/#10910 for live/offline HDC parity.
+4. Extend the eight counterfactual fixture families with signal-level mutation receipts, paired invariants and human-listen review metadata.
+5. Run R0–R7 on a small frozen pilot; expand only after validating scorer, splits, consent/license and resource measurements.
+6. Compose resource/acquisition efficiency into Symtropy #6770/#6860; do not create a competing aggregate-score or EVSI implementation.
