@@ -25,7 +25,6 @@ const MAX_MORPHOGENESIS_UNIT_BYTES: usize = 48;
 const MAX_MORPHOGENESIS_METHOD_BYTES: usize = 128;
 const MAX_MORPHOGENESIS_STRING_BYTES: usize = 8 * 1024 * 1024;
 const DIGEST_HEX_BYTES: usize = 64;
-const VECTOR_NORM_TOLERANCE: f64 = 1.0e-9;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
