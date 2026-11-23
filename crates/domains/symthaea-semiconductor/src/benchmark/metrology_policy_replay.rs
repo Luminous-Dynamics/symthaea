@@ -154,6 +154,9 @@ pub struct SyntheticFabPolicyEvaluationV1 {
     pub horvitz_thompson_prevalence: f64,
     pub horvitz_thompson_absolute_error: f64,
     pub standard_error_ht_prevalence: Option<f64>,
+    pub hajek_prevalence: f64,
+    pub hajek_absolute_error: f64,
+    pub standard_error_hajek_prevalence: Option<f64>,
     pub horvitz_thompson_mean_brier: f64,
     pub standard_error_ht_mean_brier: Option<f64>,
     pub design_variance_qualified: bool,
@@ -1529,6 +1532,7 @@ pub fn evaluate_synthetic_metrology_policy_v1(
     let true_defect_prevalence = true_positive_count as f64 / population_count as f64;
     let selected_sample_prevalence = selected_positive_count as f64 / selected_count as f64;
     let horvitz_thompson_prevalence = ht_positive_total / population_count as f64;
+    let hajek_prevalence = ht_positive_total / weight_sum;
     let horvitz_thompson_mean_brier = ht_brier_total / population_count as f64;
     let true_population_mean_brier = true_population_brier_total / population_count as f64;
     let measured_fraction = selected_count as f64 / population_count as f64;
@@ -1574,6 +1578,38 @@ pub fn evaluate_synthetic_metrology_policy_v1(
     }
     let standard_error_ht_prevalence =
         design_variance_qualified.then(|| positive_total_variance.sqrt() / population_count as f64);
+    let mut hajek_total_variance = 0.0;
+    let mut hajek_variance_qualified = true;
+    for (stratum, residual_population) in &selection.residual_population_by_stratum {
+        let sample_count = selection.audit_quota_by_stratum[stratum];
+        if sample_count == *residual_population {
+            continue;
+        }
+        if sample_count < 2 {
+            hajek_variance_qualified = false;
+            continue;
+        }
+        let Some(sample) = randomized_sample_by_stratum.get(stratum) else {
+            hajek_variance_qualified = false;
+            continue;
+        };
+        let residual_values: Vec<f64> = sample
+            .iter()
+            .map(|(positive, _)| *positive - hajek_prevalence)
+            .collect();
+        let Some(residual_variance) = finite_population_sample_variance(&residual_values) else {
+            hajek_variance_qualified = false;
+            continue;
+        };
+        let finite_population_correction =
+            1.0 - sample_count as f64 / *residual_population as f64;
+        hajek_total_variance += (*residual_population as f64).powi(2)
+            * finite_population_correction
+            * residual_variance
+            / sample_count as f64;
+    }
+    let standard_error_hajek_prevalence = hajek_variance_qualified
+        .then(|| hajek_total_variance.sqrt() / weight_sum);
     let standard_error_ht_mean_brier =
         design_variance_qualified.then(|| brier_total_variance.sqrt() / population_count as f64);
 
@@ -1663,6 +1699,9 @@ pub fn evaluate_synthetic_metrology_policy_v1(
         horvitz_thompson_prevalence,
         horvitz_thompson_absolute_error: (horvitz_thompson_prevalence - true_defect_prevalence).abs(),
         standard_error_ht_prevalence,
+        hajek_prevalence,
+        hajek_absolute_error: (hajek_prevalence - true_defect_prevalence).abs(),
+        standard_error_hajek_prevalence,
         horvitz_thompson_mean_brier,
         standard_error_ht_mean_brier,
         design_variance_qualified,
