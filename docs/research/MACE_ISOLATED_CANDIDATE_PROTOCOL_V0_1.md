@@ -48,7 +48,7 @@ The candidate envelope binds:
 - schema version, run ID, pair/task ID, opaque observation sequence and custodian nonce;
 - candidate method;
 - the candidate-visible `DecisionNeedV1` task contract, including exact action alternatives, semantic estimand and qualification-profile digest;
-- candidate-visible evidence records and their source/lifecycle/causal descriptors.
+- candidate-visible evidence records and their source/lifecycle/causal descriptors. The parent projects these records to the exact `DecisionNeedV1` scope and allowed action alternatives before sending the envelope; unrelated regimes, objectives and actions are not disclosed.
 
 It intentionally has no field for evaluator truth, realized utility labels, optimal action, intervention identity/kind, target key, removed evidence IDs, score, evaluator seed or evaluator instructions. Such fields are rejected as unknown rather than ignored.
 
@@ -62,7 +62,7 @@ The receipt binds:
 - decision and support/retrieval event IDs;
 - retrieval-profile digest, index payload bytes and candidate-process latency.
 
-The observation identity follows the same canonical formula as the paired evaluator receipt contract in PR #13331. A digest establishes byte identity, not who supplied the bytes.
+The receipt also records the candidate-visible event count separately from the full available-event count in the parent-authored candidate/evaluator rows. This makes the scope projection auditable. The run's source-bundle digest binds the evaluator runner and reducer, process client, candidate source, direct policy/HDC sources, evaluator/candidate/policy/HDC/workspace manifests, Rust 1.96.0 toolchain file and root Nix lock. A separate schema-bundle digest binds the counterfactual evidence, candidate envelope and candidate receipt schemas. The nested research workspace still lacks a dedicated Cargo.lock; see [#13364](https://github.com/Luminous-Dynamics/symthaea/issues/13364). The observation identity follows the same canonical formula as the paired evaluator receipt contract in PR #13331. A digest establishes byte identity, not who supplied the bytes.
 
 ## Invocation
 
@@ -78,7 +78,7 @@ cargo test --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml \
 
 The program reads the envelope from stdin. Capture stdout as the candidate receipt and stderr as diagnostic output. Do not combine the candidate's stdout with evaluator output or let candidate code read evaluator paths.
 
-The benchmark evaluator has **not yet been rewired** to launch this process. The current paired runner still performs candidate execution and hidden-label scoring inside the public evaluator package. Until the runner is changed and the process boundary is verified, existing paired results remain diagnostic-only.
+The paired evaluator has since been wired in source to launch the candidate worker for exact-scope scan and typed-content HDC; see the evaluator subprocess integration section below. The evaluator and synthetic truth/fixture generator remain public and co-located, and three legacy baselines remain in-process. No runtime execution has been verified, so all current paired results remain diagnostic-only.
 
 ## Security properties of this increment
 
@@ -96,22 +96,22 @@ Implemented in source/schema:
 Not established:
 
 1. **Authenticity:** source-root SHA-256 digests identify roots but do not authenticate issuers. The booleans for trusted/retracted/reconciled status are inputs. Production admission must derive them from an independently verified Mycelix/ingress receipt, not trust caller-supplied flags.
-2. **Isolation:** a Cargo package is not an OS security boundary. The next process-integration increment must use default-deny filesystem and network, dedicated UID/namespaces, bounded CPU/memory/pids/FDs, read-only runtime and no evaluator mounts. Then qualify Firecracker or gVisor (or an equivalently strong isolated runner) using negative controls.
+2. **Isolation:** a child process under the same OS identity is not an OS security boundary. The next increment must use default-deny filesystem and network, dedicated UID/namespaces, bounded CPU/memory/pids/FDs, read-only runtime and no evaluator mounts. Then qualify Firecracker or gVisor (or an equivalently strong isolated runner) using negative controls.
 3. **Evaluator custody:** the evaluator remains public and co-located in the current runner. An independent custodian must own hidden labels and intervention plans and expose a one-way task envelope.
 4. **Receipt authenticity:** output hashes are self-reported. The custodian must sign or independently attest the candidate artifact digest, request digest, evaluator/data/split/scoring digests and measured resource envelope.
-5. **Resource accounting:** `latency_ns` currently measures the candidate retrieval/policy call only; it excludes envelope parsing/validation, input hashing, receipt serialization, process launch, IPC, ingress verification, evaluator, memory write/update, tokenization, model calls and external environment work. Report end-to-end p50/p95/p99 and all-in compute, energy, storage and money separately.
+5. **Resource accounting:** `latency_ns` measures candidate retrieval/policy work. The parent separately records request construction, request/response wall time, receipt validation and parent-side end-to-end invocation; process startup is recorded once per worker (and repeated in rows for correlation). The current end-to-end field excludes worker startup, ingress verification, evaluator work, memory write/update, external model calls and the rest of the environment loop. Report end-to-end p50/p95/p99 and all-in compute, energy, storage and money separately.
 6. **Runtime verification:** JSON schemas and parser tests are authored, but no Rust compilation, test execution or sandbox negative-control execution is claimed here.
 
-## Required next boundary: evaluator-to-candidate IPC
+## Required next boundary: sandboxing, evaluator custody and replay
 
-The next engineering increment should replace the evaluator's in-process `run_candidate` calls with a process client:
+The next engineering increment is to qualify the subprocess with a real OS sandbox and split evaluator custody:
 
-1. Custodian freezes the task/evidence envelope and hidden intervention metadata independently.
-2. The process launcher pins the candidate binary and dependency digest, passes one envelope over stdin, captures bounded stdout/stderr and enforces a hard deadline.
-3. The candidate process has no evaluator mount, network route, mutable shared directory, evaluator environment variable or secret seed.
-4. The custodian validates receipt schema, request digest, nonce, observation identity, decision support IDs and resource telemetry.
-5. Only the evaluator joins the accepted receipt to the sealed outcome/intervention record and computes regret/utility.
-6. A replay tool reproduces scoring from signed receipts without executing candidate source.
+1. Put candidate execution in a default-deny sandbox with no evaluator mounts, network route, shared writable directory, evaluator environment variable or secret seed; apply CPU/memory/pid/FD/deadline limits.
+2. Keep hidden outcomes, intervention labels, scoring and held-out seeds in a separately operated evaluator custodian that sends one-way candidate envelopes.
+3. Bind the candidate binary, dependency tree, request, evaluator/data/split/scoring revisions and sandbox resource envelope into authenticated receipts.
+4. Validate receipt schema, request digest, nonce, observation identity, both retrieved and decision-support IDs, process timing and resource telemetry.
+5. Independently replay scores from sealed evaluator data and receipts without executing candidate source.
+6. Keep legacy in-process baselines as explicitly diagnostic comparisons until detached equivalents exist; do not silently pool execution boundaries.
 
 Negative controls must prove that mutating evaluator truth, permuting intervention IDs, changing scoring labels or altering hidden seeds leaves candidate request bytes and output unchanged; candidate attempts to read evaluator files, environment, mounts, sockets or network must fail closed. Altering the candidate binary or dependencies after qualification invalidates prior receipts.
 
@@ -127,3 +127,71 @@ Negative controls must prove that mutating evaluator truth, permuting interventi
 | 5 | Matched public benchmark submissions, repeated runs, uncertainty and full cost | External comparison under the named protocol |
 
 Do not skip a level in public claims.
+
+
+## Evaluator subprocess integration slice (#13351)
+
+The paired runner now uses `CandidateProcessSession` for the exact-scope and typed-content-HDC arms. The worker is a persistent, line-framed stateless request/receipt process scoped to one task block:
+
+- the parent launches one hash-pinned candidate executable per benchmark run and checks its readiness frame;
+- the parent sends a fresh random 24-byte nonce and one candidate-only JSON envelope per observation;
+- the worker emits one receipt for each request and keeps no cross-request memory state;
+- the parent validates the exact request digest, nonce digest, run/task/sequence/method, DecisionNeed/evidence/input digests and observation ID;
+- candidate-visible evidence is filtered to the declared task scope/action set; the candidate parser rejects any out-of-scope record even if the parent projection is faulty;
+- support IDs must be a subset of retrieved IDs; every retrieved ID must resolve to a supplied canonical record in the declared scope/action set;
+- evaluator intervention labels and outcome truth remain in the evaluator loop and are not fields in the candidate envelope.
+
+The process session is reused for baseline and ablation observations in the same benchmark run. This avoids a fresh process launch for every ablation while preserving an independent candidate invocation for each observation. The candidate sequence is monotonic within that worker session across the whole run.
+
+### Build and invoke
+
+From the repository root on Linux:
+
+```bash
+cargo build --release \
+  --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml \
+  -p broca-mace-candidate
+
+export MACE_CANDIDATE_BIN="$PWD/target/release/broca-mace-candidate"
+export MACE_CANDIDATE_BIN_SHA256="$(sha256sum "$MACE_CANDIDATE_BIN" | awk '{print $1}')"
+
+MACE_SOURCE_REVISION="$(git rev-parse HEAD)" \
+cargo run --release \
+  --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml \
+  -p broca-mace-evaluator \
+  --bin mace_counterfactual_evidence \
+  -- 1 /tmp/mace-candidate.jsonl /tmp/mace-evaluator.jsonl
+```
+
+The evaluator also requires `MACE_SOURCE_REVISION` to be the exact checked-out 40- or 64-character lowercase Git SHA; a missing, abbreviated or invalid revision fails closed. The run ID and manifest receipt bind this exact revision. Before the first benchmark run, generate the nested workspace lockfile from the checked-out sources with the pinned toolchain:
+
+```bash
+cargo build --release \
+  --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml \
+  -p broca-mace-candidate
+```
+
+This creates `research/broca-mace-transfer-bench-v0-1/Cargo.lock` if it does not yet exist. The benchmark refuses to start without that file. Its bytes are included in the run's length-prefixed source-bundle digest; the only Git working-tree exception is this exact untracked lockfile while #13364 generates and checks it in. Every other modified/untracked path is rejected. Once the lock is committed, the working tree must be clean.
+
+The evaluator also requires `MACE_SOURCE_REVISION` to equal the checked-out `git rev-parse HEAD`; it checks the actual repository root, commit and working-tree status before it starts. A stale/fabricated SHA, dirty tracked file, or any unexpected untracked file fails closed. The run bundle binds the candidate executable source, evaluator/process client/reducer, direct policy/HDC sources, their Cargo manifests, the workspace/evaluator manifests, the Rust 1.96.0 toolchain file, Nix lockfile and nested Cargo.lock. A separate schema-bundle digest binds all three JSON schemas.
+
+The evaluator requires both `MACE_CANDIDATE_BIN` and `MACE_CANDIDATE_BIN_SHA256`; missing or mismatched values fail closed. The child process runs with a cleared environment and working directory `/`, but remains under the parent user's OS identity. The digest pins the candidate executable file bytes only; it does not pin dynamic shared libraries, the host kernel, CPU microcode, runtime image or sandbox configuration. Those must be included in a later container/attestation manifest. The nested MACE workspace still lacks its own Cargo.lock; dependency-lock reproducibility is tracked in [#13364](https://github.com/Luminous-Dynamics/symthaea/issues/13364).
+
+### Timing contract
+
+Candidate and evaluator records now carry:
+
+- `candidate_process_startup_ns`: worker spawn/readiness time; repeated on each detached observation from the same run-scoped worker. Aggregate once per distinct `(run_id, candidate_artifact_sha256)`, not once per row.
+- `candidate_request_build_ns`: parent nonce generation, evidence ordering, wire construction/serialization and expected-digest preparation.
+- `candidate_process_wall_ns`: from writing/flushing the request until the response line is received. It includes candidate execution and IPC/scheduling; it is **not** pure network/IPC transport.
+- `candidate_latency_ns` / score-row `latency_ns`: candidate-internal retrieval/policy timing reported by the child after request parse/validation.
+- `candidate_receipt_validation_ns`: parent JSON receipt decoding and semantic/identity validation.
+- `candidate_end_to_end_ns`: parent-side request-build through receipt validation. It excludes worker startup, which is recorded separately.
+
+Three remaining baseline arms—event-ID KV top-k, static HDC and HDC-LTC zero-input—are still explicitly labelled `legacy_in_process`; they have null child-process metadata. The detached exact-scope arm returns all eligible in-scope evidence as a ceiling, whereas typed-content HDC returns its top-k candidate set. Do not describe all five arms as process-isolated or compare them without accounting for their different execution boundaries.
+
+### Updated validation boundary
+
+Static source/schema inspection now covers the child-process launcher, executable digest pinning, readiness and request/response framing, strict receipt validation, support-ID reconciliation, explicit detached/legacy labels and the timing fields. Regression tests are authored in the reducer. **No Rust build, test, runtime child process, sandbox or benchmark run has been executed in this environment.**
+
+This process integration still does not provide OS sandboxing, evaluator custody, candidate source authenticity or sealed truth. The parent evaluator and fixture generator remain public and in the same executable. It is progress toward #13287, not completion of #13287.

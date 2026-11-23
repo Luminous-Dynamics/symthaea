@@ -81,6 +81,47 @@ This is a deliberately stronger test than "HDC vs vector retrieval." MACE should
 
 **LongMemEval stretch target:** after reproducing the exact public benchmark configuration, target at least 88.4% task-averaged accuracy (one point above the published 87.4% Memora reference), while reporting per-question-type accuracy, ingest/write costs, query latency, token use and lifecycle governance. This is an aspirational threshold, not a same-protocol direct comparison or a MACE result today. Do not count a score against a different split/model/judge as a win.
 
+## 2B. Deployment is part of the benchmark, not an afterthought
+
+The [AML Cycle 2 participation contract](https://agentmemories.ai/rules) requires participant-hosted, stable Add and Search endpoints, API authentication/capacity details and an integration smoke test. A public repository or Docker image alone does not constitute an eligible deployment. Cycle 2's published submission windows are already closed as of November 23, 2026; the strategic use of this requirement is to prepare a repeatable deployment package for the next cycle, not to suggest that this cycle can still be entered.
+
+MACE therefore needs a provider-neutral production Add/Search service, not just a research runner:
+- idempotent, bounded Add with immutable request IDs and explicit completion/abandon receipts;
+- Search that returns source-linked evidence, not generated answer text;
+- text, coding and ordered multimodal input preservation, including the original image parts and timestamp/speaker/session metadata;
+- strict tenant/principal/authority scoping and data retention/erasure semantics;
+- deterministic request accounting, rate limits, retries, health/readiness, capacity and p50/p95/p99 telemetry;
+- evaluator smoke fixtures and a deployment manifest pinning image/binary, schema, config and dependencies;
+- a stable endpoint that can be hosted and audited independently of the research evaluator.
+
+The AML Add/Search score should be reported separately from MACE's decision-assurance tests. A good Add/Search adapter is a prerequisite for leaderboard participation, not evidence of causal memory transfer or adversarial lifecycle resilience.
+
+## 2C. Agentic benchmark qualification targets
+
+The recent agentic benchmarks expose four kinds of evidence MACE needs to preserve:
+
+| Benchmark | Task structure / primary axes | MACE target and measures |
+|---|---|---|
+| AMA-Bench | 207 trajectory samples / 2,482 QA pairs across six domains (Spider/Text2SQL, GAIA, WebArena, BALROG, ALFWorld, SWE-bench); Recall, Causal Inference, State Updating, State Abstraction | Reproduce each domain with fixed agent/backbone; aim for ≥5 absolute points over the strongest matched baseline on an agreed primary metric, while separately reporting four capability axes, tool/environment cost and memory tokens |
+| MemoryArena | Interdependent multi-session subtasks; earlier actions/feedback must be distilled and used in later web navigation, preference-constrained planning, progressive search and formal reasoning | Measure Session-A→B/C success lift vs no-memory and raw/full-context; require source-linked lessons, correct revision after feedback, and lower regret at matched memory/context budgets |
+| WorldMemArena | 400 multi-session multimodal tasks with gold memory points, updates, distractors and evidence chains across write / maintain / retrieve / use | Publish stage-level correctness and end-to-end task success; report stale-state and visual-evidence retention, update/retraction propagation, retrieval support fidelity, and action success separately |
+
+The AMA-Bench paper reports 57.22% for AMA-Agent and an 11.16-point improvement over its strongest baseline in that paper's own protocol. That is a reproduction anchor, not a MACE result or a direct cross-benchmark target. MemoryArena explicitly finds that near-saturated long-context recall can still fail on interdependent agent-environment tasks. WorldMemArena makes the four lifecycle stages independently visible. The lesson is to measure both what a memory system stores and how it changes later agent behaviour.
+
+## 2D. Model-conditioned memory dosage is now a research priority
+
+IBM Research's November 19, 2026 paper, [*How Much Should an Agent Remember?*](https://arxiv.org/abs/2611.26361), reports that useful memory quantity depends on target-agent model capability. In its AppWorld experiments, the weaker gpt-oss-120b baseline was 39.9% task-completion; all 199 guidelines raised it to 51.2%, but a selected subset of about 29 reached 55.4% (mean of two runs). DeepSeek-V3.2 improved with the full 191-guideline set. The authors also report failure modes including dropped provenance during consolidation and swallowed tool/API errors that produced plausible logs.
+
+MACE already has a model-conditioned memory budget prototype (v0.16) and a receipt-gated qualification path. The next work package is [#13363 — model-conditioned dose-response under model-family shift](https://github.com/Luminous-Dynamics/symthaea/issues/13363). The next step is not to hard-code 29 or 191 as universal budgets. Instead:
+1. estimate a target-model-specific memory dose-response curve on calibration clusters;
+2. qualify a candidate budget on disjoint held-out clusters and source/task families;
+3. fit hierarchical model-family fallback when a model has insufficient calibration data;
+4. evaluate leave-one-model-family-out generalization and model updates as distribution shift;
+5. report utility, regret, abstention, tokens, retrieval/write latency, energy, storage and monetary cost at each dose;
+6. preserve source lineage through lesson extraction and consolidation, and count failed/unreconciled tool calls as failures rather than successful experiences.
+
+**Paradigm shift:** memory capacity should be treated like a control variable selected for a particular agent, task distribution and risk envelope—not a universal context limit or a fixed number of retained facts. The output is a qualified memory-dose policy, not just a summary size.
+
 ## 3. MACE's differentiated scorecard
 
 MACE should run external utility tracks plus an internal decision-assurance track. Never collapse all of these into one headline percentage.
@@ -160,7 +201,7 @@ Run attacks after memory write, during consolidation, after retrieval, and durin
 
 ### 5.5 Independent evaluator by construction
 
-A separate candidate package is now an initial step (see [MACE Isolated Candidate Protocol v0.1](MACE_ISOLATED_CANDIDATE_PROTOCOL_V0_1.md)). The benchmark's evaluator must remain outside candidate reach, with one-way task delivery, sealed labels, separate credentials and signed result receipts. A separate Cargo crate or two JSONL files does not qualify as isolation.
+The candidate package now has a one-way request/receipt worker, and the paired evaluator launches it for exact-scope and typed-content HDC (see [MACE Isolated Candidate Protocol v0.1](MACE_ISOLATED_CANDIDATE_PROTOCOL_V0_1.md) and #13351). This reaches process-boundary source integration, not secure isolation. The benchmark's evaluator must still move to independent custody with default-deny sandboxing, sealed labels, separate credentials and signed result receipts. A separate Cargo crate or child process alone does not qualify as isolation.
 
 ## 6. Matched experimental design
 
@@ -193,8 +234,11 @@ Every capability report should separate: **implemented**, **source-inspected**, 
 
 ## References
 
-- Agent Memory Leaderboard, [Cycle 2 official results](https://agentmemoryleaderboard.ai/results/cycle-2/), published 2026-11-19.
+- Agent Memory Leaderboard, [Cycle 2 official results](https://agentmemoryleaderboard.ai/results/cycle-2/), published 2026-11-19; [Cycle 2 participation rules and Add/Search API guide](https://agentmemories.ai/rules).
 - He et al., [MemoryArena](https://proceedings.mlr.press/v306/he26am.html), ICML 2026.
-- Zhao et al., [AMA-Bench](https://proceedings.mlr.press/v306/zhao26bs.html), ICML 2026.
+- Zhao et al., [AMA-Bench](https://ama-bench.github.io/), ICML 2026.
 - Liu et al., [WorldMemArena](https://worldmemarena-mem.github.io/), 2026 benchmark site and paper.
-- Luminous Dynamics, [MACE evaluator-custody qualification issue #13287](https://github.com/Luminous-Dynamics/symthaea/issues/13287) and [candidate extraction issue #13350](https://github.com/Luminous-Dynamics/symthaea/issues/13350).
+- IBM Research, [How Much Should an Agent Remember?](https://arxiv.org/abs/2611.26361), arXiv, 2026-11-19.
+- [Learning to remember: advances in memory mechanisms for large language models](https://link.springer.com/article/10.1007/s44336-026-00044-1), 2026-11-09.
+- Redis, [Remis + Instruct LongMemEval report](https://redis.io/resources/agent-memory-benchmark-report/), 2026-09-21; [June research reproduction](https://redis.github.io/redis-ai-research-public/longmemeval-agent-memory/).
+- Luminous Dynamics, [MACE evaluator-custody qualification issue #13287](https://github.com/Luminous-Dynamics/symthaea/issues/13287), [candidate extraction #13350](https://github.com/Luminous-Dynamics/symthaea/pull/13350), and [candidate subprocess integration #13351](https://github.com/Luminous-Dynamics/symthaea/issues/13351).

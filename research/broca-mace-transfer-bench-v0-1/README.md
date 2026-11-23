@@ -663,6 +663,40 @@ cargo test --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml \
   -p broca-mace-candidate
 ```
 
-This is a separate package and protocol, **not yet a sandboxed or independently custodied evaluator**. The paired evaluator has not yet been rewired to launch the candidate process. Candidate evidence trust/retraction/reconciliation fields are inputs to the prototype and must be derived from independently verified ingress receipts in production. Public digests do not authenticate issuers. See [MACE Isolated Candidate Protocol v0.1](../../docs/research/MACE_ISOLATED_CANDIDATE_PROTOCOL_V0_1.md) and [MACE Evaluation Paradigm and Benchmark Frontier v0.1](../../docs/research/MACE_EVALUATION_PARADIGM_AND_BENCHMARK_FRONTIER_V0_1.md).
+This is a separate package and protocol, **not yet a sandboxed or independently custodied evaluator**. The paired evaluator is wired in source to launch the worker for exact-scope scan and typed-content HDC; the three other baseline arms remain explicitly in-process. Candidate evidence trust/retraction/reconciliation fields are inputs to the prototype and must be derived from independently verified ingress receipts in production. Public digests do not authenticate issuers. See [MACE Isolated Candidate Protocol v0.1](../../docs/research/MACE_ISOLATED_CANDIDATE_PROTOCOL_V0_1.md) and [MACE Evaluation Paradigm and Benchmark Frontier v0.1](../../docs/research/MACE_EVALUATION_PARADIGM_AND_BENCHMARK_FRONTIER_V0_1.md).
 
-**Validation boundary:** source/schema work and parser regression tests are authored; Rust compilation, test execution, child-process integration, sandbox negative controls and independent evaluation have not been completed in this environment.
+**Validation boundary:** source/schema work and parser regression tests are authored; the subprocess integration is source-complete but not runtime verified. Rust compilation, test execution, sandbox negative controls and independent evaluation have not been completed in this environment.
+
+
+## Evaluator subprocess integration (v0.2 research)
+
+The paired counterfactual evaluator now invokes the separate candidate worker for `exact_scope_scan` and `typed_content_hdc`. Build and run on Linux:
+
+```bash
+cargo build --release --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p broca-mace-candidate
+export MACE_CANDIDATE_BIN="$PWD/target/release/broca-mace-candidate"
+export MACE_CANDIDATE_BIN_SHA256="$(sha256sum "$MACE_CANDIDATE_BIN" | awk '{print $1}')"
+MACE_SOURCE_REVISION="$(git rev-parse HEAD)" cargo run --release \
+  --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml \
+  -p broca-mace-evaluator --bin mace_counterfactual_evidence -- \
+  1 /tmp/mace-candidate.jsonl /tmp/mace-evaluator.jsonl
+```
+
+The evaluator starts one persistent stateless worker per generated task block and reuses it across that block's baseline/intervention requests. Each request gets a new nonce and monotonic observation sequence. Exact scan remains the all-evidence reference ceiling; typed-content HDC is the top-k retrieval method. Three other methods (event-ID KV top-k, static HDC, HDC-LTC zero-input) remain `legacy_in_process` and are visibly labelled as such in candidate and evaluator rows.
+
+The timing record separates worker startup, request construction, request/response wall time, child-internal retrieval/policy time, receipt validation, and end-to-end parent-side request time. Startup is repeated on rows from the run-scoped worker; aggregate it once per run and artifact digest, not by summing every row.
+
+The evaluator now cross-checks both retrieved IDs and the exact decision-support IDs emitted by the candidate. A valid retrieval list cannot silently substitute for a different support set in evaluator scoring.
+
+**No Rust build/tests or runtime benchmark have been executed here.** The process is launched with a cleared environment and fixed executable digest, but still runs under the same OS identity and has no filesystem/network sandbox. The evaluator, synthetic fixture generator and hidden labels remain public/co-located; all scores remain diagnostic-only. See [MACE Isolated Candidate Protocol v0.1](../../docs/research/MACE_ISOLATED_CANDIDATE_PROTOCOL_V0_1.md).
+
+
+### Task-scoped candidate projection
+
+For all retrieval arms, the comparable candidate-visible input is the evidence whose exact scope matches `DecisionNeedV1.scope` and whose action belongs to `DecisionNeedV1.action_alternatives`. The detached parent constructs this projection before serialization; the candidate parser independently rejects any record outside it. Runner candidate/evaluator rows preserve both `available_event_count` (whole task memory before projection) and `candidate_visible_event_count` (the actual candidate input size). The full evidence set is still retained only by the evaluator for intervention planning and score calculation. This prevents unrelated regimes/actions from leaking into candidate execution and keeps the exact-scan, KV and HDC arms on the same candidate-visible evidence contract.
+
+
+**Dependency reproducibility note:** the repository root pins Rust 1.96.0 and Nix inputs, but this nested research workspace has no dedicated Cargo.lock yet. The exact dependency-lock and `--locked` CPU build/test workflow is tracked in [#13364](https://github.com/Luminous-Dynamics/symthaea/issues/13364). Do not treat the current semver dependency declarations as a frozen benchmark environment.
+
+
+**Run provenance preflight:** before the first benchmark, build the candidate package with the pinned Rust toolchain to generate the nested workspace `Cargo.lock`. The runner requires that lock and includes its exact bytes in a length-prefixed source bundle. It requires `MACE_SOURCE_REVISION` to match `git rev-parse HEAD` and rejects dirty tracked files or untracked paths other than that one nested lock while it remains untracked. This is source/lock reproducibility, not a sandbox attestation. See [#13364](https://github.com/Luminous-Dynamics/symthaea/issues/13364) for committing the lock and adding `--locked` build checks.

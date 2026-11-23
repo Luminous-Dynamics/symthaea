@@ -8,7 +8,7 @@
 //! not part of the wire types; serde rejects unknown fields at every level.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::io::{self, Read, Write};
+use std::io::{self, BufRead, BufReader, Read, Write};
 use std::time::Instant;
 
 use broca_mace_hdc_retrieval::{
@@ -387,6 +387,11 @@ fn validate_envelope(envelope: CandidateEnvelopeV1) -> Result<(DecisionNeedV1, V
             return Err(format!("duplicate candidate event_id {event_id}"));
         }
         let item = wire.to_domain()?;
+        if item.scope != need.scope || !need.action_alternatives.contains(&item.action) {
+            return Err(format!(
+                "candidate evidence event_id {event_id} is outside DecisionNeedV1 scope/action alternatives"
+            ));
+        }
         memory.push(item);
     }
     memory.sort_by_key(|item| item.event_id);
@@ -446,15 +451,17 @@ fn run_candidate(
 
     match method {
         CandidateMethod::ExactScopeScan => {
-            for action in need.action_alternatives {
-                let mut candidates: Vec<&Experience> = memory
-                    .iter()
-                    .filter(|item| item.scope == need.scope && item.action == action)
-                    .collect();
-                candidates.sort_by_key(|item| item.event_id);
-                for (rank, item) in candidates.into_iter().take(TOP_K_PER_ACTION).enumerate() {
-                    retrieved.push((item.event_id, experience_view_digest(item), rank + 1));
-                }
+            // The exact-scope arm is the candidate-visible ceiling: return all
+            // records in the declared scope and action set, not a truncated top-k.
+            let mut candidates: Vec<&Experience> = memory
+                .iter()
+                .filter(|item| {
+                    item.scope == need.scope && need.action_alternatives.contains(&item.action)
+                })
+                .collect();
+            candidates.sort_by_key(|item| item.event_id);
+            for item in candidates {
+                retrieved.push((item.event_id, experience_view_digest(item), 0));
             }
         }
         CandidateMethod::TypedContentHdc => {
@@ -578,7 +585,90 @@ fn execute_request(bytes: &[u8]) -> Result<CandidateReceiptV1, String> {
     })
 }
 
+fn read_bounded_request_line<R: BufRead>(
+    reader: &mut R,
+    max_bytes: usize,
+) -> Result<Option<Vec<u8>>, String> {
+    let mut line = Vec::with_capacity(4096);
+    let mut terminated = false;
+    let mut reached_eof = false;
+    loop {
+        let available = match reader
+            .fill_buf()
+            .map_err(|error| format!("read candidate request line: {error}"))?
+        {
+            [] => {
+                reached_eof = true;
+                break;
+            }
+            available => available,
+        };
+        let newline = available.iter().position(|byte| *byte == b'\n');
+        let take = newline.unwrap_or(available.len());
+        if line.len().saturating_add(take) > max_bytes {
+            return Err(format!("request line exceeds {max_bytes} bytes"));
+        }
+        line.extend_from_slice(&available[..take]);
+        let consumed = take + usize::from(newline.is_some());
+        reader.consume(consumed);
+        if newline.is_some() {
+            terminated = true;
+            break;
+        }
+    }
+
+    if line.is_empty() && reached_eof {
+        return Ok(None);
+    }
+    if !terminated {
+        return Err("candidate request ended without a newline delimiter".to_string());
+    }
+    if line.last() == Some(&b'\r') {
+        line.pop();
+    }
+    if line.is_empty() {
+        return Err("empty candidate request line".to_string());
+    }
+    Ok(Some(line))
+}
+
+fn run_stream() -> Result<(), String> {
+    let stdin = io::stdin();
+    let mut reader = BufReader::new(stdin.lock());
+    let stdout = io::stdout();
+    let mut writer = stdout.lock();
+
+    // The parent validates this exact line before sending any candidate input.
+    writer
+        .write_all(b"MACE_CANDIDATE_STREAM_READY_V1\n")
+        .map_err(|error| format!("write stream readiness: {error}"))?;
+    writer
+        .flush()
+        .map_err(|error| format!("flush stream readiness: {error}"))?;
+
+    while let Some(line) = read_bounded_request_line(&mut reader, MAX_REQUEST_BYTES)? {
+        let receipt = execute_request(&line)?;
+        serde_json::to_writer(&mut writer, &receipt)
+            .map_err(|error| format!("serialize candidate receipt: {error}"))?;
+        writer
+            .write_all(b"\n")
+            .map_err(|error| format!("terminate candidate receipt line: {error}"))?;
+        writer
+            .flush()
+            .map_err(|error| format!("flush candidate receipt: {error}"))?;
+    }
+    Ok(())
+}
+
 fn main() {
+    if std::env::args().nth(1).as_deref() == Some("--stream") {
+        if let Err(error) = run_stream() {
+            eprintln!("mace_candidate: {error}");
+            std::process::exit(1);
+        }
+        return;
+    }
+
     let mut input = Vec::new();
     let read_result = io::stdin()
         .take((MAX_REQUEST_BYTES + 1) as u64)
@@ -738,7 +828,7 @@ mod tests {
     #[test]
     fn out_of_range_evidence_is_rejected_not_silently_clamped() {
         let mut value = envelope_value();
-        let item = serde_json::json!({
+        let mut item = serde_json::json!({
             "event_id": 5,
             "source_family": 1,
             "source_root_id": 1,
@@ -780,6 +870,14 @@ mod tests {
         assert!(execute_request(&serde_json::to_vec(&value).unwrap())
             .unwrap_err()
             .contains("observed_utility"));
+
+        item["observed_utility"] = serde_json::json!(0.5);
+        item["scope"]["regime"] = serde_json::json!("shifted");
+        let mut out_of_scope = envelope_value();
+        out_of_scope["candidate_evidence"] = serde_json::json!([item]);
+        assert!(execute_request(&serde_json::to_vec(&out_of_scope).unwrap())
+            .unwrap_err()
+            .contains("outside DecisionNeedV1 scope/action alternatives"));
     }
 
     #[test]
@@ -909,6 +1007,37 @@ mod tests {
             candidate_input_digest(need, HASH_B)
         );
     }
+    #[test]
+    fn bounded_stream_reader_accepts_exact_size_and_clean_eof() {
+        let mut exact = std::io::Cursor::new(b"12345\n");
+        assert_eq!(
+            read_bounded_request_line(&mut exact, 5).unwrap(),
+            Some(b"12345".to_vec())
+        );
+        assert_eq!(read_bounded_request_line(&mut exact, 5).unwrap(), None);
+    }
+
+    #[test]
+    fn bounded_stream_reader_rejects_oversize_and_unterminated_frames() {
+        let mut oversize = std::io::Cursor::new(b"123456\n");
+        assert!(read_bounded_request_line(&mut oversize, 5)
+            .unwrap_err()
+            .contains("exceeds 5 bytes"));
+
+        let mut unterminated = std::io::Cursor::new(b"12345");
+        assert!(read_bounded_request_line(&mut unterminated, 5)
+            .unwrap_err()
+            .contains("without a newline delimiter"));
+    }
+
+    #[test]
+    fn bounded_stream_reader_rejects_empty_frames() {
+        let mut empty = std::io::Cursor::new(b"\n");
+        assert!(read_bounded_request_line(&mut empty, 5)
+            .unwrap_err()
+            .contains("empty candidate request line"));
+    }
+
     #[test]
     fn typed_hdc_empty_evidence_abstains_without_building_an_index() {
         let mut value = envelope_value();

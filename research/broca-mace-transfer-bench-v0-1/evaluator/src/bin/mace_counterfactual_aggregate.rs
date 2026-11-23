@@ -163,7 +163,7 @@ struct InputProvenance {
     source_code_sha256: String,
     fixture_sha256: String,
     schema_sha256: String,
-    source_revision: Option<String>,
+    source_revision: String,
 }
 
 fn valid_sha256(value: &str) -> bool {
@@ -178,6 +178,26 @@ fn required_u64(record: &Value, field: &str) -> Result<u64, String> {
         .get(field)
         .and_then(Value::as_u64)
         .ok_or_else(|| format!("missing or invalid unsigned integer field {field}"))
+}
+
+fn nullable_u64(record: &Value, field: &str) -> Result<Option<u64>, String> {
+    match record.get(field) {
+        Some(Value::Null) => Ok(None),
+        Some(value) => value
+            .as_u64()
+            .map(Some)
+            .ok_or_else(|| format!("field {field} must be an unsigned integer or null")),
+        None => Err(format!("missing field {field}")),
+    }
+}
+
+fn nullable_sha256(record: &Value, field: &str) -> Result<Option<String>, String> {
+    match record.get(field) {
+        Some(Value::Null) => Ok(None),
+        Some(Value::String(value)) if valid_sha256(value) => Ok(Some(value.clone())),
+        Some(_) => Err(format!("field {field} must be a SHA-256 string or null")),
+        None => Err(format!("missing field {field}")),
+    }
 }
 
 fn parse_manifest(record: &Value) -> Result<(InputProvenance, String), String> {
@@ -201,11 +221,7 @@ fn parse_manifest(record: &Value) -> Result<(InputProvenance, String), String> {
         source_code_sha256: required_string(record, "source_code_sha256")?.to_string(),
         fixture_sha256: required_string(record, "fixture_sha256")?.to_string(),
         schema_sha256: required_string(record, "schema_sha256")?.to_string(),
-        source_revision: match record.get("source_revision") {
-            Some(Value::Null) => None,
-            Some(Value::String(value)) => Some(value.clone()),
-            _ => return Err("source_revision must be present as a string or null".to_string()),
-        },
+        source_revision: required_string(record, "source_revision")?.to_string(),
     };
     for (field, digest) in [
         ("source_code_sha256", provenance.source_code_sha256.as_str()),
@@ -219,17 +235,13 @@ fn parse_manifest(record: &Value) -> Result<(InputProvenance, String), String> {
     if provenance.run_id.is_empty() {
         return Err("intervention manifest run_id must not be empty".to_string());
     }
-    if provenance
-        .source_revision
-        .as_deref()
-        .is_some_and(|revision| {
-            !matches!(revision.len(), 40 | 64)
-                || !revision
-                    .bytes()
-                    .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-        })
+    if !matches!(provenance.source_revision.len(), 40 | 64)
+        || !provenance
+            .source_revision
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
     {
-        return Err("intervention manifest has invalid source_revision".to_string());
+        return Err("intervention manifest source_revision must be a 40- or 64-character lowercase Git SHA".to_string());
     }
 
     let pair_block_id = required_string(record, "pair_block_id")?;
@@ -364,7 +376,7 @@ fn parse_manifest(record: &Value) -> Result<(InputProvenance, String), String> {
         "source_code_sha256": provenance.source_code_sha256.as_str(),
         "fixture_sha256": provenance.fixture_sha256.as_str(),
         "schema_sha256": provenance.schema_sha256.as_str(),
-        "source_revision": provenance.source_revision.as_deref()
+        "source_revision": provenance.source_revision.as_str()
     }))
     .map_err(|error| format!("serialize intervention manifest receipt: {error}"))?;
     let computed_receipt_sha256 =
@@ -487,10 +499,15 @@ fn parse_score(record: &Value) -> Result<(TaskKey, MethodKind, Metrics), String>
             "target_key", "matched_to", "removed_event_ids", "removed_event_count",
             "removed_experience_struct_bytes", "decision", "full_evidence_decision",
             "decision_agrees_with_full", "decision_changed", "utility", "regret",
+            "candidate_visible_event_count",
             "full_evidence_regret", "regret_gap_vs_full_evidence",
             "regret_gap_vs_full_method", "decision_is_optimal", "abstained",
             "evaluation_validity", "invalidity_reason", "method", "retrieved_event_ids",
-            "index_bytes", "retrieval_profile_sha256",
+            "index_bytes", "retrieval_profile_sha256", "decision_support_event_ids",
+            "candidate_execution_boundary", "candidate_artifact_sha256",
+            "candidate_process_startup_ns", "candidate_process_wall_ns",
+            "candidate_request_build_ns", "candidate_receipt_validation_ns",
+            "candidate_end_to_end_ns",
         ],
         "evaluator score",
     )?;
@@ -534,6 +551,8 @@ fn parse_score(record: &Value) -> Result<(TaskKey, MethodKind, Metrics), String>
     }
     required_string(record, "invalidity_reason")?;
     required_event_ids(record, "retrieved_event_ids")?;
+    required_event_ids(record, "decision_support_event_ids")?;
+    required_u64(record, "candidate_visible_event_count")?;
     required_u64(record, "index_bytes")?;
     required_u64(record, "removed_event_count")?;
     required_u64(record, "removed_experience_struct_bytes")?;
@@ -542,6 +561,36 @@ fn parse_score(record: &Value) -> Result<(TaskKey, MethodKind, Metrics), String>
         return Err("evaluator regret values must be non-negative".to_string());
     }
     optional_sha256(record, "retrieval_profile_sha256")?;
+    let candidate_execution_boundary = required_string(record, "candidate_execution_boundary")?;
+    if !matches!(
+        candidate_execution_boundary,
+        "detached_subprocess_stream" | "legacy_in_process"
+    ) {
+        return Err("unsupported evaluator score candidate_execution_boundary".to_string());
+    }
+    let candidate_artifact_sha256 = nullable_sha256(record, "candidate_artifact_sha256")?;
+    let candidate_process_startup_ns = nullable_u64(record, "candidate_process_startup_ns")?;
+    let candidate_process_wall_ns = nullable_u64(record, "candidate_process_wall_ns")?;
+    let candidate_request_build_ns = nullable_u64(record, "candidate_request_build_ns")?;
+    let candidate_receipt_validation_ns = nullable_u64(record, "candidate_receipt_validation_ns")?;
+    let candidate_end_to_end_ns = nullable_u64(record, "candidate_end_to_end_ns")?;
+    match candidate_execution_boundary {
+        "detached_subprocess_stream"
+            if candidate_artifact_sha256.is_some()
+                && candidate_process_startup_ns.is_some()
+                && candidate_process_wall_ns.is_some()
+                && candidate_request_build_ns.is_some()
+                && candidate_receipt_validation_ns.is_some()
+                && candidate_end_to_end_ns.is_some() => {}
+        "legacy_in_process"
+            if candidate_artifact_sha256.is_none()
+                && candidate_process_startup_ns.is_none()
+                && candidate_process_wall_ns.is_none()
+                && candidate_request_build_ns.is_none()
+                && candidate_receipt_validation_ns.is_none()
+                && candidate_end_to_end_ns.is_none() => {}
+        _ => return Err("evaluator score execution-boundary metadata is inconsistent".to_string()),
+    }
     let method = required_string(record, "method")?.to_string();
     if !supported_method(&method) {
         return Err(format!("unsupported evaluator method {method}"));
@@ -769,9 +818,18 @@ struct CandidateReceipt {
     candidate_observation_sequence: u64,
     candidate_input_sha256: String,
     decision: String,
+    decision_support_event_ids: Vec<u32>,
     retrieved_event_ids: Vec<u32>,
+    candidate_visible_event_count: u64,
     index_bytes: u64,
     retrieval_profile_sha256: Option<String>,
+    candidate_execution_boundary: String,
+    candidate_artifact_sha256: Option<String>,
+    candidate_process_startup_ns: Option<u64>,
+    candidate_process_wall_ns: Option<u64>,
+    candidate_request_build_ns: Option<u64>,
+    candidate_receipt_validation_ns: Option<u64>,
+    candidate_end_to_end_ns: Option<u64>,
 }
 
 fn expected_candidate_observation_id(
@@ -820,8 +878,11 @@ fn parse_candidate_receipt(record: &Value) -> Result<((String, String), Candidat
             "support_unresolved_count", "available_event_count",
             "available_experience_struct_bytes", "available_known_root_count",
             "available_known_family_count", "unknown_root_event_count",
-            "unknown_family_event_count", "index_bytes", "latency_ns",
-            "retrieval_profile_sha256",
+            "unknown_family_event_count", "candidate_visible_event_count", "index_bytes", "latency_ns",
+            "retrieval_profile_sha256", "candidate_execution_boundary",
+            "candidate_artifact_sha256", "candidate_process_startup_ns",
+            "candidate_process_wall_ns", "candidate_request_build_ns",
+            "candidate_receipt_validation_ns", "candidate_end_to_end_ns",
         ],
         "candidate decision receipt",
     )?;
@@ -880,19 +941,55 @@ fn parse_candidate_receipt(record: &Value) -> Result<((String, String), Candidat
         return Err("candidate receipt contains unsupported decision value".to_string());
     }
     let retrieved_event_ids = required_event_ids(record, "retrieved_event_ids")?;
-    required_event_ids(record, "decision_support_event_ids")?;
+    let decision_support_event_ids = required_event_ids(record, "decision_support_event_ids")?;
+    let retrieved_set: BTreeSet<u32> = retrieved_event_ids.iter().copied().collect();
+    if !decision_support_event_ids.iter().all(|event_id| retrieved_set.contains(event_id)) {
+        return Err("candidate decision support IDs must be a subset of retrieved event IDs".to_string());
+    }
     for field in [
         "support_event_count", "support_known_root_count", "support_known_family_count",
-        "support_unresolved_count", "available_event_count",
+        "support_unresolved_count", "available_event_count", "candidate_visible_event_count",
         "available_experience_struct_bytes", "available_known_root_count",
         "available_known_family_count", "unknown_root_event_count",
         "unknown_family_event_count", "latency_ns",
     ] {
         required_u64(record, field)?;
     }
+    let candidate_visible_event_count = required_u64(record, "candidate_visible_event_count")?;
     let index_bytes = required_u64(record, "index_bytes")?;
     let retrieval_profile_sha256 =
         optional_sha256(record, "retrieval_profile_sha256")?;
+    let candidate_execution_boundary =
+        required_string(record, "candidate_execution_boundary")?.to_string();
+    if !matches!(
+        candidate_execution_boundary.as_str(),
+        "detached_subprocess_stream" | "legacy_in_process"
+    ) {
+        return Err("unsupported candidate_execution_boundary".to_string());
+    }
+    let candidate_artifact_sha256 = nullable_sha256(record, "candidate_artifact_sha256")?;
+    let candidate_process_startup_ns = nullable_u64(record, "candidate_process_startup_ns")?;
+    let candidate_process_wall_ns = nullable_u64(record, "candidate_process_wall_ns")?;
+    let candidate_request_build_ns = nullable_u64(record, "candidate_request_build_ns")?;
+    let candidate_receipt_validation_ns = nullable_u64(record, "candidate_receipt_validation_ns")?;
+    let candidate_end_to_end_ns = nullable_u64(record, "candidate_end_to_end_ns")?;
+    match candidate_execution_boundary.as_str() {
+        "detached_subprocess_stream"
+            if candidate_artifact_sha256.is_some()
+                && candidate_process_startup_ns.is_some()
+                && candidate_process_wall_ns.is_some()
+                && candidate_request_build_ns.is_some()
+                && candidate_receipt_validation_ns.is_some()
+                && candidate_end_to_end_ns.is_some() => {}
+        "legacy_in_process"
+            if candidate_artifact_sha256.is_none()
+                && candidate_process_startup_ns.is_none()
+                && candidate_process_wall_ns.is_none()
+                && candidate_request_build_ns.is_none()
+                && candidate_receipt_validation_ns.is_none()
+                && candidate_end_to_end_ns.is_none() => {}
+        _ => return Err("candidate execution boundary metadata is inconsistent".to_string()),
+    }
 
     Ok((
         (pair_block_id, candidate_observation_id),
@@ -902,9 +999,18 @@ fn parse_candidate_receipt(record: &Value) -> Result<((String, String), Candidat
             candidate_observation_sequence,
             candidate_input_sha256,
             decision,
+            decision_support_event_ids,
             retrieved_event_ids,
+            candidate_visible_event_count,
             index_bytes,
             retrieval_profile_sha256,
+            candidate_execution_boundary,
+            candidate_artifact_sha256,
+            candidate_process_startup_ns,
+            candidate_process_wall_ns,
+            candidate_request_build_ns,
+            candidate_receipt_validation_ns,
+            candidate_end_to_end_ns,
         },
     ))
 }
@@ -934,6 +1040,16 @@ fn validate_score_against_candidate(
     if required_event_ids(score, "retrieved_event_ids")? != candidate.retrieved_event_ids {
         return Err("evaluator score retrieved_event_ids differ from candidate receipt".to_string());
     }
+    if required_event_ids(score, "decision_support_event_ids")?
+        != candidate.decision_support_event_ids
+    {
+        return Err("evaluator score decision_support_event_ids differ from candidate receipt".to_string());
+    }
+    if required_u64(score, "candidate_visible_event_count")?
+        != candidate.candidate_visible_event_count
+    {
+        return Err("evaluator score candidate_visible_event_count differs from candidate receipt".to_string());
+    }
     if required_u64(score, "index_bytes")? != candidate.index_bytes {
         return Err("evaluator score index_bytes differ from candidate receipt".to_string());
     }
@@ -944,6 +1060,23 @@ fn validate_score_against_candidate(
     let score_pair_block = required_string(score, "pair_block_id")?;
     if score_pair_block != pair_block_id {
         return Err("evaluator score pair_block_id differs from candidate key".to_string());
+    }
+    if required_string(score, "candidate_execution_boundary")?
+        != candidate.candidate_execution_boundary
+        || nullable_sha256(score, "candidate_artifact_sha256")?
+            != candidate.candidate_artifact_sha256
+        || nullable_u64(score, "candidate_process_startup_ns")?
+            != candidate.candidate_process_startup_ns
+        || nullable_u64(score, "candidate_process_wall_ns")?
+            != candidate.candidate_process_wall_ns
+        || nullable_u64(score, "candidate_request_build_ns")?
+            != candidate.candidate_request_build_ns
+        || nullable_u64(score, "candidate_receipt_validation_ns")?
+            != candidate.candidate_receipt_validation_ns
+        || nullable_u64(score, "candidate_end_to_end_ns")?
+            != candidate.candidate_end_to_end_ns
+    {
+        return Err("evaluator score candidate execution metadata differs from candidate receipt".to_string());
     }
     Ok(())
 }
@@ -1197,7 +1330,7 @@ fn reduce(
         record["input_source_code_sha256"] = json!(provenance.source_code_sha256.as_str());
         record["input_fixture_sha256"] = json!(provenance.fixture_sha256.as_str());
         record["input_schema_sha256"] = json!(provenance.schema_sha256.as_str());
-        record["input_source_revision"] = json!(provenance.source_revision.as_deref());
+        record["input_source_revision"] = json!(provenance.source_revision.as_str());
         record["aggregation_code_sha256"] = json!(aggregation_code_sha256.as_str());
         record["bootstrap_seed"] = json!(seed);
         record["input_manifest_count"] = json!(manifest_row_count);
@@ -1279,6 +1412,8 @@ mod tests {
             "removed_experience_struct_bytes": 0,
             "method": method,
             "retrieved_event_ids": [],
+            "decision_support_event_ids": [],
+            "candidate_visible_event_count": 0,
             "index_bytes": 0,
             "decision": "action_a",
             "full_evidence_decision": "action_a",
@@ -1292,7 +1427,14 @@ mod tests {
             "decision_is_optimal": true,
             "abstained": false,
             "evaluation_validity": "diagnostic_only",
-            "invalidity_reason": "unit test fixture"
+            "invalidity_reason": "unit test fixture",
+            "candidate_execution_boundary": "legacy_in_process",
+            "candidate_artifact_sha256": null,
+            "candidate_process_startup_ns": null,
+            "candidate_process_wall_ns": null,
+            "candidate_request_build_ns": null,
+            "candidate_receipt_validation_ns": null,
+            "candidate_end_to_end_ns": null
         })
     }
 
@@ -1322,9 +1464,29 @@ mod tests {
             "decision_need_sha256": decision_need_sha256,
             "candidate_evidence_sha256": candidate_evidence_sha256,
             "retrieved_event_ids": [3, 7],
+            "decision_support_event_ids": [3, 7],
+            "candidate_visible_event_count": 2,
+            "support_event_count": 2,
+            "support_known_root_count": 1,
+            "support_known_family_count": 2,
+            "support_unresolved_count": 0,
+            "available_event_count": 2,
+            "available_experience_struct_bytes": 256,
+            "available_known_root_count": 1,
+            "available_known_family_count": 2,
+            "unknown_root_event_count": 0,
+            "unknown_family_event_count": 0,
             "decision": "action_a",
+            "latency_ns": 123,
             "index_bytes": 2048,
-            "retrieval_profile_sha256": "c".repeat(64)
+            "retrieval_profile_sha256": "c".repeat(64),
+            "candidate_execution_boundary": "detached_subprocess_stream",
+            "candidate_artifact_sha256": "e".repeat(64),
+            "candidate_process_startup_ns": 100,
+            "candidate_process_wall_ns": 200,
+            "candidate_request_build_ns": 20,
+            "candidate_receipt_validation_ns": 30,
+            "candidate_end_to_end_ns": 250
         })
     }
 
@@ -1344,8 +1506,17 @@ mod tests {
             "candidate_input_sha256": candidate.candidate_input_sha256,
             "decision": candidate.decision,
             "retrieved_event_ids": candidate.retrieved_event_ids,
+            "decision_support_event_ids": candidate.decision_support_event_ids,
+            "candidate_visible_event_count": candidate.candidate_visible_event_count,
             "index_bytes": candidate.index_bytes,
-            "retrieval_profile_sha256": candidate.retrieval_profile_sha256
+            "retrieval_profile_sha256": candidate.retrieval_profile_sha256,
+            "candidate_execution_boundary": candidate.candidate_execution_boundary,
+            "candidate_artifact_sha256": candidate.candidate_artifact_sha256,
+            "candidate_process_startup_ns": candidate.candidate_process_startup_ns,
+            "candidate_process_wall_ns": candidate.candidate_process_wall_ns,
+            "candidate_request_build_ns": candidate.candidate_request_build_ns,
+            "candidate_receipt_validation_ns": candidate.candidate_receipt_validation_ns,
+            "candidate_end_to_end_ns": candidate.candidate_end_to_end_ns
         })
     }
 
@@ -1452,6 +1623,18 @@ mod tests {
             .unwrap_err()
             .contains("retrieved_event_ids"));
 
+        let mut wrong_support = valid.clone();
+        wrong_support["decision_support_event_ids"] = json!([3]);
+        assert!(validate_score_against_candidate(&wrong_support, &key.0, &receipt)
+            .unwrap_err()
+            .contains("decision_support_event_ids"));
+
+        let mut wrong_visible_count = valid.clone();
+        wrong_visible_count["candidate_visible_event_count"] = json!(99);
+        assert!(validate_score_against_candidate(&wrong_visible_count, &key.0, &receipt)
+            .unwrap_err()
+            .contains("candidate_visible_event_count"));
+
         let mut wrong_size = valid.clone();
         wrong_size["index_bytes"] = json!(999);
         assert!(validate_score_against_candidate(&wrong_size, &key.0, &receipt)
@@ -1470,11 +1653,29 @@ mod tests {
             .unwrap_err()
             .contains("run_id"));
 
-        let mut wrong_sequence = valid;
+        let mut wrong_sequence = valid.clone();
         wrong_sequence["candidate_observation_sequence"] = json!(8);
         assert!(validate_score_against_candidate(&wrong_sequence, &key.0, &receipt)
             .unwrap_err()
             .contains("candidate_observation_sequence"));
+
+        let mut wrong_boundary = valid.clone();
+        wrong_boundary["candidate_execution_boundary"] = json!("legacy_in_process");
+        assert!(validate_score_against_candidate(&wrong_boundary, &key.0, &receipt)
+            .unwrap_err()
+            .contains("execution metadata"));
+
+        let mut wrong_artifact = valid.clone();
+        wrong_artifact["candidate_artifact_sha256"] = json!("f".repeat(64));
+        assert!(validate_score_against_candidate(&wrong_artifact, &key.0, &receipt)
+            .unwrap_err()
+            .contains("execution metadata"));
+
+        let mut missing_process_time = valid;
+        missing_process_time["candidate_process_wall_ns"] = json!(null);
+        assert!(validate_score_against_candidate(&missing_process_time, &key.0, &receipt)
+            .unwrap_err()
+            .contains("execution metadata"));
     }
 
     #[test]
@@ -1725,7 +1926,7 @@ mod tests {
         let valid = manifest_record("run-1", &"a".repeat(64));
         let (provenance, manifest_sha) = parse_manifest(&valid).unwrap();
         assert_eq!(provenance.run_id, "run-1");
-        assert_eq!(provenance.source_revision.as_deref().map(str::len), Some(40));
+        assert_eq!(provenance.source_revision.len(), 40);
         assert!(valid_sha256(&manifest_sha));
 
         let invalid = manifest_record("run-1", "not-a-sha");

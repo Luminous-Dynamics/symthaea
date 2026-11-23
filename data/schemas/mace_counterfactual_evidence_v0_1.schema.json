@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/mace_counterfactual_evidence_v0_1.schema.json",
   "title": "MACE Counterfactual Evidence Sufficiency v0.1",
-  "description": "Separate candidate-visible decision observations and evaluator-only counterfactual intervention manifests/scores. Candidate records MUST NOT contain intervention labels, outcome utilities or hidden truth.",
+  "description": "Separate candidate-visible decision observations and evaluator-only counterfactual intervention manifests/scores. Candidate records MUST NOT contain intervention labels, outcome utilities or hidden truth. Candidate execution-boundary metadata distinguishes detached candidate subprocess runs from explicitly retained legacy in-process baselines; process launch and per-request IPC wall time are separate from candidate-internal latency_ns. Detached candidate rows separately record request construction, candidate process/IPC wall time, receipt verification, and end-to-end parent-side invocation timing. Evaluator score rows bind both retrieved IDs and the exact decision-support IDs emitted by the candidate. Candidate records distinguish all available evidence from the task-scoped/action-scoped candidate-visible projection so out-of-scope evidence is not leaked to candidate execution. Intervention manifests require the exact checked-out lowercase Git SHA; an unspecified source revision is no longer accepted.",
   "oneOf": [
     {
       "$ref": "#/$defs/intervention_manifest"
@@ -176,10 +176,8 @@
           "$ref": "#/$defs/sha256"
         },
         "source_revision": {
-          "type": [
-            "string",
-            "null"
-          ]
+          "type": "string",
+          "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
         },
         "schema_sha256": {
           "$ref": "#/$defs/sha256"
@@ -217,7 +215,15 @@
         "latency_ns",
         "method",
         "retrieved_event_ids",
-        "index_bytes"
+        "index_bytes",
+        "candidate_execution_boundary",
+        "candidate_artifact_sha256",
+        "candidate_process_startup_ns",
+        "candidate_process_wall_ns",
+        "candidate_request_build_ns",
+        "candidate_receipt_validation_ns",
+        "candidate_end_to_end_ns",
+        "candidate_visible_event_count"
       ],
       "properties": {
         "schema_version": {
@@ -310,6 +316,82 @@
         "candidate_observation_sequence": {
           "type": "integer",
           "minimum": 0
+        },
+        "candidate_execution_boundary": {
+          "type": "string",
+          "enum": [
+            "detached_subprocess_stream",
+            "legacy_in_process"
+          ]
+        },
+        "candidate_artifact_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "candidate_process_startup_ns": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "candidate_process_wall_ns": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "candidate_request_build_ns": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "candidate_receipt_validation_ns": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "candidate_end_to_end_ns": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "candidate_visible_event_count": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     },
@@ -345,7 +427,16 @@
         "method",
         "retrieved_event_ids",
         "index_bytes",
-        "regret_gap_vs_full_method"
+        "regret_gap_vs_full_method",
+        "candidate_execution_boundary",
+        "candidate_artifact_sha256",
+        "candidate_process_startup_ns",
+        "candidate_process_wall_ns",
+        "candidate_request_build_ns",
+        "candidate_receipt_validation_ns",
+        "candidate_end_to_end_ns",
+        "decision_support_event_ids",
+        "candidate_visible_event_count"
       ],
       "properties": {
         "schema_version": {
@@ -446,6 +537,85 @@
           "$ref": "#/$defs/sha256"
         },
         "candidate_observation_sequence": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "candidate_execution_boundary": {
+          "type": "string",
+          "enum": [
+            "detached_subprocess_stream",
+            "legacy_in_process"
+          ]
+        },
+        "candidate_artifact_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "candidate_process_startup_ns": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "candidate_process_wall_ns": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "candidate_request_build_ns": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "candidate_receipt_validation_ns": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "candidate_end_to_end_ns": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "decision_support_event_ids": {
+          "$ref": "#/$defs/event_ids"
+        },
+        "candidate_visible_event_count": {
           "type": "integer",
           "minimum": 0
         }
