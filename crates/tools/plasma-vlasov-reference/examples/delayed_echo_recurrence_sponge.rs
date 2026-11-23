@@ -475,7 +475,9 @@ mod tests {
     use super::*;
     use std::f64::consts::PI;
 
-    fn synthetic_pair(velocity_mode_sign: f64) -> (VlasovPoissonConfig, VlasovPoisson1d1v, VlasovPoisson1d1v) {
+    fn synthetic_pair(
+        velocity_mode_sign: f64,
+    ) -> (VlasovPoissonConfig, VlasovPoisson1d1v, VlasovPoisson1d1v) {
         let config = VlasovPoissonConfig {
             nx: 32,
             nv: 128,
