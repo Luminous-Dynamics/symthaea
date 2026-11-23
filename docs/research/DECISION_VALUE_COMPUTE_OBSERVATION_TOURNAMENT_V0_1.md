@@ -289,6 +289,21 @@ Fourteen Rust unit tests are authored for positive complementarity (+230,000 PPM
 
 This reference does not replace #13176. #13176 remains responsible for exposure and resource factorial attribution; the new crate supplies only the paired decision-regret contrast, which is not in the current #13176 outcome schema. Exact-head Rust 1.96 verification passed on 0e5f80ca51541711752869d8d6bfe0304df1496d: formatting passed, 14 tests passed, and strict Clippy passed (workflow run 45086902847). This is evaluator qualification, not a RoboDyna or external benchmark result.
 
+### 16.1 Independent-cluster inference handoff
+
+Per-world certificates are not independent statistical samples merely because they have different episode or hidden-world IDs. The Rust adapter `research/decision-value-interaction-001/src/cluster_adapter.rs` preserves the intended hierarchy and emits the input contract owned by [#8578 — VIS-DVPC-014](https://github.com/Luminous-Dynamics/symthaea/pull/8578):
+
+1. Recompute certificate effects from the four raw arm regrets.
+2. Average hidden-world counterfactual outcomes within each episode.
+3. Average episode means within a preregistered independent scene/sequence/session cluster.
+4. Emit one row per independent cluster and each of four predeclared contrasts: compute benefit, observation benefit, joint benefit and compute×observation interaction.
+
+It binds the complete thirteen-field paired identity on the evaluator certificate. It rejects duplicate cluster/episode/world records, episode reassignment across clusters, task/loss/evaluator/environment/action/resource/model/policy context changes, initial-state/seed drift within an episode and hidden-world cohort drift across episodes in a cluster.
+
+The adapter emits exactly the `VIS-DVPC-CLUSTER-DELTAS-001-v1` table. #8578 owns the downstream approximate percentile cluster bootstrap, sign-flip diagnostic and Bonferroni correction. It does not duplicate those statistics here. A minimum of five clusters is only an executable-mechanics floor; confirmatory studies still need a preregistered power/MDE analysis, substantially more independent clusters where feasible and a second held-out-domain replication.
+
+The adapter's ten tests are included in the passing 24-test evaluator run. The analyzer itself is separately developed in #8578; its custom push workflow has been authored, but no exact-head analyzer result is claimed until a visible run receipt is available.
+
 ## 17. RoboDyna replication profile: paired episode identity, not just average async loss
 
 RoboDyna is the closest public embodied benchmark for this programme and should be promoted from a background citation to a first external execution target. Its NeurIPS 2026 workshop paper evaluates 20 conceptual dynamic-manipulation tasks across five capability categories plus 10 household tasks, with 3,500 expert demonstrations, held-out compositional difficulty, paired synchronous/asynchronous evaluation on identical seeds, progress score and human controls. The environment uses SAPIEN physics at 250 Hz and an action cadence of 15 simulation steps (60 ms). During asynchronous inference, measured forward-pass wall time is charged to simulated time while the scene continues evolving and the arm holds its last target. The reported mean inference charges are 109 ms for π0.5, 156 ms for X-VLA and 236 ms for FastWAM.
