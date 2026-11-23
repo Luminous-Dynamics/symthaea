@@ -432,10 +432,7 @@ pub struct VmAuxiliaryInversionReportV1 {
     pub claim_limits: Vec<String>,
 }
 
-fn sum_gradients(
-    gradients: impl Iterator<Item = Vec<f64>>,
-    dimension: usize,
-) -> Vec<f64> {
+fn sum_gradients(gradients: impl Iterator<Item = Vec<f64>>, dimension: usize) -> Vec<f64> {
     let mut sum = vec![0.0; dimension];
     for gradient in gradients {
         for (target, value) in sum.iter_mut().zip(gradient) {
@@ -459,9 +456,7 @@ fn attempt_single_record_inversion(
         .features
         .iter()
         .enumerate()
-        .map(|(index, feature)| {
-            (residual_gradient[index] / bias_gradient - feature).powi(2)
-        })
+        .map(|(index, feature)| (residual_gradient[index] / bias_gradient - feature).powi(2))
         .sum::<f64>()
         / model_dimension as f64;
     let inferred_label = bias_gradient < 0.0;
@@ -487,8 +482,7 @@ pub fn evaluate_vm_known_auxiliary_batch_inversion_v1(
     validate_inputs(records, model_weights, model_bias, config)?;
     if config.visibility == UpdateVisibilityV1::PerRecord {
         return Err(VmPrivacyAttackErrorV1(
-            "auxiliary batch inversion requires per-client or secure aggregate visibility"
-                .into(),
+            "auxiliary batch inversion requires per-client or secure aggregate visibility".into(),
         ));
     }
 
@@ -800,7 +794,10 @@ mod tests {
 
         assert_eq!(report.unknown_record_count, 1);
         assert_eq!(report.reconstructed_record_count, 1);
-        assert_eq!(report.reconstructed_record_ids_for_evaluation, vec!["wafer-004"]);
+        assert_eq!(
+            report.reconstructed_record_ids_for_evaluation,
+            vec!["wafer-004"]
+        );
         assert_eq!(report.mean_feature_rmse, Some(0.0));
         assert_eq!(report.label_inference_accuracy, Some(1.0));
         assert!(!report.formal_differential_privacy_claim);
@@ -821,7 +818,10 @@ mod tests {
 
         assert_eq!(report.unknown_record_count, 1);
         assert_eq!(report.reconstructed_record_count, 1);
-        assert_eq!(report.reconstructed_record_ids_for_evaluation, vec!["wafer-004"]);
+        assert_eq!(
+            report.reconstructed_record_ids_for_evaluation,
+            vec!["wafer-004"]
+        );
         assert_eq!(report.mean_feature_rmse, Some(0.0));
         assert_eq!(report.label_inference_accuracy, Some(1.0));
     }
