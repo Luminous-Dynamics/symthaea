@@ -1313,6 +1313,53 @@ mod tests {
         }
     }
 
+    /// Independent test oracle: Floyd-Warshall for paths plus reachability
+    /// components. It intentionally does not call the production graph helpers.
+    fn floyd_warshall_oracle(
+        node_count: usize,
+        edges: &[(usize, usize, f64)],
+    ) -> (usize, usize, Vec<Vec<f64>>) {
+        let mut distances = vec![vec![f64::INFINITY; node_count]; node_count];
+        for (index, row) in distances.iter_mut().enumerate() {
+            row[index] = 0.0;
+        }
+        for &(source, target, length) in edges {
+            distances[source][target] = distances[source][target].min(length);
+            distances[target][source] = distances[target][source].min(length);
+        }
+        for pivot in 0..node_count {
+            for source in 0..node_count {
+                for target in 0..node_count {
+                    let through_pivot =
+                        distances[source][pivot] + distances[pivot][target];
+                    if through_pivot < distances[source][target] {
+                        distances[source][target] = through_pivot;
+                    }
+                }
+            }
+        }
+        let mut visited = vec![false; node_count];
+        let mut components = 0usize;
+        for start in 0..node_count {
+            if visited[start] {
+                continue;
+            }
+            components += 1;
+            visited[start] = true;
+            let mut pending = vec![start];
+            while let Some(current) = pending.pop() {
+                for next in 0..node_count {
+                    if distances[current][next].is_finite() && !visited[next] {
+                        visited[next] = true;
+                        pending.push(next);
+                    }
+                }
+            }
+        }
+        let cycle_rank = edges.len().saturating_add(components).saturating_sub(node_count);
+        (components, cycle_rank, distances)
+    }
+
     fn skeleton(
         junctions: Vec<AnnotatedJunction>,
         segments: Vec<AnnotatedHyphaSegment>,
@@ -1396,6 +1443,30 @@ mod tests {
         report
             .validate_against(&source, &candidates, &demands, &[])
             .unwrap();
+
+        let (oracle_before_components, oracle_before_cycles, before_paths) =
+            floyd_warshall_oracle(3, &[(0, 1, 1.0), (0, 2, 1.0)]);
+        let (oracle_after_components, oracle_after_cycles, after_paths) =
+            floyd_warshall_oracle(3, &[(0, 1, 1.0), (0, 2, 1.0), (1, 2, 1.0)]);
+        assert_eq!(impact.rejected.connected_components, oracle_before_components);
+        assert_eq!(impact.rejected.cycle_rank, oracle_before_cycles);
+        assert_eq!(
+            impact.accepted_for_analysis.connected_components,
+            oracle_after_components
+        );
+        assert_eq!(impact.accepted_for_analysis.cycle_rank, oracle_after_cycles);
+        assert_eq!(before_paths[1][2], 2.0);
+        assert_eq!(after_paths[1][2], 1.0);
+        assert_eq!(
+            impact.demand_deltas[0].rejected.shortest_path_length,
+            Some(before_paths[1][2])
+        );
+        assert_eq!(
+            impact.demand_deltas[0]
+                .accepted_for_analysis
+                .shortest_path_length,
+            Some(after_paths[1][2])
+        );
     }
 
     #[test]
@@ -1445,6 +1516,20 @@ mod tests {
         );
         assert!((impact.rejected.total_hypha_length - 20.0).abs() < 1.0e-12);
         assert!((impact.accepted_for_analysis.total_hypha_length - 22.0).abs() < 1.0e-12);
+        let (oracle_before_components, oracle_before_cycles, _) =
+            floyd_warshall_oracle(5, &[(0, 4, 4.0), (4, 1, 6.0), (2, 3, 10.0)]);
+        let (oracle_after_components, oracle_after_cycles, _) =
+            floyd_warshall_oracle(
+                5,
+                &[(0, 4, 4.0), (4, 1, 6.0), (2, 3, 10.0), (3, 4, 2.0)],
+            );
+        assert_eq!(impact.rejected.connected_components, oracle_before_components);
+        assert_eq!(impact.rejected.cycle_rank, oracle_before_cycles);
+        assert_eq!(
+            impact.accepted_for_analysis.connected_components,
+            oracle_after_components
+        );
+        assert_eq!(impact.accepted_for_analysis.cycle_rank, oracle_after_cycles);
         assert_eq!(
             impact.rejected.hypha_segment_count + 1,
             impact.accepted_for_analysis.hypha_segment_count
