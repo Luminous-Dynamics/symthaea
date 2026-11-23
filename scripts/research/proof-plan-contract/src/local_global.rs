@@ -934,8 +934,12 @@ mod tests {
 
     #[test]
     fn truth_table_accepts_modus_ponens_entailment() {
-        let p = BooleanFormula::Atom { name: "p".to_owned() };
-        let q = BooleanFormula::Atom { name: "q".to_owned() };
+        let p = BooleanFormula::Atom {
+            name: "p".to_owned(),
+        };
+        let q = BooleanFormula::Atom {
+            name: "q".to_owned(),
+        };
         let result = check_finite_propositional_entailment(
             &[
                 p.clone(),
