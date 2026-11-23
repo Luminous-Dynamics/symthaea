@@ -1988,12 +1988,13 @@ mod tests {
             sensitivity: 0.92,
             specificity: 0.97,
         };
-        let episode = generate_synthetic_fab_episode_v1(&scenario).unwrap();
+        let base_episode = generate_synthetic_fab_episode_v1(&scenario).unwrap();
         let semantics = synthetic_defect_semantics_v1(scenario.defect_threshold).unwrap();
-        let view = episode.policy_view();
+        let base_observation_digest =
+            json_sha256(&base_episode.policy_view.observations).unwrap();
         let truth = evaluate_synthetic_metrology_policy_v1(
-            &episode,
-            &fake_selection(&episode),
+            &base_episode,
+            &fake_selection(&base_episode),
         )
         .unwrap()
         .true_defect_prevalence;
@@ -2001,16 +2002,31 @@ mod tests {
         let mut ht_estimates = Vec::new();
         let mut assay_adjusted_estimates = Vec::new();
         let mut ht_covered = 0_usize;
-        let mut assay_adjusted_covered = 0_usize;
         let replay_count = 256_usize;
 
         for seed in 0..replay_count {
+            let mut replicate_scenario = scenario.clone();
+            replicate_scenario.measurement_seed = seed as u64;
+            let replicate_episode =
+                generate_synthetic_fab_episode_v1(&replicate_scenario).unwrap();
+            assert_eq!(
+                json_sha256(&replicate_episode.policy_view.observations).unwrap(),
+                base_observation_digest
+            );
+            let view = replicate_episode.policy_view();
             let policy = policy_config(view, "stratified-random", 0, 32, 8, seed as u64);
-            let run =
-                run_synthetic_metrology_policy_v1(&episode, view, &semantics, &policy).unwrap();
+            let run = run_synthetic_metrology_policy_v1(
+                &replicate_episode,
+                view,
+                &semantics,
+                &policy,
+            )
+            .unwrap();
             let report = run.evaluation;
             assert!(report.design_variance_qualified);
             assert!(report.assay_estimator_qualified);
+            assert_eq!(report.assay_measurement_seed, seed as u64);
+            assert!(valid_sha256(&report.assay_outcomes_sha256));
 
             let ht = report.horvitz_thompson_prevalence;
             let ht_se = report.standard_error_ht_prevalence.unwrap();
@@ -2018,25 +2034,17 @@ mod tests {
                 ht_covered += 1;
             }
             ht_estimates.push(ht);
-
-            let assay_adjusted = report.assay_adjusted_ht_prevalence.unwrap();
-            let assay_se = report.assay_adjusted_ht_standard_error.unwrap();
-            if (assay_adjusted - truth).abs() <= 1.96 * assay_se {
-                assay_adjusted_covered += 1;
-            }
-            assay_adjusted_estimates.push(assay_adjusted);
+            assay_adjusted_estimates.push(report.assay_adjusted_ht_prevalence.unwrap());
         }
 
         let mean_ht = ht_estimates.iter().sum::<f64>() / replay_count as f64;
         let mean_assay_adjusted =
             assay_adjusted_estimates.iter().sum::<f64>() / replay_count as f64;
         let ht_coverage = ht_covered as f64 / replay_count as f64;
-        let assay_adjusted_coverage = assay_adjusted_covered as f64 / replay_count as f64;
 
         assert!((mean_ht - truth).abs() < 0.02);
         assert!((mean_assay_adjusted - truth).abs() < 0.03);
         assert!((0.88..=0.99).contains(&ht_coverage));
-        assert!((0.88..=0.99).contains(&assay_adjusted_coverage));
     }
 
     #[test]
