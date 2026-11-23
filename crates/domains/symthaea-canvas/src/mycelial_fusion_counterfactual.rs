@@ -764,16 +764,16 @@ fn shortest_path_length(
         }
         visited.insert(current);
         if let Some(neighbours) = adjacency.get(current) {
-            for (neighbour, weight) in neighbours {
+            for &(neighbour, weight) in neighbours {
                 if visited.contains(neighbour) {
                     continue;
                 }
-                let candidate = distance + *weight;
+                let candidate = distance + weight;
                 let replace = distances
-                    .get(*neighbour)
+                    .get(neighbour)
                     .is_none_or(|previous| candidate < *previous);
                 if replace {
-                    distances.insert(*neighbour, candidate);
+                    distances.insert(neighbour, candidate);
                 }
             }
         }
