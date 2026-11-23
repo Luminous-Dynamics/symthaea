@@ -7,7 +7,8 @@
   "additionalProperties": false,
   "required": [
     "schema_version",
-    "cases"
+    "cases",
+    "claim_boundary"
   ],
   "properties": {
     "schema_version": {
@@ -18,6 +19,30 @@
       "minItems": 1,
       "items": {
         "$ref": "#/$defs/case"
+      }
+    },
+    "claim_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "no_neural_operator_evaluated",
+        "no_physical_plasma_run",
+        "boundary_type_is_explicit_not_inferred_from_particle_sample"
+      ],
+      "properties": {
+        "status": {
+          "const": "synthetic_analytic_contract_only"
+        },
+        "no_neural_operator_evaluated": {
+          "const": true
+        },
+        "no_physical_plasma_run": {
+          "const": true
+        },
+        "boundary_type_is_explicit_not_inferred_from_particle_sample": {
+          "const": true
+        }
       }
     }
   },
