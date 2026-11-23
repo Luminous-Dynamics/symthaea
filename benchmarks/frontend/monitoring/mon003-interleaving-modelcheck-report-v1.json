@@ -1,0 +1,44 @@
+{
+  "schema": "sfeb-mon003-interleaving-modelcheck-report-v1",
+  "status": "passed",
+  "runtime": {
+    "node_version": "v22.16.0",
+    "source_path": "benchmarks/frontend/monitoring/mon003-interleaving-modelcheck-v1.mjs",
+    "source_git_blob_sha": "88f08084fcf596b8ab499d77d2cc7d91129b7e49",
+    "source_sha256": "457853ee59e6b66c5bdd8a2188c2554ce05c7ba8cd52e2fefc0748d0ae386371"
+  },
+  "operations": [
+    "replace_worker",
+    "revoke_permission",
+    "expire_receipt",
+    "worker_a_commit_response_lost",
+    "worker_b_retry_same_operation",
+    "reconcile_operation"
+  ],
+  "schedules_explored": 720,
+  "expected_permutations": 720,
+  "invariants": {
+    "at_most_one_side_effect_per_operation_key": "pass",
+    "no_stale_worker_commit_after_fence_replacement": "pass",
+    "no_commit_after_permission_revocation": "pass",
+    "no_commit_after_receipt_expiry": "pass",
+    "unknown_outcome_is_not_assumed_to_be_failure": "pass",
+    "reconciliation_is_read_only": "pass"
+  },
+  "counts": {
+    "schedules_with_one_effect": 228,
+    "schedules_with_zero_effects": 492,
+    "stale_fence_rejections": 324,
+    "permission_rejections": 312,
+    "receipt_expiry_rejections": 108,
+    "idempotent_replays": 108,
+    "schedules_with_successful_reconciliation": 174,
+    "schedules_still_outcome_unknown_at_end": 558
+  },
+  "limitations": [
+    "Bounded in-memory sequential interleaving model, not a concurrent memory-model proof.",
+    "The sink models atomic fence, permission, expiry and dedupe checks as one transition.",
+    "Does not cover database isolation anomalies, network partitions beyond the enumerated orderings, clock drift, broker durability or real cryptographic identities.",
+    "Zero failures in this finite model is not a production probability guarantee."
+  ]
+}
