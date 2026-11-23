@@ -33,3 +33,14 @@ The crate has its own workspace boundary. It does not add the large Symthaea wor
 - whether a reader understands or transfers the mathematics.
 
 A successful output is **structural validation only**. Kernel checking, mathematical review, and human-study outcomes remain separate evidence.
+
+
+## Local-to-global consistency control
+
+The mutation fixture set includes a paired control: first assess a proposed inference in isolation, then test whether the same inference is reused in the complete proof plan under a misleading context cue. This is not ProofGrid's Epistemic Stability Index; it is a separate proposed **Local-to-Global Consistency** outcome.
+
+A proposed metric is:
+
+`Context-Induced Reuse Rate = locally rejected invalid warrants reused in global plans / locally rejected invalid-warrant cases`
+
+Report the numerator, denominator, clustered confidence interval, and subgroup by mutation/context family. If the denominator is zero, report the metric as undefined, not zero. Keep this separate from theorem truth, kernel acceptance and plan validity.
