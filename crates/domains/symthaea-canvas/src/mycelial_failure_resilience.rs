@@ -2821,7 +2821,7 @@ mod tests {
         let demand_pairs = demands();
 
         let degree_graph = adaptive_attack_graph();
-let degree = build_mycelial_failure_attack_plan(
+        let degree = build_mycelial_failure_attack_plan(
             &degree_graph,
             &demand_pairs,
             MycelialFailureAttackConfig {
