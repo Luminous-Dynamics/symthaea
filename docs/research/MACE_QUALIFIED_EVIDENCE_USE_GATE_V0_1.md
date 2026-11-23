@@ -117,7 +117,7 @@ The Ed25519 verification algorithm and direct pinned leaf-key profile are now im
 
 ## 7. Test inventory
 
-Sixteen Rust unit tests in the qualification gate and seven in the pinned-trust module are authored:
+Sixteen Rust unit tests in the qualification gate and nine in the pinned-trust module are authored:
 
 1. Only independently admissible evidence IDs cross the gate.
 2. DecisionNeed binding cannot be changed.
@@ -135,8 +135,9 @@ Sixteen Rust unit tests in the qualification gate and seven in the pinned-trust 
 14. The versioned JSON receipt codec round-trips typed values and rejects unknown fields.
 15. A pinned Ed25519 profile verifies a complete qualification receipt using a real signature.
 16. A changed trust profile, revoked key, unknown key, invalid key window or altered signature is rejected by the pinned verifier.
+17. Trust profiles with reordered, duplicated or aliased keys are rejected.
 
-The module's test verifier is intentionally a deterministic test double; it is not a production signature scheme.
+The qualification-gate protocol unit tests retain a deterministic signature-verifier double for isolated binding tests. The pinned-trust module additionally tests real Ed25519 signing and strict verification with deterministic test keys. Both sets are authored but unexecuted.
 
 **Rust execution status:** unexecuted. The environment currently has no `rustc`, `cargo` or `rustfmt`. No compile, Rust unit-test, Clippy, Rust codec, integration or CI pass is claimed. The standalone adapter now directly pins `ed25519-dalek = 2.1.0`; a generated Cargo.lock and exact dependency-graph review remain pending.
 
