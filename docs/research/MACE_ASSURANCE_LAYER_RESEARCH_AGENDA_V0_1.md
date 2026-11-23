@@ -220,6 +220,31 @@ These are separate track measures. Do not pool them into a single cross-track sc
 
 The textual leaderboard reports capability-level dimensions including explicit fact recall, relational/multi-hop reasoning, temporal/event sequencing, memory governance, personalization/care, workflow execution, epistemic safety/privacy and streaming. MACE comparisons should publish each dimension, not just the aggregate. An aggregate retrieval improvement must not hide a governance or privacy regression.
 
+### Capability-level gap diagnosis
+
+The same Cycle 2 textual table gives a much more useful engineering map than the overall score alone:
+
+| Capability | MemoraX commercial | Resurface open-method | Gap |
+|---|---:|---:|---:|
+| Explicit fact recall | 70.85 | 62.98 | 7.87 |
+| Relational / multi-hop | 64.40 | 58.94 | 5.46 |
+| Temporal / event sequencing | 67.05 | 57.76 | 9.29 |
+| Memory governance | 78.10 | 76.55 | 1.55 |
+| Personalization / care | 54.70 | 38.82 | 15.88 |
+| Workflow execution | 61.20 | 59.67 | 1.53 |
+| Epistemic safety / privacy | 81.98 | 68.59 | 13.39 |
+| Streaming | 63.11 | 49.65 | 13.46 |
+
+These are published scores in the same Cycle 2 textual table, not a matched internal experiment. The gaps should guide hypotheses, not be treated as proof that one architecture causes the difference.
+
+**Research implications:**
+
+1. Governance and workflow are comparatively close among the current leaders. MACE should seek differentiation through verifiable lineage, correction, rights-aware retrieval and replay, not simply assume those dimensions are solved.
+2. Personalization/care, epistemic safety/privacy and streaming have the largest open-to-commercial gaps. These should become explicit ablation and qualification families: user-controlled memory scope, purpose limitation, retention minimization, preference correction, sensitive-data refusal, streaming consistency and late-event reconciliation.
+3. Temporal reasoning needs an explicit bitemporal model: distinguish when an event was true from when the system learned or corrected it. Replaying “what did the agent know at decision time?” should be a first-class benchmark, not a side effect of timestamps.
+4. A system that improves personalization while weakening privacy is not a net improvement. Publish per-capability deltas and rights/authority violation counts alongside aggregate AML scores.
+
+
 Sources:
 - Official results: https://agentmemoryleaderboard.ai/results/cycle-2/
 - Resurface: https://github.com/lilysttail/Resurface
@@ -247,6 +272,12 @@ The current public leaderboard reports:
 - AgentRunbook-C V2 Online: +2.8231 LAFS gain, 75.6% Small accuracy, 130.5s average query latency.
 - Perpetual Recall V3: +1.0955 LAFS gain, 53.2% Small accuracy, 1.96s.
 - OPS-Agentic-Memory-v1: 81.4% Small accuracy, 153.6s, +0.3223 LAFS.
+
+A separate AgentRunbook-C V2 controller report gives additional operating points under named backbones/reasoning tiers:
+- GPT-5.4-mini: low 65.41% at 26.11s, medium 72.73% at 56.68s, xhigh 75.61% at 130.54s.
+- GPT-5.6 Luna: medium 66.52% at 24.72s and xhigh 75.17% at 48.94s.
+
+Do not merge these rows with the leaderboard's single online result or compare different backbone/tier runs as if they were the same experiment. Their value is methodological: report multiple frontier points, identify the exact reader/backbone/reasoning budget, and measure online consolidation cost rather than only offline retrieval latency.
 
 The highest peak accuracy is not necessarily the best frontier point. MACE should optimize LAFS and publish its operating points.
 
