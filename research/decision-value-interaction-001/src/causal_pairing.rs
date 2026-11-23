@@ -15,9 +15,7 @@
 //! is physically true or complete. Independent execution isolation and replay
 //! audit remain required (#9437, #8732, and the Symtropy scenario owners).
 
-use crate::{
-    InteractionError, PairedRunIdentity, TreatmentArm,
-};
+use crate::{InteractionError, PairedRunIdentity, TreatmentArm};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
@@ -150,34 +148,61 @@ pub enum CausalDigestField {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum CausalPairingError {
-    WrongReceiptCount { actual: usize },
-    DuplicateArm { arm: TreatmentArm },
-    MissingArm { arm: TreatmentArm },
+    WrongReceiptCount {
+        actual: usize,
+    },
+    DuplicateArm {
+        arm: TreatmentArm,
+    },
+    MissingArm {
+        arm: TreatmentArm,
+    },
     PairedIdentity(InteractionError),
     CommonIdentityMismatch,
     RegimeMismatch,
     MixedTrajectoryOrigins,
     OfflineLoggedPolicyEvaluationUnsupported,
-    SharedRecordedTrajectoryForbiddenForClosedLoop { arm: TreatmentArm },
-    IncompleteReceipt { arm: TreatmentArm },
-    IndependentReplayAuditFailed { arm: TreatmentArm },
-    EmptyTrajectory { arm: TreatmentArm },
+    SharedRecordedTrajectoryForbiddenForClosedLoop {
+        arm: TreatmentArm,
+    },
+    IncompleteReceipt {
+        arm: TreatmentArm,
+    },
+    IndependentReplayAuditFailed {
+        arm: TreatmentArm,
+    },
+    EmptyTrajectory {
+        arm: TreatmentArm,
+    },
     EmptyDigest {
         arm: Option<TreatmentArm>,
         field: CausalDigestField,
     },
     RandomnessDomainsNotSeparated,
-    InitialStateMismatch { arm: TreatmentArm },
-    StateChainMismatch { arm: TreatmentArm, world_tick: u64 },
-    TickOverflow { arm: TreatmentArm },
+    InitialStateMismatch {
+        arm: TreatmentArm,
+    },
+    StateChainMismatch {
+        arm: TreatmentArm,
+        world_tick: u64,
+    },
+    TickOverflow {
+        arm: TreatmentArm,
+    },
     NonContiguousTick {
         arm: TreatmentArm,
         expected: u64,
         actual: u64,
     },
-    ExogenousInputMismatch { world_tick: u64 },
-    OpenLoopTrajectoryMismatch { world_tick: u64 },
-    ConflictingDeterministicTransition { world_tick: u64 },
+    ExogenousInputMismatch {
+        world_tick: u64,
+    },
+    OpenLoopTrajectoryMismatch {
+        world_tick: u64,
+    },
+    ConflictingDeterministicTransition {
+        world_tick: u64,
+    },
     ArithmeticOverflow,
 }
 
@@ -189,19 +214,34 @@ impl fmt::Display for CausalPairingError {
                 "expected four causal trajectory receipts, received {actual}"
             ),
             Self::DuplicateArm { arm } => {
-                write!(formatter, "causal trajectory receipt duplicates arm {arm:?}")
+                write!(
+                    formatter,
+                    "causal trajectory receipt duplicates arm {arm:?}"
+                )
             }
             Self::MissingArm { arm } => {
-                write!(formatter, "causal trajectory receipt is missing arm {arm:?}")
+                write!(
+                    formatter,
+                    "causal trajectory receipt is missing arm {arm:?}"
+                )
             }
             Self::PairedIdentity(error) => {
-                write!(formatter, "paired decision-regret identity is invalid: {error}")
+                write!(
+                    formatter,
+                    "paired decision-regret identity is invalid: {error}"
+                )
             }
             Self::CommonIdentityMismatch => {
-                write!(formatter, "causal experiment roots differ across treatment arms")
+                write!(
+                    formatter,
+                    "causal experiment roots differ across treatment arms"
+                )
             }
             Self::RegimeMismatch => {
-                write!(formatter, "treatment arms declare different causal replay regimes")
+                write!(
+                    formatter,
+                    "treatment arms declare different causal replay regimes"
+                )
             }
             Self::MixedTrajectoryOrigins => {
                 write!(formatter, "treatment arms mix trajectory provenance modes")
@@ -215,7 +255,10 @@ impl fmt::Display for CausalPairingError {
                 "closed-loop action-coupled arm {arm:?} cannot reuse a shared recorded future trajectory"
             ),
             Self::IncompleteReceipt { arm } => {
-                write!(formatter, "trajectory receipt for arm {arm:?} is incomplete")
+                write!(
+                    formatter,
+                    "trajectory receipt for arm {arm:?} is incomplete"
+                )
             }
             Self::IndependentReplayAuditFailed { arm } => write!(
                 formatter,
@@ -225,7 +268,10 @@ impl fmt::Display for CausalPairingError {
                 write!(formatter, "trajectory for arm {arm:?} has no steps")
             }
             Self::EmptyDigest { arm, field } => {
-                write!(formatter, "empty {field:?} digest in causal pairing receipt for {arm:?}")
+                write!(
+                    formatter,
+                    "empty {field:?} digest in causal pairing receipt for {arm:?}"
+                )
             }
             Self::RandomnessDomainsNotSeparated => write!(
                 formatter,
@@ -240,7 +286,10 @@ impl fmt::Display for CausalPairingError {
                 "arm {arm:?} has a discontinuous world-state chain at tick {world_tick}"
             ),
             Self::TickOverflow { arm } => {
-                write!(formatter, "world-tick arithmetic overflowed for arm {arm:?}")
+                write!(
+                    formatter,
+                    "world-tick arithmetic overflowed for arm {arm:?}"
+                )
             }
             Self::NonContiguousTick {
                 arm,
@@ -263,7 +312,10 @@ impl fmt::Display for CausalPairingError {
                 "identical pre-state/action/exogenous inputs produce conflicting next states at tick {world_tick}"
             ),
             Self::ArithmeticOverflow => {
-                write!(formatter, "causal pairing certificate arithmetic overflowed")
+                write!(
+                    formatter,
+                    "causal pairing certificate arithmetic overflowed"
+                )
             }
         }
     }
@@ -296,16 +348,26 @@ fn require_digest(
     }
 }
 
-fn validate_common_identity(
-    identity: &CausalPairingIdentity,
-) -> Result<(), CausalPairingError> {
+fn validate_common_identity(identity: &CausalPairingIdentity) -> Result<(), CausalPairingError> {
     crate::validate_identity(&identity.paired).map_err(CausalPairingError::PairedIdentity)?;
 
     for (digest, field) in [
-        (&identity.dynamics_model_sha256, CausalDigestField::DynamicsModel),
-        (&identity.simulator_build_sha256, CausalDigestField::SimulatorBuild),
-        (&identity.exogenous_schedule_sha256, CausalDigestField::ExogenousSchedule),
-        (&identity.clock_profile_sha256, CausalDigestField::ClockProfile),
+        (
+            &identity.dynamics_model_sha256,
+            CausalDigestField::DynamicsModel,
+        ),
+        (
+            &identity.simulator_build_sha256,
+            CausalDigestField::SimulatorBuild,
+        ),
+        (
+            &identity.exogenous_schedule_sha256,
+            CausalDigestField::ExogenousSchedule,
+        ),
+        (
+            &identity.clock_profile_sha256,
+            CausalDigestField::ClockProfile,
+        ),
         (
             &identity.randomness_domains.world_disturbance_sha256,
             CausalDigestField::WorldDisturbanceRngDomain,
@@ -370,8 +432,14 @@ fn validate_steps(receipt: &CausalTrajectoryReceipt) -> Result<(), CausalPairing
         }
         for (digest, field) in [
             (&step.pre_state_sha256, CausalDigestField::PreState),
-            (&step.applied_action_sha256, CausalDigestField::AppliedAction),
-            (&step.exogenous_input_sha256, CausalDigestField::ExogenousInput),
+            (
+                &step.applied_action_sha256,
+                CausalDigestField::AppliedAction,
+            ),
+            (
+                &step.exogenous_input_sha256,
+                CausalDigestField::ExogenousInput,
+            ),
             (&step.post_state_sha256, CausalDigestField::PostState),
             (
                 &step.observation_delivery_sha256,
@@ -383,9 +451,7 @@ fn validate_steps(receipt: &CausalTrajectoryReceipt) -> Result<(), CausalPairing
         if index == 0 && step.pre_state_sha256 != receipt.identity.paired.initial_state_sha256 {
             return Err(CausalPairingError::InitialStateMismatch { arm: receipt.arm });
         }
-        if index > 0
-            && step.pre_state_sha256 != receipt.steps[index - 1].post_state_sha256
-        {
+        if index > 0 && step.pre_state_sha256 != receipt.steps[index - 1].post_state_sha256 {
             return Err(CausalPairingError::StateChainMismatch {
                 arm: receipt.arm,
                 world_tick: step.world_tick,
@@ -485,10 +551,8 @@ pub fn validate_causal_pairing(
     // A fully specified transition input must have one deterministic output.
     // This also catches accidental RNG stream desynchronization when the same
     // keyed exogenous event is presented with the same state and action.
-    let mut transition_outputs: BTreeMap<
-        (u64, [u8; 32], [u8; 32], [u8; 32]),
-        [u8; 32],
-    > = BTreeMap::new();
+    let mut transition_outputs: BTreeMap<(u64, [u8; 32], [u8; 32], [u8; 32]), [u8; 32]> =
+        BTreeMap::new();
 
     let mut exogenous_by_tick: BTreeMap<u64, [u8; 32]> = BTreeMap::new();
 
@@ -648,8 +712,7 @@ mod tests {
             TreatmentArm::ObservationOnly,
             TreatmentArm::Joint,
         ];
-        arms
-            .into_iter()
+        arms.into_iter()
             .enumerate()
             .map(|(index, arm)| {
                 let branch = if divergent { index as u8 } else { 0 };
@@ -689,7 +752,10 @@ mod tests {
         );
         let certificate = validate_causal_pairing(&runs).expect("valid paired causal arms");
         assert_eq!(certificate.matched_tick_count, 2);
-        assert_ne!(certificate.terminal_state_sha256[0], certificate.terminal_state_sha256[1]);
+        assert_ne!(
+            certificate.terminal_state_sha256[0],
+            certificate.terminal_state_sha256[1]
+        );
     }
 
     #[test]
@@ -701,9 +767,11 @@ mod tests {
         );
         assert!(matches!(
             validate_causal_pairing(&runs),
-            Err(CausalPairingError::SharedRecordedTrajectoryForbiddenForClosedLoop {
-                arm: TreatmentArm::Baseline
-            })
+            Err(
+                CausalPairingError::SharedRecordedTrajectoryForbiddenForClosedLoop {
+                    arm: TreatmentArm::Baseline
+                }
+            )
         ));
     }
 
@@ -716,10 +784,12 @@ mod tests {
         );
         let certificate = validate_causal_pairing(&runs).expect("valid action-invariant arms");
         assert_eq!(certificate.matched_tick_count, 2);
-        assert!(certificate
-            .terminal_state_sha256
-            .iter()
-            .all(|state| *state == digest(40)));
+        assert!(
+            certificate
+                .terminal_state_sha256
+                .iter()
+                .all(|state| *state == digest(40))
+        );
     }
 
     #[test]
