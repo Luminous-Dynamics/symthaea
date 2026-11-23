@@ -1623,6 +1623,10 @@ pub struct KirdRecordSummary {
     pub confirmed_probe_count: u64,
     pub response_coverage_kind: String,
     pub globally_bounded: bool,
+    pub covering_radius: Option<f64>,
+    pub verified_lipschitz_constant: Option<f64>,
+    pub uncertainty_budget: Option<f64>,
+    pub global_normalized_error_bound: Option<f64>,
     pub physical_gate_status: String,
 }
 
@@ -1865,6 +1869,21 @@ pub fn validate_kird_record_value(
         return Err(ContractError::StorageByteCountOverflow);
     }
 
+    let (covering_radius, verified_lipschitz_constant, uncertainty_budget, global_normalized_error_bound) =
+        if response_coverage_kind == "certified_global" {
+            let uncertainty_budget = kird_number(value, "response_scope.reference_uncertainty")?
+                + kird_number(value, "response_scope.candidate_uncertainty")?
+                + kird_number(value, "response_scope.measurement_uncertainty")?;
+            (
+                Some(kird_number(value, "response_scope.covering_radius")?),
+                Some(kird_number(value, "response_scope.verified_lipschitz_constant")?),
+                Some(uncertainty_budget),
+                Some(kird_number(value, "response_scope.global_normalized_error_bound")?),
+            )
+        } else {
+            (None, None, None, None)
+        };
+
     Ok(KirdRecordSummary {
         record_id: record_id.to_owned(),
         record_status: record_status.to_owned(),
@@ -1880,6 +1899,10 @@ pub fn validate_kird_record_value(
         confirmed_probe_count,
         response_coverage_kind: response_coverage_kind.to_owned(),
         globally_bounded,
+        covering_radius,
+        verified_lipschitz_constant,
+        uncertainty_budget,
+        global_normalized_error_bound,
         physical_gate_status: physical_gate_status.to_owned(),
     })
 }
@@ -2232,6 +2255,41 @@ mod tests {
 
     fn fixture_value() -> serde_json::Value {
         serde_json::from_str(SYNTHETIC_FIXTURE).expect("checked-in fixture must be valid JSON")
+    }
+
+    fn certified_kird_value() -> serde_json::Value {
+        let mut value: serde_json::Value =
+            serde_json::from_str(KIRD_SYNTHETIC_FIXTURE).unwrap();
+        value["response_scope"]["coverage_kind"] = serde_json::json!("certified_global");
+        value["response_scope"]["registered_probe_count"] = serde_json::json!(5);
+        value["response_scope"]["confirmed_probe_count"] = serde_json::json!(5);
+        value["response_scope"]["globally_bounded"] = serde_json::json!(true);
+        value["response_scope"]["bound_method"] =
+            serde_json::json!("validated-interval-derivative-bound-v1");
+        value["response_scope"]["bound_evidence_sha256"] =
+            serde_json::json!("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+        value["response_scope"]["coverage_metric_id"] =
+            serde_json::json!("normalized-response-max-v1");
+        value["response_scope"]["covering_radius"] = serde_json::json!(0.1);
+        value["response_scope"]["verified_lipschitz_constant"] = serde_json::json!(2.0);
+        value["response_scope"]["reference_uncertainty"] = serde_json::json!(0.01);
+        value["response_scope"]["candidate_uncertainty"] = serde_json::json!(0.02);
+        value["response_scope"]["measurement_uncertainty"] = serde_json::json!(0.02);
+        value["response_scope"]["maximum_sampled_normalized_error"] = serde_json::json!(0.5);
+        value["response_scope"]["global_normalized_error_bound"] = serde_json::json!(0.75);
+        value["response_scope"]["covering_set_sha256"] =
+            serde_json::json!("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+        value["response_scope"]["branch_association_stable"] = serde_json::json!(true);
+        value["response_scope"]["branch_stability_evidence_sha256"] =
+            serde_json::json!("cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc");
+        value["response_scope"]["independent_checker_revision"] =
+            serde_json::json!("kird-checker-v0.1.0");
+        value["distortion"]["intervention_response"]["status"] = serde_json::json!("PASS");
+        value["distortion"]["intervention_response"]["worst_confirmed_normalized_error"] =
+            serde_json::json!(0.5);
+        value["distortion"]["intervention_response"]["evidence_sha256"] =
+            serde_json::json!("dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd");
+        value
     }
 
     fn parse_value(value: &serde_json::Value) -> Result<PulseFamilyContract, ContractError> {
@@ -2709,6 +2767,85 @@ mod tests {
             validate_kird_record_value(&value),
             Err(ContractError::StorageByteCountOverflow)
         );
+    }
+
+    #[test]
+    fn kird_audit_accepts_manufactured_lipschitz_cover_certificate() {
+        let value = certified_kird_value();
+        let summary = validate_kird_record_value(&value).unwrap();
+        assert_eq!(summary.response_coverage_kind, "certified_global");
+        assert!(summary.globally_bounded);
+        assert_eq!(summary.covering_radius, Some(0.1));
+        assert_eq!(summary.verified_lipschitz_constant, Some(2.0));
+        assert_eq!(summary.uncertainty_budget, Some(0.05));
+        assert_eq!(summary.global_normalized_error_bound, Some(0.75));
+    }
+
+    #[test]
+    fn kird_audit_rejects_understated_lipschitz_cover_bound() {
+        let mut value = certified_kird_value();
+        value["response_scope"]["global_normalized_error_bound"] = serde_json::json!(0.74);
+        assert!(matches!(
+            validate_kird_record_value(&value),
+            Err(ContractError::InvalidKirdField {
+                field: "response_scope.global_normalized_error_bound",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn kird_audit_rejects_unstable_branch_association_in_global_certificate() {
+        let mut value = certified_kird_value();
+        value["response_scope"]["branch_association_stable"] = serde_json::json!(false);
+        assert!(matches!(
+            validate_kird_record_value(&value),
+            Err(ContractError::InvalidKirdField {
+                field: "response_scope.branch_association_stable",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn kird_audit_rejects_global_cover_that_understates_sampled_error() {
+        let mut value = certified_kird_value();
+        value["response_scope"]["maximum_sampled_normalized_error"] =
+            serde_json::json!(0.49);
+        assert!(matches!(
+            validate_kird_record_value(&value),
+            Err(ContractError::InvalidKirdField {
+                field: "response_scope.maximum_sampled_normalized_error",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn kird_audit_rejects_global_certificate_without_branch_proof_digest() {
+        let mut value = certified_kird_value();
+        value["response_scope"]["branch_stability_evidence_sha256"] =
+            serde_json::json!("0000000000000000000000000000000000000000000000000000000000000000");
+        assert!(matches!(
+            validate_kird_record_value(&value),
+            Err(ContractError::InvalidKirdField {
+                field: "response_scope.branch_stability_evidence_sha256",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn kird_audit_rejects_response_pass_when_global_bound_exceeds_tolerance() {
+        let mut value = certified_kird_value();
+        value["response_scope"]["global_normalized_error_bound"] = serde_json::json!(1.01);
+        assert!(matches!(
+            validate_kird_record_value(&value),
+            Err(ContractError::InvalidKirdField {
+                field: "distortion.intervention_response",
+                ..
+            })
+        ));
     }
 
     #[test]
