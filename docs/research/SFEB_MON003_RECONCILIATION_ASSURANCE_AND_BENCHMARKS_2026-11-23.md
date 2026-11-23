@@ -27,8 +27,8 @@ The fence namespace is now the composite `(tenantId, objectiveId)`. Reusing an o
 
 ## Executed evidence
 
-Source: [`mon003-objective-kernel-v3.mjs`](../benchmarks/frontend/monitoring/mon003-objective-kernel-v3.mjs)  
-Report: [`mon003-objective-kernel-v3-report-v1.json`](../benchmarks/frontend/monitoring/mon003-objective-kernel-v3-report-v1.json)
+Source: [`mon003-objective-kernel-v3.mjs`](../../benchmarks/frontend/monitoring/mon003-objective-kernel-v3.mjs)  
+Report: [`mon003-objective-kernel-v3-report-v1.json`](../../benchmarks/frontend/monitoring/mon003-objective-kernel-v3-report-v1.json)
 
 Node.js v22.16.0 executed `node --check` and the full test program. **20/20 deterministic cases passed.** Added cases specifically exercise minimized lost-response reconciliation, audit access after action revocation, unauthorized/expired/revoked reader grants, operation/tenant scope binding, fence isolation for identical objective IDs, and stale-worker replay denial.
 
