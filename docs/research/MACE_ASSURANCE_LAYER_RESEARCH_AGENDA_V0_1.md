@@ -464,6 +464,7 @@ For decision sufficiency, compare memory representations on identical world/task
 | #13386 | V2 retrieval-to-candidate evidence DAG integration | Explicit state/text/image/neighbor lineage, cross-language candidate-set commitment verification and durable query receipts; no issuer/rights/lifecycle qualification |
 | #13391 | Label-blind retrieval-policy memory prototype | In-memory trace receipts and deterministic strategy promotion; not yet connected to the V2 operation stream or durable service |
 | #13393 | V2 query-to-retrieval-policy trace integration | One actual BM25 operation per opaque invocation; cross-language trace digest, paired candidate receipt and strict save/load; index-byte telemetry incomplete and policy store process-local |
+| #13396 | Durable V2 retrieval-policy trace store | Shared Rust/Python invocation-keyed receipt directory, atomic create-once publication, startup replay and unknown-outcome reconciliation; local rollback domain only, strategy-note persistence pending |
 
 No row above should be interpreted as a CI pass or official benchmark score unless a later exact-head run receipt establishes it.
 
@@ -485,7 +486,8 @@ No row above should be interpreted as a CI pass or official benchmark score unle
 ### Stage 3 — Improve retrieval without sacrificing source fidelity
 - Reproduce AgentRunbook-C V2 Online as a distinct retrieval-policy-memory arm before building a MACE consolidation controller.
 - Extend #13393's actual single-operation V2 trace capture into a multi-operation controller using only the opaque query invocation ID, observed candidate IDs, exact tool/action template digests, measured costs and stop reason; never pass evaluator labels.
-- Add durable cross-process trace receipt restoration and atomic strategy-note promotion outside the candidate process; retain #13391 as the deterministic in-memory conformance reference.
+- Use #13396 as the current local durable trace-receipt implementation and conformance reference; keep its local rollback limitation explicit.
+- Add durable, atomic strategy-note promotion outside the candidate process, backed by independent witness custody; retain #13391 as the deterministic in-memory conformance reference.
 - Instrument BM25 posting/index reads and RSS; the current trace explicitly marks inspected-byte accounting incomplete.
 - Compare cold, warm, shuffled-order and cross-version transfer, including no-consolidation and random-policy controls.
 - Keep retrieval-policy notes separate from factual/source evidence and require applicability, expiry and source lineage for every strategy note.
