@@ -3,6 +3,7 @@ pub mod raw_session;
 pub mod longmemeval_v2;
 pub mod candidate_evidence;
 pub mod longmemeval_v2_candidate_adapter;
+pub mod retrieval_policy_memory;
 
 // Copyright (C) 2026 Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
