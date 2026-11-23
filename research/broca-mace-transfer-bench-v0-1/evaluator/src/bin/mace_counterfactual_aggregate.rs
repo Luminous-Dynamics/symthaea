@@ -935,6 +935,11 @@ fn reduce(
     }
     let provenance = input_provenance
         .ok_or_else(|| "evaluator stream has no run provenance".to_string())?;
+    let evaluator_bytes = fs::read(evaluator_path)
+        .map_err(|error| format!("read evaluator stream for digest {evaluator_path}: {error}"))?;
+    let evaluator_stream_sha256 =
+        hex_digest(Sha256::digest(&evaluator_bytes).as_slice());
+    let evaluator_record_count = manifest_row_count + intervention_row_count;
     let manifest_set_payload = manifest_shas.iter().cloned().collect::<Vec<_>>().join("\n");
     let input_manifest_set_sha256 =
         hex_digest(Sha256::digest(manifest_set_payload.as_bytes()).as_slice());
@@ -1026,6 +1031,8 @@ fn reduce(
         record["input_run_id"] = json!(provenance.run_id.as_str());
         record["input_candidate_stream_sha256"] = json!(candidate_stream_sha256.as_str());
         record["input_candidate_record_count"] = json!(candidate_record_count);
+        record["input_evaluator_stream_sha256"] = json!(evaluator_stream_sha256.as_str());
+        record["input_evaluator_record_count"] = json!(evaluator_record_count);
         record["input_manifest_set_sha256"] = json!(input_manifest_set_sha256.as_str());
         record["input_source_code_sha256"] = json!(provenance.source_code_sha256.as_str());
         record["input_fixture_sha256"] = json!(provenance.fixture_sha256.as_str());
