@@ -261,6 +261,7 @@ Three strict JSON Schema artifacts accompany this specification:
 
 - [`mace_onpolicy_run_manifest_v1.schema.json`](../../data/schemas/mace_onpolicy_run_manifest_v1.schema.json): public non-secret run configuration and artifact commitments. Assignment seeds are committed, not disclosed.
 - [`mace_onpolicy_candidate_event_v1.schema.json`](../../data/schemas/mace_onpolicy_candidate_event_v1.schema.json): candidate-visible prefix events only, with an explicit visibility marker, source/rights profile references, payload digest and predecessor digest. Unknown fields are rejected.
+- [`mace_onpolicy_candidate_action_v1.schema.json`](../../data/schemas/mace_onpolicy_candidate_action_v1.schema.json): candidate-emitted responses, user questions, memory mutations, tool requests and abstentions as explicit action records. The action type determines required fields, and unknown fields are rejected.
 - [`mace_onpolicy_evaluator_outcome_v1.schema.json`](../../data/schemas/mace_onpolicy_evaluator_outcome_v1.schema.json): sealed evaluator-only latent-state, utility, burden, memory-quality, privacy/authority and resource outcomes. This record must never be serialized into the candidate request stream.
 
 The schemas define wire shape, not authenticity or authorization. The runtime must separately verify digests, source/authority receipts, event sequence, append-only chain continuity, policy assignment and custody. A schema parse is not schema validation, runtime conformance or isolation qualification.
