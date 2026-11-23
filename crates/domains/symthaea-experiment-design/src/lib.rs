@@ -818,3 +818,6 @@ mod tests {
         assert!(serialized.contains("not Bayesian expected information gain"));
     }
 }
+
+/// Covariance-aware experiment design with explicit singular-support handling.
+pub mod covariance;
