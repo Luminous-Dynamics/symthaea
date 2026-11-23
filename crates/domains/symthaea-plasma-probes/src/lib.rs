@@ -17,8 +17,7 @@ use thiserror::Error;
 const CONTRACT_VERSION: &str = "0.1";
 const EQUATION_ID: &str = "periodic_1d1v_collisionless_vlasov_poisson";
 const OPERATOR_ID: &str = "sinusoidal_velocity_kick_v1";
-const OPERATOR_DEFINITION: &str =
-    "v_after(x) = v_before(x) + A*sin(2*pi*m*(x-x_min)/L + phase)";
+const OPERATOR_DEFINITION: &str = "v_after(x) = v_before(x) + A*sin(2*pi*m*(x-x_min)/L + phase)";
 const AMPLITUDE_SEMANTICS: &str = "maximum_absolute_delta_v";
 const APPLICATION_SEMANTICS: &str = "instantaneous_canonical_velocity_kick";
 const TAU: f64 = std::f64::consts::TAU;
@@ -214,7 +213,12 @@ impl PulseFamilyContract {
         }
         if self.physics_cohort.normalization_id.trim().is_empty()
             || self.physics_cohort.time_unit.trim().is_empty()
-            || self.physics_cohort.velocity_domain.velocity_unit.trim().is_empty()
+            || self
+                .physics_cohort
+                .velocity_domain
+                .velocity_unit
+                .trim()
+                .is_empty()
         {
             return Err(ContractError::InvalidField {
                 field: "physics_cohort",
@@ -240,8 +244,7 @@ impl PulseFamilyContract {
                 reason: "velocity bounds must be finite and increasing",
             });
         }
-        if !self.physics_cohort.maximum_time.is_finite()
-            || self.physics_cohort.maximum_time <= 0.0
+        if !self.physics_cohort.maximum_time.is_finite() || self.physics_cohort.maximum_time <= 0.0
         {
             return Err(ContractError::InvalidField {
                 field: "physics_cohort.maximum_time",
@@ -316,8 +319,8 @@ impl PulseFamilyContract {
         }
 
         let policy = &self.evaluation_policy;
-        let post_pulse_end = controls.application_time.maximum
-            + policy.minimum_post_pulse_observation_duration;
+        let post_pulse_end =
+            controls.application_time.maximum + policy.minimum_post_pulse_observation_duration;
         if !policy.independent_confirmation_required
             || policy.minimum_spatial_refinement_levels == 0
             || policy.minimum_time_refinement_levels == 0
@@ -376,7 +379,10 @@ impl PulseFamilyContract {
         let provenance = &self.provenance;
         if !valid_sha256(&provenance.initial_state_sha256)
             || provenance.reference_solver_revision.trim().is_empty()
-            || provenance.candidate_representation_revision.trim().is_empty()
+            || provenance
+                .candidate_representation_revision
+                .trim()
+                .is_empty()
         {
             return Err(ContractError::InvalidField {
                 field: "provenance",
@@ -401,7 +407,10 @@ impl PulseFamilyContract {
         } else if self.contract_status == "physical_candidate" {
             if provenance.fixture_class != "physical_candidate"
                 || !provenance.physical_execution_authorized
-                || provenance.initial_state_sha256.bytes().all(|byte| byte == b'0')
+                || provenance
+                    .initial_state_sha256
+                    .bytes()
+                    .all(|byte| byte == b'0')
             {
                 return Err(ContractError::PhysicalProvenanceIncomplete);
             }
@@ -445,8 +454,14 @@ impl PulseFamilyContract {
         );
         update_length_prefixed(&mut hasher, self.physics_cohort.time_unit.as_bytes());
         update_f64(&mut hasher, self.physics_cohort.maximum_time);
-        update_length_prefixed(&mut hasher, self.intervention_operator.operator_id.as_bytes());
-        update_length_prefixed(&mut hasher, self.intervention_operator.definition.as_bytes());
+        update_length_prefixed(
+            &mut hasher,
+            self.intervention_operator.operator_id.as_bytes(),
+        );
+        update_length_prefixed(
+            &mut hasher,
+            self.intervention_operator.definition.as_bytes(),
+        );
         update_length_prefixed(
             &mut hasher,
             self.intervention_operator.amplitude_semantics.as_bytes(),
@@ -456,7 +471,11 @@ impl PulseFamilyContract {
             self.intervention_operator.application_semantics.as_bytes(),
         );
         hasher.update(&[u8::from(self.physics_cohort.spatial_domain.periodic)]);
-        update_f64(&mut hasher, self.evaluation_policy.minimum_post_pulse_observation_duration);
+        update_f64(
+            &mut hasher,
+            self.evaluation_policy
+                .minimum_post_pulse_observation_duration,
+        );
         hasher.update(&self.admissible_controls.spatial_mode.minimum.to_le_bytes());
         hasher.update(&self.admissible_controls.spatial_mode.maximum.to_le_bytes());
         update_f64(&mut hasher, self.admissible_controls.phase_rad.minimum);
@@ -467,16 +486,30 @@ impl PulseFamilyContract {
             &mut hasher,
             self.admissible_controls.kick_amplitude.unit.as_bytes(),
         );
-        update_f64(&mut hasher, self.admissible_controls.application_time.minimum);
-        update_f64(&mut hasher, self.admissible_controls.application_time.maximum);
+        update_f64(
+            &mut hasher,
+            self.admissible_controls.application_time.minimum,
+        );
+        update_f64(
+            &mut hasher,
+            self.admissible_controls.application_time.maximum,
+        );
         update_length_prefixed(
             &mut hasher,
             self.admissible_controls.application_time.unit.as_bytes(),
         );
         update_length_prefixed(&mut hasher, self.provenance.initial_state_sha256.as_bytes());
-        update_length_prefixed(&mut hasher, self.provenance.reference_solver_revision.as_bytes());
+        update_length_prefixed(
+            &mut hasher,
+            self.provenance.reference_solver_revision.as_bytes(),
+        );
         hasher.update(&self.provenance.generator_seed.to_le_bytes());
-        for source_ref in self.provenance.source_record_refs.iter().collect::<BTreeSet<_>>() {
+        for source_ref in self
+            .provenance
+            .source_record_refs
+            .iter()
+            .collect::<BTreeSet<_>>()
+        {
             update_length_prefixed(&mut hasher, source_ref.as_bytes());
         }
         hasher.finalize().to_hex().to_string()
@@ -547,11 +580,7 @@ impl EmpiricalGramian {
     ///
     /// A zero weight is a no-op. Negative and non-finite weights are rejected.
     /// The direction and its weighted factor must remain finite.
-    pub fn add_direction(
-        &mut self,
-        direction: &[f64],
-        weight: f64,
-    ) -> Result<(), ContractError> {
+    pub fn add_direction(&mut self, direction: &[f64], weight: f64) -> Result<(), ContractError> {
         if direction.len() != self.dimension {
             return Err(ContractError::GramianDimensionMismatch {
                 expected: self.dimension,
@@ -722,10 +751,7 @@ pub struct PulseCandidate {
 
 impl PulseCandidate {
     /// Check that the candidate belongs to this family and uses finite, admissible values.
-    pub fn validate_for(
-        &self,
-        contract: &PulseFamilyContract,
-    ) -> Result<(), ContractError> {
+    pub fn validate_for(&self, contract: &PulseFamilyContract) -> Result<(), ContractError> {
         contract.validate()?;
         let bounds = &contract.admissible_controls;
 
@@ -744,7 +770,9 @@ impl PulseCandidate {
             || self.kick_velocity_amplitude < bounds.kick_amplitude.minimum
             || self.kick_velocity_amplitude > bounds.kick_amplitude.maximum
         {
-            return Err(ContractError::CandidateOutOfRange("kick_velocity_amplitude"));
+            return Err(ContractError::CandidateOutOfRange(
+                "kick_velocity_amplitude",
+            ));
         }
         if !self.application_time.is_finite()
             || self.application_time < bounds.application_time.minimum
@@ -821,9 +849,7 @@ pub struct GridSpec {
 
 impl GridSpec {
     pub fn validate(self) -> Result<(), ContractError> {
-        if self.phase_steps == 0
-            || self.amplitude_steps == 0
-            || self.application_time_steps == 0
+        if self.phase_steps == 0 || self.amplitude_steps == 0 || self.application_time_steps == 0
         {
             return Err(ContractError::InvalidGrid);
         }
@@ -1005,8 +1031,7 @@ mod tests {
     }
 
     fn contract() -> PulseFamilyContract {
-        PulseFamilyContract::parse_json(SYNTHETIC_FIXTURE)
-            .expect("synthetic fixture must parse")
+        PulseFamilyContract::parse_json(SYNTHETIC_FIXTURE).expect("synthetic fixture must parse")
     }
 
     fn candidate(
@@ -1056,7 +1081,10 @@ mod tests {
             gramian.add_direction(&[f64::NAN, 0.0], 1.0),
             Err(ContractError::InvalidGramianArithmetic)
         );
-        assert_eq!(EmpiricalGramian::new(0).unwrap_err(), ContractError::InvalidGramianDimension);
+        assert_eq!(
+            EmpiricalGramian::new(0).unwrap_err(),
+            ContractError::InvalidGramianDimension
+        );
     }
 
     #[test]
@@ -1080,9 +1108,7 @@ mod tests {
             .unwrap();
         assert!((captured - 1.0).abs() < 1.0e-12);
 
-        let first_only = gramian
-            .captured_trace_fraction(&[vec![1.0, 0.0]])
-            .unwrap();
+        let first_only = gramian.captured_trace_fraction(&[vec![1.0, 0.0]]).unwrap();
         assert!((first_only - (2.0 / 10.5)).abs() < 1.0e-12);
     }
 
@@ -1189,7 +1215,9 @@ mod tests {
         );
         assert_eq!(
             candidate(2, 0.2, 0.03, 3.0).validate_for(&family),
-            Err(ContractError::CandidateOutOfRange("kick_velocity_amplitude"))
+            Err(ContractError::CandidateOutOfRange(
+                "kick_velocity_amplitude"
+            ))
         );
     }
 
