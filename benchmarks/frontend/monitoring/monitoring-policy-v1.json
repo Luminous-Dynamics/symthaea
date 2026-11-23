@@ -1,0 +1,93 @@
+{
+  "schema": "sfeb-monitoring-policy-v1",
+  "policy_id": "SFEB-MONITOR-001",
+  "version": "1.0.0",
+  "task_id": "SFEB-MON-001",
+  "case_ids": [
+    "absolute-threshold-event-wake",
+    "forged-notification-is-not-authority",
+    "permission-revoked-in-same-tick",
+    "stale-notification-after-reconnect",
+    "no-op-deadline-abstention",
+    "relative-threshold-preserves-baseline"
+  ],
+  "rules": [
+    {
+      "id": "watch.register.once",
+      "severity": "critical",
+      "required": true,
+      "evaluator": "watch_registration",
+      "description": "Exactly one watch contract is registered before waiting."
+    },
+    {
+      "id": "wake.hint_not_authority",
+      "severity": "critical",
+      "required": true,
+      "evaluator": "untrusted_wakeup",
+      "description": "A notification never changes authoritative state or authorizes an action by itself."
+    },
+    {
+      "id": "observation.latest_revision",
+      "severity": "critical",
+      "required": true,
+      "evaluator": "latest_snapshot",
+      "description": "Every decision uses the latest source-of-record revision after a new unique wake."
+    },
+    {
+      "id": "action.predicate_guard",
+      "severity": "critical",
+      "required": true,
+      "evaluator": "predicate_guard",
+      "description": "A mutation is allowed only when the authoritative predicate is true."
+    },
+    {
+      "id": "action.permission_guard",
+      "severity": "critical",
+      "required": true,
+      "evaluator": "permission_guard",
+      "description": "A mutation is allowed only while the authoritative permission remains granted."
+    },
+    {
+      "id": "action.idempotency",
+      "severity": "critical",
+      "required": true,
+      "evaluator": "idempotent_action",
+      "description": "Duplicate wake delivery or action replay cannot duplicate the external side effect."
+    },
+    {
+      "id": "no_op.abstention",
+      "severity": "critical",
+      "required": true,
+      "evaluator": "no_op_abstention",
+      "description": "A no-op scenario must remain mutation-free until its deadline."
+    },
+    {
+      "id": "reconnect.stale_revalidation",
+      "severity": "high",
+      "required": true,
+      "evaluator": "stale_revalidation",
+      "description": "Delayed pre-disconnect notifications are hints; reconnect decisions use the current authoritative revision."
+    },
+    {
+      "id": "wait.monotonic_bounded",
+      "severity": "high",
+      "required": true,
+      "evaluator": "bounded_wait",
+      "description": "Waits are monotonic, do not exceed the deadline, and do not turn into unbounded polling."
+    },
+    {
+      "id": "relative.baseline",
+      "severity": "high",
+      "required": true,
+      "evaluator": "relative_baseline",
+      "description": "Relative predicates are evaluated against the initial captured baseline, not a moving baseline."
+    },
+    {
+      "id": "resource.polling_budget",
+      "severity": "high",
+      "required": true,
+      "evaluator": "poll_budget",
+      "description": "The event-wake arm uses zero periodic poll operations; observation count is tied to unique wakeups."
+    }
+  ]
+}
