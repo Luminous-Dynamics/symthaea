@@ -308,10 +308,10 @@ pub fn estimate_total_effect(
         + sample_variance(&control_values) / control_values.len() as f64).sqrt();
     let confirmatory = control.len() >= MIN_CONFIRMATORY_CLUSTERS_PER_ARM
         && treatment.len() >= MIN_CONFIRMATORY_CLUSTERS_PER_ARM;
-    let hard_gates_passed = control_summary.privacy_violations
-        + treatment_summary.privacy_violations
-        + control_summary.unauthorized_actions
-        + treatment_summary.unauthorized_actions == 0;
+    let hard_gates_passed = control_summary.privacy_violations == 0
+        && treatment_summary.privacy_violations == 0
+        && control_summary.unauthorized_actions == 0
+        && treatment_summary.unauthorized_actions == 0;
 
     Ok(TotalEffectReport {
         control: control_summary,
@@ -420,19 +420,23 @@ mod tests {
     fn total_effect_weights_profile_clusters_not_turn_counts() {
         let assignments = make_assignments();
         let mut outcomes = make_outcomes(&assignments);
-        outcomes.push(EpisodeOutcome {
-            profile_id: "profile-000".into(),
-            episode_id: "task-2".into(),
-            task_family: "planning".into(),
-            arm: PolicyArm::Control,
-            utility: 0.0,
-            task_success: false,
-            question_count: 5,
-            all_in_cost: 0.8,
-            user_refused: false,
-            privacy_violations: 0,
-            unauthorized_actions: 0,
-        });
+        for assignment in &assignments {
+            let treatment = assignment.arm == PolicyArm::Treatment;
+            let is_extra_control = assignment.profile_id == "profile-000";
+            outcomes.push(EpisodeOutcome {
+                profile_id: assignment.profile_id.clone(),
+                episode_id: "task-2".to_string(),
+                task_family: "planning".to_string(),
+                arm: assignment.arm,
+                utility: if is_extra_control { 0.0 } else if treatment { 0.9 } else { 0.4 },
+                task_success: treatment,
+                question_count: if treatment { 1 } else { 3 },
+                all_in_cost: if treatment { 0.2 } else { 0.4 },
+                user_refused: false,
+                privacy_violations: 0,
+                unauthorized_actions: 0,
+            });
+        }
         let report = estimate_total_effect(&assignments, &outcomes).unwrap();
         assert_eq!(report.utility_effect.control_profiles, 4);
         assert_eq!(report.utility_effect.treatment_profiles, 4);
