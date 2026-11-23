@@ -1155,8 +1155,6 @@ pub fn evaluate_synthetic_metrology_policy_v1(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::benchmark::metrology_audit::MetrologyAuditSelectionRowV1;
-
     fn config(regime: SyntheticFabRegimeV1, seed: u64) -> SyntheticFabScenarioConfigV1 {
         SyntheticFabScenarioConfigV1 {
             schema: REPLAY_SCENARIO_SCHEMA_V1.into(),
@@ -1234,88 +1232,23 @@ mod tests {
     }
 
     fn fake_selection(episode: &SyntheticFabEpisodeV1) -> MetrologyAuditSelectionReportV1 {
-        let mut semantics = crate::benchmark::metrology_semantics::BinaryMeasurandSemanticsV1 {
-            schema: crate::benchmark::metrology_semantics::SEMANTICS_SCHEMA_V1.into(),
-            semantics_id: "synthetic-defect-rule".into(),
-            revision: 1,
-            target_measurand_id: "synthetic-defect-score".into(),
-            unit: "synthetic_unit".into(),
-            positive_class_name: "defect".into(),
-            negative_class_name: "pass".into(),
-            positive_condition:
-                crate::benchmark::metrology_semantics::PositiveConditionV1::GreaterThanOrEqual,
-            threshold: 0.62,
-            authority_ref: "synthetic-benchmark-only".into(),
-            semantics_sha256: String::new(),
-        };
-        crate::benchmark::metrology_semantics::seal_binary_measurand_semantics_v1(&mut semantics)
-            .expect("synthetic semantics should seal");
-        let mut position_by_stratum = BTreeMap::<String, usize>::new();
-        let rows = episode
-            .policy_view
-            .observations
-            .iter()
-            .map(|observed| {
-                let position = position_by_stratum
-                    .entry(observed.stratum_id.clone())
-                    .or_default();
-                let selected = (*position).is_multiple_of(4);
-                *position += 1;
-                MetrologyAuditSelectionRowV1 {
-                    candidate_id: observed.candidate_id.clone(),
-                    subject_id: observed.subject_id.clone(),
-                    stratum_id: observed.stratum_id.clone(),
-                    target_measurand_id: semantics.target_measurand_id.clone(),
-                    class_semantics_ref: semantics.semantics_id.clone(),
-                    class_semantics_sha256: semantics.semantics_sha256.clone(),
-                    predicted_defect_probability: 0.1,
-                    priority_score: 0.1,
-                    measurement_cost: 1,
-                    inclusion_probability: 0.25,
-                    selected,
-                    method: if selected {
-                        MetrologySelectionMethodV1::RandomizedAudit
-                    } else {
-                        MetrologySelectionMethodV1::NotSelected
-                    },
-                }
-            })
-            .collect::<Vec<_>>();
-        let mut residual_population_by_stratum = BTreeMap::<String, usize>::new();
-        for observed in &episode.policy_view.observations {
-            *residual_population_by_stratum
-                .entry(observed.stratum_id.clone())
-                .or_default() += 1;
-        }
-        let audit_quota_by_stratum = residual_population_by_stratum
-            .iter()
-            .map(|(stratum, population)| (stratum.clone(), population / 4))
-            .collect();
-        let mut selection = MetrologyAuditSelectionReportV1 {
-            schema: crate::benchmark::metrology_audit::SELECTION_SCHEMA_V1.into(),
-            policy_id: "synthetic-test-policy".into(),
-            model_sha256: "a".repeat(64),
-            prediction_packet_sha256: "b".repeat(64),
-            policy_config_sha256: "c".repeat(64),
-            binary_semantics: semantics,
-            seed: 7,
-            total_cost_budget: 32,
-            exploit_cost_budget: 0,
-            audit_cost_budget: 32,
-            exploit_cost_used: 0,
-            audit_cost_used: 32,
-            audit_worst_case_cost: 32,
-            total_selected_cost: 32,
-            population_count: episode.policy_view.population_count,
-            exploit_count: 0,
-            randomized_audit_count: 32,
-            residual_population_by_stratum,
-            audit_quota_by_stratum,
-            rows,
-            selection_sha256: String::new(),
-        };
-        seal_selection_for_test(&mut selection);
-        selection
+        let semantics = synthetic_defect_semantics_v1(episode.defect_threshold)
+            .expect("synthetic target semantics should seal");
+        let config = policy_config(
+            episode.policy_view(),
+            "synthetic-test-policy",
+            0,
+            32,
+            8,
+            7,
+        );
+        let policy = build_synthetic_metrology_policy_v1(
+            episode.policy_view(),
+            &semantics,
+            &config,
+        )
+        .expect("synthetic policy should build");
+        select_metrology_audit_v1(&policy).expect("seeded audit selection should validate")
     }
 
     #[test]
@@ -1524,6 +1457,39 @@ mod tests {
         selection.rows[0].inclusion_probability = 0.0;
         seal_selection_for_test(&mut selection);
         assert!(evaluate_synthetic_metrology_policy_v1(&episode, &selection).is_err());
+    }
+
+    #[test]
+    fn evaluator_rejects_a_periodic_draw_mislabeled_as_randomized_audit() {
+        let episode =
+            generate_synthetic_fab_episode_v1(&config(SyntheticFabRegimeV1::Stable, 25)).unwrap();
+        let mut selection = fake_selection(&episode);
+        let stratum = selection.rows[0].stratum_id.clone();
+        let selected_index = selection
+            .rows
+            .iter()
+            .position(|row| {
+                row.stratum_id == stratum
+                    && matches!(&row.method, MetrologySelectionMethodV1::RandomizedAudit)
+            })
+            .expect("stratum has randomized audit selection");
+        let unselected_index = selection
+            .rows
+            .iter()
+            .position(|row| {
+                row.stratum_id == stratum
+                    && matches!(&row.method, MetrologySelectionMethodV1::NotSelected)
+            })
+            .expect("stratum has residual unselected candidate");
+
+        selection.rows[selected_index].selected = false;
+        selection.rows[selected_index].method = MetrologySelectionMethodV1::NotSelected;
+        selection.rows[unselected_index].selected = true;
+        selection.rows[unselected_index].method = MetrologySelectionMethodV1::RandomizedAudit;
+        seal_selection_for_test(&mut selection);
+        assert!(
+            evaluate_synthetic_metrology_policy_v1(&episode, &selection).is_err()
+        );
     }
 
     #[test]
