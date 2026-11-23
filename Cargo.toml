@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "xtask",
+    "tools/muse-control-effect-qualifier",
     "crates/core/*",
     "crates/domains/*",
     "crates/bridges/*",
