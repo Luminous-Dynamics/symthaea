@@ -83,6 +83,18 @@ A practical standards map already exists in the semiconductor scorecard issue [#
 
 SEMI describes EDA / Interface A as a high-volume data-acquisition channel distinct from SECS/GEM equipment control; preserve that boundary in adapters. The initial integration target should be authenticated, read-only collection and replay, not a command path.
 
+### GFA-VM+ cross-domain benchmark: concrete 10-label reference
+
+The IEEE Early Access abstract for GFA-VM+ (published 29 October 2026; DOI [10.1109/OJIES.2026.3748865](https://doi.org/10.1109/OJIES.2026.3748865)) reports, at ten target labels:
+- EPI thickness: MAE 1.01 nm;
+- EPI doping: MAE (3.49\times10^{15}\) cm⁻³;
+- EPI-to-ETCH etch depth: MAE 4.51 nm;
+- early-ramp cross-fab critical dimension: MAE 3.19 nm.
+
+It reports diminishing-return regions near nine target labels for cross-machine and eleven for cross-process transfer. Its architecture combines mask-aware sensor alignment, variational representation learning, MAML-style adaptation and optional FedAvg. It also reports reduced performance under severe sensor dropout and empirical model-update inversion; raw-data non-centralization is not a privacy proof. <Cite refs={["turn293282search1"]}/>
+
+These are four different physical targets and domains, not one pooled score and not comparable to SECOM AP or CMP MRR RMSE. The correct challenge is to reproduce each exact task/protocol with matched label draws, then compare the *additional assurance* we can provide: calibrated uncertainty, sensor/units mapping validation, negative-transfer detection, abstention and update-inversion resistance under a declared attacker.
+
 ## Where Luminous should differentiate
 
 The opportunity is an **evidence and decision assurance layer** around VM and manufacturing analytics:
