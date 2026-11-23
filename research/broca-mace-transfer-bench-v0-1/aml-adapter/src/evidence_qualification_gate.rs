@@ -144,6 +144,21 @@ pub enum EvidenceQualificationRejectV1 {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct VerifiedEvidenceQualificationV1 {
     receipt_sha256: String,
+    run_id: String,
+    query_invocation_id: String,
+    domain_id: String,
+    subject_scope_sha256: String,
+    environment_revision_sha256: String,
+    tool_profile_sha256: String,
+    query_sha256: String,
+    candidate_set_sha256: String,
+    candidate_evidence_ids_sha256: String,
+    decision_need_sha256: String,
+    purpose_sha256: String,
+    qualification_policy_sha256: String,
+    lifecycle_snapshot_sha256: String,
+    verifier_profile_sha256: String,
+    issued_at_unix: u64,
     admissible_evidence_ids: Vec<String>,
     rejected_evidence_ids: Vec<String>,
     indeterminate_evidence_ids: Vec<String>,
@@ -232,6 +247,21 @@ impl VerifiedEvidenceQualificationV1 {
 
         Ok(Self {
             receipt_sha256: receipt.receipt_sha256(),
+            run_id: receipt.run_id.clone(),
+            query_invocation_id: receipt.query_invocation_id.clone(),
+            domain_id: receipt.domain_id.clone(),
+            subject_scope_sha256: receipt.subject_scope_sha256.clone(),
+            environment_revision_sha256: receipt.environment_revision_sha256.clone(),
+            tool_profile_sha256: receipt.tool_profile_sha256.clone(),
+            query_sha256: receipt.query_sha256.clone(),
+            candidate_set_sha256: receipt.candidate_set_sha256.clone(),
+            candidate_evidence_ids_sha256: receipt.candidate_evidence_ids_sha256.clone(),
+            decision_need_sha256: receipt.decision_need_sha256.clone(),
+            purpose_sha256: receipt.purpose_sha256.clone(),
+            qualification_policy_sha256: receipt.qualification_policy_sha256.clone(),
+            lifecycle_snapshot_sha256: receipt.lifecycle_snapshot_sha256.clone(),
+            verifier_profile_sha256: receipt.verifier_profile_sha256.clone(),
+            issued_at_unix: receipt.issued_at_unix,
             admissible_evidence_ids: admissible,
             rejected_evidence_ids: rejected,
             indeterminate_evidence_ids: indeterminate,
@@ -239,13 +269,41 @@ impl VerifiedEvidenceQualificationV1 {
         })
     }
 
-    /// Only IDs that passed the independent, decision-scoped admissibility
-    /// check. The executor must still re-check live authority and lifecycle.
-    pub fn admissible_evidence_ids_at(
+    /// Re-bind the verified capability to the exact query, subject/tenant scope,
+    /// DecisionNeed, purpose, candidate set, policy and lifecycle snapshot at
+    /// consumption time. Live authorization and lifecycle checks remain
+    /// mandatory at consequential use.
+    pub fn admissible_evidence_ids_for_use(
         &self,
-        now_unix: u64,
+        binding: &EvidenceQualificationBindingV1<'_>,
     ) -> Result<&[String], EvidenceQualificationRejectV1> {
-        if now_unix >= self.expires_at_unix {
+        validate_binding(binding)?;
+        for (actual, expected) in [
+            (self.run_id.as_str(), binding.run_id),
+            (self.query_invocation_id.as_str(), binding.query_invocation_id),
+            (self.domain_id.as_str(), binding.domain_id),
+            (self.subject_scope_sha256.as_str(), binding.subject_scope_sha256),
+            (self.environment_revision_sha256.as_str(), binding.environment_revision_sha256),
+            (self.tool_profile_sha256.as_str(), binding.tool_profile_sha256),
+            (self.query_sha256.as_str(), binding.query_sha256),
+            (self.candidate_set_sha256.as_str(), binding.candidate_set_sha256),
+            (self.decision_need_sha256.as_str(), binding.decision_need_sha256),
+            (self.purpose_sha256.as_str(), binding.purpose_sha256),
+            (self.qualification_policy_sha256.as_str(), binding.qualification_policy_sha256),
+            (self.lifecycle_snapshot_sha256.as_str(), binding.lifecycle_snapshot_sha256),
+            (self.verifier_profile_sha256.as_str(), binding.verifier_profile_sha256),
+        ] {
+            if actual != expected {
+                return Err(EvidenceQualificationRejectV1::BindingMismatch);
+            }
+        }
+        if self.candidate_evidence_ids_sha256 != candidate_ids_sha256(binding.candidate_evidence_ids) {
+            return Err(EvidenceQualificationRejectV1::BindingMismatch);
+        }
+        if binding.now_unix < self.issued_at_unix {
+            return Err(EvidenceQualificationRejectV1::ReceiptNotYetValid);
+        }
+        if binding.now_unix >= self.expires_at_unix {
             return Err(EvidenceQualificationRejectV1::ReceiptExpired);
         }
         Ok(&self.admissible_evidence_ids)
@@ -654,6 +712,28 @@ mod tests {
             inspected_bytes: 0,
             inspected_bytes_complete: false,
             created_at_unix,
+        }
+    }
+
+    fn binding_for_test<'a>(
+        receipt: &'a EvidenceQualificationReceiptV1, ids: &'a [String], now: u64,
+    ) -> EvidenceQualificationBindingV1<'a> {
+        EvidenceQualificationBindingV1 {
+            run_id: &receipt.run_id,
+            query_invocation_id: &receipt.query_invocation_id,
+            domain_id: &receipt.domain_id,
+            subject_scope_sha256: &receipt.subject_scope_sha256,
+            environment_revision_sha256: &receipt.environment_revision_sha256,
+            tool_profile_sha256: &receipt.tool_profile_sha256,
+            query_sha256: &receipt.query_sha256,
+            candidate_set_sha256: &receipt.candidate_set_sha256,
+            candidate_evidence_ids: ids,
+            decision_need_sha256: &receipt.decision_need_sha256,
+            purpose_sha256: &receipt.purpose_sha256,
+            qualification_policy_sha256: &receipt.qualification_policy_sha256,
+            lifecycle_snapshot_sha256: &receipt.lifecycle_snapshot_sha256,
+            verifier_profile_sha256: &receipt.verifier_profile_sha256,
+            now_unix: now,
         }
     }
 
