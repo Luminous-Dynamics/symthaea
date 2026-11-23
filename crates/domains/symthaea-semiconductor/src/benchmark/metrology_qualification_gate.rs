@@ -342,6 +342,16 @@ fn report_digest(
     json_sha256(&material)
 }
 
+#[derive(Clone, Debug)]
+struct QualificationReportInputsV1 {
+    calibration_certificate_sha256: Option<String>,
+    calibration_record_sha256: Option<String>,
+    policy_sha256: String,
+    measurement_sha256: String,
+    uncertainty_upper_bound: Option<f64>,
+    coverage_factor: f64,
+}
+
 /// Assesses whether a measurement is eligible for a downstream evidence update.
 /// Missing or unverified evidence yields UNKNOWN; contradictions or expired
 /// or revoked certificates yield REJECTED. Neither status grants control authority.
@@ -362,14 +372,16 @@ pub fn qualify_measurement_evidence_v1(
         status = MeasurementQualificationStatusV1::Unknown;
         return finish_report(
             measurement,
-            None,
-            None,
-            policy_sha256,
-            measurement_sha256,
             status,
             reasons,
-            None,
-            policy.required_coverage_factor,
+            QualificationReportInputsV1 {
+                calibration_certificate_sha256: None,
+                calibration_record_sha256: None,
+                policy_sha256,
+                measurement_sha256,
+                uncertainty_upper_bound: None,
+                coverage_factor: policy.required_coverage_factor,
+            },
         );
     };
 
@@ -451,14 +463,16 @@ pub fn qualify_measurement_evidence_v1(
         }
         return finish_report(
             measurement,
-            Some(certificate_digest),
-            Some(certificate_record_digest),
-            policy_sha256,
-            measurement_sha256,
             status,
             reasons,
-            None,
-            policy.required_coverage_factor,
+            QualificationReportInputsV1 {
+                calibration_certificate_sha256: Some(certificate_digest),
+                calibration_record_sha256: Some(certificate_record_digest),
+                policy_sha256,
+                measurement_sha256,
+                uncertainty_upper_bound: None,
+                coverage_factor: policy.required_coverage_factor,
+            },
         );
     }
 
@@ -480,27 +494,24 @@ pub fn qualify_measurement_evidence_v1(
 
     finish_report(
         measurement,
-        Some(certificate_digest),
-        Some(certificate_record_digest),
-        policy_sha256,
-        measurement_sha256,
         status,
         reasons,
-        Some(uncertainty_upper_bound),
-        policy.required_coverage_factor,
+        QualificationReportInputsV1 {
+            calibration_certificate_sha256: Some(certificate_digest),
+            calibration_record_sha256: Some(certificate_record_digest),
+            policy_sha256,
+            measurement_sha256,
+            uncertainty_upper_bound: Some(uncertainty_upper_bound),
+            coverage_factor: policy.required_coverage_factor,
+        },
     )
 }
 
 fn finish_report(
     measurement: &MeasurementEvidenceV1,
-    calibration_certificate_sha256: Option<String>,
-    calibration_record_sha256: Option<String>,
-    policy_sha256: String,
-    measurement_sha256: String,
     status: MeasurementQualificationStatusV1,
     mut reasons: Vec<MeasurementQualificationReasonV1>,
-    uncertainty_upper_bound: Option<f64>,
-    coverage_factor: f64,
+    inputs: QualificationReportInputsV1,
 ) -> Result<MeasurementQualificationReportV1, MeasurementQualificationErrorV1> {
     if reasons.is_empty() {
         reasons.push(MeasurementQualificationReasonV1::QualifiedAgainstDeclaredPolicy);
@@ -511,14 +522,15 @@ fn finish_report(
         status,
         reasons,
         measurement_event_id: measurement.measurement_event_id.clone(),
-        measurement_sha256,
-        calibration_certificate_sha256,
-        calibration_record_sha256,
-        policy_sha256,
+        measurement_sha256: inputs.measurement_sha256,
+        calibration_certificate_sha256: inputs.calibration_certificate_sha256,
+        calibration_record_sha256: inputs.calibration_record_sha256,
+        policy_sha256: inputs.policy_sha256,
         corrected_value: measurement.corrected_value,
-        conservative_standard_uncertainty_upper_bound: uncertainty_upper_bound,
-        expanded_uncertainty_upper_bound: uncertainty_upper_bound
-            .map(|value| value * coverage_factor),
+        conservative_standard_uncertainty_upper_bound: inputs.uncertainty_upper_bound,
+        expanded_uncertainty_upper_bound: inputs
+            .uncertainty_upper_bound
+            .map(|value| value * inputs.coverage_factor),
         uncertainty_combination_method:
             "fully_correlated_upper_bound_sum; no independence assumption".into(),
         report_sha256: String::new(),
@@ -756,7 +768,7 @@ mod tests {
     #[test]
     fn structured_certificate_mutation_changes_record_digest() {
         let measured = measurement();
-        let mut first_certificate = certificate();
+        let first_certificate = certificate();
         let mut second_certificate = certificate();
         second_certificate.calibration_standard_uncertainty = 0.05;
 
