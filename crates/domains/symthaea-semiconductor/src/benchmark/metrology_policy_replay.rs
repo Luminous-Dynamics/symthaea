@@ -79,9 +79,6 @@ pub struct SyntheticFabObservedWaferV1 {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SyntheticFabPolicyViewV1 {
     pub schema: String,
-    pub scenario_id: String,
-    pub scenario_config_sha256: String,
-    pub observation_packet_sha256: String,
     pub population_count: usize,
     pub observations: Vec<SyntheticFabObservedWaferV1>,
 }
@@ -130,6 +127,9 @@ struct SyntheticFabHiddenTruthV1 {
 #[derive(Clone, Debug)]
 pub struct SyntheticFabEpisodeV1 {
     policy_view: SyntheticFabPolicyViewV1,
+    scenario_id: String,
+    scenario_config_sha256: String,
+    observation_packet_sha256: String,
     hidden_truth: Vec<SyntheticFabHiddenTruthV1>,
 }
 
@@ -341,15 +341,15 @@ pub fn generate_synthetic_fab_episode_v1(
     let observation_packet_sha256 = json_sha256(&observations)?;
     let policy_view = SyntheticFabPolicyViewV1 {
         schema: REPLAY_POLICY_VIEW_SCHEMA_V1.into(),
-        scenario_id: config.scenario_id.clone(),
-        scenario_config_sha256,
-        observation_packet_sha256,
         population_count: observations.len(),
         observations,
     };
 
     Ok(SyntheticFabEpisodeV1 {
         policy_view,
+        scenario_id: config.scenario_id.clone(),
+        scenario_config_sha256,
+        observation_packet_sha256,
         hidden_truth,
     })
 }
@@ -516,9 +516,9 @@ pub fn evaluate_synthetic_metrology_policy_v1(
 
     let mut report = SyntheticFabPolicyEvaluationV1 {
         schema: REPLAY_EVALUATION_SCHEMA_V1.into(),
-        scenario_id: episode.policy_view.scenario_id.clone(),
-        scenario_config_sha256: episode.policy_view.scenario_config_sha256.clone(),
-        observation_packet_sha256: episode.policy_view.observation_packet_sha256.clone(),
+        scenario_id: episode.scenario_id.clone(),
+        scenario_config_sha256: episode.scenario_config_sha256.clone(),
+        observation_packet_sha256: episode.observation_packet_sha256.clone(),
         selection_sha256: selection.selection_sha256.clone(),
         hidden_truth_sha256,
         population_count,
@@ -655,8 +655,8 @@ mod tests {
         ))
         .unwrap();
         assert_eq!(
-            first.policy_view.observation_packet_sha256,
-            second.policy_view.observation_packet_sha256
+            json_sha256(&first.policy_view.observations).unwrap(),
+            json_sha256(&second.policy_view.observations).unwrap()
         );
         assert_eq!(
             json_sha256(&first.hidden_truth).unwrap(),
@@ -671,8 +671,8 @@ mod tests {
         let second =
             generate_synthetic_fab_episode_v1(&config(SyntheticFabRegimeV1::Stable, 43)).unwrap();
         assert_ne!(
-            first.policy_view.observation_packet_sha256,
-            second.policy_view.observation_packet_sha256
+            json_sha256(&first.policy_view.observations).unwrap(),
+            json_sha256(&second.policy_view.observations).unwrap()
         );
     }
 
@@ -685,17 +685,19 @@ mod tests {
         assert!(!serialized.contains("defect_score"));
         assert!(!serialized.contains("label_available_step"));
         assert!(!serialized.contains("latent_process_state"));
+        assert!(!serialized.contains("scenario_id"));
+        assert!(!serialized.contains("scenario_config_sha256"));
+        assert!(!serialized.contains("observation_packet_sha256"));
     }
 
     #[test]
     fn hidden_truth_changes_cannot_mutate_the_policy_view() {
         let mut episode =
             generate_synthetic_fab_episode_v1(&config(SyntheticFabRegimeV1::Stable, 9)).unwrap();
-        let before = episode.policy_view.observation_packet_sha256.clone();
+        let before = json_sha256(&episode.policy_view.observations).unwrap();
         for truth in &mut episode.hidden_truth {
             truth.defect_positive = !truth.defect_positive;
         }
-        assert_eq!(before, episode.policy_view.observation_packet_sha256);
         assert_eq!(
             before,
             json_sha256(&episode.policy_view.observations).unwrap()
