@@ -31,6 +31,7 @@ pub mod mycelial_annotation_triage;
 pub mod mycelial_contact_persistence;
 pub mod mycelial_failure_resilience;
 pub mod mycelial_fusion_counterfactual;
+pub mod mycelial_functional_observations;
 pub mod mycelial_junction_graph;
 pub mod mycelial_mesh;
 pub mod mycelial_model;
@@ -132,6 +133,14 @@ pub use mycelial_fusion_counterfactual::{
     MycelialFusionDisruptionDelta, MycelialFusionDisruptionScenario, MycelialFusionTarget,
     MycelialFusionTopologyEffect, MycelialFusionViewMetrics,
     evaluate_mycelial_fusion_counterfactuals,
+};
+pub use mycelial_functional_observations::{
+    MAX_MYCELIAL_FUNCTIONAL_ID_BYTES, MAX_MYCELIAL_FUNCTIONAL_OBSERVATIONS,
+    MYCELIAL_FUNCTIONAL_OBSERVATION_SCHEMA_VERSION,
+    MycelialFunctionalFlowDirection, MycelialFunctionalMeasurement,
+    MycelialFunctionalObservation, MycelialFunctionalObservationError,
+    MycelialFunctionalObservationSet, MycelialFunctionalQuantity,
+    MycelialFunctionalQuantityUnit,
 };
 
 pub use mycelial_junction_graph::{
