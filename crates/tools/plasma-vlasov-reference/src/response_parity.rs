@@ -330,4 +330,44 @@ mod tests {
             Err(ResponseParityError::NonFiniteResult)
         );
     }
+
+    #[test]
+    fn finite_amplitude_estimates_expose_higher_order_contamination() {
+        let amplitude: f64 = 0.1;
+        let baseline = ComplexResponse::new(0.2, -0.1);
+        let first = ComplexResponse::new(0.7, 0.3);
+        let second = ComplexResponse::new(-0.2, 0.4);
+        let third = ComplexResponse::new(0.5, -0.6);
+        let fourth = ComplexResponse::new(-0.3, 0.2);
+        let make = |signed_amplitude: f64| {
+            baseline
+                .add(first.scale(signed_amplitude))
+                .add(second.scale(signed_amplitude.powi(2)))
+                .add(third.scale(signed_amplitude.powi(3)))
+                .add(fourth.scale(signed_amplitude.powi(4)))
+        };
+        let negative = make(-amplitude);
+        let zero = make(0.0);
+        let positive = make(amplitude);
+        let result = decompose_signed_response(
+            sample(4, 9.0, negative.real, negative.imaginary),
+            sample(4, 9.0, zero.real, zero.imaginary),
+            sample(4, 9.0, positive.real, positive.imaginary),
+            amplitude,
+        )
+        .unwrap();
+
+        let amplitude_squared = amplitude.powi(2);
+        close(
+            result.odd_per_amplitude,
+            first.add(third.scale(amplitude_squared)),
+            1.0e-13,
+        );
+        close(
+            result.even_per_amplitude_squared,
+            second.add(fourth.scale(amplitude_squared)),
+            1.0e-12,
+        );
+    }
+
 }
