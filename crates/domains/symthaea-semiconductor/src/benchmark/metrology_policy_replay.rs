@@ -11,9 +11,13 @@ use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
 
 use crate::benchmark::metrology_audit::{
-    MetrologyAuditSelectionReportV1, MetrologySelectionMethodV1,
+    MetrologyAuditCandidateV1, MetrologyAuditPolicyV1, MetrologyAuditSelectionReportV1,
+    MetrologySelectionMethodV1, POLICY_SCHEMA_V1, select_metrology_audit_v1,
 };
-use crate::benchmark::metrology_semantics::validate_binary_measurand_semantics_v1;
+use crate::benchmark::metrology_semantics::{
+    BinaryMeasurandSemanticsV1, PositiveConditionV1, SEMANTICS_SCHEMA_V1,
+    seal_binary_measurand_semantics_v1, validate_binary_measurand_semantics_v1,
+};
 
 pub const REPLAY_SCENARIO_SCHEMA_V1: &str = "luminous.semi-bench.synthetic-fab-replay-scenario.v1";
 pub const REPLAY_POLICY_VIEW_SCHEMA_V1: &str = "luminous.semi-bench.synthetic-fab-policy-view.v1";
@@ -142,6 +146,7 @@ pub struct SyntheticFabEpisodeV1 {
     scenario_id: String,
     scenario_config_sha256: String,
     observation_packet_sha256: String,
+    defect_threshold: f64,
     hidden_truth: Vec<SyntheticFabHiddenTruthV1>,
 }
 
@@ -204,6 +209,177 @@ fn selection_digest(
 fn seal_selection_for_test(selection: &mut MetrologyAuditSelectionReportV1) {
     selection.selection_sha256.clear();
     selection.selection_sha256 = selection_digest(selection).expect("selection should hash");
+}
+
+pub const SYNTHETIC_HEURISTIC_MODEL_V1: &str =
+    "semi.synthetic.sensor-rule-heuristic.v1";
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct SyntheticMetrologyPolicyConfigV1 {
+    pub policy_id: String,
+    pub seed: u64,
+    pub total_cost_budget: u64,
+    pub exploit_cost_budget: u64,
+    pub audit_cost_budget: u64,
+    pub risk_weight: f64,
+    pub uncertainty_weight: f64,
+    pub evsi_weight: f64,
+    pub audit_quota_by_stratum: BTreeMap<String, usize>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct SyntheticMetrologyPolicyRunV1 {
+    pub selection: MetrologyAuditSelectionReportV1,
+    pub evaluation: SyntheticFabPolicyEvaluationV1,
+}
+
+/// Creates the frozen synthetic target semantics. The threshold must match
+/// the scenario configuration and is checked again by the hidden-truth oracle.
+pub fn synthetic_defect_semantics_v1(
+    threshold: f64,
+) -> Result<BinaryMeasurandSemanticsV1, SyntheticFabReplayError> {
+    if !threshold.is_finite() {
+        return Err(SyntheticFabReplayError(
+            "synthetic defect threshold must be finite".into(),
+        ));
+    }
+    let mut semantics = BinaryMeasurandSemanticsV1 {
+        schema: SEMANTICS_SCHEMA_V1.into(),
+        semantics_id: "synthetic-defect-rule".into(),
+        revision: 1,
+        target_measurand_id: "synthetic-defect-score".into(),
+        unit: "synthetic_unit".into(),
+        positive_class_name: "defect".into(),
+        negative_class_name: "pass".into(),
+        positive_condition: PositiveConditionV1::GreaterThanOrEqual,
+        threshold,
+        authority_ref: "synthetic-benchmark-only".into(),
+        semantics_sha256: String::new(),
+    };
+    seal_binary_measurand_semantics_v1(&mut semantics)
+        .map_err(|error| SyntheticFabReplayError(format!("synthetic semantics invalid: {error}")))?;
+    Ok(semantics)
+}
+
+fn build_synthetic_candidates(
+    policy_view: &SyntheticFabPolicyViewV1,
+    semantics: &BinaryMeasurandSemanticsV1,
+) -> Result<Vec<MetrologyAuditCandidateV1>, SyntheticFabReplayError> {
+    if policy_view.schema != REPLAY_POLICY_VIEW_SCHEMA_V1
+        || policy_view.population_count != policy_view.observations.len()
+        || policy_view.population_count == 0
+    {
+        return Err(SyntheticFabReplayError(
+            "policy view schema or population count is invalid".into(),
+        ));
+    }
+    validate_binary_measurand_semantics_v1(semantics)
+        .map_err(|error| SyntheticFabReplayError(format!("target semantics invalid: {error}")))?;
+
+    policy_view
+        .observations
+        .iter()
+        .map(|observed| {
+            let sensor_a = observed.sensor_a.value;
+            let sensor_b_normalized = observed.sensor_b.value.map(|value| value / 0.72);
+            let readings: Vec<f64> = [sensor_a, sensor_b_normalized]
+                .into_iter()
+                .flatten()
+                .collect();
+            if readings.iter().any(|value| !value.is_finite()) {
+                return Err(SyntheticFabReplayError(format!(
+                    "{}: sensor packet contains a non-finite value",
+                    observed.candidate_id
+                )));
+            }
+            let estimate = if readings.is_empty() {
+                0.24
+            } else {
+                readings.iter().sum::<f64>() / readings.len() as f64
+            };
+            let logit = (estimate - semantics.threshold) * 12.0;
+            let probability = (1.0 / (1.0 + (-logit).exp())).clamp(0.0, 1.0);
+            let disagreement = match (sensor_a, sensor_b_normalized) {
+                (Some(left), Some(right)) => (left - right).abs(),
+                _ => 0.0,
+            };
+            let missing_count = usize::from(sensor_a.is_none())
+                + usize::from(sensor_b_normalized.is_none());
+            let uncertainty = match readings.len() {
+                0 => 1.0,
+                1 => 0.65,
+                _ => (0.08 + disagreement * 0.75).clamp(0.0, 1.0),
+            };
+            let missingness_penalty = missing_count as f64 * 0.08;
+            let evsi_proxy = (4.0 * probability * (1.0 - probability) * uncertainty
+                + missingness_penalty)
+                .clamp(0.0, 1.0);
+            Ok(MetrologyAuditCandidateV1 {
+                candidate_id: observed.candidate_id.clone(),
+                subject_id: observed.subject_id.clone(),
+                stratum_id: observed.stratum_id.clone(),
+                target_measurand_id: semantics.target_measurand_id.clone(),
+                predicted_defect_probability: probability,
+                epistemic_uncertainty: uncertainty,
+                expected_value_of_information: evsi_proxy,
+                measurement_cost: 1,
+            })
+        })
+        .collect()
+}
+
+/// Builds an explicitly heuristic challenger policy using only observed data.
+/// The uncertainty and EVSI fields are ranking proxies, not calibrated VM
+/// uncertainty or a decision-theoretic EVSI estimate.
+pub fn build_synthetic_metrology_policy_v1(
+    policy_view: &SyntheticFabPolicyViewV1,
+    semantics: &BinaryMeasurandSemanticsV1,
+    config: &SyntheticMetrologyPolicyConfigV1,
+) -> Result<MetrologyAuditPolicyV1, SyntheticFabReplayError> {
+    if config.policy_id.trim().is_empty() {
+        return Err(SyntheticFabReplayError(
+            "policy_id must be non-empty".into(),
+        ));
+    }
+    let candidates = build_synthetic_candidates(policy_view, semantics)?;
+    let model_sha256 = sha256_hex(SYNTHETIC_HEURISTIC_MODEL_V1.as_bytes());
+    let prediction_packet_sha256 = json_sha256(&candidates)?;
+    let policy_config_sha256 = json_sha256(config)?;
+    Ok(MetrologyAuditPolicyV1 {
+        schema: POLICY_SCHEMA_V1.into(),
+        policy_id: config.policy_id.clone(),
+        model_sha256,
+        prediction_packet_sha256,
+        policy_config_sha256,
+        binary_semantics: semantics.clone(),
+        total_cost_budget: config.total_cost_budget,
+        exploit_cost_budget: config.exploit_cost_budget,
+        audit_cost_budget: config.audit_cost_budget,
+        risk_weight: config.risk_weight,
+        uncertainty_weight: config.uncertainty_weight,
+        evsi_weight: config.evsi_weight,
+        audit_quota_by_stratum: config.audit_quota_by_stratum.clone(),
+        seed: config.seed,
+        candidates,
+    })
+}
+
+/// Runs the existing audited selection mechanism and hidden-truth evaluator.
+/// A policy cannot access the episode or hidden truth during candidate building.
+pub fn run_synthetic_metrology_policy_v1(
+    episode: &SyntheticFabEpisodeV1,
+    policy_view: &SyntheticFabPolicyViewV1,
+    semantics: &BinaryMeasurandSemanticsV1,
+    config: &SyntheticMetrologyPolicyConfigV1,
+) -> Result<SyntheticMetrologyPolicyRunV1, SyntheticFabReplayError> {
+    let policy = build_synthetic_metrology_policy_v1(policy_view, semantics, config)?;
+    let selection = select_metrology_audit_v1(&policy)
+        .map_err(|error| SyntheticFabReplayError(format!("policy selection rejected: {error}")))?;
+    let evaluation = evaluate_synthetic_metrology_policy_v1(episode, &selection)?;
+    Ok(SyntheticMetrologyPolicyRunV1 {
+        selection,
+        evaluation,
+    })
 }
 
 fn validate_selection_design(
@@ -563,6 +739,7 @@ pub fn generate_synthetic_fab_episode_v1(
         scenario_id: config.scenario_id.clone(),
         scenario_config_sha256,
         observation_packet_sha256,
+        defect_threshold: config.defect_threshold,
         hidden_truth,
     })
 }
@@ -589,6 +766,18 @@ pub fn evaluate_synthetic_metrology_policy_v1(
     validate_binary_measurand_semantics_v1(&selection.binary_semantics).map_err(|error| {
         SyntheticFabReplayError(format!("selection class semantics rejected: {error}"))
     })?;
+    if selection.binary_semantics.target_measurand_id != "synthetic-defect-score"
+        || selection.binary_semantics.unit != "synthetic_unit"
+        || selection.binary_semantics.threshold != episode.defect_threshold
+        || !matches!(
+            selection.binary_semantics.positive_condition,
+            PositiveConditionV1::GreaterThanOrEqual
+        )
+    {
+        return Err(SyntheticFabReplayError(
+            "selection semantics do not match the hidden scenario's frozen defect rule".into(),
+        ));
+    }
     validate_selection_design(selection)?;
 
     let mut selection_by_id = BTreeMap::new();
