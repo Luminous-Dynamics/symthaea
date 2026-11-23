@@ -194,6 +194,70 @@ pub struct TotalEffectReport {
     pub confirmatory_cluster_floor_met: bool,
 }
 
+/// Digest-bound output from a completed evaluator analysis. This receipt is
+/// evaluator-owned; it must not be supplied to candidate code as feedback
+/// during the held-out run.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AnalysisReceiptV1 {
+    pub schema_version: String,
+    pub estimator: String,
+    pub run_manifest_digest: String,
+    pub assignments_digest: String,
+    pub task_schedule_digest: String,
+    pub outcomes_digest: String,
+    pub report: TotalEffectReport,
+}
+
+/// Create a reproducible analysis receipt from canonicalized evaluator inputs.
+/// The run-manifest digest must be the BLAKE3 digest of the exact frozen
+/// manifest bytes. Input digests are calculated from canonical typed records.
+pub fn create_analysis_receipt(
+    run_manifest_digest: &str,
+    assignments: &[PolicyAssignment],
+    expected_tasks: &[ScheduledTask],
+    outcomes: &[EpisodeOutcome],
+) -> Result<AnalysisReceiptV1, String> {
+    if !is_blake3_digest(run_manifest_digest) {
+        return Err("run_manifest_digest must be 64 lowercase hexadecimal characters".to_string());
+    }
+    let report = estimate_total_effect(assignments, expected_tasks, outcomes)?;
+
+    let mut canonical_assignments = assignments.to_vec();
+    canonical_assignments.sort_by(|a, b| a.profile_id.cmp(&b.profile_id));
+    let mut canonical_tasks = expected_tasks.to_vec();
+    canonical_tasks.sort();
+    let mut canonical_outcomes = outcomes.to_vec();
+    canonical_outcomes.sort_by(|a, b| {
+        a.profile_id
+            .cmp(&b.profile_id)
+            .then_with(|| a.episode_id.cmp(&b.episode_id))
+    });
+
+    Ok(AnalysisReceiptV1 {
+        schema_version: "mace_onpolicy_analysis_report_v1".to_string(),
+        estimator: "stratified_profile_mean_wald_v1".to_string(),
+        run_manifest_digest: run_manifest_digest.to_string(),
+        assignments_digest: digest_serialized(&canonical_assignments)?,
+        task_schedule_digest: digest_serialized(&canonical_tasks)?,
+        outcomes_digest: digest_serialized(&canonical_outcomes)?,
+        report,
+    })
+}
+
+fn is_blake3_digest(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn digest_serialized<T: Serialize>(value: &T) -> Result<String, String> {
+    let bytes = serde_json::to_vec(value)
+        .map_err(|error| format!("failed to serialize analysis input: {}", error))?;
+    Ok(blake3::hash(&bytes).to_hex().to_string())
+}
+
 #[derive(Debug, Clone)]
 struct ProfileMean {
     stratum: String,
@@ -688,6 +752,49 @@ mod tests {
         let mut missing_same_task_in_both_arms = make_outcomes(&assignments);
         missing_same_task_in_both_arms.retain(|row| row.episode_id == "task-1");
         assert!(estimate_total_effect(&assignments, &expected_tasks(), &missing_same_task_in_both_arms).is_err());
+    }
+
+    #[test]
+    fn analysis_receipt_is_stable_under_input_order() {
+        let assignments = make_assignments();
+        let tasks = expected_tasks();
+        let outcomes = make_outcomes(&assignments);
+        let expected = create_analysis_receipt(&"a".repeat(64), &assignments, &tasks, &outcomes).unwrap();
+
+        let mut reverse_assignments = assignments.clone();
+        reverse_assignments.reverse();
+        let mut reverse_tasks = tasks.clone();
+        reverse_tasks.reverse();
+        let mut reverse_outcomes = outcomes.clone();
+        reverse_outcomes.reverse();
+        let actual = create_analysis_receipt(
+            &"a".repeat(64),
+            &reverse_assignments,
+            &reverse_tasks,
+            &reverse_outcomes,
+        ).unwrap();
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn analysis_receipt_binds_outcome_content() {
+        let assignments = make_assignments();
+        let tasks = expected_tasks();
+        let mut outcomes = make_outcomes(&assignments);
+        let first = create_analysis_receipt(&"b".repeat(64), &assignments, &tasks, &outcomes).unwrap();
+        outcomes[0].utility = (outcomes[0].utility - 0.1).max(0.0);
+        let second = create_analysis_receipt(&"b".repeat(64), &assignments, &tasks, &outcomes).unwrap();
+        assert_ne!(first.outcomes_digest, second.outcomes_digest);
+    }
+
+    #[test]
+    fn analysis_receipt_rejects_malformed_manifest_digest() {
+        let assignments = make_assignments();
+        let tasks = expected_tasks();
+        let outcomes = make_outcomes(&assignments);
+        assert!(create_analysis_receipt("not-a-digest", &assignments, &tasks, &outcomes).is_err());
+        assert!(create_analysis_receipt(&"A".repeat(64), &assignments, &tasks, &outcomes).is_err());
     }
 
     #[test]
