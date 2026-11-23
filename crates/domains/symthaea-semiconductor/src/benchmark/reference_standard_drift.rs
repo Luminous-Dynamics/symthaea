@@ -428,7 +428,9 @@ pub fn predict_reference_standard_drift_v1(
         status = ReferenceDriftPredictionStatusV1::Rejected;
     }
     if input.model.anchor_time_unix_seconds
-        != input.calibration_certificate.calibration_performed_at_unix_seconds
+        != input
+            .calibration_certificate
+            .calibration_performed_at_unix_seconds
     {
         reasons.push(ReferenceDriftReasonV1::CorrectionAnchorTimeMismatch);
         status = ReferenceDriftPredictionStatusV1::Rejected;
