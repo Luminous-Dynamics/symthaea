@@ -296,3 +296,40 @@ Hamami & Morris (2024) argue that understanding a proof involves rationally reco
 Prospective targets include at least 80% expert acceptance of held-out proof-plan skeletons, 90% side-condition/subgoal coverage and a 10 percentage-point improvement in delayed or cross-family transfer over the strongest matched baseline. These are goals, not current results.
 
 The existing study preregistration is being extended to separate the treatment arms and outcomes. No participants have been recruited and no human study has been run. Expert annotation, ethics determination/review, consent, feasibility pilot and a power analysis remain prerequisites to confirmatory data collection.
+
+
+## 11. ProofGrid, generative verifiers and local-to-global epistemic stability (2026-11-23)
+
+Three additional baselines sharpen the evaluation beyond theorem pass rate and explanation quality.
+
+### ProofGrid — machine-checkable proof competence
+
+Arkoudas & Batzoglou, [*Stress-Testing the Reasoning Competence of LLMs With Proofs Under Minimal Formalism*](https://arxiv.org/abs/2605.12524), introduces 15 tasks spanning proof writing, proof checking, proof masking and proof gap-filling in compact natural-deduction notation. Its instrumented checker localizes the first substantive proof failure rather than collapsing everything into a binary pass/fail. The paper also introduces an Epistemic Stability Index and uses 2PL item-response analysis / task-discrimination measures.
+
+**Use in Symthaea:** ProofGrid is a baseline for local inference checking, proof gap detection and failure localization. It is not a human-transfer benchmark and does not replace Lean's kernel. Add a separate local-to-global consistency experiment: measure whether a model that rejects an invalid inference when isolated also avoids using it in a complete proof plan. Preserve the paper's ESI as its own metric; do not rename a different formula as ESI.
+
+### Scaling Generative Verifiers — evaluator calibration
+
+Mahdavi et al., [*Scaling Generative Verifiers For Natural Language Mathematical Proof Verification And Selection*](https://proceedings.mlr.press/v306/mahdavi26a.html), ICML 2026, reports that combining GenSelect and LLM-as-a-Judge improves proof verification/selection, while judge-prompt choice materially affects performance. It also reports that gains in proof-level metrics do not necessarily improve final-answer precision.
+
+**Use in Symthaea:** any LLM reviewer must be evaluated across prompt variants and calibrated against human labels. Report false acceptance, false rejection, abstention and calibration. Do not let a generative verifier become the authority for a formal fact.
+
+### FormalMATH — explanation can interfere with proving
+
+FormalMATH's 2026 paper reports that providing human-written natural-language solution references can measurably degrade proof generation in its evaluated settings ([paper](https://aclanthology.org/2026.findings-emnlp.579/)). This is a warning against assuming that more explanation is always better or that a teaching-oriented explanation is necessarily the best prover context.
+
+**Use in Symthaea:** test two different interventions: explanation delivered to a human learner, and structured plan context delivered to a proof-generating model. Report their effects separately. A proof plan may improve human transfer while having no benefit—or even a cost—for Lean proof synthesis.
+
+### New benchmark outcomes
+
+Add the following as separate results, not a combined score:
+- first-invalid-step localization accuracy and distance from the actual first invalid inference;
+- local-to-global inference consistency under matched adversarial corruptions;
+- judge prompt sensitivity, calibration and false-acceptance rate;
+- proof-plan structural/evidence quality;
+- reader plan reconstruction and delayed transfer;
+- proof-generation utility when the same plan is supplied as model context.
+
+Prospective target: at least 95% precision for any system-labelled invalid inference used to block acceptance; zero false acceptance of an altered theorem as the original; report local-to-global consistency with confidence intervals and per-mutation family results. These are goals, not measured Symthaea results.
+
+The executable schema and initial fixture are tracked in [#13338 — MATH-PROOF-PLAN-SCHEMA-001](https://github.com/Luminous-Dynamics/symthaea/issues/13338). The validator's structural result must remain distinct from Lean kernel, expert and human-study results.
