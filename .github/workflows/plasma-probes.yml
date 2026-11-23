@@ -67,6 +67,8 @@ jobs:
             "${tmp_root}/benchmarks/plasma/rate-distortion/"
           cp benchmarks/plasma/rate-distortion/fixtures/synthetic-kird-point-v0.1.json \
             "${tmp_root}/benchmarks/plasma/rate-distortion/fixtures/"
+          cp benchmarks/plasma/rate-distortion/fixtures/synthetic-kird-certified-cover-v0.1.json \
+            "${tmp_root}/benchmarks/plasma/rate-distortion/fixtures/"
           cp benchmarks/plasma/topology-lifting/boundary-lift-contract-v0.1.schema.json \
             "${tmp_root}/benchmarks/plasma/topology-lifting/"
           cp benchmarks/plasma/topology-lifting/fixtures/topology-lift-known-answer-v0.1.json \
@@ -103,14 +105,19 @@ jobs:
           root = Path("${{ runner.temp }}/plasma-probe-validation/benchmarks/plasma/rate-distortion")
           schema = json.loads((root / "kird-point-v0.1.schema.json").read_text())
           fixture = json.loads((root / "fixtures/synthetic-kird-point-v0.1.json").read_text())
+          certified = json.loads((root / "fixtures/synthetic-kird-certified-cover-v0.1.json").read_text())
+          validator = Draft202012Validator(schema)
           Draft202012Validator.check_schema(schema)
-          Draft202012Validator(schema).validate(fixture)
+          validator.validate(fixture)
+          validator.validate(certified)
           assert fixture["record_status"] == "synthetic_fixture_only"
           assert fixture["provenance"]["physical_execution_authorized"] is False
+          assert certified["response_scope"]["coverage_kind"] == "certified_global"
+          assert certified["response_scope"]["global_normalized_error_bound"] == 0.75
           invalid_physical = json.loads(json.dumps(fixture))
           invalid_physical["record_status"] = "physical_measurement"
           invalid_physical["provenance"]["physical_execution_authorized"] = True
-          assert not Draft202012Validator(schema).is_valid(invalid_physical)
+          assert not validator.is_valid(invalid_physical)
           print("kird_schema_validation=PASS")
           PY
 
@@ -145,8 +152,12 @@ jobs:
           print("topology_lift_schema_validation=PASS")
           PY
 
-      - name: Run KIRD semantic audit fixture
-        run: cargo run --locked --manifest-path "${RUNNER_TEMP}/plasma-probe-validation/crates/domains/symthaea-plasma-probes/Cargo.toml" --bin kird_point_audit -- "${RUNNER_TEMP}/plasma-probe-validation/benchmarks/plasma/rate-distortion/fixtures/synthetic-kird-point-v0.1.json"
+      - name: Run KIRD semantic audit fixtures
+        run: |
+          manifest="${RUNNER_TEMP}/plasma-probe-validation/crates/domains/symthaea-plasma-probes/Cargo.toml"
+          fixture_root="${RUNNER_TEMP}/plasma-probe-validation/benchmarks/plasma/rate-distortion/fixtures"
+          cargo run --locked --manifest-path "$manifest" --bin kird_point_audit -- "$fixture_root/synthetic-kird-point-v0.1.json"
+          cargo run --locked --manifest-path "$manifest" --bin kird_point_audit -- "$fixture_root/synthetic-kird-certified-cover-v0.1.json"
 
       - name: Run strict Clippy
         run: cargo clippy --locked --manifest-path "${RUNNER_TEMP}/plasma-probe-validation/crates/domains/symthaea-plasma-probes/Cargo.toml" --all-targets -- -D warnings
