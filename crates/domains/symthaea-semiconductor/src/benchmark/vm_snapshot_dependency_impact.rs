@@ -573,7 +573,7 @@ pub fn compute_vm_snapshot_impact_closure_v1(
     let mut requalification_by_snapshot = BTreeMap::new();
     for report in &input.snapshot_requalification_reports {
         require_text(&report.snapshot_id, "requalification.snapshot_id")?;
-        if report_digest(report)? != report.report_sha256 {
+        if requalification_digest(report)? != report.report_sha256 {
             return Err(VmImpactClosureErrorV1(format!(
                 "snapshot {} requalification receipt digest mismatch",
                 report.snapshot_id
