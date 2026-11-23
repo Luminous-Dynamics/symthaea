@@ -90,7 +90,13 @@ The existing lexical resource receipt counts source JSON/text and screenshot ref
 
 ## Validation boundary
 
-- Rust sidecar and the modified trajectory parser have authored source but no Rust compile/test/Clippy pass is claimed here.
+Five Python ingress tests are provided in `tests/test_mace_lmev2_memory.py` for byte-preserving image copy/digest binding, canonical original-trajectory preservation, absolute/traversal/symlink escape rejection, screenshot size limits and domain isolation. Copy this test file into the official repository's `tests/` directory after installing the plugin. The prescribed command is:
+
+```sh
+python -m unittest tests.test_mace_lmev2_memory
+```
+
+The tests are authored but have not been executed here. Rust sidecar and the modified trajectory parser have authored source but no Rust compile/test/Clippy pass is claimed here.
 - The Python shim has not been exercised against the official harness in this environment.
 - No dataset download, official run, answer-accuracy result, LAFS value or SOTA comparison is claimed.
 - Before qualification, run the official unit tests and privacy tests, add MACE-specific integration tests, and execute the official small split with the pinned reader, judge, prompts and resource limits.
