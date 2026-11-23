@@ -37,10 +37,14 @@ pub enum RawSessionReject {
     InvalidChunkPlan,
     EmptyIndex,
     DuplicateChunkId { chunk_id: String },
+    DuplicateSessionChunkOrder,
+    ChunkIntegrityMismatch,
     WrongUserScope,
     EmptyQuery,
     InvalidTopK,
+    InvalidNeighborRadius,
     InvalidBm25Profile,
+    InvalidRrfRankConstant,
     RankingCountMismatch,
     InvalidRrfWeight,
     DuplicateIdInRanking { ranking: usize, id: String },
@@ -213,6 +217,7 @@ pub struct RawSessionChunkV1 {
     pub user_id: String,
     pub session_id: String,
     pub ordinal: usize,
+    pub request_id: String,
     pub turn_ids: Vec<String>,
     pub messages: Vec<Message>,
     pub first_timestamp_ms: i64,
@@ -311,6 +316,7 @@ fn chunks_from_plan(
             user_id: session.user_id.clone(),
             session_id: session.session_id.clone(),
             ordinal,
+            request_id: request.request_id.clone(),
             turn_ids,
             messages: request.messages,
             first_timestamp_ms,
@@ -414,6 +420,9 @@ impl RawSessionBm25IndexV1 {
         if chunks.iter().any(|chunk| chunk.user_id != user_id) {
             return Err(RawSessionReject::WrongUserScope);
         }
+        for chunk in &chunks {
+            validate_chunk_integrity(chunk)?;
+        }
         chunks.sort_by(|left, right| {
             left.session_id
                 .cmp(&right.session_id)
@@ -449,7 +458,9 @@ impl RawSessionBm25IndexV1 {
                 *document_frequency.entry(term.clone()).or_default() += 1;
             }
             total_tokens = total_tokens.saturating_add(token_count);
-            positions.insert((chunk.session_id.clone(), chunk.ordinal), index);
+            if positions.insert((chunk.session_id.clone(), chunk.ordinal), index).is_some() {
+                return Err(RawSessionReject::DuplicateSessionChunkOrder);
+            }
             hash_field(&mut corpus_hasher, &chunk.chunk_id);
             hash_field(&mut corpus_hasher, &chunk.source_payload_sha256);
             indexed.push(IndexedChunk {
@@ -501,6 +512,9 @@ impl RawSessionBm25IndexV1 {
         }
         if top_k == 0 {
             return Err(RawSessionReject::InvalidTopK);
+        }
+        if neighbor_radius > 64 {
+            return Err(RawSessionReject::InvalidNeighborRadius);
         }
         let query_terms: BTreeSet<String> = tokenize(query).into_iter().collect();
         if query_terms.is_empty() {
@@ -614,8 +628,11 @@ pub fn reciprocal_rank_fusion(
     weights: &[f64],
     rrf_k: usize,
 ) -> Result<Vec<RrfHitV1>, RawSessionReject> {
-    if rankings.is_empty() || rankings.len() != weights.len() || rrf_k == 0 {
+    if rankings.is_empty() || rankings.len() != weights.len() {
         return Err(RawSessionReject::RankingCountMismatch);
+    }
+    if rrf_k == 0 {
+        return Err(RawSessionReject::InvalidRrfRankConstant);
     }
     if weights.iter().any(|weight| !weight.is_finite() || *weight <= 0.0) {
         return Err(RawSessionReject::InvalidRrfWeight);
@@ -637,7 +654,11 @@ pub fn reciprocal_rank_fusion(
                     id: id.clone(),
                 });
             }
-            *scores.entry(id.clone()).or_default() += *weight / (rrf_k + rank + 1) as f64;
+            let denominator = rrf_k
+                .checked_add(rank)
+                .and_then(|value| value.checked_add(1))
+                .ok_or(RawSessionReject::InvalidRrfRankConstant)?;
+            *scores.entry(id.clone()).or_default() += *weight / denominator as f64;
         }
     }
 
@@ -666,6 +687,61 @@ pub struct RrfHitV1 {
     pub document_id: String,
     pub score: f64,
     pub rank: usize,
+}
+
+fn validate_chunk_integrity(chunk: &RawSessionChunkV1) -> Result<(), RawSessionReject> {
+    if chunk.user_id.trim().is_empty()
+        || chunk.session_id.trim().is_empty()
+        || chunk.request_id.trim().is_empty()
+        || chunk.messages.is_empty()
+        || chunk.messages.len() != chunk.turn_ids.len()
+        || chunk.turn_ids.iter().any(|turn_id| turn_id.trim().is_empty())
+        || chunk.source_session_sha256.len() != 64
+        || chunk.source_payload_sha256.len() != 64
+    {
+        return Err(RawSessionReject::ChunkIntegrityMismatch);
+    }
+    let mut turn_ids = BTreeSet::new();
+    if chunk.turn_ids.iter().any(|turn_id| !turn_ids.insert(turn_id.as_str())) {
+        return Err(RawSessionReject::ChunkIntegrityMismatch);
+    }
+    let mut index_parts = Vec::with_capacity(chunk.messages.len());
+    for message in &chunk.messages {
+        let MessageContent::Text(text) = &message.content else {
+            return Err(RawSessionReject::ChunkIntegrityMismatch);
+        };
+        index_parts.push(text.as_str());
+    }
+    let expected_index_text = index_parts.join("\n");
+    if expected_index_text != chunk.index_text {
+        return Err(RawSessionReject::ChunkIntegrityMismatch);
+    }
+    let request = AddRequest {
+        request_id: chunk.request_id.clone(),
+        user_id: chunk.user_id.clone(),
+        session_id: chunk.session_id.clone(),
+        messages: chunk.messages.clone(),
+    };
+    if add_payload_digest(Track::Textual, &request) != chunk.source_payload_sha256 {
+        return Err(RawSessionReject::ChunkIntegrityMismatch);
+    }
+    let expected_digest = chunk_digest(
+        &chunk.user_id,
+        &chunk.session_id,
+        chunk.ordinal,
+        &chunk.source_session_sha256,
+        &chunk.source_payload_sha256,
+        &chunk.turn_ids,
+    );
+    if expected_digest != chunk.chunk_sha256 || chunk.chunk_id != chunk.chunk_sha256 {
+        return Err(RawSessionReject::ChunkIntegrityMismatch);
+    }
+    let first = chunk.messages.first().and_then(|message| message.timestamp_ms);
+    let last = chunk.messages.last().and_then(|message| message.timestamp_ms);
+    if first != Some(chunk.first_timestamp_ms) || last != Some(chunk.last_timestamp_ms) {
+        return Err(RawSessionReject::ChunkIntegrityMismatch);
+    }
+    Ok(())
 }
 
 fn tokenize(text: &str) -> Vec<String> {
@@ -838,12 +914,10 @@ mod tests {
 
     #[test]
     fn chunking_is_deterministic_and_keeps_original_turn_boundaries() {
+        let ids: Vec<String> = (0..25).map(|i| format!("t{i}")).collect();
+        let texts: Vec<String> = (0..25).map(|i| format!("message {i}")).collect();
         let turns: Vec<_> = (0..25)
-            .map(|i| {
-                let id = Box::leak(format!("t{i}").into_boxed_str());
-                let text = Box::leak(format!("message {i}").into_boxed_str());
-                (id as &str, "user", text as &str, i as i64)
-            })
+            .map(|i| (ids[i].as_str(), "user", texts[i].as_str(), i as i64))
             .collect();
         let input = session_json("u", "s", &turns);
         let session = RawSessionV1::parse_jsonl(&input).expect("session");
@@ -897,11 +971,11 @@ mod tests {
 
     #[test]
     fn neighbor_expansion_stays_within_the_same_session() {
+        let ids: Vec<String> = (0..42).map(|i| format!("t{i}")).collect();
         let turns: Vec<_> = (0..42)
             .map(|i| {
-                let id = Box::leak(format!("t{i}").into_boxed_str());
                 let text = if i == 20 { "rare target marker" } else { "ordinary conversation" };
-                (id as &str, "user", text, i as i64)
+                (ids[i].as_str(), "user", text, i as i64)
             })
             .collect();
         let source = RawSessionV1::parse_jsonl(&session_json("u", "s", &turns)).expect("session");
@@ -940,6 +1014,29 @@ mod tests {
         assert_eq!(
             result,
             reciprocal_rank_fusion(&[first, second], &[1.0, 1.0], 60).expect("same fusion")
+        );
+    }
+
+    #[test]
+    fn index_detects_chunk_metadata_mutation_after_chunking() {
+        let mut corpus = chunks("u", "s", &[("t1", "user", "untouched source", 1)]);
+        corpus[0].turn_ids[0] = "rewritten-turn".into();
+        assert_eq!(
+            RawSessionBm25IndexV1::build("u", corpus, Bm25ProfileV1::default()).map(|_| ()),
+            Err(RawSessionReject::ChunkIntegrityMismatch)
+        );
+    }
+
+    #[test]
+    fn index_rejects_duplicate_session_ordinals() {
+        let mut corpus = chunks("u", "s", &[("t1", "user", "one", 1)]);
+        let mut duplicate = corpus[0].clone();
+        duplicate.chunk_id = "another-chunk-id".into();
+        duplicate.chunk_sha256 = "another-chunk-id".into();
+        corpus.push(duplicate);
+        assert_eq!(
+            RawSessionBm25IndexV1::build("u", corpus, Bm25ProfileV1::default()).map(|_| ()),
+            Err(RawSessionReject::DuplicateSessionChunkOrder)
         );
     }
 
