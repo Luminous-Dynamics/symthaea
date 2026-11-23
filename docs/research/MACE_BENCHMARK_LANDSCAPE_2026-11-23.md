@@ -239,3 +239,32 @@ Targets for the hard-gate families should be zero confirmed unauthorized use, ze
 - [AMA-Bench ICML 2026 paper](https://proceedings.mlr.press/v306/zhao26bs.html)
 - [AMA-Bench benchmark site, dataset size/domains/capabilities](https://ama-bench.github.io/)
 
+
+## Confirmatory sample-size planning (illustrative, not a power guarantee)
+
+The Rust estimator uses 30 independent profile clusters per arm only as a minimum reporting floor. That number is not sufficient to establish a small improvement. For a simple, equal-allocation two-arm comparison of bounded profile-level utility, a rough normal-approximation planning formula is:
+
+`n_per_arm ≈ 2 × (z_(1−α/2) + z_(power))² × σ² / δ²`
+
+where `σ` is the pilot standard deviation of **profile means**, `δ` is the minimum effect worth detecting, and `α=0.05` is two-sided. Illustrative values:
+
+| Profile-mean SD | Detect 5pp lift, 80% power | Detect 5pp lift, 90% power | Detect 10pp lift, 80% power | Detect 10pp lift, 90% power |
+|---:|---:|---:|---:|---:|
+| 0.20 | 252 / arm | 337 / arm | 63 / arm | 85 / arm |
+| 0.25 | 393 / arm | 526 / arm | 99 / arm | 132 / arm |
+| 0.30 | 566 / arm | 757 / arm | 142 / arm | 190 / arm |
+
+These are planning approximations, not achieved study sizes or statistical guarantees. They assume independent profile clusters, equal allocation, one predeclared primary endpoint and a simple two-sample normal approximation. Stratification, finite-sample corrections, non-compliance, missing outcomes, profile-generator dependence, multiple endpoints and attrition can change the required sample. Estimate the variance from a frozen pilot, choose the smallest practically meaningful effect in advance, and preregister the power analysis before confirmatory evaluation. The 30-cluster floor is a software guardrail, not evidence that a study is adequately powered.
+
+For simulated experiments, the randomization/analysis cluster is the independent latent profile generator unit. For human evaluation, use the highest independent unit that prevents contamination (often participant, household or organization), not conversation turns. Repeated sessions and task episodes nested within a profile remain correlated observations.
+
+## Integration ownership — avoid a parallel memory stack
+
+The evidence-spine idea is intentionally an integration contract across existing work rather than a new standalone store:
+
+- **#13261** owns competitive method reproduction, including AMA-Agent's causal graph, state-first memory and external AML baselines.
+- **#13284** owns decision-sufficient evidence, transitive lineage, bitemporal validity, active acquisition and regret/cost frontiers.
+- **#13319** owns poisoning, provenance, lifecycle repair, erasure and restore-resurrection qualification.
+- **#13388 / this PR** own the randomized on-policy policy-effect estimand and its profile-cluster analysis mechanics.
+
+The inspected `symthaea-memory` fields should be extended under those owners with stable evidence IDs/digests, validity and knowledge times, correction/retraction references and authority/consent scope; HDC/CfC and the existing episodic/semantic tiers remain the retrieval and temporal-learning machinery.
