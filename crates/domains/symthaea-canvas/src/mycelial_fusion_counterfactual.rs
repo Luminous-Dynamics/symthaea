@@ -200,6 +200,8 @@ pub struct MycelialFusionCounterfactualReport {
     pub source_observation_digest: String,
     pub source_graph_digest: String,
     pub candidate_inventory_digest: String,
+    /// Canonical digest of every frozen failure scenario and its exact entity IDs.
+    pub disruption_scenario_inventory_digest: String,
     pub analysis_only: bool,
     pub source_graph_unchanged: bool,
     pub candidates: Vec<MycelialFusionCandidateImpact>,
@@ -435,6 +437,32 @@ fn candidate_inventory_digest(candidates: &[MycelialFusionCandidate]) -> String 
     hasher.update(&(ordered.len() as u64).to_le_bytes());
     for candidate in ordered {
         hasher.update(candidate_digest(candidate).as_bytes());
+    }
+    hex_digest(hasher.finalize().as_bytes())
+}
+
+fn disruption_scenario_inventory_digest(
+    disruptions: &[MycelialFusionDisruptionScenario],
+) -> String {
+    let mut ordered: Vec<_> = disruptions.iter().collect();
+    ordered.sort_by(|left, right| left.scenario_id.cmp(&right.scenario_id));
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"symthaea-mycelial-fusion-disruption-inventory-v1");
+    hasher.update(&(ordered.len() as u64).to_le_bytes());
+    for scenario in ordered {
+        hash_string(&mut hasher, &scenario.scenario_id);
+        hasher.update(&(scenario.failed_segment_ids.len() as u64).to_le_bytes());
+        for id in &scenario.failed_segment_ids {
+            hash_string(&mut hasher, id);
+        }
+        hasher.update(&(scenario.failed_junction_ids.len() as u64).to_le_bytes());
+        for id in &scenario.failed_junction_ids {
+            hash_string(&mut hasher, id);
+        }
+        hasher.update(&(scenario.failed_candidate_ids.len() as u64).to_le_bytes());
+        for id in &scenario.failed_candidate_ids {
+            hash_string(&mut hasher, id);
+        }
     }
     hex_digest(hasher.finalize().as_bytes())
 }
@@ -1372,6 +1400,7 @@ pub fn evaluate_mycelial_fusion_counterfactuals(
         source_observation_digest: skeleton.source_observation_digest.clone(),
         source_graph_digest,
         candidate_inventory_digest: candidate_inventory_digest(candidates),
+        disruption_scenario_inventory_digest: disruption_scenario_inventory_digest(disruptions),
         analysis_only: true,
         source_graph_unchanged: true,
         candidates: impacts,
@@ -1879,6 +1908,23 @@ mod tests {
         report
             .validate_against(&source, &[candidate.clone()], &demands, &disruptions)
             .unwrap();
+        let no_failure_scenario = vec![MycelialFusionDisruptionScenario {
+            scenario_id: "candidate-bridge-fails".to_string(),
+            failed_segment_ids: Vec::new(),
+            failed_junction_ids: Vec::new(),
+            failed_candidate_ids: Vec::new(),
+        }];
+        let no_failure_report = evaluate_mycelial_fusion_counterfactuals(
+            &source,
+            &[candidate.clone()],
+            &demands,
+            &no_failure_scenario,
+        )
+        .unwrap();
+        assert_ne!(
+            report.disruption_scenario_inventory_digest,
+            no_failure_report.disruption_scenario_inventory_digest
+        );
 
         let mut tampered = report.clone();
         tampered.candidates[0].disruption_deltas[0].failed_candidate_ids.clear();
