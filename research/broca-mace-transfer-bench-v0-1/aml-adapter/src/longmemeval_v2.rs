@@ -273,7 +273,7 @@ impl LongMemEvalV2HitV1 {
         }];
         items.extend(self.screenshot_references.iter().map(|reference| {
             LongMemEvalV2ContextItemV1 {
-                kind: LongMemEvalV2ContextKind::ImageReference,
+                kind: LongMemEvalV2ContextKind::Image,
                 value: reference.clone(),
             }
         }));
@@ -294,7 +294,7 @@ impl LongMemEvalV2HitV1 {
         for reference in &self.screenshot_references {
             let resolved = resolve_screenshot_reference(dataset_root, reference)?;
             items.push(LongMemEvalV2ContextItemV1 {
-                kind: LongMemEvalV2ContextKind::ImageReference,
+                kind: LongMemEvalV2ContextKind::Image,
                 value: resolved.to_string_lossy().into_owned(),
             });
         }
@@ -312,7 +312,7 @@ pub fn resolve_screenshot_reference(
 ) -> Result<PathBuf, V2TrajectoryReject> {
     if reference.is_empty()
         || reference.trim() != reference
-        || reference.contains('\\\\')
+        || reference.contains('\\')
     {
         return Err(V2TrajectoryReject::ScreenshotPathInvalid);
     }
@@ -807,7 +807,7 @@ mod tests {
         assert!(result.hits[0].evidence_text.contains("Customer: Ada"));
         let context = result.hits[0].context_items();
         assert_eq!(context[0].kind, LongMemEvalV2ContextKind::Text);
-        assert!(context.iter().any(|item| item.kind == LongMemEvalV2ContextKind::ImageReference));
+        assert!(context.iter().any(|item| item.kind == LongMemEvalV2ContextKind::Image));
         assert!(result.search_latency_ns > 0);
         assert!(index.resource_receipt().total_payload_bytes_lower_bound > 0);
     }
@@ -971,7 +971,7 @@ mod tests {
         assert_eq!(items[0].kind, LongMemEvalV2ContextKind::Text);
         assert_eq!(items[0].value, result.hits[0].evidence_text);
         assert!(items.iter().skip(1).all(|item| {
-            item.kind == LongMemEvalV2ContextKind::ImageReference
+            item.kind == LongMemEvalV2ContextKind::Image
                 && Path::new(&item.value).is_absolute()
                 && Path::new(&item.value).is_file()
         }));
