@@ -3,7 +3,9 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 
 use std::{
-    env, error::Error, fs,
+    env,
+    error::Error,
+    fs,
     io::{Error as IoError, ErrorKind},
     process::ExitCode,
 };
@@ -13,7 +15,10 @@ use symthaea_plasma_probes::validate_kird_record_json;
 fn run() -> Result<(), Box<dyn Error>> {
     let mut args = env::args_os().skip(1);
     let record_path = args.next().ok_or_else(|| {
-        IoError::new(ErrorKind::InvalidInput, "usage: kird_point_audit <record.json>")
+        IoError::new(
+            ErrorKind::InvalidInput,
+            "usage: kird_point_audit <record.json>",
+        )
     })?;
     if args.next().is_some() {
         return Err(IoError::new(
