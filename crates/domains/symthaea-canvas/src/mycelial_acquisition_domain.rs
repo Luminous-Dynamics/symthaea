@@ -196,7 +196,10 @@ impl fmt::Display for MycelialAcquisitionDomainError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidSchemaVersion(version) => {
-                write!(f, "unsupported Mycelial acquisition schema version {version}")
+                write!(
+                    f,
+                    "unsupported Mycelial acquisition schema version {version}"
+                )
             }
             Self::InvalidIdentifier(field) => {
                 write!(f, "invalid or unbounded acquisition identifier: {field}")
@@ -205,53 +208,89 @@ impl fmt::Display for MycelialAcquisitionDomainError {
                 write!(f, "invalid acquisition evidence digest: {field}")
             }
             Self::SourceRightsNotCleared(status) => {
-                write!(f, "source artifact is not cleared for processing: {status:?}")
+                write!(
+                    f,
+                    "source artifact is not cleared for processing: {status:?}"
+                )
             }
             Self::InvalidDomainDimensions => {
-                write!(f, "acquisition dimensions and tile dimensions must be nonzero")
+                write!(
+                    f,
+                    "acquisition dimensions and tile dimensions must be nonzero"
+                )
             }
             Self::DomainResourceLimitExceeded(count) => write!(
                 f,
                 "acquisition domain unit count {count} exceeds {MAX_MYCELIAL_ACQUISITION_DOMAIN_UNITS}"
             ),
             Self::InvalidAxisLayout => {
-                write!(f, "acquisition axes must contain X, Y, Z, Channel and Time exactly once")
+                write!(
+                    f,
+                    "acquisition axes must contain X, Y, Z, Channel and Time exactly once"
+                )
             }
             Self::DuplicateAxis(axis) => {
                 write!(f, "duplicate acquisition axis {axis:?}")
             }
             Self::AxisDimensionMismatch(axis) => {
-                write!(f, "acquisition axis dimension does not match domain spec for {axis:?}")
+                write!(
+                    f,
+                    "acquisition axis dimension does not match domain spec for {axis:?}"
+                )
             }
             Self::InvalidAxisMetadata(field) => {
                 write!(f, "invalid acquisition axis metadata: {field}")
             }
             Self::NonCanonicalExclusionOrder => {
-                write!(f, "scope exclusions must be strictly sorted by acquisition unit")
+                write!(
+                    f,
+                    "scope exclusions must be strictly sorted by acquisition unit"
+                )
             }
             Self::ExcludedUnitOutsideDomain => {
-                write!(f, "scope exclusion refers to a unit outside the acquisition domain")
+                write!(
+                    f,
+                    "scope exclusion refers to a unit outside the acquisition domain"
+                )
             }
             Self::EmptyDeclaredScope => {
-                write!(f, "acquisition manifest must retain at least one in-scope unit")
+                write!(
+                    f,
+                    "acquisition manifest must retain at least one in-scope unit"
+                )
             }
             Self::InvalidDispositionReason => {
-                write!(f, "acquisition disposition requires a bounded non-empty reason")
+                write!(
+                    f,
+                    "acquisition disposition requires a bounded non-empty reason"
+                )
             }
             Self::InvalidExclusionReason => {
-                write!(f, "scope exclusion requires a bounded reason and decision digest")
+                write!(
+                    f,
+                    "scope exclusion requires a bounded reason and decision digest"
+                )
             }
             Self::ManifestDigestMismatch => {
-                write!(f, "extraction receipt does not bind to the supplied acquisition manifest")
+                write!(
+                    f,
+                    "extraction receipt does not bind to the supplied acquisition manifest"
+                )
             }
             Self::ReceiptUnitInventoryMismatch => {
-                write!(f, "extraction receipt does not exactly cover the in-scope unit inventory")
+                write!(
+                    f,
+                    "extraction receipt does not exactly cover the in-scope unit inventory"
+                )
             }
             Self::InvalidUnitDisposition { reason } => {
                 write!(f, "invalid extraction unit disposition: {reason}")
             }
             Self::DigestResourceLimitExceeded => {
-                write!(f, "acquisition artifact exceeds canonical digest resource limits")
+                write!(
+                    f,
+                    "acquisition artifact exceeds canonical digest resource limits"
+                )
             }
         }
     }
@@ -264,9 +303,7 @@ fn validate_identifier(
     field: &'static str,
     maximum_bytes: usize,
 ) -> Result<(), MycelialAcquisitionDomainError> {
-    if value.trim().is_empty()
-        || value.len() > maximum_bytes
-        || value.chars().any(char::is_control)
+    if value.trim().is_empty() || value.len() > maximum_bytes || value.chars().any(char::is_control)
     {
         return Err(MycelialAcquisitionDomainError::InvalidIdentifier(field));
     }
@@ -279,10 +316,7 @@ fn reason_is_valid(value: &str) -> bool {
         && !value.chars().any(char::is_control)
 }
 
-fn validate_digest(
-    value: &str,
-    field: &'static str,
-) -> Result<(), MycelialAcquisitionDomainError> {
+fn validate_digest(value: &str, field: &'static str) -> Result<(), MycelialAcquisitionDomainError> {
     if value.len() != DIGEST_HEX_BYTES
         || !value
             .bytes()
@@ -355,7 +389,9 @@ impl MycelialAcquisitionDomainSpec {
             .and_then(|value| value.checked_mul(self.z_planes as usize))
             .and_then(|value| value.checked_mul(self.channels as usize))
             .and_then(|value| value.checked_mul(self.timepoints as usize))
-            .ok_or(MycelialAcquisitionDomainError::DomainResourceLimitExceeded(usize::MAX))?;
+            .ok_or(MycelialAcquisitionDomainError::DomainResourceLimitExceeded(
+                usize::MAX,
+            ))?;
 
         if count > MAX_MYCELIAL_ACQUISITION_DOMAIN_UNITS {
             return Err(MycelialAcquisitionDomainError::DomainResourceLimitExceeded(
@@ -419,7 +455,11 @@ impl MycelialAcquisitionDomainManifest {
                 self.source_rights_status,
             ));
         }
-        validate_identifier(&self.source_format, "source_format", MAX_DOMAIN_VERSION_BYTES)?;
+        validate_identifier(
+            &self.source_format,
+            "source_format",
+            MAX_DOMAIN_VERSION_BYTES,
+        )?;
         validate_identifier(
             &self.acquisition_session_id,
             "acquisition_session_id",
@@ -447,10 +487,7 @@ impl MycelialAcquisitionDomainManifest {
             "manifest_producer_version",
             MAX_DOMAIN_VERSION_BYTES,
         )?;
-        validate_digest(
-            &self.manifest_producer_digest,
-            "manifest_producer_digest",
-        )?;
+        validate_digest(&self.manifest_producer_digest, "manifest_producer_digest")?;
 
         self.domain.expected_unit_count()?;
 
@@ -506,10 +543,7 @@ impl MycelialAcquisitionDomainManifest {
             if !reason_is_valid(&exclusion.reason) {
                 return Err(MycelialAcquisitionDomainError::InvalidExclusionReason);
             }
-            validate_digest(
-                &exclusion.scope_decision_digest,
-                "scope_decision_digest",
-            )?;
+            validate_digest(&exclusion.scope_decision_digest, "scope_decision_digest")?;
         }
         Ok(())
     }
@@ -533,9 +567,7 @@ impl MycelialAcquisitionDomainManifest {
 
     /// Hash the exact manifest fields independently from semantic validation.
     /// Invalid/tampered manifests still receive a distinct digest when bounded.
-    pub fn canonical_digest_hex(
-        &self,
-    ) -> Result<String, MycelialAcquisitionDomainError> {
+    pub fn canonical_digest_hex(&self) -> Result<String, MycelialAcquisitionDomainError> {
         if self.axes.len() > 5
             || self.scope_exclusions.len() > MAX_MYCELIAL_ACQUISITION_DOMAIN_UNITS
         {
@@ -907,9 +939,7 @@ mod tests {
         }
     }
 
-    fn receipt(
-        manifest: &MycelialAcquisitionDomainManifest,
-    ) -> MycelialExtractionCoverageReceipt {
+    fn receipt(manifest: &MycelialAcquisitionDomainManifest) -> MycelialExtractionCoverageReceipt {
         let manifest_digest = manifest.canonical_digest_hex().unwrap();
         let units = manifest
             .in_scope_unit_keys()
@@ -996,7 +1026,9 @@ mod tests {
     fn omission_of_an_interior_tile_is_detected() {
         let manifest = manifest();
         let mut receipt = receipt(&manifest);
-        receipt.units.retain(|outcome| outcome.unit.tile_x != 1 || outcome.unit.tile_y != 1);
+        receipt
+            .units
+            .retain(|outcome| outcome.unit.tile_x != 1 || outcome.unit.tile_y != 1);
         assert_eq!(
             receipt.validate_against(&manifest),
             Err(MycelialAcquisitionDomainError::ReceiptUnitInventoryMismatch)
@@ -1020,11 +1052,13 @@ mod tests {
     fn explicit_scope_exclusion_is_visible_and_not_called_full_domain() {
         let mut manifest = manifest();
         let excluded_unit = manifest.domain.expected_unit_keys().unwrap()[0];
-        manifest.scope_exclusions.push(MycelialAcquisitionScopeExclusion {
-            unit: excluded_unit,
-            reason: "outside preregistered field of view".to_string(),
-            scope_decision_digest: digest('f'),
-        });
+        manifest
+            .scope_exclusions
+            .push(MycelialAcquisitionScopeExclusion {
+                unit: excluded_unit,
+                reason: "outside preregistered field of view".to_string(),
+                scope_decision_digest: digest('f'),
+            });
         let receipt = receipt(&manifest);
         let summary = receipt.summarize(&manifest).unwrap();
         assert_eq!(
@@ -1038,17 +1072,19 @@ mod tests {
     #[test]
     fn exclusion_outside_source_domain_is_rejected() {
         let mut manifest = manifest();
-        manifest.scope_exclusions.push(MycelialAcquisitionScopeExclusion {
-            unit: MycelialAcquisitionUnitKey {
-                tile_x: 99,
-                tile_y: 99,
-                z_plane: 0,
-                channel: 0,
-                timepoint: 0,
-            },
-            reason: "not acquired".to_string(),
-            scope_decision_digest: digest('f'),
-        });
+        manifest
+            .scope_exclusions
+            .push(MycelialAcquisitionScopeExclusion {
+                unit: MycelialAcquisitionUnitKey {
+                    tile_x: 99,
+                    tile_y: 99,
+                    z_plane: 0,
+                    channel: 0,
+                    timepoint: 0,
+                },
+                reason: "not acquired".to_string(),
+                scope_decision_digest: digest('f'),
+            });
         assert_eq!(
             manifest.validate(),
             Err(MycelialAcquisitionDomainError::ExcludedUnitOutsideDomain)
@@ -1133,7 +1169,9 @@ mod tests {
         };
         assert!(matches!(
             domain.expected_unit_count(),
-            Err(MycelialAcquisitionDomainError::DomainResourceLimitExceeded(_))
+            Err(MycelialAcquisitionDomainError::DomainResourceLimitExceeded(
+                _
+            ))
         ));
     }
 
@@ -1197,7 +1235,9 @@ mod tests {
         receipt.units[0].source_unit_digest = "not-a-digest".to_string();
         assert!(matches!(
             receipt.validate_against(&manifest),
-            Err(MycelialAcquisitionDomainError::InvalidDigest("source_unit_digest"))
+            Err(MycelialAcquisitionDomainError::InvalidDigest(
+                "source_unit_digest"
+            ))
         ));
     }
 
