@@ -1215,6 +1215,187 @@ mod tests {
         );
     }
 
+    fn evidence(id: u8, available_at_us: u64, delivered_at_us: u64) -> DeliveredEvidenceRef {
+        DeliveredEvidenceRef {
+            event_id_sha256: digest(id),
+            available_at_us,
+            delivered_at_us,
+        }
+    }
+
+    #[test]
+    fn certificate_counts_decisions_and_consumed_evidence_references() {
+        let mut runs = receipts(
+            CausalReplayRegime::ClosedLoopActionCoupled,
+            TrajectoryOrigin::ArmLocalDriverExecution,
+            true,
+        );
+        for run in &mut runs {
+            run.steps[0].delivered_evidence = vec![evidence(201, 900, 950)];
+            run.steps[0].consumed_evidence_ids = vec![digest(201)];
+            run.steps[1].consumed_evidence_ids = vec![digest(201)];
+        }
+        let certificate = validate_causal_pairing(&runs).expect("decision-time evidence is valid");
+        assert_eq!(certificate.validated_decision_count, 8);
+        assert_eq!(certificate.consumed_evidence_reference_count, 8);
+    }
+
+    #[test]
+    fn prior_delivered_evidence_can_be_reused_at_later_decisions() {
+        let mut runs = receipts(
+            CausalReplayRegime::ClosedLoopActionCoupled,
+            TrajectoryOrigin::ArmLocalDriverExecution,
+            true,
+        );
+        for run in &mut runs {
+            run.steps[0].delivered_evidence = vec![evidence(202, 800, 900)];
+            run.steps[1].consumed_evidence_ids = vec![digest(202)];
+        }
+        assert!(validate_causal_pairing(&runs).is_ok());
+    }
+
+    #[test]
+    fn future_evidence_cannot_be_consumed_before_delivery() {
+        let mut runs = receipts(
+            CausalReplayRegime::ClosedLoopActionCoupled,
+            TrajectoryOrigin::ArmLocalDriverExecution,
+            true,
+        );
+        runs[0].steps[0].consumed_evidence_ids = vec![digest(203)];
+        runs[0].steps[1].delivered_evidence = vec![evidence(203, 1_900, 1_950)];
+        assert!(matches!(
+            validate_causal_pairing(&runs),
+            Err(CausalPairingError::ConsumedEvidenceNotDelivered {
+                arm: TreatmentArm::Baseline,
+                event_id_sha256
+            }) if event_id_sha256 == digest(203)
+        ));
+    }
+
+    #[test]
+    fn evidence_delivered_after_decision_is_rejected() {
+        let mut runs = receipts(
+            CausalReplayRegime::ClosedLoopActionCoupled,
+            TrajectoryOrigin::ArmLocalDriverExecution,
+            true,
+        );
+        runs[1].steps[0].delivered_evidence = vec![evidence(204, 900, 1_001)];
+        assert!(matches!(
+            validate_causal_pairing(&runs),
+            Err(CausalPairingError::EvidenceDeliveredAfterDecision {
+                arm: TreatmentArm::ComputeOnly,
+                event_id_sha256
+            }) if event_id_sha256 == digest(204)
+        ));
+    }
+
+    #[test]
+    fn evidence_cannot_be_delivered_before_it_is_available() {
+        let mut runs = receipts(
+            CausalReplayRegime::ClosedLoopActionCoupled,
+            TrajectoryOrigin::ArmLocalDriverExecution,
+            true,
+        );
+        runs[2].steps[0].delivered_evidence = vec![evidence(205, 1_001, 1_000)];
+        assert!(matches!(
+            validate_causal_pairing(&runs),
+            Err(CausalPairingError::EvidenceAvailableAfterDelivery {
+                arm: TreatmentArm::ObservationOnly,
+                event_id_sha256
+            }) if event_id_sha256 == digest(205)
+        ));
+    }
+
+    #[test]
+    fn an_event_cannot_be_delivered_twice_to_one_arm() {
+        let mut runs = receipts(
+            CausalReplayRegime::ClosedLoopActionCoupled,
+            TrajectoryOrigin::ArmLocalDriverExecution,
+            true,
+        );
+        runs[3].steps[0].delivered_evidence = vec![evidence(206, 800, 900)];
+        runs[3].steps[1].delivered_evidence = vec![evidence(206, 800, 1_900)];
+        assert!(matches!(
+            validate_causal_pairing(&runs),
+            Err(CausalPairingError::DuplicateEvidenceDelivery {
+                arm: TreatmentArm::Joint,
+                event_id_sha256
+            }) if event_id_sha256 == digest(206)
+        ));
+    }
+
+    #[test]
+    fn one_decision_cannot_claim_the_same_evidence_twice() {
+        let mut runs = receipts(
+            CausalReplayRegime::ClosedLoopActionCoupled,
+            TrajectoryOrigin::ArmLocalDriverExecution,
+            true,
+        );
+        runs[0].steps[0].delivered_evidence = vec![evidence(207, 800, 900)];
+        runs[0].steps[0].consumed_evidence_ids = vec![digest(207), digest(207)];
+        assert!(matches!(
+            validate_causal_pairing(&runs),
+            Err(CausalPairingError::DuplicateConsumedEvidence {
+                arm: TreatmentArm::Baseline,
+                event_id_sha256
+            }) if event_id_sha256 == digest(207)
+        ));
+    }
+
+    #[test]
+    fn decision_clock_must_not_regress() {
+        let mut runs = receipts(
+            CausalReplayRegime::ClosedLoopActionCoupled,
+            TrajectoryOrigin::ArmLocalDriverExecution,
+            true,
+        );
+        runs[2].steps[1].decision_at_us = 999;
+        runs[2].steps[1].action_applied_at_us = 1_100;
+        assert!(matches!(
+            validate_causal_pairing(&runs),
+            Err(CausalPairingError::DecisionClockRegression {
+                arm: TreatmentArm::ObservationOnly,
+                previous_us: 1_000,
+                current_us: 999
+            })
+        ));
+    }
+
+    #[test]
+    fn action_cannot_be_applied_before_its_decision() {
+        let mut runs = receipts(
+            CausalReplayRegime::ClosedLoopActionCoupled,
+            TrajectoryOrigin::ArmLocalDriverExecution,
+            true,
+        );
+        runs[3].steps[0].action_applied_at_us = 999;
+        assert!(matches!(
+            validate_causal_pairing(&runs),
+            Err(CausalPairingError::ActionAppliedBeforeDecision {
+                arm: TreatmentArm::Joint,
+                decision_at_us: 1_000,
+                action_applied_at_us: 999
+            })
+        ));
+    }
+
+    #[test]
+    fn evidence_event_identity_cannot_be_empty() {
+        let mut runs = receipts(
+            CausalReplayRegime::ClosedLoopActionCoupled,
+            TrajectoryOrigin::ArmLocalDriverExecution,
+            true,
+        );
+        runs[1].steps[0].delivered_evidence = vec![evidence(0, 800, 900)];
+        assert!(matches!(
+            validate_causal_pairing(&runs),
+            Err(CausalPairingError::EmptyDigest {
+                arm: Some(TreatmentArm::ComputeOnly),
+                field: CausalDigestField::EvidenceEventIdentity
+            })
+        ));
+    }
+
     #[test]
     fn mixed_trajectory_origins_are_rejected() {
         let mut runs = receipts(
