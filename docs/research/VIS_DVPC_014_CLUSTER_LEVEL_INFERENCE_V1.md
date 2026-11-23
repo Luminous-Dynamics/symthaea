@@ -96,7 +96,7 @@ The synthetic interoperability fixtures are:
 - `fixtures/vis-dvpc-compute-observation-cluster-deltas-v0.1.tsv`: six scene clusters and four predeclared comparisons (24 cluster-level deltas);
 - `fixtures/vis-dvpc-compute-observation-cluster-assignments-v0.1.tsv`: twelve episode-to-scene assignments, each bound to an initial-state digest.
 
-The synthetic assignment manifest SHA-256 is `3446df932c4a91b37d3494a0912519e7df0922e949bd68289fd3ff7d359865d8`. The all-`a` bundle-lock value is a placeholder for this synthetic fixture only. CI computes the assignment file hash, checks it against the pinned value, and passes it independently to the analyzer. A real campaign must freeze its assignment manifest and source-bundle lock before evaluation. The fixtures are not benchmark results.
+The synthetic assignment manifest SHA-256 is `8257074ad9d509a144c807fe1eeca8c0f29fb9c5101589a3e220d207236d0aab`. The all-`a` bundle-lock value is a placeholder for this synthetic fixture only. CI computes the assignment file hash, checks it against the pinned value, and passes it independently to the analyzer. A real campaign must freeze its assignment manifest and source-bundle lock before evaluation. The fixtures are not benchmark results.
 
 The current workflow pins Rust 1.96 and:
 - runs the analyzer's adversarial unit tests;
