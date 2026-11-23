@@ -374,6 +374,7 @@ jobs:
             and (.declarations | length) == 4
             and ([.declarations[] | select(.classification == "identical_type_proof_and_closure_sets")] | length) == 2
             and ([.declarations[] | select(.declaration == "Nat.choose_pos" and .classification == "stable_type_interface_proof_value_drift" and .type_dependencies.jaccard == 1)] | length) == 1
+            and ([.declarations[] | select(.declaration == "Nat.choose_pos" and .helper_expansion_explains_direct_drift == true and .helper_expanded_proof_dependencies.jaccard >= 0.9 and .proof_value_dependencies.jaccard < 0.5)] | length) == 1
             and ([.declarations[] | select(.declaration == "Set.countable_union" and .classification == "type_and_or_closure_dependency_drift")] | length) == 1
             and ([.declarations[] | select(.baseline_closure_reconciles == false or .candidate_closure_reconciles == false or .baseline_unresolved_count != 0 or .candidate_unresolved_count != 0)] | length) == 0
             and ([.declarations[] | select(.declaration == "Nat.choose_pos" and (.helper_nodes_baseline | length) > 0 and (.helper_nodes_candidate | length) > 0)] | length) == 1' \

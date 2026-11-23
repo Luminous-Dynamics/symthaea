@@ -60,3 +60,24 @@ The differential CLI now validates the complete generated-helper worklist per ro
 Trust profiles are recursively derived from the loaded Lean environment, walking each reachable ConstantInfo type/value/structural dependency. They distinguish kernel axiom dependencies, unsafe declarations, partial definitions, opaque declarations, explicit sorryAx reachability and unresolved names. A complete trust closure means every reachable name resolved under the pinned environment; it does not mean zero axioms. Legitimate Lean axioms such as extensionality or classical choice are disclosed and interpreted as part of the declared foundation, not automatically counted as defects. A reachable sorryAx, unsafe declaration or partial definition is a separate high-salience boundary for expert review.
 
 The comparison report includes set differences for each trust class and exact sorryAx booleans. No claim of proof soundness follows from the trust profile alone; kernel acceptance and theorem-statement fidelity remain separate.
+
+## 10. Source-grounded explanation of the first two drift cases
+
+The dependency differential was traced to exact source declarations in the two pinned Mathlib cohorts:
+
+- In Mathlib v4.29, Mathlib/Data/Set/Defs.lean (blob cd1214aa75db2ab1a70bf41696f4ce7ea8a05581) defines Set.union and installs it through `instance : Union (Set α) := ⟨Set.union⟩` at line 234.
+- In Mathlib v4.37-rc1, Mathlib/Data/Set/Defs.lean (blob b394e615f38aee9aabde418a33931c3f29732736) retains the same Set.union definition but installs it through `instance : Max (Set α) := ⟨Set.union⟩` at line 232.
+
+The source theorem Set.countable_union retains the same visible simp [union_eq_iUnion, and_comm] expression in both cohorts. The Union.union / Set.instUnion versus Max.max / Set.instMax type-edge difference is directly explained by a source-level notation/instance-interface change. It is not evidence that the theorem's mathematical claim changed. The direct type-edge Jaccard of 0.5 is a representation-level result requiring this provenance explanation.
+
+For Nat.choose_pos, the v4.29 direct proof-value set has 33 names and v4.37 has 10. The newer root proof value exposes Nat.choose_pos._f as a generated helper. The nested helper worklist recovers most of the old references: direct proof-value Jaccard is 0.265, while helper-expanded proof-value Jaccard is approximately 0.946. This motivates the report field helper_expansion_explains_direct_drift.
+
+### Helper-expanded stability signal
+
+The comparator now emits helper_expansion_explains_direct_drift. It is true only when:
+
+1. The type dependency set is exactly stable.
+2. Direct proof-value dependencies have changed and their Jaccard is below 0.5.
+3. The union of root and generated-helper proof dependencies has Jaccard at least 0.9.
+
+This is a diagnostic for dependency representation/repackaging, not proof equivalence, proof-plan fidelity or mathematical essentiality. It does not suppress or replace raw direct-edge differences. On this four-theorem cohort it should trigger for Nat.choose_pos and not for Set.countable_union.

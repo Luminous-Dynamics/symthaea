@@ -94,6 +94,7 @@ struct DeclarationDiff {
     helper_nodes_baseline: Vec<String>,
     helper_nodes_candidate: Vec<String>,
     helper_expanded_proof_dependencies: SetDiff,
+    helper_expansion_explains_direct_drift: bool,
     axiom_declarations: SetDiff,
     unsafe_declarations: SetDiff,
     partial_declarations: SetDiff,
@@ -169,6 +170,22 @@ fn helper_closure_reconciles(helper: &HelperNode) -> bool {
     let proof_refs = string_set(&helper.proof_value_dependencies);
     let closure = string_set(&helper.constant_info_dependency_closure);
     union_set(&type_refs, &proof_refs) == closure
+}
+
+fn helper_expansion_explains_direct_drift(
+    type_diff: &SetDiff,
+    direct_proof_diff: &SetDiff,
+    helper_expanded_diff: &SetDiff,
+) -> bool {
+    let type_interface_stable =
+        type_diff.baseline_only.is_empty() && type_diff.candidate_only.is_empty();
+    let direct_proof_set_shifted =
+        !direct_proof_diff.baseline_only.is_empty()
+            || !direct_proof_diff.candidate_only.is_empty();
+    type_interface_stable
+        && direct_proof_set_shifted
+        && direct_proof_diff.jaccard < 0.5
+        && helper_expanded_diff.jaccard >= 0.9
 }
 
 fn relation_counts(snapshot: &Snapshot) -> BTreeMap<String, usize> {
@@ -329,6 +346,15 @@ fn compare(
             &dependency_closure,
         )
         .to_owned();
+        let helper_expanded_diff = set_diff(
+            &helper_expanded_proof_dependencies(left),
+            &helper_expanded_proof_dependencies(right),
+        );
+        let helper_expansion_explains_direct_drift = helper_expansion_explains_direct_drift(
+            &type_dependencies,
+            &proof_value_dependencies,
+            &helper_expanded_diff,
+        );
 
         declarations.push(DeclarationDiff {
             declaration: name,
@@ -348,10 +374,8 @@ fn compare(
             edge_relation_counts_candidate: relation_counts(right),
             helper_nodes_baseline: helper_names(left),
             helper_nodes_candidate: helper_names(right),
-            helper_expanded_proof_dependencies: set_diff(
-                &helper_expanded_proof_dependencies(left),
-                &helper_expanded_proof_dependencies(right),
-            ),
+            helper_expanded_proof_dependencies: helper_expanded_diff,
+            helper_expansion_explains_direct_drift,
             axiom_declarations: set_diff(
                 &string_set(&left.trust_profile.axiom_declarations),
                 &string_set(&right.trust_profile.axiom_declarations),
@@ -613,6 +637,21 @@ mod tests {
         );
     }
 
+    #[test]
+    fn helper_expansion_stability_signal_detects_generated_helper_repackaging() {
+        let type_diff = SetDiff { baseline_count: 8, candidate_count: 8, intersection_count: 8, baseline_only: Vec::new(), candidate_only: Vec::new(), jaccard: 1.0 };
+        let direct_proof_diff = SetDiff { baseline_count: 33, candidate_count: 10, intersection_count: 9, baseline_only: vec!["old-helper".to_owned()], candidate_only: vec!["new-helper".to_owned()], jaccard: 0.265 };
+        let helper_expanded_diff = SetDiff { baseline_count: 35, candidate_count: 37, intersection_count: 35, baseline_only: Vec::new(), candidate_only: vec!["new-helper-expanded-edge".to_owned()], jaccard: 0.946 };
+        assert!(helper_expansion_explains_direct_drift(&type_diff, &direct_proof_diff, &helper_expanded_diff));
+    }
+
+    #[test]
+    fn helper_expansion_signal_does_not_hide_type_interface_drift() {
+        let type_diff = SetDiff { baseline_count: 6, candidate_count: 6, intersection_count: 4, baseline_only: vec!["Union.union".to_owned()], candidate_only: vec!["Max.max".to_owned()], jaccard: 0.5 };
+        let direct_proof_diff = SetDiff { baseline_count: 22, candidate_count: 32, intersection_count: 20, baseline_only: vec!["Union.union".to_owned()], candidate_only: vec!["Max.max".to_owned()], jaccard: 0.588 };
+        let helper_expanded_diff = SetDiff { baseline_count: 24, candidate_count: 34, intersection_count: 22, baseline_only: vec!["Union.union".to_owned()], candidate_only: vec!["Max.max".to_owned()], jaccard: 0.611 };
+        assert!(!helper_expansion_explains_direct_drift(&type_diff, &direct_proof_diff, &helper_expanded_diff));
+    }
     #[test]
     fn closure_mismatch_is_rejected_before_comparison() {
         let mut bad = snapshot("T", &["A"], &["B"]);

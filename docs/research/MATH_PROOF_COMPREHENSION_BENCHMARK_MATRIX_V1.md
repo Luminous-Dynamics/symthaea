@@ -114,3 +114,6 @@ The theorem-sandwich evaluator treats theorem statements as sequents \`Γ ⊢ P\
 
 This is still only a bounded propositional control. Lean's dependent binder contexts, typeclass parameters, universe parameters, implicit arguments and non-propositional structures require elaborated Lean-level comparison and independent review.
 
+### Representation-sensitive graph differential
+
+Report raw direct type/proof edge changes and generated-helper-expanded overlap separately. The Mathlib v4.29/v4.37 pilot shows why: Nat.choose_pos direct proof-value Jaccard is 0.265, while helper-expanded overlap is about 0.946; much of the apparent drift is generated-helper encapsulation. In contrast, Set.countable_union changes its elaborated operation instance from Union (Set α) to Max (Set α), changing type references without changing the visible theorem expression or underlying Set.union definition. Neither direct nor helper-expanded Jaccard is semantic equivalence; source and elaboration provenance must explain each difference.
