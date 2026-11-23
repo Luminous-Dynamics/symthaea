@@ -204,6 +204,44 @@ Each run should bind:
 
 The candidate process must not receive evaluator labels, gold answers, hidden attack assignment or privileged question metadata. Evaluator custody must be independently controlled. A candidate/evaluator stream split in the same process is not independent custody.
 
+### 3.7 From fact memory to retrieval-policy memory
+
+The current LongMemEval-V2 frontier establishes an important second memory class: **memory about how to retrieve evidence**, not just memory containing evidence.
+
+AgentRunbook-C V2 reports that repeated queries often share search strategies, useful file paths and exhausted search directions. Its online variant consolidates those retrieval traces into reusable strategy notes without using evaluation labels. Its published result is a concrete reminder that test-time learning about search policy can improve future queries, separately from storing more facts. See the [V2 method report](https://xiaowu0162.github.io/longmemeval-v2/agentrunbook-c-v2/) and [official leaderboard](https://xiaowu0162.github.io/longmemeval-v2/).
+
+MACE should therefore maintain two explicitly separated memory planes:
+
+1. **World/evidence memory:** source records, events, state transitions, facts, screenshots, documents and their rights/lineage/lifecycle qualification.
+2. **Retrieval-policy memory:** reusable search plans, successful query decompositions, productive tool sequences, useful paths and already-exhausted directions, each bound to a domain, tool/API version, environment revision, observed success condition and freshness window.
+
+A retrieval policy is not a fact about the world. “Search `orders/` before `history/` in environment revision X” can be reusable procedural evidence; it cannot establish that an order exists or that a retrieved file is authoritative. Strategy notes must never self-authorize access to sources or bypass evidence qualification.
+
+**Safe consolidation rule:** the candidate process may learn only from its own permitted interaction trace: operations issued, files/paths actually inspected, evidence actually returned, source receipts, and whether the query process itself found sufficient evidence. It must not receive question IDs, hidden task families, gold answers, evaluator judgements or attack assignments. A retrieval attempt that returns no result is not automatically an exhausted direction; exhaustion requires a recorded, bounded search under a pinned environment and tool policy.
+
+Proposed policy-memory protocol:
+- Write a retrieval trace receipt for each opaque query invocation, binding the query digest, run/domain, backend/tool versions, executed actions, inspected source IDs, candidate-set digest, stop reason and actual cost.
+- Consolidate only after the query is complete; emit a new strategy note with explicit parent trace IDs, an algorithm/version digest, applicability predicates, expiry/freshness and expected failure conditions.
+- Treat promoted strategy notes as untrusted hypotheses until a later query validates them. Strategy memory may suggest where to search; it cannot alter source authority, rights or lifecycle state.
+- Detect negative transfer: if an environment, site, API, permissions or schema revision changes, stale strategy notes are suspended or revalidated rather than blindly reused.
+- Maintain per-domain/per-tool namespaces and prevent strategy leakage across tenants or benchmark domains unless explicit policy permits it.
+
+**Required ablations:**
+
+| Arm | Evidence memory | Retrieval-policy memory | Purpose |
+|---|---|---|---|
+| A | None | None | No-memory control |
+| B | Raw BM25/dense | None | Retrieval-only baseline |
+| C | None | Strategy only | Does policy help without factual stores? |
+| D | Facts/events/notes | None | Structured memory baseline |
+| E | Facts/events/notes | Strategy | Dual-memory hypothesis |
+| F | Raw source + qualified evidence | Strategy with lineage/expiry | Full MACE design |
+| G | AgentRunbook-C V2 Online | Native strategy notes | Strong external strategy-memory comparator |
+
+Measure cold-start and warmed-up performance separately. Randomize question order; repeat with independent order permutations; use leave-one-domain-out and leave-one-tool-version-out transfer. Report accuracy, LAFS, latency, actions/tool calls, inspected bytes/tokens, consolidation cost, strategy-note growth, staleness detection, negative transfer, privacy leakage and downstream evidence admissibility. Include a “no consolidation” and a “random strategy-note” negative control. A warmed-up result must not be presented as a cold-start result.
+
+The central MACE hypothesis is **dual memory with asymmetric authority**: strategy memory can optimize evidence acquisition, while only source-bound, independently qualified evidence can support a consequential decision.
+
 ## 4. Competitive landscape and comparison rules
 
 ### 4.1 Agent Memory Leaderboard Cycle 2
@@ -285,14 +323,19 @@ Sources:
 
 The official benchmark contains 451 manually curated questions, five memory abilities, web and enterprise domains, up to 500 trajectories per haystack and up to 115M tokens in the largest haystacks. It assesses static state recall, dynamic state tracking, workflow knowledge, environment gotchas and premise awareness.
 
-The current public leaderboard reports:
-- AgentRunbook-C V2 Online: +2.8231 LAFS gain, 75.6% Small accuracy, 130.5s average query latency.
-- Perpetual Recall V3: +1.0955 LAFS gain, 53.2% Small accuracy, 1.96s.
-- OPS-Agentic-Memory-v1: 81.4% Small accuracy, 153.6s, +0.3223 LAFS.
+The current public Small-tier frontier reports:
+| System | Family | Accuracy | Average query latency | LAFS gain |
+|---|---|---:|---:|---:|
+| AgentRunbook-C V2 Online | Coding-agent controller + online strategy consolidation | 75.6% | 130.5s | +2.8231 |
+| Perpetual Recall V3 | Hybrid retrieval | 53.2% | 1.96s | +1.0955 |
+| OPS-Agentic-Memory-v1 | Coding-agent controller | 81.4% | 153.6s | +0.3223 |
+
+The highest peak accuracy does not imply the best frontier point. Perpetual Recall's lower accuracy but much shorter latency is why a full frontier is essential; OPS reports higher accuracy but a lower LAFS gain than AgentRunbook-C V2 Online.
 
 A separate AgentRunbook-C V2 controller report gives additional operating points under named backbones/reasoning tiers:
 - GPT-5.4-mini: low 65.41% at 26.11s, medium 72.73% at 56.68s, xhigh 75.61% at 130.54s.
 - GPT-5.6 Luna: medium 66.52% at 24.72s and xhigh 75.17% at 48.94s.
+
 
 Do not merge these rows with the leaderboard's single online result or compare different backbone/tier runs as if they were the same experiment. Their value is methodological: report multiple frontier points, identify the exact reader/backbone/reasoning budget, and measure online consolidation cost rather than only offline retrieval latency.
 
@@ -389,7 +432,7 @@ Under one frozen reader/backbone/judge and a fixed evidence/context budget, comp
 11. typed/HDC retrieval;
 12. MACE-qualified variants of the above.
 
-For V2, add the official AgentRunbook-R and AgentRunbook-C baselines. Preserve text and image items separately; do not turn screenshots into synthetic captions and then call the result image retrieval.
+For V2, add the official AgentRunbook-R and AgentRunbook-C baselines, **including AgentRunbook-C V2 Online**. Add the seven-arm evidence/policy-memory ablation in §3.7. Preserve text and image items separately; do not turn screenshots into synthetic captions and then call the result image retrieval. The consolidation process must be label-blind, and cold/warm, question-order and cross-version transfer must be reported separately.
 
 For lifecycle, add clean, L1, L2 and L3 paired tasks and the T1–T10 storage edit suite with its controls.
 
@@ -437,6 +480,9 @@ No row above should be interpreted as a CI pass or official benchmark score unle
 - Record screenshot bytes, file verification time, RSS, index size, storage and total reader tokens.
 
 ### Stage 3 — Improve retrieval without sacrificing source fidelity
+- Reproduce AgentRunbook-C V2 Online as a distinct retrieval-policy-memory arm before building a MACE consolidation controller.
+- Add a label-blind retrieval-trace receipt and bounded strategy-note consolidation prototype; compare cold, warm, shuffled-order and cross-version transfer.
+- Keep retrieval-policy notes separate from factual/source evidence and require applicability, expiry and source lineage for every strategy note.
 - Add pinned dense retrieval and an explicit hybrid fusion profile.
 - Add a pinned reranker and query expansion only as distinct ablation arms.
 - Add fact extraction as a separate memory pool; preserve raw evidence for audit and fallback.
