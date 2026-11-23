@@ -381,3 +381,17 @@ The practical architectural principle from *World Models for Robotic Manipulatio
 Add World-In-World as a separate closed-loop visual/embodied track alongside (not pooled with) RoboDyna, LIBERO-Dynamic, RoboTwin and H2RBench. Its four task families are Active Recognition, Active Embodied QA, Image-Goal Navigation and Robotic Manipulation. Preserve its native API, planner, scene/task population, checkpoint, inference budget and metric definitions.
 
 This benchmark is particularly relevant to the adaptive-compute hypothesis because it varies world-model inference compute in closed-loop tasks. It does not replace RoboDyna's dynamic manipulation stress, LIBERO-Dynamic's contact/time/latency protocol, RoboWM-Bench's video-to-executable-action bridge, or H2RBench's sim-to-real transfer analysis.
+
+
+### Benchmark-provenance note: standard LIBERO success is near saturation
+
+The Streaming-WAM project page's own standard-LIBERO table reports:
+- FastWAM-Joint-CD: 98.85%;
+- FastWAM-Joint: 98.60%;
+- Streaming-WAM: 98.35%.
+
+Streaming-WAM's distinctive result in that table is its asynchronous efficiency (41 ms chunk preparation, 12× faster than FastWAM's 493 ms), not the highest raw standard-LIBERO success percentage. The project separately reports 91.74% on RoboTwin 2.0 and 75.35% on RoboCasa. Preserve these as three native benchmark tracks.
+
+Source: https://sjtu-deng-lab.github.io/Streaming-WAM/
+
+Therefore, Symthaea should not use 98.35% as a universal world-model SOTA threshold. On near-saturated standard LIBERO, a more discriminating result would be matched-budget latency/energy, robustness under dynamic/contact perturbations, harmful-intervention rate, and performance on the unsolved tail. For LIBERO-Dynamic and RoboDyna, compare only against their own protocol-specific baselines.
