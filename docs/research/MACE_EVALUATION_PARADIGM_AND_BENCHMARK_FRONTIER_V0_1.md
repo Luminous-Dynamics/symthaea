@@ -52,6 +52,35 @@ A one-point aggregate win with a material safety regression, hidden additional m
 
 The published textual subscores show specific opportunities: Resurface is strongest among open methods in governance, while the commercial leader has larger leads in personalization/care, epistemic safety/privacy, streaming and temporal/event sequencing. On multimodal, the visible gaps include retrieval, continual learning and relational reasoning. Coding requires a separate bug-fix improvement programme while preserving new-feature performance. Use the official detailed table for the exact values and versions.
 
+## 2A. Industry architecture baselines beyond the leaderboard
+
+Two additional public LongMemEval references shape the reproduction plan:
+
+| System | Published protocol/result | Architectural lesson | Comparison caution |
+|---|---|---|---|
+| Redis Remis + Instruct | Redis' September 21, 2026 report: 86.5% on the 500-question LongMemEval Small split, GPT-4o answer model and judge; report shows 1.78 s query latency and about $0.0703 per session under its cost assumptions | Preserve raw chunks with hybrid BM25+dense retrieval and neighboring-context expansion, while separately retrieving extracted facts; the two stores cover different failure modes | Redis' earlier June report shows 86.1% under a distinct configuration. Keep those snapshots separate. Its cost model uses a stated average turn count and list pricing; reproduce it rather than copying it |
+| Microsoft Research Memora | The ICML 2026 work reports 86.3% LLM-judge accuracy on LoCoMo and 87.4% on LongMemEval | Balance abstract memory entries with concrete values through primary abstractions and cue anchors; consolidate updates while allowing graph-like cue traversal beyond direct similarity | Paper-reported results use their own setup; do not compare directly with Redis, AML Cycle 2 or MACE without matching model, judge, split and pipeline |
+
+Sources: [Redis June 2026 LongMemEval study](https://redis.github.io/redis-ai-research-public/longmemeval-agent-memory/), [Redis September 2026 reproduction report](https://redis.io/resources/agent-memory-benchmark-report/), and [Microsoft Research Memora](https://www.microsoft.com/en-us/research/publication/memora-a-harmonic-memory-representation-balancing-abstraction-and-specificity/).
+
+### Required retrieval/representation baselines
+
+MACE should implement and compare these arms against the same candidate reader and exact benchmark split:
+
+1. Raw full-history / full-context ceiling.
+2. Raw chunk retrieval: BM25, dense cosine, and reciprocal-rank fusion (RRF), with adjacent/neighbor context expansion.
+3. Extracted fact memory with create/update/delete and contradiction handling.
+4. Hybrid raw chunks + extracted facts (Redis-style), preserving provenance to the original turn.
+5. Hierarchical abstraction + cue-anchor expansion (Memora-style).
+6. Structured state / causal-objective graph.
+7. Typed-content HDC/HDC-LTC candidate generation, followed by unchanged MACE evidence gates.
+8. MACE decision capsule: smallest evidence representation meeting a preregistered regret/risk bound, with a replayable chain to source records.
+9. No-memory and full-context baselines.
+
+This is a deliberately stronger test than "HDC vs vector retrieval." MACE should show where HDC adds value (temporal/relational cue binding, memory footprint, update cost, source-preserving retrieval or decision regret) and where conventional hybrid retrieval is better. If a conventional arm wins on task quality and cost without compromising assurance, use it.
+
+**LongMemEval stretch target:** after reproducing the exact public benchmark configuration, target at least 88.4% task-averaged accuracy (one point above the published 87.4% Memora reference), while reporting per-question-type accuracy, ingest/write costs, query latency, token use and lifecycle governance. This is an aspirational threshold, not a same-protocol direct comparison or a MACE result today. Do not count a score against a different split/model/judge as a win.
+
 ## 3. MACE's differentiated scorecard
 
 MACE should run external utility tracks plus an internal decision-assurance track. Never collapse all of these into one headline percentage.
