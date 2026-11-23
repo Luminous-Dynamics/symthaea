@@ -90,7 +90,7 @@ It returns a combined `CausalDecisionValueCertificate` containing both the causa
 
 ### Stochastic correspondence evidence is referenced, not reimplemented
 
-Each arm carries four linked stochastic-evidence fields: `stochastic_draw_bundle_sha256`, `stochastic_draw_bundle_verifier_sha256`, `stochastic_draw_bundle_verification_receipt_sha256`, and `stochastic_draw_bundle_semantically_verified`. The causal certificate retains the four bundle digests and the four external verification-receipt digests in canonical arm order. An empty bundle, verifier identity or verification receipt is rejected; a false semantic-verification disposition is rejected.
+Each arm carries four linked stochastic-evidence fields: `stochastic_draw_bundle_sha256`, `stochastic_draw_bundle_verifier_sha256`, `stochastic_draw_bundle_verification_receipt_sha256`, and `stochastic_draw_bundle_semantically_verified`. The causal certificate retains the four bundle digests, four exact verifier-profile digests and four external verification-receipt digests in canonical arm order. An empty bundle, verifier identity or verification receipt is rejected; a false semantic-verification disposition is rejected.
 
 The referenced bundle must preserve the full event-candidate inventories, event scopes, all admissible correspondence hypotheses, the separate causal-invariance disposition for each mapped stochastic source, semantic draw-address plans and the resulting Philox receipts. The external verifier receipt must identify the exact bundle digest and verifier profile that were checked. Downstream admission must retrieve and independently validate that receipt/artifact, rather than trusting the caller's boolean or a non-empty hash string.
 
