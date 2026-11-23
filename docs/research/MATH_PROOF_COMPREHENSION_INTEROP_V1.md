@@ -224,3 +224,12 @@ The first differential should compare (1) the historical dataset graph, (2) curr
 The adapter should distinguish `exact_equivalent`, `formal_implies_informal`, `informal_implies_formal`, `specialization`, `generalization`, `related_not_equivalent`, `wrong_match`, and `unresolved`. Each relation needs explicit direction, assumptions/domain restrictions, translation provenance, and review disposition. #11362 remains the owner of the full paper-claim fidelity audit; this section specifies interoperation, not a duplicate audit system.
 
 The new differential work is tracked in [#13325 — MATH-GRAPH-INTEROP-001](https://github.com/Luminous-Dynamics/symthaea/issues/13325). No local LeanGraph build, dataset ingest, or differential execution is claimed here; this is a source- and paper-grounded interoperation contract.
+
+
+## 9. Proof-plan reconstruction is a separate semantic layer (2026-11-23)
+
+The graph-interoperation work must not collapse proof understanding into dependency retrieval. Hamami & Morris (2024) characterize proof understanding as rational reconstruction of the underlying plan ([DOI](https://doi.org/10.1111/nous.12489)). Gao & Evans (2026-11-06) studied proof presentation in 143 undergraduates and found that strong presentation performance was only moderately associated with delayed near-transfer proof construction ([DOI](https://doi.org/10.1007/s40753-026-00319-4)). These motivate a separate `ProofPlanV1` artifact and outcomes for plan reconstruction, proof validation/presentation, immediate transfer, and delayed transfer.
+
+A proof-plan graph records goal states, mathematical actions, justifications, side conditions, generated subgoals, witnesses/constructions, invariants and unresolved steps. Typed edges include `transforms`, `justified_by`, `requires`, `creates_subgoal`, `preserves`, `discharges`, `constructs`, `alternative_to`, and `evidenced_by`. This is not inferred mechanically from Lean dependency edges: the relationship is many-to-many and the mathematical action labels require review.
+
+The same theorem may have several valid plans. Benchmarking must accept distinct valid routes and compare their side-condition burden, explanatory clarity and cost without turning one proof route into a claim of mathematical necessity. See [#13326 — MATH-PROOF-PLAN-001](https://github.com/Luminous-Dynamics/symthaea/issues/13326).
