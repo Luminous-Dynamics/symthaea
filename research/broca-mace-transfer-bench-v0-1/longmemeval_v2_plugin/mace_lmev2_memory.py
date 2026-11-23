@@ -883,6 +883,7 @@ class MaceLongMemEvalV2Memory(Memory):
                 "MACE_LMEV2_RUN_ID": self.run_id,
                 "MACE_LMEV2_ENVIRONMENT_REVISION_SHA256": self.environment_revision_sha256,
                 "MACE_LMEV2_BACKEND_REVISION_SHA256": self.backend_revision_sha256,
+                "MACE_LMEV2_POLICY_TRACE_DIR": str(self.retrieval_trace_dir.resolve()),
                 "MACE_LMEV2_DATASET_ROOT": str(self.asset_root.resolve()),
                 "MACE_LMEV2_TOP_K": str(self.top_k),
                 "MACE_LMEV2_SLICE_RADIUS": str(self.slice_radius),
