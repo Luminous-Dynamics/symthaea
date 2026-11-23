@@ -1358,6 +1358,153 @@ pub fn calculate_synthetic_binary_evsi_v1(
     })
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct SyntheticBinaryEvsiAssumptionProfileV1 {
+    pub weight: f64,
+    pub metrology_characteristics: SyntheticMetrologyCharacteristicsV1,
+    pub decision_loss: SyntheticBinaryDecisionLossV1,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct SyntheticBinaryEvsiAssumptionScenarioResultV1 {
+    pub scenario_id: String,
+    pub weight: f64,
+    pub report: SyntheticBinaryEvsiReportV1,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct SyntheticBinaryEvsiSensitivityReportV1 {
+    pub schema: String,
+    pub assumption_set_sha256: String,
+    pub scenario_count: usize,
+    pub gross_evsi_min: f64,
+    pub gross_evsi_weighted_mean: f64,
+    pub gross_evsi_max: f64,
+    pub net_value_min: f64,
+    pub net_value_weighted_mean: f64,
+    pub net_value_weighted_p10: f64,
+    pub net_value_weighted_median: f64,
+    pub net_value_weighted_p90: f64,
+    pub weighted_net_positive_fraction: f64,
+    /// True only when net value is non-negative in every declared scenario.
+    pub robust_measurement_hurdle_pass: bool,
+    /// Min of each scenario's normalized net-value score.
+    pub conservative_normalized_net_value_score: f64,
+    pub scenarios: Vec<SyntheticBinaryEvsiAssumptionScenarioResultV1>,
+}
+
+fn weighted_quantile(values: &[(f64, f64)], quantile: f64) -> f64 {
+    let mut ordered = values.to_vec();
+    ordered.sort_by(|left, right| left.0.total_cmp(&right.0));
+    let mut cumulative_weight = 0.0;
+    for (value, weight) in &ordered {
+        cumulative_weight += *weight;
+        if cumulative_weight + 1.0e-12 >= quantile {
+            return *value;
+        }
+    }
+    ordered.last().map(|(value, _)| *value).unwrap_or(0.0)
+}
+
+/// Evaluates binary decision EVSI across a finite, explicitly declared set of
+/// plausible model/assay/loss assumptions. Scenario weights are user-declared
+/// sensitivity weights, not empirically calibrated posterior probabilities.
+pub fn evaluate_synthetic_binary_evsi_sensitivity_v1(
+    prior_defect_probability: f64,
+    assumption_set: &std::collections::BTreeMap<String, SyntheticBinaryEvsiAssumptionProfileV1>,
+) -> Result<SyntheticBinaryEvsiSensitivityReportV1, SyntheticFabReplayError> {
+    if assumption_set.is_empty() {
+        return Err(SyntheticFabReplayError(
+            "EVSI assumption set must be non-empty".into(),
+        ));
+    }
+    let total_weight = assumption_set
+        .values()
+        .map(|profile| profile.weight)
+        .sum::<f64>();
+    if !total_weight.is_finite()
+        || (total_weight - 1.0).abs() > 1.0e-9
+        || assumption_set.values().any(|profile| {
+            !profile.weight.is_finite() || profile.weight <= 0.0
+        })
+    {
+        return Err(SyntheticFabReplayError(
+            "EVSI assumption weights must be finite, positive and sum to one".into(),
+        ));
+    }
+
+    let mut scenarios = Vec::with_capacity(assumption_set.len());
+    let mut gross_values = Vec::with_capacity(assumption_set.len());
+    let mut net_values = Vec::with_capacity(assumption_set.len());
+    let mut normalized_net_values = Vec::with_capacity(assumption_set.len());
+    let mut weighted_gross_mean = 0.0;
+    let mut weighted_net_mean = 0.0;
+    let mut weighted_net_positive_fraction = 0.0;
+    let mut robust_measurement_hurdle_pass = true;
+
+    for (scenario_id, profile) in assumption_set {
+        let report = calculate_synthetic_binary_evsi_v1(
+            prior_defect_probability,
+            profile.metrology_characteristics,
+            profile.decision_loss,
+        )?;
+        weighted_gross_mean += profile.weight * report.expected_value_of_sample_information;
+        weighted_net_mean += profile.weight * report.net_value_after_measurement_cost;
+        if report.net_value_after_measurement_cost > 0.0 {
+            weighted_net_positive_fraction += profile.weight;
+        } else {
+            robust_measurement_hurdle_pass = false;
+        }
+        gross_values.push(report.expected_value_of_sample_information);
+        net_values.push(report.net_value_after_measurement_cost);
+        normalized_net_values.push(report.normalized_net_value_score);
+        scenarios.push(SyntheticBinaryEvsiAssumptionScenarioResultV1 {
+            scenario_id: scenario_id.clone(),
+            weight: profile.weight,
+            report,
+        });
+    }
+
+    let weighted_net_values: Vec<(f64, f64)> = scenarios
+        .iter()
+        .map(|scenario| {
+            (
+                scenario.report.net_value_after_measurement_cost,
+                scenario.weight,
+            )
+        })
+        .collect();
+    let assumption_set_sha256 = json_sha256(assumption_set)?;
+    let gross_evsi_min = gross_values.iter().copied().fold(f64::INFINITY, f64::min);
+    let gross_evsi_max = gross_values
+        .iter()
+        .copied()
+        .fold(f64::NEG_INFINITY, f64::max);
+    let net_value_min = net_values.iter().copied().fold(f64::INFINITY, f64::min);
+    let conservative_normalized_net_value_score = normalized_net_values
+        .iter()
+        .copied()
+        .fold(f64::INFINITY, f64::min);
+
+    Ok(SyntheticBinaryEvsiSensitivityReportV1 {
+        schema: "luminous.semi-bench.synthetic-binary-evsi-sensitivity.v1".into(),
+        assumption_set_sha256,
+        scenario_count: scenarios.len(),
+        gross_evsi_min,
+        gross_evsi_weighted_mean: weighted_gross_mean,
+        gross_evsi_max,
+        net_value_min,
+        net_value_weighted_mean: weighted_net_mean,
+        net_value_weighted_p10: weighted_quantile(&weighted_net_values, 0.10),
+        net_value_weighted_median: weighted_quantile(&weighted_net_values, 0.50),
+        net_value_weighted_p90: weighted_quantile(&weighted_net_values, 0.90),
+        weighted_net_positive_fraction,
+        robust_measurement_hurdle_pass,
+        conservative_normalized_net_value_score,
+        scenarios,
+    })
+}
+
 fn process_shift(regime: SyntheticFabRegimeV1, fraction: f64) -> f64 {
     match regime {
         SyntheticFabRegimeV1::Stable
