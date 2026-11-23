@@ -308,7 +308,7 @@ fn load_cohort(path: &Path) -> Result<(CohortIdentity, BTreeMap<String, Snapshot
 
         if !closure_reconciles(&snapshot) {
             return Err(format!(
-                "type/proof dependency union does not reconcile with ConstantInfo closure for {}",
+                "type/value dependency union does not reconcile with ConstantInfo closure for {}",
                 snapshot.declaration
             ));
         }
@@ -636,7 +636,57 @@ mod tests {
     }
 
     #[test]
-    fn helper_node_dependencies_are_included_in_expanded_proof_comparison() {
+    fn definition_body_dependencies_are_not_counted_as_theorem_proof_dependencies() {
+        let mut baseline = snapshot("D", &["Nat"], &[]);
+        baseline.declaration_kind = "definition".to_owned();
+        baseline.value_kind = "definition_body".to_owned();
+        baseline.value_dependencies = vec!["Nat.add".to_owned()];
+        baseline.definition_value_dependencies = vec!["Nat.add".to_owned()];
+        baseline.proof_value_dependencies.clear();
+        baseline.constant_info_dependency_closure =
+            vec!["Nat".to_owned(), "Nat.add".to_owned()];
+
+        let mut candidate = baseline.clone();
+        candidate.value_dependencies = vec!["Nat.mul".to_owned()];
+        candidate.definition_value_dependencies = vec!["Nat.mul".to_owned()];
+        candidate.constant_info_dependency_closure =
+            vec!["Nat".to_owned(), "Nat.mul".to_owned()];
+
+        assert!(closure_reconciles(&baseline));
+        assert!(closure_reconciles(&candidate));
+
+        let report = compare(
+            identity("v1", "lean-a"),
+            BTreeMap::from([("D".to_owned(), baseline)]),
+            identity("v2", "lean-b"),
+            BTreeMap::from([("D".to_owned(), candidate)]),
+        )
+        .expect("valid definition snapshots");
+
+        let diff = &report.declarations[0];
+        assert_eq!(diff.baseline_value_kind, "definition_body");
+        assert_eq!(diff.candidate_value_kind, "definition_body");
+        assert_eq!(diff.proof_value_dependencies.jaccard, 1.0);
+        assert_eq!(diff.definition_value_dependencies.intersection_count, 0);
+        assert_eq!(diff.value_dependencies.intersection_count, 0);
+        assert_eq!(
+            diff.classification,
+            "stable_type_interface_value_drift"
+        );
+    }
+
+    #[test]
+    fn legacy_snapshot_falls_back_to_unclassified_value_dependencies() {
+        let mut legacy = snapshot("T", &["Nat"], &["Nat.add"]);
+        legacy.value_kind.clear();
+        legacy.value_dependencies.clear();
+        assert_eq!(snapshot_value_dependencies(&legacy), string_set(&legacy.proof_value_dependencies));
+        assert_eq!(normalized_value_kind(&legacy.value_kind), "legacy_unclassified");
+        assert!(closure_reconciles(&legacy));
+    }
+
+    #[test]
+    fn helper_definition_body_dependencies_are_included_in_expanded_value_comparison() {
         let mut a = snapshot("Nat.choose_pos", &["Nat"], &["helper"]);
         a.helper_nodes.push(HelperNode {
             root_declaration: "Nat.choose_pos".to_owned(),
