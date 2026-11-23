@@ -2050,6 +2050,164 @@ mod tests {
     }
 
     #[test]
+    fn binary_evsi_matches_known_bayes_decision_calculation() {
+        let report = calculate_synthetic_binary_evsi_v1(
+            0.10,
+            SyntheticMetrologyCharacteristicsV1 {
+                sensitivity: 0.95,
+                specificity: 0.99,
+            },
+            SyntheticBinaryDecisionLossV1 {
+                false_negative_cost: 100.0,
+                false_positive_cost: 5.0,
+                measurement_cost: 2.0,
+            },
+        )
+        .unwrap();
+
+        assert!((report.probability_assay_positive - 0.104).abs() < 1.0e-12);
+        assert!((report.probability_assay_negative - 0.896).abs() < 1.0e-12);
+        assert!((report.expected_loss_without_measurement - 4.5).abs() < 1.0e-12);
+        assert!((report.expected_loss_after_measurement - 0.545).abs() < 1.0e-12);
+        assert!(
+            (report.expected_value_of_sample_information - 3.955).abs() < 1.0e-12
+        );
+        assert!((report.net_value_after_measurement_cost - 1.955).abs() < 1.0e-12);
+        assert_eq!(
+            report.decision_without_measurement,
+            SyntheticBinaryDecisionV1::Hold
+        );
+        assert_eq!(
+            report.decision_after_positive,
+            Some(SyntheticBinaryDecisionV1::Hold)
+        );
+        assert_eq!(
+            report.decision_after_negative,
+            Some(SyntheticBinaryDecisionV1::Accept)
+        );
+    }
+
+    #[test]
+    fn uninformative_assay_has_zero_decision_theoretic_evsi() {
+        let report = calculate_synthetic_binary_evsi_v1(
+            0.10,
+            SyntheticMetrologyCharacteristicsV1 {
+                sensitivity: 0.70,
+                specificity: 0.30,
+            },
+            SyntheticBinaryDecisionLossV1 {
+                false_negative_cost: 100.0,
+                false_positive_cost: 5.0,
+                measurement_cost: 0.0,
+            },
+        )
+        .unwrap();
+        assert!(report.expected_value_of_sample_information.abs() < 1.0e-12);
+        assert!(report.normalized_evsi_score.abs() < 1.0e-12);
+        assert!(report.normalized_net_value_score.abs() < 1.0e-12);
+        assert!((report.expected_loss_after_measurement
+            - report.expected_loss_without_measurement)
+            .abs()
+            < 1.0e-12);
+    }
+
+    #[test]
+    fn measurement_cost_hurdle_distinguishes_gross_evsi_from_net_value() {
+        let report = calculate_synthetic_binary_evsi_v1(
+            0.10,
+            SyntheticMetrologyCharacteristicsV1 {
+                sensitivity: 0.95,
+                specificity: 0.99,
+            },
+            SyntheticBinaryDecisionLossV1 {
+                false_negative_cost: 100.0,
+                false_positive_cost: 5.0,
+                measurement_cost: 10.0,
+            },
+        )
+        .unwrap();
+        assert!(report.expected_value_of_sample_information > 0.0);
+        assert!(report.net_value_after_measurement_cost < 0.0);
+        assert_eq!(report.normalized_net_value_score, 0.0);
+    }
+
+    #[test]
+    fn decision_evsi_policy_uses_loss_and_assay_profile_bound_scores() {
+        let scenario = config(SyntheticFabRegimeV1::GradualProcessDrift, 83);
+        let episode = generate_synthetic_fab_episode_v1(&scenario).unwrap();
+        let semantics = synthetic_defect_semantics_v1(scenario.defect_threshold).unwrap();
+        let view = episode.policy_view();
+        let loss = SyntheticBinaryDecisionLossV1 {
+            false_negative_cost: 100.0,
+            false_positive_cost: 5.0,
+            measurement_cost: 2.0,
+        };
+        let policy_config =
+            policy_config_with_weights(view, "decision-evsi", 16, 16, 4, 109, PolicyWeightsV1 {
+                risk: 0.0,
+                uncertainty: 0.0,
+                evsi: 1.0,
+            });
+        let policy = build_synthetic_decision_evsi_policy_v1(
+            view,
+            &semantics,
+            scenario.metrology_characteristics,
+            loss,
+            &policy_config,
+        )
+        .unwrap();
+        assert!(policy.candidates.iter().any(|candidate| {
+            candidate.expected_value_of_information > 0.0
+        }));
+        assert!(policy.candidates.iter().all(|candidate| {
+            (0.0..=1.0).contains(&candidate.expected_value_of_information)
+        }));
+
+        let run = run_synthetic_decision_evsi_policy_v1(
+            &episode,
+            view,
+            &semantics,
+            scenario.metrology_characteristics,
+            loss,
+            &policy_config,
+        )
+        .unwrap();
+        assert_eq!(run.selection.total_selected_cost, 32);
+        assert_eq!(run.selection.exploit_count, 16);
+        assert_eq!(run.selection.randomized_audit_count, 16);
+    }
+
+    #[test]
+    fn binary_evsi_rejects_invalid_probabilities_and_losses() {
+        assert!(calculate_synthetic_binary_evsi_v1(
+            1.1,
+            SyntheticMetrologyCharacteristicsV1 {
+                sensitivity: 0.95,
+                specificity: 0.99,
+            },
+            SyntheticBinaryDecisionLossV1 {
+                false_negative_cost: 100.0,
+                false_positive_cost: 5.0,
+                measurement_cost: 2.0,
+            }
+        )
+        .is_err());
+        assert!(calculate_synthetic_binary_evsi_v1(
+            0.1,
+            SyntheticMetrologyCharacteristicsV1 {
+                sensitivity: 0.95,
+                specificity: 0.99,
+            },
+            SyntheticBinaryDecisionLossV1 {
+                false_negative_cost: -1.0,
+                false_positive_cost: 5.0,
+                measurement_cost: 2.0,
+            }
+        )
+        .is_err());
+    }
+
+    #[test]
     fn mcar_mar_and_mnar_apply_distinct_dropout_mechanisms() {
         let mcar = conditional_dropout_probability(
             SyntheticFabMissingnessMechanismV1::Mcar,
