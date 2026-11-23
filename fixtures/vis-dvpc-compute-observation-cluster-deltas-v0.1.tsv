@@ -1,0 +1,38 @@
+META	format	VIS-DVPC-CLUSTER-DELTAS-001-v1
+META	experiment_id	compute-observation-cluster-adapter-v0.1
+META	dataset_id	synthetic-paired-interaction-fixture
+META	dataset_revision	synthetic-2026-11-23
+META	split	test
+META	cluster_unit	scene
+META	primary_metric	signed_decision_regret_effect_ppm
+META	positive_is_better	true
+META	bundle_lock_sha256	aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+META	comparison_family_size	4
+META	bootstrap_seed	42
+META	bootstrap_replicates	10000
+META	familywise_confidence	0.95
+DELTA_HEADER	comparison_id	candidate_id	baseline_id	cluster_id	delta
+DELTA	compute_benefit	compute_only	baseline	scene-00	50000
+DELTA	observation_benefit	observation_only	baseline	scene-00	20000
+DELTA	joint_benefit	joint	baseline	scene-00	300000
+DELTA	compute_observation_interaction	joint_over_additive	additive_expectation	scene-00	230000
+DELTA	compute_benefit	compute_only	baseline	scene-01	75000
+DELTA	observation_benefit	observation_only	baseline	scene-01	85000
+DELTA	joint_benefit	joint	baseline	scene-01	220000
+DELTA	compute_observation_interaction	joint_over_additive	additive_expectation	scene-01	60000
+DELTA	compute_benefit	compute_only	baseline	scene-02	90000
+DELTA	observation_benefit	observation_only	baseline	scene-02	125000
+DELTA	joint_benefit	joint	baseline	scene-02	315000
+DELTA	compute_observation_interaction	joint_over_additive	additive_expectation	scene-02	100000
+DELTA	compute_benefit	compute_only	baseline	scene-03	60000
+DELTA	observation_benefit	observation_only	baseline	scene-03	45000
+DELTA	joint_benefit	joint	baseline	scene-03	330000
+DELTA	compute_observation_interaction	joint_over_additive	additive_expectation	scene-03	225000
+DELTA	compute_benefit	compute_only	baseline	scene-04	100000
+DELTA	observation_benefit	observation_only	baseline	scene-04	95000
+DELTA	joint_benefit	joint	baseline	scene-04	245000
+DELTA	compute_observation_interaction	joint_over_additive	additive_expectation	scene-04	50000
+DELTA	compute_benefit	compute_only	baseline	scene-05	80000
+DELTA	observation_benefit	observation_only	baseline	scene-05	70000
+DELTA	joint_benefit	joint	baseline	scene-05	290000
+DELTA	compute_observation_interaction	joint_over_additive	additive_expectation	scene-05	140000
