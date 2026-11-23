@@ -184,3 +184,43 @@ A result that:
 7. generalizes to a theorem family not used during development.
 
 That would complement, rather than relabel, the achievements of HumanLean, APE-Bench and LeanGraphSearch.
+
+
+## 8. TheoremGraph / LeanGraph interoperation (2026-11-23)
+
+TheoremGraph is now a required external baseline, not merely adjacent context.
+
+- Paper: [TheoremGraph: Bridging Formal and Informal Mathematics](https://arxiv.org/abs/2606.25363).
+- Project and API: [TheoremSearch](https://github.com/uw-math-ai/TheoremSearch), [Theorem Graph API](https://www.theoremsearch.com/docs).
+- Dataset: [Math-Graph](https://huggingface.co/datasets/uw-math-ai/math-graph), CC-BY-4.0; retain attribution, dataset revision and source metadata.
+- LeanGraph source: [aurasoph/lean-graph](https://github.com/aurasoph/lean-graph), Apache-2.0.
+
+The paper reports 11.7M informal mathematical statement nodes, 18.3M candidate informal dependency edges, 388,105 formal Lean declaration nodes and 11.3M typed formal dependency edges across 25 projects. Its formal graph distinguishes `sig`, `proof`, and `def` edges, alongside structural/documentation relations `extends`, `field`, and `docref`. Signature edges also preserve binder position/kind, function-versus-argument role, and projection metadata.
+
+### Exact and inexact cross-formality relations
+
+The headline set of 47,952 judge-affirmed cross-formality links must not be treated as 47,952 faithful formalizations. The authors' November 19, 2026 rebuttal separates 4,765 exact matches from 43,187 inexact/related matches (for example, special cases, generalizations or one direction of an equivalence). Inexact matches can be useful retrieval candidates, but they are not evidence of equivalence or paper-to-Lean fidelity. The reviewed evidence is limited: one expert reviewed twenty pairs; a separate 199-pair sample was assessed by two LLM judges. Reported judge agreement is repeatability, not correctness. These labels must remain candidate annotations until independently adjudicated.
+
+### LeanGraph source-version distinction
+
+Do not conflate the historical LeanGraph submodule revision recorded in the TheoremSearch corpus (`9823e3f8f45036b124905e541c7dc92c39620283`) with the later raw-graph implementation inspected at `3bf57c70f0326e45b9e84345c8fe7cf520919358`.
+
+At the historical pinned revision, the unified graph applies signature filtering/parent redirection, proof/definition transitive expansion, and structure/field/docstring overlays. It is therefore a filtered/expanded view, not a direct raw `getUsedConstants` export. The later revision introduces `rawUnifiedGraph` and derives a readable view as a post-pass. The raw and readable outputs are different semantic artifacts and must be evaluated separately.
+
+### Revised extractor strategy
+
+Do not rebuild a second 388k-node graph extractor. Use the current LeanGraph raw mode as an external differential baseline where toolchain and environment pins are compatible. Keep #13295 focused on:
+
+- exact local receipts binding Lean/Mathlib/Lake/module closure, declaration identity, type/value availability and digests, universes, axiom/`sorryAx` profile, source ranges and serializer version;
+- direct type edges, direct value edges, filtered/expanded edges and overlays as distinct provenance classes;
+- explicit opaque-value-unavailable status rather than an empty successful proof-dependency list;
+- explicit axiom and inductive/constructor/recursor records;
+- differential tests on the four pinned Mathlib and six Lean-core pilot declarations already in #13294.
+
+The first differential should compare (1) the historical dataset graph, (2) current LeanGraph raw output, and (3) Symthaea's local extracted output. Explain each mismatch by filter/redirect, transitive expansion, type/value classification, opaque values, irreducible-definition helper, inductive/recursor, declaration filter, or unknown. Do not compare only edge counts.
+
+### Role-aware informal/formal relations
+
+The adapter should distinguish `exact_equivalent`, `formal_implies_informal`, `informal_implies_formal`, `specialization`, `generalization`, `related_not_equivalent`, `wrong_match`, and `unresolved`. Each relation needs explicit direction, assumptions/domain restrictions, translation provenance, and review disposition. #11362 remains the owner of the full paper-claim fidelity audit; this section specifies interoperation, not a duplicate audit system.
+
+The new differential work is tracked in [#13325 — MATH-GRAPH-INTEROP-001](https://github.com/Luminous-Dynamics/symthaea/issues/13325). No local LeanGraph build, dataset ingest, or differential execution is claimed here; this is a source- and paper-grounded interoperation contract.
