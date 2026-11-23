@@ -224,6 +224,13 @@ fn sha256_hex(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
 
+fn is_lowercase_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
 fn json_sha256<T: Serialize>(value: &T) -> Result<String, SyntheticFabReplayError> {
     let bytes = serde_json::to_vec(value).map_err(|error| {
         SyntheticFabReplayError(format!("canonical JSON serialization failed: {error}"))
@@ -899,6 +906,15 @@ pub fn evaluate_synthetic_metrology_policy_v1(
     {
         return Err(SyntheticFabReplayError(
             "selection receipt schema/population does not match scenario".into(),
+        ));
+    }
+    if selection.policy_id.trim().is_empty()
+        || !is_lowercase_sha256(&selection.model_sha256)
+        || !is_lowercase_sha256(&selection.prediction_packet_sha256)
+        || !is_lowercase_sha256(&selection.policy_config_sha256)
+    {
+        return Err(SyntheticFabReplayError(
+            "selection receipt requires policy identity and valid model/prediction/config digests".into(),
         ));
     }
     if selection_digest(selection)? != selection.selection_sha256 {
