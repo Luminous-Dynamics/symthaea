@@ -184,6 +184,9 @@ fn graph_digest(graph: &VmSnapshotDependencyGraphV1) -> Result<String, VmImpactC
     canonical.graph_sha256.clear();
     canonical.nodes.sort_by(|a, b| a.snapshot_id.cmp(&b.snapshot_id));
     canonical.edges.sort_by(|a, b| a.edge_id.cmp(&b.edge_id));
+    for edge in &mut canonical.edges {
+        edge.inherited_dimensions.sort();
+    }
     json_sha256(&canonical)
 }
 
@@ -1195,6 +1198,69 @@ mod tests {
             true,
         );
         assert!(validate_graph(&g).is_err());
+    }
+
+    #[test]
+    fn inherited_dimension_order_does_not_change_edge_or_graph_digest() {
+        let root = node(
+            "root",
+            VmModelDerivationKindV1::IndependentRetrain,
+            VmSnapshotPurposeV1::Training,
+            'a',
+            'b',
+        );
+        let child = node(
+            "child",
+            VmModelDerivationKindV1::FineTuneFromParent,
+            VmSnapshotPurposeV1::Training,
+            'c',
+            'd',
+        );
+        let mut forward = edge(
+            "e1",
+            &root,
+            &child,
+            vec![
+                VmDependencyDimensionV1::ModelWeights,
+                VmDependencyDimensionV1::CalibrationState,
+            ],
+        );
+        let forward_digest = forward.edge_sha256.clone();
+        forward.inherited_dimensions.reverse();
+        assert_eq!(
+            forward_digest,
+            seal_vm_snapshot_dependency_edge_v1(&forward).unwrap()
+        );
+
+        let first = graph(
+            vec![root.clone(), child.clone()],
+            vec![edge(
+                "e1",
+                &root,
+                &child,
+                vec![
+                    VmDependencyDimensionV1::ModelWeights,
+                    VmDependencyDimensionV1::CalibrationState,
+                ],
+            )],
+            true,
+            true,
+        );
+        let second = graph(
+            vec![root.clone(), child.clone()],
+            vec![edge(
+                "e1",
+                &root,
+                &child,
+                vec![
+                    VmDependencyDimensionV1::CalibrationState,
+                    VmDependencyDimensionV1::ModelWeights,
+                ],
+            )],
+            true,
+            true,
+        );
+        assert_eq!(first.graph_sha256, second.graph_sha256);
     }
 
     #[test]
