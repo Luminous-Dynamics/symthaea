@@ -71,7 +71,7 @@ jobs:
         run: cargo test --manifest-path Cargo.toml -p symthaea --lib --features voice-stt --locked
 
       - name: Run strict STT Clippy
-        run: cargo clippy --manifest-path Cargo.toml -p symthaea-stt --lib --locked -- -D warnings
+        run: cargo clippy --no-deps --manifest-path Cargo.toml -p symthaea-stt --lib --locked -- -D warnings
 
       - name: Run strict application Clippy with voice-stt
-        run: cargo clippy --manifest-path Cargo.toml -p symthaea --lib --features voice-stt --locked -- -D warnings
+        run: cargo clippy --no-deps --manifest-path Cargo.toml -p symthaea --lib --features voice-stt --locked -- -D warnings
