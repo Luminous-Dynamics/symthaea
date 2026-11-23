@@ -32,6 +32,8 @@ pub const MAX_FAILURE_SCENARIOS: usize = 768;
 pub const MAX_FAILURE_ID_BYTES: usize = 128;
 /// Largest total demand weight exactly representable as an IEEE-754 f64 integer.
 pub const MAX_FAILURE_TOTAL_DEMAND_WEIGHT: u128 = 9_007_199_254_740_992;
+pub const MAX_FAILURE_DELIVERY_TRIALS_PER_SCENARIO: usize = 1_024;
+pub const MAX_FAILURE_DELIVERY_EVALUATIONS: usize = 131_072;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -1308,7 +1310,7 @@ pub fn build_mycelial_failure_attack_plan(
         scenarios.push(MycelialFailureScenario {
             scenario_id,
             failed_segment_ids: if attack_strategy_targets_segments(config.strategy) {
-                failed_ids
+                failed_ids.clone()
             } else {
                 Vec::new()
             },
@@ -1476,7 +1478,9 @@ impl MycelialFailureAttackPlan {
                 hasher.update(&[1]);
                 hash_string(&mut hasher, id);
             }
-            None => hasher.update(&[0]),
+            None => {
+                hasher.update(&[0]);
+            }
         }
         hasher.update(&(self.ranked_entity_ids.len() as u64).to_le_bytes());
         for id in &self.ranked_entity_ids {
@@ -2165,8 +2169,8 @@ impl MycelialFailureResilienceProfile {
                         reachable_count += 1;
                         reachable_weight += u128::from(demand.weight);
                         weighted_directness_sum +=
-                            (direct_distance / path_length) * f64::from(demand.weight);
-                        weighted_path_length_sum += path_length * f64::from(demand.weight);
+                            (direct_distance / path_length) * demand.weight as f64;
+                        weighted_path_length_sum += path_length * demand.weight as f64;
                     }
                     (None, None) => {}
                     _ => {
@@ -2396,7 +2400,7 @@ mod tests {
             schema_version: MYCELIAL_JUNCTION_GRAPH_SCHEMA_VERSION,
             source_model_version: 1,
             length_unit: JunctionLengthUnit::OrganismLocalModelUnit,
-            source_model_digest: "a".repeat(64),
+            source_geometry_digest: "a".repeat(64),
             source_filament_ids: vec![1, 2, 3],
             maximum_junction_gap_model_units: 0.0,
             junctions: vec![a, b, c],
@@ -2440,7 +2444,7 @@ mod tests {
             schema_version: MYCELIAL_JUNCTION_GRAPH_SCHEMA_VERSION,
             source_model_version: 1,
             length_unit: JunctionLengthUnit::OrganismLocalModelUnit,
-            source_model_digest: "c".repeat(64),
+            source_geometry_digest: "c".repeat(64),
             source_filament_ids: vec![1, 2, 3, 4, 5, 6],
             maximum_junction_gap_model_units: 0.0,
             junctions: vec![
@@ -2511,7 +2515,7 @@ mod tests {
             schema_version: MYCELIAL_JUNCTION_GRAPH_SCHEMA_VERSION,
             source_model_version: 1,
             length_unit: JunctionLengthUnit::OrganismLocalModelUnit,
-            source_model_digest: "e".repeat(64),
+            source_geometry_digest: "e".repeat(64),
             source_filament_ids: vec![1, 2, 3, 4, 5],
             maximum_junction_gap_model_units: 0.0,
             junctions: vec![
@@ -2602,7 +2606,7 @@ mod tests {
     fn anastomosis_cycle_preserves_demand_after_edge_failure_better_than_tree() {
         let ring = triangle_graph();
         let mut tree = triangle_graph();
-        tree.source_model_digest = "b".repeat(64);
+        tree.source_geometry_digest = "b".repeat(64);
         tree.source_filament_ids = vec![1, 2];
         tree.segments.retain(|segment| segment.id != "edge-ca");
         tree.junctions[0].kind = JunctionKind::Tip;
@@ -3023,7 +3027,7 @@ mod tests {
     #[test]
     fn lowest_degree_attack_prioritizes_peripheral_junctions() {
         let mut graph = triangle_graph();
-        graph.source_model_digest = "d".repeat(64);
+        graph.source_geometry_digest = "d".repeat(64);
         graph.source_filament_ids.push(4);
         graph.junctions[0].incident_filament_ids.push(4);
         graph.junctions[0].incident_filament_ids.sort_unstable();
