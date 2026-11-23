@@ -135,7 +135,11 @@ fn helper_expanded_proof_dependencies(snapshot: &Snapshot) -> BTreeSet<String> {
 }
 
 fn helper_names(snapshot: &Snapshot) -> Vec<String> {
-    snapshot.helper_nodes.iter().map(|helper| helper.declaration.clone()).collect()
+    snapshot
+        .helper_nodes
+        .iter()
+        .map(|helper| helper.declaration.clone())
+        .collect()
 }
 
 fn helper_closure_reconciles(helper: &HelperNode) -> bool {
@@ -481,7 +485,11 @@ mod tests {
             proof_value_available: true,
             type_dependencies: vec!["Nat".to_owned()],
             proof_value_dependencies: vec!["A".to_owned(), "B".to_owned()],
-            constant_info_dependency_closure: vec!["A".to_owned(), "B".to_owned(), "Nat".to_owned()],
+            constant_info_dependency_closure: vec![
+                "A".to_owned(),
+                "B".to_owned(),
+                "Nat".to_owned(),
+            ],
             unresolved_dependencies: Vec::new(),
             edges: Vec::new(),
         });
@@ -503,10 +511,16 @@ mod tests {
             BTreeMap::from([("Nat.choose_pos".to_owned(), a)]),
             identity("v2", "lean-b"),
             BTreeMap::from([("Nat.choose_pos".to_owned(), b)]),
-        ).expect("same root declaration inventory");
+        )
+        .expect("same root declaration inventory");
         assert_eq!(report.declarations[0].helper_nodes_baseline.len(), 1);
         assert_eq!(report.declarations[0].helper_nodes_candidate.len(), 1);
-        assert_eq!(report.declarations[0].helper_expanded_proof_dependencies.jaccard, 1.0);
+        assert_eq!(
+            report.declarations[0]
+                .helper_expanded_proof_dependencies
+                .jaccard,
+            1.0
+        );
     }
 
     #[test]
