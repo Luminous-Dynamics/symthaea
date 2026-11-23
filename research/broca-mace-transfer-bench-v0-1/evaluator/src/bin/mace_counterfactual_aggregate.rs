@@ -1345,6 +1345,53 @@ mod tests {
     }
 
     #[test]
+    fn optional_digest_fields_reject_null_and_wrong_json_types() {
+        let mut candidate = candidate_receipt_record("run-1", "world-1:task-a");
+        candidate["retrieval_profile_sha256"] = json!(null);
+        assert!(parse_candidate_receipt(&candidate)
+            .unwrap_err()
+            .contains("optional digest field"));
+
+        let mut manifest = manifest_record("run-1", &"a".repeat(64));
+        manifest["source_revision"] = json!(7);
+        assert!(parse_manifest(&manifest)
+            .unwrap_err()
+            .contains("source_revision"));
+
+        let mut missing_revision = manifest_record("run-1", &"a".repeat(64));
+        missing_revision.as_object_mut().unwrap().remove("source_revision");
+        assert!(parse_manifest(&missing_revision)
+            .unwrap_err()
+            .contains("source_revision"));
+    }
+
+    #[test]
+    fn evaluator_score_rejects_inconsistent_decision_and_abstention_flags() {
+        let mut changed_without_disagreement =
+            score_record("world-1:task-a", "typed_content_hdc", "event", 0.5, 0.5);
+        changed_without_disagreement["decision_changed"] = json!(true);
+        assert!(parse_score(&changed_without_disagreement)
+            .unwrap_err()
+            .contains("agreement flags"));
+
+        let mut false_abstention =
+            score_record("world-1:task-a", "typed_content_hdc", "event", 0.5, 0.5);
+        false_abstention["abstained"] = json!(true);
+        assert!(parse_score(&false_abstention)
+            .unwrap_err()
+            .contains("abstained flag"));
+    }
+
+    #[test]
+    fn evaluator_score_rejects_unknown_schema_fields() {
+        let mut score = score_record("world-1:task-a", "typed_content_hdc", "event", 0.5, 0.5);
+        score["candidate_intervention_label"] = json!("hidden");
+        assert!(parse_score(&score)
+            .unwrap_err()
+            .contains("unsupported field candidate_intervention_label"));
+    }
+
+    #[test]
     fn strict_record_allowlists_reject_candidate_evaluator_and_manifest_extras() {
         let candidate = candidate_receipt_record("run-1", "world-1:task-a");
         let mut candidate_with_label = candidate;
