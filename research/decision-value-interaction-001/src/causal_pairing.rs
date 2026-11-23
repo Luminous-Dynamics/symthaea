@@ -957,6 +957,7 @@ mod tests {
         );
         runs[1].steps[0].applied_action_sha256 = runs[0].steps[0].applied_action_sha256;
         runs[1].steps[0].post_state_sha256 = digest(222);
+        runs[1].steps[1].pre_state_sha256 = digest(222);
         assert!(matches!(
             validate_causal_pairing(&runs),
             Err(CausalPairingError::ConflictingDeterministicTransition { world_tick: 100 })
@@ -994,6 +995,36 @@ mod tests {
                 world_tick: 101
             })
         ));
+    }
+
+    #[test]
+    fn duplicate_treatment_arm_is_rejected() {
+        let mut runs = receipts(
+            CausalReplayRegime::ClosedLoopActionCoupled,
+            TrajectoryOrigin::ArmLocalDriverExecution,
+            true,
+        );
+        runs[3].arm = TreatmentArm::Baseline;
+        assert!(matches!(
+            validate_causal_pairing(&runs),
+            Err(CausalPairingError::DuplicateArm {
+                arm: TreatmentArm::Baseline
+            })
+        ));
+    }
+
+    #[test]
+    fn incomplete_four_arm_set_is_rejected() {
+        let mut runs = receipts(
+            CausalReplayRegime::ClosedLoopActionCoupled,
+            TrajectoryOrigin::ArmLocalDriverExecution,
+            true,
+        );
+        runs.truncate(3);
+        assert_eq!(
+            validate_causal_pairing(&runs),
+            Err(CausalPairingError::WrongReceiptCount { actual: 3 })
+        );
     }
 
     #[test]
