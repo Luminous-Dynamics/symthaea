@@ -263,6 +263,7 @@ Zero observed failures is not a probability-zero guarantee. Publish complete den
 - Temporal Activity idempotency and at-least-once retries: https://docs.temporal.io/activities
 - DBOS Postgres-backed durable workflow recovery: https://docs.dbos.dev/architecture
 - DBOS durable execution and exactly-once database transaction boundary: https://www.dbos.dev/
+- Deployment Decision Reliability: Generalizability-Theory Framework for Long-Horizon Agent Evaluations (Stanford CS321M project, 2026): https://aims.stanford.edu/cs321m-projects/Srinivasan2026.pdf
 
 ## 11. Qualification boundary
 
@@ -325,3 +326,35 @@ Exact source Git blob SHA: `43d0550304cd6e0e8a003e913cc5241c82421f78`.
 Exact source SHA-256: `24f80efae77fc4d31f64098febf15d5d4881a646d26e69c6cf4bf5b4f491a6de`.
 
 **Important integration boundary:** this is a companion contract test, not proof that the original 9-case fencing kernel or a production service already enforces tenant scope. The next integration change must carry tenant identity through source receipts, authorization grants, idempotency derivation and sink-side atomic checks. Trust in the test's source/tenant identity is an input assumption; no receipt signature, issuer key revocation or persistent tenant policy store is qualified.
+
+
+## 15. Bounded interleaving exploration (2026-11-23)
+
+Companion source: `benchmarks/frontend/monitoring/mon003-interleaving-modelcheck-v1.mjs`  
+Machine-readable report: `benchmarks/frontend/monitoring/mon003-interleaving-modelcheck-report-v1.json`
+
+Executed with Node.js v22.16.0:
+```sh
+node --check mon003-interleaving-modelcheck-v1.mjs
+node mon003-interleaving-modelcheck-v1.mjs
+```
+
+**Executed result: all 720 permutations of six lifecycle operations explored.** Operations: worker replacement, permission revocation, receipt expiry, old-worker commit with lost response, replacement-worker retry under the same operation identity, and reconciliation.
+
+All modeled invariants passed:
+- at most one side effect for one operation key;
+- stale worker cannot commit after a higher fencing epoch is installed;
+- no new effect after permission revocation or receipt expiry;
+- a lost response does not imply failure or justify a new key;
+- reconciliation is read-only.
+
+Observed across the 720 schedules: 228 schedules with one effect; 492 with no effect; 324 stale-fence rejections; 312 permission rejections; 108 expiry rejections; 108 idempotent replays; 174 successful reconciliations; and 558 schedules still marked outcome-unknown at the end because the finite event order did not provide a later successful reconciliation.
+
+Exact source Git blob SHA: `88f08084fcf596b8ab499d77d2cc7d91129b7e49`.  
+Exact source SHA-256: `457853ee59e6b66c5bdd8a2188c2554ce05c7ba8cd52e2fefc0748d0ae386371`.
+
+This is bounded sequential interleaving exploration, not a concurrent memory-model proof. It assumes atomic sink checks and does not cover database isolation anomalies, actual broker durability, clock drift or network partitions beyond the modeled events. It is useful for finding ordering counterexamples before live integration; zero finite-model failures do not establish production failure probability.
+
+## 16. Local toolchain boundary
+
+The available local execution environment had Node.js v22.16.0 but no `rustc`, `cargo` or Nix executable. The Rust parity implementation is therefore not marked executed or passed. The current JS reference suites and bounded model checker were run locally; Rust translation remains an explicit next engineering gate rather than silently substituting Node results for Rust evidence.
