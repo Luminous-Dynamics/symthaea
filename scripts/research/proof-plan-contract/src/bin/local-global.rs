@@ -2,7 +2,10 @@ use std::env;
 use std::fs;
 use std::process::ExitCode;
 
-use proof_plan_contract::local_global::{compute_cirr, validate_pair_json};
+use proof_plan_contract::local_global::{
+    check_finite_propositional_entailment, compute_cirr, validate_pair_json,
+    FiniteTruthTableResult, MAX_FINITE_BOOLEAN_ATOMS,
+};
 
 fn main() -> ExitCode {
     let Some(path) = env::args().nth(1) else {
@@ -51,6 +54,43 @@ fn main() -> ExitCode {
                 "finite_boolean_countermodel=verified premises={} conclusion=false",
                 countermodel.premises.len()
             );
+            match check_finite_propositional_entailment(
+                &countermodel.premises,
+                &countermodel.conclusion,
+                MAX_FINITE_BOOLEAN_ATOMS,
+            ) {
+                Ok(FiniteTruthTableResult::Countermodel {
+                    valuation,
+                    assignments_checked,
+                }) => {
+                    println!(
+                        "finite_truth_table=countermodel assignments_checked={} witness={}",
+                        assignments_checked,
+                        valuation
+                            .iter()
+                            .map(|assignment| format!("{}={}", assignment.atom, assignment.value))
+                            .collect::<Vec<_>>()
+                            .join(",")
+                    );
+                }
+                Ok(FiniteTruthTableResult::NoCountermodelFound {
+                    assignments_checked,
+                }) => println!(
+                    "finite_truth_table=no_countermodel assignments_checked={}",
+                    assignments_checked
+                ),
+                Ok(FiniteTruthTableResult::AtomBudgetExceeded {
+                    atom_count,
+                    max_atoms,
+                }) => println!(
+                    "finite_truth_table=unknown atom_count={} max_atoms={}",
+                    atom_count, max_atoms
+                ),
+                Err(error) => {
+                    eprintln!("finite truth-table check rejected: {error}");
+                    return ExitCode::from(1);
+                }
+            }
         }
     }
     println!(

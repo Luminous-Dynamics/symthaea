@@ -262,3 +262,8 @@ The hypothesis and premise arrays are treated as sorted, duplicate-free sets. Sc
 Remaining integrity gap: model decoding configuration and execution prompt/input/output digests are still only syntax-checked. Their canonical preimages and artifact contents are not yet included/resolved. A digest shape is not a trusted execution attestation. Artifact URI authorization and digest verification remain follow-up work.
 
 The SHA-256 dependency is introduced in this commit. The focused workflow temporarily regenerates Cargo.lock and uploads it as an artifact. The generated lock must be committed in a follow-up before restoring --locked everywhere.
+
+
+## 14. Exhaustive finite propositional oracle
+
+The Rust receipt validator now includes a bounded truth-table checker for the Boolean formula AST. It enumerates all assignments for at most 16 distinct propositional atoms, sorts atom names for deterministic witnesses, and returns one of three explicit outcomes: a concrete countermodel, no countermodel found over the complete finite truth table, or `AtomBudgetExceeded` (unknown). The budget result is never treated as proof or refutation. Tests cover the invalid converse implication, valid modus ponens, deterministic witness ordering, and the budget boundary. This is a complete decision procedure only for the supported classical propositional AST within the declared atom budget; it is not a general mathematical theorem prover, dependent-type checker, or Lean kernel receipt.

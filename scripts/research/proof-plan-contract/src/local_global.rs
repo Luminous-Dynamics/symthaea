@@ -150,7 +150,7 @@ pub enum BooleanFormula {
     },
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct BooleanAssignment {
     pub atom: String,
@@ -208,6 +208,92 @@ impl BooleanFormula {
             }
         }
     }
+}
+
+
+/// Result of exhaustive enumeration over a finite propositional atom set.
+/// NoCountermodelFound is complete only for this Boolean AST and atom set;
+/// it is not a general Lean proof or a result about arbitrary mathematical types.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FiniteTruthTableResult {
+    Countermodel {
+        valuation: Vec<BooleanAssignment>,
+        assignments_checked: usize,
+    },
+    NoCountermodelFound {
+        assignments_checked: usize,
+    },
+    AtomBudgetExceeded {
+        atom_count: usize,
+        max_atoms: usize,
+    },
+}
+
+pub const MAX_FINITE_BOOLEAN_ATOMS: usize = 16;
+
+/// Decide propositional entailment by exhaustive truth-table enumeration.
+///
+/// At most max_atoms (and never more than 16) distinct atoms are enumerated.
+/// The first countermodel is deterministic because atom names are sorted.
+pub fn check_finite_propositional_entailment(
+    premises: &[BooleanFormula],
+    conclusion: &BooleanFormula,
+    max_atoms: usize,
+) -> Result<FiniteTruthTableResult, String> {
+    let mut atom_set = HashSet::new();
+    for premise in premises {
+        premise.collect_atoms(&mut atom_set)?;
+    }
+    conclusion.collect_atoms(&mut atom_set)?;
+
+    let mut atoms = atom_set.into_iter().collect::<Vec<_>>();
+    atoms.sort();
+
+    let effective_budget = max_atoms.min(MAX_FINITE_BOOLEAN_ATOMS);
+    if atoms.len() > effective_budget {
+        return Ok(FiniteTruthTableResult::AtomBudgetExceeded {
+            atom_count: atoms.len(),
+            max_atoms: effective_budget,
+        });
+    }
+
+    let assignments_total = 1usize
+        .checked_shl(atoms.len() as u32)
+        .ok_or_else(|| "Boolean atom count exceeds platform shift width".to_owned())?;
+
+    for mask in 0..assignments_total {
+        let valuation = atoms
+            .iter()
+            .enumerate()
+            .map(|(index, atom)| BooleanAssignment {
+                atom: atom.clone(),
+                value: (mask & (1usize << index)) != 0,
+            })
+            .collect::<Vec<_>>();
+        let values = valuation
+            .iter()
+            .map(|assignment| (assignment.atom.clone(), assignment.value))
+            .collect::<std::collections::HashMap<_, _>>();
+
+        let mut all_premises_true = true;
+        for premise in premises {
+            if !premise.evaluate(&values)? {
+                all_premises_true = false;
+                break;
+            }
+        }
+
+        if all_premises_true && !conclusion.evaluate(&values)? {
+            return Ok(FiniteTruthTableResult::Countermodel {
+                valuation,
+                assignments_checked: mask + 1,
+            });
+        }
+    }
+
+    Ok(FiniteTruthTableResult::NoCountermodelFound {
+        assignments_checked: assignments_total,
+    })
 }
 
 impl BooleanCountermodel {
@@ -806,6 +892,120 @@ mod tests {
         assert!(visible.get("independently_assessed_warrant").is_none());
         assert!(!visible.to_string().contains("finite_boolean_countermodel"));
         assert!(visible.get("valuation").is_none());
+    }
+
+
+    #[test]
+    fn truth_table_finds_converse_implication_countermodel() {
+        let p = BooleanFormula::Atom { name: "p".to_owned() };
+        let q = BooleanFormula::Atom { name: "q".to_owned() };
+        let result = check_finite_propositional_entailment(
+            &[BooleanFormula::Implies {
+                left: Box::new(p.clone()),
+                right: Box::new(q.clone()),
+            }],
+            &BooleanFormula::Implies {
+                left: Box::new(q),
+                right: Box::new(p),
+            },
+            MAX_FINITE_BOOLEAN_ATOMS,
+        )
+        .expect("well-formed propositional formula");
+
+        let FiniteTruthTableResult::Countermodel { valuation, .. } = result else {
+            panic!("expected a countermodel for p -> q / q -> p");
+        };
+        assert_eq!(
+            valuation,
+            vec![
+                BooleanAssignment {
+                    atom: "p".to_owned(),
+                    value: false,
+                },
+                BooleanAssignment {
+                    atom: "q".to_owned(),
+                    value: true,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn truth_table_accepts_modus_ponens_entailment() {
+        let p = BooleanFormula::Atom { name: "p".to_owned() };
+        let q = BooleanFormula::Atom { name: "q".to_owned() };
+        let result = check_finite_propositional_entailment(
+            &[
+                p.clone(),
+                BooleanFormula::Implies {
+                    left: Box::new(p),
+                    right: Box::new(q.clone()),
+                },
+            ],
+            &q,
+            MAX_FINITE_BOOLEAN_ATOMS,
+        )
+        .expect("well-formed propositional formula");
+
+        assert_eq!(
+            result,
+            FiniteTruthTableResult::NoCountermodelFound {
+                assignments_checked: 4,
+            }
+        );
+    }
+
+    #[test]
+    fn truth_table_abstains_when_atom_budget_is_exceeded() {
+        let premise = (0..=MAX_FINITE_BOOLEAN_ATOMS)
+            .map(|index| BooleanFormula::Atom {
+                name: format!("p{index}"),
+            })
+            .reduce(|left, right| BooleanFormula::And {
+                left: Box::new(left),
+                right: Box::new(right),
+            })
+            .expect("non-empty atom sequence");
+        let result = check_finite_propositional_entailment(
+            &[premise.clone()],
+            &premise,
+            MAX_FINITE_BOOLEAN_ATOMS,
+        )
+        .expect("well-formed propositional formula");
+
+        assert_eq!(
+            result,
+            FiniteTruthTableResult::AtomBudgetExceeded {
+                atom_count: MAX_FINITE_BOOLEAN_ATOMS + 1,
+                max_atoms: MAX_FINITE_BOOLEAN_ATOMS,
+            }
+        );
+    }
+
+    #[test]
+    fn truth_table_countermodels_are_deterministic() {
+        let a = BooleanFormula::Atom { name: "a".to_owned() };
+        let z = BooleanFormula::Atom { name: "z".to_owned() };
+        let premise = BooleanFormula::Implies {
+            left: Box::new(a.clone()),
+            right: Box::new(z.clone()),
+        };
+        let conclusion = BooleanFormula::Implies {
+            left: Box::new(z),
+            right: Box::new(a),
+        };
+
+        let first = check_finite_propositional_entailment(
+            std::slice::from_ref(&premise),
+            &conclusion,
+            MAX_FINITE_BOOLEAN_ATOMS,
+        );
+        let second = check_finite_propositional_entailment(
+            std::slice::from_ref(&premise),
+            &conclusion,
+            MAX_FINITE_BOOLEAN_ATOMS,
+        );
+        assert_eq!(first, second);
     }
 
     #[test]
