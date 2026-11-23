@@ -239,8 +239,7 @@ impl VlasovPoisson1d1v {
             return Err(VelocityFourierSpongeError::Solver(error));
         }
 
-        let imaginary_tolerance =
-            256.0 * f64::EPSILON * max_real_magnitude.max(f64::MIN_POSITIVE);
+        let imaginary_tolerance = 256.0 * f64::EPSILON * max_real_magnitude.max(f64::MIN_POSITIVE);
         if max_imaginary_residual > imaginary_tolerance {
             self.distribution = previous_distribution;
             self.electric_field = previous_field;
