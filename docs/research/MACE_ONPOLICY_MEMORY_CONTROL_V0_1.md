@@ -1,0 +1,311 @@
+# MACE On-Policy Memory Control v0.1
+
+**Status:** research protocol specification. No AMemGym score, closed-loop policy gain, privacy qualification, or human-user result is claimed.
+
+**Tracking issue:** [#13388 — qualify on-policy memory control under endogenous disclosure and feedback](https://github.com/Luminous-Dynamics/symthaea/issues/13388)
+
+## 1. Research question
+
+Does a memory controller improve long-horizon assistant outcomes when the assistant's own responses alter what information becomes observable in later interactions?
+
+Most static memory evaluations replay a fixed transcript. That estimates performance conditional on an already-realized history. In deployment, the history is partly endogenous:
+
+- memory affects retrieval;
+- retrieval affects the assistant response;
+- the response affects what a user chooses to reveal next;
+- later observations affect memory updates and subsequent responses.
+
+A system can therefore improve apparent recall by soliciting more information, eliciting information through leading questions, or causing users to disclose information that is not necessary for the task. A static replay score does not measure the total effect or cost of this behavior.
+
+MACE should qualify both **off-policy evidence use** and **on-policy interaction policy** while keeping them separate.
+
+## 2. Benchmark grounding
+
+### AMemGym — primary interactive protocol
+
+AMemGym (ICLR 2026) introduces on-policy evaluation for conversational memory. It uses structured user profiles, state-dependent questions and state-evolution trajectories; LLM-simulated users expose latent state through interactive conversations.
+
+- Paper: https://proceedings.iclr.cc/paper_files/paper/2026/hash/0856bc553d3e3b9827e5140d0ad3bf8d-Abstract-Conference.html
+- Project, code and dataset entry point: https://agi-eval-official.github.io/amemgym/
+
+MACE must first reproduce the published AMemGym protocol and report its official metrics as a distinct benchmark lane. The MACE-specific measures in this document are additional diagnostics, not replacements for official scoring.
+
+### Complementary protocols
+
+- **MemoryAgentBench (ICLR 2026):** incremental multi-turn evaluation of accurate retrieval, test-time learning, long-range understanding and selective forgetting. https://proceedings.iclr.cc/paper_files/paper/2026/hash/fd1eff9dd295df50a41f2521942fa31d-Abstract.html
+- **Beyond Recall:** multimodal temporal memory across images, videos and documents, with 11 fine-grained retrieval, reasoning and management tasks. Pin the exact dataset revision and its media/license card. https://beyond-recall.github.io/
+- **MemoryArena / AMA-Bench:** later-task transfer, trajectory reasoning, state updating and causal/objective memory. These remain separate protocols.
+- **MemSecBench / MemoryDojo / MemPoison:** poisoning, persistence, propagation, consequences and repair. These remain separate security lanes.
+
+Do not pool percentages across these benchmarks.
+
+## 3. Formal interaction model
+
+Let:
+
+- (z): evaluator-owned latent user/task state;
+- (h_t): candidate-visible interaction history through time (t);
+- (m_t): candidate memory state;
+- (a_t): assistant response or interaction action;
+- (o_{t+1}): next user/environment observation;
+- (pi): the complete agent-plus-memory policy.
+
+The environment generates future observations conditional on the interaction so far:
+
+`o_{t+1} \sim P(o \mid z, h_t, a_t)`
+
+The memory controller updates from permitted observations:
+
+`m_{t+1} = M(m_t, h_t, a_t, o_{t+1})`
+
+The next response is generated from the resulting memory and visible history:
+
+`a_{t+1} = A(m_{t+1}, h_{t+1})`
+
+The evaluator retains (z), future state, simulator parameters and answer labels. Candidate code receives only permitted observations and public task/action/cost contracts.
+
+### 3.1 Two distinct estimands
+
+**Off-policy conditional performance**
+
+Evaluate policies against the same frozen history (h). This measures retrieval and answer quality conditional on a fixed transcript:
+
+`V_off(\pi) = E[Y(\pi; h)]`
+
+It is useful for component diagnosis, but it does not measure how the policy shapes future observations.
+
+**On-policy total closed-loop value**
+
+Randomize the complete policy at the episode/profile level and allow each interaction to evolve naturally:
+
+`V_on(\pi) = E_{z,U}[Y(\pi; z,U)]`
+
+Here (U) represents the environment/user-simulator randomness. The primary policy contrast is:
+
+`\Delta_on = V_on(\pi_{MACE}) - V_on(\pi_{baseline})`
+
+This is the total effect of the assigned policy, including changes to future disclosure and interaction. Do not condition the primary total-effect estimate on post-assignment transcript length, number of disclosures, or later observations: those can be mediators of the policy effect.
+
+### 3.2 Mechanism analysis
+
+Report the interaction pathway separately:
+
+`policy \rightarrow response \rightarrow disclosure \rightarrow memory\ update \rightarrow later\ decision`
+
+Mediation estimates require additional assumptions and should be labelled exploratory unless the simulator supports a preregistered intervention on the mediator. Do not infer that increased disclosure caused better utility merely because both increased.
+
+## 4. Experimental tracks
+
+### Track A — official off-policy reproduction
+
+1. Freeze the official AMemGym release, profile/task generators, user simulator, prompts, agent backbone, scoring code and environment.
+2. Reproduce its declared baseline systems and metrics.
+3. Preserve its official split and run settings.
+4. Record deviations and method changes.
+5. Do not adapt memory policy parameters using held-out profiles or answers.
+
+### Track B — on-policy evaluation
+
+1. Randomize complete memory policies across independent episodes, stratified by latent profile and task family.
+2. Keep the agent backbone, system prompt, tools, simulator version and interaction budget matched within a comparison.
+3. Allow conversations and observations to diverge naturally after policy-specific responses.
+4. Use common random numbers only where the simulator contract guarantees that they do not reveal future state or invalidate the intervention.
+5. Estimate policy value over independent episode seeds and cluster uncertainty by latent profile/task generator. Turns within one conversation are not independent samples.
+6. Record every prompt/response, user observation, state transition, memory mutation, retrieval, tool action and cost with sequence numbers and source receipts.
+
+### Track C — policy adaptation
+
+1. Permit memory-policy adaptation only on declared training and calibration profiles.
+2. Freeze the policy, prompts, retrieval configuration and thresholds before held-out evaluation.
+3. Include a no-adaptation control.
+4. Treat any test-time change to policy weights, rules or configuration as a new policy version with a new manifest.
+5. Evaluate leave-one-profile-family-out, leave-one-task-family-out and simulator-version shift.
+
+### Track D — MACE-specific controlled fixtures
+
+Build small deterministic fixtures for mechanisms that can be exhaustively understood:
+
+- stable preferences and constraints;
+- explicit preference revisions;
+- latent state changes without explicit announcement;
+- conflicting statements with different source authority;
+- missing or delayed information;
+- useful information that is not volunteered;
+- leading questions that induce irrelevant disclosures;
+- excessive questioning that increases burden or refusal;
+- privacy-sensitive information that is not needed for the task;
+- stale memory that causes repeated or inappropriate questions;
+- confirmation loops where a mistaken memory changes the assistant response and then elicits apparent confirmation;
+- simulator or tool errors that must not be recorded as successful observations.
+
+These fixtures are development controls. They do not replace official AMemGym data or consented human evaluation.
+
+## 5. Matched baselines
+
+Use one frozen agent backbone and tool harness per comparison. Report different model families and model revisions separately.
+
+1. No external memory / current context only.
+2. Full conversation history under the same context budget.
+3. Fixed-window and recency memory.
+4. Raw chunk BM25, dense retrieval and hybrid reciprocal-rank fusion.
+5. Extracted facts with correction and supersession.
+6. Raw evidence plus extracted facts.
+7. Hierarchical abstraction with cue-anchor expansion.
+8. Model-conditioned memory dose, including a valid zero-memory fallback (#13363).
+9. MACE evidence-qualified controller with accept / retrieve / acquire / abstain behavior.
+10. Evaluator-only latent-state oracle as a non-deployable upper bound. It must never enter candidate memory or candidate runtime.
+
+Match model, prompt, tool, interaction, context, token and latency budgets. Where a budget cannot be matched exactly, show the full cost vector rather than hiding the mismatch in a scalar.
+
+## 6. Outcome and safety scorecard
+
+### 6.1 Primary utility
+
+- Closed-loop task success and user/task utility.
+- Regret against the evaluator-owned task optimum.
+- Held-out utility difference against the strongest matched deployable baseline.
+- Worst-profile and worst-task-family outcomes.
+- Completion, refusal and attrition rates.
+
+### 6.2 Memory correctness
+
+- State acquisition precision/recall against evaluator-owned state.
+- Preference and constraint update accuracy.
+- Time to incorporate an explicit correction.
+- Stale-state use after correction.
+- Historical as-of answer accuracy.
+- Unsupported inference rate.
+- Provenance retention through write, consolidation, retrieval and use.
+
+### 6.3 Interaction burden and disclosure
+
+- Questions asked and interaction turns per successful task.
+- Relevant state gained per question and per unit of interaction burden.
+- Unnecessary question rate.
+- Irrelevant or redundant disclosure elicitation.
+- User refusal, disengagement and task abandonment.
+- Leading-question and confirmation-loop incidence.
+- Privacy-boundary violation and unauthorized inference.
+
+Disclosure volume is not a standalone reward. More disclosure is not inherently better.
+
+### 6.4 All-in cost
+
+- Memory bytes, evidence sidecar bytes and index bytes.
+- Input/output/context tokens.
+- Write, update, consolidation, retrieval and verification calls.
+- p50/p95/p99 latency.
+- CPU/GPU time, peak memory and energy where measurable.
+- User interaction cost and monetary cost.
+- Recovery, replay and correction cost.
+
+Publish utility-versus-cost and burden-versus-utility frontiers. Do not collapse unlike resource types without a declared application utility function.
+
+## 7. Hard gates and negative controls
+
+These are non-compensable qualification requirements; a higher task score cannot offset a failure.
+
+1. **Latent-state isolation:** candidate cannot read simulator internals, future state, evaluator labels or random-state seeds.
+2. **Hidden-state mutation invariance:** changing evaluator-only labels while holding the candidate-visible prefix fixed must not change candidate input bytes or candidate-visible logs.
+3. **Future-state isolation:** candidate input at (t) must be invariant to mutations of future simulator state that have not yet been observed.
+4. **No hidden-label feedback:** evaluator scores, task answer keys and intervention labels are not sent to candidate code during held-out execution.
+5. **Privacy:** do not solicit, retain, infer or expose data outside the declared task purpose and consent contract.
+6. **Correction:** an explicit correction invalidates stale derived state at current use; historical queries remain answerable as-of their original knowledge time.
+7. **No resurrection:** retraction and erasure remain effective after restart, compaction, replay and backup restoration.
+8. **Tool reconciliation:** a claimed external success is not stored as a successful outcome until an independently observed receipt reconciles it.
+9. **No over-questioning reward:** extra irrelevant or sensitive disclosures must not improve the score.
+10. **Policy freeze:** held-out test outcomes cannot silently update the evaluated memory policy.
+11. **Cost integrity:** count the complete interaction and memory lifecycle, not just the final Search call.
+12. **Independent evaluator:** held-out latent state and scoring remain under separate custody for confirmatory results.
+
+## 8. Prospective targets
+
+These are qualification targets, not current MACE results. Freeze a pilot, estimate variance and statistical power, then preregister confirmatory thresholds.
+
+- Reproduce the official AMemGym baseline scores within the expected uncertainty of its frozen protocol before claiming a MACE extension.
+- Demonstrate positive held-out on-policy utility against the strongest matched deployable baseline, with a cluster-level confidence interval whose lower bound exceeds zero.
+- Use a stretch target of at least **5 percentage points** of closed-loop task-success improvement only where the task metric and sample size support that target.
+- Achieve at least 95% accuracy on explicit state correction in the controlled fixture set, while separately reporting unresolved/ambiguous cases.
+- Zero unauthorized latent-state access and zero evaluator-label leakage in all registered negative controls.
+- Zero confirmed privacy/authority hard-gate violations in the qualification fixture suite.
+- No increase in unnecessary questioning or privacy burden beyond a preregistered non-inferiority margin.
+- Demonstrate positive transfer to held-out profile and task families; report any family where performance regresses.
+- Publish the complete cost, interaction-burden and utility frontiers, including failed and abandoned episodes.
+
+Do not set a universal numeric stale-use or privacy threshold before the event taxonomy and denominator are frozen. Report counts and denominators for every hard-gate failure.
+
+## 9. Reproducibility manifest
+
+Every result must bind:
+
+- benchmark name, release, dataset revision and license/media card;
+- profile/task generator and user-simulator version;
+- evaluator and scoring implementation;
+- agent model/provider/revision/reasoning mode;
+- system/developer prompts and tool schemas;
+- memory controller, extractor, retriever and consolidation digests;
+- initial memory state and write/search protocol versions;
+- episode/profile split and seed schedule;
+- interaction, token, context, tool and wall-clock budgets;
+- hardware/runtime/container and dependency lock;
+- randomization assignment and cluster unit;
+- raw candidate-visible interaction trace digest;
+- evaluator-only outcome artifact digest, kept outside candidate custody;
+- run, policy and result receipt identifiers.
+
+Use immutable revisions. The Beyond Recall project specifically documents differences between paper and packaged dataset revisions; pin the actual media release and its license card rather than following a moving branch.
+
+## 10. Execution sequence
+
+### P0 — specification and fixtures
+
+- Freeze the event vocabulary and episode manifest.
+- Implement deterministic synthetic profiles, disclosure rules, explicit corrections, refusals and irrelevant-disclosure traps.
+- Author hidden-state and future-state mutation negative controls.
+- Write the causal estimand and cluster-analysis plan before held-out evaluation.
+
+### P1 — official reproduction
+
+- Reproduce AMemGym under its published protocol.
+- Record its exact data/model/configuration and resource use.
+- Preserve the official results separately from MACE-specific controls.
+
+### P2 — matched policy comparisons
+
+- Run static replay and on-policy interaction with matched backbones.
+- Compare all baselines listed above.
+- Separate the total policy effect from exploratory mediation analysis.
+
+### P3 — shift and lifecycle qualification
+
+- Hold out profile and task families.
+- Introduce model/prompt/tool/simulator version shifts.
+- Exercise correction, supersession, privacy, refusal, deletion and restart/restore controls.
+
+### P4 — independent qualification
+
+- Move evaluator custody outside candidate runtime.
+- Run default-deny candidate isolation and external resource accounting.
+- Obtain independent reproduction of the policy assignment, score and result receipts.
+- Only then publish confirmatory claims.
+
+## 11. Related MACE programmes
+
+- [#13388 — on-policy memory control under endogenous disclosure and feedback](https://github.com/Luminous-Dynamics/symthaea/issues/13388)
+- [#13261 — competitive hybrid, causal-graph and state-first baselines](https://github.com/Luminous-Dynamics/symthaea/issues/13261)
+- [#13363 — model-conditioned memory dose under model-family shift](https://github.com/Luminous-Dynamics/symthaea/issues/13363)
+- [#13284 — decision-sufficient memory and active evidence acquisition](https://github.com/Luminous-Dynamics/symthaea/issues/13284)
+- [#9516 — causal experience transfer across dependent sessions](https://github.com/Luminous-Dynamics/symthaea/issues/9516)
+- [#13319 — adversarial lifecycle, poisoning, repair and erasure](https://github.com/Luminous-Dynamics/symthaea/issues/13319)
+- [#13287 — independent candidate/evaluator custody](https://github.com/Luminous-Dynamics/symthaea/issues/13287)
+
+## 12. Claim boundary
+
+- Static replay accuracy is not closed-loop policy value.
+- More user disclosure is not inherently better.
+- A simulated user is not a real human participant.
+- An evaluator-only latent-state oracle is not a deployable baseline.
+- A changed transcript is not automatically a retrieval failure.
+- A candidate's reported support is not proof of causal influence.
+- AMemGym reproduction is not proof of general real-world personalization.
+- No SOTA, privacy, safety or causal claim is valid without matched protocols, independent evaluation and the hard gates above.
