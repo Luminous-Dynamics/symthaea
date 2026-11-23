@@ -28,6 +28,12 @@ A metric is `None` when its denominator is empty or it cannot be estimated. We d
 - Optional periodicity is constrained to [0, 1] but is not interpreted as a calibrated probability.
 - One-to-one monotonic timestamp alignment uses the configured maximum difference (default 2 ms; adjust and freeze it for other frame cadences). To guarantee unique matches, adjacent timestamps within either input track must be separated by strictly more than twice the tolerance; otherwise the scorer rejects the comparison rather than guessing or silently sacrificing coverage.
 
+## Machine-readable score output
+
+- `schemas/pitch-track-evaluation-v1.schema.json` validates the source-bound reference/estimate/config input.
+- `schemas/pitch-track-metrics-v1.schema.json` validates the scorer output. It preserves the full count denominators and keeps every non-estimable floating metric explicitly nullable.
+- Metric consumers should retain the associated track/source digests, producer IDs, scorer version and frozen config alongside the output. Never compare aggregate scores after dropping the reference count, missing-frame count, jointly voiced denominator or coverage fields.
+
 ## Known-answer tests
 
 Synthetic tests check perfect tracks, explicit unvoiced frames, octave errors, voiced/unvoiced confusion, missing frame coverage, timestamp jitter, source/clock mutation and invalid F0/periodicity metadata.
