@@ -876,8 +876,7 @@ pub fn estimate_metrology_population_v1(
 mod tests {
     use super::*;
     use crate::benchmark::process_event_graph::{
-        ClockBasisV1, MetrologyLabelStatusV1, MetrologyLabelV1, ProcessEventKindV1,
-        ProcessEventV1,
+        ClockBasisV1, MetrologyLabelStatusV1, MetrologyLabelV1, ProcessEventKindV1, ProcessEventV1,
     };
 
     const SHA_A: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
