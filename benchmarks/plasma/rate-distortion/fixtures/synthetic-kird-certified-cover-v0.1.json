@@ -104,18 +104,5 @@
     "analysis_revision": "synthetic-lipschitz-cover-known-answer",
     "physical_execution_authorized": false,
     "reference_bundle_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
-  },
-  "synthetic_certificate_definition": {
-    "intervention_space": "U=[0,0.1] with metric d(u,v)=abs(u-v)",
-    "response_error_function": "e(u)=0.5+2u",
-    "registered_probe_set": [
-      0
-    ],
-    "covering_radius": 0.1,
-    "verified_lipschitz_constant": 2,
-    "exact_supremum": 0.7,
-    "uncertainty_budget": 0.05,
-    "certified_upper_bound": 0.75,
-    "proof_note": "For any u in [0,0.1], e(u)<=e(0)+2*0.1=0.7; adding 0.05 uncertainty gives 0.75."
   }
 }
