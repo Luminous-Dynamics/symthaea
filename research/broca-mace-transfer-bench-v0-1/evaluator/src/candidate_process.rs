@@ -77,6 +77,11 @@ struct CandidateReceiptWire {
     probe_requested: bool,
 }
 
+fn terminate_and_reap(child: &mut Child) {
+    let _ = child.kill();
+    let _ = child.wait();
+}
+
 pub struct CandidateProcessSession {
     child: Child,
     requests: mpsc::SyncSender<Vec<u8>>,
@@ -133,12 +138,15 @@ impl CandidateProcessSession {
         let mut child = command
             .spawn()
             .map_err(|error| format!("spawn candidate worker: {error}"))?;
-        let stdin = child
-            .stdin
-            .take()
-            .ok_or_else(|| "candidate worker stdin pipe unavailable".to_string())?;
+        let stdin = match child.stdin.take() {
+            Some(stdin) => stdin,
+            None => {
+                terminate_and_reap(&mut child);
+                return Err("candidate worker stdin pipe unavailable".to_string());
+            }
+        };
         let (request_sender, request_receiver) = mpsc::sync_channel::<Vec<u8>>(1);
-        thread::Builder::new()
+        let writer_spawn = thread::Builder::new()
             .name("mace-candidate-stdin".into())
             .spawn(move || {
                 let mut writer = stdin;
@@ -152,20 +160,29 @@ impl CandidateProcessSession {
                         break;
                     }
                 }
-            })
-            .map_err(|error| format!("start candidate stdin writer: {error}"))?;
-        let stdout = child
-            .stdout
-            .take()
-            .ok_or_else(|| "candidate worker stdout pipe unavailable".to_string())?;
-        let stderr = child
-            .stderr
-            .take()
-            .ok_or_else(|| "candidate worker stderr pipe unavailable".to_string())?;
+            });
+        if let Err(error) = writer_spawn {
+            terminate_and_reap(&mut child);
+            return Err(format!("start candidate stdin writer: {error}"));
+        }
+        let stdout = match child.stdout.take() {
+            Some(stdout) => stdout,
+            None => {
+                terminate_and_reap(&mut child);
+                return Err("candidate worker stdout pipe unavailable".to_string());
+            }
+        };
+        let stderr = match child.stderr.take() {
+            Some(stderr) => stderr,
+            None => {
+                terminate_and_reap(&mut child);
+                return Err("candidate worker stderr pipe unavailable".to_string());
+            }
+        };
 
         // Keep at most one complete response queued if a child emits unsolicited output.
         let (sender, responses) = mpsc::sync_channel(1);
-        thread::Builder::new()
+        let stdout_spawn = thread::Builder::new()
             .name("mace-candidate-stdout".into())
             .spawn(move || {
                 let mut reader = BufReader::new(stdout);
@@ -222,12 +239,15 @@ impl CandidateProcessSession {
                         break;
                     }
                 }
-            })
-            .map_err(|error| format!("start candidate stdout reader: {error}"))?;
+            });
+        if let Err(error) = stdout_spawn {
+            terminate_and_reap(&mut child);
+            return Err(format!("start candidate stdout reader: {error}"));
+        }
 
         let stderr_capture = Arc::new(Mutex::new(Vec::new()));
         let stderr_sink = Arc::clone(&stderr_capture);
-        thread::Builder::new()
+        let stderr_spawn = thread::Builder::new()
             .name("mace-candidate-stderr".into())
             .spawn(move || {
                 let mut reader = stderr;
@@ -245,8 +265,11 @@ impl CandidateProcessSession {
                         }
                     }
                 }
-            })
-            .map_err(|error| format!("start candidate stderr reader: {error}"))?;
+            });
+        if let Err(error) = stderr_spawn {
+            terminate_and_reap(&mut child);
+            return Err(format!("start candidate stderr reader: {error}"));
+        }
 
         let ready = match responses.recv_timeout(STARTUP_TIMEOUT) {
             Ok(Ok(line)) => line,
@@ -269,8 +292,13 @@ impl CandidateProcessSession {
 
         // Detect a path replacement between the first digest check and spawn.
         // This is a defensive consistency check, not an OS-level immutable-fd exec guarantee.
-        let after_spawn = fs::read(&canonical_path)
-            .map_err(|error| format!("re-read candidate binary after spawn: {error}"))?;
+        let after_spawn = match fs::read(&canonical_path) {
+            Ok(bytes) => bytes,
+            Err(error) => {
+                terminate_and_reap(&mut child);
+                return Err(format!("re-read candidate binary after spawn: {error}"));
+            }
+        };
         if hex_digest(Sha256::digest(&after_spawn).as_slice()) != actual_sha256 {
             let _ = child.kill();
             let _ = child.wait();
