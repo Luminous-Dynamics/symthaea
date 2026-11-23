@@ -444,9 +444,7 @@ fn conditional_dropout_probability(
             (base_probability + 0.45 * observed_tool_fraction).min(1.0)
         }
         SyntheticFabMissingnessMechanismV1::Mnar => {
-            (base_probability
-                + if latent_defect_positive { 0.55 } else { 0.0 })
-            .min(1.0)
+            (base_probability + if latent_defect_positive { 0.55 } else { 0.0 }).min(1.0)
         }
     }
 }
