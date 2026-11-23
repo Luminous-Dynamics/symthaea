@@ -223,7 +223,15 @@ impl VerifiedEvidenceQualificationV1 {
 
     /// Only IDs that passed the independent, decision-scoped admissibility
     /// check. The executor must still re-check live authority and lifecycle.
-    pub fn admissible_evidence_ids(&self) -> &[String] { &self.admissible_evidence_ids }
+    pub fn admissible_evidence_ids_at(
+        &self,
+        now_unix: u64,
+    ) -> Result<&[String], EvidenceQualificationRejectV1> {
+        if now_unix >= self.expires_at_unix {
+            return Err(EvidenceQualificationRejectV1::ReceiptExpired);
+        }
+        Ok(&self.admissible_evidence_ids)
+    }
     pub fn rejected_evidence_ids(&self) -> &[String] { &self.rejected_evidence_ids }
     pub fn indeterminate_evidence_ids(&self) -> &[String] { &self.indeterminate_evidence_ids }
     pub fn receipt_sha256(&self) -> &str { &self.receipt_sha256 }
@@ -487,7 +495,7 @@ mod tests {
         let verified = VerifiedEvidenceQualificationV1::verify_and_bind(
             &receipt, &binding, &TestSignatureVerifier,
         ).expect("valid scoped receipt");
-        assert_eq!(verified.admissible_evidence_ids(), &["evidence-a".to_owned()]);
+        assert_eq!(verified.admissible_evidence_ids_at(150).expect("still valid"), &["evidence-a".to_owned()]);
         assert_eq!(verified.rejected_evidence_ids(), &["evidence-b".to_owned()]);
         assert_eq!(verified.indeterminate_evidence_ids(), &["evidence-c".to_owned()]);
         assert_eq!(verified.expires_at_unix(), 200);
@@ -591,6 +599,20 @@ mod tests {
     }
 
     #[test]
+    fn verified_token_cannot_be_used_after_its_expiry() {
+        let receipt = signed_receipt();
+        let ids = candidate_ids();
+        let binding = binding(&receipt, &ids, 150);
+        let verified = VerifiedEvidenceQualificationV1::verify_and_bind(
+            &receipt, &binding, &TestSignatureVerifier,
+        ).expect("valid at issuance");
+        assert_eq!(
+            verified.admissible_evidence_ids_at(200),
+            Err(EvidenceQualificationRejectV1::ReceiptExpired)
+        );
+    }
+
+    #[test]
     fn zero_admissible_candidates_is_an_abstention_signal_not_permission() {
         let mut receipt = receipt();
         for item in &mut receipt.entries { item.disposition = EvidenceDispositionV1::Rejected; }
@@ -601,6 +623,6 @@ mod tests {
             &receipt, &binding, &TestSignatureVerifier,
         ).expect("valid receipt can qualify zero candidates");
         assert!(verified.is_empty());
-        assert!(verified.admissible_evidence_ids().is_empty());
+        assert!(verified.admissible_evidence_ids_at(150).expect("still valid").is_empty());
     }
 }
