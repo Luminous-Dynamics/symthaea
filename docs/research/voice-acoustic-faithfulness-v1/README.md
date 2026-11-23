@@ -228,6 +228,15 @@ Official starting points:
 - AfriVox-v2 dataset card: https://huggingface.co/datasets/intronhealth/afrivox-v2
 - NWU code-switch corpus catalogue: https://hdl.handle.net/20.500.12185/545
 
+### Admission and cohort ownership
+
+This benchmark plan does not create a second South African dataset registry or split auditor:
+- **#10913** owns the South African speech qualification programme and task-specific benchmark protocol.
+- **#10914** owns the versioned cohort registry and immutable cohort IDs.
+- **#10942** owns fail-closed rights/admission, source identity, speaker/source split-leakage tests, scorer normalization and evaluation receipts.
+
+For this programme, each dataset row above is a candidate pointer only. A cohort is usable only after the exact registry revision is admitted for the specific task under #10942. Keep Swivuriso's TTS/voice-synthesis prohibition and the NWU research-only restriction machine-enforced. Do not ingest gated audio or upload raw audio/speaker-level metadata into this public research branch.
+
 ### A competitive plan that can beat the global average without gaming the benchmark
 
 1. **Do not train on the test speaker/session.** Create speaker-, episode-, recording-device- and domain-disjoint train/dev/test partitions, and keep one untouched language-domain holdout. For the soap-opera corpus, partition by episode/scene and speaker, not random clip.
