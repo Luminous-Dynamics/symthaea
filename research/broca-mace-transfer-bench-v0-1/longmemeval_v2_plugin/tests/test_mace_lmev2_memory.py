@@ -429,6 +429,18 @@ class MaceLongMemEvalV2IngressTests(unittest.TestCase):
                 "e818d458148b2edd093a95d45afffb3d86b65291ee1b399149abf4ca4d18edb6",
             )
             trace["receipt_sha256"] = trace_digest
+            # Simulate Rust's durable create-once publication. Python must
+            # accept exactly the same canonical bytes rather than rewriting them.
+            invocation_digest = hashlib.sha256(candidate_id.encode("utf-8")).hexdigest()
+            rust_persisted_path = memory.retrieval_trace_dir / f"{invocation_digest}.trace.json"
+            rust_persisted_path.write_bytes(
+                json.dumps(
+                    trace,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+            )
             response = {
                 **candidate_response,
                 "retrieval_trace": trace,
