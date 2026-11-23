@@ -620,6 +620,21 @@ fn validate_scope(scope: &ScopeBinding, errors: &mut Vec<String>, label: &str) {
                     "{label}.root_goal_text does not match the canonical typed sequent conclusion"
                 ));
             }
+            let canonical_warrant = format!(
+                "From {} infer {}.",
+                sequent
+                    .premises
+                    .iter()
+                    .map(BooleanFormula::canonical_surface_text)
+                    .collect::<Vec<_>>()
+                    .join(", "),
+                sequent.conclusion.canonical_surface_text()
+            );
+            if scope.warrant_text != canonical_warrant {
+                errors.push(format!(
+                    "{label}.warrant_text does not match the canonical typed sequent warrant"
+                ));
+            }
             for (index, premise) in sequent.premises.iter().enumerate() {
                 let mut atoms = HashSet::new();
                 if let Err(error) = premise.collect_atoms(&mut atoms) {
@@ -1287,6 +1302,25 @@ mod tests {
             right: Box::new(BooleanFormula::Atom { name: "q".to_owned() }),
         };
         assert_eq!(formula.canonical_surface_text(), "(p → q)");
+    }
+
+
+    #[test]
+    fn candidate_warrant_text_must_match_typed_sequent_even_after_valid_rehash() {
+        let mut pair = fixture();
+        {
+            let scope = &mut pair.candidate.local_stage.scope_binding;
+            scope.warrant_text = "From (q → p) infer (p → q).".to_owned();
+            scope.warrant_sha256 =
+                domain_separated_sha256("warrant", &scope.warrant_text).unwrap();
+        }
+        pair.candidate.global_stage.scope_binding =
+            pair.candidate.local_stage.scope_binding.clone();
+        assert!(
+            validate_pair(&pair)
+                .iter()
+                .any(|error| error.contains("warrant_text does not match the canonical typed sequent warrant"))
+        );
     }
 
     #[test]
