@@ -176,7 +176,7 @@ pub fn assess_label_consumption_eligibility_v1(
         ));
     }
     let label_sha256 = json_sha256(label)?;
-    let qualification = qualify_measurement_evidence_v1( qualify_measurement_evidence_v1(
+    let qualification = qualify_measurement_evidence_v1(
         measurement,
         Some(certificate),
         &input.qualification_policy,
