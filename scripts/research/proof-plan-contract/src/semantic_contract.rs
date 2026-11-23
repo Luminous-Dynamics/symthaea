@@ -105,8 +105,6 @@ fn derive_translation_assessment(reviews: &[TranslationReviewV1]) -> Translation
     }
 }
 
-
-
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct StrongerObligationV1 {
@@ -376,12 +374,14 @@ pub fn validate_receipt(receipt: &TheoremSandwichReceiptV1) -> Vec<String> {
         let mut reviewer_ids = HashSet::new();
         for review in &evaluator.translation_reviews {
             if !non_empty(&review.reviewer_id) || !reviewer_ids.insert(&review.reviewer_id) {
-                errors.push(
-                    "translation review reviewer_id must be non-empty and unique".to_owned(),
-                );
+                errors
+                    .push("translation review reviewer_id must be non-empty and unique".to_owned());
             }
             if review.evidence_refs.is_empty()
-                || review.evidence_refs.iter().any(|reference| !non_empty(reference))
+                || review
+                    .evidence_refs
+                    .iter()
+                    .any(|reference| !non_empty(reference))
             {
                 errors.push(format!(
                     "translation review {} requires non-empty evidence references",
@@ -389,7 +389,11 @@ pub fn validate_receipt(receipt: &TheoremSandwichReceiptV1) -> Vec<String> {
                 ));
             }
             let mut refs = HashSet::new();
-            if review.evidence_refs.iter().any(|reference| !refs.insert(reference)) {
+            if review
+                .evidence_refs
+                .iter()
+                .any(|reference| !refs.insert(reference))
+            {
                 errors.push(format!(
                     "translation review {} evidence_refs must be unique",
                     review.reviewer_id
@@ -535,8 +539,7 @@ pub fn evaluate_receipt(
     }
 
     let translation_assessment = derive_translation_assessment(&evaluator.translation_reviews);
-    let translation_review_disputed =
-        translation_assessment == TranslationAssessment::Disputed;
+    let translation_review_disputed = translation_assessment == TranslationAssessment::Disputed;
 
     let classification = if any_fail(&evaluator_controls) {
         SandwichClassification::InvalidEvaluatorControls
@@ -821,7 +824,10 @@ mod tests {
     #[test]
     fn two_aligned_translation_reviews_are_required_for_acceptance() {
         let report = evaluate_receipt(&fixture()).expect("two aligned synthetic reviews");
-        assert_eq!(report.translation_assessment, TranslationAssessment::Aligned);
+        assert_eq!(
+            report.translation_assessment,
+            TranslationAssessment::Aligned
+        );
         assert_eq!(report.translation_review_count, 2);
         assert!(!report.translation_review_disputed);
         assert_eq!(
@@ -836,7 +842,10 @@ mod tests {
         let reviews = &mut receipt.evaluator_only.as_mut().unwrap().translation_reviews;
         reviews[0].disposition = TranslationReviewDisposition::Misaligned;
         let report = evaluate_receipt(&receipt).expect("valid but disputed review receipt");
-        assert_eq!(report.translation_assessment, TranslationAssessment::Disputed);
+        assert_eq!(
+            report.translation_assessment,
+            TranslationAssessment::Disputed
+        );
         assert!(report.translation_review_disputed);
         assert_eq!(report.classification, SandwichClassification::Unknown);
     }
@@ -861,7 +870,12 @@ mod tests {
     #[test]
     fn one_translation_review_cannot_satisfy_review_quorum() {
         let mut receipt = fixture();
-        receipt.evaluator_only.as_mut().unwrap().translation_reviews.pop();
+        receipt
+            .evaluator_only
+            .as_mut()
+            .unwrap()
+            .translation_reviews
+            .pop();
         assert!(
             validate_receipt(&receipt)
                 .iter()
