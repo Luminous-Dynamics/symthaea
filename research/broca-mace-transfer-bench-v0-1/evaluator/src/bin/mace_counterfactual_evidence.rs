@@ -940,18 +940,36 @@ fn run() -> Result<(), String> {
 
     let cases = mace_generated_stress::generated_worlds(clusters);
     let mut source_bundle_hasher = Sha256::new();
-    source_bundle_hasher.update(b"mace-counterfactual-runner-source-bundle-v1\0");
+    source_bundle_hasher.update(b"mace-counterfactual-source-bundle-v2\0");
+    // Evaluator, IPC client, candidate executable source, direct policy/HDC
+    // sources, and all relevant Cargo manifests are bound into one digest.
     source_bundle_hasher.update(include_bytes!("mace_counterfactual_evidence.rs"));
+    source_bundle_hasher.update(include_bytes!("mace_counterfactual_aggregate.rs"));
     source_bundle_hasher.update(include_bytes!("../candidate_process.rs"));
+    source_bundle_hasher.update(include_bytes!("../../../candidate/src/main.rs"));
+    source_bundle_hasher.update(include_bytes!("../../../candidate/Cargo.toml"));
+    source_bundle_hasher.update(include_bytes!("../../../policy/src/lib.rs"));
+    source_bundle_hasher.update(include_bytes!("../../../policy/Cargo.toml"));
+    source_bundle_hasher.update(include_bytes!("../../../hdc-retrieval/src/lib.rs"));
+    source_bundle_hasher.update(include_bytes!("../../../hdc-retrieval/src/typed_content.rs"));
+    source_bundle_hasher.update(include_bytes!("../../../hdc-retrieval/Cargo.toml"));
+    source_bundle_hasher.update(include_bytes!("../../Cargo.toml"));
+    source_bundle_hasher.update(include_bytes!("../../../Cargo.toml"));
     let source_code_sha256 = hex_digest(source_bundle_hasher.finalize().as_slice());
     let fixture_sha256 =
         hex_digest(Sha256::digest(include_bytes!("mace_generated_stress.rs")).as_slice());
-    let schema_sha256 = hex_digest(
-        Sha256::digest(include_bytes!(
-            "../../../../../data/schemas/mace_counterfactual_evidence_v0_1.schema.json"
-        ))
-        .as_slice(),
-    );
+    let mut schema_bundle_hasher = Sha256::new();
+    schema_bundle_hasher.update(b"mace-counterfactual-schema-bundle-v1\0");
+    schema_bundle_hasher.update(include_bytes!(
+        "../../../../../data/schemas/mace_counterfactual_evidence_v0_1.schema.json"
+    ));
+    schema_bundle_hasher.update(include_bytes!(
+        "../../../../../data/schemas/mace_candidate_envelope_v1.schema.json"
+    ));
+    schema_bundle_hasher.update(include_bytes!(
+        "../../../../../data/schemas/mace_candidate_receipt_v1.schema.json"
+    ));
+    let schema_sha256 = hex_digest(schema_bundle_hasher.finalize().as_slice());
     let source_revision = env::var("MACE_SOURCE_REVISION").ok();
     if source_revision
         .as_deref()
