@@ -666,3 +666,26 @@ cargo test --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml \
 This is a separate package and protocol, **not yet a sandboxed or independently custodied evaluator**. The paired evaluator has not yet been rewired to launch the candidate process. Candidate evidence trust/retraction/reconciliation fields are inputs to the prototype and must be derived from independently verified ingress receipts in production. Public digests do not authenticate issuers. See [MACE Isolated Candidate Protocol v0.1](../../docs/research/MACE_ISOLATED_CANDIDATE_PROTOCOL_V0_1.md) and [MACE Evaluation Paradigm and Benchmark Frontier v0.1](../../docs/research/MACE_EVALUATION_PARADIGM_AND_BENCHMARK_FRONTIER_V0_1.md).
 
 **Validation boundary:** source/schema work and parser regression tests are authored; Rust compilation, test execution, child-process integration, sandbox negative controls and independent evaluation have not been completed in this environment.
+
+
+## Evaluator subprocess integration (v0.2 research)
+
+The paired counterfactual evaluator now invokes the separate candidate worker for `exact_scope_scan` and `typed_content_hdc`. Build and run on Linux:
+
+```bash
+cargo build --release --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p broca-mace-candidate
+export MACE_CANDIDATE_BIN="$PWD/target/release/broca-mace-candidate"
+export MACE_CANDIDATE_BIN_SHA256="$(sha256sum "$MACE_CANDIDATE_BIN" | awk '{print $1}')"
+MACE_SOURCE_REVISION="$(git rev-parse HEAD)" cargo run --release \
+  --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml \
+  -p broca-mace-evaluator --bin mace_counterfactual_evidence -- \
+  1 /tmp/mace-candidate.jsonl /tmp/mace-evaluator.jsonl
+```
+
+The evaluator starts one persistent stateless worker per generated task block and reuses it across that block's baseline/intervention requests. Each request gets a new nonce and monotonic observation sequence. Exact scan remains the all-evidence reference ceiling; typed-content HDC is the top-k retrieval method. Three other methods (event-ID KV top-k, static HDC, HDC-LTC zero-input) remain `legacy_in_process` and are visibly labelled as such in candidate and evaluator rows.
+
+The timing record separates worker startup, request construction, request/response wall time, child-internal retrieval/policy time, receipt validation, and end-to-end parent-side request time. Startup is repeated on rows from a task-block worker; aggregate it once per pair block and artifact digest, not by summing every row.
+
+The evaluator now cross-checks both retrieved IDs and the exact decision-support IDs emitted by the candidate. A valid retrieval list cannot silently substitute for a different support set in evaluator scoring.
+
+**No Rust build/tests or runtime benchmark have been executed here.** The process is launched with a cleared environment and fixed executable digest, but still runs under the same OS identity and has no filesystem/network sandbox. The evaluator, synthetic fixture generator and hidden labels remain public/co-located; all scores remain diagnostic-only. See [MACE Isolated Candidate Protocol v0.1](../../docs/research/MACE_ISOLATED_CANDIDATE_PROTOCOL_V0_1.md).
