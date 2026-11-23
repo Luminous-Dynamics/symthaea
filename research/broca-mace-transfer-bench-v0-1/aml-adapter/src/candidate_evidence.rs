@@ -11,7 +11,7 @@
 
 use std::collections::BTreeSet;
 
-use serde_json::{Map, Value};
+use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 
 pub const CANDIDATE_EVIDENCE_SCHEMA: &str = "mace_candidate_evidence_v0_1";
@@ -92,6 +92,59 @@ pub struct CandidateEvidenceBatchV1 {
     pub evidence: Vec<CandidateEvidenceV1>,
     /// Commitment to the complete normalized candidate set and its query/backend identity.
     pub candidate_set_sha256: String,
+}
+
+impl CandidateEvidenceV1 {
+    /// Serialize one typed evidence record using the exact v0.1 JSON field names.
+    ///
+    /// This is structural serialization only; it does not qualify the evidence.
+    pub fn to_json_value(&self) -> Result<Value, CandidateEvidenceReject> {
+        if self.retrieval_score.is_some_and(|score| !score.is_finite()) {
+            return Err(CandidateEvidenceReject::InvalidScore);
+        }
+        Ok(json!({
+            "schema_version": CANDIDATE_EVIDENCE_SCHEMA,
+            "record_type": "candidate_evidence",
+            "run_id": self.run_id,
+            "candidate_id": self.candidate_id,
+            "backend_id": self.backend_id,
+            "backend_revision_sha256": self.backend_revision_sha256,
+            "query_scope": self.query_scope,
+            "query_purpose": self.query_purpose,
+            "query_sha256": self.query_sha256,
+            "evidence_id": self.evidence_id,
+            "source_id": self.source_id,
+            "source_sha256": self.source_sha256,
+            "payload_sha256": self.payload_sha256,
+            "payload_ref": self.payload_ref,
+            "modality": self.modality.as_str(),
+            "retrieval_channel": self.retrieval_channel,
+            "retrieval_rank": self.retrieval_rank,
+            "retrieval_score": self.retrieval_score,
+            "parent_evidence_ids": self.parent_evidence_ids,
+            "derivation_receipt_sha256": self.derivation_receipt_sha256
+        }))
+    }
+}
+
+impl CandidateEvidenceBatchV1 {
+    /// Emit a canonical JSONL stream, revalidating the public batch fields first.
+    ///
+    /// Because batch fields are public for inspection, callers can mutate a
+    /// previously validated batch. This method rebuilds its commitment and
+    /// refuses to serialize stale or inconsistent batch metadata.
+    pub fn to_jsonl(&self) -> Result<String, CandidateEvidenceReject> {
+        let rebuilt = encode_candidate_evidence_jsonl(&self.evidence)?;
+        if &rebuilt != self {
+            return Err(CandidateEvidenceReject::InvalidDigest);
+        }
+        let lines = rebuilt
+            .evidence
+            .iter()
+            .map(|record| record.to_json_value().map(|value| value.to_string()))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(lines.join("\n"))
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -354,6 +407,41 @@ pub fn parse_candidate_evidence_jsonl(
     })
 }
 
+/// Validate typed backend records and return their canonical candidate batch.
+///
+/// This is the symmetric producer-side entry point for retrieval adapters. It
+/// applies the same strict identity, duplicate, size and digest checks as the
+/// JSONL parser before the candidate-set commitment is emitted.
+pub fn encode_candidate_evidence_jsonl(
+    records: &[CandidateEvidenceV1],
+) -> Result<CandidateEvidenceBatchV1, CandidateEvidenceReject> {
+    if records.is_empty() {
+        return Err(CandidateEvidenceReject::EmptyBatch);
+    }
+    if records.len() > MAX_CANDIDATE_EVIDENCE_RECORDS {
+        return Err(CandidateEvidenceReject::TooManyRecords);
+    }
+
+    let mut lines = Vec::with_capacity(records.len());
+    let mut total_bytes = 0_usize;
+    for record in records {
+        let line = record.to_json_value()?.to_string();
+        if line.len() > MAX_CANDIDATE_EVIDENCE_RECORD_BYTES {
+            return Err(CandidateEvidenceReject::RecordTooLarge);
+        }
+        total_bytes = total_bytes
+            .checked_add(line.len())
+            .and_then(|value| value.checked_add(1))
+            .ok_or(CandidateEvidenceReject::BatchTooLarge)?;
+        if total_bytes > MAX_CANDIDATE_EVIDENCE_BATCH_BYTES {
+            return Err(CandidateEvidenceReject::BatchTooLarge);
+        }
+        lines.push(line);
+    }
+
+    parse_candidate_evidence_jsonl(&lines.join("\n"))
+}
+
 fn candidate_set_digest(evidence: &[CandidateEvidenceV1]) -> String {
     let mut hasher = Sha256::new();
     hasher.update(b"luminous:mace:candidate-evidence-set:v1\0");
@@ -591,6 +679,62 @@ mod tests {
         assert_eq!(
             parse_candidate_evidence_jsonl(&oversized_batch),
             Err(CandidateEvidenceReject::BatchTooLarge)
+        );
+    }
+
+    #[test]
+    fn typed_encoder_round_trips_through_the_same_strict_parser() {
+        let parsed = parse_candidate_evidence_jsonl(&jsonl(&[
+            record("e1", "bm25", 1),
+            record("e2", "dense", 1),
+        ]))
+        .expect("parsed baseline");
+        let encoded = encode_candidate_evidence_jsonl(&parsed.evidence)
+            .expect("typed encoder");
+        assert_eq!(encoded, parsed);
+        let canonical_jsonl = encoded.to_jsonl().expect("canonical JSONL");
+        assert_eq!(
+            parse_candidate_evidence_jsonl(&canonical_jsonl).expect("round trip"),
+            encoded
+        );
+    }
+
+    #[test]
+    fn canonical_encoder_orders_records_and_is_independent_of_input_order() {
+        let first = parse_record(&record("e1", "bm25", 1).to_string()).expect("first");
+        let second = parse_record(&record("e2", "bm25", 2).to_string()).expect("second");
+        let forward = encode_candidate_evidence_jsonl(&[first.clone(), second.clone()])
+            .expect("forward");
+        let reverse = encode_candidate_evidence_jsonl(&[second, first])
+            .expect("reverse");
+        assert_eq!(forward, reverse);
+        assert_eq!(forward.evidence[0].retrieval_rank, 1);
+        assert_eq!(forward.evidence[1].retrieval_rank, 2);
+    }
+
+    #[test]
+    fn serializer_rejects_mutated_batch_metadata_and_oversized_typed_records() {
+        let parsed = parse_candidate_evidence_jsonl(&jsonl(&[record("e1", "bm25", 1)]))
+            .expect("parsed");
+        let mut mutated = parsed.clone();
+        mutated.query_scope = "tenant:other-user".to_owned();
+        assert_eq!(
+            mutated.to_jsonl(),
+            Err(CandidateEvidenceReject::InvalidDigest)
+        );
+
+        let mut large = parsed.evidence[0].clone();
+        large.payload_ref = "x".repeat(MAX_CANDIDATE_EVIDENCE_RECORD_BYTES);
+        assert_eq!(
+            encode_candidate_evidence_jsonl(&[large]),
+            Err(CandidateEvidenceReject::RecordTooLarge)
+        );
+
+        let mut non_finite = parsed.evidence[0].clone();
+        non_finite.retrieval_score = Some(f64::NAN);
+        assert_eq!(
+            encode_candidate_evidence_jsonl(&[non_finite]),
+            Err(CandidateEvidenceReject::InvalidScore)
         );
     }
 

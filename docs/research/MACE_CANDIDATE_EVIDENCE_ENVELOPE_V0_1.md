@@ -35,6 +35,19 @@ The Rust reference parser:
 
 Scores are backend-native diagnostics. Scores from different channels are not comparable and must not be combined by this module. Fusion must be an explicit, pinned retrieval profile with its own identity.
 
+## Producer-side encoding
+
+Retrieval backends can construct typed `CandidateEvidenceV1` records and call:
+
+```rust
+let batch = encode_candidate_evidence_jsonl(&records)?;
+let canonical_jsonl = batch.to_jsonl()?;
+```
+
+The encoder applies the same strict parser/validation path as JSONL ingestion, enforces record and batch limits, rejects non-finite scores before JSON serialization, normalizes parent IDs and record order, and computes the candidate-set digest. `CandidateEvidenceBatchV1::to_jsonl()` revalidates the public batch fields and refuses stale or mutated batch metadata.
+
+This is a serialization/interchange facility only. It does not create backend source receipts, verify payload references, or grant qualification.
+
 ## Critical trust boundary
 
 A valid candidate envelope is **not qualified evidence**.
@@ -48,6 +61,12 @@ This module does not verify issuer signatures, source authority, legal rights, s
 - content-addressed references must be resolved through an allowlisted local adapter, not arbitrary network or filesystem access.
 
 The later MACE qualification service must attach independently authenticated issuer, policy, rights, lifecycle-checkpoint and lineage receipts before evidence can be used in consequential decisions. Evaluator truth, benchmark labels and attack assignments remain outside the candidate process.
+
+## Producer-side tests and validation
+
+The Rust module includes three additional typed-encoder tests: JSONL round-trip through the same strict parser, deterministic normalization independent of input record order, and rejection of mutated batch metadata, oversized typed records and non-finite retrieval scores.
+
+The candidate-evidence module now has thirteen authored deterministic tests in total. They have not been executed in this authoring environment; no Rust compiler/test/Clippy or external Draft 2020-12 validation pass is claimed.
 
 ## Integration sequence
 
