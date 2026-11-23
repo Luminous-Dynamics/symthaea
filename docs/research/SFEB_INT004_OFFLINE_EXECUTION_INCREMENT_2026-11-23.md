@@ -16,7 +16,7 @@ INT-004 has moved from an unauthored brief to a fixture-ready public-pilot task.
 - conflict detection that blocks mutation until explicit clarification is resolved;
 - equivalent semantic outcomes for pointer and keyboard action paths.
 
-The fixture includes six golden scenarios, one pointer/keyboard metamorphic pair, and six negative controls. Event identity, sequence ownership, entity versions, actor permissions and state-machine transitions are independently represented. The event schedule has no live service, wall clock, credentials, or third-party network dependency.
+The fixture includes six golden scenarios, one pointer/keyboard metamorphic pair, and six negative controls, including unsafe stream-gap and unknown-field attempts. Event identity, sequence ownership, entity versions, actor permissions and state-machine transitions are independently represented. The event schedule has no live service, wall clock, credentials, or third-party network dependency.
 
 ## Executed preflight
 
@@ -32,7 +32,7 @@ This is a reference-model result. It does not demonstrate that a browser candida
 
 ## Rust and browser qualification boundary
 
-A standalone Rust reference model and five authored unit tests are included. Event delivery is transactional: a rejected event cannot reserve its identity or sequence, alter the buffer, or poison a later valid retry. They have **not** been compiled or executed in this authoring environment because `rustc`/`cargo` are unavailable. The task still requires a Leptos candidate, fixture-local streaming adapter, real pointer and keyboard browser journeys, full accessibility-tree checks, deterministic Chromium execution, egress isolation, and a verifier in a separate trust domain.
+A standalone Rust reference model and seven authored unit tests are included. The event contract rejects unknown fields and unsafe numeric values, and caps out-of-order buffering at a 1,024-sequence window / 1,024 pending events. Event delivery is transactional: a rejected event cannot reserve its identity or sequence, alter the buffer, or poison a later valid retry. They have **not** been compiled or executed in this authoring environment because `rustc`/`cargo` are unavailable. The task still requires a Leptos candidate, fixture-local streaming adapter, real pointer and keyboard browser journeys, full accessibility-tree checks, deterministic Chromium execution, egress isolation, and a verifier in a separate trust domain.
 
 The task-family ledger records INT-004 as `fixture_ready`, `golden_cases_authored_rust_execution_pending`, and `browser_runner_pending`. The portfolio's `runnable_task_count` remains **0**. Public pilot cases are not hidden holdouts and are not used as comparative leaderboard evidence.
 
