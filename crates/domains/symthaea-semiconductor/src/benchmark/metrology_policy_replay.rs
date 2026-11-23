@@ -180,6 +180,17 @@ impl SplitMix64 {
         value ^ (value >> 31)
     }
 
+    fn below(&mut self, upper_exclusive: usize) -> usize {
+        let bound = upper_exclusive as u64;
+        let threshold = bound.wrapping_neg() % bound;
+        loop {
+            let value = self.next_u64();
+            if value >= threshold {
+                return (value % bound) as usize;
+            }
+        }
+    }
+
     fn unit_interval(&mut self) -> f64 {
         ((self.next_u64() >> 11) as f64) * (1.0 / ((1_u64 << 53) as f64))
     }
@@ -188,6 +199,24 @@ impl SplitMix64 {
     /// Avoids platform-dependent trigonometric transforms in fixtures.
     fn centered_noise(&mut self) -> f64 {
         (0..12).map(|_| self.unit_interval()).sum::<f64>() - 6.0
+    }
+}
+
+fn stratum_seed(seed: u64, stratum_id: &str) -> u64 {
+    let mut digest = Sha256::new();
+    digest.update(seed.to_le_bytes());
+    digest.update(stratum_id.as_bytes());
+    let bytes = digest.finalize();
+    u64::from_le_bytes(
+        bytes[..8]
+            .try_into()
+            .expect("SHA-256 prefix has eight bytes"),
+    )
+}
+
+fn shuffle_indices(indices: &mut [usize], rng: &mut SplitMix64) {
+    for index in (1..indices.len()).rev() {
+        indices.swap(index, rng.below(index + 1));
     }
 }
 
@@ -421,6 +450,62 @@ pub fn run_synthetic_metrology_policy_v1(
 fn validate_selection_design(
     selection: &MetrologyAuditSelectionReportV1,
 ) -> Result<(), SyntheticFabReplayError> {
+    if selection.rows.is_empty() {
+        return Err(SyntheticFabReplayError(
+            "selection receipt must contain candidate rows".into(),
+        ));
+    }
+
+    let mut previous_candidate_id: Option<&str> = None;
+    for (index, row) in selection.rows.iter().enumerate() {
+        if row.candidate_id.trim().is_empty()
+            || row.subject_id.trim().is_empty()
+            || row.stratum_id.trim().is_empty()
+            || row.measurement_cost == 0
+            || !row.priority_score.is_finite()
+            || row.priority_score < 0.0
+        {
+            return Err(SyntheticFabReplayError(format!(
+                "selection.rows[{index}]: invalid identity, cost or priority"
+            )));
+        }
+        if previous_candidate_id.is_some_and(|previous| previous >= row.candidate_id.as_str()) {
+            return Err(SyntheticFabReplayError(
+                "selection rows must be unique and sorted by candidate_id".into(),
+            ));
+        }
+        previous_candidate_id = Some(row.candidate_id.as_str());
+    }
+
+    // Reconstruct the deterministic exploit stage from the recorded priority
+    // scores and costs. This verifies which rows were certain selections.
+    let mut exploit_order: Vec<usize> = (0..selection.rows.len()).collect();
+    exploit_order.sort_by(|left, right| {
+        let left_row = &selection.rows[*left];
+        let right_row = &selection.rows[*right];
+        let left_ratio = left_row.priority_score / left_row.measurement_cost as f64;
+        let right_ratio = right_row.priority_score / right_row.measurement_cost as f64;
+        right_ratio
+            .total_cmp(&left_ratio)
+            .then_with(|| left_row.candidate_id.cmp(&right_row.candidate_id))
+    });
+
+    let mut expected_exploit = vec![false; selection.rows.len()];
+    let mut expected_exploit_cost = 0_u64;
+    for index in exploit_order {
+        let row = &selection.rows[index];
+        if row.priority_score <= 0.0 {
+            continue;
+        }
+        if let Some(next_cost) = expected_exploit_cost.checked_add(row.measurement_cost)
+            && next_cost <= selection.exploit_cost_budget
+        {
+            expected_exploit[index] = true;
+            expected_exploit_cost = next_cost;
+        }
+    }
+
+    let mut residual_by_stratum = BTreeMap::<String, Vec<usize>>::new();
     let mut residual_population_by_stratum = BTreeMap::<String, usize>::new();
     let mut randomized_selected_by_stratum = BTreeMap::<String, usize>::new();
     let mut maximum_cost_by_stratum = BTreeMap::<String, u64>::new();
@@ -431,26 +516,39 @@ fn validate_selection_design(
     let mut total_selected_cost = 0_u64;
 
     for (index, row) in selection.rows.iter().enumerate() {
-        if row.measurement_cost == 0 {
-            return Err(SyntheticFabReplayError(format!(
-                "selection.rows[{index}].measurement_cost must be positive"
-            )));
-        }
-        match &row.method {
-            MetrologySelectionMethodV1::DeterministicExploit => {
-                if !row.selected || row.inclusion_probability != 1.0 {
-                    return Err(SyntheticFabReplayError(format!(
-                        "selection.rows[{index}]: exploit must be selected with pi=1"
-                    )));
-                }
-                exploit_count += 1;
-                exploit_cost_used = exploit_cost_used
-                    .checked_add(row.measurement_cost)
-                    .ok_or_else(|| SyntheticFabReplayError("exploit cost overflow".into()))?;
-                total_selected_cost = total_selected_cost
-                    .checked_add(row.measurement_cost)
-                    .ok_or_else(|| SyntheticFabReplayError("selected cost overflow".into()))?;
+        let is_exploit = expected_exploit[index];
+        if is_exploit {
+            if !matches!(&row.method, MetrologySelectionMethodV1::DeterministicExploit)
+                || !row.selected
+                || row.inclusion_probability != 1.0
+            {
+                return Err(SyntheticFabReplayError(format!(
+                    "selection.rows[{index}]: deterministic exploit receipt does not replay"
+                )));
             }
+            exploit_count += 1;
+            exploit_cost_used = exploit_cost_used
+                .checked_add(row.measurement_cost)
+                .ok_or_else(|| SyntheticFabReplayError("exploit cost overflow".into()))?;
+            total_selected_cost = total_selected_cost
+                .checked_add(row.measurement_cost)
+                .ok_or_else(|| SyntheticFabReplayError("selected cost overflow".into()))?;
+            continue;
+        }
+
+        residual_by_stratum
+            .entry(row.stratum_id.clone())
+            .or_default()
+            .push(index);
+        *residual_population_by_stratum
+            .entry(row.stratum_id.clone())
+            .or_default() += 1;
+        let maximum = maximum_cost_by_stratum
+            .entry(row.stratum_id.clone())
+            .or_default();
+        *maximum = (*maximum).max(row.measurement_cost);
+
+        match &row.method {
             MetrologySelectionMethodV1::RandomizedAudit => {
                 if !row.selected {
                     return Err(SyntheticFabReplayError(format!(
@@ -458,16 +556,9 @@ fn validate_selection_design(
                     )));
                 }
                 randomized_audit_count += 1;
-                *residual_population_by_stratum
-                    .entry(row.stratum_id.clone())
-                    .or_default() += 1;
                 *randomized_selected_by_stratum
                     .entry(row.stratum_id.clone())
                     .or_default() += 1;
-                let maximum = maximum_cost_by_stratum
-                    .entry(row.stratum_id.clone())
-                    .or_default();
-                *maximum = (*maximum).max(row.measurement_cost);
                 audit_cost_used = audit_cost_used
                     .checked_add(row.measurement_cost)
                     .ok_or_else(|| SyntheticFabReplayError("audit cost overflow".into()))?;
@@ -481,13 +572,11 @@ fn validate_selection_design(
                         "selection.rows[{index}]: not_selected conflicts with selected=true"
                     )));
                 }
-                *residual_population_by_stratum
-                    .entry(row.stratum_id.clone())
-                    .or_default() += 1;
-                let maximum = maximum_cost_by_stratum
-                    .entry(row.stratum_id.clone())
-                    .or_default();
-                *maximum = (*maximum).max(row.measurement_cost);
+            }
+            MetrologySelectionMethodV1::DeterministicExploit => {
+                return Err(SyntheticFabReplayError(format!(
+                    "selection.rows[{index}]: unexpected exploit outside reconstructed exploit set"
+                )));
             }
         }
     }
@@ -495,18 +584,17 @@ fn validate_selection_design(
     if exploit_count != selection.exploit_count
         || randomized_audit_count != selection.randomized_audit_count
         || residual_population_by_stratum != selection.residual_population_by_stratum
+        || exploit_cost_used != selection.exploit_cost_used
     {
         return Err(SyntheticFabReplayError(
-            "selection report counts do not reconcile with row-level methods".into(),
+            "selection report counts/costs do not reconcile with row-level methods".into(),
         ));
     }
+
     if residual_population_by_stratum
         .keys()
         .collect::<BTreeSet<_>>()
-        != selection
-            .audit_quota_by_stratum
-            .keys()
-            .collect::<BTreeSet<_>>()
+        != selection.audit_quota_by_stratum.keys().collect::<BTreeSet<_>>()
     {
         return Err(SyntheticFabReplayError(
             "audit quotas do not exactly cover residual strata".into(),
@@ -531,20 +619,36 @@ fn validate_selection_design(
                 "stratum {stratum}: selected audit count differs from declared quota"
             )));
         }
+
         let expected_probability = quota as f64 / *residual_population as f64;
-        for row in selection.rows.iter().filter(|row| {
-            row.stratum_id == *stratum
-                && !matches!(
-                    &row.method,
-                    MetrologySelectionMethodV1::DeterministicExploit
-                )
-        }) {
+        for index in &residual_by_stratum[stratum] {
+            let row = &selection.rows[*index];
             if (row.inclusion_probability - expected_probability).abs() > 1.0e-12 {
                 return Err(SyntheticFabReplayError(format!(
                     "stratum {stratum}: row inclusion probability disagrees with quota/population"
                 )));
             }
         }
+
+        // Independently replay the exact seeded SRSWOR draw used by the
+        // selector. A periodic or hand-picked sample cannot claim audit status.
+        let mut expected_draw = residual_by_stratum[stratum].clone();
+        let mut rng = SplitMix64::new(stratum_seed(selection.seed, stratum));
+        shuffle_indices(&mut expected_draw, &mut rng);
+        let expected_audit: BTreeSet<usize> =
+            expected_draw.into_iter().take(quota).collect();
+        for index in &residual_by_stratum[stratum] {
+            let should_be_selected = expected_audit.contains(index);
+            let row = &selection.rows[*index];
+            if should_be_selected
+                != matches!(&row.method, MetrologySelectionMethodV1::RandomizedAudit)
+            {
+                return Err(SyntheticFabReplayError(format!(
+                    "stratum {stratum}: randomized audit draw does not replay from declared seed"
+                )));
+            }
+        }
+
         quota_total += quota;
         let maximum_cost = maximum_cost_by_stratum.get(stratum).copied().unwrap_or(0);
         audit_worst_case_cost = audit_worst_case_cost
@@ -555,7 +659,6 @@ fn validate_selection_design(
     }
 
     if quota_total != selection.randomized_audit_count
-        || exploit_cost_used != selection.exploit_cost_used
         || audit_cost_used != selection.audit_cost_used
         || total_selected_cost != selection.total_selected_cost
         || audit_worst_case_cost != selection.audit_worst_case_cost
