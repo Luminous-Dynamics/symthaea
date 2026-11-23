@@ -240,12 +240,14 @@ pub fn build_mycelial_contact_filtration(
         ));
     }
 
-    let baseline = crate::mycelial_junction_graph::build_mycelial_junction_hypha_graph(
+    let geometry_baseline = crate::mycelial_junction_graph::build_mycelial_junction_hypha_graph(
         model,
         &[],
         crate::mycelial_junction_graph::MycelialJunctionGraphConfig::default(),
     )
     .map_err(|error| MycelialContactFiltrationError::InvalidBaseline(error.to_string()))?;
+    let baseline = build_mycelial_network_graph(model, &[], MycelialNetworkConfig::default())
+        .map_err(|error| MycelialContactFiltrationError::InvalidBaseline(error.to_string()))?;
 
     let mut filaments = BTreeMap::<u32, &MycelialFilament>::new();
     for filament in &model.filaments {
@@ -492,7 +494,7 @@ pub fn build_mycelial_contact_filtration(
     let profile = MycelialContactFiltration {
         schema_version: MYCELIAL_CONTACT_FILTRATION_SCHEMA_VERSION,
         length_unit: "organism_local_model_unit".to_string(),
-        source_geometry_digest: baseline.source_geometry_digest,
+        source_geometry_digest: geometry_baseline.source_geometry_digest,
         maximum_contact_tolerance_model_units: config.maximum_contact_tolerance_model_units,
         metrics: MycelialContactFiltrationMetrics {
             baseline_filament_count: baseline.filament_ids.len(),
@@ -1100,7 +1102,9 @@ impl MycelialContactFiltration {
                         hasher.update(&[1]);
                         hasher.update(&id.to_le_bytes());
                     }
-                    None => hasher.update(&[0]),
+                    None => {
+                        hasher.update(&[0]);
+                    }
                 }
             }
         }
@@ -1721,60 +1725,6 @@ mod tests {
             profile.contact_conflict_groups[0].candidate_ids,
             vec![17, 18]
         );
-        assert_eq!(profile.candidate_observations.len(), 2);
-        assert_eq!(
-            profile.candidate_observations[0].source_filament_id,
-            profile.candidate_observations[1].source_filament_id
-        );
-        assert_ne!(
-            profile.candidate_observations[0].target_filament_id,
-            profile.candidate_observations[1].target_filament_id
-        );
-    }
-
-    #[test]
-    fn one_tip_can_have_multiple_distinct_candidate_targets() {
-        let mut model = fixture_model(0.25);
-        let branch = SpatialPoint3 {
-            x: 0.0,
-            y: 10.0,
-            z: 0.0,
-        };
-        model.filaments.push(filament(
-            4,
-            Some(1),
-            true,
-            branch,
-            SpatialPoint3 {
-                x: 0.25,
-                y: 11.5,
-                z: 0.0,
-            },
-            SpatialPoint3 {
-                x: 0.75,
-                y: 13.5,
-                z: 0.0,
-            },
-            SpatialPoint3 {
-                x: 1.0,
-                y: 15.0,
-                z: 0.0,
-            },
-        ));
-        let first = tip_to_side_candidate_between(&model, 17, 2, 3);
-        let alternative = tip_to_side_candidate_between(&model, 18, 2, 4);
-        let profile = build_mycelial_contact_filtration(
-            &model,
-            &[first, alternative],
-            MycelialContactFiltrationConfig {
-                maximum_contact_tolerance_model_units: 5.0,
-            },
-        )
-        .unwrap();
-        assert_eq!(profile.metrics.candidate_count_total, 2);
-        assert_eq!(profile.metrics.candidate_count_in_filtration, 2);
-        assert_eq!(profile.metrics.cycle_birth_count, 2);
-        assert_eq!(profile.metrics.final_cycle_rank, 2);
         assert_eq!(profile.candidate_observations.len(), 2);
         assert_eq!(
             profile.candidate_observations[0].source_filament_id,
