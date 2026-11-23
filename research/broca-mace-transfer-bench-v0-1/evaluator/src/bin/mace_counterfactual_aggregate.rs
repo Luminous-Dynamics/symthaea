@@ -1378,7 +1378,11 @@ mod tests {
             "decision_is_optimal": true,
             "abstained": false,
             "evaluation_validity": "diagnostic_only",
-            "invalidity_reason": "unit test fixture"
+            "invalidity_reason": "unit test fixture",
+            "candidate_execution_boundary": "legacy_in_process",
+            "candidate_artifact_sha256": null,
+            "candidate_process_startup_ns": null,
+            "candidate_process_wall_ns": null
         })
     }
 
@@ -1410,7 +1414,11 @@ mod tests {
             "retrieved_event_ids": [3, 7],
             "decision": "action_a",
             "index_bytes": 2048,
-            "retrieval_profile_sha256": "c".repeat(64)
+            "retrieval_profile_sha256": "c".repeat(64),
+            "candidate_execution_boundary": "detached_subprocess_stream",
+            "candidate_artifact_sha256": "e".repeat(64),
+            "candidate_process_startup_ns": 100,
+            "candidate_process_wall_ns": 200
         })
     }
 
@@ -1431,7 +1439,11 @@ mod tests {
             "decision": candidate.decision,
             "retrieved_event_ids": candidate.retrieved_event_ids,
             "index_bytes": candidate.index_bytes,
-            "retrieval_profile_sha256": candidate.retrieval_profile_sha256
+            "retrieval_profile_sha256": candidate.retrieval_profile_sha256,
+            "candidate_execution_boundary": candidate.candidate_execution_boundary,
+            "candidate_artifact_sha256": candidate.candidate_artifact_sha256,
+            "candidate_process_startup_ns": candidate.candidate_process_startup_ns,
+            "candidate_process_wall_ns": candidate.candidate_process_wall_ns
         })
     }
 
@@ -1556,11 +1568,29 @@ mod tests {
             .unwrap_err()
             .contains("run_id"));
 
-        let mut wrong_sequence = valid;
+        let mut wrong_sequence = valid.clone();
         wrong_sequence["candidate_observation_sequence"] = json!(8);
         assert!(validate_score_against_candidate(&wrong_sequence, &key.0, &receipt)
             .unwrap_err()
             .contains("candidate_observation_sequence"));
+
+        let mut wrong_boundary = valid.clone();
+        wrong_boundary["candidate_execution_boundary"] = json!("legacy_in_process");
+        assert!(validate_score_against_candidate(&wrong_boundary, &key.0, &receipt)
+            .unwrap_err()
+            .contains("execution metadata"));
+
+        let mut wrong_artifact = valid.clone();
+        wrong_artifact["candidate_artifact_sha256"] = json!("f".repeat(64));
+        assert!(validate_score_against_candidate(&wrong_artifact, &key.0, &receipt)
+            .unwrap_err()
+            .contains("execution metadata"));
+
+        let mut missing_process_time = valid;
+        missing_process_time["candidate_process_wall_ns"] = json!(null);
+        assert!(validate_score_against_candidate(&missing_process_time, &key.0, &receipt)
+            .unwrap_err()
+            .contains("execution metadata"));
     }
 
     #[test]
