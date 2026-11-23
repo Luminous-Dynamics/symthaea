@@ -81,7 +81,9 @@
         "mean_decision_changed",
         "mean_decision_optimal",
         "mean_abstained",
-        "task_block_aggregation"
+        "task_block_aggregation",
+        "input_candidate_stream_sha256",
+        "input_candidate_record_count"
       ],
       "properties": {
         "schema_version": {
@@ -190,6 +192,13 @@
         "input_manifest_count": {
           "type": "integer",
           "minimum": 1
+        },
+        "input_candidate_stream_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "input_candidate_record_count": {
+          "type": "integer",
+          "minimum": 1
         }
       }
     },
@@ -220,7 +229,9 @@
         "mean_regret_delta_vs_exact_scope",
         "utility_delta_cluster_bootstrap_95pct_ci",
         "regret_delta_cluster_bootstrap_95pct_ci",
-        "paired_task_block_aggregation"
+        "paired_task_block_aggregation",
+        "input_candidate_stream_sha256",
+        "input_candidate_record_count"
       ],
       "properties": {
         "schema_version": {
@@ -299,6 +310,13 @@
           "minimum": 0
         },
         "input_manifest_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "input_candidate_stream_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "input_candidate_record_count": {
           "type": "integer",
           "minimum": 1
         }
