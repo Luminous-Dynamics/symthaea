@@ -170,6 +170,7 @@ pub mod research_archive;
 pub mod research_release_promotion;
 #[cfg(feature = "theory")]
 pub mod research_revision_governance;
+pub mod realization_contract;
 pub mod rhythm;
 #[cfg(feature = "theory")]
 pub mod sonata_intervention;
