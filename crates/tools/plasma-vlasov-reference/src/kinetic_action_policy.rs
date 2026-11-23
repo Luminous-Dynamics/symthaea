@@ -181,9 +181,7 @@ impl HorizonEvidence {
         if self.high_velocity_guardband_fraction >= limits.maximum_guardband_fraction {
             reasons.push(HorizonReason::GuardbandLimitExceeded);
             hard_failure = true;
-        } else if self.high_velocity_guardband_fraction
-            >= limits.warning_guardband_fraction
-        {
+        } else if self.high_velocity_guardband_fraction >= limits.warning_guardband_fraction {
             reasons.push(HorizonReason::HighVelocityGuardband);
             warning = true;
         }
@@ -207,9 +205,7 @@ impl HorizonEvidence {
         if self.registered_branch_f_strophy <= limits.hard_minimum_branch_f_strophy {
             reasons.push(HorizonReason::RegisteredBranchLost);
             hard_failure = true;
-        } else if self.registered_branch_f_strophy
-            <= limits.warning_minimum_branch_f_strophy
-        {
+        } else if self.registered_branch_f_strophy <= limits.warning_minimum_branch_f_strophy {
             reasons.push(HorizonReason::RegisteredBranchWeak);
             warning = true;
         }
@@ -563,8 +559,16 @@ mod tests {
     fn nyquist_encounter_warns_but_does_not_expire_a_measured_branch() {
         let assessment = evidence(162.2).assess(limits()).unwrap();
         assert_eq!(assessment.status, HorizonStatus::Warning);
-        assert!(assessment.reasons.contains(&HorizonReason::NyquistEncountered));
-        assert!(!assessment.reasons.contains(&HorizonReason::DiscreteRecurrenceReached));
+        assert!(
+            assessment
+                .reasons
+                .contains(&HorizonReason::NyquistEncountered)
+        );
+        assert!(
+            !assessment
+                .reasons
+                .contains(&HorizonReason::DiscreteRecurrenceReached)
+        );
     }
 
     #[test]
@@ -614,7 +618,11 @@ mod tests {
         state.registered_branch_f_strophy = 1.0e-12;
         let result = state.assess(limits()).unwrap();
         assert_eq!(result.status, HorizonStatus::Unknown);
-        assert!(result.reasons.contains(&HorizonReason::RegisteredBranchLost));
+        assert!(
+            result
+                .reasons
+                .contains(&HorizonReason::RegisteredBranchLost)
+        );
     }
 
     #[test]
@@ -665,8 +673,20 @@ mod tests {
             10.0,
             500_000_000,
         );
-        let sponge = action(KineticAction::VelocityFourierSponge, 0.002, 0.003, 2.0, 100_000_000);
-        let dominated = action(KineticAction::RefineVelocityGrid, 0.003, 0.004, 12.0, 600_000_000);
+        let sponge = action(
+            KineticAction::VelocityFourierSponge,
+            0.002,
+            0.003,
+            2.0,
+            100_000_000,
+        );
+        let dominated = action(
+            KineticAction::RefineVelocityGrid,
+            0.003,
+            0.004,
+            12.0,
+            600_000_000,
+        );
         let decision =
             ActionDecision::select(&[conservative, sponge, dominated], constraints()).unwrap();
         assert_eq!(decision.pareto_front_indices, vec![0, 1]);
@@ -676,8 +696,13 @@ mod tests {
 
     #[test]
     fn invalid_candidate_metrics_are_never_selected() {
-        let mut candidate =
-            action(KineticAction::RefineVelocityGrid, 0.001, 0.0, 1.0, 100_000_000);
+        let mut candidate = action(
+            KineticAction::RefineVelocityGrid,
+            0.001,
+            0.0,
+            1.0,
+            100_000_000,
+        );
         candidate.future_response_error_upper_bound = f64::NAN;
         let decision = ActionDecision::select(&[candidate], constraints()).unwrap();
         assert_eq!(decision.recommended_index, None);
@@ -685,8 +710,7 @@ mod tests {
 
     #[test]
     fn action_with_lost_registered_branch_is_not_feasible() {
-        let mut candidate =
-            action(KineticAction::VelocityFourierSponge, 0.001, 0.001, 0.1, 10);
+        let mut candidate = action(KineticAction::VelocityFourierSponge, 0.001, 0.001, 0.1, 10);
         candidate.registered_branch_retention_fraction_lower_bound = 0.20;
         let decision = ActionDecision::select(&[candidate], constraints()).unwrap();
         assert_eq!(decision.recommended_index, None);
