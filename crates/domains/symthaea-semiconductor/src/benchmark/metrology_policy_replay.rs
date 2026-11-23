@@ -1047,6 +1047,41 @@ mod tests {
         }
     }
 
+    fn policy_quotas(
+        policy_view: &SyntheticFabPolicyViewV1,
+        quota_per_stratum: usize,
+    ) -> BTreeMap<String, usize> {
+        let mut counts = BTreeMap::<String, usize>::new();
+        for observed in &policy_view.observations {
+            *counts.entry(observed.stratum_id.clone()).or_default() += 1;
+        }
+        counts
+            .into_keys()
+            .map(|stratum| (stratum, quota_per_stratum))
+            .collect()
+    }
+
+    fn policy_config(
+        policy_view: &SyntheticFabPolicyViewV1,
+        policy_id: &str,
+        exploit_budget: u64,
+        audit_budget: u64,
+        quota_per_stratum: usize,
+        seed: u64,
+    ) -> SyntheticMetrologyPolicyConfigV1 {
+        SyntheticMetrologyPolicyConfigV1 {
+            policy_id: policy_id.into(),
+            seed,
+            total_cost_budget: exploit_budget + audit_budget,
+            exploit_cost_budget: exploit_budget,
+            audit_cost_budget: audit_budget,
+            risk_weight: 1.0,
+            uncertainty_weight: 0.0,
+            evsi_weight: 0.0,
+            audit_quota_by_stratum: policy_quotas(policy_view, quota_per_stratum),
+        }
+    }
+
     fn fake_selection(episode: &SyntheticFabEpisodeV1) -> MetrologyAuditSelectionReportV1 {
         let mut semantics = crate::benchmark::metrology_semantics::BinaryMeasurandSemanticsV1 {
             schema: crate::benchmark::metrology_semantics::SEMANTICS_SCHEMA_V1.into(),
@@ -1234,6 +1269,59 @@ mod tests {
         assert!(report.standard_error_ht_prevalence.is_some());
         assert!(report.standard_error_ht_mean_brier.is_some());
         assert_eq!(report.matured_label_count_at_horizon, 123);
+    }
+
+    #[test]
+    fn policy_runner_compares_random_audit_and_risk_exploit_at_equal_budget() {
+        let episode = generate_synthetic_fab_episode_v1(&config(
+            SyntheticFabRegimeV1::GradualProcessDrift,
+            31,
+        ))
+        .unwrap();
+        let semantics = synthetic_defect_semantics_v1(0.62).unwrap();
+        let view = episode.policy_view();
+
+        let random_policy = policy_config(view, "stratified-random", 0, 32, 8, 41);
+        let random_run = run_synthetic_metrology_policy_v1(
+            &episode,
+            view,
+            &semantics,
+            &random_policy,
+        )
+        .unwrap();
+
+        let risk_policy = policy_config(view, "risk-plus-audit", 16, 16, 4, 41);
+        let risk_run =
+            run_synthetic_metrology_policy_v1(&episode, view, &semantics, &risk_policy).unwrap();
+
+        assert_eq!(random_run.selection.total_selected_cost, 32);
+        assert_eq!(risk_run.selection.total_selected_cost, 32);
+        assert_eq!(random_run.evaluation.selected_count, 32);
+        assert_eq!(risk_run.evaluation.selected_count, 32);
+        assert_eq!(random_run.selection.exploit_count, 0);
+        assert_eq!(random_run.selection.randomized_audit_count, 32);
+        assert_eq!(risk_run.selection.exploit_count, 16);
+        assert_eq!(risk_run.selection.randomized_audit_count, 16);
+        assert!(random_run.evaluation.design_variance_qualified);
+        assert!(risk_run.evaluation.design_variance_qualified);
+    }
+
+    #[test]
+    fn evaluator_rejects_label_semantics_that_disagree_with_hidden_threshold() {
+        let episode =
+            generate_synthetic_fab_episode_v1(&config(SyntheticFabRegimeV1::Stable, 29)).unwrap();
+        let mut selection = fake_selection(&episode);
+        selection.binary_semantics.threshold = 0.50;
+        crate::benchmark::metrology_semantics::seal_binary_measurand_semantics_v1(
+            &mut selection.binary_semantics,
+        )
+        .unwrap();
+        for row in &mut selection.rows {
+            row.class_semantics_sha256 =
+                selection.binary_semantics.semantics_sha256.clone();
+        }
+        seal_selection_for_test(&mut selection);
+        assert!(evaluate_synthetic_metrology_policy_v1(&episode, &selection).is_err());
     }
 
     #[test]
