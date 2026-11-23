@@ -268,3 +268,51 @@ The evidence-spine idea is intentionally an integration contract across existing
 - **#13388 / this PR** own the randomized on-policy policy-effect estimand and its profile-cluster analysis mechanics.
 
 The inspected `symthaea-memory` fields should be extended under those owners with stable evidence IDs/digests, validity and knowledge times, correction/retraction references and authority/consent scope; HDC/CfC and the existing episodic/semantic tiers remain the retrieval and temporal-learning machinery.
+## 2026-11-24 research refresh — stronger retrieval and lifecycle baselines
+
+### Agent Zero Memory: new paper-reported SOTA comparator
+
+Agent Zero Memory (Wu & Zhu, 2026-08-30) is a significant addition to the baseline matrix. It reports **95.60% on LongMemEval** and **93.60% on LoCoMo**, claiming gains of 0.73 and 1.10 percentage points over the strongest prior public figures in its comparison. Its architecture uses three complementary representations: an episodic Memory Events timeline, an entity–event knowledge graph, and a curated citation-locked Hierarchical Documentary Memory. At query time it uses an intent gate, source router, parallel agentic search, lexical+dense retrieval, evidence opening and a citation-locked answer stage. The paper reports a backbone/cost/latency study across eight models and says quality varied only 3.4 points while per-query cost varied by roughly 30x.
+
+These are **paper-reported results**, not an independent replication or MACE score. The comparison uses the benchmark's judge and publicly reported competitor figures; reproduce the exact data, reader, judge, prompt, model, retrieval configuration and token/cost protocol before claiming to exceed them.
+
+This is an important architectural lesson: a high-performing memory system can be multi-view, combining event time, entity relations and citation-locked documents. MACE should not force HDC, a knowledge graph or a document store to do all three jobs. The evidence spine should be the shared eligibility/provenance contract across those views.
+
+### AML Cycle 2: interpret the actual competitive gaps
+
+The official Cycle 2 release reports 289 track entries across nine boards. The first-place results remain division/track-specific: Resurface 61.22 textual open-source, MemoraX 69.26 textual commercial/closed, Khipu 43.26 multimodal open-source, InsightMem 63.33% coding-resolved open-source, and MemoraX 68.00% coding-resolved commercial/closed. Do not compare these across dimensions.
+
+An entrant's post-result analysis illustrates why capability vectors matter more than the aggregate: AgentPark's benchmark-specific Tideline configuration reports 59.72 overall on the textual track, 6th of 62 commercial systems for Memory Governance (74.46), but 91st of 125 closed-source systems for Epistemic Safety & Privacy (63.77), below the published median. This is a vendor's own analysis of its official leaderboard result, not an independent system-wide assessment. It nevertheless demonstrates that governance and privacy can diverge sharply, and supports MACE's non-compensable rights/authority gates.
+
+AML's current Cycle 2 rules require participant-hosted, stable Add/Search APIs; the platform supplies Answer/Eval. It also fixes the evaluation contract, candidate ordering and limits, and prohibits evaluation-data use outside the run. A future entry needs an operational service and a frozen system version; a public code repository alone is not an entry.
+
+### MemoryDojo and MemSecBench: lifecycle baselines become unavoidable
+
+MemoryDojo (November 2026) contains 155 multi-session long-horizon trajectories across four domains and supports five memory systems. Its focus is the persistence and downstream behavioral influence of poisoned memory over sessions. It reports susceptibility across every evaluated memory system, with attack effectiveness varying by architecture.
+
+MemSecBench contains 310 cases across 48 contexts and a controlled Write–Execute–Forget protocol. Its paper reports malicious persistence in 84.2% of all cases across its tested configurations, full Write–Execute success in 50.3%, and selective repair in 56.1% of successfully poisoned cases. These figures are protocol-specific and must not be treated as universal system rates.
+
+Together these benchmarks establish that the lifecycle must be measured from attempted write through persistence, retrieval, action, detection, repair, erasure and restore—not only by blocking malicious writes or measuring answer accuracy.
+
+### What this changes in the MACE baseline matrix
+
+Add these explicit arms/reproductions:
+
+1. **Agent Zero Memory composition:** event timeline + entity/event graph + citation-locked documentary memory; compare each component and the full composition.
+2. **Strong hybrid retrieval:** BM25 + dense + reciprocal-rank fusion + reranking + neighbor/context expansion + source opening.
+3. **Temporal/state-first memory:** explicit valid-time, knowledge-time, correction/supersession and objective state.
+4. **Causal trajectory memory:** AMA-Agent-like causal graph and tool-augmented retrieval on AMA-Bench.
+5. **Rights/evidence projection:** same candidate retriever with and without bitemporal/purpose/authority/consent checks; no unsafe arm may access real personal data or execute real actions.
+6. **Lifecycle attack/recovery:** official MemoryDojo and MemSecBench reproduction plus MACE-specific correction, consent revocation, parent invalidation, erasure and backup-restore cases.
+
+Report retrieval recall, answer/action utility, citation/evidence support, current-state correctness, stale-use rate, privacy/authority failures, poison influence, repair closure, user burden, all-in cost and p95/p99 latency independently. A single aggregate score would conceal the most consequential failure modes.
+
+### Updated source register
+
+- Agent Zero Memory (2026): https://arxiv.org/abs/2608.29606
+- AMA-Bench (ICML 2026): https://proceedings.mlr.press/v306/zhao26bs.html
+- Agent Memory Leaderboard Cycle 2 official results: https://agentmemoryleaderboard.ai/results/cycle-2/
+- Agent Memory Challenge Cycle 2 rules: https://agentmemories.ai/rules
+- AgentPark's Cycle 2 result analysis: https://agentpark.si/blog/agent-memory-leaderboard-cycle-2
+- MemoryDojo (November 2026): https://arxiv.org/abs/2611.09721
+- MemSecBench (2026): https://arxiv.org/abs/2607.27080
