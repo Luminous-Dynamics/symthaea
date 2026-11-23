@@ -3,6 +3,7 @@
 pub mod binary_metrics;
 pub mod dtco_manifest;
 pub mod metrology_audit;
+pub mod metrology_qualification_gate;
 pub mod metrology_semantics;
 pub mod mf_acquisition;
 pub mod pair_manifest;
@@ -66,6 +67,15 @@ pub use secom_raw::{
 
 pub use dtco_manifest::{
     DtcoLineageError, DtcoLineageManifestV1, DtcoLineageReportV1, validate_dtco_lineage_v1,
+};
+
+pub use metrology_qualification_gate::{
+    CALIBRATION_CERTIFICATE_SCHEMA_V1, CalibrationCertificateV1, MEASUREMENT_EVIDENCE_SCHEMA_V1,
+    MeasurementEvidenceV1, MeasurementQualificationErrorV1, MeasurementQualificationPolicyV1,
+    MeasurementQualificationReasonV1, MeasurementQualificationReportV1,
+    MeasurementQualificationStatusV1, MeasurementUncertaintyComponentV1,
+    QUALIFICATION_POLICY_SCHEMA_V1, QUALIFICATION_REPORT_SCHEMA_V1, TraceabilityDeclarationV1,
+    UncertaintyComponentKindV1, qualify_measurement_evidence_v1,
 };
 
 pub use metrology_semantics::{
