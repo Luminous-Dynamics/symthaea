@@ -36,6 +36,7 @@ pub mod mycelial_graph_hypothesis_posterior;
 pub mod mycelial_junction_graph;
 pub mod mycelial_mesh;
 pub mod mycelial_model;
+pub mod mycelial_morphogenesis_observation;
 pub mod mycelial_network;
 pub mod mycelial_observation_coverage;
 pub mod mycelial_presence;
@@ -210,6 +211,12 @@ pub use mycelial_mesh::{
 pub use mycelial_model::{
     MYCELIAL_MODEL_VERSION, MycelialFilament, MycelialModel, OrbitalCell, PresenceMode,
     SpatialPoint3, build_mycelial_model,
+};
+pub use mycelial_morphogenesis_observation::{
+    MYCELIAL_MORPHOGENESIS_OBSERVATION_SCHEMA_VERSION, MycelialDevelopmentStage,
+    MycelialMorphogenesisMeasurement, MycelialMorphogenesisMissingStatus,
+    MycelialMorphogenesisObservation, MycelialMorphogenesisObservationError,
+    MycelialMorphogenesisRegionKind,
 };
 pub use mycelial_network::{
     AnastomosisKind, MAX_MYCELIAL_ANASTOMOSES, MYCELIAL_NETWORK_SCHEMA_VERSION,
