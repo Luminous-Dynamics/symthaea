@@ -416,9 +416,7 @@ fn validate_input(
         &input.qualification_policy,
     )
     .map_err(|error| CalibrationRequalificationErrorV1(error.to_string()))?;
-    if recreated.report_sha256 != input.original_qualification_at_k0.report_sha256
-        || recreated.status != input.original_qualification_at_k0.status
-    {
+    if recreated != input.original_qualification_at_k0 {
         return Err(CalibrationRequalificationErrorV1(
             "original K0 qualification receipt does not replay from its frozen inputs".into(),
         ));
