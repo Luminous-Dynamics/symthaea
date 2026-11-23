@@ -116,6 +116,14 @@ fn ensure_known_fields(record: &Value, allowed: &[&str], context: &str) -> Resul
     Ok(())
 }
 
+fn optional_sha256(record: &Value, field: &str) -> Result<Option<String>, String> {
+    match record.get(field) {
+        None => Ok(None),
+        Some(Value::String(value)) if valid_sha256(value) => Ok(Some(value.clone())),
+        Some(_) => Err(format!("optional digest field {field} must be omitted or a valid SHA-256 string")),
+    }
+}
+
 fn required_number(record: &Value, field: &str) -> Result<f64, String> {
     let value = record
         .get(field)
@@ -193,10 +201,11 @@ fn parse_manifest(record: &Value) -> Result<(InputProvenance, String), String> {
         source_code_sha256: required_string(record, "source_code_sha256")?.to_string(),
         fixture_sha256: required_string(record, "fixture_sha256")?.to_string(),
         schema_sha256: required_string(record, "schema_sha256")?.to_string(),
-        source_revision: record
-            .get("source_revision")
-            .and_then(Value::as_str)
-            .map(str::to_string),
+        source_revision: match record.get("source_revision") {
+            Some(Value::Null) => None,
+            Some(Value::String(value)) => Some(value.clone()),
+            _ => return Err("source_revision must be present as a string or null".to_string()),
+        },
     };
     for (field, digest) in [
         ("source_code_sha256", provenance.source_code_sha256.as_str()),
@@ -498,7 +507,23 @@ fn parse_score(record: &Value) -> Result<(TaskKey, MethodKind, Metrics), String>
     }
     required_string(record, "intervention_id")?;
     required_string(record, "target_key")?;
-    required_string(record, "full_evidence_decision")?;
+    let decision = required_string(record, "decision")?;
+    let full_evidence_decision = required_string(record, "full_evidence_decision")?;
+    if !matches!(decision, "action_a" | "action_b" | "abstain")
+        || !matches!(full_evidence_decision, "action_a" | "action_b" | "abstain")
+    {
+        return Err("evaluator score contains unsupported decision value".to_string());
+    }
+    let decision_agrees_with_full = required_bool(record, "decision_agrees_with_full")?;
+    let decision_changed = required_bool(record, "decision_changed")?;
+    if decision_agrees_with_full != (decision == full_evidence_decision)
+        || decision_changed == decision_agrees_with_full
+    {
+        return Err("evaluator score decision agreement flags are inconsistent".to_string());
+    }
+    if required_bool(record, "abstained")? != (decision == "abstain") {
+        return Err("evaluator score abstained flag does not match decision".to_string());
+    }
     if !matches!(required_string(record, "evaluation_validity")?, "diagnostic_only") {
         return Err("unsupported evaluation_validity in evaluator score".to_string());
     }
@@ -507,10 +532,11 @@ fn parse_score(record: &Value) -> Result<(TaskKey, MethodKind, Metrics), String>
     required_u64(record, "index_bytes")?;
     required_u64(record, "removed_event_count")?;
     required_u64(record, "removed_experience_struct_bytes")?;
-    required_number(record, "full_evidence_regret")?;
-    if record.get("retrieval_profile_sha256").and_then(Value::as_str).is_some_and(|digest| !valid_sha256(digest)) {
-        return Err("invalid retrieval_profile_sha256 in evaluator score".to_string());
+    let full_evidence_regret = required_number(record, "full_evidence_regret")?;
+    if full_evidence_regret < 0.0 || required_number(record, "regret")? < 0.0 {
+        return Err("evaluator regret values must be non-negative".to_string());
     }
+    optional_sha256(record, "retrieval_profile_sha256")?;
     let method = required_string(record, "method")?.to_string();
     if !supported_method(&method) {
         return Err(format!("unsupported evaluator method {method}"));
@@ -860,16 +886,8 @@ fn parse_candidate_receipt(record: &Value) -> Result<((String, String), Candidat
         required_u64(record, field)?;
     }
     let index_bytes = required_u64(record, "index_bytes")?;
-    let retrieval_profile_sha256 = record
-        .get("retrieval_profile_sha256")
-        .and_then(Value::as_str)
-        .map(str::to_string);
-    if retrieval_profile_sha256
-        .as_deref()
-        .is_some_and(|digest| !valid_sha256(digest))
-    {
-        return Err("invalid retrieval_profile_sha256 in candidate receipt".to_string());
-    }
+    let retrieval_profile_sha256 =
+        optional_sha256(record, "retrieval_profile_sha256")?;
 
     Ok((
         (pair_block_id, candidate_observation_id),
@@ -914,10 +932,7 @@ fn validate_score_against_candidate(
     if required_u64(score, "index_bytes")? != candidate.index_bytes {
         return Err("evaluator score index_bytes differ from candidate receipt".to_string());
     }
-    let score_profile = score
-        .get("retrieval_profile_sha256")
-        .and_then(Value::as_str)
-        .map(str::to_string);
+    let score_profile = optional_sha256(score, "retrieval_profile_sha256")?;
     if score_profile != candidate.retrieval_profile_sha256 {
         return Err("evaluator score retrieval_profile_sha256 differs from candidate receipt".to_string());
     }
@@ -1245,17 +1260,34 @@ mod tests {
         json!({
             "schema_version": INPUT_SCHEMA,
             "record_type": "evaluator_score",
+            "run_id": "run-1",
             "pair_block_id": pair_block_id,
-            "method": method,
+            "candidate_observation_id": "obs-test",
+            "candidate_observation_sequence": 0,
+            "candidate_input_sha256": "f".repeat(64),
+            "intervention_id": format!("test-{kind}"),
             "intervention_kind": kind,
-            "utility": utility,
-            "regret": regret,
-            "regret_gap_vs_full_evidence": regret,
-            "regret_gap_vs_full_method": regret,
+            "target_key": "test-target",
+            "matched_to": null,
+            "removed_event_ids": [],
+            "removed_event_count": 0,
+            "removed_experience_struct_bytes": 0,
+            "method": method,
+            "retrieved_event_ids": [],
+            "index_bytes": 0,
+            "decision": "action_a",
+            "full_evidence_decision": "action_a",
             "decision_agrees_with_full": true,
             "decision_changed": false,
+            "utility": utility,
+            "regret": regret,
+            "full_evidence_regret": regret,
+            "regret_gap_vs_full_evidence": regret,
+            "regret_gap_vs_full_method": regret,
             "decision_is_optimal": true,
-            "abstained": false
+            "abstained": false,
+            "evaluation_validity": "diagnostic_only",
+            "invalidity_reason": "unit test fixture"
         })
     }
 
