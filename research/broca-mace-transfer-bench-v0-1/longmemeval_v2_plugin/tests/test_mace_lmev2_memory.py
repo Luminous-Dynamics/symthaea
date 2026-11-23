@@ -237,6 +237,7 @@ class MaceLongMemEvalV2IngressTests(unittest.TestCase):
             memory = self.make_memory(root)
             memory.run_id = "run-2026-11-23"
             memory.sidecar_binary_sha256 = "a" * 64
+            memory.backend_revision_sha256 = "b" * 64
             memory.candidate_evidence_dir = root / "workspace" / "candidate_evidence"
             query = "query"
             query_digest = hashlib.sha256(query.encode("utf-8")).hexdigest()
@@ -246,7 +247,7 @@ class MaceLongMemEvalV2IngressTests(unittest.TestCase):
                 "run_id": memory.run_id,
                 "candidate_id": "opaque-invocation-1",
                 "backend_id": "mace_lmev2_bm25_text",
-                "backend_revision_sha256": memory.sidecar_binary_sha256,
+                "backend_revision_sha256": memory.backend_revision_sha256,
                 "query_scope": "longmemeval-v2:domain:web",
                 "query_purpose": "benchmark:memory-context",
                 "query_sha256": query_digest,
@@ -303,6 +304,7 @@ class MaceLongMemEvalV2IngressTests(unittest.TestCase):
             memory = self.make_memory(root)
             memory.run_id = "run-orphan"
             memory.sidecar_binary_sha256 = "a" * 64
+            memory.backend_revision_sha256 = "b" * 64
             memory.candidate_evidence_dir = root / "workspace" / "candidate_evidence"
             memory._persist_candidate_envelope(
                 "opaque-invocation",
@@ -325,6 +327,7 @@ class MaceLongMemEvalV2IngressTests(unittest.TestCase):
             memory = self.make_memory(root)
             memory.run_id = "run-empty"
             memory.sidecar_binary_sha256 = "a" * 64
+            memory.backend_revision_sha256 = "b" * 64
             memory.candidate_evidence_dir = root / "workspace" / "candidate_evidence"
             memory._persist_candidate_envelope(
                 "opaque-empty-invocation",
