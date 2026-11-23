@@ -181,8 +181,10 @@ impl EvidenceQualificationSignatureVerifierV1 for PinnedEd25519QualificationVeri
         if signature.len() != 64 {
             return Err(EvidenceQualificationRejectV1::InvalidSignatureEncoding);
         }
-        let signature = Signature::from_slice(signature)
+        let signature_bytes: &[u8; 64] = signature
+            .try_into()
             .map_err(|_| EvidenceQualificationRejectV1::InvalidSignatureEncoding)?;
+        let signature = Signature::from_bytes(signature_bytes);
         key.verifying_key
             .verify_strict(payload_sha256.as_bytes(), &signature)
             .map_err(|_| EvidenceQualificationRejectV1::SignatureRejected)
