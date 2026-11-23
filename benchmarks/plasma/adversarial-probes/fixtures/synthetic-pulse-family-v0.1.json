@@ -15,7 +15,8 @@
       "maximum": 6,
       "velocity_unit": "v_th"
     },
-    "time_unit": "omega_pe^-1"
+    "time_unit": "omega_pe^-1",
+    "maximum_time": 30
   },
   "intervention_operator": {
     "operator_id": "sinusoidal_velocity_kick_v1",
