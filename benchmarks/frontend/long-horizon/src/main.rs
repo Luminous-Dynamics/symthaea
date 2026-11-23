@@ -29,15 +29,21 @@ impl<'de> Deserialize<'de> for UniqueJson {
                 formatter.write_str("a JSON value with unique object keys")
             }
 
-            fn visit_bool<E>(self, value: bool) -> Result<Self::Value, E> {
+            fn visit_bool<E>(self, value: bool) -> Result<Self::Value, E>
+            where E: de::Error,
+            {
                 Ok(UniqueJson(Value::Bool(value)))
             }
 
-            fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E> {
+            fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E>
+            where E: de::Error,
+            {
                 Ok(UniqueJson(Value::from(value)))
             }
 
-            fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E> {
+            fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E>
+            where E: de::Error,
+            {
                 Ok(UniqueJson(Value::from(value)))
             }
 
@@ -50,19 +56,27 @@ impl<'de> Deserialize<'de> for UniqueJson {
                 Ok(UniqueJson(Value::Number(number)))
             }
 
-            fn visit_str<E>(self, value: &str) -> Result<Self::Value, E> {
+            fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+            where E: de::Error,
+            {
                 Ok(UniqueJson(Value::String(value.to_string())))
             }
 
-            fn visit_string<E>(self, value: String) -> Result<Self::Value, E> {
+            fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
+            where E: de::Error,
+            {
                 Ok(UniqueJson(Value::String(value)))
             }
 
-            fn visit_none<E>(self) -> Result<Self::Value, E> {
+            fn visit_none<E>(self) -> Result<Self::Value, E>
+            where E: de::Error,
+            {
                 Ok(UniqueJson(Value::Null))
             }
 
-            fn visit_unit<E>(self) -> Result<Self::Value, E> {
+            fn visit_unit<E>(self) -> Result<Self::Value, E>
+            where E: de::Error,
+            {
                 Ok(UniqueJson(Value::Null))
             }
 
