@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/sfeb/monitoring-fixture-v1.schema.json",
+  "title": "SFEB monitoring fixture v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "fixture_id",
+    "clock",
+    "cases"
+  ],
+  "properties": {
+    "schema": {
+      "const": "sfeb-monitoring-fixture-v1"
+    },
+    "fixture_id": {
+      "type": "string",
+      "pattern": "^[A-Z0-9._-]+$"
+    },
+    "clock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "unit",
+        "same_timestamp",
+        "notification_role"
+      ],
+      "properties": {
+        "unit": {
+          "const": "virtual_seconds"
+        },
+        "same_timestamp": {
+          "type": "string"
+        },
+        "notification_role": {
+          "const": "untrusted_wakeup_hint_only"
+        }
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "case_id",
+          "watch_contract",
+          "initial_state",
+          "source_events",
+          "notifications",
+          "expected"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string"
+          },
+          "watch_contract": {
+            "type": "object"
+          },
+          "initial_state": {
+            "type": "object"
+          },
+          "source_events": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "notifications": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "expected": {
+            "type": "object"
+          }
+        }
+      }
+    }
+  }
+}
