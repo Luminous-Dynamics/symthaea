@@ -205,6 +205,7 @@ pub enum MycelialFusionCounterfactualError {
     InvalidSideContactFraction(u32),
     LengthUnitMismatch,
     DuplicateExistingConnection(String),
+    CounterfactualTopologyMismatch,
     UnknownDemandEndpoint(String),
     InvalidDemand(String),
     InvalidDisruption(String),
@@ -254,6 +255,9 @@ impl fmt::Display for MycelialFusionCounterfactualError {
             },
             Self::DuplicateExistingConnection(id) => {
                 write!(f, "candidate {id} duplicates an existing source connection")
+            }
+            Self::CounterfactualTopologyMismatch => {
+                write!(f, "single-edge counterfactual did not produce the expected beta-0/beta-1 delta")
             }
             Self::UnknownDemandEndpoint(id) => write!(f, "unknown declared demand endpoint {id}"),
             Self::InvalidDemand(id) => write!(f, "invalid declared demand pair {id}"),
@@ -589,7 +593,8 @@ fn split_target_segment(
         || !right_length.is_finite()
         || left_length <= 0.0
         || right_length <= 0.0
-        || (left_length + right_length - original.length).abs() > 1.0e-10
+        || (left_length + right_length - original.length).abs()
+            > original.length.abs() * 1.0e-12 + 1.0e-12
     {
         return Err(MycelialFusionCounterfactualError::InvalidCandidate(
             candidate.candidate_id.clone(),
@@ -959,6 +964,20 @@ fn build_candidate_impact(
     let accepted_digest = graph_view_digest(&accepted_view);
     let (accepted_metrics, accepted_demand_outcomes) =
         view_metrics(&accepted_view, demands, &BTreeSet::new(), &BTreeSet::new());
+    let topology_delta_is_valid = match topology_effect {
+        MycelialFusionTopologyEffect::ComponentMerge => {
+            rejected_metrics.connected_components
+                == accepted_metrics.connected_components.saturating_add(1)
+                && rejected_metrics.cycle_rank == accepted_metrics.cycle_rank
+        }
+        MycelialFusionTopologyEffect::CycleClosing => {
+            rejected_metrics.connected_components == accepted_metrics.connected_components
+                && accepted_metrics.cycle_rank == rejected_metrics.cycle_rank.saturating_add(1)
+        }
+    };
+    if !topology_delta_is_valid {
+        return Err(MycelialFusionCounterfactualError::CounterfactualTopologyMismatch);
+    }
     let demand_deltas = rejected_demand_outcomes
         .into_iter()
         .zip(accepted_demand_outcomes)
@@ -1365,6 +1384,7 @@ mod tests {
         assert_eq!(impact.accepted_for_analysis.cycle_rank, 1);
         assert_eq!(impact.cycle_rank_delta, 1);
         assert_eq!(impact.connected_component_delta, 0);
+        assert!(!impact.contact_anchor_interpolation_used);
         assert_eq!(impact.cycle_witness_segment_ids.len(), 2);
         assert_eq!(
             impact.demand_deltas[0].shortest_path_length_delta,
@@ -1383,7 +1403,6 @@ mod tests {
         let source = skeleton(
             vec![
                 junction("A", AnnotatedJunctionKind::Origin, 0.0, 0.0),
-                junction("B", AnnotatedJunctionKind::Tip, 10.0, 0.0),
                 junction("C", AnnotatedJunctionKind::Tip, 0.0, 10.0),
                 junction("D", AnnotatedJunctionKind::Origin, 30.0, 0.0),
                 junction("E", AnnotatedJunctionKind::Tip, 40.0, 0.0),
@@ -1419,6 +1438,11 @@ mod tests {
         assert_eq!(impact.accepted_for_analysis.connected_components, 1);
         assert_eq!(impact.connected_component_delta, -1);
         assert_eq!(impact.cycle_rank_delta, 0);
+        assert!(impact.contact_anchor_interpolation_used);
+        assert_eq!(
+            impact.bridge_length_basis,
+            MycelialFusionBridgeLengthBasis::DeclaredAssumption
+        );
         assert!((impact.rejected.total_hypha_length - 20.0).abs() < 1.0e-12);
         assert!((impact.accepted_for_analysis.total_hypha_length - 22.0).abs() < 1.0e-12);
         assert_eq!(
