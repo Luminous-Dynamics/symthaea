@@ -431,3 +431,24 @@ Prospective targets: 100% identity match; ≥95% precision and ≥90% recall for
 The v4.29-compatible and v4.37-rc1 Mathlib extraction artifacts now give a first exact dependency-set comparison across four declarations. The same source declaration text was inspected at both snapshots, yet `Nat.choose_pos` retained all type references while its proof-value closure changed from 33 to 10 names, and `Set.countable_union` changed the elaborated set-operation references (`Union.union` / `Set.instUnion` versus `Max.max` / `Set.instMax`). `Finset.card_map` and `Multiset.map_id` remained identical in all three sets.
 
 This is a source-snapshot/toolchain comparison, not a controlled Lean compiler-only experiment: both the Lean and Mathlib revisions differ. A cache keyed only by declaration name is therefore insufficient. Persist exact Mathlib commit, Lean toolchain/revision, declaration type identity and dependency provenance with every graph. See [the source-snapshot differential report](MATHLIB_SOURCE_SNAPSHOT_DIFFERENTIAL_V1.md).
+
+## 15. Exact-head focused execution receipt — 2026-11-23
+
+The focused Math Proof Comprehension workflow completed successfully on exact PR head `61cc196132abc54de6eaba39a82f149783dd58e0`:
+
+- Workflow run: https://github.com/Luminous-Dynamics/symthaea/actions/runs/45260762718
+- Finite reference oracle: 11 passed / 0 failed.
+- Rust contract library: 64 passed / 0 failed.
+- Source-snapshot differential CLI: 7 passed / 0 failed, including helper-expanded stability positive and type-interface-drift negative controls.
+- Rust formatting, frozen JSON fixtures and Cargo lock export: passed.
+- Both Lean extraction cohorts: Mathlib v4.29.0 LeanGraph-compatible and Mathlib v4.37.0-rc1 passed exact source/toolchain checks and extraction.
+- Cross-snapshot differential: passed all workflow assertions, including the `Nat.choose_pos` helper-expansion signal and separate `Set.countable_union` interface-drift classification.
+- ProofPlanV1 CLI: `PROOF_PLAN_STRUCTURALLY_VALID plan_id=PROOFPLAN-AND-COMM-001`.
+- Local/global CLI: `LOCAL_GLOBAL_PAIR_STRUCTURALLY_VALID`; finite truth-table witness `p=false,q=true`; synthetic CIRR numerator/denominator 1/1; lower/upper/point all 1.0.
+- Theorem-sandwich CLI: `THEOREM_SANDWICH_RECEIPT_VALID task_id=SYNTHETIC-SANDWICH-IMPLICATION-001`.
+
+The 64 library tests include canonical preimage hashing, local/global scope and CIRR semantics, finite countermodel validation, context-indexed theorem-sandwich semantics, two-reviewer translation quorum/disagreement, and the context-aware adversarial controls. The 7 comparator tests include positive helper-expansion diagnosis and a negative guard against hiding type-interface drift.
+
+**Claim ceiling:** The local/global 1/1 score is synthetic arithmetic only. The two reviewer IDs in the fixture are stipulated records, not real independent mathematicians. No model-produced CIRR, Lean kernel replay of the And.comm plan, expert proof-plan gold set, participant recruitment, or human delayed-transfer result has been produced.
+
+The focused run's sibling workflows (general CI, PR Governance, Benchmark Suite, Workflow Syntax and Showroom Integrity) were skipped because the PR remains a draft; they are not claimed as passes. A subsequent documentation-only benchmark-target revision followed this tested code head; a final exact-head focused rerun is requested separately.
