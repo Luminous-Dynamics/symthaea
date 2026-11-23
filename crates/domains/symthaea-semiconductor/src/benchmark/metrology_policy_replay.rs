@@ -513,7 +513,6 @@ pub fn run_synthetic_metrology_policy_tournament_v1(
     Ok(tournament)
 }
 
-
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SyntheticMetrologyPolicyConfigV1 {
     pub policy_id: String,
