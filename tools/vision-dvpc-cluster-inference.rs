@@ -131,7 +131,9 @@ fn parse_table(input: &str) -> Result<Table, String> {
     for (index, line) in input.lines().enumerate() {
         let line_number = index + 1;
         if line.is_empty() {
-            return Err(invalid(format!("line {line_number}: blank lines are forbidden")));
+            return Err(invalid(format!(
+                "line {line_number}: blank lines are forbidden"
+            )));
         }
         let fields: Vec<&str> = line.split('\t').collect();
         if fields.first().copied() == Some("META") {
@@ -145,7 +147,10 @@ fn parse_table(input: &str) -> Result<Table, String> {
                     "line {line_number}: META requires exactly key and value"
                 )));
             }
-            if meta.insert(fields[1].to_owned(), fields[2].to_owned()).is_some() {
+            if meta
+                .insert(fields[1].to_owned(), fields[2].to_owned())
+                .is_some()
+            {
                 return Err(invalid(format!(
                     "line {line_number}: duplicate metadata key {}",
                     fields[1]
@@ -169,7 +174,9 @@ fn parse_table(input: &str) -> Result<Table, String> {
             )));
         }
         if fields.iter().any(|field| field.is_empty()) {
-            return Err(invalid(format!("line {line_number}: empty fields are forbidden")));
+            return Err(invalid(format!(
+                "line {line_number}: empty fields are forbidden"
+            )));
         }
         rows.push(fields.iter().map(|field| (*field).to_owned()).collect());
     }
@@ -188,11 +195,22 @@ fn parse_table(input: &str) -> Result<Table, String> {
     if meta.get("positive_is_better").map(String::as_str) != Some("true") {
         return Err(invalid("positive_is_better must be the literal true"));
     }
-    if !matches!(meta.get("split").map(String::as_str), Some("test" | "private_test")) {
-        return Err(invalid("inference accepts only the predeclared test or private_test split"));
+    if !matches!(
+        meta.get("split").map(String::as_str),
+        Some("test" | "private_test")
+    ) {
+        return Err(invalid(
+            "inference accepts only the predeclared test or private_test split",
+        ));
     }
 
-    for key in ["experiment_id", "dataset_id", "dataset_revision", "cluster_unit", "primary_metric"] {
+    for key in [
+        "experiment_id",
+        "dataset_id",
+        "dataset_revision",
+        "cluster_unit",
+        "primary_metric",
+    ] {
         validate_token(meta.get(key).map(String::as_str).unwrap_or(""), key)?;
     }
     let cluster_unit = meta.get("cluster_unit").map(String::as_str).unwrap_or("");
@@ -205,7 +223,9 @@ fn parse_table(input: &str) -> Result<Table, String> {
         ));
     }
     validate_sha256(
-        meta.get("bundle_lock_sha256").map(String::as_str).unwrap_or(""),
+        meta.get("bundle_lock_sha256")
+            .map(String::as_str)
+            .unwrap_or(""),
         "bundle_lock_sha256",
     )?;
     Ok(Table { meta, rows })
@@ -233,7 +253,9 @@ fn parse_config(meta: &BTreeMap<String, String>) -> Result<Config, String> {
         .parse::<f64>()
         .map_err(|_| invalid("familywise_confidence must be numeric"))?;
     if !familywise_confidence.is_finite() || !(0.5..1.0).contains(&familywise_confidence) {
-        return Err(invalid("familywise_confidence must be finite and in [0.5, 1)"));
+        return Err(invalid(
+            "familywise_confidence must be finite and in [0.5, 1)",
+        ));
     }
     let per_tail = (1.0 - familywise_confidence) / (2.0 * family_size as f64);
     if (bootstrap_replicates as f64 * per_tail < 20.0) {
@@ -271,20 +293,22 @@ fn parse_comparisons(rows: &[Vec<String>]) -> Result<BTreeMap<String, Comparison
                 "data row {row_number}: candidate_id and baseline_id must differ"
             )));
         }
-        let delta = row[5].parse::<f64>().map_err(|_| {
-            invalid(format!("data row {row_number}: delta must be numeric"))
-        })?;
+        let delta = row[5]
+            .parse::<f64>()
+            .map_err(|_| invalid(format!("data row {row_number}: delta must be numeric")))?;
         if !delta.is_finite() {
             return Err(invalid(format!(
                 "data row {row_number}: delta must be finite"
             )));
         }
 
-        let comparison = comparisons.entry(comparison_id.clone()).or_insert_with(|| Comparison {
-            candidate_id: candidate_id.clone(),
-            baseline_id: baseline_id.clone(),
-            deltas: BTreeMap::new(),
-        });
+        let comparison = comparisons
+            .entry(comparison_id.clone())
+            .or_insert_with(|| Comparison {
+                candidate_id: candidate_id.clone(),
+                baseline_id: baseline_id.clone(),
+                deltas: BTreeMap::new(),
+            });
         if comparison.candidate_id.as_str() != candidate_id.as_str()
             || comparison.baseline_id.as_str() != baseline_id.as_str()
         {
@@ -292,7 +316,11 @@ fn parse_comparisons(rows: &[Vec<String>]) -> Result<BTreeMap<String, Comparison
                 "comparison {comparison_id} changes candidate/baseline identity across rows"
             )));
         }
-        if comparison.deltas.insert(cluster_id.clone(), delta).is_some() {
+        if comparison
+            .deltas
+            .insert(cluster_id.clone(), delta)
+            .is_some()
+        {
             return Err(invalid(format!(
                 "duplicate cluster {cluster_id} in comparison {comparison_id}"
             )));
@@ -390,19 +418,30 @@ fn sign_flip_test(values: &[f64], seed: u64, monte_carlo_replicates: u64) -> (St
         for mask in 0..configurations {
             let mut sum = 0.0;
             for (bit, value) in values.iter().enumerate() {
-                sum += if (mask & (1u64 << bit)) == 0 { -*value } else { *value };
+                sum += if (mask & (1u64 << bit)) == 0 {
+                    -*value
+                } else {
+                    *value
+                };
             }
             if (sum / values.len() as f64).abs() + tolerance >= observed {
                 extreme += 1;
             }
         }
-        ("exact_sign_flip_symmetric_null".to_owned(), extreme as f64 / configurations as f64)
+        (
+            "exact_sign_flip_symmetric_null".to_owned(),
+            extreme as f64 / configurations as f64,
+        )
     } else {
         let mut rng = SplitMix64::new(seed);
         for _ in 0..monte_carlo_replicates {
             let mut sum = 0.0;
             for value in values {
-                sum += if (rng.next_u64() & 1) == 0 { -*value } else { *value };
+                sum += if (rng.next_u64() & 1) == 0 {
+                    -*value
+                } else {
+                    *value
+                };
             }
             if (sum / values.len() as f64).abs() + tolerance >= observed {
                 extreme += 1;
@@ -494,7 +533,11 @@ fn render_receipt(
         let _ = writeln!(output, "ANALYSIS\t{key}\t{}", table.meta[key]);
     }
     let _ = writeln!(output, "ANALYSIS\tindependent_clusters\t{cluster_count}");
-    let _ = writeln!(output, "ANALYSIS\tcomparison_family_size\t{}", config.family_size);
+    let _ = writeln!(
+        output,
+        "ANALYSIS\tcomparison_family_size\t{}",
+        config.family_size
+    );
     let _ = writeln!(output, "ANALYSIS\tbootstrap_seed\t{}", config.seed);
     let _ = writeln!(output, "ANALYSIS\tbootstrap_replicates\t{}", config.bootstrap_replicates);
     let _ = writeln!(
@@ -511,7 +554,10 @@ fn render_receipt(
         "ANALYSIS\tsign_flip_assumption\tINDEPENDENT_CLUSTER_DELTAS_SYMMETRIC_UNDER_NULL"
     );
     let _ = writeln!(output, "ANALYSIS\tframes_are_independent_units\tfalse");
-    let _ = writeln!(output, "ANALYSIS\tsafety_certificate\tNOT_COMPUTED_BY_THIS_TOOL");
+    let _ = writeln!(
+        output,
+        "ANALYSIS\tsafety_certificate\tNOT_COMPUTED_BY_THIS_TOOL"
+    );
     let _ = writeln!(output, "ANALYSIS\tperformance_claim\tNONE");
     let _ = writeln!(
         output,
@@ -604,7 +650,9 @@ fn analyze(
     let cluster_ids: Vec<String> = first_clusters.into_iter().collect();
     let results: Vec<ResultRow> = comparisons
         .iter()
-        .map(|(comparison_id, comparison)| analyze_one(comparison_id, comparison, &cluster_ids, config))
+        .map(|(comparison_id, comparison)| {
+            analyze_one(comparison_id, comparison, &cluster_ids, config)
+        })
         .collect();
     Ok(render_receipt(&table, config, &results, cluster_ids.len()))
 }
@@ -625,7 +673,10 @@ fn main() {
     match run_cli(&args) {
         Ok(receipt) => print!("{receipt}"),
         Err(error) => {
-            eprintln!("REJECT\treason\t{}", error.replace('\t', " ").replace('\n', " "));
+            eprintln!(
+                "REJECT\treason\t{}",
+                error.replace('\t', " ").replace('\n', " ")
+            );
             std::process::exit(2);
         }
     }
@@ -701,12 +752,18 @@ DELTA_HEADER\tcomparison_id\tcandidate_id\tbaseline_id\tcluster_id\tdelta\n",
     fn reordered_rows_do_not_change_analysis() {
         let source = fixture();
         let mut lines: Vec<&str> = source.lines().collect();
-        let header_index = lines.iter().position(|line| line.starts_with("DELTA_HEADER")).unwrap();
+        let header_index = lines
+            .iter()
+            .position(|line| line.starts_with("DELTA_HEADER"))
+            .unwrap();
         let meta_and_header = lines[..=header_index].join("\n") + "\n";
         let mut rows: Vec<&str> = lines[header_index + 1..].to_vec();
         rows.reverse();
         let reversed = meta_and_header + &rows.join("\n") + "\n";
-        assert_eq!(analyze(&source, LOCK).unwrap(), analyze(&reversed, LOCK).unwrap());
+        assert_eq!(
+            analyze(&source, LOCK).unwrap(),
+            analyze(&reversed, LOCK).unwrap()
+        );
     }
 
     #[test]
@@ -719,13 +776,24 @@ DELTA_HEADER\tcomparison_id\tcandidate_id\tbaseline_id\tcluster_id\tdelta\n",
             .to_owned();
         broken.push_str(&row);
         broken.push('\n');
-        assert!(analyze(&broken, LOCK).unwrap_err().contains("duplicate cluster"));
+        assert!(
+            analyze(&broken, LOCK)
+                .unwrap_err()
+                .contains("duplicate cluster")
+        );
     }
 
     #[test]
     fn changed_bundle_lock_fails_against_external_expected_digest() {
-        let broken = fixture().replace(LOCK, "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
-        assert!(analyze(&broken, LOCK).unwrap_err().contains("expected bundle-lock digest"));
+        let broken = fixture().replace(
+            LOCK,
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        );
+        assert!(
+            analyze(&broken, LOCK)
+                .unwrap_err()
+                .contains("expected bundle-lock digest")
+        );
     }
 
     #[test]
@@ -750,9 +818,17 @@ DELTA_HEADER\tcomparison_id\tcandidate_id\tbaseline_id\tcluster_id\tdelta\n",
     #[test]
     fn nonfinite_delta_fails_closed() {
         let broken = fixture().replace("\t0.0100\n", "\tNaN\n");
-        assert!(analyze(&broken, LOCK).unwrap_err().contains("must be finite"));
+        assert!(
+            analyze(&broken, LOCK)
+                .unwrap_err()
+                .contains("must be finite")
+        );
         let broken_inf = fixture().replace("\t0.0100\n", "\tinf\n");
-        assert!(analyze(&broken_inf, LOCK).unwrap_err().contains("must be finite"));
+        assert!(
+            analyze(&broken_inf, LOCK)
+                .unwrap_err()
+                .contains("must be finite")
+        );
     }
 
     #[test]
@@ -760,7 +836,10 @@ DELTA_HEADER\tcomparison_id\tcandidate_id\tbaseline_id\tcluster_id\tdelta\n",
         let mut lines: Vec<&str> = fixture().lines().collect();
         let mut found = false;
         lines.retain(|line| {
-            if !found && line.starts_with("DELTA\tcandidate-vs-random") && line.ends_with("seq-007\t-0.0100") {
+            if !found
+                && line.starts_with("DELTA\tcandidate-vs-random")
+                && line.ends_with("seq-007\t-0.0100")
+            {
                 found = true;
                 false
             } else {
@@ -769,15 +848,29 @@ DELTA_HEADER\tcomparison_id\tcandidate_id\tbaseline_id\tcluster_id\tdelta\n",
         });
         assert!(found);
         let broken = lines.join("\n") + "\n";
-        assert!(analyze(&broken, LOCK).unwrap_err().contains("exact shared cluster set"));
+        assert!(
+            analyze(&broken, LOCK)
+                .unwrap_err()
+                .contains("exact shared cluster set")
+        );
     }
 
     #[test]
     fn family_size_must_match_predeclared_comparisons() {
         let broken = fixture()
-            .replace("META\tcomparison_family_size\t2", "META\tcomparison_family_size\t3")
-            .replace("META\tbootstrap_replicates\t2000", "META\tbootstrap_replicates\t3000");
-        assert!(analyze(&broken, LOCK).unwrap_err().contains("preregistered family size"));
+            .replace(
+                "META\tcomparison_family_size\t2",
+                "META\tcomparison_family_size\t3",
+            )
+            .replace(
+                "META\tbootstrap_replicates\t2000",
+                "META\tbootstrap_replicates\t3000",
+            );
+        assert!(
+            analyze(&broken, LOCK)
+                .unwrap_err()
+                .contains("preregistered family size")
+        );
     }
 
     #[test]
@@ -786,26 +879,50 @@ DELTA_HEADER\tcomparison_id\tcandidate_id\tbaseline_id\tcluster_id\tdelta\n",
             "META\tpositive_is_better\ttrue",
             "META\tpositive_is_better\ttrue\nMETA\tposthoc_threshold\t0.0",
         );
-        assert!(analyze(&broken_meta, LOCK).unwrap_err().contains("META key set mismatch"));
+        assert!(
+            analyze(&broken_meta, LOCK)
+                .unwrap_err()
+                .contains("META key set mismatch")
+        );
         let broken_header = fixture().replace(
             "DELTA_HEADER\tcomparison_id\tcandidate_id\tbaseline_id\tcluster_id\tdelta",
             "DELTA_HEADER\tcomparison_id\tcandidate_id\tbaseline_id\tcluster_id\tdelta\tp_value",
         );
-        assert!(analyze(&broken_header, LOCK).unwrap_err().contains("exact DELTA header"));
+        assert!(
+            analyze(&broken_header, LOCK)
+                .unwrap_err()
+                .contains("exact DELTA header")
+        );
     }
 
     #[test]
     fn unsupported_bootstrap_counts_and_confidence_fail_closed() {
-        let too_few = fixture().replace("META\tbootstrap_replicates\t2000", "META\tbootstrap_replicates\t99");
-        assert!(analyze(&too_few, LOCK).unwrap_err().contains("bootstrap_replicates must be in"));
-        let bad_confidence = fixture().replace("META\tfamilywise_confidence\t0.95", "META\tfamilywise_confidence\t1.0");
-        assert!(analyze(&bad_confidence, LOCK).unwrap_err().contains("familywise_confidence must be finite"));
+        let too_few = fixture().replace(
+            "META\tbootstrap_replicates\t2000",
+            "META\tbootstrap_replicates\t99",
+        );
+        assert!(
+            analyze(&too_few, LOCK)
+                .unwrap_err()
+                .contains("bootstrap_replicates must be in")
+        );
+        let bad_confidence = fixture().replace(
+            "META\tfamilywise_confidence\t0.95",
+            "META\tfamilywise_confidence\t1.0",
+        );
+        assert!(
+            analyze(&bad_confidence, LOCK)
+                .unwrap_err()
+                .contains("familywise_confidence must be finite")
+        );
     }
 
     #[test]
     fn insufficient_independent_clusters_fails_closed() {
         let mut lines: Vec<String> = fixture().lines().map(str::to_owned).collect();
-        lines.retain(|line| !line.ends_with("seq-007\t0.0800") && !line.ends_with("seq-007\t-0.0100"));
+        lines.retain(|line| {
+            !line.ends_with("seq-007\t0.0800") && !line.ends_with("seq-007\t-0.0100")
+        });
         for line in &mut lines {
             // no other data mutation
             let _ = line;
@@ -813,7 +930,11 @@ DELTA_HEADER\tcomparison_id\tcandidate_id\tbaseline_id\tcluster_id\tdelta\n",
         // Keep four clusters by removing seq-006 too.
         lines.retain(|line| !line.contains("\tseq-006\t"));
         let broken = lines.join("\n") + "\n";
-        assert!(analyze(&broken, LOCK).unwrap_err().contains("at least 5 independent clusters"));
+        assert!(
+            analyze(&broken, LOCK)
+                .unwrap_err()
+                .contains("at least 5 independent clusters")
+        );
     }
 
     #[test]
@@ -822,7 +943,11 @@ DELTA_HEADER\tcomparison_id\tcandidate_id\tbaseline_id\tcluster_id\tdelta\n",
             "DELTA\tcandidate-vs-cheap\tcandidate\tall-cheap\tseq-001",
             "DELTA\tcandidate-vs-cheap\tcandidate\tdifferent-baseline\tseq-001",
         );
-        assert!(analyze(&broken, LOCK).unwrap_err().contains("changes candidate/baseline identity"));
+        assert!(
+            analyze(&broken, LOCK)
+                .unwrap_err()
+                .contains("changes candidate/baseline identity")
+        );
     }
 
     #[test]
@@ -832,10 +957,7 @@ DELTA_HEADER\tcomparison_id\tcandidate_id\tbaseline_id\tcluster_id\tdelta\n",
             let from = format!("seq-{i:03}\t{:.4}", (i as f64 + 1.0) / 100.0);
             let to = format!("seq-{i:03}\t0.0000");
             content = content.replace(&from, &to);
-            let rfrom = format!(
-                "seq-{i:03}\t{:.4}",
-                if i % 2 == 0 { 0.03 } else { -0.01 }
-            );
+            let rfrom = format!("seq-{i:03}\t{:.4}", if i % 2 == 0 { 0.03 } else { -0.01 });
             let rto = format!("seq-{i:03}\t0.0000");
             content = content.replace(&rfrom, &rto);
         }
