@@ -613,6 +613,12 @@ mod tests {
     #[test]
     fn search_result_encoder_includes_neighbors_without_inheriting_bm25_scores() {
         let hit = hit();
+        let mut neighbor_state = state(
+            3,
+            "4444444444444444444444444444444444444444444444444444444444444444",
+            Some("5555555555555555555555555555555555555555555555555555555555555555"),
+        );
+        neighbor_state.screenshot_reference = "trajectory-2/state-3.png".to_owned();
         let neighbor_chunk = crate::longmemeval_v2::LongMemEvalV2EvidenceChunkV1 {
             chunk_id: "2222222222222222222222222222222222222222222222222222222222222222".to_owned(),
             trajectory_id: "trajectory-2".to_owned(),
@@ -623,11 +629,7 @@ mod tests {
             window_start_ordinal: 3,
             window_end_ordinal_exclusive: 4,
             source_trajectory_sha256: "3333333333333333333333333333333333333333333333333333333333333333".to_owned(),
-            state_window: vec![state(
-                3,
-                "4444444444444444444444444444444444444444444444444444444444444444",
-                Some("5555555555555555555555555555555555555555555555555555555555555555"),
-            )],
+            state_window: vec![neighbor_state],
             screenshot_references: vec!["trajectory-2/state-3.png".to_owned()],
             chunk_sha256: "2222222222222222222222222222222222222222222222222222222222222222".to_owned(),
             evidence_text: "Earlier order workflow state".to_owned(),
@@ -654,6 +656,11 @@ mod tests {
         assert_eq!(neighbor.retrieval_score, None);
         assert_eq!(neighbor.retrieval_rank, 1);
         assert_eq!(neighbor.parent_evidence_ids.len(), 1);
+        assert!(batch.evidence.iter().any(|item| {
+            item.evidence_id == neighbor.parent_evidence_ids[0]
+                && item.retrieval_channel == "source_state_lineage"
+        }));
+        assert!(batch.evidence.iter().filter(|item| item.retrieval_channel == "source_state_lineage").count() == 3);
     }
 
     #[test]
