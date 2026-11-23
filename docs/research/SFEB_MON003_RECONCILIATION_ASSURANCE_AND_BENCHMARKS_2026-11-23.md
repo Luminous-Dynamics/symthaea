@@ -96,6 +96,20 @@ D. Trust: JCS cross-language vectors or DSSE exact-byte verification, issuer sco
 E. Integration: paired Temporal and DBOS adapters plus a real idempotent/conditional external sink.  
 F. Outcome: independent system-of-record readback; executor cannot self-certify success.
 
+## Executed DSSE source-receipt verification preflight
+
+The follow-on trust increment now has an executable verifier rather than relying only on boolean signature fixtures:
+
+- Source: `benchmarks/frontend/monitoring/mon003-dsse-receipt-v1.mjs`
+- Report: `benchmarks/frontend/monitoring/mon003-dsse-receipt-report-v1.json`
+- Node.js v22.16.0: **22/22 deterministic cases passed**, including real Ed25519 signing and verification using Node's built-in `crypto` implementation.
+- The harness checks DSSE v1 PAE with UTF-8 byte lengths and exact payload bytes; payload/signature tampering; payload-type substitution; untrusted or spoofed key IDs; key validity and revocation; issuer identity; tenant and source scope; receipt expiry/future timestamps; malformed base64/JSON; and a fail-closed single-signer profile.
+- The trust record—not DSSE `keyid`—supplies issuer identity and authorized tenant/source scopes. The key ID is only an untrusted lookup hint.
+
+This closes the prior *test-fixture crypto boolean* gap for the verifier logic. It does not establish source truth: it proves that a payload was signed by the private key corresponding to a configured public key, and that the current in-memory trust record authorizes that key for the declared issuer/tenant/source at the supplied verification time.
+
+**Qualification boundary:** ephemeral generated test keys and an in-memory registry only. No production trust-root provisioning, durable key-revocation feed, rotation controller, HSM, multi-signature threshold, live source adapter or external key management service is included. This remains a preflight, not production PKI.
+
 ## Immediate next work
 
 1. Port operation identity, tenant/objective scope, execution gate and minimized reconciliation to a Rust core.
