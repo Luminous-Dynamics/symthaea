@@ -255,11 +255,11 @@ impl MycelialObservationCoverageLedger {
 
         let mut previous_id: Option<&str> = None;
         for (record, declared_id) in self.records.iter().zip(&self.declared_observation_ids) {
-            if record.observation_id != *declared_id {
+            if record.observation_id.as_str() != declared_id.as_str() {
                 return Err(MycelialObservationCoverageError::ObservationInventoryMismatch);
             }
             if let Some(previous) = previous_id {
-                if previous == record.observation_id {
+                if previous == record.observation_id.as_str() {
                     return Err(MycelialObservationCoverageError::DuplicateObservationId(
                         record.observation_id.clone(),
                     ));
@@ -580,6 +580,29 @@ mod tests {
             ledger.validate(),
             Err(MycelialObservationCoverageError::DuplicateCandidateId { .. })
         ));
+    }
+
+    #[test]
+    fn rejected_unresolved_and_unavailable_dispositions_preserve_candidate_semantics() {
+        let mut ledger = fixture();
+        ledger.records[0].state = MycelialObservationCoverageState::CandidateRejected;
+        ledger.validate().unwrap();
+
+        ledger.records[0].state = MycelialObservationCoverageState::CandidateUnresolved;
+        ledger.records[0].residual_kind =
+            Some(MycelialObservationResidualKind::ApparentCrossingUnresolvedDepth);
+        ledger.validate().unwrap();
+
+        ledger.records[1].state = MycelialObservationCoverageState::UnavailableOrUnmeasurable;
+        ledger.validate().unwrap();
+    }
+
+    #[test]
+    fn out_of_scope_disposition_is_valid_only_without_candidates_or_residuals() {
+        let mut ledger = fixture();
+        ledger.records[1].state = MycelialObservationCoverageState::OutsideDeclaredScope;
+        ledger.records[1].residual_kind = None;
+        ledger.validate().unwrap();
     }
 
     #[test]
