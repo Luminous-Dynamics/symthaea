@@ -76,3 +76,33 @@ For up to 16 clusters, the sign-flip calculation enumerates all sign configurati
 - Do not rank methods on one headline mean alone. Compare against all-cheap, all-full, uniform, same-budget random, confidence/entropy routing, perception-gain routing, a simple lightweight router and the strongest available published baseline. Measure allocator overhead and charge it against separate latency and energy constraints before interpreting utility deltas.
 
 No third-party dataset, frames or evaluator labels are included in this PR. Synthetic unit tests test arithmetic/state mechanics only.
+
+
+## Compute × observation interaction handoff
+
+The dataset-agnostic analyzer is now explicitly reusable by the paired compute × observation evaluator in PR #13281. The evaluator-side adapter at `research/decision-value-interaction-001/src/cluster_adapter.rs` exports the exact `VIS-DVPC-CLUSTER-DELTAS-001-v1` input contract consumed by this tool.
+
+The adapter performs a hierarchy-preserving reduction before inference:
+
+1. Recompute and validate the certificate's four signed effects from its raw four-arm regret values.
+2. Average hidden-world counterfactual effects within each episode.
+3. Average episode means within each preregistered independent cluster.
+4. Emit exactly one delta per cluster for each of four contrasts: compute benefit, observation benefit, joint benefit, and compute×observation interaction.
+
+It refuses duplicate (cluster, episode, hidden-world) rows, episode-to-multiple-cluster assignment, changes to task/loss/evaluator/environment/action/resource/model/policy context, changes to an episode's initial-state or seed identity, and a changed hidden-world cohort within a cluster. It does not calculate confidence intervals or p-values; this analyzer remains the owner of those statistics.
+
+The synthetic interoperability fixture is `fixtures/vis-dvpc-compute-observation-cluster-deltas-v0.1.tsv`. It contains six scene clusters and four predeclared comparisons (24 cluster-level deltas). The all-`a` bundle-lock value is a placeholder for this synthetic fixture only; a real analysis must pass the independently frozen and separately verified source-bundle digest to the CLI. The fixture is not a benchmark result.
+
+The current workflow pins Rust 1.96 and:
+- runs the analyzer's adversarial unit tests;
+- builds the standalone binary;
+- runs strict Clippy via `clippy-driver`;
+- executes the synthetic compute×observation handoff fixture;
+- checks deterministic receipt replay;
+- verifies that a mismatched external bundle-lock digest is rejected.
+
+### Important interpretation limits
+
+The cluster bootstrap interval is an approximate percentile interval, not distribution-free finite-sample coverage. The sign-flip p-value relies on independent cluster deltas and its declared symmetry-under-the-null assumption. Bonferroni adjustment covers the four preregistered contrasts; it does not fix a biased sampling design, outcome leakage, post-hoc selection, or an incorrectly chosen cluster unit.
+
+Five clusters are only a minimum mechanics threshold. Real confirmatory work still requires a preregistered power/minimum-detectable-effect analysis, substantially more independent clusters where feasible, appropriate hierarchical sampling, and a replication on a second held-out domain. A positive cluster-level interval is evidence only for the declared metric, population, comparator family and design—not general SOTA superiority.
