@@ -112,7 +112,9 @@ Fourteen Rust unit tests are authored in the module:
 
 The module's test verifier is intentionally a deterministic test double; it is not a production signature scheme.
 
-**Execution status:** unexecuted. The environment currently has no `rustc`, `cargo` or `rustfmt`. No compile, test, clippy, schema, integration or CI pass is claimed.
+**Rust execution status:** unexecuted. The environment currently has no `rustc`, `cargo` or `rustfmt`. No compile, Rust unit-test, Clippy, Rust codec, integration or CI pass is claimed.
+
+**Independent schema preflight:** the Draft 2020-12 schema definition was checked with Python `jsonschema` 4.26.0. One valid receipt fixture was accepted and three negative controls (unknown top-level field, invalid disposition, signature octet above 255) were rejected. This validates the schema definition only; it does not execute the Rust codec or verify cryptographic signatures.
 
 ## 7. Relationship to the current MACE architecture
 
@@ -165,12 +167,12 @@ These are distinct tasks and scoring protocols. Do not pool their scores with AM
 
 ## 9. Next integration milestones
 
-1. Add a versioned JSON wire schema and canonical serializer/deserializer for this receipt.
-2. Implement a signature verifier adapter with separate trust-profile and revocation handling.
-3. Connect the canonical candidate-evidence envelope to a qualification service that independently verifies parent closure and source-observation receipts.
-4. Add a V2 sidecar protocol operation that obtains the qualification receipt before exposing candidates to a consequential reader.
+1. Implement the external signature verifier, trust-profile resolution, key revocation and separate custody.
+2. Independently recompute the complete candidate-evidence envelope digest and verify the transitive source/derivation closure before signing a qualification receipt.
+3. Connect authenticated source-observation receipts and rights/purpose checks to the qualification service.
+4. Add a V2 sidecar protocol operation that obtains the qualification receipt before exposing candidates to a consequential reader; keep the controller multi-step and policy notes advisory.
 5. Make missing, expired, mismatched or indeterminate qualifications result in no admissible evidence and a visible abstention/repair path.
-6. Add current-at-use revalidation, correction/revocation propagation and a bitemporal lifecycle snapshot.
+6. Add current-at-use revalidation, correction/revocation propagation and bitemporal valid-time / knowledge-time snapshots.
 7. Add external witness custody for T9/T10; do not count local filesystem persistence as rollback protection.
 8. Run the adversarial decision episodes in #13397 and matched baselines in #13261 under independently isolated evaluator custody in #13287.
 
