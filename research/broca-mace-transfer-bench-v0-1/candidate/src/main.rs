@@ -797,7 +797,7 @@ mod tests {
     #[test]
     fn out_of_range_evidence_is_rejected_not_silently_clamped() {
         let mut value = envelope_value();
-        let item = serde_json::json!({
+        let mut item = serde_json::json!({
             "event_id": 5,
             "source_family": 1,
             "source_root_id": 1,
@@ -839,6 +839,14 @@ mod tests {
         assert!(execute_request(&serde_json::to_vec(&value).unwrap())
             .unwrap_err()
             .contains("observed_utility"));
+
+        item["observed_utility"] = serde_json::json!(0.5);
+        item["scope"]["regime"] = serde_json::json!("shifted");
+        let mut out_of_scope = envelope_value();
+        out_of_scope["candidate_evidence"] = serde_json::json!([item]);
+        assert!(execute_request(&serde_json::to_vec(&out_of_scope).unwrap())
+            .unwrap_err()
+            .contains("outside DecisionNeedV1 scope/action alternatives"));
     }
 
     #[test]
