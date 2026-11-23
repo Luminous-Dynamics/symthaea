@@ -98,6 +98,8 @@ The augmented covariance has rank two. Its covariance-aware pseudoinverse score 
 
 A second hostile test uses S=[[1,1],[1,1]] and Δμ=(1,0)^T. Because the mean difference has a component outside range(S), the candidate must be quarantined rather than assigned the finite value returned by the pseudoinverse quadratic form alone.
 
+A further metamorphic control applies the invertible transformation A=[[2,1],[-1,1]] (determinant 3) to both the mean vector and covariance, producing S'=[[7,-1/2],[-1/2,1]]. The quadratic form remains D²=4. A three-hypothesis test also confirms that the selector ranks by the least-separated pair and rejects a missing pairwise covariance.
+
 These tests are linear-algebra controls, not EGB calculations, not physical covariance estimates, and not validation of the scalar #8034 planner.
 
 ## Run locally
@@ -110,7 +112,7 @@ The second command emits the base and exactly-redundant candidates with the same
 ## Required next qualifications
 
 1. Compare the Jacobi result against an independent LAPACK/BLAS or high-precision reference over randomized SPD, PSD, nearly singular, badly conditioned, and indefinite matrices.
-2. Add metamorphic tests for arbitrary invertible linear basis changes A, verifying AΔμ, ASA^T, and invariant quadratic form when numerically well-conditioned.
+2. Expand the existing invertible-basis metamorphic control across randomized, badly conditioned and endpoint Gram-metric transformations, verifying AΔμ, ASA^T and invariant quadratic form where numerically justified.
 3. Add interval/uncertainty-set covariance bounds. A single point covariance is not robust to covariance-estimation uncertainty.
 4. Add a predictive calibration campaign: coverage, standardized residuals, and covariance calibration on held-out synthetic and independently solved controls.
 5. Add a Symtropy #7131 adapter that carries the response operator, endpoint bases and Gram metrics, chart identity, units, and uncertainty provenance without reconstructing or duplicating the physical response model.
