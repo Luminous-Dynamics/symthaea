@@ -49,7 +49,7 @@ The KIRD semantic auditor requires a certified-global record to carry:
 
 It verifies the arithmetic `global_bound >= sampled_max + L*cover_radius + total_uncertainty`, checks that the declared sampled maximum is not below the worst confirmed response error, and refuses certification when branch association is unstable. A `PASS` response disposition under certified-global coverage additionally requires the upper bound to be at most one.
 
-The checked-in `synthetic-kird-certified-cover-v0.1.json` is a manufactured mathematical example: U=[0,0.1], e(u)=0.5+2u, one probe at zero, r=0.1, L=2, and eta=0.05; the exact global upper bound is 0.75. This fixture tests the theorem and auditor only. It does not assert Lipschitz continuity of a Vlasov response map or certify any physical plasma model.
+The checked-in `synthetic-kird-certified-cover-v0.1.json` is a schema-conformant KIRD wire record. Its mathematical known-answer definition is documented here rather than added as an extra schema field: U=[0,0.1], d(u,v)=|u-v|, e(u)=0.5+2u, P={0}, r=0.1, L=2, eta_ref=0.01, eta_candidate=0.02, eta_measurement=0.02, so the bound is 0.5 + 2*0.1 + 0.05 = 0.75. U=[0,0.1], e(u)=0.5+2u, one probe at zero, r=0.1, L=2, and eta=0.05; the exact global upper bound is 0.75. This fixture tests the theorem and auditor only. It does not assert Lipschitz continuity of a Vlasov response map or certify any physical plasma model.
 
 
 ## Synthetic fixture
