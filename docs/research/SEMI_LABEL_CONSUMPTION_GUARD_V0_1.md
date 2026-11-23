@@ -58,6 +58,10 @@ The guard returns an eligibility report only. It does not:
 
 `EligibleUnderDeclaredPolicy` means the supplied declared evidence contract passed. It is not independent physical traceability or source authenticity.
 
+## Numeric binding and rounding policy
+
+The v1 guard uses exact numeric equality for the corrected point value and a one-sided uncertainty check. It does not assume a hidden rounding tolerance. If a fab source emits rounded values, a future adapter must carry an explicit resolution/rounding policy and include it in the hashed receipt. The label payload digest binds its value, uncertainty, revision, source and metadata.
+
 ## Authored tests
 
 The test module covers:
@@ -70,7 +74,11 @@ The test module covers:
 7. retroactive revocation preserving K0 and blocking K1;
 8. relevant but unmaterialized revocation;
 9. tampered original qualification receipt;
-10. deterministic eligibility receipt replay.
+10. deterministic eligibility receipt replay;
+11. validated point value mismatch and missing point value;
+12. missing uncertainty and understated uncertainty;
+13. value and uncertainty edits both change the label/eligibility digest;
+14. non-finite point values and uncertainty metadata are rejected before receipt creation.
 
 Tests are authored and must not be described as passing until the exact branch head completes rustfmt, strict Clippy, crate tests and SEMI-BENCH-001 independent reference workflow.
 
