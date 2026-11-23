@@ -67,6 +67,20 @@ Luminous should align through concrete interoperability rather than terminology:
 
 The potential paradigm shift is not an “agent that controls a fab.” It is a portable evidence contract that lets multiple models and vendors exchange contextualized observations, decisions and verification receipts without granting them authority they have not earned.
 
+A practical standards map already exists in the semiconductor scorecard issue [#13273](https://github.com/Luminous-Dynamics/symthaea/issues/13273) and the broader manufacturing-process semantics issue [#5686](https://github.com/Luminous-Dynamics/symthaea/issues/5686). For this programme, map fields and adapter behavior—not a claim of formal conformance:
+
+| Concern | Relevant standards family | Evidence-layer use |
+|---|---|---|
+| Wafer/substrate identity and movement | SEMI E87 / E90 / E94 | Carrier, substrate, control-job, process-step and location lineage |
+| Equipment model and self-description | SEMI E120 / E125 / E164 | Versioned equipment, module, sensor and metadata identities |
+| Data collection and client trust | SEMI E132 / E134 | Authenticated read-only collection plans and provenance of acquisition |
+| Measurement / data-quality state | SEMI E151 / E160 | Explicit quality status, reason, origin and quality communication |
+| Equipment and process quality context | SEMI E116 / E126 / E157 | Equipment performance, quality parameters and module/process tracking |
+| Process-control boundary | SEMI E133 | Map advisory evidence to APC interfaces without granting APC write authority |
+| Operations/enterprise context | ISA-95 / IEC 62264 | Resource, equipment, material, job and production-operation context |
+
+SEMI describes EDA / Interface A as a high-volume data-acquisition channel distinct from SECS/GEM equipment control; preserve that boundary in adapters. The initial integration target should be authenticated, read-only collection and replay, not a command path.
+
 ## Where Luminous should differentiate
 
 The opportunity is an **evidence and decision assurance layer** around VM and manufacturing analytics:
