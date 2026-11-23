@@ -21,7 +21,7 @@ The Rust crate is intentionally standalone so it can be run while the main works
 
 ## Covered behaviors
 
-The six golden scenarios exercise optimistic rollback after a late authoritative transition, permission revocation, duplicate delivery, out-of-order replay/reconnect, conflict clarification, and pointer/keyboard semantic equivalence. Four negative controls must be rejected: changed payload under a reused event identity, a second identity claiming the same sequence, an unauthorized actor, and an illegal transition whose rejected delivery must leave the event identity/sequence free for a valid retry.
+The six golden scenarios exercise optimistic rollback after a late authoritative transition, permission revocation, duplicate delivery, out-of-order replay/reconnect, conflict clarification, and pointer/keyboard semantic equivalence. Four negative controls must be rejected: changed payload under a reused event identity, a second identity claiming the same sequence, an unauthorized actor, and an illegal transition whose rejected delivery must leave the event identity/sequence free for a valid retry, an excessive reorder gap, and an unknown event field.
 
 Events are applied only in contiguous sequence order. Duplicate delivery of the same event identity and payload is idempotent. A changed payload under a previously seen identity is rejected. Pending actions remain visibly optimistic but are not authoritative state; the authoritative event either confirms them or invalidates them.
 
