@@ -3,7 +3,7 @@
 **Date:** 23 November 2026  
 **Status:** Research specification; not yet implemented or experimentally qualified  
 **Scope:** Periodic 1D1V collisionless Vlasov–Poisson as the first common cohort  
-**Owners / related work:** [#12907](https://github.com/Luminous-Dynamics/symthaea/issues/12907), [#12910](https://github.com/Luminous-Dynamics/symthaea/issues/12910), [#12914](https://github.com/Luminous-Dynamics/symthaea/issues/12914), [#12921](https://github.com/Luminous-Dynamics/symthaea/issues/12921), [#12942](https://github.com/Luminous-Dynamics/symthaea/issues/12942), [#12976](https://github.com/Luminous-Dynamics/symthaea/issues/12976), [#12979](https://github.com/Luminous-Dynamics/symthaea/issues/12979), [#13104](https://github.com/Luminous-Dynamics/symthaea/issues/13104), [#13132](https://github.com/Luminous-Dynamics/symthaea/issues/13132), [#13138](https://github.com/Luminous-Dynamics/symthaea/issues/13138), [#13156](https://github.com/Luminous-Dynamics/symthaea/issues/13156), [#13169](https://github.com/Luminous-Dynamics/symthaea/issues/13169), [#13177](https://github.com/Luminous-Dynamics/symthaea/issues/13177), [#13404](https://github.com/Luminous-Dynamics/symthaea/issues/13404)
+**Owners / related work:** [#12907](https://github.com/Luminous-Dynamics/symthaea/issues/12907), [#12910](https://github.com/Luminous-Dynamics/symthaea/issues/12910), [#12914](https://github.com/Luminous-Dynamics/symthaea/issues/12914), [#12921](https://github.com/Luminous-Dynamics/symthaea/issues/12921), [#12942](https://github.com/Luminous-Dynamics/symthaea/issues/12942), [#12976](https://github.com/Luminous-Dynamics/symthaea/issues/12976), [#12979](https://github.com/Luminous-Dynamics/symthaea/issues/12979), [#13104](https://github.com/Luminous-Dynamics/symthaea/issues/13104), [#13132](https://github.com/Luminous-Dynamics/symthaea/issues/13132), [#13138](https://github.com/Luminous-Dynamics/symthaea/issues/13138), [#13156](https://github.com/Luminous-Dynamics/symthaea/issues/13156), [#13169](https://github.com/Luminous-Dynamics/symthaea/issues/13169), [#13177](https://github.com/Luminous-Dynamics/symthaea/issues/13177), [#13414](https://github.com/Luminous-Dynamics/symthaea/issues/13414), [#13404](https://github.com/Luminous-Dynamics/symthaea/issues/13404)
 
 ## Executive thesis
 
@@ -384,6 +384,60 @@ With zero observed false-safe outcomes, a one-sided exact 95% binomial upper bou
 - Adaptation overhead: transition, observation, projection and fallback cost divided by total cost.
 - Recovery cost: compute and memory needed to restore a richer representation after an unsupported request.
 - Selective risk: error among non-abstained cases, reported with coverage and UNKNOWN rate.
+
+## Response-balanced kinetic reduction (RBKR)
+
+New companion programme: [#13414 — build response-balanced kinetic reduction](https://github.com/Luminous-Dynamics/symthaea/issues/13414).
+
+The goal is to construct a task-conditioned reduced basis from state directions that are both reachable by the registered interventions and observable through future QoIs. This is a plasma-specific research extension, not a claim that balanced truncation or empirical Gramians are new.
+
+Padovan (2026), [Non-Intrusive Balancing for Data-Driven Model Reduction with Oblique Projections](https://arxiv.org/abs/2610.15219), is mandatory prior art and a comparator. The paper computes nonlinear empirical reachability and projected observability Gramians from forward simulation data, then forms balancing-based oblique projections. It reports up to two orders of magnitude lower forecast error than POD-based Operator Inference on its tested flow examples, including a three-dimensional wing flow with approximately 80 million degrees of freedom. We must reproduce or faithfully compare against the published algorithm before claiming any advantage.
+
+For a frozen trajectory, use the discrete tangent system
+
+\[
+\delta x_{k+1}=A_k\delta x_k+B_k\delta u_k,
+\qquad
+\delta y_k=C_k\delta x_k.
+\]
+
+A finite-horizon intervention reachability Gramian and QoI observability Gramian can be written schematically as
+
+\[
+W_c=\sum_j \Phi(T,j+1)B_jR_j^{-1}B_j^T\Phi(T,j+1)^T,
+\]
+
+\[
+W_o=\sum_k \Phi(k,0)^TC_k^TQ_kC_k\Phi(k,0),
+\]
+
+where R weights admissible intervention cost and Q weights the frozen observable registry. The exact indexing, tangent maps and adjoints must be derived for the actual discrete split and time integrator. Large kinetic state dimensions require matrix-free products, low-rank factors, randomized range finding or restricted trial spaces rather than dense state-by-state Gramians.
+
+The balanced spectrum is a candidate ranking of jointly reachable and observable directions, not a physical correctness certificate. Standard linear balanced-truncation bounds do not automatically transfer to nonlinear Vlasov–Poisson, finite-amplitude plasma echoes, rank changes or representation switches.
+
+RBKR must be tested against:
+- snapshot POD / SVD;
+- Hermite and mixed Hermite–Legendre coefficient-tail selection;
+- VlasovTT / MPS truncation;
+- adaptive Hermite conservative projections;
+- Padovan-style non-intrusive balanced oblique projections;
+- adjoint / goal-oriented residual estimates in #13132.
+
+The nonlinear extension must separately qualify tangent response, signed finite-amplitude response, second-order cross-pulse effects and finite pulse-graph branch association. A tangent Gramian cannot be assumed to capture nonlinear echo creation.
+
+Success means greater held-out intervention-response fidelity per retained byte/rank at matched total construction and simulation cost, without worsening mandatory physical gates. It does not mean a good singular-value capture plot, nor does it imply a universal nonlinear error bound.
+
+## Revised quantitative reading of the October 2026 FNO result
+
+The benchmark should preserve the exact time- and regime-dependent findings from Burles, Camporeale and Pezzi, rather than collapsing them into a generic late-time-drift statement:
+
+- Within the linear training window, the fitted damping rate agrees with the kinetic value to within 0.2%; the paper reports every resolved moment's time-averaged relative L2 error at or below 1e-2, with density and pressure errors as low as about 1e-6.
+- In the held-out linear test window, the fitted damping-rate error is approximately 18%. The relative electric-field error crosses 10% about 1.4 plasma periods after the split, 50% at about 45 plasma periods and 100% at about 55 plasma periods after the split.
+- The amplitude scan succeeds for interpolation inside the training range and for tested amplitudes below its minimum training amplitude; the two largest out-of-range amplitudes, 0.2 and 0.3, depart sharply from the kinetic damping rate.
+- In the nonlinear trapping regime, heat-flux-divergence error reaches order unity as trapping begins, while resolved-moment errors grow more gradually. The paper explicitly distinguishes the effective learned heat flux from the kinetic heat flux and notes the learned closure is not required to match it pointwise.
+- The paper identifies RK-substage buffer semantics as an unresolved coupling and leaves a substage-consistent / solver-independent implementation as future work; this is owned by #12910.
+
+Primary source: [Burles, Camporeale & Pezzi (2026), Journal of Plasma Physics, DOI 10.1017/S0022377826102517](https://doi.org/10.1017/S0022377826102517). The source-faithful reproduction remains owned by #12907; this document supplies the comparison contract.
 
 ## 7. Adaptive representation architecture
 
