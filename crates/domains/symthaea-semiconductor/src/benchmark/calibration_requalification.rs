@@ -527,7 +527,8 @@ fn assess_frontier(
     frontier: &CalibrationEventFrontierV1,
     cutoff: i64,
 ) -> Result<CalibrationRequalificationFrontierReportV1, CalibrationRequalificationErrorV1> {
-    let mut status = input.original_qualification_at_k0.status;
+    let initial_status = input.original_qualification_at_k0.status;
+    let mut status = initial_status;
     let mut reasons = BTreeSet::new();
     let mut potentially_applicable = BTreeSet::new();
     let mut applied = Vec::new();
@@ -632,9 +633,15 @@ fn assess_frontier(
                 reasons.insert(CalibrationRequalificationReasonV1::CalibrationScopeChanged);
             }
             CalibrationChangeKindV1::Reinstated => {
-                // Reinstatement does not recreate a missing certificate,
-                // reissue a reference result, or requalify a prior measurement.
-                set_unknown(&mut status);
+                // A qualified reinstatement supersedes the earlier revocation
+                // state for current status, but does not recreate a certificate
+                // or requalify this historical measurement. Preserve a separate
+                // original K0 rejection when one already existed.
+                status = if initial_status == MeasurementQualificationStatusV1::Rejected {
+                    MeasurementQualificationStatusV1::Rejected
+                } else {
+                    MeasurementQualificationStatusV1::Unknown
+                };
                 reasons.insert(
                     CalibrationRequalificationReasonV1::CalibrationReinstatedRequiresNewEvidence,
                 );
