@@ -1785,20 +1785,11 @@ pub fn validate_kird_record_value(
                     "certified_global coverage requires a true global-bound flag",
                 ));
             }
-            let method = kird_string(value, "response_scope.bound_method")?;
-            if method.trim().is_empty() {
-                return Err(kird_error(
-                    "response_scope.bound_method",
-                    "must be non-empty",
-                ));
-            }
-            let evidence = kird_string(value, "response_scope.bound_evidence_sha256")?;
-            if !is_sha256_hex(evidence) || evidence.bytes().all(|byte| byte == b'0') {
-                return Err(kird_error(
-                    "response_scope.bound_evidence_sha256",
-                    "requires a non-placeholder SHA-256 evidence digest",
-                ));
-            }
+            validate_kird_global_coverage(
+                value,
+                registered_probe_count,
+                confirmed_probe_count,
+            )?;
         }
         _ => {
             return Err(kird_error(
@@ -1870,7 +1861,6 @@ pub fn validate_kird_record_value(
         checkpoint_bytes as f64 + amortized_asset_bytes_per_rollout;
     if !amortized_asset_bytes_per_rollout.is_finite()
         || !amortized_persistent_bytes_per_rollout.is_finite()
-        || checkpoint_and_assets < checkpoint_bytes
     {
         return Err(ContractError::StorageByteCountOverflow);
     }
@@ -1892,6 +1882,113 @@ pub fn validate_kird_record_value(
         globally_bounded,
         physical_gate_status: physical_gate_status.to_owned(),
     })
+}
+
+fn validate_kird_global_coverage(
+    root: &serde_json::Value,
+    registered_probe_count: u64,
+    confirmed_probe_count: u64,
+) -> Result<(), ContractError> {
+    if registered_probe_count == 0 || confirmed_probe_count == 0 {
+        return Err(kird_error(
+            "response_scope",
+            "certified_global coverage requires registered and confirmed probes",
+        ));
+    }
+
+    let metric_id = kird_string(root, "response_scope.coverage_metric_id")?;
+    let method = kird_string(root, "response_scope.bound_method")?;
+    let checker = kird_string(root, "response_scope.independent_checker_revision")?;
+    if metric_id.trim().is_empty() || method.trim().is_empty() || checker.trim().is_empty() {
+        return Err(kird_error(
+            "response_scope",
+            "global certification requires metric, method and checker identities",
+        ));
+    }
+
+    let covering_radius = kird_number(root, "response_scope.covering_radius")?;
+    let lipschitz_constant =
+        kird_number(root, "response_scope.verified_lipschitz_constant")?;
+    let reference_uncertainty = kird_number(root, "response_scope.reference_uncertainty")?;
+    let candidate_uncertainty = kird_number(root, "response_scope.candidate_uncertainty")?;
+    let measurement_uncertainty = kird_number(root, "response_scope.measurement_uncertainty")?;
+    let maximum_sampled_error =
+        kird_number(root, "response_scope.maximum_sampled_normalized_error")?;
+    let global_bound = kird_number(root, "response_scope.global_normalized_error_bound")?;
+
+    if [
+        covering_radius,
+        lipschitz_constant,
+        reference_uncertainty,
+        candidate_uncertainty,
+        measurement_uncertainty,
+        maximum_sampled_error,
+        global_bound,
+    ]
+    .iter()
+    .any(|value| *value < 0.0)
+    {
+        return Err(kird_error(
+            "response_scope",
+            "cover radius, Lipschitz constant, uncertainty and error bounds must be non-negative",
+        ));
+    }
+
+    if !kird_bool(root, "response_scope.branch_association_stable")? {
+        return Err(kird_error(
+            "response_scope.branch_association_stable",
+            "global certification cannot cross an unresolved response-branch change",
+        ));
+    }
+
+    for digest_path in [
+        "response_scope.bound_evidence_sha256",
+        "response_scope.covering_set_sha256",
+        "response_scope.branch_stability_evidence_sha256",
+    ] {
+        let digest = kird_string(root, digest_path)?;
+        if !is_sha256_hex(digest) || digest.bytes().all(|byte| byte == b'0') {
+            return Err(kird_error(
+                digest_path,
+                "global certification requires non-placeholder proof digests",
+            ));
+        }
+    }
+
+    let uncertainty = reference_uncertainty + candidate_uncertainty + measurement_uncertainty;
+    let lipschitz_cover_term = lipschitz_constant * covering_radius;
+    let required_bound = maximum_sampled_error + lipschitz_cover_term + uncertainty;
+    if !uncertainty.is_finite()
+        || !lipschitz_cover_term.is_finite()
+        || !required_bound.is_finite()
+        || !global_bound.is_finite()
+    {
+        return Err(kird_error(
+            "response_scope.global_normalized_error_bound",
+            "certificate arithmetic must remain finite",
+        ));
+    }
+    let allowance = 1.0e-12_f64.max(required_bound.abs() * 1.0e-10);
+    if global_bound + allowance < required_bound {
+        return Err(kird_error(
+            "response_scope.global_normalized_error_bound",
+            "must conservatively cover sampled error + Lipschitz cover term + uncertainty",
+        ));
+    }
+
+    if let Some(confirmed_error) = kird_optional_number(
+        root,
+        "distortion.intervention_response.worst_confirmed_normalized_error",
+    )? {
+        if maximum_sampled_error + allowance < confirmed_error {
+            return Err(kird_error(
+                "response_scope.maximum_sampled_normalized_error",
+                "cannot be smaller than the worst confirmed response error",
+            ));
+        }
+    }
+
+    Ok(())
 }
 
 fn validate_kird_distortion_tier(
@@ -1953,13 +2050,33 @@ fn validate_kird_response_tier(root: &serde_json::Value) -> Result<(), ContractE
         root,
         "distortion.intervention_response.misassociated_branch_count",
     )?;
+    if status == "PASS" || status == "FAIL" {
+        let registered = kird_u64(root, "response_scope.registered_probe_count")?;
+        let confirmed = kird_u64(root, "response_scope.confirmed_probe_count")?;
+        if registered == 0 || confirmed == 0 {
+            return Err(kird_error(
+                "distortion.intervention_response",
+                "measured response dispositions require confirmed intervention probes",
+            ));
+        }
+    }
     if status == "PASS" {
         let normalized = kird_number(
             root,
             "distortion.intervention_response.worst_confirmed_normalized_error",
         )?;
         let evidence = kird_string(root, "distortion.intervention_response.evidence_sha256")?;
+        let coverage_kind = kird_string(root, "response_scope.coverage_kind")?;
+        let global_bound = if coverage_kind == "certified_global" {
+            Some(kird_number(
+                root,
+                "response_scope.global_normalized_error_bound",
+            )?)
+        } else {
+            None
+        };
         if normalized > 1.0
+            || global_bound.is_some_and(|bound| bound > 1.0)
             || missing != 0
             || misassociated != 0
             || !is_sha256_hex(evidence)
@@ -1968,7 +2085,7 @@ fn validate_kird_response_tier(root: &serde_json::Value) -> Result<(), ContractE
         {
             return Err(kird_error(
                 "distortion.intervention_response",
-                "PASS requires error <= 1, zero missing/misassociated branches and non-placeholder evidence",
+                "PASS requires empirical/global error <= 1, zero missing/misassociated branches and non-placeholder evidence",
             ));
         }
     }
