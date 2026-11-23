@@ -1342,7 +1342,10 @@ mod tests {
             execution.report.unmapped_source_sensor_ids,
             vec!["source-extra-temperature".to_string()]
         );
-        assert_eq!(execution.target_frame.as_ref().unwrap().observations.len(), 2);
+        assert_eq!(
+            execution.target_frame.as_ref().unwrap().observations.len(),
+            2
+        );
     }
 
     #[test]
