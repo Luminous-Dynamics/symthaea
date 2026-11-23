@@ -914,7 +914,8 @@ pub fn evaluate_synthetic_metrology_policy_v1(
         || !is_lowercase_sha256(&selection.policy_config_sha256)
     {
         return Err(SyntheticFabReplayError(
-            "selection receipt requires policy identity and valid model/prediction/config digests".into(),
+            "selection receipt requires policy identity and valid model/prediction/config digests"
+                .into(),
         ));
     }
     if selection_digest(selection)? != selection.selection_sha256 {
