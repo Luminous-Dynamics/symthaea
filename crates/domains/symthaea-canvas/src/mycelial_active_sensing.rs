@@ -659,6 +659,13 @@ mod tests {
         std::iter::repeat_n(character, 64).collect()
     }
 
+    fn close(left: f64, right: f64) {
+        assert!(
+            (left - right).abs() < 1.0e-12,
+            "{left} != {right}"
+        );
+    }
+
     fn skeleton() -> AnnotatedMycelialSkeleton {
         AnnotatedMycelialSkeleton {
             schema_version: MYCELIAL_RECONSTRUCTION_SCHEMA_VERSION,
