@@ -95,6 +95,17 @@ It reports diminishing-return regions near nine target labels for cross-machine 
 
 These are four different physical targets and domains, not one pooled score and not comparable to SECOM AP or CMP MRR RMSE. The correct challenge is to reproduce each exact task/protocol with matched label draws, then compare the *additional assurance* we can provide: calibrated uncertainty, sensor/units mapping validation, negative-transfer detection, abstention and update-inversion resistance under a declared attacker.
 
+## Industry comparison: what would count as better
+
+The current baseline landscape is already more advanced than an ordinary SECOM classifier:
+
+- **Industrial VM/inspection/adaptation:** Bertelson et al. report a linear-Gaussian dynamic VM and physical-metrology selection/adaptation framework evaluated on 114,774 wafers from a 300 mm plasma-etch fab (IEEE TSM 2026, DOI [10.1109/TSM.2026.3709162](https://doi.org/10.1109/TSM.2026.3709162)). We should not pretend that a public SECOM split beats this industrial evidence.
+- **Cross-domain few-shot transfer:** GFA-VM+ reports 10-target-label MAEs of 1.01 nm EPI thickness, 3.49 × 10^15 cm⁻³ EPI doping, 4.51 nm EPI-to-ETCH depth and 3.19 nm early-ramp cross-fab CD, with diminishing returns around 9–11 labels. Those are separate tasks and cannot be pooled or compared to SECOM AP. <Cite refs={["turn293282search1"]}/>
+- **CMP temporal prediction and constrained screening:** a 2026 PHM 2016 CMP study reports R² 0.9543, RMSE 5.9743, MAE 4.7199 and 95.96% empirical coverage for guarded 95% intervals on 396 time-out observations. In its 20 model-in-the-loop cases, the proposed and constrained baselines both attained 95% target-window hit rate and 100% feasibility; the authors attribute the feasibility improvement to the shared constraints rather than a unique optimizer gain. This is a useful public-data comparator, not a physical recipe-intervention result. <Cite refs={["turn293282search0"]}/>
+- **Manufacturing systems benchmark:** NIST TIDAL explicitly expects context ablations, grounding, latency/cost measurement, digital-twin VVUQ and human-machine teaming. Context and measurement metadata should be benchmark dimensions, not narrative decoration. <Cite refs={["turn324740view2"]}/>
+
+The relevant question is therefore not “can our model beat one headline MAE?” It is “can we deliver better-qualified decisions at the same or lower measurement cost, while accounting for assay error, selection bias, calibration drift, cross-domain failure and privacy leakage?”
+
 ## Where Luminous should differentiate
 
 The opportunity is an **evidence and decision assurance layer** around VM and manufacturing analytics:
