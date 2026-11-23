@@ -20,6 +20,8 @@
 use std::collections::BTreeMap;
 use std::fmt;
 
+pub mod cluster_adapter;
+
 /// Normalized regret scale used by the paired benchmark.
 pub const DECISION_REGRET_PPM: u32 = 1_000_000;
 
@@ -131,6 +133,8 @@ pub enum InteractionSign {
 /// savings and must not be added to #13176's exposure/resource dividends.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DecisionValueInteractionCertificate {
+    /// The exact thirteen-field identity validated across all four treatment arms.
+    pub pairing_identity: PairedRunIdentity,
     pub episode_id: u64,
     pub hidden_world_id: u64,
     pub hidden_world_sha256: [u8; 32],
@@ -419,6 +423,7 @@ pub fn evaluate_decision_value_interaction(
     };
 
     Ok(DecisionValueInteractionCertificate {
+        pairing_identity: baseline.identity.clone(),
         episode_id: baseline.identity.episode_id,
         hidden_world_id: baseline.identity.hidden_world_id,
         hidden_world_sha256: baseline.identity.hidden_world_sha256,
