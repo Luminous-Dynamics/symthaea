@@ -30,6 +30,7 @@ pub mod geometry;
 pub mod mycelial_annotation_triage;
 pub mod mycelial_contact_persistence;
 pub mod mycelial_failure_resilience;
+pub mod mycelial_functional_benchmark;
 pub mod mycelial_functional_observations;
 pub mod mycelial_fusion_counterfactual;
 pub mod mycelial_junction_graph;
@@ -119,6 +120,12 @@ pub use mycelial_failure_resilience::{
     build_mycelial_failure_attack_plan, build_mycelial_failure_delivery_profile,
     build_mycelial_failure_resilience_profile, build_single_failure_resilience_profile,
     evaluate_mycelial_failure_attack_plan,
+};
+pub use mycelial_functional_benchmark::{
+    MAX_MYCELIAL_FUNCTIONAL_BENCHMARK_ASSIGNMENTS,
+    MYCELIAL_FUNCTIONAL_BENCHMARK_SCHEMA_VERSION,
+    MycelialFunctionalBenchmarkAssignment, MycelialFunctionalBenchmarkError,
+    MycelialFunctionalBenchmarkSplit, MycelialFunctionalBenchmarkSplitManifest,
 };
 pub use mycelial_functional_observations::{
     MAX_MYCELIAL_FUNCTIONAL_ID_BYTES, MAX_MYCELIAL_FUNCTIONAL_OBSERVATIONS,
