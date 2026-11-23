@@ -507,6 +507,7 @@ fn parse_score(record: &Value) -> Result<(TaskKey, MethodKind, Metrics), String>
             "target_key", "matched_to", "removed_event_ids", "removed_event_count",
             "removed_experience_struct_bytes", "decision", "full_evidence_decision",
             "decision_agrees_with_full", "decision_changed", "utility", "regret",
+            "candidate_visible_event_count",
             "full_evidence_regret", "regret_gap_vs_full_evidence",
             "regret_gap_vs_full_method", "decision_is_optimal", "abstained",
             "evaluation_validity", "invalidity_reason", "method", "retrieved_event_ids",
@@ -559,6 +560,7 @@ fn parse_score(record: &Value) -> Result<(TaskKey, MethodKind, Metrics), String>
     required_string(record, "invalidity_reason")?;
     required_event_ids(record, "retrieved_event_ids")?;
     required_event_ids(record, "decision_support_event_ids")?;
+    required_u64(record, "candidate_visible_event_count")?;
     required_u64(record, "index_bytes")?;
     required_u64(record, "removed_event_count")?;
     required_u64(record, "removed_experience_struct_bytes")?;
@@ -826,6 +828,7 @@ struct CandidateReceipt {
     decision: String,
     decision_support_event_ids: Vec<u32>,
     retrieved_event_ids: Vec<u32>,
+    candidate_visible_event_count: u64,
     index_bytes: u64,
     retrieval_profile_sha256: Option<String>,
     candidate_execution_boundary: String,
@@ -883,7 +886,7 @@ fn parse_candidate_receipt(record: &Value) -> Result<((String, String), Candidat
             "support_unresolved_count", "available_event_count",
             "available_experience_struct_bytes", "available_known_root_count",
             "available_known_family_count", "unknown_root_event_count",
-            "unknown_family_event_count", "index_bytes", "latency_ns",
+            "unknown_family_event_count", "candidate_visible_event_count", "index_bytes", "latency_ns",
             "retrieval_profile_sha256", "candidate_execution_boundary",
             "candidate_artifact_sha256", "candidate_process_startup_ns",
             "candidate_process_wall_ns", "candidate_request_build_ns",
@@ -953,13 +956,14 @@ fn parse_candidate_receipt(record: &Value) -> Result<((String, String), Candidat
     }
     for field in [
         "support_event_count", "support_known_root_count", "support_known_family_count",
-        "support_unresolved_count", "available_event_count",
+        "support_unresolved_count", "available_event_count", "candidate_visible_event_count",
         "available_experience_struct_bytes", "available_known_root_count",
         "available_known_family_count", "unknown_root_event_count",
         "unknown_family_event_count", "latency_ns",
     ] {
         required_u64(record, field)?;
     }
+    let candidate_visible_event_count = required_u64(record, "candidate_visible_event_count")?;
     let index_bytes = required_u64(record, "index_bytes")?;
     let retrieval_profile_sha256 =
         optional_sha256(record, "retrieval_profile_sha256")?;
@@ -1005,6 +1009,7 @@ fn parse_candidate_receipt(record: &Value) -> Result<((String, String), Candidat
             decision,
             decision_support_event_ids,
             retrieved_event_ids,
+            candidate_visible_event_count,
             index_bytes,
             retrieval_profile_sha256,
             candidate_execution_boundary,
@@ -1047,6 +1052,11 @@ fn validate_score_against_candidate(
         != candidate.decision_support_event_ids
     {
         return Err("evaluator score decision_support_event_ids differ from candidate receipt".to_string());
+    }
+    if required_u64(score, "candidate_visible_event_count")?
+        != candidate.candidate_visible_event_count
+    {
+        return Err("evaluator score candidate_visible_event_count differs from candidate receipt".to_string());
     }
     if required_u64(score, "index_bytes")? != candidate.index_bytes {
         return Err("evaluator score index_bytes differ from candidate receipt".to_string());
@@ -1411,6 +1421,7 @@ mod tests {
             "method": method,
             "retrieved_event_ids": [],
             "decision_support_event_ids": [],
+            "candidate_visible_event_count": 0,
             "index_bytes": 0,
             "decision": "action_a",
             "full_evidence_decision": "action_a",
@@ -1462,6 +1473,7 @@ mod tests {
             "candidate_evidence_sha256": candidate_evidence_sha256,
             "retrieved_event_ids": [3, 7],
             "decision_support_event_ids": [3, 7],
+            "candidate_visible_event_count": 2,
             "support_event_count": 2,
             "support_known_root_count": 1,
             "support_known_family_count": 2,
@@ -1503,6 +1515,7 @@ mod tests {
             "decision": candidate.decision,
             "retrieved_event_ids": candidate.retrieved_event_ids,
             "decision_support_event_ids": candidate.decision_support_event_ids,
+            "candidate_visible_event_count": candidate.candidate_visible_event_count,
             "index_bytes": candidate.index_bytes,
             "retrieval_profile_sha256": candidate.retrieval_profile_sha256,
             "candidate_execution_boundary": candidate.candidate_execution_boundary,
@@ -1623,6 +1636,12 @@ mod tests {
         assert!(validate_score_against_candidate(&wrong_support, &key.0, &receipt)
             .unwrap_err()
             .contains("decision_support_event_ids"));
+
+        let mut wrong_visible_count = valid.clone();
+        wrong_visible_count["candidate_visible_event_count"] = json!(99);
+        assert!(validate_score_against_candidate(&wrong_visible_count, &key.0, &receipt)
+            .unwrap_err()
+            .contains("candidate_visible_event_count"));
 
         let mut wrong_size = valid.clone();
         wrong_size["index_bytes"] = json!(999);
