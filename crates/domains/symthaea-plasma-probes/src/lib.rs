@@ -782,58 +782,22 @@ fn linspace(minimum: f64, maximum: f64, steps: usize) -> Result<Vec<f64>, Contra
 mod tests {
     use super::*;
 
-    const SYNTHETIC_FIXTURE: &str = r#"{
-      "schema_version": "0.1",
-      "contract_id": "AKPD-SYNTHETIC-PULSE-FAMILY-001",
-      "contract_status": "synthetic_fixture_only",
-      "physics_cohort": {
-        "equation": "periodic_1d1v_collisionless_vlasov_poisson",
-        "normalization_id": "synthetic_schema_fixture_not_a_physical_run",
-        "spatial_domain": {"minimum": -3.141592653589793, "maximum": 3.141592653589793, "periodic": true},
-        "velocity_domain": {"minimum": -6.0, "maximum": 6.0, "velocity_unit": "v_th"},
-        "time_unit": "omega_pe^-1",
-        "maximum_time": 30.0
-      },
-      "intervention_operator": {
-        "operator_id": "sinusoidal_velocity_kick_v1",
-        "definition": "v_after(x) = v_before(x) + A*sin(2*pi*m*(x-x_min)/L + phase)",
-        "amplitude_semantics": "maximum_absolute_delta_v",
-        "application_semantics": "instantaneous_canonical_velocity_kick"
-      },
-      "admissible_controls": {
-        "spatial_mode": {"minimum": 1, "maximum": 4},
-        "phase_rad": {"minimum": -3.141592653589793, "maximum": 3.141592653589793},
-        "kick_amplitude": {"minimum": 0.0, "maximum": 0.02, "unit": "v_th"},
-        "application_time": {"minimum": 0.0, "maximum": 20.0, "unit": "omega_pe^-1"}
-      },
-      "search_budget": {
-        "maximum_proposals": 128,
-        "maximum_high_fidelity_confirmations": 8,
-        "maximum_reference_steps": 1000000,
-        "maximum_wall_time_seconds": 3600.0
-      },
-      "evaluation_policy": {
-        "independent_confirmation_required": true,
-        "minimum_spatial_refinement_levels": 2,
-        "minimum_time_refinement_levels": 2,
-        "required_controls": ["no_pulse", "sign_reversed", "phase_mismatch", "off_mode_sham"],
-        "response_metrics": ["complex_amplitude", "wrapped_phase", "waveform_error", "peak_time", "branch_association"]
-      },
-      "split_role": "development",
-      "acquisition_allowed": true,
-      "provenance": {
-        "fixture_class": "synthetic_schema_test_only",
-        "initial_state_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-        "reference_solver_revision": "synthetic-fixture-no-solver",
-        "candidate_representation_revision": "synthetic-fixture-no-representation",
-        "generator_seed": 7,
-        "physical_execution_authorized": false,
-        "source_record_refs": []
-      }
-    }"#;
+    const SYNTHETIC_FIXTURE: &str = include_str!(
+        "../../../../benchmarks/plasma/adversarial-probes/fixtures/synthetic-pulse-family-v0.1.json"
+    );
+
+    fn fixture_value() -> serde_json::Value {
+        serde_json::from_str(SYNTHETIC_FIXTURE).expect("checked-in fixture must be valid JSON")
+    }
+
+    fn parse_value(value: &serde_json::Value) -> Result<PulseFamilyContract, ContractError> {
+        let input = serde_json::to_string(value).expect("JSON value must serialize");
+        PulseFamilyContract::parse_json(&input)
+    }
 
     fn contract() -> PulseFamilyContract {
-        PulseFamilyContract::parse_json(SYNTHETIC_FIXTURE).expect("synthetic fixture must parse")
+        PulseFamilyContract::parse_json(SYNTHETIC_FIXTURE)
+            .expect("synthetic fixture must parse")
     }
 
     fn candidate(
