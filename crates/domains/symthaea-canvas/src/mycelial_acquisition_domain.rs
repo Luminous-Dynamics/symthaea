@@ -95,10 +95,16 @@ pub struct MycelialAcquisitionDomainManifest {
     pub source_artifact_id: String,
     pub source_artifact_digest: String,
     pub source_rights_status: MycelialSourceRightsStatus,
+    /// Digest of the license/permission evidence supporting the rights status.
+    pub rights_evidence_digest: String,
     pub source_format: String,
     pub acquisition_session_id: String,
     pub biological_replicate_id: String,
     pub coordinate_frame_id: String,
+    /// Digest of the exact acquisition scope/ROI mask and declared exclusions context.
+    pub declared_scope_digest: String,
+    /// Digest of instrument, firmware and acquisition settings metadata.
+    pub instrument_metadata_digest: String,
     /// Original source order is retained; dimensions are checked by axis identity.
     pub axes: Vec<MycelialAcquisitionAxis>,
     pub domain: MycelialAcquisitionDomainSpec,
@@ -450,6 +456,7 @@ impl MycelialAcquisitionDomainManifest {
             MAX_DOMAIN_IDENTIFIER_BYTES,
         )?;
         validate_digest(&self.source_artifact_digest, "source_artifact_digest")?;
+        validate_digest(&self.rights_evidence_digest, "rights_evidence_digest")?;
         if self.source_rights_status != MycelialSourceRightsStatus::VerifiedForProcessing {
             return Err(MycelialAcquisitionDomainError::SourceRightsNotCleared(
                 self.source_rights_status,
@@ -475,6 +482,8 @@ impl MycelialAcquisitionDomainManifest {
             "coordinate_frame_id",
             MAX_DOMAIN_IDENTIFIER_BYTES,
         )?;
+        validate_digest(&self.declared_scope_digest, "declared_scope_digest")?;
+        validate_digest(&self.instrument_metadata_digest, "instrument_metadata_digest")?;
         validate_digest(&self.spatial_transform_digest, "spatial_transform_digest")?;
         validate_digest(&self.calibration_digest, "calibration_digest")?;
         validate_identifier(
@@ -581,10 +590,13 @@ impl MycelialAcquisitionDomainManifest {
         for value in [
             self.source_artifact_id.as_str(),
             self.source_artifact_digest.as_str(),
+            self.rights_evidence_digest.as_str(),
             self.source_format.as_str(),
             self.acquisition_session_id.as_str(),
             self.biological_replicate_id.as_str(),
             self.coordinate_frame_id.as_str(),
+            self.declared_scope_digest.as_str(),
+            self.instrument_metadata_digest.as_str(),
             self.spatial_transform_digest.as_str(),
             self.calibration_digest.as_str(),
             self.manifest_producer_id.as_str(),
@@ -612,10 +624,13 @@ impl MycelialAcquisitionDomainManifest {
         for value in [
             self.source_artifact_id.as_str(),
             self.source_artifact_digest.as_str(),
+            self.rights_evidence_digest.as_str(),
             self.source_format.as_str(),
             self.acquisition_session_id.as_str(),
             self.biological_replicate_id.as_str(),
             self.coordinate_frame_id.as_str(),
+            self.declared_scope_digest.as_str(),
+            self.instrument_metadata_digest.as_str(),
         ] {
             hash_string(&mut hasher, value);
         }
@@ -880,10 +895,13 @@ mod tests {
             source_artifact_id: "source-001".to_string(),
             source_artifact_digest: digest('a'),
             source_rights_status: MycelialSourceRightsStatus::VerifiedForProcessing,
+            rights_evidence_digest: digest('b'),
             source_format: "ome_tiff".to_string(),
             acquisition_session_id: "session-001".to_string(),
             biological_replicate_id: "replicate-001".to_string(),
             coordinate_frame_id: "specimen-frame-v1".to_string(),
+            declared_scope_digest: digest('6'),
+            instrument_metadata_digest: digest('7'),
             axes: vec![
                 MycelialAcquisitionAxis {
                     name: MycelialAcquisitionAxisName::X,
@@ -1121,6 +1139,32 @@ mod tests {
                 MycelialSourceRightsStatus::AuthorPermissionRequired
             ))
         );
+    }
+
+    #[test]
+    fn rights_evidence_digest_is_required_and_committed() {
+        let original = manifest();
+        let original_digest = original.canonical_digest_hex().unwrap();
+        let mut changed = original;
+        changed.rights_evidence_digest = digest('9');
+        assert_ne!(changed.canonical_digest_hex().unwrap(), original_digest);
+        changed.rights_evidence_digest = "not-a-digest".to_string();
+        assert!(matches!(
+            changed.validate(),
+            Err(MycelialAcquisitionDomainError::InvalidDigest("rights_evidence_digest"))
+        ));
+    }
+
+    #[test]
+    fn declared_scope_and_instrument_metadata_are_committed() {
+        let original = manifest();
+        let original_digest = original.canonical_digest_hex().unwrap();
+        let mut changed = original.clone();
+        changed.declared_scope_digest = digest('8');
+        assert_ne!(changed.canonical_digest_hex().unwrap(), original_digest);
+        let mut changed = original.clone();
+        changed.instrument_metadata_digest = digest('9');
+        assert_ne!(changed.canonical_digest_hex().unwrap(), original_digest);
     }
 
     #[test]
