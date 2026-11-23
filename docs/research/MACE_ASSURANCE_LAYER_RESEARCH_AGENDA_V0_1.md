@@ -463,6 +463,7 @@ For decision sufficiency, compare memory representations on identical world/task
 | #13371 | Official LongMemEval-V2 Memory API shim plus Rust sidecar | Text BM25 with original screenshot evidence; query_image not used for ranking |
 | #13386 | V2 retrieval-to-candidate evidence DAG integration | Explicit state/text/image/neighbor lineage, cross-language candidate-set commitment verification and durable query receipts; no issuer/rights/lifecycle qualification |
 | #13391 | Label-blind retrieval-policy memory prototype | In-memory trace receipts and deterministic strategy promotion; not yet connected to the V2 operation stream or durable service |
+| #13393 | V2 query-to-retrieval-policy trace integration | One actual BM25 operation per opaque invocation; cross-language trace digest, paired candidate receipt and strict save/load; index-byte telemetry incomplete and policy store process-local |
 
 No row above should be interpreted as a CI pass or official benchmark score unless a later exact-head run receipt establishes it.
 
@@ -483,8 +484,9 @@ No row above should be interpreted as a CI pass or official benchmark score unle
 
 ### Stage 3 — Improve retrieval without sacrificing source fidelity
 - Reproduce AgentRunbook-C V2 Online as a distinct retrieval-policy-memory arm before building a MACE consolidation controller.
-- Integrate #13391 with actual LongMemEval-V2 tool operations using only the opaque query invocation ID, observed candidate IDs, exact tool/action template digests, measured costs and stop reason; never pass evaluator labels.
-- Add durable, create-once trace receipts and atomic strategy-note promotion outside the candidate process; retain the in-memory #13391 implementation as the deterministic conformance reference.
+- Extend #13393's actual single-operation V2 trace capture into a multi-operation controller using only the opaque query invocation ID, observed candidate IDs, exact tool/action template digests, measured costs and stop reason; never pass evaluator labels.
+- Add durable cross-process trace receipt restoration and atomic strategy-note promotion outside the candidate process; retain #13391 as the deterministic in-memory conformance reference.
+- Instrument BM25 posting/index reads and RSS; the current trace explicitly marks inspected-byte accounting incomplete.
 - Compare cold, warm, shuffled-order and cross-version transfer, including no-consolidation and random-policy controls.
 - Keep retrieval-policy notes separate from factual/source evidence and require applicability, expiry and source lineage for every strategy note.
 - Add pinned dense retrieval and an explicit hybrid fusion profile.
