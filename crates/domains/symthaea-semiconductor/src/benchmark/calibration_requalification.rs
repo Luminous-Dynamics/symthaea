@@ -1099,9 +1099,10 @@ mod tests {
             MeasurementQualificationStatusV1::Unknown
         );
         assert!(
-            report.current_at_k1.reason_codes.contains(
-                &CalibrationRequalificationReasonV1::UnknownEventScope
-            )
+            report
+                .current_at_k1
+                .reason_codes
+                .contains(&CalibrationRequalificationReasonV1::UnknownEventScope)
         );
     }
 
