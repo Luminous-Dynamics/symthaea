@@ -682,14 +682,14 @@ fn validate_steps(
                 actual: step.world_tick,
             });
         }
-        if let Some(previous_us) = previous_decision_at_us {
-            if step.decision_at_us < previous_us {
-                return Err(CausalPairingError::DecisionClockRegression {
-                    arm: receipt.arm,
-                    previous_us,
-                    current_us: step.decision_at_us,
-                });
-            }
+        if let Some(previous_us) = previous_decision_at_us
+            && step.decision_at_us < previous_us
+        {
+            return Err(CausalPairingError::DecisionClockRegression {
+                arm: receipt.arm,
+                previous_us,
+                current_us: step.decision_at_us,
+            });
         }
         if step.action_applied_at_us < step.decision_at_us {
             return Err(CausalPairingError::ActionAppliedBeforeDecision {
