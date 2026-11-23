@@ -771,13 +771,17 @@ mod tests {
         revision: u64,
         supersedes: Option<&str>,
     ) -> MetrologyLabelV1 {
+        let has_point_value = matches!(
+            &status,
+            MetrologyLabelStatusV1::Validated | MetrologyLabelStatusV1::Provisional
+        );
         let validated = matches!(&status, MetrologyLabelStatusV1::Validated);
         MetrologyLabelV1 {
             label_id: id.into(),
             measurement_event_id: "met-17".into(),
             subject_id: "wafer-17".into(),
             measurand_id: "film-thickness".into(),
-            value: if validated { Some(12.5) } else { None },
+            value: if has_point_value { Some(12.5) } else { None },
             unit: "nm".into(),
             standard_uncertainty: if validated { Some(0.2) } else { None },
             censoring_lower_bound: None,
