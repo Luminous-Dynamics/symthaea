@@ -37,9 +37,9 @@ Initial methods are `exact_scope_scan` and `typed_content_hdc`. Both pass canoni
 
 ## Wire protocol
 
-Input schema: [mace_candidate_envelope_v1](../../../data/schemas/mace_candidate_envelope_v1.schema.json)
+Input schema: [mace_candidate_envelope_v1](../../data/schemas/mace_candidate_envelope_v1.schema.json)
 
-Output schema: [mace_candidate_receipt_v1](../../../data/schemas/mace_candidate_receipt_v1.schema.json)
+Output schema: [mace_candidate_receipt_v1](../../data/schemas/mace_candidate_receipt_v1.schema.json)
 
 The process reads one JSON object, bounded to 32 MiB and 20,000 evidence records. Unknown fields are rejected at every nested object. It emits one JSON receipt or exits nonzero without emitting a decision receipt.
 
