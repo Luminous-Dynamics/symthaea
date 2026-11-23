@@ -184,7 +184,7 @@
   "qualification": {
     "toolchain": "Rust 1.96.0",
     "changed_module_rustfmt": "passed",
-    "full_evaluator_test_suite": "54_passed_0_failed",
+    "full_evaluator_test_suite": "65_passed_0_failed",
     "strict_clippy": "passed",
     "workflow_run_id": 45085999687,
     "qualification_head_sha": "9185feae6fb775436449b8af2a64595b54bb96e1",
