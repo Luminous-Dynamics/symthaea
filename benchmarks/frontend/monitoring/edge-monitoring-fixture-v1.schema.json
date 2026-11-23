@@ -92,8 +92,7 @@
                 "const": "edge"
               },
               "event_type": {
-                "type": "string",
-                "minLength": 1
+                "const": "capacity_threshold_crossed"
               },
               "permission_scope": {
                 "type": "string",
@@ -146,71 +145,9 @@
               },
               "trigger_receipts": {
                 "type": "array",
+                "maxItems": 0,
                 "items": {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "required": [
-                    "receipt_id",
-                    "event_type",
-                    "source_event_id",
-                    "source_revision",
-                    "occurred_at",
-                    "valid_until",
-                    "status",
-                    "action_type",
-                    "resource_id",
-                    "permission_scope"
-                  ],
-                  "properties": {
-                    "receipt_id": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 128
-                    },
-                    "event_type": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 128
-                    },
-                    "source_event_id": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 128
-                    },
-                    "source_revision": {
-                      "type": "integer",
-                      "minimum": 1
-                    },
-                    "occurred_at": {
-                      "type": "integer",
-                      "minimum": 0
-                    },
-                    "valid_until": {
-                      "type": "integer",
-                      "minimum": 1
-                    },
-                    "status": {
-                      "enum": [
-                        "active",
-                        "revoked"
-                      ]
-                    },
-                    "action_type": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 64
-                    },
-                    "resource_id": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 128
-                    },
-                    "permission_scope": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 128
-                    }
-                  }
+                  "$ref": "#/$defs/receipt"
                 }
               },
               "reserved": {
@@ -264,70 +201,7 @@
                     "trigger_receipts": {
                       "type": "array",
                       "items": {
-                        "type": "object",
-                        "additionalProperties": false,
-                        "required": [
-                          "receipt_id",
-                          "event_type",
-                          "source_event_id",
-                          "source_revision",
-                          "occurred_at",
-                          "valid_until",
-                          "status",
-                          "action_type",
-                          "resource_id",
-                          "permission_scope"
-                        ],
-                        "properties": {
-                          "receipt_id": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 128
-                          },
-                          "event_type": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 128
-                          },
-                          "source_event_id": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 128
-                          },
-                          "source_revision": {
-                            "type": "integer",
-                            "minimum": 1
-                          },
-                          "occurred_at": {
-                            "type": "integer",
-                            "minimum": 0
-                          },
-                          "valid_until": {
-                            "type": "integer",
-                            "minimum": 1
-                          },
-                          "status": {
-                            "enum": [
-                              "active",
-                              "revoked"
-                            ]
-                          },
-                          "action_type": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 64
-                          },
-                          "resource_id": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 128
-                          },
-                          "permission_scope": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 128
-                          }
-                        }
+                        "$ref": "#/$defs/receipt"
                       }
                     },
                     "reserved": {
@@ -462,6 +336,72 @@
               }
             }
           }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "receipt_id",
+        "event_type",
+        "source_event_id",
+        "source_revision",
+        "occurred_at",
+        "valid_until",
+        "status",
+        "action_type",
+        "resource_id",
+        "permission_scope"
+      ],
+      "properties": {
+        "receipt_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "event_type": {
+          "const": "capacity_threshold_crossed"
+        },
+        "source_event_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "source_revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "occurred_at": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "valid_until": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "status": {
+          "enum": [
+            "active",
+            "revoked"
+          ]
+        },
+        "action_type": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "resource_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "permission_scope": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
         }
       }
     }
