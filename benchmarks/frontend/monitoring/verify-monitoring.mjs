@@ -289,18 +289,22 @@ function verifyAll({fixtureBytes,traceBytes,policyBytes,fixture,traces,policy}){
  const revoked=byId.get('permission-revoked-in-same-tick');
  const relative=byId.get('relative-threshold-preserves-baseline');
  const triggered=results.filter(r=>r.metrics.outcome==='triggered');
+ const totalObservations=results.reduce((n,r)=>n+r.metrics.observation_count,0);
+ const totalWaitSeconds=results.reduce((n,r)=>n+r.metrics.virtual_wait_seconds,0);
+ const totalPollCalls=results.reduce((n,r)=>n+r.metrics.poll_count,0);
+ const totalDuplicateActionAttempts=results.reduce((n,r)=>n+r.metrics.duplicate_action_attempts,0);
  const rules=[
-  {oracle_id:'watch.register.once',result:results.length===fixture.cases.length?'pass':'fail',non_vacuous:true},
+  {oracle_id:'watch.register.once',result:results.length===fixture.cases.length?'pass':'fail',non_vacuous:results.length>0},
   {oracle_id:'wake.hint_not_authority',result:forged.metrics.action_count===0?'pass':'fail',non_vacuous:forged.metrics.unique_wake_count>0},
-  {oracle_id:'observation.latest_revision',result:results.every(r=>r.metrics.final_revision>=1&&r.metrics.observation_count<=r.metrics.unique_wake_count)?'pass':'fail',non_vacuous:true},
+  {oracle_id:'observation.latest_revision',result:results.every(r=>r.metrics.final_revision>=1&&r.metrics.observation_count<=r.metrics.unique_wake_count)?'pass':'fail',non_vacuous:totalObservations>0},
   {oracle_id:'action.predicate_guard',result:triggered.every(r=>r.metrics.condition_first_true_at!==null&&r.metrics.action_at>=r.metrics.condition_first_true_at)?'pass':'fail',non_vacuous:triggered.length>0},
-  {oracle_id:'action.permission_guard',result:revoked.metrics.action_count===0&&revoked.metrics.final_permission_granted===false?'pass':'fail',non_vacuous:true},
-  {oracle_id:'action.idempotency',result:byId.get('absolute-threshold-event-wake').metrics.action_count===1&&byId.get('absolute-threshold-event-wake').metrics.duplicate_wake_count===1&&byId.get('absolute-threshold-event-wake').metrics.duplicate_action_attempts===1?'pass':'fail',non_vacuous:true},
-  {oracle_id:'no_op.abstention',result:noop.metrics.action_count===0&&noop.metrics.outcome==='not_triggered'?'pass':'fail',non_vacuous:true},
-  {oracle_id:'reconnect.stale_revalidation',result:stale.metrics.final_revision===3&&stale.metrics.stale_hint_count===1&&stale.metrics.action_count===0?'pass':'fail',non_vacuous:true},
-  {oracle_id:'wait.monotonic_bounded',result:results.every(r=>r.metrics.virtual_wait_seconds>=0)?'pass':'fail',non_vacuous:true},
-  {oracle_id:'relative.baseline',result:relative.metrics.condition_first_true_at===30&&relative.metrics.action_count===1?'pass':'fail',non_vacuous:true},
-  {oracle_id:'resource.polling_budget',result:results.every(r=>r.metrics.poll_count===0)?'pass':'fail',non_vacuous:true}
+  {oracle_id:'action.permission_guard',result:revoked.metrics.action_count===0&&revoked.metrics.final_permission_granted===false?'pass':'fail',non_vacuous:revoked.metrics.unique_wake_count>0},
+  {oracle_id:'action.idempotency',result:byId.get('absolute-threshold-event-wake').metrics.action_count===1&&byId.get('absolute-threshold-event-wake').metrics.duplicate_wake_count===1&&byId.get('absolute-threshold-event-wake').metrics.duplicate_action_attempts===1?'pass':'fail',non_vacuous:totalDuplicateActionAttempts>0},
+  {oracle_id:'no_op.abstention',result:noop.metrics.action_count===0&&noop.metrics.outcome==='not_triggered'?'pass':'fail',non_vacuous:noop.metrics.unique_wake_count===0},
+  {oracle_id:'reconnect.stale_revalidation',result:stale.metrics.final_revision===3&&stale.metrics.stale_hint_count===1&&stale.metrics.action_count===0?'pass':'fail',non_vacuous:stale.metrics.stale_hint_count>0},
+  {oracle_id:'wait.monotonic_bounded',result:results.every(r=>r.metrics.virtual_wait_seconds>=0)?'pass':'fail',non_vacuous:totalWaitSeconds>0},
+  {oracle_id:'relative.baseline',result:relative.metrics.condition_first_true_at===30&&relative.metrics.action_count===1?'pass':'fail',non_vacuous:relative.metrics.condition_first_true_at===30},
+  {oracle_id:'resource.polling_budget',result:totalPollCalls===0?'pass':'fail',non_vacuous:totalWaitSeconds>0}
  ];
  return {
   schema:'sfeb-monitoring-verification-v1',
@@ -313,9 +317,12 @@ function verifyAll({fixtureBytes,traceBytes,policyBytes,fixture,traces,policy}){
   oracle_results:rules,
   hard_safety_pass:rules.filter(r=>r.oracle_id!=='wait.monotonic_bounded'&&r.oracle_id!=='relative.baseline'&&r.oracle_id!=='resource.polling_budget').every(r=>r.result==='pass'),
   event_trigger_cases:triggered.length,
+  liveness_pass_cases:results.filter(r=>r.liveness_pass).length,
   missed_trigger_cases:results.filter(r=>r.metrics.outcome==='missed_trigger').length,
-  total_poll_calls:results.reduce((n,r)=>n+r.metrics.poll_count,0),
-  total_authoritative_observations:results.reduce((n,r)=>n+r.metrics.observation_count,0),
+  total_poll_calls:totalPollCalls,
+  total_authoritative_observations:totalObservations,
+  total_duplicate_action_attempts:totalDuplicateActionAttempts,
+  all_rules_non_vacuous:rules.every(rule=>rule.non_vacuous),
   total_unique_wakes:results.reduce((n,r)=>n+r.metrics.unique_wake_count,0),
   claim_boundary:'Synthetic event-monitoring reference replay only. It does not authenticate a browser, production event bus, external identity, or signed execution.'
  };
