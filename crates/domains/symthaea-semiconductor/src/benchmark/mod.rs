@@ -1,8 +1,6 @@
 //! Versioned benchmark protocols and independent scoring primitives.
 
 pub mod binary_metrics;
-pub mod reference_standard_drift;
-pub mod reference_standard_drift;
 pub mod calibration_requalification;
 pub mod dtco_manifest;
 pub mod metrology_audit;
@@ -11,6 +9,7 @@ pub mod metrology_semantics;
 pub mod mf_acquisition;
 pub mod pair_manifest;
 pub mod process_event_graph;
+pub mod reference_standard_drift;
 pub mod secom_fold_preprocessor;
 pub mod secom_logistic;
 pub mod secom_missingness;
@@ -128,5 +127,14 @@ pub use reference_standard_drift::{
     ReferenceDriftPredictionInputV1, ReferenceDriftPredictionPolicyV1,
     ReferenceDriftPredictionReportV1, ReferenceDriftPredictionStatusV1,
     ReferenceDriftReasonV1, ReferenceStandardDriftModelV1,
+    predict_reference_standard_drift_v1, seal_reference_standard_drift_model_v1,
+};
+
+pub use reference_standard_drift::{
+    REFERENCE_DRIFT_INPUT_SCHEMA_V1, REFERENCE_DRIFT_MODEL_SCHEMA_V1,
+    REFERENCE_DRIFT_POLICY_SCHEMA_V1, REFERENCE_DRIFT_REPORT_SCHEMA_V1, ReferenceDriftErrorV1,
+    ReferenceDriftModelQualificationV1, ReferenceDriftPredictionInputV1,
+    ReferenceDriftPredictionPolicyV1, ReferenceDriftPredictionReportV1,
+    ReferenceDriftPredictionStatusV1, ReferenceDriftReasonV1, ReferenceStandardDriftModelV1,
     predict_reference_standard_drift_v1, seal_reference_standard_drift_model_v1,
 };
