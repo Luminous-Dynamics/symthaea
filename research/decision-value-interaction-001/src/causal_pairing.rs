@@ -19,6 +19,9 @@ use crate::{InteractionError, PairedRunIdentity, TreatmentArm};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
+type TransitionInputKey = (u64, [u8; 32], [u8; 32], [u8; 32]);
+type TransitionOutputDigest = [u8; 32];
+
 /// The causal regime represented by a four-arm experiment.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CausalReplayRegime {
@@ -327,15 +330,6 @@ fn digest_is_empty(digest: &[u8; 32]) -> bool {
     digest.iter().all(|byte| *byte == 0)
 }
 
-fn arm_index(arm: TreatmentArm) -> usize {
-    match arm {
-        TreatmentArm::Baseline => 0,
-        TreatmentArm::ComputeOnly => 1,
-        TreatmentArm::ObservationOnly => 2,
-        TreatmentArm::Joint => 3,
-    }
-}
-
 fn require_digest(
     digest: &[u8; 32],
     arm: Option<TreatmentArm>,
@@ -551,21 +545,20 @@ pub fn validate_causal_pairing(
     // A fully specified transition input must have one deterministic output.
     // This also catches accidental RNG stream desynchronization when the same
     // keyed exogenous event is presented with the same state and action.
-    let mut transition_outputs: BTreeMap<(u64, [u8; 32], [u8; 32], [u8; 32]), [u8; 32]> =
+    let mut transition_outputs: BTreeMap<TransitionInputKey, TransitionOutputDigest> =
         BTreeMap::new();
 
     let mut exogenous_by_tick: BTreeMap<u64, [u8; 32]> = BTreeMap::new();
 
     for receipt in &ordered {
         for step in &receipt.steps {
-            if let Some(reference) =
-                exogenous_by_tick.insert(step.world_tick, step.exogenous_input_sha256)
+            if exogenous_by_tick
+                .insert(step.world_tick, step.exogenous_input_sha256)
+                .is_some_and(|reference| reference != step.exogenous_input_sha256)
             {
-                if reference != step.exogenous_input_sha256 {
-                    return Err(CausalPairingError::ExogenousInputMismatch {
-                        world_tick: step.world_tick,
-                    });
-                }
+                return Err(CausalPairingError::ExogenousInputMismatch {
+                    world_tick: step.world_tick,
+                });
             }
 
             let key = (
@@ -574,12 +567,13 @@ pub fn validate_causal_pairing(
                 step.applied_action_sha256,
                 step.exogenous_input_sha256,
             );
-            if let Some(previous_output) = transition_outputs.insert(key, step.post_state_sha256) {
-                if previous_output != step.post_state_sha256 {
-                    return Err(CausalPairingError::ConflictingDeterministicTransition {
-                        world_tick: step.world_tick,
-                    });
-                }
+            if transition_outputs
+                .insert(key, step.post_state_sha256)
+                .is_some_and(|previous_output| previous_output != step.post_state_sha256)
+            {
+                return Err(CausalPairingError::ConflictingDeterministicTransition {
+                    world_tick: step.world_tick,
+                });
             }
         }
     }
@@ -593,10 +587,8 @@ pub fn validate_causal_pairing(
                 });
             }
         }
-        for index in 0..reference_steps.len() {
-            let reference = &reference_steps[index];
-            for receipt in &ordered[1..] {
-                let candidate = &receipt.steps[index];
+        for receipt in &ordered[1..] {
+            for (reference, candidate) in reference_steps.iter().zip(&receipt.steps) {
                 if candidate.world_tick != reference.world_tick
                     || candidate.pre_state_sha256 != reference.pre_state_sha256
                     || candidate.post_state_sha256 != reference.post_state_sha256
