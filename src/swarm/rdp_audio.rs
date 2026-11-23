@@ -488,30 +488,30 @@ mod tests {
             sample_rate: 48_000,
             channels: 2,
         };
-        assert_eq!(
+        assert!(matches!(
             encode_audio_frame(&empty, 1, 0, 0.8, 0.0, 0),
             Err(AudioFrameEncodeError::EmptyChunk)
-        );
+        ));
 
         let zero_rate = AudioChunk {
             samples: vec![0.1, 0.2],
             sample_rate: 0,
             channels: 2,
         };
-        assert_eq!(
+        assert!(matches!(
             encode_audio_frame(&zero_rate, 1, 0, 0.8, 0.0, 0),
             Err(AudioFrameEncodeError::ZeroSampleRate)
-        );
+        ));
 
         let unsupported_channels = AudioChunk {
             samples: vec![0.1, 0.2, 0.3],
             sample_rate: 48_000,
             channels: 3,
         };
-        assert_eq!(
+        assert!(matches!(
             encode_audio_frame(&unsupported_channels, 1, 0, 0.8, 0.0, 0),
             Err(AudioFrameEncodeError::UnsupportedChannelCount(3))
-        );
+        ));
 
         let incomplete_stereo_frame = AudioChunk {
             samples: vec![0.1],
