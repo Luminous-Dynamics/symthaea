@@ -878,6 +878,14 @@ mod tests {
         }
     }
 
+    fn metadata_for_assignments(assignments: &[ClusterAssignment]) -> ClusterInferenceMetadata {
+        let mut frozen = metadata();
+        frozen.cluster_assignment_manifest_sha256 = sha256_hex(
+            canonical_cluster_assignment_manifest(assignments, &frozen).as_bytes(),
+        );
+        frozen
+    }
+
     #[test]
     fn sha256_matches_standard_empty_and_abc_vectors() {
         assert_eq!(
@@ -987,7 +995,8 @@ mod tests {
     fn missing_and_extra_assignment_manifest_entries_are_rejected() {
         let mut missing = assignments();
         missing.pop();
-        let missing_error = export_cluster_deltas(&fixture(), &missing, &metadata())
+        let missing_metadata = metadata_for_assignments(&missing);
+        let missing_error = export_cluster_deltas(&fixture(), &missing, &missing_metadata)
             .unwrap_err()
             .to_string();
         assert!(
@@ -1001,8 +1010,9 @@ mod tests {
             cluster_id: "scene-99".to_owned(),
             initial_state_sha256: digest(99),
         });
+        let extra_metadata = metadata_for_assignments(&extra);
         assert!(
-            export_cluster_deltas(&fixture(), &extra, &metadata())
+            export_cluster_deltas(&fixture(), &extra, &extra_metadata)
                 .unwrap_err()
                 .to_string()
                 .contains("manifest contains episodes with no evaluator outcomes")
@@ -1055,8 +1065,9 @@ mod tests {
             .into_iter()
             .filter(|assignment| assignment.cluster_id.as_str() <= "scene-02")
             .collect();
+        let frozen_metadata = metadata_for_assignments(&frozen);
         assert!(
-            export_cluster_deltas(&rows, &frozen, &metadata())
+            export_cluster_deltas(&rows, &frozen, &frozen_metadata)
                 .unwrap_err()
                 .to_string()
                 .contains("at least 5 independent clusters")
