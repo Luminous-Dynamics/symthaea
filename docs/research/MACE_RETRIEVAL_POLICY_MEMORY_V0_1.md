@@ -109,16 +109,17 @@ Never present warmed-up results as cold-start. Do not fold consolidation cost ou
 
 ## 7. Security and governance boundaries
 
-This local module is a deterministic in-memory reference implementation. It does not provide:
-- durable or crash-safe storage;
+This local module includes an in-memory policy engine plus a local append-only receipt-store adapter. It does not provide:
+- an independently administered or rollback-resistant trust anchor;
 - multi-process atomic promotion;
 - cryptographic issuer authentication;
 - authorization to call tools or read sources;
 - proof that a tool actually returned the cited source ID;
 - evidence qualification, semantic truth or decision sufficiency;
-- defense against an attacker who can rewrite the trace store and its digests.
+- persistence of promoted strategy notes (trace receipts can be replayed, but promotion must be recomputed);
+- defense against an attacker who can rewrite or roll back the trace store and its digests.
 
-Production requires durable write receipts, tenant-aware authorization, source-observation receipts, tamper-evident storage with independent witness custody, access-controlled note namespaces and replayable consolidation manifests. Tool execution must independently enforce rights/scope regardless of strategy-note content.
+Production still requires separately administered witness custody, authenticated source-observation receipts, tenant-aware authorization, access-controlled note namespaces and replayable consolidation manifests. The local file adapter writes canonical receipts create-once via temporary-file fsync and atomic hard-link publication, restricts the directory to 0700 and files to 0600 on Unix, and replays strict receipt JSON into the in-memory policy store on restart. It shares the benchmark workspace/backup domain and therefore does not defend against whole-workspace rollback. Tool execution must independently enforce rights/scope regardless of strategy-note content.
 
 A strategy note is advisory and untrusted. It may propose an action sequence; the execution layer must re-authorize every actual tool call and the evidence layer must qualify every result.
 
@@ -134,11 +135,15 @@ The companion V2 sidecar now emits one policy trace for each official query invo
 - latency: measured end-to-end sidecar query work;
 - inspected bytes: explicitly incomplete because the current BM25 index does not expose posting/index bytes read.
 
-The official opaque query invocation ID is used as the trace key. Python persists the receipt with the candidate-evidence receipt, independently recomputes the receipt SHA-256 and verifies that both records carry the same candidate-set digest. Restore fails closed when either saved directory is missing and checks the trace stop reason and operation/evidence consistency. Rust and Python share a pinned receipt-hash reference vector.
+The official opaque query invocation ID is used as the trace key. The Rust sidecar and Python shim share the same `retrieval_traces/` directory and invocation-derived filename. Rust publishes the canonical JSON receipt create-once through a temporary file, fsync and atomic hard link, then reloads all receipts into `RetrievalPolicyMemoryV1` at sidecar startup. Python independently recomputes the receipt SHA-256, verifies the exact persisted bytes, and checks that each trace pairs with one candidate-evidence receipt carrying the same candidate-set digest. Restore fails closed when either saved directory is missing and checks trace stop reason, operation/evidence consistency and resource-accounting completeness. Rust and Python share a pinned receipt-hash reference vector.
 
-This is **single-operation trace capture**, not multi-step strategy learning. The V2 BM25 adapter does not yet choose alternate tools or promote a search sequence. The Rust policy-memory state remains process-local; Python stores audit/replay receipt JSON but does not restore the in-memory promotion state on process restart. Cross-query consolidation and durable promotion remain future work.
+This is **single-operation trace capture**, not multi-step strategy learning. The V2 BM25 adapter does not yet choose alternate tools or automatically promote a search sequence. Persisted traces are restored across sidecar restarts and can support later re-promotion; strategy notes themselves are not yet persisted. The local trace store shares the benchmark workspace's rollback domain, so restoring the whole workspace can roll back the trace history too. Cross-query consolidation, persistent note storage and independent witness custody remain future work.
 
-## 9. Rust API
+## 9. Durable receipt storage
+
+The Rust reference file store is in `research/broca-mace-transfer-bench-v0-1/aml-adapter/src/retrieval_policy_store.rs`. It strictly decodes canonical trace JSON, binds filenames to the opaque invocation ID, enforces file/count bounds, rejects symlinks/non-regular entries and replays receipts into the policy store. Four tests cover restart replay, create-once idempotency/conflict, tamper rejection and interrupted pending files. The store is a local conformance adapter, not an external witness service.
+
+## 10. Rust API
 
 The reference API is in:
 
@@ -150,13 +155,13 @@ research/broca-mace-transfer-bench-v0-1/aml-adapter/src/retrieval_policy_memory.
 
 The eleven Rust unit tests cover invocation idempotency/rebinding, minimum support, duplicate query exclusion, domain/environment/tool-profile/strategy isolation, expiry, resource accounting, invalid success claims, insufficient search budgets, input-size limits, explicit byte-accounting completeness and a cross-language retrieval-trace receipt hash vector.
 
-## 10. Next implementation stages
+## 11. Next implementation stages
 
-1. Compile, rustfmt, Clippy and execute the 11 policy-memory unit tests at the exact PR head.
-2. Add strict JSONL serialization for trace receipts and strategy notes, plus canonical schema files.
-3. Build a persistent receipt store with create-once invocation binding and atomic promotion.
-4. Extend the current one-operation V2 trace capture into a multi-step, label-blind tool/controller trace using the official opaque invocation ID and no evaluator metadata.
+1. Compile, rustfmt, Clippy and execute the 13 policy-memory and 4 file-store tests at the exact PR head.
+2. Add canonical schema and replay receipts for promoted strategy notes, then atomically persist those notes against the supporting trace digests.
+3. Replace the single BM25 operation with a multi-step, label-blind tool/controller trace using the official opaque invocation ID and no evaluator metadata.
+4. Add actual posting/index byte and RSS instrumentation; never infer zero from missing telemetry.
 5. Run the seven-arm ablation with cold/warm and randomized order; compare AgentRunbook-C V2 Online using its native protocol.
-6. Restore validated trace receipts into a durable policy service, then add independent source-observation receipts and qualification checks before strategy-supported actions can influence consequential decisions.
+6. Move trace and note custody into a separately administered witness/policy service, add independent source-observation receipts and qualification checks, and test whole-workspace rollback separately from local process restart.
 
 **No MACE benchmark result is claimed by this research prototype.**
