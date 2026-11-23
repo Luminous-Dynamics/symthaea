@@ -15,8 +15,8 @@ use std::fmt;
 use serde::{Deserialize, Serialize};
 
 use crate::mycelial_reconstruction_metrics::{
-    AnnotatedJunctionKind, AnnotatedMycelialSkeleton, ReconstructionDimensionality,
-    ReconstructionLengthUnit, MycelialReconstructionError,
+    AnnotatedJunctionKind, AnnotatedMycelialSkeleton, MycelialReconstructionError,
+    ReconstructionDimensionality, ReconstructionLengthUnit,
 };
 
 pub const MYCELIAL_GRAPH_SIDECAR_SCHEMA_VERSION: u16 = 1;
@@ -109,11 +109,17 @@ impl fmt::Display for MycelialGraphSidecarError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidSchemaVersion(version) => {
-                write!(f, "unsupported mycelial graph sidecar schema version {version}")
+                write!(
+                    f,
+                    "unsupported mycelial graph sidecar schema version {version}"
+                )
             }
             Self::InvalidMetadata => write!(f, "invalid mycelial graph sidecar metadata"),
             Self::InvalidSourceReference => {
-                write!(f, "invalid image-container URI, group path or source reference")
+                write!(
+                    f,
+                    "invalid image-container URI, group path or source reference"
+                )
             }
             Self::SourceGraphBindingMismatch => write!(
                 f,
@@ -128,7 +134,10 @@ impl fmt::Display for MycelialGraphSidecarError {
                 write!(f, "invalid external object mapping {id}")
             }
             Self::DuplicateOrUnorderedExternalMapping(id) => {
-                write!(f, "external object mappings are duplicated or unordered at {id}")
+                write!(
+                    f,
+                    "external object mappings are duplicated or unordered at {id}"
+                )
             }
         }
     }
@@ -149,7 +158,9 @@ fn valid_digest(value: &str) -> bool {
 fn valid_uri(value: &str) -> bool {
     if value.is_empty()
         || value.len() > MAX_MYCELIAL_GRAPH_SIDECAR_URI_BYTES
-        || value.bytes().any(|byte| byte.is_ascii_whitespace() || byte.is_ascii_control())
+        || value
+            .bytes()
+            .any(|byte| byte.is_ascii_whitespace() || byte.is_ascii_control())
     {
         return false;
     }
@@ -213,9 +224,7 @@ fn hash_graph_content(hasher: &mut blake3::Hasher, graph: &AnnotatedMycelialSkel
     }
 }
 
-fn mapping_order_key(
-    mapping: &MycelialExternalObjectMapping,
-) -> (&str, &str, &str) {
+fn mapping_order_key(mapping: &MycelialExternalObjectMapping) -> (&str, &str, &str) {
     (
         mapping.target_system_id.as_str(),
         mapping.target_dataset_id.as_str(),
@@ -317,10 +326,18 @@ impl MycelialGraphSidecar {
             ));
         }
 
-        let junction_ids: BTreeSet<_> =
-            self.graph.junctions.iter().map(|item| item.id.as_str()).collect();
-        let segment_ids: BTreeSet<_> =
-            self.graph.segments.iter().map(|item| item.id.as_str()).collect();
+        let junction_ids: BTreeSet<_> = self
+            .graph
+            .junctions
+            .iter()
+            .map(|item| item.id.as_str())
+            .collect();
+        let segment_ids: BTreeSet<_> = self
+            .graph
+            .segments
+            .iter()
+            .map(|item| item.id.as_str())
+            .collect();
         let mut external_keys = BTreeSet::new();
         let mut previous_key: Option<(&str, &str, &str)> = None;
         for mapping in &self.external_object_mappings {
@@ -485,9 +502,7 @@ pub struct MycelialGraphSidecarRoundTripReport {
     pub lossless_graph_round_trip: bool,
 }
 
-fn graph_topology(
-    graph: &AnnotatedMycelialSkeleton,
-) -> (usize, usize, Vec<usize>) {
+fn graph_topology(graph: &AnnotatedMycelialSkeleton) -> (usize, usize, Vec<usize>) {
     let mut index_by_id = BTreeMap::new();
     for (index, junction) in graph.junctions.iter().enumerate() {
         index_by_id.insert(junction.id.as_str(), index);
@@ -543,9 +558,10 @@ pub fn assess_mycelial_graph_interoperability(
     sidecar: &MycelialGraphSidecar,
 ) -> Result<MycelialGraphInteroperabilityAssessment, MycelialGraphSidecarError> {
     sidecar.validate()?;
-    let graph_digest = sidecar.graph.canonical_digest_hex().map_err(|error| {
-        MycelialGraphSidecarError::InvalidGraph(error.to_string())
-    })?;
+    let graph_digest = sidecar
+        .graph
+        .canonical_digest_hex()
+        .map_err(|error| MycelialGraphSidecarError::InvalidGraph(error.to_string()))?;
     let (connected_component_count, cycle_rank, degree) = graph_topology(&sidecar.graph);
     let branch_junction_count = degree.iter().filter(|degree| **degree >= 3).count();
     let forest_topology_compatible_with_swc = cycle_rank == 0;
@@ -578,12 +594,14 @@ pub fn evaluate_mycelial_graph_sidecar_round_trip(
 ) -> Result<MycelialGraphSidecarRoundTripReport, MycelialGraphSidecarError> {
     source.validate()?;
     imported.validate()?;
-    let source_graph_digest = source.graph.canonical_digest_hex().map_err(|error| {
-        MycelialGraphSidecarError::InvalidGraph(error.to_string())
-    })?;
-    let imported_graph_digest = imported.graph.canonical_digest_hex().map_err(|error| {
-        MycelialGraphSidecarError::InvalidGraph(error.to_string())
-    })?;
+    let source_graph_digest = source
+        .graph
+        .canonical_digest_hex()
+        .map_err(|error| MycelialGraphSidecarError::InvalidGraph(error.to_string()))?;
+    let imported_graph_digest = imported
+        .graph
+        .canonical_digest_hex()
+        .map_err(|error| MycelialGraphSidecarError::InvalidGraph(error.to_string()))?;
     let graph_digest_match = source_graph_digest == imported_graph_digest;
     let source_observation_digest_match =
         source.source.source_observation_digest == imported.source.source_observation_digest;
@@ -591,10 +609,8 @@ pub fn evaluate_mycelial_graph_sidecar_round_trip(
         source.graph.coordinate_frame_id == imported.graph.coordinate_frame_id;
     let calibration_digest_match =
         source.graph.calibration_digest == imported.graph.calibration_digest;
-    let junction_count_match =
-        source.graph.junctions.len() == imported.graph.junctions.len();
-    let segment_count_match =
-        source.graph.segments.len() == imported.graph.segments.len();
+    let junction_count_match = source.graph.junctions.len() == imported.graph.junctions.len();
+    let segment_count_match = source.graph.segments.len() == imported.graph.segments.len();
     let source_assessment = assess_mycelial_graph_interoperability(source)?;
     let imported_assessment = assess_mycelial_graph_interoperability(imported)?;
     let cycle_rank_match = source_assessment.cycle_rank == imported_assessment.cycle_rank;
@@ -647,22 +663,38 @@ mod tests {
                 AnnotatedJunction {
                     id: "A".to_string(),
                     kind: AnnotatedJunctionKind::Origin,
-                    position: ReconstructionPoint3 { x: 0.0, y: 0.0, z: 0.0 },
+                    position: ReconstructionPoint3 {
+                        x: 0.0,
+                        y: 0.0,
+                        z: 0.0,
+                    },
                 },
                 AnnotatedJunction {
                     id: "B".to_string(),
                     kind: AnnotatedJunctionKind::Branch,
-                    position: ReconstructionPoint3 { x: 10.0, y: 0.0, z: 0.0 },
+                    position: ReconstructionPoint3 {
+                        x: 10.0,
+                        y: 0.0,
+                        z: 0.0,
+                    },
                 },
                 AnnotatedJunction {
                     id: "C".to_string(),
                     kind: AnnotatedJunctionKind::Tip,
-                    position: ReconstructionPoint3 { x: 20.0, y: 0.0, z: 0.0 },
+                    position: ReconstructionPoint3 {
+                        x: 20.0,
+                        y: 0.0,
+                        z: 0.0,
+                    },
                 },
                 AnnotatedJunction {
                     id: "D".to_string(),
                     kind: AnnotatedJunctionKind::Tip,
-                    position: ReconstructionPoint3 { x: 10.0, y: 10.0, z: 0.0 },
+                    position: ReconstructionPoint3 {
+                        x: 10.0,
+                        y: 10.0,
+                        z: 0.0,
+                    },
                 },
             ],
             segments: vec![
@@ -810,10 +842,12 @@ mod tests {
         assert_eq!(report.cycle_rank, 1);
         assert!(!report.forest_topology_compatible_with_swc);
         assert!(!report.swc_geometry_export_ready);
-        assert!(report
-            .swc_blocked_reasons
-            .iter()
-            .any(|reason| reason == "cyclic_graph_cannot_be_losslessly_encoded_as_swc"));
+        assert!(
+            report
+                .swc_blocked_reasons
+                .iter()
+                .any(|reason| reason == "cyclic_graph_cannot_be_losslessly_encoded_as_swc")
+        );
     }
 
     #[test]
@@ -824,10 +858,12 @@ mod tests {
         assert_eq!(report.cycle_rank, 0);
         assert!(report.forest_topology_compatible_with_swc);
         assert!(!report.swc_geometry_export_ready);
-        assert!(report
-            .swc_blocked_reasons
-            .iter()
-            .any(|reason| reason == "centerline_samples_are_not_present_in_source_schema"));
+        assert!(
+            report
+                .swc_blocked_reasons
+                .iter()
+                .any(|reason| reason == "centerline_samples_are_not_present_in_source_schema")
+        );
     }
 
     #[test]
