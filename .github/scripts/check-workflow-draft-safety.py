@@ -176,6 +176,8 @@ def require_ready_event(path: Path, pr_block: list[str]) -> None:
 
 def validate_generic(path: Path, text: str, pr_block: list[str]) -> tuple[int, int]:
     jobs = parse_jobs(text)
+    # Report all runner allocations, but gate ready_for_review only on jobs
+    # that can actually be scheduled by a pull_request event.
     runner_jobs = 0
     pr_runner_jobs = 0
     draft_guarded = 0
