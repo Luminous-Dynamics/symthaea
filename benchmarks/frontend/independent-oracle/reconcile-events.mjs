@@ -81,20 +81,26 @@ const eventById=new Map(fixture.events.map(e=>[e.event_id,e]));if(eventById.size
 function runCase(c){const s=newState(fixture.initial_state);for(const step of c.steps){if(step.op==='submit')submit(s,step.action);else if(step.op==='deliver'){const e=eventById.get(step.event_id);if(!e)throw new Error(`${c.case_id}: unknown event`);deliver(s,e);}else throw new Error(`${c.case_id}: unknown step`);}const out=snapshot(s);assertSubset(out,c.expected);return out;}
 const results=new Map(fixture.cases.map(c=>[c.case_id,runCase(c)]));
 for(const r of fixture.metamorphic_pairs){if(!results.has(r.left_case)||!results.has(r.right_case))throw new Error(`${r.relation_id}: case missing`);if(JSON.stringify(results.get(r.left_case))!==JSON.stringify(results.get(r.right_case)))throw new Error(`${r.relation_id}: outputs differ`);}
-// Exhaust every delivery order for the fixture's authoritative event stream.
-// Each permutation is then replayed in reverse to verify identity idempotency.
+// Exhaust every causally valid delivery order for the first six events.
+// Event 7 acknowledges a user action that is valid only after event 6 resolves the conflict.
+// Each permutation is replayed with the final action/ack, then all identities are replayed in reverse.
 function verifyAllDeliveryOrders(){
- const events=fixture.events,canonical=newState(fixture.initial_state);
- for(const event of events)deliver(canonical,event);
+ const events=fixture.events;
+ const clarification=fixture.cases.find(c=>c.case_id==='clarification-gates-mutation-until-resolved');
+ const finalAction=clarification.steps.find(step=>step.op==='submit'&&step.action.action_id==='act-clear').action;
+ const canonical=newState(fixture.initial_state);
+ for(const event of events.slice(0,6))deliver(canonical,event);
+ submit(canonical,finalAction);deliver(canonical,events[6]);
  const expected=snapshot(canonical);expected.duplicate_deliveries=events.length;
- const order=events.map((_,i)=>i);let checked=0;
+ const order=events.slice(0,6).map((_,i)=>i);let checked=0;
  function visit(start){
   if(start===order.length){
    const state=newState(fixture.initial_state);
    for(const index of order)deliver(state,events[index]);
-   for(const index of [...order].reverse())deliver(state,events[index]);
+   submit(state,finalAction);deliver(state,events[6]);
+   for(const event of [...events].reverse())deliver(state,event);
    const actual=snapshot(state);
-   if(JSON.stringify(actual)!==JSON.stringify(expected))throw new Error(`event delivery order failed to converge: ${order.join(',')}`);
+   if(JSON.stringify(actual)!==JSON.stringify(expected))throw new Error(`causally valid event order failed to converge: ${order.join(',')}`);
    checked++;return;
   }
   for(let i=start;i<order.length;i++){[order[start],order[i]]=[order[i],order[start]];visit(start+1);[order[start],order[i]]=[order[i],order[start]];}
