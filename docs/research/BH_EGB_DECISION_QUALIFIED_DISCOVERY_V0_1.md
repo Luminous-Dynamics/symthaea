@@ -183,3 +183,23 @@ S' = P S P^{\mathsf T},\qquad
 The synthetic mixed-basis transform is \(P=\begin{bmatrix}2&1\\1&1\end{bmatrix}\), with transported mean \([4,3]\) and covariance \(\begin{bmatrix}7&9/2\\9/2&3\end{bmatrix}\). The unit transform is \(U=\mathrm{diag}(1000,1/100)\), with mean \([1000,1/50]\) and covariance \(\begin{bmatrix}1000000&5\\5&1/10000\end{bmatrix}\). Both preserve the exact score 4. These controls test the algebraic rule that coordinates, units and covariance must move together; they do not verify any physical endpoint metric. Symtropy #7131 remains authoritative for the actual horizon/infinity Gram metrics and their transport.
 
 The covariance fixture now has four exact properties: correlated covariance is respected; duplicate observables do not create information; invertible basis changes preserve the score; and unit rescaling preserves the score. All values are synthetic known answers.
+
+
+## Decision value versus information gain: exact Stage-A oracle
+
+A third finite synthetic control distinguishes research-action allocation (Stage A) from numerical design (Stage B).
+
+Four equiprobable latent states fall into two decision classes, A and B. The pre-action Bayes risk under zero-one loss is \(1/2\). Two equally costly actions each reveal exactly one bit:
+
+- **A_entropy_only** reveals a within-class subtype. It distinguishes states but leaves the posterior decision-class risk at \(1/2\). Gross decision value is zero; with cost \(1/10\), net VoC is \(-1/10\).
+- **B_decision_relevant** reveals the decision class. It reduces posterior Bayes risk to zero. Gross decision value is \(1/2\); with the same cost, net VoC is \(2/5\).
+
+The exact finite oracle selects B even though both actions have identical one-bit information gain and identical cost. This is the concrete reason to optimize decision value / cost-to-qualified-decision rather than maximize entropy reduction or model disagreement.
+
+Artifacts:
+
+- **BH_EGB_DECISION_VALUE_CONTROL_V0_1.json** — fully enumerated exact state/action oracle.
+- **verify_bh_egb_decision_value.py** — exact-rational replay and four hostile mutations.
+- **BH_EGB_DECISION_VALUE_VERIFICATION_RECEIPT_V0_1.json** — replay receipt.
+
+This is a deterministic toy oracle, not a learned policy, real-world utility function, or calibrated EGB action model. Before using this logic in the live #8721/#11171 Stage-A policy, actions must bind to actual claim dispositions and independently measured resource costs; any probability forecast must be calibrated prospectively.
