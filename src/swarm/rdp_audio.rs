@@ -58,7 +58,10 @@ impl std::fmt::Display for AudioFrameEncodeError {
                 "{sample_values} sample values do not form complete {channels}-channel frames"
             ),
             Self::TooManySampleFrames { sample_frames, max } => {
-                write!(f, "audio chunk has {sample_frames} sample frames; maximum is {max}")
+                write!(
+                    f,
+                    "audio chunk has {sample_frames} sample frames; maximum is {max}"
+                )
             }
             Self::PayloadTooLarge {
                 encoded_bytes,
@@ -94,7 +97,7 @@ impl std::fmt::Display for AudioFrameDecodeError {
             Self::ZeroSampleRate => write!(f, "audio frame sample rate must be non-zero"),
             Self::ZeroSampleCount => {
                 write!(f, "audio frame must contain at least one sample frame")
-            },
+            }
             Self::PayloadTooLarge {
                 payload_bytes,
                 max_bytes,
