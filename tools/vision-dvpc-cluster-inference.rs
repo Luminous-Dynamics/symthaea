@@ -7,6 +7,8 @@
 //! cluster and predeclared comparison. It does not accept per-frame rows.
 //! Percentile intervals are approximate cluster-bootstrap intervals;
 //! sign-flip p-values rely on the declared cluster-level symmetry assumption.
+//! The independently frozen episode-to-cluster assignment manifest is a
+//! separate input commitment from the evidence-bundle lock.
 //! Neither output is an automatic SOTA verdict.
 //!
 //! Usage:
