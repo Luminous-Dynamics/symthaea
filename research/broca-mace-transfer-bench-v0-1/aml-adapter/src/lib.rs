@@ -2,6 +2,7 @@ pub mod submission;
 pub mod raw_session;
 pub mod longmemeval_v2;
 pub mod candidate_evidence;
+pub mod qualified_candidate_evidence;
 pub mod longmemeval_v2_candidate_adapter;
 pub mod retrieval_policy_memory;
 pub mod retrieval_policy_store;
