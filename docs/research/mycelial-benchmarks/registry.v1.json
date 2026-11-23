@@ -244,6 +244,138 @@
         "CFU detection limit and non-arrival coding",
         "Per-file data license"
       ]
+    },
+    {
+      "dataset_id": "fna_multitaxa_images_2021",
+      "title": "Fungal Network Analysis — multi-taxa microscopy images and processing parameters",
+      "publication_doi": "https://doi.org/10.1038/s43705-021-00085-1",
+      "artifact_urls": [
+        "https://doi.org/10.5281/zenodo.5725751"
+      ],
+      "code_url": "https://doi.org/10.5281/zenodo.14931863",
+      "software_license": "Fungal Network Analysis software package is separately versioned at Zenodo; packaged v1.00.24 requires MATLAB 2024b or uses Windows standalone. Pin exact archive/build before comparison.",
+      "access_status": "public_source_data",
+      "data_rights": {
+        "status": "per_artifact_review_required",
+        "notes": "Zenodo record 5725751 exposes a blank License field; OpenAIRE indexes CC BY for the record, but validate the actual file-level metadata and source-image rights before reuse or redistribution. Do not infer data rights from the software package."
+      },
+      "ingestion_status": "metadata_only_not_ingested",
+      "published_sample_summary": "3.2 GB of mycelial images from basidiomycetes, ascomycetes and zygomycetes, with associated species keys and Fungal Network Analysis processing parameter files.",
+      "benchmark_tasks": [
+        "multi-taxa 2D segmentation",
+        "skeletonization and connectivity preservation",
+        "width/length/orientation extraction",
+        "graph topology and ecological trait reproduction"
+      ],
+      "independent_unit": "Original fungal specimen and acquisition image series; recover specimen/source grouping from names_key.xlsx and source metadata.",
+      "split_requirements": [
+        "Keep images from the same specimen/acquisition series in one split.",
+        "Hold out fungal taxa and acquisition conditions separately for domain transfer.",
+        "Reproduce FNA parameters and report tuning budget; do not tune on the final holdout."
+      ],
+      "known_limitations": [
+        "Zenodo's visible License field is blank, although OpenAIRE indexes CC BY; file-level rights require verification.",
+        "This is principally image and parameter data; it is not a calibrated 3D contact ground-truth benchmark.",
+        "FNA's connectivity-preserving over-segmentation followed by edge pruning is a strong baseline and must be reproduced rather than approximated."
+      ],
+      "source_manifest_requirements": [
+        "Zenodo DOI/version and per-file digests",
+        "Per-file license/rightsholder verification",
+        "Species/source image keys",
+        "Original acquisition/specimen mapping",
+        "FNA software build and parameter files"
+      ]
+    },
+    {
+      "dataset_id": "fna_grazer_timeseries_2025",
+      "title": "Fungal Network Grazer Analysis — four-species time-series images and processed data",
+      "publication_doi": "https://doi.org/10.1111/ele.70281",
+      "artifact_urls": [
+        "https://doi.org/10.5281/zenodo.14931953"
+      ],
+      "code_url": "https://github.com/aguilart/FungalGrazers",
+      "software_license": "FungalGrazers R repository license and FNA binary license are separate; inspect/pin each before execution or reuse.",
+      "access_status": "public_source_data",
+      "data_rights": {
+        "status": "per_artifact_review_required",
+        "notes": "The Zenodo record exposes a blank License field. It contains legacy experimental images from Crowther et al. (2011), parameter files and processed outputs; verify source image rights and reuse permission per artifact before redistribution."
+      },
+      "ingestion_status": "metadata_only_not_ingested",
+      "published_sample_summary": "10.2 GB across four fungal species (Hypholoma fasciculare, Phanerochaete velutina, Phallus impudicus and Resinicium bicolor) growing from wood-block resources over compressed soil, with and without invertebrate grazers. ZIPs include original time-series images, FNA parameters and processed outputs; FNA version 1.00.24 is identified in the record.",
+      "benchmark_tasks": [
+        "longitudinal colony expansion",
+        "grazing-treatment response",
+        "multi-species 2D network traits",
+        "topology/connectivity under perturbation",
+        "reproduction of published FNA outputs"
+      ],
+      "independent_unit": "Independent soil-box/wood-block experiment and fungal species/replicate. Recover the exact experimental-unit map from source metadata before splitting.",
+      "split_requirements": [
+        "Keep all frames, images, parameter files and processed outputs from one wood-block/soil-box replicate in one split.",
+        "Use leave-species-out and leave-treatment-out tests in addition to replicate-held-out tests.",
+        "Do not treat individual frames or processed edge measurements as independent replicates."
+      ],
+      "known_limitations": [
+        "The Zenodo record's visible License field is blank; source image rights require clarification.",
+        "Dataset was produced with FNA v1.00.24; compare using that pinned processing version and report deviations.",
+        "Ecological treatment/time-series data are not 3D geometry or direct measurements of cytoplasmic/resource flux."
+      ],
+      "source_manifest_requirements": [
+        "Zenodo DOI/version and per-file checksums",
+        "Species and treatment assignment",
+        "Wood-block/soil-box replicate mapping",
+        "Timepoint and acquisition metadata",
+        "FNA v1.00.24 parameters and software archive",
+        "Data rights/permission by original image source"
+      ]
+    },
+    {
+      "dataset_id": "skelpy_2026_code_examples",
+      "title": "SkelPy — fungal skeletonization software and example images",
+      "publication_doi": "https://doi.org/10.1002/aps3.70049",
+      "artifact_urls": [
+        "https://github.com/AaronMoseley/SkelPy",
+        "https://github.com/melaniemadrigal07/Post.ImageProcessing"
+      ],
+      "code_url": "https://github.com/AaronMoseley/SkelPy",
+      "software_license": "Repository license must be checked at the exact code commit; do not assume the article's CC BY-NC 4.0 license applies to the code or example images.",
+      "access_status": "public_repository",
+      "data_rights": {
+        "status": "per_artifact_review_required",
+        "license_label": "Article: CC BY-NC 4.0",
+        "notes": "The paper states that the SkelPy repository contains source code and example images. The full 180-image time series is not stated as publicly available. Check the GitHub repository's code and example-image license separately; article CC BY-NC terms do not automatically apply to repository contents."
+      },
+      "ingestion_status": "metadata_only_not_ingested",
+      "published_sample_summary": "The paper's study imaged three Botrytis cinerea isolates in liquid culture over 72 hours at 20 four-hourly timepoints (180 time-series images). It also reports a throughput run of 3,842 images. Only code and example images are stated as publicly available; the full raw 180-image series should be treated as author-access dependent until confirmed.",
+      "benchmark_tasks": [
+        "time-series 2D skeletonization",
+        "centerline and nearest-skeleton distance",
+        "node precision/recall",
+        "network trait extraction",
+        "processing time and memory",
+        "calibrated physical-coordinate export"
+      ],
+      "independent_unit": "Independent fungal isolate/culture replicate and well/plate series; all timepoints from a biological series must remain together.",
+      "split_requirements": [
+        "Do not split 20 timepoints from one well/series across train and test.",
+        "Use leave-isolate-out and biological-replicate-held-out evaluation.",
+        "Separate node-level validation (30 images) from spatial-grid cell validation (30 sampled cells).",
+        "Do not compare its grid-cell F1 directly with a crossing-detection F1 from another task."
+      ],
+      "known_limitations": [
+        "SkelPy's image acquisition was consistently focused at the bottom of each well and constitutes a 2D planar projection, not complete 3D network truth.",
+        "The article reports a 0.0046 normalized-image-width mean nearest-skeleton distance, node precision 80.8% on 30 images, and a separate spatial-cell F1 of 0.905 from 30 sampled cells; these are distinct protocols.",
+        "The full 180-image raw series is not identified as a public download; only code and example images are stated to be available.",
+        "The article's CC BY-NC 4.0 license does not establish repository-code or example-image licenses."
+      ],
+      "source_manifest_requirements": [
+        "Paper DOI and version",
+        "Exact Git commits for SkelPy and downstream R analysis",
+        "Per-file code/example image digests and licenses",
+        "Isolate/well/replicate/timepoint grouping",
+        "Imaging plane, scale and calibration metadata",
+        "Author permission for full raw image series if requested"
+      ]
     }
   ]
 }
