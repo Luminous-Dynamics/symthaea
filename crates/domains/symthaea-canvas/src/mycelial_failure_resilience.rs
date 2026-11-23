@@ -1991,8 +1991,7 @@ impl MycelialFailureDeliveryProfile {
     pub fn canonical_digest_hex(&self) -> Result<String, MycelialFailureResilienceError> {
         if self.scenarios.len() > MAX_FAILURE_SCENARIOS
             || self.trials.len()
-                > MAX_FAILURE_SCENARIOS
-                    .saturating_mul(MAX_FAILURE_DELIVERY_TRIALS_PER_SCENARIO)
+                > MAX_FAILURE_SCENARIOS.saturating_mul(MAX_FAILURE_DELIVERY_TRIALS_PER_SCENARIO)
         {
             return Err(MycelialFailureResilienceError::InvalidDeliveryProfile(
                 "delivery profile exceeds digest resource limits",
