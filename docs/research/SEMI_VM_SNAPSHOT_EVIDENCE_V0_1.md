@@ -25,7 +25,7 @@ The snapshot receipt binds the model artifact/configuration, split manifest, pre
 Each consumed row records:
 - label ID and revision;
 - subject, measurand and measurement-event ID;
-- label source-artifact digest;
+- label source-artifact digest and full label-payload SHA-256 (value, uncertainty, revision and metadata);
 - measurement digest and original qualification-report digest;
 - calibration certificate identity and digest;
 - K0 calibration-frontier digest;
@@ -114,7 +114,8 @@ The current unit tests cover:
 13. changed model/preprocessing digest changes the manifest;
 14. stored manifest tampering rejection;
 15. evaluation snapshot with blocked row becomes historical-only;
-16. actual stored-manifest digest validation before replay.
+16. actual stored-manifest digest validation before replay;
+17. numeric label uncertainty edits change the explicit label-payload and snapshot-manifest digests.
 
 Tests are authored, not yet claimed as passing. Exact-head rustfmt, strict Clippy, crate tests and SEMI-BENCH-001 reference workflow are required.
 
