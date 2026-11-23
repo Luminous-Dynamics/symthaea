@@ -1,0 +1,159 @@
+{
+  "case_id": "SEMI-BENCH-001-THRESHOLD-KA-001",
+  "fallback_threshold": 0.5,
+  "fallback_used": false,
+  "minimum_validation_precision": 0.9,
+  "schema": "luminous.semi-bench.validation-threshold-report.v1",
+  "selection": {
+    "threshold": 0.91,
+    "validation_fp": 0,
+    "validation_precision": 1,
+    "validation_recall": 0.6,
+    "validation_tp": 3
+  },
+  "test_metrics": {
+    "case_id": "SEMI-BENCH-001-THRESHOLD-KA-001",
+    "class_counts": {
+      "negative": 5,
+      "positive": 5
+    },
+    "probability_metrics": {
+      "brier_score": 0.21692,
+      "calibration_bins": [
+        {
+          "bin": 0,
+          "count": 1,
+          "ece_contribution": 0.01,
+          "lower_inclusive": 0,
+          "mean_score": 0.1,
+          "observed_positive_rate": 0,
+          "upper_exclusive": 0.25
+        },
+        {
+          "bin": 1,
+          "count": 1,
+          "ece_contribution": 0.03,
+          "lower_inclusive": 0.25,
+          "mean_score": 0.3,
+          "observed_positive_rate": 0,
+          "upper_exclusive": 0.5
+        },
+        {
+          "bin": 2,
+          "count": 2,
+          "ece_contribution": 0.015,
+          "lower_inclusive": 0.5,
+          "mean_score": 0.575,
+          "observed_positive_rate": 0.5,
+          "upper_exclusive": 0.75
+        },
+        {
+          "bin": 3,
+          "count": 6,
+          "ece_contribution": 0.123,
+          "lower_inclusive": 0.75,
+          "mean_score": 0.871666666667,
+          "observed_positive_rate": 0.666666666667,
+          "upper_exclusive": null
+        }
+      ],
+      "expected_calibration_error": 0.178
+    },
+    "ranking_metrics": {
+      "auroc": 0.72,
+      "average_precision": 0.729523809524,
+      "fpr_at_recall": {
+        "achieved_recall": 0.8,
+        "false_positive_rate": 0.4,
+        "target_recall": 0.75,
+        "threshold": 0.75
+      }
+    },
+    "risk_coverage": [
+      {
+        "accepted": 1,
+        "coverage": 0.1,
+        "errors": 0,
+        "minimum_confidence_inclusive": 0.99,
+        "risk": 0
+      },
+      {
+        "accepted": 2,
+        "coverage": 0.2,
+        "errors": 1,
+        "minimum_confidence_inclusive": 0.92,
+        "risk": 0.5
+      },
+      {
+        "accepted": 3,
+        "coverage": 0.3,
+        "errors": 1,
+        "minimum_confidence_inclusive": 0.91,
+        "risk": 0.333333333333
+      },
+      {
+        "accepted": 4,
+        "coverage": 0.4,
+        "errors": 1,
+        "minimum_confidence_inclusive": 0.9,
+        "risk": 0.25
+      },
+      {
+        "accepted": 5,
+        "coverage": 0.5,
+        "errors": 2,
+        "minimum_confidence_inclusive": 0.86,
+        "risk": 0.4
+      },
+      {
+        "accepted": 6,
+        "coverage": 0.6,
+        "errors": 2,
+        "minimum_confidence_inclusive": 0.8,
+        "risk": 0.333333333333
+      },
+      {
+        "accepted": 7,
+        "coverage": 0.7,
+        "errors": 2,
+        "minimum_confidence_inclusive": 0.75,
+        "risk": 0.285714285714
+      },
+      {
+        "accepted": 8,
+        "coverage": 0.8,
+        "errors": 2,
+        "minimum_confidence_inclusive": 0.7,
+        "risk": 0.25
+      },
+      {
+        "accepted": 9,
+        "coverage": 0.9,
+        "errors": 2,
+        "minimum_confidence_inclusive": 0.65,
+        "risk": 0.222222222222
+      },
+      {
+        "accepted": 10,
+        "coverage": 1,
+        "errors": 3,
+        "minimum_confidence_inclusive": 0.5,
+        "risk": 0.3
+      }
+    ],
+    "sample_count": 10,
+    "schema": "luminous.semi-bench.binary-metrics.v1",
+    "threshold_metrics": {
+      "accuracy": 0.6,
+      "balanced_accuracy": 0.6,
+      "fn": 3,
+      "fp": 1,
+      "precision": 0.666666666667,
+      "sensitivity": 0.4,
+      "specificity": 0.8,
+      "threshold": 0.91,
+      "tn": 4,
+      "tp": 2
+    }
+  }
+}

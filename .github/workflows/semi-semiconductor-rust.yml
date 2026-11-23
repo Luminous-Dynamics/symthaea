@@ -1,0 +1,89 @@
+name: Semiconductor Rust Contract
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-semiconductor/**"
+      - "Cargo.lock"
+      - "docs/research/semi-bench-001/splits/**"
+      - "benchmarks/semi-bench-001/reference/fixtures/split-manifest-known-answer-v1*.json"
+      - ".github/workflows/semi-semiconductor-rust.yml"
+  push:
+    branches: [main, research/eng-semi-rust-contracts-v0.1]
+    paths:
+      - "crates/domains/symthaea-semiconductor/**"
+      - "Cargo.lock"
+      - "docs/research/semi-bench-001/splits/**"
+      - "benchmarks/semi-bench-001/reference/fixtures/split-manifest-known-answer-v1*.json"
+      - ".github/workflows/semi-semiconductor-rust.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  split-manifest-contract:
+    name: Rust split-manifest parity and SECOM source manifest
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      # The repository-wide workspace currently contains an unrelated missing
+      # path member on this ref. Validate this new crate in an isolated temporary
+      # workspace so cargo metadata does not depend on those unrelated members.
+      - name: Prepare isolated crate and golden fixtures
+        run: |
+          set -euo pipefail
+          export CHECK_ROOT="${RUNNER_TEMP}/semi-contract-check"
+          mkdir -p "${CHECK_ROOT}/crates/domains" \
+                   "${CHECK_ROOT}/benchmarks/semi-bench-001/reference" \
+                   "${CHECK_ROOT}/docs/research/semi-bench-001/splits/uci-secom-mirror-0d27427a"
+          cp -a crates/domains/symthaea-semiconductor "${CHECK_ROOT}/crates/domains/"
+          cp -a benchmarks/semi-bench-001/reference/fixtures "${CHECK_ROOT}/benchmarks/semi-bench-001/reference/"
+          cp -a docs/research/semi-bench-001/splits/uci-secom-mirror-0d27427a/chronological-60-20-20-v0.1.json \
+            "${CHECK_ROOT}/docs/research/semi-bench-001/splits/uci-secom-mirror-0d27427a/"
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          path = Path(os.environ["CHECK_ROOT"]) / "crates/domains/symthaea-semiconductor/Cargo.toml"
+          text = path.read_text()
+          replacements = {
+              'chrono = { workspace = true }': 'chrono = { version = "0.4", features = ["serde"] }',
+              'serde = { workspace = true }': 'serde = { version = "1.0", features = ["derive"] }',
+              'serde_json = { workspace = true }': 'serde_json = "1.0"',
+              'sha2 = { workspace = true }': 'sha2 = { version = "0.10", features = ["oid"] }',
+              'thiserror = { workspace = true }': 'thiserror = "1.0"',
+          }
+          for old, new in replacements.items():
+              if old not in text:
+                  raise SystemExit(f"Expected workspace dependency not found: {old}")
+              text = text.replace(old, new)
+          text += "\n[workspace]\nresolver = \"3\"\n"
+          path.write_text(text)
+          PY
+
+      - name: Format isolated crate
+        run: |
+          set -euo pipefail
+          ROOT="${RUNNER_TEMP}/semi-contract-check"
+          rustfmt --edition 2024 "$ROOT/crates/domains/symthaea-semiconductor/src/lib.rs"
+          rustfmt --edition 2024 "$ROOT/crates/domains/symthaea-semiconductor/src/benchmark/mod.rs"
+          rustfmt --edition 2024 "$ROOT/crates/domains/symthaea-semiconductor/src/benchmark/split_manifest.rs"
+          rustfmt --edition 2024 "$ROOT/crates/domains/symthaea-semiconductor/src/benchmark/binary_metrics.rs"
+          rustfmt --edition 2024 "$ROOT/crates/domains/symthaea-semiconductor/src/benchmark/threshold_policy.rs"
+          rustfmt --edition 2024 "$ROOT/crates/domains/symthaea-semiconductor/src/benchmark/inspection_decision.rs"
+          rustfmt --edition 2024 --check "$ROOT/crates/domains/symthaea-semiconductor/src/lib.rs"
+          rustfmt --edition 2024 --check "$ROOT/crates/domains/symthaea-semiconductor/src/benchmark/mod.rs"
+          rustfmt --edition 2024 --check "$ROOT/crates/domains/symthaea-semiconductor/src/benchmark/split_manifest.rs"
+          rustfmt --edition 2024 --check "$ROOT/crates/domains/symthaea-semiconductor/src/benchmark/binary_metrics.rs"
+          rustfmt --edition 2024 --check "$ROOT/crates/domains/symthaea-semiconductor/src/benchmark/threshold_policy.rs"
+          rustfmt --edition 2024 --check "$ROOT/crates/domains/symthaea-semiconductor/src/benchmark/inspection_decision.rs"
+
+      - name: Test Rust benchmark contracts
+        run: cargo test --manifest-path "${RUNNER_TEMP}/semi-contract-check/crates/domains/symthaea-semiconductor/Cargo.toml"
