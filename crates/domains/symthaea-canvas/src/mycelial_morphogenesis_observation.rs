@@ -158,7 +158,10 @@ impl fmt::Display for MycelialMorphogenesisObservationError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidSchemaVersion(version) => {
-                write!(f, "unsupported Mycelial morphogenesis observation schema version {version}")
+                write!(
+                    f,
+                    "unsupported Mycelial morphogenesis observation schema version {version}"
+                )
             }
             Self::InvalidIdentifier(field) => {
                 write!(f, "invalid or unbounded morphogenesis identifier: {field}")
@@ -170,19 +173,34 @@ impl fmt::Display for MycelialMorphogenesisObservationError {
                 write!(f, "invalid typed morphogenesis measurement: {field}")
             }
             Self::InvalidMissingReason => {
-                write!(f, "missing or censored morphogenesis observation requires a bounded reason")
+                write!(
+                    f,
+                    "missing or censored morphogenesis observation requires a bounded reason"
+                )
             }
             Self::EvidenceChainMismatch(field) => {
-                write!(f, "morphogenesis observation disagrees with evidence chain: {field}")
+                write!(
+                    f,
+                    "morphogenesis observation disagrees with evidence chain: {field}"
+                )
             }
             Self::ObservationNotInLedger => {
-                write!(f, "morphogenesis source observation is absent from the validated observation ledger")
+                write!(
+                    f,
+                    "morphogenesis source observation is absent from the validated observation ledger"
+                )
             }
             Self::SourceUnitMismatch => {
-                write!(f, "morphogenesis source-unit identity differs from observation ledger")
+                write!(
+                    f,
+                    "morphogenesis source-unit identity differs from observation ledger"
+                )
             }
             Self::ResourceLimitExceeded => {
-                write!(f, "morphogenesis observation exceeds canonical digest resource limits")
+                write!(
+                    f,
+                    "morphogenesis observation exceeds canonical digest resource limits"
+                )
             }
         }
     }
@@ -197,7 +215,9 @@ fn validate_identifier(
 ) -> Result<(), MycelialMorphogenesisObservationError> {
     if value.trim().is_empty() || value.len() > maximum_bytes || value.chars().any(char::is_control)
     {
-        return Err(MycelialMorphogenesisObservationError::InvalidIdentifier(field));
+        return Err(MycelialMorphogenesisObservationError::InvalidIdentifier(
+            field,
+        ));
     }
     Ok(())
 }
@@ -216,9 +236,14 @@ fn validate_digest(
     Ok(())
 }
 
-fn validate_finite(value: f64, field: &'static str) -> Result<(), MycelialMorphogenesisObservationError> {
+fn validate_finite(
+    value: f64,
+    field: &'static str,
+) -> Result<(), MycelialMorphogenesisObservationError> {
     if !value.is_finite() {
-        return Err(MycelialMorphogenesisObservationError::InvalidMeasurement(field));
+        return Err(MycelialMorphogenesisObservationError::InvalidMeasurement(
+            field,
+        ));
     }
     Ok(())
 }
@@ -468,10 +493,7 @@ impl MycelialMorphogenesisObservation {
                     MAX_MORPHOGENESIS_METHOD_BYTES,
                 )?;
             }
-            MycelialMorphogenesisMeasurement::CordPresence {
-                analysis_method_id,
-                ..
-            } => {
+            MycelialMorphogenesisMeasurement::CordPresence { analysis_method_id, .. } => {
                 validate_identifier(
                     analysis_method_id,
                     "analysis_method_id",
@@ -527,9 +549,11 @@ impl MycelialMorphogenesisObservation {
             || self.spatial_transform_digest != manifest.spatial_transform_digest
             || self.calibration_digest != manifest.calibration_digest
         {
-            return Err(MycelialMorphogenesisObservationError::EvidenceChainMismatch(
-                "source, replicate, acquisition or coordinate identity",
-            ));
+            return Err(
+                MycelialMorphogenesisObservationError::EvidenceChainMismatch(
+                    "source, replicate, acquisition or coordinate identity",
+                ),
+            );
         }
 
         let Some(record) = ledger
@@ -541,9 +565,11 @@ impl MycelialMorphogenesisObservation {
             return Err(MycelialMorphogenesisObservationError::ObservationNotInLedger);
         };
         if record.observation_digest != self.source_observation_digest {
-            return Err(MycelialMorphogenesisObservationError::EvidenceChainMismatch(
-                "source observation digest",
-            ));
+            return Err(
+                MycelialMorphogenesisObservationError::EvidenceChainMismatch(
+                    "source observation digest",
+                ),
+            );
         }
         if record.source_unit_key != Some(self.source_unit_key) {
             return Err(MycelialMorphogenesisObservationError::SourceUnitMismatch);
@@ -552,9 +578,7 @@ impl MycelialMorphogenesisObservation {
     }
 
     /// Canonical content digest over exact source bindings and typed measurement values.
-    pub fn canonical_digest_hex(
-        &self,
-    ) -> Result<String, MycelialMorphogenesisObservationError> {
+    pub fn canonical_digest_hex(&self) -> Result<String, MycelialMorphogenesisObservationError> {
         if self.observation_id.len() + self.substrate_region_id.len()
             > MAX_MORPHOGENESIS_STRING_BYTES
         {
@@ -679,9 +703,7 @@ mod tests {
         std::iter::repeat_n(character, DIGEST_HEX_BYTES).collect()
     }
 
-    fn fixture(
-        measurement: MycelialMorphogenesisMeasurement,
-    ) -> MycelialMorphogenesisObservation {
+    fn fixture(measurement: MycelialMorphogenesisMeasurement) -> MycelialMorphogenesisObservation {
         MycelialMorphogenesisObservation {
             schema_version: MYCELIAL_MORPHOGENESIS_OBSERVATION_SCHEMA_VERSION,
             observation_id: "morph-001".to_string(),
@@ -720,16 +742,13 @@ mod tests {
         MycelialMorphogenesisObservation,
     ) {
         use crate::mycelial_acquisition_domain::{
-            MYCELIAL_ACQUISITION_DOMAIN_SCHEMA_VERSION,
-            MYCELIAL_EXTRACTION_RECEIPT_SCHEMA_VERSION,
-            MycelialAcquisitionAxis, MycelialAcquisitionAxisName,
-            MycelialAcquisitionDomainSpec, MycelialExtractionUnitOutcome,
-            MycelialExtractionUnitState, MycelialSourceRightsStatus,
+            MYCELIAL_ACQUISITION_DOMAIN_SCHEMA_VERSION, MYCELIAL_EXTRACTION_RECEIPT_SCHEMA_VERSION,
+            MycelialAcquisitionAxis, MycelialAcquisitionAxisName, MycelialAcquisitionDomainSpec,
+            MycelialExtractionUnitOutcome, MycelialExtractionUnitState, MycelialSourceRightsStatus,
         };
         use crate::mycelial_observation_coverage::{
-            MYCELIAL_OBSERVATION_COVERAGE_SCHEMA_VERSION,
-            MycelialObservationCoverageRecord, MycelialObservationCoverageState,
-            mycelial_observation_id_inventory_digest,
+            MYCELIAL_OBSERVATION_COVERAGE_SCHEMA_VERSION, MycelialObservationCoverageRecord,
+            MycelialObservationCoverageState, mycelial_observation_id_inventory_digest,
         };
 
         let unit = MycelialAcquisitionUnitKey {
@@ -856,12 +875,9 @@ mod tests {
         observation.source_observation_digest = digest('5');
         observation.source_artifact_id = manifest.source_artifact_id.clone();
         observation.source_artifact_digest = manifest.source_artifact_digest.clone();
-        observation.acquisition_domain_manifest_digest =
-            manifest.canonical_digest_hex().unwrap();
-        observation.extraction_coverage_receipt_digest =
-            receipt.canonical_digest_hex().unwrap();
-        observation.observation_coverage_ledger_digest =
-            ledger.canonical_digest_hex().unwrap();
+        observation.acquisition_domain_manifest_digest = manifest.canonical_digest_hex().unwrap();
+        observation.extraction_coverage_receipt_digest = receipt.canonical_digest_hex().unwrap();
+        observation.observation_coverage_ledger_digest = ledger.canonical_digest_hex().unwrap();
         observation.biological_replicate_id = manifest.biological_replicate_id.clone();
         observation.acquisition_session_id = manifest.acquisition_session_id.clone();
         observation.source_unit_key = unit;
@@ -916,9 +932,11 @@ mod tests {
         observation.source_observation_digest = digest('9');
         assert!(matches!(
             observation.validate_against_evidence(&manifest, &receipt, &ledger),
-            Err(MycelialMorphogenesisObservationError::EvidenceChainMismatch(
-                "source observation digest"
-            ))
+            Err(
+                MycelialMorphogenesisObservationError::EvidenceChainMismatch(
+                    "source observation digest"
+                )
+            )
         ));
     }
 
@@ -930,23 +948,23 @@ mod tests {
             ledger.canonical_digest_hex().unwrap();
         assert!(matches!(
             observation.validate_against_evidence(&manifest, &receipt, &ledger),
-            Err(MycelialMorphogenesisObservationError::EvidenceChainMismatch(
-                "acquisition, extraction and observation inventory"
-            ))
+            Err(
+                MycelialMorphogenesisObservationError::EvidenceChainMismatch(
+                    "acquisition, extraction and observation inventory"
+                )
+            )
         ));
     }
 
     #[test]
     fn grayscale_density_is_explicitly_a_proxy_and_validates() {
-        let observation = fixture(
-            MycelialMorphogenesisMeasurement::ColonizationDensityProxy {
+        let observation = fixture(MycelialMorphogenesisMeasurement::ColonizationDensityProxy {
                 mean_intensity: 0.4,
                 scale_min: 0.0,
                 scale_max: 1.0,
                 intensity_scale_id: "normalized-grayscale-v1".to_string(),
-                analysis_method_id: "segmentation-v1".to_string(),
-            },
-        );
+            analysis_method_id: "segmentation-v1".to_string(),
+        });
         observation.validate().unwrap();
         assert_eq!(observation.canonical_digest_hex().unwrap().len(), 64);
     }
