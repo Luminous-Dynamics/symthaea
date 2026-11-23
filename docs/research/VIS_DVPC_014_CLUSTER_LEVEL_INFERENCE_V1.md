@@ -22,11 +22,11 @@ Build:
 
 Run:
 
-    /tmp/vis-dvpc-014 DELTAS.tsv EXPECTED_BUNDLE_LOCK_SHA256
+    /tmp/vis-dvpc-014 DELTAS.tsv EXPECTED_BUNDLE_LOCK_SHA256 EXPECTED_CLUSTER_ASSIGNMENT_MANIFEST_SHA256
 
-The expected SHA-256 argument must come from the separately frozen VIS-DVPC-012 receipt/preregistration. The input TSV's bundle_lock_sha256 metadata must match it. If the data and its metadata are edited without changing the expected lock, analysis fails. This standalone analyzer does not itself validate source-media bytes; the supplied lock must already have passed VIS-DVPC-012 verification.
+Both expected SHA-256 values must come from separately frozen receipts/preregistration and must be supplied independently of the TSV. The first locks the evaluated source/evaluator evidence. The second locks the canonical episode-to-cluster assignment manifest. The TSV metadata must match both external values. Changing cluster membership after inspecting outcomes therefore requires changing the manifest digest and fails against the preregistered value.
 
-The lock is a commitment to the evaluated evidence, not proof of authenticity by itself. Freeze it under independent custody before policy developers see private test outcomes.
+The expected bundle lock must already have passed VIS-DVPC-012 verification. The cluster assignment digest must be computed from the exact canonical manifest bytes. This analyzer validates the two digests and the delta table; it does not parse source media or independently recompute the manifest hash. Freeze both under independent custody before policy developers see private test outcomes.
 
 ## Input contract
 
@@ -39,7 +39,8 @@ Required metadata keys:
 - cluster_unit: a defensible independent sampling unit, not an individual frame
 - primary_metric: the preregistered primary endpoint
 - positive_is_better: literal true; each delta is candidate minus baseline on that metric
-- bundle_lock_sha256: digest of the upstream independently frozen bundle lock, checked against the separate CLI argument
+- bundle_lock_sha256: digest of the upstream independently frozen bundle lock, checked against the first separate CLI argument
+- cluster_assignment_manifest_sha256: digest of the canonical episode-to-cluster assignment manifest, checked against the second separate CLI argument
 - comparison_family_size: number of predeclared candidate-vs-baseline comparisons and must equal the unique comparison count in the file
 - bootstrap_seed, bootstrap_replicates: frozen deterministic resampling controls
 - familywise_confidence: in [0.5, 1); adjustment uses Bonferroni across the predeclared comparison family
@@ -91,7 +92,11 @@ The adapter performs a hierarchy-preserving reduction before inference:
 
 It refuses duplicate (cluster, episode, hidden-world) rows, episode-to-multiple-cluster assignment, changes to task/loss/evaluator/environment/action/resource/model/policy context, changes to an episode's initial-state or seed identity, and a changed hidden-world cohort within a cluster. It does not calculate confidence intervals or p-values; this analyzer remains the owner of those statistics.
 
-The synthetic interoperability fixture is `fixtures/vis-dvpc-compute-observation-cluster-deltas-v0.1.tsv`. It contains six scene clusters and four predeclared comparisons (24 cluster-level deltas). The all-`a` bundle-lock value is a placeholder for this synthetic fixture only; a real analysis must pass the independently frozen and separately verified source-bundle digest to the CLI. The fixture is not a benchmark result.
+The synthetic interoperability fixtures are:
+- `fixtures/vis-dvpc-compute-observation-cluster-deltas-v0.1.tsv`: six scene clusters and four predeclared comparisons (24 cluster-level deltas);
+- `fixtures/vis-dvpc-compute-observation-cluster-assignments-v0.1.tsv`: twelve episode-to-scene assignments, each bound to an initial-state digest.
+
+The synthetic assignment manifest SHA-256 is `8257074ad9d509a144c807fe1eeca8c0f29fb9c5101589a3e220d207236d0aab`. The all-`a` bundle-lock value is a placeholder for this synthetic fixture only. CI computes the assignment file hash, checks it against the pinned value, and passes it independently to the analyzer. A real campaign must freeze its assignment manifest and source-bundle lock before evaluation. The fixtures are not benchmark results.
 
 The current workflow pins Rust 1.96 and:
 - runs the analyzer's adversarial unit tests;
@@ -106,3 +111,20 @@ The current workflow pins Rust 1.96 and:
 The cluster bootstrap interval is an approximate percentile interval, not distribution-free finite-sample coverage. The sign-flip p-value relies on independent cluster deltas and its declared symmetry-under-the-null assumption. Bonferroni adjustment covers the four preregistered contrasts; it does not fix a biased sampling design, outcome leakage, post-hoc selection, or an incorrectly chosen cluster unit.
 
 Five clusters are only a minimum mechanics threshold. Real confirmatory work still requires a preregistered power/minimum-detectable-effect analysis, substantially more independent clusters where feasible, appropriate hierarchical sampling, and a replication on a second held-out domain. A positive cluster-level interval is evidence only for the declared metric, population, comparator family and design—not general SOTA superiority.
+
+
+## Cluster-assignment manifest format
+
+The assignment manifest is a separate UTF-8 TSV with exact header:
+
+    ASSIGNMENT_HEADER<TAB>episode_id<TAB>cluster_id<TAB>initial_state_sha256
+
+It has one row per evaluated episode. Duplicate episode IDs, missing/extra episodes, cluster reassignment, or a mismatch with the episode's initial-state commitment must fail before cluster deltas are emitted. The adapter in #13281 receives the parsed typed assignment list and verifies those conditions against every paired per-world certificate. The analyzer receives only the separately supplied expected manifest digest and rejects TSV metadata carrying a different value.
+
+This split keeps the boundaries explicit:
+- the evaluator adapter validates the assignment mapping against the episode certificates;
+- the external integrity/preregistration process freezes and hashes the canonical manifest;
+- the downstream analyzer checks that the delta table carries the independently supplied expected digest;
+- the broader evidence-bundle lock independently binds the source/evaluator evidence.
+
+A digest alone does not prove that an arbitrary assignment map is scientifically appropriate. Cluster units must be selected from the sampling design before outcomes are inspected, with sequence/scene/session/subject definitions justified for the domain.
