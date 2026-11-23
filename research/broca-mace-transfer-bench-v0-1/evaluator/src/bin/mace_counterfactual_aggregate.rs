@@ -838,8 +838,8 @@ fn reduce(
 ) -> Result<(usize, usize), String> {
     let (candidate_receipts, candidate_stream_sha256, candidate_record_count, candidate_run_id) =
         load_candidate_receipts(candidate_path)?;
-    let input = File::open(input_path)
-        .map_err(|error| format!("open evaluator input {input_path}: {error}"))?;
+    let input = File::open(evaluator_path)
+        .map_err(|error| format!("open evaluator input {evaluator_path}: {error}"))?;
     let reader = BufReader::new(input);
 
     let mut block_rows: BTreeMap<TaskKey, BTreeMap<MethodKind, Accumulator>> = BTreeMap::new();
@@ -848,6 +848,7 @@ fn reduce(
     let mut manifest_shas = BTreeSet::new();
     let mut manifest_pair_blocks = BTreeSet::new();
     let mut manifest_records: BTreeMap<String, Value> = BTreeMap::new();
+    let mut consumed_candidate_keys: BTreeSet<(String, String)> = BTreeSet::new();
     let mut input_provenance: Option<InputProvenance> = None;
 
     for (line_index, line) in reader.lines().enumerate() {
@@ -865,6 +866,9 @@ fn reduce(
                     required_string(&record, "pair_block_id")?.to_string();
                 if !manifest_pair_blocks.insert(manifest_pair_block.clone()) {
                     return Err("duplicate intervention manifest pair_block_id".to_string());
+                }
+                if provenance.run_id != candidate_run_id {
+                    return Err("candidate and evaluator streams have different run IDs".to_string());
                 }
                 manifest_records.insert(manifest_pair_block, record.clone());
                 if let Some(existing) = &input_provenance {
@@ -898,6 +902,18 @@ fn reduce(
             .ok_or_else(|| "evaluator_score has no matching intervention manifest".to_string())?;
         validate_score_against_manifest(&record, manifest)
             .map_err(|error| format!("line {}: {error}", line_index + 1))?;
+
+        let candidate_observation_id =
+            required_string(&record, "candidate_observation_id")?.to_string();
+        let candidate_key = (task_key.1.clone(), candidate_observation_id);
+        let candidate_receipt = candidate_receipts
+            .get(&candidate_key)
+            .ok_or_else(|| "evaluator score has no matching candidate decision receipt".to_string())?;
+        validate_score_against_candidate(&record, &task_key.1, candidate_receipt)
+            .map_err(|error| format!("line {}: {error}", line_index + 1))?;
+        if !consumed_candidate_keys.insert(candidate_key) {
+            return Err("candidate decision receipt is referenced by more than one evaluator score".to_string());
+        }
         block_rows
             .entry(task_key)
             .or_default()
@@ -912,6 +928,10 @@ fn reduce(
     }
     if manifest_row_count == 0 || manifest_shas.is_empty() {
         return Err("evaluator stream contains no intervention manifest receipts".to_string());
+    }
+    if consumed_candidate_keys.len() != candidate_receipts.len() {
+        let orphan_count = candidate_receipts.len().saturating_sub(consumed_candidate_keys.len());
+        return Err(format!("candidate stream contains {orphan_count} decision receipts without evaluator scores"));
     }
     let provenance = input_provenance
         .ok_or_else(|| "evaluator stream has no run provenance".to_string())?;
@@ -1004,6 +1024,8 @@ fn reduce(
 
     for record in &mut output_records {
         record["input_run_id"] = json!(provenance.run_id.as_str());
+        record["input_candidate_stream_sha256"] = json!(candidate_stream_sha256.as_str());
+        record["input_candidate_record_count"] = json!(candidate_record_count);
         record["input_manifest_set_sha256"] = json!(input_manifest_set_sha256.as_str());
         record["input_source_code_sha256"] = json!(provenance.source_code_sha256.as_str());
         record["input_fixture_sha256"] = json!(provenance.fixture_sha256.as_str());
@@ -1039,16 +1061,15 @@ fn reduce(
 
 fn main() {
     let args: Vec<String> = env::args().skip(1).collect();
-    let Some(input_path) = args.first() else {
-        eprintln!("usage: mace_counterfactual_aggregate <evaluator.jsonl> <summary.jsonl> [seed]");
+    if args.len() < 3 {
+        eprintln!("usage: mace_counterfactual_aggregate <candidate.jsonl> <evaluator.jsonl> <summary.jsonl> [seed]");
         std::process::exit(2);
-    };
-    let output_path = args
-        .get(1)
-        .map(String::as_str)
-        .unwrap_or("mace_counterfactual_summary.jsonl");
+    }
+    let candidate_path = &args[0];
+    let evaluator_path = &args[1];
+    let output_path = &args[2];
     let seed = args
-        .get(2)
+        .get(3)
         .map(|value| value.parse::<u64>().map_err(|error| error.to_string()))
         .transpose()
         .unwrap_or_else(|error| {
@@ -1057,7 +1078,7 @@ fn main() {
         })
         .unwrap_or(0x4d41_4345_5354_4154);
 
-    if let Err(error) = reduce(input_path, output_path, seed) {
+    if let Err(error) = reduce(candidate_path, evaluator_path, output_path, seed) {
         eprintln!("mace_counterfactual_aggregate: {error}");
         std::process::exit(1);
     }
