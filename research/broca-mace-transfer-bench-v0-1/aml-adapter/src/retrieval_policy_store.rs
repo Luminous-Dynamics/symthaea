@@ -351,6 +351,31 @@ mod tests {
     }
 
     #[test]
+    fn post_publication_memory_bind_conflict_is_reported_as_unknown_and_reconcilable() {
+        let root = temporary_directory("unknown-bind");
+        let store = RetrievalPolicyTraceFileStoreV1::open(&root).expect("open store");
+        let mut memory = RetrievalPolicyMemoryV1::default();
+
+        let mut conflicting = trace("invocation-bind-conflict");
+        conflicting.query_sha256 = "e".repeat(64);
+        memory.record_trace(conflicting).expect("seed conflicting in-memory binding");
+
+        let persisted = trace("invocation-bind-conflict");
+        let error = store.record_trace(&mut memory, &persisted)
+            .expect_err("same invocation cannot rebind the live memory map");
+        assert!(error.contains("outcome may be unknown"));
+        assert_eq!(fs::read_dir(&root).expect("trace directory").count(), 1);
+
+        let mut reconciled = RetrievalPolicyMemoryV1::default();
+        assert_eq!(store.load_into(&mut reconciled).expect("reconcile"), 1);
+        assert_eq!(
+            reconciled.trace_receipt_sha256("run-1", "invocation-bind-conflict"),
+            Some(persisted.receipt_sha256().as_str())
+        );
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
     fn changed_or_tampered_receipt_fails_restore() {
         let root = temporary_directory("tamper");
         let store = RetrievalPolicyTraceFileStoreV1::open(&root).expect("open store");
