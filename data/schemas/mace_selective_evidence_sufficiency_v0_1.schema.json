@@ -189,7 +189,9 @@
         "coverage",
         "multiplicity_adjustment",
         "risk_bound_method",
-        "certificate_scope"
+        "certificate_scope",
+        "distribution_shift_detected",
+        "minimum_cluster_requirement"
       ],
       "properties": {
         "schema_version": {
@@ -329,7 +331,7 @@
         },
         "minimum_cluster_requirement": {
           "type": "integer",
-          "minimum": 1
+          "minimum": 2
         }
       },
       "allOf": [
@@ -398,7 +400,10 @@
               "parent_fallback_group_id": {
                 "$ref": "#/$defs/identifier"
               }
-            }
+            },
+            "required": [
+              "parent_fallback_group_id"
+            ]
           }
         }
       ]
@@ -542,17 +547,42 @@
           "if": {
             "properties": {
               "status": {
+                "const": "abstained_not_estimable"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "action": {
+                "const": "abstain"
+              },
+              "risk_upper_bound": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
                 "const": "accepted_under_certificate"
               }
             }
           },
           "then": {
+            "required": [
+              "group_certificate_sha256"
+            ],
             "properties": {
               "hard_gates_pass": {
                 "const": true
               },
               "action": {
                 "const": "accept_and_act"
+              },
+              "group_certificate_sha256": {
+                "$ref": "#/$defs/sha256"
               },
               "risk_upper_bound": {
                 "$ref": "#/$defs/risk_bound"
@@ -566,15 +596,23 @@
         {
           "if": {
             "properties": {
-              "status": {
-                "const": "abstained_not_estimable"
+              "distribution_shift_detected": {
+                "const": true
               }
             }
           },
           "then": {
             "properties": {
+              "status": {
+                "const": "certificate_suspended_shift"
+              },
               "action": {
-                "const": "abstain"
+                "enum": [
+                  "acquire_evidence",
+                  "retrieve_more",
+                  "abstain",
+                  "escalate"
+                ]
               },
               "risk_upper_bound": {
                 "type": "null"
