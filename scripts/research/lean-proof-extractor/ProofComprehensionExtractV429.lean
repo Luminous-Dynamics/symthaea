@@ -62,6 +62,41 @@ def structuralEdges (source : String) (info : ConstantInfo) : Array Json :=
   | _ => #[]
 
 
+
+def valueKindString (info : ConstantInfo) (valueAvailable : Bool) : String :=
+  if !valueAvailable then "unavailable" else
+    match info with
+    | .thmInfo _ => "theorem_proof"
+    | .defnInfo _ => "definition_body"
+    | .opaqueInfo _ => "opaque_value"
+    | _ => "other_value"
+
+def theoremProofDependencies (info : ConstantInfo) (values : Array Name) : Array Name :=
+  match info with
+  | .thmInfo _ => values
+  | _ => #[]
+
+def definitionValueDependencies (info : ConstantInfo) (values : Array Name) : Array Name :=
+  match info with
+  | .defnInfo _ => values
+  | _ => #[]
+
+def opaqueValueDependencies (info : ConstantInfo) (values : Array Name) : Array Name :=
+  match info with
+  | .opaqueInfo _ => values
+  | _ => #[]
+
+def valueEdges (source : String) (info : ConstantInfo) (targets : Array Name) : Array Json :=
+  match info with
+  | .thmInfo _ =>
+      nameEdges source "proof_dependency" "ConstantInfo.value?" targets
+  | .defnInfo _ =>
+      nameEdges source "definition_dependency" "ConstantInfo.value?" targets
+  | .opaqueInfo _ =>
+      nameEdges source "opaque_value_dependency" "ConstantInfo.value?" targets
+  | _ =>
+      nameEdges source "other_value_dependency" "ConstantInfo.value?" targets
+
 def startsWithNameParts : List Name → List Name → Bool
   | [], _ => true
   | _ :: _, [] => false
@@ -131,7 +166,11 @@ elab "#emit_proof_comprehension " declaration:ident : command => do
 
   let typeDependencies := info.type.getUsedConstantsAsSet.toList.toArray
   let value? := info.value? (allowOpaque := true)
-  let proofValueDependencies := value?.map Expr.getUsedConstants |>.getD #[]
+  let valueDependencies := value?.map Expr.getUsedConstants |>.getD #[]
+  let valueKind := valueKindString info value?.isSome
+  let proofValueDependencies := theoremProofDependencies info valueDependencies
+  let definitionValueDependencies := definitionValueDependencies info valueDependencies
+  let opaqueValueDependencies := opaqueValueDependencies info valueDependencies
   let closureDependencies := info.getUsedConstantsAsSet.toList.toArray
   let unresolvedDependencies :=
     closureDependencies.filter fun dependency => (env.find? dependency).isNone
@@ -140,12 +179,11 @@ elab "#emit_proof_comprehension " declaration:ident : command => do
   let edges :=
     nameEdges declarationName "type_dependency" "ConstantInfo.type"
       typeDependencies
-    ++ nameEdges declarationName "proof_dependency" "ConstantInfo.value?"
-      proofValueDependencies
+    ++ valueEdges declarationName info valueDependencies
     ++ structuralEdges declarationName info
 
   let mut helperNodes : Array Json := #[]
-  let mut pendingHelpers := proofValueDependencies.toList
+  let mut pendingHelpers := valueDependencies.toList
   let mut visitedHelpers : NameSet := {}
   while !pendingHelpers.isEmpty do
     match pendingHelpers with
@@ -158,18 +196,21 @@ elab "#emit_proof_comprehension " declaration:ident : command => do
             | throwError "proof-comprehension helper {helperName} referenced by {name} is not in the environment"
           let helperTypeDependencies := helperInfo.type.getUsedConstantsAsSet.toList.toArray
           let helperValue? := helperInfo.value? (allowOpaque := true)
-          let helperProofDependencies := helperValue?.map Expr.getUsedConstants |>.getD #[]
+          let helperValueDependencies := helperValue?.map Expr.getUsedConstants |>.getD #[]
+          let helperValueKind := valueKindString helperInfo helperValue?.isSome
+          let helperProofDependencies := theoremProofDependencies helperInfo helperValueDependencies
+          let helperDefinitionValueDependencies := definitionValueDependencies helperInfo helperValueDependencies
+          let helperOpaqueValueDependencies := opaqueValueDependencies helperInfo helperValueDependencies
           let helperClosure := helperInfo.getUsedConstantsAsSet.toList.toArray
           let helperUnresolved :=
             helperClosure.filter fun dependency => (env.find? dependency).isNone
-          for dependency in helperProofDependencies do
+          for dependency in helperValueDependencies do
             if isGeneratedHelperFor name dependency then
               pendingHelpers := dependency :: pendingHelpers
           let helperEdges :=
             nameEdges (toString helperName) "type_dependency" "ConstantInfo.type"
               helperTypeDependencies
-            ++ nameEdges (toString helperName) "proof_dependency" "ConstantInfo.value?"
-              helperProofDependencies
+            ++ valueEdges (toString helperName) helperInfo helperValueDependencies
             ++ structuralEdges (toString helperName) helperInfo
           helperNodes := helperNodes.push <| Json.mkObj
             [ ("root_declaration", toJson declarationName)
@@ -177,8 +218,12 @@ elab "#emit_proof_comprehension " declaration:ident : command => do
             , ("declaration", toJson (toString helperName))
             , ("declaration_kind", toJson (constantKind helperInfo))
             , ("proof_value_available", toJson helperValue?.isSome)
+            , ("value_kind", toJson helperValueKind)
             , ("type_dependencies", namesJson helperTypeDependencies)
+            , ("value_dependencies", namesJson helperValueDependencies)
             , ("proof_value_dependencies", namesJson helperProofDependencies)
+            , ("definition_value_dependencies", namesJson helperDefinitionValueDependencies)
+            , ("opaque_value_dependencies", namesJson helperOpaqueValueDependencies)
             , ("constant_info_dependency_closure", namesJson helperClosure)
             , ("unresolved_dependencies", namesJson helperUnresolved)
             , ("edges", Json.arr helperEdges)
@@ -195,8 +240,12 @@ elab "#emit_proof_comprehension " declaration:ident : command => do
     , ("declaration_kind", toJson (constantKind info))
     , ("level_parameters", namesJson info.levelParams.toArray)
     , ("proof_value_available", toJson value?.isSome)
+    , ("value_kind", toJson valueKind)
     , ("type_dependencies", namesJson typeDependencies)
+    , ("value_dependencies", namesJson valueDependencies)
     , ("proof_value_dependencies", namesJson proofValueDependencies)
+    , ("definition_value_dependencies", namesJson definitionValueDependencies)
+    , ("opaque_value_dependencies", namesJson opaqueValueDependencies)
     , ("constant_info_dependency_closure", namesJson closureDependencies)
     , ("unresolved_dependencies", namesJson unresolvedDependencies)
     , ("edges", Json.arr edges)

@@ -21,7 +21,10 @@
     "edges",
     "helper_nodes",
     "trust_profile",
-    "trust_profile"
+    "value_kind",
+    "value_dependencies",
+    "definition_value_dependencies",
+    "opaque_value_dependencies"
   ],
   "properties": {
     "schema_version": {
@@ -117,7 +120,10 @@
               "constructor_of",
               "recursor_for_inductive",
               "recursor_rule_constructor",
-              "recursor_reduction_dependency"
+              "recursor_reduction_dependency",
+              "definition_dependency",
+              "opaque_value_dependency",
+              "other_value_dependency"
             ]
           },
           "origin": {
@@ -135,6 +141,33 @@
     },
     "trust_profile": {
       "$ref": "#/$defs/trustProfile"
+    },
+    "value_kind": {
+      "enum": [
+        "theorem_proof",
+        "definition_body",
+        "opaque_value",
+        "unavailable",
+        "other_value"
+      ]
+    },
+    "value_dependencies": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "definition_value_dependencies": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "opaque_value_dependencies": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
     }
   },
   "$defs": {
@@ -152,7 +185,11 @@
         "constant_info_dependency_closure",
         "unresolved_dependencies",
         "edges",
-        "trust_profile"
+        "trust_profile",
+        "value_kind",
+        "value_dependencies",
+        "definition_value_dependencies",
+        "opaque_value_dependencies"
       ],
       "properties": {
         "root_declaration": {
@@ -246,6 +283,33 @@
         },
         "trust_profile": {
           "$ref": "#/$defs/trustProfile"
+        },
+        "value_kind": {
+          "enum": [
+            "theorem_proof",
+            "definition_body",
+            "opaque_value",
+            "unavailable",
+            "other_value"
+          ]
+        },
+        "value_dependencies": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "definition_value_dependencies": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "opaque_value_dependencies": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       }
     },

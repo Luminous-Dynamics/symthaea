@@ -280,6 +280,10 @@ jobs:
               and .declaration == $declaration
               and (.unresolved_dependencies | length) == 0
               and (.edges | length) > 0
+              and .value_kind == "theorem_proof"
+              and .value_dependencies == .proof_value_dependencies
+              and (.definition_value_dependencies | length) == 0
+              and (.opaque_value_dependencies | length) == 0
               and .trust_profile.closure_status == "complete"
               and (.trust_profile.unresolved_declarations | length) == 0
               and (.trust_profile.transitive_declaration_count > 0)
@@ -344,7 +348,7 @@ jobs:
           for declaration in Nat.choose_pos Set.countable_union Multiset.map_id Finset.card_map; do
             file="proof-comprehension-extract-${declaration}.json"
             test -s "$file"
-            jq -e --arg declaration "$declaration" '.schema_version == "1.0.0" and .source_revision == "8a178386ffc0f5fef0b77738bb5449d50efeea95" and .lean_revision == "98dc76e3c0a9b856c9b98726b713fb04fab16740" and .declaration == $declaration and (.unresolved_dependencies | length) == 0 and (.edges | length) > 0 and .trust_profile.closure_status == "complete" and (.trust_profile.unresolved_declarations | length) == 0 and (.trust_profile.transitive_declaration_count > 0) and (if $declaration == "Nat.choose_pos" then ((.helper_nodes | length) > 0 and all(.helper_nodes[]; .trust_profile.closure_status == "complete" and (.trust_profile.unresolved_declarations | length) == 0)) else true end)' "$file" >/dev/null
+            jq -e --arg declaration "$declaration" '.schema_version == "1.0.0" and .source_revision == "8a178386ffc0f5fef0b77738bb5449d50efeea95" and .lean_revision == "98dc76e3c0a9b856c9b98726b713fb04fab16740" and .declaration == $declaration and (.unresolved_dependencies | length) == 0 and (.edges | length) > 0 and .value_kind == "theorem_proof" and .value_dependencies == .proof_value_dependencies and (.definition_value_dependencies | length) == 0 and (.opaque_value_dependencies | length) == 0 and .trust_profile.closure_status == "complete" and (.trust_profile.unresolved_declarations | length) == 0 and (.trust_profile.transitive_declaration_count > 0) and (if $declaration == "Nat.choose_pos" then ((.helper_nodes | length) > 0 and all(.helper_nodes[]; .trust_profile.closure_status == "complete" and (.trust_profile.unresolved_declarations | length) == 0)) else true end)' "$file" >/dev/null
           done
           echo "MATHLIB_V429_DIRECT_EXTRACTION_PASS"
 
