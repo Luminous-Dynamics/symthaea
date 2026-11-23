@@ -653,6 +653,35 @@ mod tests {
     }
 
     #[test]
+    fn invertible_observable_basis_change_preserves_the_score() {
+        let mut input = covariance_redundancy_fixture();
+        let experiment = input.experiments.iter_mut()
+            .find(|x| x.experiment_id == "base_two_observables")
+            .unwrap();
+
+        // A = [[2, 1], [-1, 1]], det(A) = 3, so this is invertible.
+        // Transport every hypothesis mean by A and the covariance by A S A^T.
+        for prediction in &mut experiment.predictions {
+            let x = prediction.means[0];
+            let y = prediction.means[1];
+            prediction.means = vec![2.0 * x + y, -x + y];
+        }
+        experiment.observables[0].unit = "basis-row-1".to_owned();
+        experiment.observables[1].unit = "basis-row-2".to_owned();
+
+        let pair = &mut experiment.pairwise_difference_covariances[0];
+        pair.covariance = vec![vec![7.0, -0.5], vec![-0.5, 1.0]];
+        pair.covariance_matrix_digest_sha256 = matrix_digest_sha256(&pair.covariance);
+
+        let report = rank_covariance_aware_experiments(&input).unwrap();
+        let score = report.ranked_experiments.iter()
+            .find(|x| x.experiment_id == "base_two_observables")
+            .unwrap()
+            .worst_case_separation_squared;
+        assert!((score - 4.0).abs() < 1.0e-10);
+    }
+
+    #[test]
     fn singular_covariance_outside_support_is_quarantined() {
         let mut input = covariance_redundancy_fixture();
         let experiment = &mut input.experiments[0];
