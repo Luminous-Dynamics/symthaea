@@ -1,0 +1,152 @@
+{
+  "schema_version": "0.1",
+  "comparator_id": "vlasovtt-jl-1d1v-vlasov-poisson",
+  "captured_at": "2026-11-23",
+  "admission_status": "source_pinned_not_reproduced",
+  "claim_ceiling": "Immutable source and configuration inventory only. No independent execution, reproduction, fidelity comparison, or performance result is asserted.",
+  "upstream": {
+    "repository": "https://github.com/erikasgrim/VlasovTT.jl",
+    "commit": "99aa077b6f5e4ae4dfc8330590e502267caf298b",
+    "commit_authored_at": "2026-06-12T12:23:10Z",
+    "repository_last_pushed_at": "2026-08-20T19:37:48Z",
+    "license": "MIT",
+    "paper": {
+      "title": "Tensor Network Compression for Fully Spectral Vlasov-Poisson Simulation",
+      "journal": "Journal of Computational Physics",
+      "published_online": "2026-08-26",
+      "doi": "10.1016/j.jcp.2026.115330",
+      "url": "https://doi.org/10.1016/j.jcp.2026.115330"
+    }
+  },
+  "source_blobs": {
+    "Project.toml": "7cc4eebe40fba860faf4880527ccf7c1d7c5f6e7",
+    "Manifest.toml": "8f5efd2bd03d5fbe79b8b40eaaffa1b16640acd7",
+    "README.md": "6da931cce05e8a904d1f722ba04d320d33170df6",
+    "LICENSE": "df9b271d7d4065bd66203827d161674759750b03",
+    "src/VlasovTT.jl": "2099d14b7a4b82f0e24b771737f49d40075a8e91",
+    "src/operators/poisson.jl": "bce482ad0197d311ce580af888dd3bc42cb6a7fb",
+    "src/steppers/strang.jl": "998ad6d1c0954a14e86d7afd7825b2deb41204fe",
+    "src/observables.jl": "666f3406acbd3e27ed73954feeb1255554bbac31",
+    "examples/landau_damping.jl": "a1745409ea245a919068e53ad5df9d15227689f3",
+    "examples/two_stream.jl": "95e6c2716d569a0340cff12136968ea5ab0ec88d",
+    "examples/reference_landau_damping.jl": "1f2bcf8acb17ab321861bae2b9937b821b7e1973",
+    "examples/reference_two_stream.jl": "55127484472463a3cf149e438ca8f05cea5edd18",
+    "tests/test_electric_field.jl": "4e8589fbb2ddcba3581a4f2131b546eaf79f0d89",
+    "tests/test_observables.jl": "caf1ec6292d0e43f804b61d6659e67b4e0ed3bad",
+    "tests/test_precision.jl": "c4291b4144f8a457c79d03ceb29f301d77b482e3"
+  },
+  "method": {
+    "physics": "Periodic 1D1V collisionless Vlasov-Poisson",
+    "representation": "Quantics tensor-train / matrix-product-state with tensor-cross interpolation; repository also provides a dense reference solver",
+    "time_integrator": "Second-order Strang splitting",
+    "operator_treatment": "Spectral free-streaming and velocity-advection operators; tensor Poisson field solve",
+    "dependency_environment": "Julia Project.toml and Manifest.toml are present and blob-pinned above"
+  },
+  "paper_reproduction_profiles": {
+    "landau_example_defaults": {
+      "dt": 0.1,
+      "final_time": 30,
+      "quantics_bits_per_axis": 10,
+      "k_cut": 64,
+      "beta": 2,
+      "x_interval": [
+        -6.283185307179586,
+        6.283185307179586
+      ],
+      "velocity_interval": [
+        -6,
+        6
+      ],
+      "tci_tolerance": 1e-8,
+      "max_tt_rank": 500,
+      "max_electric_field_rank": 32,
+      "truncation_cutoff": 1e-10,
+      "gpu_precision": "double",
+      "use_gpu_default": true,
+      "initial_condition": {
+        "kind": "linear Landau damping",
+        "amplitude": 0.1,
+        "drift": 0,
+        "thermal_speed": 1,
+        "mode": 1
+      }
+    },
+    "two_stream_example_defaults": {
+      "dt": 0.1,
+      "final_time": 30,
+      "quantics_bits_per_axis": 10,
+      "k_cut": 64,
+      "beta": 2,
+      "x_interval": [
+        -1.0266642658790173,
+        1.0266642658790173
+      ],
+      "velocity_interval": [
+        -0.6,
+        0.6
+      ],
+      "tci_tolerance": 1e-8,
+      "max_tt_rank": 500,
+      "max_electric_field_rank": 32,
+      "truncation_cutoff": 1e-10,
+      "gpu_precision": "double",
+      "use_gpu_default": true,
+      "initial_condition": {
+        "kind": "two-stream instability",
+        "amplitude": 0.01,
+        "drift_speed": 0.2,
+        "thermal_speed": 0.01,
+        "mode": 1
+      }
+    },
+    "reconciliation_required": [
+      "The unmodified Landau example source sets initial-condition amplitude A=0.1.",
+      "The Symthaea comparator notes currently record the paper Landau cohort amplitude as 0.01.",
+      "Do not call either profile a faithful paper reproduction until the discrepancy is resolved against the paper's exact configuration; preserve both profiles in the reproduction record."
+    ]
+  },
+  "required_reproduction": {
+    "before_modification": true,
+    "separate_execution_paths": [
+      "compressed TT/MPS",
+      "dense reference"
+    ],
+    "hardware_lanes": [
+      "CPU",
+      "GPU when supported; record exact device and precision"
+    ],
+    "tests": [
+      "tests/test_electric_field.jl",
+      "tests/test_observables.jl",
+      "tests/test_precision.jl"
+    ],
+    "outputs": [
+      "complex electric-field modes",
+      "mass/charge",
+      "momentum",
+      "kinetic energy",
+      "field energy",
+      "total energy",
+      "TT bond-rank history",
+      "TCI reconstruction cost",
+      "runtime",
+      "peak memory",
+      "GPU/CPU transfer cost",
+      "full output and diagnostic cost"
+    ],
+    "controls": [
+      "paper-faithful Landau",
+      "two-stream",
+      "time-step refinement",
+      "spatial/velocity grid refinement",
+      "TCI tolerance/rank sweep",
+      "echo response cohort only after original cases reproduce"
+    ]
+  },
+  "benchmark_comparability": {
+    "same_equation_cohort": "Compare with Symthaea only after common 1D1V Vlasov-Poisson initial states, normalization, domain, timestep, final time and observables are matched.",
+    "resource_accounting": "Include TT construction, TCI interpolation, tensor contractions, Poisson solve, truncation, conversion, diagnostics, output, initialization and all failed/retried work.",
+    "report_cpu_gpu_separately": true,
+    "no_single_headline_speedup": true
+  }
+}
