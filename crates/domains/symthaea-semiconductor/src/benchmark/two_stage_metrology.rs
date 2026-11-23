@@ -742,7 +742,7 @@ mod tests {
         assert_eq!(first.subsets_examined, 8);
         assert_eq!(first.candidates.len(), 3);
         assert!(first.expected_incremental_net_value >= 0.0);
-        assert_eq!(first.claim_limits.plan_does_not_execute_measurements, true);
+        assert!(first.claim_limits.plan_does_not_execute_measurements);
     }
 
     #[test]
