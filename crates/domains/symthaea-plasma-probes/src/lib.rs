@@ -1575,10 +1575,7 @@ impl OpenBoundaryCoordinateLift {
 /// In two dimensions, the pair preserves the canonical symplectic form exactly
 /// when this oriented area equals one. This is a small independent oracle, not
 /// a general high-dimensional symplectic reduced-basis constructor.
-pub fn canonical_symplectic_pair_defect_2d(
-    q: [f64; 2],
-    p: [f64; 2],
-) -> Result<f64, ContractError> {
+pub fn canonical_symplectic_pair_defect_2d(q: [f64; 2], p: [f64; 2]) -> Result<f64, ContractError> {
     if q.iter().chain(p.iter()).any(|value| !value.is_finite()) {
         return Err(ContractError::NonFiniteSymplecticBasis);
     }
@@ -1789,11 +1786,7 @@ pub fn validate_kird_record_value(
                     "certified_global coverage requires a true global-bound flag",
                 ));
             }
-            validate_kird_global_coverage(
-                value,
-                registered_probe_count,
-                confirmed_probe_count,
-            )?;
+            validate_kird_global_coverage(value, registered_probe_count, confirmed_probe_count)?;
         }
         _ => {
             return Err(kird_error(
@@ -1869,20 +1862,30 @@ pub fn validate_kird_record_value(
         return Err(ContractError::StorageByteCountOverflow);
     }
 
-    let (covering_radius, verified_lipschitz_constant, uncertainty_budget, global_normalized_error_bound) =
-        if response_coverage_kind == "certified_global" {
-            let uncertainty_budget = kird_number(value, "response_scope.reference_uncertainty")?
-                + kird_number(value, "response_scope.candidate_uncertainty")?
-                + kird_number(value, "response_scope.measurement_uncertainty")?;
-            (
-                Some(kird_number(value, "response_scope.covering_radius")?),
-                Some(kird_number(value, "response_scope.verified_lipschitz_constant")?),
-                Some(uncertainty_budget),
-                Some(kird_number(value, "response_scope.global_normalized_error_bound")?),
-            )
-        } else {
-            (None, None, None, None)
-        };
+    let (
+        covering_radius,
+        verified_lipschitz_constant,
+        uncertainty_budget,
+        global_normalized_error_bound,
+    ) = if response_coverage_kind == "certified_global" {
+        let uncertainty_budget = kird_number(value, "response_scope.reference_uncertainty")?
+            + kird_number(value, "response_scope.candidate_uncertainty")?
+            + kird_number(value, "response_scope.measurement_uncertainty")?;
+        (
+            Some(kird_number(value, "response_scope.covering_radius")?),
+            Some(kird_number(
+                value,
+                "response_scope.verified_lipschitz_constant",
+            )?),
+            Some(uncertainty_budget),
+            Some(kird_number(
+                value,
+                "response_scope.global_normalized_error_bound",
+            )?),
+        )
+    } else {
+        (None, None, None, None)
+    };
 
     Ok(KirdRecordSummary {
         record_id: record_id.to_owned(),
@@ -1930,8 +1933,7 @@ fn validate_kird_global_coverage(
     }
 
     let covering_radius = kird_number(root, "response_scope.covering_radius")?;
-    let lipschitz_constant =
-        kird_number(root, "response_scope.verified_lipschitz_constant")?;
+    let lipschitz_constant = kird_number(root, "response_scope.verified_lipschitz_constant")?;
     let reference_uncertainty = kird_number(root, "response_scope.reference_uncertainty")?;
     let candidate_uncertainty = kird_number(root, "response_scope.candidate_uncertainty")?;
     let measurement_uncertainty = kird_number(root, "response_scope.measurement_uncertainty")?;
@@ -2129,25 +2131,25 @@ fn kird_join_field(parent: &'static str, child: &'static str) -> &'static str {
         ("distortion.weak_observable", "metric_id") => "distortion.weak_observable.metric_id",
         ("distortion.weak_observable", "observed_error") => {
             "distortion.weak_observable.observed_error"
-        },
+        }
         ("distortion.weak_observable", "tolerance") => "distortion.weak_observable.tolerance",
         ("distortion.weak_observable", "normalized_error") => {
             "distortion.weak_observable.normalized_error"
-        },
+        }
         ("distortion.weak_observable", "evidence_sha256") => {
             "distortion.weak_observable.evidence_sha256"
-        },
+        }
         ("distortion.macroscopic_qoi", "metric_id") => "distortion.macroscopic_qoi.metric_id",
         ("distortion.macroscopic_qoi", "observed_error") => {
             "distortion.macroscopic_qoi.observed_error"
-        },
+        }
         ("distortion.macroscopic_qoi", "tolerance") => "distortion.macroscopic_qoi.tolerance",
         ("distortion.macroscopic_qoi", "normalized_error") => {
             "distortion.macroscopic_qoi.normalized_error"
-        },
+        }
         ("distortion.macroscopic_qoi", "evidence_sha256") => {
             "distortion.macroscopic_qoi.evidence_sha256"
-        },
+        }
         ("distortion.sensitivity", "metric_id") => "distortion.sensitivity.metric_id",
         ("distortion.sensitivity", "observed_error") => "distortion.sensitivity.observed_error",
         ("distortion.sensitivity", "tolerance") => "distortion.sensitivity.tolerance",
@@ -2783,8 +2785,7 @@ mod tests {
     #[test]
     fn kird_audit_rejects_global_cover_that_understates_sampled_error() {
         let mut value = certified_kird_value();
-        value["response_scope"]["maximum_sampled_normalized_error"] =
-            serde_json::json!(0.49);
+        value["response_scope"]["maximum_sampled_normalized_error"] = serde_json::json!(0.49);
         assert!(matches!(
             validate_kird_record_value(&value),
             Err(ContractError::InvalidKirdField {
@@ -3009,8 +3010,7 @@ mod tests {
 
     #[test]
     fn kird_audit_requires_reference_bundle_for_physical_measurements() {
-        let mut value: serde_json::Value =
-            serde_json::from_str(KIRD_SYNTHETIC_FIXTURE).unwrap();
+        let mut value: serde_json::Value = serde_json::from_str(KIRD_SYNTHETIC_FIXTURE).unwrap();
         value["record_status"] = serde_json::json!("physical_measurement");
         value["provenance"]["physical_execution_authorized"] = serde_json::json!(true);
         for pointer in [
@@ -3070,9 +3070,8 @@ mod tests {
                 }
             }
         }
-        value["provenance"]["reference_bundle_sha256"] = serde_json::json!(
-            "0000000000000000000000000000000000000000000000000000000000000000"
-        );
+        value["provenance"]["reference_bundle_sha256"] =
+            serde_json::json!("0000000000000000000000000000000000000000000000000000000000000000");
         assert!(matches!(
             validate_kird_record_value(&value),
             Err(ContractError::InvalidKirdField {
@@ -3109,9 +3108,8 @@ mod tests {
                 }
             }
         }
-        value["provenance"]["reference_bundle_sha256"] = serde_json::json!(
-            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-        );
+        value["provenance"]["reference_bundle_sha256"] =
+            serde_json::json!("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
         let report = validate_kird_record_value(&value).unwrap();
         assert_eq!(report.record_status, "physical_measurement");
         assert_eq!(report.physical_gate_status, "UNKNOWN");
@@ -3124,19 +3122,14 @@ mod tests {
         let p = [0.0, 1.0 / scale];
         let defect = canonical_symplectic_pair_defect_2d(q, p).unwrap();
         assert!(defect < 1.0e-12);
-        assert!(
-            validate_canonical_symplectic_pair_2d(q, p, 1.0e-12).is_ok()
-        );
+        assert!(validate_canonical_symplectic_pair_2d(q, p, 1.0e-12).is_ok());
     }
 
     #[test]
     fn canonical_symplectic_pair_oracle_rejects_structure_defect() {
         let q = [1.0, 0.0];
         let p = [0.0, 2.0];
-        assert_eq!(
-            canonical_symplectic_pair_defect_2d(q, p),
-            Ok(1.0)
-        );
+        assert_eq!(canonical_symplectic_pair_defect_2d(q, p), Ok(1.0));
         assert_eq!(
             validate_canonical_symplectic_pair_2d(q, p, 1.0e-12),
             Err(ContractError::InvalidSymplecticBasis)
@@ -3150,11 +3143,7 @@ mod tests {
             Err(ContractError::NonFiniteSymplecticBasis)
         );
         assert_eq!(
-            validate_canonical_symplectic_pair_2d(
-                [1.0, 0.0],
-                [0.0, 1.0],
-                f64::NAN
-            ),
+            validate_canonical_symplectic_pair_2d([1.0, 0.0], [0.0, 1.0], f64::NAN),
             Err(ContractError::InvalidProjectionBasis)
         );
     }
