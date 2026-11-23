@@ -67,6 +67,8 @@ pub struct MycelialMorphogenesisSplitManifest {
     pub timebase_id: String,
     /// Digest over every morphogenesis observation ID in canonical sorted order.
     pub morphogenesis_observation_inventory_digest: String,
+    /// Digest over each observation ID and its typed canonical content digest.
+    pub morphogenesis_observation_content_inventory_digest: String,
     pub split_unit_basis: MycelialMorphogenesisSplitUnitBasis,
     pub split_protocol_id: String,
     pub split_protocol_version: String,
@@ -90,6 +92,7 @@ pub enum MycelialMorphogenesisSplitError {
     NonCanonicalObservationOrder(String),
     SplitUnitInventoryMismatch,
     ObservationInventoryDigestMismatch,
+    MorphogenesisObservationContentDigestMismatch,
     ObservationEvidenceMismatch(&'static str),
     ObservationValidationFailed(String),
     ObservationUnitMismatch(String),
@@ -140,6 +143,12 @@ impl fmt::Display for MycelialMorphogenesisSplitError {
             }
             Self::ObservationInventoryDigestMismatch => {
                 write!(f, "morphogenesis observation inventory digest does not match split IDs")
+            }
+            Self::MorphogenesisObservationContentDigestMismatch => {
+                write!(
+                    f,
+                    "morphogenesis observation content digest does not match split observations"
+                )
             }
             Self::ObservationEvidenceMismatch(field) => {
                 write!(f, "morphogenesis observations disagree on evidence binding: {field}")
@@ -282,6 +291,46 @@ fn hash_string(hasher: &mut blake3::Hasher, value: &str) {
     hasher.update(value.as_bytes());
 }
 
+/// Digest over observation IDs paired with their canonical typed content digests.
+pub fn mycelial_morphogenesis_observation_content_inventory_digest(
+    observations: &[MycelialMorphogenesisObservation],
+) -> Result<String, MycelialMorphogenesisSplitError> {
+    if observations.is_empty()
+        || observations.len() > MAX_MYCELIAL_MORPHOGENESIS_SPLIT_OBSERVATIONS
+    {
+        return Err(MycelialMorphogenesisSplitError::ResourceLimitExceeded);
+    }
+    let mut by_id = BTreeMap::new();
+    for observation in observations {
+        observation
+            .validate()
+            .map_err(|_| MycelialMorphogenesisSplitError::ObservationValidationFailed(
+                observation.observation_id.clone(),
+            ))?;
+        if by_id
+            .insert(observation.observation_id.as_str(), observation)
+            .is_some()
+        {
+            return Err(MycelialMorphogenesisSplitError::DuplicateObservationId(
+                observation.observation_id.clone(),
+            ));
+        }
+    }
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"symthaea-mycelial-morphogenesis-content-inventory-v1");
+    hasher.update(&(by_id.len() as u64).to_le_bytes());
+    for (observation_id, observation) in by_id {
+        hash_string(&mut hasher, observation_id);
+        let digest = observation
+            .canonical_digest_hex()
+            .map_err(|_| MycelialMorphogenesisSplitError::ObservationValidationFailed(
+                observation_id.to_string(),
+            ))?;
+        hash_string(&mut hasher, &digest);
+    }
+    Ok(hasher.finalize().to_hex().to_string())
+}
+
 impl MycelialMorphogenesisSplitManifest {
     pub fn validate(&self) -> Result<(), MycelialMorphogenesisSplitError> {
         if self.schema_version != MYCELIAL_MORPHOGENESIS_SPLIT_SCHEMA_VERSION {
@@ -304,6 +353,10 @@ impl MycelialMorphogenesisSplitManifest {
             (
                 &self.morphogenesis_observation_inventory_digest,
                 "morphogenesis_observation_inventory_digest",
+            ),
+            (
+                &self.morphogenesis_observation_content_inventory_digest,
+                "morphogenesis_observation_content_inventory_digest",
             ),
             (&self.split_protocol_digest, "split_protocol_digest"),
         ] {
@@ -436,6 +489,13 @@ impl MycelialMorphogenesisSplitManifest {
                 "per-observation acquisition evidence-chain inventory",
             ));
         }
+        if mycelial_morphogenesis_observation_content_inventory_digest(observations)?
+            != self.morphogenesis_observation_content_inventory_digest
+        {
+            return Err(
+                MycelialMorphogenesisSplitError::MorphogenesisObservationContentDigestMismatch,
+            );
+        }
         if first.coordinate_frame_id != self.coordinate_frame_id
             || first.timebase_id != self.timebase_id
         {
@@ -525,6 +585,7 @@ impl MycelialMorphogenesisSplitManifest {
             self.coordinate_frame_id.as_str(),
             self.timebase_id.as_str(),
             self.morphogenesis_observation_inventory_digest.as_str(),
+            self.morphogenesis_observation_content_inventory_digest.as_str(),
             self.split_protocol_id.as_str(),
             self.split_protocol_version.as_str(),
             self.split_protocol_digest.as_str(),
@@ -648,6 +709,9 @@ mod tests {
             timebase_id: source_observations[0].timebase_id.clone(),
             morphogenesis_observation_inventory_digest:
                 mycelial_observation_id_inventory_digest(&ids),
+            morphogenesis_observation_content_inventory_digest:
+                mycelial_morphogenesis_observation_content_inventory_digest(source_observations)
+                    .unwrap(),
             split_unit_basis: basis,
             split_protocol_id: "leave-independent-unit-out-forward-time".to_string(),
             split_protocol_version: "1.0.0".to_string(),
@@ -800,12 +864,32 @@ mod tests {
     #[test]
     fn source_evidence_mismatch_is_rejected() {
         let mut observations = observations();
+        let manifest = manifest(
+            &observations,
+            MycelialMorphogenesisSplitUnitBasis::CultivationUnit,
+        );
         observations[5].calibration_digest = digest('7');
-        let manifest = manifest(&observations, MycelialMorphogenesisSplitUnitBasis::CultivationUnit);
         assert!(matches!(
             manifest.validate_against(&observations),
             Err(MycelialMorphogenesisSplitError::ObservationEvidenceMismatch(_))
         ));
+    }
+
+    #[test]
+    fn typed_morphogenesis_observation_content_is_committed() {
+        let mut observations = observations();
+        let manifest = manifest(
+            &observations,
+            MycelialMorphogenesisSplitUnitBasis::CultivationUnit,
+        );
+        observations[0].measurement = MycelialMorphogenesisMeasurement::CordAreaFraction {
+            fraction: 0.75,
+            analysis_method_id: "cord-segmentation-v2".to_string(),
+        };
+        assert_eq!(
+            manifest.validate_against(&observations),
+            Err(MycelialMorphogenesisSplitError::MorphogenesisObservationContentDigestMismatch)
+        );
     }
 
     #[test]
