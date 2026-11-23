@@ -9,7 +9,7 @@
 //! records remain untrusted until independently qualified by the assurance
 //! layer.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
@@ -382,7 +382,7 @@ fn candidate_set_digest(evidence: &[CandidateEvidenceV1]) -> String {
                 hasher.update([1]);
                 hash_field(&mut hasher, digest);
             }
-            None => hasher.update([0]),
+            None => { hasher.update([0]); }
         }
     }
     hex_digest(hasher.finalize().as_slice())
@@ -555,7 +555,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_unknown_modalities_and_non_finite_scores() {
+    fn rejects_unknown_modalities_and_non_numeric_scores() {
         let mut modality = record("e1", "bm25", 1);
         modality["modality"] = json!("telepathy");
         assert_eq!(
