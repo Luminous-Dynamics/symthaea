@@ -386,9 +386,17 @@ impl EvidenceLedger {
         query: &EvidenceQuery,
     ) -> Option<&'a EvidenceEvent> {
         self.events.iter().find(|candidate| {
-            let temporal_match = candidate.known_at_millis <= query.known_at_millis
-                && query.valid_at_millis >= candidate.valid_from_millis
-                && candidate.valid_until_millis.is_none_or(|until| query.valid_at_millis < until);
+            let known_by_cutoff = candidate.known_at_millis <= query.known_at_millis;
+            let applies_at_valid_time = match candidate.kind {
+                EvidenceEventKind::Correction | EvidenceEventKind::Retraction => {
+                    query.valid_at_millis >= candidate.valid_from_millis
+                        && candidate.valid_until_millis.is_none_or(|until| query.valid_at_millis < until)
+                }
+                // Erasure is a knowledge-time transition, not a world fact:
+                // once known, it blocks every historical valid-time view.
+                EvidenceEventKind::ErasureTombstone => true,
+                _ => false,
+            };
             let scope_match = match candidate.kind {
                 EvidenceEventKind::Correction | EvidenceEventKind::Retraction => {
                     candidate.authority_scopes.iter().any(|scope| scope == &query.required_authority)
@@ -403,7 +411,8 @@ impl EvidenceLedger {
                 _ => false,
             };
             candidate.sequence > event.sequence
-                && temporal_match
+                && known_by_cutoff
+                && applies_at_valid_time
                 && scope_match
                 && candidate.targets.iter().any(|target| target == &event.event_id)
         })
@@ -545,6 +554,9 @@ pub fn validate_events(events: &[EvidenceEvent]) -> Result<(), String> {
             }
             EvidenceEventKind::ErasureTombstone => {
                 require_control_fields(event)?;
+                if event.valid_from_millis != 0 || event.valid_until_millis.is_some() {
+                    return Err(format!("erasure tombstones are knowledge-time events and cannot have a world-validity interval: {}", event.event_id));
+                }
                 if !event.authority_scopes.iter().any(|scope| scope == "memory-erasure") {
                     return Err(format!("erasure tombstone lacks memory-erasure authority scope: {}", event.event_id));
                 }
@@ -988,6 +1000,19 @@ mod tests {
         let first = claim("claim-1", 1, 20, EvidenceEventKind::Assertion, Vec::new());
         let second = claim("claim-2", 2, 19, EvidenceEventKind::Assertion, Vec::new());
         assert!(EvidenceLedger::new(vec![first, second]).is_err());
+    }
+
+    #[test]
+    fn erasure_tombstones_cannot_be_limited_to_a_world_validity_window() {
+        let original = claim("claim-1", 1, 10, EvidenceEventKind::Assertion, Vec::new());
+        let mut tombstone = claim("erase-1", 2, 30, EvidenceEventKind::ErasureTombstone, vec!["claim-1"]);
+        tombstone.claim_key = None;
+        tombstone.source = None;
+        tombstone.payload_digest = None;
+        tombstone.observed_at_millis = None;
+        tombstone.authority_scopes = vec!["memory-erasure".to_string()];
+        tombstone.valid_from_millis = 100;
+        assert!(EvidenceLedger::new(vec![original, tombstone]).is_err());
     }
 
     #[test]
