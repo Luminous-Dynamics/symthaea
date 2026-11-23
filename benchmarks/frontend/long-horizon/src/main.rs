@@ -1060,7 +1060,7 @@ mod tests {
         let policy: Value = serde_json::from_slice(policy_bytes).unwrap();
         let mut trace: Value = serde_json::from_slice(trace_bytes).unwrap();
         trace["fixture_sha256"] = json!(digest_hex(fixture_bytes));
-        trace["steps"][1]["event"]["to_status"] = json!("done");
+        trace["steps"][2]["event"]["to_status"] = json!("done");
         let changed_bytes = serde_json::to_vec(&trace).unwrap();
         let error = verify_event_trace_values(&fixture,fixture_bytes,&policy,policy_bytes,&trace,&changed_bytes)
             .expect_err("altered event payload must be rejected");
