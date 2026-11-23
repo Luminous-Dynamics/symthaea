@@ -1,0 +1,13 @@
+# Copyright (C) 2026 Luminous Dynamics
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+[package]
+name = "mace-memory-lifecycle-kernel"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Reference state-transition kernel for MACE memory lifecycle qualification"
+
+[dependencies]
+sha2 = "0.10"
