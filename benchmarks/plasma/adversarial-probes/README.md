@@ -93,3 +93,26 @@ The crate also exposes two separate feature maps for the TAPL programme (#13447)
 - `OpenBoundaryCoordinateLift` retains the normalized coordinate plus distances to the lower and upper physical faces. It does not wrap and rejects coordinates outside [0,1].
 
 Manufactured tests check exact seam equivalence at xi=0 and xi=1, near-seam continuity, derivative continuity, integer-period translations, and the distinction between the two open-boundary faces. These are analytic feature-map tests only: they do not train or evaluate a particle-field operator, prove field equivariance, or validate a physical plasma trajectory. Boundary type must come from the physical cohort contract, never from the current particle cloud.
+
+
+## Manufactured Hamiltonian structure oracle
+
+The crate exposes `canonical_symplectic_pair_defect_2d(q,p)` for an explicitly limited 2D canonical fixture with
+`J = [[0,1],[-1,0]]`. For basis columns q and p, the symplectic pairing is
+
+`q^T J p = q[0]*p[1] - q[1]*p[0]`.
+
+Its canonical defect is the absolute difference from one. The validator accepts a pair only when the defect is within the caller's tolerance. Tests cover an area-preserving scaled basis, a broken pairing, and non-finite values.
+
+This is a manufactured 2D structure oracle, not a high-dimensional symplectic basis builder, Hamiltonian reduced solver, Poisson integrator or proof of structure preservation for Vlasov–Poisson. It supplies a small exact test layer for [#13448](https://github.com/Luminous-Dynamics/symthaea/issues/13448).
+
+## Boundary topology and coordinate-lift contract
+
+The companion schema and known-answer fixture live under `benchmarks/plasma/topology-lifting/`. They declare separate periodic-torus and open-interval cases:
+- periodic cases use Fourier-character lift features only, no raw normalized coordinate;
+- open cases retain the raw coordinate plus normalized distances to both boundary faces;
+- boundary topology is explicit in the cohort, not inferred from a particle sample.
+
+The focused workflow validates the Draft 2020-12 schema/fixture. Rust tests validate seam equality, derivative equality, near-seam continuity and integer-period wrapping for the periodic feature map, plus the fact that open-boundary endpoints remain distinct.
+
+These checks qualify coordinate features only. They do not establish learned field equivariance, force accuracy, or physical solver fidelity; those require a matched particle-field operator and independent reference runs under #13447.
