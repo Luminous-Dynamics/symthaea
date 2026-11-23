@@ -648,7 +648,6 @@ mod tests {
         assert!(!visible.to_string().contains("valuation"));
     }
 
-
     #[test]
     fn converse_implication_countermodel_is_evaluated_not_trusted_as_text() {
         let pair = fixture();
