@@ -61,6 +61,8 @@ The pairing certificate also validates the arm-local decision-time information f
 
 This is a DVPC semantic adapter over driver-supplied event references. Generic canonical event encoding, SHA-256 hash-chain receipts, oracle isolation and signing remain with #9437/#8715; the driver-owned information ledger remains with #8732. The validator does not prove policy non-anticipativity without an actual driver replay and future-suffix mutation test.
 
+Each arm also carries a required `stochastic_draw_bundle_sha256` that references the Symtropy correspondence-conditioned draw bundle. Symtropy #3690 owns semantic address projection and Philox draw receipts; #3755 independently reconstructs the correspondence/address projection from complete event inventories and scopes. This Rust module only binds the per-arm bundle digest and rejects an empty reference. It does not implement correspondence matching, causal-invariance inference, or Philox; the referenced bundle must independently pass the Symtropy semantic verifier before the arm is considered complete.
+
 The evaluator also exposes `validate_causal_pairing_with_interaction`, which joins the four causal trajectory receipts to the #13281 regret outcomes. Applied outcomes must match the exact world tick, action digest and consumer application timestamp. Non-applied outcomes must match the terminal timestamp and reason. The combined certificate carries the exact same thirteen-field `PairedRunIdentity` as the regret certificate, so individually valid but unrelated trajectory and regret payloads cannot be joined.
 
 ## Run
