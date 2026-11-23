@@ -848,8 +848,9 @@ pub fn build_synthetic_metrology_policy_v1(
 
 /// Builds an observation-only policy whose EVSI score is the exact one-step
 /// expected reduction in binary decision loss under the declared assay model.
-/// Candidates with non-positive net value after measurement cost receive an
-/// EVSI priority of zero. The supplied assay profile and loss model are bound
+/// Candidates with non-positive net value after measurement cost receive
+/// zero EVSI selection priority; positive candidates retain normalized gross
+/// EVSI scores. The supplied assay profile and loss model are bound
 /// into the policy and prediction digests; the policy still receives no hidden
 /// outcome or realized assay result.
 pub fn build_synthetic_decision_evsi_policy_v1(
@@ -871,7 +872,12 @@ pub fn build_synthetic_decision_evsi_policy_v1(
             metrology_characteristics,
             decision_loss,
         )?;
-        candidate.expected_value_of_information = evsi.normalized_net_value_score;
+        candidate.expected_value_of_information =
+            if evsi.net_value_after_measurement_cost > 0.0 {
+                evsi.normalized_evsi_score
+            } else {
+                0.0
+            };
     }
     let model_material = (
         SYNTHETIC_HEURISTIC_MODEL_V1,
