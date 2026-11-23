@@ -1110,8 +1110,7 @@ fn build_candidate_impact(
 /// caller conflict groups take precedence, but common source tips, shared
 /// tip endpoints, and identical tip-to-side contacts are also detected.
 fn candidates_conflict(left: &MycelialFusionCandidate, right: &MycelialFusionCandidate) -> bool {
-    if left.conflict_group_id.is_some() && left.conflict_group_id == right.conflict_group_id
-    {
+    if left.conflict_group_id.is_some() && left.conflict_group_id == right.conflict_group_id {
         return true;
     }
     if left.source_tip_junction_id == right.source_tip_junction_id {
