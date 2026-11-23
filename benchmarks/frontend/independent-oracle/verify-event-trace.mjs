@@ -293,12 +293,12 @@ function selfTest() {
   const input=readInputs(DEFAULT_TRACE,DEFAULT_FIXTURE,DEFAULT_POLICY);
   const baseline=verifyTrace(input);
   if(baseline.semantic_decision!=='accepted'||baseline.oracle_results.some(item=>item.result!=='pass')) fail('self-test baseline did not pass all seven rules');
-  const forged=clone(input);forged.trace.worker_claims={disposition:'rejected',observed_oracle_ids:['fake.failure','fake.security']};
-  const forgedReport=verifyTrace({...forged,traceBytes:Buffer.from(JSON.stringify(forged.trace))});
+  const forgedTrace=clone(input.trace);forgedTrace.worker_claims={disposition:'rejected',observed_oracle_ids:['fake.failure','fake.security']};
+  const forgedReport=verifyTrace({...input,trace:forgedTrace,traceBytes:Buffer.from(JSON.stringify(forgedTrace))});
   if(JSON.stringify(baseline.oracle_results)!==JSON.stringify(forgedReport.oracle_results)) fail('worker claims influenced oracle outcomes');
-  const altered=clone(input);altered.trace.steps[1].event.to_status='done';
+  const alteredTrace=clone(input.trace);alteredTrace.steps[1].event.to_status='done';
   let mutationRejected=false;
-  try { verifyTrace({...altered,traceBytes:Buffer.from(JSON.stringify(altered.trace))}); } catch { mutationRejected=true; }
+  try { verifyTrace({...input,trace:alteredTrace,traceBytes:Buffer.from(JSON.stringify(alteredTrace))}); } catch { mutationRejected=true; }
   if(!mutationRejected) fail('altered authoritative event was accepted');
   console.log(JSON.stringify({status:'offline_event_oracle_self_test_passed',fixture_id:input.fixture.fixture_id,
     policy_rules:baseline.oracle_results.length,policy_rules_passed:baseline.oracle_results.filter(x=>x.result==='pass').length,
