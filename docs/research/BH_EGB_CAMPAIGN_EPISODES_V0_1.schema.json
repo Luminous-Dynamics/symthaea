@@ -17,7 +17,8 @@
     "confirmatory_preconditions",
     "primary_metrics",
     "frozen_negative_controls",
-    "external_benchmarks"
+    "external_benchmarks",
+    "acquisition_policy"
   ],
   "properties": {
     "schema_version": {
@@ -297,6 +298,76 @@
           "use": {
             "type": "string"
           }
+        }
+      }
+    },
+    "acquisition_policy": {
+      "type": "object",
+      "required": [
+        "issue",
+        "stages",
+        "anti_conflation"
+      ],
+      "properties": {
+        "issue": {
+          "type": "string",
+          "format": "uri"
+        },
+        "stages": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "name",
+              "objective",
+              "authority"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "owner_issues": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "uri"
+                }
+              },
+              "owner_pr": {
+                "type": "string",
+                "format": "uri"
+              },
+              "objective": {
+                "type": "string"
+              },
+              "baseline_arms": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "authority": {
+                "type": "string"
+              },
+              "current_candidate_status": {
+                "type": "string"
+              },
+              "required_extension": {
+                "type": "string"
+              },
+              "synthetic_control": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "anti_conflation": {
+          "type": "string"
         }
       }
     }
