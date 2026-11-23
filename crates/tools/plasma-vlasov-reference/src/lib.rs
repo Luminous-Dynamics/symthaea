@@ -14,7 +14,6 @@
 
 pub mod echo_analysis;
 pub mod kinetic_action_policy;
-pub mod kinetic_action_policy;
 pub mod phase_space_cascade;
 pub mod phase_space_flux;
 pub mod velocity_sponge;
