@@ -208,12 +208,10 @@ pub use mycelial_network::{
     MycelialNetworkMetrics, build_mycelial_network_graph, detect_anastomosis_candidates,
 };
 pub use mycelial_observation_coverage::{
-    MAX_MYCELIAL_COVERAGE_CANDIDATES_PER_OBSERVATION,
-    MAX_MYCELIAL_OBSERVATION_COVERAGE_RECORDS,
-    MYCELIAL_OBSERVATION_COVERAGE_SCHEMA_VERSION,
-    MycelialObservationCoverageError, MycelialObservationCoverageLedger,
-    MycelialObservationCoverageRecord, MycelialObservationCoverageState,
-    MycelialObservationResidualKind,
+    MAX_MYCELIAL_COVERAGE_CANDIDATES_PER_OBSERVATION, MAX_MYCELIAL_OBSERVATION_COVERAGE_RECORDS,
+    MYCELIAL_OBSERVATION_COVERAGE_SCHEMA_VERSION, MycelialObservationCoverageError,
+    MycelialObservationCoverageLedger, MycelialObservationCoverageRecord,
+    MycelialObservationCoverageState, MycelialObservationResidualKind,
 };
 pub use mycelial_presence::{
     build_mycelial_presence, build_mycelial_presence_with_mode, render_mycelial_presence,
