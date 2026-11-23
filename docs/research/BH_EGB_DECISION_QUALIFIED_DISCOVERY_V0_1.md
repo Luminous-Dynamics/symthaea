@@ -167,3 +167,19 @@ The two synthetic controls now test orthogonal acquisition invariants:
 
 The first test is an exact rational linear-algebra control; the second is an exact deterministic model-adequacy control. Neither establishes an EGB physical result, policy performance, or SOTA.
 
+
+
+## Coordinate and unit metamorphic regression
+
+The exact covariance verifier has now been extended beyond redundant-output invariance. It also transports a nonsingular mixed basis change \(P\) and a nontrivial unit scaling \(U\), checking in exact rational arithmetic that:
+
+\[
+\Delta\mu' = P\Delta\mu,\qquad
+S' = P S P^{\mathsf T},\qquad
+(\Delta\mu')^{\mathsf T}(S')^{-1}\Delta\mu'
+=\Delta\mu^{\mathsf T}S^{-1}\Delta\mu=4.
+\]
+
+The synthetic mixed-basis transform is \(P=\begin{bmatrix}2&1\\1&1\end{bmatrix}\), with transported mean \([4,3]\) and covariance \(\begin{bmatrix}7&9/2\\9/2&3\end{bmatrix}\). The unit transform is \(U=\mathrm{diag}(1000,1/100)\), with mean \([1000,1/50]\) and covariance \(\begin{bmatrix}1000000&5\\5&1/10000\end{bmatrix}\). Both preserve the exact score 4. These controls test the algebraic rule that coordinates, units and covariance must move together; they do not verify any physical endpoint metric. Symtropy #7131 remains authoritative for the actual horizon/infinity Gram metrics and their transport.
+
+The covariance fixture now has four exact properties: correlated covariance is respected; duplicate observables do not create information; invertible basis changes preserve the score; and unit rescaling preserves the score. All values are synthetic known answers.
