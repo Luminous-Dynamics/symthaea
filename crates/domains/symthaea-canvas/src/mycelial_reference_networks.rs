@@ -277,7 +277,6 @@ pub fn build_euclidean_minimum_spanning_tree(
 
     let mut selected_edges = Vec::with_capacity(count.saturating_sub(1));
     let mut adjacency = vec![Vec::<(usize, f64)>::new(); count];
-    let mut total_cost = 0.0f64;
     if count > 0 {
         let mut in_tree = vec![false; count];
         let mut best_distance = vec![f64::INFINITY; count];
@@ -315,7 +314,6 @@ pub fn build_euclidean_minimum_spanning_tree(
                 });
                 adjacency[parent].push((next, distance));
                 adjacency[next].push((parent, distance));
-                total_cost += distance;
             }
             for candidate in 0..count {
                 if in_tree[candidate] {
@@ -356,7 +354,7 @@ pub fn build_euclidean_minimum_spanning_tree(
     }
     // Re-sum in canonical output order so the receipt's quantized cost is
     // independent of the Prim visitation order and matches its own validator.
-    total_cost = selected_edges
+    let total_cost = selected_edges
         .iter()
         .map(|edge| edge.euclidean_length_model_units)
         .sum();
