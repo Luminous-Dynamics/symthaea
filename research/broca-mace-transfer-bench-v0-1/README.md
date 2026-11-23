@@ -645,3 +645,24 @@ cargo test --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p
 The current implementation is a synthetic pairwise diagnostic, not the production portfolio optimiser. Its relation labels and training observations are generated fixtures. The pairwise radius is a 90% split-conformal residual quantile. The same-family holdout is intended to satisfy the exchangeability premise; stable out-of-family and shifted-regime coverage are separate diagnostics. These intervals predict pairwise effects, not the mean. The test suite is authored but has not been executed in this environment.
 
 **Verification:** 17 Rust tests are authored in the binary, but have not run here; no Cargo/Rust/rustfmt toolchain is available. The conformal coverage diagnostic uses evaluator-owned true relation classes, while candidate relation-label errors and unknowns are counted separately. The same-family holdout is the nominal 90% split-conformal domain; stable-family OOD and shifted-regime coverage are separate diagnostics. Source audits are not test passes.
+
+
+## Standalone oracle-blind candidate artifact (v0.1)
+
+A new workspace member, `candidate/` (`broca-mace-candidate`), provides a separate candidate process with one bounded JSON envelope on stdin and one candidate receipt on stdout. It initially supports exact-scope scan and typed-content HDC; both retain the unchanged `Policy::CausalQualified` decision gate.
+
+The candidate package depends on the policy and HDC retrieval packages, serialization and hashing. It does not depend on the evaluator or generated stress fixtures. The input and output contracts are in [mace_candidate_envelope_v1.schema.json](../../data/schemas/mace_candidate_envelope_v1.schema.json) and [mace_candidate_receipt_v1.schema.json](../../data/schemas/mace_candidate_receipt_v1.schema.json). Nested unknown fields are rejected; the envelope is bounded to 32 MiB / 20,000 evidence records and does not define evaluator truth, utility labels, optimal actions, intervention labels or scoring instructions.
+
+Run independently:
+
+```bash
+cargo run --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml \
+  -p broca-mace-candidate --release < candidate-envelope.json > candidate-receipt.json
+
+cargo test --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml \
+  -p broca-mace-candidate
+```
+
+This is a separate package and protocol, **not yet a sandboxed or independently custodied evaluator**. The paired evaluator has not yet been rewired to launch the candidate process. Candidate evidence trust/retraction/reconciliation fields are inputs to the prototype and must be derived from independently verified ingress receipts in production. Public digests do not authenticate issuers. See [MACE Isolated Candidate Protocol v0.1](../../docs/research/MACE_ISOLATED_CANDIDATE_PROTOCOL_V0_1.md) and [MACE Evaluation Paradigm and Benchmark Frontier v0.1](../../docs/research/MACE_EVALUATION_PARADIGM_AND_BENCHMARK_FRONTIER_V0_1.md).
+
+**Validation boundary:** source/schema work and parser regression tests are authored; Rust compilation, test execution, child-process integration, sandbox negative controls and independent evaluation have not been completed in this environment.

@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mace_candidate_receipt_v1.schema.json",
+  "title": "MACE Candidate Receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "pair_block_id",
+    "observation_sequence",
+    "task_nonce_sha256",
+    "method",
+    "request_sha256",
+    "decision_need_sha256",
+    "candidate_evidence_sha256",
+    "candidate_input_sha256",
+    "candidate_observation_id",
+    "decision",
+    "decision_support_event_ids",
+    "retrieved_event_ids",
+    "retrieval_profile_sha256",
+    "index_payload_bytes",
+    "latency_ns",
+    "probe_requested"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mace_candidate_receipt_v1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_.:-]+$"
+    },
+    "pair_block_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9_.:-]+$"
+    },
+    "observation_sequence": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709552000
+    },
+    "task_nonce_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "method": {
+      "enum": [
+        "exact_scope_scan",
+        "typed_content_hdc"
+      ]
+    },
+    "request_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "decision_need_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "candidate_evidence_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "candidate_input_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "candidate_observation_id": {
+      "type": "string",
+      "pattern": "^obs-[0-9a-f]{64}$"
+    },
+    "decision": {
+      "enum": [
+        "action_a",
+        "action_b",
+        "abstain"
+      ]
+    },
+    "decision_support_event_ids": {
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 4294967295
+      },
+      "uniqueItems": true
+    },
+    "retrieved_event_ids": {
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 4294967295
+      },
+      "uniqueItems": true
+    },
+    "retrieval_profile_sha256": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "index_payload_bytes": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709552000
+    },
+    "latency_ns": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709552000
+    },
+    "probe_requested": {
+      "type": "boolean"
+    }
+  }
+}
