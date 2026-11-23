@@ -387,6 +387,11 @@ fn validate_envelope(envelope: CandidateEnvelopeV1) -> Result<(DecisionNeedV1, V
             return Err(format!("duplicate candidate event_id {event_id}"));
         }
         let item = wire.to_domain()?;
+        if item.scope != need.scope || !need.action_alternatives.contains(&item.action) {
+            return Err(format!(
+                "candidate evidence event_id {event_id} is outside DecisionNeedV1 scope/action alternatives"
+            ));
+        }
         memory.push(item);
     }
     memory.sort_by_key(|item| item.event_id);
