@@ -85,7 +85,11 @@ impl RetrievalPolicyTraceFileStoreV1 {
         }
 
         let path = self.trace_path(trace);
-        self.publish_create_once(&path, &encoded)?;
+        self.publish_create_once(&path, &encoded).map_err(|error| {
+            format!(
+                "retrieval trace persistence outcome may be unknown; reopen and reconcile before retry: {error}"
+            )
+        })?;
         memory
             .restore_trace_json_value(&value)
             .map_err(|error| format!("bind persisted retrieval trace: {error:?}"))
