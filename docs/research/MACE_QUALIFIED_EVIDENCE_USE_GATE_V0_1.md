@@ -85,7 +85,7 @@ The trait is an integration seam, not a cryptographic implementation. A producti
 
 The downstream executor must perform live authorization and lifecycle checks again at consequential use. A qualification token is purpose- and time-scoped; it is not a standing access credential.
 
-No signature algorithm, key custody, issuer registry, remote source-observation API, rights engine, tenant-isolation service or external rollback witness is implemented by this module.
+No signature algorithm, key custody, issuer registry, remote source-observation API, rights engine, tenant-isolation service or external rollback witness is implemented by this module. The subject-scope digest must commit to the effective authorization-scope manifest; it must not be treated as a raw user/tenant identifier or as a substitute for live access control.
 
 ## 6. Test inventory
 
@@ -143,6 +143,19 @@ It complements, rather than replaces, the current external protocols:
 - The **Agent Memory Integrity Internet-Draft** is an individual Internet-Draft, not an IETF-endorsed standard. Its T9 whole-store rollback and T10 erasure-resurrection tests remain important but are specifically about at-rest integrity, not semantic correctness or evidence admissibility.
 
 MACE should keep the original external benchmark protocols separate and add its own assurance dimensions: unauthorized exposure, inadmissible evidence influence, decision regret, harmful influence removal, benign utility retention and repair closure.
+
+Other current benchmarks expose additional gaps that the MACE comparison matrix should cover:
+
+| Benchmark | Scope and distinctive measurement | MACE implication |
+|---|---|---|
+| MemoryArena (ICML 2026) | Interdependent multi-session Memory-Agent-Environment tasks across web navigation, preference-constrained planning, progressive information search and sequential formal reasoning | Evaluate memory acquisition and later action together; a dialogue-recall score is not enough |
+| AMA-Bench (ICML 2026) | 207 samples, 2,482 QA pairs, six domains and four capabilities: recall, causal inference, state updating and state abstraction | Add causal and state-update baselines, not just recall/retrieval |
+| WorldMemArena (2026) | 400 multi-session multimodal tasks and an observable write/maintain/retrieve/use lifecycle | Preserve original images, screenshots, states and action feedback; do not reduce all visual evidence to captions |
+| StateMemBench (2026) | 234 multi-session state-tracking scenarios; separates current-state, superseded-state and other failures | Make supersession and bitemporal current-at-use semantics first-class baselines |
+| Memora / FAMA (Findings ACL 2026) | Weeks-to-months personalized histories; remembering, reasoning and recommending; Forgetting-Aware Memory Accuracy penalizes reliance on obsolete memory | Score harmful retention and stale-memory use, not just successful recall |
+| TimlMemBench (Findings EMNLP 2026) | 208 reviewed bilingual samples, 1,566 sessions, 1,715 questions and 1,821 governed-use/activation cases | Test revocation, scope, provenance recovery, activation and restraint under raw-native memory ingestion |
+
+These are distinct tasks and scoring protocols. Do not pool their scores with AML, LongMemEval-V2 or each other. Use them as separate benchmark adapters and as guides to MACE's own cross-protocol assurance axes. In particular, StateMem's reported gains from explicit supersession/state structure and TimlMemBench's raw-native governance failures reinforce that MACE needs current-at-use qualification, not only high-quality storage and recall.
 
 ## 9. Next integration milestones
 
