@@ -3,6 +3,7 @@ name: Plasma Probe Contract
 on:
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "Cargo.lock"
       - "crates/domains/symthaea-plasma-probes/**"
@@ -31,11 +32,40 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      - name: Check formatting
-        run: cargo fmt --package symthaea-plasma-probes -- --check
+      - name: Check formatting without workspace discovery
+        run: rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/lib.rs
 
-      - name: Run unit tests
-        run: cargo test --locked --package symthaea-plasma-probes
+      - name: Prepare isolated crate validation workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmp_root="${RUNNER_TEMP}/plasma-probe-validation"
+          crate_dir="${tmp_root}/crates/domains/symthaea-plasma-probes"
+          mkdir -p "${crate_dir}/src"
+          mkdir -p "${tmp_root}/benchmarks/plasma/adversarial-probes/fixtures"
+          cp crates/domains/symthaea-plasma-probes/src/lib.rs "${crate_dir}/src/lib.rs"
+          cp benchmarks/plasma/adversarial-probes/fixtures/synthetic-pulse-family-v0.1.json \
+            "${tmp_root}/benchmarks/plasma/adversarial-probes/fixtures/"
+          cat > "${crate_dir}/Cargo.toml" <<'EOF'
+          [package]
+          name = "symthaea-plasma-probes"
+          version = "0.1.0"
+          edition = "2024"
+          rust-version = "1.94"
+          publish = false
+
+          [workspace]
+
+          [dependencies]
+          blake3 = "=1.8.5"
+          serde = { version = "=1.0.228", features = ["derive"] }
+          serde_json = "=1.0.150"
+          thiserror = "=1.0.69"
+          EOF
+          cargo generate-lockfile --manifest-path "${crate_dir}/Cargo.toml"
+
+      - name: Run isolated unit tests against pinned dependency versions
+        run: cargo test --locked --manifest-path "${RUNNER_TEMP}/plasma-probe-validation/crates/domains/symthaea-plasma-probes/Cargo.toml"
 
       - name: Run strict Clippy
-        run: cargo clippy --locked --package symthaea-plasma-probes --all-targets -- -D warnings
+        run: cargo clippy --locked --manifest-path "${RUNNER_TEMP}/plasma-probe-validation/crates/domains/symthaea-plasma-probes/Cargo.toml" --all-targets -- -D warnings
