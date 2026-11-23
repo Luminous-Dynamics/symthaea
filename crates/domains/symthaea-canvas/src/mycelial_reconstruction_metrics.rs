@@ -602,16 +602,16 @@ pub fn match_junctions_hungarian(
                 forbidden_cost
             };
         }
-        for dummy_column in truth_count..matrix_size {
-            costs[prediction_index][dummy_column] = unmatched_cost;
+        for cost in costs[prediction_index].iter_mut().skip(truth_count) {
+            *cost = unmatched_cost;
         }
     }
-    for dummy_row in prediction_count..matrix_size {
-        for truth_column in 0..truth_count {
-            costs[dummy_row][truth_column] = unmatched_cost;
+    for row in costs.iter_mut().skip(prediction_count) {
+        for cost in row.iter_mut().take(truth_count) {
+            *cost = unmatched_cost;
         }
-        for dummy_column in truth_count..matrix_size {
-            costs[dummy_row][dummy_column] = 0.0;
+        for cost in row.iter_mut().skip(truth_count) {
+            *cost = 0.0;
         }
     }
 
