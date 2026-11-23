@@ -5,8 +5,7 @@ on:
     branches: [main]
     paths:
       - "scripts/research/proof_comprehension_oracle.rs"
-      - "scripts/research/proof-plan-contract/**
-"
+      - "scripts/research/proof-plan-contract/**"
       - "docs/research/PROOF_PLAN_*.json"
       - "docs/research/MATH_PROOF_COMPREHENSION_*.json"
       - "docs/research/MATHLIB_PROOF_COMPREHENSION_PILOT_V1.*"
