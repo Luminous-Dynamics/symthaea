@@ -2056,7 +2056,7 @@ mod tests {
             vec![
                 node("pA", AnnotatedJunctionKind::Branch, 0.01, 0.0, 0.0),
                 node("pB", AnnotatedJunctionKind::Tip, 1.01, 0.0, 0.0),
-                node("pC", AnnotatedJunctionKind::Tip, 0.0, 1.01, 0.0),
+                node("pC", AnnotatedJunctionKind::ProjectedCrossing, 0.0, 1.01, 0.0),
             ],
             vec![edge("s1", "pA", "pB", 1.0), edge("s2", "pA", "pC", 1.0)],
         );
@@ -2507,6 +2507,7 @@ mod tests {
         let bytes = serde_json::to_vec(&score).unwrap();
         let restored: MycelialReconstructionScore = serde_json::from_slice(&bytes).unwrap();
         restored.validate().unwrap();
+        assert_eq!(restored, score);
         assert_eq!(restored.canonical_digest_hex().unwrap(), digest);
     }
 
