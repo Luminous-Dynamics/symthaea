@@ -96,6 +96,10 @@ pub enum ContractError {
     InvalidNormalizationOutputInterval,
     #[error("normalization coordinate is non-finite")]
     NonFiniteNormalizationCoordinate,
+    #[error("periodic Fourier lift harmonic budget must be positive")]
+    InvalidHarmonicBudget,
+    #[error("open-boundary coordinate must lie in [0, 1]")]
+    InvalidOpenBoundaryCoordinate,
     #[error("invalid KIRD record field {field}: {reason}")]
     InvalidKirdField {
         field: &'static str,
@@ -1466,6 +1470,98 @@ fn linspace(minimum: f64, maximum: f64, steps: usize) -> Result<Vec<f64>, Contra
     Ok(values)
 }
 
+/// Periodic Fourier-character feature lift for a normalized torus coordinate.
+///
+/// The input is interpreted modulo one. For harmonic k the emitted pair is
+/// [cos(2*pi*k*xi), sin(2*pi*k*xi)]. No raw non-periodic coordinate is included,
+/// so the feature map and all of its derivatives are periodic at the seam.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PeriodicTorusLift {
+    max_harmonic: usize,
+}
+
+impl PeriodicTorusLift {
+    /// Construct a periodic lift with harmonics 1 through max_harmonic.
+    pub fn new(max_harmonic: usize) -> Result<Self, ContractError> {
+        if max_harmonic == 0 {
+            return Err(ContractError::InvalidHarmonicBudget);
+        }
+        Ok(Self { max_harmonic })
+    }
+
+    /// Return interleaved cosine/sine features, wrapping xi modulo one.
+    pub fn features(&self, xi: f64) -> Result<Vec<f64>, ContractError> {
+        let xi = self.wrapped_coordinate(xi)?;
+        let mut features = Vec::with_capacity(self.max_harmonic * 2);
+        for harmonic in 1..=self.max_harmonic {
+            let phase = TAU * harmonic as f64 * xi;
+            features.push(phase.cos());
+            features.push(phase.sin());
+        }
+        if features.iter().any(|value| !value.is_finite()) {
+            return Err(ContractError::InvalidGramianArithmetic);
+        }
+        Ok(features)
+    }
+
+    /// Derivatives of the interleaved features with respect to normalized xi.
+    pub fn derivative(&self, xi: f64) -> Result<Vec<f64>, ContractError> {
+        let xi = self.wrapped_coordinate(xi)?;
+        let mut derivative = Vec::with_capacity(self.max_harmonic * 2);
+        for harmonic in 1..=self.max_harmonic {
+            let angular_frequency = TAU * harmonic as f64;
+            let phase = angular_frequency * xi;
+            derivative.push(-angular_frequency * phase.sin());
+            derivative.push(angular_frequency * phase.cos());
+        }
+        if derivative.iter().any(|value| !value.is_finite()) {
+            return Err(ContractError::InvalidGramianArithmetic);
+        }
+        Ok(derivative)
+    }
+
+    pub fn max_harmonic(&self) -> usize {
+        self.max_harmonic
+    }
+
+    fn wrapped_coordinate(&self, xi: f64) -> Result<f64, ContractError> {
+        if !xi.is_finite() {
+            return Err(ContractError::NonFiniteNormalizationCoordinate);
+        }
+        Ok(xi.rem_euclid(1.0))
+    }
+}
+
+/// Non-periodic normalized coordinate features for a known open interval.
+///
+/// Unlike PeriodicTorusLift, this map deliberately preserves the distinction
+/// between xi=0 and xi=1 and reports distance to each physical boundary.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct OpenBoundaryCoordinateFeatures {
+    pub coordinate: f64,
+    pub distance_to_lower_boundary: f64,
+    pub distance_to_upper_boundary: f64,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct OpenBoundaryCoordinateLift;
+
+impl OpenBoundaryCoordinateLift {
+    pub fn features(xi: f64) -> Result<OpenBoundaryCoordinateFeatures, ContractError> {
+        if !xi.is_finite() {
+            return Err(ContractError::NonFiniteNormalizationCoordinate);
+        }
+        if !(0.0..=1.0).contains(&xi) {
+            return Err(ContractError::InvalidOpenBoundaryCoordinate);
+        }
+        Ok(OpenBoundaryCoordinateFeatures {
+            coordinate: xi,
+            distance_to_lower_boundary: xi,
+            distance_to_upper_boundary: 1.0 - xi,
+        })
+    }
+}
+
 /// Summary of a semantically checked KIRD checkpoint record.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct KirdRecordSummary {
@@ -2529,6 +2625,118 @@ mod tests {
             validate_kird_record_value(&value),
             Err(ContractError::InvalidKirdField {
                 field: "cohort.initial_state_sha256",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn periodic_torus_lift_is_continuous_at_the_coordinate_seam() {
+        let lift = PeriodicTorusLift::new(4).unwrap();
+        let at_zero = lift.features(0.0).unwrap();
+        let at_one = lift.features(1.0).unwrap();
+        assert_eq!(at_zero.len(), 8);
+        assert_eq!(at_zero.len(), at_one.len());
+        for (left, right) in at_zero.iter().zip(&at_one) {
+            assert!((left - right).abs() < 1.0e-12);
+        }
+    }
+
+    #[test]
+    fn periodic_torus_lift_derivatives_match_at_the_seam() {
+        let lift = PeriodicTorusLift::new(4).unwrap();
+        let at_zero = lift.derivative(0.0).unwrap();
+        let at_one = lift.derivative(1.0).unwrap();
+        for (left, right) in at_zero.iter().zip(&at_one) {
+            assert!((left - right).abs() < 1.0e-10);
+        }
+    }
+
+    #[test]
+    fn periodic_torus_lift_wraps_integer_translations() {
+        let lift = PeriodicTorusLift::new(5).unwrap();
+        let reference = lift.features(0.375).unwrap();
+        for translated in [1.375, -0.625, 3.375] {
+            let candidate = lift.features(translated).unwrap();
+            for (left, right) in reference.iter().zip(&candidate) {
+                assert!((left - right).abs() < 1.0e-12);
+            }
+        }
+    }
+
+    #[test]
+    fn periodic_torus_lift_rejects_zero_harmonics_and_non_finite_coordinates() {
+        assert_eq!(
+            PeriodicTorusLift::new(0),
+            Err(ContractError::InvalidHarmonicBudget)
+        );
+        let lift = PeriodicTorusLift::new(1).unwrap();
+        assert_eq!(
+            lift.features(f64::NAN),
+            Err(ContractError::NonFiniteNormalizationCoordinate)
+        );
+        assert_eq!(
+            lift.derivative(f64::INFINITY),
+            Err(ContractError::NonFiniteNormalizationCoordinate)
+        );
+    }
+
+    #[test]
+    fn open_boundary_lift_keeps_opposite_faces_distinct() {
+        let lower = OpenBoundaryCoordinateLift::features(0.0).unwrap();
+        let upper = OpenBoundaryCoordinateLift::features(1.0).unwrap();
+        assert_eq!(lower.coordinate, 0.0);
+        assert_eq!(lower.distance_to_lower_boundary, 0.0);
+        assert_eq!(lower.distance_to_upper_boundary, 1.0);
+        assert_eq!(upper.coordinate, 1.0);
+        assert_eq!(upper.distance_to_lower_boundary, 1.0);
+        assert_eq!(upper.distance_to_upper_boundary, 0.0);
+        assert_ne!(lower, upper);
+    }
+
+    #[test]
+    fn open_boundary_lift_rejects_periodic_wrapping_inputs() {
+        assert_eq!(
+            OpenBoundaryCoordinateLift::features(-0.01),
+            Err(ContractError::InvalidOpenBoundaryCoordinate)
+        );
+        assert_eq!(
+            OpenBoundaryCoordinateLift::features(1.01),
+            Err(ContractError::InvalidOpenBoundaryCoordinate)
+        );
+    }
+
+    #[test]
+    fn kird_audit_requires_reference_bundle_for_physical_measurements() {
+        let mut value: serde_json::Value =
+            serde_json::from_str(KIRD_SYNTHETIC_FIXTURE).unwrap();
+        value["record_status"] = serde_json::json!("physical_measurement");
+        value["provenance"]["physical_execution_authorized"] = serde_json::json!(true);
+        for pointer in [
+            "/cohort/initial_state_sha256",
+            "/task_contract/intervention_family_sha256",
+            "/task_contract/qoi_registry_sha256",
+            "/candidate/configuration_sha256",
+            "/provenance/candidate_output_sha256",
+            "/provenance/run_receipt_sha256",
+        ] {
+            let field = pointer.trim_start_matches('/').replace('/', ".");
+            let mut current = &mut value;
+            let mut parts = field.split('.').peekable();
+            while let Some(part) = parts.next() {
+                if parts.peek().is_none() {
+                    current[part] = serde_json::json!(
+                        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                    );
+                } else {
+                    current = &mut current[part];
+                }
+            }
+        }
+        assert!(matches!(
+            validate_kird_record_value(&value),
+            Err(ContractError::InvalidKirdField {
+                field: "provenance.reference_bundle_sha256",
                 ..
             })
         ));
