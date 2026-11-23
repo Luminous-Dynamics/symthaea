@@ -132,6 +132,24 @@ Start with finite deterministic generators. Every generator family needs an inde
 4. **Discrimination:** permit bounded queries/interventions only under the declared protocol.
 5. **Qualification:** evaluate transfer, false analogies, uncertainty, cost and counterexamples independently.
 
+### A hierarchy of transfer relations
+
+Avoid treating cross-domain transfer as a binary “same graph / different graph” judgment. The strict total isomorphism in Symtropy #7173 is an integrity floor; real scientific transfer may be partial, abstracted or behaviorally asymmetric.
+
+The next version should expose explicit, scope-indexed map types:
+- **Isomorphism** for exact one-to-one structural correspondence.
+- **Embedding** for a source substructure mapped into a declared target region.
+- **Homomorphism** when a declared relation-preserving map intentionally collapses distinctions.
+- **Quotient / coarse-graining** when fine entities or states become an abstract equivalence class.
+- **Simulation** for one-way action-conditioned transition coverage.
+- **Bisimulation** for mutual behavioral correspondence.
+- **Approximate simulation / bisimulation** for bounded-error trajectories.
+- **Conjugacy / semiconjugacy** for continuous dynamics under explicit state, action and time transformations.
+
+Every map must declare source and target scope, omitted entities/relations, assumptions, uncertainty, alternatives and counterexamples. The evaluator must never infer a stronger relationship than the declared one. For example, a valid embedding does not imply a whole-system isomorphism; a one-way simulation does not imply bisimulation; a coarse-grained invariant does not imply fine-scale equivalence.
+
+This provides a practical mathematical ladder for distinguishing analogy, structural reuse, abstraction, behavioral equivalence and dynamical transfer. It is a v0.2 research requirement, not implemented by the finite v0.1 validator.
+
 ## 4. Scorecard: no single ErgoScore
 
 Report every metric per generator family and transformation class.
