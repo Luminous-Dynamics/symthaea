@@ -45,5 +45,7 @@ jobs:
         run: cargo run --locked -p symthaea-experiment-design -- --demo
       - name: Run covariance redundancy control
         run: cargo run --locked -p symthaea-experiment-design -- --covariance-demo
+      - name: Exercise covariance JSON input/output contract
+        run: cargo run --locked --quiet -p symthaea-experiment-design -- --covariance < crates/domains/symthaea-experiment-design/fixtures/covariance-redundancy-v0.1.json
       - name: Exercise JSON input/output contract
         run: cargo run --locked --quiet -p symthaea-experiment-design < crates/domains/symthaea-experiment-design/fixtures/galileo-discrimination-v0.1.json
