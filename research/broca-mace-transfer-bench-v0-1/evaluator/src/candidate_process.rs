@@ -151,30 +151,56 @@ impl CandidateProcessSession {
             .spawn(move || {
                 let mut reader = BufReader::new(stdout);
                 loop {
-                    let mut line = String::new();
-                    match reader.read_line(&mut line) {
-                        Ok(0) => {
-                            let _ = sender.send(Err("candidate worker closed stdout".into()));
-                            break;
-                        }
-                        Ok(_) if line.len() > MAX_RESPONSE_BYTES => {
+                    // Read in bounded chunks so a malformed child cannot force
+                    // an unbounded allocation before the response-size check.
+                    let mut bytes = Vec::with_capacity(4096);
+                    let mut terminated = false;
+                    loop {
+                        let available = match reader.fill_buf() {
+                            Ok([]) => break,
+                            Ok(available) => available,
+                            Err(error) => {
+                                let _ = sender.send(Err(format!("read candidate stdout: {error}")));
+                                return;
+                            }
+                        };
+                        let newline = available.iter().position(|byte| *byte == b'\n');
+                        let take = newline.unwrap_or(available.len());
+                        if bytes.len().saturating_add(take) > MAX_RESPONSE_BYTES {
                             let _ = sender.send(Err(format!(
                                 "candidate response exceeds {MAX_RESPONSE_BYTES} bytes"
                             )));
+                            return;
+                        }
+                        bytes.extend_from_slice(&available[..take]);
+                        let consumed = take + usize::from(newline.is_some());
+                        reader.consume(consumed);
+                        if newline.is_some() {
+                            terminated = true;
                             break;
                         }
-                        Ok(_) => {
-                            while line.ends_with('\n') || line.ends_with('\r') {
-                                line.pop();
-                            }
-                            if sender.send(Ok(line)).is_err() {
-                                break;
-                            }
-                        }
+                    }
+
+                    if bytes.is_empty() && !terminated {
+                        let _ = sender.send(Err("candidate worker closed stdout".into()));
+                        break;
+                    }
+                    if !terminated {
+                        let _ = sender.send(Err("candidate worker closed stdout with an unterminated response".into()));
+                        break;
+                    }
+                    if bytes.last() == Some(&b'\r') {
+                        bytes.pop();
+                    }
+                    let line = match String::from_utf8(bytes) {
+                        Ok(line) => line,
                         Err(error) => {
-                            let _ = sender.send(Err(format!("read candidate stdout: {error}")));
+                            let _ = sender.send(Err(format!("candidate stdout is not UTF-8: {error}")));
                             break;
                         }
+                    };
+                    if sender.send(Ok(line)).is_err() {
+                        break;
                     }
                 }
             })
