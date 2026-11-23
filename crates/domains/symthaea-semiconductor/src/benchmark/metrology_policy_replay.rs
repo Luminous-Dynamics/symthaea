@@ -291,7 +291,7 @@ fn build_synthetic_candidates(
             ] {
                 let observed_state = sensor.state == SyntheticSensorStateV1::Observed;
                 if observed_state != sensor.value.is_some()
-                    || sensor.unit != semantics.unit
+                    || sensor.unit != "synthetic_process_unit"
                     || sensor.value.is_some_and(|value| !value.is_finite())
                 {
                     return Err(SyntheticFabReplayError(format!(
