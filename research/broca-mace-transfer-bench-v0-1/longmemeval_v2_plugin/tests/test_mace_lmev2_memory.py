@@ -31,6 +31,10 @@ class MaceLongMemEvalV2IngressTests(unittest.TestCase):
         self.addCleanup(os.close, memory._source_root_fd)
         memory.asset_root = root / "workspace" / "assets"
         memory.asset_root.mkdir(parents=True)
+        memory.candidate_evidence_dir = root / "workspace" / "candidate_evidence"
+        memory.candidate_evidence_dir.mkdir(mode=0o700, parents=True)
+        memory.retrieval_trace_dir = root / "workspace" / "retrieval_traces"
+        memory.retrieval_trace_dir.mkdir(mode=0o700, parents=True)
         memory.domain = "web"
         return memory
 
@@ -331,6 +335,142 @@ class MaceLongMemEvalV2IngressTests(unittest.TestCase):
             )
             with self.assertRaisesRegex(RuntimeError, "orphan or unreferenced"):
                 memory._verify_persisted_candidate_evidence()
+
+    def test_retrieval_trace_is_independently_verified_and_persisted(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            memory = self.make_memory(root)
+            memory.run_id = "run-trace-test"
+            memory.environment_revision_sha256 = "e" * 64
+            memory.sidecar_binary_sha256 = "a" * 64
+            memory.backend_revision_sha256 = "b" * 64
+            candidate_id = "opaque-trace-invocation"
+            query = "find Ada order"
+            query_sha256 = hashlib.sha256(query.encode("utf-8")).hexdigest()
+
+            candidate_response = {
+                "candidate_evidence_jsonl": "",
+                "candidate_record_count": 0,
+                "candidate_set_sha256": None,
+            }
+            memory._persist_candidate_envelope(candidate_id, query, candidate_response)
+
+            trace = {
+                "schema_version": "mace_retrieval_trace_receipt_v1",
+                "run_id": memory.run_id,
+                "query_invocation_id": candidate_id,
+                "domain_id": "web",
+                "environment_revision_sha256": memory.environment_revision_sha256,
+                "tool_profile_sha256": memory.backend_revision_sha256,
+                "query_sha256": query_sha256,
+                "candidate_set_sha256": None,
+                "operations": [
+                    {
+                        "tool_id": "trajectory.bm25.search",
+                        "tool_revision_sha256": memory.backend_revision_sha256,
+                        "action_template_sha256": "c" * 64,
+                        "observed_evidence_ids": [],
+                        "outcome": "no_evidence",
+                        "elapsed_ns": 17,
+                        "inspected_bytes": 0,
+                        "inspected_bytes_measured": False,
+                    }
+                ],
+                "stop_reason": "no_candidate_evidence",
+                "tool_call_budget": 1,
+                "tool_calls_used": 1,
+                "elapsed_ns": 17,
+                "inspected_bytes": 0,
+                "inspected_bytes_complete": False,
+                "created_at_unix": 100,
+            }
+            trace_digest = memory._retrieval_trace_digest_from_json(trace)
+            trace["receipt_sha256"] = trace_digest
+            response = {
+                **candidate_response,
+                "retrieval_trace": trace,
+                "retrieval_trace_sha256": trace_digest,
+            }
+
+            memory._persist_retrieval_trace(candidate_id, query, response)
+            memory._verify_persisted_retrieval_traces()
+            files = list(memory.retrieval_trace_dir.iterdir())
+            self.assertEqual(len(files), 1)
+            saved = json.loads(files[0].read_text(encoding="utf-8"))
+            self.assertEqual(saved["receipt_sha256"], trace_digest)
+            self.assertFalse(saved["inspected_bytes_complete"])
+
+            invalid_response = dict(response, retrieval_trace_sha256="0" * 64)
+            with self.assertRaisesRegex(RuntimeError, "receipt digest mismatch"):
+                memory._persist_retrieval_trace(candidate_id, query, invalid_response)
+
+            saved["elapsed_ns"] = 18
+            files[0].write_text(
+                json.dumps(saved, ensure_ascii=False, sort_keys=True, separators=(",", ":")),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(RuntimeError, "receipt digest mismatch"):
+                memory._verify_persisted_retrieval_traces()
+
+    def test_retrieval_trace_restore_rejects_missing_candidate_receipt_pair(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            memory = self.make_memory(root)
+            memory.run_id = "run-trace-pair"
+            memory.environment_revision_sha256 = "e" * 64
+            memory.sidecar_binary_sha256 = "a" * 64
+            memory.backend_revision_sha256 = "b" * 64
+            candidate_id = "paired-invocation"
+            query = "find order"
+            query_sha256 = hashlib.sha256(query.encode("utf-8")).hexdigest()
+            empty_response = {
+                "candidate_evidence_jsonl": "",
+                "candidate_record_count": 0,
+                "candidate_set_sha256": None,
+            }
+            memory._persist_candidate_envelope(candidate_id, query, empty_response)
+            trace = {
+                "schema_version": "mace_retrieval_trace_receipt_v1",
+                "run_id": memory.run_id,
+                "query_invocation_id": candidate_id,
+                "domain_id": "web",
+                "environment_revision_sha256": memory.environment_revision_sha256,
+                "tool_profile_sha256": memory.backend_revision_sha256,
+                "query_sha256": query_sha256,
+                "candidate_set_sha256": None,
+                "operations": [{
+                    "tool_id": "trajectory.bm25.search",
+                    "tool_revision_sha256": memory.backend_revision_sha256,
+                    "action_template_sha256": "c" * 64,
+                    "observed_evidence_ids": [],
+                    "outcome": "no_evidence",
+                    "elapsed_ns": 1,
+                    "inspected_bytes": 0,
+                    "inspected_bytes_measured": False,
+                }],
+                "stop_reason": "no_candidate_evidence",
+                "tool_call_budget": 1,
+                "tool_calls_used": 1,
+                "elapsed_ns": 1,
+                "inspected_bytes": 0,
+                "inspected_bytes_complete": False,
+                "created_at_unix": 100,
+            }
+            trace_digest = memory._retrieval_trace_digest_from_json(trace)
+            trace["receipt_sha256"] = trace_digest
+            memory._persist_retrieval_trace(
+                candidate_id,
+                query,
+                {
+                    **empty_response,
+                    "retrieval_trace": trace,
+                    "retrieval_trace_sha256": trace_digest,
+                },
+            )
+            receipt_path = next(memory.candidate_evidence_dir.glob("*.receipt.json"))
+            receipt_path.unlink()
+            with self.assertRaisesRegex(RuntimeError, "no paired candidate receipt"):
+                memory._verify_persisted_retrieval_traces()
 
     def test_zero_candidate_query_still_persists_an_empty_result_receipt(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
