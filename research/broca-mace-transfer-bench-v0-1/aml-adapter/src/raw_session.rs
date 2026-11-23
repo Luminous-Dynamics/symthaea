@@ -219,6 +219,7 @@ pub struct RawSessionChunkV1 {
     pub ordinal: usize,
     pub request_id: String,
     pub turn_ids: Vec<String>,
+    pub turn_line_sha256: Vec<String>,
     pub messages: Vec<Message>,
     pub first_timestamp_ms: i64,
     pub last_timestamp_ms: i64,
@@ -283,6 +284,10 @@ fn chunks_from_plan(
             .iter()
             .map(|message| message.turn_id.clone())
             .collect();
+        let turn_line_sha256: Vec<String> = source_messages
+            .iter()
+            .map(|message| message.raw_line_sha256.clone())
+            .collect();
         let first_timestamp_ms = source_messages
             .first()
             .ok_or(RawSessionReject::InvalidChunkPlan)?
@@ -309,6 +314,7 @@ fn chunks_from_plan(
             &session.raw_session_sha256,
             &source_payload_sha256,
             &turn_ids,
+            &turn_line_sha256,
         );
         source_offset = end;
         chunks.push(RawSessionChunkV1 {
@@ -318,6 +324,7 @@ fn chunks_from_plan(
             ordinal,
             request_id: request.request_id.clone(),
             turn_ids,
+            turn_line_sha256,
             messages: request.messages,
             first_timestamp_ms,
             last_timestamp_ms,
@@ -695,7 +702,9 @@ fn validate_chunk_integrity(chunk: &RawSessionChunkV1) -> Result<(), RawSessionR
         || chunk.request_id.trim().is_empty()
         || chunk.messages.is_empty()
         || chunk.messages.len() != chunk.turn_ids.len()
+        || chunk.messages.len() != chunk.turn_line_sha256.len()
         || chunk.turn_ids.iter().any(|turn_id| turn_id.trim().is_empty())
+        || chunk.turn_line_sha256.iter().any(|digest| !is_lower_sha256(digest))
         || chunk.source_session_sha256.len() != 64
         || chunk.source_payload_sha256.len() != 64
     {
@@ -732,6 +741,7 @@ fn validate_chunk_integrity(chunk: &RawSessionChunkV1) -> Result<(), RawSessionR
         &chunk.source_session_sha256,
         &chunk.source_payload_sha256,
         &chunk.turn_ids,
+        &chunk.turn_line_sha256,
     );
     if expected_digest != chunk.chunk_sha256 || chunk.chunk_id != chunk.chunk_sha256 {
         return Err(RawSessionReject::ChunkIntegrityMismatch);
@@ -767,6 +777,7 @@ fn chunk_digest(
     source_session_sha256: &str,
     source_payload_sha256: &str,
     turn_ids: &[String],
+    turn_line_sha256: &[String],
 ) -> String {
     let mut hasher = Sha256::new();
     hasher.update(b"luminous:mace:raw-session-chunk:v1\0");
@@ -778,6 +789,10 @@ fn chunk_digest(
     hasher.update((turn_ids.len() as u64).to_be_bytes());
     for turn_id in turn_ids {
         hash_field(&mut hasher, turn_id);
+    }
+    hasher.update((turn_line_sha256.len() as u64).to_be_bytes());
+    for digest in turn_line_sha256 {
+        hash_field(&mut hasher, digest);
     }
     hex_digest(hasher.finalize().as_slice())
 }
@@ -1030,10 +1045,7 @@ mod tests {
     #[test]
     fn index_rejects_duplicate_session_ordinals() {
         let mut corpus = chunks("u", "s", &[("t1", "user", "one", 1)]);
-        let mut duplicate = corpus[0].clone();
-        duplicate.chunk_id = "another-chunk-id".into();
-        duplicate.chunk_sha256 = "another-chunk-id".into();
-        corpus.push(duplicate);
+        corpus.extend(chunks("u", "s", &[("t2", "assistant", "two", 2)]));
         assert_eq!(
             RawSessionBm25IndexV1::build("u", corpus, Bm25ProfileV1::default()).map(|_| ()),
             Err(RawSessionReject::DuplicateSessionChunkOrder)
