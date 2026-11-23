@@ -37,7 +37,7 @@ RetrievalPolicyMemoryV1::record_trace checks:
 
 - non-empty, canonical run/invocation/domain identities;
 - valid SHA-256 digests for query, environment, tool profile, executable revisions and action templates;
-- bounded, non-empty operation sequences and exact operation/tool-call count agreement;
+- bounded, non-empty operation sequences and exact operation/tool-call count agreement (256 tool calls maximum, 10,000 evidence IDs maximum per trace, 256-byte run/invocation/tool identifiers, 512-byte domain IDs and 1,024-byte evidence IDs);
 - operation evidence IDs consistent with the declared outcome;
 - aggregate elapsed nanoseconds and inspected bytes exactly equal the sum of operation measurements;
 - stop-reason constraints: sufficient evidence requires a candidate-set digest and observed evidence; no-candidate-evidence cannot carry either; budget exhaustion requires the full declared budget; tool-error termination requires the final operation to have failed.
@@ -132,7 +132,7 @@ research/broca-mace-transfer-bench-v0-1/aml-adapter/src/retrieval_policy_memory.
 - promote_strategy(refs, algorithm_revision, promoted_at, expires_at) deterministically creates a note from supporting traces.
 - applicable_notes(domain, environment_revision, tool_profile, now) returns only currently valid notes matching every scope/version constraint.
 
-The tests cover invocation idempotency/rebinding, minimum support, duplicate query exclusion, domain/environment/tool-profile/strategy isolation, expiry, resource accounting, invalid success claims and insufficient search budgets.
+The nine tests cover invocation idempotency/rebinding, minimum support, duplicate query exclusion, domain/environment/tool-profile/strategy isolation, expiry, resource accounting, invalid success claims, insufficient search budgets and input-size limits.
 
 ## 9. Next implementation stages
 
