@@ -513,6 +513,8 @@ fn parse_score(record: &Value) -> Result<(TaskKey, MethodKind, Metrics), String>
             "index_bytes", "retrieval_profile_sha256",
             "candidate_execution_boundary", "candidate_artifact_sha256",
             "candidate_process_startup_ns", "candidate_process_wall_ns",
+            "candidate_request_build_ns", "candidate_receipt_validation_ns",
+            "candidate_end_to_end_ns",
         ],
         "evaluator score",
     )?;
@@ -574,15 +576,24 @@ fn parse_score(record: &Value) -> Result<(TaskKey, MethodKind, Metrics), String>
     let candidate_artifact_sha256 = nullable_sha256(record, "candidate_artifact_sha256")?;
     let candidate_process_startup_ns = nullable_u64(record, "candidate_process_startup_ns")?;
     let candidate_process_wall_ns = nullable_u64(record, "candidate_process_wall_ns")?;
+    let candidate_request_build_ns = nullable_u64(record, "candidate_request_build_ns")?;
+    let candidate_receipt_validation_ns = nullable_u64(record, "candidate_receipt_validation_ns")?;
+    let candidate_end_to_end_ns = nullable_u64(record, "candidate_end_to_end_ns")?;
     match candidate_execution_boundary {
         "detached_subprocess_stream"
             if candidate_artifact_sha256.is_some()
                 && candidate_process_startup_ns.is_some()
-                && candidate_process_wall_ns.is_some() => {}
+                && candidate_process_wall_ns.is_some()
+                && candidate_request_build_ns.is_some()
+                && candidate_receipt_validation_ns.is_some()
+                && candidate_end_to_end_ns.is_some() => {}
         "legacy_in_process"
             if candidate_artifact_sha256.is_none()
                 && candidate_process_startup_ns.is_none()
-                && candidate_process_wall_ns.is_none() => {}
+                && candidate_process_wall_ns.is_none()
+                && candidate_request_build_ns.is_none()
+                && candidate_receipt_validation_ns.is_none()
+                && candidate_end_to_end_ns.is_none() => {}
         _ => return Err("evaluator score execution-boundary metadata is inconsistent".to_string()),
     }
     let method = required_string(record, "method")?.to_string();
@@ -819,6 +830,9 @@ struct CandidateReceipt {
     candidate_artifact_sha256: Option<String>,
     candidate_process_startup_ns: Option<u64>,
     candidate_process_wall_ns: Option<u64>,
+    candidate_request_build_ns: Option<u64>,
+    candidate_receipt_validation_ns: Option<u64>,
+    candidate_end_to_end_ns: Option<u64>,
 }
 
 fn expected_candidate_observation_id(
@@ -870,7 +884,8 @@ fn parse_candidate_receipt(record: &Value) -> Result<((String, String), Candidat
             "unknown_family_event_count", "index_bytes", "latency_ns",
             "retrieval_profile_sha256", "candidate_execution_boundary",
             "candidate_artifact_sha256", "candidate_process_startup_ns",
-            "candidate_process_wall_ns",
+            "candidate_process_wall_ns", "candidate_request_build_ns",
+            "candidate_receipt_validation_ns", "candidate_end_to_end_ns",
         ],
         "candidate decision receipt",
     )?;
@@ -953,6 +968,9 @@ fn parse_candidate_receipt(record: &Value) -> Result<((String, String), Candidat
     let candidate_artifact_sha256 = nullable_sha256(record, "candidate_artifact_sha256")?;
     let candidate_process_startup_ns = nullable_u64(record, "candidate_process_startup_ns")?;
     let candidate_process_wall_ns = nullable_u64(record, "candidate_process_wall_ns")?;
+    let candidate_request_build_ns = nullable_u64(record, "candidate_request_build_ns")?;
+    let candidate_receipt_validation_ns = nullable_u64(record, "candidate_receipt_validation_ns")?;
+    let candidate_end_to_end_ns = nullable_u64(record, "candidate_end_to_end_ns")?;
     match candidate_execution_boundary.as_str() {
         "detached_subprocess_stream"
             if candidate_artifact_sha256.is_some()
@@ -980,6 +998,9 @@ fn parse_candidate_receipt(record: &Value) -> Result<((String, String), Candidat
             candidate_artifact_sha256,
             candidate_process_startup_ns,
             candidate_process_wall_ns,
+            candidate_request_build_ns,
+            candidate_receipt_validation_ns,
+            candidate_end_to_end_ns,
         },
     ))
 }
@@ -1028,6 +1049,12 @@ fn validate_score_against_candidate(
             != candidate.candidate_process_startup_ns
         || nullable_u64(score, "candidate_process_wall_ns")?
             != candidate.candidate_process_wall_ns
+        || nullable_u64(score, "candidate_request_build_ns")?
+            != candidate.candidate_request_build_ns
+        || nullable_u64(score, "candidate_receipt_validation_ns")?
+            != candidate.candidate_receipt_validation_ns
+        || nullable_u64(score, "candidate_end_to_end_ns")?
+            != candidate.candidate_end_to_end_ns
     {
         return Err("evaluator score candidate execution metadata differs from candidate receipt".to_string());
     }
