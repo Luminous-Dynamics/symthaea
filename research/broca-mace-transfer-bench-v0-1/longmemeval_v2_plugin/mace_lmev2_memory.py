@@ -1147,6 +1147,7 @@ class MaceLongMemEvalV2Memory(Memory):
             }
         )
         self._persist_candidate_envelope(candidate_id, query, response)
+        self._persist_retrieval_trace(candidate_id, query, response)
         items = response.get("items")
         if not isinstance(items, list):
             self._poison_sidecar()
@@ -1178,6 +1179,10 @@ class MaceLongMemEvalV2Memory(Memory):
         if saved_evidence.exists():
             shutil.rmtree(saved_evidence)
         shutil.copytree(self.candidate_evidence_dir, saved_evidence)
+        saved_traces = state_dir / "retrieval_traces"
+        if saved_traces.exists():
+            shutil.rmtree(saved_traces)
+        shutil.copytree(self.retrieval_trace_dir, saved_traces)
 
     def _load_backend(self, input_dir: Path) -> None:
         state_dir = input_dir / "mace_lmev2"
@@ -1198,6 +1203,15 @@ class MaceLongMemEvalV2Memory(Memory):
                 shutil.rmtree(self.candidate_evidence_dir)
             shutil.copytree(saved_evidence, self.candidate_evidence_dir)
             self._verify_persisted_candidate_evidence()
+        saved_traces = state_dir / "retrieval_traces"
+        if saved_traces.is_dir():
+            saved_traces_stat = saved_traces.lstat()
+            require(stat.S_ISDIR(saved_traces_stat.st_mode),
+                    "saved retrieval trace root must be a real directory")
+            if self.retrieval_trace_dir.exists():
+                shutil.rmtree(self.retrieval_trace_dir)
+            shutil.copytree(saved_traces, self.retrieval_trace_dir)
+            self._verify_persisted_retrieval_traces()
         self._trajectory_lines = []
         self._inserted_ids = set()
         for line in trajectories_path.read_text(encoding="utf-8").splitlines():
