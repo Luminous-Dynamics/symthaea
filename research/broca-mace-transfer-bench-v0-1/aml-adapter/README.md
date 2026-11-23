@@ -56,4 +56,4 @@ It does **not** yet reproduce Redis Remis + Instruct, Agent Zero Memory, AML Cyc
 
 ## Tests
 
-Thirteen deterministic tests are authored for raw text fidelity, strict schema/unknown-field handling, duplicate IDs, session/user isolation, stable chunking, source mutation identity, chunk-metadata tamper detection, BM25 matching, neighbor isolation, lower-bound resource receipts, measured latency fields, invalid input and RRF. They have not been executed here.
+Fourteen deterministic tests are authored for raw text fidelity, strict schema/unknown-field handling, duplicate IDs, session/user isolation, stable chunking, source mutation identity, chunk-metadata tamper detection, BM25 matching, neighbor isolation, lower-bound resource receipts, measured latency fields, unsupported tokenizer-version rejection, invalid input and RRF. They have not been executed here.
