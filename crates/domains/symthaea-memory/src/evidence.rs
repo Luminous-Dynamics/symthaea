@@ -166,7 +166,10 @@ pub struct EvidenceLedger {
     events: Vec<EvidenceEvent>,
 }
 
-/// A memory value paired with the evidence event that qualifies its use.
+/// A memory value paired with an evidence event that was admissible for one
+/// query. This is a checked projection, not a reusable authorization token:
+/// callers must re-evaluate at the actual decision/action time because
+/// corrections, revocations, retention expiry or erasure can occur later.
 /// This wrapper lets existing semantic/episodic types adopt provenance
 /// without breaking their public struct-literal constructors.
 #[derive(Debug, Clone, PartialEq)]
@@ -251,9 +254,9 @@ impl EvidenceLedger {
         self.evaluate_inner(event, query, &mut BTreeSet::new())
     }
 
-    /// Pair an existing memory value with an admissible evidence event.
-    /// Downstream consumers should accept this wrapper, not an unqualified
-    /// value, at decision/action boundaries.
+    /// Pair an existing memory value with an admissible evidence event for
+    /// this query. Call at the actual use boundary; do not cache the wrapper
+    /// as a reusable permission. Re-evaluate before every later use.
     pub fn bind<T>(
         &self,
         value: T,
