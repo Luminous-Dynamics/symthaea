@@ -522,11 +522,11 @@ pub fn plan_two_stage_metrology_v1(
         let mut expected_net_value = 0.0;
         let mut valid = true;
 
-        for index in 0..canonical_candidates.len() {
+        for (index, (candidate, item)) in canonical_candidates.iter().zip(&preliminary).enumerate() {
             if mask & (1_usize << index) == 0 {
                 continue;
             }
-            let candidate_cost = preliminary[index].5;
+            let candidate_cost = item.5;
             if candidate_cost == 0 {
                 valid = false;
                 break;
@@ -541,8 +541,8 @@ pub fn plan_two_stage_metrology_v1(
                 }
             }
             indices.push(index);
-            ids.push(canonical_candidates[index].candidate_id.clone());
-            expected_net_value += preliminary[index].3;
+            ids.push(candidate.candidate_id.clone());
+            expected_net_value += item.3;
         }
         if valid {
             let score = ConfirmationPortfolioScoreV1 {
@@ -565,8 +565,9 @@ pub fn plan_two_stage_metrology_v1(
     let mut two_stage_expected_decision_loss = 0.0;
     let mut confirmation_expected_cost = 0.0;
 
-    for (index, candidate) in canonical_candidates.iter().enumerate() {
-        let (screen_evsi, _, _, _, _, _) = &preliminary[index];
+    for (index, (candidate, (screen_evsi, _, _, _, _, _))) in
+        canonical_candidates.iter().zip(&preliminary).enumerate()
+    {
         let selected = selected_indices.contains(&index);
         let positive = candidate_branch(
             ScreenOutcomeV1::Positive,
