@@ -34,3 +34,6 @@ JSON Schema validates field shape and local numeric ranges. A runtime validator 
 The schema alone does not prove physical admissibility or numerical convergence. A selected intervention is only a *candidate witness*. It becomes a confirmed physical counterexample only after independent replay and spatial, velocity-domain and timestep refinement.
 
 A finite search provides empirical intervention coverage; it is not a continuous worst-case certificate without a separate, justified covering or regularity argument.
+
+
+A family also declares a strictly positive minimum post-pulse observation duration. The latest admissible pulse time plus this duration must fit inside the physical horizon; a pulse at the final time cannot count as a future-response probe.
