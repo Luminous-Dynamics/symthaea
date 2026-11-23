@@ -211,8 +211,7 @@ fn seal_selection_for_test(selection: &mut MetrologyAuditSelectionReportV1) {
     selection.selection_sha256 = selection_digest(selection).expect("selection should hash");
 }
 
-pub const SYNTHETIC_HEURISTIC_MODEL_V1: &str =
-    "semi.synthetic.sensor-rule-heuristic.v1";
+pub const SYNTHETIC_HEURISTIC_MODEL_V1: &str = "semi.synthetic.sensor-rule-heuristic.v1";
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SyntheticMetrologyPolicyConfigV1 {
@@ -256,8 +255,9 @@ pub fn synthetic_defect_semantics_v1(
         authority_ref: "synthetic-benchmark-only".into(),
         semantics_sha256: String::new(),
     };
-    seal_binary_measurand_semantics_v1(&mut semantics)
-        .map_err(|error| SyntheticFabReplayError(format!("synthetic semantics invalid: {error}")))?;
+    seal_binary_measurand_semantics_v1(&mut semantics).map_err(|error| {
+        SyntheticFabReplayError(format!("synthetic semantics invalid: {error}"))
+    })?;
     Ok(semantics)
 }
 
@@ -326,8 +326,8 @@ fn build_synthetic_candidates(
                 (Some(left), Some(right)) => (left - right).abs(),
                 _ => 0.0,
             };
-            let missing_count = usize::from(sensor_a.is_none())
-                + usize::from(sensor_b_normalized.is_none());
+            let missing_count =
+                usize::from(sensor_a.is_none()) + usize::from(sensor_b_normalized.is_none());
             let uncertainty = match readings.len() {
                 0 => 1.0,
                 1 => 0.65,
