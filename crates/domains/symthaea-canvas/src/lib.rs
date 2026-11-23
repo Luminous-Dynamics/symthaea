@@ -30,6 +30,7 @@ pub mod geometry;
 pub mod mycelial_annotation_triage;
 pub mod mycelial_contact_persistence;
 pub mod mycelial_failure_resilience;
+pub mod mycelial_functional_observations;
 pub mod mycelial_fusion_counterfactual;
 pub mod mycelial_junction_graph;
 pub mod mycelial_mesh;
@@ -119,6 +120,14 @@ pub use mycelial_failure_resilience::{
     build_mycelial_failure_resilience_profile, build_single_failure_resilience_profile,
     evaluate_mycelial_failure_attack_plan,
 };
+pub use mycelial_functional_observations::{
+    MAX_MYCELIAL_FUNCTIONAL_ID_BYTES, MAX_MYCELIAL_FUNCTIONAL_OBSERVATIONS,
+    MYCELIAL_FUNCTIONAL_OBSERVATION_SCHEMA_VERSION, MycelialFunctionalFlowDirection,
+    MycelialFunctionalMeasurement, MycelialFunctionalObservation,
+    MycelialFunctionalObservationError, MycelialFunctionalObservationSet,
+    MycelialFunctionalQuantity, MycelialFunctionalQuantityUnit,
+};
+
 pub use mycelial_fusion_counterfactual::{
     MAX_MYCELIAL_FUSION_COUNTERFACTUAL_CANDIDATES, MAX_MYCELIAL_FUSION_COUNTERFACTUAL_JUNCTIONS,
     MAX_MYCELIAL_FUSION_COUNTERFACTUAL_SEGMENTS, MAX_MYCELIAL_FUSION_DEMAND_EVALUATIONS,
@@ -133,7 +142,6 @@ pub use mycelial_fusion_counterfactual::{
     MycelialFusionTopologyEffect, MycelialFusionViewMetrics,
     evaluate_mycelial_fusion_counterfactuals,
 };
-
 pub use mycelial_junction_graph::{
     GeometricEfficiencyReport, JunctionKind, JunctionLengthUnit, MAX_JUNCTION_GRAPH_JUNCTIONS,
     MAX_JUNCTION_GRAPH_SEGMENTS, MYCELIAL_JUNCTION_GRAPH_SCHEMA_VERSION, MycelialHyphaSegment,

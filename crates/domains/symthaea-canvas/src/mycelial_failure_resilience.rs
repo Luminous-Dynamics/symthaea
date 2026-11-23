@@ -1984,8 +1984,19 @@ impl MycelialFailureDeliveryProfile {
         Ok(())
     }
 
+    /// Hashes exact content, including semantically invalid content.
+    ///
+    /// Content addressing is separate from validation: a tampered artifact
+    /// must still receive a distinct digest before `validate` rejects it.
     pub fn canonical_digest_hex(&self) -> Result<String, MycelialFailureResilienceError> {
-        self.validate()?;
+        if self.scenarios.len() > MAX_FAILURE_SCENARIOS
+            || self.trials.len()
+                > MAX_FAILURE_SCENARIOS.saturating_mul(MAX_FAILURE_DELIVERY_TRIALS_PER_SCENARIO)
+        {
+            return Err(MycelialFailureResilienceError::InvalidDeliveryProfile(
+                "delivery profile exceeds digest resource limits",
+            ));
+        }
         let mut hasher = blake3::Hasher::new();
         hasher.update(b"symthaea-mycelial-failure-delivery-profile-v2");
         hasher.update(&self.schema_version.to_le_bytes());
