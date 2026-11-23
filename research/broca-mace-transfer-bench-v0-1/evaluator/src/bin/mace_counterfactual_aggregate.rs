@@ -10,7 +10,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fs::{self, File};
-use std::io::{BufRead, BufReader, BufWriter, Write};
+use std::io::{BufRead, BufReader, BufWriter, Cursor, Write};
 
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -104,6 +104,18 @@ fn required_string<'a>(record: &'a Value, field: &str) -> Result<&'a str, String
         .ok_or_else(|| format!("missing or invalid string field {field}"))
 }
 
+fn ensure_known_fields(record: &Value, allowed: &[&str], context: &str) -> Result<(), String> {
+    let object = record
+        .as_object()
+        .ok_or_else(|| format!("{context} must be a JSON object"))?;
+    for field in object.keys() {
+        if !allowed.contains(&field.as_str()) {
+            return Err(format!("{context} contains unsupported field {field}"));
+        }
+    }
+    Ok(())
+}
+
 fn required_number(record: &Value, field: &str) -> Result<f64, String> {
     let value = record
         .get(field)
@@ -161,6 +173,18 @@ fn required_u64(record: &Value, field: &str) -> Result<u64, String> {
 }
 
 fn parse_manifest(record: &Value) -> Result<(InputProvenance, String), String> {
+    ensure_known_fields(
+        record,
+        &[
+            "schema_version", "record_type", "run_id", "pair_block_id",
+            "manifest_sha256", "manifest_payload_sha256", "baseline_evidence_sha256",
+            "public_seed", "intervention_count", "interventions", "known_root_count",
+            "candidate_validity", "max_root_pairs", "root_pair_count",
+            "matched_random_count", "unmatched_random_target_count",
+            "source_code_sha256", "fixture_sha256", "source_revision", "schema_sha256",
+        ],
+        "intervention manifest",
+    )?;
     if required_string(record, "schema_version")? != INPUT_SCHEMA {
         return Err("unsupported intervention manifest schema version".to_string());
     }
@@ -202,6 +226,10 @@ fn parse_manifest(record: &Value) -> Result<(InputProvenance, String), String> {
     let pair_block_id = required_string(record, "pair_block_id")?;
     parse_cluster(pair_block_id)
         .map_err(|error| format!("invalid intervention manifest pair_block_id: {error}"))?;
+    required_u64(record, "known_root_count")?;
+    if required_string(record, "candidate_validity")? != "diagnostic_only" {
+        return Err("unsupported candidate_validity in intervention manifest".to_string());
+    }
 
     let manifest_payload_sha256 =
         required_string(record, "manifest_payload_sha256")?.to_string();
@@ -232,6 +260,11 @@ fn parse_manifest(record: &Value) -> Result<(InputProvenance, String), String> {
 
     let mut unique_intervention_ids = BTreeSet::new();
     for intervention in interventions {
+        ensure_known_fields(
+            intervention,
+            &["intervention_id", "kind", "target_key", "removed_event_ids", "matched_to"],
+            "intervention",
+        )?;
         let id = required_string(intervention, "intervention_id")?;
         if !unique_intervention_ids.insert(id.to_string()) {
             return Err("intervention manifest contains duplicate intervention_id values".to_string());
@@ -431,6 +464,22 @@ fn validate_score_against_manifest(score: &Value, manifest: &Value) -> Result<()
 }
 
 fn parse_score(record: &Value) -> Result<(TaskKey, MethodKind, Metrics), String> {
+    ensure_known_fields(
+        record,
+        &[
+            "schema_version", "record_type", "run_id", "pair_block_id",
+            "candidate_observation_id", "candidate_observation_sequence",
+            "candidate_input_sha256", "intervention_id", "intervention_kind",
+            "target_key", "matched_to", "removed_event_ids", "removed_event_count",
+            "removed_experience_struct_bytes", "decision", "full_evidence_decision",
+            "decision_agrees_with_full", "decision_changed", "utility", "regret",
+            "full_evidence_regret", "regret_gap_vs_full_evidence",
+            "regret_gap_vs_full_method", "decision_is_optimal", "abstained",
+            "evaluation_validity", "invalidity_reason", "method", "retrieved_event_ids",
+            "index_bytes", "retrieval_profile_sha256",
+        ],
+        "evaluator score",
+    )?;
     if required_string(record, "schema_version")? != INPUT_SCHEMA {
         return Err("unsupported input schema version".to_string());
     }
@@ -704,6 +753,22 @@ fn expected_candidate_input_sha256(
 }
 
 fn parse_candidate_receipt(record: &Value) -> Result<((String, String), CandidateReceipt), String> {
+    ensure_known_fields(
+        record,
+        &[
+            "schema_version", "record_type", "run_id", "pair_block_id",
+            "candidate_observation_id", "candidate_observation_sequence", "method",
+            "candidate_input_sha256", "decision_need_sha256", "candidate_evidence_sha256",
+            "retrieved_event_ids", "decision", "decision_support_event_ids",
+            "support_event_count", "support_known_root_count", "support_known_family_count",
+            "support_unresolved_count", "available_event_count",
+            "available_experience_struct_bytes", "available_known_root_count",
+            "available_known_family_count", "unknown_root_event_count",
+            "unknown_family_event_count", "index_bytes", "latency_ns",
+            "retrieval_profile_sha256",
+        ],
+        "candidate decision receipt",
+    )?;
     if required_string(record, "schema_version")? != INPUT_SCHEMA {
         return Err("unsupported candidate stream schema version".to_string());
     }
@@ -759,6 +824,16 @@ fn parse_candidate_receipt(record: &Value) -> Result<((String, String), Candidat
         return Err("candidate receipt contains unsupported decision value".to_string());
     }
     let retrieved_event_ids = required_event_ids(record, "retrieved_event_ids")?;
+    required_event_ids(record, "decision_support_event_ids")?;
+    for field in [
+        "support_event_count", "support_known_root_count", "support_known_family_count",
+        "support_unresolved_count", "available_event_count",
+        "available_experience_struct_bytes", "available_known_root_count",
+        "available_known_family_count", "unknown_root_event_count",
+        "unknown_family_event_count", "latency_ns",
+    ] {
+        required_u64(record, field)?;
+    }
     let index_bytes = required_u64(record, "index_bytes")?;
     let retrieval_profile_sha256 = record
         .get("retrieval_profile_sha256")
@@ -877,9 +952,13 @@ fn reduce(
 ) -> Result<(usize, usize), String> {
     let (candidate_receipts, candidate_stream_sha256, candidate_record_count, candidate_run_id) =
         load_candidate_receipts(candidate_path)?;
-    let input = File::open(evaluator_path)
-        .map_err(|error| format!("open evaluator input {evaluator_path}: {error}"))?;
-    let reader = BufReader::new(input);
+    // Read once so the digest is over exactly the bytes parsed below; do not
+    // reopen the path after parsing and accidentally attest to a different file.
+    let evaluator_bytes = fs::read(evaluator_path)
+        .map_err(|error| format!("read evaluator input {evaluator_path}: {error}"))?;
+    let evaluator_stream_sha256 =
+        hex_digest(Sha256::digest(&evaluator_bytes).as_slice());
+    let reader = BufReader::new(Cursor::new(evaluator_bytes.as_slice()));
 
     let mut block_rows: BTreeMap<TaskKey, BTreeMap<MethodKind, Accumulator>> = BTreeMap::new();
     let mut intervention_row_count = 0_usize;
@@ -974,10 +1053,6 @@ fn reduce(
     }
     let provenance = input_provenance
         .ok_or_else(|| "evaluator stream has no run provenance".to_string())?;
-    let evaluator_bytes = fs::read(evaluator_path)
-        .map_err(|error| format!("read evaluator stream for digest {evaluator_path}: {error}"))?;
-    let evaluator_stream_sha256 =
-        hex_digest(Sha256::digest(&evaluator_bytes).as_slice());
     let evaluator_record_count = manifest_row_count + intervention_row_count;
     let manifest_set_payload = manifest_shas.iter().cloned().collect::<Vec<_>>().join("\n");
     let input_manifest_set_sha256 =
