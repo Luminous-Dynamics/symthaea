@@ -737,7 +737,7 @@ fn parse_candidate_receipt(record: &Value) -> Result<((String, String), Candidat
         &candidate_input_sha256,
     ) != candidate_observation_id
     {
-        return Err("candidate_observation_id does not match method/input digest".to_string());
+        return Err("candidate_observation_id does not match run/task/sequence/method/input identity".to_string());
     }
 
     let decision = required_string(record, "decision")?.to_string();
@@ -1244,11 +1244,17 @@ mod tests {
             .unwrap_err()
             .contains("retrieval_profile_sha256"));
 
-        let mut wrong_run = valid;
+        let mut wrong_run = valid.clone();
         wrong_run["run_id"] = json!("run-2");
         assert!(validate_score_against_candidate(&wrong_run, &key.0, &receipt)
             .unwrap_err()
             .contains("run_id"));
+
+        let mut wrong_sequence = valid;
+        wrong_sequence["candidate_observation_sequence"] = json!(8);
+        assert!(validate_score_against_candidate(&wrong_sequence, &key.0, &receipt)
+            .unwrap_err()
+            .contains("candidate_observation_sequence"));
     }
 
     #[test]
