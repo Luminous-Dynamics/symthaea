@@ -115,17 +115,11 @@ fn relation_counts(snapshot: &Snapshot) -> BTreeMap<String, usize> {
     counts
 }
 
-fn classify(
-    type_diff: &SetDiff,
-    proof_diff: &SetDiff,
-    closure_diff: &SetDiff,
-) -> &'static str {
-    let type_stable = type_diff.baseline_only.is_empty()
-        && type_diff.candidate_only.is_empty();
-    let proof_stable = proof_diff.baseline_only.is_empty()
-        && proof_diff.candidate_only.is_empty();
-    let closure_stable = closure_diff.baseline_only.is_empty()
-        && closure_diff.candidate_only.is_empty();
+fn classify(type_diff: &SetDiff, proof_diff: &SetDiff, closure_diff: &SetDiff) -> &'static str {
+    let type_stable = type_diff.baseline_only.is_empty() && type_diff.candidate_only.is_empty();
+    let proof_stable = proof_diff.baseline_only.is_empty() && proof_diff.candidate_only.is_empty();
+    let closure_stable =
+        closure_diff.baseline_only.is_empty() && closure_diff.candidate_only.is_empty();
 
     match (type_stable, proof_stable, closure_stable) {
         (true, true, true) => "identical_type_proof_and_closure_sets",
@@ -135,9 +129,7 @@ fn classify(
     }
 }
 
-fn load_cohort(
-    path: &Path,
-) -> Result<(CohortIdentity, BTreeMap<String, Snapshot>), String> {
+fn load_cohort(path: &Path) -> Result<(CohortIdentity, BTreeMap<String, Snapshot>), String> {
     let entries = fs::read_dir(path)
         .map_err(|error| format!("cannot read artifact directory {}: {error}", path.display()))?;
     let mut snapshots = BTreeMap::new();
@@ -198,8 +190,8 @@ fn load_cohort(
         }
     }
 
-    let identity = identity
-        .ok_or_else(|| format!("no JSON snapshots found in {}", path.display()))?;
+    let identity =
+        identity.ok_or_else(|| format!("no JSON snapshots found in {}", path.display()))?;
     Ok((identity, snapshots))
 }
 
@@ -214,8 +206,12 @@ fn compare(
     if baseline_names != candidate_names {
         return Err(format!(
             "declaration cohorts differ; baseline_only={:?}; candidate_only={:?}",
-            baseline_names.difference(&candidate_names).collect::<Vec<_>>(),
-            candidate_names.difference(&baseline_names).collect::<Vec<_>>()
+            baseline_names
+                .difference(&candidate_names)
+                .collect::<Vec<_>>(),
+            candidate_names
+                .difference(&baseline_names)
+                .collect::<Vec<_>>()
         ));
     }
 
@@ -280,9 +276,7 @@ fn compare(
 fn main() -> ExitCode {
     let args = env::args().skip(1).collect::<Vec<_>>();
     if args.len() != 2 {
-        eprintln!(
-            "usage: source-snapshot-diff <baseline-artifact-dir> <candidate-artifact-dir>"
-        );
+        eprintln!("usage: source-snapshot-diff <baseline-artifact-dir> <candidate-artifact-dir>");
         return ExitCode::from(2);
     }
 
@@ -291,12 +285,7 @@ fn main() -> ExitCode {
     let result = (|| {
         let (baseline_identity, baseline) = load_cohort(baseline_path)?;
         let (candidate_identity, candidate) = load_cohort(candidate_path)?;
-        let report = compare(
-            baseline_identity,
-            baseline,
-            candidate_identity,
-            candidate,
-        )?;
+        let report = compare(baseline_identity, baseline, candidate_identity, candidate)?;
         serde_json::to_string_pretty(&report)
             .map_err(|error| format!("could not serialize differential report: {error}"))
     })();
@@ -387,7 +376,12 @@ mod tests {
             report.declarations[0].classification,
             "stable_type_interface_proof_value_drift"
         );
-        assert_eq!(report.declarations[0].proof_value_dependencies.intersection_count, 1);
+        assert_eq!(
+            report.declarations[0]
+                .proof_value_dependencies
+                .intersection_count,
+            1
+        );
     }
 
     #[test]
@@ -405,8 +399,16 @@ mod tests {
             report.declarations[0].classification,
             "type_and_or_closure_dependency_drift"
         );
-        assert_eq!(report.declarations[0].type_dependencies.intersection_count, 1);
-        assert_eq!(report.declarations[0].proof_value_dependencies.intersection_count, 1);
+        assert_eq!(
+            report.declarations[0].type_dependencies.intersection_count,
+            1
+        );
+        assert_eq!(
+            report.declarations[0]
+                .proof_value_dependencies
+                .intersection_count,
+            1
+        );
     }
 
     #[test]
