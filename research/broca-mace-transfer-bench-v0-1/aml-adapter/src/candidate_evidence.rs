@@ -422,6 +422,9 @@ pub fn encode_candidate_evidence_jsonl(
     let mut lines = Vec::with_capacity(records.len());
     let mut total_bytes = 0_usize;
     for record in records {
+        if record.retrieval_score.is_some_and(|score| !score.is_finite()) {
+            return Err(CandidateEvidenceReject::InvalidScore);
+        }
         let line = record.to_json_value().to_string();
         if line.len() > MAX_CANDIDATE_EVIDENCE_RECORD_BYTES {
             return Err(CandidateEvidenceReject::RecordTooLarge);
@@ -725,6 +728,13 @@ mod tests {
         assert_eq!(
             encode_candidate_evidence_jsonl(&[large]),
             Err(CandidateEvidenceReject::RecordTooLarge)
+        );
+
+        let mut non_finite = parsed.evidence[0].clone();
+        non_finite.retrieval_score = Some(f64::NAN);
+        assert_eq!(
+            encode_candidate_evidence_jsonl(&[non_finite]),
+            Err(CandidateEvidenceReject::InvalidScore)
         );
     }
 
