@@ -46,9 +46,7 @@ impl FourierOutflowConfig {
         if !self.thermal_speed.is_finite() || self.thermal_speed <= 0.0 {
             return Err(FourierOutflowError::InvalidThermalSpeed);
         }
-        if !self.plasma_frequency_squared.is_finite()
-            || self.plasma_frequency_squared <= 0.0
-        {
+        if !self.plasma_frequency_squared.is_finite() || self.plasma_frequency_squared <= 0.0 {
             return Err(FourierOutflowError::InvalidPlasmaFrequency);
         }
         Ok(())
@@ -67,8 +65,7 @@ impl FourierOutflowConfig {
     }
 
     pub fn eta(self, index: usize) -> Option<f64> {
-        (index < self.eta_nodes)
-            .then(|| self.eta_min() + index as f64 * self.eta_spacing())
+        (index < self.eta_nodes).then(|| self.eta_min() + index as f64 * self.eta_spacing())
     }
 
     pub fn equilibrium_transform(self, eta: f64) -> f64 {
@@ -155,7 +152,10 @@ impl fmt::Display for FourierOutflowError {
                 write!(formatter, "thermal speed must be finite and positive")
             }
             Self::InvalidPlasmaFrequency => {
-                write!(formatter, "squared plasma frequency must be finite and positive")
+                write!(
+                    formatter,
+                    "squared plasma frequency must be finite and positive"
+                )
             }
             Self::InvalidPerturbationAmplitude => {
                 write!(formatter, "perturbation amplitude must be finite")
@@ -170,10 +170,16 @@ impl fmt::Display for FourierOutflowError {
                 write!(formatter, "initial transformed distribution is non-finite")
             }
             Self::NonFiniteState => {
-                write!(formatter, "Fourier-outflow update produced a non-finite state")
+                write!(
+                    formatter,
+                    "Fourier-outflow update produced a non-finite state"
+                )
             }
             Self::AllocationFailed => {
-                write!(formatter, "unable to allocate Fourier-outflow candidate state")
+                write!(
+                    formatter,
+                    "unable to allocate Fourier-outflow candidate state"
+                )
             }
         }
     }
@@ -321,10 +327,7 @@ impl LinearizedMaxwellianFourierOutflow {
     ///
     /// The source substep is exact for frozen g_hat_k(0): its eta=0 derivative
     /// is zero, so the density trace remains fixed during that substep.
-    pub fn step(
-        &mut self,
-        duration: f64,
-    ) -> Result<FourierOutflowStepReport, FourierOutflowError> {
+    pub fn step(&mut self, duration: f64) -> Result<FourierOutflowStepReport, FourierOutflowError> {
         validate_duration(duration)?;
         let mut candidate = self.clone();
         let time_before = candidate.time;
@@ -447,9 +450,7 @@ fn l2_integral(values: &[FourierOutflowValue], spacing: f64) -> f64 {
         } else {
             1.0
         };
-        sum = value
-            .magnitude_squared()
-            .mul_add(weight * spacing, sum);
+        sum = value.magnitude_squared().mul_add(weight * spacing, sum);
     }
     sum
 }
@@ -480,9 +481,7 @@ fn estimate_outflow_l2(
             } else {
                 1.0
             };
-            sum = value
-                .magnitude_squared()
-                .mul_add(weight * spacing, sum);
+            sum = value.magnitude_squared().mul_add(weight * spacing, sum);
         }
     }
     sum
@@ -507,8 +506,7 @@ fn interpolate_cubic(
                 continue;
             }
             let other_index = start + other;
-            weight *= (position - other_index as f64)
-                / (index as f64 - other_index as f64);
+            weight *= (position - other_index as f64) / (index as f64 - other_index as f64);
         }
         result = result.add(values[index].scale(weight));
     }
@@ -576,7 +574,11 @@ mod tests {
         let after = state.transformed_l2_norm();
 
         assert!(report.estimated_outflow_l2 > 0.9 * before);
-        assert!(after < 1.0e-3 * before, "remaining norm fraction = {:e}", after / before);
+        assert!(
+            after < 1.0e-3 * before,
+            "remaining norm fraction = {:e}",
+            after / before
+        );
         assert_eq!(
             state.transformed_value(config.eta_nodes - 1),
             Some(FourierOutflowValue::ZERO)
@@ -604,10 +606,7 @@ mod tests {
 
         assert!(report.estimated_outflow_l2 > 0.9 * before);
         assert!(after < 1.0e-3 * before, "remaining norm fraction = {:e}", after / before);
-        assert_eq!(
-            state.transformed_value(0),
-            Some(FourierOutflowValue::ZERO)
-        );
+        assert_eq!(state.transformed_value(0), Some(FourierOutflowValue::ZERO));
     }
 
     #[test]
@@ -626,8 +625,7 @@ mod tests {
     #[test]
     fn field_source_leaves_zero_eta_density_trace_unchanged() {
         let mut state =
-            LinearizedMaxwellianFourierOutflow::from_maxwellian_mode(config(1.0), 1.0e-2)
-                .unwrap();
+            LinearizedMaxwellianFourierOutflow::from_maxwellian_mode(config(1.0), 1.0e-2).unwrap();
         let density_before = state.density_mode();
         let index = config(1.0).zero_index() + 5;
         let off_axis_before = state.transformed_value(index).unwrap();
@@ -660,7 +658,10 @@ mod tests {
                 .unwrap();
         let before = state.clone();
         assert_eq!(state.step(0.0), Err(FourierOutflowError::InvalidTimeStep));
-        assert_eq!(state.step(f64::NAN), Err(FourierOutflowError::InvalidTimeStep));
+        assert_eq!(
+            state.step(f64::NAN),
+            Err(FourierOutflowError::InvalidTimeStep)
+        );
         assert_eq!(state, before);
     }
 
