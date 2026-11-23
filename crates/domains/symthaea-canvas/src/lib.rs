@@ -122,11 +122,10 @@ pub use mycelial_failure_resilience::{
 };
 pub use mycelial_functional_observations::{
     MAX_MYCELIAL_FUNCTIONAL_ID_BYTES, MAX_MYCELIAL_FUNCTIONAL_OBSERVATIONS,
-    MYCELIAL_FUNCTIONAL_OBSERVATION_SCHEMA_VERSION,
-    MycelialFunctionalFlowDirection, MycelialFunctionalMeasurement,
-    MycelialFunctionalObservation, MycelialFunctionalObservationError,
-    MycelialFunctionalObservationSet, MycelialFunctionalQuantity,
-    MycelialFunctionalQuantityUnit,
+    MYCELIAL_FUNCTIONAL_OBSERVATION_SCHEMA_VERSION, MycelialFunctionalFlowDirection,
+    MycelialFunctionalMeasurement, MycelialFunctionalObservation,
+    MycelialFunctionalObservationError, MycelialFunctionalObservationSet,
+    MycelialFunctionalQuantity, MycelialFunctionalQuantityUnit,
 };
 
 pub use mycelial_fusion_counterfactual::{
