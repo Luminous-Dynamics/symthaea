@@ -16,7 +16,7 @@ INT-004 has moved from an unauthored brief to a fixture-ready public-pilot task.
 - conflict detection that blocks mutation until explicit clarification is resolved;
 - equivalent semantic outcomes for pointer and keyboard action paths.
 
-The fixture includes six golden scenarios, one pointer/keyboard metamorphic pair, and six negative controls, including unsafe stream-gap and unknown-field attempts. Event identity, sequence ownership, entity versions, actor permissions and state-machine transitions are independently represented. The event schedule has no live service, wall clock, credentials, or third-party network dependency.
+The fixture includes six golden scenarios, one pointer/keyboard metamorphic pair, and seven negative controls, including unsafe stream-gap, unknown-field and same-job pending-action contention attempts. Event identity, sequence ownership, entity versions, actor permissions and state-machine transitions are independently represented. The event schedule has no live service, wall clock, credentials, or third-party network dependency.
 
 ## Executed preflight
 
@@ -24,7 +24,7 @@ The independent JavaScript model was executed against the fixture bytes:
 
 - Golden scenarios: **6/6**
 - Pointer/keyboard metamorphic relation: **1/1**
-- Adversarial negative controls rejected: **6/6**
+- Adversarial negative controls rejected: **7/7**
 - Event deliveries represented in golden traces: **17**
 - Fixture SHA-256: `f9f642acd996300068f0b0dd9a8a428093bfec6fa1236d27d8ee774370e3669a`
 
@@ -47,9 +47,9 @@ Added a frozen task policy, raw execution-trace schema/example, verifier report 
 - `--verify-event-trace`: checks the frozen controller step sequence, replays event payloads through the reducer, derives seven semantic outcomes, and ignores worker `disposition` / `observed_oracle_ids`.
 - `benchmarks/frontend/independent-oracle/verify-event-trace.mjs`: dependency-free Node.js implementation with a `--self-test` covering worker-claim invariance and altered-event rejection. The source is committed but has not been run as a Node CLI here.
 
-The Rust verifier's raw JSON path now rejects duplicate object keys recursively before constructing `serde_json::Value`. A generated event-order campaign now exhausts all 5,040 permutations of the seven authoritative events; every order must converge to the same authoritative state, and reverse replay of all seven event identities must remain idempotent.
+The Rust verifier's raw JSON path now rejects duplicate object keys recursively before constructing `serde_json::Value`. A generated event-order campaign now exhausts all 720 causally valid delivery permutations of the six precondition events; each permutation then submits the post-clarification action, delivers its authoritative acknowledgement and reverse-replays all seven event identities.
 
-An independent in-memory V8 preflight against the exact repository fixture, policy and example trace passed **7/7 policy rules**. A separate in-memory V8 state-reducer campaign passed **5,040/5,040 event delivery permutations**, each followed by seven reverse-order duplicate replays. Mutating worker claims left all oracle outcomes unchanged; altering a frozen event payload was rejected. These are independent in-memory V8 checks against the exact fixture/policy/trace bytes, not executions of the committed Node.js CLI or Rust verifier. The permutation reducer is separately authored in the Rust test source and has not been compiler-executed. The verifier does not authenticate browser execution, produce a signed in-toto verifier statement or inspect browser screenshots/accessibility/network artifacts. It is an initial semantic replay component for #13247 only.
+An independent in-memory V8 preflight against the exact repository fixture, policy and example trace passed **7/7 policy rules**. A separate in-memory V8 state-reducer campaign passed **720/720 causally valid event delivery permutations**, each followed by the post-conflict action/acknowledgement and seven reverse-order duplicate replays. Mutating worker claims left all oracle outcomes unchanged; altering a frozen event payload was rejected. These are independent in-memory V8 checks against the exact fixture/policy/trace bytes, not executions of the committed Node.js CLI or Rust verifier. The causality-aware permutation reducer is separately authored in the Rust test source and has not been compiler-executed. The verifier does not authenticate browser execution, produce a signed in-toto verifier statement or inspect browser screenshots/accessibility/network artifacts. It is an initial semantic replay component for #13247 only.
 
 Trace SHA-256: `a6db51ee92df248161b15975027e65c13a475b20ae67a5e2b16ccb4b566d7fc0`.
 
