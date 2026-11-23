@@ -16,6 +16,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
 pub const MIN_SUPPORTING_TRACES_V1: usize = 3;
@@ -42,6 +43,14 @@ impl RetrievalOperationOutcomeV1 {
             Self::ToolError => 3,
         }
     }
+
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::EvidenceObserved => "evidence_observed",
+            Self::NoEvidence => "no_evidence",
+            Self::ToolError => "tool_error",
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -63,6 +72,16 @@ impl RetrievalStopReasonV1 {
             Self::Abstained => 5,
         }
     }
+
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::EvidenceSufficient => "evidence_sufficient",
+            Self::BudgetExhausted => "budget_exhausted",
+            Self::NoCandidateEvidence => "no_candidate_evidence",
+            Self::ToolError => "tool_error",
+            Self::Abstained => "abstained",
+        }
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -78,6 +97,8 @@ pub struct RetrievalOperationV1 {
     pub outcome: RetrievalOperationOutcomeV1,
     pub elapsed_ns: u64,
     pub inspected_bytes: u64,
+    /// False means the adapter cannot account for all bytes inspected by the operation.
+    pub inspected_bytes_measured: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -98,7 +119,49 @@ pub struct RetrievalTraceReceiptV1 {
     pub tool_calls_used: u32,
     pub elapsed_ns: u64,
     pub inspected_bytes: u64,
+    /// True only when every operation reports complete inspected-byte accounting.
+    pub inspected_bytes_complete: bool,
     pub created_at_unix: u64,
+}
+
+impl RetrievalTraceReceiptV1 {
+    /// Deterministic receipt commitment using the versioned binary encoding.
+    pub fn receipt_sha256(&self) -> String {
+        trace_receipt_digest(self)
+    }
+
+    /// JSON projection for an audit/replay envelope. The receipt digest commits
+    /// to the typed fields using the separate canonical binary encoding.
+    pub fn to_json_value(&self) -> Value {
+        json!({
+            "schema_version": "mace_retrieval_trace_receipt_v1",
+            "run_id": self.run_id,
+            "query_invocation_id": self.query_invocation_id,
+            "domain_id": self.domain_id,
+            "environment_revision_sha256": self.environment_revision_sha256,
+            "tool_profile_sha256": self.tool_profile_sha256,
+            "query_sha256": self.query_sha256,
+            "candidate_set_sha256": self.candidate_set_sha256,
+            "operations": self.operations.iter().map(|operation| json!({
+                "tool_id": operation.tool_id,
+                "tool_revision_sha256": operation.tool_revision_sha256,
+                "action_template_sha256": operation.action_template_sha256,
+                "observed_evidence_ids": operation.observed_evidence_ids,
+                "outcome": operation.outcome.as_str(),
+                "elapsed_ns": operation.elapsed_ns,
+                "inspected_bytes": operation.inspected_bytes,
+                "inspected_bytes_measured": operation.inspected_bytes_measured,
+            })).collect::<Vec<_>>(),
+            "stop_reason": self.stop_reason.as_str(),
+            "tool_call_budget": self.tool_call_budget,
+            "tool_calls_used": self.tool_calls_used,
+            "elapsed_ns": self.elapsed_ns,
+            "inspected_bytes": self.inspected_bytes,
+            "inspected_bytes_complete": self.inspected_bytes_complete,
+            "created_at_unix": self.created_at_unix,
+            "receipt_sha256": self.receipt_sha256(),
+        })
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -231,6 +294,7 @@ fn trace_receipt_digest(trace: &RetrievalTraceReceiptV1) -> String {
     hasher.update(trace.tool_calls_used.to_be_bytes());
     hasher.update(trace.elapsed_ns.to_be_bytes());
     hasher.update(trace.inspected_bytes.to_be_bytes());
+    hasher.update([u8::from(trace.inspected_bytes_complete)]);
     hasher.update(trace.created_at_unix.to_be_bytes());
     hasher.update((trace.operations.len() as u64).to_be_bytes());
     for operation in &trace.operations {
@@ -240,6 +304,7 @@ fn trace_receipt_digest(trace: &RetrievalTraceReceiptV1) -> String {
         hasher.update(operation.outcome.tag().to_be_bytes());
         hasher.update(operation.elapsed_ns.to_be_bytes());
         hasher.update(operation.inspected_bytes.to_be_bytes());
+        hasher.update([u8::from(operation.inspected_bytes_measured)]);
         let mut evidence_ids = operation.observed_evidence_ids.clone();
         evidence_ids.sort();
         hasher.update((evidence_ids.len() as u64).to_be_bytes());
@@ -385,7 +450,12 @@ fn validate_trace(trace: &RetrievalTraceReceiptV1) -> Result<(), RetrievalPolicy
             }
         }
     }
-    if elapsed_sum != trace.elapsed_ns || bytes_sum != trace.inspected_bytes {
+    let all_bytes_measured = trace.operations.iter()
+        .all(|operation| operation.inspected_bytes_measured);
+    if elapsed_sum != trace.elapsed_ns
+        || bytes_sum != trace.inspected_bytes
+        || all_bytes_measured != trace.inspected_bytes_complete
+    {
         return Err(RetrievalPolicyRejectV1::InvalidResourceAccounting);
     }
 
@@ -618,6 +688,7 @@ mod tests {
             outcome,
             elapsed_ns: 10,
             inspected_bytes: 128,
+            inspected_bytes_measured: true,
         }
     }
 
@@ -655,6 +726,7 @@ mod tests {
             tool_calls_used: 2,
             elapsed_ns: 20,
             inspected_bytes: 256,
+            inspected_bytes_complete: true,
             created_at_unix: 100,
         }
     }
@@ -890,6 +962,32 @@ mod tests {
         assert_eq!(
             memory.record_trace(early_stop),
             Err(RetrievalPolicyRejectV1::InvalidStopReason)
+        );
+    }
+
+    #[test]
+    fn inspected_byte_completeness_is_explicit_and_committed() {
+        let mut receipt = trace(
+            "byte-accounting",
+            "a595959595959595959595959595959595959595959595959595959595959595",
+            "web-shop-a",
+            ENV_A,
+            TOOL_PROFILE_A,
+            ACTION_SEARCH,
+        );
+        receipt.operations[0].inspected_bytes_measured = false;
+        receipt.inspected_bytes_complete = false;
+        let digest = receipt.receipt_sha256();
+        assert!(digest.len() == 64);
+        let json = receipt.to_json_value();
+        assert_eq!(json["inspected_bytes_complete"], false);
+        assert_eq!(json["operations"][0]["inspected_bytes_measured"], false);
+        assert_eq!(json["receipt_sha256"], digest);
+
+        receipt.inspected_bytes_complete = true;
+        assert_eq!(
+            RetrievalPolicyMemoryV1::default().record_trace(receipt),
+            Err(RetrievalPolicyRejectV1::InvalidResourceAccounting)
         );
     }
 
