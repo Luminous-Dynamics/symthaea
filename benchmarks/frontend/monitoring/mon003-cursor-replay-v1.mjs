@@ -22,7 +22,7 @@ class PartitionJournal {
     if (p.forked) fail('PARTITION_QUARANTINED', 'partition is quarantined');
     const prior = this.ids.get(idKey);
     if (prior) {
-      if (prior.digest !== d || prior.partition !== e.partition || prior.seq !== e.seq) { p.forked = true; fail('EVENT_ID_REUSE', 'source+id identity changed content or position'); }
+      if (prior.digest !== d || prior.partition !== e.partition || prior.seq !== e.seq) { p.forked = true; this.part(e.source, prior.partition).forked = true; fail('EVENT_ID_REUSE', 'source+id identity changed content or position'); }
       if (e.seq <= p.cursor) return { status: 'duplicate_committed', cursor: p.cursor };
       if (p.pending.has(e.seq)) return { status: 'duplicate_pending', cursor: p.cursor };
       p.forked = true; fail('EVENT_ID_REUSE', 'known event identity is absent from cursor/pending state');
@@ -66,6 +66,7 @@ test('replay of missing events drains the pending suffix in order',()=>{const j=
 test('identical duplicate pending event is idempotent',()=>{const j=new PartitionJournal(),x=ev('sA','p0','e2',2);j.ingest(x);assert.equal(j.ingest(x).status,'duplicate_pending');assert.deepEqual(j.snapshot('sA','p0').pending,[2]);});
 test('identical duplicate committed event adds no evidence',()=>{const j=new PartitionJournal(),x=ev('sA','p0','e1',1);j.ingest(x);assert.equal(j.ingest(x).status,'duplicate_committed');assert.equal(j.eligible('sA','p0').length,1);});
 test('same source+id with changed payload is rejected',()=>{const j=new PartitionJournal();j.ingest(ev('sA','p0','e1',1));expect('EVENT_ID_REUSE',()=>j.ingest(ev('sA','p0','e1',1,{n:999})));});
+test('source+id reused on another partition quarantines both partitions',()=>{const j=new PartitionJournal();j.ingest(ev('sA','p0','shared',1));expect('EVENT_ID_REUSE',()=>j.ingest(ev('sA','p1','shared',1)));assert.equal(j.snapshot('sA','p0').forked,true);assert.equal(j.snapshot('sA','p1').forked,true);});
 test('same event id from two distinct sources is not a collision',()=>{const j=new PartitionJournal();j.ingest(ev('sA','p0','same',1));j.ingest(ev('sB','p0','same',1));assert.equal(j.eligible('sA','p0').length,1);assert.equal(j.eligible('sB','p0').length,1);});
 test('partition progress is isolated',()=>{const j=new PartitionJournal();j.ingest(ev('sA','p0','p0e1',1));j.ingest(ev('sA','p1','p1e2',2));assert.equal(j.snapshot('sA','p0').cursor,1);assert.equal(j.snapshot('sA','p1').cursor,0);});
 test('two event identities at one sequence quarantine the partition',()=>{const j=new PartitionJournal();j.ingest(ev('sA','p0','a',2));expect('SEQUENCE_FORK',()=>j.ingest(ev('sA','p0','b',2)));assert.equal(j.snapshot('sA','p0').forked,true);expect('PARTITION_QUARANTINED',()=>j.ingest(ev('sA','p0','e1',1)));});
