@@ -2,6 +2,7 @@ use std::error::Error;
 use std::f64::consts::TAU;
 
 use plasma_vlasov_reference::echo_analysis::{EchoPulsePair, predict_two_pulse_echo};
+use plasma_vlasov_reference::phase_space_cascade::JointPhaseSpaceSpectrum;
 use plasma_vlasov_reference::{VlasovPoisson1d1v, VlasovPoissonConfig, maxwellian_perturbation};
 
 const DT: f64 = 0.05;
