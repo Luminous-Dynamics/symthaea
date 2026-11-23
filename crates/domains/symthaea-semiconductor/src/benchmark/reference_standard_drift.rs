@@ -206,7 +206,9 @@ pub fn seal_reference_standard_drift_model_v1(
     model_digest(model)
 }
 
-fn report_digest(report: &ReferenceDriftPredictionReportV1) -> Result<String, ReferenceDriftErrorV1> {
+fn report_digest(
+    report: &ReferenceDriftPredictionReportV1,
+) -> Result<String, ReferenceDriftErrorV1> {
     let mut canonical = report.clone();
     canonical.report_sha256.clear();
     json_sha256(&canonical)
@@ -243,7 +245,9 @@ fn validate_policy(policy: &ReferenceDriftPredictionPolicyV1) -> Result<(), Refe
     Ok(())
 }
 
-fn validate_model_shape(model: &ReferenceStandardDriftModelV1) -> Result<(), ReferenceDriftErrorV1> {
+fn validate_model_shape(
+    model: &ReferenceStandardDriftModelV1,
+) -> Result<(), ReferenceDriftErrorV1> {
     if model.schema != REFERENCE_DRIFT_MODEL_SCHEMA_V1 {
         return Err(ReferenceDriftErrorV1("model schema is unsupported".into()));
     }
@@ -321,8 +325,12 @@ fn blank_report(
         history_manifest_sha256: input.model.history_manifest_sha256.clone(),
         holdout_validation_manifest_sha256: input.model.holdout_validation_manifest_sha256.clone(),
         as_known_at_unix_seconds: input.as_known_at_unix_seconds,
-        measurement_time_earliest_unix_seconds: input.measurement_time_bounds.earliest_measured_at_unix_seconds,
-        measurement_time_latest_unix_seconds: input.measurement_time_bounds.latest_measured_at_unix_seconds,
+        measurement_time_earliest_unix_seconds: input
+            .measurement_time_bounds
+            .earliest_measured_at_unix_seconds,
+        measurement_time_latest_unix_seconds: input
+            .measurement_time_bounds
+            .latest_measured_at_unix_seconds,
         predicted_at_midpoint_unix_seconds: 0,
         predicted_additive_correction: None,
         predicted_corrected_measurement: None,
@@ -380,8 +388,12 @@ pub fn predict_reference_standard_drift_v1(
         return Ok(report);
     }
 
-    let lower = input.measurement_time_bounds.earliest_measured_at_unix_seconds;
-    let upper = input.measurement_time_bounds.latest_measured_at_unix_seconds;
+    let lower = input
+        .measurement_time_bounds
+        .earliest_measured_at_unix_seconds;
+    let upper = input
+        .measurement_time_bounds
+        .latest_measured_at_unix_seconds;
     if lower > upper
         || input.measurement.measured_at_unix_seconds < lower
         || input.measurement.measured_at_unix_seconds > upper
@@ -486,8 +498,7 @@ pub fn predict_reference_standard_drift_v1(
         .checked_sub(input.model.fit_end_unix_seconds)
         .ok_or_else(|| ReferenceDriftErrorV1("fit-end time delta overflows".into()))?
         .max(0);
-    let extrapolation_days =
-        days_before_fit.max(days_after_fit) as f64 / 86_400.0;
+    let extrapolation_days = days_before_fit.max(days_after_fit) as f64 / 86_400.0;
 
     if extrapolation_days > input.policy.maximum_extrapolation_days {
         reasons.push(ReferenceDriftReasonV1::ExtrapolationLimitExceeded);
@@ -522,8 +533,7 @@ pub fn predict_reference_standard_drift_v1(
         status = ReferenceDriftPredictionStatusV1::Rejected;
     }
 
-    let parameter_standard_uncertainty =
-        max_parameter_variance.max(0.0).sqrt();
+    let parameter_standard_uncertainty = max_parameter_variance.max(0.0).sqrt();
     let half_interval_days = (upper - lower) as f64 / (2.0 * 86_400.0);
     let time_interval_uncertainty =
         input.model.beta_1_correction_per_day.abs() * half_interval_days;
@@ -531,8 +541,7 @@ pub fn predict_reference_standard_drift_v1(
         + input.model.residual_standard_uncertainty
         + input.model.model_standard_uncertainty
         + time_interval_uncertainty;
-    let expanded_uncertainty =
-        predictive_uncertainty * input.policy.required_coverage_factor;
+    let expanded_uncertainty = predictive_uncertainty * input.policy.required_coverage_factor;
 
     if !predictive_uncertainty.is_finite()
         || predictive_uncertainty > input.policy.maximum_standard_uncertainty
@@ -564,9 +573,9 @@ mod tests {
     use crate::benchmark::calibration_requalification::MeasurementTimeBoundsV1;
     use crate::benchmark::metrology_qualification_gate::{
         CALIBRATION_CERTIFICATE_SCHEMA_V1, MEASUREMENT_EVIDENCE_SCHEMA_V1,
-        QUALIFICATION_POLICY_SCHEMA_V1, MeasurementUncertaintyComponentV1,
-        MeasurementQualificationPolicyV1, TraceabilityDeclarationV1,
-        UncertaintyComponentKindV1, qualify_measurement_evidence_v1,
+        MeasurementQualificationPolicyV1, MeasurementUncertaintyComponentV1,
+        QUALIFICATION_POLICY_SCHEMA_V1, TraceabilityDeclarationV1, UncertaintyComponentKindV1,
+        qualify_measurement_evidence_v1,
     };
 
     fn measurement() -> MeasurementEvidenceV1 {
@@ -694,8 +703,7 @@ mod tests {
     }
 
     fn reseal(input: &mut ReferenceDriftPredictionInputV1) {
-        input.model.model_sha256 =
-            seal_reference_standard_drift_model_v1(&input.model).unwrap();
+        input.model.model_sha256 = seal_reference_standard_drift_model_v1(&input.model).unwrap();
     }
 
     #[test]
@@ -720,8 +728,7 @@ mod tests {
                 < 1.0e-12
         );
         assert!(
-            (report.expanded_uncertainty_upper_bound.unwrap() - expected * 2.0).abs()
-                < 1.0e-12
+            (report.expanded_uncertainty_upper_bound.unwrap() - expected * 2.0).abs() < 1.0e-12
         );
     }
 
@@ -734,8 +741,10 @@ mod tests {
         };
         let point = predict_reference_standard_drift_v1(&input()).unwrap();
         let interval = predict_reference_standard_drift_v1(&value).unwrap();
-        assert!(interval.predictive_standard_uncertainty_upper_bound
-            > point.predictive_standard_uncertainty_upper_bound);
+        assert!(
+            interval.predictive_standard_uncertainty_upper_bound
+                > point.predictive_standard_uncertainty_upper_bound
+        );
     }
 
     #[test]
@@ -796,7 +805,10 @@ mod tests {
         no_holdout.model.holdout_validation_manifest_sha256 = None;
         reseal(&mut no_holdout);
         let no_holdout_report = predict_reference_standard_drift_v1(&no_holdout).unwrap();
-        assert_eq!(no_holdout_report.status, ReferenceDriftPredictionStatusV1::Unknown);
+        assert_eq!(
+            no_holdout_report.status,
+            ReferenceDriftPredictionStatusV1::Unknown
+        );
         assert!(
             no_holdout_report
                 .reasons
@@ -843,7 +855,9 @@ mod tests {
     #[test]
     fn static_gate_rejection_blocks_dynamic_prediction() {
         let mut value = input();
-        value.measurement_qualification_policy.maximum_standard_uncertainty = 0.001;
+        value
+            .measurement_qualification_policy
+            .maximum_standard_uncertainty = 0.001;
         value.measurement_qualification_report = qualify_measurement_evidence_v1(
             &value.measurement,
             Some(&value.calibration_certificate),
