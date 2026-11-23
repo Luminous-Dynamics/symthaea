@@ -471,8 +471,7 @@ impl AudioPerception {
             .iter()
             .enumerate()
             .map(|(index, frame)| {
-                let relative_start =
-                    (frame.time.max(0.0) * sample_rate as f32).round() as u64;
+                let relative_start = (frame.time.max(0.0) * sample_rate as f32).round() as u64;
                 let frame_source_start = source_start_sample.saturating_add(relative_start);
                 let frame_source_end = frame_source_start
                     .saturating_add(window_samples)
@@ -803,12 +802,7 @@ mod tests {
         let source_end = source_start + samples.len() as u64;
 
         let result = perception
-            .process_samples_at_source_position(
-                &samples,
-                16_000,
-                source_start,
-                segment_index,
-            )
+            .process_samples_at_source_position(&samples, 16_000, source_start, segment_index)
             .unwrap();
         let prosody = result.prosody.expect("prosody is enabled by default");
         assert_eq!(prosody.source_start_sample, source_start);
@@ -829,12 +823,7 @@ mod tests {
         let mut perception = AudioPerception::new(AudioPerceptionConfig::default()).unwrap();
         assert!(
             perception
-                .process_samples_at_source_position(
-                    &[0.0, f32::NAN, 0.0],
-                    16_000,
-                    0,
-                    0,
-                )
+                .process_samples_at_source_position(&[0.0, f32::NAN, 0.0], 16_000, 0, 0,)
                 .is_err()
         );
         assert!(
