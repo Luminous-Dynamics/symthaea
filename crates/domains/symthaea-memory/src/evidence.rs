@@ -927,6 +927,30 @@ mod tests {
         );
     }
 
+    #[test]
+    fn valid_ledger_round_trips_through_validating_deserializer() {
+        let ledger = EvidenceLedger::new(vec![
+            claim("claim-1", 1, 10, EvidenceEventKind::Assertion, Vec::new())
+        ]).unwrap();
+        let encoded = serde_json::to_string(&ledger).unwrap();
+        let decoded: EvidenceLedger = serde_json::from_str(&encoded).unwrap();
+        assert_eq!(decoded, ledger);
+    }
+
+    #[test]
+    fn deserializer_rejects_cross_event_invalid_references() {
+        let invalid = claim(
+            "claim-2",
+            2,
+            20,
+            EvidenceEventKind::Correction,
+            vec!["missing-parent-claim"],
+        );
+        let encoded = serde_json::json!({ "events": [invalid] }).to_string();
+        let decoded = serde_json::from_str::<EvidenceLedger>(&encoded);
+        assert!(decoded.is_err());
+    }
+
     // EvidenceLedger deserialization is intentionally custom: every decoded
     // snapshot passes the same cross-event validator as EvidenceLedger::new.
     // EvidenceBound is intentionally not deserializable; it must be minted by
