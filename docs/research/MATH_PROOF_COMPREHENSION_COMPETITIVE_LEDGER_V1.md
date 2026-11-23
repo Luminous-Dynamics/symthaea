@@ -281,3 +281,18 @@ For the first four Mathlib + six Lean-core pilot declarations, compare historica
 Report edge precision/recall by edge class, exact-vs-inexact relation classification, theorem identity fidelity, axiom/opaque handling, proof-route-vs-truth disposition, explanation fact support, counterexample validity, human outcomes and resource cost separately. Do not combine them into one aggregate mathematical-intelligence score.
 
 The interoperability work is tracked in [#13325 — MATH-GRAPH-INTEROP-001](https://github.com/Luminous-Dynamics/symthaea/issues/13325). Its figures are external published/project figures, not Symthaea results. No local differential or performance improvement is claimed until executed on pinned artifacts.
+
+
+## 10. Proof-plan reconstruction and human-learning evidence (2026-11-23)
+
+A further distinction is now explicit in the benchmark design: a dependency graph, an explanation, a proof presentation, a proof plan and delayed transfer are not interchangeable measures.
+
+Hamami & Morris (2024) argue that understanding a proof involves rationally reconstructing its underlying plan ([DOI](https://doi.org/10.1111/nous.12489)). Gao & Evans' November 6, 2026 study of 143 undergraduates found that proof-presentation performance was only moderately associated with later proof construction on a delayed near-transfer task ([DOI](https://doi.org/10.1007/s40753-026-00319-4)). Thus Symthaea must measure at least four distinct reader capabilities: (1) statement/assumption comprehension, (2) proof validation, (3) proof-plan reconstruction or presentation, and (4) immediate and delayed transfer.
+
+### New benchmark lane: MATH-PROOF-PLAN-001
+
+[#13326](https://github.com/Luminous-Dynamics/symthaea/issues/13326) defines a typed plan graph of goal states, actions, justifications, side conditions, subgoals, witnesses, invariants and unresolved steps. It requires support per action and permits alternative valid plans. It adds plan perturbation and alternative-route recognition instead of scoring only whether a natural-language summary is fluent.
+
+Prospective targets include at least 80% expert acceptance of held-out proof-plan skeletons, 90% side-condition/subgoal coverage and a 10 percentage-point improvement in delayed or cross-family transfer over the strongest matched baseline. These are goals, not current results.
+
+The existing study preregistration is being extended to separate the treatment arms and outcomes. No participants have been recruited and no human study has been run. Expert annotation, ethics determination/review, consent, feasibility pilot and a power analysis remain prerequisites to confirmatory data collection.
