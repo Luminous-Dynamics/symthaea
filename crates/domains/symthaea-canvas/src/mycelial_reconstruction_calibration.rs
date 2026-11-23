@@ -1169,7 +1169,7 @@ fn hex_digest(bytes: &[u8; 32]) -> String {
 mod tests {
     use super::*;
     use crate::mycelial_reconstruction_metrics::{
-        AnnotatedHyphaSegment, AnnotatedJunction, AnnotatedJunctionKind, JunctionIdentityMatch,
+        AnnotatedHyphaSegment, AnnotatedJunction, AnnotatedJunctionKind,
         MYCELIAL_RECONSTRUCTION_SCHEMA_VERSION, ReconstructionDimensionality,
         ReconstructionEvaluationConfig, ReconstructionLengthUnit, ReconstructionPoint3,
         evaluate_mycelial_reconstruction, match_junctions_hungarian,
