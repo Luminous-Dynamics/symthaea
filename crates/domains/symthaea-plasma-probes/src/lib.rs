@@ -158,6 +158,7 @@ struct EvaluationPolicy {
     independent_confirmation_required: bool,
     minimum_spatial_refinement_levels: usize,
     minimum_time_refinement_levels: usize,
+    minimum_post_pulse_observation_duration: f64,
     required_controls: Vec<String>,
     response_metrics: Vec<String>,
     #[serde(default)]
@@ -305,13 +306,19 @@ impl PulseFamilyContract {
         }
 
         let policy = &self.evaluation_policy;
+        let post_pulse_end = controls.application_time.maximum
+            + policy.minimum_post_pulse_observation_duration;
         if !policy.independent_confirmation_required
             || policy.minimum_spatial_refinement_levels == 0
             || policy.minimum_time_refinement_levels == 0
+            || !policy.minimum_post_pulse_observation_duration.is_finite()
+            || policy.minimum_post_pulse_observation_duration <= 0.0
+            || !post_pulse_end.is_finite()
+            || post_pulse_end > self.physics_cohort.maximum_time
         {
             return Err(ContractError::InvalidField {
                 field: "evaluation_policy",
-                reason: "independent confirmation and spatial/time refinement are mandatory",
+                reason: "independent confirmation, spatial/time refinement, and a positive post-pulse observation window are mandatory",
             });
         }
         for required in ["no_pulse", "sign_reversed", "phase_mismatch"] {
@@ -427,6 +434,10 @@ impl PulseFamilyContract {
         update_f64(&mut hasher, self.physics_cohort.maximum_time);
         update_length_prefixed(&mut hasher, self.intervention_operator.operator_id.as_bytes());
         update_length_prefixed(&mut hasher, self.intervention_operator.definition.as_bytes());
+        update_length_prefixed(&mut hasher, self.intervention_operator.amplitude_semantics.as_bytes());
+        update_length_prefixed(&mut hasher, self.intervention_operator.application_semantics.as_bytes());
+        hasher.update(&[u8::from(self.physics_cohort.spatial_domain.periodic)]);
+        update_f64(&mut hasher, self.evaluation_policy.minimum_post_pulse_observation_duration);
         hasher.update(&self.admissible_controls.spatial_mode.minimum.to_le_bytes());
         hasher.update(&self.admissible_controls.spatial_mode.maximum.to_le_bytes());
         update_f64(&mut hasher, self.admissible_controls.phase_rad.minimum);
@@ -683,7 +694,8 @@ fn valid_contract_id(value: &str) -> bool {
     bytes.len() >= 6
         && bytes.len() <= 64
         && bytes.starts_with(b"AKPD-")
-        && bytes[5..].iter().all(|byte| {
+        && (bytes[5].is_ascii_uppercase() || bytes[5].is_ascii_digit())
+        && bytes[6..].iter().all(|byte| {
             byte.is_ascii_uppercase()
                 || byte.is_ascii_digit()
                 || matches!(*byte, b'-' | b'_' | b'.')
@@ -858,6 +870,21 @@ mod tests {
             PulseFamilyContract::parse_json(&input),
             Err(ContractError::InvalidField {
                 field: "admissible_controls.application_time",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn rejects_insufficient_post_pulse_observation_window() {
+        let input = SYNTHETIC_FIXTURE.replace(
+            "\"maximum\": 20.0, \"unit\": \"omega_pe^-1\"",
+            "\"maximum\": 29.0, \"unit\": \"omega_pe^-1\"",
+        );
+        assert!(matches!(
+            PulseFamilyContract::parse_json(&input),
+            Err(ContractError::InvalidField {
+                field: "evaluation_policy",
                 ..
             })
         ));
