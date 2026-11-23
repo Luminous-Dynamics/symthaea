@@ -59,6 +59,9 @@ pub struct SyntheticMsaPolicyViewV1 {
     pub part_count: usize,
     pub appraiser_count: usize,
     pub replicates_per_cell: usize,
+    pub instrument_id: String,
+    pub measurand_id: String,
+    pub unit: String,
     pub observations: Vec<SyntheticMsaObservationV1>,
 }
 
@@ -69,6 +72,9 @@ pub struct SyntheticMsaEvaluationReportV1 {
     pub scenario_config_sha256: String,
     pub observation_packet_sha256: String,
     pub report_sha256: String,
+    pub instrument_id: String,
+    pub measurand_id: String,
+    pub unit: String,
     pub part_count: usize,
     pub appraiser_count: usize,
     pub replicates_per_cell: usize,
@@ -114,6 +120,7 @@ struct SyntheticMsaKnownModelV1 {
 
 #[derive(Clone, Debug)]
 pub struct SyntheticMsaEpisodeV1 {
+    config: SyntheticMsaScenarioConfigV1,
     policy_view: SyntheticMsaPolicyViewV1,
     known_model: SyntheticMsaKnownModelV1,
 }
@@ -290,10 +297,14 @@ pub fn generate_synthetic_msa_episode_v1(
         part_count: config.part_count,
         appraiser_count: config.appraiser_count,
         replicates_per_cell: config.replicates_per_cell,
+        instrument_id: config.instrument_id.clone(),
+        measurand_id: config.measurand_id.clone(),
+        unit: config.unit.clone(),
         observations,
     };
 
     Ok(SyntheticMsaEpisodeV1 {
+        config: config.clone(),
         policy_view,
         known_model: SyntheticMsaKnownModelV1 {
             known_appraiser_variance: config.appraiser_effect_stddev.powi(2),
@@ -313,8 +324,24 @@ pub fn evaluate_synthetic_msa_episode_v1(
     episode: &SyntheticMsaEpisodeV1,
 ) -> Result<SyntheticMsaEvaluationReportV1, SyntheticMsaError> {
     let view = &episode.policy_view;
-    if view.schema != SYNTHETIC_MSA_POLICY_VIEW_SCHEMA_V1 {
-        return Err(SyntheticMsaError("policy_view.schema: unsupported".into()));
+    validate_config(&episode.config)?;
+    if json_sha256(&episode.config)? != view.scenario_config_sha256 {
+        return Err(SyntheticMsaError(
+            "scenario config digest does not match evaluator inputs".into(),
+        ));
+    }
+    if view.schema != SYNTHETIC_MSA_POLICY_VIEW_SCHEMA_V1
+        || view.scenario_id != episode.config.scenario_id
+        || view.part_count != episode.config.part_count
+        || view.appraiser_count != episode.config.appraiser_count
+        || view.replicates_per_cell != episode.config.replicates_per_cell
+        || view.instrument_id != episode.config.instrument_id
+        || view.measurand_id != episode.config.measurand_id
+        || view.unit != episode.config.unit
+    {
+        return Err(SyntheticMsaError(
+            "policy view identity/schema differs from frozen scenario configuration".into(),
+        ));
     }
     if view.part_count < 2 || view.appraiser_count < 2 || view.replicates_per_cell < 2 {
         return Err(SyntheticMsaError("MSA design degrees of freedom are insufficient".into()));
@@ -369,9 +396,9 @@ pub fn evaluate_synthetic_msa_episode_v1(
                     "observations[{index}].appraiser_id is outside the frozen design"
                 ))
             })?;
-        if observation.instrument_id.trim().is_empty()
-            || observation.measurand_id.trim().is_empty()
-            || observation.unit.trim().is_empty()
+        if observation.instrument_id != episode.config.instrument_id
+            || observation.measurand_id != episode.config.measurand_id
+            || observation.unit != episode.config.unit
             || !observation.reference_value.is_finite()
             || !observation.measured_value.is_finite()
         {
@@ -396,6 +423,13 @@ pub fn evaluate_synthetic_msa_episode_v1(
         {
             return Err(SyntheticMsaError(format!(
                 "observations[{index}]: reference value changes within part identity"
+            )));
+        }
+        let expected_reference = episode.config.reference_value_start
+            + part_index as f64 * episode.config.reference_value_step;
+        if (expected_reference - observation.reference_value).abs() > 1.0e-12 {
+            return Err(SyntheticMsaError(format!(
+                "observations[{index}]: reference value differs from frozen artifact value"
             )));
         }
         part_references[part_index] = Some(observation.reference_value);
@@ -521,6 +555,9 @@ pub fn evaluate_synthetic_msa_episode_v1(
         scenario_config_sha256: view.scenario_config_sha256.clone(),
         observation_packet_sha256: view.observation_packet_sha256.clone(),
         report_sha256: String::new(),
+        instrument_id: view.instrument_id.clone(),
+        measurand_id: view.measurand_id.clone(),
+        unit: view.unit.clone(),
         part_count,
         appraiser_count,
         replicates_per_cell: replicate_count,
