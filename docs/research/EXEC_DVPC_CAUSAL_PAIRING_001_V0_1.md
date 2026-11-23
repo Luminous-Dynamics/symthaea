@@ -161,6 +161,78 @@ A passing Rust validator establishes only finite structural pairing and receipt 
 
 ## 8. Competitive baseline crosswalk and experiment order
 
+The most important new gap is prediction-to-action advantage, not prediction quality in isolation. A 2026 survey of 160 benchmarks reports only 11 with an explicit VLA-versus-world-model contrast and only four that take prediction through to executed action. This is a reported survey classification, not a universal census; it nevertheless identifies a concrete measurement gap. The campaign should therefore compare a direct reactive/VLA policy and a predictive/world-action policy in the same closed-loop environment, then measure whether prediction produces a positive incremental task/decision advantage at matched resources.
+
+### Two complementary primary testbeds
+
+| Testbed | What it contributes | Baselines and reported context | Symthaea's experiment |
+|---|---|---|---|
+| RoboDyna (NeurIPS 2026 Workshop) | Broad physical dynamics: 30 tasks, five capabilities, compositional difficulty, household scenes, paired sync/async execution and human baselines. | π0.5 18%, X-VLA 11%, FastWAM 6% overall success in the official summary. Async timing flips 5–12% of episode outcomes while changing average success by at most 3 points. | Reproduce official baselines; compare direct VLA, FastWAM/world-action, and each frozen policy with the Symthaea decision layer. |
+| LIBERO-Dynamic (2026) | Controlled latency-aware extension of all 40 LIBERO tasks, three motion families, three target speeds, 1,800 fixed episodes/configuration and calibrated inference delay while the scene moves. | Under async execution at best measured horizons: π0.5 (JAX) 57.8%, FastWAM-Joint 40.6%, VLA-JEPA 35.7%, FastWAM 32.1%, π0 (JAX) 31.5%, OpenVLA-OFT 27.3%. Async Queue reaches 48.4% vs Sync Hold 43.1% and RTC 37.8% in the reported π0.5 PyTorch strategy comparison. VLASH is a separately trained system reference at 55.4%, not a controller-only ablation. | Reproduce official checkpoints, latency calibration, action-horizon sweeps and queue-underflow handling. Add the four-arm compute×observation treatment without altering the official baseline protocol. |
+
+RoboDyna and LIBERO-Dynamic are not one leaderboard: task sets, action interfaces, motion distributions, checkpoints, training budgets and metrics differ. Report each separately. RoboDyna is the broader physical-competence stress test; LIBERO-Dynamic provides a more controlled latency/motion experiment. Their human baselines and real-robot sub-studies must be retained where compatible.
+
+### Matched prediction-advantage design
+
+Within each benchmark, run these policy families with frozen checkpoints and matched input/action interfaces:
+
+1. **Direct policy:** reactive VLA / direct policy without a predictive rollout.
+2. **Predictive policy:** world-action model or world-model-plus-planner.
+3. **Decision-layer direct:** the same direct policy with Symthaea's evidence/compute/observation allocation layer.
+4. **Decision-layer predictive:** the same predictive policy with the same Symthaea decision layer.
+5. **Execution controls:** fixed horizon, official asynchronous queue, RTC, progress-triggered execution (TempoWAM-style), and the benchmark's official delay-aware reference where available.
+6. **Evaluator-only oracle:** finite or hindsight diagnostic only; never a deployable ranking baseline.
+
+Do not train the direct and predictive arms on different data unless the comparison is explicitly labelled as an end-to-end system comparison. Prefer a frozen-backbone comparison first. Keep the official benchmark's own released checkpoints and scoring untouched; the Symthaea layer is an additional adapter/arm, not a silent modification to the baseline.
+
+The key within-task comparison is:
+
+\[
+\Delta_{\text{prediction}}=U(\text{predictive policy})-U(\text{direct policy})
+\]
+
+and the decision-layer increment is:
+
+\[
+\Delta_{\text{Symthaea}|P}=U(P+\text{Symthaea})-U(P)
+\]
+
+where \(P\) denotes the same frozen underlying policy family. These are task-utility contrasts, not a new scalar model score. Report task success, progress, regret, latency, queue underflow, resources and failures separately. A predictive model can win on open-loop prediction error and still lose this closed-loop contrast.
+
+For the compute×observation study, run the four #13281 arms separately within each frozen policy family. This preserves the existing paired arithmetic and avoids expanding the benchmark into a new, unreviewed eight-arm or multi-factor attribution engine. #13176 owns its existing resource/exposure factorial decomposition; #8578 owns independent-cluster inference.
+
+### LIBERO-Dynamic reproduction caveats
+
+- Use its official 1,800-episode population per configuration and official task/motion/speed assignments.
+- Reproduce calibrated, model-specific inference latency; do not replace it with nominal FLOPs or a guessed average.
+- Preserve action horizon \(K\), startup underflow, steady queue underflow, and actual executed action count.
+- Separate official π0.5, FastWAM-Joint, VLA-JEPA, FastWAM, π0 and OpenVLA-OFT checkpoint rows.
+- Keep the VLASH comparison separately labelled because it is a separately trained delay-aware system, not a pure controller-only comparison.
+- Treat reported best measured \(K\) as descriptive unless the same validation-selection procedure is reproduced. Do not choose \(K\) on confirmatory episodes.
+- Keep physical-robot results separate from simulation results; report the embodiment, task, control horizon and hardware conditions.
+
+### RoboDyna reproduction caveats
+
+- Pin the official repository commit, runtime assets, SAPIEN environment, checkpoints, language instructions, evaluation seeds and task step limits.
+- Reproduce the official \`base\`, \`var1\`, \`var2\` and held-out \`var1+2\` task conditions.
+- Retain paired sync and async outcomes by seed, plus official task success and progress score.
+- Report sync-success→async-failure, sync-failure→async-success and unchanged episode counts separately; mean success differences do not substitute for episode transition counts.
+- Preserve household and human-baseline slices; do not pool unlike slices into one unsupported claim.
+
+### New field-level metrics
+
+Report an **advantage-of-prediction** table by task capability:
+- closed-loop utility gain over the matched direct policy;
+- action regret at actual application time;
+- prediction calibration / error on the same held-out transitions;
+- rate of harmful predictive interventions (prediction changed the action and increased loss);
+- counterfactual evidence-consistency rate under matched interventions;
+- recovery quality after model error or execution deviation;
+- full latency, energy and memory costs of predicting, planning, sensing and verifying.
+
+This ties prediction fidelity to executed utility without assuming the two correlate. It also makes model exploitation visible: test the policy against deliberately perturbed or adversarially selected world-model rollouts, then verify in the authoritative environment rather than allowing the learned model to grade its own policy.
+
+
 The closest public results measure different parts of the problem. They should be treated as distinct baselines, not collapsed into one leaderboard score.
 
 | Prior work / benchmark | What it already establishes | Symthaea comparison that remains open |
