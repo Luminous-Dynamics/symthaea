@@ -437,6 +437,43 @@ Ownership remains separated: #13138/#13169 own echo physics and branch graph; #1
 
 The initial validation ladder is analytic Maxwellian susceptibility, manufactured complex MIMO fixtures, weak Landau response, phase-mixed two-time response and then finite-amplitude mixed-pulse cohorts. A pass on linear susceptibility is not evidence of nonlinear echo preservation.
 
+## Intervention-conditioned kinetic rate–distortion (KIRD)
+
+New companion programme: [#13420 — benchmark intervention-conditioned kinetic rate–distortion](https://github.com/Luminous-Dynamics/symthaea/issues/13420).
+
+This makes the storage axis representation-independent. Hermite order, TT rank, particle count, grid size and latent dimension are not interchangeable resources. Compare the **actual serialized state bytes** required to satisfy the same future-response contract.
+
+For task contract \((\mathcal U,\mathcal Q,T)\), define the empirical curve
+
+\[
+R_{\rm KIRD}(\epsilon;\mathcal U,\mathcal Q,T)
+=
+\inf_{\hat f:\,D_{\mathcal U,\mathcal Q,T}(f,\hat f)\leq\epsilon}
+\mathrm{bits}(\mathrm{serialize}(\hat f)),
+\]
+
+subject to all applicable physical-admissibility gates. The distortion is the task-conditioned future-response discrepancy defined above, not merely present-state reconstruction error.
+
+Prior art is important:
+- Tulpule & Vaidya (2021), [Information-Theoretic Approach for Model Reduction Over Finite Time Horizon](https://arxiv.org/abs/2111.12539), develop finite-step KL-rate / information-transfer ideas for dynamical-system model reduction.
+- Wang et al. (2024), [Goal-Oriented State Information Compression for Linear Dynamical System Control](https://arxiv.org/abs/2407.10224), allocate compression resources to limit control-performance degradation.
+- Predictive rate–distortion / past–future information bottleneck methods quantify how much of the past must be retained to predict future observations.
+- Padovan (2026), [Non-Intrusive Balancing](https://arxiv.org/abs/2610.15219), is a mandatory model-reduction comparator, not a claim of novelty.
+
+Our plasma-specific extension is to condition distortion on the registered kinetic intervention family, complex response phase, QoIs and finite physical horizon, with physical admissibility as a hard constraint.
+
+Count separately:
+1. state-only serialized bytes per checkpoint, including all basis/rank/normalization/ownership metadata needed to decode;
+2. peak working-set memory during evolution and reconstruction;
+3. model / decoder assets, reported both unamortized and amortized over a declared number of rollouts;
+4. encoding, decoding, projection, observation, transition, fallback and energy costs.
+
+Generate separate R(D) curves for microscopic reconstruction, weak observable projections, macroscopic QoIs and future intervention responses. A fluid closure with no distribution reconstruction is UNSUPPORTED on microscopic distortion, but can still be scored on valid macro / response tiers. Compare at equal bytes and separately at equal latency / construction budgets.
+
+Use #13404 to seek adverse response witnesses and #13415 to provide phase-resolved response coefficients. A finite probe library yields empirical coverage and a lower bound on the supremum error; it cannot certify a continuous worst-case R(D) curve without a global covering / regularity argument.
+
+The target is a **task-conditioned storage frontier**: how many bytes must a representation retain to answer a specified family of future physical questions to a declared tolerance?
+
 ## Response-balanced kinetic reduction (RBKR)
 
 New companion programme: [#13414 — build response-balanced kinetic reduction](https://github.com/Luminous-Dynamics/symthaea/issues/13414).
