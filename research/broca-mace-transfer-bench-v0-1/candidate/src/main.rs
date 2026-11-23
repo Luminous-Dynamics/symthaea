@@ -605,7 +605,7 @@ fn run_stream() -> Result<(), String> {
         if line.len() > MAX_REQUEST_BYTES + 1 {
             return Err(format!("request line exceeds {MAX_REQUEST_BYTES} bytes"));
         }
-        while matches!(line.last(), Some(b'\n' | b'\r')) {
+        while line.last().is_some_and(|byte| *byte == b'\n' || *byte == b'\r') {
             line.pop();
         }
         if line.is_empty() {
