@@ -451,13 +451,13 @@ pub fn build_vm_training_snapshot_manifest_v1(
                 label.label_id
             )));
         }
-        if let Some(selection_digest) = packet.selection_receipt_sha256.as_deref() {
-            if !valid_sha256(selection_digest) {
-                return Err(VmSnapshotEvidenceErrorV1(format!(
-                    "label {} has malformed selection receipt digest",
-                    label.label_id
-                )));
-            }
+        if let Some(selection_digest) = packet.selection_receipt_sha256.as_deref()
+            && !valid_sha256(selection_digest)
+        {
+            return Err(VmSnapshotEvidenceErrorV1(format!(
+                "label {} has malformed selection receipt digest",
+                label.label_id
+            )));
         }
 
         let report = assess_label_consumption_eligibility_v1(
