@@ -894,30 +894,44 @@ mod tests {
     }
 
     #[test]
-    fn every_event_delivery_order_converges_and_replay_is_idempotent() {
+    fn every_causally_valid_precondition_delivery_order_converges() {
         let f = fixture();
         let events = f["events"].as_array().unwrap();
+        assert_eq!(events.len(), 7);
+        let cases = f["cases"].as_array().unwrap();
+        let clarification_case = cases.iter()
+            .find(|case| case["case_id"] == "clarification-gates-mutation-until-resolved")
+            .expect("clarification case must exist");
+        let action = clarification_case["steps"].as_array().unwrap().iter()
+            .find(|step| step["op"] == "submit" && step["action"]["action_id"] == "act-clear")
+            .and_then(|step| step.get("action"))
+            .expect("final acknowledged action must exist");
+
         let mut canonical = State::new(&f["initial_state"]).unwrap();
-        for event in events {
+        for event in events.iter().take(6) {
             canonical.deliver(event).unwrap();
         }
+        canonical.submit(action).unwrap();
+        canonical.deliver(&events[6]).unwrap();
         let mut expected = canonical.snapshot();
         expected["duplicate_deliveries"] = json!(events.len());
 
-        let mut indexes: Vec<usize> = (0..events.len()).collect();
+        let mut indexes: Vec<usize> = (0..6).collect();
         let mut permutations = Vec::new();
         append_permutations(&mut indexes, 0, &mut permutations);
-        assert_eq!(permutations.len(), 5_040);
+        assert_eq!(permutations.len(), 720);
 
         for order in &permutations {
             let mut state = State::new(&f["initial_state"]).unwrap();
             for index in order {
                 state.deliver(&events[*index]).unwrap();
             }
-            for index in order.iter().rev() {
-                state.deliver(&events[*index]).unwrap();
+            state.submit(action).unwrap();
+            state.deliver(&events[6]).unwrap();
+            for event in events.iter().rev() {
+                state.deliver(event).unwrap();
             }
-            assert_eq!(state.snapshot(), expected, "delivery order did not converge: {order:?}");
+            assert_eq!(state.snapshot(), expected, "causally valid delivery order did not converge: {order:?}");
         }
     }
 
