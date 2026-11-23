@@ -943,10 +943,18 @@ mod tests {
         tombstone.authority_scopes = vec!["memory-erasure".to_string()];
         let first = EvidenceLedger::new(vec![original, tombstone]).unwrap();
         assert_eq!(
+            first.evaluate("claim-1", &query(0, 30)).reason,
+            Some(IneligibilityReason::Erased)
+        );
+        assert_eq!(
             first.evaluate("claim-1", &query(20, 30)).reason,
             Some(IneligibilityReason::Erased)
         );
         let restored = EvidenceLedger::new(first.events().to_vec()).unwrap();
+        assert_eq!(
+            restored.evaluate("claim-1", &query(0, 30)).reason,
+            Some(IneligibilityReason::Erased)
+        );
         assert_eq!(
             restored.evaluate("claim-1", &query(20, 30)).reason,
             Some(IneligibilityReason::Erased)
