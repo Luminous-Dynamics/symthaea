@@ -4,7 +4,8 @@ use std::process::ExitCode;
 use serde::Serialize;
 use symthaea_experiment_design::{
     ExperimentDesignInput, covariance::{
-        covariance_redundancy_fixture, rank_covariance_aware_experiments,
+        CovarianceAwareDesignInput, covariance_redundancy_fixture,
+        rank_covariance_aware_experiments,
     }, galileo_demo_input, rank_experiments,
 };
 
@@ -37,17 +38,43 @@ fn main() -> ExitCode {
             };
             write_json(&report)
         }
+        Some("--covariance") => {
+            let text = match read_stdin() {
+                Ok(text) => text,
+                Err(error) => {
+                    eprintln!("failed to read covariance design JSON: {error}");
+                    return ExitCode::FAILURE;
+                }
+            };
+            let input = match serde_json::from_str::<CovarianceAwareDesignInput>(&text) {
+                Ok(input) => input,
+                Err(error) => {
+                    eprintln!("invalid covariance design JSON: {error}");
+                    return ExitCode::from(2);
+                }
+            };
+            let report = match rank_covariance_aware_experiments(&input) {
+                Ok(report) => report,
+                Err(error) => {
+                    eprintln!("covariance-aware experiment design rejected: {error}");
+                    return ExitCode::FAILURE;
+                }
+            };
+            write_json(&report)
+        }
         Some(unknown) => {
             eprintln!("unknown argument: {unknown}");
             print_usage();
             ExitCode::from(2)
         }
         None => {
-            let mut text = String::new();
-            if let Err(error) = io::stdin().read_to_string(&mut text) {
-                eprintln!("failed to read input JSON: {error}");
-                return ExitCode::FAILURE;
-            }
+            let text = match read_stdin() {
+                Ok(text) => text,
+                Err(error) => {
+                    eprintln!("failed to read input JSON: {error}");
+                    return ExitCode::FAILURE;
+                }
+            };
             let input = match serde_json::from_str::<ExperimentDesignInput>(&text) {
                 Ok(input) => input,
                 Err(error) => {
@@ -65,6 +92,12 @@ fn main() -> ExitCode {
             write_json(&report)
         }
     }
+}
+
+fn read_stdin() -> io::Result<String> {
+    let mut text = String::new();
+    io::stdin().read_to_string(&mut text)?;
+    Ok(text)
 }
 
 fn write_json<T: Serialize>(value: &T) -> ExitCode {
@@ -85,6 +118,7 @@ fn print_usage() {
     println!("Ranks candidate interventions from explicit rival-model predictions.");
     println!("  --demo              run the bundled synthetic Galileo screening fixture");
     println!("  --covariance-demo   run the synthetic covariance/redundancy known-answer control");
+    println!("  --covariance        read a covariance-design-v0.1 JSON request from stdin");
     println!("  --help              show this help");
     println!("  no args             read a physics-experiment-design-v0.1 JSON request from stdin");
     println!("The covariance score is a prior-free screening statistic, not expected information gain.");
