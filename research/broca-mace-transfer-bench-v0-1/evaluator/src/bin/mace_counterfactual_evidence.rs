@@ -767,9 +767,21 @@ fn run_candidate(
     })
 }
 
-fn candidate_observation_id(candidate: &CandidateObservation) -> String {
-    let identity = format!("{}:{}", candidate.mode.name(), candidate.input_sha256);
-    format!("obs-{}", &hex_digest(Sha256::digest(identity.as_bytes()).as_slice())[..16])
+fn candidate_observation_id(
+    candidate: &CandidateObservation,
+    run_id: &str,
+    pair_block_id: &str,
+    observation_sequence: u64,
+) -> String {
+    // The opaque execution sequence distinguishes repeated candidate runs
+    // that happen to see the same input view under different interventions.
+    // It contains no intervention label or evaluator-only outcome.
+    let identity = format!(
+        "mace-candidate-observation-v1|run={run_id}|pair={pair_block_id}|sequence={observation_sequence}|method={}|input={}",
+        candidate.mode.name(),
+        candidate.input_sha256
+    );
+    format!("obs-{}", hex_digest(Sha256::digest(identity.as_bytes()).as_slice()))
 }
 
 fn truth_utility(truth: mace_generated_stress::Truth, action: Option<Action>) -> f64 {
@@ -857,6 +869,7 @@ fn run() -> Result<(), String> {
     );
     let mut candidate_records = Vec::new();
     let mut evaluator_records = Vec::new();
+    let mut next_candidate_observation_sequence = 0_u64;
 
     for case in &cases {
         let manifest = build_manifest(&case.memory, public_seed, max_root_pairs)
@@ -925,16 +938,26 @@ fn run() -> Result<(), String> {
         }));
 
         for baseline in &baseline_observations {
+            let observation_sequence = next_candidate_observation_sequence;
+            next_candidate_observation_sequence = next_candidate_observation_sequence
+                .checked_add(1)
+                .ok_or_else(|| "candidate observation sequence overflow".to_string())?;
             let support = EvidenceDependencyIndex::build(&case.memory)
                 .map_err(|error| format!("dependency index failed: {error:?}"))?
                 .support_closure_counts(&baseline.decision.evidence_ids);
-            let observation_id = candidate_observation_id(baseline);
+            let observation_id = candidate_observation_id(
+                baseline,
+                &run_id,
+                &pair_block_id,
+                observation_sequence,
+            );
             let candidate_record = json!({
                 "schema_version": SCHEMA_VERSION,
                 "record_type": "candidate_decision",
                 "run_id": run_id,
                 "pair_block_id": pair_block_id,
                 "candidate_observation_id": observation_id,
+                "candidate_observation_sequence": observation_sequence,
                 "method": baseline.mode.name(),
                 "candidate_input_sha256": baseline.input_sha256,
                 "decision_need_sha256": case.decision_need.canonical_digest().to_hex(),
@@ -968,6 +991,7 @@ fn run() -> Result<(), String> {
                 "run_id": run_id,
                 "pair_block_id": pair_block_id,
                 "candidate_observation_id": observation_id,
+                "candidate_observation_sequence": observation_sequence,
                 "candidate_input_sha256": baseline.input_sha256,
                 "method": baseline.mode.name(),
                 "intervention_id": format!("full_evidence_{}", baseline.mode.name()),
@@ -1015,7 +1039,16 @@ fn run() -> Result<(), String> {
                 let support = EvidenceDependencyIndex::build(&retained)
                     .map_err(|error| format!("retained evidence index failed: {error:?}"))?
                     .support_closure_counts(&candidate.decision.evidence_ids);
-                let observation_id = candidate_observation_id(&candidate);
+                let observation_sequence = next_candidate_observation_sequence;
+                next_candidate_observation_sequence = next_candidate_observation_sequence
+                    .checked_add(1)
+                    .ok_or_else(|| "candidate observation sequence overflow".to_string())?;
+                let observation_id = candidate_observation_id(
+                    &candidate,
+                    &run_id,
+                    &pair_block_id,
+                    observation_sequence,
+                );
 
                 let candidate_record = json!({
                     "schema_version": SCHEMA_VERSION,
@@ -1023,6 +1056,7 @@ fn run() -> Result<(), String> {
                     "run_id": run_id,
                     "pair_block_id": pair_block_id,
                     "candidate_observation_id": observation_id,
+                    "candidate_observation_sequence": observation_sequence,
                     "method": candidate.mode.name(),
                     "candidate_input_sha256": candidate.input_sha256,
                     "decision_need_sha256": case.decision_need.canonical_digest().to_hex(),
@@ -1057,6 +1091,7 @@ fn run() -> Result<(), String> {
                     "run_id": run_id,
                     "pair_block_id": pair_block_id,
                     "candidate_observation_id": observation_id,
+                    "candidate_observation_sequence": observation_sequence,
                     "candidate_input_sha256": candidate.input_sha256,
                     "method": candidate.mode.name(),
                     "intervention_id": intervention.intervention_id,
