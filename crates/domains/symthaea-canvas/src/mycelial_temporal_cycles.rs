@@ -1747,6 +1747,7 @@ mod tests {
             minimum_persistence_fraction: 0.5,
             minimum_known_duration_fraction: 0.5,
             tcr_epsilon: 1.0e-12,
+            allow_synthetic_evidence: false,
         }
     }
 
