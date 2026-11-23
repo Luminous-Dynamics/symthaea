@@ -32,7 +32,7 @@ struct FixtureCaseV1 {
     expected: FixtureExpectedV1,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct FixtureExpectedV1 {
     observed_design_rank: usize,
     plan_status: DriftIdentifiabilityPlanStatusV1,
@@ -42,7 +42,7 @@ struct FixtureExpectedV1 {
     target_status: Vec<FixtureTargetStatusV1>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct FixtureTargetStatusV1 {
     target: DriftAttributionTargetV1,
     identifiable_from_observed: bool,
