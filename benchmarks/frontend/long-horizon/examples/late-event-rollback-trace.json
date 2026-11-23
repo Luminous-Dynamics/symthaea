@@ -57,5 +57,6 @@
       "worker.claimed.security"
     ],
     "note": "Deliberately false claims; the verifier must ignore them."
-  }
+  },
+  "fixture_sha256": "f9f642acd996300068f0b0dd9a8a428093bfec6fa1236d27d8ee774370e3669a"
 }
