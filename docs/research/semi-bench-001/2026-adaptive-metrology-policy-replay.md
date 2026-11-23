@@ -108,7 +108,9 @@ The first increment adds a deterministic, synthetic finite-population generator 
 - delayed label maturation retained outside the policy view;
 - synthetic-unit measurements that cannot be mistaken for physical metrology.
 
-The evaluator is intended to accept a completed propensity-bearing audit selection report. It checks that the selection digest matches its payload; row identities, strata and label semantics match; exploit/audit/not-selected methods are coherent; inclusion probabilities equal declared stratum quota divided by residual population; report counts and costs reconcile; and budget limits are respected.
+The evaluator accepts a propensity-bearing audit selection report. It checks that the selection digest matches its payload; row identities, strata and label semantics match; row order is canonical; deterministic exploit ordering replays from recorded priority scores and costs; the exact per-stratum SRSWOR draw replays from the declared seed; inclusion probabilities equal declared stratum quota divided by residual population; report counts and costs reconcile; and budget limits are respected. A negative fixture swaps one selected and unselected audit unit while preserving the quota and digest; the replay verifier must reject it.
+
+The remaining receipt limitation is tracked in [#13336](https://github.com/Luminous-Dynamics/symthaea/issues/13336): the v1 selection report does not persist all upstream risk/uncertainty/EVSI components and scoring weights, so its verifier cannot yet independently reconstruct every priority score from the original candidate packet and frozen policy config. The unsigned report hash is not an authenticated producer signature.
 
 For stratified simple random sampling without replacement, the evaluator also computes finite-population design variance for prevalence and Brier loss. A variance estimate is marked unqualified when a residual stratum has fewer than two sampled units and is not a census. It does not silently manufacture a confidence interval where the design cannot support one.
 
