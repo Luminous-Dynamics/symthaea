@@ -624,7 +624,10 @@ mod tests {
     #[test]
     fn synthetic_receipt_is_structurally_valid() {
         let pair = fixture();
-        assert_eq!(pair.candidate.pair_id, "PAIR-SYNTHETIC-IMPLICATION-CONVERSE-001");
+        assert_eq!(
+            pair.candidate.pair_id,
+            "PAIR-SYNTHETIC-IMPLICATION-CONVERSE-001"
+        );
         assert!(pair.scope_matches());
         assert_eq!(pair.candidate.local_stage.verdict, LocalVerdict::Reject);
         assert_eq!(
