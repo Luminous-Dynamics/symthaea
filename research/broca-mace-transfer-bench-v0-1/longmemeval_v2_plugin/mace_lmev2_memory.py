@@ -1181,8 +1181,14 @@ class MaceLongMemEvalV2Memory(Memory):
                 "candidate_id": candidate_id,
             }
         )
-        self._persist_candidate_envelope(candidate_id, query, response)
-        self._persist_retrieval_trace(candidate_id, query, response)
+        try:
+            self._persist_candidate_envelope(candidate_id, query, response)
+            self._persist_retrieval_trace(candidate_id, query, response)
+        except Exception:
+            # The sidecar may already have durably recorded the trace. Do not
+            # continue serving queries on a partially reconciled invocation.
+            self._poison_sidecar()
+            raise
         items = response.get("items")
         if not isinstance(items, list):
             self._poison_sidecar()
