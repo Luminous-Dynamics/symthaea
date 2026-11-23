@@ -326,8 +326,10 @@ fn build_synthetic_candidates(
                 (Some(left), Some(right)) => (left - right).abs(),
                 _ => 0.0,
             };
-            let missing_count = (if sensor_a.is_none() { 1_usize } else { 0 })
-                + if sensor_b_normalized.is_none() { 1_usize } else { 0 };
+            let missing_count = [sensor_a.is_none(), sensor_b_normalized.is_none()]
+                .into_iter()
+                .filter(|missing| *missing)
+                .count();
             let uncertainty = match readings.len() {
                 0 => 1.0,
                 1 => 0.65,
