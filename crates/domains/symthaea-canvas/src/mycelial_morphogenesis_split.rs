@@ -246,6 +246,11 @@ pub fn mycelial_morphogenesis_evidence_chain_inventory_digest(
     }
     let mut by_id = BTreeMap::new();
     for observation in observations {
+        observation
+            .validate()
+            .map_err(|_| MycelialMorphogenesisSplitError::ObservationValidationFailed(
+                observation.observation_id.clone(),
+            ))?;
         if by_id
             .insert(observation.observation_id.as_str(), observation)
             .is_some()
