@@ -32,6 +32,7 @@ _ALLOWED_PARAMS = {
     "workspace_dir",
     "domain",
     "run_id",
+    "environment_revision_sha256",
     "top_k",
     "slice_radius",
     "neighbor_radius",
@@ -59,6 +60,7 @@ class MaceLongMemEvalV2Memory(Memory):
         workspace_value = memory_params.get("workspace_dir")
         domain = memory_params.get("domain", "web")
         run_id = memory_params.get("run_id")
+        environment_revision_sha256 = memory_params.get("environment_revision_sha256")
         require(isinstance(sidecar_value, str) and sidecar_value, "sidecar_binary is required")
         require(isinstance(source_root_value, str) and source_root_value, "source_screenshot_root is required")
         require(isinstance(workspace_value, str) and workspace_value, "workspace_dir is required")
@@ -67,6 +69,12 @@ class MaceLongMemEvalV2Memory(Memory):
             isinstance(run_id, str) and run_id.strip()
             and not any(ord(character) < 32 or ord(character) == 127 for character in run_id),
             "run_id must be a non-empty printable identifier",
+        )
+        require(
+            isinstance(environment_revision_sha256, str)
+            and len(environment_revision_sha256) == 64
+            and all(character in "0123456789abcdef" for character in environment_revision_sha256),
+            "environment_revision_sha256 must be lowercase SHA-256",
         )
 
         self.sidecar_binary = Path(sidecar_value).expanduser().resolve(strict=True)
@@ -97,9 +105,13 @@ class MaceLongMemEvalV2Memory(Memory):
         self.candidate_evidence_dir = self.workspace_dir / "candidate_evidence"
         self.candidate_evidence_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
         os.chmod(self.candidate_evidence_dir, 0o700)
+        self.retrieval_trace_dir = self.workspace_dir / "retrieval_traces"
+        self.retrieval_trace_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+        os.chmod(self.retrieval_trace_dir, 0o700)
 
         self.domain = str(domain)
         self.run_id = run_id
+        self.environment_revision_sha256 = environment_revision_sha256
         self.top_k = self._bounded_int(memory_params.get("top_k", 8), "top_k", 1, 100)
         self.slice_radius = self._bounded_int(memory_params.get("slice_radius", 1), "slice_radius", 0, 32)
         self.neighbor_radius = self._bounded_int(
@@ -339,6 +351,246 @@ class MaceLongMemEvalV2Memory(Memory):
         for record in records:
             for parent in record["parent_evidence_ids"]:
                 require(parent in ids, "candidate evidence graph has an unresolved parent")
+
+    @staticmethod
+    def _retrieval_trace_digest_from_json(trace: dict[str, Any]) -> str:
+        digest = hashlib.sha256()
+        digest.update(b"luminous:mace:retrieval-trace:v1\0")
+
+        def hash_field(value: str) -> None:
+            encoded = value.encode("utf-8")
+            digest.update(struct.pack(">Q", len(encoded)))
+            digest.update(encoded)
+
+        for field in (
+            "run_id",
+            "query_invocation_id",
+            "domain_id",
+            "environment_revision_sha256",
+            "tool_profile_sha256",
+            "query_sha256",
+        ):
+            value = trace.get(field)
+            require(isinstance(value, str), f"retrieval trace {field} must be a string")
+            hash_field(value)
+
+        candidate_set = trace.get("candidate_set_sha256")
+        if candidate_set is None:
+            digest.update(b"\x00")
+        else:
+            require(
+                isinstance(candidate_set, str)
+                and len(candidate_set) == 64
+                and all(character in "0123456789abcdef" for character in candidate_set),
+                "retrieval trace candidate digest must be lowercase SHA-256",
+            )
+            digest.update(b"\x01")
+            hash_field(candidate_set)
+
+        stop_tags = {
+            "evidence_sufficient": 1,
+            "budget_exhausted": 2,
+            "no_candidate_evidence": 3,
+            "tool_error": 4,
+            "abstained": 5,
+        }
+        stop_reason = trace.get("stop_reason")
+        require(stop_reason in stop_tags, "retrieval trace stop reason is invalid")
+        digest.update(struct.pack(">B", stop_tags[stop_reason]))
+
+        def integer_field(field: str, width: str = ">Q") -> int:
+            value = trace.get(field)
+            require(
+                isinstance(value, int) and not isinstance(value, bool)
+                and 0 <= value <= (0xFFFFFFFF if width == ">I" else 0xFFFFFFFFFFFFFFFF),
+                f"retrieval trace {field} is invalid",
+            )
+            digest.update(struct.pack(width, value))
+            return value
+
+        budget = integer_field("tool_call_budget", ">I")
+        used = integer_field("tool_calls_used", ">I")
+        require(budget > 0 and used <= budget, "retrieval trace tool budget is invalid")
+        integer_field("elapsed_ns")
+        integer_field("inspected_bytes")
+        complete = trace.get("inspected_bytes_complete")
+        require(isinstance(complete, bool), "retrieval trace byte-accounting flag must be boolean")
+        digest.update(b"\x01" if complete else b"\x00")
+        integer_field("created_at_unix")
+
+        operations = trace.get("operations")
+        require(isinstance(operations, list) and len(operations) == used,
+                "retrieval trace operation count mismatch")
+        digest.update(struct.pack(">Q", len(operations)))
+        outcome_tags = {"evidence_observed": 1, "no_evidence": 2, "tool_error": 3}
+        all_bytes_measured = True
+        elapsed_sum = 0
+        bytes_sum = 0
+        observed_any = False
+        last_outcome: str | None = None
+        for operation in operations:
+            require(isinstance(operation, dict), "retrieval trace operation must be an object")
+            for field in ("tool_id", "tool_revision_sha256", "action_template_sha256"):
+                value = operation.get(field)
+                require(isinstance(value, str), f"retrieval operation {field} must be a string")
+                hash_field(value)
+            outcome = operation.get("outcome")
+            require(outcome in outcome_tags, "retrieval operation outcome is invalid")
+            digest.update(struct.pack(">B", outcome_tags[outcome]))
+            elapsed = operation.get("elapsed_ns")
+            inspected = operation.get("inspected_bytes")
+            require(isinstance(elapsed, int) and not isinstance(elapsed, bool) and elapsed >= 0,
+                    "retrieval operation elapsed_ns is invalid")
+            require(isinstance(inspected, int) and not isinstance(inspected, bool) and inspected >= 0,
+                    "retrieval operation inspected_bytes is invalid")
+            digest.update(struct.pack(">Q", elapsed))
+            digest.update(struct.pack(">Q", inspected))
+            elapsed_sum += elapsed
+            bytes_sum += inspected
+            measured = operation.get("inspected_bytes_measured")
+            require(isinstance(measured, bool), "retrieval operation byte-accounting flag is invalid")
+            all_bytes_measured = all_bytes_measured and measured
+            digest.update(b"\x01" if measured else b"\x00")
+            evidence_ids = operation.get("observed_evidence_ids")
+            require(isinstance(evidence_ids, list), "retrieval operation evidence IDs must be a list")
+            require(all(isinstance(item, str) for item in evidence_ids),
+                    "retrieval operation evidence ID must be a string")
+            if outcome == "evidence_observed":
+                require(bool(evidence_ids), "evidence_observed operation must name evidence IDs")
+                observed_any = True
+            else:
+                require(not evidence_ids, "non-evidence operation cannot name observed evidence IDs")
+            last_outcome = outcome
+            ordered_ids = sorted(evidence_ids)
+            digest.update(struct.pack(">Q", len(ordered_ids)))
+            for evidence_id in ordered_ids:
+                hash_field(evidence_id)
+
+        require(elapsed_sum == trace["elapsed_ns"], "retrieval trace elapsed accounting mismatch")
+        require(bytes_sum == trace["inspected_bytes"], "retrieval trace byte accounting mismatch")
+        require(all_bytes_measured == complete, "retrieval trace byte completeness mismatch")
+        if stop_reason == "evidence_sufficient":
+            require(candidate_set is not None and observed_any,
+                    "evidence_sufficient trace must bind a non-empty candidate set")
+        elif stop_reason == "no_candidate_evidence":
+            require(candidate_set is None and not observed_any,
+                    "no_candidate_evidence trace cannot contain candidates")
+        elif stop_reason == "budget_exhausted":
+            require(used == budget, "budget_exhausted trace did not use its full budget")
+        elif stop_reason == "tool_error":
+            require(last_outcome == "tool_error", "tool_error trace must end in a tool error")
+        return digest.hexdigest()
+
+    def _persist_retrieval_trace(
+        self,
+        candidate_id: str,
+        query: str,
+        response: dict[str, Any],
+    ) -> None:
+        trace = response.get("retrieval_trace")
+        trace_digest = response.get("retrieval_trace_sha256")
+        require(isinstance(trace, dict), "sidecar retrieval_trace must be an object")
+        require(trace.get("schema_version") == "mace_retrieval_trace_receipt_v1",
+                "retrieval trace schema mismatch")
+        query_sha256 = hashlib.sha256(query.encode("utf-8")).hexdigest()
+        require(trace.get("run_id") == self.run_id, "retrieval trace run mismatch")
+        require(trace.get("query_invocation_id") == candidate_id,
+                "retrieval trace invocation ID mismatch")
+        require(trace.get("domain_id") == self.domain, "retrieval trace domain mismatch")
+        require(
+            trace.get("environment_revision_sha256") == self.environment_revision_sha256,
+            "retrieval trace environment revision mismatch",
+        )
+        require(trace.get("tool_profile_sha256") == self.backend_revision_sha256,
+                "retrieval trace tool-profile mismatch")
+        require(trace.get("query_sha256") == query_sha256, "retrieval trace query digest mismatch")
+        require(
+            trace.get("candidate_set_sha256") == response.get("candidate_set_sha256"),
+            "retrieval trace candidate-set digest mismatch",
+        )
+        require(
+            isinstance(trace_digest, str)
+            and len(trace_digest) == 64
+            and all(character in "0123456789abcdef" for character in trace_digest),
+            "retrieval trace digest must be lowercase SHA-256",
+        )
+        recomputed = self._retrieval_trace_digest_from_json(trace)
+        require(recomputed == trace_digest == trace.get("receipt_sha256"),
+                "retrieval trace receipt digest mismatch")
+
+        invocation_digest = hashlib.sha256(candidate_id.encode("utf-8")).hexdigest()
+        trace_bytes = json.dumps(
+            trace, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        ).encode("utf-8")
+        self._write_once(
+            self.retrieval_trace_dir,
+            f"{invocation_digest}.trace.json",
+            trace_bytes,
+        )
+
+    def _verify_persisted_retrieval_traces(self) -> None:
+        directory = self.retrieval_trace_dir
+        metadata = directory.lstat()
+        require(stat.S_ISDIR(metadata.st_mode), "retrieval trace root must be a real directory")
+        os.chmod(directory, 0o700)
+        trace_files: set[str] = set()
+        for path in directory.iterdir():
+            entry = path.lstat()
+            require(not stat.S_ISLNK(entry.st_mode), "retrieval trace directory contains a symlink")
+            require(stat.S_ISREG(entry.st_mode), "retrieval trace directory contains a non-file entry")
+            require(path.name.endswith(".trace.json"), "retrieval trace directory contains an unknown file")
+            try:
+                trace = json.loads(path.read_bytes())
+            except (json.JSONDecodeError, UnicodeDecodeError) as error:
+                raise RuntimeError(f"saved retrieval trace is invalid JSON: {path.name}") from error
+            require(isinstance(trace, dict), "saved retrieval trace must be an object")
+            require(trace.get("schema_version") == "mace_retrieval_trace_receipt_v1",
+                    "saved retrieval trace schema mismatch")
+            candidate_id = trace.get("query_invocation_id")
+            require(isinstance(candidate_id, str) and candidate_id.strip(),
+                    "saved retrieval trace has no invocation ID")
+            invocation_digest = hashlib.sha256(candidate_id.encode("utf-8")).hexdigest()
+            require(path.name == f"{invocation_digest}.trace.json",
+                    "saved retrieval trace filename does not match invocation ID")
+            require(trace.get("run_id") == self.run_id, "saved retrieval trace run mismatch")
+            require(trace.get("domain_id") == self.domain, "saved retrieval trace domain mismatch")
+            require(trace.get("environment_revision_sha256") == self.environment_revision_sha256,
+                    "saved retrieval trace environment mismatch")
+            require(trace.get("tool_profile_sha256") == self.backend_revision_sha256,
+                    "saved retrieval trace tool-profile mismatch")
+            require(
+                isinstance(trace.get("query_sha256"), str)
+                and len(trace["query_sha256"]) == 64
+                and all(character in "0123456789abcdef" for character in trace["query_sha256"]),
+                "saved retrieval trace query digest is invalid",
+            )
+            require(
+                self._retrieval_trace_digest_from_json(trace) == trace.get("receipt_sha256"),
+                "saved retrieval trace receipt digest mismatch",
+            )
+            candidate_receipt_path = (
+                self.candidate_evidence_dir / f"{invocation_digest}.receipt.json"
+            )
+            require(candidate_receipt_path.is_file(),
+                    "saved retrieval trace has no paired candidate receipt")
+            candidate_receipt = json.loads(candidate_receipt_path.read_text(encoding="utf-8"))
+            require(candidate_receipt.get("candidate_id") == candidate_id,
+                    "saved retrieval trace candidate receipt ID mismatch")
+            require(candidate_receipt.get("query_sha256") == trace.get("query_sha256"),
+                    "saved retrieval trace query digest mismatch")
+            require(candidate_receipt.get("backend_revision_sha256") == trace.get("tool_profile_sha256"),
+                    "saved retrieval trace execution-profile mismatch")
+            require(candidate_receipt.get("candidate_set_sha256") == trace.get("candidate_set_sha256"),
+                    "saved retrieval trace candidate-set mismatch")
+            trace_files.add(path.name)
+
+        candidate_receipts = {
+            path.name.replace(".receipt.json", ".trace.json")
+            for path in self.candidate_evidence_dir.iterdir()
+            if path.name.endswith(".receipt.json")
+        }
+        require(trace_files == candidate_receipts,
+                "retrieval trace receipts and candidate receipts are not one-to-one")
 
     def _persist_candidate_envelope(
         self,
@@ -629,6 +881,7 @@ class MaceLongMemEvalV2Memory(Memory):
             {
                 "MACE_LMEV2_DOMAIN": self.domain,
                 "MACE_LMEV2_RUN_ID": self.run_id,
+                "MACE_LMEV2_ENVIRONMENT_REVISION_SHA256": self.environment_revision_sha256,
                 "MACE_LMEV2_BACKEND_REVISION_SHA256": self.backend_revision_sha256,
                 "MACE_LMEV2_DATASET_ROOT": str(self.asset_root.resolve()),
                 "MACE_LMEV2_TOP_K": str(self.top_k),
@@ -923,6 +1176,7 @@ class MaceLongMemEvalV2Memory(Memory):
             }
         )
         self._persist_candidate_envelope(candidate_id, query, response)
+        self._persist_retrieval_trace(candidate_id, query, response)
         items = response.get("items")
         if not isinstance(items, list):
             self._poison_sidecar()
@@ -954,6 +1208,10 @@ class MaceLongMemEvalV2Memory(Memory):
         if saved_evidence.exists():
             shutil.rmtree(saved_evidence)
         shutil.copytree(self.candidate_evidence_dir, saved_evidence)
+        saved_traces = state_dir / "retrieval_traces"
+        if saved_traces.exists():
+            shutil.rmtree(saved_traces)
+        shutil.copytree(self.retrieval_trace_dir, saved_traces)
 
     def _load_backend(self, input_dir: Path) -> None:
         state_dir = input_dir / "mace_lmev2"
@@ -966,14 +1224,24 @@ class MaceLongMemEvalV2Memory(Memory):
             shutil.rmtree(self.asset_root)
         shutil.copytree(saved_assets, self.asset_root)
         saved_evidence = state_dir / "candidate_evidence"
-        if saved_evidence.is_dir():
-            saved_evidence_stat = saved_evidence.lstat()
-            require(stat.S_ISDIR(saved_evidence_stat.st_mode),
-                    "saved candidate evidence root must be a real directory")
-            if self.candidate_evidence_dir.exists():
-                shutil.rmtree(self.candidate_evidence_dir)
-            shutil.copytree(saved_evidence, self.candidate_evidence_dir)
-            self._verify_persisted_candidate_evidence()
+        require(saved_evidence.is_dir(), "saved candidate evidence root is missing")
+        saved_evidence_stat = saved_evidence.lstat()
+        require(stat.S_ISDIR(saved_evidence_stat.st_mode),
+                "saved candidate evidence root must be a real directory")
+        if self.candidate_evidence_dir.exists():
+            shutil.rmtree(self.candidate_evidence_dir)
+        shutil.copytree(saved_evidence, self.candidate_evidence_dir)
+        self._verify_persisted_candidate_evidence()
+
+        saved_traces = state_dir / "retrieval_traces"
+        require(saved_traces.is_dir(), "saved retrieval trace root is missing")
+        saved_traces_stat = saved_traces.lstat()
+        require(stat.S_ISDIR(saved_traces_stat.st_mode),
+                "saved retrieval trace root must be a real directory")
+        if self.retrieval_trace_dir.exists():
+            shutil.rmtree(self.retrieval_trace_dir)
+        shutil.copytree(saved_traces, self.retrieval_trace_dir)
+        self._verify_persisted_retrieval_traces()
         self._trajectory_lines = []
         self._inserted_ids = set()
         for line in trajectories_path.read_text(encoding="utf-8").splitlines():

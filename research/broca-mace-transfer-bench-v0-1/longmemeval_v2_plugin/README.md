@@ -60,6 +60,7 @@ The official harness then discovers `mace_lmev2_bm25_text` through its normal me
     "workspace_dir": "/absolute/path/to/mace_lmev2_workspace",
     "domain": "web",
     "run_id": "longmemeval-v2-web-small-run-001",
+    "environment_revision_sha256": "<sha256-of-pinned-site-browser-and-permission-manifest>",
     "top_k": 8,
     "slice_radius": 1,
     "neighbor_radius": 1,
@@ -69,7 +70,7 @@ The official harness then discovers `mace_lmev2_bm25_text` through its normal me
 }
 ```
 
-Use a separate clean workspace and unique `run_id` for each benchmark execution. The configured screenshot root must contain all source screenshot files. The bridge computes `sidecar_binary_sha256` from the exact executable bytes, then computes `backend_revision_sha256` over the binary digest plus domain, BM25 parameters, tokenizer version, top-k, slice/neighbor radii and retrieval mode. Both are passed into the Rust sidecar; the retrieval backend does not self-supply either digest. The shim rejects absolute or relative screenshot references that resolve outside that root, copies selected source bytes into a private workspace, and records both the canonical source-trajectory digest and each copied screenshot's SHA-256.
+Use a separate clean workspace and unique `run_id` for each benchmark execution. Supply `environment_revision_sha256` as the digest of the pinned environment manifest (site/application snapshot, browser/runtime image, permissions and relevant API/schema revisions); do not use a guessed or mutable label. The configured screenshot root must contain all source screenshot files. The bridge computes `sidecar_binary_sha256` from the exact executable bytes, then computes `backend_revision_sha256` over the binary digest plus domain, BM25 parameters, tokenizer version, top-k, slice/neighbor radii and retrieval mode. Both are passed into the Rust sidecar; the retrieval backend does not self-supply either digest. The shim rejects absolute or relative screenshot references that resolve outside that root, copies selected source bytes into a private workspace, and records both the canonical source-trajectory digest and each copied screenshot's SHA-256.
 
 For ingress, the plugin pins the configured screenshot root with a directory descriptor. It opens each intermediate directory and the final file relative to that descriptor using no-follow semantics; it rejects symlink replacement at both file and directory components. It reads through the opened file descriptor, requires a regular file, applies the byte cap while reading, and compares file identity, size, modification time and change time before/after the read. This closes the ordinary path-check/read symlink-swap window. The configured root itself must still be trusted, and the official reader's later open remains a separate boundary protected by the private evaluation workspace and sidecar pixel-digest verification.
 
@@ -101,6 +102,30 @@ The envelope binds `run_id`, the opaque query invocation ID, exact query SHA-256
 
 This is structural provenance and reproducibility evidence, **not** issuer authentication, semantic truth, rights authorization or lifecycle qualification. The payload references are logical `lmev2://` resolver keys, not direct file paths; the original reader context continues to use the controlled local screenshot paths.
 
+## Label-blind retrieval trace receipts
+
+Each query now emits a typed retrieval trace receipt alongside its candidate-evidence envelope. The Rust sidecar records the official opaque query invocation ID, run, domain, environment revision, execution-profile digest, exact query digest, candidate-set digest, operation/tool/action-template identities, observed evidence IDs, stop reason and query wall time.
+
+The sidecar's current V2 arm executes **one operation**: `trajectory.bm25.search`. It records this real single-step trace and retains it in the process-local RetrievalPolicyMemoryV1 reference store. It does not automatically promote a strategy note or select alternative search tools; therefore this is trace capture, not an online multi-step policy learner and not an AgentRunbook-C V2 replication.
+
+The BM25 adapter does not expose posting/index bytes read. The trace explicitly records `inspected_bytes_measured=false` and `inspected_bytes_complete=false`; the corresponding zero is an unmeasured placeholder, not zero cost. Query latency is measured. Full index I/O/RSS and total infrastructure cost remain pending instrumentation.
+
+The Python bridge independently recomputes the Rust trace-receipt SHA-256 using the versioned binary encoding and checks a fixed cross-language reference vector. It persists one create-once trace JSON per invocation under `workspace_dir/retrieval_traces/`, pairs it with the candidate receipt, and verifies the pair and digest again during save/load. Query text is not included; only its SHA-256 is retained. The environment revision is a required run input and must be identical when replaying the trace.
+
+The trace store inside the Rust sidecar is process-local and is not restored as live promotion state from Python receipts. The receipts survive in the saved benchmark state for audit/replay, but multi-query policy consolidation across restarts remains future work. An external durable, access-controlled policy service is still needed for cross-run promotion.
+
+## Label-blind retrieval trace receipts
+
+Each query now emits a typed retrieval trace receipt alongside its candidate-evidence envelope. The Rust sidecar records the official opaque query invocation ID, run, domain, environment revision, execution-profile digest, exact query digest, candidate-set digest, operation/tool/action-template identities, observed evidence IDs, stop reason and query wall time.
+
+The sidecar's current V2 arm executes **one operation**: `trajectory.bm25.search`. It records this real single-step trace in the process-local RetrievalPolicyMemoryV1 reference store. It does not automatically promote a strategy note or select alternative search tools; this is trace capture, not an online multi-step policy learner and not an AgentRunbook-C V2 replication.
+
+The BM25 adapter does not expose posting/index bytes read. The trace explicitly records `inspected_bytes_measured=false` and `inspected_bytes_complete=false`; the corresponding zero is an unmeasured placeholder, not zero cost. Query latency is measured. Full index I/O/RSS and total infrastructure cost remain pending instrumentation.
+
+The Python bridge independently recomputes the Rust trace-receipt SHA-256 using the versioned binary encoding and checks a fixed cross-language reference vector. It persists one create-once trace JSON per invocation under `workspace_dir/retrieval_traces/`, pairs it with the candidate receipt, and verifies the pair and digest again during save/load. Query text is not included; only its SHA-256 is retained. The environment revision is a required run input and must be identical when replaying the trace.
+
+The trace store inside the Rust sidecar is process-local and is not restored as live promotion state from Python receipts. The receipts survive in the saved benchmark state for audit/replay, but multi-query policy consolidation across restarts remains future work. An external durable, access-controlled policy service is still needed for cross-run promotion.
+
 ## Retrieval and accounting
 
 The sidecar exposes build and search timings, hit counts and neighbor counts in its internal response. The official harness's measured `Memory.query` wall-clock includes RPC overhead, lazy index construction on the first query, screenshot digest verification and context assembly.
@@ -115,13 +140,13 @@ The complete Rust adapter test command is:
 cargo test --manifest-path research/broca-mace-transfer-bench-v0-1/aml-adapter/Cargo.toml
 ```
 
-Twelve Python ingress/protocol tests are provided in `tests/test_mace_lmev2_memory.py` for byte-preserving image copy/digest binding, canonical original-trajectory preservation, absolute/traversal/symlink escape rejection, file and intermediate-directory symlink swaps after path validation, screenshot size limits, domain isolation, fail-closed behavior after a sidecar response is lost, run/query/execution-profile-bound candidate evidence persistence, Rust/Python candidate-set digest agreement, evidence-DAG parent closure, immutable invocation-ID conflict detection, zero-result query receipts, saved candidate JSONL tampering, incorrect commitment and orphan-payload rejection during restore. An ambiguous RPC outcome poisons the sidecar process; the plugin refuses further operations until the memory is reloaded/reconciled instead of silently restarting an empty sidecar. The Rust sidecar has three binary tests for official context-item output, duplicate inserts and screenshot-byte substitution. The candidate-evidence module has thirteen protocol tests, and the V2 candidate adapter has five tests for text/image lineage, overlapping-image deduplication, missing digests, invalid score and wrong-domain rejection, plus neighbor expansion without BM25 score inheritance and explicit source-state parent nodes. Copy this test file into the official repository's `tests/` directory after installing the plugin. The prescribed command is:
+Sixteen Python ingress/protocol tests are provided in `tests/test_mace_lmev2_memory.py` for byte-preserving image copy/digest binding, canonical original-trajectory preservation, absolute/traversal/symlink escape rejection, file and intermediate-directory symlink swaps after path validation, screenshot size limits, domain isolation, fail-closed behavior after a sidecar response is lost, run/query/execution-profile-bound candidate evidence persistence, Rust/Python candidate-set digest agreement, evidence-DAG parent closure, immutable invocation-ID conflict detection, zero-result query receipts, saved candidate JSONL tampering, incorrect commitment, orphan-payload rejection, missing candidate-state directory and missing retrieval-trace directory during restore. An ambiguous RPC outcome poisons the sidecar process; the plugin refuses further operations until the memory is reloaded/reconciled instead of silently restarting an empty sidecar. The Rust sidecar has three binary tests for official context-item output, duplicate inserts and screenshot-byte substitution. The candidate-evidence module has thirteen protocol tests, the retrieval-policy trace module has eleven Rust tests (including a cross-language receipt hash vector), and the V2 candidate adapter has five tests for text/image lineage, overlapping-image deduplication, missing digests, invalid score and wrong-domain rejection, plus neighbor expansion without BM25 score inheritance and explicit source-state parent nodes. Copy this test file into the official repository's `tests/` directory after installing the plugin. The prescribed command is:
 
 ```sh
 python -m unittest tests.test_mace_lmev2_memory
 ```
 
-The Python recomputation is an independent implementation of the candidate-set hashing algorithm, not an independent trust root. The receipt/JSONL pair remains a local consistency commitment, not a signature: an attacker able to rewrite both can rewrite both consistently. A separately administered signing/witness service is still required for adversarial provenance and rollback resistance. The tests are authored but have not been executed here. Rust sidecar and the modified trajectory parser have authored source but no Rust compile/test/Clippy pass is claimed here.
+The Python recomputation is an independent implementation of the candidate-set and retrieval-trace hashing algorithms, not an independent trust root. Restore now fails closed when either the candidate-evidence store or retrieval-trace store is absent from an otherwise present saved benchmark state. The receipt/JSONL pair remains a local consistency commitment, not a signature: an attacker able to rewrite both can rewrite both consistently. A separately administered signing/witness service is still required for adversarial provenance and rollback resistance. The tests are authored but have not been executed here. Rust sidecar and the modified trajectory parser have authored source but no Rust compile/test/Clippy pass is claimed here.
 - The Python shim has not been exercised against the official harness in this environment.
 - The official V2 repository specifies Python 3.11, Qwen3.5-9B as the paper reader, Qwen3-Embedding-8B for embedding baselines, and gpt-5.2/medium as the default judge; these pins must be held constant for matched comparisons.
 - No dataset download, official run, answer-accuracy result, LAFS value or SOTA comparison is claimed.

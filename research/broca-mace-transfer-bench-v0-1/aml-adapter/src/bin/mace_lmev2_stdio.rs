@@ -12,7 +12,7 @@ use std::env;
 use std::fs;
 use std::io::{self, BufRead, BufWriter, Write};
 use std::path::{Path, PathBuf};
-use std::time::Instant;
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use broca_aml_adapter::longmemeval_v2::{
     LongMemEvalV2Bm25IndexV1, LongMemEvalV2ContextKind,
@@ -24,12 +24,17 @@ use broca_aml_adapter::longmemeval_v2_candidate_adapter::{
     LongMemEvalV2CandidateIdentityV1,
     encode_longmemeval_v2_search_candidate_evidence_v1,
 };
+use broca_aml_adapter::retrieval_policy_memory::{
+    RetrievalOperationOutcomeV1, RetrievalOperationV1, RetrievalPolicyMemoryV1,
+    RetrievalStopReasonV1, RetrievalTraceReceiptV1,
+};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
 struct Config {
     domain: String,
     run_id: String,
+    environment_revision_sha256: String,
     backend_revision_sha256: String,
     dataset_root: PathBuf,
     top_k: usize,
@@ -49,6 +54,11 @@ impl Config {
             .map_err(|_| "MACE_LMEV2_RUN_ID is required".to_string())?;
         if run_id.trim().is_empty() || run_id.chars().any(char::is_control) {
             return Err("MACE_LMEV2_RUN_ID must be a non-empty printable identifier".into());
+        }
+        let environment_revision_sha256 = env::var("MACE_LMEV2_ENVIRONMENT_REVISION_SHA256")
+            .map_err(|_| "MACE_LMEV2_ENVIRONMENT_REVISION_SHA256 is required".to_string())?;
+        if !valid_sha256(&environment_revision_sha256) {
+            return Err("MACE_LMEV2_ENVIRONMENT_REVISION_SHA256 must be lowercase SHA-256".into());
         }
         let backend_revision_sha256 = env::var("MACE_LMEV2_BACKEND_REVISION_SHA256")
             .map_err(|_| "MACE_LMEV2_BACKEND_REVISION_SHA256 is required".to_string())?;
@@ -98,6 +108,7 @@ impl Config {
         Ok(Self {
             domain,
             run_id,
+            environment_revision_sha256,
             backend_revision_sha256,
             dataset_root,
             top_k,
@@ -114,6 +125,27 @@ fn valid_sha256(value: &str) -> bool {
         && value
             .bytes()
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn bm25_action_template_sha256(config: &Config) -> String {
+    let template = format!(
+        "mace-lmev2-bm25-search:v1|domain={}|top_k={}|slice_radius={}|neighbor_radius={}|k1={:.17}|b={:.17}|tokenizer={}",
+        config.domain,
+        config.top_k,
+        config.slice_radius,
+        config.neighbor_radius,
+        config.profile.k1,
+        config.profile.b,
+        config.profile.tokenizer_version
+    );
+    sha256_hex(template.as_bytes())
+}
+
+fn unix_now_seconds() -> Result<u64, String> {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_secs())
+        .map_err(|error| format!("system clock precedes Unix epoch: {error}"))
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {
@@ -160,6 +192,7 @@ fn handle_request(
     config: &Config,
     trajectories: &mut Vec<LongMemEvalV2TrajectoryV1>,
     index: &mut Option<LongMemEvalV2Bm25IndexV1>,
+    policy_memory: &mut RetrievalPolicyMemoryV1,
 ) -> Result<Value, String> {
     let operation = request
         .get("op")
@@ -202,6 +235,7 @@ fn handle_request(
             // Accepted for API compatibility. The lexical baseline does not
             // inspect or rank the question image; this is not multimodal search.
             let _query_image = request.get("query_image").and_then(Value::as_str);
+            let query_started = Instant::now();
 
             let build_started = Instant::now();
             let needs_build = index.is_none();
@@ -287,12 +321,67 @@ fn handle_request(
                 .as_ref()
                 .map_or(0, |batch| batch.evidence.len());
 
+            let observed_evidence_ids = candidate_evidence
+                .as_ref()
+                .map(|batch| batch.evidence.iter()
+                    .map(|item| item.evidence_id.clone())
+                    .collect::<Vec<_>>())
+                .unwrap_or_default();
+            let outcome = if observed_evidence_ids.is_empty() {
+                RetrievalOperationOutcomeV1::NoEvidence
+            } else {
+                RetrievalOperationOutcomeV1::EvidenceObserved
+            };
+            let stop_reason = if observed_evidence_ids.is_empty() {
+                RetrievalStopReasonV1::NoCandidateEvidence
+            } else {
+                RetrievalStopReasonV1::EvidenceSufficient
+            };
+            let query_elapsed_ns = u64::try_from(query_started.elapsed().as_nanos())
+                .unwrap_or(u64::MAX);
+            let created_at_unix = unix_now_seconds()?;
+            let trace = RetrievalTraceReceiptV1 {
+                run_id: config.run_id.clone(),
+                query_invocation_id: candidate_id.to_owned(),
+                domain_id: config.domain.clone(),
+                environment_revision_sha256: config.environment_revision_sha256.clone(),
+                tool_profile_sha256: config.backend_revision_sha256.clone(),
+                query_sha256: sha256_hex(query.as_bytes()),
+                candidate_set_sha256: candidate_set_sha256.clone(),
+                operations: vec![RetrievalOperationV1 {
+                    tool_id: "trajectory.bm25.search".to_owned(),
+                    tool_revision_sha256: config.backend_revision_sha256.clone(),
+                    action_template_sha256: bm25_action_template_sha256(config),
+                    observed_evidence_ids,
+                    outcome,
+                    elapsed_ns: query_elapsed_ns,
+                    // BM25 posting/index reads are not currently instrumented.
+                    // Zero is explicitly marked as incomplete, never total cost.
+                    inspected_bytes: 0,
+                    inspected_bytes_measured: false,
+                }],
+                stop_reason,
+                tool_call_budget: 1,
+                tool_calls_used: 1,
+                elapsed_ns: query_elapsed_ns,
+                inspected_bytes: 0,
+                inspected_bytes_complete: false,
+                created_at_unix,
+            };
+            let retrieval_trace_sha256 = policy_memory
+                .record_trace(trace.clone())
+                .map_err(|error| format!("record retrieval policy trace: {error:?}"))?;
+            let retrieval_trace_json = trace.to_json_value();
+
             Ok(json!({
                 "ok": true,
                 "items": items,
                 "candidate_evidence_jsonl": candidate_evidence_jsonl,
                 "candidate_set_sha256": candidate_set_sha256,
                 "candidate_record_count": candidate_record_count,
+                "retrieval_trace": retrieval_trace_json,
+                "retrieval_trace_sha256": retrieval_trace_sha256,
+                "policy_trace_count": policy_memory.trace_count(),
                 "run_id": config.run_id,
                 "candidate_id": candidate_id,
                 "hit_count": result.hits.len(),
@@ -317,11 +406,18 @@ fn main() {
     let mut writer = BufWriter::new(stdout.lock());
     let mut trajectories = Vec::<LongMemEvalV2TrajectoryV1>::new();
     let mut index = None;
+    let mut policy_memory = RetrievalPolicyMemoryV1::default();
 
     for line in stdin.lock().lines() {
         let response = match line {
             Ok(line) => match serde_json::from_str::<Value>(&line) {
-                Ok(request) => handle_request(request, &config, &mut trajectories, &mut index)
+                Ok(request) => handle_request(
+                    request,
+                    &config,
+                    &mut trajectories,
+                    &mut index,
+                    &mut policy_memory,
+                )
                     .unwrap_or_else(|error| json!({"ok": false, "error": error})),
                 Err(error) => json!({"ok": false, "error": format!("invalid request JSON: {error}")}),
             },
@@ -365,6 +461,7 @@ mod tests {
             top_k: 4,
             slice_radius: 0,
             neighbor_radius: 0,
+            environment_revision_sha256: "2222222222222222222222222222222222222222222222222222222222222222".to_owned(),
             profile: Bm25ProfileV1 {
                 k1: 1.2,
                 b: 0.75,
@@ -406,12 +503,14 @@ mod tests {
         let config = fixture_config(root.clone());
         let mut trajectories = Vec::new();
         let mut index = None;
+        let mut policy_memory = RetrievalPolicyMemoryV1::default();
 
         let inserted = handle_request(
             json!({"op": "insert", "trajectory": trajectory}),
             &config,
             &mut trajectories,
             &mut index,
+            &mut policy_memory,
         ).expect("insert");
         assert_eq!(inserted["ok"], true);
         assert_eq!(inserted["inserted"], 1);
@@ -426,6 +525,7 @@ mod tests {
             &config,
             &mut trajectories,
             &mut index,
+            &mut policy_memory,
         ).expect("query");
         assert_eq!(response["ok"], true);
         assert_eq!(response["query_image_used"], false);
@@ -435,6 +535,11 @@ mod tests {
         assert_eq!(response["candidate_record_count"], 2);
         assert!(response["candidate_set_sha256"].as_str().is_some());
         assert!(response["candidate_evidence_jsonl"].as_str().unwrap().contains("lmev2:text:"));
+        assert_eq!(response["retrieval_trace"]["run_id"], "fixture-run");
+        assert_eq!(response["retrieval_trace"]["query_invocation_id"], "query-invocation-1");
+        assert_eq!(response["retrieval_trace"]["inspected_bytes_complete"], false);
+        assert!(response["retrieval_trace_sha256"].as_str().is_some());
+        assert_eq!(response["policy_trace_count"], 1);
         let items = response["items"].as_array().expect("context items");
         assert!(items.iter().any(|item| {
             item["type"] == "text" && item["value"].as_str()
@@ -454,18 +559,21 @@ mod tests {
         let config = fixture_config(root.clone());
         let mut trajectories = Vec::new();
         let mut index = None;
+        let mut policy_memory = RetrievalPolicyMemoryV1::default();
 
         handle_request(
             json!({"op": "insert", "trajectory": trajectory.clone()}),
             &config,
             &mut trajectories,
             &mut index,
+            &mut policy_memory,
         ).expect("first insert");
         let result = handle_request(
             json!({"op": "insert", "trajectory": trajectory}),
             &config,
             &mut trajectories,
             &mut index,
+            &mut policy_memory,
         );
         assert!(result.is_err());
         assert_eq!(trajectories.len(), 1);
@@ -480,12 +588,14 @@ mod tests {
         let image_path = root.join("trajectory-1/state.png");
         let mut trajectories = Vec::new();
         let mut index = None;
+        let mut policy_memory = RetrievalPolicyMemoryV1::default();
 
         handle_request(
             json!({"op": "insert", "trajectory": trajectory}),
             &config,
             &mut trajectories,
             &mut index,
+            &mut policy_memory,
         ).expect("insert");
         fs::write(&image_path, b"replaced bytes").expect("tamper image bytes");
 
@@ -494,6 +604,7 @@ mod tests {
             &config,
             &mut trajectories,
             &mut index,
+            &mut policy_memory,
         );
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("ScreenshotDigestMismatch"));
