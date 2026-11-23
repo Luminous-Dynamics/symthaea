@@ -234,7 +234,7 @@ class MaceLongMemEvalV2Memory(Memory):
             ),
         )
         digest = hashlib.sha256()
-        digest.update(b"luminous:mace:candidate-evidence-set:v1\\0")
+        digest.update(b"luminous:mace:candidate-evidence-set:v1\0")
 
         def hash_field(value: str) -> None:
             encoded = value.encode("utf-8")
@@ -268,9 +268,9 @@ class MaceLongMemEvalV2Memory(Memory):
             digest.update(struct.pack(">I", record["retrieval_rank"]))
             score = record.get("retrieval_score")
             if score is None:
-                digest.update(b"\\x00")
+                digest.update(b"\x00")
             else:
-                digest.update(b"\\x01")
+                digest.update(b"\x01")
                 digest.update(struct.pack(">d", float(score)))
             parents = sorted(record["parent_evidence_ids"])
             digest.update(struct.pack(">Q", len(parents)))
@@ -278,9 +278,9 @@ class MaceLongMemEvalV2Memory(Memory):
                 hash_field(parent)
             receipt = record.get("derivation_receipt_sha256")
             if receipt is None:
-                digest.update(b"\\x00")
+                digest.update(b"\x00")
             else:
-                digest.update(b"\\x01")
+                digest.update(b"\x01")
                 hash_field(receipt)
         return digest.hexdigest()
 
