@@ -47,7 +47,10 @@ impl fmt::Display for VelocityFourierSpongeError {
                     "velocity-Fourier sponge produced a non-finite transform"
                 )
             }
-            Self::ImaginaryResidualTooLarge { residual, tolerance } => write!(
+            Self::ImaginaryResidualTooLarge {
+                residual,
+                tolerance,
+            } => write!(
                 formatter,
                 "inverse transform imaginary residual {residual:e} exceeds tolerance {tolerance:e}"
             ),
