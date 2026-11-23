@@ -2392,6 +2392,142 @@ mod tests {
     }
 
     #[test]
+    fn evsi_sensitivity_report_exposes_worst_case_and_weighted_net_value() {
+        let mut assumptions = BTreeMap::new();
+        assumptions.insert(
+            "validated-high-accuracy".into(),
+            SyntheticBinaryEvsiAssumptionProfileV1 {
+                weight: 0.5,
+                metrology_characteristics: SyntheticMetrologyCharacteristicsV1 {
+                    sensitivity: 0.95,
+                    specificity: 0.99,
+                },
+                decision_loss: SyntheticBinaryDecisionLossV1 {
+                    false_negative_cost: 100.0,
+                    false_positive_cost: 5.0,
+                    measurement_cost: 2.0,
+                },
+            },
+        );
+        assumptions.insert(
+            "uninformative-high-cost".into(),
+            SyntheticBinaryEvsiAssumptionProfileV1 {
+                weight: 0.5,
+                metrology_characteristics: SyntheticMetrologyCharacteristicsV1 {
+                    sensitivity: 0.70,
+                    specificity: 0.30,
+                },
+                decision_loss: SyntheticBinaryDecisionLossV1 {
+                    false_negative_cost: 100.0,
+                    false_positive_cost: 5.0,
+                    measurement_cost: 10.0,
+                },
+            },
+        );
+
+        let report =
+            evaluate_synthetic_binary_evsi_sensitivity_v1(0.10, &assumptions).unwrap();
+        assert_eq!(report.scenario_count, 2);
+        assert!((report.gross_evsi_min - 0.0).abs() < 1.0e-12);
+        assert!((report.gross_evsi_max - 3.955).abs() < 1.0e-12);
+        assert!((report.gross_evsi_weighted_mean - 1.9775).abs() < 1.0e-12);
+        assert!((report.net_value_min - (-10.0)).abs() < 1.0e-12);
+        assert!((report.weighted_net_positive_fraction - 0.5).abs() < 1.0e-12);
+        assert!(!report.robust_measurement_hurdle_pass);
+        assert_eq!(report.conservative_normalized_gross_evsi_score, 0.0);
+        assert_eq!(report.scenarios.len(), 2);
+        assert_eq!(report.assumption_set_sha256.len(), 64);
+    }
+
+    #[test]
+    fn evsi_sensitivity_rejects_unjustified_weight_sum() {
+        let mut assumptions = BTreeMap::new();
+        assumptions.insert(
+            "single-profile".into(),
+            SyntheticBinaryEvsiAssumptionProfileV1 {
+                weight: 0.8,
+                metrology_characteristics: SyntheticMetrologyCharacteristicsV1 {
+                    sensitivity: 0.95,
+                    specificity: 0.99,
+                },
+                decision_loss: SyntheticBinaryDecisionLossV1 {
+                    false_negative_cost: 100.0,
+                    false_positive_cost: 5.0,
+                    measurement_cost: 2.0,
+                },
+            },
+        );
+        assert!(
+            evaluate_synthetic_binary_evsi_sensitivity_v1(0.1, &assumptions).is_err()
+        );
+    }
+
+    #[test]
+    fn robust_evsi_policy_zeroes_priority_when_any_assumption_fails_net_hurdle() {
+        let scenario = config(SyntheticFabRegimeV1::GradualProcessDrift, 87);
+        let episode = generate_synthetic_fab_episode_v1(&scenario).unwrap();
+        let semantics = synthetic_defect_semantics_v1(scenario.defect_threshold).unwrap();
+        let view = episode.policy_view();
+        let mut assumptions = BTreeMap::new();
+        assumptions.insert(
+            "good-assay-low-cost".into(),
+            SyntheticBinaryEvsiAssumptionProfileV1 {
+                weight: 0.5,
+                metrology_characteristics: SyntheticMetrologyCharacteristicsV1 {
+                    sensitivity: 0.95,
+                    specificity: 0.99,
+                },
+                decision_loss: SyntheticBinaryDecisionLossV1 {
+                    false_negative_cost: 100.0,
+                    false_positive_cost: 5.0,
+                    measurement_cost: 2.0,
+                },
+            },
+        );
+        assumptions.insert(
+            "uninformative-assay".into(),
+            SyntheticBinaryEvsiAssumptionProfileV1 {
+                weight: 0.5,
+                metrology_characteristics: SyntheticMetrologyCharacteristicsV1 {
+                    sensitivity: 0.7,
+                    specificity: 0.3,
+                },
+                decision_loss: SyntheticBinaryDecisionLossV1 {
+                    false_negative_cost: 100.0,
+                    false_positive_cost: 5.0,
+                    measurement_cost: 0.0,
+                },
+            },
+        );
+        let policy_config = policy_config_with_weights(
+            view,
+            "robust-decision-evsi",
+            16,
+            16,
+            4,
+            113,
+            PolicyWeightsV1 {
+                risk: 0.0,
+                uncertainty: 0.0,
+                evsi: 1.0,
+            },
+        );
+        let policy = build_synthetic_robust_decision_evsi_policy_v1(
+            view,
+            &semantics,
+            &assumptions,
+            &policy_config,
+        )
+        .unwrap();
+        assert!(
+            policy
+                .candidates
+                .iter()
+                .all(|candidate| candidate.expected_value_of_information == 0.0)
+        );
+    }
+
+    #[test]
     fn binary_evsi_rejects_invalid_probabilities_and_losses() {
         assert!(
             calculate_synthetic_binary_evsi_v1(
