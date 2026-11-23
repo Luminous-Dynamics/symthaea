@@ -62,6 +62,12 @@ This module does not verify issuer signatures, source authority, legal rights, s
 
 The later MACE qualification service must attach independently authenticated issuer, policy, rights, lifecycle-checkpoint and lineage receipts before evidence can be used in consequential decisions. Evaluator truth, benchmark labels and attack assignments remain outside the candidate process.
 
+## Producer-side tests and validation
+
+The Rust module includes three additional typed-encoder tests: JSONL round-trip through the same strict parser, deterministic normalization independent of input record order, and rejection of mutated batch metadata, oversized typed records and non-finite retrieval scores.
+
+The candidate-evidence module now has thirteen authored deterministic tests in total. They have not been executed in this authoring environment; no Rust compiler/test/Clippy or external Draft 2020-12 validation pass is claimed.
+
 ## Integration sequence
 
 1. Adapt #13346 raw-session hits to this envelope while keeping verbatim source chunks retrievable through the controlled payload resolver.
