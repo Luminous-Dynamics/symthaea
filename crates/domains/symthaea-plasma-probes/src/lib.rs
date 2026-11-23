@@ -49,8 +49,6 @@ pub enum ContractError {
     SyntheticExecutionAuthorized,
     #[error("physical candidate provenance is incomplete")]
     PhysicalProvenanceIncomplete,
-    #[error("candidate belongs to another contract")]
-    ContractIdMismatch,
     #[error("candidate is outside the admissible range for {0}")]
     CandidateOutOfRange(&'static str),
     #[error("grid step counts must all be positive")]
@@ -212,7 +210,7 @@ impl PulseFamilyContract {
                 reason: "normalization and units must be non-empty",
             });
         }
-        if !finite_ordered(
+        if !finite_increasing(
             self.physics_cohort.spatial_domain.minimum,
             self.physics_cohort.spatial_domain.maximum,
         ) || !self.physics_cohort.spatial_domain.periodic
@@ -222,7 +220,7 @@ impl PulseFamilyContract {
                 reason: "domain bounds must be finite and increasing, with periodic=true",
             });
         }
-        if !finite_ordered(
+        if !finite_increasing(
             self.physics_cohort.velocity_domain.minimum,
             self.physics_cohort.velocity_domain.maximum,
         ) {
@@ -345,6 +343,18 @@ impl PulseFamilyContract {
                 reason: "unknown split role",
             });
         }
+        if matches!(self.split_role.as_str(), "confirmation" | "sealed_test")
+            && self
+                .evaluation_policy
+                .confirmation_reference_id
+                .as_ref()
+                .is_none_or(|value| value.trim().is_empty())
+        {
+            return Err(ContractError::InvalidField {
+                field: "evaluation_policy.confirmation_reference_id",
+                reason: "confirmation and sealed-test roles require a pinned independent reference",
+            });
+        }
 
         let provenance = &self.provenance;
         if !valid_sha256(&provenance.initial_state_sha256)
@@ -354,6 +364,15 @@ impl PulseFamilyContract {
             return Err(ContractError::InvalidField {
                 field: "provenance",
                 reason: "state digest and source revisions must be present and well formed",
+            });
+        }
+        if !matches!(
+            provenance.fixture_class.as_str(),
+            "synthetic_schema_test_only" | "physical_candidate"
+        ) {
+            return Err(ContractError::InvalidField {
+                field: "provenance.fixture_class",
+                reason: "unknown fixture class",
             });
         }
         if self.contract_status == "synthetic_fixture_only" {
@@ -387,6 +406,54 @@ impl PulseFamilyContract {
     /// Identifier used to scope candidate digests to this frozen family.
     pub fn contract_id(&self) -> &str {
         &self.contract_id
+    }
+
+    /// Stable fingerprint of the physics cohort, intervention family and initial-state identity.
+    ///
+    /// Candidate-representation revisions are intentionally excluded so the
+    /// same physical intervention has the same identity across competitors.
+    pub fn family_fingerprint(&self) -> String {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea.akpd.pulse-family.v0.1\0");
+        update_length_prefixed(&mut hasher, self.contract_id.as_bytes());
+        update_length_prefixed(&mut hasher, self.physics_cohort.equation.as_bytes());
+        update_length_prefixed(&mut hasher, self.physics_cohort.normalization_id.as_bytes());
+        update_f64(&mut hasher, self.physics_cohort.spatial_domain.minimum);
+        update_f64(&mut hasher, self.physics_cohort.spatial_domain.maximum);
+        update_f64(&mut hasher, self.physics_cohort.velocity_domain.minimum);
+        update_f64(&mut hasher, self.physics_cohort.velocity_domain.maximum);
+        update_length_prefixed(&mut hasher, self.physics_cohort.velocity_domain.velocity_unit.as_bytes());
+        update_length_prefixed(&mut hasher, self.physics_cohort.time_unit.as_bytes());
+        update_f64(&mut hasher, self.physics_cohort.maximum_time);
+        update_length_prefixed(&mut hasher, self.intervention_operator.operator_id.as_bytes());
+        update_length_prefixed(&mut hasher, self.intervention_operator.definition.as_bytes());
+        hasher.update(&self.admissible_controls.spatial_mode.minimum.to_le_bytes());
+        hasher.update(&self.admissible_controls.spatial_mode.maximum.to_le_bytes());
+        update_f64(&mut hasher, self.admissible_controls.phase_rad.minimum);
+        update_f64(&mut hasher, self.admissible_controls.phase_rad.maximum);
+        update_f64(&mut hasher, self.admissible_controls.kick_amplitude.minimum);
+        update_f64(&mut hasher, self.admissible_controls.kick_amplitude.maximum);
+        update_length_prefixed(&mut hasher, self.admissible_controls.kick_amplitude.unit.as_bytes());
+        update_f64(&mut hasher, self.admissible_controls.application_time.minimum);
+        update_f64(&mut hasher, self.admissible_controls.application_time.maximum);
+        update_length_prefixed(&mut hasher, self.admissible_controls.application_time.unit.as_bytes());
+        update_length_prefixed(&mut hasher, self.provenance.initial_state_sha256.as_bytes());
+        update_length_prefixed(&mut hasher, self.provenance.reference_solver_revision.as_bytes());
+        hasher.update(&self.provenance.generator_seed.to_le_bytes());
+        for source_ref in self.provenance.source_record_refs.iter().collect::<BTreeSet<_>>() {
+            update_length_prefixed(&mut hasher, source_ref.as_bytes());
+        }
+        hasher.finalize().to_hex().to_string()
+    }
+
+    /// Initial-state generator seed recorded in the family provenance.
+    pub fn generator_seed(&self) -> u64 {
+        self.provenance.generator_seed
+    }
+
+    /// Immutable source records attached to the family.
+    pub fn source_record_refs(&self) -> &[String] {
+        &self.provenance.source_record_refs
     }
 
     /// Maximum raw grid points permitted by this contract.
@@ -480,11 +547,12 @@ impl PulseCandidate {
 
         let mut hasher = blake3::Hasher::new();
         hasher.update(DIGEST_DOMAIN);
-        update_length_prefixed(&mut hasher, contract.contract_id.as_bytes())?;
+        let family_fingerprint = contract.family_fingerprint();
+        update_length_prefixed(&mut hasher, family_fingerprint.as_bytes());
         update_length_prefixed(
             &mut hasher,
             contract.intervention_operator.operator_id.as_bytes(),
-        )?;
+        );
         hasher.update(&mode.to_le_bytes());
         hasher.update(&phase.to_bits().to_le_bytes());
         hasher.update(&amplitude.to_bits().to_le_bytes());
@@ -606,6 +674,10 @@ fn finite_ordered(minimum: f64, maximum: f64) -> bool {
     minimum.is_finite() && maximum.is_finite() && minimum <= maximum
 }
 
+fn finite_increasing(minimum: f64, maximum: f64) -> bool {
+    minimum.is_finite() && maximum.is_finite() && minimum < maximum
+}
+
 fn valid_contract_id(value: &str) -> bool {
     let bytes = value.as_bytes();
     bytes.len() >= 6
@@ -634,14 +706,14 @@ fn canonical_zero(value: f64) -> f64 {
     if value == 0.0 { 0.0 } else { value }
 }
 
-fn update_length_prefixed(
-    hasher: &mut blake3::Hasher,
-    bytes: &[u8],
-) -> Result<(), ContractError> {
-    let length = u32::try_from(bytes.len()).map_err(|_| ContractError::InvalidContractId)?;
+fn update_length_prefixed(hasher: &mut blake3::Hasher, bytes: &[u8]) {
+    let length = bytes.len() as u64;
     hasher.update(&length.to_le_bytes());
     hasher.update(bytes);
-    Ok(())
+}
+
+fn update_f64(hasher: &mut blake3::Hasher, value: f64) {
+    hasher.update(&canonical_zero(value).to_bits().to_le_bytes());
 }
 
 fn linspace(minimum: f64, maximum: f64, steps: usize) -> Result<Vec<f64>, ContractError> {
@@ -757,6 +829,8 @@ mod tests {
         assert!(!contract.physical_execution_authorized());
         assert!(contract.can_acquire());
         assert_eq!(contract.contract_id(), "AKPD-SYNTHETIC-PULSE-FAMILY-001");
+        assert_eq!(contract.generator_seed(), 7);
+        assert!(contract.source_record_refs().is_empty());
     }
 
     #[test]
@@ -944,18 +1018,40 @@ mod tests {
     }
 
     #[test]
-    fn digest_is_scoped_to_the_contract_identity() {
+    fn digest_is_scoped_to_contract_and_physics_identity() {
         let first_family = contract();
-        let input = SYNTHETIC_FIXTURE.replace(
+        let second_input = SYNTHETIC_FIXTURE.replace(
             "AKPD-SYNTHETIC-PULSE-FAMILY-001",
             "AKPD-SYNTHETIC-PULSE-FAMILY-002",
         );
-        let second_family = PulseFamilyContract::parse_json(&input).unwrap();
+        let second_family = PulseFamilyContract::parse_json(&second_input).unwrap();
         let pulse = candidate(2, 0.2, 0.01, 3.0);
         assert_ne!(
             pulse.canonical_digest(&first_family).unwrap(),
             pulse.canonical_digest(&second_family).unwrap()
         );
+
+        let mut changed_physics = contract();
+        changed_physics.physics_cohort.normalization_id = "different-normalization".to_owned();
+        assert_ne!(
+            pulse.canonical_digest(&first_family).unwrap(),
+            pulse.canonical_digest(&changed_physics).unwrap()
+        );
+    }
+
+    #[test]
+    fn confirmation_role_requires_an_independent_reference_identity() {
+        let input = SYNTHETIC_FIXTURE.replace(
+            "\\"split_role\\": \\"development\\"",
+            "\\"split_role\\": \\"confirmation\\"",
+        );
+        assert!(matches!(
+            PulseFamilyContract::parse_json(&input),
+            Err(ContractError::InvalidField {
+                field: "evaluation_policy.confirmation_reference_id",
+                ..
+            })
+        ));
     }
 
     #[test]
