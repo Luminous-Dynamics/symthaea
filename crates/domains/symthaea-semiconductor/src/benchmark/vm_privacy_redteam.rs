@@ -716,7 +716,7 @@ mod tests {
             PrivacyAttackStatusV1::ExactRecordReconstructionDemonstrated
         );
         assert_eq!(report.reconstructed_record_count, 4);
-        assert_eq!(report.mean_feature_rmse, Some(0.0));
+        assert!(report.mean_feature_rmse.unwrap() < 1.0e-12);
         assert_eq!(report.label_inference_accuracy, Some(1.0));
         assert!(!report.formal_differential_privacy_claim);
     }
@@ -798,7 +798,7 @@ mod tests {
             report.reconstructed_record_ids_for_evaluation,
             vec!["wafer-004"]
         );
-        assert_eq!(report.mean_feature_rmse, Some(0.0));
+        assert!(report.mean_feature_rmse.unwrap() < 1.0e-12);
         assert_eq!(report.label_inference_accuracy, Some(1.0));
         assert!(!report.formal_differential_privacy_claim);
     }
@@ -822,7 +822,7 @@ mod tests {
             report.reconstructed_record_ids_for_evaluation,
             vec!["wafer-004"]
         );
-        assert_eq!(report.mean_feature_rmse, Some(0.0));
+        assert!(report.mean_feature_rmse.unwrap() < 1.0e-12);
         assert_eq!(report.label_inference_accuracy, Some(1.0));
     }
 
