@@ -225,7 +225,7 @@
       "files": [
         {
           "path": "docs/research/BH_EGB_COVARIANCE_REDUNDANCY_CONTROL_V0_1.json",
-          "git_blob_sha1": "cf737cf3632464bdc7d816f941027b7eefd796ea",
+          "git_blob_sha1": "8f9ed0654b88376deeee2c7d466682dc37dbc8fd",
           "use": "exact synthetic covariance and redundant-observable regression fixture"
         }
       ]
