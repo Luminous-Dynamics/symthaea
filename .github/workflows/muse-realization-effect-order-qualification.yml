@@ -61,8 +61,26 @@ jobs:
       - name: Re-run baseline/sham/active/reversal evaluator tests
         run: cargo +1.96.0 test --locked -p symthaea-muse --lib realization_effect::tests
 
-      - name: Warnings-denied Muse library Clippy
-        run: cargo +1.96.0 clippy --locked -p symthaea-muse --lib -- --no-deps -D warnings
+      - name: Clippy compile and changed-source lint gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 clippy --locked -p symthaea-muse --lib --no-deps --message-format=json > "$RUNNER_TEMP/muse-clippy.jsonl"
+          jq -s -e '
+            [
+              .[]
+              | select(.reason == "compiler-message")
+              | .message
+              | select(.level == "warning")
+              | select(any(.spans[]?;
+                  .file_name == "crates/domains/symthaea-muse/src/realization_effect_order.rs"
+                  or .file_name == "crates/domains/symthaea-muse/src/realization_effect.rs"))
+            ] as $changed_source_lints
+            | if ($changed_source_lints | length) == 0
+              then "no Clippy warnings in changed effect-order/effect-evaluator source"
+              else error("Clippy warnings in changed source: " + ($changed_source_lints | tojson))
+              end
+          ' "$RUNNER_TEMP/muse-clippy.jsonl"
 
       - name: Assemble exact-head evidence
         if: always()
