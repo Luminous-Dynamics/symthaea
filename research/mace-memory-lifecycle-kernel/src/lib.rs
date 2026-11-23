@@ -8,6 +8,8 @@
 //! independently durable TrustedWitness. SHA-256 is used for commitments only;
 //! it does not authenticate issuers or establish semantic truth.
 
+pub mod file_witness;
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
