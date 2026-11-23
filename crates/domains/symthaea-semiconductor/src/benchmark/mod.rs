@@ -1,8 +1,8 @@
 //! Versioned benchmark protocols and independent scoring primitives.
 
 pub mod binary_metrics;
-pub mod label_consumption_guard;
 pub mod calibration_requalification;
+pub mod label_consumption_guard;
 pub mod dtco_manifest;
 pub mod metrology_audit;
 pub mod metrology_qualification_gate;
