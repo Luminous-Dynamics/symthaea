@@ -158,12 +158,12 @@ pub struct CausalTrajectoryReceipt {
     /// Symtropy correspondence-receipt verifier; this module does not resolve
     /// PRNG outputs or infer event correspondence.
     pub stochastic_draw_bundle_sha256: [u8; 32],
-    /// Exact verifier implementation/profile identity used by Symtropy #3755.
+    /// Exact verifier implementation/profile identity used by Symtropy #3743.
     pub stochastic_draw_bundle_verifier_sha256: [u8; 32],
     /// Digest of the external semantic-verification receipt for this exact
     /// bundle and verifier profile. This module binds the reference only.
     pub stochastic_draw_bundle_verification_receipt_sha256: [u8; 32],
-    /// The producer's declared #3755 semantic-verification disposition.
+    /// The producer's declared #3743 semantic-verification disposition.
     /// True is eligible only with the non-empty verifier and receipt digests;
     /// the external receipt must still be independently retrieved/verified.
     pub stochastic_draw_bundle_semantically_verified: bool,
@@ -180,9 +180,9 @@ pub struct CausalPairingCertificate {
     pub regime: CausalReplayRegime,
     /// Complete draw-bundle references in baseline, compute, observation, joint order.
     pub stochastic_draw_bundle_sha256: [[u8; 32]; 4],
-    /// #3755 verifier-profile identities in baseline, compute, observation, joint order.
+    /// #3743 verifier-profile identities in baseline, compute, observation, joint order.
     pub stochastic_draw_bundle_verifier_sha256: [[u8; 32]; 4],
-    /// Independently verified #3755 receipt references in the same arm order.
+    /// Independently verified #3743 receipt references in the same arm order.
     pub stochastic_draw_bundle_verification_receipt_sha256: [[u8; 32]; 4],
     /// The full 13-field pairing root used by all four arms.
     pub paired_run_identity: PairedRunIdentity,
