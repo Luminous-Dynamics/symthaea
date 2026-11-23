@@ -167,7 +167,7 @@ pub struct CalibrationRequalificationFrontierReportV1 {
     /// Digest of only the evidence admissible at this knowledge frontier.
     pub frontier_input_sha256: String,
     pub status: MeasurementQualificationStatusV1,
-    pub current_consumption_allowed: bool,
+    pub downstream_consumption_allowed_at_frontier: bool,
     pub reason_codes: Vec<CalibrationRequalificationReasonV1>,
     pub potentially_applicable_event_ids: Vec<String>,
     pub applied_event_ids: Vec<String>,
@@ -513,6 +513,7 @@ fn frontier_input_sha256(
     json_sha256(&(
         &input.input_id,
         &input.original_qualification_at_k0.report_sha256,
+        input.measurement_time_bounds,
         cutoff,
         frontier.inventory_state,
         frontier.ordering_state,
@@ -648,7 +649,7 @@ fn assess_frontier(
     Ok(CalibrationRequalificationFrontierReportV1 {
         frontier_input_sha256: frontier_input_sha256(input, frontier, cutoff)?,
         status,
-        current_consumption_allowed: status == MeasurementQualificationStatusV1::Qualified,
+        downstream_consumption_allowed_at_frontier: status == MeasurementQualificationStatusV1::Qualified,
         reason_codes: reasons.into_iter().collect(),
         potentially_applicable_event_ids: potentially_applicable.into_iter().collect(),
         applied_event_ids: applied,
@@ -898,7 +899,7 @@ mod tests {
             report.current_at_k1.status,
             MeasurementQualificationStatusV1::Rejected
         );
-        assert!(!report.current_at_k1.current_consumption_allowed);
+        assert!(!report.current_at_k1.downstream_consumption_allowed_at_frontier);
         assert!(!report.source_authenticity_proven);
         assert!(!report.equipment_control_authority);
     }
@@ -988,7 +989,7 @@ mod tests {
             report.current_at_k1.status,
             MeasurementQualificationStatusV1::Qualified
         );
-        assert!(report.current_at_k1.current_consumption_allowed);
+        assert!(report.current_at_k1.downstream_consumption_allowed_at_frontier);
     }
 
     #[test]
@@ -1014,6 +1015,57 @@ mod tests {
             MeasurementQualificationStatusV1::Qualified
         );
         assert!(report.current_at_k1.applied_event_ids.is_empty());
+    }
+
+    #[test]
+    fn corrected_calibration_requires_requalification() {
+        let mut input = base_input();
+        install_events(
+            &mut input,
+            vec![event(
+                "certificate-corrected",
+                CalibrationChangeKindV1::Corrected,
+                1_840_000_000,
+                1_870_000_000,
+                1,
+            )],
+        );
+
+        let report = requalify_calibration_measurement_v1(&input).unwrap();
+        assert_eq!(
+            report.current_at_k1.status,
+            MeasurementQualificationStatusV1::Unknown
+        );
+        assert!(
+            report.current_at_k1.reason_codes.contains(
+                &CalibrationRequalificationReasonV1::CalibrationCorrected
+            )
+        );
+    }
+
+    #[test]
+    fn direct_certificate_scope_with_contradictory_dimensions_is_unknown() {
+        let mut input = base_input();
+        let mut conflicting = event(
+            "certificate-scope-conflict",
+            CalibrationChangeKindV1::Revoked,
+            1_840_000_000,
+            1_870_000_000,
+            1,
+        );
+        conflicting.scope.as_mut().unwrap().unit = "um".into();
+        install_events(&mut input, vec![conflicting]);
+
+        let report = requalify_calibration_measurement_v1(&input).unwrap();
+        assert_eq!(
+            report.current_at_k1.status,
+            MeasurementQualificationStatusV1::Unknown
+        );
+        assert!(
+            report.current_at_k1.reason_codes.contains(
+                &CalibrationRequalificationReasonV1::UnknownEventScope
+            )
+        );
     }
 
     #[test]
