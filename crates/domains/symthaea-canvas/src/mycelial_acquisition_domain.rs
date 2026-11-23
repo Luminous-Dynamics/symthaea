@@ -1019,6 +1019,10 @@ impl MycelialExtractionCoverageReceipt {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::mycelial_observation_coverage::{
+        MycelialObservationCoverageRecord, MycelialObservationCoverageState,
+        MycelialObservationResidualKind,
+    };
 
     fn digest(character: char) -> String {
         std::iter::repeat_n(character, DIGEST_HEX_BYTES).collect()
