@@ -1,0 +1,78 @@
+{
+  "schema_version": "physics-experiment-design-covariance-v0.1",
+  "target": "Verify covariance-aware separation is invariant to an exactly redundant observable",
+  "hypothesis_ids": ["H0", "H1"],
+  "experiments": [
+    {
+      "experiment_id": "base_two_observables",
+      "description": "Synthetic two-observable covariance control",
+      "settings": [{"parameter_id": "synthetic_case", "value": 1.0, "unit": "1"}],
+      "cost_units": 1.0,
+      "duration_hours": 0.0,
+      "observables": [
+        {"observable_id": "x1", "unit": "u1"},
+        {"observable_id": "x2", "unit": "u2"}
+      ],
+      "predictions": [
+        {
+          "hypothesis_id": "H0",
+          "model_descriptor": "synthetic-control:model:H0:v1",
+          "model_digest_sha256": "3e8b005e7ce303bef40507b4f89e595be5a7e22c507364c0914a4ac2b1a1e0e1",
+          "means": [0.0, 0.0]
+        },
+        {
+          "hypothesis_id": "H1",
+          "model_descriptor": "synthetic-control:model:H1:v1",
+          "model_digest_sha256": "a3f4729c5130d83db6a5f512fe00e4220fbe05b38c9d649e2552cf7bb59a7269",
+          "means": [1.0, 2.0]
+        }
+      ],
+      "pairwise_difference_covariances": [
+        {
+          "first_hypothesis_id": "H0",
+          "second_hypothesis_id": "H1",
+          "covariance": [[1.0, 0.5], [0.5, 1.0]],
+          "covariance_descriptor": "synthetic-control:covariance-of-hypothesis-difference:v1:includes-common-error",
+          "covariance_descriptor_digest_sha256": "60bbb9315c1fd8a4ffb12dd37e82856b14d6e6572c50bb03052a4ad2382f2b06",
+          "covariance_matrix_digest_sha256": "85e9eae2bd8638a29cc05f0ce5dd092271e41e150523a27dc081e6bbf6356ac6"
+        }
+      ]
+    },
+    {
+      "experiment_id": "with_exact_redundant_sum",
+      "description": "Same synthetic data with x3 = x1 + x2 and transformed covariance",
+      "settings": [{"parameter_id": "synthetic_case", "value": 1.0, "unit": "1"}],
+      "cost_units": 1.0,
+      "duration_hours": 0.0,
+      "observables": [
+        {"observable_id": "x1", "unit": "u1"},
+        {"observable_id": "x2", "unit": "u2"},
+        {"observable_id": "x3", "unit": "u1+u2"}
+      ],
+      "predictions": [
+        {
+          "hypothesis_id": "H0",
+          "model_descriptor": "synthetic-control:model:H0:v1",
+          "model_digest_sha256": "3e8b005e7ce303bef40507b4f89e595be5a7e22c507364c0914a4ac2b1a1e0e1",
+          "means": [0.0, 0.0, 0.0]
+        },
+        {
+          "hypothesis_id": "H1",
+          "model_descriptor": "synthetic-control:model:H1:v1",
+          "model_digest_sha256": "a3f4729c5130d83db6a5f512fe00e4220fbe05b38c9d649e2552cf7bb59a7269",
+          "means": [1.0, 2.0, 3.0]
+        }
+      ],
+      "pairwise_difference_covariances": [
+        {
+          "first_hypothesis_id": "H0",
+          "second_hypothesis_id": "H1",
+          "covariance": [[1.0, 0.5, 1.5], [0.5, 1.0, 1.5], [1.5, 1.5, 3.0]],
+          "covariance_descriptor": "synthetic-control:covariance-of-hypothesis-difference:v1:includes-common-error",
+          "covariance_descriptor_digest_sha256": "60bbb9315c1fd8a4ffb12dd37e82856b14d6e6572c50bb03052a4ad2382f2b06",
+          "covariance_matrix_digest_sha256": "cadfa55d541e3139bcc62627ea901a86d89c2697c7f95cf94a064800886eb870"
+        }
+      ]
+    }
+  ]
+}
