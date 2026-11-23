@@ -747,6 +747,18 @@ mod tests {
     }
 
     #[test]
+    fn local_global_context_control_is_not_a_theorem_refutation() {
+        let fixtures: Value = serde_json::from_str(MUTATION_FIXTURES).expect("mutation fixture JSON");
+        let cases = fixtures["cases"].as_array().expect("cases array");
+        let context_case = cases.iter().find(|case| case["id"] == "MUT-LOCAL-GLOBAL-CONTEXT")
+            .expect("local/global consistency control");
+        assert_eq!(context_case["expected_diagnostic"], "local_global_inconsistency");
+        assert_eq!(context_case["mathematical_disposition"], "unknown");
+        assert_eq!(context_case["oracle_status"], "not_run");
+        assert!(context_case["claim_ceiling"].as_str().unwrap().contains("does not establish"));
+    }
+
+    #[test]
     fn unknown_json_fields_are_rejected() {
         let mut value = fixture_value();
         value["unexpected_status"] = Value::Bool(true);
