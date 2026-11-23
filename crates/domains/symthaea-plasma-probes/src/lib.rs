@@ -66,6 +66,24 @@ pub enum ContractError {
     InvalidGramianArithmetic,
     #[error("projection basis must be orthonormal within the declared tolerance")]
     InvalidProjectionBasis,
+    #[error("response matrix requires non-empty input and output mode registries")]
+    EmptyResponseModeRegistry,
+    #[error("response mode registry contains duplicate mode IDs")]
+    DuplicateResponseMode,
+    #[error("unknown response mode ID: {0}")]
+    UnknownResponseMode(u32),
+    #[error("response matrix dimensions overflow")]
+    ResponseMatrixSizeOverflow,
+    #[error("response matrix entry must be finite")]
+    NonFiniteResponseValue,
+    #[error("response matrix axes do not match")]
+    ResponseMatrixAxisMismatch,
+    #[error("response matrix contains an unmeasured entry")]
+    MissingResponseEntry,
+    #[error("response reference matrix has zero norm")]
+    ZeroResponseReferenceNorm,
+    #[error("finite-amplitude response estimator requires positive finite pulse amplitudes")]
+    InvalidResponseAmplitude,
 }
 
 /// A parsed and semantically checked v0.1 pulse-family contract.
@@ -737,6 +755,270 @@ fn dot(left: &[f64], right: &[f64]) -> Result<f64, ContractError> {
     Ok(result)
 }
 
+/// One finite complex response coefficient with an explicit phase convention.
+///
+/// The convention is y = real + i * imag for the registered output-mode
+/// quadrature. Missing measurements are represented by None in the matrix,
+/// never by an implicit zero.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct ComplexResponse {
+    pub real: f64,
+    pub imag: f64,
+}
+
+impl ComplexResponse {
+    pub fn new(real: f64, imag: f64) -> Result<Self, ContractError> {
+        if !real.is_finite() || !imag.is_finite() {
+            return Err(ContractError::NonFiniteResponseValue);
+        }
+        Ok(Self { real, imag })
+    }
+
+    pub fn magnitude(self) -> f64 {
+        self.real.hypot(self.imag)
+    }
+
+    pub fn phase_rad(self) -> Option<f64> {
+        (self.magnitude() > 0.0).then(|| self.imag.atan2(self.real))
+    }
+
+    fn add(self, other: Self) -> Result<Self, ContractError> {
+        Self::new(self.real + other.real, self.imag + other.imag)
+    }
+
+    fn sub(self, other: Self) -> Result<Self, ContractError> {
+        Self::new(self.real - other.real, self.imag - other.imag)
+    }
+
+    fn scale(self, factor: f64) -> Result<Self, ContractError> {
+        if !factor.is_finite() {
+            return Err(ContractError::InvalidResponseAmplitude);
+        }
+        Self::new(self.real * factor, self.imag * factor)
+    }
+
+    fn norm_squared(self) -> f64 {
+        self.real.mul_add(self.real, self.imag * self.imag)
+    }
+}
+
+/// Phase-resolved output-mode by input-mode response matrix.
+///
+/// Axes retain caller-declared ordering and mode identity. An unmeasured
+/// coefficient is None, which keeps missing / below-floor / unresolved data
+/// distinct from a measured zero response.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ModeResponseMatrix {
+    input_modes: Vec<u32>,
+    output_modes: Vec<u32>,
+    entries: Vec<Option<ComplexResponse>>,
+}
+
+impl ModeResponseMatrix {
+    pub fn new(
+        input_modes: Vec<u32>,
+        output_modes: Vec<u32>,
+    ) -> Result<Self, ContractError> {
+        if input_modes.is_empty() || output_modes.is_empty() {
+            return Err(ContractError::EmptyResponseModeRegistry);
+        }
+        if has_duplicates(&input_modes) || has_duplicates(&output_modes) {
+            return Err(ContractError::DuplicateResponseMode);
+        }
+        let entry_count = input_modes
+            .len()
+            .checked_mul(output_modes.len())
+            .ok_or(ContractError::ResponseMatrixSizeOverflow)?;
+        Ok(Self {
+            input_modes,
+            output_modes,
+            entries: vec![None; entry_count],
+        })
+    }
+
+    pub fn set(
+        &mut self,
+        input_mode: u32,
+        output_mode: u32,
+        response: ComplexResponse,
+    ) -> Result<(), ContractError> {
+        if !response.real.is_finite() || !response.imag.is_finite() {
+            return Err(ContractError::NonFiniteResponseValue);
+        }
+        let index = self.entry_index(input_mode, output_mode)?;
+        self.entries[index] = Some(response);
+        Ok(())
+    }
+
+    pub fn get(
+        &self,
+        input_mode: u32,
+        output_mode: u32,
+    ) -> Result<Option<ComplexResponse>, ContractError> {
+        let index = self.entry_index(input_mode, output_mode)?;
+        Ok(self.entries[index])
+    }
+
+    pub fn is_complete(&self) -> bool {
+        self.entries.iter().all(Option::is_some)
+    }
+
+    pub fn measured_entry_count(&self) -> usize {
+        self.entries.iter().filter(|entry| entry.is_some()).count()
+    }
+
+    pub fn input_modes(&self) -> &[u32] {
+        &self.input_modes
+    }
+
+    pub fn output_modes(&self) -> &[u32] {
+        &self.output_modes
+    }
+
+    /// Relative Frobenius error against a complete reference matrix.
+    ///
+    /// Both matrices must declare exactly matching ordered mode registries.
+    /// A zero reference norm is not assigned an arbitrary finite relative error.
+    pub fn relative_frobenius_error(
+        &self,
+        reference: &Self,
+    ) -> Result<f64, ContractError> {
+        if self.input_modes != reference.input_modes
+            || self.output_modes != reference.output_modes
+        {
+            return Err(ContractError::ResponseMatrixAxisMismatch);
+        }
+        if !self.is_complete() || !reference.is_complete() {
+            return Err(ContractError::MissingResponseEntry);
+        }
+
+        let mut difference = 0.0;
+        let mut reference_norm = 0.0;
+        for (candidate, target) in self.entries.iter().zip(&reference.entries) {
+            let candidate = (*candidate).ok_or(ContractError::MissingResponseEntry)?;
+            let target = (*target).ok_or(ContractError::MissingResponseEntry)?;
+            difference += candidate.sub(target)?.norm_squared();
+            reference_norm += target.norm_squared();
+            if !difference.is_finite() || !reference_norm.is_finite() {
+                return Err(ContractError::InvalidGramianArithmetic);
+            }
+        }
+        if reference_norm <= 0.0 {
+            return Err(ContractError::ZeroResponseReferenceNorm);
+        }
+        let error = (difference / reference_norm).sqrt();
+        if !error.is_finite() {
+            return Err(ContractError::InvalidGramianArithmetic);
+        }
+        Ok(error)
+    }
+
+    fn entry_index(
+        &self,
+        input_mode: u32,
+        output_mode: u32,
+    ) -> Result<usize, ContractError> {
+        let input_index = self
+            .input_modes
+            .iter()
+            .position(|mode| *mode == input_mode)
+            .ok_or(ContractError::UnknownResponseMode(input_mode))?;
+        let output_index = self
+            .output_modes
+            .iter()
+            .position(|mode| *mode == output_mode)
+            .ok_or(ContractError::UnknownResponseMode(output_mode))?;
+        Ok(output_index * self.input_modes.len() + input_index)
+    }
+}
+
+fn has_duplicates(values: &[u32]) -> bool {
+    let mut seen = BTreeSet::new();
+    values.iter().any(|value| !seen.insert(*value))
+}
+
+/// Finite-amplitude first- and second-order coefficients from matched signed runs.
+///
+/// C1 = (R(+A) - R(-A)) / (2A)
+/// C2 = (R(+A) + R(-A) - 2R(0)) / (2A^2)
+///
+/// C2 is the Taylor coefficient multiplying A^2, not the unscaled second
+/// derivative. These are asymptotic coefficients only after amplitude
+/// convergence has been established independently.
+pub fn signed_response_coefficients(
+    positive: ComplexResponse,
+    negative: ComplexResponse,
+    zero: ComplexResponse,
+    amplitude: f64,
+) -> Result<(ComplexResponse, ComplexResponse), ContractError> {
+    if !amplitude.is_finite() || amplitude <= 0.0 {
+        return Err(ContractError::InvalidResponseAmplitude);
+    }
+    let first_denominator = 2.0 * amplitude;
+    let second_denominator = 2.0 * amplitude * amplitude;
+    if !first_denominator.is_finite()
+        || first_denominator <= 0.0
+        || !second_denominator.is_finite()
+        || second_denominator <= 0.0
+    {
+        return Err(ContractError::InvalidResponseAmplitude);
+    }
+    let first = positive
+        .sub(negative)?
+        .scale(1.0 / first_denominator)?;
+    let second = positive
+        .add(negative)?
+        .sub(zero.scale(2.0)?)?
+        .scale(1.0 / second_denominator)?;
+    Ok((first, second))
+}
+
+/// Mixed second-order finite-amplitude coefficient for two distinct controls.
+///
+/// C_ab = [R(+a,+b)-R(+a,-b)-R(-a,+b)+R(-a,-b)] / (4ab)
+///
+/// This identifies one registered mixed direction. It does not reconstruct
+/// a general nonlinear Volterra kernel from a finite intervention set.
+pub fn mixed_response_coefficient(
+    positive_positive: ComplexResponse,
+    positive_negative: ComplexResponse,
+    negative_positive: ComplexResponse,
+    negative_negative: ComplexResponse,
+    amplitude_a: f64,
+    amplitude_b: f64,
+) -> Result<ComplexResponse, ContractError> {
+    if !amplitude_a.is_finite()
+        || !amplitude_b.is_finite()
+        || amplitude_a <= 0.0
+        || amplitude_b <= 0.0
+    {
+        return Err(ContractError::InvalidResponseAmplitude);
+    }
+    let denominator = 4.0 * amplitude_a * amplitude_b;
+    if !denominator.is_finite() || denominator <= 0.0 {
+        return Err(ContractError::InvalidResponseAmplitude);
+    }
+    let numerator = positive_positive
+        .sub(positive_negative)?
+        .sub(negative_positive)?
+        .add(negative_negative)?;
+    numerator.scale(1.0 / denominator)
+}
+
+/// Wrapped signed phase difference candidate minus reference in [-pi, pi).
+///
+/// Returns None if either complex response has zero magnitude; phase is then
+/// undefined and must not be reported as zero.
+pub fn wrapped_phase_difference(
+    candidate: ComplexResponse,
+    reference: ComplexResponse,
+) -> Option<f64> {
+    let candidate_phase = candidate.phase_rad()?;
+    let reference_phase = reference.phase_rad()?;
+    let difference = candidate_phase - reference_phase;
+    Some((difference + PI).rem_euclid(TAU) - PI)
+}
+
 /// One intervention in a frozen pulse family.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct PulseCandidate {
@@ -1117,6 +1399,171 @@ mod tests {
         assert_eq!(
             gramian.captured_trace_fraction(&[vec![1.0, 0.0], vec![1.0, 0.0]]),
             Err(ContractError::InvalidProjectionBasis)
+        );
+    }
+
+    #[test]
+    fn response_matrix_preserves_mode_identity_and_missing_entries() {
+        let mut matrix = ModeResponseMatrix::new(vec![1, 3], vec![1, 2]).unwrap();
+        assert_eq!(matrix.measured_entry_count(), 0);
+        assert!(!matrix.is_complete());
+        matrix
+            .set(3, 2, ComplexResponse::new(0.5, -0.25).unwrap())
+            .unwrap();
+        assert_eq!(
+            matrix.get(3, 2).unwrap(),
+            Some(ComplexResponse { real: 0.5, imag: -0.25 })
+        );
+        assert_eq!(matrix.get(1, 2).unwrap(), None);
+        assert_eq!(matrix.get(7, 2), Err(ContractError::UnknownResponseMode(7)));
+    }
+
+    #[test]
+    fn response_matrix_rejects_empty_and_duplicate_mode_registries() {
+        assert_eq!(
+            ModeResponseMatrix::new(Vec::new(), vec![1]),
+            Err(ContractError::EmptyResponseModeRegistry)
+        );
+        assert_eq!(
+            ModeResponseMatrix::new(vec![1, 1], vec![1]),
+            Err(ContractError::DuplicateResponseMode)
+        );
+        assert_eq!(
+            ModeResponseMatrix::new(vec![1], vec![2, 2]),
+            Err(ContractError::DuplicateResponseMode)
+        );
+    }
+
+    #[test]
+    fn response_matrix_requires_finite_measurements() {
+        let mut matrix = ModeResponseMatrix::new(vec![1], vec![2]).unwrap();
+        assert_eq!(
+            matrix.set(1, 2, ComplexResponse { real: f64::NAN, imag: 0.0 }),
+            Err(ContractError::NonFiniteResponseValue)
+        );
+    }
+
+    #[test]
+    fn response_matrix_relative_error_is_complex_and_axis_qualified() {
+        let mut reference = ModeResponseMatrix::new(vec![1, 2], vec![1, 2]).unwrap();
+        let mut candidate = ModeResponseMatrix::new(vec![1, 2], vec![1, 2]).unwrap();
+        for output in [1, 2] {
+            for input in [1, 2] {
+                let value = ComplexResponse::new((input + output) as f64, 0.5).unwrap();
+                reference.set(input, output, value).unwrap();
+                candidate.set(input, output, value).unwrap();
+            }
+        }
+        assert_eq!(candidate.relative_frobenius_error(&reference).unwrap(), 0.0);
+        let mut changed = candidate.clone();
+        changed
+            .set(1, 1, ComplexResponse::new(2.0, 1.0).unwrap())
+            .unwrap();
+        assert!(changed.relative_frobenius_error(&reference).unwrap() > 0.0);
+        let wrong_axes = ModeResponseMatrix::new(vec![2, 1], vec![1, 2]).unwrap();
+        assert_eq!(
+            candidate.relative_frobenius_error(&wrong_axes),
+            Err(ContractError::ResponseMatrixAxisMismatch)
+        );
+    }
+
+    #[test]
+    fn response_matrix_relative_error_rejects_missing_entries_and_zero_reference() {
+        let mut reference = ModeResponseMatrix::new(vec![1], vec![1]).unwrap();
+        let candidate = ModeResponseMatrix::new(vec![1], vec![1]).unwrap();
+        reference.set(1, 1, ComplexResponse::new(1.0, 0.0).unwrap()).unwrap();
+        assert_eq!(
+            candidate.relative_frobenius_error(&reference),
+            Err(ContractError::MissingResponseEntry)
+        );
+
+        let mut zero_reference = ModeResponseMatrix::new(vec![1], vec![1]).unwrap();
+        zero_reference
+            .set(1, 1, ComplexResponse::default())
+            .unwrap();
+        assert_eq!(
+            zero_reference.relative_frobenius_error(&zero_reference),
+            Err(ContractError::ZeroResponseReferenceNorm)
+        );
+    }
+
+    #[test]
+    fn signed_response_coefficients_recover_linear_and_quadratic_complex_terms() {
+        let amplitude = 0.1;
+        let c0 = ComplexResponse::new(2.0, -1.0).unwrap();
+        let c1 = ComplexResponse::new(3.0, 0.5).unwrap();
+        let c2 = ComplexResponse::new(-2.0, 1.5).unwrap();
+        let positive = c0
+            .add(c1.scale(amplitude).unwrap())
+            .unwrap()
+            .add(c2.scale(amplitude * amplitude).unwrap())
+            .unwrap();
+        let negative = c0
+            .sub(c1.scale(amplitude).unwrap())
+            .unwrap()
+            .add(c2.scale(amplitude * amplitude).unwrap())
+            .unwrap();
+        let (estimated_c1, estimated_c2) =
+            signed_response_coefficients(positive, negative, c0, amplitude).unwrap();
+        assert!((estimated_c1.real - c1.real).abs() < 1.0e-12);
+        assert!((estimated_c1.imag - c1.imag).abs() < 1.0e-12);
+        assert!((estimated_c2.real - c2.real).abs() < 1.0e-12);
+        assert!((estimated_c2.imag - c2.imag).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn mixed_response_coefficient_recovers_complex_cross_term() {
+        let base = ComplexResponse::new(0.2, -0.1).unwrap();
+        let amplitude_a = 0.1;
+        let amplitude_b = 0.2;
+        let cross = ComplexResponse::new(2.0, -3.0).unwrap();
+        let response = |sign_a: f64, sign_b: f64| {
+            base.add(
+                cross
+                    .scale(sign_a * sign_b * amplitude_a * amplitude_b)
+                    .unwrap(),
+            )
+            .unwrap()
+        };
+        let estimate = mixed_response_coefficient(
+            response(1.0, 1.0),
+            response(1.0, -1.0),
+            response(-1.0, 1.0),
+            response(-1.0, -1.0),
+            amplitude_a,
+            amplitude_b,
+        )
+        .unwrap();
+        assert!((estimate.real - cross.real).abs() < 1.0e-12);
+        assert!((estimate.imag - cross.imag).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn response_estimators_reject_zero_non_finite_and_overflowed_amplitudes() {
+        let value = ComplexResponse::new(1.0, 0.0).unwrap();
+        assert_eq!(
+            signed_response_coefficients(value, value, value, 0.0),
+            Err(ContractError::InvalidResponseAmplitude)
+        );
+        assert_eq!(
+            mixed_response_coefficient(value, value, value, value, 0.1, f64::INFINITY),
+            Err(ContractError::InvalidResponseAmplitude)
+        );
+        assert_eq!(
+            mixed_response_coefficient(value, value, value, value, f64::MAX, f64::MAX),
+            Err(ContractError::InvalidResponseAmplitude)
+        );
+    }
+
+    #[test]
+    fn wrapped_phase_difference_handles_branch_cut_and_zero_magnitude() {
+        let candidate = ComplexResponse::new(-1.0, -1.0e-9).unwrap();
+        let reference = ComplexResponse::new(-1.0, 1.0e-9).unwrap();
+        let error = wrapped_phase_difference(candidate, reference).unwrap();
+        assert!(error.abs() < 1.0e-6);
+        assert_eq!(
+            wrapped_phase_difference(ComplexResponse::default(), reference),
+            None
         );
     }
 
