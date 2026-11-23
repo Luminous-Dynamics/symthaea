@@ -48,15 +48,18 @@ fn main() -> ExitCode {
         pair.candidate.pair_id
     );
     println!("scope_match={}", pair.scope_matches());
-    if let Some(evaluator) = &pair.evaluator_only {
+    if let (Some(evaluator), Some(sequent)) = (
+        pair.evaluator_only.as_ref(),
+        pair.candidate.local_stage.scope_binding.finite_boolean_sequent.as_ref(),
+    ) {
         if let Some(countermodel) = &evaluator.finite_boolean_countermodel {
             println!(
                 "finite_boolean_countermodel=verified premises={} conclusion=false",
-                countermodel.premises.len()
+                sequent.premises.len()
             );
             match check_finite_propositional_entailment(
-                &countermodel.premises,
-                &countermodel.conclusion,
+                &sequent.premises,
+                &sequent.conclusion,
                 MAX_FINITE_BOOLEAN_ATOMS,
             ) {
                 Ok(FiniteTruthTableResult::Countermodel {
@@ -71,6 +74,10 @@ fn main() -> ExitCode {
                             .map(|assignment| format!("{}={}", assignment.atom, assignment.value))
                             .collect::<Vec<_>>()
                             .join(",")
+                    );
+                    println!(
+                        "stored_evaluator_witness_matches_minimum={}",
+                        countermodel.valuation == valuation
                     );
                 }
                 Ok(FiniteTruthTableResult::NoCountermodelFound {

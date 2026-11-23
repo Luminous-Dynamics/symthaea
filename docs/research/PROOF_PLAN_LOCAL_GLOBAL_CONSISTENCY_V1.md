@@ -281,3 +281,12 @@ The CIRR calculator now reports a conservative 95% Wilson envelope in addition t
 - A zero eligible denominator returns no interval and no point estimate.
 
 This is an unclustered binomial diagnostic. It is not a substitute for a task-family/model-cluster bootstrap or a hierarchical model when observations share the same theorem family, model, prompt or task template. Reports must include the raw numerator/denominator and use cluster-aware uncertainty for confirmatory claims. The synthetic fixture remains too small to support any empirical CIRR claim.
+
+
+## 15. Bind finite countermodels to the candidate sequent
+
+The local/global receipt places the optional typed propositional sequent in the candidate-visible scope and commits its canonical representation with a domain-separated SHA-256 digest. The evaluator-only countermodel contains only the hidden valuation. It no longer carries its own premise/conclusion formulas.
+
+This closes a semantic-binding gap: a valid countermodel of an unrelated inference cannot be attached to an invalid-warrant label. Validation evaluates the hidden valuation against the exact candidate-visible sequent, checks complete atom coverage, rejects duplicate and unused atom assignments, and recomputes the sequent digest. Local and global stages must bind to the same typed sequent through the existing complete scope-equality gate.
+
+The truth-table oracle now searches assignments by increasing support size (fewest true atoms relative to the all-false baseline), then ascending bitmask order over sorted atom names. The stored evaluator witness can be compared with this deterministic minimum-support result. This is a pedagogical witness-selection policy for the bounded classical Boolean fragment, not a general measure of mathematical simplicity or proof complexity.

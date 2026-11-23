@@ -28,7 +28,34 @@
           "p → q"
         ],
         "conclusion_text": "q → p",
-        "warrant_text": "From p → q infer q → p."
+        "warrant_text": "From p → q infer q → p.",
+        "finite_boolean_sequent": {
+          "premises": [
+            {
+              "op": "implies",
+              "left": {
+                "op": "atom",
+                "name": "p"
+              },
+              "right": {
+                "op": "atom",
+                "name": "q"
+              }
+            }
+          ],
+          "conclusion": {
+            "op": "implies",
+            "left": {
+              "op": "atom",
+              "name": "q"
+            },
+            "right": {
+              "op": "atom",
+              "name": "p"
+            }
+          }
+        },
+        "finite_boolean_sequent_sha256": "b084568e0b234a6869ea57c1a3bc47d1764daf3ffe525f4ef6dfaba9b43434c8"
       },
       "execution": {
         "prompt_sha256": "19ecd8ae491541d1451cd6bdf9fc9a173b3a55b834f0987d0df62d72ce7ba4fe",
@@ -63,7 +90,34 @@
           "p → q"
         ],
         "conclusion_text": "q → p",
-        "warrant_text": "From p → q infer q → p."
+        "warrant_text": "From p → q infer q → p.",
+        "finite_boolean_sequent": {
+          "premises": [
+            {
+              "op": "implies",
+              "left": {
+                "op": "atom",
+                "name": "p"
+              },
+              "right": {
+                "op": "atom",
+                "name": "q"
+              }
+            }
+          ],
+          "conclusion": {
+            "op": "implies",
+            "left": {
+              "op": "atom",
+              "name": "q"
+            },
+            "right": {
+              "op": "atom",
+              "name": "p"
+            }
+          }
+        },
+        "finite_boolean_sequent_sha256": "b084568e0b234a6869ea57c1a3bc47d1764daf3ffe525f4ef6dfaba9b43434c8"
       },
       "execution": {
         "prompt_sha256": "bbdf550fd6093eb04217ece68774b259e5bde9a92071bcb6ff9be5bec7c18c1f",
@@ -100,30 +154,6 @@
       "LOCAL-GLOBAL-PAIR:SYNTHETIC-ONLY"
     ],
     "finite_boolean_countermodel": {
-      "premises": [
-        {
-          "op": "implies",
-          "left": {
-            "op": "atom",
-            "name": "p"
-          },
-          "right": {
-            "op": "atom",
-            "name": "q"
-          }
-        }
-      ],
-      "conclusion": {
-        "op": "implies",
-        "left": {
-          "op": "atom",
-          "name": "q"
-        },
-        "right": {
-          "op": "atom",
-          "name": "p"
-        }
-      },
       "valuation": [
         {
           "atom": "p",

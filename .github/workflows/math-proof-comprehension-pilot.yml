@@ -174,8 +174,12 @@ jobs:
             and .evaluator_only.independently_assessed_warrant == "invalid"
             and .evaluator_only.global_disposition == "used_directly"
             and .evaluator_only.finite_boolean_countermodel.premises[0].op == "implies"
-            and .evaluator_only.finite_boolean_countermodel.conclusion.op == "implies"
-            and .evaluator_only.finite_boolean_countermodel.valuation == [{ "atom": "p", "value": false }, { "atom": "q", "value": true }]' \
+            and .candidate.local_stage.scope_binding.finite_boolean_sequent.premises[0].op == "implies"
+            and .candidate.local_stage.scope_binding.finite_boolean_sequent.conclusion.op == "implies"
+            and .candidate.local_stage.scope_binding.finite_boolean_sequent_sha256 == "b084568e0b234a6869ea57c1a3bc47d1764daf3ffe525f4ef6dfaba9b43434c8"
+            and .evaluator_only.finite_boolean_countermodel.valuation == [{ "atom": "p", "value": false }, { "atom": "q", "value": true }]
+            and (.evaluator_only.finite_boolean_countermodel | has("premises") | not)
+            and (.evaluator_only.finite_boolean_countermodel | has("conclusion") | not)' \
             docs/research/LOCAL_GLOBAL_PAIR_SYNTHETIC_V1.json >/dev/null
 
           jq -e '.schema_version == "1.0.0" and .candidate.task_id == "SYNTHETIC-SANDWICH-IMPLICATION-001" and .evaluator_only.stronger_obligations[0].id == "UPPER-STRONGER-P-IMPLIES-Q-AND-R" and (.evaluator_only.corollary_obligations | length) == 2' docs/research/MATH_PROOF_COMPREHENSION_THEOREM_SANDWICH_V1.json >/dev/null
