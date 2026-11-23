@@ -746,9 +746,11 @@ fn wilson_95(successes: usize, trials: usize) -> Option<(f64, f64)> {
     let z2 = Z * Z;
     let denominator = 1.0 + z2 / n;
     let center = (p + z2 / (2.0 * n)) / denominator;
-    let half_width =
-        Z * ((p * (1.0 - p) / n) + (z2 / (4.0 * n * n))).sqrt() / denominator;
-    Some(((center - half_width).max(0.0), (center + half_width).min(1.0)))
+    let half_width = Z * ((p * (1.0 - p) / n) + (z2 / (4.0 * n * n))).sqrt() / denominator;
+    Some((
+        (center - half_width).max(0.0),
+        (center + half_width).min(1.0),
+    ))
 }
 /// Compute CIRR only from independently adjudicated, validated receipts.
 /// Unknown global dispositions remain in the denominator and widen the interval;
@@ -795,8 +797,7 @@ pub fn compute_cirr(pairs: &[LocalGlobalPairV1]) -> Result<CirrSummary, Vec<Stri
         (denominator > 0).then(|| (numerator + unresolved) as f64 / denominator as f64);
     let point_estimate =
         (denominator > 0 && unresolved == 0).then(|| numerator as f64 / denominator as f64);
-    let wilson_95_envelope_lower =
-        wilson_95(numerator, denominator).map(|interval| interval.0);
+    let wilson_95_envelope_lower = wilson_95(numerator, denominator).map(|interval| interval.0);
     let wilson_95_envelope_upper =
         wilson_95(numerator + unresolved, denominator).map(|interval| interval.1);
 
