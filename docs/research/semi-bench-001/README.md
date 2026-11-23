@@ -83,6 +83,8 @@ The industrial process-control stack combines inspection, metrology and data ana
 
 **Our opportunity:** robust sensor-fusion and virtual metrology that explicitly model calibration, uncertainty, missingness, tool state, recipe/profile identity, data lineage and out-of-distribution conditions. The differentiator should be auditable, calibrated and transportable decision quality—not another unqualified “AI yield predictor.”
 
+**Current research increments:** [Adaptive metrology and evidence-qualified intelligence](2026-adaptive-metrology-policy-replay.md) and [policy replay draft PR #13328](https://github.com/Luminous-Dynamics/symthaea/pull/13328) extend this into a known-truth evaluation of sampling bias, propensity integrity, delayed evidence, design variance and transfer abstention. [CMP data-integrity and constrained recipe-screening issue #13334](https://github.com/Luminous-Dynamics/symthaea/issues/13334) tracks the separate problem of qualifying sensor/label integrity before temporal soft sensing or recipe optimization. The first Rust replay generator/evaluator is a synthetic prototype; it is not a physical fab qualification or a completed policy tournament.
+
 ### 5. Digital twins and cross-technology co-optimization
 
 Digital twins are valuable only when their state, parameters, observation paths, uncertainty and validation boundaries are explicit. Imec's 2026 strategy highlights cross-technology co-optimization (XTCO), while NIST's digital-twin work emphasizes verification, validation, uncertainty quantification, interoperability and cybersecurity challenges.
