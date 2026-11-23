@@ -1,0 +1,346 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/mace_onpolicy_candidate_action_v1.schema.json",
+  "title": "MACE On-Policy Candidate Action v1",
+  "description": "Strict candidate-emitted interaction action. The evaluator records the action before applying the environment/user response and before any hidden outcome is released.",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "record_type",
+        "run_id",
+        "episode_id",
+        "action_sequence",
+        "previous_event_sha256",
+        "action_type",
+        "content",
+        "evidence_event_ids"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mace_onpolicy_candidate_action_v1"
+        },
+        "record_type": {
+          "const": "candidate_action"
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "episode_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "action_sequence": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "previous_event_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "action_type": {
+          "const": "respond"
+        },
+        "content": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32768
+        },
+        "evidence_event_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "abstention_reason": {
+          "type": "string",
+          "maxLength": 1024
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "record_type",
+        "run_id",
+        "episode_id",
+        "action_sequence",
+        "previous_event_sha256",
+        "action_type",
+        "question",
+        "purpose_scope",
+        "requested_data_categories"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mace_onpolicy_candidate_action_v1"
+        },
+        "record_type": {
+          "const": "candidate_action"
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "episode_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "action_sequence": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "previous_event_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "action_type": {
+          "const": "ask_user"
+        },
+        "question": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8192
+        },
+        "purpose_scope": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "requested_data_categories": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "evidence_event_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "record_type",
+        "run_id",
+        "episode_id",
+        "action_sequence",
+        "previous_event_sha256",
+        "action_type",
+        "operation",
+        "memory_item_sha256",
+        "purpose_scope",
+        "parent_event_ids"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mace_onpolicy_candidate_action_v1"
+        },
+        "record_type": {
+          "const": "candidate_action"
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "episode_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "action_sequence": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "previous_event_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "action_type": {
+          "const": "memory_mutation"
+        },
+        "operation": {
+          "enum": [
+            "write",
+            "update",
+            "supersede",
+            "retract",
+            "erase"
+          ]
+        },
+        "memory_item_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "purpose_scope": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "parent_event_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "uniqueItems": true
+        },
+        "supersedes_memory_item_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "retention_policy_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "record_type",
+        "run_id",
+        "episode_id",
+        "action_sequence",
+        "previous_event_sha256",
+        "action_type",
+        "tool_id",
+        "arguments_sha256",
+        "purpose_scope"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mace_onpolicy_candidate_action_v1"
+        },
+        "record_type": {
+          "const": "candidate_action"
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "episode_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "action_sequence": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "previous_event_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "action_type": {
+          "const": "tool_request"
+        },
+        "tool_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "arguments_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "purpose_scope": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "required_authority_profile_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "record_type",
+        "run_id",
+        "episode_id",
+        "action_sequence",
+        "previous_event_sha256",
+        "action_type",
+        "reason"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mace_onpolicy_candidate_action_v1"
+        },
+        "record_type": {
+          "const": "candidate_action"
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "episode_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "action_sequence": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "previous_event_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "action_type": {
+          "const": "abstain"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "missing_evidence_scopes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "uniqueItems": true
+        }
+      }
+    }
+  ]
+}
