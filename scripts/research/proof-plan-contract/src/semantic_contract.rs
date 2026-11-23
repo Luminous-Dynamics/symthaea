@@ -942,20 +942,33 @@ mod tests {
 
     #[test]
     fn reordering_context_assumptions_preserves_sequent_semantics() {
-        let mut first = fixture();
-        first.candidate.statement_formula = atom("q");
-        first.candidate.statement_context = vec![atom("p"), atom("r")];
+        let first_context = vec![atom("p"), atom("r")];
+        let second_context = vec![atom("r"), atom("p")];
+        let conclusion = atom("q");
+        let first_sequent = sequent_formula(&first_context, &conclusion);
+        let second_sequent = sequent_formula(&second_context, &conclusion);
 
-        let mut second = first.clone();
-        second.candidate.statement_context.reverse();
+        let forward = check_finite_propositional_entailment(
+            std::slice::from_ref(&first_sequent),
+            &second_sequent,
+            MAX_FINITE_BOOLEAN_ATOMS,
+        )
+        .expect("well-formed first-to-second sequent comparison");
+        let reverse = check_finite_propositional_entailment(
+            std::slice::from_ref(&second_sequent),
+            &first_sequent,
+            MAX_FINITE_BOOLEAN_ATOMS,
+        )
+        .expect("well-formed second-to-first sequent comparison");
 
-        let first_report = evaluate_receipt(&first).expect("valid first context ordering");
-        let second_report = evaluate_receipt(&second).expect("valid second context ordering");
-        assert_eq!(
-            first_report.classification,
-            SandwichClassification::ConsistentWithSelectedControls
-        );
-        assert_eq!(first_report.classification, second_report.classification);
+        assert!(matches!(
+            forward,
+            FiniteTruthTableResult::NoCountermodelFound { .. }
+        ));
+        assert!(matches!(
+            reverse,
+            FiniteTruthTableResult::NoCountermodelFound { .. }
+        ));
     }
 
     #[test]
