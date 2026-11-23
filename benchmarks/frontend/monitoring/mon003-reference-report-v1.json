@@ -4,9 +4,9 @@
   "runtime": {
     "node_version": "v22.16.0",
     "source_path": "benchmarks/frontend/monitoring/mon003-objective-kernel-v1.mjs",
-    "source_sha256": "eee472accbff167138e71791448a782ec73e36c271e69f412c8a4fd5a5c5e182"
+    "source_sha256": "e34246012cf360f37fa3d014b3c2515d150e1b9c8a6ec4c483c256d53452071f"
   },
-  "deterministic_cases": 8,
+  "deterministic_cases": 9,
   "cases": [
     {
       "name": "edge receipt survives level falling false but remains event evidence",
@@ -30,6 +30,10 @@
     },
     {
       "name": "same idempotency key with a different request digest is rejected",
+      "result": "pass"
+    },
+    {
+      "name": "worker cannot falsify the request digest during an idempotent replay",
       "result": "pass"
     },
     {
