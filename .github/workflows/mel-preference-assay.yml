@@ -1,0 +1,97 @@
+name: MEL blind preference assay
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "tools/mel-preference-assay/**"
+      - "docs/research/MEL_PREFERENCE_MEASUREMENT_ASSURANCE_V1_2026-11-22.md"
+      - ".github/workflows/mel-preference-assay.yml"
+  push:
+    branches:
+      - research/mel-blind-preference-assay-v1-20261122
+    paths:
+      - "tools/mel-preference-assay/**"
+      - "docs/research/MEL_PREFERENCE_MEASUREMENT_ASSURANCE_V1_2026-11-22.md"
+      - ".github/workflows/mel-preference-assay.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  preference-assay:
+    name: Exact-source preference assay qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact tested head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify source revision and preserve committed inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+          evidence="$RUNNER_TEMP/mel-preference-evidence"
+          mkdir -p "$evidence"
+          printf 'exact_head=%s\\n' "$actual" > "$evidence/source-revision.txt"
+          git rev-parse HEAD:tools/mel-preference-assay/src/lib.rs > "$evidence/lib-blob.txt"
+          git rev-parse HEAD:tools/mel-preference-assay/src/main.rs > "$evidence/main-blob.txt"
+          cp tools/mel-preference-assay/src/lib.rs "$evidence/lib.committed.rs"
+          cp tools/mel-preference-assay/src/main.rs "$evidence/main.committed.rs"
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Normalize formatting and preserve the exact diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 fmt --manifest-path tools/mel-preference-assay/Cargo.toml
+          cargo +1.96.0 fmt --check --manifest-path tools/mel-preference-assay/Cargo.toml
+          diff -u "$RUNNER_TEMP/mel-preference-evidence/lib.committed.rs" tools/mel-preference-assay/src/lib.rs > "$RUNNER_TEMP/mel-preference-evidence/lib-rustfmt.diff" || test "$?" -eq 1
+          diff -u "$RUNNER_TEMP/mel-preference-evidence/main.committed.rs" tools/mel-preference-assay/src/main.rs > "$RUNNER_TEMP/mel-preference-evidence/main-rustfmt.diff" || test "$?" -eq 1
+          cp tools/mel-preference-assay/src/lib.rs "$RUNNER_TEMP/mel-preference-evidence/lib.formatted.rs"
+          cp tools/mel-preference-assay/src/main.rs "$RUNNER_TEMP/mel-preference-evidence/main.formatted.rs"
+          sha256sum "$RUNNER_TEMP/mel-preference-evidence/lib.committed.rs" "$RUNNER_TEMP/mel-preference-evidence/lib.formatted.rs" > "$RUNNER_TEMP/mel-preference-evidence/lib-source-identities.txt"
+      - name: Generate isolated dependency lock
+        run: cargo +1.96.0 generate-lockfile --manifest-path tools/mel-preference-assay/Cargo.toml
+      - name: Run deterministic assay tests
+        run: cargo +1.96.0 test --locked --manifest-path tools/mel-preference-assay/Cargo.toml
+      - name: Run warnings-denied Clippy
+        run: cargo +1.96.0 clippy --locked --manifest-path tools/mel-preference-assay/Cargo.toml --all-targets -- -D warnings
+      - name: Parse schema and synthetic fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m json.tool tools/mel-preference-assay/schema/mel-blind-preference-assay-v1.schema.json > /dev/null
+          python -m json.tool tools/mel-preference-assay/fixtures/valid-assay-v1.json > /dev/null
+      - name: Execute reference assay and assert claim ceiling
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 run --locked --quiet --manifest-path tools/mel-preference-assay/Cargo.toml -- tools/mel-preference-assay/fixtures/valid-assay-v1.json > "$RUNNER_TEMP/mel-preference-report.json"
+          python -c 'import json,sys; r=json.load(open(sys.argv[1])); assert r["valid"] is True; assert r["presentation_count"] == 4; assert r["side_bias"]["status"] == "insufficient_identical_controls"; assert r["order_effect"]["matched_case_count"] == 1; assert r["order_effect"]["mean_absolute_a_win_rate_gap"] == 0.0' "$RUNNER_TEMP/mel-preference-report.json"
+      - name: Record source and run evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/mel-preference-evidence"
+          cp tools/mel-preference-assay/Cargo.toml "$evidence/Cargo.toml"
+          cp tools/mel-preference-assay/Cargo.lock "$evidence/Cargo.lock"
+          cp tools/mel-preference-assay/schema/mel-blind-preference-assay-v1.schema.json "$evidence/schema.json"
+          cp tools/mel-preference-assay/fixtures/valid-assay-v1.json "$evidence/fixture.json"
+          cp "$RUNNER_TEMP/mel-preference-report.json" "$evidence/report.json"
+          (cd "$evidence" && sha256sum Cargo.toml Cargo.lock schema.json fixture.json report.json lib.committed.rs lib.formatted.rs main.committed.rs main.formatted.rs > SHA256SUMS)
+      - name: Upload exact-source evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: mel-preference-assay-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/mel-preference-evidence/
+          if-no-files-found: error
+          retention-days: 90
