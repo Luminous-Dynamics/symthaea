@@ -1290,7 +1290,9 @@ mod tests {
             .find(|observation| observation.sensor_id == "target-pressure")
             .unwrap();
         match &pressure.state {
-            SensorObservationStateV1::Observed { value, uncertainty, .. } => {
+            SensorObservationStateV1::Observed {
+                value, uncertainty, ..
+            } => {
                 assert_eq!(*value, 2500.0);
                 let expected_standard_uncertainty = (406.0625_f64).sqrt();
                 assert!(
