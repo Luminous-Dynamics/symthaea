@@ -2300,12 +2300,19 @@ mod tests {
         );
         assert_eq!(plan["runnable_task_count"], 0);
         let authored: Vec<&Value> = tasks.iter().filter(|task| task["fixture_status"] != "not_authored").collect();
-        assert_eq!(authored.len(), 1);
-        assert_eq!(authored[0]["promoted_task_id"], "SFEB-L2-005");
-        assert_eq!(authored[0]["fixture_status"], "fixture_ready");
-        assert_eq!(authored[0]["oracle_status"], "golden_cases_authored_rust_execution_pending");
-        assert_eq!(authored[0]["promotion_status"], "browser_runner_pending");
-        assert!(tasks.iter().filter(|task| task["task_id"] != "SFEB-PILOT-INT-003").all(|task| {
+        assert_eq!(authored.len(), 2);
+        let inventory = tasks.iter().find(|task| task["task_id"] == "SFEB-PILOT-INT-003").unwrap();
+        assert_eq!(inventory["promoted_task_id"], "SFEB-L2-005");
+        assert_eq!(inventory["fixture_status"], "fixture_ready");
+        assert_eq!(inventory["oracle_status"], "golden_cases_authored_rust_execution_pending");
+        assert_eq!(inventory["promotion_status"], "browser_runner_pending");
+        let reconciliation = tasks.iter().find(|task| task["task_id"] == "SFEB-PILOT-INT-004").unwrap();
+        assert_eq!(reconciliation["fixture_status"], "fixture_ready");
+        assert_eq!(reconciliation["oracle_status"], "golden_cases_authored_rust_execution_pending");
+        assert_eq!(reconciliation["promotion_status"], "browser_runner_pending");
+        assert!(tasks.iter().filter(|task| {
+            task["task_id"] != "SFEB-PILOT-INT-003" && task["task_id"] != "SFEB-PILOT-INT-004"
+        }).all(|task| {
             task["fixture_status"] == "not_authored"
                 && task["oracle_status"] == "not_authored"
                 && task["promotion_status"] == "planned_not_runnable"
