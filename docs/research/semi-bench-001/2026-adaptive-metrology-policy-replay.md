@@ -236,6 +236,12 @@ A single seed is not a result. A single synthetic generator is not a fab model. 
 
 No benchmark in this workstream grants wafer hold/release, physical measurement scheduling, recipe editing, APC/R2R writes or equipment-control authority.
 
+## Measurement-system characterization and multi-fidelity metrology
+
+The complementary workstream [#13356](https://github.com/Luminous-Dynamics/symthaea/issues/13356) expands the current fixed synthetic sensitivity/specificity model into an actual measurement-system characterization benchmark: repeatability, reproducibility, trueness/bias, linearity, hysteresis, resolution, calibration stability, correlated/common-cause errors and reference-standard traceability. It also defines a multi-fidelity policy path—cheap screening followed by higher-accuracy confirmation—where the optimized object is the value of the complete evidence package rather than the first measurement alone.
+
+This matters because the inspection measurement is not perfect ground truth. An instrument result can be biased, correlated with other measurements, outside its calibration validity or unable to distinguish the decision threshold. The current assay simulator is only a first correction to the perfect-label assumption; it does not yet model continuous gauge error, calibration drift, reference artifacts or gauge R&R.
+
 ## Related CMP workstream: data integrity before recipe optimization
 
 The complementary issue [#13334](https://github.com/Luminous-Dynamics/symthaea/issues/13334) addresses temporal probabilistic soft sensing and constrained Bayesian recipe screening on the PHM Society 2016 CMP Challenge dataset. It is intentionally separate from #13328: one evaluates metrology acquisition and population inference; the other evaluates whether data and process constraints are trustworthy enough to support an offline recipe proposal.
