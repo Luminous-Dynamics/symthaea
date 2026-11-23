@@ -29,6 +29,7 @@ _ALLOWED_PARAMS = {
     "source_screenshot_root",
     "workspace_dir",
     "domain",
+    "run_id",
     "top_k",
     "slice_radius",
     "neighbor_radius",
@@ -55,14 +56,21 @@ class MaceLongMemEvalV2Memory(Memory):
         source_root_value = memory_params.get("source_screenshot_root")
         workspace_value = memory_params.get("workspace_dir")
         domain = memory_params.get("domain", "web")
+        run_id = memory_params.get("run_id")
         require(isinstance(sidecar_value, str) and sidecar_value, "sidecar_binary is required")
         require(isinstance(source_root_value, str) and source_root_value, "source_screenshot_root is required")
         require(isinstance(workspace_value, str) and workspace_value, "workspace_dir is required")
         require(domain in {"web", "enterprise"}, "domain must be web or enterprise")
+        require(
+            isinstance(run_id, str) and run_id.strip()
+            and not any(ord(character) < 32 or ord(character) == 127 for character in run_id),
+            "run_id must be a non-empty printable identifier",
+        )
 
         self.sidecar_binary = Path(sidecar_value).expanduser().resolve(strict=True)
         require(self.sidecar_binary.is_file(), "sidecar_binary must be a file")
         require(os.access(self.sidecar_binary, os.X_OK), "sidecar_binary must be executable")
+        self.sidecar_binary_sha256 = self._sha256_file(self.sidecar_binary)
 
         self.source_screenshot_root = Path(source_root_value).expanduser().resolve(strict=True)
         require(self.source_screenshot_root.is_dir(), "source_screenshot_root must be a directory")
@@ -82,8 +90,12 @@ class MaceLongMemEvalV2Memory(Memory):
         self.workspace_dir.mkdir(parents=True, exist_ok=True)
         self.asset_root = self.workspace_dir / "assets"
         self.asset_root.mkdir(parents=True, exist_ok=True)
+        self.candidate_evidence_dir = self.workspace_dir / "candidate_evidence"
+        self.candidate_evidence_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+        os.chmod(self.candidate_evidence_dir, 0o700)
 
         self.domain = str(domain)
+        self.run_id = run_id
         self.top_k = self._bounded_int(memory_params.get("top_k", 8), "top_k", 1, 100)
         self.slice_radius = self._bounded_int(memory_params.get("slice_radius", 1), "slice_radius", 0, 32)
         self.neighbor_radius = self._bounded_int(
@@ -102,6 +114,146 @@ class MaceLongMemEvalV2Memory(Memory):
         self._inserted_ids: set[str] = set()
         super().__init__(memory_params)
         atexit.register(self.close)
+
+    @staticmethod
+    def _sha256_file(path: Path) -> str:
+        digest = hashlib.sha256()
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+        return digest.hexdigest()
+
+    @staticmethod
+    def _write_once(directory: Path, filename: str, payload: bytes) -> None:
+        directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+        os.chmod(directory, 0o700)
+        directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+        if hasattr(os, "O_CLOEXEC"):
+            directory_flags |= os.O_CLOEXEC
+        directory_fd = os.open(directory, directory_flags)
+        file_flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
+        if hasattr(os, "O_CLOEXEC"):
+            file_flags |= os.O_CLOEXEC
+        try:
+            try:
+                file_fd = os.open(filename, file_flags, 0o600, dir_fd=directory_fd)
+            except FileExistsError:
+                read_flags = os.O_RDONLY | os.O_NOFOLLOW
+                if hasattr(os, "O_CLOEXEC"):
+                    read_flags |= os.O_CLOEXEC
+                existing_fd = os.open(filename, read_flags, dir_fd=directory_fd)
+                try:
+                    metadata = os.fstat(existing_fd)
+                    require(stat.S_ISREG(metadata.st_mode), "candidate receipt is not a regular file")
+                    chunks: list[bytes] = []
+                    while True:
+                        chunk = os.read(existing_fd, 1024 * 1024)
+                        if not chunk:
+                            break
+                        chunks.append(chunk)
+                    require(
+                        b"".join(chunks) == payload,
+                        "candidate invocation ID was already bound to different evidence",
+                    )
+                finally:
+                    os.close(existing_fd)
+                return
+
+            try:
+                view = memoryview(payload)
+                written = 0
+                while written < len(view):
+                    count = os.write(file_fd, view[written:])
+                    require(count > 0, "short write while persisting candidate evidence")
+                    written += count
+                os.fsync(file_fd)
+            finally:
+                os.close(file_fd)
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+
+    def _persist_candidate_envelope(
+        self,
+        candidate_id: str,
+        query: str,
+        response: dict[str, Any],
+    ) -> None:
+        candidate_jsonl = response.get("candidate_evidence_jsonl")
+        record_count = response.get("candidate_record_count")
+        candidate_set_sha256 = response.get("candidate_set_sha256")
+        require(
+            isinstance(candidate_jsonl, str),
+            "sidecar response candidate_evidence_jsonl must be a string",
+        )
+        require(
+            isinstance(record_count, int) and not isinstance(record_count, bool) and record_count >= 0,
+            "sidecar response candidate_record_count must be a non-negative integer",
+        )
+
+        query_sha256 = hashlib.sha256(query.encode("utf-8")).hexdigest()
+        lines = [line for line in candidate_jsonl.splitlines() if line.strip()]
+        require(len(lines) == record_count, "candidate record count does not match JSONL")
+        if record_count == 0:
+            require(
+                candidate_set_sha256 is None and not candidate_jsonl,
+                "empty candidate result must not carry a candidate-set digest",
+            )
+        else:
+            require(
+                isinstance(candidate_set_sha256, str)
+                and len(candidate_set_sha256) == 64
+                and all(character in "0123456789abcdef" for character in candidate_set_sha256),
+                "candidate-set digest must be lowercase SHA-256",
+            )
+            for ordinal, line in enumerate(lines):
+                try:
+                    record = json.loads(line)
+                except json.JSONDecodeError as error:
+                    raise RuntimeError(f"invalid candidate JSONL record {ordinal}: {error}") from error
+                require(isinstance(record, dict), f"candidate JSONL record {ordinal} must be an object")
+                require(record.get("run_id") == self.run_id, "candidate run_id mismatch")
+                require(record.get("candidate_id") == candidate_id, "candidate invocation ID mismatch")
+                require(
+                    record.get("backend_id") == "mace_lmev2_bm25_text",
+                    "candidate backend ID mismatch",
+                )
+                require(
+                    record.get("backend_revision_sha256") == self.sidecar_binary_sha256,
+                    "candidate backend binary digest mismatch",
+                )
+                require(record.get("query_sha256") == query_sha256, "candidate query digest mismatch")
+                require(
+                    record.get("query_scope") == f"longmemeval-v2:domain:{self.domain}",
+                    "candidate query scope mismatch",
+                )
+
+        invocation_digest = hashlib.sha256(candidate_id.encode("utf-8")).hexdigest()
+        candidate_filename = f"{invocation_digest}.jsonl"
+        candidate_bytes = candidate_jsonl.encode("utf-8")
+        receipt = {
+            "schema_version": "mace_lmev2_candidate_receipt_v1",
+            "run_id": self.run_id,
+            "candidate_id": candidate_id,
+            "query_sha256": query_sha256,
+            "domain": self.domain,
+            "backend_id": "mace_lmev2_bm25_text",
+            "backend_revision_sha256": self.sidecar_binary_sha256,
+            "candidate_record_count": record_count,
+            "candidate_set_sha256": candidate_set_sha256,
+            "candidate_jsonl_sha256": hashlib.sha256(candidate_bytes).hexdigest(),
+            "candidate_file": candidate_filename,
+            "retrieval_mode": "text_bm25_with_original_image_evidence",
+        }
+        receipt_bytes = json.dumps(
+            receipt, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        ).encode("utf-8")
+        self._write_once(self.candidate_evidence_dir, candidate_filename, candidate_bytes)
+        self._write_once(
+            self.candidate_evidence_dir,
+            f"{invocation_digest}.receipt.json",
+            receipt_bytes,
+        )
 
     @staticmethod
     def _bounded_int(value: object, name: str, minimum: int, maximum: int) -> int:
@@ -136,6 +288,8 @@ class MaceLongMemEvalV2Memory(Memory):
         env.update(
             {
                 "MACE_LMEV2_DOMAIN": self.domain,
+                "MACE_LMEV2_RUN_ID": self.run_id,
+                "MACE_LMEV2_BACKEND_REVISION_SHA256": self.sidecar_binary_sha256,
                 "MACE_LMEV2_DATASET_ROOT": str(self.asset_root.resolve()),
                 "MACE_LMEV2_TOP_K": str(self.top_k),
                 "MACE_LMEV2_SLICE_RADIUS": str(self.slice_radius),
@@ -414,13 +568,21 @@ class MaceLongMemEvalV2Memory(Memory):
         query_image: str | None = None,
     ) -> list[MemoryContextItem]:
         require(isinstance(query, str) and query.strip(), "query must be non-empty")
+        query_context = self.get_query_context()
+        candidate_id = query_context.get("query_invocation_id")
+        require(
+            isinstance(candidate_id, str) and candidate_id.strip(),
+            "official LongMemEval-V2 query_invocation_id is required for evidence binding",
+        )
         response = self._rpc(
             {
                 "op": "query",
                 "query": query,
                 "query_image": query_image,
+                "candidate_id": candidate_id,
             }
         )
+        self._persist_candidate_envelope(candidate_id, query, response)
         items = response.get("items")
         if not isinstance(items, list):
             self._poison_sidecar()
@@ -448,6 +610,10 @@ class MaceLongMemEvalV2Memory(Memory):
         if saved_assets.exists():
             shutil.rmtree(saved_assets)
         shutil.copytree(self.asset_root, saved_assets, ignore=shutil.ignore_patterns(".staging"))
+        saved_evidence = state_dir / "candidate_evidence"
+        if saved_evidence.exists():
+            shutil.rmtree(saved_evidence)
+        shutil.copytree(self.candidate_evidence_dir, saved_evidence)
 
     def _load_backend(self, input_dir: Path) -> None:
         state_dir = input_dir / "mace_lmev2"
@@ -459,6 +625,11 @@ class MaceLongMemEvalV2Memory(Memory):
         if self.asset_root.exists():
             shutil.rmtree(self.asset_root)
         shutil.copytree(saved_assets, self.asset_root)
+        saved_evidence = state_dir / "candidate_evidence"
+        if saved_evidence.is_dir():
+            if self.candidate_evidence_dir.exists():
+                shutil.rmtree(self.candidate_evidence_dir)
+            shutil.copytree(saved_evidence, self.candidate_evidence_dir)
         self._trajectory_lines = []
         self._inserted_ids = set()
         for line in trajectories_path.read_text(encoding="utf-8").splitlines():
