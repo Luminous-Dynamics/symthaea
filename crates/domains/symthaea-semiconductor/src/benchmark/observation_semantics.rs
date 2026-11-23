@@ -115,6 +115,31 @@ pub struct SensorObservationReportV1 {
     pub claim_limits: ObservationClaimLimitsV1,
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct SensorCorrespondenceExecutionReportV1 {
+    pub schema: String,
+    pub mapping_id: String,
+    pub source_frame_sha256: String,
+    pub correspondence_manifest_sha256: String,
+    pub target_frame_sha256: Option<String>,
+    pub matched_count: usize,
+    pub structurally_absent_count: usize,
+    pub unsupported_count: usize,
+    pub transformed_observed_count: usize,
+    pub copied_non_point_state_count: usize,
+    pub unmapped_source_sensor_ids: Vec<String>,
+    pub abstain_required: bool,
+    pub abstention_reasons: Vec<String>,
+    pub report_sha256: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct SensorCorrespondenceExecutionV1 {
+    /// None means a complete target frame could not be constructed safely.
+    pub target_frame: Option<SensorObservationFrameV1>,
+    pub report: SensorCorrespondenceExecutionReportV1,
+}
+
 #[derive(Clone, Debug, PartialEq, Error)]
 #[error("{0}")]
 pub struct SensorObservationError(pub String);
@@ -562,6 +587,297 @@ pub fn validate_sensor_correspondence_manifest_v1(
         unsupported_count,
         position_only_alignment_rejected: true,
         report_sha256: sha256_hex(&serialized),
+    })
+}
+
+fn transform_observation_state_v1(
+    source: &SensorObservationV1,
+    mapping: &SensorCorrespondenceV1,
+    index: usize,
+) -> Result<(SensorObservationStateV1, bool), SensorObservationError> {
+    let transform = mapping.unit_transform.as_ref().ok_or_else(|| {
+        SensorObservationError(format!(
+            "correspondences[{index}].unit_transform: missing for matched mapping"
+        ))
+    })?;
+    let abstain = |reason: String| {
+        Err(SensorObservationError(format!(
+            "abstain: {} -> {}: {reason}",
+            source.sensor_id, mapping.target_sensor_id
+        )))
+    };
+
+    let state = match &source.state {
+        SensorObservationStateV1::Observed {
+            value,
+            unit,
+            uncertainty,
+        } => {
+            if unit != &transform.source_unit {
+                return abstain(format!(
+                    "source unit {unit} differs from declared transform source unit {}",
+                    transform.source_unit
+                ));
+            }
+            let converted_value = value * transform.scale + transform.offset;
+            let converted_uncertainty =
+                uncertainty.standard_uncertainty * transform.scale.abs();
+            if !converted_value.is_finite() || !converted_uncertainty.is_finite() {
+                return abstain("unit conversion overflowed to a non-finite value".into());
+            }
+            (
+                SensorObservationStateV1::Observed {
+                    value: converted_value,
+                    unit: transform.target_unit.clone(),
+                    uncertainty: MeasurementUncertaintyV1 {
+                        standard_uncertainty: converted_uncertainty,
+                        coverage_probability: uncertainty.coverage_probability,
+                        method_ref: format!(
+                            "{};transform={}",
+                            uncertainty.method_ref, transform.transform_evidence_ref
+                        ),
+                    },
+                },
+                true,
+            )
+        }
+        SensorObservationStateV1::ObservedUnqualified { .. } => {
+            return abstain(
+                "unqualified observation has no source unit or uncertainty semantics".into(),
+            );
+        }
+        SensorObservationStateV1::Censored {
+            lower_bound,
+            upper_bound,
+            unit,
+            censoring_basis,
+            evidence_ref,
+        } => {
+            if unit != &transform.source_unit {
+                return abstain(format!(
+                    "censored source unit {unit} differs from declared transform source unit {}",
+                    transform.source_unit
+                ));
+            }
+            let convert = |value: f64| value * transform.scale + transform.offset;
+            let converted_bounds = match (lower_bound, upper_bound) {
+                (Some(lower), Some(upper)) if transform.scale > 0.0 => {
+                    (Some(convert(*lower)), Some(convert(*upper)))
+                }
+                (Some(lower), Some(upper)) => (Some(convert(*upper)), Some(convert(*lower))),
+                (Some(lower), None) if transform.scale > 0.0 => (Some(convert(*lower)), None),
+                (Some(lower), None) => (None, Some(convert(*lower))),
+                (None, Some(upper)) if transform.scale > 0.0 => (None, Some(convert(*upper))),
+                (None, Some(upper)) => (Some(convert(*upper)), None),
+                (None, None) => {
+                    return abstain("censored observation has no numeric bounds".into());
+                }
+            };
+            if converted_bounds
+                .0
+                .into_iter()
+                .chain(converted_bounds.1)
+                .any(|value| !value.is_finite())
+            {
+                return abstain("censored unit conversion produced a non-finite bound".into());
+            }
+            (
+                SensorObservationStateV1::Censored {
+                    lower_bound: converted_bounds.0,
+                    upper_bound: converted_bounds.1,
+                    unit: transform.target_unit.clone(),
+                    censoring_basis: censoring_basis.clone(),
+                    evidence_ref: format!(
+                        "{};transform={}",
+                        evidence_ref, transform.transform_evidence_ref
+                    ),
+                },
+                true,
+            )
+        }
+        other => (other.clone(), false),
+    };
+    Ok(state)
+}
+
+/// Executes a correspondence manifest against one source frame.
+///
+/// No positional fallback is permitted. A missing source identity, unsupported
+/// target mapping, unqualified numeric source value, or incompatible unit
+/// causes an explicit abstention and returns no target frame.
+pub fn execute_sensor_correspondence_v1(
+    source_frame: &SensorObservationFrameV1,
+    manifest: &SensorCorrespondenceManifestV1,
+) -> Result<SensorCorrespondenceExecutionV1, SensorObservationError> {
+    let source_report = validate_sensor_observation_frame_v1(source_frame)?;
+    let manifest_report = validate_sensor_correspondence_manifest_v1(manifest)?;
+    if source_frame.sensor_schema_sha256 != manifest.source_sensor_schema_sha256 {
+        return Err(SensorObservationError(
+            "source frame sensor schema digest differs from correspondence manifest".into(),
+        ));
+    }
+
+    let source_frame_bytes = serde_json::to_vec(source_frame).map_err(|error| {
+        SensorObservationError(format!("source frame serialization failed: {error}"))
+    })?;
+    let manifest_bytes = serde_json::to_vec(manifest).map_err(|error| {
+        SensorObservationError(format!("correspondence manifest serialization failed: {error}"))
+    })?;
+    let source_frame_sha256 = sha256_hex(&source_frame_bytes);
+    let correspondence_manifest_sha256 = sha256_hex(&manifest_bytes);
+    let source_by_id: std::collections::BTreeMap<&str, &SensorObservationV1> = source_frame
+        .observations
+        .iter()
+        .map(|observation| (observation.sensor_id.as_str(), observation))
+        .collect();
+
+    let mut ordered_correspondences: Vec<_> = manifest.correspondences.iter().collect();
+    ordered_correspondences.sort_by(|left, right| {
+        left.target_sensor_id.cmp(&right.target_sensor_id)
+    });
+
+    let mapped_source_ids: BTreeSet<&str> = manifest
+        .correspondences
+        .iter()
+        .filter_map(|mapping| mapping.source_sensor_id.as_deref())
+        .collect();
+    let mut unmapped_source_sensor_ids: Vec<String> = source_frame
+        .observations
+        .iter()
+        .filter(|observation| !mapped_source_ids.contains(observation.sensor_id.as_str()))
+        .map(|observation| observation.sensor_id.clone())
+        .collect();
+    unmapped_source_sensor_ids.sort();
+
+    let mut target_observations = Vec::with_capacity(ordered_correspondences.len());
+    let mut matched_count = 0_usize;
+    let mut structurally_absent_count = 0_usize;
+    let mut unsupported_count = 0_usize;
+    let mut transformed_observed_count = 0_usize;
+    let mut copied_non_point_state_count = 0_usize;
+    let mut abstention_reasons = Vec::new();
+
+    for mapping in ordered_correspondences {
+        match mapping.status {
+            SensorCorrespondenceStatusV1::Matched => {
+                matched_count += 1;
+                let Some(source_id) = mapping.source_sensor_id.as_deref() else {
+                    abstention_reasons.push(format!(
+                        "target {} declares matched status without a source sensor ID",
+                        mapping.target_sensor_id
+                    ));
+                    continue;
+                };
+                let Some(source) = source_by_id.get(source_id).copied() else {
+                    abstention_reasons.push(format!(
+                        "target {} requires source sensor {}, which is absent from the source frame",
+                        mapping.target_sensor_id, source_id
+                    ));
+                    continue;
+                };
+                match transform_observation_state_v1(source, mapping, 0) {
+                    Ok((state, transformed)) => {
+                        if transformed {
+                            transformed_observed_count += 1;
+                        } else {
+                            copied_non_point_state_count += 1;
+                        }
+                        target_observations.push(SensorObservationV1 {
+                            sensor_id: mapping.target_sensor_id.clone(),
+                            state,
+                            instrument_id: source.instrument_id.clone(),
+                            calibration_ref: source.calibration_ref.clone(),
+                        });
+                    }
+                    Err(error) => abstention_reasons.push(error.to_string()),
+                }
+            }
+            SensorCorrespondenceStatusV1::StructurallyAbsent => {
+                structurally_absent_count += 1;
+                target_observations.push(SensorObservationV1 {
+                    sensor_id: mapping.target_sensor_id.clone(),
+                    state: SensorObservationStateV1::NotInstalled {
+                        evidence_ref: mapping.evidence_ref.clone(),
+                    },
+                    instrument_id: None,
+                    calibration_ref: None,
+                });
+            }
+            SensorCorrespondenceStatusV1::Unsupported => {
+                unsupported_count += 1;
+                abstention_reasons.push(format!(
+                    "target {} has unsupported correspondence: {}",
+                    mapping.target_sensor_id, mapping.evidence_ref
+                ));
+            }
+        }
+    }
+
+    let abstain_required = !abstention_reasons.is_empty();
+    let target_frame = if abstain_required {
+        None
+    } else {
+        let transform_material = (
+            source_frame.transform_sha256.as_str(),
+            correspondence_manifest_sha256.as_str(),
+        );
+        let transform_sha256 = sha256_hex(
+            &serde_json::to_vec(&transform_material).map_err(|error| {
+                SensorObservationError(format!("transform digest serialization failed: {error}"))
+            })?,
+        );
+        let frame = SensorObservationFrameV1 {
+            schema: OBSERVATION_FRAME_SCHEMA_V1.into(),
+            frame_id: format!("{}::{}", source_frame.frame_id, manifest.mapping_id),
+            subject_id: source_frame.subject_id.clone(),
+            source_clock_domain_id: source_frame.source_clock_domain_id.clone(),
+            observed_at_source_local: source_frame.observed_at_source_local.clone(),
+            sensor_schema_sha256: manifest.target_sensor_schema_sha256.clone(),
+            source_artifact_sha256: source_frame.source_artifact_sha256.clone(),
+            transform_sha256,
+            observations: target_observations,
+        };
+        validate_sensor_observation_frame_v1(&frame)?;
+        Some(frame)
+    };
+
+    let target_frame_sha256 = target_frame
+        .as_ref()
+        .map(|frame| {
+            serde_json::to_vec(frame)
+                .map(|bytes| sha256_hex(&bytes))
+                .map_err(|error| {
+                    SensorObservationError(format!("target frame serialization failed: {error}"))
+                })
+        })
+        .transpose()?;
+    let mut report = SensorCorrespondenceExecutionReportV1 {
+        schema: "luminous.semi-bench.sensor-correspondence-execution-report.v1".into(),
+        mapping_id: manifest.mapping_id.clone(),
+        source_frame_sha256,
+        correspondence_manifest_sha256,
+        target_frame_sha256,
+        matched_count,
+        structurally_absent_count,
+        unsupported_count,
+        transformed_observed_count,
+        copied_non_point_state_count,
+        unmapped_source_sensor_ids,
+        abstain_required,
+        abstention_reasons,
+        report_sha256: String::new(),
+    };
+    let mut material = report.clone();
+    material.report_sha256.clear();
+    report.report_sha256 = sha256_hex(
+        &serde_json::to_vec(&material).map_err(|error| {
+            SensorObservationError(format!("execution report serialization failed: {error}"))
+        })?,
+    );
+    let _ = (source_report, manifest_report);
+    Ok(SensorCorrespondenceExecutionV1 {
+        target_frame,
+        report,
     })
 }
 
