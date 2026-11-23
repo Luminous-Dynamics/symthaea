@@ -180,16 +180,19 @@ All adversarial actions use a non-destructive mock sink. The mock must validate 
 
 ## 8. Benchmark design
 
-### 8.1 Eight matched arms
+### 8.1 Nine matched arms
 
 1. LLM sleep/reload/inspect.
 2. SentinelBench-style one-second `wait_for`.
 3. Fixed-interval browser polling.
 4. Untrusted notification + latest source-of-record reconciliation.
 5. Durable edge receipt + current authorization + idempotent sink.
-6. Existing durable-workflow baseline (e.g. Temporal Workflow History + Signal/Update + idempotent Activity), with the same event source and action sink.
-7. DBOS PostgreSQL-native durable execution baseline, with the same event source and external action sink.
-8. Full SFEB assurance contract over a durable backend (Temporal and DBOS), with sink-enforced fencing, signed receipts, tenant scope and independent postcondition verifier.
+6. Temporal native durable-workflow baseline (Workflow History + Signal/Update + idempotent Activity), with the same event source and action sink.
+7. Temporal + SFEB assurance layer (source evidence, current authorization, sink fencing, tenant scope and independent postcondition verifier).
+8. DBOS native PostgreSQL durable-execution baseline, with the same event source and external action sink.
+9. DBOS + SFEB assurance layer with the same evidence/authority/fencing/verifier contract.
+
+The native and augmented arms must be paired on the same backend. This separates the value of the orchestration engine from the incremental assurance layer and avoids hiding a backend effect inside one combined arm.
 
 Temporal is a meaningful orchestration baseline, not a strawman: it durably records workflow event history and replays it after worker replacement; its messaging model distinguishes asynchronous Signals from validated, tracked Updates; and its documentation warns that Activities can run more than once and downstream idempotency must be enforced by the called service. DBOS is a distinct database-native baseline: its documentation describes Postgres-backed workflow checkpoints and states that database writes can be made exactly-once when the mutation and checkpoint share one transaction, while external API effects still require idempotency keys. Give both baselines the same source feed, policy semantics and action sink. SFEB's hypothesis is not that it replaces durable workflow orchestration, but that event provenance, tenant scope, current authorization, sink-enforced fencing and independently verified postconditions deserve explicit semantics above the orchestration layer. Compare both backends with and without the SFEB assurance layer where feasible.
 
@@ -211,9 +214,9 @@ Reproduce SentinelBench's original wait/sleep comparison separately; its task-su
 
 **Liveness:** level-condition timely-action rate and edge eligible-event recall are distinct estimands. Report opportunity expiry misses separately from safe abstentions.
 
-**Recovery:** outcome-unknown frequency, authoritative reconciliation success, time to determine committed/not-committed, cursor-gap recovery and stale-worker rejection.
+**Recovery:** outcome-unknown frequency, authoritative reconciliation success, time to determine committed/not-committed, cursor-gap recovery, high-watermark rollback detection, duplicate/replay handling, and stale-worker rejection.
 
-**Latency:** p50/p95/p99 for event→delivery, wake→authoritative snapshot, snapshot→authorization, authorization→sink commit and sink commit→independent proof.
+**Latency/recovery:** p50/p95/p99 for event→delivery, wake→authoritative snapshot, snapshot→authorization, authorization→sink commit and sink commit→independent proof; also cursor-gap age, replay completion latency, source high-watermark lag and duration in quarantined/inconclusive states.
 
 **Efficiency:** verified dormancy ratio (VDR), process CPU seconds/hour, network bytes/hour, model/browser calls/hour, scheduler events/hour and fully loaded cost/hour. VDR does not imply zero CPU/network activity.
 
@@ -358,3 +361,24 @@ This is bounded sequential interleaving exploration, not a concurrent memory-mod
 ## 16. Local toolchain boundary
 
 The available local execution environment had Node.js v22.16.0 but no `rustc`, `cargo` or Nix executable. The Rust parity implementation is therefore not marked executed or passed. The current JS reference suites and bounded model checker were run locally; Rust translation remains an explicit next engineering gate rather than silently substituting Node results for Rust evidence.
+
+
+## 17. Partitioned source cursor and replay preflight (2026-11-23)
+
+Companion source: `benchmarks/frontend/monitoring/mon003-cursor-replay-v1.mjs`  
+Machine-readable report: `benchmarks/frontend/monitoring/mon003-cursor-replay-report-v1.json`
+
+Executed with Node.js v22.16.0:
+```sh
+node --check mon003-cursor-replay-v1.mjs
+node mon003-cursor-replay-v1.mjs
+```
+
+**Executed result: 15/15 deterministic cases passed.** Cases cover out-of-order delivery without cursor leap, replay gap closure, duplicate pending/committed delivery, source-scoped `(source,id)` identity, changed-content ID reuse, partition isolation, sequence forks and quarantine, high-watermark gap reporting, gap recovery, watermark rollback below committed cursor, watermark rollback while the consumer is behind, committed-sequence rewrite, high-watermark-without-evidence and malformed cursors.
+
+Exact source Git blob SHA: `5afddb6a1a647e200e836b0427bab1517fe3b8d1`.  
+Exact source SHA-256: `77919e99612be1253f9524b160cf9c43796f2c8d57c7b53ab8cfee59dcbdb032`.
+
+A source high-watermark cannot regress behind either the committed cursor or a previously trusted high-watermark. Only the contiguous committed prefix is eligible as source-event evidence; a notification or high-watermark alone cannot create an eligible event.
+
+This is a single-threaded in-memory cursor/replay model. It does not qualify a real broker, database cursor, retention/outbox transaction, concurrent cursor CAS, authenticated source identity or signed event provenance.
