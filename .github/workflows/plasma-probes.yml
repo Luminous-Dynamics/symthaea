@@ -1,6 +1,14 @@
 name: Plasma Probe Contract
 
 on:
+  push:
+    branches:
+      - "research/plasma-adversarial-probe-contract-v0-1"
+    paths:
+      - "Cargo.lock"
+      - "crates/domains/symthaea-plasma-probes/**"
+      - "benchmarks/plasma/adversarial-probes/**"
+      - ".github/workflows/plasma-probes.yml"
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
