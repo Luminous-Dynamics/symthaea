@@ -58,6 +58,10 @@ The guard returns an eligibility report only. It does not:
 
 `EligibleUnderDeclaredPolicy` means the supplied declared evidence contract passed. It is not independent physical traceability or source authenticity.
 
+## Numeric binding and rounding policy
+
+The v1 guard uses exact numeric equality for the corrected point value and a one-sided uncertainty check. It does not assume a hidden rounding tolerance. If a fab source emits rounded values, a future adapter must carry an explicit resolution/rounding policy and include it in the hashed receipt. The label payload digest binds its value, uncertainty, revision, source and metadata.
+
 ## Authored tests
 
 The test module covers:
