@@ -3,14 +3,15 @@ name: Decision Value Interaction
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review, edited]
-    branches: ["main", "research/joint-compute-observation-tournament-20261122"]
+    branches: ["main", "research/joint-compute-observation-tournament-20261122", "research/compute-observation-regret-interaction-rebuild3-20261123"]
     paths:
       - "research/decision-value-interaction-001/**"
       - "docs/research/DECISION_VALUE_COMPUTE_OBSERVATION_TOURNAMENT_V0_1.md"
+      - "docs/research/EXEC_DVPC_CAUSAL_PAIRING_001_V0_1.md"
       - "crates/domains/symthaea-capability-closure/fixtures/decision_value_compute_observation_tournament_v0.1.json"
       - ".github/workflows/decision-value-interaction.yml"
   push:
-    branches: ["research/compute-observation-regret-interaction-20261122"]
+    branches: ["research/compute-observation-regret-interaction-20261122", "research/dvpc-causal-pairing-001-20261123"]
     paths:
       - "research/decision-value-interaction-001/**"
       - "docs/research/DECISION_VALUE_COMPUTE_OBSERVATION_TOURNAMENT_V0_1.md"
