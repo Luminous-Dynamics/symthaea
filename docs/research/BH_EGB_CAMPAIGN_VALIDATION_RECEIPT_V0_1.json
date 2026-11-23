@@ -1,0 +1,128 @@
+{
+  "schema_version": "0.1.0",
+  "artifact_kind": "bh_egb_campaign_manifest_structural_replay",
+  "checked_utc": "2026-11-23",
+  "result": "pass_structural_source_pin_replay_only",
+  "repository_context": {
+    "symthaea_repository": "Luminous-Dynamics/symthaea",
+    "symthaea_branch": "research/bh-egb-symthaea-campaign-2026-11-23",
+    "symthaea_campaign_protocol_commit": "c98881471ddd929dfe97e9bb5c5d0e3ff71a790f",
+    "symtropy_repository": "Luminous-Dynamics/symtropy",
+    "symtropy_branch": "research/spin2-regularized-pivot-2026-11-21",
+    "symtropy_branch_head": "ef5a006023300086e134ba6d39ca4fc3e859872f"
+  },
+  "inputs": {
+    "manifest_path": "docs/research/BH_EGB_CAMPAIGN_EPISODES_V0_1.json",
+    "manifest_git_blob_sha1": "e2f44c570dfc28986a6ce05c35c66a787465f094",
+    "schema_path": "docs/research/BH_EGB_CAMPAIGN_EPISODES_V0_1.schema.json",
+    "schema_git_blob_sha1": "963c5d4ff8606bbf3877fa621348752394d8612e"
+  },
+  "checks": {
+    "manifest_json_parse": true,
+    "schema_json_parse": true,
+    "top_level_required_property_presence": true,
+    "unique_episode_ids": true,
+    "unique_action_ids": true,
+    "all_episode_action_references_resolve": true,
+    "all_declared_source_git_blob_ids_match_live_fetch": true,
+    "policy_arm_count": 10,
+    "episode_count": 8,
+    "action_count": 10,
+    "frozen_negative_control_count": 14,
+    "source_pin_count": 13,
+    "source_pin_matches": 13,
+    "source_pin_mismatches": 0,
+    "confirmatory_preconditions_all_unset": true
+  },
+  "source_pin_replay": [
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "ref": "main",
+      "path": "crates/core/symthaea-core/src/physics/general_relativity.rs",
+      "git_blob_sha1": "cae917e114407316bf263065d13a59dda9794e49"
+    },
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "ref": "main",
+      "path": "crates/bridges/symthaea-physics-bridge/src/integrated_discovery.rs",
+      "git_blob_sha1": "e840a4e316b8770dd0293154e9e116f30c049b9b"
+    },
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "ref": "main",
+      "path": "src/language/research_plugin.rs",
+      "git_blob_sha1": "9aa62780576f9937ce6310c9c0176fbfa51bb9d5"
+    },
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "ref": "main",
+      "path": "src/z3_bridge.rs",
+      "git_blob_sha1": "28b802030718c299105f6e337be3a94db699f1f7"
+    },
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "ref": "research/bh-egb-symthaea-campaign-2026-11-23",
+      "path": "docs/research/BH_EGB_SYMTHAEA_CAMPAIGN_V0_1.md",
+      "git_blob_sha1": "6ed3bab896d55d1eabe4563e41b373a7754a7ee7"
+    },
+    {
+      "repository": "Luminous-Dynamics/symtropy",
+      "ref": "research/spin2-regularized-pivot-2026-11-21",
+      "path": "crates/domains/symtropy-lovelock5d/benchmarks/spin2_boundary_response_operator_protocol_v1.md",
+      "git_blob_sha1": "435e86f3d6852b5e4df16d4a2068c62df8d50eda"
+    },
+    {
+      "repository": "Luminous-Dynamics/symtropy",
+      "ref": "research/spin2-regularized-pivot-2026-11-21",
+      "path": "crates/domains/symtropy-lovelock5d/benchmarks/verify_spin2_response_basis_covariance.py",
+      "git_blob_sha1": "5c5a973f06da5f18a6c6b8e0e75611746bcb2161"
+    },
+    {
+      "repository": "Luminous-Dynamics/symtropy",
+      "ref": "research/spin2-regularized-pivot-2026-11-21",
+      "path": "crates/domains/symtropy-lovelock5d/benchmarks/spin2_response_basis_covariance_v1.json",
+      "git_blob_sha1": "1063012ae7480858f9283671ac05843c89d5791a"
+    },
+    {
+      "repository": "Luminous-Dynamics/symtropy",
+      "ref": "research/spin2-regularized-pivot-2026-11-21",
+      "path": "crates/domains/symtropy-lovelock5d/benchmarks/spin2_coupling_sensitivity_continuation_contract_v1.md",
+      "git_blob_sha1": "f89fdb2fe19cafd13327ae44231485bc9874accf"
+    },
+    {
+      "repository": "Luminous-Dynamics/symtropy",
+      "ref": "research/spin2-regularized-pivot-2026-11-21",
+      "path": "crates/domains/symtropy-lovelock5d/benchmarks/akribiea_5d_mp_exact_fixture_v1.json",
+      "git_blob_sha1": "2cf5847556925aea7a376dadd6d4b4861d6d8bb8"
+    },
+    {
+      "repository": "Luminous-Dynamics/symtropy",
+      "ref": "research/spin2-regularized-pivot-2026-11-21",
+      "path": "crates/domains/symtropy-lovelock5d/benchmarks/akribiea_5d_mp_exact_reference.py",
+      "git_blob_sha1": "fc461ceb18d219ac7a0a97beee488bc1fb094ce7"
+    },
+    {
+      "repository": "Luminous-Dynamics/symtropy",
+      "ref": "research/spin2-regularized-pivot-2026-11-21",
+      "path": "crates/domains/symtropy-lovelock5d/benchmarks/derive_ma_lu_equal_spin_parameter_map.py",
+      "git_blob_sha1": "30616c178a051f0a2fd120aba8a9d03dfc8c865e"
+    },
+    {
+      "repository": "Luminous-Dynamics/symtropy",
+      "ref": "research/spin2-regularized-pivot-2026-11-21",
+      "path": "crates/domains/symtropy-lovelock5d/benchmarks/derive_ma_lu_equal_spin_symtropy_gauge.py",
+      "git_blob_sha1": "538003f2936e645ef8c7c62f4ffd1f4db00153ae"
+    }
+  ],
+  "exclusions": [
+    "not a JSON Schema implementation run",
+    "not a Rust build/test/Clippy run",
+    "not a hosted CI pass",
+    "not a Symthaea research-policy execution",
+    "not a finite-positive-coupling EGB BVP",
+    "not an interval existence/uniqueness theorem",
+    "not a branch-completeness or hyperbolicity result",
+    "not a SOTA comparison result"
+  ],
+  "claim_ceiling": "The check establishes that the manifest parses, its declared structural relationships pass the listed local checks, and all 13 pinned source blob IDs matched live public GitHub fetches at the declared refs. It does not validate the physics or execute Symthaea."
+}
