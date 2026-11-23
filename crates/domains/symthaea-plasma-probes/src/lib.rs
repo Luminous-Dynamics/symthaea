@@ -2644,6 +2644,28 @@ mod tests {
     }
 
     #[test]
+    fn periodic_torus_lift_is_continuous_across_near_seam_samples() {
+        let lift = PeriodicTorusLift::new(4).unwrap();
+        let epsilon = 1.0e-9;
+        let left = lift.features(1.0 - epsilon).unwrap();
+        let right = lift.features(epsilon).unwrap();
+        let left_derivative = lift.derivative(1.0 - epsilon).unwrap();
+        let right_derivative = lift.derivative(epsilon).unwrap();
+        let max_feature_gap = left
+            .iter()
+            .zip(&right)
+            .map(|(a, b)| (a - b).abs())
+            .fold(0.0_f64, f64::max);
+        let max_derivative_gap = left_derivative
+            .iter()
+            .zip(&right_derivative)
+            .map(|(a, b)| (a - b).abs())
+            .fold(0.0_f64, f64::max);
+        assert!(max_feature_gap < 1.0e-6);
+        assert!(max_derivative_gap < 1.0e-5);
+    }
+
+    #[test]
     fn periodic_torus_lift_derivatives_match_at_the_seam() {
         let lift = PeriodicTorusLift::new(4).unwrap();
         let at_zero = lift.derivative(0.0).unwrap();
