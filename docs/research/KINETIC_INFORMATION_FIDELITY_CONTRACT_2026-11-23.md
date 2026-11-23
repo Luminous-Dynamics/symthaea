@@ -43,6 +43,23 @@ Measure, where the representation exposes a comparable distribution:
 
 Dense, Hermite, Legendre and tensor representations must be compared through a declared common diagnostic projection or a converged reference. Comparing unrelated native coefficient norms is not a physical comparison.
 
+Report **strong** and **weak / observable** state errors separately. A strong diagnostic may use a weighted phase-space norm such as
+
+\[
+\epsilon_{L^2,w} =
+\frac{\|f-\hat f\|_{L^2(w)}}{\|f\|_{L^2(w)}+\epsilon_0},
+\]
+
+while an observable-projection error uses a frozen family of test functionals \(\Psi\):
+
+\[
+\epsilon_{\Psi} =
+\max_{\psi\in\Psi}
+\left|\int (f-\hat f)\,\psi(x,v)\,dx\,dv\right|.
+\]
+
+An optional negative-Sobolev norm may be reported as a separate diagnostic when its domain, boundary conditions and exponent are declared. Do not substitute it for a physical quantity of interest. Weak error can hide fine phase-space filaments; the intervention-response tier tests whether those hidden structures matter to the future physical questions actually registered.
+
 A learned fluid closure that does not reconstruct f(x,v,t) is not assigned an invented microscopic error. Its microscopic status is **unsupported / unscored** unless a separate recovery mechanism is supplied and tested.
 
 ### 1.2 Macroscopic-observable fidelity
@@ -443,7 +460,7 @@ The following work can proceed without waiting for long echo/recurrence workflow
 The initial paper-quality claims should be modest and independently testable:
 
 - **C1 — Observable and microscopic fidelity are non-equivalent.** Exhibit at least one reduced closure that passes a declared macroscopic contract while failing or not supporting microscopic reconstruction.
-- **C2 — Current-state error does not fully predict future-response error.** Find two candidate states with similar present QoI errors but materially different registered pulse responses.
+- **C2 — Current-state and weak-observable error do not fully predict future-response error.** Find two candidate states with similar present QoI / weak-projection errors but materially different registered pulse responses.
 - **C3 — Native indicators can predict response loss.** Show held-out calibration better than a field-amplitude-only baseline without a false-safe increase.
 - **C4 — Response-aware allocation can save compute.** At matched physical and response fidelity, demonstrate a Pareto improvement against fixed-resolution or global-state-error-only adaptation on at least one held-out cohort.
 - **C5 — The validity envelope is useful.** Predict when a representation must refine, recover, switch or abstain before a later intervention demonstrates the loss.
