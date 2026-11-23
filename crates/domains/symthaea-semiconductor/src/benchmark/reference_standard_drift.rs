@@ -88,7 +88,7 @@ pub struct ReferenceStandardDriftModelV1 {
     pub prediction_valid_until_unix_seconds: i64,
     /// When the model packet became available to this consumer.
     pub model_available_at_unix_seconds: i64,
-    pub fit_observation_count: u64,
+    pub fit_calibration_epoch_count: u64,
     pub history_manifest_sha256: String,
     pub holdout_validation_manifest_sha256: Option<String>,
     pub qualification: ReferenceDriftModelQualificationV1,
@@ -432,7 +432,7 @@ pub fn predict_reference_standard_drift_v1(
         reasons.push(ReferenceDriftReasonV1::CorrectionAnchorMismatch);
         status = ReferenceDriftPredictionStatusV1::Rejected;
     }
-    if input.model.fit_observation_count < input.policy.minimum_history_epochs {
+    if input.model.fit_calibration_epoch_count < input.policy.minimum_history_epochs {
         reasons.push(ReferenceDriftReasonV1::InsufficientHistoryEpochs);
         if status != ReferenceDriftPredictionStatusV1::Rejected {
             status = ReferenceDriftPredictionStatusV1::Unknown;
@@ -651,7 +651,7 @@ mod tests {
             prediction_valid_from_unix_seconds: 1_830_000_000,
             prediction_valid_until_unix_seconds: 1_900_000_000,
             model_available_at_unix_seconds: 1_849_200_000,
-            fit_observation_count: 8,
+            fit_calibration_epoch_count: 8,
             history_manifest_sha256: "d".repeat(64),
             holdout_validation_manifest_sha256: Some("e".repeat(64)),
             qualification: ReferenceDriftModelQualificationV1::Qualified,
@@ -791,7 +791,7 @@ mod tests {
     #[test]
     fn insufficient_history_and_missing_holdout_leave_model_unknown() {
         let mut too_few = input();
-        too_few.model.fit_observation_count = 2;
+        too_few.model.fit_calibration_epoch_count = 2;
         reseal(&mut too_few);
         let few_report = predict_reference_standard_drift_v1(&too_few).unwrap();
         assert_eq!(few_report.status, ReferenceDriftPredictionStatusV1::Unknown);
