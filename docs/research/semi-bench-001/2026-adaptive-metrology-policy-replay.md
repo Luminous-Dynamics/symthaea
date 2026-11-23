@@ -201,6 +201,14 @@ A single seed is not a result. A single synthetic generator is not a fab model. 
 
 No benchmark in this workstream grants wafer hold/release, physical measurement scheduling, recipe editing, APC/R2R writes or equipment-control authority.
 
+## Related CMP workstream: data integrity before recipe optimization
+
+The complementary issue [#13334](https://github.com/Luminous-Dynamics/symthaea/issues/13334) addresses temporal probabilistic soft sensing and constrained Bayesian recipe screening on the PHM Society 2016 CMP Challenge dataset. It is intentionally separate from #13328: one evaluates metrology acquisition and population inference; the other evaluates whether data and process constraints are trustworthy enough to support an offline recipe proposal.
+
+A late-2026 article (DOI [10.1080/21642583.2026.2753948](https://doi.org/10.1080/21642583.2026.2753948)) reports 672,744 sensor records, 1,981 labelled wafer-stage combinations and four unusually large MRR labels. The authors identify those values as unverified anomalies that could be consistent with export, unit-conversion or metrology faults, but the public data do not establish a cause. The correct response is not to delete or “correct” these observations by intuition. The benchmark should preserve the raw files, carry disputed-label state, compare robust and sensitivity analyses side-by-side, and require source evidence before authoritative reinterpretation.
+
+The deeper paradigm shift is **feasibility before optimization**: a Bayesian optimizer must not maximize predicted utility through a questionable target scale or a constraint whose unit/authority is unresolved. Every proposed recipe remains an offline, independently re-scoreable candidate; this work creates no production-control authority.
+
 ## Claim ceiling
 
 A passing synthetic replay demonstrates only that the declared policy/evaluator behaves as expected on the declared synthetic scenarios. Public-dataset reproduction demonstrates only the reproduced data/protocol. Neither proves real-fab transfer, yield gain, scrap reduction, lower operating cost, metrology traceability or safe process control.
