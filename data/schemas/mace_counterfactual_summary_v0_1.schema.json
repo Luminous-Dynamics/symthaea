@@ -83,7 +83,9 @@
         "mean_abstained",
         "task_block_aggregation",
         "input_candidate_stream_sha256",
-        "input_candidate_record_count"
+        "input_candidate_record_count",
+        "input_evaluator_stream_sha256",
+        "input_evaluator_record_count"
       ],
       "properties": {
         "schema_version": {
@@ -199,6 +201,13 @@
         "input_candidate_record_count": {
           "type": "integer",
           "minimum": 1
+        },
+        "input_evaluator_stream_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "input_evaluator_record_count": {
+          "type": "integer",
+          "minimum": 1
         }
       }
     },
@@ -231,7 +240,9 @@
         "regret_delta_cluster_bootstrap_95pct_ci",
         "paired_task_block_aggregation",
         "input_candidate_stream_sha256",
-        "input_candidate_record_count"
+        "input_candidate_record_count",
+        "input_evaluator_stream_sha256",
+        "input_evaluator_record_count"
       ],
       "properties": {
         "schema_version": {
@@ -317,6 +328,13 @@
           "$ref": "#/$defs/sha256"
         },
         "input_candidate_record_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "input_evaluator_stream_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "input_evaluator_record_count": {
           "type": "integer",
           "minimum": 1
         }
