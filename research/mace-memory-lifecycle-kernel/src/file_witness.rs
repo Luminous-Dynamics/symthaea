@@ -24,6 +24,7 @@ const MAGIC: &[u8; 8] = b"MACEWIT1";
 const FILE_EXTENSION: &str = "macew";
 const MAX_CHECKPOINT_BYTES: u64 = 16 * 1024 * 1024;
 const MAX_TOMBSTONES: usize = 100_000;
+const MAX_CHECKPOINTS: usize = 1_000_000;
 const MAX_FIELD_BYTES: usize = 4096;
 const GENERATION_WIDTH: usize = 20;
 
@@ -138,6 +139,9 @@ impl FileBackedWitnessStore {
 
         if entries.is_empty() {
             return Err(LifecycleError::WitnessUnavailable);
+        }
+        if entries.len() > MAX_CHECKPOINTS {
+            return Err(LifecycleError::WitnessCheckpointInvalid);
         }
         entries.sort_by_key(|(generation, _)| *generation);
         if entries[0].0 != 0 {
@@ -376,10 +380,15 @@ fn read_checkpoint(path: &Path) -> Result<WitnessCheckpoint, LifecycleError> {
     {
         return Err(LifecycleError::WitnessCheckpointInvalid);
     }
-    let mut file = File::open(path).map_err(|_| LifecycleError::WitnessUnavailable)?;
+    let file = File::open(path).map_err(|_| LifecycleError::WitnessUnavailable)?;
+    let mut limited = file.take(MAX_CHECKPOINT_BYTES + 1);
     let mut bytes = Vec::with_capacity(metadata.len() as usize);
-    file.read_to_end(&mut bytes)
+    limited
+        .read_to_end(&mut bytes)
         .map_err(|_| LifecycleError::WitnessUnavailable)?;
+    if bytes.len() as u64 > MAX_CHECKPOINT_BYTES {
+        return Err(LifecycleError::WitnessCheckpointInvalid);
+    }
     decode_checkpoint(&bytes)
 }
 
@@ -507,6 +516,8 @@ fn sync_directory(_path: &Path) -> std::io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{Arc, Barrier};
+    use std::thread;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     fn temporary_directory(label: &str) -> PathBuf {
@@ -588,6 +599,55 @@ mod tests {
             Err(LifecycleError::WitnessConflict)
         );
         assert_eq!(first.latest_checkpoint().expect("latest"), first_next);
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn concurrent_writers_publish_at_most_one_checkpoint_per_generation() {
+        let root = temporary_directory("concurrent-writers");
+        let genesis = FileBackedWitnessStore::open(&root)
+            .expect("genesis open")
+            .latest_checkpoint()
+            .expect("genesis");
+        let barrier = Arc::new(Barrier::new(2));
+        let mut handles = Vec::new();
+
+        for marker in ["e", "f"] {
+            let root = root.clone();
+            let barrier = Arc::clone(&barrier);
+            let expected = genesis.checkpoint_sha256.clone();
+            let previous = genesis.checkpoint_sha256.clone();
+            handles.push(thread::spawn(move || {
+                let mut store = FileBackedWitnessStore::open(&root).expect("thread open");
+                let next = WitnessCheckpoint::new(
+                    1,
+                    marker.repeat(64),
+                    BTreeSet::new(),
+                    BTreeSet::new(),
+                    Some(previous),
+                );
+                barrier.wait();
+                store.append_checkpoint(&expected, next)
+            }));
+        }
+
+        let outcomes = handles
+            .into_iter()
+            .map(|handle| handle.join().expect("writer thread"))
+            .collect::<Vec<_>>();
+        assert_eq!(outcomes.iter().filter(|result| result.is_ok()).count(), 1);
+        assert_eq!(
+            outcomes
+                .iter()
+                .filter(|result| **result == Err(LifecycleError::WitnessConflict))
+                .count(),
+            1
+        );
+        let latest = FileBackedWitnessStore::open(&root)
+            .expect("reopen")
+            .latest_checkpoint()
+            .expect("latest");
+        assert_eq!(latest.generation, 1);
         fs::remove_dir_all(root).expect("cleanup");
     }
 
