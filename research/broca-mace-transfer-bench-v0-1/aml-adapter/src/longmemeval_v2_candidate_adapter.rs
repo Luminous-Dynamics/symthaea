@@ -72,6 +72,98 @@ fn state_parent_id(trajectory_id: &str, ordinal: usize, state_sha256: &str) -> S
     format!("lmev2:state:{trajectory_id}:{ordinal}:{state_sha256}")
 }
 
+fn source_state_evidence(
+    identity: &LongMemEvalV2CandidateIdentityV1,
+    query_scope: &str,
+    query_purpose: &str,
+    query_sha256: &str,
+    domain: &str,
+    trajectory_id: &str,
+    trajectory_sha256: &str,
+    state: &LongMemEvalV2StateV1,
+    retrieval_rank: u32,
+) -> CandidateEvidenceV1 {
+    CandidateEvidenceV1 {
+        run_id: identity.run_id.clone(),
+        candidate_id: identity.candidate_id.clone(),
+        backend_id: identity.backend_id.clone(),
+        backend_revision_sha256: identity.backend_revision_sha256.clone(),
+        query_scope: query_scope.to_owned(),
+        query_purpose: query_purpose.to_owned(),
+        query_sha256: query_sha256.to_owned(),
+        evidence_id: state_parent_id(trajectory_id, state.source_ordinal, &state.raw_state_sha256),
+        source_id: trajectory_id.to_owned(),
+        source_sha256: trajectory_sha256.to_owned(),
+        payload_sha256: state.raw_state_sha256.clone(),
+        payload_ref: format!(
+            "lmev2://{domain}/trajectories/{trajectory_id}/states/{}/raw-json",
+            state.source_ordinal
+        ),
+        modality: EvidenceModalityV1::Structured,
+        retrieval_channel: "source_state_lineage".to_owned(),
+        retrieval_rank,
+        retrieval_score: None,
+        parent_evidence_ids: Vec::new(),
+        derivation_receipt_sha256: None,
+    }
+}
+
+fn screenshot_derivation_receipt(
+    state_sha256: &str,
+    image_sha256: &str,
+    screenshot_reference: &str,
+) -> String {
+    let material = format!(
+        "luminous:mace:lmev2:screenshot-binding:v1\\0{state_sha256}\\0{image_sha256}\\0{screenshot_reference}"
+    );
+    sha256_hex(material.as_bytes())
+}
+
+fn screenshot_evidence(
+    identity: &LongMemEvalV2CandidateIdentityV1,
+    query_scope: &str,
+    query_purpose: &str,
+    query_sha256: &str,
+    domain: &str,
+    trajectory_id: &str,
+    trajectory_sha256: &str,
+    state: &LongMemEvalV2StateV1,
+    retrieval_rank: u32,
+) -> CandidateEvidenceV1 {
+    let digest = state.screenshot_sha256.as_deref().unwrap_or_default();
+    let parent_id = state_parent_id(trajectory_id, state.source_ordinal, &state.raw_state_sha256);
+    CandidateEvidenceV1 {
+        run_id: identity.run_id.clone(),
+        candidate_id: identity.candidate_id.clone(),
+        backend_id: identity.backend_id.clone(),
+        backend_revision_sha256: identity.backend_revision_sha256.clone(),
+        query_scope: query_scope.to_owned(),
+        query_purpose: query_purpose.to_owned(),
+        query_sha256: query_sha256.to_owned(),
+        evidence_id: format!(
+            "lmev2:image:{trajectory_id}:{}:{digest}",
+            state.source_ordinal
+        ),
+        source_id: trajectory_id.to_owned(),
+        source_sha256: trajectory_sha256.to_owned(),
+        payload_sha256: digest.to_owned(),
+        payload_ref: format!(
+            "lmev2://{domain}/trajectories/{trajectory_id}/states/{}/screenshots/{digest}",
+            state.source_ordinal
+        ),
+        modality: EvidenceModalityV1::Image,
+        retrieval_channel: "attached_image_evidence".to_owned(),
+        retrieval_rank,
+        retrieval_score: None,
+        parent_evidence_ids: vec![parent_id],
+        derivation_receipt_sha256: Some(screenshot_derivation_receipt(
+            &state.raw_state_sha256,
+            digest,
+            &state.screenshot_reference,
+        )),
+    }
+}
+
 /// Convert retrieved V2 hits to canonical MACE candidate evidence.
 ///
 /// Every hit contributes one text candidate whose parent IDs reference the
@@ -99,9 +191,11 @@ pub fn encode_longmemeval_v2_candidate_evidence_v1(
 
     let query_sha256 = sha256_hex(query.as_bytes());
     let query_scope = format!("longmemeval-v2:domain:{domain}");
-    let query_purpose = "benchmark:memory-context".to_owned();
+    let query_purpose = "benchmark:memory-context";
     let mut records = Vec::new();
+    let mut seen_state_ids = BTreeSet::<String>::new();
     let mut seen_screenshots = BTreeSet::<(String, usize, String)>::new();
+    let mut state_rank = 0_u32;
     let mut image_rank = 0_u32;
 
     for hit in hits {
@@ -113,9 +207,7 @@ pub fn encode_longmemeval_v2_candidate_evidence_v1(
         {
             return Err(LongMemEvalV2CandidateReject::InvalidHit);
         }
-        if !valid_sha256(&hit.source_trajectory_sha256)
-            || !valid_sha256(&hit.chunk_id)
-        {
+        if !valid_sha256(&hit.source_trajectory_sha256) || !valid_sha256(&hit.chunk_id) {
             return Err(LongMemEvalV2CandidateReject::InvalidSourceDigest);
         }
         if hit.rank == 0 {
@@ -133,15 +225,67 @@ pub fn encode_longmemeval_v2_candidate_evidence_v1(
         }
 
         let mut parent_evidence_ids = Vec::with_capacity(hit.state_window.len());
-        for state in &hit.state_window {
+        for (index, state) in hit.state_window.iter().enumerate() {
             if !valid_sha256(&state.raw_state_sha256) {
                 return Err(LongMemEvalV2CandidateReject::InvalidSourceDigest);
             }
-            parent_evidence_ids.push(state_parent_id(
+            if hit.screenshot_references[index] != state.screenshot_reference
+                || hit.screenshot_sha256s[index] != state.screenshot_sha256
+            {
+                return Err(LongMemEvalV2CandidateReject::ScreenshotProjectionMismatch);
+            }
+            let image_digest = state
+                .screenshot_sha256
+                .as_deref()
+                .ok_or(LongMemEvalV2CandidateReject::MissingScreenshotDigest)?;
+            if !valid_sha256(image_digest) {
+                return Err(LongMemEvalV2CandidateReject::InvalidSourceDigest);
+            }
+
+            let state_id = state_parent_id(
                 &hit.trajectory_id,
                 state.source_ordinal,
                 &state.raw_state_sha256,
-            ));
+            );
+            parent_evidence_ids.push(state_id.clone());
+            if seen_state_ids.insert(state_id) {
+                state_rank = state_rank
+                    .checked_add(1)
+                    .ok_or(LongMemEvalV2CandidateReject::InvalidRank)?;
+                records.push(source_state_evidence(
+                    identity,
+                    &query_scope,
+                    query_purpose,
+                    &query_sha256,
+                    domain,
+                    &hit.trajectory_id,
+                    &hit.source_trajectory_sha256,
+                    state,
+                    state_rank,
+                ));
+            }
+
+            let image_key = (
+                hit.trajectory_id.clone(),
+                state.source_ordinal,
+                image_digest.to_owned(),
+            );
+            if seen_screenshots.insert(image_key) {
+                image_rank = image_rank
+                    .checked_add(1)
+                    .ok_or(LongMemEvalV2CandidateReject::InvalidRank)?;
+                records.push(screenshot_evidence(
+                    identity,
+                    &query_scope,
+                    query_purpose,
+                    &query_sha256,
+                    domain,
+                    &hit.trajectory_id,
+                    &hit.source_trajectory_sha256,
+                    state,
+                    image_rank,
+                ));
+            }
         }
 
         records.push(CandidateEvidenceV1 {
@@ -150,7 +294,7 @@ pub fn encode_longmemeval_v2_candidate_evidence_v1(
             backend_id: identity.backend_id.clone(),
             backend_revision_sha256: identity.backend_revision_sha256.clone(),
             query_scope: query_scope.clone(),
-            query_purpose: query_purpose.clone(),
+            query_purpose: query_purpose.to_owned(),
             query_sha256: query_sha256.clone(),
             evidence_id: format!("lmev2:text:{}:{}", hit.trajectory_id, hit.chunk_id),
             source_id: hit.trajectory_id.clone(),
@@ -169,56 +313,6 @@ pub fn encode_longmemeval_v2_candidate_evidence_v1(
             // and rendered text. It is not an authenticated issuer signature.
             derivation_receipt_sha256: Some(hit.chunk_id.clone()),
         });
-
-        for (index, state) in hit.state_window.iter().enumerate() {
-            if hit.screenshot_references[index] != state.screenshot_reference
-                || hit.screenshot_sha256s[index] != state.screenshot_sha256
-            {
-                return Err(LongMemEvalV2CandidateReject::ScreenshotProjectionMismatch);
-            }
-            let digest = state
-                .screenshot_sha256
-                .as_deref()
-                .ok_or(LongMemEvalV2CandidateReject::MissingScreenshotDigest)?;
-            if !valid_sha256(digest) {
-                return Err(LongMemEvalV2CandidateReject::InvalidSourceDigest);
-            }
-
-            let key = (hit.trajectory_id.clone(), state.source_ordinal, digest.to_owned());
-            if !seen_screenshots.insert(key) {
-                continue;
-            }
-            image_rank = image_rank
-                .checked_add(1)
-                .ok_or(LongMemEvalV2CandidateReject::InvalidRank)?;
-
-            records.push(CandidateEvidenceV1 {
-                run_id: identity.run_id.clone(),
-                candidate_id: identity.candidate_id.clone(),
-                backend_id: identity.backend_id.clone(),
-                backend_revision_sha256: identity.backend_revision_sha256.clone(),
-                query_scope: query_scope.clone(),
-                query_purpose: query_purpose.clone(),
-                query_sha256: query_sha256.clone(),
-                evidence_id: format!(
-                    "lmev2:image:{}:{}:{}",
-                    hit.trajectory_id, state.source_ordinal, digest
-                ),
-                source_id: hit.trajectory_id.clone(),
-                source_sha256: hit.source_trajectory_sha256.clone(),
-                payload_sha256: digest.to_owned(),
-                payload_ref: format!(
-                    "lmev2://{domain}/trajectories/{}/states/{}/screenshots/{}",
-                    hit.trajectory_id, state.source_ordinal, digest
-                ),
-                modality: EvidenceModalityV1::Image,
-                retrieval_channel: "attached_image_evidence".to_owned(),
-                retrieval_rank: image_rank,
-                retrieval_score: None,
-                parent_evidence_ids: Vec::new(),
-                derivation_receipt_sha256: None,
-            });
-        }
     }
 
     encode_candidate_evidence_jsonl(&records).map_err(Into::into)
@@ -243,12 +337,26 @@ pub fn encode_longmemeval_v2_search_candidate_evidence_v1(
         domain,
         &result.hits,
     )?;
+    let query_sha256 = sha256_hex(query.as_bytes());
+    let query_scope = format!("longmemeval-v2:domain:{domain}");
+    let query_purpose = "benchmark:memory-context";
     let mut records = hit_batch.evidence.clone();
+    let mut seen_state_ids = records
+        .iter()
+        .filter(|item| item.retrieval_channel == "source_state_lineage")
+        .map(|item| item.evidence_id.clone())
+        .collect::<BTreeSet<_>>();
     let mut seen_image_ids = records
         .iter()
         .filter(|item| item.modality == EvidenceModalityV1::Image)
         .map(|item| item.evidence_id.clone())
         .collect::<BTreeSet<_>>();
+    let mut state_rank = records
+        .iter()
+        .filter(|item| item.retrieval_channel == "source_state_lineage")
+        .map(|item| item.retrieval_rank)
+        .max()
+        .unwrap_or(0);
     let mut image_rank = records
         .iter()
         .filter(|item| item.retrieval_channel == "attached_image_evidence")
@@ -279,11 +387,57 @@ pub fn encode_longmemeval_v2_search_candidate_evidence_v1(
             if !valid_sha256(&state.raw_state_sha256) {
                 return Err(LongMemEvalV2CandidateReject::InvalidSourceDigest);
             }
-            parents.push(state_parent_id(
+            let image_digest = state
+                .screenshot_sha256
+                .as_deref()
+                .ok_or(LongMemEvalV2CandidateReject::MissingScreenshotDigest)?;
+            if !valid_sha256(image_digest) {
+                return Err(LongMemEvalV2CandidateReject::InvalidSourceDigest);
+            }
+
+            let state_id = state_parent_id(
                 &chunk.trajectory_id,
                 state.source_ordinal,
                 &state.raw_state_sha256,
-            ));
+            );
+            parents.push(state_id.clone());
+            if seen_state_ids.insert(state_id) {
+                state_rank = state_rank
+                    .checked_add(1)
+                    .ok_or(LongMemEvalV2CandidateReject::InvalidRank)?;
+                records.push(source_state_evidence(
+                    identity,
+                    &query_scope,
+                    query_purpose,
+                    &query_sha256,
+                    domain,
+                    &chunk.trajectory_id,
+                    &chunk.source_trajectory_sha256,
+                    state,
+                    state_rank,
+                ));
+            }
+
+            let image_id = format!(
+                "lmev2:image:{}:{}:{}",
+                chunk.trajectory_id, state.source_ordinal, image_digest
+            );
+            if seen_image_ids.insert(image_id) {
+                image_rank = image_rank
+                    .checked_add(1)
+                    .ok_or(LongMemEvalV2CandidateReject::InvalidRank)?;
+                records.push(screenshot_evidence(
+                    identity,
+                    &query_scope,
+                    query_purpose,
+                    &query_sha256,
+                    domain,
+                    &chunk.trajectory_id,
+                    &chunk.source_trajectory_sha256,
+                    state,
+                    image_rank,
+                ));
+            }
         }
 
         let neighbor_rank = u32::try_from(neighbor_index + 1)
@@ -293,9 +447,9 @@ pub fn encode_longmemeval_v2_search_candidate_evidence_v1(
             candidate_id: identity.candidate_id.clone(),
             backend_id: identity.backend_id.clone(),
             backend_revision_sha256: identity.backend_revision_sha256.clone(),
-            query_scope: format!("longmemeval-v2:domain:{domain}"),
-            query_purpose: "benchmark:memory-context".to_owned(),
-            query_sha256: sha256_hex(query.as_bytes()),
+            query_scope: query_scope.clone(),
+            query_purpose: query_purpose.to_owned(),
+            query_sha256: query_sha256.clone(),
             evidence_id: format!(
                 "lmev2:neighbor:{}:{}",
                 chunk.trajectory_id, chunk.chunk_sha256
@@ -314,49 +468,6 @@ pub fn encode_longmemeval_v2_search_candidate_evidence_v1(
             parent_evidence_ids: parents,
             derivation_receipt_sha256: Some(chunk.chunk_sha256.clone()),
         });
-
-        for state in &chunk.state_window {
-            let digest = state
-                .screenshot_sha256
-                .as_deref()
-                .ok_or(LongMemEvalV2CandidateReject::MissingScreenshotDigest)?;
-            if !valid_sha256(digest) {
-                return Err(LongMemEvalV2CandidateReject::InvalidSourceDigest);
-            }
-            let evidence_id = format!(
-                "lmev2:image:{}:{}:{}",
-                chunk.trajectory_id, state.source_ordinal, digest
-            );
-            if !seen_image_ids.insert(evidence_id.clone()) {
-                continue;
-            }
-            image_rank = image_rank
-                .checked_add(1)
-                .ok_or(LongMemEvalV2CandidateReject::InvalidRank)?;
-            records.push(CandidateEvidenceV1 {
-                run_id: identity.run_id.clone(),
-                candidate_id: identity.candidate_id.clone(),
-                backend_id: identity.backend_id.clone(),
-                backend_revision_sha256: identity.backend_revision_sha256.clone(),
-                query_scope: format!("longmemeval-v2:domain:{domain}"),
-                query_purpose: "benchmark:memory-context".to_owned(),
-                query_sha256: sha256_hex(query.as_bytes()),
-                evidence_id,
-                source_id: chunk.trajectory_id.clone(),
-                source_sha256: chunk.source_trajectory_sha256.clone(),
-                payload_sha256: digest.to_owned(),
-                payload_ref: format!(
-                    "lmev2://{domain}/trajectories/{}/states/{}/screenshots/{}",
-                    chunk.trajectory_id, state.source_ordinal, digest
-                ),
-                modality: EvidenceModalityV1::Image,
-                retrieval_channel: "attached_image_evidence".to_owned(),
-                retrieval_rank: image_rank,
-                retrieval_score: None,
-                parent_evidence_ids: Vec::new(),
-                derivation_receipt_sha256: None,
-            });
-        }
     }
 
     encode_candidate_evidence_jsonl(&records).map_err(Into::into)
@@ -438,7 +549,7 @@ mod tests {
         )
         .expect("candidate evidence");
 
-        assert_eq!(batch.evidence.len(), 3);
+        assert_eq!(batch.evidence.len(), 5);
         assert_eq!(
             batch.query_sha256,
             sha256_hex("Which order did Ada submit?".as_bytes())
@@ -450,6 +561,14 @@ mod tests {
         assert_eq!(text.payload_sha256, CHUNK_DIGEST);
         assert_eq!(text.parent_evidence_ids.len(), 2);
         assert_eq!(text.derivation_receipt_sha256.as_deref(), Some(CHUNK_DIGEST));
+        assert!(text.parent_evidence_ids.iter().all(|parent| batch.evidence.iter()
+            .any(|item| item.evidence_id == *parent
+                && item.retrieval_channel == "source_state_lineage")));
+        let source_states = batch.evidence.iter()
+            .filter(|item| item.retrieval_channel == "source_state_lineage")
+            .collect::<Vec<_>>();
+        assert_eq!(source_states.len(), 2);
+        assert!(source_states.iter().all(|item| item.modality == EvidenceModalityV1::Structured));
 
         let images = batch.evidence.iter()
             .filter(|item| item.modality == EvidenceModalityV1::Image)
@@ -459,6 +578,8 @@ mod tests {
         assert!(images.iter().any(|item| item.payload_sha256 == IMAGE_DIGEST_B));
         assert!(images.iter().all(|item| item.retrieval_score.is_none()));
         assert!(images.iter().all(|item| item.retrieval_channel == "attached_image_evidence"));
+        assert!(images.iter().all(|item| item.parent_evidence_ids.len() == 1
+            && item.derivation_receipt_sha256.is_some()));
     }
 
     #[test]
