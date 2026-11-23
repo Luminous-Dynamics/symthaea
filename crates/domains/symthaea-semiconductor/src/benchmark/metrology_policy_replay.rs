@@ -1190,6 +1190,13 @@ mod tests {
             .collect()
     }
 
+    #[derive(Clone, Copy)]
+    struct PolicyWeightsV1 {
+        risk: f64,
+        uncertainty: f64,
+        evsi: f64,
+    }
+
     fn policy_config(
         policy_view: &SyntheticFabPolicyViewV1,
         policy_id: &str,
@@ -1205,9 +1212,11 @@ mod tests {
             audit_budget,
             quota_per_stratum,
             seed,
-            1.0,
-            0.0,
-            0.0,
+            PolicyWeightsV1 {
+                risk: 1.0,
+                uncertainty: 0.0,
+                evsi: 0.0,
+            },
         )
     }
 
@@ -1218,9 +1227,7 @@ mod tests {
         audit_budget: u64,
         quota_per_stratum: usize,
         seed: u64,
-        risk_weight: f64,
-        uncertainty_weight: f64,
-        evsi_weight: f64,
+        weights: PolicyWeightsV1,
     ) -> SyntheticMetrologyPolicyConfigV1 {
         SyntheticMetrologyPolicyConfigV1 {
             policy_id: policy_id.into(),
@@ -1228,9 +1235,9 @@ mod tests {
             total_cost_budget: exploit_budget + audit_budget,
             exploit_cost_budget: exploit_budget,
             audit_cost_budget: audit_budget,
-            risk_weight,
-            uncertainty_weight,
-            evsi_weight,
+            risk_weight: weights.risk,
+            uncertainty_weight: weights.uncertainty,
+            evsi_weight: weights.evsi,
             audit_quota_by_stratum: policy_quotas(policy_view, quota_per_stratum),
         }
     }
@@ -1395,14 +1402,35 @@ mod tests {
         let view = episode.policy_view();
         let semantics = synthetic_defect_semantics_v1(0.62).unwrap();
         let policy_specs = [
-            ("risk-only", 1.0, 0.0, 0.0),
-            ("uncertainty-only", 0.0, 1.0, 0.0),
-            ("evsi-proxy-only", 0.0, 0.0, 1.0),
+            (
+                "risk-only",
+                PolicyWeightsV1 {
+                    risk: 1.0,
+                    uncertainty: 0.0,
+                    evsi: 0.0,
+                },
+            ),
+            (
+                "uncertainty-only",
+                PolicyWeightsV1 {
+                    risk: 0.0,
+                    uncertainty: 1.0,
+                    evsi: 0.0,
+                },
+            ),
+            (
+                "evsi-proxy-only",
+                PolicyWeightsV1 {
+                    risk: 0.0,
+                    uncertainty: 0.0,
+                    evsi: 1.0,
+                },
+            ),
         ];
 
-        for (policy_id, risk, uncertainty, evsi) in policy_specs {
+        for (policy_id, weights) in policy_specs {
             let policy =
-                policy_config_with_weights(view, policy_id, 16, 16, 4, 53, risk, uncertainty, evsi);
+                policy_config_with_weights(view, policy_id, 16, 16, 4, 53, weights);
             let run =
                 run_synthetic_metrology_policy_v1(&episode, view, &semantics, &policy).unwrap();
             assert_eq!(run.selection.total_selected_cost, 32);
