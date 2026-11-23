@@ -33,6 +33,7 @@ pub const MAX_MYCELIAL_FUSION_DEMAND_PAIRS: usize = 256;
 pub const MAX_MYCELIAL_FUSION_DISRUPTION_SCENARIOS: usize = 768;
 pub const MAX_MYCELIAL_FUSION_ID_BYTES: usize = 128;
 pub const MAX_MYCELIAL_FUSION_TOTAL_DEMAND_WEIGHT: u128 = 9_007_199_254_740_992;
+pub const MAX_MYCELIAL_FUSION_DEMAND_EVALUATIONS: usize = 65_536;
 pub const MIN_SIDE_CONTACT_FRACTION_MICROS: u32 = 50_000;
 pub const MAX_SIDE_CONTACT_FRACTION_MICROS: u32 = 950_000;
 const PARAMETER_SCALE: f64 = 1_000_000.0;
@@ -53,6 +54,15 @@ pub enum MycelialFusionTarget {
 
 /// A proposal plus the probability provenance needed to audit its review priority.
 /// Probabilities describe the classifier output; they never authorize a fusion.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MycelialFusionBridgeLengthBasis {
+    /// Bridge length comes from a measurement with declared acquisition provenance.
+    Measured,
+    /// Bridge length is an explicit model assumption, not a biological observation.
+    DeclaredAssumption,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MycelialFusionCandidate {
     pub candidate_id: String,
@@ -60,6 +70,7 @@ pub struct MycelialFusionCandidate {
     pub target: MycelialFusionTarget,
     pub bridge_length: f64,
     pub bridge_length_unit: ReconstructionLengthUnit,
+    pub bridge_length_basis: MycelialFusionBridgeLengthBasis,
     pub fusion_probability: f64,
     pub calibration_policy_id: String,
     pub probability_evidence_digest: String,
@@ -144,6 +155,8 @@ pub struct MycelialFusionCandidateImpact {
     pub calibration_policy_id: String,
     pub probability_evidence_digest: String,
     pub fusion_probability: f64,
+    pub bridge_length_basis: MycelialFusionBridgeLengthBasis,
+    pub contact_anchor_interpolation_used: bool,
     pub conflict_group_id: Option<String>,
     /// All other candidates that share this candidate's conflict group.
     pub conflicting_candidate_ids: Vec<String>,
@@ -178,6 +191,7 @@ pub enum MycelialFusionCounterfactualError {
     TooManyCandidates(usize),
     TooManyDemandPairs(usize),
     TooManyDisruptionScenarios(usize),
+    DemandEvaluationBudgetExceeded(usize),
     ResourceLimitExceeded,
     InvalidCandidate(String),
     DuplicateCandidateId(String),
@@ -212,6 +226,10 @@ impl fmt::Display for MycelialFusionCounterfactualError {
             Self::TooManyDisruptionScenarios(count) => write!(
                 f,
                 "disruption scenario count {count} exceeds {MAX_MYCELIAL_FUSION_DISRUPTION_SCENARIOS}"
+            ),
+            Self::DemandEvaluationBudgetExceeded(count) => write!(
+                f,
+                "fusion counterfactual demand evaluations {count} exceed {MAX_MYCELIAL_FUSION_DEMAND_EVALUATIONS}"
             ),
             Self::ResourceLimitExceeded => {
                 write!(f, "counterfactual graph exceeds resource limits")
@@ -338,6 +356,10 @@ fn candidate_digest(candidate: &MycelialFusionCandidate) -> String {
     }
     hasher.update(&candidate.bridge_length.to_bits().to_le_bytes());
     hasher.update(&[length_unit_tag(candidate.bridge_length_unit)]);
+    hasher.update(&[match candidate.bridge_length_basis {
+        MycelialFusionBridgeLengthBasis::Measured => 0,
+        MycelialFusionBridgeLengthBasis::DeclaredAssumption => 1,
+    }]);
     hasher.update(&candidate.fusion_probability.to_bits().to_le_bytes());
     hash_string(&mut hasher, &candidate.calibration_policy_id);
     hash_string(&mut hasher, &candidate.probability_evidence_digest);
@@ -546,7 +568,8 @@ fn split_target_segment(
         .ok_or_else(|| MycelialFusionCounterfactualError::UnknownTargetSegment(segment_id.clone()))?
         .position;
     let fraction = f64::from(*arc_length_fraction_micros) / PARAMETER_SCALE;
-    let split_junction_id = format!("fusion-split:{}", candidate.candidate_id);
+    let candidate_identity = candidate_digest(candidate);
+    let split_junction_id = format!("fusion-split:{candidate_identity}");
     if !valid_id(&split_junction_id) || view.nodes.contains_key(&split_junction_id) {
         return Err(MycelialFusionCounterfactualError::InvalidCandidate(
             candidate.candidate_id.clone(),
@@ -911,7 +934,7 @@ fn build_candidate_impact(
     };
 
     let mut accepted_view = rejected_view.clone();
-    let fusion_edge_id = format!("fusion-edge:{}", candidate.candidate_id);
+    let fusion_edge_id = format!("fusion-edge:{}", candidate_digest(candidate));
     if accepted_view
         .segments
         .iter()
@@ -981,6 +1004,11 @@ fn build_candidate_impact(
         calibration_policy_id: candidate.calibration_policy_id.clone(),
         probability_evidence_digest: candidate.probability_evidence_digest.clone(),
         fusion_probability: candidate.fusion_probability,
+        bridge_length_basis: candidate.bridge_length_basis,
+        contact_anchor_interpolation_used: matches!(
+            candidate.target,
+            MycelialFusionTarget::HyphaSide { .. }
+        ),
         conflict_group_id: candidate.conflict_group_id.clone(),
         conflicting_candidate_ids,
         topology_effect,
@@ -1021,6 +1049,15 @@ fn validate_inputs(
     if demands.len() > MAX_MYCELIAL_FUSION_DEMAND_PAIRS {
         return Err(MycelialFusionCounterfactualError::TooManyDemandPairs(
             demands.len(),
+        ));
+    }
+    let demand_evaluations = candidates
+        .len()
+        .saturating_mul(disruptions.len().saturating_add(1))
+        .saturating_mul(demands.len().max(1));
+    if demand_evaluations > MAX_MYCELIAL_FUSION_DEMAND_EVALUATIONS {
+        return Err(MycelialFusionCounterfactualError::DemandEvaluationBudgetExceeded(
+            demand_evaluations,
         ));
     }
     if disruptions.len() > MAX_MYCELIAL_FUSION_DISRUPTION_SCENARIOS {
@@ -1257,6 +1294,7 @@ mod tests {
             },
             bridge_length: 1.0,
             bridge_length_unit: ReconstructionLengthUnit::Micrometer,
+            bridge_length_basis: MycelialFusionBridgeLengthBasis::DeclaredAssumption,
             fusion_probability: 0.65,
             calibration_policy_id: "calibration-v1".to_string(),
             probability_evidence_digest: digest('c'),
@@ -1330,6 +1368,7 @@ mod tests {
             },
             bridge_length: 2.0,
             bridge_length_unit: ReconstructionLengthUnit::Micrometer,
+            bridge_length_basis: MycelialFusionBridgeLengthBasis::DeclaredAssumption,
             fusion_probability: 0.72,
             calibration_policy_id: "calibration-v1".to_string(),
             probability_evidence_digest: digest('d'),
@@ -1416,6 +1455,7 @@ mod tests {
             },
             bridge_length: 1.0,
             bridge_length_unit: ReconstructionLengthUnit::Micrometer,
+            bridge_length_basis: MycelialFusionBridgeLengthBasis::DeclaredAssumption,
             fusion_probability: 0.8,
             calibration_policy_id: "calibration-v1".to_string(),
             probability_evidence_digest: digest('e'),
