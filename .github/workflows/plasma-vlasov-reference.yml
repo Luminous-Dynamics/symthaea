@@ -50,6 +50,8 @@ jobs:
         run: /usr/bin/time -v -o artifacts/plasma-vlasov-reference/self-consistent-echo-resource.txt cargo run --release --locked --manifest-path crates/tools/plasma-vlasov-reference/Cargo.toml --example self_consistent_echo > artifacts/plasma-vlasov-reference/self-consistent-echo.csv
       - name: Run finite-velocity recurrence sweep
         run: /usr/bin/time -v -o artifacts/plasma-vlasov-reference/velocity-recurrence-resource.txt cargo run --release --locked --manifest-path crates/tools/plasma-vlasov-reference/Cargo.toml --example velocity_recurrence_sweep > artifacts/plasma-vlasov-reference/velocity-recurrence-sweep.csv
+      - name: Run adaptive velocity refinement sweep
+        run: /usr/bin/time -v -o artifacts/plasma-vlasov-reference/velocity-refinement-resource.txt cargo run --release --locked --manifest-path crates/tools/plasma-vlasov-reference/Cargo.toml --example velocity_refinement_sweep > artifacts/plasma-vlasov-reference/velocity-refinement-sweep.csv
       - name: Upload reproducible trajectory traces
         uses: actions/upload-artifact@v4
         with:
