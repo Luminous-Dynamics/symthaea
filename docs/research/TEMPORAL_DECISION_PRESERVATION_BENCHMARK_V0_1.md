@@ -8,7 +8,7 @@
 **Joint resource evaluation:** #9666 / #9882 / #13176  
 **Memory consolidation and transfer:** #9139  
 **Evaluator isolation:** #9437  
-**Status:** eleven temporal Rust unit tests authored; exact-head Rust 1.96 formatting, full evaluator tests (54 passed, 0 failed) and strict Clippy passed at `6931c3dcce7e18797ea130e1ae50cee67271f93e`. No external benchmark or hardware result is claimed.
+**Status:** eleven temporal Rust unit tests authored; exact-head Rust 1.96 formatting, full evaluator tests (65 passed, 0 failed) and strict Clippy passed at `9185feae6fb775436449b8af2a64595b54bb96e1`. No external benchmark or hardware result is claimed.
 
 ## 1. Research question
 
@@ -108,7 +108,7 @@ Eleven Rust unit tests cover:
 
 The machine-readable fixture includes stable-representation, future-collision and candidate-action-failure known-answer cases, plus adversarial scenario families. The Rust 1.96 exact-head workflow has passed changed-module formatting, whole-crate tests and strict Clippy.
 
-Exact-head Rust 1.96 verification at `6931c3dcce7e18797ea130e1ae50cee67271f93e` (workflow run `45085114505`):
+Exact-head Rust 1.96 verification at `9185feae6fb775436449b8af2a64595b54bb96e1` (workflow run `45085999687`):
 
 - Changed-module rustfmt check: passed.
 - Full evaluator crate test suite: 54 passed, 0 failed.
