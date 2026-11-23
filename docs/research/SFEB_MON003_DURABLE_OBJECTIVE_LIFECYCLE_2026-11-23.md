@@ -3,7 +3,7 @@
 **Date:** 2026-11-23  
 **Parent:** [MON-003 issue #13398](https://github.com/Luminous-Dynamics/symthaea/issues/13398)  
 **Related:** [MON-001 issue #13392](https://github.com/Luminous-Dynamics/symthaea/issues/13392), [MON-002 issue #13394](https://github.com/Luminous-Dynamics/symthaea/issues/13394)  
-**Status:** specification committed; tenant-bound primary fencing/idempotency v2 kernel (14 cases), objective-ledger kernel (3), tenant-boundary suite (8), bounded interleaving model check (720 orders), cursor/replay suite (16) and source-capability compiler (15) committed and executed under Node.js v22.16.0; production qualification pending
+**Status:** specification committed; tenant-bound primary fencing/idempotency v2 kernel (14 cases), objective-ledger kernel (3), tenant-boundary suite (8), bounded interleaving model check (720 orders), cursor/replay suite (16), source-capability compiler (15) and time-bounded capability-lease suite (15) committed and executed under Node.js v22.16.0; production qualification pending
 
 ## 1. Research thesis
 
@@ -462,3 +462,31 @@ Exact source SHA-256: `d279eab1801fe5d3ce5fa4d39656745a2a6dad07fd29a5fc0f1af2202
 All negative controls record zero mock side effects. The lost-response case returns the original operation identity and one side effect on replay.
 
 V2 is the preferred tenant-bound primary *reference model*. It is not a production authorization system: its source receipts and tenant identities are trusted in-memory inputs; the mock sink assumes atomic fence/policy/idempotency/mutation persistence; no signing, persistent DB, broker, distributed lease service, real action sink, browser, scheduler or independent postcondition verifier is exercised. The 8-case companion tenant suite remains as a distinct additional regression set, not a substitute for this integrated path.
+
+
+## 21. Time-bounded source capability leases (2026-11-23)
+
+A capability profile is not a permanent fact. Webhook delivery can stop, replay retention can be shortened, connector versions can change, signing keys can be revoked, and permission enforcement can drift. A one-time source classification must therefore not support an indefinite edge-recall claim.
+
+SFEB now models a **capability lease** bound to:
+- source identity and connector version;
+- a digest of the complete capability profile;
+- attestation issue and expiry times;
+- signature verification, issuer scope and key-revocation checks;
+- source replay/high-watermark and sink-permission conformance probes.
+
+A new connector version or capability-profile digest invalidates the old lease. A failed replay probe, high-watermark rollback or sink-authority probe makes the objective `inconclusive`; a source with insufficient retention or polling-only delivery is explicitly `degraded`. Restoring a full guarantee requires a fresh attestation bound to the new connector/profile. The agent cannot silently keep a stronger guarantee after an integration loses the capability on which that guarantee depended.
+
+### Executed capability-lease reference suite
+
+Companion source: `benchmarks/frontend/monitoring/mon003-capability-lease-v1.mjs`  
+Machine-readable report: `benchmarks/frontend/monitoring/mon003-capability-lease-report-v1.json`
+
+Executed under Node.js v22.16.0: **15/15 deterministic cases passed**. Tests cover valid attestation, expiry boundary, connector/profile drift, failed replay and cursor probes, sink authority probe failure, short retention, poll-only downgrade, key revocation, unverified signatures, source and connector transplant, re-attestation after upgrade, and invalid issue/expiry time.
+
+Exact source Git blob SHA: `3f3b8e8f9d08a41c7a62464a03176f7e86306c99`.  
+Exact source SHA-256: `f394c0fca7b395c0b01de74e9783300e439956a81d578943e4fc652e34d90ef6`.
+
+This remains an in-memory reference model. Signature/issuer/key/conformance booleans are trusted test inputs; no production signature verifier, key registry, live source probe, persisted attestation ledger or scheduler is qualified. Production use requires a separate trust domain to issue and verify attestation receipts, and independent monitoring of capability drift.
+
+**Product-level consequence:** VDR and edge recall should be reported alongside current capability-lease status and duration spent degraded/inconclusive. A source capability downgrade is a correctness event, not merely an infrastructure warning.
