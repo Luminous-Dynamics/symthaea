@@ -264,6 +264,26 @@ Keep the current proposed targets, but apply them to the actual paired-world tra
 
 These targets require pilot variance and power analysis. False-unification and false causal transfer remain non-compensable guardrails. A SOTA claim requires direct matched runs, pinned artifacts, complete costs and uncertainty intervals.
 
+## 7A. Continuous-time and hybrid structural transfer
+
+Graph correspondence and finite transition commutation are not enough for physical or continuous-time transfer. Two systems can have isomorphic state/relation graphs but different vector fields, time scales, observation delays, contact laws or event resets.
+
+For continuous dynamics, make the proposed state/action/time correspondence explicit. A useful idealized condition is:
+
+```text
+Dphi(x) f_source(x, u, t) * (dt_source / dt_target)
+    = f_target(phi(x), psi(u), tau(t))
+```
+
+For non-smooth or hybrid systems, do not force a differentiable flow condition across impacts or switching surfaces. Evaluate the complete mapped trajectory and event/reset structure under a declared time map, clock uncertainty, observation schedule and action correspondence.
+
+The separate Symtropy protocol now defines this next step:
+[`CONTINUOUS_DYNAMICS_TRANSFER_V0_2_PROTOCOL.md`](https://github.com/Luminous-Dynamics/symtropy/blob/research/ergo-stream-transfer-witness-v0.1/research/ergo-stream-world-contract/v0.1/CONTINUOUS_DYNAMICS_TRANSFER_V0_2_PROTOCOL.md).
+
+It covers measurement time versus arrival time, asynchronous and irregular sampling, delayed/missing observations, clock calibration, hybrid guards/resets, impact/contact events, uncertainty decomposition, held-out trajectory and event-time metrics, and matched continuous-time baselines (CfC, LTC, neural ODE/continuous recurrent, discrete recurrent, sequence transformer and domain-appropriate system identification).
+
+The current #7173 Rust witness is only a deterministic finite transition-system conformance test. It does not implement CfC/LTC dynamics, continuous ODE/DAE/PDE execution, contact simulation, or a continuous-time equivalence proof. The next meaningful implementation is an adapter from existing AV-STREAM / physics interfaces into the continuous protocol, not a duplicate simulator.
+
 ## 8. Execution order
 
 **P0 — close the transfer contract**
