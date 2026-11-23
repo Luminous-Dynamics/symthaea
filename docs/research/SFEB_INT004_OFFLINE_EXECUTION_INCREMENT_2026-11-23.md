@@ -45,8 +45,9 @@ Added a frozen task policy, raw execution-trace schema/example, verifier report 
 - `event-execution-trace-v1.schema.json` and `examples/late-event-rollback-trace.json`: raw action/event steps bind to the exact fixture SHA-256.
 - `event-oracle-verification-v1.schema.json`: structured event-semantics report, rule hashes and canonical evidence-event digests.
 - `--verify-event-trace`: checks the frozen controller step sequence, replays event payloads through the reducer, derives seven semantic outcomes, and ignores worker `disposition` / `observed_oracle_ids`.
+- `benchmarks/frontend/independent-oracle/verify-event-trace.mjs`: dependency-free Node.js implementation with a `--self-test` covering worker-claim invariance and altered-event rejection. The source is committed but has not been run as a Node CLI here.
 
-An independent in-memory V8 preflight against the exact repository fixture, policy and example trace passed **7/7 policy rules**. Mutating worker claims left all oracle outcomes unchanged; altering a frozen event payload was rejected. This is not execution of the committed Rust verifier. The verifier does not authenticate browser execution, produce a signed in-toto verifier statement or inspect browser screenshots/accessibility/network artifacts. It is an initial semantic replay component for #13247 only.
+An independent in-memory V8 preflight against the exact repository fixture, policy and example trace passed **7/7 policy rules**. Mutating worker claims left all oracle outcomes unchanged; altering a frozen event payload was rejected. This is not execution of either committed verifier file. The V8 check is a separate in-memory implementation against the exact bytes. The verifier does not authenticate browser execution, produce a signed in-toto verifier statement or inspect browser screenshots/accessibility/network artifacts. It is an initial semantic replay component for #13247 only.
 
 Trace SHA-256: `a6db51ee92df248161b15975027e65c13a475b20ae67a5e2b16ccb4b566d7fc0`.
 
