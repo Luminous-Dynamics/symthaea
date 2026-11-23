@@ -1000,6 +1000,12 @@ fn run() -> Result<(), String> {
         .unwrap_or(32);
 
     let cases = mace_generated_stress::generated_worlds(clusters);
+    let source_revision = env::var("MACE_SOURCE_REVISION")
+        .map_err(|_| "MACE_SOURCE_REVISION is required and must be the exact checked-out Git SHA".to_string())?;
+    if !valid_git_revision(&source_revision) {
+        return Err("MACE_SOURCE_REVISION must be a 40- or 64-character lowercase Git SHA".to_string());
+    }
+    let repository_root = verify_source_checkout(&source_revision)?;
     let nested_cargo_lock_path =
         repository_root.join("research/broca-mace-transfer-bench-v0-1/Cargo.lock");
     let nested_cargo_lock = fs::read(&nested_cargo_lock_path)
@@ -1029,13 +1035,7 @@ fn run() -> Result<(), String> {
     add_bundle_entry(&mut schema_bundle_hasher, "mace_counterfactual_evidence_v0_1.schema.json", include_bytes!("../../../../../data/schemas/mace_counterfactual_evidence_v0_1.schema.json"));
     add_bundle_entry(&mut schema_bundle_hasher, "mace_candidate_envelope_v1.schema.json", include_bytes!("../../../../../data/schemas/mace_candidate_envelope_v1.schema.json"));
     add_bundle_entry(&mut schema_bundle_hasher, "mace_candidate_receipt_v1.schema.json", include_bytes!("../../../../../data/schemas/mace_candidate_receipt_v1.schema.json"));
-    let schema_sha256 = hex_digest(schema_bundle_hasher.finalize().as_slice());    let source_revision = env::var("MACE_SOURCE_REVISION")
-        .map_err(|_| "MACE_SOURCE_REVISION is required and must be the exact checked-out Git SHA".to_string())?;
-    if !valid_git_revision(&source_revision) {
-        return Err("MACE_SOURCE_REVISION must be a 40- or 64-character lowercase Git SHA".to_string());
-    }
-    let repository_root = verify_source_checkout(&source_revision)?;
-    let run_identity = format!(
+    let schema_sha256 = hex_digest(schema_bundle_hasher.finalize().as_slice());    let run_identity = format!(
         "{clusters}:{public_seed}:{SCHEMA_VERSION}:{source_code_sha256}:{fixture_sha256}:{schema_sha256}:{source_revision}"
     );
     let run_id = format!(
