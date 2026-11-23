@@ -378,7 +378,12 @@ class MaceLongMemEvalV2Memory(Memory):
         if candidate_set is None:
             digest.update(b"\x00")
         else:
-            require(isinstance(candidate_set, str), "retrieval trace candidate digest must be a string")
+            require(
+                isinstance(candidate_set, str)
+                and len(candidate_set) == 64
+                and all(character in "0123456789abcdef" for character in candidate_set),
+                "retrieval trace candidate digest must be lowercase SHA-256",
+            )
             digest.update(b"\x01")
             hash_field(candidate_set)
 
@@ -1219,23 +1224,24 @@ class MaceLongMemEvalV2Memory(Memory):
             shutil.rmtree(self.asset_root)
         shutil.copytree(saved_assets, self.asset_root)
         saved_evidence = state_dir / "candidate_evidence"
-        if saved_evidence.is_dir():
-            saved_evidence_stat = saved_evidence.lstat()
-            require(stat.S_ISDIR(saved_evidence_stat.st_mode),
-                    "saved candidate evidence root must be a real directory")
-            if self.candidate_evidence_dir.exists():
-                shutil.rmtree(self.candidate_evidence_dir)
-            shutil.copytree(saved_evidence, self.candidate_evidence_dir)
-            self._verify_persisted_candidate_evidence()
+        require(saved_evidence.is_dir(), "saved candidate evidence root is missing")
+        saved_evidence_stat = saved_evidence.lstat()
+        require(stat.S_ISDIR(saved_evidence_stat.st_mode),
+                "saved candidate evidence root must be a real directory")
+        if self.candidate_evidence_dir.exists():
+            shutil.rmtree(self.candidate_evidence_dir)
+        shutil.copytree(saved_evidence, self.candidate_evidence_dir)
+        self._verify_persisted_candidate_evidence()
+
         saved_traces = state_dir / "retrieval_traces"
-        if saved_traces.is_dir():
-            saved_traces_stat = saved_traces.lstat()
-            require(stat.S_ISDIR(saved_traces_stat.st_mode),
-                    "saved retrieval trace root must be a real directory")
-            if self.retrieval_trace_dir.exists():
-                shutil.rmtree(self.retrieval_trace_dir)
-            shutil.copytree(saved_traces, self.retrieval_trace_dir)
-            self._verify_persisted_retrieval_traces()
+        require(saved_traces.is_dir(), "saved retrieval trace root is missing")
+        saved_traces_stat = saved_traces.lstat()
+        require(stat.S_ISDIR(saved_traces_stat.st_mode),
+                "saved retrieval trace root must be a real directory")
+        if self.retrieval_trace_dir.exists():
+            shutil.rmtree(self.retrieval_trace_dir)
+        shutil.copytree(saved_traces, self.retrieval_trace_dir)
+        self._verify_persisted_retrieval_traces()
         self._trajectory_lines = []
         self._inserted_ids = set()
         for line in trajectories_path.read_text(encoding="utf-8").splitlines():
