@@ -224,6 +224,14 @@ impl State {
     }
 
     fn deliver(&mut self, event: &Value) -> Result<(), String> {
+        // A rejected event must not poison identity, sequence, buffer, audit, or state.
+        let mut candidate = self.clone();
+        candidate.deliver_uncommitted(event)?;
+        *self = candidate;
+        Ok(())
+    }
+
+    fn deliver_uncommitted(&mut self, event: &Value) -> Result<(), String> {
         let event_id = field_str(event, "event_id")?.to_string();
         if let Some(previous) = self.seen_by_id.get(&event_id) {
             if previous == event { self.duplicate_deliveries += 1; return Ok(()); }
@@ -310,7 +318,19 @@ fn reject_control(fixture: &Value, events: &BTreeMap<String, Value>, control: &V
             for id in ["evt-001", "evt-002"] { state.deliver(events.get(id).ok_or("prerequisite event missing")?)?; }
             altered["actor_id"] = control["actor_id"].clone();
         }
-        "replace_transition_target" => altered["to_status"] = control["to_status"].clone(),
+        "invalid_event_is_rolled_back_atomically" => {
+            altered["to_status"] = control["to_status"].clone();
+            if state.deliver(&altered).is_ok() {
+                return Err(format!("{control_id}: adversarial mutation was accepted"));
+            }
+            let original_sequence = field_u64(original, "sequence")?;
+            let original_id = field_str(original, "event_id")?;
+            state.deliver(original)?;
+            if state.last_sequence != original_sequence || state.audit.last().map(String::as_str) != Some(original_id) {
+                return Err(format!("{control_id}: valid retry did not apply after rejected mutation"));
+            }
+            return Ok(());
+        }
         other => return Err(format!("{control_id}: unsupported operation {other}")),
     }
     if state.deliver(&altered).is_ok() { return Err(format!("{control_id}: adversarial mutation was accepted")); }
@@ -403,6 +423,22 @@ mod tests {
         assert_eq!(state.last_sequence, 4);
         assert!(state.buffered.is_empty());
         assert_eq!(state.jobs["JOB-A"]["status"], "in_progress");
+    }
+
+    #[test]
+    fn rejected_event_does_not_poison_identity_or_sequence_for_valid_retry() {
+        let f = fixture();
+        let mut state = State::new(&f["initial_state"]).unwrap();
+        let original = f["events"][0].clone();
+        let mut altered = original.clone();
+        altered["to_status"] = json!("done");
+        assert!(state.deliver(&altered).is_err());
+        assert_eq!(state.last_sequence, 0);
+        assert!(state.audit.is_empty());
+        assert!(state.seen_by_id.is_empty());
+        state.deliver(&original).unwrap();
+        assert_eq!(state.last_sequence, 1);
+        assert_eq!(state.audit, vec!["evt-001"]);
     }
 
     #[test]
