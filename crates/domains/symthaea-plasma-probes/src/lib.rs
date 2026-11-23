@@ -547,10 +547,7 @@ impl PulseFamilyContract {
 
 /// Matrix-free positive-semidefinite empirical Gramian.
 ///
-/// The represented matrix is
-///
-///     W = sum_i weight_i * direction_i * direction_i^T
-///
+/// The represented matrix is `W = sum_i weight_i * direction_i * direction_i^T`,
 /// but W is never materialized. Each stored factor is
 /// sqrt(weight_i) * direction_i, so storage is O(rank * state_dimension).
 ///
