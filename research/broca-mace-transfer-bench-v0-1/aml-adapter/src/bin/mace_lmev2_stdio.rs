@@ -570,6 +570,18 @@ mod tests {
             fs::read_dir(&config.policy_trace_dir).expect("trace store directory").count(),
             1
         );
+        let reopened_store = RetrievalPolicyTraceFileStoreV1::open(&config.policy_trace_dir)
+            .expect("reopen durable policy trace store");
+        let mut restored_policy_memory = RetrievalPolicyMemoryV1::default();
+        assert_eq!(
+            reopened_store.load_into(&mut restored_policy_memory).expect("restore policy traces"),
+            1
+        );
+        assert_eq!(restored_policy_memory.trace_count(), 1);
+        assert_eq!(
+            restored_policy_memory.trace_receipt_sha256("fixture-run", "query-invocation-1"),
+            response["retrieval_trace_sha256"].as_str()
+        );
         let items = response["items"].as_array().expect("context items");
         assert!(items.iter().any(|item| {
             item["type"] == "text" && item["value"].as_str()
