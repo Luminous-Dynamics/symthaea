@@ -115,12 +115,6 @@
       "SYNTHETIC-NON-EMPIRICAL-RECEIPT"
     ],
     "target_statement_context": [],
-    "translation_assessment": "aligned",
-    "translation_assessor": "synthetic_fixture_adjudicator",
-    "translation_review_refs": [
-      "SYNTHETIC-EXACT-TEXT-FORMULA-PAIR",
-      "SYNTHETIC-REVIEW-ONLY-NOT-EMPIRICAL"
-    ],
     "translation_reviews": [
       {
         "reviewer_id": "synthetic-reviewer-a",
