@@ -928,6 +928,20 @@ pub fn generate_synthetic_fab_episode_v1(
 
 /// Scores a completed selection against hidden finite-population truth.
 /// Every unit must have a positive, logged first-order inclusion probability.
+fn simulate_metrology_result_v1(
+    episode: &SyntheticFabEpisodeV1,
+    candidate_id: &str,
+    true_defect: bool,
+) -> bool {
+    let mut rng = SplitMix64::new(stratum_seed(episode.measurement_seed, candidate_id));
+    let draw = rng.unit_interval();
+    if true_defect {
+        draw < episode.metrology_characteristics.sensitivity
+    } else {
+        draw < 1.0 - episode.metrology_characteristics.specificity
+    }
+}
+
 pub fn evaluate_synthetic_metrology_policy_v1(
     episode: &SyntheticFabEpisodeV1,
     selection: &MetrologyAuditSelectionReportV1,
@@ -1023,6 +1037,9 @@ pub fn evaluate_synthetic_metrology_policy_v1(
     let mut selected_count = 0_usize;
     let mut selected_positive_count = 0_usize;
     let mut true_positive_count = 0_usize;
+    let mut metrology_detected_true_positive_count = 0_usize;
+    let mut metrology_false_positive_count = 0_usize;
+    let mut metrology_false_negative_count = 0_usize;
     let mut latent_process_state_total = 0.0;
     let mut defect_score_total = 0.0;
     let mut ht_positive_total = 0.0;
@@ -1070,9 +1087,21 @@ pub fn evaluate_synthetic_metrology_policy_v1(
         true_population_brier_total += squared_error;
         if row.selected {
             selected_count += 1;
+            let assay_positive = simulate_metrology_result_v1(
+                episode,
+                &observed.candidate_id,
+                truth.defect_positive,
+            );
             if truth.defect_positive {
                 selected_positive_count += 1;
                 ht_positive_total += 1.0 / row.inclusion_probability;
+                if assay_positive {
+                    metrology_detected_true_positive_count += 1;
+                } else {
+                    metrology_false_negative_count += 1;
+                }
+            } else if assay_positive {
+                metrology_false_positive_count += 1;
             }
             ht_brier_total += squared_error / row.inclusion_probability;
             if matches!(&row.method, MetrologySelectionMethodV1::RandomizedAudit) {
@@ -1103,6 +1132,11 @@ pub fn evaluate_synthetic_metrology_policy_v1(
 
     let population_count = episode.policy_view.population_count;
     let escaped_defect_count = true_positive_count.saturating_sub(selected_positive_count);
+    let total_undetected_defect_count =
+        escaped_defect_count.saturating_add(metrology_false_negative_count);
+    let detection_capture_fraction = (true_positive_count > 0).then(|| {
+        metrology_detected_true_positive_count as f64 / true_positive_count as f64
+    });
     let defect_capture_fraction = (true_positive_count > 0)
         .then(|| selected_positive_count as f64 / true_positive_count as f64);
     let escaped_defect_fraction =
@@ -1173,9 +1207,16 @@ pub fn evaluate_synthetic_metrology_policy_v1(
         selected_count,
         selected_positive_count,
         escaped_defect_count,
+        metrology_detected_true_positive_count,
+        metrology_false_positive_count,
+        metrology_false_negative_count,
+        total_undetected_defect_count,
+        detection_capture_fraction,
         defect_capture_fraction,
         escaped_defect_fraction,
         true_defect_prevalence,
+        metrology_sensitivity: episode.metrology_characteristics.sensitivity,
+        metrology_specificity: episode.metrology_characteristics.specificity,
         mean_latent_process_state: latent_process_state_total / population_count as f64,
         mean_defect_score: defect_score_total / population_count as f64,
         selected_sample_prevalence,
