@@ -1,0 +1,128 @@
+#!/usr/bin/env node
+// SFEB-MON-003 v3: tenant-bound source receipts, live authorization,
+// sink-enforced fencing, idempotency and unknown-outcome reconciliation.
+// Pure in-memory reference model; no production atomicity/crypto claim.
+import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+const canon=v=>v===null||typeof v!=='object'?JSON.stringify(v):Array.isArray(v)?'['+v.map(canon).join(',')+']':'{'+Object.keys(v).sort().map(k=>JSON.stringify(k)+':'+canon(v[k])).join(',')+'}';
+const digest=v=>createHash('sha256').update(canon(v)).digest('hex');
+const clone=v=>JSON.parse(JSON.stringify(v));
+const fail=(code,msg)=>{const e=new Error(msg);e.code=code;throw e;};
+const scopeKey=({tenantId,objectiveId})=>JSON.stringify([tenantId,objectiveId]);
+
+class SourceOfRecord {
+  constructor({tenantId,source,threshold}){if(!tenantId||!source||!Number.isFinite(threshold))fail('INVALID_SOURCE','tenant/source/threshold required');this.tenantId=tenantId;this.source=source;this.threshold=threshold;this.sequence=0;this.capacity=0;this.ready=false;this.receipts=new Map();this.eventIds=new Set();}
+  append({eventId,capacity,ready,now,expiresAt,resourceId,actionType}){
+    if(!eventId||!Number.isFinite(capacity)||!Number.isFinite(now)||!Number.isFinite(expiresAt)||expiresAt<=now||!resourceId||!actionType)fail('INVALID_EVENT','source event fields invalid');
+    if(this.eventIds.has(eventId))fail('DUPLICATE_SOURCE_EVENT','source event id already exists');
+    const previousCapacity=this.capacity,previousReady=this.ready;this.sequence+=1;this.capacity=capacity;this.ready=ready;this.eventIds.add(eventId);
+    const crossed=previousCapacity<this.threshold&&capacity>=this.threshold&&ready===true;
+    if(!crossed)return null;
+    const body={tenantId:this.tenantId,source:this.source,eventId,sequence:this.sequence,occurredAt:now,expiresAt,previousCapacity,capacity,previousReady,ready,resourceId,actionType};
+    const receipt={...body,receiptId:this.tenantId+'|'+this.source+'#'+eventId,predicateDigest:digest({threshold:this.threshold,providerReady:true}),payloadDigest:digest(body),revoked:false};
+    this.receipts.set(receipt.receiptId,receipt);return clone(receipt);
+  }
+  revoke(receiptId){const r=this.receipts.get(receiptId);if(!r)fail('UNKNOWN_RECEIPT','unknown receipt');r.revoked=true;}
+  get(receiptId){const r=this.receipts.get(receiptId);return r?clone(r):null;}
+}
+
+class LeaseCoordinator {
+  constructor({tenantId,objectiveId,sink}){this.tenantId=tenantId;this.objectiveId=objectiveId;this.sink=sink;this.epoch=0;this.active=null;}
+  acquire(workerId,{now,ttl}){if(!workerId||!Number.isFinite(now)||!Number.isFinite(ttl)||ttl<=0)fail('INVALID_LEASE','lease invalid');if(this.active&&this.active.expiresAt>now)fail('LEASE_HELD','lease still held');const lease=Object.freeze({tenantId:this.tenantId,objectiveId:this.objectiveId,workerId,epoch:++this.epoch,issuedAt:now,expiresAt:now+ttl});this.active=lease;this.sink.installFence(this.tenantId,this.objectiveId,lease.epoch);return lease;}
+}
+
+class PolicyPlane {
+  constructor(tenants=['tenant-A']){this.revisions=new Map(tenants.map(t=>[t,1]));this.allowed=new Set(tenants);this.readers=new Map(tenants.map(t=>[t,new Set(['reconciler-A'])]));this.readRevisions=new Map(tenants.map(t=>[t,1]));}
+  revoke(tenant){this.allowed.delete(tenant);this.revisions.set(tenant,(this.revisions.get(tenant)||0)+1);}
+  revokeReader(tenant,principalId){const readers=this.readers.get(tenant);if(readers)readers.delete(principalId);this.readRevisions.set(tenant,(this.readRevisions.get(tenant)||0)+1);}
+  issueReconciliationGrant({tenantId,objective,principalId,actionKey,now,ttl}){
+    if(!tenantId||objective.tenantId!==tenantId)fail('TENANT_SCOPE_MISMATCH','reconciliation tenant does not match objective');
+    if(!principalId||!actionKey||!Number.isFinite(now)||!Number.isFinite(ttl)||ttl<=0)fail('INVALID_RECONCILIATION_GRANT','reconciliation grant fields invalid');
+    if(!this.readers.get(tenantId)?.has(principalId))fail('RECONCILIATION_NOT_AUTHORIZED','principal lacks read-only reconciliation authority');
+    const readRevision=this.readRevisions.get(tenantId)||0;
+    return Object.freeze({grantId:'read-'+digest({tenantId,objectiveId:objective.id,principalId,actionKey,readRevision}).slice(0,20),tenantId,objectiveId:objective.id,objectiveVersion:objective.version,principalId,actionKey,readRevision,issuedAt:now,expiresAt:now+ttl});
+  }
+  issueGrant({lease,objective,source,receiptId,action,now,ttl}){
+    const receipt=source.get(receiptId);if(!receipt)fail('UNKNOWN_SOURCE_RECEIPT','receipt missing in source of record');
+    if(receipt.tenantId!==objective.tenantId||lease.tenantId!==objective.tenantId||lease.objectiveId!==objective.id)fail('TENANT_SCOPE_MISMATCH','objective, lease and source receipt are not in one scope');
+    if(!this.allowed.has(objective.tenantId))fail('NOT_AUTHORIZED','tenant permission denied');
+    if(receipt.resourceId!==action.resourceId||receipt.actionType!==action.type)fail('GRANT_SCOPE_MISMATCH','action outside source receipt scope');
+    if(receipt.revoked||now>=receipt.expiresAt)fail('RECEIPT_INELIGIBLE','receipt revoked or expired');
+    const policyRevision=this.revisions.get(objective.tenantId)||0,actionDigest=digest(action);
+    return Object.freeze({grantId:'grant-'+digest({tenantId:objective.tenantId,objectiveId:objective.id,version:objective.version,actor:lease.workerId,epoch:lease.epoch,actionDigest,policyRevision}).slice(0,20),tenantId:objective.tenantId,actor:lease.workerId,objectiveId:objective.id,objectiveVersion:objective.version,receiptId:receipt.receiptId,receiptDigest:receipt.payloadDigest,actionDigest,resourceId:action.resourceId,permissionRevision:policyRevision,fencingEpoch:lease.epoch,issuedAt:now,expiresAt:Math.min(now+ttl,receipt.expiresAt)});
+  }
+}
+
+class DurableMockSink {
+  constructor(){this.maxEpoch=new Map();this.results=new Map();this.sideEffects=[];this.loseNextResponse=false;}
+  installFence(tenantId,objectiveId,epoch){const key=scopeKey({tenantId,objectiveId});const prior=this.maxEpoch.get(key)||0;if(!Number.isSafeInteger(epoch)||epoch<=prior)fail('NON_MONOTONIC_FENCE','fence must increase within tenant/objective scope');this.maxEpoch.set(key,epoch);}
+  execute({objective,lease,grant,source,receiptId,action,actionKey,requestDigest,policy,now}){
+    const receipt=source.get(receiptId);if(!receipt)fail('UNKNOWN_SOURCE_RECEIPT','source receipt unavailable');
+    if(receipt.tenantId!==objective.tenantId||grant.tenantId!==objective.tenantId||lease.tenantId!==objective.tenantId)fail('TENANT_SCOPE_MISMATCH','objective, receipt, lease and grant tenant mismatch');
+    const expectedActionKey=deriveActionKey({objective,receipt,action});
+    const expectedRequestDigest=deriveRequestDigest({objective,receipt,action});
+    if(actionKey!==expectedActionKey)fail('ACTION_KEY_MISMATCH','idempotency key not bound to tenant/objective/event/action');
+    if(requestDigest!==expectedRequestDigest)fail('REQUEST_DIGEST_MISMATCH','request digest not canonical for tenant/objective/event/action');
+    const prior=this.results.get(actionKey);
+    if(prior&&prior.requestDigest!==expectedRequestDigest)fail('IDEMPOTENCY_CONFLICT','same key with different request');
+    const maxEpoch=this.maxEpoch.get(scopeKey({tenantId:objective.tenantId,objectiveId:objective.id}))||0;
+    if(lease.tenantId!==objective.tenantId||lease.objectiveId!==objective.id||lease.epoch!==maxEpoch||lease.expiresAt<=now)fail('STALE_FENCE','stale/foreign/expired worker epoch');
+    if(grant.actor!==lease.workerId||grant.fencingEpoch!==lease.epoch||grant.objectiveId!==objective.id||grant.objectiveVersion!==objective.version)fail('GRANT_BINDING_MISMATCH','grant actor/objective/fence mismatch');
+    if(grant.receiptId!==receipt.receiptId||grant.receiptDigest!==receipt.payloadDigest||grant.actionDigest!==digest(action)||grant.resourceId!==action.resourceId)fail('GRANT_SCOPE_MISMATCH','grant not bound to this receipt/action/target');
+    const currentRevision=policy.revisions.get(objective.tenantId)||0;
+    if(!policy.allowed.has(objective.tenantId)||grant.permissionRevision!==currentRevision)fail('PERMISSION_REVISION_STALE','tenant permission revoked or changed');
+    if(now<grant.issuedAt||now>=grant.expiresAt||now>=receipt.expiresAt||receipt.revoked)fail('RECEIPT_OR_GRANT_INELIGIBLE','receipt or grant expired/revoked');
+    if(receipt.resourceId!==action.resourceId||receipt.actionType!==action.type)fail('TARGET_SCOPE_MISMATCH','target not in receipt scope');
+    if(prior)fail('REPLAY_REQUIRES_RECONCILIATION','prior operation results are available only through separately authorized read-only reconciliation');
+    const result={tenantId:objective.tenantId,objectiveId:objective.id,objectiveVersion:objective.version,receiptId:receipt.receiptId,actionKey,requestDigest:expectedRequestDigest,operationId:'op-'+digest({actionKey,requestDigest:expectedRequestDigest}).slice(0,24),workerId:lease.workerId,fencingEpoch:lease.epoch,authorizationGrantId:grant.grantId,permissionRevision:currentRevision,committedAt:now,sinkStatus:'committed',postcondition:{resourceId:action.resourceId,state:'reserved'},replayed:false};
+    // The result and side-effect write model one atomic sink transaction.
+    this.results.set(actionKey,clone(result));this.sideEffects.push(clone(result));
+    if(this.loseNextResponse){this.loseNextResponse=false;const e=new Error('sink committed but response was lost');e.code='OUTCOME_UNKNOWN';e.actionKey=actionKey;throw e;}
+    return clone(result);
+  }
+  reconcile({tenantId,objectiveId,principalId,actionKey,grant,policy,now}){
+    if(!grant||grant.tenantId!==tenantId||grant.objectiveId!==objectiveId||grant.principalId!==principalId||grant.actionKey!==actionKey)fail('RECONCILIATION_SCOPE_MISMATCH','read grant does not match tenant/objective/principal/operation');
+    const currentReadRevision=policy.readRevisions.get(tenantId)||0;
+    if(!policy.readers.get(tenantId)?.has(principalId)||grant.readRevision!==currentReadRevision)fail('RECONCILIATION_NOT_AUTHORIZED','read authority revoked or changed');
+    if(!Number.isFinite(now)||now<grant.issuedAt||now>=grant.expiresAt)fail('RECONCILIATION_GRANT_INELIGIBLE','read grant expired or not yet valid');
+    const r=this.results.get(actionKey);if(!r)return null;
+    if(r.tenantId!==tenantId||r.objectiveId!==objectiveId)fail('RECONCILIATION_SCOPE_MISMATCH','stored operation belongs to another tenant/objective');
+    // Return a deliberately minimized receipt; no worker, target or postcondition payload.
+    return {tenantId,objectiveId,objectiveVersion:r.objectiveVersion,actionKey,requestDigest:r.requestDigest,operationId:r.operationId,sinkStatus:r.sinkStatus,committedAt:r.committedAt,reconciled:true};
+  }
+}
+
+function deriveActionKey({objective,receipt,action}){return 'sfeb:'+digest({domain:'sfeb.mon003.action.v2',tenantId:objective.tenantId,objectiveId:objective.id,objectiveVersion:objective.version,source:receipt.source,eventId:receipt.eventId,actionDigest:digest(action)});}
+function deriveRequestDigest({objective,receipt,action}){return digest({tenantId:objective.tenantId,objectiveId:objective.id,objectiveVersion:objective.version,source:receipt.source,eventId:receipt.eventId,action});}
+function makeWorld(tenantId='tenant-A'){
+ const objective=Object.freeze({id:'objective-reservation-1',version:1,tenantId});const sink=new DurableMockSink();const leases=new LeaseCoordinator({tenantId,objectiveId:objective.id,sink});const source=new SourceOfRecord({tenantId,source:'urn:fixture:capacity-service',threshold:3});const policy=new PolicyPlane([tenantId]);
+ source.append({eventId:'baseline-ready',capacity:1,ready:true,now:0,expiresAt:100,resourceId:'slot-17',actionType:'reserve'});
+ const receipt=source.append({eventId:'capacity-crossing-1',capacity:3,ready:true,now:10,expiresAt:30,resourceId:'slot-17',actionType:'reserve'});
+ source.append({eventId:'capacity-falls',capacity:1,ready:true,now:12,expiresAt:100,resourceId:'slot-17',actionType:'reserve'});
+ assert.ok(receipt);const action=Object.freeze({type:'reserve',resourceId:'slot-17',amount:1});return {objective,sink,leases,source,policy,receipt,action};
+}
+const cases=[];function test(name,fn){fn();cases.push({name,result:'pass'});}function expect(code,fn){assert.throws(fn,e=>e&&e.code===code,'expected '+code);}
+const request=w=>({objective:w.objective,lease:w.lease,grant:w.grant,source:w.source,receiptId:w.receipt.receiptId,action:w.action,actionKey:deriveActionKey({objective:w.objective,receipt:w.receipt,action:w.action}),requestDigest:deriveRequestDigest({objective:w.objective,receipt:w.receipt,action:w.action}),policy:w.policy,now:w.now});
+
+test('durable edge receipt survives current level falling false and is tenant bound',()=>{const w=makeWorld();assert.equal(w.source.capacity,1);assert.equal(w.receipt.tenantId,'tenant-A');assert.equal(w.source.get(w.receipt.receiptId).revoked,false);});
+test('stale worker A is fenced after worker B obtains a higher epoch',()=>{const w=makeWorld();const a=w.leases.acquire('worker-A',{now:1,ttl:5});const g=w.policy.issueGrant({lease:a,objective:w.objective,source:w.source,receiptId:w.receipt.receiptId,action:w.action,now:2,ttl:10});w.leases.acquire('worker-B',{now:7,ttl:10});const args=request({...w,lease:a,grant:g,now:8});expect('STALE_FENCE',()=>w.sink.execute(args));assert.equal(w.sink.sideEffects.length,0);});
+test('permission revocation between grant and sink commit blocks mutation',()=>{const w=makeWorld();const lease=w.leases.acquire('worker-B',{now:13,ttl:10});const grant=w.policy.issueGrant({lease,objective:w.objective,source:w.source,receiptId:w.receipt.receiptId,action:w.action,now:14,ttl:10});w.policy.revoke('tenant-A');expect('PERMISSION_REVISION_STALE',()=>w.sink.execute(request({...w,lease,grant,now:15})));assert.equal(w.sink.sideEffects.length,0);});
+test('expired receipt cannot authorize mutation',()=>{const w=makeWorld();const lease=w.leases.acquire('worker-X',{now:13,ttl:20});const grant=w.policy.issueGrant({lease,objective:w.objective,source:w.source,receiptId:w.receipt.receiptId,action:w.action,now:14,ttl:30});expect('RECEIPT_OR_GRANT_INELIGIBLE',()=>w.sink.execute(request({...w,lease,grant,now:30})));});
+test('revoked source receipt cannot authorize mutation',()=>{const w=makeWorld();const lease=w.leases.acquire('worker-Y',{now:13,ttl:20});const grant=w.policy.issueGrant({lease,objective:w.objective,source:w.source,receiptId:w.receipt.receiptId,action:w.action,now:14,ttl:10});w.source.revoke(w.receipt.receiptId);expect('RECEIPT_OR_GRANT_INELIGIBLE',()=>w.sink.execute(request({...w,lease,grant,now:15})));assert.equal(w.sink.sideEffects.length,0);});
+test('lost sink response uses separately authorized, minimized reconciliation',()=>{const w=makeWorld();const lease=w.leases.acquire('worker-R',{now:13,ttl:20});const grant=w.policy.issueGrant({lease,objective:w.objective,source:w.source,receiptId:w.receipt.receiptId,action:w.action,now:14,ttl:10});const args=request({...w,lease,grant,now:15});w.sink.loseNextResponse=true;expect('OUTCOME_UNKNOWN',()=>w.sink.execute(args));const readGrant=w.policy.issueReconciliationGrant({tenantId:'tenant-A',objective:w.objective,principalId:'reconciler-A',actionKey:args.actionKey,now:16,ttl:10});const known=w.sink.reconcile({tenantId:'tenant-A',objectiveId:w.objective.id,principalId:'reconciler-A',actionKey:args.actionKey,grant:readGrant,policy:w.policy,now:16});assert.equal(known.sinkStatus,'committed');assert.equal(typeof known.operationId,'string');assert.equal('postcondition' in known,false);assert.equal('workerId' in known,false);expect('REPLAY_REQUIRES_RECONCILIATION',()=>w.sink.execute({...args,now:16}));assert.equal(w.sink.sideEffects.length,1);});
+test('read-only reconciliation remains possible after action permission is revoked',()=>{const w=makeWorld();const lease=w.leases.acquire('worker-A',{now:13,ttl:20});const grant=w.policy.issueGrant({lease,objective:w.objective,source:w.source,receiptId:w.receipt.receiptId,action:w.action,now:14,ttl:10});const args=request({...w,lease,grant,now:15});w.sink.execute(args);w.policy.revoke('tenant-A');const readGrant=w.policy.issueReconciliationGrant({tenantId:'tenant-A',objective:w.objective,principalId:'reconciler-A',actionKey:args.actionKey,now:16,ttl:10});const receipt=w.sink.reconcile({tenantId:'tenant-A',objectiveId:w.objective.id,principalId:'reconciler-A',actionKey:args.actionKey,grant:readGrant,policy:w.policy,now:16});assert.equal(receipt.sinkStatus,'committed');expect('PERMISSION_REVISION_STALE',()=>w.sink.execute({...args,now:16}));assert.equal(w.sink.sideEffects.length,1);});
+test('unauthorized principal cannot reconcile a stored operation',()=>{const w=makeWorld();const lease=w.leases.acquire('worker-A',{now:13,ttl:20});const grant=w.policy.issueGrant({lease,objective:w.objective,source:w.source,receiptId:w.receipt.receiptId,action:w.action,now:14,ttl:10});const args=request({...w,lease,grant,now:15});w.sink.execute(args);expect('RECONCILIATION_NOT_AUTHORIZED',()=>w.policy.issueReconciliationGrant({tenantId:'tenant-A',objective:w.objective,principalId:'worker-A',actionKey:args.actionKey,now:16,ttl:10}));});
+test('reconciliation grants are bound to one operation and cannot cross tenants',()=>{const w=makeWorld();const lease=w.leases.acquire('worker-A',{now:13,ttl:20});const grant=w.policy.issueGrant({lease,objective:w.objective,source:w.source,receiptId:w.receipt.receiptId,action:w.action,now:14,ttl:10});const args=request({...w,lease,grant,now:15});w.sink.execute(args);const readGrant=w.policy.issueReconciliationGrant({tenantId:'tenant-A',objective:w.objective,principalId:'reconciler-A',actionKey:args.actionKey,now:16,ttl:10});expect('RECONCILIATION_SCOPE_MISMATCH',()=>w.sink.reconcile({tenantId:'tenant-B',objectiveId:w.objective.id,principalId:'reconciler-A',actionKey:args.actionKey,grant:readGrant,policy:w.policy,now:16}));expect('RECONCILIATION_SCOPE_MISMATCH',()=>w.sink.reconcile({tenantId:'tenant-A',objectiveId:w.objective.id,principalId:'reconciler-A',actionKey:'other-operation',grant:readGrant,policy:w.policy,now:16}));});
+test('expired and revoked reconciliation grants fail closed',()=>{const w=makeWorld();const lease=w.leases.acquire('worker-A',{now:13,ttl:20});const grant=w.policy.issueGrant({lease,objective:w.objective,source:w.source,receiptId:w.receipt.receiptId,action:w.action,now:14,ttl:10});const args=request({...w,lease,grant,now:15});w.sink.execute(args);const readGrant=w.policy.issueReconciliationGrant({tenantId:'tenant-A',objective:w.objective,principalId:'reconciler-A',actionKey:args.actionKey,now:16,ttl:1});expect('RECONCILIATION_GRANT_INELIGIBLE',()=>w.sink.reconcile({tenantId:'tenant-A',objectiveId:w.objective.id,principalId:'reconciler-A',actionKey:args.actionKey,grant:readGrant,policy:w.policy,now:17}));w.policy.revokeReader('tenant-A','reconciler-A');expect('RECONCILIATION_NOT_AUTHORIZED',()=>w.sink.reconcile({tenantId:'tenant-A',objectiveId:w.objective.id,principalId:'reconciler-A',actionKey:args.actionKey,grant:readGrant,policy:w.policy,now:16.5}));});
+test('fencing epochs are isolated for identical objective IDs across tenants',()=>{const sink=new DurableMockSink();const a=new LeaseCoordinator({tenantId:'tenant-A',objectiveId:'shared-objective',sink});const b=new LeaseCoordinator({tenantId:'tenant-B',objectiveId:'shared-objective',sink});const la=a.acquire('worker-A',{now:1,ttl:10});const lb=b.acquire('worker-B',{now:1,ttl:10});assert.equal(la.epoch,1);assert.equal(lb.epoch,1);assert.equal(sink.maxEpoch.get(scopeKey({tenantId:'tenant-A',objectiveId:'shared-objective'})),1);assert.equal(sink.maxEpoch.get(scopeKey({tenantId:'tenant-B',objectiveId:'shared-objective'})),1);sink.installFence('tenant-B','shared-objective',2);assert.equal(sink.maxEpoch.get(scopeKey({tenantId:'tenant-A',objectiveId:'shared-objective'})),1);});
+test('stale worker cannot retrieve a committed result by retrying the action',()=>{const w=makeWorld();const leaseA=w.leases.acquire('worker-A',{now:13,ttl:2});const grantA=w.policy.issueGrant({lease:leaseA,objective:w.objective,source:w.source,receiptId:w.receipt.receiptId,action:w.action,now:13,ttl:10});const args=request({...w,lease:leaseA,grant:grantA,now:14});w.sink.execute(args);w.leases.acquire('worker-B',{now:16,ttl:10});expect('STALE_FENCE',()=>w.sink.execute({...args,now:16}));const readGrant=w.policy.issueReconciliationGrant({tenantId:'tenant-A',objective:w.objective,principalId:'reconciler-A',actionKey:args.actionKey,now:16,ttl:10});const reconciled=w.sink.reconcile({tenantId:'tenant-A',objectiveId:w.objective.id,principalId:'reconciler-A',actionKey:args.actionKey,grant:readGrant,policy:w.policy,now:16});assert.equal(reconciled.sinkStatus,'committed');assert.equal(w.sink.sideEffects.length,1);});
+test('same idempotency key with changed request digest is rejected',()=>{const w=makeWorld();const lease=w.leases.acquire('worker-I',{now:13,ttl:20});const grant=w.policy.issueGrant({lease,objective:w.objective,source:w.source,receiptId:w.receipt.receiptId,action:w.action,now:14,ttl:10});const args=request({...w,lease,grant,now:15});w.sink.execute(args);const changed={...w.action,amount:2};expect('ACTION_KEY_MISMATCH',()=>w.sink.execute({...args,action:changed,requestDigest:deriveRequestDigest({objective:w.objective,receipt:w.receipt,action:changed}),now:16}));assert.equal(w.sink.sideEffects.length,1);});
+test('grant cannot be rebound to a different target',()=>{const w=makeWorld();const lease=w.leases.acquire('worker-S',{now:13,ttl:20});const grant=w.policy.issueGrant({lease,objective:w.objective,source:w.source,receiptId:w.receipt.receiptId,action:w.action,now:14,ttl:10});const changed={...w.action,resourceId:'slot-attacker'};expect('GRANT_SCOPE_MISMATCH',()=>w.sink.execute({...request({...w,lease,grant,now:15}),action:changed,actionKey:deriveActionKey({objective:w.objective,receipt:w.receipt,action:changed}),requestDigest:deriveRequestDigest({objective:w.objective,receipt:w.receipt,action:changed})}));assert.equal(w.sink.sideEffects.length,0);});
+test('fabricated source receipt cannot produce a grant',()=>{const w=makeWorld();const lease=w.leases.acquire('worker-F',{now:13,ttl:20});expect('UNKNOWN_SOURCE_RECEIPT',()=>w.policy.issueGrant({lease,objective:w.objective,source:w.source,receiptId:'attacker#fake',action:w.action,now:14,ttl:10}));});
+test('tenant A source receipt cannot authorize tenant B objective',()=>{const w=makeWorld();const lease=w.leases.acquire('worker-B',{now:13,ttl:20});const foreign={...w.objective,tenantId:'tenant-B'};expect('TENANT_SCOPE_MISMATCH',()=>w.policy.issueGrant({lease,objective:foreign,source:w.source,receiptId:w.receipt.receiptId,action:w.action,now:14,ttl:10}));assert.equal(w.sink.sideEffects.length,0);});
+test('sink rejects cross-tenant receipt and grant transplant',()=>{const w=makeWorld();const lease=w.leases.acquire('worker-A',{now:13,ttl:20});const grant=w.policy.issueGrant({lease,objective:w.objective,source:w.source,receiptId:w.receipt.receiptId,action:w.action,now:14,ttl:10});const foreign={...w.objective,tenantId:'tenant-B'};expect('TENANT_SCOPE_MISMATCH',()=>w.sink.execute({...request({...w,lease,grant,now:15}),objective:foreign,actionKey:deriveActionKey({objective:foreign,receipt:w.receipt,action:w.action}),requestDigest:deriveRequestDigest({objective:foreign,receipt:w.receipt,action:w.action})}));assert.equal(w.sink.sideEffects.length,0);});
+test('tenant identity changes the derived idempotency key',()=>{const a=makeWorld('tenant-A'),b=makeWorld('tenant-B');const rb={...b.receipt,source:a.receipt.source,eventId:a.receipt.eventId};assert.notEqual(deriveActionKey({objective:a.objective,receipt:a.receipt,action:a.action}),deriveActionKey({objective:b.objective,receipt:rb,action:b.action}));});
+test('grant tenant mismatch is rejected even when action target matches',()=>{const w=makeWorld();const lease=w.leases.acquire('worker-T',{now:13,ttl:20});const grant=w.policy.issueGrant({lease,objective:w.objective,source:w.source,receiptId:w.receipt.receiptId,action:w.action,now:14,ttl:10});expect('TENANT_SCOPE_MISMATCH',()=>w.sink.execute({...request({...w,lease,grant,now:15}),grant:{...grant,tenantId:'tenant-B'}}));assert.equal(w.sink.sideEffects.length,0);});
+test('event source id cannot be reused with changed source content',()=>{const w=makeWorld();expect('DUPLICATE_SOURCE_EVENT',()=>w.source.append({eventId:'capacity-crossing-1',capacity:4,ready:true,now:13,expiresAt:30,resourceId:'slot-17',actionType:'reserve'}));});
+
+console.log(JSON.stringify({schema:'sfeb-mon003-objective-kernel-v3-report-v1',status:'passed',deterministic_cases:cases.length,cases,side_effect_claim:'All negative controls produce zero additional side effects; lost-response recovery returns a minimized receipt for the original operation and the original mutation remains exactly one mock effect.',limitations:['Pure in-memory reference model; no DB, broker, cryptographic signer, external authorization service or browser is exercised.',The mock sink models tenant-scoped fencing, current action permission, separately authorized minimized read-only reconciliation, idempotency and mutation/result persistence as an atomic transition.,'Source receipts and tenant identity are trusted model inputs, not cryptographically authenticated production artifacts.',This does not demonstrate exactly-once delivery for arbitrary external sinks. The local canonicalizer is a test-only deterministic encoding, not RFC 8785/JCS; production request digests must use a standardized canonicalization implementation.]},null,2));
