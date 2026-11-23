@@ -1,0 +1,9 @@
+{
+  "schema": "luminous.semi-bench.secom-raw-expectations.v1",
+  "dataset_id": "synthetic-secom-raw-fixture-v1",
+  "expected_feature_sha256": "06324b50b87e6ae9b97347907a42c928cca9716fd67a4a444c9c25d03872ae59",
+  "expected_label_sha256": "1b6643872e828998aac2fdcca7bd6fc87cb90bc9f8ce41bb95e93cea9e655572",
+  "expected_rows": 2,
+  "expected_features_per_row": 3,
+  "clock_domain_id": "synthetic-secom-fixture-clock"
+}

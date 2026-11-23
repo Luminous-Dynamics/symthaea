@@ -1,0 +1,39 @@
+{
+  "basis_counts": {
+    "density": 1,
+    "production_proximity": 2,
+    "spatial": 1,
+    "structure": 1
+  },
+  "claim_limits": {
+    "does_not_establish_causal_production_relationship": true,
+    "does_not_prove_embedding_quality_or_model_performance": true,
+    "does_not_prove_pair_semantic_correctness": true,
+    "pair_manifest_integrity_only": true
+  },
+  "clock_domain_id": "wafer-demo-source-clock",
+  "dataset_id": "synthetic-wafer-contrastive-fixture-v1",
+  "guarantees": {
+    "all_pair_endpoints_in_declared_scope": true,
+    "no_self_pairs": true,
+    "production_proximity_has_supporting_lot_or_time_evidence": true,
+    "unique_pair_identity": true,
+    "unique_sample_identity": true,
+    "unique_unordered_pair": true
+  },
+  "pair_count": 3,
+  "pair_counts_by_scope": {
+    "test": 1,
+    "train": 1,
+    "validation": 1
+  },
+  "relation_counts": {
+    "negative": 1,
+    "positive": 2
+  },
+  "sample_count": 6,
+  "schema": "luminous.semi-bench.contrastive-pair-validation.v1",
+  "split_manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "time_basis": "source_local_naive",
+  "time_embargo_minutes": 60.0
+}

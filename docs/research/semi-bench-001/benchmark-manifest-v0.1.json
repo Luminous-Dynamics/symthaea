@@ -1,0 +1,1735 @@
+{
+  "schema": "luminous.semi-bench.manifest.v0.1",
+  "version": "0.1.0",
+  "status": "proposed-reference-manifest",
+  "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13058",
+  "evidence_ceiling": "public_datasets_and_synthetic_or_reproducible_eda_only",
+  "claims": {
+    "measured_fab_yield_improvement": false,
+    "production_fab_capability": false,
+    "production_pdk_qualification": false,
+    "physical_process_authority": false,
+    "no_autonomous_process_authority": "All learning-based or LMM-assisted recommendations remain bounded by validated offline/simulation evidence, explicit hard constraints, safe fallback and human approval; no process recipe execution is authorized by classifier output."
+  },
+  "benchmark_families": [
+    {
+      "id": "secom-process-diagnostics",
+      "source": "https://archive.ics.uci.edu/dataset/179/secom",
+      "modality": "tabular-process-sensor-data",
+      "known_facts": {
+        "instances": 1567,
+        "uci_listed_attributes": 591,
+        "commonly_represented_sensor_columns": 590,
+        "failed_examples": 104,
+        "missing_values_present": true
+      },
+      "tasks": [
+        "pass-fail-risk-ranking",
+        "missingness-aware-feature-screening",
+        "calibrated-abstention"
+      ],
+      "split_policy": "forward-chaining-or-time-aware-where-timestamp-semantics-permit; freeze-split-ids-before-fitting; random-stratified-splits-secondary-only",
+      "baselines": [
+        "prevalence-only",
+        "logistic-regression",
+        "ridge",
+        "tree-ensemble",
+        "simple-anomaly-detector"
+      ],
+      "metrics": [
+        "balanced-error-rate",
+        "balanced-accuracy",
+        "auprc",
+        "minority-recall",
+        "false-alarm-at-fixed-recall",
+        "brier-score",
+        "calibration",
+        "risk-coverage",
+        "confidence-intervals"
+      ],
+      "limitations": [
+        "small-and-old-dataset",
+        "anonymized-sensors",
+        "limited-process-context",
+        "not-representative-of-current-leading-edge-fabs"
+      ],
+      "evidence_class": "historical-real-production-data"
+    },
+    {
+      "id": "wm-811k-wafer-map-defects",
+      "source": "https://doi.org/10.1007/s10845-024-02390-7",
+      "modality": "wafer-map-images",
+      "known_facts": {
+        "total_maps": 811457,
+        "labeled_maps": 172950,
+        "single_pattern_maps": 25519,
+        "mixed_none_maps": 147431,
+        "single_pattern_classes": [
+          "Center",
+          "Donut",
+          "Edge-Loc",
+          "Edge-Ring",
+          "Loc",
+          "Random",
+          "Scratch",
+          "Near-full"
+        ]
+      },
+      "tasks": [
+        "eight-class-single-pattern-recognition",
+        "separate-mixed-none-handling",
+        "rare-class-recognition",
+        "low-label-learning",
+        "calibrated-rejection",
+        "deployment-cost-comparison"
+      ],
+      "split_policy": "deduplicate-exact-image-content-before-splitting; use-wafer-lot-group-disjoint-splits-if-identifiers-support-them; otherwise-explicitly-disclose-no-group-generalization-claim",
+      "baselines": [
+        "classical-image-features",
+        "compact-cnn",
+        "residual-cnn",
+        "small-transformer",
+        "symthaea-hdc-cfc-candidate"
+      ],
+      "metrics": [
+        "macro-f1",
+        "balanced-accuracy",
+        "per-class-precision-recall-support",
+        "rare-class-auprc",
+        "calibration",
+        "risk-coverage",
+        "parameter-count",
+        "inference-latency",
+        "peak-memory",
+        "energy-only-if-instrumented"
+      ],
+      "limitations": [
+        "majority-mixed-none-class",
+        "label-coverage-limited",
+        "published-selected-subset-accuracy-not-comparable-to-full-distribution"
+      ],
+      "evidence_class": "public-labeled-wafer-map-data"
+    },
+    {
+      "id": "circuitnet-eda-physical-design",
+      "source": "https://circuitnet.github.io/intro/intro.html",
+      "modality": "eda-derived-spatial-and-tabular-data",
+      "known_facts": {
+        "reported_sample_count": "more_than_20000",
+        "variants": {
+          "CircuitNet-N28": [
+            "congestion",
+            "drc",
+            "ir-drop",
+            "net-delay"
+          ],
+          "CircuitNet-N14": [
+            "congestion",
+            "ir-drop",
+            "net-delay"
+          ],
+          "CircuitNet-ISPD15": [
+            "congestion"
+          ]
+        }
+      },
+      "tasks": [
+        "congestion-prediction",
+        "ir-drop-prediction",
+        "net-delay-prediction",
+        "unseen-design-transfer"
+      ],
+      "split_policy": "hold-out-complete-designs; preserve-technology-node-and-task-boundaries; record-design-lineage-overlap",
+      "baselines": [
+        "published-dataset-baselines",
+        "simple-regression",
+        "cnn-or-unet-family",
+        "residual-model"
+      ],
+      "metrics": [
+        "mae",
+        "rmse",
+        "normalized-error",
+        "critical-tail-recall",
+        "calibration",
+        "out-of-domain-abstention",
+        "per-design-results",
+        "compute-and-memory"
+      ],
+      "limitations": [
+        "commercial-tool-generated-data",
+        "technology-and-task-coverage-differs-by-variant",
+        "not-a-fabrication-outcome"
+      ],
+      "evidence_class": "eda-generated-public-benchmark-data"
+    },
+    {
+      "id": "openroad-rtl-to-gds-ppa",
+      "source": "https://openroad-flow-scripts.readthedocs.io/en/latest/contrib/Metrics.html",
+      "modality": "reproducible-eda-flow",
+      "candidate_pdks": [
+        {
+          "name": "SKY130",
+          "source": "https://github.com/google/skywater-pdk",
+          "reported_status": "experimental-preview-alpha"
+        },
+        {
+          "name": "GF180MCU",
+          "source": "https://github.com/google/gf180mcu-pdk",
+          "reported_status": "verify-current-project-status-and-version"
+        },
+        {
+          "name": "IHP-SG13G2",
+          "source": "https://github.com/IHP-GmbH/IHP-Open-PDK",
+          "reported_status": "early-access-not-production-intended"
+        }
+      ],
+      "tasks": [
+        "rtl-to-gds-reproduction",
+        "ppa-regression",
+        "cross-design-transfer"
+      ],
+      "split_policy": "fixed-design-pdk-constraints-and-tool-version; compare-only-like-for-like-runs",
+      "metrics": [
+        "area",
+        "wns",
+        "tns",
+        "power-under-explicit-activity-assumptions",
+        "congestion",
+        "wirelength",
+        "drc-lvs",
+        "runtime",
+        "peak-memory",
+        "reproducibility"
+      ],
+      "limitations": [
+        "open-pdk-model-and-rule-status-varies",
+        "different-pdks-and-constraints-are-not-directly-comparable",
+        "rtl-to-gds-does-not-prove-fabricated-silicon-performance"
+      ],
+      "industry_reference": {
+        "name": "IEEE CEDA First Commercial Benchmarking — Siemens EDA Aprisa",
+        "source": "https://github.com/ieee-ceda-datc/First-Commercial-Benchmarking-SiemensEDA",
+        "use_policy": "compare-only-where-design-pdk-constraints-and-tool-version-match; respect-proprietary-tool-script-and-artifact-permissions"
+      },
+      "evidence_class": "reproducible-software-eda-results"
+    },
+    {
+      "id": "device-analytical-tcad-spice-measurement",
+      "source": "https://github.com/Luminous-Dynamics/symthaea/issues/5868",
+      "modality": "multiphysics-reference-chain",
+      "tasks": [
+        "analytical-known-answer",
+        "devsim-tcad-reference",
+        "compact-model-fit",
+        "ngspice-projection",
+        "low-voltage-physical-iv-observation"
+      ],
+      "split_policy": "separate-oracle-known-answers-from-fit-data-and-physical-measurement-holdouts",
+      "metrics": [
+        "analytical-tcad-residual",
+        "mesh-refinement-sensitivity",
+        "fit-holdout-residual",
+        "circuit-prediction-residual",
+        "measurement-residual",
+        "uncertainty"
+      ],
+      "limitations": [
+        "bounded-benign-diode-profile-only-for-v1",
+        "solver-convergence-not-mesh-independence",
+        "model-fit-not-independent-validation"
+      ],
+      "evidence_class": "analytical-and-simulation-until-physical-observation-is-added"
+    },
+    {
+      "id": "inspection-positioning-calibration-bench",
+      "source": "https://github.com/Luminous-Dynamics/symthaea/issues/5912",
+      "reuse_existing_contract": "https://github.com/Luminous-Dynamics/symthaea/issues/5914",
+      "modality": "synthetic-then-physical-reference-measurement",
+      "tasks": [
+        "scale-calibration",
+        "position-discrepancy",
+        "revisit-repeatability",
+        "absolute-accuracy",
+        "remount-sensitivity",
+        "raw-image-lineage",
+        "coverage"
+      ],
+      "metrics": [
+        "calibration-currentness",
+        "repeatability",
+        "absolute-error",
+        "uncertainty",
+        "field-of-view-coverage",
+        "lineage-integrity"
+      ],
+      "limitations": [
+        "synthetic-corpus-does-not-qualify-a-physical-instrument",
+        "local-field-observation-not-whole-wafer-evidence"
+      ],
+      "evidence_class": "synthetic-until-traceable-physical-reference-campaign"
+    },
+    {
+      "id": "chip-placement-end-to-end-routed-ppa",
+      "source": "https://proceedings.neurips.cc/paper_files/paper/2025/hash/1cba8502063fab9df252a63968691768-Abstract-Datasets_and_Benchmarks_Track.html",
+      "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13069",
+      "latest_method_reference": {
+        "name": "PPAPlace",
+        "source": "https://arxiv.org/abs/2608.13790",
+        "doi": "10.1145/3831252.3834172",
+        "reported_test_circuits": 5,
+        "reported_average_wns_improvement_percent": 22,
+        "reported_average_tns_improvement_percent": 51,
+        "reported_preserves_power_and_routability": true,
+        "claim_status": "paper-reported-not-independently-reproduced"
+      },
+      "tasks": [
+        "reproduce-hierarchical-baseline",
+        "compare-ai-placement-algorithms",
+        "validate-surrogate-to-final-timing-fidelity",
+        "optimize-final-routed-wns-tns-ppa"
+      ],
+      "split_policy": "hold-out-entire-circuits; freeze-design-pdk-library-corner-constraints-flow-tools-and-seeds",
+      "final_metrics": [
+        "routed-wns",
+        "routed-tns",
+        "area",
+        "power-under-declared-activity-and-extraction",
+        "congestion",
+        "wirelength",
+        "drc-routability",
+        "full-flow-completion",
+        "runtime",
+        "memory"
+      ],
+      "intermediate_metrics": [
+        "hpwl",
+        "pre-route-timing",
+        "global-route-timing",
+        "surrogate-predictions"
+      ],
+      "negative_controls": [
+        "proxy-ranking-disagrees-with-final-wns",
+        "placement-looks-better-but-route-fails",
+        "held-out-design-leakage",
+        "mismatched-pdk-or-constraints"
+      ],
+      "claim_ceiling": "end-to-end software-flow result for exact design/PDK/constraints only; no fabricated-silicon or foundry-yield claim",
+      "training_data_reference": {
+        "name": "PPAPlace-5000",
+        "url": "https://huggingface.co/datasets/ValleyC/PPAPlace-5000",
+        "placements": 5000,
+        "circuits": 10,
+        "placements_per_circuit": 500,
+        "compressed_archive_size_gib": 8.47,
+        "labels": [
+          "post-global-routing-WNS",
+          "post-global-routing-TNS",
+          "power",
+          "area"
+        ],
+        "license_metadata": "other",
+        "rights_gate": "review exact dataset card and associated design/tool restrictions before caching or redistribution",
+        "claim_status": "public-release-described; exact license terms and dataset snapshot digest not yet frozen"
+      }
+    },
+    {
+      "id": "adaptive-wafer-inspection-and-latent-risk",
+      "sources": [
+        "https://doi.org/10.1016/j.aei.2026.104621",
+        "https://doi.org/10.1016/j.cie.2026.112291"
+      ],
+      "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13083",
+      "tasks": [
+        "budget-aware-inspection-policy",
+        "value-of-information",
+        "latent-risk-in-uninspected-wafers",
+        "noisy-label-active-learning",
+        "missing-not-at-random-inspection"
+      ],
+      "metrics": [
+        "cost-weighted-defect-discovery",
+        "time-to-detection",
+        "residual-latent-risk",
+        "defects-per-100-inspections",
+        "inspection-turnaround",
+        "policy-regret-synthetic",
+        "operator-burden"
+      ],
+      "claim_ceiling": "public/synthetic decision-policy results only; no fab-impact claim without controlled site measurements"
+    },
+    {
+      "id": "physics-bounded-ai-sem-detection-limits",
+      "sources": [
+        "https://pages.nist.gov/detection_limits/web/index.html",
+        "https://www.nist.gov/publications/detection-limits-ai-based-sem-dimensional-metrology",
+        "https://www.nist.gov/programs-projects/overlay-metrology-using-physics-and-ai-based-scanning-electron-microscopy"
+      ],
+      "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13084",
+      "reported_reference_metadata": {
+        "simulated_image_sets": 6,
+        "images_per_set": 567,
+        "image_dimensions": [
+          512,
+          512
+        ],
+        "trained_unet_models": 3,
+        "approximate_parameters_per_unet": 7900000,
+        "published_visualization_graphs": 540
+      },
+      "tasks": [
+        "dimensional-measurement-bias",
+        "probability-of-detection",
+        "false-alarm-probability",
+        "noise-and-contrast-detection-limit",
+        "observer-comparison",
+        "sparse-scan-throughput"
+      ],
+      "metrics": [
+        "dimensional-bias",
+        "absolute-error",
+        "uncertainty-calibration",
+        "detection-limit-surface",
+        "false-alarm",
+        "missed-feature-risk",
+        "scan-time"
+      ],
+      "acquisition_status": "metadata-reviewed; raw image/model artifact availability and rights still require verification",
+      "claim_ceiling": "public NIST reference/synthetic image results only; no physical SEM metrology capability without traceable calibration"
+    },
+    {
+      "id": "chiplet-package-testability",
+      "source": "https://doi.org/10.1109/MDAT.2026.3706448",
+      "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13085",
+      "tasks": [
+        "prebond-known-good-die-test",
+        "die-to-die-interface-test",
+        "postbond-package-test",
+        "system-bringup",
+        "infield-monitoring",
+        "fault-localization"
+      ],
+      "metrics": [
+        "per-fault-family-coverage",
+        "escaped-defect-probability",
+        "diagnostic-localization",
+        "test-time",
+        "test-access-overhead",
+        "repair-and-containment"
+      ],
+      "claim_ceiling": "synthetic fault coverage only until qualified package test vehicles and independent reliability evidence exist"
+    },
+    {
+      "id": "mixedwm38-compositional-zero-shot-and-synthetic-to-real",
+      "source": "https://github.com/Junliangwangdhu/WaferMap",
+      "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13113",
+      "reference_paper": {
+        "title": "Classifying mixed-defect from single-defect training in imbalanced wafer maps via diffusion and attention",
+        "doi": "10.1016/j.eswa.2025.130127",
+        "publication_date": "2026-03-01",
+        "method": [
+          "class-mixing-diffusion-model",
+          "prompt-wise-attention-score-similarity"
+        ],
+        "reported_harmonic_mean_accuracy_most_imbalanced": 0.743,
+        "reported_gain_vs_compared_diffusion_classifier_percentage_points": 3.92,
+        "claim_status": "paper-reported-not-independently-reproduced"
+      },
+      "dataset_caveats": [
+        "upstream states GAN-generated maps were added to balance mixed combinations",
+        "original source has no clear per-sample synthetic-vs-real provenance in the published interface",
+        "third-party data audit reports undocumented pixel value 3 and visual mapping required for label column order",
+        "Near-full (149) and Random (866) are sparse single classes and absent from mixtures according to one independent data audit",
+        "source data license must be verified independently; downstream code repository MIT license does not establish raw dataset rights"
+      ],
+      "tasks": [
+        "standard-multilabel-interpolation",
+        "leave-combination-out-zero-shot",
+        "leave-component-out-open-set",
+        "cross-dataset-partial-label-transfer",
+        "synthetic-to-real-only-if-provenance-supports"
+      ],
+      "metrics": [
+        "per-component-macro-f1",
+        "exact-set-match",
+        "harmonic-mean-seen-unseen",
+        "open-set-false-acceptance",
+        "risk-coverage",
+        "per-cardinality-performance"
+      ],
+      "claim_ceiling": "synthetic/unknown-origin benchmark results are not real-fab generalization or process-root-cause proof"
+    },
+    {
+      "id": "upstream-silicon-substrate-material-to-wafer",
+      "source": "https://doi.org/10.1016/j.ijmachtools.2025.104345",
+      "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13114",
+      "reference_publication_date": "2026-01",
+      "scope": [
+        "crystal-growth",
+        "ingot-shaping-and-slicing",
+        "grinding-lapping-polishing",
+        "surface-quality",
+        "tool-wear"
+      ],
+      "tasks": [
+        "material-lot-provenance",
+        "crystal-growth-modelling",
+        "kerf-and-slicing-quality",
+        "wafer-geometry",
+        "surface-and-subsurface-quality",
+        "metrology-uncertainty",
+        "downstream-compatibility"
+      ],
+      "metrics": [
+        "accepted-wafer-yield",
+        "TTV",
+        "bow-warp",
+        "flatness",
+        "roughness",
+        "defect-density",
+        "material-utilization",
+        "kerf-loss",
+        "cycle-time",
+        "tool-wear",
+        "water-energy-chemical-intensity-per-accepted-wafer"
+      ],
+      "claim_ceiling": "literature/simulation or exact measured substrate test only; no electronic-grade purification or qualified substrate production claim"
+    },
+    {
+      "id": "wm811k-graph-contrastive-lot-time-generalization",
+      "sources": [
+        "https://doi.org/10.1007/s10845-026-02906-3",
+        "https://github.com/irjawais/wafer-gnn-contrastive"
+      ],
+      "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13122",
+      "published_protocol": {
+        "maps": 811457,
+        "lots": 46293,
+        "sample_fraction": 0.3,
+        "sampled_maps": 243437,
+        "split": "stratified-60-20-20-sample-level",
+        "train": 146062,
+        "validation": 48687,
+        "test": 48688,
+        "reported_metrics": {
+          "clustering_ari": 0.89,
+          "clustering_nmi": 0.87,
+          "fine_tuned_accuracy": 0.986,
+          "fine_tuned_ari": 0.98,
+          "fine_tuned_nmi": 0.96,
+          "accuracy_at_25_percent_labels": 0.957,
+          "macro_f1": 0.975,
+          "loco_ood_detection_at_95_percent_id_retention": 0.893,
+          "loco_ood_auroc": 0.927,
+          "inference_latency_ms": 8.3,
+          "memory_mb": 387
+        },
+        "claim_status": "paper-reported-not-independently-reproduced",
+        "mixedwm38_transfer": {
+          "held_out_test_samples": 7603,
+          "bitwise_accuracy": 0.9086,
+          "bitwise_macro_f1": 0.815,
+          "comparison_context": {
+            "wscn_accuracy": 0.982,
+            "pienet_accuracy": 0.989
+          },
+          "author_reported_limitations": [
+            "36x36 downsampling discards spatial detail for four-pattern mixtures",
+            "GIN encoder was not tuned specifically on MixedWM38",
+            "shorter supervised schedule than some compared methods"
+          ],
+          "claim_status": "paper-reported-cross-dataset-transfer-not-independent-reproduction"
+        }
+      },
+      "implementation_audit": {
+        "repo": "https://github.com/irjawais/wafer-gnn-contrastive",
+        "uses_lot_name_for_production_proximity": true,
+        "stratified_sample_split_not_lot_disjoint": true,
+        "ood_script_threshold_source": "public script appears to compute MSP 5th percentile from test_in; paper text says validation ID",
+        "discrepancy_status": "paper-versus-released-script-requires-resolution",
+        "source_code_license": "not-yet-verified; do not copy code until checked"
+      },
+      "tasks": [
+        "exact-stratified-paper-reproduction",
+        "lot-disjoint-holdout",
+        "time-forward-with-embargo",
+        "split-local-contrastive-pairs",
+        "context-aware-vs-context-blind",
+        "leave-one-class-out-ood"
+      ],
+      "metrics": [
+        "per-lot-macro-f1",
+        "worst-decile-lot-performance",
+        "temporal-degradation",
+        "ood-auroc-aupr",
+        "fpr-at-95-percent-id-tpr",
+        "oscr",
+        "calibration",
+        "confidence-intervals"
+      ],
+      "integrity_gates": [
+        "cross-split-lot-overlap-zero",
+        "cross-split-source-identity-overlap-zero",
+        "training-pairs-only-from-training-lots-and-time-windows",
+        "validation-only-ood-threshold",
+        "test-set-untouched"
+      ],
+      "claim_ceiling": "sample-level and group/time-held-out results are separate; no fab-transfer, yield or root-cause claim"
+    },
+    {
+      "id": "industrial-cp-dfc-multiview-open-world-wafer-maps",
+      "source": "https://doi.org/10.1016/j.eswa.2026.131994",
+      "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13123",
+      "reported_method": {
+        "known_class_model": "M3Net multi-task, multi-scale, multi-label",
+        "novel_class_detector": "Parallel SVM (PSVM)",
+        "observation_views": [
+          "Chip-Probe-CP-map",
+          "Delta-Fuse-Count-DFC-map"
+        ],
+        "claim_status": "paper-abstract-reported-industrial-dataset; detailed protocol and results not independently reproduced"
+      },
+      "acquisition": {
+        "raw_data_available_publicly": "not-verified",
+        "sample_lineage": "not-verified",
+        "dataset_license": "not-verified",
+        "redistribution": "not-authorized-until-verified",
+        "physical_test_campaign": "not-accessible-to-this-benchmark"
+      },
+      "tasks": [
+        "cp-only",
+        "dfc-only",
+        "late-fusion",
+        "cross-view-attention",
+        "missing-view-robustness",
+        "contradictory-view-detection",
+        "item-wise-open-set"
+      ],
+      "metrics": [
+        "per-view-macro-f1",
+        "fused-macro-f1",
+        "gain-over-best-single-view",
+        "missing-view-risk-coverage",
+        "cross-view-disagreement",
+        "novelty-fpr-tpr",
+        "per-item-transfer"
+      ],
+      "claim_ceiling": "no industrial-data or physical deployment claim until rights, sample lineage and exact test protocol are verified"
+    },
+    {
+      "id": "frozen-lmm-rule-ordered-wafer-map-zero-shot",
+      "source": "https://arxiv.org/abs/2610.35080",
+      "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13146",
+      "reference_paper": {
+        "title": "Zero-Shot Multi-Class Wafer Map Classification with Rule-Ordered Prompts for Large Multimodal Models",
+        "authors": [
+          "Tianjian Cao",
+          "Jun Tao"
+        ],
+        "publication_date": "2026-10-26",
+        "status": "arxiv-preprint",
+        "model": "gpt-4o-2024-08-06",
+        "method": [
+          "connected-component-visual-highlighting",
+          "morphology-spatial-anchor-exclusion-rules",
+          "fixed-rule-presentation-order"
+        ],
+        "training_or_finetuning": "none",
+        "results": {
+          "MixedWM38_subset": {
+            "samples": 6866,
+            "classes": 6,
+            "macro_accuracy": 0.929,
+            "overall_accuracy": 0.938
+          },
+          "WM811K_subset": {
+            "samples": 9000,
+            "classes": 6,
+            "macro_accuracy": 0.791,
+            "overall_accuracy": 0.813
+          },
+          "tested_alternative_rule_order_overall_accuracy_range": [
+            0.901,
+            0.919
+          ],
+          "reported_api_latency_seconds_per_image": [
+            0.5,
+            1
+          ]
+        },
+        "scope_limits": [
+          "Only six single-pattern classes are evaluated, not all 38 MixedWM38 categories.",
+          "WM-811K sample is selected by class, not lot-disjoint or time-forward.",
+          "One API call per map does not characterize repeatability.",
+          "Selected order is a fixed condition, not globally optimized."
+        ],
+        "claim_status": "preprint-reported-not-independently-reproduced"
+      },
+      "tasks": [
+        "exact-six-class-reproduction",
+        "prompt-order-permutation",
+        "paraphrase-sensitivity",
+        "deterministic-geometry-evidence",
+        "evidence-grounding",
+        "full-38-way-composition",
+        "leave-combination-out",
+        "open-set-abstention",
+        "group-time-transfer",
+        "LMM-HDC-CNN-GNN-pareto"
+      ],
+      "metrics": [
+        "macro-accuracy",
+        "per-class-recall",
+        "exact-set-match",
+        "order-flip-rate",
+        "worst-order-degradation",
+        "unsupported-claim-rate",
+        "unknown-false-acceptance",
+        "risk-coverage",
+        "latency-cost",
+        "query-repeatability"
+      ]
+    },
+    {
+      "id": "human-supervised-closed-loop-fab-decision-support",
+      "source": "https://doi.org/10.1007/s43684-026-00146-z",
+      "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13147",
+      "reference_review": {
+        "title": "Toward autonomous decision support in semiconductor manufacturing: a review of planning, scheduling, dispatching, and execution control",
+        "publication_date": "2026-11-06",
+        "finding": "Human-supervised closed loop integrating state sensing, planning, scheduling, dispatching, execution and metrology/quality feedback; hard constraints, bounded authority, safe fallback and audit trails remain necessary.",
+        "claim_status": "review-derived-architecture-reference-not-performance-benchmark"
+      },
+      "tasks": [
+        "reentrant-fab-scheduling",
+        "quality-aware-dispatch",
+        "multi-timescale-planning",
+        "llm-assisted-structured-recommendation",
+        "digital-twin-counterfactual-validation",
+        "shadow-mode-evaluation"
+      ],
+      "baselines": [
+        "fifo",
+        "earliest-due-date",
+        "critical-ratio",
+        "fab-native-dispatch",
+        "milp-or-cp-sat",
+        "des-no-learned-policy",
+        "risk-blind-dispatch",
+        "quality-aware-dispatch",
+        "bounded-rl-policy",
+        "llm-assisted-vs-structured-only"
+      ],
+      "metrics": [
+        "throughput",
+        "cycle-time-p95",
+        "wip",
+        "on-time-delivery",
+        "schedule-adherence",
+        "bottleneck-migration",
+        "queue-time-violations",
+        "quality-excursion-detection-lead-time",
+        "inspection-value",
+        "hard-constraint-violations",
+        "policy-regret",
+        "safe-fallback-activation"
+      ],
+      "integrity_gates": [
+        "zero-hard-constraint-violations-under-seeded-negative-controls",
+        "unknown-quality-is-not-treated-as-good",
+        "only-authorized-actions-can-change-state",
+        "all-decisions-bound-to-input-state-and-constraint-digests",
+        "unknown-outcome-requires-reconciliation"
+      ],
+      "evidence_progression": [
+        "synthetic-des",
+        "historical-event-replay",
+        "offline-counterfactual-evaluation",
+        "shadow-mode-no-control",
+        "human-approved-bounded-pilot",
+        "preregistered-controlled-outcome-study"
+      ],
+      "claim_ceiling": "simulation and replay improvements are not measured fab or yield improvements; no process authority"
+    },
+    {
+      "id": "cross-dataset-wafer-label-alignment-and-pseudo-label-integrity",
+      "source": "https://doi.org/10.1109/ACCESS.2026.3744016",
+      "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13148",
+      "reference_paper": {
+        "title": "Comparative Study of AI Models for Wafer Map Defect Pattern Classification Using a Novel Pseudo-Labeling-Based Integrated Dataset",
+        "publisher": "IEEE Access",
+        "publication_date": "2026-10-16",
+        "reported_method": "pseudo-label integration of labeled WM-811K and unlabeled Mixed38 using cluster distributions and inter-label boundaries",
+        "reported_results": {
+          "silhouette_relative_improvement_percent": 207.75,
+          "ratkowsky_lance_relative_improvement_percent": 16.19
+        },
+        "claim_status": "paper-abstract-reported-cluster-structure-metrics; not independently reproduced; not equivalent to pseudo-label correctness or fab transfer"
+      },
+      "tasks": [
+        "partial-cross-dataset-label-alignment",
+        "label-boundary-aware-pseudo-labels",
+        "confidence-vs-cluster-distribution-vs-boundary-filtering",
+        "unknown-and-unmapped-class-preservation",
+        "leave-component-and-combination-out",
+        "source-group-heldout"
+      ],
+      "baselines": [
+        "no-integration",
+        "forced-label-map",
+        "nearest-centroid",
+        "kmeans",
+        "label-propagation",
+        "confidence-filtered-self-training",
+        "cluster-distribution-pseudo-labels",
+        "boundary-aware-pseudo-labels",
+        "HDC-prototype-alignment",
+        "manual-reviewed-audit-subset"
+      ],
+      "metrics": [
+        "silhouette",
+        "ratkowsky-lance",
+        "ARI",
+        "NMI",
+        "pseudo-label-precision-recall",
+        "pseudo-label-ECE",
+        "boundary-error",
+        "unknown-false-acceptance",
+        "seen-unseen-harmonic-mean",
+        "source-transfer-degradation"
+      ],
+      "integrity_gates": [
+        "heldout-labels-never-used-to-generate-pseudo-labels",
+        "preserve-source-and-original-label",
+        "unmapped-patterns-remain-unknown",
+        "duplicate-and-source-identity-leakage-zero",
+        "synthetic-real-provenance-not-inferred"
+      ],
+      "claim_ceiling": "cluster separability is not pseudo-label accuracy; no causal, yield or cross-fab claim"
+    },
+    {
+      "id": "deployable-wafer-map-model-pareto",
+      "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13149",
+      "sources": [
+        "https://doi.org/10.1038/s41598-026-63752-0",
+        "https://doi.org/10.1038/s41598-026-68884-x",
+        "https://doi.org/10.1007/s10845-026-02906-3",
+        "https://doi.org/10.1002/qre.70321",
+        "https://arxiv.org/abs/2610.35080"
+      ],
+      "paper_reported_reference_points": {
+        "vit_tiny": {
+          "dataset": "WM-38K",
+          "accuracy": 0.984,
+          "parameters": 5700000,
+          "inference_speedup": 1.77,
+          "memory_reduction_factor": 4.47
+        },
+        "hybrid_deep_handcrafted": {
+          "dataset": "WM-811K",
+          "accuracy": 0.9889,
+          "macro_f1": 0.9441,
+          "trainable_parameters": 64967,
+          "offline_generator_excluded_from_inference_count": true
+        },
+        "graph_contrastive_gin": {
+          "dataset": "WM-811K-sampled",
+          "accuracy": 0.986,
+          "macro_f1": 0.975,
+          "split": "sample-level-stratified-60-20-20"
+        },
+        "fad_net": {
+          "datasets": [
+            "WM-811K",
+            "MixedWM38"
+          ],
+          "accuracy_range": [
+            0.9535,
+            0.9863
+          ],
+          "f1_range": [
+            0.9255,
+            0.9858
+          ],
+          "auc_range": [
+            0.9971,
+            0.9997
+          ]
+        },
+        "frozen_lmm": {
+          "MixedWM38_six_class_macro_accuracy": 0.929,
+          "WM811K_six_class_macro_accuracy": 0.791,
+          "latency_seconds_per_image": [
+            0.5,
+            1
+          ]
+        }
+      },
+      "tasks": [
+        "matched-single-pattern",
+        "full-mixed-composition",
+        "open-set-abstention",
+        "lot-disjoint",
+        "time-forward",
+        "source-transfer",
+        "resolution-ablation",
+        "edge-runtime"
+      ],
+      "metrics": [
+        "macro-f1",
+        "worst-class-recall",
+        "exact-composition-match",
+        "unknown-fpr-at-known-retention",
+        "calibration",
+        "p50-p95-p99-latency",
+        "peak-ram",
+        "peak-accelerator-memory",
+        "artifact-bytes",
+        "measured-energy-per-inference",
+        "training-and-update-lifecycle-cost"
+      ],
+      "hardware_profiles": [
+        "cpu-only",
+        "edge-accelerator",
+        "workstation-gpu"
+      ],
+      "integrity_gates": [
+        "matched-splits-and-label-mapping",
+        "same-input-resolution-or-declared-ablation",
+        "include-all-deployed-components",
+        "report-offline-generator-training-cost-separately",
+        "hardware-and-runtime-pinned",
+        "no-test-set-threshold-or-quantization-selection"
+      ],
+      "claim_ceiling": "paper results are not directly rankable until task, split, source identity, hardware and metric are matched; no fab yield/process qualification claim"
+    },
+    {
+      "id": "multi-fidelity-device-to-routed-ppa-chiplet-dtco",
+      "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13172",
+      "composes": [
+        "device-analytical-tcad-spice-measurement",
+        "openroad-rtl-to-gds-ppa",
+        "chip-placement-end-to-end-routed-ppa",
+        "chiplet-package-testability"
+      ],
+      "frontier_sources": [
+        "https://www.imec-int.com/en/articles/advancing-cfet-based-device-roadmap-novel-integration-modules-and-standard-cell",
+        "https://www.imec-int.com/en/articles/advancing-cfet-based-device-roadmap-novel-integration-modules-and-standard-cell-2",
+        "https://www.uciexpress.org/_files/ugd/0c1418_970201e6ba294a0fa690ae864082fc46.pdf"
+      ],
+      "fidelity_ladder": [
+        "analytical-or-reduced-order",
+        "compact-model",
+        "tcad-if-lawful-model-and-data-available",
+        "spice",
+        "synthesis-and-standard-cell-mapping",
+        "placement-and-global-route",
+        "detailed-route",
+        "package-si-pi-thermal",
+        "physical-measurement"
+      ],
+      "metrics": [
+        "device-model-residual-by-operating-regime",
+        "compact-model-to-circuit-residual",
+        "detailed-route-wns-tns-area-power",
+        "hard-constraint-violations",
+        "pareto-hypervolume",
+        "multi-fidelity-expensive-evaluation-count",
+        "package-useful-bandwidth",
+        "system-energy-per-useful-bit",
+        "link-health-detection-latency-and-false-alarm",
+        "test-coverage-and-diagnostic-resolution"
+      ],
+      "research_target": "5-10-percent preregistered primary Pareto-objective improvement on held-out designs with hard-constraint and uncertainty guardrails; research target only",
+      "claim_ceiling": "open-PDK/compact-model experiments do not establish CFET fabrication, fabricated-silicon PPA, UCIe compliance, chiplet reliability or yield",
+      "multi_fidelity_selection_followup": "https://github.com/Luminous-Dynamics/symthaea/issues/13175",
+      "comparison_methods": [
+        "random-search-DOE",
+        "high-fidelity-only",
+        "low-fidelity-only-surrogate",
+        "uncertainty-triggered-verification",
+        "trust-region-BO",
+        "multi-fidelity-BO-knowledge-gradient",
+        "ensemble-disagreement-diversity",
+        "NSGA-II/III",
+        "SPEA2",
+        "MOEA-D",
+        "trust-aware-LLM-with-independent-verifier"
+      ],
+      "research_targets_not_claims": {
+        "high_fidelity_spice_call_reduction": 0.9,
+        "normalized_high_fidelity_pareto_hypervolume_minimum": 0.99,
+        "asp_dac_sampling_efficiency_target": 5,
+        "stretch_spice_call_reduction": 0.965,
+        "stretch_total_simulation_speedup": 20,
+        "guardrails": [
+          "no-increase-in-false-safe-hard-constraint-predictions",
+          "every-reported-pareto-candidate-re-evaluated-at-final-fidelity",
+          "hold-out-complete-circuit-or-design-family"
+        ],
+        "claim_status": "research-targets-only"
+      },
+      "acquisition_oracle": {
+        "implementation": "crates/domains/symthaea-semiconductor/src/benchmark/mf_acquisition.rs",
+        "cli": "crates/domains/symthaea-semiconductor/src/bin/semi-mf-acquire.rs",
+        "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13175",
+        "method": "exact-budgeted-subset-of-risk-adjusted-expected-HV-gain-plus-calibrated-uncertainty-bonus",
+        "candidate_limit": 18,
+        "binds": [
+          "prediction-packet",
+          "model",
+          "uncertainty-calibration",
+          "objective-specification"
+        ],
+        "claim_status": "synthetic-known-answer-reference-only"
+      }
+    }
+  ],
+  "cross_cutting_protocol": {
+    "split_policy": "freeze-before-fitting; prefer-time-lot-wafer-design-grouped-evaluation; disclose-identity-gaps",
+    "negative_controls": [
+      "label-permutation",
+      "duplicate-and-group-leakage",
+      "timestamp-leakage",
+      "missingness-only-signal",
+      "corrupted-labels",
+      "stale-calibration",
+      "invalid-lineage",
+      "wrong-units",
+      "wrong-pdk-or-constraints",
+      "out-of-domain-inputs"
+    ],
+    "positive_control_required": true,
+    "result_packet": [
+      "benchmark-version",
+      "dataset-source-license-version-and-digest",
+      "frozen-split-manifest",
+      "code-commit-and-build-toolchain",
+      "model-config-and-weights-digest",
+      "tool-pdk-library-constraint-identities",
+      "hardware-runtime-memory",
+      "energy-only-when-instrumented",
+      "raw-and-derived-result-references",
+      "confidence-intervals",
+      "failed-controls",
+      "claim-ceiling"
+    ]
+  },
+  "research_targets_not_claims": {
+    "seeded_negative_control_rejection": "100%",
+    "primary_metric_relative_improvement_under_grouped_or_time_held_out_shift": ">=10% target versus strongest matched baseline, confidence interval supports gain",
+    "guardrails": [
+      "no-material-calibration-regression",
+      "no-rare-class-recall-regression",
+      "no-critical-tail-recall-regression",
+      "no-hard-constraint-violation"
+    ],
+    "physical_process_impact": "no-claim-until-preregistered-controlled-measurement-and-independent-outcome-verification"
+  },
+  "source_register": "docs/research/semi-bench-001/data-source-register-v0.1.json",
+  "latest_literature_references": {
+    "secom_park_baek_2026": {
+      "url": "https://www.mdpi.com/2075-1702/14/7/716",
+      "doi": "10.3390/machines14070716",
+      "publication_date": "2026-06-24",
+      "scope": "supplementary-SECOM-evaluation-in-a-Bosch-manufacturing-study",
+      "split": "stratified-60-20-20",
+      "best_reported_secom_pr_auc": 0.2207,
+      "note": "Only 21 defective observations in validation and test; validation precision>=0.90 yielded zero held-out test recall in this small experiment."
+    },
+    "wm811k_pss_hnet_2026": {
+      "url": "https://www.mdpi.com/2227-9717/14/7/1134",
+      "doi": "10.3390/pr14071134",
+      "publication_date": "2026-03-31",
+      "split": "stratified-80-20-sample-level",
+      "seeds": 3,
+      "macro_f1": {
+        "mean": 0.9098,
+        "std": 0.0008
+      },
+      "macro_recall": {
+        "mean": 0.8954,
+        "std": 0.0034
+      },
+      "parameters": 4381000,
+      "flops_giga": 0.754,
+      "latency_ms": 7.682,
+      "latency_hardware": "NVIDIA RTX 3060 Ti",
+      "training_hardware": "NVIDIA H100",
+      "note": "Single dataset; authors identify cross-dataset/process-condition generalization and batch latency as future validation."
+    },
+    "fad_net_2026": {
+      "title": "FAD-Net: An Efficient Architecture for Defect Recognition in Semiconductor Wafers",
+      "url": "https://doi.org/10.1002/qre.70321",
+      "publication_date": "2026-07-05",
+      "reported_ranges": {
+        "accuracy": [
+          0.9535,
+          0.9863
+        ],
+        "f1": [
+          0.9255,
+          0.9858
+        ],
+        "auc": [
+          0.9971,
+          0.9997
+        ]
+      },
+      "datasets": [
+        "WM-811K",
+        "MixedWM38"
+      ],
+      "method": [
+        "Dendritic-Neuron-Module",
+        "Feature-Pyramid-Module",
+        "attention"
+      ],
+      "data_availability": "The public statement directs interested readers to the manuscript/corresponding author for further details.",
+      "protocol_status": "exact per-dataset split, source identity and evaluation protocol not established from public abstract; reproduction required before direct comparison"
+    },
+    "wm811k_graph_contrastive_2026": {
+      "mixedwm38_transfer": {
+        "test_samples": 7603,
+        "bitwise_accuracy": 0.9086,
+        "bitwise_macro_f1": 0.815,
+        "comparison_baselines_cited": {
+          "WSCN_accuracy": 0.982,
+          "PIENet_accuracy": 0.989
+        },
+        "caveat": "bit-wise evaluation only; exact 38-way whole-composition accuracy and cross-data protocol are separate"
+      }
+    },
+    "semiconductor_closed_loop_decision_support_2026": {
+      "title": "Toward autonomous decision support in semiconductor manufacturing: a review of planning, scheduling, dispatching, and execution control",
+      "url": "https://doi.org/10.1007/s43684-026-00146-z",
+      "publication_date": "2026-11-06",
+      "core_finding": "human-supervised closed-loop AIS across state sensing, planning, scheduling, dispatching, execution and feedback; hard constraints, bounded authority, safe fallback and auditability remain central",
+      "claim_status": "review-derived-architecture-reference-not-performance-benchmark"
+    },
+    "cross_dataset_wafer_pseudolabel_2026": {
+      "title": "Comparative Study of AI Models for Wafer Map Defect Pattern Classification Using a Novel Pseudo-Labeling-Based Integrated Dataset",
+      "url": "https://doi.org/10.1109/ACCESS.2026.3744016",
+      "publication_date": "2026-10-16",
+      "reported_results": {
+        "silhouette_relative_improvement_percent": 207.75,
+        "ratkowsky_lance_relative_improvement_percent": 16.19
+      },
+      "method": "integrates labeled WM-811K and unlabeled Mixed38 using pseudo-labels informed by cluster distributions and inter-label boundaries",
+      "caveat": "The abstract's cluster-separation metrics do not establish pseudo-label correctness or production transfer; full split and source identity protocol require reproduction."
+    },
+    "vit_tiny_mixed_defect_2026": {
+      "title": "Scalable and lightweight vision transformers for mixed-defect classification in semiconductor wafer maps",
+      "url": "https://doi.org/10.1038/s41598-026-63752-0",
+      "publication_date": "2026-08-25",
+      "reported_results": {
+        "dataset": "WM-38K",
+        "accuracy": 0.984,
+        "parameters": 5700000,
+        "inference_speedup_vs_comparable_transformers": 1.77,
+        "memory_reduction_factor": 4.47
+      },
+      "caveat": "reported as paper result; exact source identity, split protocol and hardware/runtime need matched reproduction before direct leaderboard comparison"
+    },
+    "hybrid_deep_handcrafted_2026": {
+      "title": "A hybrid deep and handcrafted feature learning approach for imbalanced wafer map defect classification",
+      "url": "https://doi.org/10.1038/s41598-026-68884-x",
+      "publication_date": "2026-09-10",
+      "reported_results": {
+        "dataset": "WM-811K",
+        "accuracy": 0.9889,
+        "macro_f1": 0.9441,
+        "trainable_parameters": 64967
+      },
+      "method": [
+        "class-mask-conditioned-StyleGAN2-ADA-offline-augmentation",
+        "global-local-MobileNetV2-derived-branches",
+        "cross-attention",
+        "radial-angular-profile",
+        "connected-component-count",
+        "eccentricity",
+        "edge-concentration",
+        "class-balanced-focal-loss"
+      ],
+      "caveat": "64,967 trainable parameters exclude offline generator and deterministic handcrafted features; exact split and full lifecycle resource costs need reproduction"
+    },
+    "imec_cfet_backside_contact_2026": {
+      "part1": "https://www.imec-int.com/en/articles/advancing-cfet-based-device-roadmap-novel-integration-modules-and-standard-cell",
+      "part2": "https://www.imec-int.com/en/articles/advancing-cfet-based-device-roadmap-novel-integration-modules-and-standard-cell-2",
+      "reported_part1": {
+        "bottom_pfET_access_resistance_ohm_um": {
+          "before": 1753,
+          "after": 378
+        },
+        "bottom_pfET_survival_yield": {
+          "before": 0.45,
+          "after": 0.85
+        },
+        "drive_current_relative": 5
+      },
+      "reported_part2": {
+        "layout_efficiency": 0.98,
+        "sram_5t1_area_reduction_vs_6t_cfet": 0.125,
+        "sram_write_speed_improvement_percent": [
+          7,
+          15
+        ],
+        "cpp_m1_gear_ratio_study": "2:1"
+      },
+      "evidence_class": "imec-reported-2026-CFET-test-vehicle-and-DTCO-study; not open raw data or Luminous reproduction"
+    },
+    "ucie_4_0_2026": {
+      "release_date": "2026-11-12",
+      "release_pdf": "https://www.uciexpress.org/_files/ugd/0c1418_970201e6ba294a0fa690ae864082fc46.pdf",
+      "normative_specification": "https://www.uciexpress.org/specifications",
+      "reported": {
+        "ucie_mem_data_efficiency_max": 0.9375,
+        "die_edge_bandwidth_density_tb_s_mm": 2.5,
+        "optional_energy_efficiency_improvement_at_64_gt_s_percent": [
+          30,
+          80
+        ],
+        "shoreline_bandwidth_density_increase_percent": 20,
+        "area_bandwidth_density_increase_percent": 10
+      },
+      "features": [
+        "trusted-reporting-of-chiplet-state",
+        "integrity-protected-management-channels",
+        "reset-management",
+        "error-notification",
+        "link-health-monitoring"
+      ],
+      "access_note": "normative specification available by request; press release alone cannot ground conformance claims",
+      "evidence_class": "consortium-reported-standard-release-headlines; not independently benchmarked Luminous package results"
+    },
+    "nist_physics_ai_overlay_metrology_2026": {
+      "url": "https://www.nist.gov/programs-projects/overlay-metrology-using-physics-and-ai-based-scanning-electron-microscopy",
+      "created": "2026-09-03",
+      "updated": "2026-09-18",
+      "scope": [
+        "SEM-overlay",
+        "critical-dimension",
+        "defect-inspection",
+        "physics-based-image-simulation",
+        "physics-based-3d-reconstruction",
+        "measurement-limits"
+      ],
+      "evidence_class": "current-NIST-research-programme; raw dataset rights/access not assumed"
+    },
+    "nvidia_tsmc_fab_ai_2026": {
+      "url": "https://nvidianews.nvidia.com/news/nvidia-and-tsmc-bring-ai-into-fabs-to-advance-semiconductor-design-and-manufacturing",
+      "publication_date": "2026-05-31",
+      "vendor_reported_claims": {
+        "cuLitho_cost_effectiveness_or_cycle_time_improvement_percent": [
+          20,
+          50
+        ],
+        "cuEST_chemistry_simulation_average_speedup": 50,
+        "application_areas": [
+          "computational-lithography",
+          "transistor-and-process-simulation",
+          "advanced-process-control",
+          "fab-operations",
+          "defect-inspection"
+        ]
+      },
+      "evidence_class": "vendor-partnership-press-release-reported-results; not independent benchmark"
+    },
+    "multifidelity_analog_optimization_2026": {
+      "title": "Multi-Fidelity Surrogate Models for Accelerated Multi-Objective Analog Circuit Design and Optimization",
+      "doi": "10.3390/electronics15010105",
+      "url": "https://www.mdpi.com/2079-9292/15/1/105",
+      "publication_date": "2025-12-25",
+      "volume_issue": "Electronics 15(1), 105 (2026)",
+      "topologies": 4,
+      "algorithms": [
+        "NSGA-II",
+        "NSGA-III",
+        "SPEA2",
+        "MOEA/D"
+      ],
+      "reported": {
+        "surrogate_guided_spice_call_reduction": 0.965,
+        "surrogate_guided_total_simulation_speedup": 20,
+        "adaptive_multifidelity_spice_call_reduction": 0.9
+      },
+      "evidence_class": "paper-reported-on-four-CMOS-opamp-topologies; not independently reproduced by Luminous"
+    },
+    "aspdac_ml_dtco_2026": {
+      "title": "ML-driven Design Technology Co-Optimization Framework for Advanced Technology Nodes",
+      "doi": "10.1109/ASP-DAC66049.2026.11420446",
+      "url": "https://doi.org/10.1109/ASP-DAC66049.2026.11420446",
+      "conference_dates": "2026-01-19/2026-01-22",
+      "reported_sampling_efficiency": 5,
+      "capabilities": [
+        "technology-parameter-option-exploration",
+        "automatic-standard-cell-library-generation",
+        "chip-and-block-PPA-exploration",
+        "CFET-standard-cells",
+        "multi-row-height-standard-cells"
+      ],
+      "evidence_class": "conference-paper-abstract-reported; full split/compute protocol review required before direct reproduction"
+    },
+    "trust_aware_llm_bo_2026": {
+      "title": "Trust-aware LLM-assisted Bayesian optimization for efficient design space exploration",
+      "doi": "10.1016/j.vlsi.2026.102782",
+      "url": "https://doi.org/10.1016/j.vlsi.2026.102782",
+      "publication_date": "2026-09",
+      "methods": [
+        "LLM-assisted-Bayesian-optimization",
+        "trust-control-mechanism",
+        "constrained-DSE"
+      ],
+      "evaluation_targets": [
+        "configurable-digital-baseband-generator",
+        "systolic-array-NPU"
+      ],
+      "evidence_class": "paper-reported-abstract; not direct TCAD/fab benchmark"
+    },
+    "semiconductor_equipment_multifidelity_2026": {
+      "title": "Design optimization of semiconductor manufacturing equipment using a novel multi-fidelity surrogate modeling approach",
+      "doi": "10.1007/s11081-025-10059-0",
+      "url": "https://doi.org/10.1007/s11081-025-10059-0",
+      "version_of_record": "2025-12-12",
+      "issue_date": "2026-06",
+      "evidence_class": "methodological reference; detailed comparable numeric protocol pending full-text review"
+    },
+    "transformer_multicircuit_bo_2026": {
+      "title": "Transformer-based surrogate modeling for multi-circuit analog sizing via Bayesian optimization",
+      "doi": "10.1016/j.vlsi.2026.102809",
+      "url": "https://doi.org/10.1016/j.vlsi.2026.102809",
+      "publication_date": "2026-11",
+      "methods": [
+        "multi-circuit-Transformer-surrogate",
+        "Bayesian-optimization",
+        "LTspice-verification-of-selected-candidates"
+      ],
+      "evidence_class": "abstract-reported; matched numerical protocol not established"
+    },
+    "robustness_aware_cim_dtco_2026": {
+      "title": "Robustness-Aware Multi-Objective Design Technology Co-Optimization Framework for Computing-in-Memory Using Surrogate-Assisted SPEA2",
+      "doi": "10.1109/ACCESS.2026.3703077",
+      "url": "https://doi.org/10.1109/ACCESS.2026.3703077",
+      "reported_simulation": {
+        "off_grid_normalized_error_below": 0.05,
+        "energy_efficiency_tops_per_w": 10361,
+        "throughput_tops": 12.05,
+        "cifar10_accuracy": 0.8908
+      },
+      "evidence_class": "paper-reported-simulation-specific-FeFET-CIM; not fabricated-silicon evidence"
+    }
+  },
+  "reference_evaluator": {
+    "classification_metric_oracle": "benchmarks/semi-bench-001/reference/python/semi_binary_metrics_reference.py",
+    "tests": "benchmarks/semi-bench-001/reference/python/test_semi_binary_metrics_reference.py",
+    "input_fixture": "benchmarks/semi-bench-001/reference/fixtures/binary-metrics-known-answer-v1.json",
+    "expected_output": "benchmarks/semi-bench-001/reference/fixtures/binary-metrics-known-answer-v1.expected.json",
+    "mode": "test-only-independent-reference; production implementation remains Rust-first",
+    "local_tests": null,
+    "local_status": "not-run-as-a-full-suite",
+    "threshold_policy": {
+      "implementation": "benchmarks/semi-bench-001/reference/python/semi_threshold_policy_reference.py",
+      "tests": "benchmarks/semi-bench-001/reference/python/test_semi_threshold_policy_reference.py",
+      "input_fixture": "benchmarks/semi-bench-001/reference/fixtures/validation-threshold-known-answer-v1.json",
+      "expected_output": "benchmarks/semi-bench-001/reference/fixtures/validation-threshold-known-answer-v1.expected.json",
+      "semantics": "maximize-validation-recall-subject-to-minimum-precision-floor; group-equal-scores; reject-validation-test-identity-overlap; explicit-fallback-if-infeasible",
+      "test_count": 3,
+      "empirical_dataset_result": false
+    },
+    "split_manifest_validator": {
+      "implementation": "benchmarks/semi-bench-001/reference/python/semi_split_manifest_reference.py",
+      "tests": "benchmarks/semi-bench-001/reference/python/test_semi_split_manifest_reference.py",
+      "input_fixture": "benchmarks/semi-bench-001/reference/fixtures/split-manifest-known-answer-v1.json",
+      "expected_output": "benchmarks/semi-bench-001/reference/fixtures/split-manifest-known-answer-v1.expected.json",
+      "supported_schemes": [
+        "group_disjoint",
+        "forward_time",
+        "stratified_sample"
+      ],
+      "semantics": "unique-identity; all-splits-non-empty; group-disjoint-check; strict-forward-time-check; timezone-required; deterministic-assignment-digest; source-local-naive chronology permitted only with explicit clock_domain_id and no UTC/cross-domain claim",
+      "test_count": 11,
+      "empirical_dataset_result": false,
+      "supported_time_basis": [
+        "offset_aware",
+        "source_local_naive-with-explicit-clock_domain_id"
+      ],
+      "actual_source_manifest": {
+        "path": "docs/research/semi-bench-001/splits/uci-secom-mirror-0d27427a/chronological-60-20-20-v0.1.json",
+        "source_snapshot_id": "26c59ab70a7339d82ab4e4006a5230d1a2ffff48c2df3fc423a458f9ef152281",
+        "manifest_blob_sha1": "7b38864a07347410c5c90c6d8e248c7ad8a5e81e",
+        "clock_domain_id": "uci-secom-mirror-single-source-clock",
+        "split_support": {
+          "train": {
+            "rows": 940,
+            "fail": 76,
+            "pass": 864
+          },
+          "validation": {
+            "rows": 313,
+            "fail": 11,
+            "pass": 302
+          },
+          "test": {
+            "rows": 314,
+            "fail": 17,
+            "pass": 297
+          }
+        },
+        "tested_by_ci": true,
+        "status": "frozen-row-level-split-manifest; model-not-yet-evaluated"
+      }
+    },
+    "hosted_ci": {
+      "workflow": "SEMI-BENCH-001 Reference Oracle",
+      "run_url": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44990424342",
+      "run_id": 44990424342,
+      "tested_commit": "f5073aab67d8aaf987bfe42d74d0ebd43365cf6e",
+      "conclusion": "success",
+      "python_reference_tests": 46,
+      "rust_unit_tests": 43,
+      "rust_checks": [
+        "cargo fmt --check",
+        "cargo clippy --all-targets -- -D warnings",
+        "cargo test"
+      ],
+      "python_byte_for_byte_reports": [
+        "binary-metrics",
+        "inspection-decision",
+        "contrastive-pair-validation"
+      ],
+      "rust_byte_for_byte_reports": [
+        "binary-metrics",
+        "SECOM-raw-integrity-audit",
+        "DTCO-lineage",
+        "multi-fidelity-acquisition"
+      ],
+      "note": "Hosted GitHub Actions verified the current clean-base PR head. Rust checks run in an isolated temporary Cargo workspace because the root workspace on main references a missing member."
+    },
+    "inspection_decision_policy": {
+      "implementation": "benchmarks/semi-bench-001/reference/python/semi_inspection_decision_reference.py",
+      "tests": "benchmarks/semi-bench-001/reference/python/test_semi_inspection_decision_reference.py",
+      "input_fixture": "benchmarks/semi-bench-001/reference/fixtures/inspection-decision-known-answer-v1.json",
+      "expected_output": "benchmarks/semi-bench-001/reference/fixtures/inspection-decision-known-answer-v1.expected.json",
+      "method": "exact-exhaustive-subset-optimization-for-at-most-18-candidates",
+      "constraints": [
+        "cash-budget",
+        "inspection-time-budget",
+        "per-group-capacity"
+      ],
+      "comparator": "matched-budget-risk-only-greedy",
+      "test_count": 10,
+      "claim_ceiling": "synthetic model-based expected value only; no physical savings or inspection authorization"
+    },
+    "total_test_count": 46,
+    "policy_claim_limits": "expected values are modeled; uninspected wafers remain unknown; reference oracle is not a production scheduler",
+    "contrastive_pair_manifest_validator": {
+      "implementation": "benchmarks/semi-bench-001/reference/python/semi_pair_manifest_reference.py",
+      "tests": "benchmarks/semi-bench-001/reference/python/test_semi_pair_manifest_reference.py",
+      "input_fixture": "benchmarks/semi-bench-001/reference/fixtures/contrastive-pair-manifest-known-answer-v1.json",
+      "expected_output": "benchmarks/semi-bench-001/reference/fixtures/contrastive-pair-manifest-known-answer-v1.expected.json",
+      "rules": [
+        "unique-sample-ids",
+        "unique-pair-ids",
+        "unique-unordered-pairs",
+        "no-self-pairs",
+        "endpoints-exist",
+        "pair-scope-matches-both-endpoint-splits",
+        "same-lot-pairs-require-matching-group-ids",
+        "time-near-pairs-require-clock-domain-and-within-embargo"
+      ],
+      "test_count": 11,
+      "claim_ceiling": "pair-manifest-integrity-only; no proof of pair-semantic correctness or model quality",
+      "local_verification": {
+        "tests_passed": 11,
+        "tests_total": 11,
+        "result": "PASS",
+        "cli_report_byte_for_byte": true
+      },
+      "hosted_ci_status": "success",
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44917385489"
+    },
+    "rust_binary_metrics": {
+      "package": "symthaea-semiconductor",
+      "crate_path": "crates/domains/symthaea-semiconductor",
+      "implementation": "crates/domains/symthaea-semiconductor/src/benchmark/binary_metrics.rs",
+      "tests": "inline-unit-tests",
+      "test_count": 7,
+      "reference_oracle": "benchmarks/semi-bench-001/reference/python/semi_binary_metrics_reference.py",
+      "input_fixture": "benchmarks/semi-bench-001/reference/fixtures/binary-metrics-known-answer-v1.json",
+      "expected_output": "benchmarks/semi-bench-001/reference/fixtures/binary-metrics-known-answer-v1.expected.json",
+      "semantics": [
+        "fixed-threshold-confusion-metrics",
+        "tie-grouped-average-precision",
+        "rank-group-auroc-with-half-credit-for-ties",
+        "brier-score",
+        "fixed-width-ece",
+        "fpr-at-recall",
+        "tie-grouped-risk-coverage"
+      ],
+      "complexity": {
+        "auroc": "O(n log n) sorting and tie-group accumulation",
+        "large_synthetic_test_rows": 40000,
+        "old_pairwise_algorithm_removed": true
+      },
+      "implementation_class": "production-Rust-scorer-with-independent-test-only-Python-reference",
+      "hosted_ci_status": "success",
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44988247262",
+      "tested_commit": "061cc034d38afabe12cbe189f2ef2f0a31183786",
+      "claim_ceiling": "known-answer metric semantic agreement and tested complexity path; not predictive model quality or physical manufacturing result",
+      "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13129"
+    },
+    "rust_split_manifest_validator": {
+      "implementation": "crates/domains/symthaea-semiconductor/src/benchmark/split_manifest.rs",
+      "tests": "inline-unit-tests",
+      "input_fixture": "benchmarks/semi-bench-001/reference/fixtures/split-manifest-known-answer-v1.json",
+      "expected_output": "benchmarks/semi-bench-001/reference/fixtures/split-manifest-known-answer-v1.expected.json",
+      "real_source_manifest": "docs/research/semi-bench-001/splits/uci-secom-mirror-0d27427a/chronological-60-20-20-v0.1.json",
+      "semantics": [
+        "unique-sample-ids",
+        "nonempty-train-validation-test",
+        "group-disjointness",
+        "strict-forward-time-order",
+        "offset-aware-or-declared-source-local-clock",
+        "canonical-split-digest",
+        "actual-SECOM-count-support"
+      ],
+      "test_count": 6,
+      "hosted_ci_status": "success",
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44935276557",
+      "claim_ceiling": "split-manifest identity and leakage integrity only; not model generalization",
+      "tested_commit": "162a96cd423daa1f4f9297f00a32e434cd19a5f9"
+    },
+    "rust_contrastive_pair_validator": {
+      "implementation": "crates/domains/symthaea-semiconductor/src/benchmark/pair_manifest.rs",
+      "tests": "inline-unit-tests",
+      "input_fixture": "benchmarks/semi-bench-001/reference/fixtures/contrastive-pair-manifest-known-answer-v1.json",
+      "expected_output": "benchmarks/semi-bench-001/reference/fixtures/contrastive-pair-manifest-known-answer-v1.expected.json",
+      "semantics": [
+        "unique-sample-and-pair-ids",
+        "unique-unordered-edges",
+        "no-self-pairs",
+        "no-orphan-endpoints",
+        "same-split-endpoints-and-pair-scope",
+        "same-lot-evidence",
+        "time-near-within-clock-domain-and-embargo"
+      ],
+      "test_count": 6,
+      "hosted_ci_status": "success",
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44935276557",
+      "claim_ceiling": "pair-manifest integrity only; does not prove pair semantic correctness or model quality",
+      "tested_commit": "162a96cd423daa1f4f9297f00a32e434cd19a5f9"
+    },
+    "total_rust_test_count": 43,
+    "latest_rust_hosted_ci": {
+      "run_url": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44935276557",
+      "commit": "162a96cd423daa1f4f9297f00a32e434cd19a5f9",
+      "conclusion": "success",
+      "tests": 23,
+      "passed_steps": [
+        "cargo fmt --check",
+        "cargo clippy --all-targets -- -D warnings",
+        "cargo test: 23 passed",
+        "Rust binary-metrics CLI report byte-for-byte",
+        "Rust SECOM raw-audit CLI report byte-for-byte"
+      ],
+      "limitations": [
+        "raw audit CLI verified with synthetic 2-row fixture only",
+        "full 1567x590 raw sensor feature file not retrieved in this runtime"
+      ]
+    },
+    "secom_raw_integrity_audit": {
+      "implementation": "crates/domains/symthaea-semiconductor/src/benchmark/secom_raw.rs",
+      "cli": "crates/domains/symthaea-semiconductor/src/bin/semi-secom-audit.rs",
+      "expectations": "docs/research/semi-bench-001/secom-raw-expectations-v1.json",
+      "synthetic_input_fixtures": [
+        "benchmarks/semi-bench-001/reference/fixtures/secom-mini-features-v1.data",
+        "benchmarks/semi-bench-001/reference/fixtures/secom-mini-labels-v1.data"
+      ],
+      "synthetic_expectations": "benchmarks/semi-bench-001/reference/fixtures/secom-mini-expectations-v1.json",
+      "synthetic_expected_report": "benchmarks/semi-bench-001/reference/fixtures/secom-mini-integrity-report-v1.expected.json",
+      "semantics": [
+        "raw-file-sha256-check",
+        "expected-row-and-feature-count",
+        "NaN-preserved-as-missing",
+        "label-domain-(-1,+1)",
+        "strict-row-alignment",
+        "source-local-naive-timestamp-preservation",
+        "monotonic-source-order",
+        "missingness-and-class-support-report"
+      ],
+      "hosted_ci_status": "pending",
+      "claim_ceiling": "raw-source integrity only; no predictive model or physical process claim"
+    },
+    "rust_secom_raw_integrity_audit": {
+      "implementation": "crates/domains/symthaea-semiconductor/src/benchmark/secom_raw.rs",
+      "cli": "crates/domains/symthaea-semiconductor/src/bin/semi-secom-audit.rs",
+      "expectations": "docs/research/semi-bench-001/secom-raw-expectations-v1.json",
+      "tests": 5,
+      "hosted_ci_status": "success",
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44935276557",
+      "tested_commit": "162a96cd423daa1f4f9297f00a32e434cd19a5f9",
+      "verification_steps": [
+        "rustfmt",
+        "clippy-with-warnings-denied",
+        "5 raw-parser tests",
+        "synthetic raw-audit CLI byte-for-byte report parity"
+      ],
+      "real_sensor_matrix_ingested": false,
+      "claim_ceiling": "synthetic parser contract and raw-source digest/shape validation code; no full-matrix model result"
+    },
+    "rust_unit_test_count": 43,
+    "rust_dtco_lineage": {
+      "package": "symthaea-semiconductor",
+      "implementation": "crates/domains/symthaea-semiconductor/src/benchmark/dtco_manifest.rs",
+      "cli": "crates/domains/symthaea-semiconductor/src/bin/semi-dtco-lineage.rs",
+      "tests": "inline-unit-tests",
+      "test_count": 11,
+      "input_fixture": "benchmarks/semi-bench-001/reference/fixtures/dtco-lineage-known-answer-v1.json",
+      "expected_output": "benchmarks/semi-bench-001/reference/fixtures/dtco-lineage-known-answer-v1.expected.json",
+      "enforced_rules": [
+        "unique-run-identities",
+        "all-parent-runs-exist",
+        "parent-output-digest-is-child-input",
+        "acyclic-run-graph",
+        "parent-fidelity-stage-not-later-than-child",
+        "root-run-binds-exact-design-input-digest",
+        "constraints-digest-consumed-by-at-least-one-run",
+        "model-prediction-requires-model-digest",
+        "model-prediction-requires-uncertainty-artifact",
+        "physical-measurement-requires-instrument-calibration-and-uncertainty",
+        "simulations-cannot-assert-physical-measurement"
+      ],
+      "unique_artifact_count_in_fixture": 7,
+      "cli_report_byte_for_byte": true,
+      "hosted_ci_status": "success",
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44990424342",
+      "tested_commit": "f5073aab67d8aaf987bfe42d74d0ebd43365cf6e",
+      "claim_ceiling": "evidence-lineage integrity only; no validation of device physics, model predictive accuracy, PDK qualification or fabricated silicon"
+    },
+    "rust_mf_acquisition": {
+      "package": "symthaea-semiconductor",
+      "implementation": "crates/domains/symthaea-semiconductor/src/benchmark/mf_acquisition.rs",
+      "cli": "crates/domains/symthaea-semiconductor/src/bin/semi-mf-acquire.rs",
+      "tests": "inline-unit-tests",
+      "test_count": 8,
+      "input_fixture": "benchmarks/semi-bench-001/reference/fixtures/mf-acquisition-known-answer-v1.json",
+      "expected_output": "benchmarks/semi-bench-001/reference/fixtures/mf-acquisition-known-answer-v1.expected.json",
+      "decision_method": "exact-subset-knapsack",
+      "maximum_candidates": 18,
+      "utility": "expected_feasible_hv_gain + exploration_weight * epistemic_stddev * frontier_relevance",
+      "required_digest_bindings": [
+        "prediction_packet_sha256",
+        "model_sha256",
+        "uncertainty_calibration_sha256",
+        "objective_spec_sha256"
+      ],
+      "deterministic_tie_break": [
+        "maximize-utility",
+        "minimize-cost",
+        "lexicographic-candidate-ids"
+      ],
+      "hosted_ci_status": "success",
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44990424342",
+      "tested_commit": "f5073aab67d8aaf987bfe42d74d0ebd43365cf6e",
+      "synthetic_known_answer": {
+        "candidate_count": 5,
+        "budget": 13,
+        "budget_unit": "normalized-high-fidelity-minutes",
+        "selected_candidates": [
+          "B",
+          "E"
+        ],
+        "used_budget": 13,
+        "modeled_utility": 0.3115
+      },
+      "claim_ceiling": "synthetic scheduler semantics only; no high-fidelity run, verified Pareto gain or design approval"
+    }
+  },
+  "execution_followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13067",
+  "eda_end_to_end_followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13069",
+  "industry_frontier_review": "docs/research/semi-bench-001/2026-industry-frontier.md",
+  "industry_architecture_references": {
+    "nist_tidal": "https://www.nist.gov/programs-projects/super-intelligence-si-manufacturing",
+    "semi_semiconductor_digital_twin_activity": "https://downloads.semi.org/web/wstdsbal.nsf/0e0afa4c4969bea688256efd0062a27c/61c2bf6034c0eed988258dcd00669238%21OpenDocument",
+    "note": "TIDAL is a NIST programme architecture reference; SEMI document 7465 is a standards activity proposal, not a final published standard or conformance claim."
+  },
+  "inspection_metrology_packaging_review": "docs/research/semi-bench-001/2026-inspection-metrology-packaging-frontier.md",
+  "new_followups": {
+    "adaptive_inspection": "https://github.com/Luminous-Dynamics/symthaea/issues/13083",
+    "ai_sem_detection_limits": "https://github.com/Luminous-Dynamics/symthaea/issues/13084",
+    "chiplet_package_testability": "https://github.com/Luminous-Dynamics/symthaea/issues/13085",
+    "unseen_lot_time_generalization": "https://github.com/Luminous-Dynamics/symthaea/issues/13122",
+    "industrial_cp_dfc_multiview": "https://github.com/Luminous-Dynamics/symthaea/issues/13123",
+    "mixed_defect_compositional_zero_shot": "https://github.com/Luminous-Dynamics/symthaea/issues/13113",
+    "open_world_wafer_defects": "https://github.com/Luminous-Dynamics/symthaea/issues/13121",
+    "secom_missingness_drift": "https://github.com/Luminous-Dynamics/symthaea/issues/13115",
+    "wafer_substrate_material_to_wafer": "https://github.com/Luminous-Dynamics/symthaea/issues/13114",
+    "rust_semiconductor_metrics": "https://github.com/Luminous-Dynamics/symthaea/issues/13129",
+    "frozen_lmm_rule_ordered_zero_shot": "https://github.com/Luminous-Dynamics/symthaea/issues/13146",
+    "fab_closed_loop_decision_support": "https://github.com/Luminous-Dynamics/symthaea/issues/13147",
+    "cross_dataset_wafer_pseudolabel_alignment": "https://github.com/Luminous-Dynamics/symthaea/issues/13148",
+    "deployable_model_pareto": "https://github.com/Luminous-Dynamics/symthaea/issues/13149",
+    "multi_fidelity_dtco_device_to_package": "https://github.com/Luminous-Dynamics/symthaea/issues/13172",
+    "multi_fidelity_optimizer_efficiency": "https://github.com/Luminous-Dynamics/symthaea/issues/13175"
+  },
+  "new_research_updates": {
+    "real_data_and_upstream_frontier": "docs/research/semi-bench-001/2026-real-data-and-upstream-frontier.md",
+    "mixed_wbm_compositional_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13113",
+    "wafer_substrate_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13114",
+    "secom_external_baseline": "https://github.com/Be1an001/semiconductor-pass-fail-prediction-python",
+    "wafer_lot_and_multiview_frontier": "docs/research/semi-bench-001/2026-wafer-lot-and-multiview-frontier.md",
+    "wafer_gnn_contrastive_paper": "https://doi.org/10.1007/s10845-026-02906-3",
+    "wafer_gnn_public_implementation": "https://github.com/irjawais/wafer-gnn-contrastive",
+    "wafer_gnn_lot_time_followup": "https://github.com/Luminous-Dynamics/symthaea/issues/13122",
+    "cp_dfc_open_world_paper": "https://doi.org/10.1016/j.eswa.2026.131994",
+    "cp_dfc_multiview_followup": "https://github.com/Luminous-Dynamics/symthaea/issues/13123",
+    "ppaplace_5000_dataset": "https://huggingface.co/datasets/ValleyC/PPAPlace-5000",
+    "ppaplace_dataset_license_note": "Hugging Face dataset card metadata is 'other'; verify exact use/redistribution terms; no raw archive checked in.",
+    "ppaplace_followup": "https://github.com/Luminous-Dynamics/symthaea/issues/13069",
+    "fad_net_2026": "https://doi.org/10.1002/qre.70321",
+    "semi_rust_core_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13129",
+    "semi_rust_core_path": "crates/domains/symthaea-semiconductor",
+    "frozen_lmm_rule_ordered_preprint": "https://arxiv.org/abs/2610.35080",
+    "frozen_lmm_rule_ordered_followup": "https://github.com/Luminous-Dynamics/symthaea/issues/13146",
+    "semiconductor_closed_loop_decision_support_review": "https://doi.org/10.1007/s43684-026-00146-z",
+    "fab_closed_loop_decision_review": "https://doi.org/10.1007/s43684-026-00146-z",
+    "fab_closed_loop_decision_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13147",
+    "cross_dataset_wafer_pseudolabel_paper": "https://doi.org/10.1109/ACCESS.2026.3744016",
+    "cross_dataset_wafer_pseudolabel_followup": "https://github.com/Luminous-Dynamics/symthaea/issues/13148",
+    "vit_tiny_mixed_defect_2026": "https://doi.org/10.1038/s41598-026-63752-0",
+    "hybrid_deep_handcrafted_2026": "https://doi.org/10.1038/s41598-026-68884-x",
+    "deployable_model_pareto_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13149",
+    "dtco_cfet_ucie40_frontier": "docs/research/semi-bench-001/2026-dtco-ucie40-frontier.md",
+    "semi_dtco_followup": "https://github.com/Luminous-Dynamics/symthaea/issues/13172",
+    "imec_cfet_part1": "https://www.imec-int.com/en/articles/advancing-cfet-based-device-roadmap-novel-integration-modules-and-standard-cell",
+    "imec_cfet_part2": "https://www.imec-int.com/en/articles/advancing-cfet-based-device-roadmap-novel-integration-modules-and-standard-cell-2",
+    "ucie_4_0_release": "https://www.uciexpress.org/_files/ugd/0c1418_970201e6ba294a0fa690ae864082fc46.pdf",
+    "ucie_4_0_specification_access": "https://www.uciexpress.org/specifications",
+    "nist_overlay_metrology_project": "https://www.nist.gov/programs-projects/overlay-metrology-using-physics-and-ai-based-scanning-electron-microscopy",
+    "nvidia_tsmc_fab_ai_announcement": "https://nvidianews.nvidia.com/news/nvidia-and-tsmc-bring-ai-into-fabs-to-advance-semiconductor-design-and-manufacturing",
+    "multifidelity_optimizer_frontier": "docs/research/semi-bench-001/2026-multifidelity-optimization-frontier.md",
+    "multi_fidelity_optimizer_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13175",
+    "analog_multifidelity_2026": "https://doi.org/10.3390/electronics15010105",
+    "asp_dac_dtco_2026": "https://doi.org/10.1109/ASP-DAC66049.2026.11420446",
+    "trust_aware_llm_bo_2026": "https://doi.org/10.1016/j.vlsi.2026.102782",
+    "semiconductor_equipment_multifidelity_2026": "https://doi.org/10.1007/s11081-025-10059-0",
+    "transformer_multicircuit_bo_2026": "https://doi.org/10.1016/j.vlsi.2026.102809",
+    "robustness_aware_cim_dtco_2026": "https://doi.org/10.1109/ACCESS.2026.3703077",
+    "rust_semiconductor_pr": "https://github.com/Luminous-Dynamics/symthaea/pull/13126",
+    "current_hosted_ci": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44989451987",
+    "mf_acquisition_oracle": "crates/domains/symthaea-semiconductor/src/benchmark/mf_acquisition.rs",
+    "mf_acquisition_cli": "crates/domains/symthaea-semiconductor/src/bin/semi-mf-acquire.rs",
+    "current_verified_ci": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44990125209"
+  },
+  "industry_frontier_reviews": [
+    "docs/research/semi-bench-001/2026-real-data-and-upstream-frontier.md",
+    "docs/research/semi-bench-001/2026-wafer-lot-and-multiview-frontier.md",
+    "docs/research/semi-bench-001/2026-dtco-ucie40-frontier.md",
+    "docs/research/semi-bench-001/2026-multifidelity-optimization-frontier.md"
+  ],
+  "source_integrity_audits": [
+    "docs/research/semi-bench-001/secom-source-integrity-audit-v0.1.json"
+  ],
+  "secom_integrity_audit": "docs/research/semi-bench-001/secom-source-integrity-audit-v0.1.json",
+  "missingness_drift_followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13115"
+}

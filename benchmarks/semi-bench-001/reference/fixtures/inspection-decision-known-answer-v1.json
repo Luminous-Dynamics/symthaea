@@ -1,0 +1,101 @@
+{
+  "schema": "luminous.semi-bench.inspection-decision.v1",
+  "case_id": "SEMI-INSPECT-KA-001",
+  "budget": {
+    "max_minutes": 45,
+    "max_cash_cost": 20,
+    "max_per_group": 1
+  },
+  "candidates": [
+    {
+      "candidate_id": "A",
+      "group_id": "LOT-1",
+      "risk_probability": 0.2,
+      "test_sensitivity": 0.9,
+      "test_specificity": 0.95,
+      "actionability_probability": 0.95,
+      "exposed_units": 20,
+      "avoidable_loss_per_defect": 100,
+      "false_hold_cost_per_unit": 10,
+      "inspection_cost": 4,
+      "inspection_minutes": 10,
+      "delay_hours": 1,
+      "delay_cost_per_hour": 1
+    },
+    {
+      "candidate_id": "B",
+      "group_id": "LOT-2",
+      "risk_probability": 0.5,
+      "test_sensitivity": 0.8,
+      "test_specificity": 0.9,
+      "actionability_probability": 0.8,
+      "exposed_units": 5,
+      "avoidable_loss_per_defect": 50,
+      "false_hold_cost_per_unit": 15,
+      "inspection_cost": 3,
+      "inspection_minutes": 5,
+      "delay_hours": 0.5,
+      "delay_cost_per_hour": 1
+    },
+    {
+      "candidate_id": "C",
+      "group_id": "LOT-3",
+      "risk_probability": 0.1,
+      "test_sensitivity": 0.99,
+      "test_specificity": 0.99,
+      "actionability_probability": 0.98,
+      "exposed_units": 40,
+      "avoidable_loss_per_defect": 200,
+      "false_hold_cost_per_unit": 20,
+      "inspection_cost": 7,
+      "inspection_minutes": 20,
+      "delay_hours": 1,
+      "delay_cost_per_hour": 1
+    },
+    {
+      "candidate_id": "D",
+      "group_id": "LOT-4",
+      "risk_probability": 0.7,
+      "test_sensitivity": 0.7,
+      "test_specificity": 0.7,
+      "actionability_probability": 0.6,
+      "exposed_units": 2,
+      "avoidable_loss_per_defect": 25,
+      "false_hold_cost_per_unit": 20,
+      "inspection_cost": 1,
+      "inspection_minutes": 4,
+      "delay_hours": 1,
+      "delay_cost_per_hour": 1
+    },
+    {
+      "candidate_id": "E",
+      "group_id": "LOT-1",
+      "risk_probability": 0.05,
+      "test_sensitivity": 0.9,
+      "test_specificity": 0.99,
+      "actionability_probability": 0.9,
+      "exposed_units": 100,
+      "avoidable_loss_per_defect": 30,
+      "false_hold_cost_per_unit": 5,
+      "inspection_cost": 8,
+      "inspection_minutes": 15,
+      "delay_hours": 2,
+      "delay_cost_per_hour": 1
+    },
+    {
+      "candidate_id": "F",
+      "group_id": "LOT-5",
+      "risk_probability": 0.3,
+      "test_sensitivity": 0.95,
+      "test_specificity": 0.95,
+      "actionability_probability": 0.9,
+      "exposed_units": 10,
+      "avoidable_loss_per_defect": 80,
+      "false_hold_cost_per_unit": 10,
+      "inspection_cost": 5,
+      "inspection_minutes": 15,
+      "delay_hours": 0.5,
+      "delay_cost_per_hour": 1
+    }
+  ]
+}
