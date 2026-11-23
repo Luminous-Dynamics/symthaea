@@ -47,10 +47,10 @@ This crate does not implement a candidate controller, scheduler, sensor policy, 
 
 Twenty-four Rust tests are authored and passed at exact source head `99a1ed303d8fc9d7539de8505349a1c1ea5f41f2` (workflow run `45119544918`, Rust 1.96.0):
 - rustfmt: passed;
-- tests: 24 passed, 0 failed;
+- tests: 30 passed, 0 failed;
 - strict Clippy with warnings denied: passed.
 
-The 24 tests comprise the original paired interaction checks plus ten cluster-adapter tests. They qualify deterministic four-arm arithmetic, 13-field pairing validation, terminal no-application scoring, hierarchy-preserving cluster aggregation and fail-closed input rejection. They do not validate the task-loss oracle, causal treatment design, sampling representativeness, statistical assumptions, support completeness, physical latency, energy or deployment readiness.
+The 30 tests comprise the original paired interaction checks plus sixteen cluster-adapter tests. They qualify deterministic four-arm arithmetic, 13-field pairing validation, terminal no-application scoring, hierarchy-preserving cluster aggregation and fail-closed input rejection. They do not validate the task-loss oracle, causal treatment design, sampling representativeness, statistical assumptions, support completeness, physical latency, energy or deployment readiness.
 
 ## Cluster-level inference handoff
 
