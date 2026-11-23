@@ -1,0 +1,242 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/plasma/topology-lifting/boundary-lift-contract-v0.1.schema.json",
+  "title": "Kinetic boundary-aware coordinate lift contract v0.1",
+  "description": "A frozen physical boundary contract and compatible coordinate lift. Schema validates structure only; it does not prove field equivariance or physical correctness.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    }
+  },
+  "$defs": {
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "boundary",
+        "physical_domain",
+        "coordinate_convention",
+        "lift"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "boundary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "enum": [
+                "periodic",
+                "open"
+              ]
+            }
+          }
+        },
+        "physical_domain": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "minimum",
+            "maximum",
+            "length_unit",
+            "topology"
+          ],
+          "properties": {
+            "minimum": {
+              "type": "number"
+            },
+            "maximum": {
+              "type": "number"
+            },
+            "length_unit": {
+              "type": "string",
+              "minLength": 1
+            },
+            "topology": {
+              "enum": [
+                "torus",
+                "interval"
+              ]
+            }
+          }
+        },
+        "coordinate_convention": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "normalized_interval",
+            "wrap_modulo_one"
+          ],
+          "properties": {
+            "normalized_interval": {
+              "const": [
+                0,
+                1
+              ]
+            },
+            "wrap_modulo_one": {
+              "type": "boolean"
+            }
+          }
+        },
+        "lift": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "family",
+            "raw_coordinate_included",
+            "boundary_distances_included"
+          ],
+          "properties": {
+            "family": {
+              "enum": [
+                "periodic_fourier_characters",
+                "open_boundary_distances"
+              ]
+            },
+            "max_harmonic": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 4096
+            },
+            "raw_coordinate_included": {
+              "type": "boolean"
+            },
+            "boundary_distances_included": {
+              "type": "boolean"
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "boundary": {
+                "properties": {
+                  "kind": {
+                    "const": "periodic"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              }
+            },
+            "required": [
+              "boundary"
+            ]
+          },
+          "then": {
+            "properties": {
+              "physical_domain": {
+                "properties": {
+                  "topology": {
+                    "const": "torus"
+                  }
+                }
+              },
+              "coordinate_convention": {
+                "properties": {
+                  "wrap_modulo_one": {
+                    "const": true
+                  }
+                }
+              },
+              "lift": {
+                "required": [
+                  "max_harmonic"
+                ],
+                "properties": {
+                  "family": {
+                    "const": "periodic_fourier_characters"
+                  },
+                  "raw_coordinate_included": {
+                    "const": false
+                  },
+                  "boundary_distances_included": {
+                    "const": false
+                  },
+                  "max_harmonic": {
+                    "minimum": 1,
+                    "maximum": 4096
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "boundary": {
+                "properties": {
+                  "kind": {
+                    "const": "open"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              }
+            },
+            "required": [
+              "boundary"
+            ]
+          },
+          "then": {
+            "properties": {
+              "physical_domain": {
+                "properties": {
+                  "topology": {
+                    "const": "interval"
+                  }
+                }
+              },
+              "coordinate_convention": {
+                "properties": {
+                  "wrap_modulo_one": {
+                    "const": false
+                  }
+                }
+              },
+              "lift": {
+                "properties": {
+                  "family": {
+                    "const": "open_boundary_distances"
+                  },
+                  "raw_coordinate_included": {
+                    "const": true
+                  },
+                  "boundary_distances_included": {
+                    "const": true
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
