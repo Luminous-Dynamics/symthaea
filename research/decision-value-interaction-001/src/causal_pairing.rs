@@ -180,6 +180,8 @@ pub struct CausalPairingCertificate {
     pub regime: CausalReplayRegime,
     /// Complete draw-bundle references in baseline, compute, observation, joint order.
     pub stochastic_draw_bundle_sha256: [[u8; 32]; 4],
+    /// #3755 verifier-profile identities in baseline, compute, observation, joint order.
+    pub stochastic_draw_bundle_verifier_sha256: [[u8; 32]; 4],
     /// Independently verified #3755 receipt references in the same arm order.
     pub stochastic_draw_bundle_verification_receipt_sha256: [[u8; 32]; 4],
     /// The full 13-field pairing root used by all four arms.
@@ -1025,6 +1027,12 @@ pub fn validate_causal_pairing(
         ordered[2].stochastic_draw_bundle_sha256,
         ordered[3].stochastic_draw_bundle_sha256,
     ];
+    let stochastic_draw_bundle_verifier_sha256 = [
+        ordered[0].stochastic_draw_bundle_verifier_sha256,
+        ordered[1].stochastic_draw_bundle_verifier_sha256,
+        ordered[2].stochastic_draw_bundle_verifier_sha256,
+        ordered[3].stochastic_draw_bundle_verifier_sha256,
+    ];
     let stochastic_draw_bundle_verification_receipt_sha256 = [
         ordered[0].stochastic_draw_bundle_verification_receipt_sha256,
         ordered[1].stochastic_draw_bundle_verification_receipt_sha256,
@@ -1035,6 +1043,7 @@ pub fn validate_causal_pairing(
     Ok(CausalPairingCertificate {
         regime,
         stochastic_draw_bundle_sha256,
+        stochastic_draw_bundle_verifier_sha256,
         stochastic_draw_bundle_verification_receipt_sha256,
         paired_run_identity: baseline.identity.paired.clone(),
         scored_outcome_bindings,
@@ -1268,6 +1277,10 @@ mod tests {
         )
         .expect("causal trajectories and regret outcomes share the same actions");
         assert_eq!(certificate.decision_value.interaction_ppm, 230_000);
+        assert_eq!(
+            certificate.causal_pairing.stochastic_draw_bundle_verifier_sha256[0],
+            digest(130)
+        );
         assert_eq!(
             certificate.causal_pairing.paired_run_identity,
             certificate.decision_value.pairing_identity
