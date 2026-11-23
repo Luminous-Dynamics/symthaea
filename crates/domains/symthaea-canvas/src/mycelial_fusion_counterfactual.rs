@@ -72,6 +72,8 @@ pub struct MycelialFusionCandidate {
     pub bridge_length: f64,
     pub bridge_length_unit: ReconstructionLengthUnit,
     pub bridge_length_basis: MycelialFusionBridgeLengthBasis,
+    /// Digest of the measurement record or declared bridge-length assumption.
+    pub bridge_length_evidence_digest: String,
     pub fusion_probability: f64,
     pub calibration_policy_id: String,
     pub probability_evidence_digest: String,
@@ -159,6 +161,7 @@ pub struct MycelialFusionCandidateImpact {
     pub target: MycelialFusionTarget,
     pub bridge_length: f64,
     pub bridge_length_unit: ReconstructionLengthUnit,
+    pub bridge_length_evidence_digest: String,
     pub calibration_policy_id: String,
     pub probability_evidence_digest: String,
     pub fusion_probability: f64,
@@ -382,6 +385,7 @@ fn candidate_digest(candidate: &MycelialFusionCandidate) -> String {
         MycelialFusionBridgeLengthBasis::Measured => 0,
         MycelialFusionBridgeLengthBasis::DeclaredAssumption => 1,
     }]);
+    hash_string(&mut hasher, &candidate.bridge_length_evidence_digest);
     hasher.update(&candidate.fusion_probability.to_bits().to_le_bytes());
     hash_string(&mut hasher, &candidate.calibration_policy_id);
     hash_string(&mut hasher, &candidate.probability_evidence_digest);
@@ -482,6 +486,7 @@ fn validate_candidate(
         || candidate.bridge_length <= 0.0
         || candidate.bridge_length > MAX_CANDIDATE_BRIDGE_LENGTH
         || candidate.bridge_length_unit != skeleton.length_unit
+        || !valid_digest(&candidate.bridge_length_evidence_digest)
         || !candidate.fusion_probability.is_finite()
         || !(0.0..=1.0).contains(&candidate.fusion_probability)
         || !valid_id(&candidate.calibration_policy_id)
@@ -1063,6 +1068,7 @@ fn build_candidate_impact(
         target: candidate.target.clone(),
         bridge_length: candidate.bridge_length,
         bridge_length_unit: candidate.bridge_length_unit,
+        bridge_length_evidence_digest: candidate.bridge_length_evidence_digest.clone(),
         calibration_policy_id: candidate.calibration_policy_id.clone(),
         probability_evidence_digest: candidate.probability_evidence_digest.clone(),
         fusion_probability: candidate.fusion_probability,
@@ -1453,6 +1459,7 @@ mod tests {
             bridge_length: 1.0,
             bridge_length_unit: ReconstructionLengthUnit::Micrometer,
             bridge_length_basis: MycelialFusionBridgeLengthBasis::DeclaredAssumption,
+            bridge_length_evidence_digest: digest('h'),
             fusion_probability: 0.65,
             calibration_policy_id: "calibration-v1".to_string(),
             probability_evidence_digest: digest('c'),
@@ -1551,6 +1558,7 @@ mod tests {
             bridge_length: 2.0,
             bridge_length_unit: ReconstructionLengthUnit::Micrometer,
             bridge_length_basis: MycelialFusionBridgeLengthBasis::DeclaredAssumption,
+            bridge_length_evidence_digest: digest('i'),
             fusion_probability: 0.72,
             calibration_policy_id: "calibration-v1".to_string(),
             probability_evidence_digest: digest('d'),
@@ -1692,6 +1700,7 @@ mod tests {
                 bridge_length: 1.0,
                 bridge_length_unit: ReconstructionLengthUnit::Micrometer,
                 bridge_length_basis: MycelialFusionBridgeLengthBasis::DeclaredAssumption,
+                bridge_length_evidence_digest: digest('k'),
                 fusion_probability: 0.7,
                 calibration_policy_id: "calibration-v1".to_string(),
                 probability_evidence_digest: digest('g'),
@@ -1746,6 +1755,7 @@ mod tests {
             bridge_length: 1.0,
             bridge_length_unit: ReconstructionLengthUnit::Micrometer,
             bridge_length_basis: MycelialFusionBridgeLengthBasis::DeclaredAssumption,
+            bridge_length_evidence_digest: digest('j'),
             fusion_probability: 0.8,
             calibration_policy_id: "calibration-v1".to_string(),
             probability_evidence_digest: digest('e'),
