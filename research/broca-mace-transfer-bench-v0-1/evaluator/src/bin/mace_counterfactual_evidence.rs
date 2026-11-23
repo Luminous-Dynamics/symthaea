@@ -12,6 +12,7 @@ use std::env;
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::mem::size_of;
+use std::process::Command;
 use std::time::Instant;
 
 use broca_mace_hdc_retrieval::{
@@ -513,6 +514,36 @@ fn valid_git_revision(value: &str) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
+fn verify_source_checkout(expected_revision: &str) -> Result<(), String> {
+    let revision = Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .output()
+        .map_err(|error| format!("read checked-out Git revision: {error}"))?;
+    if !revision.status.success() {
+        return Err("git rev-parse HEAD failed; exact source revision cannot be verified".into());
+    }
+    let actual_revision = String::from_utf8(revision.stdout)
+        .map_err(|error| format!("git rev-parse returned non-UTF-8 output: {error}"))?;
+    let actual_revision = actual_revision.trim();
+    if actual_revision != expected_revision {
+        return Err(format!(
+            "MACE_SOURCE_REVISION mismatch: declared {expected_revision}, checkout {actual_revision}"
+        ));
+    }
+
+    let status = Command::new("git")
+        .args(["status", "--porcelain", "--untracked-files=all"])
+        .output()
+        .map_err(|error| format!("inspect source checkout status: {error}"))?;
+    if !status.status.success() {
+        return Err("git status failed; source checkout cleanliness cannot be verified".into());
+    }
+    if !status.stdout.is_empty() {
+        return Err("MACE benchmark requires a clean Git working tree; commit or remove local changes first".into());
+    }
+    Ok(())
+}
+
 fn action_name(action: Option<Action>) -> &'static str {
     match action {
         Some(Action::A) => "action_a",
@@ -977,6 +1008,7 @@ fn run() -> Result<(), String> {
     if !valid_git_revision(&source_revision) {
         return Err("MACE_SOURCE_REVISION must be a 40- or 64-character lowercase Git SHA".to_string());
     }
+    verify_source_checkout(&source_revision)?;
     let run_identity = format!(
         "{clusters}:{public_seed}:{SCHEMA_VERSION}:{source_code_sha256}:{fixture_sha256}:{schema_sha256}:{source_revision}"
     );
