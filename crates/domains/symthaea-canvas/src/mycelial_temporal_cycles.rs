@@ -979,12 +979,11 @@ pub fn build_temporal_mycelial_cycle_profile(
     let mut edge_evidence_counts = TemporalMycelialEdgeEvidenceCounts::default();
     for snapshot in &sequence.snapshots {
         for edge in &snapshot.edges {
-            let (source_node_id, target_node_id) =
-                if edge.source_node_id <= edge.target_node_id {
-                    (edge.source_node_id.clone(), edge.target_node_id.clone())
-                } else {
-                    (edge.target_node_id.clone(), edge.source_node_id.clone())
-                };
+            let (source_node_id, target_node_id) = if edge.source_node_id <= edge.target_node_id {
+                (edge.source_node_id.clone(), edge.target_node_id.clone())
+            } else {
+                (edge.target_node_id.clone(), edge.source_node_id.clone())
+            };
             let record = TemporalMycelialEdgeEvidenceRecord {
                 edge_id: edge.id.clone(),
                 source_node_id,
