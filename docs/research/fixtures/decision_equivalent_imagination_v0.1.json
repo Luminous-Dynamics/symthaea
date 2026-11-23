@@ -1,0 +1,190 @@
+{
+  "schema_version": "decision_equivalent_imagination.fixture.v0.1",
+  "status": "research_contract_fixture_not_benchmark_result",
+  "utility_direction": "higher_is_better",
+  "epsilon": 0,
+  "fixtures": [
+    {
+      "id": "F1_DECISION_INVARIANT_UNCERTAINTY",
+      "kind": "exact_finite_decision",
+      "worlds": [
+        {
+          "world_id": "W0",
+          "action_utilities": {
+            "A": 100,
+            "B": 70
+          }
+        },
+        {
+          "world_id": "W1",
+          "action_utilities": {
+            "A": 80,
+            "B": 60
+          }
+        }
+      ],
+      "candidate_profiles": [
+        {
+          "profile_id": "low_budget",
+          "worlds_distinguished": false,
+          "chosen_action": "A",
+          "illustrative_cost_units": 10
+        },
+        {
+          "profile_id": "full_budget",
+          "worlds_distinguished": true,
+          "chosen_action_by_world": {
+            "W0": "A",
+            "W1": "A"
+          },
+          "illustrative_cost_units": 25
+        },
+        {
+          "profile_id": "excess_budget",
+          "worlds_distinguished": true,
+          "chosen_action_by_world": {
+            "W0": "A",
+            "W1": "A"
+          },
+          "illustrative_cost_units": 80
+        }
+      ],
+      "expected": {
+        "low_budget_regret_by_world": {
+          "W0": 0,
+          "W1": 0
+        },
+        "low_budget_mean_regret": 0,
+        "full_budget_mean_regret": 0,
+        "additional_decision_value_of_full_budget": 0,
+        "excess_budget_dominated_by": "full_budget",
+        "note": "All costs are abstract fixture units, not measured time or energy."
+      }
+    },
+    {
+      "id": "F2_DECISION_BOUNDARY_AMBIGUITY",
+      "kind": "exact_finite_decision",
+      "world_probability": {
+        "W0": 0.5,
+        "W1": 0.5
+      },
+      "worlds": [
+        {
+          "world_id": "W0",
+          "action_utilities": {
+            "A": 100,
+            "B": 70
+          }
+        },
+        {
+          "world_id": "W1",
+          "action_utilities": {
+            "A": 20,
+            "B": 85
+          }
+        }
+      ],
+      "candidate_profiles": [
+        {
+          "profile_id": "low_budget",
+          "worlds_distinguished": false,
+          "chosen_action": "A",
+          "illustrative_cost_units": 10
+        },
+        {
+          "profile_id": "resolved_budget",
+          "worlds_distinguished": true,
+          "chosen_action_by_world": {
+            "W0": "A",
+            "W1": "B"
+          },
+          "illustrative_cost_units": 25
+        }
+      ],
+      "expected": {
+        "low_budget_regret_by_world": {
+          "W0": 0,
+          "W1": 65
+        },
+        "low_budget_mean_regret": 32.5,
+        "resolved_budget_regret_by_world": {
+          "W0": 0,
+          "W1": 0
+        },
+        "resolved_budget_mean_regret": 0,
+        "decision_value_before_cost": 32.5,
+        "note": "Probability weights are evaluator-side fixture values and are not candidate-visible."
+      }
+    },
+    {
+      "id": "F3_HARD_CONSTRAINT_OVERRIDE",
+      "kind": "authority_and_feasibility",
+      "candidate_action": "A",
+      "predicted_utility": 1000000,
+      "independent_admissibility": false,
+      "fallback_authorized": true,
+      "expected": {
+        "disposition": "DIRECT_FALLBACK",
+        "candidate_action_executed": false
+      },
+      "negative_control": {
+        "fallback_authorized": false,
+        "expected_disposition": "BLOCK"
+      }
+    },
+    {
+      "id": "F4_UNSUPPORTED_TARGET_RANGE",
+      "kind": "horizon_scope",
+      "supported_prediction_range_steps": 10,
+      "requested_target_lookahead_steps": 20,
+      "planner_lookahead_steps": 30,
+      "expected": {
+        "model_supports_target": false,
+        "allowed_dispositions": [
+          "QUALIFIED_NEARER_SUBGOAL",
+          "REQUEST_FRESH_EVIDENCE",
+          "DIRECT_FALLBACK",
+          "UNKNOWN_DEFER"
+        ],
+        "forbidden_inference": "planner_lookahead_expands_supported_prediction_range"
+      }
+    },
+    {
+      "id": "F5_OPTIMIZER_EXPLOITABILITY",
+      "kind": "adversarial_search",
+      "setup": {
+        "behaviour_distribution_average_error": "matched_between_models",
+        "model_a": "no_localized_optimism_pocket",
+        "model_b": "narrow_optimism_pocket_discoverable_by_adaptive_search"
+      },
+      "expected": {
+        "report_selected_action_error_separately": true,
+        "report_realized_selected_action_regret": true,
+        "report_search_induced_exploitability": true,
+        "expanded_search_inherits_prior_qualification": false
+      }
+    },
+    {
+      "id": "F6_FUTURE_DECISION_REPRESENTATION_COLLISION",
+      "kind": "temporal_representation",
+      "setup": {
+        "full_states": [
+          "S0",
+          "S1"
+        ],
+        "compressed_representation": "Z",
+        "current_action": "A",
+        "later_observation": "O",
+        "later_best_action": {
+          "S0": "B",
+          "S1": "C"
+        }
+      },
+      "expected": {
+        "current_decision_may_be_sufficient": true,
+        "future_decision_is_sufficient": false,
+        "single_snapshot_pass_authorizes_future_horizon": false
+      }
+    }
+  ]
+}
