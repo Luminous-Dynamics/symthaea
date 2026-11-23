@@ -332,6 +332,8 @@ class MaceLongMemEvalV2Memory(Memory):
             entry = path.lstat()
             require(not stat.S_ISLNK(entry.st_mode), "candidate evidence directory contains a symlink")
             require(stat.S_ISREG(entry.st_mode), "candidate evidence directory contains a non-file entry")
+            if path.name.endswith(".jsonl"):
+                continue
             require(path.name.endswith(".receipt.json"), "candidate evidence directory contains an unknown file")
             receipt_bytes = path.read_bytes()
             try:
