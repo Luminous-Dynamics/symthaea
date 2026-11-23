@@ -47,7 +47,10 @@ pub struct CandidateProcessObservation {
     pub retrieval_profile_sha256: Option<String>,
     pub index_payload_bytes: u64,
     pub candidate_latency_ns: u64,
+    pub request_build_ns: u64,
     pub process_wall_ns: u64,
+    pub receipt_validation_ns: u64,
+    pub end_to_end_ns: u64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -267,6 +270,8 @@ impl CandidateProcessSession {
         }
         self.next_expected_sequence = Some(observation_sequence);
 
+        let end_to_end_started = Instant::now();
+        let request_build_started = Instant::now();
         let mut nonce_bytes = [0_u8; 24];
         fs::File::open("/dev/urandom")
             .and_then(|mut file| file.read_exact(&mut nonce_bytes))
@@ -305,8 +310,10 @@ impl CandidateProcessSession {
         );
         let expected_request_sha256 = hex_digest(Sha256::digest(&request_bytes).as_slice());
         let expected_nonce_sha256 = nonce_digest(&task_nonce);
+        let request_build_ns =
+            u64::try_from(request_build_started.elapsed().as_nanos()).unwrap_or(u64::MAX);
 
-        let started = Instant::now();
+        let ipc_started = Instant::now();
         self.stdin
             .write_all(&request_bytes)
             .and_then(|_| self.stdin.write_all(b"\n"))
@@ -322,8 +329,9 @@ impl CandidateProcessSession {
                 return Err(self.worker_error(format!("candidate response timeout/failure: {error}")));
             }
         };
-        let process_wall_ns = u64::try_from(started.elapsed().as_nanos()).unwrap_or(u64::MAX);
+        let process_wall_ns = u64::try_from(ipc_started.elapsed().as_nanos()).unwrap_or(u64::MAX);
 
+        let validation_started = Instant::now();
         let receipt: CandidateReceiptWire = serde_json::from_str(&line)
             .map_err(|error| format!("invalid candidate receipt JSON: {error}"))?;
         validate_receipt(
@@ -342,6 +350,10 @@ impl CandidateProcessSession {
             need.scope,
             need.action_alternatives,
         )?;
+        let receipt_validation_ns =
+            u64::try_from(validation_started.elapsed().as_nanos()).unwrap_or(u64::MAX);
+        let end_to_end_ns =
+            u64::try_from(end_to_end_started.elapsed().as_nanos()).unwrap_or(u64::MAX);
 
         Ok(CandidateProcessObservation {
             action: match receipt.decision.as_str() {
@@ -359,7 +371,10 @@ impl CandidateProcessSession {
             retrieval_profile_sha256: receipt.retrieval_profile_sha256,
             index_payload_bytes: receipt.index_payload_bytes,
             candidate_latency_ns: receipt.latency_ns,
+            request_build_ns,
             process_wall_ns,
+            receipt_validation_ns,
+            end_to_end_ns,
         })
     }
 
