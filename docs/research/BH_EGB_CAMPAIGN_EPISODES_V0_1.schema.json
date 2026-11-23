@@ -1,0 +1,305 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/research/bh-egb-symthaea-campaign-2026-11-23/docs/research/BH_EGB_CAMPAIGN_EPISODES_V0_1.schema.json",
+  "title": "BH-EGB Symthaea Campaign Episode Manifest",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "campaign_id",
+    "campaign_state",
+    "claim_ceiling",
+    "owners",
+    "source_pins",
+    "authority_boundaries",
+    "action_catalog",
+    "episodes",
+    "policy_arms",
+    "confirmatory_preconditions",
+    "primary_metrics",
+    "frozen_negative_controls",
+    "external_benchmarks"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string"
+    },
+    "campaign_id": {
+      "const": "BH-EGB-SYMTHAEA-001"
+    },
+    "title": {
+      "type": "string"
+    },
+    "updated_utc": {
+      "type": "string",
+      "format": "date"
+    },
+    "campaign_state": {
+      "enum": [
+        "design_frozen_execution_not_started",
+        "pilot_started",
+        "confirmatory_ready",
+        "confirmatory_running",
+        "complete"
+      ]
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 20
+    },
+    "owners": {
+      "type": "object",
+      "required": [
+        "discovery_and_research_policy",
+        "equation_and_numerical_physics",
+        "independent_qualification",
+        "human_scientific_authority"
+      ],
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "source_pins": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "role",
+          "repository",
+          "ref",
+          "files"
+        ],
+        "properties": {
+          "role": {
+            "type": "string"
+          },
+          "repository": {
+            "type": "string"
+          },
+          "ref": {
+            "type": "string"
+          },
+          "commit": {
+            "type": "string"
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "path",
+                "git_blob_sha1",
+                "use"
+              ],
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "git_blob_sha1": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{40}$"
+                },
+                "use": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "pr": {
+            "type": "string"
+          },
+          "issue": {
+            "type": "string"
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "workflow_state": {
+            "type": "string"
+          },
+          "publication": {
+            "type": "string"
+          },
+          "publication_status": {
+            "type": "string"
+          },
+          "comparison_ceiling": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "authority_boundaries": {
+      "type": "object",
+      "minProperties": 6,
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "action_catalog": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "description",
+          "cost_class",
+          "decision_outputs"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "cost_class": {
+            "type": "string"
+          },
+          "decision_outputs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "episodes": {
+      "type": "array",
+      "minItems": 8,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "state",
+          "question",
+          "allowed_actions",
+          "expected_oracles",
+          "promotion_gate",
+          "non_claim"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "question": {
+            "type": "string"
+          },
+          "allowed_actions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "expected_oracles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "promotion_gate": {
+            "type": "string"
+          },
+          "non_claim": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "policy_arms": {
+      "type": "array",
+      "minItems": 8,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "features"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "features": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "eligibility": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "confirmatory_preconditions": {
+      "type": "object",
+      "additionalProperties": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "primary_metrics": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "frozen_negative_controls": {
+      "type": "array",
+      "minItems": 10,
+      "items": {
+        "type": "string"
+      }
+    },
+    "external_benchmarks": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "url",
+          "published",
+          "reported_result",
+          "use"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "published": {
+            "type": "string"
+          },
+          "reported_result": {
+            "type": "string"
+          },
+          "use": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}
