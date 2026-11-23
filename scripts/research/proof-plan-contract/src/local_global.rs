@@ -902,11 +902,13 @@ mod tests {
     #[test]
     fn scope_changed_control_is_excluded_from_primary_cirr() {
         let mut pair = fixture();
-        pair.candidate
-            .global_stage
-            .scope_binding
-            .hypothesis_set_sha256 =
-            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_owned();
+        {
+            let scope = &mut pair.candidate.global_stage.scope_binding;
+            scope.hypotheses = vec!["changed assumption".to_owned()];
+            let canonical = canonical_string_set(&scope.hypotheses, "hypotheses").unwrap();
+            scope.hypothesis_set_sha256 =
+                domain_separated_sha256("hypotheses", &canonical).unwrap();
+        }
         let evaluator = pair.evaluator_only.as_mut().unwrap();
         evaluator.eligibility = EvaluationEligibility::Excluded;
         evaluator.exclusion_reason = Some("global-stage hypothesis scope differs".to_owned());
