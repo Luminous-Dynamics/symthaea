@@ -1646,6 +1646,56 @@ mod tests {
     }
 
     #[test]
+    fn candidates_claiming_the_same_side_contact_are_conflicts() {
+        let source = skeleton(
+            vec![
+                junction("A", AnnotatedJunctionKind::Origin, 0.0, 0.0),
+                junction("B", AnnotatedJunctionKind::Tip, 10.0, 0.0),
+                junction("C", AnnotatedJunctionKind::Tip, 0.0, 10.0),
+                junction("D", AnnotatedJunctionKind::Tip, 10.0, 10.0),
+                junction("E", AnnotatedJunctionKind::Origin, 0.0, 20.0),
+                junction("F", AnnotatedJunctionKind::Origin, 10.0, 20.0),
+            ],
+            vec![
+                segment("shared-side", "A", "B", 10.0),
+                segment("source-c", "E", "C", 10.0),
+                segment("source-d", "F", "D", 10.0),
+            ],
+        );
+        let side_candidate = |id: &str, source_tip_junction_id: &str| {
+            MycelialFusionCandidate {
+                candidate_id: id.to_string(),
+                source_tip_junction_id: source_tip_junction_id.to_string(),
+                target: MycelialFusionTarget::HyphaSide {
+                    segment_id: "shared-side".to_string(),
+                    arc_length_fraction_micros: 500_000,
+                },
+                bridge_length: 1.0,
+                bridge_length_unit: ReconstructionLengthUnit::Micrometer,
+                bridge_length_basis: MycelialFusionBridgeLengthBasis::DeclaredAssumption,
+                fusion_probability: 0.7,
+                calibration_policy_id: "calibration-v1".to_string(),
+                probability_evidence_digest: digest('g'),
+                conflict_group_id: None,
+            }
+        };
+        let candidates = vec![
+            side_candidate("side-one", "C"),
+            side_candidate("side-two", "D"),
+        ];
+        let report =
+            evaluate_mycelial_fusion_counterfactuals(&source, &candidates, &[], &[]).unwrap();
+        assert_eq!(
+            report.candidates[0].conflicting_candidate_ids,
+            vec!["side-two".to_string()]
+        );
+        assert_eq!(
+            report.candidates[1].conflicting_candidate_ids,
+            vec!["side-one".to_string()]
+        );
+    }
+
+    #[test]
     fn frozen_failure_of_split_source_segment_removes_both_intervals() {
         let source = skeleton(
             vec![
