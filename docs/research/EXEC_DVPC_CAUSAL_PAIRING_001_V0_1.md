@@ -73,7 +73,38 @@ Validation enforces:
 
 The returned certificate reports the regime, episode/world identity, number of ticks common to all arms, each arm's terminal state digest and trajectory origin. It does not compute regret; #13281 remains responsible for application-time regret and signed compute×observation interaction. #8578 remains responsible for downstream cluster-level inference.
 
-## 4. Why common random numbers need event identity
+## 4. Decision-time information filtration
+
+Trajectory lineage is not sufficient if a policy can consume an event before the driver actually made it available. The evaluator must distinguish source availability, driver delivery and decision time.
+
+Each trajectory step therefore includes:
+- `decision_at_us`: the driver-clock time when the policy committed the decision/proposal;
+- `action_applied_at_us`: the time the consumer applied that proposal;
+- `delivered_evidence`: stable event IDs with source-availability and arm-delivery times;
+- `consumed_evidence_ids`: the event IDs the policy claims to have used for that decision.
+
+For each arm and decision time (t), the required invariant is:
+
+\[
+\operatorname{Consumed}(a,t)\subseteq
+\operatorname{DeliveredTo}(a,\leq t)
+\]
+
+and for every delivered event (e):
+
+\[
+t_{available}(e)\leq t_{delivered}(e)\leq t_{decision}.
+\]
+
+The validator also requires monotonic decision-clock time, action application no earlier than its decision, non-empty event identities, no duplicate event deliveries within one arm, and no duplicate evidence references within a single decision. Evidence delivered at an earlier decision may legitimately be reused later; each use remains explicit.
+
+This catches a simple but dangerous failure mode: an arm may be paired to the correct initial world and exogenous schedule, yet use a future observation or label to choose an earlier action. The four arms may have different delivered event sets because the observation treatment changes what each arm acquires; each arm is checked against its own delivered filtration.
+
+The event IDs and timestamp claims are still supplied by the driver. Canonical typed event bytes, content hashes, hash-chain construction, oracle isolation and signed receipts remain with the generic receipt/security owners (#9437 and #8715). This module checks the decision-time semantics of those references. A valid event ID alone is not proof that its event payload was honestly acquired.
+
+The reference reports the number of validated decision steps and consumed evidence references across all four arms. It does not execute candidate policies. Driver-level future-prefix invariance still requires running the same policy on two worlds with identical prefixes but different future suffixes, then proving that actions up to the prefix horizon are identical.
+
+## 5. Why common random numbers need event identity
 
 Counterfactual variance reduction should align exogenous disturbances across arms without synchronizing endogenous branches. Consider two arms where one policy requests an extra sensor read or performs more internal steps. If both consume a single sequential random-number stream, the extra draw shifts all subsequent noise. The same "seed" then fails to represent the same exogenous disturbance at a later world tick.
 
@@ -81,7 +112,7 @@ The contract therefore binds separate seed domains and a common exogenous schedu
 
 The validator checks the commitments presented by the driver. It cannot prove the driver keyed its random stream correctly unless the independent replay auditor actually reconstructs that mapping from the retained event tape.
 
-## 5. Falsification matrix
+## 6. Falsification matrix
 
 | Control | Expected result |
 |---|---|
@@ -98,9 +129,9 @@ The validator checks the commitments presented by the driver. It cannot prove th
 | An arm lacks a complete driver receipt or passing independent replay audit | Reject |
 | Offline logged-policy estimates are submitted as simulator trajectory receipts | Reject |
 
-The source test suite contains positive and negative controls for these cases. The driver must separately test future-action prefix invariance and hidden-state isolation; a static receipt validator cannot establish those dynamic properties by itself.
+The source test suite contains positive and negative controls for these cases, plus ten decision-time filtration controls covering prior-evidence reuse, future-event consumption, late delivery, delivery-before-availability, duplicate delivery/consumption, clock regression, action-before-decision and empty event identities. The driver must separately test future-action prefix invariance and hidden-state isolation; a static receipt validator cannot establish those dynamic properties by itself.
 
-## 6. Integration and ownership
+## 7. Integration and ownership
 
 - #8764 owns the general open-loop/action-coupled causal replay distinction.
 - #8732 owns driver-owned clocks, per-tick delivered evidence and decision-time information views.
@@ -112,7 +143,7 @@ The source test suite contains positive and negative controls for these cases. T
 
 No new transition simulator, actor policy, resource ledger, factorial decomposition, VOI engine, freshness horizon, statistical engine or action authority is introduced.
 
-## 7. Benchmark sequence and claim ceiling
+## 8. Benchmark sequence and claim ceiling
 
 First run the finite controls, then integrate with the qualified RoboDyna driver. Reproduce the official π0.5, X-VLA and FastWAM baselines under the benchmark's own splits, checkpoints, timing modes and resource protocol before adding Symthaea as a separately labelled decision-layer arm. Keep the open-loop DEEP perception reproduction separate from action-coupled RoboDyna results.
 
