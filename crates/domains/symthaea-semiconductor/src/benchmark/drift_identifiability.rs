@@ -167,18 +167,18 @@ fn validate_action(action: &DriftObservationActionV1) -> Result<(), DriftIdentif
 fn validate_input(input: &DriftIdentifiabilityInputV1) -> Result<(), DriftIdentifiabilityErrorV1> {
     if input.schema != DRIFT_IDENTIFIABILITY_INPUT_SCHEMA_V1 {
         return Err(DriftIdentifiabilityErrorV1(
-            "input schema is unsupported".into()
+            "input schema is unsupported".into(),
         ));
     }
     require_text(&input.input_id, "input.input_id")?;
     if input.required_targets.is_empty() {
         return Err(DriftIdentifiabilityErrorV1(
-            "at least one attribution target is required".into()
+            "at least one attribution target is required".into(),
         ));
     }
     if input.maximum_candidate_actions > 20 {
         return Err(DriftIdentifiabilityErrorV1(
-            "exact planner supports at most 20 candidate actions".into()
+            "exact planner supports at most 20 candidate actions".into(),
         ));
     }
 
