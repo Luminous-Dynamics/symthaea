@@ -240,14 +240,14 @@ pub fn evaluate_mycelial_graph_hypothesis_posterior(
         let mut accepted_candidate_ids = Vec::new();
         for (index, candidate_id) in candidate_ids.iter().enumerate() {
             let accepted = mask & (1usize << index) != 0;
-            let term = log_bernoulli_probability(probabilities[index], accepted);
-            if !term.is_finite() {
-                log_prior = f64::NEG_INFINITY;
-                break;
-            }
-            log_prior += term;
             if accepted {
                 accepted_candidate_ids.push(candidate_id.clone());
+            }
+            let term = log_bernoulli_probability(probabilities[index], accepted);
+            if !term.is_finite() || !log_prior.is_finite() {
+                log_prior = f64::NEG_INFINITY;
+            } else {
+                log_prior += term;
             }
         }
         let log_prior_probability = log_prior.is_finite().then_some(log_prior);
@@ -492,6 +492,22 @@ mod tests {
         close(report.candidate_marginals[0].posterior_probability, 0.6153846153846154);
         close(report.candidate_marginals[1].posterior_probability, 0.23076923076923078);
         close(report.hypotheses.iter().map(|hypothesis| hypothesis.posterior_probability).sum(), 1.0);
+    }
+
+    #[test]
+    fn feasible_zero_prior_hypothesis_keeps_its_complete_candidate_set() {
+        let source = skeleton();
+        let candidates = vec![candidate("never", "B", "D", 0.0, None)];
+        let report =
+            evaluate_mycelial_graph_hypothesis_posterior(&source, &candidates).unwrap();
+        assert_eq!(report.hypotheses.len(), 2);
+        assert_eq!(
+            report.hypotheses[1].accepted_candidate_ids,
+            vec!["never".to_string()]
+        );
+        assert_eq!(report.hypotheses[1].log_prior_probability, None);
+        close(report.hypotheses[1].posterior_probability, 0.0);
+        assert_eq!(report.nonzero_prior_feasible_hypothesis_count, 1);
     }
 
     #[test]
