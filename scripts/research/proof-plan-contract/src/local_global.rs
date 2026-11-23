@@ -175,8 +175,7 @@ impl LocalGlobalPairV1 {
     }
 
     pub fn scope_matches(&self) -> bool {
-        self.candidate.local_stage.scope_binding
-            == self.candidate.global_stage.scope_binding
+        self.candidate.local_stage.scope_binding == self.candidate.global_stage.scope_binding
     }
 }
 
@@ -238,7 +237,9 @@ fn validate_execution(execution: &ExecutionRecord, errors: &mut Vec<String>, lab
         errors.push(format!("{label}.tool_calls_used exceeds tool_call_budget"));
     }
     if execution.wall_clock_used_ms > execution.wall_clock_budget_ms {
-        errors.push(format!("{label}.wall_clock_used_ms exceeds wall_clock_budget_ms"));
+        errors.push(format!(
+            "{label}.wall_clock_used_ms exceeds wall_clock_budget_ms"
+        ));
     }
 }
 
@@ -253,7 +254,10 @@ pub fn validate_pair(pair: &LocalGlobalPairV1) -> Vec<String> {
     for (field, value) in [
         ("pair_id", &candidate.pair_id),
         ("task_class", &candidate.task_class),
-        ("model_identity.provider", &candidate.model_identity.provider),
+        (
+            "model_identity.provider",
+            &candidate.model_identity.provider,
+        ),
         ("model_identity.model", &candidate.model_identity.model),
         ("model_identity.version", &candidate.model_identity.version),
     ] {
@@ -262,7 +266,10 @@ pub fn validate_pair(pair: &LocalGlobalPairV1) -> Vec<String> {
         }
     }
     if !valid_sha256(&candidate.model_identity.decoding_config_sha256) {
-        errors.push("candidate.model_identity.decoding_config_sha256 must be lowercase SHA-256 hex".to_owned());
+        errors.push(
+            "candidate.model_identity.decoding_config_sha256 must be lowercase SHA-256 hex"
+                .to_owned(),
+        );
     }
 
     validate_scope(
@@ -287,7 +294,9 @@ pub fn validate_pair(pair: &LocalGlobalPairV1) -> Vec<String> {
     );
 
     if !valid_sha256(&candidate.global_stage.proof_plan_sha256) {
-        errors.push("candidate.global_stage.proof_plan_sha256 must be lowercase SHA-256 hex".to_owned());
+        errors.push(
+            "candidate.global_stage.proof_plan_sha256 must be lowercase SHA-256 hex".to_owned(),
+        );
     }
 
     let mut mention_ids = HashSet::new();
@@ -296,10 +305,16 @@ pub fn validate_pair(pair: &LocalGlobalPairV1) -> Vec<String> {
             errors.push("global warrant mention ID must be non-empty".to_owned());
         }
         if !mention_ids.insert(&mention.mention_id) {
-            errors.push(format!("duplicate warrant mention ID: {}", mention.mention_id));
+            errors.push(format!(
+                "duplicate warrant mention ID: {}",
+                mention.mention_id
+            ));
         }
         if !non_empty(&mention.warrant_id) || !non_empty(&mention.plan_node_id) {
-            errors.push(format!("warrant mention {} has an empty warrant or plan-node ID", mention.mention_id));
+            errors.push(format!(
+                "warrant mention {} has an empty warrant or plan-node ID",
+                mention.mention_id
+            ));
         }
     }
 
@@ -308,25 +323,41 @@ pub fn validate_pair(pair: &LocalGlobalPairV1) -> Vec<String> {
             errors.push("evaluator_only.adjudication_authority must be non-empty".to_owned());
         }
         if evaluator.adjudication_refs.is_empty()
-            || evaluator.adjudication_refs.iter().any(|reference| !non_empty(reference))
+            || evaluator
+                .adjudication_refs
+                .iter()
+                .any(|reference| !non_empty(reference))
         {
-            errors.push("evaluator_only.adjudication_refs must contain non-empty evidence references".to_owned());
+            errors.push(
+                "evaluator_only.adjudication_refs must contain non-empty evidence references"
+                    .to_owned(),
+            );
         }
         let mut adjudication_refs = HashSet::new();
-        if evaluator.adjudication_refs.iter().any(|reference| !adjudication_refs.insert(reference)) {
+        if evaluator
+            .adjudication_refs
+            .iter()
+            .any(|reference| !adjudication_refs.insert(reference))
+        {
             errors.push("evaluator_only.adjudication_refs must be unique".to_owned());
         }
 
         match evaluator.eligibility {
             EvaluationEligibility::Eligible => {
-                if evaluator.exclusion_reason.as_ref().is_some_and(|reason| non_empty(reason)) {
+                if evaluator
+                    .exclusion_reason
+                    .as_ref()
+                    .is_some_and(|reason| non_empty(reason))
+                {
                     errors.push("eligible pair must not have an exclusion_reason".to_owned());
                 }
                 if !pair.scope_matches() {
                     errors.push("scope mismatch cannot be marked eligible for CIRR".to_owned());
                 }
                 if evaluator.independently_assessed_warrant != WarrantValidity::Invalid {
-                    errors.push("CIRR-eligible pair requires an independently invalid warrant".to_owned());
+                    errors.push(
+                        "CIRR-eligible pair requires an independently invalid warrant".to_owned(),
+                    );
                 }
                 if candidate.local_stage.verdict != LocalVerdict::Reject {
                     errors.push("CIRR-eligible pair requires a local reject verdict".to_owned());
@@ -336,7 +367,11 @@ pub fn validate_pair(pair: &LocalGlobalPairV1) -> Vec<String> {
                 }
             }
             EvaluationEligibility::Excluded => {
-                if evaluator.exclusion_reason.as_ref().is_none_or(|reason| !non_empty(reason)) {
+                if evaluator
+                    .exclusion_reason
+                    .as_ref()
+                    .is_none_or(|reason| !non_empty(reason))
+                {
                     errors.push("excluded pair requires a non-empty exclusion_reason".to_owned());
                 }
             }
@@ -347,8 +382,8 @@ pub fn validate_pair(pair: &LocalGlobalPairV1) -> Vec<String> {
 }
 
 pub fn validate_pair_json(input: &str) -> Result<LocalGlobalPairV1, Vec<String>> {
-    let pair: LocalGlobalPairV1 =
-        serde_json::from_str(input).map_err(|error| vec![format!("invalid LocalGlobalPairV1 JSON: {error}")])?;
+    let pair: LocalGlobalPairV1 = serde_json::from_str(input)
+        .map_err(|error| vec![format!("invalid LocalGlobalPairV1 JSON: {error}")])?;
     let errors = validate_pair(&pair);
     if errors.is_empty() {
         Ok(pair)
@@ -435,7 +470,10 @@ mod tests {
         assert!(pair.scope_matches());
         assert_eq!(pair.candidate.local_stage.verdict, LocalVerdict::Reject);
         assert_eq!(
-            pair.evaluator_only.as_ref().unwrap().independently_assessed_warrant,
+            pair.evaluator_only
+                .as_ref()
+                .unwrap()
+                .independently_assessed_warrant,
             WarrantValidity::Invalid
         );
     }
@@ -443,7 +481,8 @@ mod tests {
     #[test]
     fn candidate_projection_excludes_evaluator_only_adjudication() {
         let pair = fixture();
-        let visible = serde_json::to_value(pair.candidate_view()).expect("serialize candidate view");
+        let visible =
+            serde_json::to_value(pair.candidate_view()).expect("serialize candidate view");
         assert!(visible.get("evaluator_only").is_none());
         assert!(visible.get("independently_assessed_warrant").is_none());
         assert!(!visible.to_string().contains("COUNTERMODEL:p=true,q=false"));
@@ -461,7 +500,10 @@ mod tests {
     #[test]
     fn scope_changed_control_is_excluded_from_primary_cirr() {
         let mut pair = fixture();
-        pair.candidate.global_stage.scope_binding.hypothesis_set_sha256 =
+        pair.candidate
+            .global_stage
+            .scope_binding
+            .hypothesis_set_sha256 =
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_owned();
         let evaluator = pair.evaluator_only.as_mut().unwrap();
         evaluator.eligibility = EvaluationEligibility::Excluded;

@@ -51,12 +51,20 @@ fn main() -> ExitCode {
         summary.denominator_eligible_local_rejections,
         summary.unresolved_global_outcomes
     );
-    match (summary.lower_bound, summary.upper_bound, summary.point_estimate) {
+    match (
+        summary.lower_bound,
+        summary.upper_bound,
+        summary.point_estimate,
+    ) {
         (Some(lower), Some(upper), Some(point)) => {
-            println!("cirr_lower_bound={lower:.6} cirr_upper_bound={upper:.6} cirr_point_estimate={point:.6}");
+            println!(
+                "cirr_lower_bound={lower:.6} cirr_upper_bound={upper:.6} cirr_point_estimate={point:.6}"
+            );
         }
         (Some(lower), Some(upper), None) => {
-            println!("cirr_lower_bound={lower:.6} cirr_upper_bound={upper:.6} cirr_point_estimate=undefined");
+            println!(
+                "cirr_lower_bound={lower:.6} cirr_upper_bound={upper:.6} cirr_point_estimate=undefined"
+            );
         }
         _ => println!("cirr_point_estimate=undefined (zero eligible denominator)"),
     }
