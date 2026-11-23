@@ -101,6 +101,10 @@ pub enum ContractError {
     InvalidHarmonicBudget,
     #[error("open-boundary coordinate must lie in [0, 1]")]
     InvalidOpenBoundaryCoordinate,
+    #[error("canonical symplectic basis contains non-finite values")]
+    NonFiniteSymplecticBasis,
+    #[error("canonical symplectic pair defect exceeds the declared tolerance")]
+    InvalidSymplecticBasis,
     #[error("invalid KIRD record field {field}: {reason}")]
     InvalidKirdField {
         field: &'static str,
@@ -1563,6 +1567,45 @@ impl OpenBoundaryCoordinateLift {
     }
 }
 
+/// Canonical 2D symplectic-pairing defect for a manufactured basis fixture.
+///
+/// For J = [[0, 1], [-1, 0]] and basis columns q, p:
+/// q^T J p = q[0] * p[1] - q[1] * p[0].
+///
+/// In two dimensions, the pair preserves the canonical symplectic form exactly
+/// when this oriented area equals one. This is a small independent oracle, not
+/// a general high-dimensional symplectic reduced-basis constructor.
+pub fn canonical_symplectic_pair_defect_2d(
+    q: [f64; 2],
+    p: [f64; 2],
+) -> Result<f64, ContractError> {
+    if q.iter().chain(p.iter()).any(|value| !value.is_finite()) {
+        return Err(ContractError::NonFiniteSymplecticBasis);
+    }
+    let pairing = q[0].mul_add(p[1], -(q[1] * p[0]));
+    let defect = (pairing - 1.0).abs();
+    if !pairing.is_finite() || !defect.is_finite() {
+        return Err(ContractError::NonFiniteSymplecticBasis);
+    }
+    Ok(defect)
+}
+
+/// Require a manufactured 2D canonical basis to preserve the symplectic form.
+pub fn validate_canonical_symplectic_pair_2d(
+    q: [f64; 2],
+    p: [f64; 2],
+    tolerance: f64,
+) -> Result<f64, ContractError> {
+    if !tolerance.is_finite() || tolerance < 0.0 {
+        return Err(ContractError::InvalidProjectionBasis);
+    }
+    let defect = canonical_symplectic_pair_defect_2d(q, p)?;
+    if defect > tolerance {
+        return Err(ContractError::InvalidSymplecticBasis);
+    }
+    Ok(defect)
+}
+
 /// Summary of a semantically checked KIRD checkpoint record.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct KirdRecordSummary {
@@ -2845,6 +2888,48 @@ mod tests {
         let report = validate_kird_record_value(&value).unwrap();
         assert_eq!(report.record_status, "physical_measurement");
         assert_eq!(report.physical_gate_status, "UNKNOWN");
+    }
+
+    #[test]
+    fn canonical_symplectic_pair_oracle_accepts_area_preserving_basis() {
+        let scale = 3.5;
+        let q = [scale, 0.0];
+        let p = [0.0, 1.0 / scale];
+        let defect = canonical_symplectic_pair_defect_2d(q, p).unwrap();
+        assert!(defect < 1.0e-12);
+        assert!(
+            validate_canonical_symplectic_pair_2d(q, p, 1.0e-12).is_ok()
+        );
+    }
+
+    #[test]
+    fn canonical_symplectic_pair_oracle_rejects_structure_defect() {
+        let q = [1.0, 0.0];
+        let p = [0.0, 2.0];
+        assert_eq!(
+            canonical_symplectic_pair_defect_2d(q, p),
+            Ok(1.0)
+        );
+        assert_eq!(
+            validate_canonical_symplectic_pair_2d(q, p, 1.0e-12),
+            Err(ContractError::InvalidSymplecticBasis)
+        );
+    }
+
+    #[test]
+    fn canonical_symplectic_pair_oracle_rejects_non_finite_values_and_tolerance() {
+        assert_eq!(
+            canonical_symplectic_pair_defect_2d([f64::NAN, 0.0], [0.0, 1.0]),
+            Err(ContractError::NonFiniteSymplecticBasis)
+        );
+        assert_eq!(
+            validate_canonical_symplectic_pair_2d(
+                [1.0, 0.0],
+                [0.0, 1.0],
+                f64::NAN
+            ),
+            Err(ContractError::InvalidProjectionBasis)
+        );
     }
 
     #[test]
