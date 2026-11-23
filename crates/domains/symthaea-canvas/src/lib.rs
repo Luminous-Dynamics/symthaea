@@ -37,6 +37,7 @@ pub mod mycelial_junction_graph;
 pub mod mycelial_mesh;
 pub mod mycelial_model;
 pub mod mycelial_morphogenesis_observation;
+pub mod mycelial_morphogenesis_split;
 pub mod mycelial_network;
 pub mod mycelial_observation_coverage;
 pub mod mycelial_presence;
@@ -217,6 +218,14 @@ pub use mycelial_morphogenesis_observation::{
     MycelialMorphogenesisMeasurement, MycelialMorphogenesisMissingStatus,
     MycelialMorphogenesisObservation, MycelialMorphogenesisObservationError,
     MycelialMorphogenesisRegionKind,
+};
+pub use mycelial_morphogenesis_split::{
+    MAX_MYCELIAL_MORPHOGENESIS_SPLIT_OBSERVATIONS,
+    MAX_MYCELIAL_MORPHOGENESIS_SPLIT_UNITS,
+    MYCELIAL_MORPHOGENESIS_SPLIT_SCHEMA_VERSION,
+    MycelialMorphogenesisPartition, MycelialMorphogenesisSplitError,
+    MycelialMorphogenesisSplitManifest, MycelialMorphogenesisSplitUnit,
+    MycelialMorphogenesisSplitUnitBasis,
 };
 pub use mycelial_network::{
     AnastomosisKind, MAX_MYCELIAL_ANASTOMOSES, MYCELIAL_NETWORK_SCHEMA_VERSION,
