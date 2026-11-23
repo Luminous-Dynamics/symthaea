@@ -362,3 +362,5 @@ The initial seed is source-pinned to Lean 4 core and is explicitly not expert-re
 - [Mathematical proof-comprehension benchmark matrix](MATH_PROOF_COMPREHENSION_BENCHMARK_MATRIX_V1.md) — current SOTA comparisons, paradigm-shift hypotheses, prospective metrics, controls and execution tiers.
 
 - [Theorem-sandwich finite control contract](MATH_PROOF_COMPREHENSION_THEOREM_SANDWICH_V1.md) with [schema](MATH_PROOF_COMPREHENSION_THEOREM_SANDWICH_V1.schema.json) and a hidden-evaluator synthetic fixture.
+
+- [Mathlib source-snapshot dependency differential](MATHLIB_SOURCE_SNAPSHOT_DIFFERENTIAL_V1.md) — direct dependency-set overlap across the pinned v4.29 and v4.37 Mathlib cohorts.
