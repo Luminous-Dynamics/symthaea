@@ -18,7 +18,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 use crate::retrieval_policy_memory::{
-    RetrievalPolicyMemoryV1, RetrievalPolicyRejectV1, RetrievalTraceReceiptV1,
+    RetrievalPolicyMemoryV1, RetrievalTraceReceiptV1,
 };
 
 const TRACE_SUFFIX: &str = ".trace.json";
