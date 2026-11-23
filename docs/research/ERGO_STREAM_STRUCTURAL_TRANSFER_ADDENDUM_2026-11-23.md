@@ -300,17 +300,24 @@ The separate Symtropy protocol now defines this next step:
 
 It covers measurement time versus arrival time, asynchronous and irregular sampling, delayed/missing observations, clock calibration, hybrid guards/resets, impact/contact events, uncertainty decomposition, held-out trajectory and event-time metrics, and matched continuous-time baselines (CfC, LTC, neural ODE/continuous recurrent, discrete recurrent, sequence transformer and domain-appropriate system identification).
 
-The current #7173 Rust witness is only a deterministic finite transition-system conformance test. It does not implement CfC/LTC dynamics, continuous ODE/DAE/PDE execution, contact simulation, or a continuous-time equivalence proof. The next meaningful implementation is an adapter from existing AV-STREAM / physics interfaces into the continuous protocol, not a duplicate simulator.
+The current #7173 Rust witnesses now cover:
+- total finite structural isomorphism;
+- scope-aware induced and subgraph embeddings with explicit selected/excluded entities;
+- deterministic finite action-conditioned transition commutation.
+
+The standalone `scoped_transfer_proposal_v0.schema.json` binds source/target episode IDs and evidence-prefix hashes without mutating the strict AgentEpisode v0 wire protocol. Homomorphism, quotient/coarse-graining, simulation, bisimulation and approximate variants remain separate work under Symtropy #7230.
+
+These are conformance validators. They do not implement CfC/LTC dynamics, continuous ODE/DAE/PDE execution, contact simulation, or a continuous-time equivalence proof. The next meaningful implementation is an adapter from existing AV-STREAM / physics interfaces into the continuous protocol, not a duplicate simulator.
 
 ## 8. Execution order
 
 **P0 — close the transfer contract**
 - Land or revise the Symtropy #7173 witness validator after exact-head format/test/Clippy.
-- Define explicit scope for partial mappings in a later version; do not weaken v0.1 total-map validation.
+- Use the v0.2 scoped witness for induced/subgraph embeddings; keep v0.1 full isomorphism strict. Track homomorphism, quotient, simulation and bisimulation independently in Symtropy #7230.
 - Add paired-world generation with one invariant, one equivariant and one false-analogy pair.
 
 **P0 — baseline before complexity**
-- Implement fixed segmentation, random, passive, frequent-motif and graph-matching baselines.
+- Retain the fixed segmentation/passive and unique-incidence baselines already added; next add strong VF2-style/graph-edit solvers and the optional #11171 structural-transfer sidecar adapter.
 - Freeze structural snapshots before the evaluator releases hidden intervention outcomes.
 - Add leakage negatives and non-identifiability controls.
 
