@@ -58,6 +58,14 @@ struct OraclePlanV1 {
     final_rows: Vec<[f64; DIMENSIONS]>,
 }
 
+#[derive(Debug)]
+struct OracleCandidatePlanV1 {
+    cost: u64,
+    delay: u64,
+    action_ids: Vec<String>,
+    rows: Vec<[f64; DIMENSIONS]>,
+}
+
 fn dot(left: &[f64; DIMENSIONS], right: &[f64; DIMENSIONS]) -> f64 {
     left.iter().zip(right).map(|(a, b)| a * b).sum()
 }
@@ -145,7 +153,7 @@ fn oracle_plan(case: &FixtureCaseV1) -> OraclePlanV1 {
         .collect();
     candidates.sort_by(|left, right| left.action_id.cmp(&right.action_id));
 
-    let mut best: Option<(u64, u64, Vec<String>, Vec<[f64; DIMENSIONS]>)> = None;
+    let mut best: Option<OracleCandidatePlanV1> = None;
     for mask in 0_u64..(1_u64 << candidates.len()) {
         let mut rows = observed_rows.clone();
         let mut action_ids = Vec::new();
@@ -172,9 +180,15 @@ fn oracle_plan(case: &FixtureCaseV1) -> OraclePlanV1 {
             continue;
         }
 
-        let candidate = (cost, delay, action_ids, rows);
+        let candidate = OracleCandidatePlanV1 {
+            cost,
+            delay,
+            action_ids,
+            rows,
+        };
         let should_replace = best.as_ref().is_none_or(|current| {
-            (&candidate.0, &candidate.1, &candidate.2) < (&current.0, &current.1, &current.2)
+            (candidate.cost, candidate.delay, &candidate.action_ids)
+                < (current.cost, current.delay, &current.action_ids)
         });
         if should_replace {
             best = Some(candidate);
@@ -182,12 +196,12 @@ fn oracle_plan(case: &FixtureCaseV1) -> OraclePlanV1 {
     }
 
     match best {
-        Some((cost, delay, selected_action_ids, final_rows)) => OraclePlanV1 {
+        Some(plan) => OraclePlanV1 {
             status: DriftIdentifiabilityPlanStatusV1::DiscriminatingPlanFound,
-            selected_action_ids,
-            cost,
-            delay,
-            final_rows,
+            selected_action_ids: plan.action_ids,
+            cost: plan.cost,
+            delay: plan.delay,
+            final_rows: plan.rows,
         },
         None => OraclePlanV1 {
             status: DriftIdentifiabilityPlanStatusV1::NotIdentifiableWithinBudget,
