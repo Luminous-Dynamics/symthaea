@@ -3,7 +3,7 @@
 **Date:** 2026-11-23  
 **Parent:** [MON-003 issue #13398](https://github.com/Luminous-Dynamics/symthaea/issues/13398)  
 **Related:** [MON-001 issue #13392](https://github.com/Luminous-Dynamics/symthaea/issues/13392), [MON-002 issue #13394](https://github.com/Luminous-Dynamics/symthaea/issues/13394)  
-**Status:** specification committed; 9-case fencing/idempotency kernel, 3-case objective-ledger kernel, 8-case tenant-boundary suite, 720-order interleaving model check and 15-case cursor/replay suite committed and executed under Node.js v22.16.0; production qualification pending
+**Status:** specification committed; tenant-bound primary fencing/idempotency v2 kernel (14 cases), objective-ledger kernel (3), tenant-boundary suite (8), bounded interleaving model check (720 orders), cursor/replay suite (16) and source-capability compiler (15) committed and executed under Node.js v22.16.0; production qualification pending
 
 ## 1. Research thesis
 
@@ -439,3 +439,26 @@ The research position is an **assurance layer over existing durable execution an
 - **Microsoft SentinelBench** provides the closest direct monitoring-agent comparison: 100 tasks across 10 synthetic web environments; its wait_for method polls the page every second and is more cost-efficient than repeated sleep-and-inspect. The authors explicitly leave ephemeral, must-act-now opportunities as an open benchmark gap. [SentinelBench](https://www.microsoft.com/en-us/research/articles/sentinelbench-a-benchmark-for-long-running-monitoring-agents/)
 
 These are complementary building blocks. SFEB should integrate with their durable history/replay primitives while testing whether an additional assurance contract improves eligible-event recovery, authorization correctness, stale-worker rejection, evidence quality and cost per independently verified action.
+
+
+## 20. Tenant-bound primary objective kernel v2 (2026-11-23)
+
+The initial MON-003 v1 fencing kernel remains as historical reference evidence. A primary integration gap was identified: tenant isolation had been tested in a companion suite, but v1 did not bind tenant identity through every source receipt, authorization grant, idempotency derivation and sink check. V2 integrates those checks into the same primary execution path.
+
+Companion source: `benchmarks/frontend/monitoring/mon003-objective-kernel-v2.mjs`  
+Machine-readable report: `benchmarks/frontend/monitoring/mon003-objective-kernel-v2-report-v1.json`
+
+Executed from the exact committed source under Node.js v22.16.0:
+```sh
+node --check mon003-objective-kernel-v2.mjs
+node mon003-objective-kernel-v2.mjs
+```
+
+**Executed result: 14/14 deterministic cases passed.** Coverage: edge receipt survives current level becoming false; stale worker A fenced after B replacement; current tenant permission revoked between grant and sink; expired/revoked receipt; lost response with same-key reconciliation and one effect; changed-request idempotency rejection; target substitution; fabricated source receipt; tenant A receipt cannot authorize tenant B objective; sink rejects cross-tenant receipt/grant transplant; tenant identity changes action-key derivation; mismatched grant tenant rejected even when target matches; and source event ID cannot be reused with changed event content.
+
+Exact source Git blob SHA: `07ce9c4917e191702755a32262144755ff9afb59`.  
+Exact source SHA-256: `d279eab1801fe5d3ce5fa4d39656745a2a6dad07fd29a5fc0f1af2202ff337f0`.
+
+All negative controls record zero mock side effects. The lost-response case returns the original operation identity and one side effect on replay.
+
+V2 is the preferred tenant-bound primary *reference model*. It is not a production authorization system: its source receipts and tenant identities are trusted in-memory inputs; the mock sink assumes atomic fence/policy/idempotency/mutation persistence; no signing, persistent DB, broker, distributed lease service, real action sink, browser, scheduler or independent postcondition verifier is exercised. The 8-case companion tenant suite remains as a distinct additional regression set, not a substitute for this integrated path.
