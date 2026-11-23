@@ -429,7 +429,10 @@ impl fmt::Display for CausalPairingError {
                 "scored regret outcome does not match causal trajectory identity field {field:?}"
             ),
             Self::DecisionValueInteraction(error) => {
-                write!(formatter, "paired decision-regret evaluation failed: {error}")
+                write!(
+                    formatter,
+                    "paired decision-regret evaluation failed: {error}"
+                )
             }
             Self::TickOverflow { arm } => {
                 write!(
@@ -1035,9 +1038,7 @@ pub fn validate_causal_pairing_with_interaction(
             _ => false,
         };
         if !disposition_matches {
-            return Err(CausalPairingError::ScoredOutcomeDispositionMismatch {
-                arm: outcome.arm,
-            });
+            return Err(CausalPairingError::ScoredOutcomeDispositionMismatch { arm: outcome.arm });
         }
     }
 
