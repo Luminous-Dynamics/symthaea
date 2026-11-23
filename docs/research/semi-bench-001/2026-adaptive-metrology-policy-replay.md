@@ -221,6 +221,8 @@ The complementary issue [#13334](https://github.com/Luminous-Dynamics/symthaea/i
 
 A late-2026 article (DOI [10.1080/21642583.2026.2753948](https://doi.org/10.1080/21642583.2026.2753948)) reports 672,744 sensor records, 1,981 labelled wafer-stage combinations and four unusually large MRR labels. The authors identify those values as unverified anomalies that could be consistent with export, unit-conversion or metrology faults, but the public data do not establish a cause. The correct response is not to delete or “correct” these observations by intuition. The benchmark should preserve the raw files, carry disputed-label state, compare robust and sensitivity analyses side-by-side, and require source evidence before authoritative reinterpretation.
 
+Primary source discovery should begin with the [PHM Society 2016 CMP Data Challenge](https://phmsociety.org/conference/annual-conference-of-the-phm-society/annual-conference-of-the-prognostics-and-health-management-society-2016/phm-data-challenge-4/) and the [PHM Society wafer CMP dataset repository](https://data.phmsociety.org/nasa/). [Industrial Atlas](https://www.indatlas.com/datasets/phm-2016-cmp/) and [public GitHub mirrors](https://github.com/akangel0307/PHM-Data-Challenge) are useful for cross-checking file structure, but should not replace source admission, licence review and per-file digest verification.
+
 The deeper paradigm shift is **feasibility before optimization**: a Bayesian optimizer must not maximize predicted utility through a questionable target scale or a constraint whose unit/authority is unresolved. Every proposed recipe remains an offline, independently re-scoreable candidate; this work creates no production-control authority.
 
 ## Claim ceiling
