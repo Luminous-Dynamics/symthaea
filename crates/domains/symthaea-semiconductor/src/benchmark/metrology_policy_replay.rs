@@ -7,7 +7,7 @@
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use thiserror::Error;
 
 use crate::benchmark::metrology_audit::{
@@ -102,6 +102,8 @@ pub struct SyntheticFabPolicyEvaluationV1 {
     pub selected_positive_count: usize,
     pub escaped_defect_count: usize,
     pub true_defect_prevalence: f64,
+    pub mean_latent_process_state: f64,
+    pub mean_defect_score: f64,
     pub selected_sample_prevalence: f64,
     pub horvitz_thompson_prevalence: f64,
     pub horvitz_thompson_absolute_error: f64,
@@ -424,6 +426,8 @@ pub fn evaluate_synthetic_metrology_policy_v1(
     let mut selected_count = 0_usize;
     let mut selected_positive_count = 0_usize;
     let mut true_positive_count = 0_usize;
+    let mut latent_process_state_total = 0.0;
+    let mut defect_score_total = 0.0;
     let mut ht_positive_total = 0.0;
     let mut ht_brier_total = 0.0;
     let mut true_population_brier_total = 0.0;
@@ -458,12 +462,13 @@ pub fn evaluate_synthetic_metrology_policy_v1(
         if truth.label_available_step <= final_horizon {
             matured_label_count += 1;
         }
+        latent_process_state_total += truth.latent_process_state;
+        defect_score_total += truth.defect_score;
         if truth.defect_positive {
             true_positive_count += 1;
         }
-        let squared_error = (row.predicted_defect_probability
-            - f64::from(truth.defect_positive))
-        .powi(2);
+        let target = if truth.defect_positive { 1.0 } else { 0.0 };
+        let squared_error = (row.predicted_defect_probability - target).powi(2);
         true_population_brier_total += squared_error;
         if row.selected {
             selected_count += 1;
@@ -521,6 +526,8 @@ pub fn evaluate_synthetic_metrology_policy_v1(
         selected_positive_count,
         escaped_defect_count,
         true_defect_prevalence,
+        mean_latent_process_state: latent_process_state_total / population_count as f64,
+        mean_defect_score: defect_score_total / population_count as f64,
         selected_sample_prevalence,
         horvitz_thompson_prevalence,
         horvitz_thompson_absolute_error: (horvitz_thompson_prevalence - true_defect_prevalence).abs(),
