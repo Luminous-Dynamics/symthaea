@@ -105,7 +105,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     let sequence = fixture();
-    let config = MycelialTemporalCycleConfig {
+    let config = TemporalMycelialCycleConfig {
         minimum_present_windows: 2,
         minimum_present_duration_ns: 2_000_000,
         minimum_persistence_fraction: 0.5,
