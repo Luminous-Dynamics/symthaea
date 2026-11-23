@@ -182,3 +182,31 @@ A broad agent leaderboard is not a matched black-hole physics benchmark. Match t
 ## 9. Claim ceiling
 
 A successful campaign adapter would show that Symthaea can allocate research effort and maintain evidence-bounded hypotheses on this declared black-hole task family. It would not prove that Symthaea discovers new physics, that HDC/CfC is superior, that all EGB branches are known, or that a stationary branch is dynamically stable or strongly hyperbolic.
+
+
+## 10. Machine-readable episodes, source pins and live benchmark audit
+
+The campaign now has a machine-readable episode manifest and schema:
+
+- [Episode manifest](BH_EGB_CAMPAIGN_EPISODES_V0_1.json)
+- [Manifest JSON Schema](BH_EGB_CAMPAIGN_EPISODES_V0_1.schema.json)
+- [External benchmark landscape, 23 November 2026](BH_EGB_AGENT_BENCHMARK_LANDSCAPE_2026_11_23.md)
+
+The manifest freezes eight episodes, ten legal research actions, ten policy arms and fourteen hostile controls. It deliberately leaves the confirmatory budgets, policy/model pins, evaluator identity, hidden-holdout digest and power/stopping plan null. Therefore its state remains design_frozen_execution_not_started; it is not eligible for confirmatory performance claims.
+
+### Exact public source-pin replay
+
+The manifest's thirteen source-file Git blob SHA-1 identities were independently fetched from their declared public repositories and refs. All thirteen returned blob IDs exactly matched the manifest. JSON parsing, top-level required-key presence, unique episode/action IDs, episode-to-action references, policy-arm count and negative-control count also passed the local structural check.
+
+- Manifest blob: e2f44c570dfc28986a6ce05c35c66a787465f094.
+- Schema blob: 963c5d4ff8606bbf3877fa621348752394d8612e.
+- Source pins verified: 13/13.
+- Episodes / actions / policy arms / hostile controls: 8 / 10 / 10 / 14.
+
+This is a local, source-backed structural replay. It is not a formal JSON-Schema validator run, a Symthaea runtime integration test, a Rust build, hosted CI, a research-policy execution, or a physics result. The exact checks and claim ceiling are recorded in BH_EGB_CAMPAIGN_VALIDATION_RECEIPT_V0_1.json.
+
+### Updated external benchmark implications
+
+The 17 November 2026 SciWorkBench preprint reports a best mean score of 57.38/100 on 98 real scientific workflow tasks and finds that performance depends strongly on the model–harness pair. FIRE-Bench reports sub-50 F1 for its strongest tested agents. AstaBench's 30 April 2026 update reports only 3% perfect completion on E2E-Bench-Hard, even though the leading agent completed many individual workflow steps. These are distinct suites and should never be pooled into a single score.
+
+For EGB, the differentiator to test is not merely better ideation. It is **source-bound, self-correcting research that selects useful actions, catches its own errors, preserves uncertainty and produces independently qualified mathematical claims**. That remains a research target, not an achieved Symthaea result.
