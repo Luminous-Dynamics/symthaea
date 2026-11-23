@@ -718,7 +718,7 @@ mod tests {
         }
     }
 
-    fn policy(
+    fn make_policy(
         candidates: &[TwoStageMetrologyCandidateV1],
         confirmation_budget: u64,
     ) -> TwoStageMetrologyPolicyV1 {
@@ -758,7 +758,7 @@ mod tests {
             candidate("wafer-b", 0.05, assay(true), 1, assay(true), 5),
             candidate("wafer-c", 0.65, assay(true), 1, assay(true), 5),
         ];
-        let policy = policy(&candidates, 10);
+        let policy = make_policy(&candidates, 10);
         let first = plan_two_stage_metrology_v1(&policy, &candidates).unwrap();
         let second = plan_two_stage_metrology_v1(&policy, &candidates).unwrap();
 
@@ -788,7 +788,7 @@ mod tests {
             assay(false),
             1,
         )];
-        let policy = policy(&candidates, 10);
+        let policy = make_policy(&candidates, 10);
         let report = plan_two_stage_metrology_v1(&policy, &candidates).unwrap();
         assert!(report.selected_confirmation_candidates.is_empty());
         assert_eq!(report.confirmation_worst_case_cost_used, 0);
@@ -806,7 +806,7 @@ mod tests {
             assay(true),
             1_000_000,
         )];
-        let policy = policy(&candidates, 1_000_000);
+        let policy = make_policy(&candidates, 1_000_000);
         let report = plan_two_stage_metrology_v1(&policy, &candidates).unwrap();
         assert!(report.selected_confirmation_candidates.is_empty());
         assert_eq!(report.confirmation_expected_cost, 0.0);
@@ -818,7 +818,7 @@ mod tests {
             candidate("wafer-a", 0.25, assay(true), 1, assay(true), 10),
             candidate("wafer-b", 0.30, assay(true), 1, assay(true), 10),
         ];
-        let policy = policy(&candidates, 10);
+        let policy = make_policy(&candidates, 10);
         let report = plan_two_stage_metrology_v1(&policy, &candidates).unwrap();
         assert!(report.confirmation_worst_case_cost_used <= 10);
         assert!(report.selected_confirmation_candidates.len() <= 1);
@@ -834,7 +834,7 @@ mod tests {
             assay(true),
             5,
         )];
-        let policy = policy(&candidates, 5);
+        let policy = make_policy(&candidates, 5);
         let report = plan_two_stage_metrology_v1(&policy, &candidates).unwrap();
         assert!(
             (report.screen_only_expected_decision_loss
@@ -851,8 +851,8 @@ mod tests {
             candidate("wafer-b", 0.6, assay(true), 1, assay(true), 5),
         ];
         let second = vec![first[1].clone(), first[0].clone()];
-        let first_policy = policy(&first, 5);
-        let second_policy = policy(&second, 5);
+        let first_policy = make_policy(&first, 5);
+        let second_policy = make_policy(&second, 5);
         assert_eq!(
             plan_two_stage_metrology_v1(&first_policy, &first).unwrap(),
             plan_two_stage_metrology_v1(&second_policy, &second).unwrap()
@@ -862,11 +862,11 @@ mod tests {
     #[test]
     fn screening_budget_and_candidate_packet_digest_are_enforced() {
         let candidates = vec![candidate("wafer-a", 0.2, assay(true), 2, assay(true), 5)];
-        let mut policy = policy(&candidates, 5);
+        let mut policy = make_policy(&candidates, 5);
         policy.screening_cost_budget = 1;
         assert!(plan_two_stage_metrology_v1(&policy, &candidates).is_err());
 
-        let mut policy = policy(&candidates, 5);
+        let mut policy = make_policy(&candidates, 5);
         policy.candidate_packet_sha256 = "0".repeat(64);
         assert!(plan_two_stage_metrology_v1(&policy, &candidates).is_err());
     }
@@ -875,15 +875,15 @@ mod tests {
     fn invalid_probabilities_costs_and_duplicate_ids_are_rejected() {
         let mut candidates = vec![candidate("wafer-a", 0.2, assay(true), 1, assay(true), 5)];
         candidates[0].screening.sensitivity = 1.2;
-        assert!(plan_two_stage_metrology_v1(&policy(&candidates, 5), &candidates).is_err());
+        assert!(plan_two_stage_metrology_v1(&make_policy(&candidates, 5), &candidates).is_err());
 
         let mut candidates = vec![
             candidate("wafer-a", 0.2, assay(true), 1, assay(true), 5),
             candidate("wafer-a", 0.3, assay(true), 1, assay(true), 5),
         ];
-        assert!(plan_two_stage_metrology_v1(&policy(&candidates, 10), &candidates).is_err());
+        assert!(plan_two_stage_metrology_v1(&make_policy(&candidates, 10), &candidates).is_err());
         candidates[0].screening_cost = 0;
-        assert!(plan_two_stage_metrology_v1(&policy(&candidates, 10), &candidates).is_err());
+        assert!(plan_two_stage_metrology_v1(&make_policy(&candidates, 10), &candidates).is_err());
     }
 
     #[test]
@@ -899,7 +899,7 @@ mod tests {
             assay(true),
             5,
         )];
-        let policy = policy(&candidates, 5);
+        let policy = make_policy(&candidates, 5);
         let report = plan_two_stage_metrology_v1(&policy, &candidates).unwrap();
         assert_eq!(
             report.candidates[0].negative_branch.action,
