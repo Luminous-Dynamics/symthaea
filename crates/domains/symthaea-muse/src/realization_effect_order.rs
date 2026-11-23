@@ -122,6 +122,29 @@ pub fn build_counterbalanced_order_block_v1(
 
 /// Verify that a collected block contains all 24 unique permutations and that
 /// each probe was assigned the deterministic preregistered order.
+pub fn validate_counterbalanced_order_plan_assignment_v1(
+    plan: &CounterbalancedOrderPlanV1,
+) -> Result<(), String> {
+    plan.validate()?;
+    let probe_ids: Vec<_> = (0..CONTROL_PROBE_ARM_PERMUTATIONS_V1)
+        .map(|index| format!("assignment-check-{index:02}"))
+        .collect();
+    let expected = build_counterbalanced_order_block_v1(
+        &plan.payload.block_id,
+        &plan.payload.schedule_seed_sha256,
+        &probe_ids,
+    )?;
+    let assigned = expected
+        .get(usize::from(plan.payload.block_index))
+        .ok_or_else(|| "order plan block index is out of range".to_owned())?;
+    if assigned.payload.arm_order != plan.payload.arm_order {
+        return Err("order plan is not the preregistered hash-ranked order for its block index".to_owned());
+    }
+    Ok(())
+}
+
+/// Verify that a collected block contains all 24 unique permutations and that
+/// each probe was assigned the deterministic preregistered order.
 pub fn validate_counterbalanced_order_block_v1(
     plans: &[CounterbalancedOrderPlanV1],
 ) -> Result<(), String> {
@@ -144,9 +167,12 @@ pub fn validate_counterbalanced_order_block_v1(
             return Err("counterbalanced block contains a duplicate block index".to_owned());
         }
     }
-    let ordered: Vec<_> = by_index
+    let ordered: Vec<CounterbalancedOrderPlanV1> = by_index
         .into_iter()
-        .map(|plan| plan.ok_or_else(|| "counterbalanced block index is missing".to_owned()))
+        .map(|plan| {
+            plan.cloned()
+                .ok_or_else(|| "counterbalanced block index is missing".to_owned())
+        })
         .collect::<Result<_, _>>()?;
     let probe_ids: Vec<_> = ordered
         .iter()
@@ -377,10 +403,11 @@ pub fn evaluate_ordered_control_effect_probe_v1(
 ) -> Result<OrderedControlEffectReportV1, Vec<ControlEffectOrderIssueV1>> {
     if spec.schema_version != REALIZATION_EFFECT_ORDER_SCHEMA_VERSION_V1
         || spec.base_probe_spec.probe_id != spec.order_plan.payload.probe_id
+        || spec.reset_policy.minimum_state_epoch_increment == 0
     {
         return Err(vec![ControlEffectOrderIssueV1::InvalidSpec]);
     }
-    if let Err(error) = spec.order_plan.validate() {
+    if let Err(error) = validate_counterbalanced_order_plan_assignment_v1(&spec.order_plan) {
         return Err(vec![ControlEffectOrderIssueV1::InvalidOrderPlan(error)]);
     }
     if arms.len() != 4 {
