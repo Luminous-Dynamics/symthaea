@@ -190,3 +190,15 @@ These are proposed targets, not measured performance or claims of superiority to
 ## 10. Claim boundary
 
 Until the corresponding independent measurements are actually ingested and evaluated, report only that the schema and protocol exist. Do not claim a validated transport simulator, biological viability inference, functional network superiority, or benchmark score.
+
+
+## 11. Executable split-manifest contract
+
+The companion `mycelial_functional_benchmark.rs` module makes the primary leakage rule executable:
+- Each assignment binds one canonical observation-set digest to one biological replicate and one split.
+- Train, validation, test and external-holdout are explicit states.
+- Multiple sessions or exports from the same biological replicate are allowed only when they remain in the same split.
+- `validate_against` verifies a one-to-one mapping against the exact supplied observation-set digests and checks the replicate identity rather than trusting a manifest label.
+- The canonical manifest digest commits the benchmark identity, split-policy ID/version and every sorted assignment.
+
+This is a data-partition contract, not a random splitter. Assignment policy, seed or curator procedure must be recorded by the benchmark operator; the manifest only verifies that the resulting assignments are internally consistent and leakage-resistant. At least one independent replicate group should exist in each evaluated partition, and the number of groups—not frames—must be published.
