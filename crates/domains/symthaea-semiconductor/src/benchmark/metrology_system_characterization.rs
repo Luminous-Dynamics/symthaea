@@ -515,8 +515,7 @@ pub fn evaluate_synthetic_msa_episode_v1(
     let estimated_part_raw =
         (ms_part - ms_interaction) / (appraiser_count * replicate_count) as f64;
 
-    let numerical_variance_floor =
-        f64::EPSILON * grand_mean.abs().max(1.0).powi(2) * 16.0;
+    let numerical_variance_floor = f64::EPSILON * grand_mean.abs().max(1.0).powi(2) * 16.0;
     let constrained_component = |raw: f64| {
         let non_negative = raw.max(0.0);
         if non_negative <= numerical_variance_floor {
@@ -529,8 +528,7 @@ pub fn evaluate_synthetic_msa_episode_v1(
     let estimated_appraiser = constrained_component(estimated_appraiser_raw);
     let estimated_part = constrained_component(estimated_part_raw);
     let estimated_repeatability = constrained_component(ms_repeatability);
-    let estimated_gauge_rr =
-        estimated_appraiser + estimated_interaction + estimated_repeatability;
+    let estimated_gauge_rr = estimated_appraiser + estimated_interaction + estimated_repeatability;
     let reference_values: Vec<f64> = part_references
         .into_iter()
         .map(|value| value.expect("balanced design validates every part reference"))
