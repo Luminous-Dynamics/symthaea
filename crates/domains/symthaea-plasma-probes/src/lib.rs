@@ -1469,6 +1469,7 @@ pub struct KirdRecordSummary {
     pub record_id: String,
     pub record_status: String,
     pub checkpoint_bytes: u64,
+    pub persistent_system_bytes: u64,
     pub model_asset_bytes: u64,
     pub decoder_asset_bytes: u64,
     pub amortization_rollouts: u64,
@@ -1499,8 +1500,6 @@ pub fn validate_kird_record_json(input: &str) -> Result<KirdRecordSummary, Contr
 pub fn validate_kird_record_value(
     value: &serde_json::Value,
 ) -> Result<KirdRecordSummary, ContractError> {
-    use serde_json::Value;
-
     let record_id = kird_string(value, "record_id")?;
     if !record_id.starts_with("KIRD-") {
         return Err(kird_error("record_id", "must use the KIRD- prefix"));
@@ -1697,7 +1696,7 @@ pub fn validate_kird_record_value(
         ));
     }
 
-    let checkpoint_and_assets = checkpoint_bytes
+    let persistent_system_bytes = checkpoint_bytes
         .checked_add(persistent_assets)
         .ok_or(ContractError::StorageByteCountOverflow)?;
     let amortized_asset_bytes_per_rollout =
@@ -1715,6 +1714,7 @@ pub fn validate_kird_record_value(
         record_id: record_id.to_owned(),
         record_status: record_status.to_owned(),
         checkpoint_bytes,
+        persistent_system_bytes,
         model_asset_bytes,
         decoder_asset_bytes,
         amortization_rollouts,
@@ -2344,6 +2344,7 @@ mod tests {
         let report = validate_kird_record_json(KIRD_SYNTHETIC_FIXTURE).unwrap();
         assert_eq!(report.record_id, "KIRD-SYNTHETIC-WIRE-FIXTURE-001");
         assert_eq!(report.checkpoint_bytes, 1_504);
+        assert_eq!(report.persistent_system_bytes, 6_112);
         assert_eq!(report.model_asset_bytes, 4_096);
         assert_eq!(report.decoder_asset_bytes, 512);
         assert_eq!(report.amortization_rollouts, 100);
