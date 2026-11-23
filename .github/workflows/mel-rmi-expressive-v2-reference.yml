@@ -1,0 +1,84 @@
+name: MEL RMI expressive v2 reference qualification
+
+on:
+  pull_request:
+    paths:
+      - "tools/mel-rmi-expressive-v2/**"
+      - "docs/research/MEL_RMI_EXPRESSIVE_V2_REFERENCE_2026-11-22.md"
+      - ".github/workflows/mel-rmi-expressive-v2-reference.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  expressive-v2-reference:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact pull request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Verify exact head and record committed source
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="${{ github.event.pull_request.head.sha }}"
+          test "$actual" = "$expected"
+          mkdir -p "$RUNNER_TEMP/mel-rmi-expressive-v2-evidence"
+          printf 'triggered_revision=%s\n' "$actual" > "$RUNNER_TEMP/mel-rmi-expressive-v2-evidence/triggered_revision.txt"
+          git rev-parse HEAD:tools/mel-rmi-expressive-v2/src/lib.rs > "$RUNNER_TEMP/mel-rmi-expressive-v2-evidence/committed_lib_git_blob.txt"
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Format and record normalization diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum tools/mel-rmi-expressive-v2/src/lib.rs > "$RUNNER_TEMP/mel-rmi-expressive-v2-evidence/committed_lib_worktree.sha256"
+          cargo +1.96.0 fmt --manifest-path tools/mel-rmi-expressive-v2/Cargo.toml
+          git diff --check
+          git diff -- tools/mel-rmi-expressive-v2/src/lib.rs tools/mel-rmi-expressive-v2/src/main.rs > "$RUNNER_TEMP/mel-rmi-expressive-v2-evidence/rustfmt-normalization.diff"
+          sha256sum tools/mel-rmi-expressive-v2/src/lib.rs > "$RUNNER_TEMP/mel-rmi-expressive-v2-evidence/normalized_lib_worktree.sha256"
+      - name: Verify normalized formatting
+        run: cargo +1.96.0 fmt --check --manifest-path tools/mel-rmi-expressive-v2/Cargo.toml
+      - name: Generate isolated dependency lock
+        run: cargo +1.96.0 generate-lockfile --manifest-path tools/mel-rmi-expressive-v2/Cargo.toml
+      - name: Run expressive v2 deterministic tests
+        run: cargo +1.96.0 test --locked --manifest-path tools/mel-rmi-expressive-v2/Cargo.toml
+      - name: Run warnings-denied Clippy
+        run: cargo +1.96.0 clippy --locked --manifest-path tools/mel-rmi-expressive-v2/Cargo.toml -- -D warnings
+      - name: Parse strict schema and fixture seed
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m json.tool tools/mel-rmi-expressive-v2/schema/mel-rmi-expressive-v2.schema.json > /dev/null
+          python -m json.tool tools/mel-rmi-expressive-v2/fixtures/velocity-rubato-positive-unsealed-v2.json > /dev/null
+      - name: Seal and replay known-answer fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 run --locked --quiet --manifest-path tools/mel-rmi-expressive-v2/Cargo.toml -- --seal tools/mel-rmi-expressive-v2/fixtures/velocity-rubato-positive-unsealed-v2.json "$RUNNER_TEMP/rmi-expressive-v2-sealed.json"
+          cargo +1.96.0 run --locked --quiet --manifest-path tools/mel-rmi-expressive-v2/Cargo.toml -- "$RUNNER_TEMP/rmi-expressive-v2-sealed.json" > "$RUNNER_TEMP/rmi-expressive-v2-report.json"
+          python -m json.tool "$RUNNER_TEMP/rmi-expressive-v2-report.json" > /dev/null
+          grep -q '"valid": true' "$RUNNER_TEMP/rmi-expressive-v2-report.json"
+      - name: Record lock and replay evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp tools/mel-rmi-expressive-v2/Cargo.lock "$RUNNER_TEMP/mel-rmi-expressive-v2-evidence/Cargo.lock"
+          cp "$RUNNER_TEMP/rmi-expressive-v2-sealed.json" "$RUNNER_TEMP/mel-rmi-expressive-v2-evidence/"
+          cp "$RUNNER_TEMP/rmi-expressive-v2-report.json" "$RUNNER_TEMP/mel-rmi-expressive-v2-evidence/"
+          sha256sum tools/mel-rmi-expressive-v2/Cargo.lock > "$RUNNER_TEMP/mel-rmi-expressive-v2-evidence/lock.sha256"
+          printf 'tested_revision=%s\n' "$(git rev-parse HEAD)" > "$RUNNER_TEMP/mel-rmi-expressive-v2-evidence/tested_revision.txt"
+          printf 'source_test_mode=rustfmt-normalized-working-tree; see normalization diff\n' > "$RUNNER_TEMP/mel-rmi-expressive-v2-evidence/source_test_mode.txt"
+      - name: Upload exact-run evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: mel-rmi-expressive-v2-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/mel-rmi-expressive-v2-evidence/
+          if-no-files-found: error
+          retention-days: 90
