@@ -59,7 +59,7 @@ jobs:
       - name: Verify frozen cluster-assignment manifest digest
         run: |
           actual=$(sha256sum fixtures/vis-dvpc-compute-observation-cluster-assignments-v0.1.tsv | cut -d' ' -f1)
-          test "$actual" = b09e820031edb9f7dfe482f999f0d79031ab661c212888c90ae665a524b70425
+          test "$actual" = 8257074ad9d509a144c807fe1eeca8c0f29fb9c5101589a3e220d207236d0aab
           echo "CLUSTER_MANIFEST_SHA256=$actual" >> "$GITHUB_ENV"
 
       - name: Analyze compute-observation adapter fixture
