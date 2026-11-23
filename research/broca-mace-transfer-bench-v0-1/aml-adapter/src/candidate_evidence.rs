@@ -585,7 +585,7 @@ mod tests {
         let oversized_record = " ".repeat(MAX_CANDIDATE_EVIDENCE_RECORD_BYTES + 1);
         assert_eq!(
             parse_candidate_evidence_jsonl(&oversized_record),
-            Err(CandidateEvidenceReject::BatchTooLarge)
+            Err(CandidateEvidenceReject::RecordTooLarge)
         );
         let oversized_batch = " ".repeat(MAX_CANDIDATE_EVIDENCE_BATCH_BYTES + 1);
         assert_eq!(
