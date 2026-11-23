@@ -804,8 +804,9 @@ mod tests {
         };
         let ledger = EvidenceLedger::new(vec![grant, event, revoke]).unwrap();
         assert!(ledger.evaluate("claim-1", &query(30, 30)).admissible);
+        assert!(ledger.evaluate("claim-1", &query(39, 40)).admissible);
         assert_eq!(
-            ledger.evaluate("claim-1", &query(30, 40)).reason,
+            ledger.evaluate("claim-1", &query(40, 40)).reason,
             Some(IneligibilityReason::ConsentRevoked)
         );
     }
