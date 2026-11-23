@@ -4,6 +4,7 @@ pub mod binary_metrics;
 pub mod dtco_manifest;
 pub mod metrology_audit;
 pub mod metrology_semantics;
+pub mod metrology_policy_replay;
 pub mod mf_acquisition;
 pub mod pair_manifest;
 pub mod process_event_graph;
@@ -84,4 +85,12 @@ pub use metrology_audit::{
 pub use mf_acquisition::{
     AcquisitionCandidateV1, AcquisitionError, AcquisitionReportV1, AcquisitionSubjectV1,
     select_high_fidelity_candidates_v1,
+};
+
+pub use metrology_policy_replay::{
+    REPLAY_EVALUATION_SCHEMA_V1, REPLAY_POLICY_VIEW_SCHEMA_V1, REPLAY_SCENARIO_SCHEMA_V1,
+    SyntheticFabEpisodeV1, SyntheticFabObservedWaferV1, SyntheticFabPolicyEvaluationV1,
+    SyntheticFabPolicyViewV1, SyntheticFabRegimeV1, SyntheticFabReplayError,
+    SyntheticFabScenarioConfigV1, SyntheticSensorObservationV1, SyntheticSensorStateV1,
+    evaluate_synthetic_metrology_policy_v1, generate_synthetic_fab_episode_v1,
 };
