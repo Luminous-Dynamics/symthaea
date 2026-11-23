@@ -830,4 +830,18 @@ mod tests {
         assert!(!valid_sha256("deadbeef"));
         assert!(!valid_sha256(&"g".repeat(64)));
     }
+    #[test]
+    fn candidate_binary_digest_mismatch_fails_before_spawn() {
+        let path = env::temp_dir().join(format!(
+            "mace-candidate-binary-pin-{}.bin",
+            std::process::id()
+        ));
+        fs::write(&path, b"not-a-candidate-executable").unwrap();
+        let result = CandidateProcessSession::spawn(path.clone(), "0".repeat(64));
+        let _ = fs::remove_file(path);
+        assert!(result
+            .unwrap_err()
+            .contains("candidate binary digest mismatch"));
+    }
+
 }
