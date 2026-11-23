@@ -409,6 +409,14 @@ fn hex_digest(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::retrieval_policy_memory::{
+        RetrievalOperationOutcomeV1,
+        RetrievalOperationV1,
+        RetrievalPolicyMemoryV1,
+        RetrievalStopReasonV1,
+        RetrievalTraceReceiptV1,
+        RetrievalTraceRefV1,
+    };
 
     struct TestSignatureVerifier;
 
@@ -470,6 +478,39 @@ mod tests {
 
     fn candidate_ids() -> Vec<String> {
         vec!["evidence-a".to_owned(), "evidence-b".to_owned(), "evidence-c".to_owned()]
+    }
+
+    fn successful_candidate_trace(
+        invocation: &str,
+        query_digest_byte: char,
+        created_at_unix: u64,
+    ) -> RetrievalTraceReceiptV1 {
+        RetrievalTraceReceiptV1 {
+            run_id: "run-1".to_owned(),
+            query_invocation_id: invocation.to_owned(),
+            domain_id: "web".to_owned(),
+            environment_revision_sha256: digest('b'),
+            tool_profile_sha256: digest('c'),
+            query_sha256: digest(query_digest_byte),
+            candidate_set_sha256: Some(digest('e')),
+            operations: vec![RetrievalOperationV1 {
+                tool_id: "trajectory.bm25.search".to_owned(),
+                tool_revision_sha256: digest('c'),
+                action_template_sha256: digest('d'),
+                observed_evidence_ids: vec!["poisoned-candidate".to_owned()],
+                outcome: RetrievalOperationOutcomeV1::EvidenceObserved,
+                elapsed_ns: 7,
+                inspected_bytes: 0,
+                inspected_bytes_measured: false,
+            }],
+            stop_reason: RetrievalStopReasonV1::EvidenceSufficient,
+            tool_call_budget: 1,
+            tool_calls_used: 1,
+            elapsed_ns: 7,
+            inspected_bytes: 0,
+            inspected_bytes_complete: false,
+            created_at_unix,
+        }
     }
 
     fn binding<'a>(
@@ -630,6 +671,72 @@ mod tests {
             verified.admissible_evidence_ids_at(200),
             Err(EvidenceQualificationRejectV1::ReceiptExpired)
         );
+    }
+
+    #[test]
+    fn promoted_search_strategy_never_upgrades_rejected_candidate_evidence() {
+        let mut policy_memory = RetrievalPolicyMemoryV1::default();
+        let traces = [
+            successful_candidate_trace("invocation-1", '8', 100),
+            successful_candidate_trace("invocation-2", '9', 101),
+            successful_candidate_trace("invocation-3", 'a', 102),
+        ];
+        let mut references = Vec::new();
+        for trace in traces {
+            policy_memory.record_trace(trace.clone()).expect("record candidate-producing trace");
+            references.push(RetrievalTraceRefV1 {
+                run_id: trace.run_id,
+                query_invocation_id: trace.query_invocation_id,
+            });
+        }
+
+        let note = policy_memory.promote_strategy(
+            &references,
+            &digest('5'),
+            120,
+            180,
+        ).expect("three distinct invocations may promote an advisory strategy");
+        assert_eq!(
+            policy_memory.applicable_notes("web", &digest('b'), &digest('c'), 130).len(),
+            1
+        );
+
+        let mut qualification = receipt();
+        qualification.query_invocation_id = "invocation-1".to_owned();
+        qualification.query_sha256 = digest('8');
+        qualification.candidate_set_sha256 = digest('e');
+        qualification.entries = vec![entry("poisoned-candidate", EvidenceDispositionV1::Rejected)];
+        qualification.candidate_evidence_ids_sha256 =
+            candidate_ids_sha256(&vec!["poisoned-candidate".to_owned()]);
+        qualification.signature = qualification.signing_payload_sha256().into_bytes();
+
+        let candidate_ids = vec!["poisoned-candidate".to_owned()];
+        let binding = EvidenceQualificationBindingV1 {
+            run_id: &qualification.run_id,
+            query_invocation_id: &qualification.query_invocation_id,
+            domain_id: &qualification.domain_id,
+            subject_scope_sha256: &qualification.subject_scope_sha256,
+            environment_revision_sha256: &qualification.environment_revision_sha256,
+            tool_profile_sha256: &qualification.tool_profile_sha256,
+            query_sha256: &qualification.query_sha256,
+            candidate_set_sha256: &qualification.candidate_set_sha256,
+            candidate_evidence_ids: &candidate_ids,
+            decision_need_sha256: &qualification.decision_need_sha256,
+            purpose_sha256: &qualification.purpose_sha256,
+            qualification_policy_sha256: &qualification.qualification_policy_sha256,
+            lifecycle_snapshot_sha256: &qualification.lifecycle_snapshot_sha256,
+            verifier_profile_sha256: &qualification.verifier_profile_sha256,
+            now_unix: 150,
+        };
+        let verified = VerifiedEvidenceQualificationV1::verify_and_bind(
+            &qualification,
+            &binding,
+            &TestSignatureVerifier,
+        ).expect("external qualification result is validly bound");
+        assert!(verified.is_empty());
+        assert!(verified.admissible_evidence_ids_at(150).expect("fresh token").is_empty());
+        assert!(policy_memory.applicable_notes("web", &digest('b'), &digest('c'), 130)
+            .iter().any(|candidate| candidate.note_sha256 == note.note_sha256));
     }
 
     #[test]
