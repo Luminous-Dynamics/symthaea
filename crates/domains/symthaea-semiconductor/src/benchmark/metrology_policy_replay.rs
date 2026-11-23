@@ -326,8 +326,8 @@ fn build_synthetic_candidates(
                 (Some(left), Some(right)) => (left - right).abs(),
                 _ => 0.0,
             };
-            let missing_count =
-                usize::from(sensor_a.is_none()) + usize::from(sensor_b_normalized.is_none());
+            let missing_count = (if sensor_a.is_none() { 1_usize } else { 0 })
+                + if sensor_b_normalized.is_none() { 1_usize } else { 0 };
             let uncertainty = match readings.len() {
                 0 => 1.0,
                 1 => 0.65,
@@ -799,7 +799,7 @@ pub fn evaluate_synthetic_metrology_policy_v1(
         || selection.binary_semantics.unit != "synthetic_unit"
         || selection.binary_semantics.threshold != episode.defect_threshold
         || !matches!(
-            selection.binary_semantics.positive_condition,
+            &selection.binary_semantics.positive_condition,
             PositiveConditionV1::GreaterThanOrEqual
         )
     {
