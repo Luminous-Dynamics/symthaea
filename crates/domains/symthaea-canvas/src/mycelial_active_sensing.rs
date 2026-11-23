@@ -542,7 +542,8 @@ fn evaluate_action(
     }
 
     let raw_gross_value = baseline_bayes_risk - expected_posterior_bayes_risk;
-    if raw_gross_value < -NORMALIZATION_TOLERANCE {
+    let risk_tolerance = NORMALIZATION_TOLERANCE * baseline_bayes_risk.max(1.0);
+    if raw_gross_value < -risk_tolerance {
         return Err(MycelialActiveSensingError::InvalidAction(
             action.action_id.clone(),
         ));
@@ -607,7 +608,7 @@ pub fn evaluate_mycelial_active_sensing(
                 && action.net_value_of_information > 0.0
                 && recommended_action_id
                     .as_ref()
-                    .is_none_or(|best_id| action.action_id < *best_id));
+                    .is_none_or(|best_id| action.action_id.as_str() < best_id.as_str()));
         if is_better {
             best_net_value = action.net_value_of_information;
             recommended_action_id = Some(action.action_id.clone());
