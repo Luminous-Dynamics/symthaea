@@ -377,6 +377,11 @@ impl MycelialMorphogenesisSplitManifest {
                     != first.extraction_coverage_receipt_digest
                 || observation.observation_coverage_ledger_digest
                     != first.observation_coverage_ledger_digest
+                || observation.acquisition_session_id != first.acquisition_session_id
+                || observation.coordinate_frame_id != first.coordinate_frame_id
+                || observation.spatial_transform_digest != first.spatial_transform_digest
+                || observation.calibration_digest != first.calibration_digest
+                || observation.timebase_id != first.timebase_id
             {
                 return Err(MycelialMorphogenesisSplitError::ObservationEvidenceMismatch(
                     "acquisition/extraction/observation provenance",
