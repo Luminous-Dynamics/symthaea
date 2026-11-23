@@ -258,14 +258,24 @@ pub fn score_pitch_tracks(
         + metrics.voiced_false_positive
         + metrics.voiced_false_negative
         + metrics.unvoiced_true_negative;
-    metrics.voicing_precision = ratio(
-        metrics.voiced_true_positive,
-        metrics.voiced_true_positive + metrics.voiced_false_positive,
-    );
-    metrics.voicing_recall = ratio(
-        metrics.voiced_true_positive,
-        metrics.voiced_true_positive + metrics.voiced_false_negative,
-    );
+    let predicted_voiced =
+        metrics.voiced_true_positive + metrics.voiced_false_positive;
+    let reference_voiced =
+        metrics.voiced_true_positive + metrics.voiced_false_negative;
+    metrics.voicing_precision = if predicted_voiced > 0 {
+        ratio(metrics.voiced_true_positive, predicted_voiced)
+    } else if reference_voiced > 0 {
+        Some(0.0)
+    } else {
+        None
+    };
+    metrics.voicing_recall = if reference_voiced > 0 {
+        ratio(metrics.voiced_true_positive, reference_voiced)
+    } else if predicted_voiced > 0 {
+        Some(0.0)
+    } else {
+        None
+    };
     metrics.voicing_f1 = harmonic_mean(metrics.voicing_precision, metrics.voicing_recall);
     metrics.voicing_error_rate = ratio(
         metrics.voiced_false_positive + metrics.voiced_false_negative,
@@ -400,10 +410,10 @@ fn validate_pitch_track(
         }
         if frame
             .f0_hz
-            .is_some_and(|f0| !f0.is_finite() || f0 <= 0.0)
+            .is_some_and(|f0| !f0.is_finite() || !(1.0..=20_000.0).contains(&f0))
         {
             return Err(PitchTrackEvaluationError::new(format!(
-                "{label} frame F0 must be finite and positive when present"
+                "{label} frame F0 must be finite and in [1, 20,000] Hz when present"
             )));
         }
         if frame
@@ -609,6 +619,46 @@ mod tests {
 
         let mut estimated = track("estimated", &[Some(100.0)]);
         estimated.frames[0].periodicity = Some(1.1);
+        assert!(score_pitch_tracks(
+            &reference,
+            &estimated,
+            PitchTrackScoreConfigV1::default()
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn all_missed_voiced_frames_produce_zero_recall_and_f1() {
+        let reference = track("reference", &[Some(100.0), Some(110.0)]);
+        let mut estimated = track("estimated", &[Some(100.0), Some(110.0)]);
+        estimated.frames.clear();
+        let metrics = score_pitch_tracks(
+            &reference,
+            &estimated,
+            PitchTrackScoreConfigV1::default(),
+        )
+        .unwrap();
+        assert_eq!(metrics.voicing_precision, Some(0.0));
+        assert_eq!(metrics.voicing_recall, Some(0.0));
+        assert_eq!(metrics.voicing_f1, Some(0.0));
+        assert_eq!(metrics.frame_coverage, Some(0.0));
+        assert_eq!(metrics.f0_rmse_hz, None);
+    }
+
+    #[test]
+    fn non_monotonic_and_out_of_interval_timestamps_are_rejected() {
+        let reference = track("reference", &[Some(100.0), Some(110.0)]);
+        let mut estimated = track("estimated", &[Some(100.0), Some(110.0)]);
+        estimated.frames[1].source_timestamp_ns = estimated.frames[0].source_timestamp_ns;
+        assert!(score_pitch_tracks(
+            &reference,
+            &estimated,
+            PitchTrackScoreConfigV1::default()
+        )
+        .is_err());
+
+        let mut estimated = track("estimated", &[Some(100.0)]);
+        estimated.frames[0].source_timestamp_ns = estimated.source.source_end_ns;
         assert!(score_pitch_tracks(
             &reference,
             &estimated,
