@@ -176,11 +176,19 @@ jobs:
         run: |
           set -euo pipefail
           export CARGO_TARGET_DIR="$RUNNER_TEMP/proof-plan-target"
-          cargo test --locked --manifest-path scripts/research/proof-plan-contract/Cargo.toml
-          cargo run --locked --manifest-path scripts/research/proof-plan-contract/Cargo.toml --bin proof-plan-contract -- \
+          cargo test --manifest-path scripts/research/proof-plan-contract/Cargo.toml
+          cargo run --manifest-path scripts/research/proof-plan-contract/Cargo.toml --bin proof-plan-contract -- \
             docs/research/PROOF_PLAN_AND_COMM_V1.json
-          cargo run --locked --manifest-path scripts/research/proof-plan-contract/Cargo.toml --bin local-global -- \
+          cargo run --manifest-path scripts/research/proof-plan-contract/Cargo.toml --bin local-global -- \
             docs/research/LOCAL_GLOBAL_PAIR_SYNTHETIC_V1.json
+
+      - name: Export generated Cargo.lock for dependency pinning
+        if: success()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: proof-plan-contract-cargo-lock-bootstrap
+          path: scripts/research/proof-plan-contract/Cargo.lock
+          if-no-files-found: error
 
   mathlib-elaborated-extraction:
     name: Pinned Mathlib elaborated dependency extraction

@@ -98,6 +98,11 @@
         "source_path",
         "declaration",
         "theorem_id",
+        "root_goal_text",
+        "hypotheses",
+        "premises",
+        "conclusion_text",
+        "warrant_text",
         "root_goal_sha256",
         "hypothesis_set_sha256",
         "premise_set_sha256",
@@ -138,6 +143,29 @@
         },
         "warrant_sha256": {
           "$ref": "#/$defs/sha256"
+        },
+        "root_goal_text": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "hypotheses": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/nonEmpty"
+          }
+        },
+        "premises": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/nonEmpty"
+          }
+        },
+        "conclusion_text": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "warrant_text": {
+          "$ref": "#/$defs/nonEmpty"
         }
       }
     },

@@ -251,3 +251,14 @@ Run locally:
     cargo run --locked --manifest-path scripts/research/proof-plan-contract/Cargo.toml --bin local-global -- docs/research/LOCAL_GLOBAL_PAIR_SYNTHETIC_V1.json
 
 A successful run means structural receipt checks and deterministic metric arithmetic passed. It does not mean Lean replay, expert adjudication, model testing or a human study has occurred.
+## 15. Canonical scope-preimage integrity (partial v1 implementation)
+
+The local/global receipt now carries literal theorem-scope preimages alongside their SHA-256 digests: root_goal_text, hypotheses, premises, conclusion_text and warrant_text.
+
+Rust recomputes each digest using SHA-256 over compact serde_json serialization, prefixed by the domain separator symthaea.local_global_pair.v1:{domain} followed by a NUL byte. Distinct domains are used for root goal, hypotheses, premises, conclusion and warrant. A changed proposition, assumption, premise, conclusion or warrant is rejected even when the supplied digest still has valid hexadecimal shape.
+
+The hypothesis and premise arrays are treated as sorted, duplicate-free sets. Scalar mathematical text is exact UTF-8 after JSON string serialization. No implicit whitespace, Unicode or notation normalization is performed; normalization rules must be a separately versioned protocol decision.
+
+Remaining integrity gap: model decoding configuration and execution prompt/input/output digests are still only syntax-checked. Their canonical preimages and artifact contents are not yet included/resolved. A digest shape is not a trusted execution attestation. Artifact URI authorization and digest verification remain follow-up work.
+
+The SHA-256 dependency is introduced in this commit. The focused workflow temporarily regenerates Cargo.lock and uploads it as an artifact. The generated lock must be committed in a follow-up before restoring --locked everywhere.

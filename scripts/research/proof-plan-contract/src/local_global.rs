@@ -5,6 +5,7 @@
 //! Structural validity is not a Lean-kernel or mathematical correctness claim.
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 
 #[cfg(test)]
@@ -49,6 +50,11 @@ pub struct ScopeBinding {
     pub source_path: String,
     pub declaration: String,
     pub theorem_id: String,
+    pub root_goal_text: String,
+    pub hypotheses: Vec<String>,
+    pub premises: Vec<String>,
+    pub conclusion_text: String,
+    pub warrant_text: String,
     pub root_goal_sha256: String,
     pub hypothesis_set_sha256: String,
     pub premise_set_sha256: String,
@@ -327,6 +333,37 @@ fn valid_sha256(value: &str) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
+fn domain_separated_sha256<T: Serialize>(domain: &str, value: &T) -> Result<String, String> {
+    let canonical = serde_json::to_vec(value)
+        .map_err(|error| format!("could not serialize {domain} preimage: {error}"))?;
+    let mut hasher = Sha256::new();
+    hasher.update(b"symthaea.local_global_pair.v1:");
+    hasher.update(domain.as_bytes());
+    hasher.update([0]);
+    hasher.update(canonical);
+    let digest = hasher.finalize();
+    Ok(digest.iter().map(|byte| format!("{byte:02x}")).collect())
+}
+
+fn canonical_string_set(values: &[String], label: &str) -> Result<Vec<String>, String> {
+    if values.iter().any(|value| !non_empty(value)) {
+        return Err(format!("{label} entries must be non-empty"));
+    }
+    let mut canonical = values.to_vec();
+    canonical.sort();
+    if canonical.windows(2).any(|pair| pair[0] == pair[1]) {
+        return Err(format!("{label} contains duplicate entries"));
+    }
+    Ok(canonical)
+}
+
+fn validate_preimage_digest<T: Serialize>(domain: &str, preimage: &T, actual: &str, label: &str, errors: &mut Vec<String>) {
+    match domain_separated_sha256(domain, preimage) {
+        Ok(expected) if expected == actual => {}
+        Ok(_) => errors.push(format!("{label} does not match its canonical preimage")),
+        Err(error) => errors.push(format!("{label}: {error}")),
+    }
+}
 fn validate_scope(scope: &ScopeBinding, errors: &mut Vec<String>, label: &str) {
     for (field, value) in [
         ("source_repository", &scope.source_repository),
@@ -351,7 +388,27 @@ fn validate_scope(scope: &ScopeBinding, errors: &mut Vec<String>, label: &str) {
         if !valid_sha256(digest) {
             errors.push(format!("{label}.{field} must be lowercase SHA-256 hex"));
         }
+    }    for (field, value) in [
+        ("root_goal_text", &scope.root_goal_text),
+        ("conclusion_text", &scope.conclusion_text),
+        ("warrant_text", &scope.warrant_text),
+    ] {
+        if !non_empty(value) {
+            errors.push(format!("{label}.{field} must be non-empty"));
+        }
     }
+
+    match canonical_string_set(&scope.hypotheses, "hypotheses") {
+        Ok(canonical) => validate_preimage_digest("hypotheses", &canonical, &scope.hypothesis_set_sha256, &format!("{label}.hypothesis_set_sha256"), errors),
+        Err(error) => errors.push(format!("{label}.{error}")),
+    }
+    match canonical_string_set(&scope.premises, "premises") {
+        Ok(canonical) => validate_preimage_digest("premises", &canonical, &scope.premise_set_sha256, &format!("{label}.premise_set_sha256"), errors),
+        Err(error) => errors.push(format!("{label}.{error}")),
+    }
+    validate_preimage_digest("root_goal", &scope.root_goal_text, &scope.root_goal_sha256, &format!("{label}.root_goal_sha256"), errors);
+    validate_preimage_digest("conclusion", &scope.conclusion_text, &scope.conclusion_sha256, &format!("{label}.conclusion_sha256"), errors);
+    validate_preimage_digest("warrant", &scope.warrant_text, &scope.warrant_sha256, &format!("{label}.warrant_sha256"), errors);
 }
 
 fn validate_execution(execution: &ExecutionRecord, errors: &mut Vec<String>, label: &str) {
@@ -621,6 +678,41 @@ mod tests {
         let _: Value = serde_json::from_str(SYNTHETIC_FIXTURE).expect("fixture JSON");
     }
 
+    #[test]
+    fn sha256_implementation_matches_standard_abc_vector() {
+        let digest = Sha256::digest(b"abc");
+        let rendered: String = digest.iter().map(|byte| format!("{byte:02x}")).collect();
+        assert_eq!(rendered, "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+    }
+
+    #[test]
+    fn canonical_scope_preimages_recompute_all_identity_digests() {
+        let pair = fixture();
+        let scope = &pair.candidate.local_stage.scope_binding;
+        assert_eq!(domain_separated_sha256("root_goal", &scope.root_goal_text).unwrap(), scope.root_goal_sha256);
+        assert_eq!(domain_separated_sha256("hypotheses", &canonical_string_set(&scope.hypotheses, "hypotheses").unwrap()).unwrap(), scope.hypothesis_set_sha256);
+        assert_eq!(domain_separated_sha256("premises", &canonical_string_set(&scope.premises, "premises").unwrap()).unwrap(), scope.premise_set_sha256);
+        assert_eq!(domain_separated_sha256("conclusion", &scope.conclusion_text).unwrap(), scope.conclusion_sha256);
+        assert_eq!(domain_separated_sha256("warrant", &scope.warrant_text).unwrap(), scope.warrant_sha256);
+    }
+
+    #[test]
+    fn premise_mutation_is_rejected_even_when_digest_shape_is_valid() {
+        let mut pair = fixture();
+        pair.candidate.local_stage.scope_binding.premises[0] = "q → p".to_owned();
+        assert!(validate_pair(&pair).iter().any(|error| error.contains("premise_set_sha256 does not match its canonical preimage")));
+    }
+
+    #[test]
+    fn hypothesis_and_premise_sets_are_order_canonical_and_duplicate_free() {
+        let mut values = vec!["z".to_owned(), "a".to_owned()];
+        let first = canonical_string_set(&values, "premises").unwrap();
+        values.reverse();
+        let second = canonical_string_set(&values, "premises").unwrap();
+        assert_eq!(first, second);
+        values.push("a".to_owned());
+        assert!(canonical_string_set(&values, "premises").is_err());
+    }
     #[test]
     fn synthetic_receipt_is_structurally_valid() {
         let pair = fixture();
