@@ -5,6 +5,8 @@
 //! Screenshot references are retained, but image pixels are not decoded or embedded.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::fs;
+use std::path::{Component, Path, PathBuf};
 use std::time::Instant;
 
 use serde_json::Value;
@@ -34,6 +36,11 @@ pub enum V2TrajectoryReject {
     InvalidTopK,
     InvalidNeighborRadius,
     InvalidBm25Profile,
+    DatasetRootUnavailable,
+    ScreenshotPathInvalid,
+    ScreenshotMissing,
+    ScreenshotOutsideDatasetRoot,
+    ScreenshotNotRegularFile,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -272,6 +279,67 @@ impl LongMemEvalV2HitV1 {
         }));
         items
     }
+
+    /// Produce official-reader-compatible image paths after validating every
+    /// reference against the prepared dataset root. Missing or escaping paths
+    /// fail closed; a caller must not silently drop unavailable evidence.
+    pub fn resolved_context_items(
+        &self,
+        dataset_root: &Path,
+    ) -> Result<Vec<LongMemEvalV2ContextItemV1>, V2TrajectoryReject> {
+        let mut items = vec![LongMemEvalV2ContextItemV1 {
+            kind: LongMemEvalV2ContextKind::Text,
+            value: self.evidence_text.clone(),
+        }];
+        for reference in &self.screenshot_references {
+            let resolved = resolve_screenshot_reference(dataset_root, reference)?;
+            items.push(LongMemEvalV2ContextItemV1 {
+                kind: LongMemEvalV2ContextKind::ImageReference,
+                value: resolved.to_string_lossy().into_owned(),
+            });
+        }
+        Ok(items)
+    }
+}
+
+/// Resolve a dataset-relative screenshot reference to an existing canonical
+/// file beneath the supplied dataset root. Reject absolute paths, traversal,
+/// and symlinks that escape the dataset tree. Returned paths are absolute so
+/// the official LongMemEval-V2 reader can open them without guessing the CWD.
+pub fn resolve_screenshot_reference(
+    dataset_root: &Path,
+    reference: &str,
+) -> Result<PathBuf, V2TrajectoryReject> {
+    if reference.is_empty()
+        || reference.trim() != reference
+        || reference.contains('\\\\')
+    {
+        return Err(V2TrajectoryReject::ScreenshotPathInvalid);
+    }
+    let relative = Path::new(reference);
+    if relative.is_absolute()
+        || !relative
+            .components()
+            .all(|component| matches!(component, Component::Normal(_)))
+    {
+        return Err(V2TrajectoryReject::ScreenshotPathInvalid);
+    }
+
+    let canonical_root = fs::canonicalize(dataset_root)
+        .map_err(|_| V2TrajectoryReject::DatasetRootUnavailable)?;
+    if !canonical_root.is_dir() {
+        return Err(V2TrajectoryReject::DatasetRootUnavailable);
+    }
+
+    let resolved = fs::canonicalize(canonical_root.join(relative))
+        .map_err(|_| V2TrajectoryReject::ScreenshotMissing)?;
+    if !resolved.starts_with(&canonical_root) {
+        return Err(V2TrajectoryReject::ScreenshotOutsideDatasetRoot);
+    }
+    if !resolved.is_file() {
+        return Err(V2TrajectoryReject::ScreenshotNotRegularFile);
+    }
+    Ok(resolved)
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -817,6 +885,112 @@ mod tests {
             LongMemEvalV2Bm25IndexV1::build("web", &[parse("one")], 0, invalid).map(|_| ()),
             Err(V2TrajectoryReject::InvalidBm25Profile)
         );
+    }
+
+    fn temporary_dataset_root(label: &str) -> PathBuf {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!(
+            "mace-lmev2-{label}-{}-{nonce}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&path).expect("temporary dataset root");
+        path
+    }
+
+    #[test]
+    fn screenshot_resolution_returns_canonical_existing_file() {
+        let root = temporary_dataset_root("resolved");
+        let relative = Path::new("screenshots/traj/000.png");
+        let file = root.join(relative);
+        fs::create_dir_all(file.parent().expect("parent")).expect("screenshots directory");
+        fs::write(&file, b"fixture screenshot bytes").expect("screenshot fixture");
+
+        let resolved = resolve_screenshot_reference(&root, "screenshots/traj/000.png")
+            .expect("resolved screenshot");
+        assert_eq!(resolved, fs::canonicalize(file).expect("canonical fixture"));
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn screenshot_resolution_rejects_missing_absolute_and_parent_paths() {
+        let root = temporary_dataset_root("reject-paths");
+        assert_eq!(
+            resolve_screenshot_reference(&root, "screenshots/missing.png"),
+            Err(V2TrajectoryReject::ScreenshotMissing)
+        );
+        assert_eq!(
+            resolve_screenshot_reference(&root, "../outside.png"),
+            Err(V2TrajectoryReject::ScreenshotPathInvalid)
+        );
+        assert_eq!(
+            resolve_screenshot_reference(&root, "/tmp/outside.png"),
+            Err(V2TrajectoryReject::ScreenshotPathInvalid)
+        );
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn screenshot_resolution_rejects_symlinks_that_escape_dataset_root() {
+        use std::os::unix::fs::symlink;
+        let root = temporary_dataset_root("symlink-root");
+        let outside_root = temporary_dataset_root("symlink-outside");
+        let outside = outside_root.join("outside.png");
+        fs::write(&outside, b"outside fixture").expect("outside file");
+        let inside_dir = root.join("screenshots");
+        fs::create_dir_all(&inside_dir).expect("inside directory");
+        symlink(&outside, inside_dir.join("escape.png")).expect("symlink fixture");
+
+        assert_eq!(
+            resolve_screenshot_reference(&root, "screenshots/escape.png"),
+            Err(V2TrajectoryReject::ScreenshotOutsideDatasetRoot)
+        );
+        fs::remove_dir_all(root).expect("cleanup root");
+        fs::remove_dir_all(outside_root).expect("cleanup outside");
+    }
+
+    #[test]
+    fn resolved_context_items_keep_text_and_return_absolute_image_paths() {
+        let root = temporary_dataset_root("context");
+        let image = root.join("screenshots/traj/002.png");
+        fs::create_dir_all(image.parent().expect("image parent")).expect("image directory");
+        fs::write(&image, b"fixture screenshot bytes").expect("image fixture");
+
+        let index = LongMemEvalV2Bm25IndexV1::build("web", &[parse("t1")], 0, profile())
+            .expect("index");
+        let result = index
+            .search("web", "customer Ada pending order", 1, 0)
+            .expect("search");
+        let items = result.hits[0]
+            .resolved_context_items(&root)
+            .expect("resolved context");
+        assert_eq!(items[0].kind, LongMemEvalV2ContextKind::Text);
+        assert_eq!(items[0].value, result.hits[0].evidence_text);
+        assert!(items.iter().skip(1).all(|item| {
+            item.kind == LongMemEvalV2ContextKind::ImageReference
+                && Path::new(&item.value).is_absolute()
+                && Path::new(&item.value).is_file()
+        }));
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn resolved_context_items_fail_closed_when_any_screenshot_is_missing() {
+        let root = temporary_dataset_root("context-missing");
+        let index = LongMemEvalV2Bm25IndexV1::build("web", &[parse("t1")], 0, profile())
+            .expect("index");
+        let result = index
+            .search("web", "customer Ada pending order", 1, 0)
+            .expect("search");
+        assert_eq!(
+            result.hits[0].resolved_context_items(&root),
+            Err(V2TrajectoryReject::ScreenshotMissing)
+        );
+        fs::remove_dir_all(root).expect("cleanup");
     }
 
     #[test]
