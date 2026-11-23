@@ -191,6 +191,20 @@ The actual benchmark output schemas, seed/step-limit files, launcher revisions a
 
 **Fairness boundary:** a direct VLA and a world-action model from different architectures/checkpoints are an end-to-end system comparison, not a causal ablation proving that prediction itself caused an advantage. To claim incremental predictive value, require a matched same-backbone/same-data/same-training-budget ablation with the predictive rollout/planner enabled versus disabled, or label the comparison descriptive. To measure the Symthaea increment, hold the underlying policy checkpoint fixed and compare P with P+Symthaea under the same seed, observation stream, action domain, timing and resource envelope.
 
+### Outer and inner pairing are different contracts
+
+The benchmark has two levels of pairing, and they must not be conflated.
+
+**Outer policy-family pairing** compares a direct VLA/reactive policy with a predictive/world-action policy, or compares a fixed policy (P) with (P+\text{Symthaea}). Both sides must share a benchmark episode/world key: benchmark revision, task/condition, split, seed/episode, initial state, dynamics/simulator build, clock profile, exogenous disturbance schedule, compatible observation/action semantics, runtime profile and resource/deadline envelope. Policy family, checkpoint, model configuration and augmentation identity are explicit contrast factors and are expected to differ.
+
+The outer key does not force identical future state trajectories. In an action-coupled world, the two policy variants run their own actions and create their own endogenous futures under a common exogenous forcing commitment. Each gets its own arm-local trajectory and evidence filtration under #13375/#13377. If action domains, observations, clocks or resource ceilings cannot be matched, mark the contrast NOT_COMPARABLE.
+
+**Inner compute×observation pairing** happens separately inside each fixed policy variant. Its four arms must share the complete thirteen-field #13281 identity—including candidate policy and model-configuration digest—because only the compute and observation treatments change. It is invalid to use the full inner 13-field equality as the outer policy-contrast key, since the policy digest is intentionally different between outer arms.
+
+A comparison between released π0.5 and FastWAM checkpoints is a useful **end-to-end system comparison**, but not a causal ablation that isolates prediction: architecture, data, training recipe, checkpoint and execution horizon may all differ. To make a predictive-component claim, use the same backbone/checkpoint, data and training budget with a predictive module enabled versus disabled, or label the result descriptive. To measure Symthaea's incremental decision-layer value, hold the underlying policy fixed and compare (P) versus (P+\text{Symthaea}) at the same seed, world key, observations, action domain, timing and resource envelope.
+
+Tracking work package: [#13389 — matched direct-policy vs world-model tournament](https://github.com/Luminous-Dynamics/symthaea/issues/13389).
+
 ### Matched prediction-advantage design
 
 Within each benchmark, run these policy families with frozen checkpoints and matched input/action interfaces:
