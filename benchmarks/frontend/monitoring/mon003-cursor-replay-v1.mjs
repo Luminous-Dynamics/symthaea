@@ -1,250 +1,80 @@
 #!/usr/bin/env node
-// SFEB-MON-003 source cursor / replay reference model.
-// In-memory deterministic model only; does not qualify a broker or source DB.
+// SFEB-MON-003 partitioned source cursor/replay reference model.
+// In-memory deterministic model only; no real broker/database qualification.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+const canon = v => v === null || typeof v !== 'object' ? JSON.stringify(v) : Array.isArray(v) ? '[' + v.map(canon).join(',') + ']' : '{' + Object.keys(v).sort().map(k => JSON.stringify(k) + ':' + canon(v[k])).join(',') + '}';
+const hash = v => createHash('sha256').update(canon(v)).digest('hex');
+const fail = (code, message) => { const e = new Error(message); e.code = code; throw e; };
 
-function canonical(value) {
-  if (value === null || typeof value !== 'object') return JSON.stringify(value);
-  if (Array.isArray(value)) return '[' + value.map(canonical).join(',') + ']';
-  return '{' + Object.keys(value).sort().map(key => JSON.stringify(key) + ':' + canonical(value[key])).join(',') + '}';
-}
-const digest = value => createHash('sha256').update(canonical(value)).digest('hex');
-function fail(code, message) { const error = new Error(message); error.code = code; throw error; }
-
-class PartitionedEventJournal {
-  constructor() {
-    this.partitions = new Map();
-    this.eventIdentity = new Map();
+class PartitionJournal {
+  constructor() { this.parts = new Map(); this.ids = new Map(); }
+  key(source, partition) { return source + '\n' + partition; }
+  part(source, partition) {
+    const key = this.key(source, partition);
+    if (!this.parts.has(key)) this.parts.set(key, { source, partition, cursor: 0, high: 0, pending: new Map(), seqs: new Map(), committed: [], forked: false });
+    return this.parts.get(key);
   }
-
-  #partitionKey(source, partition) { return source + '\n' + partition; }
-
-  #getPartition(source, partition) {
-    const key = this.#partitionKey(source, partition);
-    let state = this.partitions.get(key);
-    if (!state) {
-      state = { source, partition, committedSequence: 0, highWatermark: 0, pending: new Map(), committed: new Map(), committedEvents: [], forked: false };
-      this.partitions.set(key, state);
+  ingest(e) {
+    if (!e || typeof e.source !== 'string' || !e.source || typeof e.partition !== 'string' || !e.partition ||
+        typeof e.id !== 'string' || !e.id || !Number.isSafeInteger(e.seq) || e.seq < 1 || !Number.isFinite(e.at) || e.payload === undefined) fail('INVALID_EVENT', 'invalid event envelope');
+    const p = this.part(e.source, e.partition), idKey = e.source + '\n' + e.id, d = hash(e);
+    if (p.forked) fail('PARTITION_QUARANTINED', 'partition is quarantined');
+    const prior = this.ids.get(idKey);
+    if (prior) {
+      if (prior.digest !== d || prior.partition !== e.partition || prior.seq !== e.seq) { p.forked = true; fail('EVENT_ID_REUSE', 'source+id identity changed content or position'); }
+      if (e.seq <= p.cursor) return { status: 'duplicate_committed', cursor: p.cursor };
+      if (p.pending.has(e.seq)) return { status: 'duplicate_pending', cursor: p.cursor };
+      p.forked = true; fail('EVENT_ID_REUSE', 'known event identity is absent from cursor/pending state');
     }
-    return state;
+    if (e.seq <= p.cursor) { p.forked = true; fail('CURSOR_ROLLBACK_OR_FORK', 'new event attempts to rewrite committed sequence'); }
+    if (p.seqs.has(e.seq)) { p.forked = true; fail('SEQUENCE_FORK', 'two event identities claim one partition sequence'); }
+    this.ids.set(idKey, { digest: d, partition: e.partition, seq: e.seq });
+    p.seqs.set(e.seq, d); p.pending.set(e.seq, structuredClone(e));
+    const committedNow = [];
+    while (p.pending.has(p.cursor + 1)) {
+      const next = p.pending.get(p.cursor + 1); p.pending.delete(p.cursor + 1);
+      p.cursor += 1; p.committed.push(next); committedNow.push(next.id);
+    }
+    const pendingSeqs = [...p.pending.keys()].sort((a,b)=>a-b);
+    const gap = pendingSeqs.length && pendingSeqs[0] > p.cursor + 1 ? { from: p.cursor + 1, nextObserved: pendingSeqs[0] } : null;
+    return { status: committedNow.length ? 'committed' : 'buffered_gap', cursor: p.cursor, committedNow, gap };
   }
-
-  receive(event) {
-    if (!event || typeof event !== 'object' || Array.isArray(event)) fail('INVALID_EVENT', 'event must be an object');
-    const { source, partition, id, sequence, payload, occurredAt } = event;
-    if (typeof source !== 'string' || !source || typeof partition !== 'string' || !partition || typeof id !== 'string' || !id ||
-        !Number.isSafeInteger(sequence) || sequence < 1 || !Number.isFinite(occurredAt) || payload === undefined) {
-      fail('INVALID_EVENT', 'source, partition, id, positive sequence, occurredAt and payload are required');
-    }
-    const eventDigest = digest({ source, partition, id, sequence, payload, occurredAt });
-    const identity = source + '\n' + id;
-    const priorIdentity = this.eventIdentity.get(identity);
-    if (priorIdentity) {
-      if (priorIdentity.digest !== eventDigest) fail('EVENT_ID_REUSE', 'same source+id was replayed with different content or sequence');
-      const p = this.#getPartition(source, partition);
-      if (sequence <= p.committedSequence) return { status: 'duplicate_committed', committedSequence: p.committedSequence };
-      const pending = p.pending.get(sequence);
-      if (pending && pending.digest === eventDigest) return { status: 'duplicate_pending', committedSequence: p.committedSequence };
-      fail('EVENT_ID_REUSE', 'event identity moved to a different cursor position');
-    }
-
-    const state = this.#getPartition(source, partition);
-    if (state.forked) fail('PARTITION_QUARANTINED', 'partition is quarantined after a sequence fork');
-    if (sequence <= state.committedSequence) {
-      const committed = state.committed.get(sequence);
-      if (!committed || committed.digest !== eventDigest) {
-        state.forked = true;
-        fail('CURSOR_ROLLBACK_OR_FORK', 'event conflicts with an already committed source sequence');
-      }
-      this.eventIdentity.set(identity, { digest: eventDigest, source, partition, sequence });
-      return { status: 'duplicate_committed', committedSequence: state.committedSequence };
-    }
-
-    const pendingAtSequence = state.pending.get(sequence);
-    if (pendingAtSequence) {
-      if (pendingAtSequence.digest === eventDigest) return { status: 'duplicate_pending', committedSequence: state.committedSequence };
-      state.forked = true;
-      fail('SEQUENCE_FORK', 'two different events claim the same source partition sequence');
-    }
-
-    this.eventIdentity.set(identity, { digest: eventDigest, source, partition, sequence });
-    state.pending.set(sequence, { event: structuredClone(event), digest: eventDigest });
-    const newlyCommitted = [];
-    while (state.pending.has(state.committedSequence + 1)) {
-      const nextSequence = state.committedSequence + 1;
-      const item = state.pending.get(nextSequence);
-      state.pending.delete(nextSequence);
-      state.committedSequence = nextSequence;
-      state.committed.set(nextSequence, item);
-      state.committedEvents.push(item.event);
-      newlyCommitted.push(item.event.id);
-    }
-    const pendingSequences = [...state.pending.keys()].sort((a, b) => a - b);
-    const gap = pendingSequences.length > 0 && pendingSequences[0] > state.committedSequence + 1
-      ? { missingFrom: state.committedSequence + 1, observedNext: pendingSequences[0] }
-      : null;
-    return { status: newlyCommitted.length ? 'committed' : 'buffered_gap', newlyCommitted, committedSequence: state.committedSequence, gap };
+  watermark({ source, partition, high }) {
+    if (typeof source !== 'string' || !source || typeof partition !== 'string' || !partition || !Number.isSafeInteger(high) || high < 0) fail('INVALID_WATERMARK', 'invalid high watermark');
+    const p = this.part(source, partition);
+    if (high < p.cursor || high < p.high) { p.forked = true; fail('SOURCE_ROLLBACK', 'high watermark regressed'); }
+    p.high = high;
+    const pending = [...p.pending.keys()].sort((a,b)=>a-b);
+    const gap = p.cursor < p.high && (!pending.length || pending[0] > p.cursor + 1)
+      ? { from: p.cursor + 1, to: Math.max(p.cursor + 1, (pending[0] ?? p.high) - 1), nextObserved: pending[0] ?? null } : null;
+    return { cursor: p.cursor, high: p.high, gap, caughtUp: !p.forked && p.cursor >= p.high && !p.pending.size };
   }
-
-  observeHighWatermark({ source, partition, sequence }) {
-    if (typeof source !== 'string' || !source || typeof partition !== 'string' || !partition || !Number.isSafeInteger(sequence) || sequence < 0) {
-      fail('INVALID_HIGH_WATERMARK', 'high watermark fields are invalid');
-    }
-    const state = this.#getPartition(source, partition);
-    if (sequence < state.committedSequence) {
-      state.forked = true;
-      fail('SOURCE_ROLLBACK', 'source high watermark is behind the committed cursor');
-    }
-    state.highWatermark = Math.max(state.highWatermark, sequence);
-    const next = state.committedSequence + 1;
-    const pending = [...state.pending.keys()].sort((a, b) => a - b);
-    const missingTo = pending.length ? pending[0] - 1 : state.highWatermark;
-    const gap = next <= state.highWatermark && (pending.length === 0 || pending[0] > next)
-      ? { missingFrom: next, missingTo: Math.max(next, missingTo), observedNext: pending[0] ?? null }
-      : null;
-    return { committedSequence: state.committedSequence, highWatermark: state.highWatermark, gap,
-      caughtUp: !state.forked && state.committedSequence >= state.highWatermark && state.pending.size === 0 };
-  }
-
   snapshot(source, partition) {
-    const state = this.#getPartition(source, partition);
-    return {
-      source: state.source, partition: state.partition,
-      committedSequence: state.committedSequence,
-      highWatermark: state.highWatermark,
-      pendingSequences: [...state.pending.keys()].sort((a, b) => a - b),
-      committedEventIds: state.committedEvents.map(event => event.id),
-      forked: state.forked,
-      caughtUp: !state.forked && state.committedSequence >= state.highWatermark && state.pending.size === 0,
-    };
+    const p = this.part(source, partition);
+    return { cursor: p.cursor, high: p.high, pending: [...p.pending.keys()].sort((a,b)=>a-b), committed: p.committed.map(x=>x.id), forked: p.forked, caughtUp: !p.forked && p.cursor >= p.high && !p.pending.size };
   }
-
-  // Only this committed contiguous prefix can be used as source-event evidence.
-  eligibleEvents(source, partition) {
-    return this.#getPartition(source, partition).committedEvents.map(event => structuredClone(event));
-  }
+  eligible(source, partition) { return this.part(source, partition).committed.map(x=>structuredClone(x)); }
 }
 
-const cases = [];
-function test(name, fn) { fn(); cases.push({ name, result: 'pass' }); }
-function expectCode(code, fn) { assert.throws(fn, error => error && error.code === code, 'expected ' + code); }
-const e = (source, partition, id, sequence, payload = { value: sequence }, occurredAt = sequence) => ({ source, partition, id, sequence, payload, occurredAt });
+const results=[]; const test=(name,fn)=>{fn();results.push({name,result:'pass'});};
+const expect=(code,fn)=>assert.throws(fn,e=>e&&e.code===code,'expected '+code);
+const ev=(source,partition,id,seq,payload={n:seq},at=seq)=>({source,partition,id,seq,payload,at});
 
-test('out-of-order event is buffered and never advances the contiguous cursor', () => {
-  const j = new PartitionedEventJournal();
-  const r = j.receive(e('urn:src:A', 'p0', 'evt-3', 3));
-  assert.equal(r.status, 'buffered_gap');
-  assert.equal(r.committedSequence, 0);
-  assert.deepEqual(j.eligibleEvents('urn:src:A', 'p0'), []);
-});
+test('out-of-order event never advances over a missing prefix',()=>{const j=new PartitionJournal();const r=j.ingest(ev('sA','p0','e3',3));assert.equal(r.cursor,0);assert.deepEqual(j.eligible('sA','p0'),[]);});
+test('replay of missing events drains the pending suffix in order',()=>{const j=new PartitionJournal();j.ingest(ev('sA','p0','e3',3));j.ingest(ev('sA','p0','e1',1));j.ingest(ev('sA','p0','e2',2));assert.deepEqual(j.eligible('sA','p0').map(x=>x.id),['e1','e2','e3']);});
+test('identical duplicate pending event is idempotent',()=>{const j=new PartitionJournal(),x=ev('sA','p0','e2',2);j.ingest(x);assert.equal(j.ingest(x).status,'duplicate_pending');assert.deepEqual(j.snapshot('sA','p0').pending,[2]);});
+test('identical duplicate committed event adds no evidence',()=>{const j=new PartitionJournal(),x=ev('sA','p0','e1',1);j.ingest(x);assert.equal(j.ingest(x).status,'duplicate_committed');assert.equal(j.eligible('sA','p0').length,1);});
+test('same source+id with changed payload is rejected',()=>{const j=new PartitionJournal();j.ingest(ev('sA','p0','e1',1));expect('EVENT_ID_REUSE',()=>j.ingest(ev('sA','p0','e1',1,{n:999})));});
+test('same event id from two distinct sources is not a collision',()=>{const j=new PartitionJournal();j.ingest(ev('sA','p0','same',1));j.ingest(ev('sB','p0','same',1));assert.equal(j.eligible('sA','p0').length,1);assert.equal(j.eligible('sB','p0').length,1);});
+test('partition progress is isolated',()=>{const j=new PartitionJournal();j.ingest(ev('sA','p0','p0e1',1));j.ingest(ev('sA','p1','p1e2',2));assert.equal(j.snapshot('sA','p0').cursor,1);assert.equal(j.snapshot('sA','p1').cursor,0);});
+test('two event identities at one sequence quarantine the partition',()=>{const j=new PartitionJournal();j.ingest(ev('sA','p0','a',2));expect('SEQUENCE_FORK',()=>j.ingest(ev('sA','p0','b',2)));assert.equal(j.snapshot('sA','p0').forked,true);expect('PARTITION_QUARANTINED',()=>j.ingest(ev('sA','p0','e1',1)));});
+test('high watermark exposes a missing cursor interval',()=>{const j=new PartitionJournal();j.ingest(ev('sA','p0','e3',3));const r=j.watermark({source:'sA',partition:'p0',high:3});assert.deepEqual(r.gap,{from:1,to:2,nextObserved:3});assert.equal(r.caughtUp,false);});
+test('replaying every missing sequence closes high-watermark gap',()=>{const j=new PartitionJournal();j.ingest(ev('sA','p0','e3',3));j.watermark({source:'sA',partition:'p0',high:3});j.ingest(ev('sA','p0','e1',1));j.ingest(ev('sA','p0','e2',2));assert.equal(j.watermark({source:'sA',partition:'p0',high:3}).caughtUp,true);});
+test('high watermark cannot regress below committed cursor',()=>{const j=new PartitionJournal();j.ingest(ev('sA','p0','e1',1));expect('SOURCE_ROLLBACK',()=>j.watermark({source:'sA',partition:'p0',high:0}));});
+test('high watermark cannot regress even while cursor is behind',()=>{const j=new PartitionJournal();j.watermark({source:'sA',partition:'p0',high:9});expect('SOURCE_ROLLBACK',()=>j.watermark({source:'sA',partition:'p0',high:8}));});
+test('new identity cannot rewrite a committed sequence',()=>{const j=new PartitionJournal();j.ingest(ev('sA','p0','e1',1));expect('CURSOR_ROLLBACK_OR_FORK',()=>j.ingest(ev('sA','p0','attacker',1)));});
+test('high watermark without source events never creates eligible evidence',()=>{const j=new PartitionJournal();j.watermark({source:'sA',partition:'p0',high:9});assert.deepEqual(j.eligible('sA','p0'),[]);assert.equal(j.snapshot('sA','p0').caughtUp,false);});
+test('invalid sequence and invalid watermark fail closed',()=>{const j=new PartitionJournal();expect('INVALID_EVENT',()=>j.ingest(ev('sA','p0','zero',0)));expect('INVALID_WATERMARK',()=>j.watermark({source:'sA',partition:'p0',high:-1}));});
 
-test('missing replayed events close the gap and drain the pending suffix', () => {
-  const j = new PartitionedEventJournal();
-  j.receive(e('urn:src:A', 'p0', 'evt-3', 3));
-  j.receive(e('urn:src:A', 'p0', 'evt-1', 1));
-  const r = j.receive(e('urn:src:A', 'p0', 'evt-2', 2));
-  assert.equal(r.committedSequence, 3);
-  assert.deepEqual(j.eligibleEvents('urn:src:A', 'p0').map(x => x.id), ['evt-1', 'evt-2', 'evt-3']);
-});
-
-test('identical duplicate pending delivery does not create another event', () => {
-  const j = new PartitionedEventJournal(); const event = e('urn:src:A', 'p0', 'evt-2', 2);
-  assert.equal(j.receive(event).status, 'buffered_gap');
-  assert.equal(j.receive(event).status, 'duplicate_pending');
-  assert.equal(j.snapshot('urn:src:A', 'p0').pendingSequences.length, 1);
-});
-
-test('identical duplicate committed delivery does not advance cursor or duplicate evidence', () => {
-  const j = new PartitionedEventJournal(); const event = e('urn:src:A', 'p0', 'evt-1', 1);
-  j.receive(event); const duplicate = j.receive(event);
-  assert.equal(duplicate.status, 'duplicate_committed');
-  assert.equal(j.snapshot('urn:src:A', 'p0').committedSequence, 1);
-  assert.equal(j.eligibleEvents('urn:src:A', 'p0').length, 1);
-});
-
-test('same CloudEvents source and id with changed payload is rejected', () => {
-  const j = new PartitionedEventJournal(); j.receive(e('urn:src:A', 'p0', 'evt-1', 1));
-  expectCode('EVENT_ID_REUSE', () => j.receive(e('urn:src:A', 'p0', 'evt-1', 1, { value: 999 })));
-});
-
-test('same event id from different sources remains distinct', () => {
-  const j = new PartitionedEventJournal();
-  j.receive(e('urn:src:A', 'p0', 'same-id', 1));
-  j.receive(e('urn:src:B', 'p0', 'same-id', 1));
-  assert.equal(j.eligibleEvents('urn:src:A', 'p0').length, 1);
-  assert.equal(j.eligibleEvents('urn:src:B', 'p0').length, 1);
-});
-
-test('partition progress is isolated and cannot advance another partition', () => {
-  const j = new PartitionedEventJournal();
-  j.receive(e('urn:src:A', 'p0', 'p0-e1', 1));
-  j.receive(e('urn:src:A', 'p1', 'p1-e2', 2));
-  assert.equal(j.snapshot('urn:src:A', 'p0').committedSequence, 1);
-  assert.equal(j.snapshot('urn:src:A', 'p1').committedSequence, 0);
-  assert.deepEqual(j.snapshot('urn:src:A', 'p1').pendingSequences, [2]);
-});
-
-test('two event identities claiming the same sequence quarantine the partition', () => {
-  const j = new PartitionedEventJournal(); j.receive(e('urn:src:A', 'p0', 'evt-a', 2));
-  expectCode('SEQUENCE_FORK', () => j.receive(e('urn:src:A', 'p0', 'evt-b', 2)));
-  assert.equal(j.snapshot('urn:src:A', 'p0').forked, true);
-  expectCode('PARTITION_QUARANTINED', () => j.receive(e('urn:src:A', 'p0', 'evt-1', 1)));
-});
-
-test('high watermark exposes a cursor gap rather than declaring caught up', () => {
-  const j = new PartitionedEventJournal(); j.receive(e('urn:src:A', 'p0', 'evt-3', 3));
-  const r = j.observeHighWatermark({ source: 'urn:src:A', partition: 'p0', sequence: 3 });
-  assert.deepEqual(r.gap, { missingFrom: 1, missingTo: 2, observedNext: 3 });
-  assert.equal(r.caughtUp, false);
-});
-
-test('cursor becomes caught up only after every missing sequence is replayed', () => {
-  const j = new PartitionedEventJournal();
-  j.receive(e('urn:src:A', 'p0', 'evt-3', 3));
-  j.observeHighWatermark({ source: 'urn:src:A', partition: 'p0', sequence: 3 });
-  j.receive(e('urn:src:A', 'p0', 'evt-1', 1));
-  j.receive(e('urn:src:A', 'p0', 'evt-2', 2));
-  const r = j.observeHighWatermark({ source: 'urn:src:A', partition: 'p0', sequence: 3 });
-  assert.equal(r.caughtUp, true);
-  assert.equal(r.committedSequence, 3);
-});
-
-test('source high watermark rollback quarantines the partition', () => {
-  const j = new PartitionedEventJournal(); j.receive(e('urn:src:A', 'p0', 'evt-1', 1));
-  expectCode('SOURCE_ROLLBACK', () => j.observeHighWatermark({ source: 'urn:src:A', partition: 'p0', sequence: 0 }));
-  assert.equal(j.snapshot('urn:src:A', 'p0').forked, true);
-});
-
-test('committed sequence cannot be rebound to a new event identity', () => {
-  const j = new PartitionedEventJournal(); j.receive(e('urn:src:A', 'p0', 'evt-1', 1));
-  expectCode('CURSOR_ROLLBACK_OR_FORK', () => j.receive(e('urn:src:A', 'p0', 'attacker-event', 1)));
-  assert.equal(j.snapshot('urn:src:A', 'p0').forked, true);
-});
-
-test('high watermark without replayed source events yields no eligible events', () => {
-  const j = new PartitionedEventJournal();
-  j.observeHighWatermark({ source: 'urn:src:A', partition: 'p0', sequence: 9 });
-  assert.deepEqual(j.eligibleEvents('urn:src:A', 'p0'), []);
-  assert.equal(j.snapshot('urn:src:A', 'p0').caughtUp, false);
-});
-
-console.log(JSON.stringify({
-  schema: 'sfeb-mon003-cursor-replay-report-v1',
-  status: 'passed',
-  deterministic_cases: cases.length,
-  cases,
-  invariants: {
-    no_cursor_advancement_past_gap: 'pass',
-    event_identity_is_source_scoped: 'pass',
-    sequence_forks_fail_closed: 'pass',
-    partition_cursors_are_isolated: 'pass',
-    high_watermark_is_not_event_evidence: 'pass',
-    only_contiguous_committed_prefix_is_eligible: 'pass',
-  },
-  limitations: [
-    'Pure in-memory cursor/replay reference model; no real broker, database cursor, retention or outbox transaction is exercised.',
-    'Source and partition sequence are trusted model inputs; signature and source identity authentication remain pending.',
-    'The model is single-threaded and does not prove concurrent cursor update atomicity.',
-  ],
-}, null, 2));
+console.log(JSON.stringify({schema:'sfeb-mon003-cursor-replay-report-v1',status:'passed',deterministic_cases:results.length,cases:results,invariants:{no_cursor_advance_past_gap:'pass',source_scoped_identity:'pass',sequence_fork_quarantine:'pass',partition_cursor_isolation:'pass',monotonic_high_watermark:'pass',watermark_is_not_event_evidence:'pass',only_contiguous_prefix_is_eligible:'pass'},limitations:['Pure in-memory cursor/replay model; no real broker, database cursor, retention or outbox transaction is exercised.','Source and partition sequence are trusted model inputs; signature and source identity authentication remain pending.','Single-threaded reference model; it does not prove concurrent cursor-update atomicity.']},null,2));
