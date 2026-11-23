@@ -174,7 +174,7 @@ The source test suite contains positive and negative controls for these cases, p
 
 No new transition simulator, actor policy, resource ledger, factorial decomposition, VOI engine, freshness horizon, statistical engine or action authority is introduced.
 
-## 9. Benchmark sequence and claim ceiling
+## 8. Benchmark sequence and claim ceiling
 
 First run the finite controls, then integrate with the qualified RoboDyna driver. Reproduce the official π0.5, X-VLA and FastWAM baselines under the benchmark's own splits, checkpoints, timing modes and resource protocol before adding Symthaea as a separately labelled decision-layer arm. Keep the open-loop DEEP perception reproduction separate from action-coupled RoboDyna results.
 
@@ -190,7 +190,7 @@ Report separately:
 
 A passing Rust validator establishes only finite structural pairing and receipt consistency over supplied commitments. It does not validate the physics, prove that a stochastic schedule is complete, identify unsupported counterfactuals from logged data, demonstrate a better policy, establish physical safety, or show a SOTA improvement. Those require independently replayed driver traces and held-out benchmark results.
 
-## 8. Competitive baseline crosswalk and experiment order
+## 9. Competitive baseline crosswalk and experiment order
 
 The most important new gap is prediction-to-action advantage, not prediction quality in isolation. A 2026 survey of 160 benchmarks reports only 11 with an explicit VLA-versus-world-model contrast and only four that take prediction through to executed action. This is a reported survey classification, not a universal census; it nevertheless identifies a concrete measurement gap. The campaign should therefore compare a direct reactive/VLA policy and a predictive/world-action policy in the same closed-loop environment, then measure whether prediction produces a positive incremental task/decision advantage at matched resources.
 
