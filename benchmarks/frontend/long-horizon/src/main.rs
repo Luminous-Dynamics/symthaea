@@ -320,20 +320,23 @@ fn reject_control(fixture: &Value, events: &BTreeMap<String, Value>, control: &V
         }
         "invalid_event_is_rolled_back_atomically" => {
             altered["to_status"] = control["to_status"].clone();
-            if state.deliver(&altered).is_ok() {
-                return Err(format!("{control_id}: adversarial mutation was accepted"));
-            }
-            let original_sequence = field_u64(original, "sequence")?;
-            let original_id = field_str(original, "event_id")?;
-            state.deliver(original)?;
-            if state.last_sequence != original_sequence || state.audit.last().map(String::as_str) != Some(original_id) {
-                return Err(format!("{control_id}: valid retry did not apply after rejected mutation"));
-            }
-            return Ok(());
         }
         other => return Err(format!("{control_id}: unsupported operation {other}")),
     }
-    if state.deliver(&altered).is_ok() { return Err(format!("{control_id}: adversarial mutation was accepted")); }
+    let expected_error = field_str(control, "expected_error_fragment")?;
+    match state.deliver(&altered) {
+        Err(error) if error.contains(expected_error) => {}
+        Err(error) => return Err(format!("{control_id}: unexpected rejection: {error}")),
+        Ok(()) => return Err(format!("{control_id}: adversarial mutation was accepted")),
+    }
+    if field_str(control, "operation")? == "invalid_event_is_rolled_back_atomically" {
+        let original_sequence = field_u64(original, "sequence")?;
+        let original_id = field_str(original, "event_id")?;
+        state.deliver(original)?;
+        if state.last_sequence != original_sequence || state.audit.last().map(String::as_str) != Some(original_id) {
+            return Err(format!("{control_id}: valid retry did not apply after rejected mutation"));
+        }
+    }
     Ok(())
 }
 
