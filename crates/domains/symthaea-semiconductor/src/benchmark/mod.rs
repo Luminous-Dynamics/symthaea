@@ -1,6 +1,7 @@
 //! Versioned benchmark protocols and independent scoring primitives.
 
 pub mod binary_metrics;
+pub mod label_consumption_guard;
 pub mod calibration_requalification;
 pub mod dtco_manifest;
 pub mod metrology_audit;
@@ -107,4 +108,11 @@ pub use calibration_requalification::{
     CalibrationRequalificationInputV1, CalibrationRequalificationReasonV1,
     CalibrationRequalificationReportV1, MeasurementTimeBoundsV1,
     requalify_calibration_measurement_v1, seal_calibration_event_inventory_v1,
+};
+
+pub use label_consumption_guard::{
+    LABEL_CONSUMPTION_GUARD_SCHEMA_V1, LABEL_CONSUMPTION_REPORT_SCHEMA_V1,
+    LabelConsumptionEligibilityReportV1, LabelConsumptionEligibilityV1,
+    LabelConsumptionGuardErrorV1, LabelConsumptionReasonV1, LabelEvidenceFrontierV1,
+    assess_label_consumption_eligibility_v1,
 };
