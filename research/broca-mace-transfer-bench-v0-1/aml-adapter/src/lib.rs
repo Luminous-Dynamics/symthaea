@@ -5,6 +5,7 @@ pub mod candidate_evidence;
 pub mod longmemeval_v2_candidate_adapter;
 pub mod retrieval_policy_memory;
 pub mod retrieval_policy_store;
+pub mod evidence_qualification_gate;
 
 // Copyright (C) 2026 Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
