@@ -26,7 +26,8 @@ use std::time::Instant;
 
 use symthaea_stt::{
     AudioFrontend, AudioProjector, BootstrapConfig, CmuDictionary, HV16, PhonemeDecoder,
-    PhonemeInventory, PhonemeResonator, TrainedPrototypes,
+    PhonemeInventory, PhonemeResonator, PrototypeEncoderMetadata, PrototypeRepresentation,
+    TrainedPrototypes,
 };
 
 // ============================================================================
@@ -116,6 +117,7 @@ struct TranscriptionEngine {
     decoder: PhonemeDecoder,
     dictionary: Option<CmuDictionary>,
     resonator: PhonemeResonator,
+    prototype_representation: Option<PrototypeRepresentation>,
 }
 
 impl TranscriptionEngine {
@@ -125,11 +127,36 @@ impl TranscriptionEngine {
             decoder: PhonemeDecoder::new(),
             dictionary: None,
             resonator: PhonemeResonator::new(),
+            prototype_representation: None,
         }
     }
 
     fn load_model(&mut self, path: &Path) -> std::io::Result<()> {
         let prototypes = TrainedPrototypes::load(path)?;
+        let raw_expected =
+            PrototypeEncoderMetadata::direct_mel_frame_v1(self.projector.config().clone());
+        let temporal_expected = PrototypeEncoderMetadata::direct_mel_temporal_window7_v1(
+            self.projector.config().clone(),
+        );
+        let metadata = prototypes.encoder_metadata.as_ref().ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "prototype artifact has no encoder metadata; legacy artifacts require migration",
+            )
+        })?;
+        metadata
+            .validate()
+            .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error))?;
+        self.prototype_representation = if metadata == &raw_expected {
+            Some(PrototypeRepresentation::DirectMelFrameV1)
+        } else if metadata == &temporal_expected {
+            Some(PrototypeRepresentation::DirectMelTemporalWindow7V1)
+        } else {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "prototype encoder metadata does not match this audio frontend",
+            ));
+        };
         self.decoder.load_prototypes(&prototypes.as_pairs());
 
         // Also load into resonator
@@ -148,9 +175,14 @@ impl TranscriptionEngine {
     fn transcribe(&mut self, audio: &[f32]) -> TranscriptionResult {
         let start = Instant::now();
 
-        // Project audio to HDC space
-        self.projector.reset();
-        let (hvs, _saliences) = self.projector.project_with_salience(audio);
+        // Project audio through the representation declared by the loaded model.
+        let hvs = match self.prototype_representation {
+            Some(PrototypeRepresentation::DirectMelFrameV1) => self.projector.project_raw(audio),
+            Some(PrototypeRepresentation::DirectMelTemporalWindow7V1) => {
+                self.projector.project(audio)
+            }
+            None => self.projector.project(audio),
+        };
 
         let projection_time = start.elapsed();
 
@@ -248,6 +280,11 @@ fn cmd_transcribe(
 
     // Initialize engine
     let mut engine = TranscriptionEngine::new();
+
+    engine
+        .projector
+        .validate_input_sample_rate(sample_rate)
+        .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidInput, error))?;
 
     // Load model if exists
     if model.exists() {
@@ -603,6 +640,10 @@ fn cmd_benchmark(audio_file: &Path, iterations: usize) -> std::io::Result<()> {
 
     // Initialize engine with random prototypes
     let mut engine = TranscriptionEngine::new();
+    engine
+        .projector
+        .validate_input_sample_rate(sample_rate)
+        .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidInput, error))?;
     let inventory = PhonemeInventory::new();
     for phoneme in inventory.all() {
         let hv = HV16::random(&phoneme.ipa);

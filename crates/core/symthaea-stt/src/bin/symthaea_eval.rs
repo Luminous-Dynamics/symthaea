@@ -20,7 +20,8 @@ use std::time::Instant;
 
 use symthaea_stt::{
     AudioFrontend, AudioProjector, CmuDictionary, EvalResult, NgramLM, PhonemeDecoder,
-    PhonemeToWordDecoder, TemporalConfig, TemporalDecoder, TextToPhonemes, TrainedPrototypes,
+    PhonemeToWordDecoder, PrototypeEncoderMetadata, TemporalConfig, TemporalDecoder,
+    TextToPhonemes, TrainedPrototypes,
 };
 
 #[derive(Parser)]
@@ -164,7 +165,22 @@ fn main() {
         }
     };
 
-    println!("  Loaded {} phonemes", prototypes.len());
+    let expected_encoder = PrototypeEncoderMetadata::direct_mel_frame_v1(
+        AudioProjector::default_config().config().clone(),
+    );
+    if let Err(error) = prototypes.validate_encoder(&expected_encoder) {
+        eprintln!(
+            "{} Refusing incompatible raw-frame prototype artifact: {}",
+            style("ERROR:").red().bold(),
+            error
+        );
+        std::process::exit(1);
+    }
+
+    println!(
+        "  Loaded {} compatible raw-frame phonemes",
+        prototypes.len()
+    );
 
     // Load dictionary
     let dictionary = if cli.dictionary.exists() {
@@ -325,6 +341,14 @@ fn main() {
                 continue;
             }
         };
+
+        if let Err(error) = projector.validate_input_sample_rate(sample_rate) {
+            eprintln!(
+                "Refusing evaluation input {:?}: {}",
+                utterance.audio_path, error
+            );
+            std::process::exit(1);
+        }
 
         let audio_duration = audio.len() as f32 / sample_rate as f32;
         total_audio_seconds += audio_duration;

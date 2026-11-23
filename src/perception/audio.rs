@@ -153,6 +153,7 @@ pub struct AudioPerception {
     projector: symthaea_stt::AudioProjector,
     decoder: symthaea_stt::PhonemeDecoder,
     has_prototypes: bool,
+    prototype_representation: Option<symthaea_stt::PrototypeRepresentation>,
 }
 
 #[cfg(feature = "voice-stt")]
@@ -162,12 +163,37 @@ impl AudioPerception {
         let projector = symthaea_stt::AudioProjector::default_config();
         let mut decoder = symthaea_stt::PhonemeDecoder::new();
         let mut has_prototypes = false;
+        let mut prototype_representation = None;
 
         // Load prototypes if available
         if let Some(ref path) = config.prototypes_path {
             if Path::new(path).exists() {
                 let prototypes = symthaea_stt::TrainedPrototypes::load(path)
                     .context("Failed to load phoneme prototypes")?;
+                let raw_expected = symthaea_stt::PrototypeEncoderMetadata::direct_mel_frame_v1(
+                    projector.config().clone(),
+                );
+                let temporal_expected =
+                    symthaea_stt::PrototypeEncoderMetadata::direct_mel_temporal_window7_v1(
+                        projector.config().clone(),
+                    );
+                let metadata = prototypes.encoder_metadata.as_ref().ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "prototype artifact has no encoder metadata; legacy artifacts require migration"
+                    )
+                })?;
+                metadata.validate().map_err(anyhow::Error::msg)?;
+                if metadata == &raw_expected {
+                    prototype_representation =
+                        Some(symthaea_stt::PrototypeRepresentation::DirectMelFrameV1);
+                } else if metadata == &temporal_expected {
+                    prototype_representation =
+                        Some(symthaea_stt::PrototypeRepresentation::DirectMelTemporalWindow7V1);
+                } else {
+                    return Err(anyhow::anyhow!(
+                        "prototype encoder metadata does not match this audio frontend"
+                    ));
+                }
                 decoder.load_prototypes(&prototypes.as_pairs());
                 has_prototypes = true;
             }
@@ -178,7 +204,21 @@ impl AudioPerception {
             projector,
             decoder,
             has_prototypes,
+            prototype_representation,
         })
+    }
+
+    /// Project using the representation declared by the loaded prototype artifact.
+    /// Without a prototype model, retain the existing temporal-window embedding path.
+    fn project_audio(&mut self, samples: &[f32]) -> Vec<symthaea_stt::HV16> {
+        match self.prototype_representation {
+            Some(symthaea_stt::PrototypeRepresentation::DirectMelFrameV1) => {
+                self.projector.project_raw(samples)
+            }
+            Some(symthaea_stt::PrototypeRepresentation::DirectMelTemporalWindow7V1) | None => {
+                self.projector.project(samples)
+            }
+        }
     }
 
     /// Process audio file and return perception input
@@ -186,11 +226,15 @@ impl AudioPerception {
         let start = std::time::Instant::now();
 
         // Load audio
-        let (samples, _sample_rate) =
+        let (samples, sample_rate) =
             symthaea_stt::AudioFrontend::load_wav(path).context("Failed to load audio file")?;
+        self.projector
+            .validate_input_sample_rate(sample_rate)
+            .map_err(anyhow::Error::msg)
+            .context("Audio sample rate does not match the perception encoder")?;
 
-        // Project through LTC
-        let hvs = self.projector.project(&samples);
+        // Project through the encoder space associated with the loaded model.
+        let hvs = self.project_audio(&samples);
 
         // Decode phonemes (if prototypes loaded)
         let (phonemes, confidences) = if self.has_prototypes {
@@ -239,12 +283,27 @@ impl AudioPerception {
         Ok(input)
     }
 
-    /// Process raw audio samples
+    /// Validate the source sample rate before processing PCM samples.
+    pub fn process_samples_at_rate(
+        &mut self,
+        samples: &[f32],
+        sample_rate: u32,
+    ) -> Result<AudioPerceptionResult> {
+        self.projector
+            .validate_input_sample_rate(sample_rate)
+            .map_err(anyhow::Error::msg)
+            .context("Audio sample rate does not match the perception encoder")?;
+        self.process_samples(samples)
+    }
+
+    /// Process mono PCM samples already resampled to the projector's configured rate.
+    ///
+    /// Prefer process_samples_at_rate() when the source sample rate is known.
     pub fn process_samples(&mut self, samples: &[f32]) -> Result<AudioPerceptionResult> {
         let start = std::time::Instant::now();
 
-        // Project through LTC
-        let hvs = self.projector.project(samples);
+        // Project through the encoder space associated with the loaded model.
+        let hvs = self.project_audio(samples);
 
         // Decode phonemes
         let (phonemes, confidences) = if self.has_prototypes {

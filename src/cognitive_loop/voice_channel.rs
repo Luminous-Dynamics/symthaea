@@ -182,8 +182,11 @@ impl VoiceSynthesisChannel {
                     let resampled = resample_linear(&audio, 24_000, 16_000);
                     match self_ear.push_audio(&resampled) {
                         Ok(()) => {
-                            let frames: Vec<symthaea_stt::HV16> =
-                                self_ear.process().into_iter().map(|frame| frame.hv).collect();
+                            let frames: Vec<symthaea_stt::HV16> = self_ear
+                                .process()
+                                .into_iter()
+                                .map(|frame| frame.hv)
+                                .collect();
                             if frames.is_empty() {
                                 None
                             } else {

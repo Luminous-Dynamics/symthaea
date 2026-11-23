@@ -4,9 +4,9 @@
 //! # Real-time Microphone Capture for STT → Perception
 //!
 //! Wires a cpal input stream + ringbuf on the audio thread, a background
-//! worker that runs `symthaea_stt::StreamProcessor`, and an mpsc channel
-//! that delivers `ContinuousHV` snapshots to the cognitive loop's perception
-//! phase.
+//! worker that runs the shared mel-HDC `symthaea_stt::StreamProcessor`, and
+//! an mpsc channel that delivers `ContinuousHV` snapshots to the cognitive
+//! loop's perception phase.
 //!
 //! ```text
 //! cpal callback (audio RT) ─► ringbuf (lockfree) ─► STT worker thread
@@ -19,7 +19,8 @@
 //! Each layer has a clear job:
 //! - The cpal callback must not allocate or block. It only pushes raw f32
 //!   samples into a lockfree ring buffer.
-//! - The worker drains the ring buffer, runs LTC + simple mel features, and
+//! - The worker drains the ring buffer, extracts log-mel frames, applies the shared
+//!   locality-preserving HDC encoder, and uses LTC for temporal/salience state.
 //!   periodically bundles N HV16 frames into one 16,384-dim `ContinuousHV`.
 //! - Perception polls the mpsc via `drain_latest()` — non-blocking, latest-wins.
 
@@ -73,7 +74,15 @@ impl Default for MicCaptureConfig {
             sample_rate: 16_000,
             hv_channel_cap: 8,
             ringbuf_samples: 16_000,
-            stream_config: StreamConfig::low_latency(),
+            // Match AudioProjector's 10 ms training hop so live mel-delta
+            // sequences inhabit the same raw-frame prototype space by default.
+            // Callers may opt into a different cadence, but strict artifact
+            // metadata validation will then reject incompatible prototypes.
+            stream_config: StreamConfig {
+                min_frames: 2,
+                smoothing_window: 2,
+                ..StreamConfig::default()
+            },
             worker_idle_us: 1_000,
             min_frames_per_emit: 5,
             prototype_model_path: std::env::var_os("SYMTHAEA_STT_PROTOTYPES")
@@ -253,26 +262,28 @@ pub(super) fn run_worker(
 ) {
     let mut processor = StreamProcessor::new(config.stream_config.clone());
 
-    // Load phoneme prototypes when configured so the phoneme channel is
-    // actually exercised (StreamFrame.phoneme stays None otherwise).
+    // Load only artifacts explicitly trained in this live raw-frame mel-HDC space.
+    // Legacy and temporally-windowed models remain inspectable, but are not
+    // silently compared against single-frame stream codes.
     if let Some(ref path) = config.prototype_model_path {
         match symthaea_stt::TrainedPrototypes::load(path) {
-            Ok(prototypes) => {
-                tracing::info!(
-                    "STT worker: loaded {} phoneme prototypes from {}",
+            Ok(prototypes) => match processor.load_trained_prototypes(&prototypes) {
+                Ok(()) => tracing::info!(
+                    "STT worker: loaded {} compatible phoneme prototypes from {}",
                     prototypes.len(),
                     path.display()
-                );
-                processor.load_prototypes(&prototypes.as_pairs());
-            }
-            Err(e) => {
-                tracing::warn!(
-                    "STT worker: failed to load prototypes from {}: {} \
-                     (continuing with HV texture only)",
+                ),
+                Err(error) => tracing::warn!(
+                    "STT worker: refusing incompatible prototype artifact {}: {}",
                     path.display(),
-                    e
-                );
-            }
+                    error
+                ),
+            },
+            Err(error) => tracing::warn!(
+                "STT worker: failed to load prototypes from {}: {}",
+                path.display(),
+                error
+            ),
         }
     }
 
@@ -284,7 +295,10 @@ pub(super) fn run_worker(
         let n = consumer.pop_slice(&mut scratch);
         if n > 0 {
             if let Err(error) = processor.push_audio(&scratch[..n]) {
-                tracing::error!(?error, "STT worker rejected an audio chunk; stopping this stream segment");
+                tracing::error!(
+                    ?error,
+                    "STT worker rejected an audio chunk; stopping this stream segment"
+                );
                 break;
             }
 
@@ -353,6 +367,19 @@ mod tests {
         (0..n)
             .map(|i| (2.0 * std::f32::consts::PI * freq_hz * i as f32 / sample_rate as f32).sin())
             .collect()
+    }
+
+    #[test]
+    fn default_mic_stream_cadence_matches_offline_raw_frame_encoder() {
+        let capture = MicCaptureConfig::default();
+        let offline = symthaea_stt::AudioProjector::default_config();
+        let stream = &capture.stream_config;
+        let audio = offline.config();
+
+        assert_eq!(stream.sample_rate, audio.sample_rate);
+        assert_eq!(stream.frame_duration, audio.frame_duration);
+        assert_eq!(stream.hop_duration, audio.hop_duration);
+        assert_eq!(stream.n_mels, audio.n_mels);
     }
 
     #[test]

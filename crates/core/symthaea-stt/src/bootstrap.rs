@@ -8,7 +8,8 @@
 //! - Salience-based forced alignment (no external tools needed)
 //! - Prototype accumulation via HDC bundling
 
-use crate::hdc::{BundleAccumulator, HV16};
+use crate::audio::AudioConfig;
+use crate::hdc::{BundleAccumulator, HDC_DIM, HV16};
 use crate::lexicon::{CmuDictionary, TextToPhonemes};
 use crate::ltc::{LtcCell, LtcConfig};
 use crate::phoneme::PhonemeInventory;
@@ -48,6 +49,117 @@ impl Default for BootstrapConfig {
     }
 }
 
+/// Schema version for auditable acoustic prototype encoder metadata.
+pub const PROTOTYPE_ENCODER_METADATA_SCHEMA_VERSION: u32 = 1;
+
+/// The temporal composition applied before phoneme prototype aggregation.
+///
+/// A raw-frame prototype and a seven-frame temporal-window prototype are not
+/// interchangeable, even though both are represented by the same HV16 type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PrototypeRepresentation {
+    /// One direct-mel HDC code per analysis frame (live stream compatible).
+    DirectMelFrameV1,
+    /// Seven position-rotated direct-mel codes bundled around each center frame.
+    DirectMelTemporalWindow7V1,
+}
+
+/// Describes the exact acoustic HDC space used to produce a prototype artifact.
+///
+/// The fingerprint is a deterministic descriptor checksum, not an acoustic
+/// similarity representation or a signed provenance/authenticity proof. BLAKE3
+/// is used for exact identity only.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PrototypeEncoderMetadata {
+    /// Metadata schema version.
+    pub schema_version: u32,
+    /// Stable identifier for the direct-mel quantizer and basis mapping.
+    pub encoder_id: String,
+    /// Frame-level versus temporal-window representation.
+    pub representation: PrototypeRepresentation,
+    /// Complete log-mel frontend configuration.
+    pub audio_config: AudioConfig,
+    /// Binary hypervector dimension.
+    pub hdc_dimension_bits: usize,
+    /// BLAKE3 fingerprint of the descriptor fields.
+    pub fingerprint: String,
+}
+
+impl PrototypeEncoderMetadata {
+    /// Metadata for direct-mel frame codes used by aligned training and the live stream.
+    pub fn direct_mel_frame_v1(audio_config: AudioConfig) -> Self {
+        Self::new(audio_config, PrototypeRepresentation::DirectMelFrameV1)
+    }
+
+    /// Metadata for seven-frame temporal-window codes used by batch/DTW projection.
+    pub fn direct_mel_temporal_window7_v1(audio_config: AudioConfig) -> Self {
+        Self::new(
+            audio_config,
+            PrototypeRepresentation::DirectMelTemporalWindow7V1,
+        )
+    }
+
+    fn new(audio_config: AudioConfig, representation: PrototypeRepresentation) -> Self {
+        let mut metadata = Self {
+            schema_version: PROTOTYPE_ENCODER_METADATA_SCHEMA_VERSION,
+            encoder_id: "symthaea-stt.direct-mel-hdc.v1".to_string(),
+            representation,
+            audio_config,
+            hdc_dimension_bits: HDC_DIM,
+            fingerprint: String::new(),
+        };
+        metadata.fingerprint = metadata.compute_fingerprint();
+        metadata
+    }
+
+    fn compute_fingerprint(&self) -> String {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(&self.schema_version.to_le_bytes());
+        hasher.update(self.encoder_id.as_bytes());
+        let representation_id = match self.representation {
+            PrototypeRepresentation::DirectMelFrameV1 => "direct_mel_frame_v1",
+            PrototypeRepresentation::DirectMelTemporalWindow7V1 => "direct_mel_temporal_window7_v1",
+        };
+        hasher.update(representation_id.as_bytes());
+        hasher.update(&self.audio_config.sample_rate.to_le_bytes());
+        hasher.update(&self.audio_config.frame_duration.to_bits().to_le_bytes());
+        hasher.update(&self.audio_config.hop_duration.to_bits().to_le_bytes());
+        hasher.update(&(self.audio_config.n_mels as u64).to_le_bytes());
+        hasher.update(&self.audio_config.f_min.to_bits().to_le_bytes());
+        hasher.update(&self.audio_config.f_max.to_bits().to_le_bytes());
+        hasher.update(&(self.audio_config.n_fft as u64).to_le_bytes());
+        hasher.update(&(self.hdc_dimension_bits as u64).to_le_bytes());
+        hasher.finalize().to_hex().to_string()
+    }
+
+    /// Reject unsupported metadata versions, changed descriptors, and invalid fingerprints.
+    pub fn validate(&self) -> Result<(), String> {
+        if self.schema_version != PROTOTYPE_ENCODER_METADATA_SCHEMA_VERSION {
+            return Err(format!(
+                "unsupported prototype encoder metadata schema {}; expected {}",
+                self.schema_version, PROTOTYPE_ENCODER_METADATA_SCHEMA_VERSION
+            ));
+        }
+        if self.encoder_id != "symthaea-stt.direct-mel-hdc.v1" {
+            return Err(format!(
+                "unsupported acoustic encoder id: {}",
+                self.encoder_id
+            ));
+        }
+        if self.hdc_dimension_bits != HDC_DIM {
+            return Err(format!(
+                "prototype dimension mismatch: {} bits; expected {}",
+                self.hdc_dimension_bits, HDC_DIM
+            ));
+        }
+        if self.fingerprint != self.compute_fingerprint() {
+            return Err("prototype encoder metadata fingerprint mismatch".to_string());
+        }
+        Ok(())
+    }
+}
+
 /// Trained phoneme prototypes
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TrainedPrototypes {
@@ -59,6 +171,10 @@ pub struct TrainedPrototypes {
     pub config: BootstrapConfig,
     /// Version for compatibility
     pub version: String,
+    /// Exact acoustic encoder identity. Missing metadata denotes a legacy or
+    /// otherwise unqualified artifact and is rejected by strict inference loaders.
+    #[serde(default)]
+    pub encoder_metadata: Option<PrototypeEncoderMetadata>,
 }
 
 impl TrainedPrototypes {
@@ -69,7 +185,38 @@ impl TrainedPrototypes {
             counts: HashMap::new(),
             config,
             version: env!("CARGO_PKG_VERSION").to_string(),
+            encoder_metadata: None,
         }
+    }
+
+    /// Create a prototype artifact with an explicit acoustic encoder identity.
+    pub fn new_with_encoder(
+        config: BootstrapConfig,
+        encoder_metadata: PrototypeEncoderMetadata,
+    ) -> Self {
+        let mut prototypes = Self::new(config);
+        prototypes.encoder_metadata = Some(encoder_metadata);
+        prototypes
+    }
+
+    /// Validate that this artifact belongs to the requested acoustic HDC space.
+    ///
+    /// This is a fail-closed check: old artifacts without metadata are not
+    /// assumed compatible merely because they contain 2048-bit hypervectors.
+    pub fn validate_encoder(&self, expected: &PrototypeEncoderMetadata) -> Result<(), String> {
+        expected.validate()?;
+        let actual = self.encoder_metadata.as_ref().ok_or_else(|| {
+            "prototype artifact has no encoder metadata; legacy models require an explicit migration"
+                .to_string()
+        })?;
+        actual.validate()?;
+        if actual != expected {
+            return Err(format!(
+                "prototype encoder mismatch: artifact is {:?}, inference requires {:?}",
+                actual.representation, expected.representation
+            ));
+        }
+        Ok(())
     }
 
     /// Save to binary file
@@ -639,6 +786,7 @@ impl AdaptivePrototypeSet {
             counts,
             config,
             version: env!("CARGO_PKG_VERSION").to_string(),
+            encoder_metadata: None,
         }
     }
 
@@ -661,6 +809,7 @@ impl AdaptivePrototypeSet {
             counts,
             config,
             version: env!("CARGO_PKG_VERSION").to_string(),
+            encoder_metadata: None,
         }
     }
 
@@ -1013,6 +1162,7 @@ impl BootstrapPipeline {
             counts,
             config: self.config,
             version: env!("CARGO_PKG_VERSION").to_string(),
+            encoder_metadata: None,
         }
     }
 
@@ -1178,6 +1328,49 @@ mod tests {
         let protos = acc.finalize(2);
         assert!(protos.contains_key("p"));
         assert!(!protos.contains_key("b")); // Below min_instances
+    }
+
+    #[test]
+    fn prototype_encoder_metadata_is_stable_and_rejects_representation_mismatch() {
+        let config = AudioConfig::default();
+        let raw = PrototypeEncoderMetadata::direct_mel_frame_v1(config.clone());
+        let temporal = PrototypeEncoderMetadata::direct_mel_temporal_window7_v1(config.clone());
+
+        assert!(raw.validate().is_ok());
+        assert!(temporal.validate().is_ok());
+        assert_ne!(raw.fingerprint, temporal.fingerprint);
+
+        let prototypes =
+            TrainedPrototypes::new_with_encoder(BootstrapConfig::default(), raw.clone());
+        assert!(prototypes.validate_encoder(&raw).is_ok());
+        assert!(prototypes.validate_encoder(&temporal).is_err());
+
+        let encoded = serde_json::to_vec(&prototypes).unwrap();
+        let decoded: TrainedPrototypes = serde_json::from_slice(&encoded).unwrap();
+        assert!(decoded.validate_encoder(&raw).is_ok());
+    }
+
+    #[test]
+    fn legacy_prototype_artifacts_are_not_assumed_encoder_compatible() {
+        let prototypes = TrainedPrototypes::new(BootstrapConfig::default());
+        let expected = PrototypeEncoderMetadata::direct_mel_frame_v1(AudioConfig::default());
+        assert!(prototypes.validate_encoder(&expected).is_err());
+
+        // Old JSON without encoder_metadata must still deserialize so it can be
+        // inspected or migrated, but strict inference validation must reject it.
+        let encoded = serde_json::to_value(&prototypes).unwrap();
+        let mut legacy = encoded;
+        legacy.as_object_mut().unwrap().remove("encoder_metadata");
+        let decoded: TrainedPrototypes = serde_json::from_value(legacy).unwrap();
+        assert!(decoded.encoder_metadata.is_none());
+        assert!(decoded.validate_encoder(&expected).is_err());
+    }
+
+    #[test]
+    fn prototype_encoder_metadata_detects_descriptor_tampering() {
+        let mut metadata = PrototypeEncoderMetadata::direct_mel_frame_v1(AudioConfig::default());
+        metadata.audio_config.sample_rate = 48_000;
+        assert!(metadata.validate().is_err());
     }
 
     #[test]

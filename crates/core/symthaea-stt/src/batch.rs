@@ -11,7 +11,10 @@
 //! Uses work-stealing thread pool for efficient CPU utilization.
 
 use crate::audio::{AudioConfig, AudioFrontend, AudioProjector};
-use crate::bootstrap::{AdaptivePrototypeSet, AdaptiveStats, BootstrapConfig, TrainedPrototypes};
+use crate::bootstrap::{
+    AdaptivePrototypeSet, AdaptiveStats, BootstrapConfig, PrototypeEncoderMetadata,
+    TrainedPrototypes,
+};
 use crate::discovery::{DiscoveryConfig, DiscoveryPipeline, DiscoveryResult};
 use crate::hdc::HV16;
 use crate::lexicon::{CmuDictionary, TextToPhonemes};
@@ -283,6 +286,8 @@ impl BatchProcessor {
         let (audio, sample_rate) =
             AudioFrontend::load_audio(path).map_err(|e| format!("Failed to load audio: {e}"))?;
 
+        projector.validate_input_sample_rate(sample_rate)?;
+
         let audio_duration = audio.len() as f32 / sample_rate as f32;
 
         // Project to HDC
@@ -475,7 +480,10 @@ impl BatchTrainer {
 
         // Finalize prototypes
         let accumulators = self.accumulators.lock().unwrap_or_else(|e| e.into_inner());
-        let mut prototypes = TrainedPrototypes::new(self.bootstrap_config.clone());
+        let mut prototypes = TrainedPrototypes::new_with_encoder(
+            self.bootstrap_config.clone(),
+            PrototypeEncoderMetadata::direct_mel_temporal_window7_v1(AudioConfig::default()),
+        );
 
         for (phoneme, acc) in accumulators.iter() {
             if acc.count >= self.bootstrap_config.min_instances {
@@ -500,6 +508,7 @@ impl BatchTrainer {
         let (audio, sample_rate) =
             AudioFrontend::load_audio(path).map_err(|e| format!("Load error: {e}"))?;
 
+        projector.validate_input_sample_rate(sample_rate)?;
         let duration = audio.len() as f32 / sample_rate as f32;
 
         // Project audio
@@ -697,6 +706,7 @@ impl BatchTrainer {
         let (audio, sample_rate) =
             AudioFrontend::load_audio(path).map_err(|e| format!("Load error: {e}"))?;
 
+        projector.validate_input_sample_rate(sample_rate)?;
         let duration = audio.len() as f32 / sample_rate as f32;
 
         // Project audio
@@ -929,6 +939,7 @@ impl BatchDiscovery {
         let (audio, sample_rate) =
             AudioFrontend::load_audio(path).map_err(|e| format!("Load error: {e}"))?;
 
+        projector.validate_input_sample_rate(sample_rate)?;
         let duration = audio.len() as f32 / sample_rate as f32;
 
         // Project

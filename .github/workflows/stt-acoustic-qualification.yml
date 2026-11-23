@@ -1,0 +1,77 @@
+name: STT acoustic encoder qualification
+
+on:
+  push:
+    branches:
+      - fix/voice-hdc-001-live-offline-encoder-parity
+    paths:
+      - "crates/core/symthaea-stt/**"
+      - "src/perception/audio.rs"
+      - "src/perception/audio_stream.rs"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/stt-acoustic-qualification.yml"
+  pull_request:
+    branches:
+      - main
+      - fix/voice-stt-loss-001-absolute-frame-continuity
+    paths:
+      - "crates/core/symthaea-stt/**"
+      - "src/perception/audio.rs"
+      - "src/perception/audio_stream.rs"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/stt-acoustic-qualification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stt-acoustic-qualification-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  QUALIFIED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  exact-head-acoustic:
+    name: Exact-head encoder parity, compatibility and app tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.QUALIFIED_SHA }}
+          persist-credentials: false
+
+      - name: Assert exact checkout
+        run: test "$(git rev-parse HEAD)" = "${QUALIFIED_SHA}"
+
+      - name: Install repository-pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Assert pinned toolchain
+        run: |
+          test "$(rustc --version | awk '{print $2}')" = "1.96.0"
+          cargo --version
+          rustfmt --version
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path Cargo.toml -p symthaea-stt -p symthaea -- --check
+
+      - name: Run STT unit tests, including live/offline parity and metadata negatives
+        run: cargo test --manifest-path Cargo.toml -p symthaea-stt --lib --locked
+
+      - name: Run application audio-perception tests with voice-stt
+        run: cargo test --manifest-path Cargo.toml -p symthaea --lib --features voice-stt --locked
+
+      - name: Run strict STT Clippy
+        run: cargo clippy --no-deps --manifest-path Cargo.toml -p symthaea-stt --lib --locked -- -D warnings
+
+      - name: Run strict application Clippy with voice-stt
+        run: cargo clippy --no-deps --manifest-path Cargo.toml -p symthaea --lib --features voice-stt --locked -- -D warnings

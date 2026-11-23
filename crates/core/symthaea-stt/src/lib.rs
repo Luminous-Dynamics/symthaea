@@ -122,7 +122,7 @@ pub use audio::{AudioConfig, AudioFrontend, AudioProjector};
 pub use batch::{BatchConfig, BatchDiscovery, BatchProcessor, BatchStats, BatchTrainer};
 pub use bootstrap::{
     AdaptivePrototype, AdaptivePrototypeSet, AdaptiveStats, BootstrapConfig, BootstrapPipeline,
-    TrainedPrototypes,
+    PrototypeEncoderMetadata, PrototypeRepresentation, TrainedPrototypes,
 };
 pub use crystal_reservoir::{
     CrystalActivation, CrystalReservoir, GaborFilter, OnlinePrototypeClassifier,
@@ -149,7 +149,9 @@ pub use phoneme::{
 };
 pub use rls::{FastRlsClassifier, RlsClassifier};
 pub use sleep_sentinel::{BandPowers, ConsciousnessSentinel, ConsciousnessState};
-pub use streaming::{StreamConfig, StreamDiscontinuity, StreamFrame, StreamProcessor, StreamSession};
+pub use streaming::{
+    StreamConfig, StreamDiscontinuity, StreamFrame, StreamProcessor, StreamSession,
+};
 
 /// Crate version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

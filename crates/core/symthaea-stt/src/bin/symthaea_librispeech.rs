@@ -24,7 +24,8 @@ use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use symthaea_stt::{
     AudioFrontend, AudioProjector, BatchConfig, BatchTrainer, BootstrapConfig, CmuDictionary,
-    PhonemeResonator, TextToPhonemes, TrainedPrototypes, phoneme_error_rate,
+    PhonemeResonator, PrototypeEncoderMetadata, TextToPhonemes, TrainedPrototypes,
+    phoneme_error_rate,
 };
 
 static DOWNLOAD: Emoji<'_, '_> = Emoji("📥 ", "");
@@ -959,8 +960,15 @@ fn evaluate_model(
     let prototypes =
         TrainedPrototypes::load(model_path).map_err(|e| format!("Failed to load model: {}", e))?;
 
+    let expected_encoder = PrototypeEncoderMetadata::direct_mel_temporal_window7_v1(
+        AudioProjector::default_config().config().clone(),
+    );
+    prototypes
+        .validate_encoder(&expected_encoder)
+        .map_err(|error| format!("Incompatible temporal-window prototype artifact: {error}"))?;
+
     println!(
-        "Loaded {} phoneme prototypes",
+        "Loaded {} compatible temporal-window phoneme prototypes",
         style(prototypes.len()).green()
     );
 
@@ -1036,10 +1044,14 @@ fn evaluate_model(
         progress.set_position(i as u64);
 
         // Load and process audio
-        let (audio, _sample_rate) = match AudioFrontend::load_audio(audio_path) {
+        let (audio, sample_rate) = match AudioFrontend::load_audio(audio_path) {
             Ok(result) => result,
             Err(_) => continue,
         };
+        if let Err(error) = projector.validate_input_sample_rate(sample_rate) {
+            eprintln!("Skipping {}: {}", audio_path.display(), error);
+            continue;
+        }
 
         projector.reset();
         let hvs = projector.project(&audio);
