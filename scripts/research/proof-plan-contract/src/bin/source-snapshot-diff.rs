@@ -502,7 +502,11 @@ mod tests {
             proof_value_available: true,
             type_dependencies: vec!["Nat".to_owned()],
             proof_value_dependencies: vec!["A".to_owned(), "B".to_owned()],
-            constant_info_dependency_closure: vec!["A".to_owned(), "B".to_owned(), "Nat".to_owned()],
+            constant_info_dependency_closure: vec![
+                "A".to_owned(),
+                "B".to_owned(),
+                "Nat".to_owned(),
+            ],
             unresolved_dependencies: Vec::new(),
             edges: Vec::new(),
         });
