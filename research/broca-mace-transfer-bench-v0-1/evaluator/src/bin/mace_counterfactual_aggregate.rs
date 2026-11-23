@@ -489,7 +489,32 @@ fn parse_score(record: &Value) -> Result<(TaskKey, MethodKind, Metrics), String>
 
     let pair_block_id = required_string(record, "pair_block_id")?;
     let cluster = parse_cluster(pair_block_id)?;
+    let _run_id = required_string(record, "run_id")?;
+    required_string(record, "candidate_observation_id")?;
+    required_u64(record, "candidate_observation_sequence")?;
+    let candidate_input_sha256 = required_string(record, "candidate_input_sha256")?;
+    if !valid_sha256(candidate_input_sha256) {
+        return Err("invalid candidate_input_sha256 in evaluator score".to_string());
+    }
+    required_string(record, "intervention_id")?;
+    required_string(record, "target_key")?;
+    required_string(record, "full_evidence_decision")?;
+    if !matches!(required_string(record, "evaluation_validity")?, "diagnostic_only") {
+        return Err("unsupported evaluation_validity in evaluator score".to_string());
+    }
+    required_string(record, "invalidity_reason")?;
+    required_event_ids(record, "retrieved_event_ids")?;
+    required_u64(record, "index_bytes")?;
+    required_u64(record, "removed_event_count")?;
+    required_u64(record, "removed_experience_struct_bytes")?;
+    required_number(record, "full_evidence_regret")?;
+    if record.get("retrieval_profile_sha256").and_then(Value::as_str).is_some_and(|digest| !valid_sha256(digest)) {
+        return Err("invalid retrieval_profile_sha256 in evaluator score".to_string());
+    }
     let method = required_string(record, "method")?.to_string();
+    if !supported_method(&method) {
+        return Err(format!("unsupported evaluator method {method}"));
+    }
     let intervention_kind = required_string(record, "intervention_kind")?.to_string();
     let metrics = Metrics {
         utility: required_number(record, "utility")?,
@@ -1284,6 +1309,23 @@ mod tests {
             "index_bytes": candidate.index_bytes,
             "retrieval_profile_sha256": candidate.retrieval_profile_sha256
         })
+    }
+
+    #[test]
+    fn strict_record_allowlists_reject_candidate_evaluator_and_manifest_extras() {
+        let candidate = candidate_receipt_record("run-1", "world-1:task-a");
+        let mut candidate_with_label = candidate;
+        candidate_with_label["intervention_id"] = json!("event:1:1");
+        assert!(parse_candidate_receipt(&candidate_with_label)
+            .unwrap_err()
+            .contains("unsupported field intervention_id"));
+
+        let manifest = manifest_record("run-1", &"a".repeat(64));
+        let mut manifest_with_extra = manifest;
+        manifest_with_extra["debug_truth"] = json!("forbidden");
+        assert!(parse_manifest(&manifest_with_extra)
+            .unwrap_err()
+            .contains("unsupported field debug_truth"));
     }
 
     #[test]
