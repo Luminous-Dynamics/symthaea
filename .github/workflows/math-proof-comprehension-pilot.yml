@@ -414,10 +414,7 @@ jobs:
         with:
           name: mathlib-source-snapshot-differential
           path: ${{ runner.temp }}/mathlib-source-snapshot-diff.json
-          if-no-files-found: error local-global-cli.out
-          echo "CANDIDATE_PAYLOAD_DIGEST_PASS"
-          cargo run --manifest-path scripts/research/proof-plan-contract/Cargo.toml --bin theorem-sandwich -- \
-            docs/research/MATH_PROOF_COMPREHENSION_THEOREM_SANDWICH_V1.json
+          if-no-files-found: error
 
       - name: Export generated Cargo.lock for dependency pinning
         if: success()
