@@ -48,7 +48,7 @@ If the owner graph inventory is incomplete, dependency ordering is incomplete or
 
 ## Authored tests
 
-Fourteen unit tests cover:
+Seventeen unit tests cover:
 1. clean root snapshot;
 2. blocked base propagating through a fine-tune/warm-start chain;
 3. independent retrain with feature-schema-only reference remaining unimpacted by parent label failure;
@@ -62,7 +62,10 @@ Fourteen unit tests cover:
 11. node/edge input-order-invariant graph digest;
 12. required requalification report missing;
 13. tampered requalification receipt rejection;
-14. dependency-dimension-order-invariant edge and graph digest.
+14. dependency-dimension-order-invariant edge and graph digest;
+15. ensemble impact when any parent is blocked;
+16. distillation inheritance from a blocked teacher;
+17. mixed blocked/unknown parent sources with blocked precedence.
 
 Tests are authored; exact-head rustfmt, strict Clippy, crate tests and SEMI-BENCH-001 reference workflow are required before claiming a pass.
 
