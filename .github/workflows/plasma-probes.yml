@@ -124,8 +124,18 @@ jobs:
           Draft202012Validator(schema).validate(fixture)
           periodic, opened = fixture["cases"]
           assert periodic["boundary"]["kind"] == "periodic"
+          assert periodic["physical_domain"]["topology"] == "torus"
+          assert periodic["physical_domain"]["maximum"] > periodic["physical_domain"]["minimum"]
+          assert periodic["coordinate_convention"]["wrap_modulo_one"] is True
+          assert periodic["lift"]["family"] == "periodic_fourier_characters"
           assert periodic["lift"]["raw_coordinate_included"] is False
+          assert periodic["lift"]["max_harmonic"] <= 4096
           assert opened["boundary"]["kind"] == "open"
+          assert opened["physical_domain"]["topology"] == "interval"
+          assert opened["physical_domain"]["maximum"] > opened["physical_domain"]["minimum"]
+          assert opened["coordinate_convention"]["wrap_modulo_one"] is False
+          assert opened["lift"]["family"] == "open_boundary_distances"
+          assert opened["lift"]["raw_coordinate_included"] is True
           assert opened["lift"]["boundary_distances_included"] is True
           assert fixture["claim_boundary"]["no_physical_plasma_run"] is True
           print("topology_lift_schema_validation=PASS")
