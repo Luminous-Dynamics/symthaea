@@ -421,6 +421,8 @@ class MaceLongMemEvalV2Memory(Memory):
         all_bytes_measured = True
         elapsed_sum = 0
         bytes_sum = 0
+        observed_any = False
+        last_outcome: str | None = None
         for operation in operations:
             require(isinstance(operation, dict), "retrieval trace operation must be an object")
             for field in ("tool_id", "tool_revision_sha256", "action_template_sha256"):
@@ -448,6 +450,12 @@ class MaceLongMemEvalV2Memory(Memory):
             require(isinstance(evidence_ids, list), "retrieval operation evidence IDs must be a list")
             require(all(isinstance(item, str) for item in evidence_ids),
                     "retrieval operation evidence ID must be a string")
+            if outcome == "evidence_observed":
+                require(bool(evidence_ids), "evidence_observed operation must name evidence IDs")
+                observed_any = True
+            else:
+                require(not evidence_ids, "non-evidence operation cannot name observed evidence IDs")
+            last_outcome = outcome
             ordered_ids = sorted(evidence_ids)
             digest.update(struct.pack(">Q", len(ordered_ids)))
             for evidence_id in ordered_ids:
@@ -456,6 +464,16 @@ class MaceLongMemEvalV2Memory(Memory):
         require(elapsed_sum == trace["elapsed_ns"], "retrieval trace elapsed accounting mismatch")
         require(bytes_sum == trace["inspected_bytes"], "retrieval trace byte accounting mismatch")
         require(all_bytes_measured == complete, "retrieval trace byte completeness mismatch")
+        if stop_reason == "evidence_sufficient":
+            require(candidate_set is not None and observed_any,
+                    "evidence_sufficient trace must bind a non-empty candidate set")
+        elif stop_reason == "no_candidate_evidence":
+            require(candidate_set is None and not observed_any,
+                    "no_candidate_evidence trace cannot contain candidates")
+        elif stop_reason == "budget_exhausted":
+            require(used == budget, "budget_exhausted trace did not use its full budget")
+        elif stop_reason == "tool_error":
+            require(last_outcome == "tool_error", "tool_error trace must end in a tool error")
         return digest.hexdigest()
 
     def _persist_retrieval_trace(
@@ -521,6 +539,8 @@ class MaceLongMemEvalV2Memory(Memory):
             except (json.JSONDecodeError, UnicodeDecodeError) as error:
                 raise RuntimeError(f"saved retrieval trace is invalid JSON: {path.name}") from error
             require(isinstance(trace, dict), "saved retrieval trace must be an object")
+            require(trace.get("schema_version") == "mace_retrieval_trace_receipt_v1",
+                    "saved retrieval trace schema mismatch")
             candidate_id = trace.get("query_invocation_id")
             require(isinstance(candidate_id, str) and candidate_id.strip(),
                     "saved retrieval trace has no invocation ID")
@@ -551,6 +571,10 @@ class MaceLongMemEvalV2Memory(Memory):
             candidate_receipt = json.loads(candidate_receipt_path.read_text(encoding="utf-8"))
             require(candidate_receipt.get("candidate_id") == candidate_id,
                     "saved retrieval trace candidate receipt ID mismatch")
+            require(candidate_receipt.get("query_sha256") == trace.get("query_sha256"),
+                    "saved retrieval trace query digest mismatch")
+            require(candidate_receipt.get("backend_revision_sha256") == trace.get("tool_profile_sha256"),
+                    "saved retrieval trace execution-profile mismatch")
             require(candidate_receipt.get("candidate_set_sha256") == trace.get("candidate_set_sha256"),
                     "saved retrieval trace candidate-set mismatch")
             trace_files.add(path.name)
