@@ -1045,7 +1045,7 @@ fn build_candidate_impact(
         );
     }
     accepted_view.segments.push(ViewSegment {
-        id: fusion_edge_id,
+        id: fusion_edge_id.clone(),
         original_segment_id: None,
         start_junction_id: candidate.source_tip_junction_id.clone(),
         end_junction_id: target_node_id,
@@ -2043,7 +2043,10 @@ mod tests {
                 .connected_components,
             3
         );
-        assert_eq!(report.candidates[1].disruption_deltas[0].cycle_rank, 0);
+        assert_eq!(
+            report.candidates[1].disruption_deltas[0].accepted_for_analysis.cycle_rank,
+            0
+        );
     }
 
     #[test]
