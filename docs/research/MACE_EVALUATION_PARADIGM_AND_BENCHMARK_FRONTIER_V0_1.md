@@ -112,7 +112,7 @@ The AMA-Bench paper reports 57.22% for AMA-Agent and an 11.16-point improvement 
 
 IBM Research's November 19, 2026 paper, [*How Much Should an Agent Remember?*](https://arxiv.org/abs/2611.26361), reports that useful memory quantity depends on target-agent model capability. In its AppWorld experiments, the weaker gpt-oss-120b baseline was 39.9% task-completion; all 199 guidelines raised it to 51.2%, but a selected subset of about 29 reached 55.4% (mean of two runs). DeepSeek-V3.2 improved with the full 191-guideline set. The authors also report failure modes including dropped provenance during consolidation and swallowed tool/API errors that produced plausible logs.
 
-MACE already has a model-conditioned memory budget prototype (v0.16) and a receipt-gated qualification path. The next step is not to hard-code 29 or 191 as universal budgets. Instead:
+MACE already has a model-conditioned memory budget prototype (v0.16) and a receipt-gated qualification path. The next work package is [#13363 — model-conditioned dose-response under model-family shift](https://github.com/Luminous-Dynamics/symthaea/issues/13363). The next step is not to hard-code 29 or 191 as universal budgets. Instead:
 1. estimate a target-model-specific memory dose-response curve on calibration clusters;
 2. qualify a candidate budget on disjoint held-out clusters and source/task families;
 3. fit hierarchical model-family fallback when a model has insufficient calibration data;
