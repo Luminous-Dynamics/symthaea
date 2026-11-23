@@ -163,7 +163,19 @@ cargo run --release \
   -- 1 /tmp/mace-candidate.jsonl /tmp/mace-evaluator.jsonl
 ```
 
-The evaluator also requires `MACE_SOURCE_REVISION` to be the exact checked-out 40- or 64-character lowercase Git SHA; a missing, abbreviated or invalid revision fails closed. The run ID and manifest receipt bind this exact revision. The evaluator requires both `MACE_CANDIDATE_BIN` and `MACE_CANDIDATE_BIN_SHA256`; missing or mismatched values fail closed. The child process runs with a cleared environment and working directory `/`, but remains under the parent user's OS identity. The digest pins the candidate executable file bytes only; it does not pin dynamic shared libraries, the host kernel, CPU microcode, runtime image or sandbox configuration. Those must be included in a later container/attestation manifest. The nested MACE workspace still lacks its own Cargo.lock; dependency-lock reproducibility is tracked in [#13364](https://github.com/Luminous-Dynamics/symthaea/issues/13364).
+The evaluator also requires `MACE_SOURCE_REVISION` to be the exact checked-out 40- or 64-character lowercase Git SHA; a missing, abbreviated or invalid revision fails closed. The run ID and manifest receipt bind this exact revision. Before the first benchmark run, generate the nested workspace lockfile from the checked-out sources with the pinned toolchain:
+
+```bash
+cargo build --release \
+  --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml \
+  -p broca-mace-candidate
+```
+
+This creates `research/broca-mace-transfer-bench-v0-1/Cargo.lock` if it does not yet exist. The benchmark refuses to start without that file. Its bytes are included in the run's length-prefixed source-bundle digest; the only Git working-tree exception is this exact untracked lockfile while #13364 generates and checks it in. Every other modified/untracked path is rejected. Once the lock is committed, the working tree must be clean.
+
+The evaluator also requires `MACE_SOURCE_REVISION` to equal the checked-out `git rev-parse HEAD`; it checks the actual repository root, commit and working-tree status before it starts. A stale/fabricated SHA, dirty tracked file, or any unexpected untracked file fails closed. The run bundle binds the candidate executable source, evaluator/process client/reducer, direct policy/HDC sources, their Cargo manifests, the workspace/evaluator manifests, the Rust 1.96.0 toolchain file, Nix lockfile and nested Cargo.lock. A separate schema-bundle digest binds all three JSON schemas.
+
+The evaluator requires both `MACE_CANDIDATE_BIN` and `MACE_CANDIDATE_BIN_SHA256`; missing or mismatched values fail closed. The child process runs with a cleared environment and working directory `/`, but remains under the parent user's OS identity. The digest pins the candidate executable file bytes only; it does not pin dynamic shared libraries, the host kernel, CPU microcode, runtime image or sandbox configuration. Those must be included in a later container/attestation manifest. The nested MACE workspace still lacks its own Cargo.lock; dependency-lock reproducibility is tracked in [#13364](https://github.com/Luminous-Dynamics/symthaea/issues/13364).
 
 ### Timing contract
 
