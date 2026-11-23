@@ -98,8 +98,11 @@ impl CandidateEvidenceV1 {
     /// Serialize one typed evidence record using the exact v0.1 JSON field names.
     ///
     /// This is structural serialization only; it does not qualify the evidence.
-    pub fn to_json_value(&self) -> Value {
-        json!({
+    pub fn to_json_value(&self) -> Result<Value, CandidateEvidenceReject> {
+        if self.retrieval_score.is_some_and(|score| !score.is_finite()) {
+            return Err(CandidateEvidenceReject::InvalidScore);
+        }
+        Ok(json!({
             "schema_version": CANDIDATE_EVIDENCE_SCHEMA,
             "record_type": "candidate_evidence",
             "run_id": self.run_id,
@@ -120,7 +123,7 @@ impl CandidateEvidenceV1 {
             "retrieval_score": self.retrieval_score,
             "parent_evidence_ids": self.parent_evidence_ids,
             "derivation_receipt_sha256": self.derivation_receipt_sha256
-        })
+        }))
     }
 }
 
@@ -135,12 +138,12 @@ impl CandidateEvidenceBatchV1 {
         if &rebuilt != self {
             return Err(CandidateEvidenceReject::InvalidDigest);
         }
-        Ok(rebuilt
+        let lines = rebuilt
             .evidence
             .iter()
-            .map(|record| record.to_json_value().to_string())
-            .collect::<Vec<_>>()
-            .join("\n"))
+            .map(|record| record.to_json_value().map(|value| value.to_string()))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(lines.join("\n"))
     }
 }
 
@@ -422,10 +425,7 @@ pub fn encode_candidate_evidence_jsonl(
     let mut lines = Vec::with_capacity(records.len());
     let mut total_bytes = 0_usize;
     for record in records {
-        if record.retrieval_score.is_some_and(|score| !score.is_finite()) {
-            return Err(CandidateEvidenceReject::InvalidScore);
-        }
-        let line = record.to_json_value().to_string();
+        let line = record.to_json_value()?.to_string();
         if line.len() > MAX_CANDIDATE_EVIDENCE_RECORD_BYTES {
             return Err(CandidateEvidenceReject::RecordTooLarge);
         }
