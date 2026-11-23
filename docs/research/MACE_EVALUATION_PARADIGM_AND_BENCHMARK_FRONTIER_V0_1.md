@@ -36,6 +36,20 @@ The visible open-to-commercial gaps are therefore 8.04 points textual, 4.67 perc
 
 **Stretch targets (not achieved):** exceed the open-method leader by at least five points on the exact same track/protocol: textual 66.22, coding 68.33% resolved, multimodal 48.26. A credible submission must also show matched budgets, repeated runs, uncertainty and governance/cost submetrics; a higher aggregate score achieved through weaker safety or much higher resource use is not a Pareto win.
 
+### Two-tier competitive targets
+
+The open-leader +5 targets above are the first competitive milestone, not the final definition of superiority. A separate cross-division challenge should aim to exceed the current commercial reference by at least one point on the exact same track and scoring scale:
+
+- Textual: 70.26 versus the 69.26 MemoraX reference.
+- Coding: 69.00% resolved versus the 68.00% MemoraX reference.
+- Multimodal: 54.68 versus the 53.68 MemoraX reference.
+
+These are aspirational thresholds calculated from the published Cycle 2 results, not predictions or achieved MACE scores. The open-source submission would still be ranked in its own division; a cross-division result is only a measured comparison against the commercial reference.
+
+To claim a genuine improvement, require a matched protocol and no regression in the relevant governance, privacy, evidence-quality and noisy-input controls. For coding, report new-feature and bug-fix separately. For Textual/Multimodal, report every official subscore. In parallel, aim for at least 25% lower all-in lifecycle cost at parity with the commercial reference, or a strictly better quality-cost Pareto frontier at the same measured budgets. Cost must include memory writing, updates, indexing, retrieval, reasoning, external tool calls, storage, energy and recovery—not just query latency.
+
+A one-point aggregate win with a material safety regression, hidden additional model calls or an unreported token budget is not superiority. The system must publish the full scorecard and matched budget receipts.
+
 The published textual subscores show specific opportunities: Resurface is strongest among open methods in governance, while the commercial leader has larger leads in personalization/care, epistemic safety/privacy, streaming and temporal/event sequencing. On multimodal, the visible gaps include retrieval, continual learning and relational reasoning. Coding requires a separate bug-fix improvement programme while preserving new-feature performance. Use the official detailed table for the exact values and versions.
 
 ## 3. MACE's differentiated scorecard
