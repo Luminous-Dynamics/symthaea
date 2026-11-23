@@ -1,0 +1,133 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/sfeb/event-oracle-verification-v1.schema.json",
+  "title": "SFEB event oracle verification report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "verification_id",
+    "scope",
+    "trace_sha256",
+    "fixture_sha256",
+    "policy_sha256",
+    "case_id",
+    "semantic_decision",
+    "worker_claims_consulted",
+    "oracle_results",
+    "derived_state",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema": {
+      "const": "sfeb-event-oracle-verification-v1"
+    },
+    "verification_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "scope": {
+      "const": "deterministic_event_semantics_only"
+    },
+    "trace_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "fixture_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "policy_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "semantic_decision": {
+      "enum": [
+        "accepted",
+        "rejected"
+      ]
+    },
+    "worker_claims_consulted": {
+      "const": false
+    },
+    "oracle_results": {
+      "type": "array",
+      "minItems": 7,
+      "maxItems": 7,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "oracle_id",
+          "severity",
+          "result",
+          "rule_sha256",
+          "evidence_event_sha256",
+          "evidence_artifact_sha256",
+          "diagnostic_code"
+        ],
+        "properties": {
+          "oracle_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "severity": {
+            "enum": [
+              "critical",
+              "high",
+              "medium",
+              "low",
+              "informational"
+            ]
+          },
+          "result": {
+            "enum": [
+              "pass",
+              "fail",
+              "inconclusive"
+            ]
+          },
+          "rule_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "evidence_event_sha256": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          "evidence_artifact_sha256": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          "diagnostic_code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        }
+      }
+    },
+    "derived_state": {
+      "type": "object"
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 20
+    }
+  }
+}
