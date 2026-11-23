@@ -683,7 +683,7 @@ mod tests {
         assert!(
             validate_pair(&pair)
                 .iter()
-                .any(|error| error.contains("countermodel premise[0] evaluates to false"))
+                .any(|error| error.contains("countermodel conclusion evaluates to true"))
         );
     }
 
