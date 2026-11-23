@@ -125,6 +125,7 @@ pub struct SyntheticFabPolicyEvaluationV1 {
     pub metrology_false_negative_count: usize,
     /// Total defects not detected: unselected defects plus assay false negatives.
     pub total_undetected_defect_count: usize,
+    pub total_undetected_defect_fraction: Option<f64>,
     pub detection_capture_fraction: Option<f64>,
     pub defect_capture_fraction: Option<f64>,
     pub escaped_defect_fraction: Option<f64>,
@@ -149,6 +150,7 @@ pub struct SyntheticFabPolicyEvaluationV1 {
     pub measured_fraction: f64,
     pub measurement_reduction_fraction: f64,
     pub total_selected_cost: u64,
+    pub cost_per_defect_selected: Option<f64>,
     pub cost_per_defect_captured: Option<f64>,
     pub effective_sample_size: f64,
     pub matured_label_count_at_horizon: usize,
@@ -1148,6 +1150,8 @@ pub fn evaluate_synthetic_metrology_policy_v1(
     let escaped_defect_count = true_positive_count.saturating_sub(selected_positive_count);
     let total_undetected_defect_count =
         escaped_defect_count.saturating_add(metrology_false_negative_count);
+    let total_undetected_defect_fraction = (true_positive_count > 0)
+        .then(|| total_undetected_defect_count as f64 / true_positive_count as f64);
     let detection_capture_fraction = (true_positive_count > 0).then(|| {
         metrology_detected_true_positive_count as f64 / true_positive_count as f64
     });
@@ -1155,8 +1159,11 @@ pub fn evaluate_synthetic_metrology_policy_v1(
         .then(|| selected_positive_count as f64 / true_positive_count as f64);
     let escaped_defect_fraction =
         (true_positive_count > 0).then(|| escaped_defect_count as f64 / true_positive_count as f64);
-    let cost_per_defect_captured = (selected_positive_count > 0)
+    let cost_per_defect_selected = (selected_positive_count > 0)
         .then(|| selection.total_selected_cost as f64 / selected_positive_count as f64);
+    let cost_per_defect_captured = (metrology_detected_true_positive_count > 0).then(|| {
+        selection.total_selected_cost as f64 / metrology_detected_true_positive_count as f64
+    });
     let true_defect_prevalence = true_positive_count as f64 / population_count as f64;
     let selected_sample_prevalence = selected_positive_count as f64 / selected_count as f64;
     let horvitz_thompson_prevalence = ht_positive_total / population_count as f64;
@@ -1270,6 +1277,7 @@ pub fn evaluate_synthetic_metrology_policy_v1(
         metrology_false_positive_count,
         metrology_false_negative_count,
         total_undetected_defect_count,
+        total_undetected_defect_fraction,
         detection_capture_fraction,
         defect_capture_fraction,
         escaped_defect_fraction,
@@ -1294,6 +1302,7 @@ pub fn evaluate_synthetic_metrology_policy_v1(
         measured_fraction,
         measurement_reduction_fraction: 1.0 - measured_fraction,
         total_selected_cost: selection.total_selected_cost,
+        cost_per_defect_selected,
         cost_per_defect_captured,
         effective_sample_size,
         matured_label_count_at_horizon: matured_label_count,
