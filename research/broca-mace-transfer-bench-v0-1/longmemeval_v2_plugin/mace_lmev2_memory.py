@@ -17,6 +17,7 @@ import os
 from pathlib import Path
 import shutil
 import stat
+import struct
 import subprocess
 import tempfile
 import threading
@@ -221,6 +222,120 @@ class MaceLongMemEvalV2Memory(Memory):
         finally:
             os.close(directory_fd)
 
+    @staticmethod
+    def _candidate_set_digest_from_records(records: list[dict[str, Any]]) -> str:
+        require(bool(records), "candidate-set digest requires a non-empty record set")
+        ordered = sorted(
+            records,
+            key=lambda record: (
+                record["retrieval_channel"],
+                record["retrieval_rank"],
+                record["evidence_id"],
+            ),
+        )
+        digest = hashlib.sha256()
+        digest.update(b"luminous:mace:candidate-evidence-set:v1\\0")
+
+        def hash_field(value: str) -> None:
+            encoded = value.encode("utf-8")
+            digest.update(struct.pack(">Q", len(encoded)))
+            digest.update(encoded)
+
+        first = ordered[0]
+        for field in (
+            "run_id",
+            "candidate_id",
+            "backend_id",
+            "backend_revision_sha256",
+            "query_scope",
+            "query_purpose",
+            "query_sha256",
+        ):
+            hash_field(first[field])
+
+        digest.update(struct.pack(">Q", len(ordered)))
+        for record in ordered:
+            for field in (
+                "evidence_id",
+                "source_id",
+                "source_sha256",
+                "payload_sha256",
+                "payload_ref",
+                "modality",
+                "retrieval_channel",
+            ):
+                hash_field(record[field])
+            digest.update(struct.pack(">I", record["retrieval_rank"]))
+            score = record.get("retrieval_score")
+            if score is None:
+                digest.update(b"\\x00")
+            else:
+                digest.update(b"\\x01")
+                digest.update(struct.pack(">d", float(score)))
+            parents = sorted(record["parent_evidence_ids"])
+            digest.update(struct.pack(">Q", len(parents)))
+            for parent in parents:
+                hash_field(parent)
+            receipt = record.get("derivation_receipt_sha256")
+            if receipt is None:
+                digest.update(b"\\x00")
+            else:
+                digest.update(b"\\x01")
+                hash_field(receipt)
+        return digest.hexdigest()
+
+    @staticmethod
+    def _validate_candidate_evidence_graph(records: list[dict[str, Any]]) -> None:
+        require(bool(records), "candidate evidence graph must be non-empty")
+        common_fields = (
+            "run_id",
+            "candidate_id",
+            "backend_id",
+            "backend_revision_sha256",
+            "query_scope",
+            "query_purpose",
+            "query_sha256",
+        )
+        first = records[0]
+        ids: set[str] = set()
+        ranks: set[tuple[str, int]] = set()
+        for record in records:
+            require(
+                all(record.get(field) == first.get(field) for field in common_fields),
+                "candidate evidence batch contains mixed identity",
+            )
+            evidence_id = record.get("evidence_id")
+            require(isinstance(evidence_id, str) and evidence_id.strip(),
+                    "candidate evidence ID is invalid")
+            require(evidence_id not in ids, "candidate evidence contains duplicate IDs")
+            ids.add(evidence_id)
+            channel = record.get("retrieval_channel")
+            rank = record.get("retrieval_rank")
+            require(isinstance(channel, str) and channel.strip(),
+                    "candidate retrieval channel is invalid")
+            require(isinstance(rank, int) and not isinstance(rank, bool) and rank > 0,
+                    "candidate retrieval rank is invalid")
+            key = (channel, rank)
+            require(key not in ranks, "candidate evidence contains duplicate channel/rank")
+            ranks.add(key)
+            parents = record.get("parent_evidence_ids")
+            require(isinstance(parents, list) and all(
+                isinstance(parent, str) and parent.strip() for parent in parents
+            ), "candidate parent list is invalid")
+            require(len(set(parents)) == len(parents), "candidate parent list contains duplicates")
+            receipt = record.get("derivation_receipt_sha256")
+            if parents:
+                require(
+                    isinstance(receipt, str)
+                    and len(receipt) == 64
+                    and all(character in "0123456789abcdef" for character in receipt),
+                    "derived candidate is missing a valid derivation receipt",
+                )
+
+        for record in records:
+            for parent in record["parent_evidence_ids"]:
+                require(parent in ids, "candidate evidence graph has an unresolved parent")
+
     def _persist_candidate_envelope(
         self,
         candidate_id: str,
@@ -242,6 +357,7 @@ class MaceLongMemEvalV2Memory(Memory):
         query_sha256 = hashlib.sha256(query.encode("utf-8")).hexdigest()
         lines = [line for line in candidate_jsonl.splitlines() if line.strip()]
         require(len(lines) == record_count, "candidate record count does not match JSONL")
+        parsed_records: list[dict[str, Any]] = []
         if record_count == 0:
             require(
                 candidate_set_sha256 is None and not candidate_jsonl,
@@ -260,6 +376,7 @@ class MaceLongMemEvalV2Memory(Memory):
                 except json.JSONDecodeError as error:
                     raise RuntimeError(f"invalid candidate JSONL record {ordinal}: {error}") from error
                 require(isinstance(record, dict), f"candidate JSONL record {ordinal} must be an object")
+                parsed_records.append(record)
                 require(
                     record.get("schema_version") == "mace_candidate_evidence_v0_1"
                     and record.get("record_type") == "candidate_evidence",
@@ -306,6 +423,12 @@ class MaceLongMemEvalV2Memory(Memory):
                     record.get("query_scope") == f"longmemeval-v2:domain:{self.domain}",
                     "candidate query scope mismatch",
                 )
+            self._validate_candidate_evidence_graph(parsed_records)
+            recomputed_candidate_set_sha256 = self._candidate_set_digest_from_records(parsed_records)
+            require(
+                recomputed_candidate_set_sha256 == candidate_set_sha256,
+                "candidate-set digest mismatch",
+            )
 
         invocation_digest = hashlib.sha256(candidate_id.encode("utf-8")).hexdigest()
         candidate_filename = f"{invocation_digest}.jsonl"
