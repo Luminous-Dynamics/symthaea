@@ -69,7 +69,7 @@ An assertion/correction is returned as admissible only when all applicable check
 - any required consent grant exists, was known, applies to the requested purpose/time, has not been revoked by its granting issuer, and has not itself been erased;
 - every declared derivation parent remains admissible.
 
-Unknown, forward, duplicate or self references are rejected. A correction/retraction can invalidate a claim only within its own valid-time interval and declared purpose/authority scopes. Erasure is purpose-independent, but its append path must be gated by an external verifier and the event must carry the explicit memory-erasure authority scope.
+Unknown, forward, duplicate or self references are rejected. A correction/retraction can invalidate a claim only within its own valid-time interval and declared purpose/authority scopes. Erasure is a knowledge-time transition, not an ordinary world-validity fact: once known it invalidates every historical valid-time view of the target. The schema/runtime validator rejects an erasure tombstone that tries to narrow it to a world-validity interval. It is purpose-independent, but its append path must be gated by an external verifier and the event must carry the explicit memory-erasure authority scope.
 
 ## Integration without breaking existing memory APIs
 
@@ -128,9 +128,10 @@ The module contains tests for:
 18. rejection of retractions carrying an invalid consent identifier;
 19. valid ledger serialization/deserialization round-trip;
 20. rejection of a serialized correction with a missing target;
-21. binding an existing SemanticEntry without changing its public layout.
+21. binding an existing SemanticEntry without changing its public layout;
+22. rejecting erasure tombstones scoped to a limited world-validity interval.
 
-Ledger deserialization uses a custom validating implementation: decoded snapshots pass the same cross-event checks as EvidenceLedger::new. EvidenceBound<T> is deliberately not deserializable. Two codec tests cover valid ledger round-trip and rejection of a serialized correction with a missing target. These 21 tests are authored but have not been compiled or executed in this environment.
+Ledger deserialization uses a custom validating implementation: decoded snapshots pass the same cross-event checks as EvidenceLedger::new. EvidenceBound<T> is deliberately not deserializable. Two codec tests cover valid ledger round-trip and rejection of a serialized correction with a missing target. These 22 tests are authored but have not been compiled or executed in this environment.
 
 ## Benchmark plan and comparison
 
