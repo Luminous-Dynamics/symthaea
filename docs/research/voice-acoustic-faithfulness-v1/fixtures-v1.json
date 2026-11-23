@@ -1,0 +1,207 @@
+{
+  "schema_version": "symthaea.voice.acoustic_faithfulness.fixture_manifest.v1",
+  "status": "design_only",
+  "parent_issue": 10890,
+  "created_on": "2026-11-07",
+  "note": "Fixture families only. This manifest contains no audio assets, labels, annotations, or measured results.",
+  "evidence_modalities": [
+    "audio_waveform",
+    "transcript_hypothesis",
+    "prompt_context",
+    "speaker_hypothesis",
+    "scene_event",
+    "time_alignment"
+  ],
+  "fixture_families": [
+    {
+      "id": "same_lexemes_different_delivery",
+      "intervention": "Hold verified lexical sequence constant; generate or record paired versions with controlled prosody, rate, intensity and voice quality differences.",
+      "invariants": [
+        "lexical_sequence",
+        "entity_and_number_content",
+        "source_text_digest"
+      ],
+      "expected_changes": [
+        "measured_f0_contour",
+        "voicing_trajectory",
+        "intensity_trajectory",
+        "pause_and_rate_description"
+      ],
+      "negative_controls": [
+        "transcript_only_baseline_must_not_claim_acoustic_difference",
+        "F0_unvoiced_regions_must_remain_undefined"
+      ]
+    },
+    {
+      "id": "same_delivery_different_lexemes",
+      "intervention": "Hold delivery characteristics within a declared tolerance while changing lexical content.",
+      "invariants": [
+        "measured_delivery_summary_within_tolerance",
+        "speaker_session_reference_if_same_speaker"
+      ],
+      "expected_changes": [
+        "lexical_sequence",
+        "word_frame_alignment"
+      ],
+      "negative_controls": [
+        "text_change_must_not_force_unmeasured_prosody_change"
+      ]
+    },
+    {
+      "id": "transcript_prompt_audio_conflict",
+      "intervention": "Provide a deliberately misleading transcript, caption or prompt that conflicts with the waveform's prosodic or scene evidence.",
+      "invariants": [
+        "audio_artifact_digest",
+        "acoustic_annotation"
+      ],
+      "expected_changes": [
+        "explicit_conflict_report",
+        "audio_grounded_acoustic_description"
+      ],
+      "negative_controls": [
+        "system_must_not_repeat_prompt_as_audio_observation",
+        "uncertain_or_ambiguous_audio_may_abstain"
+      ]
+    },
+    {
+      "id": "background_scene_swap",
+      "intervention": "Keep foreground speech fixed and change a controlled background event.",
+      "invariants": [
+        "foreground_lexical_content",
+        "foreground_word_timing_within_tolerance"
+      ],
+      "expected_changes": [
+        "background_event_class_and_interval"
+      ],
+      "negative_controls": [
+        "background_event_must_not_be_attributed_to_foreground_speaker"
+      ]
+    },
+    {
+      "id": "session_local_speaker_swap",
+      "intervention": "Keep the lexical sequence fixed while changing the recording speaker under consented controlled conditions.",
+      "invariants": [
+        "lexical_content",
+        "intended_semantic_content"
+      ],
+      "expected_changes": [
+        "session_local_speaker_hypothesis",
+        "voice_observation_features"
+      ],
+      "negative_controls": [
+        "no_legal_identity_claim",
+        "no_cross_session_link_without_separate_authorization"
+      ]
+    },
+    {
+      "id": "nonverbal_vocal_event_insert_remove",
+      "intervention": "Insert or remove one annotated NVV such as laughter, chuckle, sigh, inhale, gasp, cough, cry or throat-clear.",
+      "invariants": [
+        "neighboring_lexical_sequence",
+        "neighboring_word_frame_ranges"
+      ],
+      "expected_changes": [
+        "nvv_category",
+        "nvv_start_end_frames",
+        "speaker_source_hypothesis_if_annotated"
+      ],
+      "negative_controls": [
+        "event_only_audio_must_not_create_phantom_lexical_tokens",
+        "event_categories_reported_separately"
+      ]
+    },
+    {
+      "id": "channel_and_noise_perturbation",
+      "intervention": "Apply controlled SNR, codec, reverberation, clipping and channel perturbations.",
+      "invariants": [
+        "intended_lexical_content",
+        "event_identity_when_signal_remains_audible"
+      ],
+      "expected_changes": [
+        "capture_quality",
+        "uncertainty",
+        "degraded_or_abstain_state"
+      ],
+      "negative_controls": [
+        "quality_degradation_must_not_increase_claimed_confidence",
+        "frame_loss_must_not_be_hidden"
+      ]
+    },
+    {
+      "id": "temporal_order_intervention",
+      "intervention": "Reorder, delay, duplicate or omit audio chunks/events while keeping exact chunk bytes available for audit.",
+      "invariants": [
+        "individual_chunk_digests"
+      ],
+      "expected_changes": [
+        "temporal_coherence_decision",
+        "discontinuity_or_reorder_detection"
+      ],
+      "negative_controls": [
+        "reordered_frames_must_not_be_reported_as_contiguous",
+        "duplicate_chunks_must_not_be_counted_twice"
+      ]
+    },
+    {
+      "id": "gain_scaling_and_loudness_calibration",
+      "intervention": "Multiply an otherwise identical waveform by known gain factors; optionally record calibrated reference SPL with a calibrated microphone.",
+      "invariants": [
+        "normalized_within_utterance_energy_shape",
+        "lexical_content",
+        "f0_trajectory_when_not_clipped"
+      ],
+      "expected_changes": [
+        "raw_rms_scales_by_known_gain",
+        "calibrated_spl_changes_only_with_valid_calibration"
+      ],
+      "negative_controls": [
+        "per_utterance_peak_normalization_must_not_be_reported_as_absolute_loudness",
+        "gain_change_must_not_be_labeled_arousal_or_emotion"
+      ]
+    },
+    {
+      "id": "fundamental_frequency_range_and_octave_error",
+      "intervention": "Sweep voiced synthetic and human-reviewed reference pitches across, below and above the configured F0 search band, with harmonic-rich and noisy cases.",
+      "invariants": [
+        "known_reference_pitch_within_supported_band",
+        "source_frame_identity"
+      ],
+      "expected_changes": [
+        "measured_f0_tracks_reference_within_frozen_tolerance",
+        "out_of_range_pitch_is_explicitly_unresolved"
+      ],
+      "negative_controls": [
+        "octave_doubling_and_halving_are_counted",
+        "out_of_range_pitch_must_not_be_clamped_and_reported_as_valid"
+      ]
+    }
+  ],
+  "required_case_metadata": [
+    "case_id",
+    "pair_group_id",
+    "audio_artifact_sha256",
+    "transcript_reference_digest_or_null",
+    "sample_rate_hz",
+    "channel_layout",
+    "source_frame_ranges",
+    "intervention_recipe_and_version",
+    "native_annotation_digest",
+    "annotator_provenance",
+    "consent_and_retention_policy_id",
+    "dataset_license_and_split",
+    "generation_or_recording_device",
+    "random_seed_if_synthetic"
+  ],
+  "scoring_separation": [
+    "lexical_correctness",
+    "temporal_alignment",
+    "prosodic_measurement",
+    "nonverbal_vocal_event_detection",
+    "background_scene_detection",
+    "speaker_attribution",
+    "acoustic_text_conflict_robustness",
+    "generation_content_fidelity",
+    "generation_style_compliance",
+    "generation_intelligibility_and_quality"
+  ]
+}
