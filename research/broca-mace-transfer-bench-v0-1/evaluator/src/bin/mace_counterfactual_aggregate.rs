@@ -1212,6 +1212,44 @@ mod tests {
             .contains("run_id"));
     }
 
+    #[test]
+    fn candidate_stream_loader_binds_bytes_count_and_run_id() {
+        let record = candidate_receipt_record("run-1", "world-1:task-a");
+        let line = serde_json::to_string(&record).unwrap();
+        let contents = format!("{line}\n");
+        let path = env::temp_dir().join(format!(
+            "mace-candidate-stream-{}-valid.jsonl",
+            std::process::id()
+        ));
+        fs::write(&path, contents.as_bytes()).unwrap();
+
+        let (receipts, digest, count, run_id) =
+            load_candidate_receipts(path.to_str().unwrap()).unwrap();
+        assert_eq!(count, 1);
+        assert_eq!(run_id, "run-1");
+        assert_eq!(receipts.len(), 1);
+        assert_eq!(digest, hex_digest(Sha256::digest(contents.as_bytes()).as_slice()));
+
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn candidate_stream_loader_rejects_duplicate_pair_block_observation_keys() {
+        let record = candidate_receipt_record("run-1", "world-1:task-a");
+        let line = serde_json::to_string(&record).unwrap();
+        let contents = format!("{line}\n{line}\n");
+        let path = env::temp_dir().join(format!(
+            "mace-candidate-stream-{}-duplicate.jsonl",
+            std::process::id()
+        ));
+        fs::write(&path, contents.as_bytes()).unwrap();
+
+        let error = load_candidate_receipts(path.to_str().unwrap()).unwrap_err();
+        assert!(error.contains("duplicate pair-block/observation identity"));
+
+        fs::remove_file(path).unwrap();
+    }
+
     fn refresh_manifest_digests(record: &mut Value) {
         let baseline_evidence_sha256 = record["baseline_evidence_sha256"]
             .as_str()
