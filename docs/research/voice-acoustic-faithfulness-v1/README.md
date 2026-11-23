@@ -183,3 +183,36 @@ These are prospective gates, not observed outcomes. Report confidence intervals,
 4. Extend the eight counterfactual fixture families with signal-level mutation receipts, paired invariants and human-listen review metadata.
 5. Run R0–R7 on a small frozen pilot; expand only after validating scorer, splits, consent/license and resource measurements.
 6. Compose resource/acquisition efficiency into Symtropy #6770/#6860; do not create a competing aggregate-score or EVSI implementation.
+
+
+## Southern African speech: a regionally meaningful comparator plan
+
+PazaBench is now an important industry baseline, but it must be interpreted correctly. The August 2026 paper evaluates 52 ASR models across 39 African languages and harmonizes six public corpora; its metric set includes WER, CER and inverse real-time factor. The associated released Paza model family is currently six Kenyan languages (Swahili, Dholuo, Kalenjin, Kikuyu, Maasai and Somali), not isiZulu/isiXhosa/Setswana/Sesotho. The November 5, 2026 MSR Africa seminar describes a 53-model accuracy/efficiency study across the same 39-language scope. We should compare our ASR lane against the public PazaBench splits where language overlap exists, then separately qualify Southern African coverage rather than claiming Paza's model release covers it.
+
+### Cohorts to admit after rights and splits are checked
+
+| Cohort | Useful coverage | Evaluation role | Restrictions / caveat |
+|---|---|---|---|
+| **Swivuriso / ZA-African Next Voices** | Target 3,000+ hours across isiZulu, isiXhosa, Sesotho, Xitsonga, Setswana, isiNdebele and Tshivenda; scripted and unscripted, including agriculture, health and general domains | Main South African ASR and speech robustness cohort; use per-language and scripted/unscripted strata | Gated access / terms acceptance. Dataset terms prohibit TTS, voice cloning and voice synthesis; do not use it for those tasks. Require approved research access, consent and intended-use audit before ingestion |
+| **AfriVox-v2** | 24 African languages, with language and domain annotations and conversational / in-the-wild content; includes Sesotho, isiXhosa, isiZulu, Setswana and Afrikaans | Cross-domain / multilingual audio robustness, environmental context and voice-interface cohort | Pin exact revision, source corpus licenses and permitted uses per component; do not treat an aggregate as uniformly licensed |
+| **NWU multilingual code-switched soap-opera corpus** | 26.9 hours of annotated spontaneous/ad-lib English mixed with isiZulu, isiXhosa, Setswana and Sesotho | Code-switch challenge split; stress language-ID changes and lexical/acoustic disagreements | Research-only license; not a production training corpus without separate permission |
+| **PazaBench** | 39 African languages, six harmonized public corpora, 52 evaluated ASR models | External ASR accuracy/efficiency comparator; use exact released split/scorer/model versions | Released Paza model weights currently cover six Kenyan languages; request/include South African models only where Paza's public protocol supports them |
+
+Official starting points:
+- PazaBench paper / model coverage: https://www.microsoft.com/en-us/research/publication/pazabench-large-scale-asr-benchmark-for-low-resource-languages-in-africa/
+- Paza model and benchmark overview: https://labs.ai.azure.com/innovations/paza/
+- Swivuriso project description: https://www.dsfsi.co.za/za-african-next-voices/
+- Swivuriso gated dataset: https://huggingface.co/datasets/dsfsi-anv/za-african-next-voices
+- AfriVox-v2 dataset card: https://huggingface.co/datasets/intronhealth/afrivox-v2
+- NWU code-switch corpus catalogue: https://hdl.handle.net/20.500.12185/545
+
+### A competitive plan that can beat the global average without gaming the benchmark
+
+1. **Do not train on the test speaker/session.** Create speaker-, episode-, recording-device- and domain-disjoint train/dev/test partitions, and keep one untouched language-domain holdout. For the soap-opera corpus, partition by episode/scene and speaker, not random clip.
+2. **Build a language-by-domain matrix.** Report WER, CER and RTFx for each language, code-switch direction, scripted/unscripted status, recording condition and domain. Publish macro-by-language and worst-cohort results; a high-resource-language average must not hide a weak language.
+3. **Separate lexical ASR from acoustic understanding.** Paza WER/CER is the lexical lane. DEAF/VoxParadox and the paired #11157 scorer are the acoustic-over-text lane. A transcript-correct answer is not proof of faithful pitch, prosody, speaker-independent event or background-sound understanding.
+4. **Test adaptation efficiency as a learning curve.** Compare frozen zero-shot, 1h/5h/10h/25h/50h/100h/150h/300h per-language fine-tuning, and 20% in-domain additions. This matches the published Paza focus on data scaling and domain adaptation. Keep data-hour budgets and augmentation pipelines frozen.
+5. **Measure deployment economics, not only WER.** Report RTFx, peak RAM/VRAM, model bytes, audio bytes, energy per hour and quality per joule on the same hardware. Paza's public overview reports encoder-only models roughly 28× faster than multitask LLMs with competitive accuracy and up to 83% CER reduction from adding 20% in-domain data in its evaluated setting; these are a strong warning that data/domain adaptation and architecture efficiency can beat brute-force model scale.
+6. **Keep consent and use restrictions enforceable.** Dataset terms are an input to the run manifest. Swivuriso's no-TTS/voice-cloning restriction must block those tasks, and NWU research-only corpus material must stay inside approved research use. A dataset being downloadable or visible in a model hub does not establish commercial or unrestricted rights.
+
+**Target:** first beat the strongest admitted baseline on a preregistered South African language/domain cohort at matched data and inference budget, with a bootstrap confidence interval and per-language worst-case guardrail. Then target a non-dominated quality/resource point—e.g. matched WER/CER within 1 absolute percentage point while improving RTFx or measured energy by at least 20%—without dropping a language or test domain from the report. These are prospective targets, not achieved results.
