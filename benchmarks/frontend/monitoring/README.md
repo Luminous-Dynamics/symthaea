@@ -17,7 +17,7 @@ A wake notification is not proof that the condition is true. It must never grant
 
 - `monitoring-fixture-v1.json`: six synthetic time-evolving scenarios with source-of-record revisions, watch contracts, permissions, and expected outcomes.
 - `monitoring-reference-traces-v1.json`: raw watch/wait/wake/observe/action/finish traces. It binds to the exact fixture bytes via SHA-256.
-- `monitoring-policy-v1.json`: eleven required oracle rules. The exact policy bytes are pinned by SHA-256 in the verifier source.
+- `monitoring-policy-v1.json`: eleven required oracle rules. The exact policy and fixture bytes are both pinned by SHA-256 in verifier source. Fixture SHA-256: `d15e2fe36d2683618ec939f80f041155a3cfec9ab36230c864c8fcf0f4311d28`; policy SHA-256: `c9fd5036206b117733a54edafdf1450bebc0696f4b20efbc6e266bb874dafab8`.
 - `verify-monitoring.mjs`: standalone Node.js semantic verifier and `--self-test`.
 - Matching JSON Schemas define fixture, trace and policy input contracts.
 
@@ -39,7 +39,7 @@ node benchmarks/frontend/monitoring/verify-monitoring.mjs --self-test
 node benchmarks/frontend/monitoring/verify-monitoring.mjs
 ```
 
-The CLI source is committed but was not executed during this authoring round. The reported 11/11 result below is from a separate in-memory V8 implementation run against the exact fetched fixture, trace bundle and policy bytes—not a claim that the committed CLI has run.
+The CLI source is committed but was not executed during this authoring round. The reported 11/11 result below is from a separate in-memory V8 implementation run against the exact fetched fixture, trace bundle and policy bytes—not a claim that the committed CLI has run. The source now rejects unknown/missing fixture, trace-step and policy fields, checks case/trace coverage, and pins both fixture and policy digests.
 
 ## Oracle policy
 
@@ -52,7 +52,7 @@ The committed example demonstrates:
 - an action target that differs from the frozen watch contract is rejected;
 - duplicate action replay with the same key and same target is counted but does not add a second side effect;
 - **0 explicit polling operations** across the six traces;
-- one deliberately missed ephemeral trigger after reconnect (safe abstention, liveness failure).
+- **5/6 liveness cases pass**; the deliberately missed ephemeral trigger after reconnect is a safety pass but a liveness failure, not a success.
 
 Zero explicit polls is a property of the synthetic trace, not a measured CPU, network, or production event-bus result. The virtual `wait_until` operations model yielding to a scheduler; they do not prove that a production scheduler or subscription service exists.
 
