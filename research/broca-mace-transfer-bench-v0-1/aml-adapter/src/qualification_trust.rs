@@ -384,6 +384,59 @@ mod tests {
     }
 
     #[test]
+    fn profile_requires_canonical_key_order() {
+        let signer_a = signing_key(14);
+        let signer_b = signing_key(15);
+        let make_key = |signer: &SigningKey| {
+            let public_key = signer.verifying_key().to_bytes();
+            QualificationTrustKeyV1 {
+                key_id: qualification_key_id_v1(&public_key),
+                public_key,
+                status: QualificationKeyStatusV1::Active,
+                not_before_unix: 10,
+                not_after_unix: 1_000,
+            }
+        };
+        let mut keys = vec![make_key(&signer_a), make_key(&signer_b)];
+        keys.sort_by(|left, right| left.key_id.cmp(&right.key_id));
+        let profile = QualificationTrustProfileV1 {
+            schema_version: 1,
+            verifier_id: "mace-test-verifier".to_owned(),
+            profile_version: 2,
+            keys: keys.into_iter().rev().collect(),
+        };
+        assert_eq!(
+            profile.profile_sha256(),
+            Err(EvidenceQualificationRejectV1::TrustProfileInvalid)
+        );
+    }
+
+    #[test]
+    fn profile_rejects_duplicate_key_and_public_key_aliases() {
+        let signer = signing_key(16);
+        let key = {
+            let public_key = signer.verifying_key().to_bytes();
+            QualificationTrustKeyV1 {
+                key_id: qualification_key_id_v1(&public_key),
+                public_key,
+                status: QualificationKeyStatusV1::Active,
+                not_before_unix: 10,
+                not_after_unix: 1_000,
+            }
+        };
+        let profile = QualificationTrustProfileV1 {
+            schema_version: 1,
+            verifier_id: "mace-test-verifier".to_owned(),
+            profile_version: 2,
+            keys: vec![key.clone(), key],
+        };
+        assert_eq!(
+            profile.profile_sha256(),
+            Err(EvidenceQualificationRejectV1::TrustProfileInvalid)
+        );
+    }
+
+    #[test]
     fn altered_signature_is_rejected() {
         let signer = signing_key(13);
         let profile = profile_with_key(&signer, QualificationKeyStatusV1::Active, 10, 1_000);
