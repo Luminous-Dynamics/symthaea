@@ -137,3 +137,17 @@ Report by arm and theorem family:
 - protocol version, randomization seed and source/task hashes.
 
 **No human study has been run.** This document is a preregistration template awaiting expert and ethics review.
+
+
+## 16. Proof-plan reconstruction and the distinction between explanation and learning (2026-11-23)
+
+A dependency graph shows which declarations are referenced; it does not by itself recover the reasoning plan. Hamami & Morris (2024) characterize proof understanding as rational reconstruction of the proof's underlying plan ([DOI](https://doi.org/10.1111/nous.12489)). Gao & Evans (2026-11-06), in a study of 143 undergraduates, report that proof-presentation performance was only moderately associated with later proof construction on delayed near transfer ([DOI](https://doi.org/10.1007/s40753-026-00319-4)).
+
+The programme therefore distinguishes:
+- formal dependency graph (typed, source/toolchain-bound);
+- proof-plan graph (goal transformations, justifications, side conditions, subgoals, invariants and alternatives);
+- reviewed mathematical-role graph (key estimate, encoding, reduction, construction, proof infrastructure);
+- explanation claims (formal facts, reviewed interpretations, bounded analogies and unknowns);
+- reader outcomes (statement comprehension, proof validation, plan reconstruction, immediate transfer, delayed transfer and cross-family transfer).
+
+Do not mechanically infer plan actions from a graph edge or tactic trace. Do not force all valid proofs into one canonical plan. Keep alternative proof routes visible. New work is specified in [#13326 — MATH-PROOF-PLAN-001](https://github.com/Luminous-Dynamics/symthaea/issues/13326).
