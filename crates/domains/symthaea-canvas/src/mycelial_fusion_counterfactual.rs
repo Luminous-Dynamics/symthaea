@@ -2046,7 +2046,9 @@ mod tests {
             3
         );
         assert_eq!(
-            report.candidates[1].disruption_deltas[0].accepted_for_analysis.cycle_rank,
+            report.candidates[1].disruption_deltas[0]
+                .accepted_for_analysis
+                .cycle_rank,
             0
         );
     }
