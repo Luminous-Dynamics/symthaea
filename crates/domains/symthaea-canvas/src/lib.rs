@@ -37,6 +37,7 @@ pub mod mycelial_graph_hypothesis_posterior;
 pub mod mycelial_junction_graph;
 pub mod mycelial_mesh;
 pub mod mycelial_model;
+pub mod mycelial_morphogenesis_observation;
 pub mod mycelial_network;
 pub mod mycelial_observation_coverage;
 pub mod mycelial_presence;
@@ -217,6 +218,11 @@ pub use mycelial_network::{
     MycelialAnastomosis, MycelialAnastomosisCandidate, MycelialConnectionKind,
     MycelialNetworkConfig, MycelialNetworkConnection, MycelialNetworkError, MycelialNetworkGraph,
     MycelialNetworkMetrics, build_mycelial_network_graph, detect_anastomosis_candidates,
+};
+pub use mycelial_morphogenesis_observation::{
+    MYCELIAL_MORPHOGENESIS_OBSERVATION_SCHEMA_VERSION, MycelialDevelopmentStage,
+    MycelialMorphogenesisMeasurement, MycelialMorphogenesisObservation,
+    MycelialMorphogenesisObservationError, MycelialMorphogenesisRegionKind,
 };
 pub use mycelial_observation_coverage::{
     MAX_MYCELIAL_COVERAGE_CANDIDATES_PER_OBSERVATION, MAX_MYCELIAL_OBSERVATION_COVERAGE_RECORDS,
