@@ -944,8 +944,7 @@ mod tests {
     fn observation_missing_ledger_unit_binding_fails_closed() {
         let (manifest, receipt, mut ledger, mut observation) = evidence_fixture();
         ledger.records[0].source_unit_key = None;
-        observation.observation_coverage_ledger_digest =
-            ledger.canonical_digest_hex().unwrap();
+        observation.observation_coverage_ledger_digest = ledger.canonical_digest_hex().unwrap();
         assert!(matches!(
             observation.validate_against_evidence(&manifest, &receipt, &ledger),
             Err(
