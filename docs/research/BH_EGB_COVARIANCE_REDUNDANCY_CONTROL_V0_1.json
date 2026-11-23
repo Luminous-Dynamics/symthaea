@@ -88,7 +88,9 @@
     "Treating x1, x2 and x3 as independent spuriously increases the squared score from 5 to 8.",
     "The selector must detect or explicitly classify the singular covariance support; no silent regularization is permitted.",
     "The covariance must transform with the observable coordinates.",
-    "This fixture is not an EGB physical calculation and must never be presented as one."
+    "This fixture is not an EGB physical calculation and must never be presented as one.",
+    "An invertible basis change must preserve the covariance-aware Mahalanobis score when both the mean difference and covariance are transported.",
+    "Unit rescaling must preserve the score when the mean difference and covariance are transformed consistently."
   ],
   "exact_derivation": {
     "inverse_base_covariance": [
@@ -109,5 +111,63 @@
     "naive_independence_before": "1^2/1 + 2^2/1 = 5",
     "naive_independence_after_duplicate": "1^2/1 + 2^2/1 + 3^2/3 = 8"
   },
-  "claim_ceiling": "This control checks covariance-aware linear algebra and invariance to an algebraically redundant observable. It does not validate #8034, a probability model, an EGB response, an experimental design, or SOTA performance."
+  "claim_ceiling": "This control checks covariance-aware linear algebra and invariance to an algebraically redundant observable. It does not validate #8034, a probability model, an EGB response, an experimental design, or SOTA performance.",
+  "invertible_basis_transport": {
+    "description": "Exact nonsingular change of observable basis. Difference mean and covariance are transported together.",
+    "transformation_matrix": [
+      [
+        "2",
+        "1"
+      ],
+      [
+        "1",
+        "1"
+      ]
+    ],
+    "transformed_mean_difference": [
+      "4",
+      "3"
+    ],
+    "transformed_difference_covariance": [
+      [
+        "7",
+        "9/2"
+      ],
+      [
+        "9/2",
+        "3"
+      ]
+    ],
+    "determinant": "1",
+    "expected_mahalanobis_squared": "4"
+  },
+  "unit_rescaling": {
+    "description": "Exact unit rescaling x1' = 1000*x1 and x2' = x2/100. The mean and covariance must use the same unit transform.",
+    "transformation_matrix": [
+      [
+        "1000",
+        "0"
+      ],
+      [
+        "0",
+        "1/100"
+      ]
+    ],
+    "transformed_mean_difference": [
+      "1000",
+      "1/50"
+    ],
+    "transformed_difference_covariance": [
+      [
+        "1000000",
+        "5"
+      ],
+      [
+        "5",
+        "1/10000"
+      ]
+    ],
+    "determinant": "10",
+    "expected_mahalanobis_squared": "4"
+  }
 }
