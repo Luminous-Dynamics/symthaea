@@ -237,6 +237,23 @@ The same Cycle 2 textual table gives a much more useful engineering map than the
 
 These are published scores in the same Cycle 2 textual table, not a matched internal experiment. The gaps should guide hypotheses, not be treated as proof that one architecture causes the difference.
 
+### Proposed capability-level targets
+
+The initial target closes at least half of each open-to-commercial gap; the stretch target reaches or slightly exceeds the commercial reference. These targets are intended for the same Cycle 2 textual protocol and scoring dimensions, not as cross-benchmark thresholds.
+
+| Capability | Open reference | Commercial reference | Initial MACE target | Stretch target |
+|---|---:|---:|---:|---:|
+| Explicit fact recall | 62.98 | 70.85 | 66.92 | 71.85 |
+| Relational / multi-hop | 58.94 | 64.40 | 61.67 | 65.40 |
+| Temporal / event sequencing | 57.76 | 67.05 | 62.41 | 68.05 |
+| Memory governance | 76.55 | 78.10 | 77.33 | 79.10 |
+| Personalization / care | 38.82 | 54.70 | 46.76 | 55.70 |
+| Workflow execution | 59.67 | 61.20 | 60.44 | 62.20 |
+| Epistemic safety / privacy | 68.59 | 81.98 | 75.29 | 82.98 |
+| Streaming | 49.65 | 63.11 | 56.38 | 65.11 |
+
+The targets deliberately emphasize the largest gaps—personalization/care, epistemic safety/privacy, streaming and temporal reasoning—while retaining a non-regression expectation for stronger governance/workflow dimensions. They are goals, not measured MACE capabilities.
+
 **Research implications:**
 
 1. Governance and workflow are comparatively close among the current leaders. MACE should seek differentiation through verifiable lineage, correction, rights-aware retrieval and replay, not simply assume those dimensions are solved.
