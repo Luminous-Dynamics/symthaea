@@ -458,23 +458,25 @@ fn run_candidate(
             }
         }
         CandidateMethod::TypedContentHdc => {
-            let config = TypedContentConfigV1 {
-                dimension: TYPED_HDC_DIMENSION,
-                seed: TYPED_HDC_SEED,
-                ..TypedContentConfigV1::default()
-            };
-            let index = TypedContentIndexV1::build(memory, config)
-                .map_err(|error| format!("typed-content index build failed: {error:?}"))?;
-            profile_sha256 = Some(index.profile_digest().to_string());
-            index_payload_bytes = index.index_payload_bytes();
-            for action in need.action_alternatives {
-                let typed_query = SemanticExperienceQueryV1::from_decision_need(need, action)
-                    .map_err(|error| format!("typed-content query failed: {error:?}"))?;
-                let result = index
-                    .retrieve(typed_query, TOP_K_PER_ACTION)
-                    .map_err(|error| format!("typed-content retrieval failed: {error:?}"))?;
-                for hit in result.candidates {
-                    retrieved.push((hit.event_id, hit.view_digest, hit.rank));
+            if !memory.is_empty() {
+                let config = TypedContentConfigV1 {
+                    dimension: TYPED_HDC_DIMENSION,
+                    seed: TYPED_HDC_SEED,
+                    ..TypedContentConfigV1::default()
+                };
+                let index = TypedContentIndexV1::build(memory, config)
+                    .map_err(|error| format!("typed-content index build failed: {error:?}"))?;
+                profile_sha256 = Some(index.profile_digest().to_string());
+                index_payload_bytes = index.index_payload_bytes();
+                for action in need.action_alternatives {
+                    let typed_query = SemanticExperienceQueryV1::from_decision_need(need, action)
+                        .map_err(|error| format!("typed-content query failed: {error:?}"))?;
+                    let result = index
+                        .retrieve(typed_query, TOP_K_PER_ACTION)
+                        .map_err(|error| format!("typed-content retrieval failed: {error:?}"))?;
+                    for hit in result.candidates {
+                        retrieved.push((hit.event_id, hit.view_digest, hit.rank));
+                    }
                 }
             }
         }
@@ -496,6 +498,9 @@ fn run_candidate(
             .ok_or_else(|| format!("retrieval returned unresolved event_id {event_id}"))?;
         if experience_view_digest(&item) != indexed_digest {
             return Err(format!("canonical evidence view changed for event_id {event_id}"));
+        }
+        if item.scope != need.scope || !need.action_alternatives.contains(&item.action) {
+            return Err(format!("retrieval returned out-of-contract event_id {event_id}"));
         }
         retrieved_ids.push(event_id);
         resolved.push(item);
