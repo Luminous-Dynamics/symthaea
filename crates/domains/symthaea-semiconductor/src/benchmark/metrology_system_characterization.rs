@@ -258,14 +258,14 @@ pub fn generate_synthetic_msa_episode_v1(
         let part_id = format!("artifact-{part_index:04}");
         let reference_value =
             config.reference_value_start + part_index as f64 * config.reference_value_step;
-        for appraiser_index in 0..config.appraiser_count {
+        for (appraiser_index, appraiser_effect) in appraiser_effects.iter().enumerate() {
             let appraiser_id = format!("appraiser-{appraiser_index:03}");
             let interaction = config.part_appraiser_interaction_stddev * rng.centered_noise();
             for replicate_index in 0..config.replicates_per_cell {
                 let repeatability_error = config.repeatability_stddev * rng.centered_noise();
                 let measured_value = reference_value
                     + config.calibration_bias
-                    + appraiser_effects[appraiser_index]
+                    + appraiser_effect
                     + interaction
                     + repeatability_error;
                 let observation_id = format!(
