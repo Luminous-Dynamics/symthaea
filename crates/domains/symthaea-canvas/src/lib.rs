@@ -28,7 +28,6 @@ pub mod embodiment;
 pub mod embodiment_trace;
 pub mod geometry;
 pub mod mycelial_acquisition_domain;
-pub mod mycelial_acquisition_domain;
 pub mod mycelial_annotation_triage;
 pub mod mycelial_contact_persistence;
 pub mod mycelial_failure_resilience;
