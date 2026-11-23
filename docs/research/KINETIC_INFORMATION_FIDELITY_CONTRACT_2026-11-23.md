@@ -130,6 +130,29 @@ At minimum, score separately:
 
 A successful two-pulse echo is not evidence of arbitrary future-response preservation. The guarantee is bounded by the declared intervention family, parameter support and tested horizon. Fixed registered suites should be supplemented with adversarial probe search: #13404 searches for admissible pulses that expose a response discrepancy missed by the ordinary suite. Such a search discovers empirical witnesses; it does not certify a continuous worst-case bound without an independent covering / regularity argument.
 
+### Task-conditioned kinetic equivalence
+
+This gives a more precise mathematical target than a universal "amount of kinetic information". For a checkpoint state f, candidate compressed state \(\hat f\), admissible intervention family \(\mathcal U\), QoI registry \(\mathcal Q\), physical horizon T and tolerances \(\tau_q\), define the normalized response distinguishability
+
+\[
+D_{\mathcal U,\mathcal Q,T}(f,\hat f)
+=
+\sup_{u\in\mathcal U}
+\max_{q\in\mathcal Q}
+\frac{
+d_q\!\left(
+q\!\left(\Phi^u_{t_0:T}(f)\right),
+q\!\left(\Phi^u_{t_0:T}(\hat f)\right)
+\right)
+}{\tau_q}.
+\]
+
+Here \(\Phi^u_{t_0:T}\) denotes evolution from the checkpoint under intervention u, and \(d_q\) is the frozen observable-specific trajectory/phase/waveform distance. The representation pair is *task-equivalent over this declared envelope* only if \(D\leq 1\), while also satisfying all mandatory physical-admissibility gates.
+
+This induces a task-conditioned equivalence relation (up to the declared tolerances): states that differ microscopically may be interchangeable for one QoI/intervention/horizon contract, yet distinguishable for another. This is the mathematical basis for legitimate observable-oriented compression: preserve the equivalence class needed by the task, not necessarily every microscopic degree of freedom.
+
+A finite probe set can only estimate a lower bound on the supremum through the largest verified discrepancy found. A confirmed adversarial witness with normalized discrepancy above 1 falsifies task-equivalence. Failure to find a witness does **not** establish \(D\leq 1\). A continuous worst-case pass requires a justified global upper bound (for example, a validated covering/regularity bound or interval method) over the declared intervention family. Without such a bound, label the result empirical probe coverage, not a certified supremum.
+
 ### 1.4 Sensitivity fidelity
 
 For tasks that use inference, design or control, add a separate derivative contract for
@@ -463,7 +486,8 @@ The initial paper-quality claims should be modest and independently testable:
 - **C2 — Current-state and weak-observable error do not fully predict future-response error.** Find two candidate states with similar present QoI / weak-projection errors but materially different registered pulse responses.
 - **C3 — Native indicators can predict response loss.** Show held-out calibration better than a field-amplitude-only baseline without a false-safe increase.
 - **C4 — Response-aware allocation can save compute.** At matched physical and response fidelity, demonstrate a Pareto improvement against fixed-resolution or global-state-error-only adaptation on at least one held-out cohort.
-- **C5 — The validity envelope is useful.** Predict when a representation must refine, recover, switch or abstain before a later intervention demonstrates the loss.
+- **C5 — Task-conditioned kinetic equivalence is useful.** Show that a compressed state can be interchangeable with its reference for one declared \((\mathcal U,\mathcal Q,T)\) contract yet be falsifiably distinguishable under a broader intervention family or horizon.
+- **C6 — The validity envelope is useful.** Predict when a representation must refine, recover, switch or abstain before a later intervention demonstrates the loss.
 
 Failure of any claim is useful: it narrows the conditions under which response-aware compression is justified.
 
