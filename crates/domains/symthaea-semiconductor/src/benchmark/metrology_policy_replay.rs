@@ -131,6 +131,11 @@ pub struct SyntheticFabPolicyEvaluationV1 {
     pub true_defect_prevalence: f64,
     pub metrology_sensitivity: f64,
     pub metrology_specificity: f64,
+    pub assay_observed_ht_positive_rate: f64,
+    pub assay_adjusted_ht_prevalence: Option<f64>,
+    pub assay_adjusted_ht_absolute_error: Option<f64>,
+    pub assay_adjusted_ht_standard_error: Option<f64>,
+    pub assay_estimator_qualified: bool,
     pub mean_latent_process_state: f64,
     pub mean_defect_score: f64,
     pub selected_sample_prevalence: f64,
@@ -1043,11 +1048,13 @@ pub fn evaluate_synthetic_metrology_policy_v1(
     let mut latent_process_state_total = 0.0;
     let mut defect_score_total = 0.0;
     let mut ht_positive_total = 0.0;
+    let mut assay_ht_positive_total = 0.0;
     let mut ht_brier_total = 0.0;
     let mut true_population_brier_total = 0.0;
     let mut weight_sum = 0.0;
     let mut squared_weight_sum = 0.0;
     let mut randomized_sample_by_stratum = BTreeMap::<String, Vec<(f64, f64)>>::new();
+    let mut randomized_assay_by_stratum = BTreeMap::<String, Vec<f64>>::new();
     let mut matured_label_count = 0_usize;
     let final_horizon = episode.policy_view.population_count.saturating_sub(1) as u64;
 
@@ -1092,6 +1099,9 @@ pub fn evaluate_synthetic_metrology_policy_v1(
                 &observed.candidate_id,
                 truth.defect_positive,
             );
+            if assay_positive {
+                assay_ht_positive_total += 1.0 / row.inclusion_probability;
+            }
             if truth.defect_positive {
                 selected_positive_count += 1;
                 ht_positive_total += 1.0 / row.inclusion_probability;
@@ -1109,6 +1119,10 @@ pub fn evaluate_synthetic_metrology_policy_v1(
                     .entry(row.stratum_id.clone())
                     .or_default()
                     .push((target, squared_error));
+                randomized_assay_by_stratum
+                    .entry(row.stratum_id.clone())
+                    .or_default()
+                    .push(if assay_positive { 1.0 } else { 0.0 });
             }
             let weight = 1.0 / row.inclusion_probability;
             weight_sum += weight;
@@ -1193,6 +1207,51 @@ pub fn evaluate_synthetic_metrology_policy_v1(
         design_variance_qualified.then(|| positive_total_variance.sqrt() / population_count as f64);
     let standard_error_ht_mean_brier =
         design_variance_qualified.then(|| brier_total_variance.sqrt() / population_count as f64);
+
+    let assay_observed_ht_positive_rate =
+        assay_ht_positive_total / population_count as f64;
+    let assay_informativeness = episode.metrology_characteristics.sensitivity
+        + episode.metrology_characteristics.specificity
+        - 1.0;
+    let assay_adjusted_ht_prevalence = (assay_informativeness.abs() > 1.0e-12).then(|| {
+        (assay_observed_ht_positive_rate
+            - (1.0 - episode.metrology_characteristics.specificity))
+            / assay_informativeness
+    });
+
+    let mut assay_positive_total_variance = 0.0;
+    let mut assay_design_variance_qualified = true;
+    for (stratum, residual_population) in &selection.residual_population_by_stratum {
+        let sample_count = selection.audit_quota_by_stratum[stratum];
+        if sample_count == *residual_population {
+            continue;
+        }
+        if sample_count < 2 {
+            assay_design_variance_qualified = false;
+            continue;
+        }
+        let Some(sample) = randomized_assay_by_stratum.get(stratum) else {
+            assay_design_variance_qualified = false;
+            continue;
+        };
+        let Some(sample_variance) = finite_population_sample_variance(sample) else {
+            assay_design_variance_qualified = false;
+            continue;
+        };
+        let finite_population_correction = 1.0 - sample_count as f64 / *residual_population as f64;
+        assay_positive_total_variance += (*residual_population as f64).powi(2)
+            * finite_population_correction
+            * sample_variance
+            / sample_count as f64;
+    }
+    let assay_estimator_qualified = assay_design_variance_qualified
+        && assay_informativeness.abs() > 1.0e-12;
+    let assay_adjusted_ht_standard_error = assay_estimator_qualified.then(|| {
+        assay_positive_total_variance.sqrt()
+            / (population_count as f64 * assay_informativeness.abs())
+    });
+    let assay_adjusted_ht_absolute_error = assay_adjusted_ht_prevalence
+        .map(|estimate| (estimate - true_defect_prevalence).abs());
     let hidden_truth_sha256 = json_sha256(&episode.hidden_truth)?;
 
     let mut report = SyntheticFabPolicyEvaluationV1 {
@@ -1217,6 +1276,11 @@ pub fn evaluate_synthetic_metrology_policy_v1(
         true_defect_prevalence,
         metrology_sensitivity: episode.metrology_characteristics.sensitivity,
         metrology_specificity: episode.metrology_characteristics.specificity,
+        assay_observed_ht_positive_rate,
+        assay_adjusted_ht_prevalence,
+        assay_adjusted_ht_absolute_error,
+        assay_adjusted_ht_standard_error,
+        assay_estimator_qualified,
         mean_latent_process_state: latent_process_state_total / population_count as f64,
         mean_defect_score: defect_score_total / population_count as f64,
         selected_sample_prevalence,
