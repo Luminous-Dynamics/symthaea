@@ -116,9 +116,155 @@
     "mean_absolute_displacement_coordinate_units": 0.05555555555555555
   },
   "interpretation": {
-    "empirical_measure_change": "The added outlier has weight 1e-12; the physical mass of the original inliers is unchanged before any optional renormalization of total weights.",
-    "normalization_change": "The exact NEOPIC arXiv v1 transform independently maps each sample to [0,1]. The sample support changes from [0.1,0.9] to [0,0.9], remapping every existing inlier except the upper endpoint even though the new particle weight is negligible.",
+    "empirical_measure_change": "There are two distinct examples: the source-faithful unweighted case adds one equally weighted particle; the weighted extension adds a 1e-12-mass support point while leaving original inlier mass essentially unchanged. The tagged normalization code ignores weights in both cases.",
+    "normalization_change": "The exact NEOPIC arXiv v1 transform independently maps each sample to [0,1]. In either example, support changes from [0.1,0.9] to [0,0.9], shifting every original inlier except the upper endpoint.",
     "expected_disposition": "Detect and report normalization-induced global coordinate drift separately from sampling / learned-operator error.",
-    "scope_limit": "The formula and [0,1] output interval match the pinned NEOPIC arXiv v1 code. This is still a synthetic one-coordinate sample-space witness, not a learned field-output error, physical kinetic simulation or proof of failure in the published model."
+    "scope_limit": "The normalization formula and [0,1] output interval match the pinned NEOPIC arXiv v1 code. The equal-weight example matches its unweighted particle-position input convention. The weighted example is an extension to weighted particle measures, not the paper's native input interface. Neither example is a learned field-output error or kinetic simulation."
+  },
+  "source_faithful_unweighted_case": {
+    "description": "Source-faithful unweighted particle-position sample: every listed particle contributes equally to the empirical measure.",
+    "base_cloud": {
+      "positions": [
+        0.1,
+        0.3,
+        0.5,
+        0.7,
+        0.9
+      ],
+      "normalized_positions": [
+        0,
+        0.25,
+        0.5,
+        0.75,
+        1
+      ],
+      "equal_particle_weights": [
+        0.2,
+        0.2,
+        0.2,
+        0.2,
+        0.2
+      ]
+    },
+    "augmented_cloud": {
+      "positions": [
+        0,
+        0.1,
+        0.3,
+        0.5,
+        0.7,
+        0.9
+      ],
+      "normalized_positions": [
+        0,
+        0.1111111111111111,
+        0.3333333333333333,
+        0.5555555555555556,
+        0.7777777777777778,
+        1
+      ],
+      "equal_particle_weights": [
+        0.16666666666666666,
+        0.16666666666666666,
+        0.16666666666666666,
+        0.16666666666666666,
+        0.16666666666666666,
+        0.16666666666666666
+      ]
+    },
+    "matched_original_particle_comparison": {
+      "physical_positions": [
+        0.1,
+        0.3,
+        0.5,
+        0.7,
+        0.9
+      ],
+      "normalized_before": [
+        0,
+        0.25,
+        0.5,
+        0.75,
+        1
+      ],
+      "normalized_after": [
+        0.1111111111111111,
+        0.3333333333333333,
+        0.5555555555555556,
+        0.7777777777777778,
+        1
+      ],
+      "signed_displacement": [
+        0.1111111111111111,
+        0.08333333333333333,
+        0.05555555555555555,
+        0.027777777777777776,
+        0
+      ],
+      "max_absolute_displacement": 0.1111111111111111,
+      "mean_absolute_displacement": 0.05555555555555555
+    },
+    "empirical_measure_note": "The unweighted empirical measure changes by adding one of six equally weighted particles and changing the sample count. This case demonstrates native per-sample support sensitivity, not negligible-mass invariance."
+  },
+  "weighted_measure_extension": {
+    "description": "Weighted empirical-measure extension. The tagged NEOPIC normalizer still receives only positions and ignores these weights; this case is not claimed to be the paper's native unweighted data interface.",
+    "base_cloud": {
+      "positions": [
+        0.1,
+        0.3,
+        0.5,
+        0.7,
+        0.9
+      ],
+      "weights": [
+        0.2,
+        0.2,
+        0.2,
+        0.2,
+        0.2
+      ]
+    },
+    "augmented_cloud": {
+      "positions": [
+        0,
+        0.1,
+        0.3,
+        0.5,
+        0.7,
+        0.9
+      ],
+      "weights": [
+        1e-12,
+        0.1999999999998,
+        0.1999999999998,
+        0.1999999999998,
+        0.1999999999998,
+        0.1999999999998
+      ]
+    },
+    "normalized_coordinates_of_original_particles_before": [
+      0,
+      0.25,
+      0.5,
+      0.75,
+      1
+    ],
+    "normalized_coordinates_of_original_particles_after": [
+      0.1111111111111111,
+      0.3333333333333333,
+      0.5555555555555556,
+      0.7777777777777778,
+      1
+    ],
+    "signed_displacement": [
+      0.1111111111111111,
+      0.08333333333333333,
+      0.05555555555555555,
+      0.027777777777777776,
+      0
+    ],
+    "max_absolute_displacement": 0.1111111111111111,
+    "mean_absolute_displacement": 0.05555555555555555,
+    "empirical_measure_note": "The added support point has mass 1e-12 and original inlier mass is otherwise preserved (before any optional final mass normalization). The position-only min-max map ignores this mass and remaps all inliers except the upper endpoint."
   }
 }
