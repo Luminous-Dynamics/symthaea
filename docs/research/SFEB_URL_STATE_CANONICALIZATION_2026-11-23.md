@@ -63,6 +63,7 @@ The writer emits uppercase percent hex and leaves only unreserved bytes literal.
 - Initial URL parsing now returns a Result rather than silently defaulting.
 - Invalid URL state is surfaced as an accessible alert.
 - The initial invalid URL is not rewritten until the user deliberately changes a filter or clears the state.
+- The price input parser now rejects values above 9,007,199,254,740,991 cents at the UI boundary, matching the cross-language evaluator limit; tests cover the exact maximum and the next integer.
 - User interactions clear the initial URL error and then persist a valid complete state URL.
 
 ## Reproduction commands (pending a Rust-capable environment)

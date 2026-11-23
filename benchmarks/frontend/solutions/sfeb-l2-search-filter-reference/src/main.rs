@@ -48,7 +48,9 @@ fn parse_price_cents(raw: &str) -> Option<Option<u64>> {
         2 => fraction_text.parse::<u64>().ok()?,
         _ => return None,
     };
-    whole.checked_mul(100)?.checked_add(fraction).map(Some)
+    let cents = whole.checked_mul(100)?.checked_add(fraction)?;
+    if cents > 9_007_199_254_740_991 { return None; }
+    Some(Some(cents))
 }
 
 fn compute_page(assets: &[Asset], query: &QueryState) -> Result<PageView, String> {
@@ -164,7 +166,7 @@ fn App() -> impl IntoView {
                                             input_error.set(None);
                                             query.update(|state| { state.min_price_cents = value; state.page = 1; });
                                         }
-                                        None => input_error.set(Some("Use a non-negative price with at most two decimal places.".to_string())),
+                                        None => input_error.set(Some("Use a non-negative price with at most two decimal places within the supported safe-integer range.".to_string())),
                                     }
                                 } />
                         </div>
@@ -179,7 +181,7 @@ fn App() -> impl IntoView {
                                             input_error.set(None);
                                             query.update(|state| { state.max_price_cents = value; state.page = 1; });
                                         }
-                                        None => input_error.set(Some("Use a non-negative price with at most two decimal places.".to_string())),
+                                        None => input_error.set(Some("Use a non-negative price with at most two decimal places within the supported safe-integer range.".to_string())),
                                     }
                                 } />
                         </div>
@@ -344,6 +346,15 @@ mod tests {
     #[test]
     fn invalid_initial_url_is_rejected_without_defaulting() {
         assert!(search_filter::decode_state_url("?state=%").is_err());
+    }
+
+    #[test]
+    fn integer_price_parser_enforces_javascript_safe_integer_ceiling() {
+        assert_eq!(
+            parse_price_cents("90071992547409.91"),
+            Some(Some(9_007_199_254_740_991))
+        );
+        assert_eq!(parse_price_cents("90071992547409.92"), None);
     }
 
     #[test]
