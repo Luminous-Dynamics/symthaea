@@ -1,0 +1,73 @@
+{
+  "schema_version": "0.1.0",
+  "dataset": {
+    "id": "AMB2025-02",
+    "doi": "10.18434/mds2-3735",
+    "title": "AMB2025-02 Macroscale Quasi-Static Tensile Tests of PBF-L IN718",
+    "publisher": "National Institute of Standards and Technology (NIST)",
+    "source_url": "https://doi.org/10.18434/mds2-3735",
+    "repository_url": "https://data.nist.gov/od/id/mds2-3735",
+    "descriptive_readme_url": "https://www.nist.gov/system/files/documents/2025/03/05/readme%20AMB2025-02%20Macroscale%20Quasi-Static%20Tensile%20Tests%20of%20PBF-L%20IN718.pdf",
+    "citation_policy": "Use the citation and attribution instructions on the DOI landing page verbatim; do not infer a substitute citation.",
+    "source_revision": "DOI record 10.18434/mds2-3735; artifact inventory pending",
+    "metadata_accessed_on": "2026-10-18"
+  },
+  "related_sources": [
+    {
+      "id": "AMB2022-01-modeling-description",
+      "doi": "10.18434/mds2-2607",
+      "role": "AM Bench 2022 3D-build modeling-challenge description data; candidate calibration reference",
+      "url": "https://doi.org/10.18434/mds2-2607"
+    },
+    {
+      "id": "AMB2022-01-thermography-processing",
+      "doi": "10.18434/mds2-2715",
+      "role": "in-situ thermography and data-processing scripts for IN718 builds; candidate calibration reference",
+      "url": "https://doi.org/10.18434/mds2-2715"
+    },
+    {
+      "id": "AMB2022-01-microstructure",
+      "doi": "10.18434/mds2-2692",
+      "role": "microstructure measurements for IN718 3D builds; candidate calibration reference",
+      "url": "https://doi.org/10.18434/mds2-2692"
+    },
+    {
+      "id": "AMB2022-01-residual-strain-stress-deflection",
+      "doi": "10.18434/mds2-2711",
+      "role": "residual elastic strain, residual stress, and part-deflection measurements; candidate calibration reference",
+      "url": "https://doi.org/10.18434/mds2-2711"
+    },
+    {
+      "id": "AMB2022-01-serial-sectioning-xct",
+      "doi": "10.18434/mds2-2767",
+      "role": "serial-sectioning and X-ray CT measurements; explicitly linked by the AMB2025-02 README as the EBSD-related calibration source",
+      "url": "https://doi.org/10.18434/mds2-2767"
+    },
+    {
+      "id": "AMB2022-01-description-web",
+      "doi": "not_applicable_web_description",
+      "role": "NIST AM Bench 2022 challenge-problem descriptions and source links",
+      "url": "https://www.nist.gov/ambench/am-bench-2022-challenge-problems-and-measurement-results"
+    }
+  ],
+  "challenge_context": {
+    "material": "IN718",
+    "process": "laser powder bed fusion (PBF-LB; NIST title uses PBF-L)",
+    "condition": "as-built; no heat treatment",
+    "test_method": "ASTM E8",
+    "strain_rate_per_second": 0.001,
+    "gauge_length_mm": 3,
+    "target_specimen_count": 8,
+    "target_parent_specimen_id": "AMB2022-718-AMMT-B7-P4",
+    "target_definition": "Average tensile properties across all eight miniature specimens; exact target field names must come from the official dataset/submission template.",
+    "split_policy": "Outcome labels for the target parent lineage are held out as one group. Never randomly split the eight sibling specimens and represent them as independent-build validation."
+  },
+  "reuse_policy": {
+    "artifact_terms_reviewed": false,
+    "local_use_authorized": false,
+    "repository_bundling_authorized": false,
+    "status_note": "Metadata/link only. Dataset bytes are intentionally not copied into this repository until artifact-specific terms, attribution, and local-use permissions are reviewed."
+  },
+  "artifacts": [],
+  "source_objects": []
+}

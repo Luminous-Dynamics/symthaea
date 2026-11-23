@@ -1,0 +1,327 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Source-bound measurement observation set v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "records"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "records": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "record_id",
+          "source_doi",
+          "specimen_id",
+          "lineage_group_id",
+          "variable_id",
+          "role",
+          "split",
+          "censoring",
+          "source_field",
+          "raw_unit",
+          "source_object_id",
+          "source_row_id"
+        ],
+        "properties": {
+          "record_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_doi": {
+            "type": "string",
+            "minLength": 1
+          },
+          "specimen_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "lineage_group_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "variable_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "role": {
+            "enum": [
+              "predictor",
+              "target_outcome"
+            ]
+          },
+          "split": {
+            "enum": [
+              "calibration",
+              "held_out"
+            ]
+          },
+          "raw_value": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "raw_unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "normalized_value": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "normalized_unit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "conversion_note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reported_uncertainty": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "uncertainty_unit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "censoring": {
+            "enum": [
+              "uncensored",
+              "left_censored",
+              "right_censored",
+              "interval_censored",
+              "unknown"
+            ]
+          },
+          "metadata_note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_field": {
+            "type": "string",
+            "minLength": 1
+          },
+          "censor_lower_bound": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "censor_upper_bound": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "source_object_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_row_id": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "normalized_value": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "normalized_value"
+              ]
+            },
+            "then": {
+              "required": [
+                "raw_value",
+                "raw_unit",
+                "normalized_unit",
+                "conversion_note"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "reported_uncertainty": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "reported_uncertainty"
+              ]
+            },
+            "then": {
+              "required": [
+                "uncertainty_unit"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "censoring": {
+                  "const": "unknown"
+                }
+              },
+              "required": [
+                "censoring"
+              ]
+            },
+            "then": {
+              "required": [
+                "metadata_note"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "censoring": {
+                  "const": "uncensored"
+                }
+              },
+              "required": [
+                "censoring"
+              ]
+            },
+            "then": {
+              "required": [
+                "raw_value",
+                "censor_lower_bound",
+                "censor_upper_bound"
+              ],
+              "properties": {
+                "raw_value": {
+                  "type": "number"
+                },
+                "censor_lower_bound": {
+                  "type": "null"
+                },
+                "censor_upper_bound": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "censoring": {
+                  "const": "left_censored"
+                }
+              },
+              "required": [
+                "censoring"
+              ]
+            },
+            "then": {
+              "properties": {
+                "raw_value": {
+                  "type": "null"
+                },
+                "censor_lower_bound": {
+                  "type": "null"
+                },
+                "censor_upper_bound": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "raw_value",
+                "censor_lower_bound",
+                "censor_upper_bound"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "censoring": {
+                  "const": "right_censored"
+                }
+              },
+              "required": [
+                "censoring"
+              ]
+            },
+            "then": {
+              "properties": {
+                "raw_value": {
+                  "type": "null"
+                },
+                "censor_lower_bound": {
+                  "type": "number"
+                },
+                "censor_upper_bound": {
+                  "type": "null"
+                }
+              },
+              "required": [
+                "raw_value",
+                "censor_lower_bound",
+                "censor_upper_bound"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "censoring": {
+                  "const": "interval_censored"
+                }
+              },
+              "required": [
+                "censoring"
+              ]
+            },
+            "then": {
+              "properties": {
+                "raw_value": {
+                  "type": "null"
+                },
+                "censor_lower_bound": {
+                  "type": "number"
+                },
+                "censor_upper_bound": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "raw_value",
+                "censor_lower_bound",
+                "censor_upper_bound"
+              ]
+            }
+          }
+        ]
+      }
+    }
+  }
+}

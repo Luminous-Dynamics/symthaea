@@ -1,0 +1,490 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Metal Measurement Evidence Audit Receipt v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "receipt_schema_version",
+    "adapter_version",
+    "source_commit",
+    "operation",
+    "status",
+    "manifest_sha256",
+    "evidence_input_sha256",
+    "artifact_count",
+    "record_count",
+    "held_out_outcome_groups",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "receipt_schema_version": {
+      "const": "0.1.0"
+    },
+    "adapter_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_commit": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9a-f]{40,64}$"
+    },
+    "operation": {
+      "enum": [
+        "validate-manifest",
+        "verify-artifacts",
+        "inspect-csv",
+        "validate-records",
+        "reconcile-csv",
+        "inspect-zip"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "minLength": 1
+    },
+    "manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "evidence_input_sha256": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "artifact_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "record_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "held_out_outcome_groups": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "csv_inventory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_relative_path",
+        "artifact_sha256",
+        "data_row_count",
+        "columns",
+        "row_identity_note",
+        "claim_ceiling"
+      ],
+      "properties": {
+        "artifact_relative_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "artifact_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "data_row_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "columns": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "source_header",
+              "column_index_zero_based",
+              "nonempty_cells",
+              "empty_cells"
+            ],
+            "properties": {
+              "source_header": {
+                "type": "string",
+                "minLength": 1
+              },
+              "column_index_zero_based": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "nonempty_cells": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "empty_cells": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        },
+        "row_identity_note": {
+          "type": "string",
+          "minLength": 1
+        },
+        "claim_ceiling": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    },
+    "csv_reconciliation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_relative_path",
+        "artifact_sha256",
+        "mapping_sha256",
+        "headers_sha256",
+        "source_row_id_header",
+        "ordered_source_row_ids_sha256",
+        "data_row_count",
+        "unique_source_row_ids",
+        "mapped_column_count",
+        "columns",
+        "reconciliation_note",
+        "claim_ceiling",
+        "excluded_column_count",
+        "excluded_columns"
+      ],
+      "properties": {
+        "artifact_relative_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "artifact_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "mapping_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "headers_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "source_row_id_header": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ordered_source_row_ids_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "data_row_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unique_source_row_ids": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "mapped_column_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "columns": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "source_header",
+              "canonical_field_id",
+              "raw_unit",
+              "role",
+              "missing_policy",
+              "nonempty_cells",
+              "preserved_missing_cells",
+              "value_kind",
+              "missing_tokens",
+              "missing_token_counts",
+              "numeric_values_validated",
+              "preserved_missing_token_cells"
+            ],
+            "properties": {
+              "source_header": {
+                "type": "string",
+                "minLength": 1
+              },
+              "canonical_field_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "raw_unit": {
+                "type": "string",
+                "minLength": 1
+              },
+              "role": {
+                "enum": [
+                  "metadata",
+                  "predictor",
+                  "target_outcome"
+                ]
+              },
+              "missing_policy": {
+                "enum": [
+                  "reject",
+                  "preserve_missing"
+                ]
+              },
+              "nonempty_cells": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "preserved_missing_cells": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "value_kind": {
+                "enum": [
+                  "text",
+                  "finite_number"
+                ]
+              },
+              "missing_tokens": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "uniqueItems": true
+              },
+              "missing_token_counts": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "numeric_values_validated": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "preserved_missing_token_cells": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        },
+        "reconciliation_note": {
+          "type": "string",
+          "minLength": 1
+        },
+        "claim_ceiling": {
+          "type": "string",
+          "minLength": 1
+        },
+        "excluded_column_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "excluded_columns": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "source_header",
+              "reason",
+              "nonempty_cells",
+              "empty_cells"
+            ],
+            "properties": {
+              "source_header": {
+                "type": "string",
+                "minLength": 1
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              },
+              "nonempty_cells": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "empty_cells": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      }
+    },
+    "zip_inventory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_relative_path",
+        "archive_sha256",
+        "member_count",
+        "total_uncompressed_bytes",
+        "members",
+        "inventory_note",
+        "claim_ceiling"
+      ],
+      "properties": {
+        "artifact_relative_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "archive_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "member_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_uncompressed_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "members": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "member_path",
+              "compressed_size_bytes",
+              "uncompressed_size_bytes",
+              "crc32_hex",
+              "is_directory",
+              "unix_mode"
+            ],
+            "properties": {
+              "member_path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "compressed_size_bytes": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "uncompressed_size_bytes": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "crc32_hex": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{8}$"
+              },
+              "is_directory": {
+                "type": "boolean"
+              },
+              "unix_mode": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 4294967295
+              }
+            }
+          }
+        },
+        "inventory_note": {
+          "type": "string",
+          "minLength": 1
+        },
+        "claim_ceiling": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "operation": {
+            "const": "inspect-csv"
+          }
+        },
+        "required": [
+          "operation"
+        ]
+      },
+      "then": {
+        "required": [
+          "csv_inventory"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "csv_inventory"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "operation": {
+            "const": "reconcile-csv"
+          }
+        },
+        "required": [
+          "operation"
+        ]
+      },
+      "then": {
+        "required": [
+          "csv_reconciliation"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "csv_reconciliation"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "operation": {
+            "const": "inspect-zip"
+          }
+        },
+        "required": [
+          "operation"
+        ]
+      },
+      "then": {
+        "required": [
+          "zip_inventory"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "zip_inventory"
+          ]
+        }
+      }
+    }
+  ]
+}

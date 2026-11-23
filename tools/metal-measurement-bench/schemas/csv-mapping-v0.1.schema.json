@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Metal Measurement Source CSV Mapping v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_relative_path",
+    "source_row_id_header",
+    "columns",
+    "excluded_columns"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "artifact_relative_path": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Exact manifest-declared relative artifact path; must match the CLI argument."
+    },
+    "source_row_id_header": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Exact source header containing stable source-native row identity; row ordinals are not substituted."
+    },
+    "columns": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "source_header",
+          "canonical_field_id",
+          "raw_unit",
+          "role",
+          "missing_policy",
+          "value_kind",
+          "missing_tokens"
+        ],
+        "properties": {
+          "source_header": {
+            "type": "string",
+            "minLength": 1
+          },
+          "canonical_field_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Explicit stable field identity supplied by the profile author; never inferred from display text."
+          },
+          "raw_unit": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Explicit source unit or declared non-numeric type label; this tool does not infer unit semantics."
+          },
+          "role": {
+            "enum": [
+              "metadata",
+              "predictor",
+              "target_outcome"
+            ]
+          },
+          "missing_policy": {
+            "enum": [
+              "reject",
+              "preserve_missing"
+            ],
+            "description": "Choose whether an empty mapped cell fails reconciliation or is counted explicitly as missing. No imputation is performed."
+          },
+          "value_kind": {
+            "enum": [
+              "text",
+              "finite_number"
+            ],
+            "description": "Explicit lexical validator; numeric fields must parse as finite IEEE-754 values."
+          },
+          "missing_tokens": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^\\S(?:.*\\S)?$"
+            },
+            "description": "Exact, case-sensitive source tokens treated as missing; blank cells are missing separately. Do not guess sentinel values."
+          }
+        }
+      }
+    },
+    "excluded_columns": {
+      "type": "array",
+      "description": "Every source header other than source_row_id_header and mapped columns must be explicitly excluded with a reviewable reason.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "source_header",
+          "reason"
+        ],
+        "properties": {
+          "source_header": {
+            "type": "string",
+            "minLength": 1
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Why the source column is excluded from this profile; the source bytes remain bound in the artifact digest."
+          }
+        }
+      }
+    }
+  }
+}
