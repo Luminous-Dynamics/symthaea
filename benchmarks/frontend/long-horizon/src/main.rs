@@ -1,4 +1,5 @@
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fs;
@@ -440,6 +441,262 @@ fn run_fixture(fixture: &Value) -> Result<(String, usize, usize, usize), String>
     Ok((field_str(fixture, "fixture_id")?.to_string(), cases.len(), relations.len(), controls.len()))
 }
 
+
+const DEFAULT_POLICY: &str = "benchmarks/frontend/long-horizon/event-oracle-policy-v1.json";
+const DEFAULT_TRACE: &str = "benchmarks/frontend/long-horizon/examples/late-event-rollback-trace.json";
+const DEFAULT_POLICY_SCHEMA: &str = "benchmarks/frontend/long-horizon/event-oracle-policy-v1.schema.json";
+const DEFAULT_TRACE_SCHEMA: &str = "benchmarks/frontend/long-horizon/event-execution-trace-v1.schema.json";
+
+fn digest_hex(bytes: &[u8]) -> String {
+    hex::encode(Sha256::digest(bytes))
+}
+
+fn verify_policy(policy: &Value) -> Result<(), String> {
+    if field_str(policy, "schema")? != "sfeb-event-oracle-policy-v1"
+        || field_str(policy, "task_id")? != "SFEB-PILOT-INT-004" {
+        return Err("unsupported event oracle policy".to_string());
+    }
+    let rules = policy.get("rules").and_then(Value::as_array)
+        .ok_or("event oracle policy rules must be an array")?;
+    if rules.len() != 7 {
+        return Err("INT-004 event policy must define exactly seven rules".to_string());
+    }
+    let mut ids = BTreeSet::new();
+    for rule in rules {
+        let id = field_str(rule, "id")?;
+        if !ids.insert(id.to_string()) {
+            return Err(format!("duplicate event oracle rule ID: {id}"));
+        }
+        if rule.get("required").and_then(Value::as_bool) != Some(true)
+            || rule.get("inconclusive_on_missing").and_then(Value::as_bool) != Some(true) {
+            return Err(format!("event oracle rule {id} must be required and fail closed on missing evidence"));
+        }
+    }
+    Ok(())
+}
+
+fn verify_trace_shape(trace: &Value) -> Result<(), String> {
+    let object = trace.as_object().ok_or("event execution trace must be a JSON object")?;
+    const ALLOWED: &[&str] = &["schema","trace_id","case_id","fixture_id","fixture_sha256","steps","worker_claims"];
+    const REQUIRED: &[&str] = &["schema","trace_id","case_id","fixture_id","fixture_sha256","steps"];
+    for key in object.keys() {
+        if !ALLOWED.contains(&key.as_str()) {
+            return Err(format!("unknown event trace field: {key}"));
+        }
+    }
+    for key in REQUIRED {
+        if !object.contains_key(*key) {
+            return Err(format!("missing event trace field: {key}"));
+        }
+    }
+    if field_str(trace, "schema")? != "sfeb-event-execution-trace-v1" {
+        return Err("unsupported event execution trace schema".to_string());
+    }
+    for key in ["trace_id","case_id","fixture_id"] {
+        let value = field_str(trace, key)?;
+        if value.is_empty() || value.len() > 128 {
+            return Err(format!("invalid event trace identity: {key}"));
+        }
+    }
+    if !is_hex_digest(field_str(trace, "fixture_sha256")?, &[64]) {
+        return Err("malformed fixture_sha256 in event trace".to_string());
+    }
+    let steps = trace.get("steps").and_then(Value::as_array)
+        .ok_or("event execution trace steps must be an array")?;
+    if steps.is_empty() || steps.len() > 10_000 {
+        return Err("event execution trace step count is outside 1..=10000".to_string());
+    }
+    if let Some(claims) = trace.get("worker_claims") {
+        if !claims.is_object() {
+            return Err("worker_claims must be an object when present".to_string());
+        }
+    }
+    Ok(())
+}
+
+fn verify_event_trace_values(
+    fixture: &Value,
+    fixture_bytes: &[u8],
+    policy: &Value,
+    policy_bytes: &[u8],
+    trace: &Value,
+    trace_bytes: &[u8],
+) -> Result<Value, String> {
+    verify_policy(policy)?;
+    verify_trace_shape(trace)?;
+    let fixture_id = field_str(fixture, "fixture_id")?;
+    if field_str(trace, "fixture_id")? != fixture_id {
+        return Err("event trace fixture ID does not match frozen fixture".to_string());
+    }
+    let actual_fixture_sha = digest_hex(fixture_bytes);
+    if field_str(trace, "fixture_sha256")? != actual_fixture_sha {
+        return Err("event trace does not bind exact frozen fixture bytes".to_string());
+    }
+    let case_id = field_str(trace, "case_id")?;
+    let cases = fixture.get("cases").and_then(Value::as_array)
+        .ok_or("frozen fixture cases are missing")?;
+    let case = cases.iter().find(|item| item.get("case_id").and_then(Value::as_str) == Some(case_id))
+        .ok_or_else(|| format!("unknown frozen event case: {case_id}"))?;
+    let expected_steps = case.get("steps").and_then(Value::as_array)
+        .ok_or("frozen case steps are missing")?;
+    let observed_steps = trace.get("steps").and_then(Value::as_array)
+        .ok_or("observed event trace steps are missing")?;
+    if expected_steps.len() != observed_steps.len() {
+        return Err("observed event trace does not cover the exact controller step sequence".to_string());
+    }
+    let events = fixture.get("events").and_then(Value::as_array)
+        .ok_or("frozen fixture event list is missing")?;
+    let mut event_map = BTreeMap::<String, Value>::new();
+    for event in events {
+        let id = field_str(event, "event_id")?.to_string();
+        if event_map.insert(id.clone(), event.clone()).is_some() {
+            return Err(format!("duplicate frozen event identity: {id}"));
+        }
+    }
+    let mut state = State::new(&fixture["initial_state"])?;
+    let mut evidence_event_ids = Vec::<String>::new();
+    let mut replay_error: Option<String> = None;
+    for (index, (expected, observed)) in expected_steps.iter().zip(observed_steps).enumerate() {
+        let expected_op = field_str(expected, "op")?;
+        let observed_op = field_str(observed, "op")?;
+        if expected_op != observed_op {
+            return Err(format!("trace step {index} does not match controller operation"));
+        }
+        match expected_op {
+            "submit" => {
+                if observed.get("action") != expected.get("action") {
+                    return Err(format!("trace step {index} action does not match controller input"));
+                }
+                if let Err(error) = state.submit(observed.get("action").ok_or("submit trace step missing action")?) {
+                    replay_error = Some(error);
+                    break;
+                }
+            }
+            "deliver" => {
+                let expected_id = field_str(expected, "event_id")?;
+                let observed_event = observed.get("event").ok_or("deliver trace step missing raw event payload")?;
+                if field_str(observed_event, "event_id")? != expected_id {
+                    return Err(format!("trace step {index} delivered an unexpected event identity"));
+                }
+                let frozen_event = event_map.get(expected_id)
+                    .ok_or_else(|| format!("controller references missing frozen event: {expected_id}"))?;
+                if observed_event != frozen_event {
+                    return Err(format!("trace step {index} event payload differs from frozen authoritative event"));
+                }
+                evidence_event_ids.push(expected_id.to_string());
+                if let Err(error) = state.deliver(observed_event) {
+                    replay_error = Some(error);
+                    break;
+                }
+            }
+            other => return Err(format!("unsupported controller operation in frozen case: {other}")),
+        }
+    }
+
+    let actual_snapshot = state.snapshot();
+    let expected_snapshot = case.get("expected").ok_or("frozen case expected state is missing")?;
+    let snapshot_matches = replay_error.is_none() && subset_matches(&actual_snapshot, expected_snapshot);
+    let expected_last = expected_snapshot.get("last_sequence").and_then(Value::as_u64);
+    let sequence_contiguous = replay_error.is_none()
+        && state.buffered.is_empty()
+        && expected_last == Some(state.last_sequence);
+    let mut unique_audit = BTreeSet::new();
+    let audit_unique = state.audit.iter().all(|event_id| unique_audit.insert(event_id.clone()));
+    let expected_duplicates = expected_snapshot.get("duplicate_deliveries").and_then(Value::as_u64);
+    let idempotent = replay_error.is_none()
+        && audit_unique
+        && expected_duplicates == Some(state.duplicate_deliveries);
+
+    let has_permission_event = evidence_event_ids.iter().any(|id| {
+        event_map.get(id).and_then(|event| event.get("type")).and_then(Value::as_str) == Some("permission_revoked")
+    });
+    let permission_ok = !has_permission_event
+        || (snapshot_matches && expected_snapshot.get("permissions").is_some()
+            && actual_snapshot.get("permissions") == expected_snapshot.get("permissions"));
+
+    let has_conflict_event = evidence_event_ids.iter().any(|id| {
+        event_map.get(id).and_then(|event| event.get("type")).and_then(Value::as_str) == Some("clarification_required")
+    });
+    let clarification_ok = !has_conflict_event || snapshot_matches;
+
+    let expected_audit = expected_snapshot.get("audit_event_ids");
+    let audit_ok = audit_unique && expected_audit == actual_snapshot.get("audit_event_ids")
+        && replay_error.is_none();
+
+    let evaluators = [
+        ("strict_event_contract", replay_error.is_none()),
+        ("contiguous_sequence_replay", sequence_contiguous),
+        ("idempotent_event_identity", idempotent),
+        ("pending_action_reconciliation", snapshot_matches),
+        ("permission_revocation", permission_ok),
+        ("clarification_gate", clarification_ok),
+        ("exactly_once_audit", audit_ok),
+    ];
+    let rules = policy.get("rules").and_then(Value::as_array).ok_or("policy rules missing")?;
+    let mut oracle_results = Vec::new();
+    let mut any_failed = false;
+    for rule in rules {
+        let rule_id = field_str(rule, "id")?;
+        let evaluator = field_str(rule, "evaluator")?;
+        let passed = evaluators.iter().find(|(kind, _)| *kind == evaluator)
+            .map(|(_, value)| *value)
+            .ok_or_else(|| format!("unknown event evaluator in policy: {evaluator}"))?;
+        if !passed { any_failed = true; }
+        let canonical_rule = serde_jcs::to_vec(rule)
+            .map_err(|error| format!("cannot canonicalize event oracle rule: {error}"))?;
+        let event_digests: Result<Vec<String>, String> = evidence_event_ids.iter().map(|id| {
+            let event = event_map.get(id).ok_or_else(|| format!("missing evidence event: {id}"))?;
+            let canonical_event = serde_jcs::to_vec(event)
+                .map_err(|error| format!("cannot canonicalize evidence event: {error}"))?;
+            Ok(digest_hex(&canonical_event))
+        }).collect();
+        oracle_results.push(json!({
+            "oracle_id": rule_id,
+            "severity": rule.get("severity"),
+            "result": if passed { "pass" } else { "fail" },
+            "rule_sha256": digest_hex(&canonical_rule),
+            "evidence_event_sha256": event_digests?,
+            "evidence_artifact_sha256": [],
+            "diagnostic_code": if passed { "derived_from_raw_event_trace" } else { replay_error.as_deref().unwrap_or("semantic_state_mismatch") }
+        }));
+    }
+
+    Ok(json!({
+        "schema": "sfeb-event-oracle-verification-v1",
+        "verification_id": format!("SFEB-VERIFY-{}", field_str(trace, "trace_id")?),
+        "scope": "deterministic_event_semantics_only",
+        "trace_sha256": digest_hex(trace_bytes),
+        "fixture_sha256": actual_fixture_sha,
+        "policy_sha256": digest_hex(policy_bytes),
+        "case_id": case_id,
+        "semantic_decision": if any_failed { "rejected" } else { "accepted" },
+        "worker_claims_consulted": false,
+        "oracle_results": oracle_results,
+        "derived_state": actual_snapshot,
+        "claim_boundary": "This offline evaluator authenticates neither browser execution nor execution identity. It does not produce a signed verifier attestation and does not qualify the UI candidate."
+    }))
+}
+
+fn run_event_trace_verification(
+    trace_path: &str,
+    fixture_path: &str,
+    policy_path: &str,
+) -> Result<(), String> {
+    let trace_bytes = fs::read(trace_path).map_err(|error| format!("cannot read trace {trace_path}: {error}"))?;
+    let fixture_bytes = fs::read(fixture_path).map_err(|error| format!("cannot read fixture {fixture_path}: {error}"))?;
+    let policy_bytes = fs::read(policy_path).map_err(|error| format!("cannot read policy {policy_path}: {error}"))?;
+    let trace: Value = serde_json::from_slice(&trace_bytes).map_err(|error| format!("invalid trace JSON: {error}"))?;
+    let fixture: Value = serde_json::from_slice(&fixture_bytes).map_err(|error| format!("invalid fixture JSON: {error}"))?;
+    let policy: Value = serde_json::from_slice(&policy_bytes).map_err(|error| format!("invalid policy JSON: {error}"))?;
+    let report = verify_event_trace_values(&fixture,&fixture_bytes,&policy,&policy_bytes,&trace,&trace_bytes)?;
+    println!("{}",serde_json::to_string_pretty(&report).map_err(|error|error.to_string())?);
+    if report.get("semantic_decision").and_then(Value::as_str) != Some("accepted") {
+        return Err("independent event semantic replay rejected the observed trace".to_string());
+    }
+    Ok(())
+}
+
+
 fn main_result(path: &str) -> Result<(), String> {
     let bytes = fs::read(path).map_err(|error| format!("cannot read fixture {path}: {error}"))?;
     let fixture: Value = serde_json::from_slice(&bytes).map_err(|error| format!("invalid fixture JSON: {error}"))?;
@@ -450,8 +707,21 @@ fn main_result(path: &str) -> Result<(), String> {
 }
 
 fn main() -> ExitCode {
-    let path = env::args().nth(1).unwrap_or_else(|| DEFAULT_FIXTURE.to_string());
-    match main_result(&path) {
+    let args: Vec<String> = env::args().skip(1).collect();
+    let result = if args.first().is_some_and(|arg| arg == "--verify-event-trace") {
+        if args.len() > 4 {
+            Err("--verify-event-trace accepts TRACE_JSON [FIXTURE_JSON [POLICY_JSON]]".to_string())
+        } else {
+            run_event_trace_verification(
+                args.get(1).map(String::as_str).unwrap_or(DEFAULT_TRACE),
+                args.get(2).map(String::as_str).unwrap_or(DEFAULT_FIXTURE),
+                args.get(3).map(String::as_str).unwrap_or(DEFAULT_POLICY),
+            )
+        }
+    } else {
+        main_result(args.first().map(String::as_str).unwrap_or(DEFAULT_FIXTURE))
+    };
+    match result {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => { eprintln!("sfeb-reconciliation-check: {error}"); ExitCode::FAILURE }
     }
@@ -469,7 +739,7 @@ mod tests {
     fn all_golden_cases_metamorphic_pairs_and_negative_controls_match() {
         let (id, cases, relations, negatives) = run_fixture(&fixture()).expect("event fixture should pass");
         assert_eq!(id, "SFEB-INT-004-EVENTS-001");
-        assert_eq!((cases, relations, negatives), (6, 1, 4));
+        assert_eq!((cases, relations, negatives), (6, 1, 6));
     }
 
     #[test]
@@ -536,6 +806,47 @@ mod tests {
         state.deliver(&original).unwrap();
         assert_eq!(state.last_sequence, 1);
         assert_eq!(state.audit, vec!["evt-001"]);
+    }
+
+
+    #[test]
+    fn independent_event_verifier_ignores_worker_claims() {
+        let fixture_bytes = include_bytes!("../event-reconciliation-v1.json");
+        let policy_bytes = include_bytes!("../event-oracle-policy-v1.json");
+        let trace_bytes = include_bytes!("../examples/late-event-rollback-trace.json");
+        let fixture: Value = serde_json::from_slice(fixture_bytes).unwrap();
+        let policy: Value = serde_json::from_slice(policy_bytes).unwrap();
+        let mut trace: Value = serde_json::from_slice(trace_bytes).unwrap();
+        let fixture_sha = digest_hex(fixture_bytes);
+        trace["fixture_sha256"] = json!(fixture_sha);
+        let trace_bytes = serde_json::to_vec(&trace).unwrap();
+        let first = verify_event_trace_values(&fixture,fixture_bytes,&policy,policy_bytes,&trace,&trace_bytes).unwrap();
+        assert_eq!(first["semantic_decision"], "accepted");
+        assert_eq!(first["worker_claims_consulted"], false);
+        assert_eq!(first["oracle_results"].as_array().unwrap().len(), 7);
+
+        trace["worker_claims"]["disposition"] = json!("rejected");
+        trace["worker_claims"]["observed_oracle_ids"] = json!(["fake.failure","fake.security"]);
+        let forged_worker_bytes = serde_json::to_vec(&trace).unwrap();
+        let second = verify_event_trace_values(&fixture,fixture_bytes,&policy,policy_bytes,&trace,&forged_worker_bytes).unwrap();
+        assert_eq!(first["oracle_results"], second["oracle_results"]);
+        assert_eq!(second["semantic_decision"], "accepted");
+    }
+
+    #[test]
+    fn independent_event_verifier_rejects_event_payload_not_in_frozen_fixture() {
+        let fixture_bytes = include_bytes!("../event-reconciliation-v1.json");
+        let policy_bytes = include_bytes!("../event-oracle-policy-v1.json");
+        let trace_bytes = include_bytes!("../examples/late-event-rollback-trace.json");
+        let fixture: Value = serde_json::from_slice(fixture_bytes).unwrap();
+        let policy: Value = serde_json::from_slice(policy_bytes).unwrap();
+        let mut trace: Value = serde_json::from_slice(trace_bytes).unwrap();
+        trace["fixture_sha256"] = json!(digest_hex(fixture_bytes));
+        trace["steps"][1]["event"]["to_status"] = json!("done");
+        let changed_bytes = serde_json::to_vec(&trace).unwrap();
+        let error = verify_event_trace_values(&fixture,fixture_bytes,&policy,policy_bytes,&trace,&changed_bytes)
+            .expect_err("altered event payload must be rejected");
+        assert!(error.contains("differs from frozen authoritative event"));
     }
 
     #[test]
