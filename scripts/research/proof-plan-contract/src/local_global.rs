@@ -519,7 +519,10 @@ mod tests {
     #[test]
     fn scope_changed_pair_cannot_be_marked_eligible() {
         let mut pair = fixture();
-        pair.candidate.global_stage.scope_binding.hypothesis_set_sha256 =
+        pair.candidate
+            .global_stage
+            .scope_binding
+            .hypothesis_set_sha256 =
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_owned();
         assert!(
             validate_pair(&pair)
