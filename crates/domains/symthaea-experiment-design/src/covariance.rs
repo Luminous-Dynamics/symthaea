@@ -631,6 +631,55 @@ mod tests {
     }
 
     #[test]
+    fn three_hypotheses_use_the_worst_pair_and_require_every_pair_covariance() {
+        let mut input = covariance_redundancy_fixture();
+        input.hypothesis_ids.push("H2".to_owned());
+
+        for experiment in &mut input.experiments {
+            let means = if experiment.experiment_id == "base_two_observables" {
+                vec![0.0, 1.0]
+            } else {
+                vec![0.0, 1.0, 1.0]
+            };
+            experiment.predictions.push(VectorHypothesisPrediction {
+                hypothesis_id: "H2".to_owned(),
+                model_descriptor: "synthetic-control:model:H2:v1".to_owned(),
+                model_digest_sha256: format!(
+                    "{:x}",
+                    Sha256::digest("synthetic-control:model:H2:v1".as_bytes())
+                ),
+                means,
+            });
+
+            let mut pair_02 = experiment.pairwise_difference_covariances[0].clone();
+            pair_02.first_hypothesis_id = "H0".to_owned();
+            pair_02.second_hypothesis_id = "H2".to_owned();
+            experiment.pairwise_difference_covariances.push(pair_02.clone());
+
+            let mut pair_12 = pair_02;
+            pair_12.first_hypothesis_id = "H1".to_owned();
+            pair_12.second_hypothesis_id = "H2".to_owned();
+            experiment.pairwise_difference_covariances.push(pair_12);
+        }
+
+        let report = rank_covariance_aware_experiments(&input).unwrap();
+        for candidate in &report.ranked_experiments {
+            assert!((candidate.worst_case_separation_squared - (4.0 / 3.0)).abs() < 1.0e-10);
+            assert_eq!(
+                candidate.closest_hypothesis_pair,
+                ["H0".to_owned(), "H2".to_owned()]
+            );
+        }
+
+        let mut missing = input;
+        missing.experiments[0].pairwise_difference_covariances.pop();
+        assert!(matches!(
+            rank_covariance_aware_experiments(&missing),
+            Err(CovarianceDesignError::InvalidInput(_))
+        ));
+    }
+
+    #[test]
     fn diagonal_unit_rescaling_preserves_the_score() {
         let mut input = covariance_redundancy_fixture();
         let experiment = input.experiments.iter_mut().find(|x| x.experiment_id == "base_two_observables").unwrap();
