@@ -104,6 +104,8 @@ pub trait EvidenceQualificationSignatureVerifierV1 {
         key_id: &str,
         payload_sha256: &str,
         signature: &[u8],
+        issued_at_unix: u64,
+        now_unix: u64,
     ) -> Result<(), EvidenceQualificationRejectV1>;
 }
 
@@ -127,6 +129,14 @@ pub enum EvidenceQualificationRejectV1 {
     EmptySignature,
     SignatureTooLarge,
     SignatureRejected,
+    TrustProfileInvalid,
+    TrustProfileDigestMismatch,
+    UnknownKey,
+    RevokedKey,
+    KeyNotYetValid,
+    KeyExpired,
+    InvalidPublicKey,
+    InvalidSignatureEncoding,
 }
 
 /// Capability token created only by verify_and_bind. Callers cannot construct
@@ -204,6 +214,8 @@ impl VerifiedEvidenceQualificationV1 {
                 &receipt.key_id,
                 &payload_sha256,
                 &receipt.signature,
+                receipt.issued_at_unix,
+                binding.now_unix,
             )
             .map_err(|_| EvidenceQualificationRejectV1::SignatureRejected)?;
 
@@ -546,6 +558,7 @@ mod tests {
     impl EvidenceQualificationSignatureVerifierV1 for TestSignatureVerifier {
         fn verify_signature(
             &self, profile: &str, key_id: &str, payload: &str, signature: &[u8],
+            _issued_at_unix: u64, _now_unix: u64,
         ) -> Result<(), EvidenceQualificationRejectV1> {
             if valid_sha256(profile) && key_id == "test-key" && signature == payload.as_bytes() {
                 Ok(())
