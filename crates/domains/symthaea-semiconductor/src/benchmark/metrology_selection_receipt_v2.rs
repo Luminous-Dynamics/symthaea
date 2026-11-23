@@ -178,7 +178,10 @@ fn validate_configuration(
         ));
     }
     if config.total_cost_budget == 0
-        || config.exploit_cost_budget + config.audit_cost_budget > config.total_cost_budget
+        || config
+            .exploit_cost_budget
+            .checked_add(config.audit_cost_budget)
+            .is_none_or(|sum| sum > config.total_cost_budget)
         || config.exploit_cost_budget > config.total_cost_budget
         || config.audit_cost_budget > config.total_cost_budget
     {
@@ -534,10 +537,39 @@ mod tests {
     }
 
     #[test]
+    fn changed_policy_weight_without_configuration_digest_update_is_rejected() {
+        let candidate_scores = candidates();
+        let config = configuration(&candidate_scores);
+        let mut receipt = build_selection_receipt_v2(&config, &candidate_scores).unwrap();
+        receipt.configuration.risk_weight = 0.7;
+        receipt.configuration.uncertainty_weight = 0.1;
+        receipt.receipt_sha256.clear();
+        receipt.receipt_sha256 = receipt_digest(&receipt).unwrap();
+        assert!(verify_selection_receipt_v2(&receipt).is_err());
+    }
+
+    #[test]
+    fn resealed_candidate_and_config_tampering_still_fails_selection_replay() {
+        let candidate_scores = candidates();
+        let config = configuration(&candidate_scores);
+        let mut receipt = build_selection_receipt_v2(&config, &candidate_scores).unwrap();
+        receipt.candidate_scores[0].predicted_defect_probability += 0.2;
+        receipt.configuration.prediction_packet_sha256 =
+            json_sha256(&receipt.candidate_scores).unwrap();
+        receipt.configuration_sha256 = json_sha256(&receipt.configuration).unwrap();
+
+        // The forged report keeps the old per-candidate priority and selection.
+        // Rerunning the selector from the changed raw score must disagree.
+        receipt.receipt_sha256.clear();
+        receipt.receipt_sha256 = receipt_digest(&receipt).unwrap();
+        assert!(verify_selection_receipt_v2(&receipt).is_err());
+    }
+
+    #[test]
     fn candidate_order_is_canonicalized_and_digest_bound() {
         let mut candidate_scores = candidates();
-        candidate_scores.reverse();
         let config = configuration(&candidate_scores);
+        candidate_scores.reverse();
         let receipt = build_selection_receipt_v2(&config, &candidate_scores).unwrap();
         assert!(receipt
             .candidate_scores
