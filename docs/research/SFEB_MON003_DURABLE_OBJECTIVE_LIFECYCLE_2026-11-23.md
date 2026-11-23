@@ -3,7 +3,7 @@
 **Date:** 2026-11-23  
 **Parent:** [MON-003 issue #13398](https://github.com/Luminous-Dynamics/symthaea/issues/13398)  
 **Related:** [MON-001 issue #13392](https://github.com/Luminous-Dynamics/symthaea/issues/13392), [MON-002 issue #13394](https://github.com/Luminous-Dynamics/symthaea/issues/13394)  
-**Status:** specification committed; 8-case deterministic JavaScript reference kernel committed and executed under Node.js v22.16.0; production qualification pending
+**Status:** specification committed; 9-case deterministic JavaScript reference kernel committed and executed under Node.js v22.16.0; production qualification pending
 
 ## 1. Research thesis
 
@@ -258,7 +258,8 @@ This document specifies a research direction and acceptance contract; the compan
 
 ## 12. Executed reference-kernel increment (2026-11-23)
 
-Companion source: `benchmarks/frontend/monitoring/mon003-objective-kernel-v1.mjs`
+Companion source: `benchmarks/frontend/monitoring/mon003-objective-kernel-v1.mjs`  
+Machine-readable report: `benchmarks/frontend/monitoring/mon003-reference-report-v1.json`
 
 Exact local execution:
 ```sh
@@ -266,9 +267,9 @@ node --check benchmarks/frontend/monitoring/mon003-objective-kernel-v1.mjs
 node benchmarks/frontend/monitoring/mon003-objective-kernel-v1.mjs
 ```
 
-Runtime: Node.js v22.16.0. Source SHA-256: `eee472accbff167138e71791448a782ec73e36c271e69f412c8a4fd5a5c5e182`.
+Runtime: Node.js v22.16.0. Source SHA-256: `e34246012cf360f37fa3d014b3c2515d150e1b9c8a6ec4c483c256d53452071f`.
 
-**Executed result: 8/8 deterministic cases passed.** Coverage: durable edge receipt after current level fell false; stale worker A rejected after worker B obtained the higher fence; permission revocation after grant issuance; expired receipt; revoked receipt; sink commit with response lost followed by reconciliation using the same key; same idempotency key with a different request digest; wrong-target grant substitution; fabricated receipt lookup rejected by the source/authority path.
+**Executed result: 9/9 deterministic cases passed.** Coverage: durable edge receipt after current level fell false; stale worker A rejected after worker B obtained the higher fence; permission revocation after grant issuance; expired receipt; revoked receipt; sink commit with response lost followed by reconciliation using the same key; same idempotency key with a different request digest; wrong-target grant substitution; fabricated receipt lookup rejected by the source/authority path; request-digest substitution during an idempotent replay rejected.
 
 The lost-response case produced exactly one mock side effect and recovered the original operation receipt by the same idempotency key. The negative controls produced no side effect.
 
