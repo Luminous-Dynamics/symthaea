@@ -60,11 +60,11 @@ pub struct MycelialMorphogenesisSplitUnit {
 pub struct MycelialMorphogenesisSplitManifest {
     pub schema_version: u16,
     pub dataset_id: String,
-    pub source_artifact_id: String,
-    pub source_artifact_digest: String,
-    pub acquisition_domain_manifest_digest: String,
-    pub extraction_coverage_receipt_digest: String,
-    pub observation_coverage_ledger_digest: String,
+    /// Commits each observation's source artifact, acquisition, extraction, ledger and unit.
+    pub evidence_chain_inventory_digest: String,
+    /// All observations are normalized into this coordinate frame and timebase.
+    pub coordinate_frame_id: String,
+    pub timebase_id: String,
     /// Digest over every morphogenesis observation ID in canonical sorted order.
     pub morphogenesis_observation_inventory_digest: String,
     pub split_unit_basis: MycelialMorphogenesisSplitUnitBasis,
@@ -225,6 +225,58 @@ fn split_basis_tag(basis: MycelialMorphogenesisSplitUnitBasis) -> u8 {
     }
 }
 
+/// Canonical evidence-chain inventory, ordered by observation ID. Longitudinal
+/// datasets may span multiple raw artifacts and acquisition sessions.
+pub fn mycelial_morphogenesis_evidence_chain_inventory_digest(
+    observations: &[MycelialMorphogenesisObservation],
+) -> Result<String, MycelialMorphogenesisSplitError> {
+    if observations.is_empty()
+        || observations.len() > MAX_MYCELIAL_MORPHOGENESIS_SPLIT_OBSERVATIONS
+    {
+        return Err(MycelialMorphogenesisSplitError::ResourceLimitExceeded);
+    }
+    let mut by_id = BTreeMap::new();
+    for observation in observations {
+        if by_id
+            .insert(observation.observation_id.as_str(), observation)
+            .is_some()
+        {
+            return Err(MycelialMorphogenesisSplitError::DuplicateObservationId(
+                observation.observation_id.clone(),
+            ));
+        }
+    }
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"symthaea-mycelial-morphogenesis-evidence-chain-inventory-v1");
+    hasher.update(&(by_id.len() as u64).to_le_bytes());
+    for (observation_id, observation) in by_id {
+        for value in [
+            observation_id,
+            observation.source_artifact_id.as_str(),
+            observation.source_artifact_digest.as_str(),
+            observation.acquisition_domain_manifest_digest.as_str(),
+            observation.extraction_coverage_receipt_digest.as_str(),
+            observation.observation_coverage_ledger_digest.as_str(),
+            observation.biological_replicate_id.as_str(),
+            observation.cultivation_unit_id.as_str(),
+            observation.acquisition_session_id.as_str(),
+            observation.coordinate_frame_id.as_str(),
+            observation.spatial_transform_digest.as_str(),
+            observation.calibration_digest.as_str(),
+            observation.timebase_id.as_str(),
+        ] {
+            hash_string(&mut hasher, value);
+        }
+        hasher.update(&observation.source_unit_key.tile_x.to_le_bytes());
+        hasher.update(&observation.source_unit_key.tile_y.to_le_bytes());
+        hasher.update(&observation.source_unit_key.z_plane.to_le_bytes());
+        hasher.update(&observation.source_unit_key.channel.to_le_bytes());
+        hasher.update(&observation.source_unit_key.timepoint.to_le_bytes());
+        hasher.update(&observation.timestamp_ns.to_le_bytes());
+    }
+    Ok(hasher.finalize().to_hex().to_string())
+}
+
 fn hash_string(hasher: &mut blake3::Hasher, value: &str) {
     hasher.update(&(value.len() as u64).to_le_bytes());
     hasher.update(value.as_bytes());
@@ -245,20 +297,10 @@ impl MycelialMorphogenesisSplitManifest {
         ] {
             validate_identifier(value, field)?;
         }
+        validate_identifier(&self.coordinate_frame_id, "coordinate_frame_id")?;
+        validate_identifier(&self.timebase_id, "timebase_id")?;
         for (value, field) in [
-            (&self.source_artifact_digest, "source_artifact_digest"),
-            (
-                &self.acquisition_domain_manifest_digest,
-                "acquisition_domain_manifest_digest",
-            ),
-            (
-                &self.extraction_coverage_receipt_digest,
-                "extraction_coverage_receipt_digest",
-            ),
-            (
-                &self.observation_coverage_ledger_digest,
-                "observation_coverage_ledger_digest",
-            ),
+            (&self.evidence_chain_inventory_digest, "evidence_chain_inventory_digest"),
             (
                 &self.morphogenesis_observation_inventory_digest,
                 "morphogenesis_observation_inventory_digest",
@@ -364,27 +406,11 @@ impl MycelialMorphogenesisSplitManifest {
                 .map_err(|_| MycelialMorphogenesisSplitError::ObservationValidationFailed(
                     observation.observation_id.clone(),
                 ))?;
-            if observation.source_artifact_id != first.source_artifact_id
-                || observation.source_artifact_digest != first.source_artifact_digest
+            if observation.coordinate_frame_id != self.coordinate_frame_id
+                || observation.timebase_id != self.timebase_id
             {
                 return Err(MycelialMorphogenesisSplitError::ObservationEvidenceMismatch(
-                    "source artifact",
-                ));
-            }
-            if observation.acquisition_domain_manifest_digest
-                != first.acquisition_domain_manifest_digest
-                || observation.extraction_coverage_receipt_digest
-                    != first.extraction_coverage_receipt_digest
-                || observation.observation_coverage_ledger_digest
-                    != first.observation_coverage_ledger_digest
-                || observation.acquisition_session_id != first.acquisition_session_id
-                || observation.coordinate_frame_id != first.coordinate_frame_id
-                || observation.spatial_transform_digest != first.spatial_transform_digest
-                || observation.calibration_digest != first.calibration_digest
-                || observation.timebase_id != first.timebase_id
-            {
-                return Err(MycelialMorphogenesisSplitError::ObservationEvidenceMismatch(
-                    "acquisition/extraction/observation provenance",
+                    "normalized coordinate frame/timebase",
                 ));
             }
             if observation_by_id
@@ -403,14 +429,18 @@ impl MycelialMorphogenesisSplitManifest {
         {
             return Err(MycelialMorphogenesisSplitError::ObservationInventoryDigestMismatch);
         }
-        if first.source_artifact_id != self.source_artifact_id
-            || first.source_artifact_digest != self.source_artifact_digest
-            || first.acquisition_domain_manifest_digest != self.acquisition_domain_manifest_digest
-            || first.extraction_coverage_receipt_digest != self.extraction_coverage_receipt_digest
-            || first.observation_coverage_ledger_digest != self.observation_coverage_ledger_digest
+        if mycelial_morphogenesis_evidence_chain_inventory_digest(observations)?
+            != self.evidence_chain_inventory_digest
         {
             return Err(MycelialMorphogenesisSplitError::ObservationEvidenceMismatch(
-                "split manifest source digests",
+                "per-observation acquisition evidence-chain inventory",
+            ));
+        }
+        if first.coordinate_frame_id != self.coordinate_frame_id
+            || first.timebase_id != self.timebase_id
+        {
+            return Err(MycelialMorphogenesisSplitError::ObservationEvidenceMismatch(
+                "split manifest coordinate frame/timebase",
             ));
         }
 
@@ -491,11 +521,9 @@ impl MycelialMorphogenesisSplitManifest {
         hasher.update(&self.schema_version.to_le_bytes());
         for value in [
             self.dataset_id.as_str(),
-            self.source_artifact_id.as_str(),
-            self.source_artifact_digest.as_str(),
-            self.acquisition_domain_manifest_digest.as_str(),
-            self.extraction_coverage_receipt_digest.as_str(),
-            self.observation_coverage_ledger_digest.as_str(),
+            self.evidence_chain_inventory_digest.as_str(),
+            self.coordinate_frame_id.as_str(),
+            self.timebase_id.as_str(),
             self.morphogenesis_observation_inventory_digest.as_str(),
             self.split_protocol_id.as_str(),
             self.split_protocol_version.as_str(),
@@ -614,17 +642,10 @@ mod tests {
         MycelialMorphogenesisSplitManifest {
             schema_version: MYCELIAL_MORPHOGENESIS_SPLIT_SCHEMA_VERSION,
             dataset_id: "agaricus-cordogenesis-2026".to_string(),
-            source_artifact_id: source_observations[0].source_artifact_id.clone(),
-            source_artifact_digest: source_observations[0].source_artifact_digest.clone(),
-            acquisition_domain_manifest_digest: source_observations[0]
-                .acquisition_domain_manifest_digest
-                .clone(),
-            extraction_coverage_receipt_digest: source_observations[0]
-                .extraction_coverage_receipt_digest
-                .clone(),
-            observation_coverage_ledger_digest: source_observations[0]
-                .observation_coverage_ledger_digest
-                .clone(),
+            evidence_chain_inventory_digest:
+                mycelial_morphogenesis_evidence_chain_inventory_digest(source_observations).unwrap(),
+            coordinate_frame_id: source_observations[0].coordinate_frame_id.clone(),
+            timebase_id: source_observations[0].timebase_id.clone(),
             morphogenesis_observation_inventory_digest:
                 mycelial_observation_id_inventory_digest(&ids),
             split_unit_basis: basis,
@@ -753,6 +774,26 @@ mod tests {
                 target_observation_ids: vec!["c-target".to_string()],
             },
         ];
+        manifest.validate_against(&observations).unwrap();
+    }
+
+    #[test]
+    fn split_supports_multiple_source_artifacts_and_acquisition_sessions() {
+        let mut observations = observations();
+        observations[2].source_artifact_id = "source-session-b".to_string();
+        observations[2].source_artifact_digest = digest('7');
+        observations[2].acquisition_domain_manifest_digest = digest('8');
+        observations[2].extraction_coverage_receipt_digest = digest('9');
+        observations[2].observation_coverage_ledger_digest = digest('0');
+        observations[2].acquisition_session_id = "session-002".to_string();
+        observations[2].spatial_transform_digest = digest('6');
+        observations[2].calibration_digest = digest('5');
+        let mut manifest = manifest(
+            &observations,
+            MycelialMorphogenesisSplitUnitBasis::CultivationUnit,
+        );
+        manifest.evidence_chain_inventory_digest =
+            mycelial_morphogenesis_evidence_chain_inventory_digest(&observations).unwrap();
         manifest.validate_against(&observations).unwrap();
     }
 
