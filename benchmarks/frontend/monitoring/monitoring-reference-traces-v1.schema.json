@@ -15,7 +15,9 @@
       "const": "sfeb-monitoring-reference-traces-v1"
     },
     "fixture_id": {
-      "type": "string"
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
     },
     "fixture_sha256": {
       "type": "string",
@@ -33,15 +35,19 @@
         ],
         "properties": {
           "case_id": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           },
           "worker_claims": {
             "type": "object",
-            "description": "Untrusted diagnostics; never used to derive verdicts."
+            "description": "Untrusted diagnostics only; never an input to verdict derivation.",
+            "additionalProperties": true
           },
           "steps": {
             "type": "array",
             "minItems": 2,
+            "maxItems": 10000,
             "items": {
               "oneOf": [
                 {
@@ -61,7 +67,9 @@
                       "minimum": 0
                     },
                     "watch_id": {
-                      "type": "string"
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
                     }
                   }
                 },
@@ -99,7 +107,9 @@
                       "minimum": 0
                     },
                     "message_id": {
-                      "type": "string"
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
                     }
                   }
                 },
@@ -135,44 +145,6 @@
                   "required": [
                     "op",
                     "time",
-                    "revision",
-                    "action_id",
-                    "idempotency_key",
-                    "action_type",
-                    "resource_id"
-                  ],
-                  "properties": {
-                    "op": {
-                      "const": "act"
-                    },
-                    "time": {
-                      "type": "integer",
-                      "minimum": 0
-                    },
-                    "revision": {
-                      "type": "integer",
-                      "minimum": 1
-                    },
-                    "action_id": {
-                      "type": "string"
-                    },
-                    "idempotency_key": {
-                      "type": "string"
-                    },
-                    "action_type": {
-                      "type": "string"
-                    },
-                    "resource_id": {
-                      "type": "string"
-                    }
-                  }
-                },
-                {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "required": [
-                    "op",
-                    "time",
                     "revision"
                   ],
                   "properties": {
@@ -195,6 +167,52 @@
                   "required": [
                     "op",
                     "time",
+                    "revision",
+                    "action_id",
+                    "idempotency_key",
+                    "action_type",
+                    "resource_id"
+                  ],
+                  "properties": {
+                    "op": {
+                      "const": "act"
+                    },
+                    "time": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "revision": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "action_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    },
+                    "idempotency_key": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 256
+                    },
+                    "action_type": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "resource_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "op",
+                    "time",
                     "claimed_outcome"
                   ],
                   "properties": {
@@ -206,7 +224,9 @@
                       "minimum": 0
                     },
                     "claimed_outcome": {
-                      "type": "string"
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
                     }
                   }
                 }
