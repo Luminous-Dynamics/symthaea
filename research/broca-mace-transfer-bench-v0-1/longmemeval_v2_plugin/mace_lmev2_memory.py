@@ -954,6 +954,11 @@ class MaceLongMemEvalV2Memory(Memory):
                 ) from error
             if isinstance(response, dict) and response.get("ok") is False:
                 message = response.get("error", "request rejected")
+                if isinstance(message, str) and "outcome may be unknown" in message:
+                    self._poison_sidecar()
+                    raise RuntimeError(
+                        "MACE sidecar mutation outcome is unknown; process poisoned until reload/reconciliation"
+                    )
                 raise RuntimeError(f"MACE Rust sidecar rejected request: {message}")
             if not isinstance(response, dict) or response.get("ok") is not True:
                 self._poison_sidecar()
