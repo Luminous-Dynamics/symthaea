@@ -371,6 +371,9 @@ impl AudioPerception {
         stream_segment_index: u64,
     ) -> Result<AudioPerceptionResult> {
         self.validate_sample_rate(sample_rate)?;
+        if samples.is_empty() {
+            return Err(anyhow::anyhow!("audio sample block must not be empty"));
+        }
         if let Some(invalid_index) = samples.iter().position(|sample| !sample.is_finite()) {
             return Err(anyhow::anyhow!(
                 "audio sample at block offset {invalid_index} is not finite"
@@ -815,6 +818,17 @@ mod tests {
                 && frame.source_end_sample <= source_end
                 && frame.source_end_sample > frame.source_start_sample
         }));
+    }
+
+    #[cfg(feature = "voice-stt")]
+    #[test]
+    fn empty_pcm_block_is_rejected_before_projection() {
+        let mut perception = AudioPerception::new(AudioPerceptionConfig::default()).unwrap();
+        assert!(
+            perception
+                .process_samples_at_source_position(&[], 16_000, 0, 0)
+                .is_err()
+        );
     }
 
     #[cfg(feature = "voice-stt")]
