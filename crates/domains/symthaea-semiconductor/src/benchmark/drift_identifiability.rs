@@ -183,10 +183,16 @@ fn validate_input(input: &DriftIdentifiabilityInputV1) -> Result<(), DriftIdenti
     }
 
     let mut action_ids = BTreeSet::new();
+    let mut evidence_origins = BTreeSet::new();
     for action in &input.actions {
         validate_action(action)?;
         if !action_ids.insert(action.action_id.as_str()) {
             return Err(DriftIdentifiabilityErrorV1("duplicate action ID".into()));
+        }
+        if !evidence_origins.insert(action.evidence_origin_id.as_str()) {
+            return Err(DriftIdentifiabilityErrorV1(
+                "duplicate evidence origin would double-count one observation".into(),
+            ));
         }
     }
 
@@ -706,6 +712,19 @@ mod tests {
             1,
         ));
         assert!(plan_drift_identifiability_v1(&non_finite).is_err());
+    }
+
+    #[test]
+    fn duplicate_evidence_origins_cannot_manufacture_identifiability() {
+        let first = wafer_a(DriftActionEvidenceStateV1::ObservedQualified, 1);
+        let mut duplicate = witness_a(DriftActionEvidenceStateV1::ObservedQualified, 1);
+        duplicate.evidence_origin_id = first.evidence_origin_id.clone();
+        let value = input(
+            vec![first, duplicate],
+            vec![DriftAttributionTargetV1::ProcessShift],
+            10,
+        );
+        assert!(plan_drift_identifiability_v1(&value).is_err());
     }
 
     #[test]
