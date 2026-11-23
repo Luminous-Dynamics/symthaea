@@ -955,6 +955,8 @@ fn run() -> Result<(), String> {
     source_bundle_hasher.update(include_bytes!("../../../hdc-retrieval/Cargo.toml"));
     source_bundle_hasher.update(include_bytes!("../../Cargo.toml"));
     source_bundle_hasher.update(include_bytes!("../../../Cargo.toml"));
+    source_bundle_hasher.update(include_bytes!("../../../../../rust-toolchain.toml"));
+    source_bundle_hasher.update(include_bytes!("../../../../../flake.lock"));
     let source_code_sha256 = hex_digest(source_bundle_hasher.finalize().as_slice());
     let fixture_sha256 =
         hex_digest(Sha256::digest(include_bytes!("mace_generated_stress.rs")).as_slice());
