@@ -9,6 +9,7 @@
 //! - Phase C: episodic replay (Phi-prioritized consolidation), memory coordinator
 
 pub mod coherence;
+pub mod evidence;
 pub mod conversation;
 pub mod coordinator;
 pub mod episodic_replay;
@@ -16,6 +17,10 @@ pub mod hippocampus;
 pub mod semantic;
 
 pub use coherence::{CoherenceTrajectoryStats, ConversationCoherenceTracker};
+pub use evidence::{
+    EvidenceBound, EvidenceDecision, EvidenceEvent, EvidenceEventKind, EvidenceLedger,
+    EvidenceQuery, IneligibilityReason, MemoryRights, SourceCommitment, validate_events,
+};
 pub use conversation::{
     CausalLearning, ConversationMemory, ConversationMemoryStats, ConversationSummary,
     ConversationTurn,
