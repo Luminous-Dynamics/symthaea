@@ -1971,6 +1971,64 @@ mod tests {
     }
 
     #[test]
+    fn randomized_audit_estimators_recover_finite_population_over_paired_seed_replays() {
+        let mut scenario = config(SyntheticFabRegimeV1::GradualProcessDrift, 101);
+        scenario.metrology_characteristics = SyntheticMetrologyCharacteristicsV1 {
+            sensitivity: 0.92,
+            specificity: 0.97,
+        };
+        let episode = generate_synthetic_fab_episode_v1(&scenario).unwrap();
+        let semantics = synthetic_defect_semantics_v1(scenario.defect_threshold).unwrap();
+        let view = episode.policy_view();
+        let truth = evaluate_synthetic_metrology_policy_v1(
+            &episode,
+            &fake_selection(&episode),
+        )
+        .unwrap()
+        .true_defect_prevalence;
+
+        let mut ht_estimates = Vec::new();
+        let mut assay_adjusted_estimates = Vec::new();
+        let mut ht_covered = 0_usize;
+        let mut assay_adjusted_covered = 0_usize;
+        let replay_count = 256_usize;
+
+        for seed in 0..replay_count {
+            let policy = policy_config(view, "stratified-random", 0, 32, 8, seed as u64);
+            let run =
+                run_synthetic_metrology_policy_v1(&episode, view, &semantics, &policy).unwrap();
+            let report = run.evaluation;
+            assert!(report.design_variance_qualified);
+            assert!(report.assay_estimator_qualified);
+
+            let ht = report.horvitz_thompson_prevalence;
+            let ht_se = report.standard_error_ht_prevalence.unwrap();
+            if (ht - truth).abs() <= 1.96 * ht_se {
+                ht_covered += 1;
+            }
+            ht_estimates.push(ht);
+
+            let assay_adjusted = report.assay_adjusted_ht_prevalence.unwrap();
+            let assay_se = report.assay_adjusted_ht_standard_error.unwrap();
+            if (assay_adjusted - truth).abs() <= 1.96 * assay_se {
+                assay_adjusted_covered += 1;
+            }
+            assay_adjusted_estimates.push(assay_adjusted);
+        }
+
+        let mean_ht = ht_estimates.iter().sum::<f64>() / replay_count as f64;
+        let mean_assay_adjusted =
+            assay_adjusted_estimates.iter().sum::<f64>() / replay_count as f64;
+        let ht_coverage = ht_covered as f64 / replay_count as f64;
+        let assay_adjusted_coverage = assay_adjusted_covered as f64 / replay_count as f64;
+
+        assert!((mean_ht - truth).abs() < 0.02);
+        assert!((mean_assay_adjusted - truth).abs() < 0.03);
+        assert!((0.88..=0.99).contains(&ht_coverage));
+        assert!((0.88..=0.99).contains(&assay_adjusted_coverage));
+    }
+
+    #[test]
     fn policy_runner_compares_random_audit_and_risk_exploit_at_equal_budget() {
         let episode = generate_synthetic_fab_episode_v1(&config(
             SyntheticFabRegimeV1::GradualProcessDrift,
