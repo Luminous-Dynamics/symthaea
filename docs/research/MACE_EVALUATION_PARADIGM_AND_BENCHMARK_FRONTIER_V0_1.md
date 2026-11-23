@@ -201,7 +201,7 @@ Run attacks after memory write, during consolidation, after retrieval, and durin
 
 ### 5.5 Independent evaluator by construction
 
-A separate candidate package is now an initial step (see [MACE Isolated Candidate Protocol v0.1](MACE_ISOLATED_CANDIDATE_PROTOCOL_V0_1.md)). The benchmark's evaluator must remain outside candidate reach, with one-way task delivery, sealed labels, separate credentials and signed result receipts. A separate Cargo crate or two JSONL files does not qualify as isolation.
+The candidate package now has a one-way request/receipt worker, and the paired evaluator launches it for exact-scope and typed-content HDC (see [MACE Isolated Candidate Protocol v0.1](MACE_ISOLATED_CANDIDATE_PROTOCOL_V0_1.md) and #13351). This reaches process-boundary source integration, not secure isolation. The benchmark's evaluator must still move to independent custody with default-deny sandboxing, sealed labels, separate credentials and signed result receipts. A separate Cargo crate or child process alone does not qualify as isolation.
 
 ## 6. Matched experimental design
 
