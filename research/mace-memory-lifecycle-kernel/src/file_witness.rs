@@ -548,6 +548,104 @@ mod tests {
         )
     }
 
+    #[derive(Default)]
+    struct FixtureAuthority;
+
+    impl crate::IdentityAuthority for FixtureAuthority {
+        fn profile_for(&self, issuer_id: &str) -> Option<crate::AuthorityProfile> {
+            (issuer_id == "issuer").then(|| crate::AuthorityProfile {
+                allowed_scopes: BTreeSet::from(["project-x".to_owned()]),
+                allowed_purposes: BTreeSet::from(["planning".to_owned()]),
+                may_assert: true,
+                may_derive: true,
+                may_revoke: true,
+                may_erase: true,
+            })
+        }
+    }
+
+    fn copy_directory(source: &Path, destination: &Path) {
+        fs::create_dir_all(destination).expect("create destination directory");
+        for entry in fs::read_dir(source).expect("read source directory") {
+            let entry = entry.expect("source entry");
+            let source_path = entry.path();
+            let destination_path = destination.join(entry.file_name());
+            if entry.file_type().expect("source entry type").is_dir() {
+                copy_directory(&source_path, &destination_path);
+            } else {
+                fs::copy(&source_path, &destination_path).expect("copy checkpoint file");
+            }
+        }
+    }
+
+    #[test]
+    fn file_witness_reconciles_t10_when_only_memory_backup_is_stale_and_demonstrates_joint_rollback_limit() {
+        let root = temporary_directory("t10-reconciliation");
+        let witness_directory = root.join("witness");
+        let mut witness =
+            FileBackedWitnessStore::open(&witness_directory).expect("open witness");
+        let authority = FixtureAuthority;
+        let mut current = MemorySnapshot::default();
+
+        crate::commit_record(
+            &mut current,
+            &mut witness,
+            crate::MemoryRecord::new(
+                "root",
+                "protected source record",
+                "issuer",
+                "project-x",
+                "planning",
+                Vec::new(),
+            ),
+            &authority,
+        )
+        .expect("commit protected record");
+
+        let pre_erasure_backup = current.clone();
+        let rolled_back_witness_directory = root.join("witness-backup-before-erasure");
+        copy_directory(&witness_directory, &rolled_back_witness_directory);
+
+        let erased = crate::erase_record(
+            &mut current,
+            &mut witness,
+            &authority,
+            "issuer",
+            "root",
+        )
+        .expect("erase protected record");
+        assert_eq!(erased.invalidated_ids, vec!["root".to_owned()]);
+        assert!(!current.contains("root"));
+
+        drop(witness);
+        let current_witness =
+            FileBackedWitnessStore::open(&witness_directory).expect("reopen current witness");
+        let (recovered, report) = crate::reconcile_snapshot(
+            pre_erasure_backup.clone(),
+            &current_witness,
+        )
+        .expect("T10 stale data backup reconciles against current witness");
+        assert!(!recovered.contains("root"));
+        assert_eq!(report.removed_resurrected_ids, vec!["root".to_owned()]);
+        assert_eq!(recovered.head_sha256(), current.head_sha256());
+        assert_eq!(report.recovered_head_sha256, current.head_sha256());
+
+        // This is the explicit limit of a same-domain local witness: if both
+        // data and witness are restored to the pre-erasure point, no local
+        // history remains that can prove the erasure happened.
+        let rolled_back_witness = FileBackedWitnessStore::open(&rolled_back_witness_directory)
+            .expect("open jointly rolled-back witness");
+        let (jointly_rolled_back, _) = crate::reconcile_snapshot(
+            pre_erasure_backup,
+            &rolled_back_witness,
+        )
+        .expect("old data and old local witness are mutually consistent");
+        assert!(jointly_rolled_back.contains("root"));
+
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+
     #[test]
     fn checkpoint_history_survives_reopen_and_preserves_tombstones() {
         let root = temporary_directory("reopen");
