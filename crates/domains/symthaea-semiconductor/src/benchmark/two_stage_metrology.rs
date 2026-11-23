@@ -11,10 +11,8 @@ use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 use thiserror::Error;
 
-pub const TWO_STAGE_INPUT_SCHEMA_V1: &str =
-    "luminous.semi-bench.two-stage-metrology-input.v1";
-pub const TWO_STAGE_REPORT_SCHEMA_V1: &str =
-    "luminous.semi-bench.two-stage-metrology-report.v1";
+pub const TWO_STAGE_INPUT_SCHEMA_V1: &str = "luminous.semi-bench.two-stage-metrology-input.v1";
+pub const TWO_STAGE_REPORT_SCHEMA_V1: &str = "luminous.semi-bench.two-stage-metrology-report.v1";
 pub const MAX_TWO_STAGE_CANDIDATES_EXACT: usize = 18;
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -206,10 +204,7 @@ fn validate_assay(
     Ok(())
 }
 
-fn optimal_binary_decision_loss(
-    prior_defect_probability: f64,
-    loss: BinaryDecisionLossV1,
-) -> f64 {
+fn optimal_binary_decision_loss(prior_defect_probability: f64, loss: BinaryDecisionLossV1) -> f64 {
     let loss_when_disposed_as_pass = prior_defect_probability * loss.false_negative_cost;
     let loss_when_disposed_as_defect = (1.0 - prior_defect_probability) * loss.false_positive_cost;
     loss_when_disposed_as_pass.min(loss_when_disposed_as_defect)
@@ -227,12 +222,10 @@ fn binary_evsi(
         prior * assay.sensitivity + (1.0 - prior) * (1.0 - assay.specificity);
     let probability_negative = (1.0 - probability_positive).clamp(0.0, 1.0);
 
-    let posterior_positive = (probability_positive > 0.0).then(|| {
-        (prior * assay.sensitivity / probability_positive).clamp(0.0, 1.0)
-    });
-    let posterior_negative = (probability_negative > 0.0).then(|| {
-        (prior * (1.0 - assay.sensitivity) / probability_negative).clamp(0.0, 1.0)
-    });
+    let posterior_positive = (probability_positive > 0.0)
+        .then(|| (prior * assay.sensitivity / probability_positive).clamp(0.0, 1.0));
+    let posterior_negative = (probability_negative > 0.0)
+        .then(|| (prior * (1.0 - assay.sensitivity) / probability_negative).clamp(0.0, 1.0));
 
     let expected_loss_without_measurement = optimal_binary_decision_loss(prior, loss);
     let positive_loss = posterior_positive
@@ -250,7 +243,11 @@ fn binary_evsi(
             .abs()
             .max(expected_loss_after_measurement.abs())
             .max(1.0);
-    let gross_evsi = if raw_gross > tolerance { raw_gross } else { 0.0 };
+    let gross_evsi = if raw_gross > tolerance {
+        raw_gross
+    } else {
+        0.0
+    };
 
     BinaryEvsiV1 {
         probability_positive,
@@ -279,7 +276,10 @@ fn validate_candidate(
             "candidates[{index}].prior_defect_probability: expected finite value in [0, 1]"
         )));
     }
-    validate_assay(candidate.screening, &format!("candidates[{index}].screening"))?;
+    validate_assay(
+        candidate.screening,
+        &format!("candidates[{index}].screening"),
+    )?;
     validate_assay(
         candidate.confirmation,
         &format!("candidates[{index}].confirmation"),
@@ -292,7 +292,10 @@ fn validate_candidate(
         candidate.decision_loss.false_positive_cost,
         &format!("candidates[{index}].false_positive_cost"),
     )?;
-    if candidate.decision_loss.false_negative_cost.max(candidate.decision_loss.false_positive_cost)
+    if candidate
+        .decision_loss
+        .false_negative_cost
+        .max(candidate.decision_loss.false_positive_cost)
         <= 0.0
     {
         return Err(TwoStageMetrologyErrorV1(format!(
@@ -312,7 +315,9 @@ fn validate_policy_and_candidates(
     candidates: &[TwoStageMetrologyCandidateV1],
 ) -> Result<Vec<TwoStageMetrologyCandidateV1>, TwoStageMetrologyErrorV1> {
     if policy.schema != TWO_STAGE_INPUT_SCHEMA_V1 {
-        return Err(TwoStageMetrologyErrorV1("policy.schema: unsupported".into()));
+        return Err(TwoStageMetrologyErrorV1(
+            "policy.schema: unsupported".into(),
+        ));
     }
     if policy.policy_id.trim().is_empty() {
         return Err(TwoStageMetrologyErrorV1("policy.policy_id: empty".into()));
@@ -481,9 +486,9 @@ pub fn plan_two_stage_metrology_v1(
             candidate,
             true,
         );
-        let expected_incremental_net_value =
-            positive.screen_outcome_probability * positive.net_confirmation_value
-                + negative.screen_outcome_probability * negative.net_confirmation_value;
+        let expected_incremental_net_value = positive.screen_outcome_probability
+            * positive.net_confirmation_value
+            + negative.screen_outcome_probability * negative.net_confirmation_value;
         let confirmation_worst_case_cost = positive
             .worst_case_confirmation_cost
             .max(negative.worst_case_confirmation_cost);
@@ -525,9 +530,7 @@ pub fn plan_two_stage_metrology_v1(
                 break;
             }
             match cost.checked_add(candidate_cost) {
-                Some(next_cost)
-                    if next_cost <= policy.confirmation_worst_case_cost_budget =>
-                {
+                Some(next_cost) if next_cost <= policy.confirmation_worst_case_cost_budget => {
                     cost = next_cost;
                 }
                 _ => {
@@ -578,12 +581,13 @@ pub fn plan_two_stage_metrology_v1(
             selected,
         );
 
-        let no_measurement_loss =
-            optimal_binary_decision_loss(candidate.prior_defect_probability, candidate.decision_loss);
+        let no_measurement_loss = optimal_binary_decision_loss(
+            candidate.prior_defect_probability,
+            candidate.decision_loss,
+        );
         no_measurement_expected_decision_loss += no_measurement_loss;
 
-        screen_only_expected_decision_loss +=
-            screen_evsi.expected_loss_after_measurement;
+        screen_only_expected_decision_loss += screen_evsi.expected_loss_after_measurement;
 
         let high_only = binary_evsi(
             candidate.prior_defect_probability,
@@ -593,18 +597,21 @@ pub fn plan_two_stage_metrology_v1(
         high_fidelity_only_expected_decision_loss += high_only.expected_loss_after_measurement;
 
         let positive_loss = if positive.action == ConfirmationActionV1::Confirm {
-            positive.expected_decision_loss_after_confirmation.unwrap_or(0.0)
+            positive
+                .expected_decision_loss_after_confirmation
+                .unwrap_or(0.0)
         } else {
             positive.decision_loss_without_confirmation.unwrap_or(0.0)
         };
         let negative_loss = if negative.action == ConfirmationActionV1::Confirm {
-            negative.expected_decision_loss_after_confirmation.unwrap_or(0.0)
+            negative
+                .expected_decision_loss_after_confirmation
+                .unwrap_or(0.0)
         } else {
             negative.decision_loss_without_confirmation.unwrap_or(0.0)
         };
-        two_stage_expected_decision_loss +=
-            positive.screen_outcome_probability * positive_loss
-                + negative.screen_outcome_probability * negative_loss;
+        two_stage_expected_decision_loss += positive.screen_outcome_probability * positive_loss
+            + negative.screen_outcome_probability * negative_loss;
         confirmation_expected_cost +=
             positive.expected_confirmation_cost + negative.expected_confirmation_cost;
 
@@ -615,9 +622,9 @@ pub fn plan_two_stage_metrology_v1(
         } else {
             0
         };
-        let expected_incremental_net_value =
-            positive.screen_outcome_probability * positive.net_confirmation_value
-                + negative.screen_outcome_probability * negative.net_confirmation_value;
+        let expected_incremental_net_value = positive.screen_outcome_probability
+            * positive.net_confirmation_value
+            + negative.screen_outcome_probability * negative.net_confirmation_value;
 
         candidate_plans.push(TwoStageCandidatePlanV1 {
             candidate_id: candidate.candidate_id.clone(),
@@ -641,8 +648,7 @@ pub fn plan_two_stage_metrology_v1(
     let expected_incremental_net_value = screen_only_expected_decision_loss
         - two_stage_expected_decision_loss
         - confirmation_expected_cost;
-    let total_expected_measurement_cost =
-        screening_cost_used as f64 + confirmation_expected_cost;
+    let total_expected_measurement_cost = screening_cost_used as f64 + confirmation_expected_cost;
     let total_worst_case_measurement_cost = screening_cost_used
         .checked_add(best.cost)
         .ok_or_else(|| TwoStageMetrologyErrorV1("two-stage worst-case cost overflow".into()))?;
@@ -710,7 +716,10 @@ mod tests {
         }
     }
 
-    fn policy(candidates: &[TwoStageMetrologyCandidateV1], confirmation_budget: u64) -> TwoStageMetrologyPolicyV1 {
+    fn policy(
+        candidates: &[TwoStageMetrologyCandidateV1],
+        confirmation_budget: u64,
+    ) -> TwoStageMetrologyPolicyV1 {
         let mut canonical = candidates.to_vec();
         canonical.sort_by(|left, right| left.candidate_id.cmp(&right.candidate_id));
         TwoStageMetrologyPolicyV1 {
@@ -825,10 +834,12 @@ mod tests {
         )];
         let policy = policy(&candidates, 5);
         let report = plan_two_stage_metrology_v1(&policy, &candidates).unwrap();
-        assert!((report.screen_only_expected_decision_loss
-            - report.no_measurement_expected_decision_loss)
-            .abs()
-            < 1.0e-10);
+        assert!(
+            (report.screen_only_expected_decision_loss
+                - report.no_measurement_expected_decision_loss)
+                .abs()
+                < 1.0e-10
+        );
     }
 
     #[test]
@@ -893,7 +904,9 @@ mod tests {
             ConfirmationActionV1::OutcomeImpossible
         );
         assert_eq!(
-            report.candidates[0].negative_branch.posterior_defect_probability,
+            report.candidates[0]
+                .negative_branch
+                .posterior_defect_probability,
             None
         );
     }
