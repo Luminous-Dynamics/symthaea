@@ -385,6 +385,10 @@ class MaceLongMemEvalV2IngressTests(unittest.TestCase):
                 "created_at_unix": 100,
             }
             trace_digest = memory._retrieval_trace_digest_from_json(trace)
+            self.assertEqual(
+                trace_digest,
+                "e818d458148b2edd093a95d45afffb3d86b65291ee1b399149abf4ca4d18edb6",
+            )
             trace["receipt_sha256"] = trace_digest
             response = {
                 **candidate_response,
