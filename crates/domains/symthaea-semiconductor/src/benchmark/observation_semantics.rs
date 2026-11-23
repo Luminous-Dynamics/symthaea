@@ -1064,6 +1064,255 @@ mod tests {
         assert!(validate_sensor_observation_frame_v1(&input).is_err());
     }
 
+    fn mapped_source_frame(state: SensorObservationStateV1) -> SensorObservationFrameV1 {
+        let mut input = frame(state);
+        input.observations[0].sensor_id = "source-pressure".into();
+        input
+    }
+
+    fn complete_correspondence_manifest() -> SensorCorrespondenceManifestV1 {
+        let mut manifest = correspondence_manifest();
+        manifest
+            .correspondences
+            .retain(|mapping| mapping.target_sensor_id != "target-unknown");
+        manifest
+    }
+
+    #[test]
+    fn correspondence_execution_converts_value_and_propagates_uncertainty() {
+        let source = mapped_source_frame(SensorObservationStateV1::Observed {
+            value: 2.5,
+            unit: "kPa".into(),
+            uncertainty: MeasurementUncertaintyV1 {
+                standard_uncertainty: 0.02,
+                coverage_probability: Some(0.95),
+                method_ref: "gauge-report-4".into(),
+            },
+        });
+        let manifest = complete_correspondence_manifest();
+        let execution = execute_sensor_correspondence_v1(&source, &manifest).unwrap();
+        assert!(!execution.report.abstain_required);
+        assert_eq!(execution.report.matched_count, 1);
+        assert_eq!(execution.report.structurally_absent_count, 1);
+        assert!(execution.target_frame.is_some());
+
+        let target = execution.target_frame.unwrap();
+        let absent = target
+            .observations
+            .iter()
+            .find(|observation| observation.sensor_id == "target-flow")
+            .unwrap();
+        assert!(matches!(
+            &absent.state,
+            SensorObservationStateV1::NotInstalled { .. }
+        ));
+
+        let pressure = target
+            .observations
+            .iter()
+            .find(|observation| observation.sensor_id == "target-pressure")
+            .unwrap();
+        match &pressure.state {
+            SensorObservationStateV1::Observed {
+                value,
+                unit,
+                uncertainty,
+            } => {
+                assert_eq!(*value, 2500.0);
+                assert_eq!(unit, "Pa");
+                assert!((uncertainty.standard_uncertainty - 20.0).abs() < 1.0e-12);
+                assert_eq!(uncertainty.coverage_probability, Some(0.95));
+                assert!(uncertainty.method_ref.contains("unit-proof-1"));
+            }
+            other => panic!("expected transformed qualified observation, got {other:?}"),
+        }
+        assert_eq!(pressure.instrument_id.as_deref(), Some("instrument-1"));
+        assert_eq!(pressure.calibration_ref.as_deref(), Some("calibration-1"));
+        assert!(target.observations.iter().all(|observation| {
+            observation.sensor_id.starts_with("target-")
+        }));
+    }
+
+    #[test]
+    fn unsupported_mapping_abstains_instead_of_emitting_partial_target_frame() {
+        let source = mapped_source_frame(SensorObservationStateV1::Observed {
+            value: 2.5,
+            unit: "kPa".into(),
+            uncertainty: MeasurementUncertaintyV1 {
+                standard_uncertainty: 0.02,
+                coverage_probability: Some(0.95),
+                method_ref: "gauge-report-4".into(),
+            },
+        });
+        let manifest = correspondence_manifest();
+        let execution = execute_sensor_correspondence_v1(&source, &manifest).unwrap();
+        assert!(execution.report.abstain_required);
+        assert!(execution.target_frame.is_none());
+        assert_eq!(execution.report.unsupported_count, 1);
+        assert!(
+            execution
+                .report
+                .abstention_reasons
+                .iter()
+                .any(|reason| reason.contains("target-unknown"))
+        );
+    }
+
+    #[test]
+    fn unqualified_numeric_observation_cannot_cross_unit_mapping() {
+        let source = mapped_source_frame(SensorObservationStateV1::ObservedUnqualified {
+            value: 2.5,
+        });
+        let execution =
+            execute_sensor_correspondence_v1(&source, &complete_correspondence_manifest())
+                .unwrap();
+        assert!(execution.report.abstain_required);
+        assert!(execution.target_frame.is_none());
+        assert!(
+            execution
+                .report
+                .abstention_reasons
+                .iter()
+                .any(|reason| reason.contains("no source unit or uncertainty"))
+        );
+    }
+
+    #[test]
+    fn censored_bounds_transform_correctly_under_negative_scale() {
+        let source = mapped_source_frame(SensorObservationStateV1::Censored {
+            lower_bound: Some(1.0),
+            upper_bound: Some(4.0),
+            unit: "raw_unit".into(),
+            censoring_basis: "instrument range limit".into(),
+            evidence_ref: "censoring-record-8".into(),
+        });
+        let mut manifest = complete_correspondence_manifest();
+        let transform = manifest.correspondences[0]
+            .unit_transform
+            .as_mut()
+            .unwrap();
+        transform.source_unit = "raw_unit".into();
+        transform.target_unit = "corrected_unit".into();
+        transform.scale = -2.0;
+        transform.offset = 10.0;
+
+        let execution = execute_sensor_correspondence_v1(&source, &manifest).unwrap();
+        let target = execution.target_frame.unwrap();
+        let pressure = target
+            .observations
+            .iter()
+            .find(|observation| observation.sensor_id == "target-pressure")
+            .unwrap();
+        match &pressure.state {
+            SensorObservationStateV1::Censored {
+                lower_bound,
+                upper_bound,
+                unit,
+                ..
+            } => {
+                assert_eq!(*lower_bound, Some(2.0));
+                assert_eq!(*upper_bound, Some(8.0));
+                assert_eq!(unit, "corrected_unit");
+            }
+            other => panic!("expected transformed censored observation, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn mismatched_source_unit_abstains_without_fabricating_a_conversion() {
+        let source = mapped_source_frame(SensorObservationStateV1::Observed {
+            value: 2.5,
+            unit: "bar".into(),
+            uncertainty: MeasurementUncertaintyV1 {
+                standard_uncertainty: 0.02,
+                coverage_probability: Some(0.95),
+                method_ref: "gauge-report-4".into(),
+            },
+        });
+        let execution =
+            execute_sensor_correspondence_v1(&source, &complete_correspondence_manifest())
+                .unwrap();
+        assert!(execution.report.abstain_required);
+        assert!(execution.target_frame.is_none());
+        assert!(
+            execution
+                .report
+                .abstention_reasons
+                .iter()
+                .any(|reason| reason.contains("differs from declared transform source unit"))
+        );
+    }
+
+    #[test]
+    fn correspondence_order_does_not_change_canonical_target_frame() {
+        let source = mapped_source_frame(SensorObservationStateV1::Observed {
+            value: 2.5,
+            unit: "kPa".into(),
+            uncertainty: MeasurementUncertaintyV1 {
+                standard_uncertainty: 0.02,
+                coverage_probability: Some(0.95),
+                method_ref: "gauge-report-4".into(),
+            },
+        });
+        let manifest = complete_correspondence_manifest();
+        let mut reordered = manifest.clone();
+        reordered.correspondences.reverse();
+
+        let first = execute_sensor_correspondence_v1(&source, &manifest).unwrap();
+        let second = execute_sensor_correspondence_v1(&source, &reordered).unwrap();
+        assert_eq!(first.target_frame, second.target_frame);
+        assert_eq!(
+            first.report.correspondence_manifest_sha256,
+            second.report.correspondence_manifest_sha256
+        );
+        assert_eq!(first.report.target_frame_sha256, second.report.target_frame_sha256);
+        assert_eq!(first.report.report_sha256, second.report.report_sha256);
+    }
+
+    #[test]
+    fn unmapped_source_sensor_is_reported_not_positionally_reused() {
+        let mut source = mapped_source_frame(SensorObservationStateV1::Observed {
+            value: 2.5,
+            unit: "kPa".into(),
+            uncertainty: MeasurementUncertaintyV1 {
+                standard_uncertainty: 0.02,
+                coverage_probability: Some(0.95),
+                method_ref: "gauge-report-4".into(),
+            },
+        });
+        source.observations.push(SensorObservationV1 {
+            sensor_id: "source-extra-temperature".into(),
+            state: SensorObservationStateV1::ObservedUnqualified { value: 300.0 },
+            instrument_id: None,
+            calibration_ref: None,
+        });
+        let execution =
+            execute_sensor_correspondence_v1(&source, &complete_correspondence_manifest())
+                .unwrap();
+        assert!(!execution.report.abstain_required);
+        assert_eq!(
+            execution.report.unmapped_source_sensor_ids,
+            vec!["source-extra-temperature".to_string()]
+        );
+        assert_eq!(
+            execution
+                .target_frame
+                .as_ref()
+                .unwrap()
+                .observations
+                .len(),
+            2
+        );
+    }
+
+    #[test]
+    fn source_schema_digest_must_match_correspondence_manifest() {
+        let source = mapped_source_frame(SensorObservationStateV1::UnknownMissingReason);
+        let mut manifest = complete_correspondence_manifest();
+        manifest.source_sensor_schema_sha256 = SHA_C.into();
+        assert!(execute_sensor_correspondence_v1(&source, &manifest).is_err());
+    }
+
     #[test]
     fn matched_correspondence_requires_identity_and_explicit_unit_transform() {
         let report = validate_sensor_correspondence_manifest_v1(&correspondence_manifest())
