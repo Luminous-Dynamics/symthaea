@@ -45,6 +45,7 @@ pub struct CandidateProcessObservation {
     pub candidate_evidence_sha256: String,
     pub candidate_observation_id: String,
     pub retrieval_profile_sha256: Option<String>,
+    pub candidate_visible_event_count: u64,
     pub index_payload_bytes: u64,
     pub candidate_latency_ns: u64,
     pub request_build_ns: u64,
@@ -304,7 +305,16 @@ impl CandidateProcessSession {
             .map_err(|error| format!("obtain custodian task nonce from /dev/urandom: {error}"))?;
         let task_nonce = hex_bytes(&nonce_bytes);
 
-        let mut ordered_memory = memory.to_vec();
+        // Do not send unrelated regimes, objectives or action alternatives
+        // to the candidate process. The candidate receives only the exact
+        // scope/action projection declared by DecisionNeedV1.
+        let mut ordered_memory: Vec<Experience> = memory
+            .iter()
+            .copied()
+            .filter(|item| {
+                item.scope == need.scope && need.action_alternatives.contains(&item.action)
+            })
+            .collect();
         ordered_memory.sort_by_key(|item| item.event_id);
         let request_value = candidate_envelope(
             run_id,
@@ -395,6 +405,7 @@ impl CandidateProcessSession {
             candidate_evidence_sha256: receipt.candidate_evidence_sha256,
             candidate_observation_id: receipt.candidate_observation_id,
             retrieval_profile_sha256: receipt.retrieval_profile_sha256,
+            candidate_visible_event_count: u64::try_from(ordered_memory.len()).unwrap_or(u64::MAX),
             index_payload_bytes: receipt.index_payload_bytes,
             candidate_latency_ns: receipt.latency_ns,
             request_build_ns,
