@@ -1,0 +1,109 @@
+name: MUSE renderer control arm-order and washout qualification
+
+on:
+  push:
+    branches:
+      - research/mel-control-order-washout-v1-20261123
+    paths:
+      - "crates/domains/symthaea-muse/src/realization_effect_order.rs"
+      - "crates/domains/symthaea-muse/src/realization_effect.rs"
+      - "crates/domains/symthaea-muse/src/lib.rs"
+      - ".github/workflows/muse-realization-effect-order-qualification.yml"
+      - "docs/research/MEL_RENDERER_CONTROL_ORDER_WASHOUT_V1_2026-11-23.md"
+  pull_request:
+    branches:
+      - research/mel-observed-control-effect-v1-20261123
+    paths:
+      - "crates/domains/symthaea-muse/src/realization_effect_order.rs"
+      - "crates/domains/symthaea-muse/src/realization_effect.rs"
+      - "crates/domains/symthaea-muse/src/lib.rs"
+      - ".github/workflows/muse-realization-effect-order-qualification.yml"
+      - "docs/research/MEL_RENDERER_CONTROL_ORDER_WASHOUT_V1_2026-11-23.md"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Exact-head control order, reset and carryover qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout exact tested PR head or pushed commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+          printf 'tested_head=%s\n' "$actual"
+
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Format order and washout evaluator
+        run: rustfmt +1.96.0 --edition 2024 --check crates/domains/symthaea-muse/src/realization_effect_order.rs
+
+      - name: Verify locked workspace metadata
+        run: cargo +1.96.0 metadata --locked --no-deps --format-version 1 > "$RUNNER_TEMP/muse-metadata.json"
+
+      - name: Run counterbalanced order and carryover tests
+        run: cargo +1.96.0 test --locked -p symthaea-muse --lib realization_effect_order::tests
+
+      - name: Re-run baseline/sham/active/reversal evaluator tests
+        run: cargo +1.96.0 test --locked -p symthaea-muse --lib realization_effect::tests
+
+      # Muse currently has existing Clippy warnings in many untouched modules.
+      # Keep the compile gate and fail only on lints in the two changed effect modules.
+      - name: Clippy compile and changed-source lint gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 clippy --locked -p symthaea-muse --lib --no-deps --message-format=json > "$RUNNER_TEMP/muse-clippy.jsonl"
+          jq -s -e '
+            [
+              .[]
+              | select(.reason == "compiler-message")
+              | .message
+              | select(.level == "warning")
+              | select(any(.spans[]?;
+                  .file_name == "crates/domains/symthaea-muse/src/realization_effect_order.rs"
+                  or .file_name == "crates/domains/symthaea-muse/src/realization_effect.rs"))
+            ] as $changed_source_lints
+            | if ($changed_source_lints | length) == 0
+              then "no Clippy warnings in changed effect-order/effect-evaluator source"
+              else error("Clippy warnings in changed source: " + ($changed_source_lints | tojson))
+              end
+          ' "$RUNNER_TEMP/muse-clippy.jsonl"
+
+      - name: Assemble exact-head evidence
+        if: always()
+        shell: bash
+        run: |
+          set -uo pipefail
+          evidence="$RUNNER_TEMP/muse-realization-effect-order-evidence"
+          mkdir -p "$evidence"
+          printf 'tested_head=%s\n' "$(git rev-parse HEAD)" > "$evidence/source-identity.txt"
+          rustc +1.96.0 --version --verbose > "$evidence/rustc-version.txt" 2>&1 || true
+          cargo +1.96.0 --version > "$evidence/cargo-version.txt" 2>&1 || true
+          sha256sum Cargo.lock > "$evidence/cargo-lock.sha256" 2>&1 || true
+          cp crates/domains/symthaea-muse/src/realization_effect_order.rs "$evidence/"
+          cp docs/research/MEL_RENDERER_CONTROL_ORDER_WASHOUT_V1_2026-11-23.md "$evidence/" 2>/dev/null || true
+          (cd "$evidence" && find . -maxdepth 1 -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)
+
+      - name: Upload exact-head evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: muse-realization-effect-order-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/muse-realization-effect-order-evidence/
+          if-no-files-found: error
+          retention-days: 90
