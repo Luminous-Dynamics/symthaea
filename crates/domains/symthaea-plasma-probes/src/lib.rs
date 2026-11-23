@@ -1826,7 +1826,7 @@ mod tests {
     }
 
     #[test]
-    fn minmax_normalization_exposes_global_inlier_drift_from_low_weight_outlier_witness() {
+    fn minmax_normalization_exposes_global_inlier_drift_when_sample_support_expands() {
         let inliers = [0.1, 0.3, 0.5, 0.7, 0.9];
         let augmented = [0.0, 0.1, 0.3, 0.5, 0.7, 0.9];
         let before = MinMaxCoordinateMap::fit(&inliers, -PI, PI).expect("base sample has support");
