@@ -263,6 +263,21 @@ A single seed is not a result. A single synthetic generator is not a fab model. 
 
 No benchmark in this workstream grants wafer hold/release, physical measurement scheduling, recipe editing, APC/R2R writes or equipment-control authority.
 
+## Decision-theoretic EVSI: known-assumption prototype
+
+The Rust prototype now includes an exact one-step binary decision-theoretic EVSI calculation, not only the earlier entropy/uncertainty proxy. Given a prior defect probability, fixed assay sensitivity/specificity and declared false-negative, false-positive and acquisition costs, it computes:
+- assay positive/negative probabilities and posterior defect probabilities;
+- the optimal Accept/Hold decision before measurement and after each outcome;
+- expected loss before and after measurement;
+- gross EVSI, acquisition cost and net value;
+- normalized gross EVSI score and a zero-priority hurdle when net value is non-positive.
+
+A frozen known-answer case checks the entire Bayes calculation; tests also verify that an uninformative assay yields zero decision value and that a measurement cost above gross EVSI fails the net-value hurdle. The policy builder binds the assay profile and loss model into its model/config digests and ranks by normalized **gross** EVSI only when its net value is positive. It does not receive hidden outcomes.
+
+This calculation is exact only conditional on the supplied prior, assay likelihood and loss/cost inputs. The predicted prior in the current synthetic challenger comes from an uncalibrated heuristic sensor model; the fixed assay characteristics are synthetic; loss and cost values are assumed. It therefore demonstrates correct decision-value arithmetic, not empirically valid fab EVSI.
+
+The next qualification step is tracked in [#13365](https://github.com/Luminous-Dynamics/symthaea/issues/13365): posterior uncertainty in sensitivity/specificity and prevalence, spectrum/tool/product effects, imperfect reference standards, common-cause assay errors, robust consequence models, queue/capacity costs and paired realized-value calibration. Do not claim the prototype improves industrial measurement economics until those inputs are independently measured and the model-implied ranking predicts realized incremental value on randomized assignments.
+
 ## Measurement-system characterization and multi-fidelity metrology
 
 The complementary workstream [#13356](https://github.com/Luminous-Dynamics/symthaea/issues/13356) expands the current fixed synthetic sensitivity/specificity model into an actual measurement-system characterization benchmark: repeatability, reproducibility, trueness/bias, linearity, hysteresis, resolution, calibration stability, correlated/common-cause errors and reference-standard traceability. It also defines a multi-fidelity policy path—cheap screening followed by higher-accuracy confirmation—where the optimized object is the value of the complete evidence package rather than the first measurement alone.
