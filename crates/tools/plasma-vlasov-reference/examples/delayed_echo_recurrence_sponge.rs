@@ -93,12 +93,24 @@ fn measure_peak(samples: &[(f64, f64, f64)]) -> Peak {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+struct ResponseModeGuardbandMetrics {
+    total_f_strophy: f64,
+    guard_075_f_strophy: f64,
+    guard_090_f_strophy: f64,
+    nyquist_f_strophy: f64,
+    guard_075_fraction: f64,
+    guard_090_fraction: f64,
+    nyquist_fraction: f64,
+    signed_velocity_mode_centroid: f64,
+}
+
 fn response_mode_guardband_metrics(
     config: VlasovPoissonConfig,
     pulse: &VlasovPoisson1d1v,
     control: &VlasovPoisson1d1v,
     spatial_mode: usize,
-) -> Result<(f64, f64, f64, f64), Box<dyn Error>> {
+) -> Result<ResponseModeGuardbandMetrics, Box<dyn Error>> {
     let response_distribution: Vec<f64> = pulse
         .distribution()
         .iter()
@@ -108,7 +120,8 @@ fn response_mode_guardband_metrics(
     let response_state = VlasovPoisson1d1v::new(config, response_distribution)?;
     let spectrum: JointPhaseSpaceSpectrum = response_state.joint_phase_space_spectrum()?;
 
-    let negative_x_mode = (spectrum.nx - spatial_mode) % spectrum.nx;
+    // Measure only the registered positive-k branch. Adding its -k
+    // conjugate would cancel the signed-s centroid identically for real f.
     let mut total = 0.0;
     let mut guard_075 = 0.0;
     let mut guard_090 = 0.0;
@@ -116,28 +129,28 @@ fn response_mode_guardband_metrics(
     let mut signed_s_moment = 0.0;
     let mut non_nyquist_total = 0.0;
 
-    for x_mode in [spatial_mode, negative_x_mode] {
-        for velocity_index in 0..spectrum.nv {
-            let energy = spectrum.mode_energy(x_mode, velocity_index).unwrap_or(0.0);
-            total += energy;
-            if velocity_index == spectrum.nv / 2 {
-                nyquist += energy;
-                continue;
-            }
-
-            let signed_s = spectrum
-                .signed_velocity_mode(velocity_index)
-                .unwrap_or_default();
-            let normalized = signed_s.unsigned_abs() as f64 / (spectrum.nv / 2) as f64;
-            if normalized >= 0.75 {
-                guard_075 += energy;
-            }
-            if normalized >= 0.90 {
-                guard_090 += energy;
-            }
-            signed_s_moment += signed_s as f64 * energy;
-            non_nyquist_total += energy;
+    for velocity_index in 0..spectrum.nv {
+        let energy = spectrum
+            .mode_energy(spatial_mode, velocity_index)
+            .unwrap_or(0.0);
+        total += energy;
+        if velocity_index == spectrum.nv / 2 {
+            nyquist += energy;
+            continue;
         }
+
+        let signed_s = spectrum
+            .signed_velocity_mode(velocity_index)
+            .unwrap_or_default();
+        let normalized = signed_s.unsigned_abs() as f64 / (spectrum.nv / 2) as f64;
+        if normalized >= 0.75 {
+            guard_075 += energy;
+        }
+        if normalized >= 0.90 {
+            guard_090 += energy;
+        }
+        signed_s_moment += signed_s as f64 * energy;
+        non_nyquist_total += energy;
     }
 
     let denominator = total.max(f64::MIN_POSITIVE);
@@ -146,12 +159,16 @@ fn response_mode_guardband_metrics(
     } else {
         0.0
     };
-    Ok((
-        guard_075 / denominator,
-        guard_090 / denominator,
-        nyquist / denominator,
-        centroid,
-    ))
+    Ok(ResponseModeGuardbandMetrics {
+        total_f_strophy: total,
+        guard_075_f_strophy: guard_075,
+        guard_090_f_strophy: guard_090,
+        nyquist_f_strophy: nyquist,
+        guard_075_fraction: guard_075 / denominator,
+        guard_090_fraction: guard_090 / denominator,
+        nyquist_fraction: nyquist / denominator,
+        signed_velocity_mode_centroid: centroid,
+    })
 }
 
 fn config(nv: usize) -> VlasovPoissonConfig {
@@ -226,7 +243,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         "trace_columns,time,coarse_real,coarse_imag,fine_real,fine_imag,sponge_real,sponge_imag"
     );
     println!(
-        "response_spectrum_columns,time,coarse_guard_075,coarse_guard_090,coarse_nyquist,coarse_signed_s_centroid,fine_guard_075,fine_guard_090,fine_nyquist,fine_signed_s_centroid,sponge_guard_075,sponge_guard_090,sponge_nyquist,sponge_signed_s_centroid"
+        "response_spectrum_columns,time,coarse_total_f_strophy,coarse_guard075_fraction,coarse_guard075_abs,coarse_guard090_fraction,coarse_guard090_abs,coarse_nyquist_fraction,coarse_nyquist_abs,coarse_signed_s_centroid,fine_total_f_strophy,fine_guard075_fraction,fine_guard075_abs,fine_guard090_fraction,fine_guard090_abs,fine_nyquist_fraction,fine_nyquist_abs,fine_signed_s_centroid,sponge_total_f_strophy,sponge_guard075_fraction,sponge_guard075_abs,sponge_guard090_fraction,sponge_guard090_abs,sponge_nyquist_fraction,sponge_nyquist_abs,sponge_signed_s_centroid"
     );
     for step in 0..=total_steps {
         if step == pulse_step {
@@ -259,19 +276,31 @@ fn main() -> Result<(), Box<dyn Error>> {
                     prediction.echo_mode as usize,
                 )?;
                 println!(
-                    "response_spectrum,{time:.8},{:.12e},{:.12e},{:.12e},{:.8},{:.12e},{:.12e},{:.12e},{:.8},{:.12e},{:.12e},{:.12e},{:.8}",
-                    coarse_metrics.0,
-                    coarse_metrics.1,
-                    coarse_metrics.2,
-                    coarse_metrics.3,
-                    fine_metrics.0,
-                    fine_metrics.1,
-                    fine_metrics.2,
-                    fine_metrics.3,
-                    sponge_metrics.0,
-                    sponge_metrics.1,
-                    sponge_metrics.2,
-                    sponge_metrics.3,
+                    "response_spectrum,{time:.8},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.8},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.8},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.8}",
+                    coarse_metrics.total_f_strophy,
+                    coarse_metrics.guard_075_fraction,
+                    coarse_metrics.guard_075_f_strophy,
+                    coarse_metrics.guard_090_fraction,
+                    coarse_metrics.guard_090_f_strophy,
+                    coarse_metrics.nyquist_fraction,
+                    coarse_metrics.nyquist_f_strophy,
+                    coarse_metrics.signed_velocity_mode_centroid,
+                    fine_metrics.total_f_strophy,
+                    fine_metrics.guard_075_fraction,
+                    fine_metrics.guard_075_f_strophy,
+                    fine_metrics.guard_090_fraction,
+                    fine_metrics.guard_090_f_strophy,
+                    fine_metrics.nyquist_fraction,
+                    fine_metrics.nyquist_f_strophy,
+                    fine_metrics.signed_velocity_mode_centroid,
+                    sponge_metrics.total_f_strophy,
+                    sponge_metrics.guard_075_fraction,
+                    sponge_metrics.guard_075_f_strophy,
+                    sponge_metrics.guard_090_fraction,
+                    sponge_metrics.guard_090_f_strophy,
+                    sponge_metrics.nyquist_fraction,
+                    sponge_metrics.nyquist_f_strophy,
+                    sponge_metrics.signed_velocity_mode_centroid,
                 );
             }
 
