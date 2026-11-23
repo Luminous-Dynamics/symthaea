@@ -1828,7 +1828,7 @@ pub fn validate_kird_record_value(
             }
         }
         "FAIL" => {
-            if !gate_statuses.iter().any(|status| *status == "FAIL") {
+            if !gate_statuses.contains(&"FAIL") {
                 return Err(kird_error(
                     "physical_gates.status",
                     "FAIL requires at least one failing physical gate",
@@ -2001,16 +2001,16 @@ fn validate_kird_global_coverage(
         ));
     }
 
-    if let Some(confirmed_error) = kird_optional_number(
+    if kird_optional_number(
         root,
         "distortion.intervention_response.worst_confirmed_normalized_error",
-    )? {
-        if maximum_sampled_error + allowance < confirmed_error {
-            return Err(kird_error(
-                "response_scope.maximum_sampled_normalized_error",
-                "cannot be smaller than the worst confirmed response error",
-            ));
-        }
+    )?
+    .is_some_and(|confirmed_error| maximum_sampled_error + allowance < confirmed_error)
+    {
+        return Err(kird_error(
+            "response_scope.maximum_sampled_normalized_error",
+            "cannot be smaller than the worst confirmed response error",
+        ));
     }
 
     Ok(())
