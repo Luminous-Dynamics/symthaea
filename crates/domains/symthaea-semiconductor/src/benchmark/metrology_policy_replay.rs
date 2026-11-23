@@ -1563,10 +1563,22 @@ mod tests {
         let first = evaluate_synthetic_metrology_policy_v1(&episode, &selection).unwrap();
         let second = evaluate_synthetic_metrology_policy_v1(&episode, &selection).unwrap();
 
-        assert_eq!(first.metrology_detected_true_positive_count, second.metrology_detected_true_positive_count);
-        assert_eq!(first.metrology_false_positive_count, second.metrology_false_positive_count);
-        assert_eq!(first.metrology_false_negative_count, second.metrology_false_negative_count);
-        assert_eq!(first.assay_adjusted_ht_prevalence, second.assay_adjusted_ht_prevalence);
+        assert_eq!(
+            first.metrology_detected_true_positive_count,
+            second.metrology_detected_true_positive_count
+        );
+        assert_eq!(
+            first.metrology_false_positive_count,
+            second.metrology_false_positive_count
+        );
+        assert_eq!(
+            first.metrology_false_negative_count,
+            second.metrology_false_negative_count
+        );
+        assert_eq!(
+            first.assay_adjusted_ht_prevalence,
+            second.assay_adjusted_ht_prevalence
+        );
         assert_eq!(first.evaluation_sha256, second.evaluation_sha256);
     }
 
