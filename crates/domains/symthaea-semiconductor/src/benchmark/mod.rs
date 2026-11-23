@@ -3,6 +3,7 @@
 pub mod binary_metrics;
 pub mod dtco_manifest;
 pub mod metrology_audit;
+pub mod metrology_system_characterization;
 pub mod metrology_semantics;
 pub mod mf_acquisition;
 pub mod pair_manifest;
@@ -20,6 +21,14 @@ pub use binary_metrics::{
     BinaryClassCounts, BinaryMetricReportV1, BinaryMetricsError, BinaryScoreSampleV1,
     BinaryScoreSubjectV1, score_binary_subject_v1,
 };
+pub use metrology_system_characterization::{
+    SYNTHETIC_MSA_POLICY_VIEW_SCHEMA_V1, SYNTHETIC_MSA_REPORT_SCHEMA_V1,
+    SYNTHETIC_MSA_SCENARIO_SCHEMA_V1, SyntheticMsaEpisodeV1,
+    SyntheticMsaError, SyntheticMsaEvaluationReportV1, SyntheticMsaObservationV1,
+    SyntheticMsaPolicyViewV1, SyntheticMsaScenarioConfigV1,
+    evaluate_synthetic_msa_episode_v1, generate_synthetic_msa_episode_v1,
+};
+
 pub use process_event_graph::{
     ClockBasisV1, InformationCutoffSnapshotV1, MetrologyLabelStatusV1, MetrologyLabelV1,
     PredictionInformationCutoffV1, ProcessEventEdgeV1, ProcessEventGraphError, ProcessEventGraphV1,
