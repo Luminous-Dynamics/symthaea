@@ -255,7 +255,7 @@ impl fmt::Display for MycelialFusionCounterfactualError {
             ),
             Self::ResourceLimitExceeded => {
                 write!(f, "counterfactual graph exceeds resource limits")
-            },
+            }
             Self::InvalidCandidate(id) => write!(f, "fusion candidate {id} has invalid metadata"),
             Self::DuplicateCandidateId(id) => write!(f, "duplicate fusion candidate ID {id}"),
             Self::DuplicateDemandId(id) => write!(f, "duplicate demand ID {id}"),
@@ -273,12 +273,15 @@ impl fmt::Display for MycelialFusionCounterfactualError {
             }
             Self::LengthUnitMismatch => {
                 write!(f, "candidate bridge length unit differs from source graph")
-            },
+            }
             Self::DuplicateExistingConnection(id) => {
                 write!(f, "candidate {id} duplicates an existing source connection")
             }
             Self::CounterfactualTopologyMismatch => {
-                write!(f, "single-edge counterfactual did not produce the expected beta-0/beta-1 delta")
+                write!(
+                    f,
+                    "single-edge counterfactual did not produce the expected beta-0/beta-1 delta"
+                )
             }
             Self::UnknownDemandEndpoint(id) => write!(f, "unknown declared demand endpoint {id}"),
             Self::InvalidDemand(id) => write!(f, "invalid declared demand pair {id}"),
@@ -610,8 +613,7 @@ fn split_target_segment(
         .ok_or_else(|| MycelialFusionCounterfactualError::UnknownTargetSegment(segment_id.clone()))?
         .position;
     let fraction = f64::from(*arc_length_fraction_micros) / PARAMETER_SCALE;
-    let split_identity =
-        side_contact_anchor_digest(segment_id, *arc_length_fraction_micros);
+    let split_identity = side_contact_anchor_digest(segment_id, *arc_length_fraction_micros);
     let split_junction_id = format!("fusion-split:{split_identity}");
     if !valid_id(&split_junction_id) || view.nodes.contains_key(&split_junction_id) {
         return Err(MycelialFusionCounterfactualError::InvalidCandidate(
@@ -1107,12 +1109,8 @@ fn build_candidate_impact(
 /// independent contact events under the pairwise-fusion contract. Explicit
 /// caller conflict groups take precedence, but common source tips, shared
 /// tip endpoints, and identical tip-to-side contacts are also detected.
-fn candidates_conflict(
-    left: &MycelialFusionCandidate,
-    right: &MycelialFusionCandidate,
-) -> bool {
-    if left.conflict_group_id.is_some()
-        && left.conflict_group_id == right.conflict_group_id
+fn candidates_conflict(left: &MycelialFusionCandidate, right: &MycelialFusionCandidate) -> bool {
+    if left.conflict_group_id.is_some() && left.conflict_group_id == right.conflict_group_id
     {
         return true;
     }
@@ -1128,14 +1126,8 @@ fn candidates_conflict(
                 junction_id: right_target,
             },
         ) => {
-            let left_endpoints = [
-                left.source_tip_junction_id.as_str(),
-                left_target.as_str(),
-            ];
-            let right_endpoints = [
-                right.source_tip_junction_id.as_str(),
-                right_target.as_str(),
-            ];
+            let left_endpoints = [left.source_tip_junction_id.as_str(), left_target.as_str()];
+            let right_endpoints = [right.source_tip_junction_id.as_str(), right_target.as_str()];
             left_endpoints.iter().any(|id| right_endpoints.contains(id))
         }
         (
@@ -1186,9 +1178,9 @@ fn validate_inputs(
     }
     let demand_evaluations = graph_view_evaluations.saturating_mul(demands.len());
     if demand_evaluations > MAX_MYCELIAL_FUSION_DEMAND_EVALUATIONS {
-        return Err(MycelialFusionCounterfactualError::DemandEvaluationBudgetExceeded(
-            demand_evaluations,
-        ));
+        return Err(
+            MycelialFusionCounterfactualError::DemandEvaluationBudgetExceeded(demand_evaluations),
+        );
     }
     let mut candidate_ids = BTreeSet::new();
     for candidate in candidates {
@@ -1394,8 +1386,7 @@ mod tests {
         for pivot in 0..node_count {
             for source in 0..node_count {
                 for target in 0..node_count {
-                    let through_pivot =
-                        distances[source][pivot] + distances[pivot][target];
+                    let through_pivot = distances[source][pivot] + distances[pivot][target];
                     if through_pivot < distances[source][target] {
                         distances[source][target] = through_pivot;
                     }
@@ -1420,7 +1411,10 @@ mod tests {
                 }
             }
         }
-        let cycle_rank = edges.len().saturating_add(components).saturating_sub(node_count);
+        let cycle_rank = edges
+            .len()
+            .saturating_add(components)
+            .saturating_sub(node_count);
         (components, cycle_rank, distances)
     }
 
@@ -1513,7 +1507,10 @@ mod tests {
             floyd_warshall_oracle(3, &[(0, 1, 1.0), (0, 2, 1.0)]);
         let (oracle_after_components, oracle_after_cycles, after_paths) =
             floyd_warshall_oracle(3, &[(0, 1, 1.0), (0, 2, 1.0), (1, 2, 1.0)]);
-        assert_eq!(impact.rejected.connected_components, oracle_before_components);
+        assert_eq!(
+            impact.rejected.connected_components,
+            oracle_before_components
+        );
         assert_eq!(impact.rejected.cycle_rank, oracle_before_cycles);
         assert_eq!(
             impact.accepted_for_analysis.connected_components,
@@ -1585,11 +1582,11 @@ mod tests {
         let (oracle_before_components, oracle_before_cycles, _) =
             floyd_warshall_oracle(5, &[(0, 4, 4.0), (4, 1, 6.0), (2, 3, 10.0)]);
         let (oracle_after_components, oracle_after_cycles, _) =
-            floyd_warshall_oracle(
-                5,
-                &[(0, 4, 4.0), (4, 1, 6.0), (2, 3, 10.0), (3, 4, 2.0)],
-            );
-        assert_eq!(impact.rejected.connected_components, oracle_before_components);
+            floyd_warshall_oracle(5, &[(0, 4, 4.0), (4, 1, 6.0), (2, 3, 10.0), (3, 4, 2.0)]);
+        assert_eq!(
+            impact.rejected.connected_components,
+            oracle_before_components
+        );
         assert_eq!(impact.rejected.cycle_rank, oracle_before_cycles);
         assert_eq!(
             impact.accepted_for_analysis.connected_components,
@@ -1689,23 +1686,21 @@ mod tests {
                 segment("source-d", "F", "D", 10.0),
             ],
         );
-        let side_candidate = |id: &str, source_tip_junction_id: &str| {
-            MycelialFusionCandidate {
-                candidate_id: id.to_string(),
-                source_tip_junction_id: source_tip_junction_id.to_string(),
-                target: MycelialFusionTarget::HyphaSide {
-                    segment_id: "shared-side".to_string(),
-                    arc_length_fraction_micros: 500_000,
-                },
-                bridge_length: 1.0,
-                bridge_length_unit: ReconstructionLengthUnit::Micrometer,
-                bridge_length_basis: MycelialFusionBridgeLengthBasis::DeclaredAssumption,
-                bridge_length_evidence_digest: digest('k'),
-                fusion_probability: 0.7,
-                calibration_policy_id: "calibration-v1".to_string(),
-                probability_evidence_digest: digest('g'),
-                conflict_group_id: None,
-            }
+        let side_candidate = |id: &str, source_tip_junction_id: &str| MycelialFusionCandidate {
+            candidate_id: id.to_string(),
+            source_tip_junction_id: source_tip_junction_id.to_string(),
+            target: MycelialFusionTarget::HyphaSide {
+                segment_id: "shared-side".to_string(),
+                arc_length_fraction_micros: 500_000,
+            },
+            bridge_length: 1.0,
+            bridge_length_unit: ReconstructionLengthUnit::Micrometer,
+            bridge_length_basis: MycelialFusionBridgeLengthBasis::DeclaredAssumption,
+            bridge_length_evidence_digest: digest('k'),
+            fusion_probability: 0.7,
+            calibration_policy_id: "calibration-v1".to_string(),
+            probability_evidence_digest: digest('g'),
+            conflict_group_id: None,
         };
         let candidates = vec![
             side_candidate("side-one", "C"),
