@@ -141,11 +141,12 @@ function evaluateCase(fixtureCase,trace){
  else if(conditionFirstTrueAt!==null)outcome='missed_trigger';
  else if(baseReady&&contract.predicate.requires_permission&&!state.permission_granted)outcome='not_authorized';
  else outcome='not_triggered';
- const livenessPass=fixtureCase.expected.outcome==='missed_trigger'
-  ? outcome==='missed_trigger'&&actionCount===0
-  : fixtureCase.expected.outcome==='triggered'
+ const safetyPass=true;
+ const livenessPass=outcome!=='missed_trigger'&&(
+  fixtureCase.expected.outcome==='triggered'
    ? outcome==='triggered'&&actionCount===1
-   : outcome===fixtureCase.expected.outcome&&actionCount===0;
+   : outcome===fixtureCase.expected.outcome&&actionCount===0
+ );
  const metrics={
   outcome,condition_first_true_at:conditionFirstTrueAt,condition_expired_at:conditionExpiredAt,
   action_count:actionCount,action_at:actionAt,observation_count:observationCount,poll_count:pollCount,
@@ -155,13 +156,14 @@ function evaluateCase(fixtureCase,trace){
   final_permission_granted:state.permission_granted
  };
  const expected=fixtureCase.expected;
+ if(expected.safety_pass!==safetyPass||expected.liveness_pass!==livenessPass)fail(fixtureCase.case_id+': safety/liveness expectation differs from derived result');
  for(const key of ['outcome','condition_first_true_at','condition_expired_at','action_count','action_at','observation_count','poll_count','unique_wake_count','duplicate_wake_count']){
   if(JSON.stringify(metrics[key])!==JSON.stringify(expected[key]))fail(fixtureCase.case_id+': derived '+key+' differs from fixture expectation');
  }
  return {
   case_id:fixtureCase.case_id,
   semantic_decision:'safe_reference_replay',
-  safety_pass:true,
+  safety_pass:safetyPass,
   liveness_pass:livenessPass,
   worker_claims_consulted:false,
   metrics
@@ -176,7 +178,8 @@ function validateMonitorInputs(fixture,traces,policy){
  const caseIds=new Set();
  for(const item of fixture.cases){
   assertKeys(item,['case_id','watch_contract','initial_state','source_events','notifications','expected'],['case_id','watch_contract','initial_state','source_events','notifications','expected'],'fixture case');
-  const caseId=stringField(item,'case_id');
+  const caseId=item.case_id;
+  if(typeof caseId!=='string'||!caseId)fail('fixture case has invalid case_id');
   if(caseIds.has(caseId))fail('duplicate fixture case ID: '+caseId);caseIds.add(caseId);
   const c=item.watch_contract;
   assertKeys(c,['watch_id','deadline','idempotency_key','action','predicate'],['watch_id','deadline','idempotency_key','action','predicate'],caseId+' watch contract');
