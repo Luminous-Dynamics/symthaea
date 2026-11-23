@@ -122,9 +122,69 @@ function encodeStateUrl(input) {
   validateQuery(q);
   return `?state=${percentEncodeUtf8(JSON.stringify(orderedState(q)))}`;
 }
+function assertNoDuplicateStateFields(json) {
+  let index = 0;
+  const skipWhitespace = () => {
+    while (index < json.length && /\s/.test(json[index])) index++;
+  };
+  const readString = () => {
+    const start = index++;
+    while (index < json.length) {
+      const char = json[index++];
+      if (char === '\\') { index++; continue; }
+      if (char === '"') return JSON.parse(json.slice(start, index));
+    }
+    throw new Error('state_url_json_invalid');
+  };
+  const skipValue = () => {
+    skipWhitespace();
+    if (json[index] === '"') { readString(); return; }
+    if (json[index] === '{' || json[index] === '[') {
+      const stack = [json[index++] === '{' ? '}' : ']'];
+      let inString = false;
+      while (index < json.length && stack.length) {
+        const char = json[index++];
+        if (inString) {
+          if (char === '\\') index++;
+          else if (char === '"') inString = false;
+        } else if (char === '"') inString = true;
+        else if (char === '{') stack.push('}');
+        else if (char === '[') stack.push(']');
+        else if (char === '}' || char === ']') {
+          if (stack.pop() !== char) throw new Error('state_url_json_invalid');
+        }
+      }
+      if (stack.length || inString) throw new Error('state_url_json_invalid');
+      return;
+    }
+    while (index < json.length && json[index] !== ',' && json[index] !== '}' && !/\s/.test(json[index])) index++;
+  };
+  skipWhitespace();
+  if (json[index++] !== '{') throw new Error('state_url_fields_mismatch');
+  const seen = new Set();
+  while (true) {
+    skipWhitespace();
+    if (json[index] === '}') { index++; break; }
+    if (json[index] !== '"') throw new Error('state_url_json_invalid');
+    const key = readString();
+    if (seen.has(key)) throw new Error('state_url_duplicate_field');
+    seen.add(key);
+    skipWhitespace();
+    if (json[index++] !== ':') throw new Error('state_url_json_invalid');
+    skipValue();
+    skipWhitespace();
+    if (json[index] === ',') { index++; continue; }
+    if (json[index] === '}') { index++; break; }
+    throw new Error('state_url_json_invalid');
+  }
+  skipWhitespace();
+  if (index !== json.length) throw new Error('state_url_json_invalid');
+}
 function decodeStateUrl(url) {
   assert.ok(url.startsWith('?state=') && !url.slice(7).includes('&'), 'state_url_must_contain_only_state_parameter');
-  const parsed = JSON.parse(percentDecodeUtf8(url.slice(7)));
+  const json = percentDecodeUtf8(url.slice(7));
+  assertNoDuplicateStateFields(json);
+  const parsed = JSON.parse(json);
   assert.ok(parsed && typeof parsed === 'object' && !Array.isArray(parsed), 'state_url_fields_mismatch');
   const keys = Object.keys(parsed);
   assert.ok(keys.length === STATE_FIELDS.length && STATE_FIELDS.every((field) => Object.hasOwn(parsed, field)), 'state_url_fields_mismatch');

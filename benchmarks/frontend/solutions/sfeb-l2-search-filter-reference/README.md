@@ -45,7 +45,7 @@ increase the runnable task count.
 
 ## Canonical URL state and invalid links
 
-Shared state URLs use exactly one `?state=` parameter with exactly eight fields. Reserved and non-ASCII UTF-8 bytes are percent-encoded; raw URL-component bytes are limited to RFC 3986 unreserved characters. Search/name sorting use ASCII-only case folding and C0/C1 query controls are rejected. Price values remain within the JavaScript safe-integer range.
+Shared state URLs use exactly one `?state=` parameter with exactly eight unique fields; duplicate JSON keys reject. Reserved and non-ASCII UTF-8 bytes are percent-encoded; raw URL-component bytes are limited to RFC 3986 unreserved characters. Search/name sorting use ASCII-only case folding and C0/C1 query controls are rejected. Price values remain within the JavaScript safe-integer range.
 
 A malformed or partial initial URL is shown as an accessible error. The candidate does not replace the user's URL with default state until the user deliberately changes a filter or clears the state. These behaviors are source-authored and require browser qualification; they are not yet browser-verified.
 

@@ -15,7 +15,7 @@ struct DatasetDocument {
     assets: Vec<Asset>,
 }
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct QueryState {
     pub q: String, pub category: Option<String>, pub available_only: bool,
     pub min_price_cents: Option<u64>, pub max_price_cents: Option<u64>,
@@ -161,13 +161,23 @@ pub fn decode_state_url(url: &str) -> Result<QueryState, String> {
     }
     let decoded = percent_decode_component(encoded)?;
     let json = std::str::from_utf8(&decoded).map_err(|error| format!("state URL is not UTF-8: {error}"))?;
+    // Deserialize into the typed struct first: Serde's derived visitor rejects duplicate fields.
+    let query: QueryState = serde_json::from_str(json).map_err(|error| {
+        let message = error.to_string();
+        if message.contains("duplicate field") {
+            "state_url_duplicate_field".to_string()
+        } else if message.contains("unknown field") {
+            "state_url_fields_mismatch".to_string()
+        } else {
+            format!("state URL JSON is invalid: {message}")
+        }
+    })?;
     let document: Value = serde_json::from_str(json).map_err(|error| format!("state URL JSON is invalid: {error}"))?;
     const REQUIRED_FIELDS: [&str; 8] = ["q", "category", "available_only", "min_price_cents", "max_price_cents", "sort", "page", "page_size"];
     let object = document.as_object().ok_or_else(|| "state_url_fields_mismatch".to_string())?;
     if object.len() != REQUIRED_FIELDS.len() || REQUIRED_FIELDS.iter().any(|field| !object.contains_key(*field)) {
         return Err("state_url_fields_mismatch".to_string());
     }
-    let query: QueryState = serde_json::from_value(document).map_err(|error| format!("state URL JSON is invalid: {error}"))?;
     validate_query(&query)?;
     Ok(query)
 }

@@ -62,6 +62,19 @@
         "page": 1,
         "page_size": 5
       }
+    },
+    {
+      "id": "reserved-escaped-quotes-and-backslash",
+      "state": {
+        "q": "café + pump & \"sensor\" / valve\\line 100%",
+        "category": "Power",
+        "available_only": true,
+        "min_price_cents": 5000,
+        "max_price_cents": 250000,
+        "sort": "price_desc",
+        "page": 3,
+        "page_size": 10
+      }
     }
   ],
   "invalid_states": [
@@ -171,6 +184,11 @@
     {
       "id": "extra-parameter",
       "url": "?state=%7B%7D&admin=true"
+    },
+    {
+      "id": "duplicate-state-field",
+      "url": "?state=%7B%22q%22%3A%22first%22%2C%22q%22%3A%22second%22%2C%22category%22%3Anull%2C%22available_only%22%3Afalse%2C%22min_price_cents%22%3Anull%2C%22max_price_cents%22%3Anull%2C%22sort%22%3A%22name_asc%22%2C%22page%22%3A1%2C%22page_size%22%3A5%7D",
+      "error": "state_url_duplicate_field"
     }
   ]
 }

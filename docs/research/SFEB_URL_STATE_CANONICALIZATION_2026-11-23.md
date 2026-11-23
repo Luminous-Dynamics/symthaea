@@ -32,7 +32,7 @@ Rules:
 2. Literal bytes in the encoded component must be ASCII RFC 3986 unreserved characters only: letters, digits, hyphen, period, underscore and tilde.
 3. Reserved and non-ASCII content must be percent-encoded as UTF-8 bytes. A plus sign is data, not form-encoding whitespace, and must be encoded as `%2B`.
 4. Percent escapes are case-insensitive; the decoded byte sequence must be valid UTF-8.
-5. The JSON object must contain exactly eight fields: `q`, `category`, `available_only`, `min_price_cents`, `max_price_cents`, `sort`, `page` and `page_size`. Missing and unknown fields are rejected.
+5. The JSON object must contain exactly eight unique fields: `q`, `category`, `available_only`, `min_price_cents`, `max_price_cents`, `sort`, `page` and `page_size`. Missing fields, unknown fields and duplicate JSON keys are rejected.
 6. Query text rejects Unicode C0 and C1 control characters (U+0000–U+001F and U+007F–U+009F).
 7. Search and name sorting use ASCII A–Z case folding only. Non-ASCII code points are not Unicode case-folded; this preserves the contract's explicit ASCII-case-insensitive semantics.
 8. Monetary values and synthetic dataset numeric fields must be non-negative safe integers no greater than 9,007,199,254,740,991, so Rust `u64` and JavaScript `Number` cannot silently diverge.
@@ -84,9 +84,9 @@ The committed JavaScript oracle body was executed in an isolated V8 harness afte
 - 5,000/5,000 deterministic generated states;
 - 9/9 pre-existing semantic fault models;
 - 8/8 URL-field omission controls;
-- 14/14 new URL-state conformance vectors (3 valid, 6 invalid state objects, 5 invalid URL components).
+- 16/16 new URL-state conformance vectors (4 valid, 6 invalid state objects, 6 invalid URL components).
 
-The first run exposed an obsolete omission-control assumption: a strict decoder now rejects a missing state field rather than defaulting it, so the mutation test itself needed to count a thrown rejection as a detected omission. That test harness was corrected and the full V8 logic run then passed.
+The first run exposed an obsolete omission-control assumption: a strict decoder now rejects a missing state field rather than defaulting it, so the mutation test itself needed to count a thrown rejection as a detected omission. The expanded corpus also caught a bug in the duplicate-key scanner when valid query text contained escaped quotes and backslashes; the scanner was corrected and the full V8 logic run then passed.
 
 This is an executed JavaScript-model preflight in V8 with a compatibility shim, not a stock Node.js CLI run and not a Rust, Leptos/WASM, Chromium, trusted-executor or independent-verifier receipt. The standard reproduction commands remain the intended repository commands and should be run in the pinned host environment.
 

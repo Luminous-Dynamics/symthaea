@@ -98,6 +98,12 @@
       "severity": "high",
       "change": "Accept monetary values above the JavaScript safe integer range.",
       "expected_detection": "The shared unsafe-integer state vector rejects values above 9,007,199,254,740,991."
+    },
+    {
+      "id": "MUT-URL-017",
+      "severity": "high",
+      "change": "Accept duplicate JSON state fields and let the parser silently keep the first or last value.",
+      "expected_detection": "Shared URL-state conformance vector rejects duplicate query field names as ambiguous."
     }
   ],
   "positive_controls": [
@@ -130,6 +136,11 @@
       "id": "POS-URL-006",
       "change": "Round-trip a URL state containing accented Unicode, plus, ampersand and reserved punctuation using percent-encoded UTF-8.",
       "expected_invariant": "All eight fields and exact query text restore unchanged."
+    },
+    {
+      "id": "POS-URL-007",
+      "change": "Reorder the eight unique JSON state fields while preserving their names and values.",
+      "expected_invariant": "The state restores identically; JSON object key order has no semantic meaning."
     }
   ],
   "metamorphic_relations": [

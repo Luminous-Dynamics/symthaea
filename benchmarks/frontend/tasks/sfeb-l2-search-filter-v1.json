@@ -436,7 +436,7 @@
     "Rust model can be checked offline; browser/keyboard/accessibility qualification still requires runner.",
     "Public pilot only, not hidden holdout.",
     "Responsive stress preflight: sweep every integer CSS width from 320 through 1440 to detect breakpoint cliffs; the named five-width matrix remains mandatory, and the candidate must pass the same sweep before promotion.",
-    "URL-state contract requires exactly eight fields, one ?state= parameter, RFC 3986 unreserved literal bytes only, percent-encoded UTF-8 for all other bytes, ASCII-only case folding and rejection of C0/C1 controls and unsafe cross-language integers.",
-    "URL-state contract requires exactly eight fields, one ?state= parameter, RFC 3986 unreserved literal bytes only, percent-encoded UTF-8 for all other bytes, ASCII-only case folding and rejection of C0/C1 controls and unsafe cross-language integers."
+    "URL-state contract requires exactly eight unique fields, with duplicate JSON keys rejected, one ?state= parameter, RFC 3986 unreserved literal bytes only, percent-encoded UTF-8 for all other bytes, ASCII-only case folding and rejection of C0/C1 controls and unsafe cross-language integers.",
+    "URL-state contract requires exactly eight unique fields, with duplicate JSON keys rejected, one ?state= parameter, RFC 3986 unreserved literal bytes only, percent-encoded UTF-8 for all other bytes, ASCII-only case folding and rejection of C0/C1 controls and unsafe cross-language integers."
   ]
 }
