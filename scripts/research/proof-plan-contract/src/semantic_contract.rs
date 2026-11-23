@@ -290,7 +290,7 @@ fn to_status(result: FiniteTruthTableResult) -> ObligationStatus {
         } => ObligationStatus::UnknownAtomBudgetExceeded {
             atom_count,
             max_atoms,
-        }
+        },
     }
 }
 
