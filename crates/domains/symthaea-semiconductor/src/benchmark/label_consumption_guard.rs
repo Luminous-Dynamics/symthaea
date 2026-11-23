@@ -88,9 +88,7 @@ fn sha256_hex(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
 
-fn json_sha256<T: Serialize + ?Sized>(
-    value: &T,
-) -> Result<String, LabelConsumptionGuardErrorV1> {
+fn json_sha256<T: Serialize + ?Sized>(value: &T) -> Result<String, LabelConsumptionGuardErrorV1> {
     let bytes = serde_json::to_vec(value).map_err(|error| {
         LabelConsumptionGuardErrorV1(format!("canonical JSON serialization failed: {error}"))
     })?;
@@ -306,19 +304,18 @@ pub fn assess_label_consumption_eligibility_v1(
 mod tests {
     use super::*;
     use crate::benchmark::calibration_requalification::{
-        CalibrationChangeEventV1, CalibrationChangeKindV1, CalibrationChangeScopeV1,
-        CalibrationChangeTargetV1, CalibrationEventQualificationV1,
-        CalibrationOperatingRangeV1, CalibrationRequalificationInputV1,
         CALIBRATION_CHANGE_EVENT_SCHEMA_V1, CALIBRATION_REQUALIFICATION_INPUT_SCHEMA_V1,
-        CalibrationEventFrontierV1, CalibrationEventInventoryStateV1,
-        CalibrationEventOrderingStateV1, MeasurementTimeBoundsV1,
+        CalibrationChangeEventV1, CalibrationChangeKindV1, CalibrationChangeScopeV1,
+        CalibrationChangeTargetV1, CalibrationEventFrontierV1, CalibrationEventInventoryStateV1,
+        CalibrationEventOrderingStateV1, CalibrationEventQualificationV1,
+        CalibrationOperatingRangeV1, CalibrationRequalificationInputV1, MeasurementTimeBoundsV1,
         seal_calibration_event_inventory_v1,
     };
     use crate::benchmark::metrology_qualification_gate::{
-        CalibrationCertificateV1, MeasurementEvidenceV1, MeasurementUncertaintyComponentV1,
-        MeasurementQualificationPolicyV1, TraceabilityDeclarationV1, UncertaintyComponentKindV1,
-        CALIBRATION_CERTIFICATE_SCHEMA_V1, MEASUREMENT_EVIDENCE_SCHEMA_V1,
-        QUALIFICATION_POLICY_SCHEMA_V1, qualify_measurement_evidence_v1,
+        CALIBRATION_CERTIFICATE_SCHEMA_V1, CalibrationCertificateV1,
+        MEASUREMENT_EVIDENCE_SCHEMA_V1, MeasurementEvidenceV1, MeasurementQualificationPolicyV1,
+        MeasurementUncertaintyComponentV1, QUALIFICATION_POLICY_SCHEMA_V1,
+        TraceabilityDeclarationV1, UncertaintyComponentKindV1, qualify_measurement_evidence_v1,
     };
     use crate::benchmark::process_event_graph::{ClockBasisV1, MetrologyLabelStatusV1};
 
