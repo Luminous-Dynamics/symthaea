@@ -510,7 +510,7 @@ fn parse_score(record: &Value) -> Result<(TaskKey, MethodKind, Metrics), String>
             "full_evidence_regret", "regret_gap_vs_full_evidence",
             "regret_gap_vs_full_method", "decision_is_optimal", "abstained",
             "evaluation_validity", "invalidity_reason", "method", "retrieved_event_ids",
-            "index_bytes", "retrieval_profile_sha256",
+            "index_bytes", "retrieval_profile_sha256", "decision_support_event_ids",
             "candidate_execution_boundary", "candidate_artifact_sha256",
             "candidate_process_startup_ns", "candidate_process_wall_ns",
             "candidate_request_build_ns", "candidate_receipt_validation_ns",
@@ -558,6 +558,7 @@ fn parse_score(record: &Value) -> Result<(TaskKey, MethodKind, Metrics), String>
     }
     required_string(record, "invalidity_reason")?;
     required_event_ids(record, "retrieved_event_ids")?;
+    required_event_ids(record, "decision_support_event_ids")?;
     required_u64(record, "index_bytes")?;
     required_u64(record, "removed_event_count")?;
     required_u64(record, "removed_experience_struct_bytes")?;
@@ -823,6 +824,7 @@ struct CandidateReceipt {
     candidate_observation_sequence: u64,
     candidate_input_sha256: String,
     decision: String,
+    decision_support_event_ids: Vec<u32>,
     retrieved_event_ids: Vec<u32>,
     index_bytes: u64,
     retrieval_profile_sha256: Option<String>,
@@ -944,7 +946,11 @@ fn parse_candidate_receipt(record: &Value) -> Result<((String, String), Candidat
         return Err("candidate receipt contains unsupported decision value".to_string());
     }
     let retrieved_event_ids = required_event_ids(record, "retrieved_event_ids")?;
-    required_event_ids(record, "decision_support_event_ids")?;
+    let decision_support_event_ids = required_event_ids(record, "decision_support_event_ids")?;
+    let retrieved_set: BTreeSet<u32> = retrieved_event_ids.iter().copied().collect();
+    if !decision_support_event_ids.iter().all(|event_id| retrieved_set.contains(event_id)) {
+        return Err("candidate decision support IDs must be a subset of retrieved event IDs".to_string());
+    }
     for field in [
         "support_event_count", "support_known_root_count", "support_known_family_count",
         "support_unresolved_count", "available_event_count",
@@ -991,6 +997,7 @@ fn parse_candidate_receipt(record: &Value) -> Result<((String, String), Candidat
             candidate_observation_sequence,
             candidate_input_sha256,
             decision,
+            decision_support_event_ids,
             retrieved_event_ids,
             index_bytes,
             retrieval_profile_sha256,
@@ -1029,6 +1036,11 @@ fn validate_score_against_candidate(
     }
     if required_event_ids(score, "retrieved_event_ids")? != candidate.retrieved_event_ids {
         return Err("evaluator score retrieved_event_ids differ from candidate receipt".to_string());
+    }
+    if required_event_ids(score, "decision_support_event_ids")?
+        != candidate.decision_support_event_ids
+    {
+        return Err("evaluator score decision_support_event_ids differ from candidate receipt".to_string());
     }
     if required_u64(score, "index_bytes")? != candidate.index_bytes {
         return Err("evaluator score index_bytes differ from candidate receipt".to_string());
@@ -1392,6 +1404,7 @@ mod tests {
             "removed_experience_struct_bytes": 0,
             "method": method,
             "retrieved_event_ids": [],
+            "decision_support_event_ids": [],
             "index_bytes": 0,
             "decision": "action_a",
             "full_evidence_decision": "action_a",
@@ -1483,6 +1496,7 @@ mod tests {
             "candidate_input_sha256": candidate.candidate_input_sha256,
             "decision": candidate.decision,
             "retrieved_event_ids": candidate.retrieved_event_ids,
+            "decision_support_event_ids": candidate.decision_support_event_ids,
             "index_bytes": candidate.index_bytes,
             "retrieval_profile_sha256": candidate.retrieval_profile_sha256,
             "candidate_execution_boundary": candidate.candidate_execution_boundary,
@@ -1597,6 +1611,12 @@ mod tests {
         assert!(validate_score_against_candidate(&wrong_retrieved, &key.0, &receipt)
             .unwrap_err()
             .contains("retrieved_event_ids"));
+
+        let mut wrong_support = valid.clone();
+        wrong_support["decision_support_event_ids"] = json!([3]);
+        assert!(validate_score_against_candidate(&wrong_support, &key.0, &receipt)
+            .unwrap_err()
+            .contains("decision_support_event_ids"));
 
         let mut wrong_size = valid.clone();
         wrong_size["index_bytes"] = json!(999);
