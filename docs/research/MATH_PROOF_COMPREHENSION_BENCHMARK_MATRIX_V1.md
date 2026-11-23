@@ -157,3 +157,7 @@ Every comparison must pin and report: theorem/source/toolchain identity; graph o
 5. **Learning-aware compression:** optimize minimum-sufficient explanations on a comprehension/transfer frontier, not token reduction alone.
 
 Those are falsifiable contributions. A graph with more nodes, a higher embedding score, a fluent explanation or a better single prover Pass@K score is not by itself evidence of proof comprehension.
+
+### HDC / CfC ablations
+
+The proof-comprehension programme has a dedicated HDC/CfC ablation protocol in [MATH_PROOF_COMPREHENSION_HDC_CFC_ABLATION_V1.md](MATH_PROOF_COMPREHENSION_HDC_CFC_ABLATION_V1.md) and issue [#13440](https://github.com/Luminous-Dynamics/symthaea/issues/13440). HDC is tested for role binding under renaming/compositional changes; CfC is tested for proof-state transition reconstruction; hybrid systems are compared against BM25, dense, LeanSearch v2, LeanGraphSearch/PPR and symbolic baselines under matched data/compute/resource budgets. These are hypotheses, not assumed advantages.
