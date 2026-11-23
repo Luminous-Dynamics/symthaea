@@ -313,8 +313,11 @@ class MaceLongMemEvalV2Memory(Memory):
             rank = record.get("retrieval_rank")
             require(isinstance(channel, str) and channel.strip(),
                     "candidate retrieval channel is invalid")
-            require(isinstance(rank, int) and not isinstance(rank, bool) and rank > 0,
-                    "candidate retrieval rank is invalid")
+            require(
+                isinstance(rank, int) and not isinstance(rank, bool)
+                and 0 < rank <= 0xFFFFFFFF,
+                "candidate retrieval rank is invalid",
+            )
             key = (channel, rank)
             require(key not in ranks, "candidate evidence contains duplicate channel/rank")
             ranks.add(key)
@@ -323,6 +326,7 @@ class MaceLongMemEvalV2Memory(Memory):
                 isinstance(parent, str) and parent.strip() for parent in parents
             ), "candidate parent list is invalid")
             require(len(set(parents)) == len(parents), "candidate parent list contains duplicates")
+            require(parents == sorted(parents), "candidate parent list is not canonical")
             receipt = record.get("derivation_receipt_sha256")
             if parents:
                 require(
@@ -422,6 +426,10 @@ class MaceLongMemEvalV2Memory(Memory):
                 require(
                     record.get("query_scope") == f"longmemeval-v2:domain:{self.domain}",
                     "candidate query scope mismatch",
+                )
+                require(
+                    record.get("query_purpose") == "benchmark:memory-context",
+                    "candidate query purpose mismatch",
                 )
             self._validate_candidate_evidence_graph(parsed_records)
             recomputed_candidate_set_sha256 = self._candidate_set_digest_from_records(parsed_records)
@@ -567,6 +575,8 @@ class MaceLongMemEvalV2Memory(Memory):
                         "saved candidate record backend mismatch")
                 require(record.get("query_scope") == f"longmemeval-v2:domain:{self.domain}",
                         "saved candidate record scope mismatch")
+                require(record.get("query_purpose") == "benchmark:memory-context",
+                        "saved candidate record purpose mismatch")
             if count:
                 self._validate_candidate_evidence_graph(saved_records)
                 require(
