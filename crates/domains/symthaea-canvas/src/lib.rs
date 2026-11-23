@@ -175,7 +175,7 @@ pub use mycelial_temporal_cycles::{
     MAX_TEMPORAL_EDGE_WINDOW_OBSERVATIONS, MAX_TEMPORAL_MYCELIAL_EDGES,
     MAX_TEMPORAL_MYCELIAL_NODES, MAX_TEMPORAL_MYCELIAL_WINDOWS,
     MYCELIAL_TEMPORAL_CYCLE_PROFILE_SCHEMA_VERSION, MYCELIAL_TEMPORAL_CYCLE_SCHEMA_VERSION,
-    MycelialTemporalCycleConfig, MycelialTemporalCycleError, TemporalCycleWindowObservation,
+    TemporalMycelialCycleConfig, MycelialTemporalCycleError, TemporalCycleWindowObservation,
     TemporalCycleWindowState, TemporalEdgeEvidence, TemporalMycelialCycleHyperedge,
     TemporalMycelialCycleProfile, TemporalMycelialCycleRecord, TemporalMycelialEdge,
     TemporalMycelialEdgeEvidenceCounts, TemporalMycelialEdgeEvidenceRecord,
