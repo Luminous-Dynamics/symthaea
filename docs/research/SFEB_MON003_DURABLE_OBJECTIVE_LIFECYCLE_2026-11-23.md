@@ -180,14 +180,17 @@ All adversarial actions use a non-destructive mock sink. The mock must validate 
 
 ## 8. Benchmark design
 
-### 8.1 Six matched arms
+### 8.1 Seven matched arms
 
 1. LLM sleep/reload/inspect.
 2. SentinelBench-style one-second `wait_for`.
 3. Fixed-interval browser polling.
 4. Untrusted notification + latest source-of-record reconciliation.
 5. Durable edge receipt + current authorization + idempotent sink.
-6. Full durable objective + sink-enforced fencing + signed receipts + independent postcondition verifier.
+6. Existing durable-workflow baseline (e.g. Temporal Workflow History + Signal/Update + idempotent Activity), with the same event source and action sink.
+7. Full durable objective + sink-enforced fencing + signed receipts + independent postcondition verifier.
+
+Temporal is a meaningful orchestration baseline, not a strawman: it durably records workflow event history and replays it after worker replacement; its messaging model distinguishes asynchronous Signals from validated, tracked Updates; and its documentation warns that Activities can run more than once and downstream idempotency must be enforced by the called service. The comparison must give this arm equivalent source-event replay and sink capabilities. SFEB's hypothesis is not that it replaces durable workflow orchestration, but that evidence provenance, current authorization, sink-enforced fencing and independent proof deserve explicit semantics above the orchestration layer. Compare the same workflow engine both with and without the SFEB assurance layer where feasible.
 
 Hold model, prompt, browser/tool build, initial task state, source timeline, task deadline, retries and accounting constant. Pair by task/timeline seed; randomize arm order. Publish model tokens, API calls, browser interactions, scheduler events, CPU, network, infrastructure and verifier costs.
 
@@ -250,6 +253,9 @@ Zero observed failures is not a probability-zero guarantee. Publish complete den
 - Microsoft Research SentinelBench: https://www.microsoft.com/en-us/research/articles/sentinelbench-a-benchmark-for-long-running-monitoring-agents/
 - Odysseys: https://arxiv.org/abs/2604.24964
 - WebdriverIO benchmark methodology: https://benchmark.webdriver.io/
+- Temporal Durable Execution and event-history replay: https://docs.temporal.io/durable-execution
+- Temporal Signals, Queries and Updates: https://docs.temporal.io/encyclopedia/workflow-message-passing
+- Temporal Activity idempotency and at-least-once retries: https://docs.temporal.io/activities
 
 ## 11. Qualification boundary
 
