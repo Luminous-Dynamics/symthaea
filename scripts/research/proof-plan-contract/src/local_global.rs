@@ -117,7 +117,6 @@ pub enum MentionRelation {
     ContextOnly,
     Alternative,
 }
-
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(tag = "op", rename_all = "snake_case", deny_unknown_fields)]
 pub enum BooleanFormula {
