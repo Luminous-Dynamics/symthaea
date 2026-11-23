@@ -45,7 +45,7 @@ This crate does not implement a candidate controller, scheduler, sensor policy, 
 
 ## Verification boundary
 
-Twenty-four Rust tests are authored and passed at exact source head `99a1ed303d8fc9d7539de8505349a1c1ea5f41f2` (workflow run `45119544918`, Rust 1.96.0):
+Thirty Rust tests are authored and passed at exact source head `8f6d2e9b605e3ef07af5c593b1f209bc9a2c410e` (workflow run `45133813434`, Rust 1.96.0):
 - rustfmt: passed;
 - tests: 30 passed, 0 failed;
 - strict Clippy with warnings denied: passed.
