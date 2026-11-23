@@ -164,3 +164,37 @@ Do not claim superiority over these platforms because our graph reports are more
 - Oxford Instruments. Imaris 10.0 release notes: https://imaris.oxinst.com/support/imaris-release-notes/10-0-0
 - ZEISS. arivis Pro: https://www.zeiss.com/microscopy/en/products/software/arivis-pro.html
 - napari documentation: https://napari.org/stable/getting_started/quick_start.html
+
+## First source implementation slice — 2026-11-23
+
+Added `crates/domains/symthaea-canvas/src/mycelial_fusion_counterfactual.rs` and exported its public contract from `symthaea-canvas`.
+
+Public entry point:
+
+```rust
+evaluate_mycelial_fusion_counterfactuals(
+    skeleton,
+    candidates,
+    declared_demand_pairs,
+    frozen_disruption_scenarios,
+)
+```
+
+The source slice currently provides:
+- candidate identity, calibrated fusion probability/policy/evidence digest, explicit measured-versus-declared bridge-length basis and bridge-length unit;
+- tip-to-tip and tip-to-side target contracts, with tip-to-side parameter explicitly defined as normalized arc-length fraction (not Bezier parameter);
+- two read-only paired views. For a side contact, the same target-segment split is applied to both views, and only the candidate fusion edge differs;
+- length-conserving target split with an explicitly interpolated *display anchor* because the current annotated skeleton does not retain source centerlines;
+- exact connected-component/cycle-rank deltas, existing cycle witness, declared-demand shortest paths/directness, and the same frozen source-segment/junction disruption sets applied to both views;
+- automatic conflict discovery for shared source tips, shared tip endpoints, identical side-contact identities, in addition to caller-supplied conflict groups;
+- complete source frame/calibration metadata, candidate target/bridge details, evidence digests and exact disruption sets in the report;
+- independent recomputation through `validate_against`, read-only source semantics, and bounded demand-evaluation work;
+- an independent test-only Floyd–Warshall oracle for small tip-to-tip and tip-to-side examples.
+
+**Important claim boundary:** the side-contact split is graph-level only. The interpolated anchor is not a measured 3D centerline point, and normalized arc-length fraction is not transferable to a Bezier curve parameter without the missing centerline geometry. The bridge may be measured or explicitly declared; the report preserves which basis applies. No fusion is automatically accepted.
+
+### Current validation status
+
+- The previous exact-head run on `f548a8ee4fec46ce8daef70a29ea9e1c6a8f5add` stopped at `cargo fmt --check`; the formatting output was applied to that source slice.
+- The subsequent GitHub API commits have advanced the PR head, but no workflow run or commit status is currently returned for the latest API-created head. The current module has **not** been compiled, unit-tested, Clippy-checked or independently executed locally. The local container has no `rustc`, `cargo` or `rustfmt` executable. Do not treat source tests as executed results.
+- Re-run the workflow from GitHub Actions on the current PR head before merging; its current workflow trigger is `pull_request` / `workflow_dispatch`.
