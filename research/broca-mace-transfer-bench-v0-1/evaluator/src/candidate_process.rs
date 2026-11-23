@@ -146,7 +146,8 @@ impl CandidateProcessSession {
             .take()
             .ok_or_else(|| "candidate worker stderr pipe unavailable".to_string())?;
 
-        let (sender, responses) = mpsc::channel();
+        // Keep at most one complete response queued if a child emits unsolicited output.
+        let (sender, responses) = mpsc::sync_channel(1);
         thread::Builder::new()
             .name("mace-candidate-stdout".into())
             .spawn(move || {
