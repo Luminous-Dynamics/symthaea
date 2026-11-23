@@ -871,7 +871,7 @@ mod tests {
             primary_metric: "signed_decision_regret_effect_ppm".to_owned(),
             bundle_lock_sha256: "a".repeat(64),
             cluster_assignment_manifest_sha256:
-                "3446df932c4a91b37d3494a0912519e7df0922e949bd68289fd3ff7d359865d8".to_owned(),
+                "8257074ad9d509a144c807fe1eeca8c0f29fb9c5101589a3e220d207236d0aab".to_owned(),
             bootstrap_seed: 42,
             bootstrap_replicates: 10_000,
             familywise_confidence: 0.95,
