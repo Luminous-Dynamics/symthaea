@@ -397,6 +397,21 @@ fn candidate_digest(candidate: &MycelialFusionCandidate) -> String {
     hex_digest(hasher.finalize().as_bytes())
 }
 
+fn side_contact_anchor_digest(segment_id: &str, arc_length_fraction_micros: u32) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"symthaea-mycelial-fusion-side-anchor-v1");
+    hash_string(&mut hasher, segment_id);
+    hasher.update(&arc_length_fraction_micros.to_le_bytes());
+    hex_digest(hasher.finalize().as_bytes())
+}
+
+fn candidate_edge_identity_digest(candidate_id: &str) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"symthaea-mycelial-fusion-edge-identity-v1");
+    hash_string(&mut hasher, candidate_id);
+    hex_digest(hasher.finalize().as_bytes())
+}
+
 fn candidate_inventory_digest(candidates: &[MycelialFusionCandidate]) -> String {
     let mut ordered: Vec<_> = candidates.iter().collect();
     ordered.sort_by(|left, right| left.candidate_id.cmp(&right.candidate_id));
@@ -590,8 +605,9 @@ fn split_target_segment(
         .ok_or_else(|| MycelialFusionCounterfactualError::UnknownTargetSegment(segment_id.clone()))?
         .position;
     let fraction = f64::from(*arc_length_fraction_micros) / PARAMETER_SCALE;
-    let candidate_identity = candidate_digest(candidate);
-    let split_junction_id = format!("fusion-split:{candidate_identity}");
+    let split_identity =
+        side_contact_anchor_digest(segment_id, *arc_length_fraction_micros);
+    let split_junction_id = format!("fusion-split:{split_identity}");
     if !valid_id(&split_junction_id) || view.nodes.contains_key(&split_junction_id) {
         return Err(MycelialFusionCounterfactualError::InvalidCandidate(
             candidate.candidate_id.clone(),
@@ -957,7 +973,10 @@ fn build_candidate_impact(
     };
 
     let mut accepted_view = rejected_view.clone();
-    let fusion_edge_id = format!("fusion-edge:{}", candidate_digest(candidate));
+    let fusion_edge_id = format!(
+        "fusion-edge:{}",
+        candidate_edge_identity_digest(&candidate.candidate_id)
+    );
     if accepted_view
         .segments
         .iter()
@@ -1692,6 +1711,14 @@ mod tests {
         assert_eq!(
             report.candidates[1].conflicting_candidate_ids,
             vec!["side-one".to_string()]
+        );
+        assert_eq!(
+            report.candidates[0].rejected_view_digest,
+            report.candidates[1].rejected_view_digest
+        );
+        assert_ne!(
+            report.candidates[0].accepted_analysis_view_digest,
+            report.candidates[1].accepted_analysis_view_digest
         );
     }
 
