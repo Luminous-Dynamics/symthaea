@@ -232,6 +232,8 @@ A zero-violation target is scoped to the published threat model and test corpus;
 
 For Agent Memory Leaderboard Cycle 2, use the official results only as a comparison reference: textual leaders were 61.22 (open-source methods) and 69.26 (commercial/closed-source); multimodal leaders were 43.26 and 53.68; coding leaders were 63.33% and 68.00%. These are separate tracks and divisions, not a common score. Cycle 2 results are already published; future submissions must follow the next official cycle's rules and live API requirements.
 
+For a future cycle with materially equivalent scoring and track definitions, the proposed **stretch** thresholds are at least 70.26 textual, 54.68 multimodal and 69% coding—one point above the published Cycle 2 commercial/closed-source leaders. The first reproducibility gate is to match or exceed the Cycle 2 open-method leaders (61.22, 43.26 and 63.33%, respectively) on the exact corresponding track. These values are goals, not current MACE results; they must be re-baselined if the next cycle changes its dataset, model constraints, scoring or API contract. The capability-level targets in the parent MACE research agenda remain separate per-dimension guardrails.
+
 ## 8. Baselines and statistical controls
 
 Required retrieval baselines:
