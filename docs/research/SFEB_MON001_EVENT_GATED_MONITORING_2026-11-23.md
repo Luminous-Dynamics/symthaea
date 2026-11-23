@@ -144,3 +144,10 @@ These are prospective goals. MON-001 has six synthetic cases, which is not enoug
 ## Qualification boundary
 
 MON-001 is a new synthetic research fixture; it is not one of the 30 pilot tasks and is not counted as runnable. No browser candidate, production event bus, signed verifier identity or real scheduler has been qualified. The main pilot ledger remains at `runnable_task_count = 0`; this work does not change that status.
+
+
+## Complementary edge-triggered semantics
+
+The stale-reconnect case in MON-001 is intentionally level-triggered. A separate MON-002 experiment now tests whether a transient event can remain actionable after reconnect through a durable source-of-record receipt, with immutable event/revision/time/scope binding, expiry, revocation and current permission checks. MON-002 is not a relaxation of MON-001; it has separate fixtures, policy and outcome semantics.
+
+See [MON-002 README](../../benchmarks/frontend/monitoring/edge-monitoring-README.md), [research note](SFEB_EDGE001_DURABLE_EVENT_RECEIPTS_2026-11-23.md) and [tracking issue #13393](https://github.com/Luminous-Dynamics/symthaea/issues/13393). Its independent in-memory preflight passed 5/5 cases, 11/11 policy rules and 9/9 seeded adversarial rejections. The committed Node CLI and production event receipt service remain unexecuted.
