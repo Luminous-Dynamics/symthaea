@@ -48,7 +48,7 @@
       "files": [
         {
           "path": "docs/research/BH_EGB_SYMTHAEA_CAMPAIGN_V0_1.md",
-          "git_blob_sha1": "6ed3bab896d55d1eabe4563e41b373a7754a7ee7",
+          "git_blob_sha1": "b28966b17062877f892ce2b37b3c827b31ba67ce",
           "use": "campaign protocol and source audit"
         }
       ],
@@ -126,6 +126,18 @@
         }
       ],
       "issue": "https://github.com/Luminous-Dynamics/symtropy/issues/6915"
+    },
+    {
+      "role": "research_benchmark_landscape",
+      "repository": "Luminous-Dynamics/symthaea",
+      "ref": "research/bh-egb-symthaea-campaign-2026-11-23",
+      "files": [
+        {
+          "path": "docs/research/BH_EGB_AGENT_BENCHMARK_LANDSCAPE_2026_11_23.md",
+          "git_blob_sha1": "baebd719f5a2b71e92c6d7a4f5466ba11e928aa7",
+          "use": "pinned external research-agent and black-hole numerical-physics benchmark comparison"
+        }
+      ]
     }
   ],
   "authority_boundaries": {
