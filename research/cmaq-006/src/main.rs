@@ -6,7 +6,7 @@ use std::process;
 const REPORT_SCHEMA: &str = "cmaq-006-decision-gate-v0.2";
 // Reviewed policy constant: untrusted episode input cannot lower the model-use bar.
 const MINIMUM_NET_LIFT: f64 = 0.02;
-const INPUT_HEADER: [&str; 18] = [
+const INPUT_HEADER: [&str; 20] = [
     "case_id",
     "model_digest",
     "adequacy_model_digest",
@@ -16,6 +16,8 @@ const INPUT_HEADER: [&str; 18] = [
     "shift_detected",
     "physics_adherence_status",
     "action_fidelity_status",
+    "constraint_compliance_status",
+    "counterfactual_grounding_status",
     "failure_preservation_status",
     "horizon_support_status",
     "latent_rollout_fidelity_status",
@@ -59,6 +61,8 @@ impl EvidenceStatus {
 struct AdequacyEvidence {
     physics_adherence: EvidenceStatus,
     action_fidelity: EvidenceStatus,
+    constraint_compliance: EvidenceStatus,
+    counterfactual_grounding: EvidenceStatus,
     failure_preservation: EvidenceStatus,
     horizon_support: EvidenceStatus,
     latent_rollout_fidelity: EvidenceStatus,
@@ -72,6 +76,8 @@ impl AdequacyEvidence {
         Self {
             physics_adherence: EvidenceStatus::Pass,
             action_fidelity: EvidenceStatus::Pass,
+            constraint_compliance: EvidenceStatus::Pass,
+            counterfactual_grounding: EvidenceStatus::Pass,
             failure_preservation: EvidenceStatus::Pass,
             horizon_support: EvidenceStatus::Pass,
             latent_rollout_fidelity: EvidenceStatus::Pass,
@@ -92,6 +98,16 @@ impl AdequacyEvidence {
                 self.action_fidelity,
                 "action_fidelity_failed",
                 "action_fidelity_unknown",
+            ),
+            (
+                self.constraint_compliance,
+                "constraint_compliance_failed",
+                "constraint_compliance_unknown",
+            ),
+            (
+                self.counterfactual_grounding,
+                "counterfactual_grounding_failed",
+                "counterfactual_grounding_unknown",
             ),
             (
                 self.failure_preservation,
@@ -135,10 +151,12 @@ impl AdequacyEvidence {
         None
     }
 
-    fn values(self) -> [EvidenceStatus; 8] {
+    fn values(self) -> [EvidenceStatus; 10] {
         [
             self.physics_adherence,
             self.action_fidelity,
+            self.constraint_compliance,
+            self.counterfactual_grounding,
             self.failure_preservation,
             self.horizon_support,
             self.latent_rollout_fidelity,
@@ -152,12 +170,14 @@ impl AdequacyEvidence {
         match index {
             0 => self.physics_adherence = status,
             1 => self.action_fidelity = status,
-            2 => self.failure_preservation = status,
-            3 => self.horizon_support = status,
-            4 => self.latent_rollout_fidelity = status,
-            5 => self.state_sufficiency = status,
-            6 => self.selected_action_calibration = status,
-            7 => self.trajectory_provenance = status,
+            2 => self.constraint_compliance = status,
+            3 => self.counterfactual_grounding = status,
+            4 => self.failure_preservation = status,
+            5 => self.horizon_support = status,
+            6 => self.latent_rollout_fidelity = status,
+            7 => self.state_sufficiency = status,
+            8 => self.selected_action_calibration = status,
+            9 => self.trajectory_provenance = status,
             _ => panic!("adequacy evidence index out of range"),
         }
     }
@@ -256,25 +276,33 @@ fn parse_row(fields: &[&str]) -> Result<GateInput, String> {
             "physics_adherence_status",
         )?,
         action_fidelity: EvidenceStatus::parse(fields[8], "action_fidelity_status")?,
-        failure_preservation: EvidenceStatus::parse(
+        constraint_compliance: EvidenceStatus::parse(
             fields[9],
+            "constraint_compliance_status",
+        )?,
+        counterfactual_grounding: EvidenceStatus::parse(
+            fields[10],
+            "counterfactual_grounding_status",
+        )?,
+        failure_preservation: EvidenceStatus::parse(
+            fields[11],
             "failure_preservation_status",
         )?,
-        horizon_support: EvidenceStatus::parse(fields[10], "horizon_support_status")?,
+        horizon_support: EvidenceStatus::parse(fields[12], "horizon_support_status")?,
         latent_rollout_fidelity: EvidenceStatus::parse(
-            fields[11],
+            fields[13],
             "latent_rollout_fidelity_status",
         )?,
         state_sufficiency: EvidenceStatus::parse(
-            fields[12],
+            fields[14],
             "state_sufficiency_status",
         )?,
         selected_action_calibration: EvidenceStatus::parse(
-            fields[13],
+            fields[15],
             "selected_action_calibration_status",
         )?,
         trajectory_provenance: EvidenceStatus::parse(
-            fields[14],
+            fields[16],
             "trajectory_provenance_status",
         )?,
     };
@@ -288,9 +316,9 @@ fn parse_row(fields: &[&str]) -> Result<GateInput, String> {
         current_epoch: parse_epoch(fields[5], "current_epoch")?,
         shift_detected: parse_bool(fields[6], "shift_detected")?,
         adequacy,
-        net_lift_ci95_low: parse_finite(fields[15], "net_lift_ci95_low")?,
-        model_action_authorized: parse_bool(fields[16], "model_action_authorized")?,
-        direct_action_authorized: parse_bool(fields[17], "direct_action_authorized")?,
+        net_lift_ci95_low: parse_finite(fields[17], "net_lift_ci95_low")?,
+        model_action_authorized: parse_bool(fields[18], "model_action_authorized")?,
+        direct_action_authorized: parse_bool(fields[19], "direct_action_authorized")?,
     })
 }
 
@@ -439,7 +467,7 @@ fn run() -> Result<(), String> {
         fs::read_to_string(&path).map_err(|error| format!("cannot read {path:?}: {error}"))?;
     let cases = parse_input(&input_text)?;
     println!(
-        "schema_version\tcase_id\tmodel_digest\tadequacy_model_digest\tutility_model_digest\tmodel_epoch\tcurrent_epoch\tshift_detected\tphysics_adherence_status\taction_fidelity_status\tfailure_preservation_status\thorizon_support_status\tlatent_rollout_fidelity_status\tstate_sufficiency_status\tselected_action_calibration_status\ttrajectory_provenance_status\tdecision\tnet_lift_ci95_low\tminimum_net_lift\tmodel_action_authorized\tdirect_action_authorized\treason"
+        "schema_version\tcase_id\tmodel_digest\tadequacy_model_digest\tutility_model_digest\tmodel_epoch\tcurrent_epoch\tshift_detected\tphysics_adherence_status\taction_fidelity_status\tconstraint_compliance_status\tcounterfactual_grounding_status\tfailure_preservation_status\thorizon_support_status\tlatent_rollout_fidelity_status\tstate_sufficiency_status\tselected_action_calibration_status\ttrajectory_provenance_status\tdecision\tnet_lift_ci95_low\tminimum_net_lift\tmodel_action_authorized\tdirect_action_authorized\treason"
     );
     for case in cases {
         let result = assess(&case);
@@ -479,7 +507,7 @@ mod tests {
 
     fn valid_row() -> String {
         format!(
-            "episode_001\t{DIGEST}\t{DIGEST}\t{DIGEST}\t7\t7\tfalse\tPASS\tPASS\tPASS\tPASS\tPASS\tPASS\tPASS\tPASS\t0.12\ttrue\ttrue"
+            "episode_001\t{DIGEST}\t{DIGEST}\t{DIGEST}\t7\t7\tfalse\tPASS\tPASS\tPASS\tPASS\tPASS\tPASS\tPASS\tPASS\tPASS\tPASS\t0.12\ttrue\ttrue"
         )
     }
 
@@ -495,6 +523,8 @@ mod tests {
         let expected = [
             "physics_adherence_failed",
             "action_fidelity_failed",
+            "constraint_compliance_failed",
+            "counterfactual_grounding_failed",
             "failure_preservation_failed",
             "horizon_support_failed",
             "latent_rollout_fidelity_failed",
@@ -516,6 +546,8 @@ mod tests {
         let expected = [
             "physics_adherence_unknown",
             "action_fidelity_unknown",
+            "constraint_compliance_unknown",
+            "counterfactual_grounding_unknown",
             "failure_preservation_unknown",
             "horizon_support_unknown",
             "latent_rollout_fidelity_unknown",
@@ -628,7 +660,7 @@ mod tests {
     fn parser_rejects_nonfinite_net_lift_and_unrecognized_boolean() {
         let header = INPUT_HEADER.join("\t");
         let prefix = format!(
-            "episode_001\t{DIGEST}\t{DIGEST}\t{DIGEST}\t7\t7\tfalse\tPASS\tPASS\tPASS\tPASS\tPASS\tPASS\tPASS\tPASS"
+            "episode_001\t{DIGEST}\t{DIGEST}\t{DIGEST}\t7\t7\tfalse\tPASS\tPASS\tPASS\tPASS\tPASS\tPASS\tPASS\tPASS\tPASS\tPASS"
         );
         let nonfinite = format!("{header}\n{prefix}\tNaN\ttrue\ttrue\n");
         assert!(parse_input(&nonfinite)
@@ -647,7 +679,7 @@ mod tests {
         let rendered = render(&input, &result);
         assert_eq!(rendered, render(&input, &result));
         assert!(rendered.starts_with(&format!("{REPORT_SCHEMA}\tepisode_001\t")));
-        assert_eq!(rendered.split('\t').count(), 22);
+        assert_eq!(rendered.split('\t').count(), 24);
     }
 
     #[test]
