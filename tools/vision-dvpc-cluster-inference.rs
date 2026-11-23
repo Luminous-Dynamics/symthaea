@@ -690,7 +690,7 @@ fn main() {
 mod tests {
     const LOCK: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     const CLUSTER_ASSIGNMENT_MANIFEST: &str =
-        "3446df932c4a91b37d3494a0912519e7df0922e949bd68289fd3ff7d359865d8";
+        "8257074ad9d509a144c807fe1eeca8c0f29fb9c5101589a3e220d207236d0aab";
 
     fn analyze(input: &str, expected_bundle_lock_sha256: &str) -> Result<String, String> {
         super::analyze(
@@ -711,7 +711,7 @@ META\tcluster_unit\tsequence\n\
 META\tprimary_metric\tdecision_utility\n\
 META\tpositive_is_better\ttrue\n\
 META\tbundle_lock_sha256\taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\
-META\tcluster_assignment_manifest_sha256\t3446df932c4a91b37d3494a0912519e7df0922e949bd68289fd3ff7d359865d8\n\
+META\tcluster_assignment_manifest_sha256\t8257074ad9d509a144c807fe1eeca8c0f29fb9c5101589a3e220d207236d0aab\n\
 META\tcomparison_family_size\t2\n\
 META\tbootstrap_seed\t42\n\
 META\tbootstrap_replicates\t2000\n\
