@@ -171,6 +171,42 @@ fn response_mode_guardband_metrics(
     })
 }
 
+#[derive(Debug, Clone, Copy)]
+struct PositivityMetrics {
+    minimum: f64,
+    negative_cell_fraction: f64,
+    negative_mass_fraction: f64,
+}
+
+fn positivity_metrics(
+    distribution: &[f64],
+    config: VlasovPoissonConfig,
+) -> PositivityMetrics {
+    let mut minimum = f64::INFINITY;
+    let mut negative_cells = 0usize;
+    let mut positive_mass = 0.0;
+    let mut negative_mass = 0.0;
+    let cell_measure = config.dx() * config.dv();
+    for value in distribution.iter().copied() {
+        minimum = minimum.min(value);
+        if value < 0.0 {
+            negative_cells += 1;
+            negative_mass += -value * cell_measure;
+        } else {
+            positive_mass += value * cell_measure;
+        }
+    }
+    PositivityMetrics {
+        minimum,
+        negative_cell_fraction: negative_cells as f64 / distribution.len() as f64,
+        negative_mass_fraction: negative_mass / positive_mass.max(f64::MIN_POSITIVE),
+    }
+}
+
+fn relative_delta(after: f64, before: f64) -> f64 {
+    (after - before) / before.abs().max(f64::MIN_POSITIVE)
+}
+
 fn config(nv: usize) -> VlasovPoissonConfig {
     VlasovPoissonConfig {
         nx: 64,
@@ -215,8 +251,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut sponge_pulse = VlasovPoisson1d1v::new(coarse_config, coarse_initial.clone())?;
     let mut sponge_control = VlasovPoisson1d1v::new(coarse_config, coarse_initial.clone())?;
 
-    let initial_c2 = sponge_pulse.quadratic_casimir_budget()?.total_casimir;
-    let initial_diagnostics = sponge_pulse.diagnostics()?;
+    let coarse_initial_budget = coarse_pulse.quadratic_casimir_budget()?;
+    let fine_initial_budget = fine_pulse.quadratic_casimir_budget()?;
+    let sponge_initial_budget = sponge_pulse.quadratic_casimir_budget()?;
+    let coarse_initial_diagnostics = coarse_pulse.diagnostics()?;
+    let fine_initial_diagnostics = fine_pulse.diagnostics()?;
+    let sponge_initial_diagnostics = sponge_pulse.diagnostics()?;
+    let coarse_initial_c2 = coarse_initial_budget.total_casimir;
+    let fine_initial_c2 = fine_initial_budget.total_casimir;
+    let initial_c2 = sponge_initial_budget.total_casimir;
     let mut sponge_removed_c2 = 0.0;
     let mut sponge_control_removed_c2 = 0.0;
     let mut sponge_removed_f_strophy = 0.0;
@@ -394,10 +437,79 @@ fn main() -> Result<(), Box<dyn Error>> {
     let coarse_peak = measure_peak(&coarse_trace);
     let fine_peak = measure_peak(&fine_trace);
     let sponge_peak = measure_peak(&sponge_trace);
-    let sponge_final_c2 = sponge_pulse.quadratic_casimir_budget()?.total_casimir;
+    let coarse_final_budget = coarse_pulse.quadratic_casimir_budget()?;
+    let fine_final_budget = fine_pulse.quadratic_casimir_budget()?;
+    let sponge_final_budget = sponge_pulse.quadratic_casimir_budget()?;
+    let coarse_final_diagnostics = coarse_pulse.diagnostics()?;
+    let fine_final_diagnostics = fine_pulse.diagnostics()?;
     let sponge_final_diagnostics = sponge_pulse.diagnostics()?;
     let sponge_control_final_diagnostics = sponge_control.diagnostics()?;
-    let sponge_direct_c2_drop = initial_c2 - sponge_final_c2;
+    let sponge_direct_c2_drop = initial_c2 - sponge_final_budget.total_casimir;
+    let coarse_positivity = positivity_metrics(coarse_pulse.distribution(), coarse_config);
+    let fine_positivity = positivity_metrics(fine_pulse.distribution(), fine_config);
+    let sponge_positivity = positivity_metrics(sponge_pulse.distribution(), coarse_config);
+
+    let coarse_c2_relative_delta =
+        relative_delta(coarse_final_budget.total_casimir, coarse_initial_c2);
+    let fine_c2_relative_delta =
+        relative_delta(fine_final_budget.total_casimir, fine_initial_c2);
+    let sponge_c2_relative_delta =
+        relative_delta(sponge_final_budget.total_casimir, initial_c2);
+
+    let coarse_total_energy_relative_delta = relative_delta(
+        coarse_final_diagnostics.total_energy,
+        coarse_initial_diagnostics.total_energy,
+    );
+    let fine_total_energy_relative_delta = relative_delta(
+        fine_final_diagnostics.total_energy,
+        fine_initial_diagnostics.total_energy,
+    );
+    let sponge_total_energy_relative_delta = relative_delta(
+        sponge_final_diagnostics.total_energy,
+        sponge_initial_diagnostics.total_energy,
+    );
+    let coarse_kinetic_energy_relative_delta = relative_delta(
+        coarse_final_diagnostics.kinetic_energy,
+        coarse_initial_diagnostics.kinetic_energy,
+    );
+    let fine_kinetic_energy_relative_delta = relative_delta(
+        fine_final_diagnostics.kinetic_energy,
+        fine_initial_diagnostics.kinetic_energy,
+    );
+    let sponge_kinetic_energy_relative_delta = relative_delta(
+        sponge_final_diagnostics.kinetic_energy,
+        sponge_initial_diagnostics.kinetic_energy,
+    );
+    let coarse_field_energy_relative_delta = relative_delta(
+        coarse_final_diagnostics.field_energy,
+        coarse_initial_diagnostics.field_energy,
+    );
+    let fine_field_energy_relative_delta = relative_delta(
+        fine_final_diagnostics.field_energy,
+        fine_initial_diagnostics.field_energy,
+    );
+    let sponge_field_energy_relative_delta = relative_delta(
+        sponge_final_diagnostics.field_energy,
+        sponge_initial_diagnostics.field_energy,
+    );
+    let coarse_mass_relative_delta = relative_delta(
+        coarse_final_diagnostics.total_mass,
+        coarse_initial_diagnostics.total_mass,
+    );
+    let fine_mass_relative_delta = relative_delta(
+        fine_final_diagnostics.total_mass,
+        fine_initial_diagnostics.total_mass,
+    );
+    let sponge_mass_relative_delta = relative_delta(
+        sponge_final_diagnostics.total_mass,
+        sponge_initial_diagnostics.total_mass,
+    );
+    let coarse_momentum_delta =
+        coarse_final_diagnostics.momentum - coarse_initial_diagnostics.momentum;
+    let fine_momentum_delta =
+        fine_final_diagnostics.momentum - fine_initial_diagnostics.momentum;
+    let sponge_momentum_delta =
+        sponge_final_diagnostics.momentum - sponge_initial_diagnostics.momentum;
     let c2_closure_error =
         (sponge_removed_c2 - sponge_direct_c2_drop).abs() / initial_c2.abs().max(f64::MIN_POSITIVE);
     let sponge_phase_error = (sponge_peak.phase - fine_peak.phase + std::f64::consts::PI)
@@ -407,27 +519,18 @@ fn main() -> Result<(), Box<dyn Error>> {
         (sponge_peak.fwhm - fine_peak.fwhm) / fine_peak.fwhm.abs().max(f64::MIN_POSITIVE);
     let sponge_amplitude_relative_error = (sponge_peak.amplitude - fine_peak.amplitude)
         / fine_peak.amplitude.abs().max(f64::MIN_POSITIVE);
-    let total_energy_scale = initial_diagnostics
-        .total_energy
-        .abs()
-        .max(f64::MIN_POSITIVE);
-    let sponge_total_energy_relative_delta = (sponge_final_diagnostics.total_energy
-        - initial_diagnostics.total_energy)
-        / total_energy_scale;
-    let sponge_mass_relative_delta = (sponge_final_diagnostics.total_mass
-        - initial_diagnostics.total_mass)
-        / initial_diagnostics.total_mass.abs().max(f64::MIN_POSITIVE);
     let sponge_minimum_f = sponge_final_diagnostics.minimum_distribution;
     let sponge_boundary_ratio = sponge_final_diagnostics.velocity_boundary_ratio;
-    let control_total_energy_relative_delta = (sponge_control_final_diagnostics.total_energy
-        - initial_diagnostics.total_energy)
-        / total_energy_scale;
+    let control_total_energy_relative_delta = relative_delta(
+        sponge_control_final_diagnostics.total_energy,
+        sponge_initial_diagnostics.total_energy,
+    );
 
     println!(
-        "summary,case,nv,coarse_t_nyquist,coarse_t_recurrence,fine_t_nyquist,fine_t_recurrence,echo_mode,predicted_rephase_time,coarse_peak_time,coarse_amplitude,coarse_phase,coarse_fwhm,fine_peak_time,fine_amplitude,fine_phase,fine_fwhm,sponge_peak_time,sponge_amplitude,sponge_phase,sponge_fwhm,sponge_to_fine_amplitude_ratio,sponge_amplitude_relative_error,sponge_phase_error,sponge_peak_time_error,sponge_fwhm_relative_error,sponge_pulse_removed_C2_fraction,sponge_C2_closure_error,sponge_pulse_removed_f_strophy,sponge_control_removed_C2_fraction,sponge_control_removed_f_strophy,sponge_total_energy_relative_delta,sponge_mass_relative_delta,sponge_minimum_f,sponge_velocity_boundary_ratio,control_total_energy_relative_delta,coarse_initial_E,fine_initial_E,sponge_initial_E"
+        "summary,case,nv,coarse_t_nyquist,coarse_t_recurrence,fine_t_nyquist,fine_t_recurrence,echo_mode,predicted_rephase_time,coarse_peak_time,coarse_amplitude,coarse_phase,coarse_fwhm,fine_peak_time,fine_amplitude,fine_phase,fine_fwhm,sponge_peak_time,sponge_amplitude,sponge_phase,sponge_fwhm,sponge_to_fine_amplitude_ratio,sponge_amplitude_relative_error,sponge_phase_error,sponge_peak_time_error,sponge_fwhm_relative_error,sponge_pulse_removed_C2_fraction,sponge_C2_closure_error,sponge_pulse_removed_f_strophy,sponge_control_removed_C2_fraction,sponge_control_removed_f_strophy,coarse_C2_relative_delta,fine_C2_relative_delta,sponge_C2_relative_delta,coarse_total_energy_relative_delta,fine_total_energy_relative_delta,sponge_total_energy_relative_delta,coarse_kinetic_energy_relative_delta,fine_kinetic_energy_relative_delta,sponge_kinetic_energy_relative_delta,coarse_field_energy_relative_delta,fine_field_energy_relative_delta,sponge_field_energy_relative_delta,coarse_mass_relative_delta,fine_mass_relative_delta,sponge_mass_relative_delta,coarse_momentum_delta,fine_momentum_delta,sponge_momentum_delta,coarse_minimum_f,coarse_negative_cell_fraction,coarse_negative_mass_fraction,fine_minimum_f,fine_negative_cell_fraction,fine_negative_mass_fraction,sponge_minimum_f,sponge_negative_cell_fraction,sponge_negative_mass_fraction,sponge_velocity_boundary_ratio,control_total_energy_relative_delta,coarse_initial_E,fine_initial_E,sponge_initial_E"
     );
     println!(
-        "summary,delayed_echo,{},{:.8},{:.8},{:.8},{:.8},{},{:.8},{:.8},{:.12e},{:.8},{:.8},{:.8},{:.12e},{:.8},{:.8},{:.8},{:.12e},{:.8},{:.8},{:.12e},{:.12e},{:.12e},{:.8},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e}",
+        "summary,delayed_echo,{},{:.8},{:.8},{:.8},{:.8},{},{:.8},{:.8},{:.12e},{:.8},{:.8},{:.8},{:.12e},{:.8},{:.8},{:.8},{:.12e},{:.8},{:.8},{:.12e},{:.12e},{:.12e},{:.8},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e}",
         coarse_config.nv,
         coarse_horizon.nyquist_encounter_time,
         coarse_horizon.discrete_recurrence_time,
@@ -457,9 +560,33 @@ fn main() -> Result<(), Box<dyn Error>> {
         sponge_removed_f_strophy,
         sponge_control_removed_c2 / initial_c2.abs().max(f64::MIN_POSITIVE),
         sponge_control_removed_f_strophy,
+        coarse_c2_relative_delta,
+        fine_c2_relative_delta,
+        sponge_c2_relative_delta,
+        coarse_total_energy_relative_delta,
+        fine_total_energy_relative_delta,
         sponge_total_energy_relative_delta,
+        coarse_kinetic_energy_relative_delta,
+        fine_kinetic_energy_relative_delta,
+        sponge_kinetic_energy_relative_delta,
+        coarse_field_energy_relative_delta,
+        fine_field_energy_relative_delta,
+        sponge_field_energy_relative_delta,
+        coarse_mass_relative_delta,
+        fine_mass_relative_delta,
         sponge_mass_relative_delta,
-        sponge_minimum_f,
+        coarse_momentum_delta,
+        fine_momentum_delta,
+        sponge_momentum_delta,
+        coarse_positivity.minimum,
+        coarse_positivity.negative_cell_fraction,
+        coarse_positivity.negative_mass_fraction,
+        fine_positivity.minimum,
+        fine_positivity.negative_cell_fraction,
+        fine_positivity.negative_mass_fraction,
+        sponge_positivity.minimum,
+        sponge_positivity.negative_cell_fraction,
+        sponge_positivity.negative_mass_fraction,
         sponge_boundary_ratio,
         control_total_energy_relative_delta,
         initial_field_coarse.amplitude(),
