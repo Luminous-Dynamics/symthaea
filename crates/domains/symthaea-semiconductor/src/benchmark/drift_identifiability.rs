@@ -208,7 +208,24 @@ fn matrix_rank(rows: &[[f64; DRIFT_IDENTIFIABILITY_DIMENSIONS_V1]]) -> usize {
         return 0;
     }
 
-    let mut matrix = rows.to_vec();
+    // Row scaling changes measurement units/amplitude but not the row space.
+    // Normalize each nonzero row before elimination so rank tolerance is not
+    // accidentally tied to an action's arbitrary sensitivity scale.
+    let mut matrix: Vec<[f64; DRIFT_IDENTIFIABILITY_DIMENSIONS_V1]> = rows
+        .iter()
+        .map(|row| {
+            let scale = row.iter().map(|value| value.abs()).fold(0.0_f64, f64::max);
+            if scale <= f64::MIN_POSITIVE {
+                *row
+            } else {
+                let mut normalized = *row;
+                for value in &mut normalized {
+                    *value /= scale;
+                }
+                normalized
+            }
+        })
+        .collect();
     let row_count = matrix.len();
     let mut pivot_row = 0;
 
@@ -424,13 +441,14 @@ pub fn plan_drift_identifiability_v1(
         };
 
     let final_rank = matrix_rank(&final_rows);
-    let target_status = observed_target_status
+    let mut target_status: Vec<DriftTargetIdentifiabilityV1> = observed_target_status
         .into_iter()
         .map(|mut target| {
             target.identifiable_after_plan = contrast_is_estimable(&final_rows, target.target);
             target
         })
         .collect();
+    target_status.sort_by_key(|target| target.target);
 
     let mut report = DriftIdentifiabilityReportV1 {
         schema: DRIFT_IDENTIFIABILITY_REPORT_SCHEMA_V1.into(),
@@ -742,6 +760,59 @@ mod tests {
                 .iter()
                 .all(|target| target.identifiable_after_plan)
         );
+    }
+
+    #[test]
+    fn row_scaling_does_not_change_structural_identifiability() {
+        let mut baseline = input(
+            vec![
+                wafer_a(DriftActionEvidenceStateV1::ObservedQualified, 1),
+                witness_a(DriftActionEvidenceStateV1::ObservedQualified, 1),
+            ],
+            vec![DriftAttributionTargetV1::ProcessShift],
+            10,
+        );
+        let mut scaled = baseline.clone();
+        for action in &mut scaled.actions {
+            let scale = if action.action_id == "wafer-a" { 1.0e-8 } else { 1.0e8 };
+            for value in &mut action.sensitivity {
+                *value *= scale;
+            }
+        }
+
+        let baseline_report = plan_drift_identifiability_v1(&baseline).unwrap();
+        let scaled_report = plan_drift_identifiability_v1(&scaled).unwrap();
+        assert_eq!(baseline_report.observed_design_rank, scaled_report.observed_design_rank);
+        assert_eq!(baseline_report.plan_status, scaled_report.plan_status);
+        assert_eq!(baseline_report.target_status, scaled_report.target_status);
+        // Retain mutable baseline to make the fixture's input ownership explicit.
+        baseline.actions.reverse();
+    }
+
+    #[test]
+    fn permuting_requested_targets_preserves_report_digest_and_order() {
+        let mut first = input(
+            vec![
+                wafer_a(DriftActionEvidenceStateV1::ObservedQualified, 1),
+                witness_a(DriftActionEvidenceStateV1::ObservedQualified, 1),
+                common_monitor(DriftActionEvidenceStateV1::ObservedQualified, 1),
+            ],
+            vec![
+                DriftAttributionTargetV1::ProcessShift,
+                DriftAttributionTargetV1::InstrumentABias,
+                DriftAttributionTargetV1::SharedCommonMode,
+            ],
+            10,
+        );
+        let mut second = first.clone();
+        second.required_targets.reverse();
+
+        let report_a = plan_drift_identifiability_v1(&first).unwrap();
+        let report_b = plan_drift_identifiability_v1(&second).unwrap();
+        assert_eq!(report_a.input_sha256, report_b.input_sha256);
+        assert_eq!(report_a.report_sha256, report_b.report_sha256);
+        assert_eq!(report_a.target_status, report_b.target_status);
+        first.required_targets.reverse();
     }
 
     #[test]
