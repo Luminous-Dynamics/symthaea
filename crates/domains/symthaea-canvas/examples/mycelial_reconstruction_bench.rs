@@ -17,7 +17,7 @@ use std::time::Instant;
 
 use symthaea_canvas::{
     AnnotatedHyphaSegment, AnnotatedJunction, AnnotatedJunctionKind, AnnotatedMycelialSkeleton,
-    JunctionClassProbabilityPrediction, JunctionIdentityMatch,
+    JunctionClassProbabilityPrediction,
     MAX_AUTOMATIC_MATCH_JUNCTIONS_PER_GRAPH, MycelialAnnotationTriageConfig,
     MycelialReconstructionError, MycelialReviewOrderingPolicy, ReconstructionCalibrationClass,
     ReconstructionCalibrationConfig, ReconstructionDimensionality, ReconstructionEvaluationConfig,
