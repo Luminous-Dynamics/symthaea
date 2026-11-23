@@ -221,17 +221,41 @@ function verifyTrace({fixture,fixtureBytes,policy,policyBytes,trace,traceBytes})
   if (fixture.schema !== 'sfeb-event-reconciliation-fixture-v1' || policy.schema !== 'sfeb-event-oracle-policy-v1' ||
       policy.task_id !== 'SFEB-PILOT-INT-004') fail('unsupported fixture or policy schema');
   if (!Array.isArray(policy.rules) || policy.rules.length !== 7) fail('event policy must have seven rules');
+  const expectedRuleIDs = new Set([
+    'event.schema.strict','event.sequence.contiguous','event.identity.idempotent',
+    'action.optimistic.reconcile','permission.revocation.fail_closed',
+    'conflict.clarification.gate','audit.history.exactly_once'
+  ]);
   const policyIDs = new Set();
   for (const rule of policy.rules) {
-    if (policyIDs.has(rule.id) || rule.required !== true || rule.inconclusive_on_missing !== true) fail(`invalid policy rule: ${rule.id}`);
+    if (policyIDs.has(rule.id) || !expectedRuleIDs.has(rule.id) ||
+        rule.required !== true || rule.inconclusive_on_missing !== true ||
+        !['critical','high','medium','low','informational'].includes(rule.severity)) fail(`invalid policy rule: ${rule.id}`);
     policyIDs.add(rule.id);
   }
+  if (policyIDs.size !== expectedRuleIDs.size) fail('event policy is missing a required oracle rule');
+  const allowedTraceKeys = new Set(['schema','trace_id','case_id','fixture_id','fixture_sha256','steps','worker_claims']);
+  const requiredTraceKeys = ['schema','trace_id','case_id','fixture_id','fixture_sha256','steps'];
+  for (const key of Object.keys(trace)) if (!allowedTraceKeys.has(key)) fail(`unknown trace field: ${key}`);
+  for (const key of requiredTraceKeys) if (!Object.hasOwn(trace,key)) fail(`missing trace field: ${key}`);
   if (trace.schema !== 'sfeb-event-execution-trace-v1') fail('unsupported trace schema');
+  for (const key of ['trace_id','case_id','fixture_id']) {
+    if (typeof trace[key] !== 'string' || !/^[A-Za-z0-9._-]{1,128}$/.test(trace[key])) fail(`invalid trace identity: ${key}`);
+  }
+  if (typeof trace.fixture_sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(trace.fixture_sha256)) fail('invalid fixture digest in trace');
+  if (trace.worker_claims !== undefined && (!trace.worker_claims || typeof trace.worker_claims !== 'object' || Array.isArray(trace.worker_claims))) fail('worker_claims must be an object');
   if (trace.fixture_id !== fixture.fixture_id || trace.fixture_sha256 !== sha256(fixtureBytes)) fail('trace fixture identity/digest mismatch');
   const caseDef = fixture.cases.find(item=>item.case_id===trace.case_id);
   if (!caseDef) fail('trace case is not in frozen fixture');
   if (!Array.isArray(trace.steps) || trace.steps.length !== caseDef.steps.length || trace.steps.length > 10000) fail('trace step coverage mismatch');
-  const events = new Map(fixture.events.map(event=>[event.event_id,event]));
+  const events = new Map();
+  const sequenceOwners = new Set();
+  for (const event of fixture.events) {
+    validateEventShape(event);
+    if (events.has(event.event_id) || sequenceOwners.has(event.sequence)) fail('frozen fixture event identity/sequence is duplicated');
+    events.set(event.event_id,event);
+    sequenceOwners.add(event.sequence);
+  }
   const state = newState(fixture.initial_state);
   const eventIDs = [];
   for (let i=0;i<trace.steps.length;i++) {
