@@ -418,10 +418,7 @@ pub fn run_synthetic_metrology_policy_tournament_v1(
         let semantics = synthetic_defect_semantics_v1(scenario.defect_threshold)?;
         for template in policy_templates {
             let mut policy = template.clone();
-            policy.seed = stratum_seed(
-                template.seed ^ scenario.seed,
-                &scenario.scenario_id,
-            );
+            policy.seed = stratum_seed(template.seed ^ scenario.seed, &scenario.scenario_id);
             let run = run_synthetic_metrology_policy_v1(
                 &episode,
                 episode.policy_view(),
@@ -515,7 +512,6 @@ pub fn run_synthetic_metrology_policy_tournament_v1(
     tournament.tournament_sha256 = json_sha256(&tournament)?;
     Ok(tournament)
 }
-
 
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -1391,18 +1387,16 @@ pub fn evaluate_synthetic_metrology_policy_v1(
     let metrology_observed_positive_count =
         metrology_detected_true_positive_count + metrology_false_positive_count;
     let metrology_observed_negative_count = selected_count - metrology_observed_positive_count;
-    let metrology_empirical_sensitivity = (selected_positive_count > 0).then(|| {
-        metrology_detected_true_positive_count as f64 / selected_positive_count as f64
-    });
+    let metrology_empirical_sensitivity = (selected_positive_count > 0)
+        .then(|| metrology_detected_true_positive_count as f64 / selected_positive_count as f64);
     let metrology_empirical_specificity = (selected_count > selected_positive_count).then(|| {
         metrology_true_negative_count as f64 / (selected_count - selected_positive_count) as f64
     });
     let metrology_positive_predictive_value = (metrology_observed_positive_count > 0).then(|| {
         metrology_detected_true_positive_count as f64 / metrology_observed_positive_count as f64
     });
-    let metrology_negative_predictive_value = (metrology_observed_negative_count > 0).then(|| {
-        metrology_true_negative_count as f64 / metrology_observed_negative_count as f64
-    });
+    let metrology_negative_predictive_value = (metrology_observed_negative_count > 0)
+        .then(|| metrology_true_negative_count as f64 / metrology_observed_negative_count as f64);
     let total_undetected_defect_fraction = (true_positive_count > 0)
         .then(|| total_undetected_defect_count as f64 / true_positive_count as f64);
     let detection_capture_fraction = (true_positive_count > 0)
@@ -1810,7 +1804,10 @@ mod tests {
         assert_eq!(report.metrology_sensitivity, 0.0);
         assert_eq!(report.metrology_specificity, 0.0);
         assert_eq!(report.metrology_true_negative_count, 0);
-        assert_eq!(report.metrology_observed_positive_count, report.selected_count);
+        assert_eq!(
+            report.metrology_observed_positive_count,
+            report.selected_count
+        );
         assert_eq!(report.metrology_empirical_sensitivity, Some(0.0));
         assert_eq!(report.metrology_empirical_specificity, Some(0.0));
         assert_eq!(report.metrology_positive_predictive_value, Some(0.0));
