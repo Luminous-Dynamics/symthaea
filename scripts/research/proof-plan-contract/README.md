@@ -47,3 +47,5 @@ Report the numerator, denominator, clustered confidence interval, and subgroup b
 
 
 The standalone crate's `Cargo.lock` is committed. Use `--locked` for reproducible dependency resolution; do not regenerate or update the lockfile during validation.
+
+- The local/global receipt CLI reports deterministic CIRR bounds and a conservative Wilson-95 envelope; confirmatory estimates still require task-family-aware uncertainty.

@@ -271,3 +271,13 @@ The Rust receipt validator now includes a bounded truth-table checker for the Bo
 ## 15. Theorem-sandwich control pilot
 
 The executable TheoremSandwichReceiptV1 lane implements two one-sided finite propositional checks: hidden stronger statement implies candidate statement, and candidate statement implies hidden corollaries. These controls are intentionally asymmetric so an over-strengthened candidate can fail the upper obligation while a weakened candidate can fail a lower corollary. Evaluator-only obligations are excluded from candidate_view. Passing selected controls is not full equivalence, Lean kernel proof, or expert confirmation. See MATH_PROOF_COMPREHENSION_THEOREM_SANDWICH_V1.md.
+
+## 15. Sampling uncertainty for CIRR
+
+The CIRR calculator now reports a conservative 95% Wilson envelope in addition to its deterministic unresolved-outcome bounds:
+
+- Wilson lower endpoint is computed with definite material-reuse cases as successes (all unresolved outcomes treated as no reuse).
+- Wilson upper endpoint is computed with definite reuse plus unresolved outcomes as successes (all unresolved outcomes treated as reuse).
+- A zero eligible denominator returns no interval and no point estimate.
+
+This is an unclustered binomial diagnostic. It is not a substitute for a task-family/model-cluster bootstrap or a hierarchical model when observations share the same theorem family, model, prompt or task template. Reports must include the raw numerator/denominator and use cluster-aware uncertainty for confirmatory claims. The synthetic fixture remains too small to support any empirical CIRR claim.

@@ -100,6 +100,15 @@ fn main() -> ExitCode {
         summary.unresolved_global_outcomes
     );
     match (
+        summary.wilson_95_envelope_lower,
+        summary.wilson_95_envelope_upper,
+    ) {
+        (Some(lower), Some(upper)) => println!(
+            "cirr_wilson_95_envelope_lower={lower:.6} cirr_wilson_95_envelope_upper={upper:.6}"
+        ),
+        _ => println!("cirr_wilson_95_envelope=undefined (zero eligible denominator)"),
+    }
+    match (
         summary.lower_bound,
         summary.upper_bound,
         summary.point_estimate,

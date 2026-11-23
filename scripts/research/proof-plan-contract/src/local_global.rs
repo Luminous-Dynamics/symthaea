@@ -393,6 +393,10 @@ pub struct CirrSummary {
     /// Point estimate exists only when the denominator is nonzero and no
     /// eligible global outcomes remain unresolved.
     pub point_estimate: Option<f64>,
+    /// Lower Wilson-95 endpoint under the definite-reuse / unknown-as-zero case.
+    pub wilson_95_envelope_lower: Option<f64>,
+    /// Upper Wilson-95 endpoint under the definite-plus-unknown / unknown-as-one case.
+    pub wilson_95_envelope_upper: Option<f64>,
 }
 
 impl LocalGlobalPairV1 {
@@ -729,6 +733,23 @@ pub fn validate_pair_json(input: &str) -> Result<LocalGlobalPairV1, Vec<String>>
     }
 }
 
+/// Return the standard 95% Wilson score interval for a binomial proportion.
+/// This is a simple unclustered diagnostic; it does not replace cluster-aware
+/// inference when observations share theorem families, models or task templates.
+fn wilson_95(successes: usize, trials: usize) -> Option<(f64, f64)> {
+    if trials == 0 || successes > trials {
+        return None;
+    }
+    const Z: f64 = 1.959_963_984_540_054;
+    let n = trials as f64;
+    let p = successes as f64 / n;
+    let z2 = Z * Z;
+    let denominator = 1.0 + z2 / n;
+    let center = (p + z2 / (2.0 * n)) / denominator;
+    let half_width =
+        Z * ((p * (1.0 - p) / n) + (z2 / (4.0 * n * n))).sqrt() / denominator;
+    Some(((center - half_width).max(0.0), (center + half_width).min(1.0)))
+}
 /// Compute CIRR only from independently adjudicated, validated receipts.
 /// Unknown global dispositions remain in the denominator and widen the interval;
 /// they are never silently imputed as reuse or non-reuse.
@@ -774,6 +795,10 @@ pub fn compute_cirr(pairs: &[LocalGlobalPairV1]) -> Result<CirrSummary, Vec<Stri
         (denominator > 0).then(|| (numerator + unresolved) as f64 / denominator as f64);
     let point_estimate =
         (denominator > 0 && unresolved == 0).then(|| numerator as f64 / denominator as f64);
+    let wilson_95_envelope_lower =
+        wilson_95(numerator, denominator).map(|interval| interval.0);
+    let wilson_95_envelope_upper =
+        wilson_95(numerator + unresolved, denominator).map(|interval| interval.1);
 
     Ok(CirrSummary {
         numerator_definite_reuse: numerator,
@@ -782,6 +807,8 @@ pub fn compute_cirr(pairs: &[LocalGlobalPairV1]) -> Result<CirrSummary, Vec<Stri
         lower_bound,
         upper_bound,
         point_estimate,
+        wilson_95_envelope_lower,
+        wilson_95_envelope_upper,
     })
 }
 
@@ -1168,6 +1195,51 @@ mod tests {
         assert_eq!(summary.point_estimate, Some(0.0));
     }
 
+    #[test]
+    fn wilson_95_for_one_of_one_is_finite_and_bounded() {
+        let interval = wilson_95(1, 1).expect("non-empty binomial sample");
+        assert!((interval.0 - 0.206_549_314_377_237_45).abs() < 1e-12);
+        assert_eq!(interval.1, 1.0);
+    }
+
+    #[test]
+    fn cirr_wilson_envelope_includes_unknown_outcomes_conservatively() {
+        let mut pairs = Vec::new();
+        for index in 0..20 {
+            let mut pair = fixture();
+            pair.candidate.pair_id = format!("PAIR-WILSON-{index:02}");
+            let evaluator = pair.evaluator_only.as_mut().unwrap();
+            evaluator.global_disposition = if index < 5 {
+                GlobalDisposition::UsedDirectly
+            } else if index < 15 {
+                GlobalDisposition::Omitted
+            } else {
+                GlobalDisposition::Unknown
+            };
+            pairs.push(pair);
+        }
+        let summary = compute_cirr(&pairs).expect("valid independent receipts");
+        assert_eq!(summary.numerator_definite_reuse, 5);
+        assert_eq!(summary.denominator_eligible_local_rejections, 20);
+        assert_eq!(summary.unresolved_global_outcomes, 5);
+        assert_eq!(summary.point_estimate, None);
+        assert_eq!(summary.lower_bound, Some(0.25));
+        assert_eq!(summary.upper_bound, Some(0.5));
+        assert!(summary.wilson_95_envelope_lower.unwrap() < 0.25);
+        assert!(summary.wilson_95_envelope_upper.unwrap() > 0.5);
+        assert!(summary.wilson_95_envelope_upper.unwrap() < 1.0);
+    }
+
+    #[test]
+    fn cirr_wilson_envelope_is_undefined_for_zero_denominator() {
+        let mut pair = fixture();
+        let evaluator = pair.evaluator_only.as_mut().unwrap();
+        evaluator.eligibility = EvaluationEligibility::Excluded;
+        evaluator.exclusion_reason = Some("zero denominator control".to_owned());
+        let summary = compute_cirr(&[pair]).expect("valid excluded receipt");
+        assert_eq!(summary.wilson_95_envelope_lower, None);
+        assert_eq!(summary.wilson_95_envelope_upper, None);
+    }
     #[test]
     fn zero_denominator_is_undefined_not_zero() {
         let mut pair = fixture();
