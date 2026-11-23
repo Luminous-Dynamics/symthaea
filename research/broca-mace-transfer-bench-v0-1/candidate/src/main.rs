@@ -446,15 +446,17 @@ fn run_candidate(
 
     match method {
         CandidateMethod::ExactScopeScan => {
-            for action in need.action_alternatives {
-                let mut candidates: Vec<&Experience> = memory
-                    .iter()
-                    .filter(|item| item.scope == need.scope && item.action == action)
-                    .collect();
-                candidates.sort_by_key(|item| item.event_id);
-                for (rank, item) in candidates.into_iter().take(TOP_K_PER_ACTION).enumerate() {
-                    retrieved.push((item.event_id, experience_view_digest(item), rank + 1));
-                }
+            // The exact-scope arm is the candidate-visible ceiling: return all
+            // records in the declared scope and action set, not a truncated top-k.
+            let mut candidates: Vec<&Experience> = memory
+                .iter()
+                .filter(|item| {
+                    item.scope == need.scope && need.action_alternatives.contains(&item.action)
+                })
+                .collect();
+            candidates.sort_by_key(|item| item.event_id);
+            for item in candidates {
+                retrieved.push((item.event_id, experience_view_digest(item), 0));
             }
         }
         CandidateMethod::TypedContentHdc => {
