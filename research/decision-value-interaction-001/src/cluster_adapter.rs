@@ -34,8 +34,11 @@ pub struct ClusteredInteractionOutcome {
 
 /// Frozen metadata consumed by the VIS-DVPC-014 cluster inference analyzer.
 ///
-/// The bundle-lock digest must be supplied from an independently frozen,
-/// content-addressed evidence receipt; this adapter does not authenticate it.
+/// Both digests must come from independently frozen artifacts. The bundle
+/// lock covers the evaluator/data evidence; the cluster-assignment digest
+/// commits to the canonical episode-to-cluster manifest. This adapter checks
+/// the supplied assignments against outcomes, while the downstream CLI
+/// independently checks the manifest digest supplied by the custodian.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ClusterInferenceMetadata {
     pub experiment_id: String,
@@ -45,9 +48,20 @@ pub struct ClusterInferenceMetadata {
     pub cluster_unit: String,
     pub primary_metric: String,
     pub bundle_lock_sha256: String,
+    pub cluster_assignment_manifest_sha256: String,
     pub bootstrap_seed: u64,
     pub bootstrap_replicates: u64,
     pub familywise_confidence: f64,
+}
+
+/// One frozen episode-to-cluster assignment from the independently
+/// preregistered cluster manifest. The initial-state digest prevents a
+/// manifest row from being rebound to a different episode state.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ClusterAssignment {
+    pub episode_id: u64,
+    pub cluster_id: String,
+    pub initial_state_sha256: [u8; 32],
 }
 
 /// Canonical TSV ready for the VIS-DVPC-014 standalone cluster analyzer.
@@ -102,7 +116,9 @@ fn digest_is_empty(digest: &[u8; 32]) -> bool {
     *digest == ZERO_DIGEST
 }
 
-fn validate_metadata(metadata: &ClusterInferenceMetadata) -> Result<String, ClusterAdapterError> {
+fn validate_metadata(
+    metadata: &ClusterInferenceMetadata,
+) -> Result<(String, String), ClusterAdapterError> {
     for (field, value) in [
         ("experiment_id", metadata.experiment_id.as_str()),
         ("dataset_id", metadata.dataset_id.as_str()),
@@ -126,6 +142,10 @@ fn validate_metadata(metadata: &ClusterInferenceMetadata) -> Result<String, Clus
         ));
     }
     let bundle_lock = valid_digest(&metadata.bundle_lock_sha256, "bundle_lock_sha256")?;
+    let cluster_assignment_manifest = valid_digest(
+        &metadata.cluster_assignment_manifest_sha256,
+        "cluster_assignment_manifest_sha256",
+    )?;
     if !(MIN_BOOTSTRAP_REPLICATES..=MAX_BOOTSTRAP_REPLICATES)
         .contains(&metadata.bootstrap_replicates)
     {
@@ -144,7 +164,7 @@ fn validate_metadata(metadata: &ClusterInferenceMetadata) -> Result<String, Clus
             "bootstrap_replicates provides fewer than 20 draws in a Bonferroni-adjusted tail",
         ));
     }
-    Ok(bundle_lock)
+    Ok((bundle_lock, cluster_assignment_manifest))
 }
 
 fn validate_identity(identity: &PairedRunIdentity) -> Result<(), ClusterAdapterError> {
@@ -294,15 +314,31 @@ fn fmt_ppm(value: f64) -> String {
 /// downstream analyzer then weights independent clusters equally.
 pub fn export_cluster_deltas(
     outcomes: &[ClusteredInteractionOutcome],
+    assignments: &[ClusterAssignment],
     metadata: &ClusterInferenceMetadata,
 ) -> Result<ClusterDeltaExport, ClusterAdapterError> {
-    let bundle_lock = validate_metadata(metadata)?;
+    let (bundle_lock, cluster_assignment_manifest) = validate_metadata(metadata)?;
     if outcomes.is_empty() {
         return Err(fail(
             "at least one paired interaction certificate is required",
         ));
     }
 
+    let mut assignment_by_episode: BTreeMap<u64, &ClusterAssignment> = BTreeMap::new();
+    for assignment in assignments {
+        valid_token(&assignment.cluster_id, "cluster_id")?;
+        if digest_is_empty(&assignment.initial_state_sha256) {
+            return Err(fail("cluster assignment initial-state digest must not be zero-filled"));
+        }
+        if assignment_by_episode.insert(assignment.episode_id, assignment).is_some() {
+            return Err(fail("duplicate episode_id in frozen cluster-assignment manifest"));
+        }
+    }
+    if assignment_by_episode.is_empty() {
+        return Err(fail("frozen cluster-assignment manifest is empty"));
+    }
+
+    let mut used_assignments = BTreeSet::new();
     let mut experiment_context: Option<PairedRunIdentity> = None;
     let mut episodes: BTreeMap<u64, EpisodeAccumulator> = BTreeMap::new();
     let mut episode_clusters: BTreeMap<u64, String> = BTreeMap::new();
@@ -313,6 +349,17 @@ pub fn export_cluster_deltas(
         let certificate = &row.certificate;
         let identity = &certificate.pairing_identity;
         let effects = validate_certificate(certificate)?;
+
+        let assignment = assignment_by_episode
+            .get(&certificate.episode_id)
+            .ok_or_else(|| fail("episode is absent from frozen cluster-assignment manifest"))?;
+        if assignment.cluster_id != row.cluster_id {
+            return Err(fail("outcome cluster_id disagrees with frozen cluster-assignment manifest"));
+        }
+        if assignment.initial_state_sha256 != identity.initial_state_sha256 {
+            return Err(fail("episode initial-state digest disagrees with frozen cluster-assignment manifest"));
+        }
+        used_assignments.insert(certificate.episode_id);
 
         if let Some(reference) = &experiment_context {
             if !same_experiment_context(reference, identity) {
@@ -371,6 +418,12 @@ pub fn export_cluster_deltas(
                 .ok_or_else(|| fail("cluster adapter integer accumulation overflowed"))?;
         }
         episode.world_count += 1;
+    }
+
+    if used_assignments.len() != assignment_by_episode.len() {
+        return Err(fail(
+            "frozen cluster-assignment manifest contains episodes with no evaluator outcomes",
+        ));
     }
 
     let mut cluster_episodes: BTreeMap<String, Vec<EpisodeAccumulator>> = BTreeMap::new();
@@ -460,6 +513,11 @@ pub fn export_cluster_deltas(
     writeln!(tsv, "META\tprimary_metric\t{}", metadata.primary_metric).unwrap();
     writeln!(tsv, "META\tpositive_is_better\ttrue").unwrap();
     writeln!(tsv, "META\tbundle_lock_sha256\t{bundle_lock}").unwrap();
+    writeln!(
+        tsv,
+        "META\tcluster_assignment_manifest_sha256\t{cluster_assignment_manifest}"
+    )
+    .unwrap();
     writeln!(
         tsv,
         "META\tcomparison_family_size\t{COMPARISON_FAMILY_SIZE}"
@@ -579,6 +637,21 @@ mod tests {
         rows
     }
 
+    fn assignments() -> Vec<ClusterAssignment> {
+        (0..6_u64)
+            .flat_map(|cluster| {
+                (0..2_u64).map(move |episode_offset| {
+                    let episode_id = cluster * 10 + episode_offset + 1;
+                    ClusterAssignment {
+                        episode_id,
+                        cluster_id: format!("scene-{cluster:02}"),
+                        initial_state_sha256: digest(episode_id as u8),
+                    }
+                })
+            })
+            .collect()
+    }
+
     fn metadata() -> ClusterInferenceMetadata {
         ClusterInferenceMetadata {
             experiment_id: "compute-observation-v1".to_owned(),
@@ -588,6 +661,8 @@ mod tests {
             cluster_unit: "scene".to_owned(),
             primary_metric: "signed_decision_regret_effect_ppm".to_owned(),
             bundle_lock_sha256: "a".repeat(64),
+            cluster_assignment_manifest_sha256:
+                "b09e820031edb9f7dfe482f999f0d79031ab661c212888c90ae665a524b70425".to_owned(),
             bootstrap_seed: 42,
             bootstrap_replicates: 10_000,
             familywise_confidence: 0.95,
@@ -596,7 +671,7 @@ mod tests {
 
     #[test]
     fn exports_one_row_per_independent_cluster_and_contrast() {
-        let result = export_cluster_deltas(&fixture(), &metadata()).expect("valid cluster export");
+        let result = export_cluster_deltas(&fixture(), &assignments(), &metadata()).expect("valid cluster export");
         assert_eq!(result.independent_cluster_count, 6);
         assert_eq!(result.episode_count, 12);
         assert_eq!(result.hidden_world_observation_count, 24);
@@ -619,7 +694,7 @@ mod tests {
         let mut reversed = rows.clone();
         reversed.reverse();
         assert_eq!(
-            export_cluster_deltas(&rows, &metadata()).unwrap(),
+            export_cluster_deltas(&rows, &assignments(), &metadata()).unwrap(),
             export_cluster_deltas(&reversed, &metadata()).unwrap()
         );
     }
@@ -629,7 +704,7 @@ mod tests {
         let mut rows = fixture();
         rows.push(rows[0].clone());
         assert!(
-            export_cluster_deltas(&rows, &metadata())
+            export_cluster_deltas(&rows, &assignments(), &metadata())
                 .unwrap_err()
                 .to_string()
                 .contains("duplicate (cluster, episode, hidden-world)")
@@ -643,10 +718,75 @@ mod tests {
         duplicate.cluster_id = "different-scene".to_owned();
         rows.push(duplicate);
         assert!(
-            export_cluster_deltas(&rows, &metadata())
+            export_cluster_deltas(&rows, &assignments(), &metadata())
                 .unwrap_err()
                 .to_string()
                 .contains("more than one independent cluster")
+        );
+    }
+
+    #[test]
+    fn episode_cluster_reassignment_is_rejected_against_frozen_manifest() {
+        let mut rows = fixture();
+        rows[0].cluster_id = "scene-01".to_owned();
+        assert!(
+            export_cluster_deltas(&rows, &assignments(), &metadata())
+                .unwrap_err()
+                .to_string()
+                .contains("disagrees with frozen cluster-assignment manifest")
+        );
+    }
+
+    #[test]
+    fn initial_state_rebinding_is_rejected_against_frozen_manifest() {
+        let mut rows = fixture();
+        rows[0].certificate.pairing_identity.initial_state_sha256 = digest(200);
+        assert!(
+            export_cluster_deltas(&rows, &assignments(), &metadata())
+                .unwrap_err()
+                .to_string()
+                .contains("initial-state digest disagrees")
+        );
+    }
+
+    #[test]
+    fn missing_and_extra_assignment_manifest_entries_are_rejected() {
+        let mut missing = assignments();
+        missing.pop();
+        assert!(
+            export_cluster_deltas(&fixture(), &missing, &metadata())
+                .unwrap_err()
+                .to_string()
+                .contains("absent from frozen cluster-assignment manifest")
+                || export_cluster_deltas(&fixture(), &missing, &metadata())
+                    .unwrap_err()
+                    .to_string()
+                    .contains("manifest contains episodes with no evaluator outcomes")
+        );
+
+        let mut extra = assignments();
+        extra.push(ClusterAssignment {
+            episode_id: 999,
+            cluster_id: "scene-99".to_owned(),
+            initial_state_sha256: digest(99),
+        });
+        assert!(
+            export_cluster_deltas(&fixture(), &extra, &metadata())
+                .unwrap_err()
+                .to_string()
+                .contains("manifest contains episodes with no evaluator outcomes")
+        );
+    }
+
+    #[test]
+    fn duplicate_episode_assignment_is_rejected() {
+        let mut frozen = assignments();
+        frozen.push(frozen[0].clone());
+        assert!(
+            export_cluster_deltas(&fixture(), &frozen, &metadata())
+                .unwrap_err()
+                .to_string()
+                .contains("duplicate episode_id")
         );
     }
 
@@ -655,7 +795,7 @@ mod tests {
         let mut rows = fixture();
         rows.retain(|row| row.certificate.episode_id != 2 || row.certificate.hidden_world_id != 2);
         assert!(
-            export_cluster_deltas(&rows, &metadata())
+            export_cluster_deltas(&rows, &assignments(), &metadata())
                 .unwrap_err()
                 .to_string()
                 .contains("hidden-world cohort or digest changed")
@@ -667,7 +807,7 @@ mod tests {
         let mut rows = fixture();
         rows[0].certificate.pairing_identity.resource_budget_sha256 = digest(99);
         assert!(
-            export_cluster_deltas(&rows, &metadata())
+            export_cluster_deltas(&rows, &assignments(), &metadata())
                 .unwrap_err()
                 .to_string()
                 .contains("context changed")
@@ -681,7 +821,7 @@ mod tests {
             .filter(|row| row.cluster_id.as_str() <= "scene-02")
             .collect();
         assert!(
-            export_cluster_deltas(&rows, &metadata())
+            export_cluster_deltas(&rows, &assignments(), &metadata())
                 .unwrap_err()
                 .to_string()
                 .contains("at least 5 independent clusters")
@@ -693,7 +833,7 @@ mod tests {
         let mut config = metadata();
         config.cluster_unit = "frame".to_owned();
         assert!(
-            export_cluster_deltas(&fixture(), &config)
+            export_cluster_deltas(&fixture(), &assignments(), &config)
                 .unwrap_err()
                 .to_string()
                 .contains("too granular")
@@ -705,7 +845,7 @@ mod tests {
         let mut rows = fixture();
         rows[0].certificate.interaction_ppm += 1;
         assert!(
-            export_cluster_deltas(&rows, &metadata())
+            export_cluster_deltas(&rows, &assignments(), &metadata())
                 .unwrap_err()
                 .to_string()
                 .contains("signed effects do not recompute")
@@ -717,7 +857,15 @@ mod tests {
         let mut config = metadata();
         config.bundle_lock_sha256 = "not-a-digest".to_owned();
         assert!(
-            export_cluster_deltas(&fixture(), &config)
+            export_cluster_deltas(&fixture(), &assignments(), &config)
+                .unwrap_err()
+                .to_string()
+                .contains("64-character")
+        );
+        let mut config = metadata();
+        config.cluster_assignment_manifest_sha256 = "not-a-digest".to_owned();
+        assert!(
+            export_cluster_deltas(&fixture(), &assignments(), &config)
                 .unwrap_err()
                 .to_string()
                 .contains("64-character")
@@ -725,7 +873,7 @@ mod tests {
         let mut config = metadata();
         config.bootstrap_replicates = 1_000;
         assert!(
-            export_cluster_deltas(&fixture(), &config)
+            export_cluster_deltas(&fixture(), &assignments(), &config)
                 .unwrap_err()
                 .to_string()
                 .contains("fewer than 20 draws")
