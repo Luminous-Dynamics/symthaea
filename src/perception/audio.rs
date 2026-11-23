@@ -188,6 +188,8 @@ pub struct AcousticProsodyFrameV1 {
     pub frame_index: u64,
     /// Estimator classification; not a phoneme or emotion label.
     pub status: AcousticProsodyFrameStatusV1,
+    /// RMS amplitude in the original input PCM unit scale; not calibrated SPL.
+    pub rms_source_pcm: f32,
     /// Half-open sample interval in the original input stream.
     pub source_start_sample: u64,
     pub source_end_sample: u64,
@@ -479,6 +481,25 @@ impl AudioPerception {
                 let frame_source_end = frame_source_start
                     .saturating_add(window_samples)
                     .min(source_end_sample);
+                let local_start = usize::try_from(relative_start)
+                    .unwrap_or(samples.len())
+                    .min(samples.len());
+                let local_end = usize::try_from(
+                    frame_source_end.saturating_sub(source_start_sample),
+                )
+                .unwrap_or(samples.len())
+                .min(samples.len());
+                let source_frame = samples.get(local_start..local_end).unwrap_or(&[]);
+                let rms_source_pcm = if source_frame.is_empty() {
+                    0.0
+                } else {
+                    (source_frame
+                        .iter()
+                        .map(|sample| sample * sample)
+                        .sum::<f32>()
+                        / source_frame.len() as f32)
+                        .sqrt()
+                };
                 let f0_hz =
                     if frame.f0 > 0.0 && frame.voicing >= extraction_config.voicing_threshold {
                         Some(frame.f0)
@@ -495,6 +516,7 @@ impl AudioPerception {
                     stream_segment_index,
                     frame_index: index as u64,
                     status,
+                    rms_source_pcm,
                     source_start_sample: frame_source_start,
                     source_end_sample: frame_source_end,
                     time_seconds: frame.time,
@@ -822,6 +844,48 @@ mod tests {
 
     #[cfg(feature = "voice-stt")]
     #[test]
+    fn raw_source_rms_tracks_gain_while_peak_normalized_energy_does_not() {
+        let mut perception = AudioPerception::new(AudioPerceptionConfig::default()).unwrap();
+        let base = sine_wave(16_000, 200.0, 0.5);
+        let scaled: Vec<f32> = base.iter().map(|sample| sample * 0.5).collect();
+
+        let base_result = perception
+            .process_samples_at_source_position(&base, 16_000, 0, 0)
+            .unwrap();
+        let scaled_result = perception
+            .process_samples_at_source_position(&scaled, 16_000, 0, 0)
+            .unwrap();
+        let base_frames = base_result.prosody.unwrap().frames;
+        let scaled_frames = scaled_result.prosody.unwrap().frames;
+        assert_eq!(base_frames.len(), scaled_frames.len());
+
+        let base_rms = base_frames
+            .iter()
+            .map(|frame| frame.rms_source_pcm)
+            .sum::<f32>()
+            / base_frames.len() as f32;
+        let scaled_rms = scaled_frames
+            .iter()
+            .map(|frame| frame.rms_source_pcm)
+            .sum::<f32>()
+            / scaled_frames.len() as f32;
+        let base_normalized = base_frames
+            .iter()
+            .map(|frame| frame.energy_utterance_peak_normalized)
+            .sum::<f32>()
+            / base_frames.len() as f32;
+        let scaled_normalized = scaled_frames
+            .iter()
+            .map(|frame| frame.energy_utterance_peak_normalized)
+            .sum::<f32>()
+            / scaled_frames.len() as f32;
+
+        assert!((scaled_rms / base_rms - 0.5).abs() < 0.01);
+        assert!((scaled_normalized - base_normalized).abs() < 0.01);
+    }
+
+    #[cfg(feature = "voice-stt")]
+    #[test]
     fn empty_pcm_block_is_rejected_before_projection() {
         let mut perception = AudioPerception::new(AudioPerceptionConfig::default()).unwrap();
         assert!(
@@ -884,6 +948,7 @@ mod tests {
                 stream_segment_index: 2,
                 frame_index: 0,
                 status: AcousticProsodyFrameStatusV1::Voiced,
+                rms_source_pcm: 0.25,
                 source_start_sample: 10_000,
                 source_end_sample: 10_400,
                 time_seconds: 0.0,
