@@ -91,6 +91,7 @@ pub use metrology_policy_replay::{
     REPLAY_EVALUATION_SCHEMA_V1, REPLAY_POLICY_VIEW_SCHEMA_V1, REPLAY_SCENARIO_SCHEMA_V1,
     SyntheticFabEpisodeV1, SyntheticFabObservedWaferV1, SyntheticFabPolicyEvaluationV1,
     SyntheticFabPolicyViewV1, SyntheticFabRegimeV1, SyntheticFabReplayError,
-    SyntheticFabScenarioConfigV1, SyntheticSensorObservationV1, SyntheticSensorStateV1,
+    SyntheticFabMissingnessMechanismV1, SyntheticFabScenarioConfigV1,
+    SyntheticSensorObservationV1, SyntheticSensorStateV1,
     evaluate_synthetic_metrology_policy_v1, generate_synthetic_fab_episode_v1,
 };
