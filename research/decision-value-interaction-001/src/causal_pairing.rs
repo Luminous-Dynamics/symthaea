@@ -1187,6 +1187,191 @@ mod tests {
     }
 
     #[test]
+    fn causal_pairing_and_decision_regret_join_on_same_actions() {
+        let runs = receipts(
+            CausalReplayRegime::ClosedLoopActionCoupled,
+            TrajectoryOrigin::ArmLocalDriverExecution,
+            true,
+        );
+        let certificate = validate_causal_pairing_with_interaction(
+            &runs,
+            &arm_outcomes([400_000, 350_000, 380_000, 100_000]),
+        )
+        .expect("causal trajectories and regret outcomes share the same actions");
+        assert_eq!(certificate.decision_value.interaction_ppm, 230_000);
+        assert_eq!(
+            certificate.causal_pairing.paired_run_identity,
+            certificate.decision_value.pairing_identity
+        );
+    }
+
+    #[test]
+    fn scored_action_with_missing_world_tick_is_rejected() {
+        let mut runs = receipts(
+            CausalReplayRegime::ClosedLoopActionCoupled,
+            TrajectoryOrigin::ArmLocalDriverExecution,
+            true,
+        );
+        runs[1].scored_outcome = ScoredOutcomeBinding::Applied {
+            world_tick: 999,
+            action_sha256: digest(71),
+            applied_at_us: 2_100,
+        };
+        assert!(matches!(
+            validate_causal_pairing(&runs),
+            Err(CausalPairingError::ScoredActionTickMissing {
+                arm: TreatmentArm::ComputeOnly,
+                world_tick: 999
+            })
+        ));
+    }
+
+    #[test]
+    fn scored_action_digest_must_match_trajectory_step() {
+        let mut runs = receipts(
+            CausalReplayRegime::ClosedLoopActionCoupled,
+            TrajectoryOrigin::ArmLocalDriverExecution,
+            true,
+        );
+        runs[2].scored_outcome = ScoredOutcomeBinding::Applied {
+            world_tick: 101,
+            action_sha256: digest(222),
+            applied_at_us: 2_100,
+        };
+        assert!(matches!(
+            validate_causal_pairing(&runs),
+            Err(CausalPairingError::ScoredActionDigestMismatch {
+                arm: TreatmentArm::ObservationOnly,
+                world_tick: 101
+            })
+        ));
+    }
+
+    #[test]
+    fn scored_action_application_time_must_match_trajectory() {
+        let mut runs = receipts(
+            CausalReplayRegime::ClosedLoopActionCoupled,
+            TrajectoryOrigin::ArmLocalDriverExecution,
+            true,
+        );
+        runs[3].scored_outcome = ScoredOutcomeBinding::Applied {
+            world_tick: 101,
+            action_sha256: digest(73),
+            applied_at_us: 2_101,
+        };
+        assert!(matches!(
+            validate_causal_pairing(&runs),
+            Err(CausalPairingError::ScoredActionTimeMismatch {
+                arm: TreatmentArm::Joint,
+                expected_us: 2_100,
+                actual_us: 2_101
+            })
+        ));
+    }
+
+    #[test]
+    fn regret_identity_must_match_causal_trajectory_identity() {
+        let runs = receipts(
+            CausalReplayRegime::ClosedLoopActionCoupled,
+            TrajectoryOrigin::ArmLocalDriverExecution,
+            true,
+        );
+        let mut outcomes = arm_outcomes([400_000, 350_000, 380_000, 100_000]);
+        for outcome in &mut outcomes {
+            outcome.identity.policy_seed = 100;
+        }
+        assert!(matches!(
+            validate_causal_pairing_with_interaction(&runs, &outcomes),
+            Err(CausalPairingError::ScoredOutcomeIdentityMismatch {
+                field: crate::IdentityField::PolicySeed
+            })
+        ));
+    }
+
+    #[test]
+    fn regret_disposition_must_match_scored_outcome_binding() {
+        let runs = receipts(
+            CausalReplayRegime::ClosedLoopActionCoupled,
+            TrajectoryOrigin::ArmLocalDriverExecution,
+            true,
+        );
+        let mut outcomes = arm_outcomes([400_000, 350_000, 380_000, 100_000]);
+        outcomes[2].disposition = ApplicationDisposition::Applied { at_us: 2_101 };
+        assert!(matches!(
+            validate_causal_pairing_with_interaction(&runs, &outcomes),
+            Err(CausalPairingError::ScoredOutcomeDispositionMismatch {
+                arm: TreatmentArm::ObservationOnly
+            })
+        ));
+    }
+
+    #[test]
+    fn matching_non_application_terminal_disposition_can_be_joined() {
+        let mut runs = receipts(
+            CausalReplayRegime::ClosedLoopActionCoupled,
+            TrajectoryOrigin::ArmLocalDriverExecution,
+            true,
+        );
+        runs[3].scored_outcome = ScoredOutcomeBinding::NotApplied {
+            terminal_at_us: 2_300,
+            reason: NonApplicationReason::DeadlineMiss,
+        };
+        let mut outcomes = arm_outcomes([400_000, 350_000, 380_000, 1_000_000]);
+        outcomes[3].disposition = ApplicationDisposition::NotApplied {
+            terminal_at_us: 2_300,
+            reason: NonApplicationReason::DeadlineMiss,
+        };
+        let certificate = validate_causal_pairing_with_interaction(&runs, &outcomes)
+            .expect("matching non-application outcome remains scored");
+        assert_eq!(certificate.decision_value.realized_regret_ppm[3], 1_000_000);
+    }
+
+    #[test]
+    fn mismatched_non_application_reason_is_rejected() {
+        let mut runs = receipts(
+            CausalReplayRegime::ClosedLoopActionCoupled,
+            TrajectoryOrigin::ArmLocalDriverExecution,
+            true,
+        );
+        runs[0].scored_outcome = ScoredOutcomeBinding::NotApplied {
+            terminal_at_us: 2_300,
+            reason: NonApplicationReason::DeadlineMiss,
+        };
+        let mut outcomes = arm_outcomes([1_000_000, 350_000, 380_000, 100_000]);
+        outcomes[0].disposition = ApplicationDisposition::NotApplied {
+            terminal_at_us: 2_300,
+            reason: NonApplicationReason::ExecutionFailure,
+        };
+        assert!(matches!(
+            validate_causal_pairing_with_interaction(&runs, &outcomes),
+            Err(CausalPairingError::ScoredOutcomeDispositionMismatch {
+                arm: TreatmentArm::Baseline
+            })
+        ));
+    }
+
+    #[test]
+    fn non_application_cannot_precede_final_decision() {
+        let mut runs = receipts(
+            CausalReplayRegime::ClosedLoopActionCoupled,
+            TrajectoryOrigin::ArmLocalDriverExecution,
+            true,
+        );
+        runs[0].scored_outcome = ScoredOutcomeBinding::NotApplied {
+            terminal_at_us: 1_999,
+            reason: NonApplicationReason::DeadlineMiss,
+        };
+        assert!(matches!(
+            validate_causal_pairing(&runs),
+            Err(CausalPairingError::ScoredTerminalBeforeDecision {
+                arm: TreatmentArm::Baseline,
+                terminal_at_us: 1_999,
+                last_decision_at_us: 2_000
+            })
+        ));
+    }
+
+    #[test]
     fn closed_loop_accepts_arm_local_divergent_trajectories() {
         let runs = receipts(
             CausalReplayRegime::ClosedLoopActionCoupled,
