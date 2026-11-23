@@ -210,3 +210,45 @@ This is a local, source-backed structural replay. It is not a formal JSON-Schema
 The 17 November 2026 SciWorkBench preprint reports a best mean score of 57.38/100 on 98 real scientific workflow tasks and finds that performance depends strongly on the model–harness pair. FIRE-Bench reports sub-50 F1 for its strongest tested agents. AstaBench's 30 April 2026 update reports only 3% perfect completion on E2E-Bench-Hard, even though the leading agent completed many individual workflow steps. These are distinct suites and should never be pooled into a single score.
 
 For EGB, the differentiator to test is not merely better ideation. It is **source-bound, self-correcting research that selects useful actions, catches its own errors, preserves uncertainty and produces independently qualified mathematical claims**. That remains a research target, not an achieved Symthaea result.
+
+
+## 11. Two-stage research acquisition and selector qualification audit
+
+A new follow-on task is open: [#13418 — separate research-action VoC from covariance-aware experiment design](https://github.com/Luminous-Dynamics/symthaea/issues/13418).
+
+The campaign must distinguish two decisions:
+
+**Stage A — which research action should be purchased?** Use the existing prospective value-of-computation and research-policy owners (#8721 / #11171) to choose between source replay, derivation, negative control, BVP correction, precision refinement, endpoint matching, interval validation or theorem work. Record a prospective evidence-prefix-bound forecast and the decision it could change.
+
+**Stage B — how should the chosen numerical experiment be designed?** Use the existing model-separation/experiment-design owner to select parameter settings and observables that discriminate competing explanations. This must account for correlated outputs and shared numerical/model uncertainty.
+
+These are not the same optimization. The cost of a solver call is not its information value; the disagreement among model predictions is not automatically a calibrated expected information gain.
+
+### Exact selector audit
+
+Three distinct capabilities must not be conflated:
+
+1. The core conjecture-engine selector select_most_informative_experiment (public-main blob 06a033939ba922f1933680d8bd15ab4d9222d296) ranks candidate points by population variance of model predictions. This is a simple query-by-committee / disagreement baseline, not a posterior, EIG, or calibrated VoC.
+2. Draft [PR #8034](https://github.com/Luminous-Dynamics/symthaea/pull/8034) adds the stronger prior-free maximin standardized-separation selector. It uses explicit per-observable standard uncertainties and relative costs, then scores the worst-separated hypothesis pair. Its current implementation combines observable distances in quadrature under a conditional-independence assumption. It explicitly states that it is not Bayesian EIG, a Bayes factor or a posterior. It is not yet qualified or integrated with the live Symtropy EGB campaign.
+3. [#8721](https://github.com/Luminous-Dynamics/symthaea/issues/8721) owns prospective allocation of computation/tool calls and their realized decision value. Reuse it for Stage A; do not replace it with #8034's experiment score.
+
+### #8034 qualification blocker and workspace repair evidence
+
+I inspected the exact dedicated workflow log for PR #8034's Physics Experiment Design run 39132979516 / job 117691747141. The workflow fails at cargo fmt while Cargo resolves the repository workspace. Cargo reports that the root glob discovers crates/core/symthaea-observation-attestation/ without a Cargo.toml. The package's tests, Clippy, demo and JSON I/O steps are consequently skipped; the log does not establish a code-formatting or package-test defect.
+
+The root workspace repair is tracked separately in [PR #13080](https://github.com/Luminous-Dynamics/symthaea/pull/13080). Its dedicated Workspace manifest smoke workflow passed at exact head 6a0f432c8b647704c8a6101e78bd661722ad105c, including:
+- rejecting unexcluded source-only directories matched by workspace globs;
+- cargo metadata --no-deps --format-version 1;
+- formatting the root packages.
+
+The same PR has a separate Beverage Benchmark Contract failure; that is not the workspace smoke job and is not evidence about #8034's package code. PR #13080 remains a draft; the workspace repair has not been merged into main. The correct remedy is to incorporate the reviewed workspace quarantine/guard, not to invent a placeholder Cargo.toml for the stale observation-attestation adapter. After the workspace repair is incorporated, rerun the unchanged #8034 focused workflow on its exact updated head. Until the package-specific fmt/tests/Clippy/demo/JSON steps complete, #8034 remains unqualified.
+
+### EGB-specific covariance issue
+
+The response matrix, determinant, singular values and condition number are algebraically linked. Treating all of them as independent observables can create a false information gain. Shared background parameters, action-row extraction, endpoint normalization, asymptotic projectors and numerical errors also create cross-covariance.
+
+A new exact synthetic control is committed as [BH_EGB_COVARIANCE_REDUNDANCY_CONTROL_V0_1.json](BH_EGB_COVARIANCE_REDUNDANCY_CONTROL_V0_1.json). It uses a 2×2 correlated difference covariance with exact rational entries and a redundant third observable x3=x1+x2. The covariance-aware squared Mahalanobis score remains exactly 4 before and after adding the redundant observable. A diagonal-independence calculation spuriously changes from 5 to 8. This is an exact synthetic linear-algebra oracle, not an EGB physical calculation or an implementation pass for #8034.
+
+For the EGB response atlas, future design selection should carry the full covariance of the predicted difference, including cross-covariances and metric transport under endpoint basis changes. If distributions cannot be defended, use bounded/interval uncertainty or robust separation with explicit claim limits; do not manufacture Gaussian priors. The #13418 issue owns this two-stage acquisition and covariance-aware qualification design.
+
+**Current state:** selector source audited; selector package not yet qualified; covariance control fixture authored; no Symthaea research-policy execution or EGB finite-coupling BVP is claimed.
