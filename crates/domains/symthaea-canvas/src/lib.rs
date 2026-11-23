@@ -93,13 +93,12 @@ pub use embodiment_trace::{
 pub use geometry::build_scene;
 pub use mycelial_active_sensing::{
     MAX_MYCELIAL_ACQUISITION_ACTIONS, MAX_MYCELIAL_ACQUISITION_DECISIONS,
-    MAX_MYCELIAL_ACQUISITION_OUTCOMES_PER_ACTION,
-    MAX_MYCELIAL_ACTIVE_SENSING_EVALUATIONS,
+    MAX_MYCELIAL_ACQUISITION_OUTCOMES_PER_ACTION, MAX_MYCELIAL_ACTIVE_SENSING_EVALUATIONS,
     MAX_MYCELIAL_ACTIVE_SENSING_LOSS_UNITS, MYCELIAL_ACTIVE_SENSING_SCHEMA_VERSION,
     MycelialAcquisitionAction, MycelialAcquisitionActionKind, MycelialAcquisitionActionValue,
-    MycelialAcquisitionDecision, MycelialAcquisitionOutcome,
-    MycelialAcquisitionOutcomeValue, MycelialActiveSensingError, MycelialActiveSensingReport,
-    MycelialHypothesisLikelihood, MycelialHypothesisLoss, evaluate_mycelial_active_sensing,
+    MycelialAcquisitionDecision, MycelialAcquisitionOutcome, MycelialAcquisitionOutcomeValue,
+    MycelialActiveSensingError, MycelialActiveSensingReport, MycelialHypothesisLikelihood,
+    MycelialHypothesisLoss, evaluate_mycelial_active_sensing,
 };
 pub use mycelial_annotation_triage::{
     MAX_MYCELIAL_ANNOTATION_TRIAGE_ITEMS, MYCELIAL_ANNOTATION_TRIAGE_SCHEMA_VERSION,
