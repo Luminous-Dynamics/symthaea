@@ -546,12 +546,14 @@ class MaceLongMemEvalV2Memory(Memory):
             )
             lines = [line for line in payload.decode("utf-8").splitlines() if line.strip()]
             require(len(lines) == count, "saved candidate JSONL count mismatch")
+            saved_records: list[dict[str, Any]] = []
             for ordinal, line in enumerate(lines):
                 try:
                     record = json.loads(line)
                 except json.JSONDecodeError as error:
                     raise RuntimeError(f"saved candidate JSONL record {ordinal} is invalid") from error
                 require(isinstance(record, dict), "saved candidate JSONL record must be an object")
+                saved_records.append(record)
                 require(record.get("schema_version") == "mace_candidate_evidence_v0_1"
                         and record.get("record_type") == "candidate_evidence",
                         "saved candidate record schema/type mismatch")
@@ -565,6 +567,12 @@ class MaceLongMemEvalV2Memory(Memory):
                         "saved candidate record backend mismatch")
                 require(record.get("query_scope") == f"longmemeval-v2:domain:{self.domain}",
                         "saved candidate record scope mismatch")
+            if count:
+                self._validate_candidate_evidence_graph(saved_records)
+                require(
+                    self._candidate_set_digest_from_records(saved_records) == candidate_set_sha256,
+                    "saved candidate-set digest mismatch",
+                )
             receipts[candidate_id] = receipt
             expected_candidate_files.add(expected_payload_name)
 
