@@ -206,14 +206,15 @@ pub fn estimate_total_effect(
     }
 
     let mut expected_schedule = BTreeSet::new();
+    let mut expected_episode_ids = BTreeSet::new();
     for task in expected_tasks {
         if task.episode_id.trim().is_empty() || task.task_family.trim().is_empty() {
             return Err("expected task episode_id and task_family must not be empty".to_string());
         }
+        if !expected_episode_ids.insert(task.episode_id.as_str()) {
+            return Err(format!("duplicate expected episode_id: {}", task.episode_id));
+        }
         expected_schedule.insert((task.task_family.clone(), task.episode_id.clone()));
-    }
-    if expected_schedule.len() != expected_tasks.len() {
-        return Err("expected task schedule contains duplicate task identities".to_string());
     }
 
     let mut assigned = BTreeMap::new();
