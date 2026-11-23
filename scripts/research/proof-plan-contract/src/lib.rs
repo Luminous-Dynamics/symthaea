@@ -9,6 +9,8 @@ use std::collections::{HashMap, HashSet};
 
 const AND_COMM_FIXTURE: &str =
     include_str!("../../../../docs/research/PROOF_PLAN_AND_COMM_V1.json");
+const MUTATION_FIXTURES: &str =
+    include_str!("../../../../docs/research/PROOF_PLAN_MUTATION_FIXTURES_V1.json");
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -525,9 +527,13 @@ pub fn validate_plan(plan: &ProofPlan) -> Vec<String> {
         }
     }
 
+    let mut alternative_ids = HashSet::<String>::new();
     for alternative in &plan.alternatives {
         if alternative.id.trim().is_empty() {
             errors.push("alternative ID must not be empty".to_owned());
+        }
+        if !alternative_ids.insert(alternative.id.clone()) {
+            errors.push(format!("duplicate alternative ID: {}", alternative.id));
         }
         if node_kinds.get(&alternative.root_goal_id) != Some(&NodeKind::GoalState) {
             errors.push(format!("alternative {} root_goal_id is missing or not a goal_state", alternative.id));
@@ -550,6 +556,16 @@ pub fn validate_plan(plan: &ProofPlan) -> Vec<String> {
         });
         if !has_kernel_receipt {
             errors.push("lean_kernel_status=accepted requires passed lean_kernel_check evidence with accepted verdict".to_owned());
+        }
+    }
+
+    let mut reviewer_ids = HashSet::<String>::new();
+    for reviewer in &plan.reviewers {
+        if reviewer.reviewer_id.trim().is_empty() {
+            errors.push("reviewer_id must not be empty".to_owned());
+        }
+        if !reviewer_ids.insert(reviewer.reviewer_id.clone()) {
+            errors.push(format!("duplicate reviewer ID: {}", reviewer.reviewer_id));
         }
     }
 
@@ -636,6 +652,13 @@ mod tests {
     }
 
     #[test]
+    fn dangling_evidence_references_are_rejected() {
+        let mut value = fixture_value();
+        value["nodes"][0]["evidence_refs"] = serde_json::json!(["EVIDENCE_MISSING"]);
+        assert!(validate_value(&value).iter().any(|e| e.contains("references missing evidence ID")));
+    }
+
+    #[test]
     fn analogy_without_a_boundary_is_rejected() {
         let mut value = fixture_value();
         let node = value["nodes"].as_array_mut().unwrap()
@@ -652,6 +675,16 @@ mod tests {
             && edge["target_id"] == "G_FORWARD"
             && edge["relation"] == "creates_subgoal"));
         assert!(validate_value(&value).iter().any(|e| e.contains("lacks creates_subgoal edge")));
+    }
+
+    #[test]
+    fn missing_justification_edge_is_rejected() {
+        let mut value = fixture_value();
+        let edges = value["edges"].as_array_mut().unwrap();
+        edges.retain(|edge| !(edge["source_id"] == "A_FORWARD"
+            && edge["target_id"] == "J_AND_SYMM"
+            && edge["relation"] == "justified_by"));
+        assert!(validate_value(&value).iter().any(|e| e.contains("lacks justified_by edge")));
     }
 
     #[test]
@@ -695,6 +728,22 @@ mod tests {
             "evidence_refs":["E_SOURCE"]
         }));
         assert!(validate_value(&value).is_empty());
+    }
+
+    #[test]
+    fn mutation_fixtures_keep_route_change_separate_from_refutation() {
+        let fixtures: Value = serde_json::from_str(MUTATION_FIXTURES).expect("mutation fixture JSON");
+        let cases = fixtures["cases"].as_array().expect("cases array");
+        let route_only = cases.iter().find(|case| case["id"] == "MUT-ROUTE-ONLY")
+            .expect("route-only control");
+        assert_eq!(route_only["expected_diagnostic"], "proof_route_changed");
+        assert_eq!(route_only["mathematical_disposition"], "not_refuted");
+        assert_eq!(route_only["oracle_status"], "not_run");
+
+        let invalid_warrant = cases.iter().find(|case| case["id"] == "MUT-AND-LEFT")
+            .expect("invalid-warrant control");
+        assert_eq!(invalid_warrant["mathematical_disposition"], "unknown");
+        assert_eq!(invalid_warrant["oracle_status"], "not_run");
     }
 
     #[test]
