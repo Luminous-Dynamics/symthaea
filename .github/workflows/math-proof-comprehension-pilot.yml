@@ -92,8 +92,9 @@ jobs:
 
           jq -e '.candidate.statement_context == []
             and .evaluator_only.target_statement_context == []
-            and .evaluator_only.translation_assessment == "aligned"
-            and (.evaluator_only.translation_review_refs | length) > 0' \
+            and (.evaluator_only.translation_reviews | length) >= 2
+            and ([.evaluator_only.translation_reviews[].reviewer_id] | unique | length) == (.evaluator_only.translation_reviews | length)
+            and all(.evaluator_only.translation_reviews[]; .disposition == "aligned" and (.evidence_refs | length) > 0)' \
             docs/research/MATH_PROOF_COMPREHENSION_THEOREM_SANDWICH_V1.json >/dev/null
 
           jq -e '.task_count == (.tasks | length) and .task_count == 6 and .status == "source_pinned_seed_not_gold"' \

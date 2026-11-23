@@ -57,3 +57,13 @@ The translation assessment must be held out of the candidate-visible projection.
 
 Six tests cover moving an assumption between context and implication, adding an extra assumption, removing a required assumption, explicit text/formula mismatch, unreviewed translation abstention, and malformed context formulas. These demonstrate the new scope semantics on finite propositional examples only.
 
+### Two-reviewer translation gate
+
+The translation alignment verdict is no longer a single evaluator-supplied status. The post-hoc receipt carries at least two distinct reviewer records, each with its own disposition and evidence references. The aggregate is derived:
+- all reviewers aligned → \`aligned\`;
+- all reviewers misaligned → \`misaligned\`;
+- conflicting reviewer dispositions → \`disputed\`, which yields \`unknown\`;
+- partial or unknown reviews → \`unknown\`.
+
+A missing second reviewer or duplicated reviewer ID invalidates the receipt. This enforces the shape of a dual-review protocol; it does not cryptographically prove reviewer independence or expertise. The synthetic fixture uses stipulated reviewer IDs solely to test this structure. A real benchmark requires independently recruited/blinded reviewers and adjudication of disagreement before gold labels are frozen.
+

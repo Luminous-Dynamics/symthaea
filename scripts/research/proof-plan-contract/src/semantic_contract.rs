@@ -51,22 +51,61 @@ pub struct EvaluatorOnlyV1 {
     pub target_statement_context: Vec<BooleanFormula>,
     pub stronger_obligations: Vec<StrongerObligationV1>,
     pub corollary_obligations: Vec<CorollaryObligationV1>,
-    pub translation_assessment: TranslationAssessment,
-    pub translation_assessor: String,
-    pub translation_review_refs: Vec<String>,
+    /// Post-hoc reviews of whether the natural-language statement matches its AST.
+    pub translation_reviews: Vec<TranslationReviewV1>,
     pub adjudication_authority: String,
     pub adjudication_refs: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum TranslationAssessment {
+pub enum TranslationReviewDisposition {
     Aligned,
     PartiallyAligned,
     Misaligned,
     Unknown,
-    NotReviewed,
 }
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct TranslationReviewV1 {
+    pub reviewer_id: String,
+    pub disposition: TranslationReviewDisposition,
+    pub evidence_refs: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TranslationAssessment {
+    Aligned,
+    PartiallyAligned,
+    Misaligned,
+    Disputed,
+    Unknown,
+}
+
+fn derive_translation_assessment(reviews: &[TranslationReviewV1]) -> TranslationAssessment {
+    if reviews.len() < 2 {
+        return TranslationAssessment::Unknown;
+    }
+
+    let mut dispositions = reviews.iter().map(|review| review.disposition);
+    let Some(first) = dispositions.next() else {
+        return TranslationAssessment::Unknown;
+    };
+    if dispositions.clone().any(|disposition| disposition != first) {
+        return TranslationAssessment::Disputed;
+    }
+
+    match first {
+        TranslationReviewDisposition::Aligned => TranslationAssessment::Aligned,
+        TranslationReviewDisposition::PartiallyAligned => TranslationAssessment::PartiallyAligned,
+        TranslationReviewDisposition::Misaligned => TranslationAssessment::Misaligned,
+        TranslationReviewDisposition::Unknown => TranslationAssessment::Unknown,
+    }
+}
+
+
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -149,6 +188,8 @@ pub struct TheoremSandwichReportV1 {
     pub candidate_context_assumption_count: usize,
     pub target_context_assumption_count: usize,
     pub translation_assessment: TranslationAssessment,
+    pub translation_review_count: usize,
+    pub translation_review_disputed: bool,
 }
 
 impl TheoremSandwichReceiptV1 {
@@ -326,27 +367,34 @@ pub fn validate_receipt(receipt: &TheoremSandwichReceiptV1) -> Vec<String> {
             "evaluator target_statement_context",
             &mut errors,
         );
-        if !non_empty(&evaluator.translation_assessor) {
-            errors.push("evaluator_only.translation_assessor must be non-empty".to_owned());
-        }
-        if evaluator.translation_review_refs.is_empty()
-            || evaluator
-                .translation_review_refs
-                .iter()
-                .any(|value| !non_empty(value))
-        {
+        if evaluator.translation_reviews.len() < 2 {
             errors.push(
-                "evaluator_only.translation_review_refs must contain non-empty references"
+                "evaluator_only.translation_reviews requires at least two distinct reviewers"
                     .to_owned(),
             );
         }
-        let mut translation_refs = HashSet::new();
-        if evaluator
-            .translation_review_refs
-            .iter()
-            .any(|value| !translation_refs.insert(value))
-        {
-            errors.push("evaluator_only.translation_review_refs must be unique".to_owned());
+        let mut reviewer_ids = HashSet::new();
+        for review in &evaluator.translation_reviews {
+            if !non_empty(&review.reviewer_id) || !reviewer_ids.insert(&review.reviewer_id) {
+                errors.push(
+                    "translation review reviewer_id must be non-empty and unique".to_owned(),
+                );
+            }
+            if review.evidence_refs.is_empty()
+                || review.evidence_refs.iter().any(|reference| !non_empty(reference))
+            {
+                errors.push(format!(
+                    "translation review {} requires non-empty evidence references",
+                    review.reviewer_id
+                ));
+            }
+            let mut refs = HashSet::new();
+            if review.evidence_refs.iter().any(|reference| !refs.insert(reference)) {
+                errors.push(format!(
+                    "translation review {} evidence_refs must be unique",
+                    review.reviewer_id
+                ));
+            }
         }
     }
     errors
@@ -486,11 +534,15 @@ pub fn evaluate_receipt(
         );
     }
 
+    let translation_assessment = derive_translation_assessment(&evaluator.translation_reviews);
+    let translation_review_disputed =
+        translation_assessment == TranslationAssessment::Disputed;
+
     let classification = if any_fail(&evaluator_controls) {
         SandwichClassification::InvalidEvaluatorControls
-    } else if evaluator.translation_assessment == TranslationAssessment::Misaligned {
+    } else if translation_assessment == TranslationAssessment::Misaligned {
         SandwichClassification::IncomparableOrTranslationMismatch
-    } else if evaluator.translation_assessment != TranslationAssessment::Aligned
+    } else if translation_assessment != TranslationAssessment::Aligned
         || any_unknown(&evaluator_controls)
         || any_unknown(&upper)
         || any_unknown(&lower)
@@ -521,7 +573,9 @@ pub fn evaluate_receipt(
                 .to_owned(),
         candidate_context_assumption_count: receipt.candidate.statement_context.len(),
         target_context_assumption_count: evaluator.target_statement_context.len(),
-        translation_assessment: evaluator.translation_assessment,
+        translation_assessment,
+        translation_review_count: evaluator.translation_reviews.len(),
+        translation_review_disputed,
     })
 }
 
@@ -739,11 +793,9 @@ mod tests {
     #[test]
     fn a_misaligned_text_to_formula_translation_blocks_semantic_acceptance() {
         let mut receipt = fixture();
-        receipt
-            .evaluator_only
-            .as_mut()
-            .unwrap()
-            .translation_assessment = TranslationAssessment::Misaligned;
+        for review in &mut receipt.evaluator_only.as_mut().unwrap().translation_reviews {
+            review.disposition = TranslationReviewDisposition::Misaligned;
+        }
         let report = evaluate_receipt(&receipt).expect("valid but misaligned candidate receipt");
         assert_eq!(
             report.classification,
@@ -754,19 +806,93 @@ mod tests {
     #[test]
     fn partial_or_unreviewed_translation_is_unknown_not_a_pass() {
         for status in [
-            TranslationAssessment::PartiallyAligned,
-            TranslationAssessment::Unknown,
-            TranslationAssessment::NotReviewed,
+            TranslationReviewDisposition::PartiallyAligned,
+            TranslationReviewDisposition::Unknown,
         ] {
             let mut receipt = fixture();
-            receipt
-                .evaluator_only
-                .as_mut()
-                .unwrap()
-                .translation_assessment = status;
+            for review in &mut receipt.evaluator_only.as_mut().unwrap().translation_reviews {
+                review.disposition = status;
+            }
             let report = evaluate_receipt(&receipt).expect("valid unresolved translation receipt");
             assert_eq!(report.classification, SandwichClassification::Unknown);
         }
+    }
+
+    #[test]
+    fn two_aligned_translation_reviews_are_required_for_acceptance() {
+        let report = evaluate_receipt(&fixture()).expect("two aligned synthetic reviews");
+        assert_eq!(report.translation_assessment, TranslationAssessment::Aligned);
+        assert_eq!(report.translation_review_count, 2);
+        assert!(!report.translation_review_disputed);
+        assert_eq!(
+            report.classification,
+            SandwichClassification::ConsistentWithSelectedControls
+        );
+    }
+
+    #[test]
+    fn one_misaligned_and_one_aligned_translation_review_is_disputed() {
+        let mut receipt = fixture();
+        let reviews = &mut receipt.evaluator_only.as_mut().unwrap().translation_reviews;
+        reviews[0].disposition = TranslationReviewDisposition::Misaligned;
+        let report = evaluate_receipt(&receipt).expect("valid but disputed review receipt");
+        assert_eq!(report.translation_assessment, TranslationAssessment::Disputed);
+        assert!(report.translation_review_disputed);
+        assert_eq!(report.classification, SandwichClassification::Unknown);
+    }
+
+    #[test]
+    fn two_misaligned_translation_reviews_block_acceptance() {
+        let mut receipt = fixture();
+        for review in &mut receipt.evaluator_only.as_mut().unwrap().translation_reviews {
+            review.disposition = TranslationReviewDisposition::Misaligned;
+        }
+        let report = evaluate_receipt(&receipt).expect("two alignedly misaligned reviews");
+        assert_eq!(
+            report.translation_assessment,
+            TranslationAssessment::Misaligned
+        );
+        assert_eq!(
+            report.classification,
+            SandwichClassification::IncomparableOrTranslationMismatch
+        );
+    }
+
+    #[test]
+    fn one_translation_review_cannot_satisfy_review_quorum() {
+        let mut receipt = fixture();
+        receipt.evaluator_only.as_mut().unwrap().translation_reviews.pop();
+        assert!(
+            validate_receipt(&receipt)
+                .iter()
+                .any(|error| error.contains("at least two distinct reviewers"))
+        );
+    }
+
+    #[test]
+    fn duplicate_translation_reviewer_identity_is_rejected() {
+        let mut receipt = fixture();
+        let duplicate = receipt.evaluator_only.as_ref().unwrap().translation_reviews[0].clone();
+        receipt.evaluator_only.as_mut().unwrap().translation_reviews[1].reviewer_id =
+            duplicate.reviewer_id;
+        assert!(
+            validate_receipt(&receipt)
+                .iter()
+                .any(|error| error.contains("reviewer_id must be non-empty and unique"))
+        );
+    }
+
+    #[test]
+    fn translation_review_without_evidence_is_rejected() {
+        let mut receipt = fixture();
+        receipt.evaluator_only.as_mut().unwrap().translation_reviews[0]
+            .evidence_refs
+            .clear();
+        assert!(
+            validate_receipt(&receipt)
+                .iter()
+                .any(|error| error.contains("requires non-empty evidence references"))
+        );
     }
 
     #[test]

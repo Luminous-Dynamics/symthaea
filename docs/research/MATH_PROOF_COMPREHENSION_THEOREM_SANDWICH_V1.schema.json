@@ -143,9 +143,7 @@
         "adjudication_authority",
         "adjudication_refs",
         "target_statement_context",
-        "translation_assessment",
-        "translation_assessor",
-        "translation_review_refs"
+        "translation_reviews"
       ],
       "properties": {
         "target_statement_formula": {
@@ -182,19 +180,36 @@
             "$ref": "#/$defs/booleanFormula"
           }
         },
-        "translation_assessment": {
+        "translation_reviews": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/translationReview"
+          }
+        }
+      }
+    },
+    "translationReview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reviewer_id",
+        "disposition",
+        "evidence_refs"
+      ],
+      "properties": {
+        "reviewer_id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "disposition": {
           "enum": [
             "aligned",
             "partially_aligned",
             "misaligned",
-            "unknown",
-            "not_reviewed"
+            "unknown"
           ]
         },
-        "translation_assessor": {
-          "$ref": "#/$defs/nonEmpty"
-        },
-        "translation_review_refs": {
+        "evidence_refs": {
           "type": "array",
           "minItems": 1,
           "uniqueItems": true,

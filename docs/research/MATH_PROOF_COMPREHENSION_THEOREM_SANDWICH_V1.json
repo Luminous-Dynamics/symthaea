@@ -120,6 +120,22 @@
     "translation_review_refs": [
       "SYNTHETIC-EXACT-TEXT-FORMULA-PAIR",
       "SYNTHETIC-REVIEW-ONLY-NOT-EMPIRICAL"
+    ],
+    "translation_reviews": [
+      {
+        "reviewer_id": "synthetic-reviewer-a",
+        "disposition": "aligned",
+        "evidence_refs": [
+          "SYNTHETIC-TEXT-FORMULA-PAIR-A"
+        ]
+      },
+      {
+        "reviewer_id": "synthetic-reviewer-b",
+        "disposition": "aligned",
+        "evidence_refs": [
+          "SYNTHETIC-TEXT-FORMULA-PAIR-B"
+        ]
+      }
     ]
   }
 }
