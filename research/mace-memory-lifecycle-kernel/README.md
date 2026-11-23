@@ -35,7 +35,7 @@ These commands are prescribed but have not been executed here. The reference pac
 
 ## Filesystem witness reference adapter
 
-The crate now includes `file_witness::FileBackedWitnessStore`, an append-only filesystem reference implementation of `MonotonicWitnessStore`. It uses bounded checkpoint records, atomic create-if-absent publication, generation-chain replay, tombstone monotonicity checks and Unix directory fsync. It is intended for local restart/conformance testing, not production independent trust.
+The crate now includes `file_witness::FileBackedWitnessStore`, an append-only filesystem reference implementation of `MonotonicWitnessStore`. It uses owner-only Unix directory/file permissions, bounded checkpoint records, atomic create-if-absent publication, generation-chain replay, tombstone monotonicity checks and Unix directory fsync. It is intended for local restart/conformance testing, not production independent trust.
 
 **Critical limitation:** if the witness directory is restored together with the memory database from the same snapshot/backup/VM image, both can be rolled back together. A local hash chain does not prevent whole-directory rollback or privileged offline replacement. Production still requires a separately administered witness service or hardware-backed monotonic facility with an independently authenticated trust anchor. See [FILE_BACKED_WITNESS.md](FILE_BACKED_WITNESS.md).
 
