@@ -198,3 +198,19 @@ The source slice currently provides:
 - The previous exact-head run on `f548a8ee4fec46ce8daef70a29ea9e1c6a8f5add` stopped at `cargo fmt --check`; the formatting output was applied to that source slice.
 - The subsequent GitHub API commits have advanced the PR head, but no workflow run or commit status is currently returned for the latest API-created head. The current module has **not** been compiled, unit-tested, Clippy-checked or independently executed locally. The local container has no `rustc`, `cargo` or `rustfmt` executable. Do not treat source tests as executed results.
 - Re-run the workflow from GitHub Actions on the current PR head before merging; its current workflow trigger is `pull_request` / `workflow_dispatch`.
+
+### Receipt and identity refinements
+
+The first source slice was extended before validation to make the receipt independently interpretable:
+- report-level frame ID, coordinate-frame ID, calibration digest, dimensionality, length unit and source skeleton schema version;
+- per-candidate source tip, target identity/arc-length fraction, bridge length/unit, measured-versus-declared basis, bridge evidence digest, probability evidence digest and calibration policy ID;
+- exact failed segment and junction IDs retained in every disruption delta;
+- automatic conflict IDs for shared source tips, shared tip endpoints and identical side-contact segment/fraction claims, even when the producer omits an explicit group ID;
+- distinct stable identity derivations: side split-junction IDs come from target segment + arc-length fraction; analysis-edge IDs come from stable candidate ID. Probability/calibration changes therefore affect candidate-evidence digests, not geometry-view digests;
+- one-edge topology invariant: a component merge must reduce beta-0 by exactly one and preserve beta-1; a cycle-closing edge must preserve beta-0 and increase beta-1 by exactly one;
+- bounded graph-view and demand-evaluation counts, with explicit limit errors;
+- independent test-only Floyd–Warshall comparisons for the simple tip-to-tip and tip-to-side fixtures.
+
+The current branch also tracks [#13340 — constraint-aware posterior over feasible graph hypotheses](https://github.com/Luminous-Dynamics/symthaea/issues/13340). This will quantify graph-level uncertainty across mutually exclusive candidate sets; it is a separate research increment and is not yet implemented.
+
+**Current exact-head run:** [Mycelial Renderer Contract run #357](https://github.com/Luminous-Dynamics/symthaea/actions/runs/45135473328) is validating commit `1432967ff35f0234948ee56a49ed236987526561`. Its job is in progress; no formatting, compile, test, Bevy adapter or Clippy result is claimed until the run reports those steps.
