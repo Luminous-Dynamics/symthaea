@@ -15,6 +15,8 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
+#[cfg(unix)]
+use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 
 use super::{
     LifecycleError, MemorySnapshot, MonotonicWitnessStore, WitnessCheckpoint,
@@ -61,6 +63,9 @@ impl FileBackedWitnessStore {
         if !directory.is_dir() {
             return Err(LifecycleError::WitnessUnavailable);
         }
+        #[cfg(unix)]
+        fs::set_permissions(&directory, fs::Permissions::from_mode(0o700))
+            .map_err(|_| LifecycleError::WitnessUnavailable)?;
 
         let store = Self { directory };
         match store.read_latest_checkpoint() {
@@ -200,9 +205,11 @@ impl FileBackedWitnessStore {
         ));
 
         let publish_result = (|| {
-            let mut temporary = OpenOptions::new()
-                .write(true)
-                .create_new(true)
+            let mut options = OpenOptions::new();
+            options.write(true).create_new(true);
+            #[cfg(unix)]
+            options.mode(0o600);
+            let mut temporary = options
                 .open(&temporary_path)
                 .map_err(|error| {
                     if error.kind() == std::io::ErrorKind::AlreadyExists {
@@ -645,6 +652,28 @@ mod tests {
         fs::remove_dir_all(root).expect("cleanup");
     }
 
+
+    #[cfg(unix)]
+    #[test]
+    fn witness_directory_and_checkpoint_files_are_owner_only() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let root = temporary_directory("permissions");
+        let store = FileBackedWitnessStore::open(&root).expect("open");
+        let directory_mode = fs::metadata(store.directory())
+            .expect("directory metadata")
+            .permissions()
+            .mode()
+            & 0o777;
+        let checkpoint_mode = fs::metadata(store.checkpoint_path(0))
+            .expect("checkpoint metadata")
+            .permissions()
+            .mode()
+            & 0o777;
+        assert_eq!(directory_mode, 0o700);
+        assert_eq!(checkpoint_mode, 0o600);
+        fs::remove_dir_all(root).expect("cleanup");
+    }
 
     #[test]
     fn checkpoint_history_survives_reopen_and_preserves_tombstones() {
