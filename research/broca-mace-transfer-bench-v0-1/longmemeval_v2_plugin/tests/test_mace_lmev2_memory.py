@@ -9,6 +9,7 @@ before running this file from the benchmark repository.
 
 import hashlib
 import json
+import os
 from pathlib import Path
 import tempfile
 import threading
@@ -24,6 +25,10 @@ class MaceLongMemEvalV2IngressTests(unittest.TestCase):
     def make_memory(self, root: Path) -> MaceLongMemEvalV2Memory:
         memory = object.__new__(MaceLongMemEvalV2Memory)
         memory.source_screenshot_root = root / "source"
+        memory.source_screenshot_root.mkdir(parents=True, exist_ok=True)
+        root_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+        memory._source_root_fd = os.open(memory.source_screenshot_root, root_flags)
+        self.addCleanup(os.close, memory._source_root_fd)
         memory.asset_root = root / "workspace" / "assets"
         memory.asset_root.mkdir(parents=True)
         memory.domain = "web"
@@ -126,6 +131,44 @@ class MaceLongMemEvalV2IngressTests(unittest.TestCase):
 
             with self.assertRaises(RuntimeError):
                 memory._resolve_source_screenshot("escape.png")
+
+    def test_symlink_swap_after_path_resolution_is_rejected_by_openat(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source_root = root / "source"
+            source_root.mkdir()
+            source_file = source_root / "safe.png"
+            source_file.write_bytes(b"original bytes")
+            outside = root / "outside.png"
+            outside.write_bytes(b"outside bytes")
+            memory = self.make_memory(root)
+
+            resolved = memory._resolve_source_screenshot("safe.png")
+            source_file.unlink()
+            source_file.symlink_to(outside)
+
+            with self.assertRaisesRegex(RuntimeError, "without following links"):
+                memory._read_source_screenshot(resolved)
+
+    def test_intermediate_directory_symlink_swap_is_rejected_by_openat(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source_root = root / "source"
+            source_dir = source_root / "screenshots"
+            source_dir.mkdir(parents=True)
+            source_file = source_dir / "safe.png"
+            source_file.write_bytes(b"original bytes")
+            outside_dir = root / "outside"
+            outside_dir.mkdir()
+            (outside_dir / "safe.png").write_bytes(b"outside bytes")
+            memory = self.make_memory(root)
+
+            resolved = memory._resolve_source_screenshot("screenshots/safe.png")
+            source_dir.rename(source_root / "screenshots-original")
+            source_dir.symlink_to(outside_dir, target_is_directory=True)
+
+            with self.assertRaisesRegex(RuntimeError, "without following links"):
+                memory._read_source_screenshot(resolved)
 
     def test_oversized_screenshot_is_rejected_before_reading_pixels(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
