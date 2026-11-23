@@ -34,14 +34,15 @@ The current Lean-core and Mathlib pilot seeds are development material. They are
 
 ## 4. Study arms
 
-Use the same theorem, model, frozen task data and maximum time budget across arms:
+Use the same theorem, source snapshot, model where applicable, frozen task data, tool access and maximum time budget across arms:
 
 - A — raw source: Lean declaration(s), source and task statement; no generated explanation.
 - B — generic summary: ordinary LLM explanation using the source but no typed concept graph or claim-level evidence links.
-- C — evidence-linked explanation: concept graph, exact statement and dependency provenance, explicit formal-fact / interpretation / analogy / unknown labels.
-- D — minimum sufficient explanation: the evidence-linked explanation compressed under a token budget while preserving the same source references and proof assumptions.
+- C — evidence-linked concept explanation: exact theorem statement, dependency provenance, reviewed mathematical-role annotations, and explicit formal-fact / interpretation / analogy / unknown labels.
+- D — evidence-linked proof-plan explanation: arm C plus a `ProofPlanV1` reconstruction of goal transformations, justifications, side conditions, subgoals, invariants and alternative routes. Tactic names remain provenance, not the plan itself.
+- E — minimum-sufficient proof plan: arm D compressed under a token budget while preserving theorem identity, all necessary assumptions, plan-action evidence and unresolved-step labels.
 
-Arm D is an efficiency experiment; never allow compression to remove a required assumption or evidence link.
+The primary comparison for the new capability is D versus C: does an explicit proof plan improve validation, plan reconstruction and transfer beyond a source-linked dependency/concept explanation? E tests explanation efficiency. Compression must never remove a required assumption, side condition or evidence link. A feasibility pilot may use fewer arms if recruitment is constrained; any reduction must be fixed before confirmatory collection and reported as a protocol amendment rather than silently changing the design.
 
 ## 5. Randomization and blinding
 
@@ -54,31 +55,41 @@ Arm D is an efficiency experiment; never allow compression to remove a required 
 
 ## 6. Outcomes
 
-### Primary outcomes
+### Primary outcome selection
+
+The confirmatory protocol must designate one primary endpoint before recruitment, after the feasibility pilot and power analysis. **Recommended candidate:** delayed near-transfer accuracy on a structurally related but not previously shown problem. This is the most direct test of retained, usable understanding; the final choice and smallest effect of interest must be frozen before confirmatory data collection.
+
+### Core outcomes (reported separately)
 
 1. **Statement fidelity (0–4):** correct theorem, quantifiers, assumptions, domain and conclusion.
-2. **Mechanism comprehension (0–4):** correct account of the role of the designated construction and key lemma.
-3. **Near-transfer accuracy (0–4):** solve a held-out isomorphic problem and explain which mechanism transfers.
+2. **Proof validation (0–4):** ability to identify an invalid inference, missing warrant, unsupported analogy or changed assumption.
+3. **Proof-plan reconstruction / presentation (0–4):** ability to explain why each major transformation is used, which side conditions it consumes, what subgoals it creates, and how they discharge the original goal.
+4. **Mechanism comprehension (0–4):** correct account of the role of the designated construction, invariant and key lemma.
+5. **Immediate near-transfer accuracy (0–4):** solve a held-out isomorphic problem and explain which mechanism transfers.
+6. **Delayed near-transfer accuracy (0–4):** solve a distinct but structurally related problem after a preregistered delay, without seeing the answer key or original explanation.
 
-Report each separately. Do not collapse an incorrect theorem statement into a high total score because of a good explanation style.
+Report every dimension separately. Do not collapse an incorrect theorem statement, invalid proof validation or missing side condition into a high aggregate score because of fluent presentation.
 
 ### Secondary outcomes
 
-- counterfactual mutation diagnosis (true / false / unknown / proof gap);
+- counterfactual mutation diagnosis (proved / refuted-by-checked-witness / unknown / ill-formed);
 - minimal counterexample validity;
-- detection of planted missing assumptions;
+- detection and localization of planted missing assumptions;
+- recognition of alternative valid proof plans;
 - confidence calibration (Brier score or calibration curve);
-- time-to-correct-answer;
-- explanation token count;
+- time-to-correct-answer and time-to-plan-reconstruction;
+- explanation and plan token count;
 - reviewer time;
-- participant-reported clarity (secondary, not a substitute for correctness).
+- participant-reported clarity (secondary, not a substitute for correctness);
+- attrition, completion rate and delayed-test retention.
 
 ### Hard gates
 
-- No acceptance of altered or weakened theorem as the original theorem.
+- No acceptance of an altered or weakened theorem as the original theorem.
 - No unsupported formal fact claims.
-- No fabricated dependency.
+- No fabricated dependency or invented plan warrant.
 - A correct abstention scores better than a false mathematical explanation.
+- A proof-presentation score is not a proxy for delayed transfer.
 - Any task with an ambiguous answer key is removed or marked inconclusive before unblinding.
 
 ## 7. Sample size and analysis
@@ -122,19 +133,19 @@ Stop or mark inconclusive if:
 ## 11. Reporting template
 
 Report by arm and theorem family:
-- N randomized / completed / excluded;
+- N randomized / completed / excluded, attrition and missing delayed outcomes;
 - participant background stratum;
-- statement-fidelity score;
-- mechanism-comprehension score;
-- near-transfer score;
-- counterfactual accuracy and counterexample validity;
-- false-fact / unsupported-claim rate;
+- statement-fidelity, proof-validation, proof-plan-reconstruction/presentation and mechanism-comprehension scores;
+- immediate and delayed near-transfer scores, plus held-out cross-family transfer where available;
+- counterfactual disposition accuracy and counterexample validity;
+- alternative-plan recognition;
+- false-fact / unsupported-claim / invalid-warrant rate;
 - confidence calibration;
-- median / p95 time;
-- explanation tokens;
-- reviewer minutes;
-- effect sizes and confidence intervals;
-- protocol version, randomization seed and source/task hashes.
+- median / p95 time-to-answer and time-to-plan-reconstruction;
+- explanation and plan tokens;
+- reviewer minutes and inter-rater agreement;
+- effect sizes, confidence intervals and the preregistered primary-endpoint result;
+- protocol version, randomization seed, source/task hashes, model/tool versions and budget receipts.
 
 **No human study has been run.** This document is a preregistration template awaiting expert and ethics review.
 
