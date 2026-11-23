@@ -112,7 +112,7 @@ The BM25 adapter does not expose posting/index bytes read. The trace explicitly 
 
 The Python bridge independently recomputes the Rust trace-receipt SHA-256 using the versioned binary encoding and checks a fixed cross-language reference vector. It persists one create-once trace JSON per invocation under `workspace_dir/retrieval_traces/`, pairs it with the candidate receipt, and verifies the pair and digest again during save/load. Query text is not included; only its SHA-256 is retained. The environment revision is a required run input and must be identical when replaying the trace.
 
-The trace store inside the Rust sidecar is process-local and is not restored as live promotion state from Python receipts. The receipts survive in the saved benchmark state for audit/replay, but multi-query policy consolidation across restarts remains future work. An external durable, access-controlled policy service is still needed for cross-run promotion.
+The Rust policy memory is reconstructed from the durable local trace receipts on each sidecar start. No strategy notes are automatically promoted yet; the current V2 baseline still performs one BM25 operation per query. Local files are not a rollback-resistant independent witness: restoring the memory store and trace directory together can roll both back. A separately administered witness is still required for adversarial provenance and whole-store rollback resistance; a multi-step controller and promotion service remain future work.
 
 ## Label-blind retrieval trace receipts
 
