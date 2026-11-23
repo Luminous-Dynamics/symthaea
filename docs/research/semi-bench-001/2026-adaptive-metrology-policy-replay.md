@@ -106,7 +106,12 @@ The first increment adds a deterministic, synthetic finite-population generator 
 - observed, communication-loss and structurally-not-installed sensor states;
 - wafer, lot, tool, chamber and process-step identity;
 - delayed label maturation retained outside the policy view;
-- synthetic-unit measurements that cannot be mistaken for physical metrology.
+- synthetic-unit measurements that cannot be mistaken for physical metrology;
+- explicit synthetic assay sensitivity/specificity, with deterministic per-wafer measurement-error replay.
+
+The evaluator now separates defects never selected for inspection from assay false negatives and false positives. It reports selected-defect capture, actual detected-defect capture, total undetected defects and an assay-adjusted Horvitz–Thompson prevalence estimate using the declared sensitivity/specificity. The adjusted estimator is marked unqualified when the assay is uninformative (Youden's J is zero) or design variance cannot be estimated from the randomized audit sample. The policy-facing observation view omits the assay characteristics and hidden outcomes.
+
+This is still a synthetic error model with constant, known assay characteristics. It does not model continuous metrology error distributions, instrument drift during a run, cross-wafer correlated measurement error, reference-standard traceability, gauge R&R, or operator/instrument-specific sensitivity. Those must be added before using this to represent a real metrology system.
 
 The evaluator accepts a propensity-bearing audit selection report. It checks that the selection digest matches its payload; row identities, strata and label semantics match; row order is canonical; deterministic exploit ordering replays from recorded priority scores and costs; the exact per-stratum SRSWOR draw replays from the declared seed; inclusion probabilities equal declared stratum quota divided by residual population; report counts and costs reconcile; and budget limits are respected. A negative fixture swaps one selected and unselected audit unit while preserving the quota and digest; the replay verifier must reject it.
 
