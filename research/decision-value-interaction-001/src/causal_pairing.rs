@@ -78,6 +78,20 @@ pub struct CausalPairingIdentity {
     pub randomness_domains: RandomnessDomainCommitments,
 }
 
+/// One evidence item actually delivered to a policy before a decision.
+///
+/// `available_at_us` is when the evidence became available to the candidate
+/// under the registered clock profile; `delivered_at_us` is when the driver
+/// made it visible to this arm. The event ID is a stable opaque identifier.
+/// Payload hashing and canonical event bytes remain owned by the generic
+/// receipt/artifact layer (#9437/#8715).
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DeliveredEvidenceRef {
+    pub event_id_sha256: [u8; 32],
+    pub available_at_us: u64,
+    pub delivered_at_us: u64,
+}
+
 /// One committed world transition at a single integer world tick.
 ///
 /// An empty exogenous input or observation list must still have a canonical,
@@ -86,6 +100,16 @@ pub struct CausalPairingIdentity {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TrajectoryStepCommitment {
     pub world_tick: u64,
+    /// Driver-clock time when this arm committed the decision/action proposal.
+    pub decision_at_us: u64,
+    /// Driver-clock time when the proposed action was actually applied.
+    pub action_applied_at_us: u64,
+    /// Evidence made visible to this arm at or before this decision.
+    pub delivered_evidence: Vec<DeliveredEvidenceRef>,
+    /// Evidence IDs the policy claims to have consumed for this decision.
+    /// Every ID must occur in this arm's delivered prefix, including earlier
+    /// ticks; availability after decision time is never admissible.
+    pub consumed_evidence_ids: Vec<[u8; 32]>,
     pub pre_state_sha256: [u8; 32],
     pub applied_action_sha256: [u8; 32],
     /// Digest of the exogenous event bundle for this tick, not endogenous
@@ -118,6 +142,10 @@ pub struct CausalTrajectoryReceipt {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CausalPairingCertificate {
     pub regime: CausalReplayRegime,
+    /// Number of decisions checked across all four arms.
+    pub validated_decision_count: u64,
+    /// Number of evidence references consumed across all four arms.
+    pub consumed_evidence_reference_count: u64,
     pub episode_id: u64,
     pub hidden_world_id: u64,
     pub exogenous_schedule_sha256: [u8; 32],
@@ -147,6 +175,7 @@ pub enum CausalDigestField {
     ExogenousInput,
     PostState,
     ObservationDelivery,
+    EvidenceEventIdentity,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -191,6 +220,36 @@ pub enum CausalPairingError {
     },
     TickOverflow {
         arm: TreatmentArm,
+    },
+    DecisionClockRegression {
+        arm: TreatmentArm,
+        previous_us: u64,
+        current_us: u64,
+    },
+    ActionAppliedBeforeDecision {
+        arm: TreatmentArm,
+        decision_at_us: u64,
+        action_applied_at_us: u64,
+    },
+    EvidenceAvailableAfterDelivery {
+        arm: TreatmentArm,
+        event_id_sha256: [u8; 32],
+    },
+    EvidenceDeliveredAfterDecision {
+        arm: TreatmentArm,
+        event_id_sha256: [u8; 32],
+    },
+    DuplicateEvidenceDelivery {
+        arm: TreatmentArm,
+        event_id_sha256: [u8; 32],
+    },
+    DuplicateConsumedEvidence {
+        arm: TreatmentArm,
+        event_id_sha256: [u8; 32],
+    },
+    ConsumedEvidenceNotDelivered {
+        arm: TreatmentArm,
+        event_id_sha256: [u8; 32],
     },
     NonContiguousTick {
         arm: TreatmentArm,
@@ -294,6 +353,42 @@ impl fmt::Display for CausalPairingError {
                     "world-tick arithmetic overflowed for arm {arm:?}"
                 )
             }
+            Self::DecisionClockRegression {
+                arm,
+                previous_us,
+                current_us,
+            } => write!(
+                formatter,
+                "arm {arm:?} decision clock regressed from {previous_us} to {current_us} microseconds"
+            ),
+            Self::ActionAppliedBeforeDecision {
+                arm,
+                decision_at_us,
+                action_applied_at_us,
+            } => write!(
+                formatter,
+                "arm {arm:?} action applied at {action_applied_at_us} before decision at {decision_at_us} microseconds"
+            ),
+            Self::EvidenceAvailableAfterDelivery { arm, event_id_sha256 } => write!(
+                formatter,
+                "arm {arm:?} evidence {event_id_sha256:02x?} was delivered before it became available"
+            ),
+            Self::EvidenceDeliveredAfterDecision { arm, event_id_sha256 } => write!(
+                formatter,
+                "arm {arm:?} evidence {event_id_sha256:02x?} was delivered after the decision"
+            ),
+            Self::DuplicateEvidenceDelivery { arm, event_id_sha256 } => write!(
+                formatter,
+                "arm {arm:?} evidence {event_id_sha256:02x?} was delivered more than once"
+            ),
+            Self::DuplicateConsumedEvidence { arm, event_id_sha256 } => write!(
+                formatter,
+                "arm {arm:?} decision references evidence {event_id_sha256:02x?} more than once"
+            ),
+            Self::ConsumedEvidenceNotDelivered { arm, event_id_sha256 } => write!(
+                formatter,
+                "arm {arm:?} consumed evidence {event_id_sha256:02x?} outside its delivered prefix"
+            ),
             Self::NonContiguousTick {
                 arm,
                 expected,
@@ -394,7 +489,15 @@ fn validate_common_identity(identity: &CausalPairingIdentity) -> Result<(), Caus
     Ok(())
 }
 
-fn validate_steps(receipt: &CausalTrajectoryReceipt) -> Result<(), CausalPairingError> {
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+struct StepValidationSummary {
+    decision_count: u64,
+    consumed_evidence_reference_count: u64,
+}
+
+fn validate_steps(
+    receipt: &CausalTrajectoryReceipt,
+) -> Result<StepValidationSummary, CausalPairingError> {
     if receipt.steps.is_empty() {
         return Err(CausalPairingError::EmptyTrajectory { arm: receipt.arm });
     }
@@ -416,6 +519,10 @@ fn validate_steps(receipt: &CausalTrajectoryReceipt) -> Result<(), CausalPairing
     )?;
 
     let mut expected_tick = receipt.identity.initial_world_tick;
+    let mut previous_decision_at_us = None;
+    let mut delivered_evidence = BTreeSet::new();
+    let mut summary = StepValidationSummary::default();
+
     for (index, step) in receipt.steps.iter().enumerate() {
         if step.world_tick != expected_tick {
             return Err(CausalPairingError::NonContiguousTick {
@@ -424,6 +531,24 @@ fn validate_steps(receipt: &CausalTrajectoryReceipt) -> Result<(), CausalPairing
                 actual: step.world_tick,
             });
         }
+        if let Some(previous_us) = previous_decision_at_us {
+            if step.decision_at_us < previous_us {
+                return Err(CausalPairingError::DecisionClockRegression {
+                    arm: receipt.arm,
+                    previous_us,
+                    current_us: step.decision_at_us,
+                });
+            }
+        }
+        if step.action_applied_at_us < step.decision_at_us {
+            return Err(CausalPairingError::ActionAppliedBeforeDecision {
+                arm: receipt.arm,
+                decision_at_us: step.decision_at_us,
+                action_applied_at_us: step.action_applied_at_us,
+            });
+        }
+        previous_decision_at_us = Some(step.decision_at_us);
+
         for (digest, field) in [
             (&step.pre_state_sha256, CausalDigestField::PreState),
             (
@@ -451,13 +576,69 @@ fn validate_steps(receipt: &CausalTrajectoryReceipt) -> Result<(), CausalPairing
                 world_tick: step.world_tick,
             });
         }
+
+        for evidence in &step.delivered_evidence {
+            require_digest(
+                &evidence.event_id_sha256,
+                Some(receipt.arm),
+                CausalDigestField::EvidenceEventIdentity,
+            )?;
+            if evidence.available_at_us > evidence.delivered_at_us {
+                return Err(CausalPairingError::EvidenceAvailableAfterDelivery {
+                    arm: receipt.arm,
+                    event_id_sha256: evidence.event_id_sha256,
+                });
+            }
+            if evidence.delivered_at_us > step.decision_at_us {
+                return Err(CausalPairingError::EvidenceDeliveredAfterDecision {
+                    arm: receipt.arm,
+                    event_id_sha256: evidence.event_id_sha256,
+                });
+            }
+            if !delivered_evidence.insert(evidence.event_id_sha256) {
+                return Err(CausalPairingError::DuplicateEvidenceDelivery {
+                    arm: receipt.arm,
+                    event_id_sha256: evidence.event_id_sha256,
+                });
+            }
+        }
+
+        let mut consumed_this_decision = BTreeSet::new();
+        for event_id in &step.consumed_evidence_ids {
+            require_digest(
+                event_id,
+                Some(receipt.arm),
+                CausalDigestField::EvidenceEventIdentity,
+            )?;
+            if !consumed_this_decision.insert(*event_id) {
+                return Err(CausalPairingError::DuplicateConsumedEvidence {
+                    arm: receipt.arm,
+                    event_id_sha256: *event_id,
+                });
+            }
+            if !delivered_evidence.contains(event_id) {
+                return Err(CausalPairingError::ConsumedEvidenceNotDelivered {
+                    arm: receipt.arm,
+                    event_id_sha256: *event_id,
+                });
+            }
+            summary.consumed_evidence_reference_count = summary
+                .consumed_evidence_reference_count
+                .checked_add(1)
+                .ok_or(CausalPairingError::ArithmeticOverflow)?;
+        }
+        summary.decision_count = summary
+            .decision_count
+            .checked_add(1)
+            .ok_or(CausalPairingError::ArithmeticOverflow)?;
+
         if index + 1 < receipt.steps.len() {
             expected_tick = expected_tick
                 .checked_add(1)
                 .ok_or(CausalPairingError::TickOverflow { arm: receipt.arm })?;
         }
     }
-    Ok(())
+    Ok(summary)
 }
 
 /// Validate a complete set of four paired causal trajectories.
@@ -506,6 +687,9 @@ pub fn validate_causal_pairing(
         return Err(CausalPairingError::OfflineLoggedPolicyEvaluationUnsupported);
     }
 
+    let mut validated_decision_count = 0_u64;
+    let mut consumed_evidence_reference_count = 0_u64;
+
     for receipt in &ordered {
         validate_common_identity(&receipt.identity)?;
         crate::validate_pair(&baseline.identity.paired, &receipt.identity.paired)
@@ -528,7 +712,13 @@ pub fn validate_causal_pairing(
                 },
             );
         }
-        validate_steps(receipt)?;
+        let step_summary = validate_steps(receipt)?;
+        validated_decision_count = validated_decision_count
+            .checked_add(step_summary.decision_count)
+            .ok_or(CausalPairingError::ArithmeticOverflow)?;
+        consumed_evidence_reference_count = consumed_evidence_reference_count
+            .checked_add(step_summary.consumed_evidence_reference_count)
+            .ok_or(CausalPairingError::ArithmeticOverflow)?;
     }
 
     // All arms begin at the same initial world tick. Every overlapping tick
@@ -623,6 +813,8 @@ pub fn validate_causal_pairing(
 
     Ok(CausalPairingCertificate {
         regime,
+        validated_decision_count,
+        consumed_evidence_reference_count,
         episode_id: baseline.identity.paired.episode_id,
         hidden_world_id: baseline.identity.paired.hidden_world_id,
         exogenous_schedule_sha256: baseline.identity.exogenous_schedule_sha256,
@@ -685,6 +877,10 @@ mod tests {
     ) -> TrajectoryStepCommitment {
         TrajectoryStepCommitment {
             world_tick: tick,
+            decision_at_us: (tick - 99) * 1_000,
+            action_applied_at_us: (tick - 99) * 1_000 + 100,
+            delivered_evidence: Vec::new(),
+            consumed_evidence_ids: Vec::new(),
             pre_state_sha256: digest(pre),
             applied_action_sha256: digest(action),
             exogenous_input_sha256: digest(exogenous),
