@@ -1695,9 +1695,14 @@ mod tests {
         };
         assert_eq!(accounting.checkpoint_bytes().unwrap(), 1_100);
         assert_eq!(accounting.persistent_asset_bytes().unwrap(), 10_000);
-        assert_eq!(accounting.amortized_asset_bytes_per_rollout(10).unwrap(), 1_000.0);
         assert_eq!(
-            accounting.amortized_persistent_bytes_per_rollout(10).unwrap(),
+            accounting.amortized_asset_bytes_per_rollout(10).unwrap(),
+            1_000.0
+        );
+        assert_eq!(
+            accounting
+                .amortized_persistent_bytes_per_rollout(10)
+                .unwrap(),
             2_100.0
         );
         assert_eq!(accounting.peak_working_set_bytes, 50_000);
