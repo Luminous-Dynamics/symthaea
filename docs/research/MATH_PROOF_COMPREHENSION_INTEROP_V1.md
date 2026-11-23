@@ -252,3 +252,9 @@ The human-study and machine-evaluation protocol must therefore report judge cali
 ### Explanation is not automatically useful prover context
 
 The 2026 FormalMATH study reports that human-written natural-language solutions can degrade proof-generation performance in evaluated settings ([FormalMATH](https://aclanthology.org/2026.findings-emnlp.579/)). Consequently, Symthaea must distinguish the value of a proof plan as a teaching artifact from its value as context for a proof generator. Test both outcomes rather than assume the same representation improves both.
+
+## 11. Matched SOTA replication targets (2026-11-23)
+
+The cross-benchmark targets and the rules for matched evaluation are maintained in [MATH_PROOF_COMPREHENSION_BENCHMARK_MATRIX_V1.md](MATH_PROOF_COMPREHENSION_BENCHMARK_MATRIX_V1.md). In particular, distinguish MathlibQR retrieval recall, MathlibMPR annotated route coverage, TheoremGraph concept retrieval, T² downstream semantic testing, formal prover pass rates, and human delayed transfer. The same score name on a different corpus or cutoff is not a matched comparison.
+
+Stretch targets: at least 96% Recall@100 on the same 810-query MathlibQR fair subset; at least 45% Covered@20 and 47% Covered@50 on MathlibMPR; at least 80% Recall@10 on the same TheoremGraph retrieval split; at least 43% T² full-set testing accuracy under the same protocol; and +10 percentage points delayed human transfer against the strongest matched control. These targets are prospective; Symthaea has not measured them.

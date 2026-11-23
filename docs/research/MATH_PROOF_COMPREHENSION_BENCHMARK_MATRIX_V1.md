@@ -122,3 +122,38 @@ The translation review is a post-hoc two-reviewer gate: all reviewers must agree
 
 The theorem-sandwich validation set also includes incomparable statements, equivalent surface rewrites (\`p → q\` versus \`¬p ∨ q\`), and context-order permutations. These are exact finite propositional controls for classification correctness; they are not substitutes for Lean's dependent-context equivalence or expert translation review.
 
+
+## 7. SOTA-oriented stretch targets and matched replication rules
+
+The following are **prospective stretch targets**, not achieved results. They intentionally target the published task/cutoff where a direct comparison is possible. A result on a different subset, index, candidate pool or budget must be reported as non-comparable.
+
+| External comparison | Published reference | Symthaea stretch target | Comparison condition |
+|---|---:|---:|---|
+| MathlibQR premise retrieval, 810-query fair subset | LeanGraphSearch Recall@100 94.7% | ≥96.0% Recall@100 | Same 810 queries, same declaration inventory and candidate pool; matched index/update date; report Recall@10/50/100 and nDCG as well |
+| MathlibMPR complete proof-route coverage | LeanGraphSearch Covered@20 42.8%; Covered@50 44.2% | ≥45.0% Covered@20; ≥47.0% Covered@50 | Same annotated proof routes, same query split and retrieval budget; route coverage requires every premise group in at least one gold route |
+| TheoremGraph formal concept retrieval | Reported name/signature + graph expansion Recall@10 77.5%, LeanSearch v2 78.0% | ≥80.0% Recall@10 | Same TheoremGraph evaluation split, graph revision, candidate pool and ranking budget; compare directly to the provided baseline rather than the MathlibQR figures |
+| T² downstream semantic testing | Best reported full-set testing accuracy 38.9% | ≥43.0% accuracy, plus ≥95% precision on planted defect flags | Exact T² split and task protocol; stratify statement defects, unrelated successor failures and compilation-only successes |
+| Human delayed transfer | No directly equivalent result in these prover/retrieval benchmarks | +10 percentage points vs strongest matched control | Preregistered primary endpoint, held-out theorem family, blinded scoring, powered sample size and task/participant-clustered confidence interval |
+| Local-to-global consistency | No directly equivalent published metric | CIRR ≤5% | Nonzero eligible denominator; independent invalid-warrant adjudication; publish raw numerator, denominator, unknown-outcome bounds and interval |
+
+### Hard guardrails that outrank score maximization
+
+- Zero false formal-proof acceptance on the complete seeded vacuity, axiom-substitution, wrong-theorem and missing-assumption negative-control suite. A finite zero count is not a universal guarantee; report the denominator and an upper confidence bound.
+- 100% exact theorem, source revision, declaration and formal-context identity for all tasks entering the primary semantic and CIRR denominators.
+- No acceptance of an unreviewed or disputed natural-language-to-AST translation. Two distinct reviewer records are a schema requirement; actual reviewer independence, expertise and blinding must be established operationally.
+- Unknown is a valid outcome. Report risk-versus-coverage curves, calibration and selective error; never optimize a score by silently dropping abstentions or zero-denominator tasks.
+- Separate reader-facing explanation and prover-facing context. FormalMATH reports natural-language solution references can degrade proof generation in its evaluated settings, so teaching and proving utility must be measured independently.
+
+### Matched-cost reporting
+
+Every comparison must pin and report: theorem/source/toolchain identity; graph or corpus version; train/dev/test contamination checks; candidate pool; prompt and model revision; decoding; allowed tools; max tokens; wall-clock; hardware/runtime; search/index budget; proof-checker version; abstention handling; and reviewer minutes. Publish paired per-task differences, task-family breakdowns, confidence intervals and all negative controls. Do not infer superiority from cross-paper headline numbers.
+
+## 8. What would constitute a real paradigm shift?
+
+1. **Intervention-complete explanations:** explanations expose which assumptions and transformations are causally necessary, and predict the result of controlled edits before the oracle runs.
+2. **Proof-plan invariance under representation changes:** equivalent statement rewrites, alpha-renaming, reordered contexts and generated-helper repackaging should preserve the appropriate semantic outcomes while raw provenance differences remain visible.
+3. **Authority-separated evidence:** the system proposes plans, but formal kernels, checked countermodels, source hashes, independent reviewers and blinded human outcomes each retain separate authority.
+4. **Cross-context epistemic reliability:** a rejected warrant is not merely flagged locally; the system must avoid reusing it implicitly in a later global plan under the same immutable scope.
+5. **Learning-aware compression:** optimize minimum-sufficient explanations on a comprehension/transfer frontier, not token reduction alone.
+
+Those are falsifiable contributions. A graph with more nodes, a higher embedding score, a fluent explanation or a better single prover Pass@K score is not by itself evidence of proof comprehension.
