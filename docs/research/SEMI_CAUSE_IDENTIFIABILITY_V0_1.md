@@ -69,7 +69,7 @@ The planner uses action sensitivity rows supplied by the declared design. It doe
 
 ## Authored tests
 
-The initial module contains ten Rust tests for:
+The initial module contains thirteen unit tests and two integration tests for:
 
 1. process/gauge confounding from a single production measurement;
 2. process identifiability after a reference crossover while gauge/common-mode remain confounded;
@@ -82,6 +82,20 @@ The initial module contains ten Rust tests for:
 9. multiple-target planning, requiring every requested contrast to be estimable.
 
 Tests are authored, not yet reported as executed. They are not a reliability estimate or physical qualification result.
+
+## Frozen corpus and independent reference
+
+The benchmark now carries ten versioned synthetic known-answer cases under `benchmarks/semi-bench-001/reference/fixtures/drift-identifiability-known-answer-v1.json`.
+
+The Rust integration test uses a separate modified Gram–Schmidt row-space oracle (not the production Gaussian-elimination implementation) to verify:
+- observed rank and each requested contrast;
+- exact feasible action subset, cost and sequential delay;
+- deterministic tie-breaking by cost, then delay, then sorted action IDs;
+- fixture expected outcomes and input-order-invariant receipts.
+
+The production primitive also rejects duplicate evidence-origin IDs. The initial contract is one observation row per independently identified evidence origin; the same raw observation cannot be multiplied into multiple rows to manufacture rank. A future multivariate observation object would need to model its joint output explicitly.
+
+The corpus is synthetic and declares normalized latent coordinates. Row scaling is normalized before structural rank evaluation, but physical sensitivity matrices, nuisance-factor completeness, and stochastic uncertainty still require external qualification.
 
 ## Next benchmark layer
 
