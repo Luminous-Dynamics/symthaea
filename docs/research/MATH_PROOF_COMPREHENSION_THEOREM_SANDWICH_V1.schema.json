@@ -33,7 +33,7 @@
       "minLength": 1
     },
     "booleanFormula": {
-      "$ref": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/LOCAL_GLOBAL_PAIR_V1.schema.json#/$defs/booleanFormula"
+      "$ref": "LOCAL_GLOBAL_PAIR_V1.schema.json#/$defs/booleanFormula"
     },
     "candidate": {
       "type": "object",
