@@ -163,7 +163,7 @@ cargo run --release \
   -- 1 /tmp/mace-candidate.jsonl /tmp/mace-evaluator.jsonl
 ```
 
-The evaluator requires both `MACE_CANDIDATE_BIN` and `MACE_CANDIDATE_BIN_SHA256`; missing or mismatched values fail closed. The child process runs with a cleared environment and working directory `/`, but remains under the parent user's OS identity. The digest pins the candidate executable file bytes only; it does not pin dynamic shared libraries, the host kernel, CPU microcode, runtime image or sandbox configuration. Those must be included in a later container/attestation manifest. The nested MACE workspace still lacks its own Cargo.lock; dependency-lock reproducibility is tracked in [#13364](https://github.com/Luminous-Dynamics/symthaea/issues/13364).
+The evaluator also requires `MACE_SOURCE_REVISION` to be the exact checked-out 40- or 64-character lowercase Git SHA; a missing, abbreviated or invalid revision fails closed. The run ID and manifest receipt bind this exact revision. The evaluator requires both `MACE_CANDIDATE_BIN` and `MACE_CANDIDATE_BIN_SHA256`; missing or mismatched values fail closed. The child process runs with a cleared environment and working directory `/`, but remains under the parent user's OS identity. The digest pins the candidate executable file bytes only; it does not pin dynamic shared libraries, the host kernel, CPU microcode, runtime image or sandbox configuration. Those must be included in a later container/attestation manifest. The nested MACE workspace still lacks its own Cargo.lock; dependency-lock reproducibility is tracked in [#13364](https://github.com/Luminous-Dynamics/symthaea/issues/13364).
 
 ### Timing contract
 
