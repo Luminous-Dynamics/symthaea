@@ -516,6 +516,11 @@ pub fn requalify_vm_training_snapshot_v1(
     input: &VmSnapshotInputV1,
     historical_manifest: &VmTrainingSnapshotManifestV1,
 ) -> Result<VmSnapshotRequalificationReportV1, VmSnapshotEvidenceErrorV1> {
+    if manifest_digest(historical_manifest)? != historical_manifest.manifest_sha256 {
+        return Err(VmSnapshotEvidenceErrorV1(
+            "historical manifest content does not match its declared digest".into(),
+        ));
+    }
     let replayed_manifest = build_vm_training_snapshot_manifest_v1(input)?;
     if replayed_manifest.manifest_sha256 != historical_manifest.manifest_sha256 {
         return Err(VmSnapshotEvidenceErrorV1(
@@ -941,6 +946,14 @@ mod tests {
         changed.preprocessing_sha256 = digest('5');
         let second = build_vm_training_snapshot_manifest_v1(&changed).unwrap();
         assert_ne!(first.manifest_sha256, second.manifest_sha256);
+    }
+
+    #[test]
+    fn stale_manifest_digest_is_rejected_even_if_snapshot_id_matches() {
+        let input = snapshot_input();
+        let mut manifest = build_vm_training_snapshot_manifest_v1(&input).unwrap();
+        manifest.entries[0].label_revision += 1;
+        assert!(requalify_vm_training_snapshot_v1(&input, &manifest).is_err());
     }
 
     #[test]
