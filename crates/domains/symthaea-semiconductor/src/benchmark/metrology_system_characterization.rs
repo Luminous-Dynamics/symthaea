@@ -91,6 +91,7 @@ pub struct SyntheticMsaEvaluationReportV1 {
     pub estimated_part_appraiser_interaction_variance_raw: f64,
     pub estimated_part_appraiser_interaction_variance: f64,
     pub estimated_repeatability_variance: f64,
+    pub numerical_variance_floor: f64,
     pub estimated_gauge_rr_variance: f64,
     pub true_part_variance: f64,
     pub known_appraiser_variance: f64,
@@ -514,10 +515,22 @@ pub fn evaluate_synthetic_msa_episode_v1(
     let estimated_part_raw =
         (ms_part - ms_interaction) / (appraiser_count * replicate_count) as f64;
 
-    let estimated_interaction = estimated_interaction_raw.max(0.0);
-    let estimated_appraiser = estimated_appraiser_raw.max(0.0);
-    let estimated_part = estimated_part_raw.max(0.0);
-    let estimated_gauge_rr = estimated_appraiser + estimated_interaction + ms_repeatability;
+    let numerical_variance_floor =
+        f64::EPSILON * grand_mean.abs().max(1.0).powi(2) * 16.0;
+    let constrained_component = |raw: f64| {
+        let non_negative = raw.max(0.0);
+        if non_negative <= numerical_variance_floor {
+            0.0
+        } else {
+            non_negative
+        }
+    };
+    let estimated_interaction = constrained_component(estimated_interaction_raw);
+    let estimated_appraiser = constrained_component(estimated_appraiser_raw);
+    let estimated_part = constrained_component(estimated_part_raw);
+    let estimated_repeatability = constrained_component(ms_repeatability);
+    let estimated_gauge_rr =
+        estimated_appraiser + estimated_interaction + estimated_repeatability;
     let reference_values: Vec<f64> = part_references
         .into_iter()
         .map(|value| value.expect("balanced design validates every part reference"))
@@ -572,7 +585,8 @@ pub fn evaluate_synthetic_msa_episode_v1(
         estimated_appraiser_variance: estimated_appraiser,
         estimated_part_appraiser_interaction_variance_raw: estimated_interaction_raw,
         estimated_part_appraiser_interaction_variance: estimated_interaction,
-        estimated_repeatability_variance: ms_repeatability,
+        estimated_repeatability_variance: estimated_repeatability,
+        numerical_variance_floor,
         estimated_gauge_rr_variance: estimated_gauge_rr,
         true_part_variance,
         known_appraiser_variance,
