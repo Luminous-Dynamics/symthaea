@@ -31,6 +31,8 @@ pub enum HorizonReason {
     BoundaryLimitExceeded,
     FutureResponseLimitExceeded,
     TransferFluxLimitExceeded,
+    RegisteredBranchWeak,
+    RegisteredBranchLost,
 }
 
 /// State evidence for one registered spatial mode / intervention / representation.
@@ -42,6 +44,8 @@ pub struct HorizonEvidence {
     pub high_velocity_guardband_fraction: f64,
     pub velocity_boundary_ratio: f64,
     pub future_response_error_upper_bound: f64,
+    /// Absolute f-strophy in the registered intervention-specific response branch.
+    pub registered_branch_f_strophy: f64,
     pub transfer_flux_error_upper_bound: f64,
     pub calibration_domain_covered: bool,
     pub velocity_support_valid: bool,
@@ -56,6 +60,9 @@ pub struct HorizonLimits {
     pub maximum_boundary_ratio: f64,
     pub warning_response_error: f64,
     pub maximum_response_error: f64,
+    /// Warning / hard floors for absolute registered-branch f-strophy.
+    pub warning_minimum_branch_f_strophy: f64,
+    pub hard_minimum_branch_f_strophy: f64,
     pub warning_transfer_flux_error: f64,
     pub maximum_transfer_flux_error: f64,
     /// Warn at this fraction of the predicted recurrence time; this is not a hard expiry.
@@ -71,6 +78,8 @@ impl HorizonLimits {
             self.maximum_boundary_ratio,
             self.warning_response_error,
             self.maximum_response_error,
+            self.warning_minimum_branch_f_strophy,
+            self.hard_minimum_branch_f_strophy,
             self.warning_transfer_flux_error,
             self.maximum_transfer_flux_error,
             self.recurrence_warning_fraction,
@@ -94,6 +103,11 @@ impl HorizonLimits {
             || self.maximum_response_error <= self.warning_response_error
         {
             return Err(PolicyInputError::InvalidResponseLimits);
+        }
+        if self.warning_minimum_branch_f_strophy < self.hard_minimum_branch_f_strophy
+            || self.hard_minimum_branch_f_strophy < 0.0
+        {
+            return Err(PolicyInputError::InvalidBranchFloors);
         }
         if self.warning_transfer_flux_error < 0.0
             || self.maximum_transfer_flux_error <= self.warning_transfer_flux_error
@@ -120,6 +134,7 @@ pub enum PolicyInputError {
     InvalidGuardbandLimits,
     InvalidBoundaryLimits,
     InvalidResponseLimits,
+    InvalidBranchFloors,
     InvalidFluxLimits,
     InvalidRecurrenceWarningFraction,
     NonFiniteEvidence,
@@ -189,6 +204,16 @@ impl HorizonEvidence {
             warning = true;
         }
 
+        if self.registered_branch_f_strophy <= limits.hard_minimum_branch_f_strophy {
+            reasons.push(HorizonReason::RegisteredBranchLost);
+            hard_failure = true;
+        } else if self.registered_branch_f_strophy
+            <= limits.warning_minimum_branch_f_strophy
+        {
+            reasons.push(HorizonReason::RegisteredBranchWeak);
+            warning = true;
+        }
+
         if self.transfer_flux_error_upper_bound >= limits.maximum_transfer_flux_error {
             reasons.push(HorizonReason::TransferFluxLimitExceeded);
             hard_failure = true;
@@ -220,6 +245,7 @@ impl HorizonEvidence {
             self.high_velocity_guardband_fraction,
             self.velocity_boundary_ratio,
             self.future_response_error_upper_bound,
+            self.registered_branch_f_strophy,
             self.transfer_flux_error_upper_bound,
         ];
         if values.iter().any(|value| !value.is_finite()) {
@@ -237,6 +263,7 @@ impl HorizonEvidence {
             return Err(PolicyInputError::InvalidFraction);
         }
         if self.future_response_error_upper_bound < 0.0
+            || self.registered_branch_f_strophy < 0.0
             || self.transfer_flux_error_upper_bound < 0.0
         {
             return Err(PolicyInputError::NegativeErrorBound);
@@ -264,6 +291,8 @@ pub struct ActionEstimate {
     pub action: KineticAction,
     pub future_response_error_upper_bound: f64,
     pub branch_leakage_upper_bound: f64,
+    /// Lower bound on retained registered-branch f-strophy fraction, [0, 1].
+    pub registered_branch_retention_fraction_lower_bound: f64,
     pub transfer_flux_error_upper_bound: f64,
     pub invariant_error_upper_bound: f64,
     pub dissipated_casimir_fraction: f64,
@@ -278,6 +307,7 @@ pub struct ActionEstimate {
 pub struct ActionConstraints {
     pub maximum_future_response_error: f64,
     pub maximum_branch_leakage: f64,
+    pub minimum_registered_branch_retention_fraction: f64,
     pub maximum_transfer_flux_error: f64,
     pub maximum_invariant_error: f64,
     pub maximum_dissipated_casimir_fraction: f64,
@@ -290,6 +320,7 @@ impl ActionConstraints {
         let values = [
             self.maximum_future_response_error,
             self.maximum_branch_leakage,
+            self.minimum_registered_branch_retention_fraction,
             self.maximum_transfer_flux_error,
             self.maximum_invariant_error,
             self.maximum_dissipated_casimir_fraction,
@@ -300,6 +331,7 @@ impl ActionConstraints {
         }
         if values.iter().any(|value| *value < 0.0)
             || self.maximum_dissipated_casimir_fraction > 1.0
+            || self.minimum_registered_branch_retention_fraction > 1.0
         {
             return Err(PolicyInputError::InvalidFraction);
         }
@@ -403,6 +435,7 @@ impl ActionEstimate {
         [
             self.future_response_error_upper_bound,
             self.branch_leakage_upper_bound,
+            self.registered_branch_retention_fraction_lower_bound,
             self.transfer_flux_error_upper_bound,
             self.invariant_error_upper_bound,
             self.dissipated_casimir_fraction,
@@ -410,6 +443,7 @@ impl ActionEstimate {
         ]
         .iter()
         .all(|value| value.is_finite() && *value >= 0.0)
+            && self.registered_branch_retention_fraction_lower_bound <= 1.0
             && self.dissipated_casimir_fraction <= 1.0
     }
 
@@ -420,6 +454,8 @@ impl ActionEstimate {
             && self.positivity_preserved
             && self.future_response_error_upper_bound <= limits.maximum_future_response_error
             && self.branch_leakage_upper_bound <= limits.maximum_branch_leakage
+            && self.registered_branch_retention_fraction_lower_bound
+                >= limits.minimum_registered_branch_retention_fraction
             && self.transfer_flux_error_upper_bound <= limits.maximum_transfer_flux_error
             && self.invariant_error_upper_bound <= limits.maximum_invariant_error
             && self.dissipated_casimir_fraction <= limits.maximum_dissipated_casimir_fraction
@@ -431,6 +467,8 @@ impl ActionEstimate {
         let no_worse = self.future_response_error_upper_bound
             <= other.future_response_error_upper_bound
             && self.branch_leakage_upper_bound <= other.branch_leakage_upper_bound
+            && self.registered_branch_retention_fraction_lower_bound
+                >= other.registered_branch_retention_fraction_lower_bound
             && self.transfer_flux_error_upper_bound <= other.transfer_flux_error_upper_bound
             && self.invariant_error_upper_bound <= other.invariant_error_upper_bound
             && self.dissipated_casimir_fraction <= other.dissipated_casimir_fraction
@@ -439,6 +477,8 @@ impl ActionEstimate {
         let strictly_better = self.future_response_error_upper_bound
             < other.future_response_error_upper_bound
             || self.branch_leakage_upper_bound < other.branch_leakage_upper_bound
+            || self.registered_branch_retention_fraction_lower_bound
+                > other.registered_branch_retention_fraction_lower_bound
             || self.transfer_flux_error_upper_bound < other.transfer_flux_error_upper_bound
             || self.invariant_error_upper_bound < other.invariant_error_upper_bound
             || self.dissipated_casimir_fraction < other.dissipated_casimir_fraction
@@ -460,6 +500,8 @@ mod tests {
             maximum_boundary_ratio: 0.05,
             warning_response_error: 0.01,
             maximum_response_error: 0.03,
+            warning_minimum_branch_f_strophy: 1.0e-8,
+            hard_minimum_branch_f_strophy: 1.0e-10,
             warning_transfer_flux_error: 0.01,
             maximum_transfer_flux_error: 0.03,
             recurrence_warning_fraction: 0.80,
@@ -474,6 +516,7 @@ mod tests {
             high_velocity_guardband_fraction: 0.05,
             velocity_boundary_ratio: 0.001,
             future_response_error_upper_bound: 0.002,
+            registered_branch_f_strophy: 1.0e-4,
             transfer_flux_error_upper_bound: 0.003,
             calibration_domain_covered: true,
             velocity_support_valid: true,
@@ -491,6 +534,7 @@ mod tests {
             action,
             future_response_error_upper_bound: response,
             branch_leakage_upper_bound: 0.002,
+            registered_branch_retention_fraction_lower_bound: 0.98,
             transfer_flux_error_upper_bound: 0.003,
             invariant_error_upper_bound: 0.001,
             dissipated_casimir_fraction: dissipation,
@@ -506,6 +550,7 @@ mod tests {
         ActionConstraints {
             maximum_future_response_error: 0.01,
             maximum_branch_leakage: 0.01,
+            minimum_registered_branch_retention_fraction: 0.95,
             maximum_transfer_flux_error: 0.01,
             maximum_invariant_error: 0.01,
             maximum_dissipated_casimir_fraction: 0.01,
@@ -561,6 +606,15 @@ mod tests {
             invalid_support.assess(limits()).unwrap().status,
             HorizonStatus::Unknown
         );
+    }
+
+    #[test]
+    fn loss_of_absolute_registered_branch_strophy_returns_unknown() {
+        let mut state = evidence(20.0);
+        state.registered_branch_f_strophy = 1.0e-12;
+        let result = state.assess(limits()).unwrap();
+        assert_eq!(result.status, HorizonStatus::Unknown);
+        assert!(result.reasons.contains(&HorizonReason::RegisteredBranchLost));
     }
 
     #[test]
@@ -625,6 +679,15 @@ mod tests {
         let mut candidate =
             action(KineticAction::RefineVelocityGrid, 0.001, 0.0, 1.0, 100_000_000);
         candidate.future_response_error_upper_bound = f64::NAN;
+        let decision = ActionDecision::select(&[candidate], constraints()).unwrap();
+        assert_eq!(decision.recommended_index, None);
+    }
+
+    #[test]
+    fn action_with_lost_registered_branch_is_not_feasible() {
+        let mut candidate =
+            action(KineticAction::VelocityFourierSponge, 0.001, 0.001, 0.1, 10);
+        candidate.registered_branch_retention_fraction_lower_bound = 0.20;
         let decision = ActionDecision::select(&[candidate], constraints()).unwrap();
         assert_eq!(decision.recommended_index, None);
     }
