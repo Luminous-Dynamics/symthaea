@@ -1472,9 +1472,9 @@ pub fn evaluate_synthetic_binary_evsi_sensitivity_v1(
         .sum::<f64>();
     if !total_weight.is_finite()
         || (total_weight - 1.0).abs() > 1.0e-9
-        || assumption_set.values().any(|profile| {
-            !profile.weight.is_finite() || profile.weight <= 0.0
-        })
+        || assumption_set
+            .values()
+            .any(|profile| !profile.weight.is_finite() || profile.weight <= 0.0)
     {
         return Err(SyntheticFabReplayError(
             "EVSI assumption weights must be finite, positive and sum to one".into(),
@@ -2425,8 +2425,7 @@ mod tests {
             },
         );
 
-        let report =
-            evaluate_synthetic_binary_evsi_sensitivity_v1(0.10, &assumptions).unwrap();
+        let report = evaluate_synthetic_binary_evsi_sensitivity_v1(0.10, &assumptions).unwrap();
         assert_eq!(report.scenario_count, 2);
         assert!((report.gross_evsi_min - 0.0).abs() < 1.0e-12);
         assert!((report.gross_evsi_max - 3.955).abs() < 1.0e-12);
@@ -2457,9 +2456,7 @@ mod tests {
                 },
             },
         );
-        assert!(
-            evaluate_synthetic_binary_evsi_sensitivity_v1(0.1, &assumptions).is_err()
-        );
+        assert!(evaluate_synthetic_binary_evsi_sensitivity_v1(0.1, &assumptions).is_err());
     }
 
     #[test]
