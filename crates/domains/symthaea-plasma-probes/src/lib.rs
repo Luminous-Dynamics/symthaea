@@ -57,6 +57,16 @@ pub enum ContractError {
     ProposalBudgetExceeded { requested: usize, budget: usize },
     #[error("grid size overflow")]
     GridSizeOverflow,
+    #[error("Gramian state dimension must be positive")]
+    InvalidGramianDimension,
+    #[error("Gramian vector dimension mismatch: expected {expected}, got {actual}")]
+    GramianDimensionMismatch { expected: usize, actual: usize },
+    #[error("Gramian weight must be finite and non-negative")]
+    InvalidGramianWeight,
+    #[error("Gramian direction or arithmetic contains non-finite values")]
+    InvalidGramianArithmetic,
+    #[error("projection basis must be orthonormal within the declared tolerance")]
+    InvalidProjectionBasis,
 }
 
 /// A parsed and semantically checked v0.1 pulse-family contract.
@@ -502,6 +512,205 @@ impl PulseFamilyContract {
     }
 }
 
+/// Matrix-free positive-semidefinite empirical Gramian.
+///
+/// The represented matrix is
+///
+///     W = sum_i weight_i * direction_i * direction_i^T
+///
+/// but W is never materialized. Each stored factor is
+/// sqrt(weight_i) * direction_i, so storage is O(rank * state_dimension).
+///
+/// For a reachability Gramian, directions may be propagated intervention
+/// increments. For an observability Gramian, they may be pullbacks of
+/// output-sensitivity directions to the checkpoint state. The caller is
+/// responsible for deriving those directions for the actual discrete solver.
+#[derive(Clone, Debug, PartialEq)]
+pub struct EmpiricalGramian {
+    dimension: usize,
+    weighted_factors: Vec<Vec<f64>>,
+}
+
+impl EmpiricalGramian {
+    /// Construct an empty Gramian for a positive state dimension.
+    pub fn new(dimension: usize) -> Result<Self, ContractError> {
+        if dimension == 0 {
+            return Err(ContractError::InvalidGramianDimension);
+        }
+        Ok(Self {
+            dimension,
+            weighted_factors: Vec::new(),
+        })
+    }
+
+    /// Add one non-negative weighted sensitivity / reachability direction.
+    ///
+    /// A zero weight is a no-op. Negative and non-finite weights are rejected.
+    /// The direction and its weighted factor must remain finite.
+    pub fn add_direction(
+        &mut self,
+        direction: &[f64],
+        weight: f64,
+    ) -> Result<(), ContractError> {
+        if direction.len() != self.dimension {
+            return Err(ContractError::GramianDimensionMismatch {
+                expected: self.dimension,
+                actual: direction.len(),
+            });
+        }
+        if !weight.is_finite() || weight < 0.0 {
+            return Err(ContractError::InvalidGramianWeight);
+        }
+        if direction.iter().any(|value| !value.is_finite()) {
+            return Err(ContractError::InvalidGramianArithmetic);
+        }
+        if weight == 0.0 {
+            return Ok(());
+        }
+
+        let scale = weight.sqrt();
+        let factor = direction
+            .iter()
+            .map(|value| value * scale)
+            .collect::<Vec<_>>();
+        if factor.iter().any(|value| !value.is_finite()) {
+            return Err(ContractError::InvalidGramianArithmetic);
+        }
+        self.weighted_factors.push(factor);
+        Ok(())
+    }
+
+    /// Apply W to a vector without constructing the dense state-by-state matrix.
+    pub fn apply(&self, vector: &[f64]) -> Result<Vec<f64>, ContractError> {
+        self.validate_vector(vector)?;
+        let mut output = vec![0.0; self.dimension];
+
+        for factor in &self.weighted_factors {
+            let projection = dot(factor, vector)?;
+            for (slot, value) in output.iter_mut().zip(factor) {
+                *slot += projection * value;
+                if !slot.is_finite() {
+                    return Err(ContractError::InvalidGramianArithmetic);
+                }
+            }
+        }
+        Ok(output)
+    }
+
+    /// Evaluate x^T W x as a sum of squared factor projections.
+    pub fn quadratic_form(&self, vector: &[f64]) -> Result<f64, ContractError> {
+        self.validate_vector(vector)?;
+        let mut value = 0.0;
+        for factor in &self.weighted_factors {
+            let projection = dot(factor, vector)?;
+            value += projection * projection;
+            if !value.is_finite() {
+                return Err(ContractError::InvalidGramianArithmetic);
+            }
+        }
+        Ok(value)
+    }
+
+    /// Return trace(W), computed from the stored low-rank factors.
+    pub fn trace(&self) -> Result<f64, ContractError> {
+        let mut trace = 0.0;
+        for factor in &self.weighted_factors {
+            for value in factor {
+                trace += value * value;
+                if !trace.is_finite() {
+                    return Err(ContractError::InvalidGramianArithmetic);
+                }
+            }
+        }
+        Ok(trace)
+    }
+
+    /// Fraction of Gramian trace captured by an orthonormal retained basis.
+    ///
+    /// This is a subspace diagnostic, not a balanced-truncation error bound or
+    /// a physical-fidelity certificate. The basis must be orthonormal.
+    pub fn captured_trace_fraction(
+        &self,
+        orthonormal_basis: &[Vec<f64>],
+    ) -> Result<f64, ContractError> {
+        const ORTHOGONALITY_TOLERANCE: f64 = 1.0e-8;
+
+        let total = self.trace()?;
+        if total <= 0.0 {
+            return Err(ContractError::InvalidGramianArithmetic);
+        }
+
+        for (index, basis_vector) in orthonormal_basis.iter().enumerate() {
+            self.validate_vector(basis_vector)?;
+            for (other_index, other) in orthonormal_basis.iter().enumerate().take(index + 1) {
+                let overlap = dot(basis_vector, other)?;
+                let expected = if index == other_index { 1.0 } else { 0.0 };
+                if (overlap - expected).abs() > ORTHOGONALITY_TOLERANCE {
+                    return Err(ContractError::InvalidProjectionBasis);
+                }
+            }
+        }
+
+        let mut captured = 0.0;
+        for basis_vector in orthonormal_basis {
+            captured += self.quadratic_form(basis_vector)?;
+            if !captured.is_finite() {
+                return Err(ContractError::InvalidGramianArithmetic);
+            }
+        }
+        let fraction = captured / total;
+        if !fraction.is_finite() || fraction < 0.0 || fraction > 1.0 + ORTHOGONALITY_TOLERANCE {
+            return Err(ContractError::InvalidGramianArithmetic);
+        }
+        Ok(fraction.min(1.0))
+    }
+
+    /// State dimension of this Gramian.
+    pub fn dimension(&self) -> usize {
+        self.dimension
+    }
+
+    /// Number of stored rank-one factors.
+    pub fn factor_count(&self) -> usize {
+        self.weighted_factors.len()
+    }
+
+    /// Number of stored scalar values (excluding vector/container overhead).
+    pub fn stored_scalar_count(&self) -> usize {
+        self.weighted_factors.len() * self.dimension
+    }
+
+    fn validate_vector(&self, vector: &[f64]) -> Result<(), ContractError> {
+        if vector.len() != self.dimension {
+            return Err(ContractError::GramianDimensionMismatch {
+                expected: self.dimension,
+                actual: vector.len(),
+            });
+        }
+        if vector.iter().any(|value| !value.is_finite()) {
+            return Err(ContractError::InvalidGramianArithmetic);
+        }
+        Ok(())
+    }
+}
+
+fn dot(left: &[f64], right: &[f64]) -> Result<f64, ContractError> {
+    if left.len() != right.len() {
+        return Err(ContractError::GramianDimensionMismatch {
+            expected: left.len(),
+            actual: right.len(),
+        });
+    }
+    let mut result = 0.0;
+    for (a, b) in left.iter().zip(right) {
+        result += a * b;
+        if !result.is_finite() {
+            return Err(ContractError::InvalidGramianArithmetic);
+        }
+    }
+    Ok(result)
+}
+
 /// One intervention in a frozen pulse family.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct PulseCandidate {
@@ -812,6 +1021,79 @@ mod tests {
             kick_velocity_amplitude,
             application_time,
         }
+    }
+
+    #[test]
+    fn factorized_gramian_matches_explicit_small_matrix() {
+        let mut gramian = EmpiricalGramian::new(2).unwrap();
+        gramian.add_direction(&[1.0, 2.0], 2.0).unwrap();
+        gramian.add_direction(&[0.0, 1.0], 0.5).unwrap();
+
+        // W = 2*[1,2][1,2]^T + 0.5*[0,1][0,1]^T
+        //   = [[2,4],[4,8.5]]
+        assert_eq!(gramian.apply(&[3.0, 4.0]).unwrap(), vec![22.0, 46.0]);
+        assert!((gramian.quadratic_form(&[3.0, 4.0]).unwrap() - 250.0).abs() < 1.0e-12);
+        assert!((gramian.trace().unwrap() - 10.5).abs() < 1.0e-12);
+        assert_eq!(gramian.factor_count(), 2);
+        assert_eq!(gramian.stored_scalar_count(), 4);
+    }
+
+    #[test]
+    fn factorized_gramian_rejects_invalid_weights_and_dimensions() {
+        let mut gramian = EmpiricalGramian::new(2).unwrap();
+        assert_eq!(
+            gramian.add_direction(&[1.0, 0.0], -1.0),
+            Err(ContractError::InvalidGramianWeight)
+        );
+        assert_eq!(
+            gramian.add_direction(&[1.0], 1.0),
+            Err(ContractError::GramianDimensionMismatch {
+                expected: 2,
+                actual: 1
+            })
+        );
+        assert_eq!(
+            gramian.add_direction(&[f64::NAN, 0.0], 1.0),
+            Err(ContractError::InvalidGramianArithmetic)
+        );
+        assert_eq!(EmpiricalGramian::new(0).unwrap_err(), ContractError::InvalidGramianDimension);
+    }
+
+    #[test]
+    fn zero_weight_is_a_no_op() {
+        let mut gramian = EmpiricalGramian::new(2).unwrap();
+        gramian.add_direction(&[1.0, 2.0], 0.0).unwrap();
+        assert_eq!(gramian.factor_count(), 0);
+        assert_eq!(gramian.trace().unwrap(), 0.0);
+    }
+
+    #[test]
+    fn orthonormal_basis_captures_expected_gramian_trace() {
+        let mut gramian = EmpiricalGramian::new(2).unwrap();
+        gramian.add_direction(&[1.0, 2.0], 2.0).unwrap();
+        gramian.add_direction(&[0.0, 1.0], 0.5).unwrap();
+
+        let first_axis = vec![1.0, 0.0];
+        let second_axis = vec![0.0, 1.0];
+        let captured = gramian
+            .captured_trace_fraction(&[first_axis, second_axis])
+            .unwrap();
+        assert!((captured - 1.0).abs() < 1.0e-12);
+
+        let first_only = gramian
+            .captured_trace_fraction(&[vec![1.0, 0.0]])
+            .unwrap();
+        assert!((first_only - (2.0 / 10.5)).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn gramian_rejects_non_orthonormal_projection_basis() {
+        let mut gramian = EmpiricalGramian::new(2).unwrap();
+        gramian.add_direction(&[1.0, 0.0], 1.0).unwrap();
+        assert_eq!(
+            gramian.captured_trace_fraction(&[vec![1.0, 0.0], vec![1.0, 0.0]]),
+            Err(ContractError::InvalidProjectionBasis)
+        );
     }
 
     #[test]
