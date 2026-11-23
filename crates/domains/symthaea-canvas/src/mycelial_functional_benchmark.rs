@@ -81,7 +81,7 @@ impl fmt::Display for MycelialFunctionalBenchmarkError {
             ),
             Self::InvalidMetadata => {
                 write!(f, "invalid mycelial functional benchmark split metadata")
-            },
+            }
             Self::TooManyAssignments(count) => write!(
                 f,
                 "functional benchmark assignment count {count} exceeds {MAX_MYCELIAL_FUNCTIONAL_BENCHMARK_ASSIGNMENTS}"
