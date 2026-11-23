@@ -25,7 +25,7 @@ use crate::mycelial_reconstruction_metrics::{
     ReconstructionLengthUnit, ReconstructionPoint3,
 };
 
-pub const MYCELIAL_FUSION_COUNTERFACTUAL_SCHEMA_VERSION: u16 = 1;
+pub const MYCELIAL_FUSION_COUNTERFACTUAL_SCHEMA_VERSION: u16 = 2;
 pub const MAX_MYCELIAL_FUSION_COUNTERFACTUAL_CANDIDATES: usize = 512;
 pub const MAX_MYCELIAL_FUSION_COUNTERFACTUAL_JUNCTIONS: usize = 2_048;
 pub const MAX_MYCELIAL_FUSION_COUNTERFACTUAL_SEGMENTS: usize = 4_096;
@@ -98,6 +98,9 @@ pub struct MycelialFusionDisruptionScenario {
     /// original failure to both child intervals in both counterfactual views.
     pub failed_segment_ids: Vec<String>,
     pub failed_junction_ids: Vec<String>,
+    /// Candidate IDs identify analysis-only fusion edges to remove in their
+    /// matching accepted-for-analysis view. The rejected view has no such edge.
+    pub failed_candidate_ids: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -146,6 +149,7 @@ pub struct MycelialFusionDisruptionDelta {
     pub scenario_id: String,
     pub failed_segment_ids: Vec<String>,
     pub failed_junction_ids: Vec<String>,
+    pub failed_candidate_ids: Vec<String>,
     pub rejected: MycelialFusionViewMetrics,
     pub accepted_for_analysis: MycelialFusionViewMetrics,
     pub reachable_demand_weight_delta: i128,
@@ -196,6 +200,8 @@ pub struct MycelialFusionCounterfactualReport {
     pub source_observation_digest: String,
     pub source_graph_digest: String,
     pub candidate_inventory_digest: String,
+    /// Canonical digest of every frozen failure scenario and its exact entity IDs.
+    pub disruption_scenario_inventory_digest: String,
     pub analysis_only: bool,
     pub source_graph_unchanged: bool,
     pub candidates: Vec<MycelialFusionCandidateImpact>,
@@ -419,6 +425,13 @@ fn candidate_edge_identity_digest(candidate_id: &str) -> String {
     hex_digest(hasher.finalize().as_bytes())
 }
 
+fn candidate_edge_id(candidate_id: &str) -> String {
+    format!(
+        "fusion-edge:{}",
+        candidate_edge_identity_digest(candidate_id)
+    )
+}
+
 fn candidate_inventory_digest(candidates: &[MycelialFusionCandidate]) -> String {
     let mut ordered: Vec<_> = candidates.iter().collect();
     ordered.sort_by(|left, right| left.candidate_id.cmp(&right.candidate_id));
@@ -427,6 +440,32 @@ fn candidate_inventory_digest(candidates: &[MycelialFusionCandidate]) -> String 
     hasher.update(&(ordered.len() as u64).to_le_bytes());
     for candidate in ordered {
         hasher.update(candidate_digest(candidate).as_bytes());
+    }
+    hex_digest(hasher.finalize().as_bytes())
+}
+
+fn disruption_scenario_inventory_digest(
+    disruptions: &[MycelialFusionDisruptionScenario],
+) -> String {
+    let mut ordered: Vec<_> = disruptions.iter().collect();
+    ordered.sort_by(|left, right| left.scenario_id.cmp(&right.scenario_id));
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"symthaea-mycelial-fusion-disruption-inventory-v1");
+    hasher.update(&(ordered.len() as u64).to_le_bytes());
+    for scenario in ordered {
+        hash_string(&mut hasher, &scenario.scenario_id);
+        hasher.update(&(scenario.failed_segment_ids.len() as u64).to_le_bytes());
+        for id in &scenario.failed_segment_ids {
+            hash_string(&mut hasher, id);
+        }
+        hasher.update(&(scenario.failed_junction_ids.len() as u64).to_le_bytes());
+        for id in &scenario.failed_junction_ids {
+            hash_string(&mut hasher, id);
+        }
+        hasher.update(&(scenario.failed_candidate_ids.len() as u64).to_le_bytes());
+        for id in &scenario.failed_candidate_ids {
+            hash_string(&mut hasher, id);
+        }
     }
     hex_digest(hasher.finalize().as_bytes())
 }
@@ -694,6 +733,7 @@ fn active_graph<'a>(
     view: &'a CounterfactualView,
     failed_segment_ids: &BTreeSet<String>,
     failed_junction_ids: &BTreeSet<String>,
+    failed_candidate_edge_id: Option<&str>,
 ) -> (BTreeSet<&'a str>, Vec<&'a ViewSegment>) {
     let nodes: BTreeSet<_> = view
         .nodes
@@ -706,6 +746,7 @@ fn active_graph<'a>(
         .iter()
         .filter(|segment| {
             !failed_segment_ids.contains(&segment.id)
+                && failed_candidate_edge_id != Some(segment.id.as_str())
                 && segment
                     .original_segment_id
                     .as_ref()
@@ -905,8 +946,14 @@ fn view_metrics(
     demands: &[MycelialFusionDemandPair],
     failed_segment_ids: &BTreeSet<String>,
     failed_junction_ids: &BTreeSet<String>,
+    failed_candidate_edge_id: Option<&str>,
 ) -> (MycelialFusionViewMetrics, Vec<MycelialFusionDemandOutcome>) {
-    let (nodes, segments) = active_graph(view, failed_segment_ids, failed_junction_ids);
+    let (nodes, segments) = active_graph(
+        view,
+        failed_segment_ids,
+        failed_junction_ids,
+        failed_candidate_edge_id,
+    );
     let components = component_count(&nodes, &segments);
     let cycle_rank = segments
         .len()
@@ -963,10 +1010,15 @@ fn build_candidate_impact(
     };
     let source_id = candidate.source_tip_junction_id.as_str();
     let rejected_digest = graph_view_digest(&rejected_view);
-    let (rejected_metrics, rejected_demand_outcomes) =
-        view_metrics(&rejected_view, demands, &BTreeSet::new(), &BTreeSet::new());
+    let (rejected_metrics, rejected_demand_outcomes) = view_metrics(
+        &rejected_view,
+        demands,
+        &BTreeSet::new(),
+        &BTreeSet::new(),
+        None,
+    );
     let (rejected_active_nodes, rejected_active_segments) =
-        active_graph(&rejected_view, &BTreeSet::new(), &BTreeSet::new());
+        active_graph(&rejected_view, &BTreeSet::new(), &BTreeSet::new(), None);
     let witness = path_witness_segment_ids(
         &rejected_active_nodes,
         &rejected_active_segments,
@@ -980,10 +1032,7 @@ fn build_candidate_impact(
     };
 
     let mut accepted_view = rejected_view.clone();
-    let fusion_edge_id = format!(
-        "fusion-edge:{}",
-        candidate_edge_identity_digest(&candidate.candidate_id)
-    );
+    let fusion_edge_id = candidate_edge_id(&candidate.candidate_id);
     if accepted_view
         .segments
         .iter()
@@ -996,7 +1045,7 @@ fn build_candidate_impact(
         );
     }
     accepted_view.segments.push(ViewSegment {
-        id: fusion_edge_id,
+        id: fusion_edge_id.clone(),
         original_segment_id: None,
         start_junction_id: candidate.source_tip_junction_id.clone(),
         end_junction_id: target_node_id,
@@ -1006,8 +1055,13 @@ fn build_candidate_impact(
         .segments
         .sort_by(|left, right| left.id.cmp(&right.id));
     let accepted_digest = graph_view_digest(&accepted_view);
-    let (accepted_metrics, accepted_demand_outcomes) =
-        view_metrics(&accepted_view, demands, &BTreeSet::new(), &BTreeSet::new());
+    let (accepted_metrics, accepted_demand_outcomes) = view_metrics(
+        &accepted_view,
+        demands,
+        &BTreeSet::new(),
+        &BTreeSet::new(),
+        None,
+    );
     let topology_delta_is_valid = match topology_effect {
         MycelialFusionTopologyEffect::ComponentMerge => {
             rejected_metrics.connected_components
@@ -1043,13 +1097,33 @@ fn build_candidate_impact(
     for scenario in disruptions {
         let failed_segments: BTreeSet<_> = scenario.failed_segment_ids.iter().cloned().collect();
         let failed_junctions: BTreeSet<_> = scenario.failed_junction_ids.iter().cloned().collect();
-        let (before, _) =
-            view_metrics(&rejected_view, demands, &failed_segments, &failed_junctions);
-        let (after, _) = view_metrics(&accepted_view, demands, &failed_segments, &failed_junctions);
+        // The rejected view contains no candidate fusion edge, so the same
+        // candidate-edge failure is necessarily a no-op there. Apply it only
+        // to the matching edge in this candidate's accepted-for-analysis view.
+        let candidate_edge_failed = scenario
+            .failed_candidate_ids
+            .binary_search(&candidate.candidate_id)
+            .is_ok();
+        let failed_candidate_edge_id = candidate_edge_failed.then_some(fusion_edge_id.as_str());
+        let (before, _) = view_metrics(
+            &rejected_view,
+            demands,
+            &failed_segments,
+            &failed_junctions,
+            None,
+        );
+        let (after, _) = view_metrics(
+            &accepted_view,
+            demands,
+            &failed_segments,
+            &failed_junctions,
+            failed_candidate_edge_id,
+        );
         disruption_deltas.push(MycelialFusionDisruptionDelta {
             scenario_id: scenario.scenario_id.clone(),
             failed_segment_ids: scenario.failed_segment_ids.clone(),
             failed_junction_ids: scenario.failed_junction_ids.clone(),
+            failed_candidate_ids: scenario.failed_candidate_ids.clone(),
             reachable_demand_weight_delta: i128::from(after.reachable_demand_weight)
                 - i128::from(before.reachable_demand_weight),
             connected_component_delta: signed_difference(
@@ -1250,11 +1324,19 @@ fn validate_inputs(
                 .iter()
                 .any(|id| !source_junctions.contains(id.as_str()))
             || scenario
+                .failed_candidate_ids
+                .iter()
+                .any(|id| !candidate_ids.contains(id.as_str()))
+            || scenario
                 .failed_segment_ids
                 .windows(2)
                 .any(|pair| pair[0] >= pair[1])
             || scenario
                 .failed_junction_ids
+                .windows(2)
+                .any(|pair| pair[0] >= pair[1])
+            || scenario
+                .failed_candidate_ids
                 .windows(2)
                 .any(|pair| pair[0] >= pair[1])
         {
@@ -1316,6 +1398,7 @@ pub fn evaluate_mycelial_fusion_counterfactuals(
         source_observation_digest: skeleton.source_observation_digest.clone(),
         source_graph_digest,
         candidate_inventory_digest: candidate_inventory_digest(candidates),
+        disruption_scenario_inventory_digest: disruption_scenario_inventory_digest(disruptions),
         analysis_only: true,
         source_graph_unchanged: true,
         candidates: impacts,
@@ -1767,6 +1850,7 @@ mod tests {
             scenario_id: "remove-target-original".to_string(),
             failed_segment_ids: vec!["target-side".to_string()],
             failed_junction_ids: Vec::new(),
+            failed_candidate_ids: Vec::new(),
         }];
         let report =
             evaluate_mycelial_fusion_counterfactuals(&source, &[candidate], &demands, &disruptions)
@@ -1782,5 +1866,215 @@ mod tests {
                 .reachable_demand_weight,
             0
         );
+    }
+
+    #[test]
+    fn candidate_edge_failure_removes_the_only_counterfactual_bridge() {
+        let source = skeleton(
+            vec![
+                junction("A", AnnotatedJunctionKind::Origin, 0.0, 0.0),
+                junction("B", AnnotatedJunctionKind::Tip, 1.0, 0.0),
+                junction("C", AnnotatedJunctionKind::Origin, 10.0, 0.0),
+                junction("D", AnnotatedJunctionKind::Tip, 11.0, 0.0),
+            ],
+            vec![segment("ab", "A", "B", 1.0), segment("cd", "C", "D", 1.0)],
+        );
+        let candidate = candidate_tip_to_tip("bridge", "B", "D", None);
+        let demands = vec![MycelialFusionDemandPair {
+            demand_id: "B-to-D".to_string(),
+            source_junction_id: "B".to_string(),
+            target_junction_id: "D".to_string(),
+            weight: 10,
+        }];
+        let disruptions = vec![MycelialFusionDisruptionScenario {
+            scenario_id: "candidate-bridge-fails".to_string(),
+            failed_segment_ids: Vec::new(),
+            failed_junction_ids: Vec::new(),
+            failed_candidate_ids: vec!["bridge".to_string()],
+        }];
+        let report = evaluate_mycelial_fusion_counterfactuals(
+            &source,
+            &[candidate.clone()],
+            &demands,
+            &disruptions,
+        )
+        .unwrap();
+        let delta = &report.candidates[0].disruption_deltas[0];
+        assert_eq!(delta.failed_candidate_ids, vec!["bridge".to_string()]);
+        assert_eq!(delta.rejected, delta.accepted_for_analysis);
+        assert_eq!(delta.rejected.connected_components, 2);
+        assert_eq!(delta.rejected.reachable_demand_weight, 0);
+        assert_eq!(delta.accepted_for_analysis.reachable_demand_weight, 0);
+        report
+            .validate_against(&source, &[candidate.clone()], &demands, &disruptions)
+            .unwrap();
+        let no_failure_scenario = vec![MycelialFusionDisruptionScenario {
+            scenario_id: "candidate-bridge-fails".to_string(),
+            failed_segment_ids: Vec::new(),
+            failed_junction_ids: Vec::new(),
+            failed_candidate_ids: Vec::new(),
+        }];
+        let no_failure_report = evaluate_mycelial_fusion_counterfactuals(
+            &source,
+            &[candidate.clone()],
+            &demands,
+            &no_failure_scenario,
+        )
+        .unwrap();
+        assert_ne!(
+            report.disruption_scenario_inventory_digest,
+            no_failure_report.disruption_scenario_inventory_digest
+        );
+
+        let mut tampered = report.clone();
+        tampered.candidates[0].disruption_deltas[0]
+            .failed_candidate_ids
+            .clear();
+        assert!(matches!(
+            tampered.validate_against(&source, &[candidate], &demands, &disruptions),
+            Err(MycelialFusionCounterfactualError::ReportMismatch)
+        ));
+    }
+
+    #[test]
+    fn failed_candidate_cycle_edge_preserves_the_independent_source_route() {
+        let source = skeleton(
+            vec![
+                junction("A", AnnotatedJunctionKind::Origin, 0.0, 0.0),
+                junction("B", AnnotatedJunctionKind::Tip, 1.0, 0.0),
+                junction("C", AnnotatedJunctionKind::Tip, 0.0, 1.0),
+            ],
+            vec![segment("ab", "A", "B", 1.0), segment("ac", "A", "C", 1.0)],
+        );
+        let candidate = candidate_tip_to_tip("cycle-edge", "B", "C", None);
+        let demands = vec![MycelialFusionDemandPair {
+            demand_id: "B-to-C".to_string(),
+            source_junction_id: "B".to_string(),
+            target_junction_id: "C".to_string(),
+            weight: 5,
+        }];
+        let disruptions = vec![MycelialFusionDisruptionScenario {
+            scenario_id: "cycle-edge-fails".to_string(),
+            failed_segment_ids: Vec::new(),
+            failed_junction_ids: Vec::new(),
+            failed_candidate_ids: vec!["cycle-edge".to_string()],
+        }];
+        let report =
+            evaluate_mycelial_fusion_counterfactuals(&source, &[candidate], &demands, &disruptions)
+                .unwrap();
+        let delta = &report.candidates[0].disruption_deltas[0];
+        assert_eq!(delta.rejected, delta.accepted_for_analysis);
+        assert_eq!(delta.accepted_for_analysis.reachable_demand_weight, 5);
+        assert_eq!(report.candidates[0].accepted_for_analysis.cycle_rank, 1);
+        assert_eq!(delta.accepted_for_analysis.cycle_rank, 0);
+    }
+
+    #[test]
+    fn candidate_and_source_edge_failures_share_one_frozen_scenario() {
+        let source = skeleton(
+            vec![
+                junction("A", AnnotatedJunctionKind::Origin, 0.0, 0.0),
+                junction("B", AnnotatedJunctionKind::Tip, 1.0, 0.0),
+                junction("C", AnnotatedJunctionKind::Tip, 0.0, 1.0),
+            ],
+            vec![segment("ab", "A", "B", 1.0), segment("ac", "A", "C", 1.0)],
+        );
+        let candidate = candidate_tip_to_tip("fusion", "B", "C", None);
+        let demands = vec![MycelialFusionDemandPair {
+            demand_id: "A-to-B".to_string(),
+            source_junction_id: "A".to_string(),
+            target_junction_id: "B".to_string(),
+            weight: 1,
+        }];
+        let disruptions = vec![MycelialFusionDisruptionScenario {
+            scenario_id: "source-and-candidate-fail".to_string(),
+            failed_segment_ids: vec!["ab".to_string()],
+            failed_junction_ids: Vec::new(),
+            failed_candidate_ids: vec!["fusion".to_string()],
+        }];
+        let report =
+            evaluate_mycelial_fusion_counterfactuals(&source, &[candidate], &demands, &disruptions)
+                .unwrap();
+        let delta = &report.candidates[0].disruption_deltas[0];
+        assert_eq!(delta.failed_segment_ids, vec!["ab".to_string()]);
+        assert_eq!(delta.failed_candidate_ids, vec!["fusion".to_string()]);
+        assert_eq!(delta.rejected, delta.accepted_for_analysis);
+        assert_eq!(delta.accepted_for_analysis.reachable_demand_weight, 0);
+    }
+
+    #[test]
+    fn candidate_failure_does_not_remove_a_different_candidates_edge() {
+        let source = skeleton(
+            vec![
+                junction("A", AnnotatedJunctionKind::Origin, 0.0, 0.0),
+                junction("B", AnnotatedJunctionKind::Tip, 1.0, 0.0),
+                junction("C", AnnotatedJunctionKind::Origin, 10.0, 0.0),
+                junction("D", AnnotatedJunctionKind::Tip, 11.0, 0.0),
+                junction("E", AnnotatedJunctionKind::Origin, 20.0, 0.0),
+                junction("F", AnnotatedJunctionKind::Tip, 21.0, 0.0),
+                junction("G", AnnotatedJunctionKind::Origin, 30.0, 0.0),
+                junction("H", AnnotatedJunctionKind::Tip, 31.0, 0.0),
+            ],
+            vec![
+                segment("ab", "A", "B", 1.0),
+                segment("cd", "C", "D", 1.0),
+                segment("ef", "E", "F", 1.0),
+                segment("gh", "G", "H", 1.0),
+            ],
+        );
+        let candidates = vec![
+            candidate_tip_to_tip("one", "B", "D", None),
+            candidate_tip_to_tip("two", "F", "H", None),
+        ];
+        let disruptions = vec![MycelialFusionDisruptionScenario {
+            scenario_id: "only-first-candidate-fails".to_string(),
+            failed_segment_ids: Vec::new(),
+            failed_junction_ids: Vec::new(),
+            failed_candidate_ids: vec!["one".to_string()],
+        }];
+        let report =
+            evaluate_mycelial_fusion_counterfactuals(&source, &candidates, &[], &disruptions)
+                .unwrap();
+        assert_eq!(
+            report.candidates[0].disruption_deltas[0].rejected,
+            report.candidates[0].disruption_deltas[0].accepted_for_analysis
+        );
+        assert_eq!(
+            report.candidates[1].disruption_deltas[0]
+                .accepted_for_analysis
+                .connected_components,
+            3
+        );
+        assert_eq!(
+            report.candidates[1].disruption_deltas[0]
+                .accepted_for_analysis
+                .cycle_rank,
+            0
+        );
+    }
+
+    #[test]
+    fn unknown_candidate_failure_id_is_rejected() {
+        let source = skeleton(
+            vec![
+                junction("A", AnnotatedJunctionKind::Origin, 0.0, 0.0),
+                junction("B", AnnotatedJunctionKind::Tip, 1.0, 0.0),
+                junction("C", AnnotatedJunctionKind::Origin, 10.0, 0.0),
+                junction("D", AnnotatedJunctionKind::Tip, 11.0, 0.0),
+            ],
+            vec![segment("ab", "A", "B", 1.0), segment("cd", "C", "D", 1.0)],
+        );
+        let candidate = candidate_tip_to_tip("known", "B", "D", None);
+        let disruptions = vec![MycelialFusionDisruptionScenario {
+            scenario_id: "unknown-candidate-failure".to_string(),
+            failed_segment_ids: Vec::new(),
+            failed_junction_ids: Vec::new(),
+            failed_candidate_ids: vec!["missing".to_string()],
+        }];
+        assert!(matches!(
+            evaluate_mycelial_fusion_counterfactuals(&source, &[candidate], &[], &disruptions),
+            Err(MycelialFusionCounterfactualError::InvalidDisruption(id))
+                if id == "unknown-candidate-failure"
+        ));
     }
 }
