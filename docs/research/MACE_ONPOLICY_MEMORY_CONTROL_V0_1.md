@@ -39,6 +39,46 @@ MACE must first reproduce the published AMemGym protocol and report its official
 
 Do not pool percentages across these benchmarks.
 
+### 2.1 AMemGym implementation snapshot (pinned 2026-11-23)
+
+Repository: https://github.com/AGI-Eval-Official/amemgym/tree/ffcd18857a3e2b2c61f00730ebdec676e27d3e87
+
+The current public repository snapshot exposes four directly comparable agent configurations and a separate evolution experiment. Pin the config bytes and runner code as well as the repository commit.
+
+| Arm | Configuration | Important settings in the published file |
+|---|---|---|
+| Native | `configs/agent/native.json` | `gpt-4.1-mini`; no external memory module |
+| AWI | `configs/agent/awi.json` | `gpt-4.1-mini`; in-context memory; `update_bsz=2`, `local_length=4` |
+| AWE | `configs/agent/awe-2-4-30.json` | `gpt-4.1-mini`; Milvus; `text-embedding-3-small`; `top_k=30`; LLM memory policy enabled |
+| RAG | `configs/agent/rag-2-4-30.json` | Same listed backend/model/top-k as AWE, with LLM memory policy disabled |
+
+Published baseline config blob SHAs at the inspected snapshot:
+
+- AWI: `e665b6ad3d87c423ace125318598fb785eb8cf28`
+- AWE: `c272de3cf40db86edfc40b11ea844776b4be7c2b`
+- RAG: `9c1d9cd1b8ff47bd292ffe2fd6ecc9790acdcc59`
+- Native: `6bd40ffc7029e993b89202394ab6209c6022af6b`
+
+Environment configuration `configs/env/v1.base.json` (blob `0683d720b945fed55f472ec492ba66d7be014381`) specifies 20 user profiles, 10 questions, 10 periods, three months per period, four changes per period, one initial interaction round and two update rounds. Its user-simulation model is `gpt-4.1` at temperature 0.2; data generation uses `gpt-4.1` at temperature 1.0; the declared seed is 42. Record the actual generated dataset revision and all simulator/API fingerprints: a Python random seed alone does not make hosted LLM responses deterministic.
+
+The released interaction generator (`src/amemgym/env/sample_interactions.py`, blob `dd308d4d6bbb74fa7bd7a20f2cf716d51337c69a`) includes the user profile, tracked state schema, current date and the last two conversation messages in the simulated-user follow-up prompt. That prompt instructs the simulated user not to reveal values for tracked schema variables and explicitly says early stopping is not allowed. Therefore:
+
+- reproduce this behavior unchanged in the official AMemGym lane;
+- do not interpret its official interaction count as a naturalistic question-burden or disengagement measure;
+- test user refusal, early stopping, sensitive-data elicitation and over-questioning only in a separately labelled MACE extension.
+
+The overall runner (`src/amemgym/eval/overall.py`, blob `c185fad8847ff0d8545429af001c4d8058dd6829`) has distinct on-policy and off-policy paths. On-policy generates new sessions through the interactive simulator; off-policy loads saved interaction transcripts. They must be run and reported separately. The current metric list contains `accuracy`. When answer JSON parsing fails, the runner substitutes a random choice and records a `json_error` internally; the top-level metric file does not expose the format-error rate. Preserve official scores for exact reproduction, but additionally report malformed-response count/rate as a separate diagnostic and never let random fallback be mistaken for valid model output in MACE-specific scoring.
+
+The separate evolution runner can update the memory prompt after each period. Its code supports feedback types that include `with_answer`, which inserts the gold answer into evolution feedback. The published `complete.json` and `question-only.json` configs use different feedback modes, while `no-evolution.json` is a control. For MACE held-out evaluation, policy adaptation must be trained on training/calibration profiles only and frozen before held-out episodes; no held-out answer or evaluator label may enter adaptation feedback.
+
+### 2.2 MACE adapter requirements
+
+- Implement the benchmark adapter through AMemGym's `BaseAgent` interface (`act`, `add_msgs`, `answer_question`, `save_state`, `load_state`, `reset`). Keep the official Python benchmark harness as an external evaluation dependency; it is not a reason to move production MACE memory logic out of Rust.
+- Use the official `v1.base` release and pin the exact dataset revision, user personas, generated environment data, all config files, simulator model/API fingerprints, and scoring code. Do not regenerate the dataset for the primary reproduction unless separately reporting a newly generated environment.
+- Preserve AWI, AWE, RAG and Native as the official reference arms. Add MACE as a new arm with the same outer agent backbone, prompt contract, user simulator and budget. Do not replace the official arms with internal HDC/KV variants.
+- Report Write, Read and Utilization diagnostics separately from end-task accuracy. Preserve official JSON fallback behavior only for protocol reproduction; expose its error count and use strict validity accounting in the MACE extension.
+- Run the official AMemGym evolution configurations as a distinct research experiment. Never adapt on sealed/held-out answer labels; bind every evolution step to a training/calibration feedback receipt and a new policy digest.
+
 ## 3. Formal interaction model
 
 Let:
