@@ -45,21 +45,23 @@ This crate does not implement a candidate controller, scheduler, sensor policy, 
 
 ## Verification boundary
 
-Fourteen deterministic Rust unit tests are authored and passed on exact source head 0e5f80ca51541711752869d8d6bfe0304df1496d (workflow run 45086902847, Rust 1.96.0): changed-crate formatting passed, 14/14 tests passed, strict Clippy passed. This qualifies only bounded arithmetic, arm pairing, identity checks and signed contrast semantics for supplied records. It does not validate the evaluator's loss oracle, causal treatment design, support completeness, statistical significance, physical latency, energy, or deployment readiness.
+Twenty-four Rust tests are authored and passed at exact source head `99a1ed303d8fc9d7539de8505349a1c1ea5f41f2` (workflow run `45119544918`, Rust 1.96.0):
+- rustfmt: passed;
+- tests: 24 passed, 0 failed;
+- strict Clippy with warnings denied: passed.
 
+The 24 tests comprise the original paired interaction checks plus ten cluster-adapter tests. They qualify deterministic four-arm arithmetic, 13-field pairing validation, terminal no-application scoring, hierarchy-preserving cluster aggregation and fail-closed input rejection. They do not validate the task-loss oracle, causal treatment design, sampling representativeness, statistical assumptions, support completeness, physical latency, energy or deployment readiness.
 
 ## Cluster-level inference handoff
 
-The evaluator now retains the complete validated `PairedRunIdentity` inside each per-world certificate and exposes `cluster_adapter`.
+The evaluator retains the complete validated `PairedRunIdentity` in each certificate and exposes `cluster_adapter::export_cluster_deltas()`.
 
-`export_cluster_deltas()` converts those evaluator-produced certificates into the exact `VIS-DVPC-CLUSTER-DELTAS-001-v1` input consumed by [#8578 — VIS-DVPC-014](https://github.com/Luminous-Dynamics/symthaea/pull/8578). It does not implement a second statistical engine.
-
-Aggregation is hierarchical and deterministic:
-1. Validate each certificate by recomputing the four signed effects from the raw four-arm regrets.
+It emits the exact `VIS-DVPC-CLUSTER-DELTAS-001-v1` format consumed by [#8578 — VIS-DVPC-014](https://github.com/Luminous-Dynamics/symthaea/pull/8578), using this hierarchy:
+1. Recompute the four signed effects from the four arm regrets and verify the interaction sign.
 2. Average hidden-world outcomes within an episode.
-3. Average episode means within each preregistered independent cluster.
-4. Emit one cluster delta for each of four contrasts: compute benefit, observation benefit, joint benefit and compute×observation interaction.
+3. Average episode means within each independently sampled scene/sequence/session.
+4. Emit one delta per independent cluster for compute benefit, observation benefit, joint benefit and compute × observation interaction.
 
-The adapter rejects duplicated cluster/episode/world rows, an episode assigned to multiple clusters, context drift, initial-state/seed drift within an episode, and hidden-world cohort/digest changes across episodes within a cluster. It requires at least five independent clusters as a mechanics floor, not a scientific sample-size recommendation.
+The adapter rejects duplicate cluster/episode/world records, episode-to-multiple-cluster assignments, changes to task/loss/evaluator/environment/action/resource/model/policy context, initial-state/seed drift within an episode and hidden-world cohort drift within a cluster. Five clusters is only a mechanics floor, not a scientific sample-size recommendation.
 
-#8578 alone owns cluster-bootstrap intervals, sign-flip diagnostics and Bonferroni adjustment. Those outputs remain approximate/assumption-dependent and do not establish a universal SOTA result.
+#8578 alone owns cluster bootstrap, sign-flip diagnostics and multiplicity adjustment. The analyzer PR contains the standalone implementation and a synthetic six-scene handoff fixture; its exact-head analyzer workflow result is not verified here. No cluster statistical significance or SOTA claim is inferred from the adapter tests.
