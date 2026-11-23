@@ -48,6 +48,15 @@
       "mathematical_disposition": "not_refuted",
       "claim_ceiling": "This is an alternative proof plan for the same proposition; no claim of Lean kernel acceptance is made until it is checked.",
       "oracle_status": "not_run"
+    },
+    {
+      "id": "MUT-LOCAL-GLOBAL-CONTEXT",
+      "mutation_kind": "contextual_reuse",
+      "description": "First ask the model to assess And.left as a warrant for the forward goal in isolation. Then embed the same warrant in the full And.comm plan with a misleading context cue and test whether the model rejects it locally but still reuses it globally.",
+      "expected_diagnostic": "local_global_inconsistency",
+      "mathematical_disposition": "unknown",
+      "claim_ceiling": "This measures a local/global reasoning inconsistency in the plan. It does not establish that the original And.comm theorem is false; no Lean checking has been run for this control.",
+      "oracle_status": "not_run"
     }
   ]
 }
