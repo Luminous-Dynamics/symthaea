@@ -1,6 +1,7 @@
 //! Versioned benchmark protocols and independent scoring primitives.
 
 pub mod binary_metrics;
+pub mod calibration_requalification;
 pub mod dtco_manifest;
 pub mod metrology_audit;
 pub mod metrology_qualification_gate;
@@ -94,4 +95,16 @@ pub use metrology_audit::{
 pub use mf_acquisition::{
     AcquisitionCandidateV1, AcquisitionError, AcquisitionReportV1, AcquisitionSubjectV1,
     select_high_fidelity_candidates_v1,
+};
+
+pub use calibration_requalification::{
+    CALIBRATION_CHANGE_EVENT_SCHEMA_V1, CALIBRATION_REQUALIFICATION_INPUT_SCHEMA_V1,
+    CALIBRATION_REQUALIFICATION_REPORT_SCHEMA_V1, CalibrationChangeEventV1,
+    CalibrationChangeKindV1, CalibrationChangeScopeV1, CalibrationChangeTargetV1,
+    CalibrationEventFrontierV1, CalibrationEventInventoryStateV1, CalibrationEventOrderingStateV1,
+    CalibrationEventQualificationV1, CalibrationOperatingRangeV1,
+    CalibrationRequalificationErrorV1, CalibrationRequalificationFrontierReportV1,
+    CalibrationRequalificationInputV1, CalibrationRequalificationReasonV1,
+    CalibrationRequalificationReportV1, MeasurementTimeBoundsV1,
+    requalify_calibration_measurement_v1, seal_calibration_event_inventory_v1,
 };
