@@ -1946,6 +1946,75 @@ mod tests {
     }
 
     #[test]
+    fn paired_tournament_replays_all_policies_on_the_same_scenario_seeds() {
+        let scenarios = vec![
+            config(SyntheticFabRegimeV1::Stable, 71),
+            config(SyntheticFabRegimeV1::GradualProcessDrift, 72),
+            config(SyntheticFabRegimeV1::AbruptProcessShift, 73),
+        ];
+        let first_episode = generate_synthetic_fab_episode_v1(&scenarios[0]).unwrap();
+        let view = first_episode.policy_view();
+        let policies = vec![
+            policy_config(view, "random-audit", 0, 32, 8, 101),
+            policy_config(view, "risk-exploit-audit", 16, 16, 4, 101),
+            policy_config_with_weights(
+                view,
+                "uncertainty-exploit-audit",
+                16,
+                16,
+                4,
+                101,
+                PolicyWeightsV1 {
+                    risk: 0.0,
+                    uncertainty: 1.0,
+                    evsi: 0.0,
+                },
+            ),
+        ];
+
+        let first = run_synthetic_metrology_policy_tournament_v1(
+            "paired-three-seed-test",
+            &scenarios,
+            &policies,
+        )
+        .unwrap();
+        let second = run_synthetic_metrology_policy_tournament_v1(
+            "paired-three-seed-test",
+            &scenarios,
+            &policies,
+        )
+        .unwrap();
+
+        assert_eq!(first.paired_scenario_count, 3);
+        assert_eq!(first.policy_count, 3);
+        assert_eq!(first.runs.len(), 9);
+        assert_eq!(first.summaries.len(), 3);
+        assert_eq!(first.tournament_sha256, second.tournament_sha256);
+        for summary in &first.summaries {
+            assert_eq!(summary.run_count, 3);
+            assert_eq!(summary.measurement_reduction_mean, 0.75);
+            assert_eq!(summary.measurement_reduction_sample_stddev, 0.0);
+        }
+    }
+
+    #[test]
+    fn paired_tournament_rejects_unmatched_measurement_budgets() {
+        let scenario = config(SyntheticFabRegimeV1::Stable, 75);
+        let episode = generate_synthetic_fab_episode_v1(&scenario).unwrap();
+        let view = episode.policy_view();
+        let first = policy_config(view, "budget-a", 0, 32, 8, 101);
+        let second = policy_config(view, "budget-b", 0, 16, 4, 101);
+        assert!(
+            run_synthetic_metrology_policy_tournament_v1(
+                "unmatched-budget-test",
+                &[scenario],
+                &[first, second]
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
     fn policy_runner_rejects_an_observation_packet_from_another_episode() {
         let first =
             generate_synthetic_fab_episode_v1(&config(SyntheticFabRegimeV1::Stable, 51)).unwrap();
