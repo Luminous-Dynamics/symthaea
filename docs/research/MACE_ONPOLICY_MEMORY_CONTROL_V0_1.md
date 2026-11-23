@@ -390,11 +390,11 @@ It adds:
 - validation that terminal outcomes exist for every randomized profile and match the evaluator's frozen task list;
 - validation against a frozen expected task schedule, including exact task identities for every randomized profile;
 - profile-mean aggregation before treatment/control comparison, so repeated episodes do not inflate the independent sample count;
-- a clearly labelled normal-approximation 95% interval and a 30-independent-profiles-per-arm confirmatory floor;
+- a clearly labelled normal-approximation 95% interval and a 30-independent-profiles-per-arm confirmatory floor (each stratum also needs at least two independent profiles per arm for its variance estimate);
 - separate privacy and unauthorized-action hard gates that cannot be traded against utility.
 
 The primary estimator deliberately has no post-assignment disclosure, transcript-length or turn-count covariates. Those variables may be reported as outcomes or explored in a separately preregistered mediation analysis, but must not be used to adjust the primary total-effect estimate.
 
-Seven unit tests cover allocation balance/repeatability, duplicate assignments, profile-cluster weighting, non-compensable privacy gates, arm mismatch, task-identity mismatch, missing outcomes on both arms, and invalid utility. **They are authored but not compiled or executed in this environment.** The Wald interval is an exploratory primitive, not a substitute for a preregistered stratified randomization test or independent confirmatory analysis.
+Nine unit tests cover allocation balance/repeatability, too-small/duplicate strata and profiles, block integrity, stratified weighting (including a deliberately imbalanced treatment/control mix), profile-cluster weighting, non-compensable privacy gates, arm mismatch, frozen-task completeness and invalid utility. **They are authored but not compiled or executed in this environment.** The stratified Wald interval is an exploratory primitive, not a substitute for a preregistered randomization-inference analysis or independent confirmatory analysis.
 
 See [MACE benchmark landscape and competitive qualification plan](MACE_BENCHMARK_LANDSCAPE_2026-11-23.md) for the current external benchmark crosswalk and prospective targets.
