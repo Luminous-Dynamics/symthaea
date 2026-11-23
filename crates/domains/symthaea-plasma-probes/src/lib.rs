@@ -97,7 +97,10 @@ pub enum ContractError {
     #[error("normalization coordinate is non-finite")]
     NonFiniteNormalizationCoordinate,
     #[error("invalid KIRD record field {field}: {reason}")]
-    InvalidKirdField { field: &'static str, reason: &'static str },
+    InvalidKirdField {
+        field: &'static str,
+        reason: &'static str,
+    },
 }
 
 /// A parsed and semantically checked v0.1 pulse-family contract.
@@ -1505,7 +1508,10 @@ pub fn validate_kird_record_value(
         return Err(kird_error("record_id", "must use the KIRD- prefix"));
     }
     let record_status = kird_string(value, "record_status")?;
-    if !matches!(record_status, "synthetic_fixture_only" | "physical_measurement") {
+    if !matches!(
+        record_status,
+        "synthetic_fixture_only" | "physical_measurement"
+    ) {
         return Err(kird_error("record_status", "unsupported record status"));
     }
 
@@ -1538,7 +1544,10 @@ pub fn validate_kird_record_value(
     for digest_path in digest_paths {
         let digest = kird_string(value, digest_path)?;
         if !is_sha256_hex(digest) {
-            return Err(kird_error(digest_path, "must be a lowercase SHA-256 hex digest"));
+            return Err(kird_error(
+                digest_path,
+                "must be a lowercase SHA-256 hex digest",
+            ));
         }
         if is_physical && digest.bytes().all(|byte| byte == b'0') {
             return Err(kird_error(
@@ -1549,9 +1558,7 @@ pub fn validate_kird_record_value(
     }
     if is_physical {
         let reference_digest = kird_string(value, "provenance.reference_bundle_sha256")?;
-        if !is_sha256_hex(reference_digest)
-            || reference_digest.bytes().all(|byte| byte == b'0')
-        {
+        if !is_sha256_hex(reference_digest) || reference_digest.bytes().all(|byte| byte == b'0') {
             return Err(kird_error(
                 "provenance.reference_bundle_sha256",
                 "physical measurements require a non-placeholder reference digest",
@@ -1640,7 +1647,10 @@ pub fn validate_kird_record_value(
             }
             let method = kird_string(value, "response_scope.bound_method")?;
             if method.trim().is_empty() {
-                return Err(kird_error("response_scope.bound_method", "must be non-empty"));
+                return Err(kird_error(
+                    "response_scope.bound_method",
+                    "must be non-empty",
+                ));
             }
             let evidence = kird_string(value, "response_scope.bound_evidence_sha256")?;
             if !is_sha256_hex(evidence) || evidence.bytes().all(|byte| byte == b'0') {
@@ -1698,7 +1708,12 @@ pub fn validate_kird_record_value(
             }
         }
         "UNKNOWN" | "UNSUPPORTED" => {}
-        _ => return Err(kird_error("physical_gates.status", "unsupported gate disposition")),
+        _ => {
+            return Err(kird_error(
+                "physical_gates.status",
+                "unsupported gate disposition",
+            ));
+        }
     }
     if record_status == "synthetic_fixture_only" && physical_gate_status == "PASS" {
         return Err(kird_error(
@@ -1710,8 +1725,7 @@ pub fn validate_kird_record_value(
     let persistent_system_bytes = checkpoint_bytes
         .checked_add(persistent_assets)
         .ok_or(ContractError::StorageByteCountOverflow)?;
-    let amortized_asset_bytes_per_rollout =
-        persistent_assets as f64 / amortization_rollouts as f64;
+    let amortized_asset_bytes_per_rollout = persistent_assets as f64 / amortization_rollouts as f64;
     let amortized_persistent_bytes_per_rollout =
         checkpoint_bytes as f64 + amortized_asset_bytes_per_rollout;
     if !amortized_asset_bytes_per_rollout.is_finite()
@@ -1773,9 +1787,7 @@ fn validate_kird_distortion_tier(
         }
         let digest_path = kird_join_field(field, "evidence_sha256");
         let digest = kird_string(root, digest_path)?;
-        if !is_sha256_hex(digest)
-            || (is_physical && digest.bytes().all(|byte| byte == b'0'))
-        {
+        if !is_sha256_hex(digest) || (is_physical && digest.bytes().all(|byte| byte == b'0')) {
             return Err(kird_error(
                 digest_path,
                 "requires a valid, non-placeholder SHA-256 digest for physical evidence",
@@ -1793,9 +1805,14 @@ fn validate_kird_response_tier(root: &serde_json::Value) -> Result<(), ContractE
             "unsupported response status",
         ));
     }
-    let missing = kird_u64(root, "distortion.intervention_response.missing_branch_count")?;
-    let misassociated =
-        kird_u64(root, "distortion.intervention_response.misassociated_branch_count")?;
+    let missing = kird_u64(
+        root,
+        "distortion.intervention_response.missing_branch_count",
+    )?;
+    let misassociated = kird_u64(
+        root,
+        "distortion.intervention_response.misassociated_branch_count",
+    )?;
     if status == "PASS" {
         let normalized = kird_number(
             root,
@@ -1830,15 +1847,27 @@ fn kird_join_field(parent: &'static str, child: &'static str) -> &'static str {
         ("distortion.microscopic", "normalized_error") => "distortion.microscopic.normalized_error",
         ("distortion.microscopic", "evidence_sha256") => "distortion.microscopic.evidence_sha256",
         ("distortion.weak_observable", "metric_id") => "distortion.weak_observable.metric_id",
-        ("distortion.weak_observable", "observed_error") => "distortion.weak_observable.observed_error",
+        ("distortion.weak_observable", "observed_error") => {
+            "distortion.weak_observable.observed_error"
+        },
         ("distortion.weak_observable", "tolerance") => "distortion.weak_observable.tolerance",
-        ("distortion.weak_observable", "normalized_error") => "distortion.weak_observable.normalized_error",
-        ("distortion.weak_observable", "evidence_sha256") => "distortion.weak_observable.evidence_sha256",
+        ("distortion.weak_observable", "normalized_error") => {
+            "distortion.weak_observable.normalized_error"
+        },
+        ("distortion.weak_observable", "evidence_sha256") => {
+            "distortion.weak_observable.evidence_sha256"
+        },
         ("distortion.macroscopic_qoi", "metric_id") => "distortion.macroscopic_qoi.metric_id",
-        ("distortion.macroscopic_qoi", "observed_error") => "distortion.macroscopic_qoi.observed_error",
+        ("distortion.macroscopic_qoi", "observed_error") => {
+            "distortion.macroscopic_qoi.observed_error"
+        },
         ("distortion.macroscopic_qoi", "tolerance") => "distortion.macroscopic_qoi.tolerance",
-        ("distortion.macroscopic_qoi", "normalized_error") => "distortion.macroscopic_qoi.normalized_error",
-        ("distortion.macroscopic_qoi", "evidence_sha256") => "distortion.macroscopic_qoi.evidence_sha256",
+        ("distortion.macroscopic_qoi", "normalized_error") => {
+            "distortion.macroscopic_qoi.normalized_error"
+        },
+        ("distortion.macroscopic_qoi", "evidence_sha256") => {
+            "distortion.macroscopic_qoi.evidence_sha256"
+        },
         ("distortion.sensitivity", "metric_id") => "distortion.sensitivity.metric_id",
         ("distortion.sensitivity", "observed_error") => "distortion.sensitivity.observed_error",
         ("distortion.sensitivity", "tolerance") => "distortion.sensitivity.tolerance",
@@ -1861,10 +1890,7 @@ fn kird_value(
     Ok(current)
 }
 
-fn kird_string(
-    root: &serde_json::Value,
-    field: &'static str,
-) -> Result<&str, ContractError> {
+fn kird_string(root: &serde_json::Value, field: &'static str) -> Result<&str, ContractError> {
     kird_value(root, field)?
         .as_str()
         .ok_or_else(|| kird_error(field, "must be a string"))
@@ -2382,9 +2408,11 @@ mod tests {
     #[test]
     fn kird_schema_and_fixture_are_valid_json_documents() {
         let schema: serde_json::Value = serde_json::from_str(KIRD_POINT_SCHEMA).unwrap();
-        let fixture: serde_json::Value =
-            serde_json::from_str(KIRD_SYNTHETIC_FIXTURE).unwrap();
-        assert_eq!(schema["$schema"], "https://json-schema.org/draft/2020-12/schema");
+        let fixture: serde_json::Value = serde_json::from_str(KIRD_SYNTHETIC_FIXTURE).unwrap();
+        assert_eq!(
+            schema["$schema"],
+            "https://json-schema.org/draft/2020-12/schema"
+        );
         assert_eq!(fixture["record_status"], "synthetic_fixture_only");
     }
 
