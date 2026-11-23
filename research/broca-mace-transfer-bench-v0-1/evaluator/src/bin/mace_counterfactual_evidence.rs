@@ -1062,7 +1062,7 @@ fn run() -> Result<(), String> {
             "source_code_sha256": source_code_sha256,
             "fixture_sha256": fixture_sha256,
             "schema_sha256": schema_sha256,
-            "source_revision": source_revision,
+            "source_revision": source_revision.as_str(),
             "known_root_count": EvidenceDependencyIndex::build(&case.memory)
                 .map_err(|error| format!("dependency index failed: {error:?}"))?
                 .known_root_count(),
