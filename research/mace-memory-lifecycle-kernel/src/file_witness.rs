@@ -639,7 +639,7 @@ mod tests {
         assert_eq!(
             outcomes
                 .iter()
-                .filter(|result| **result == Err(LifecycleError::WitnessConflict))
+                .filter(|result| matches!(result, &&Err(LifecycleError::WitnessConflict)))
                 .count(),
             1
         );
