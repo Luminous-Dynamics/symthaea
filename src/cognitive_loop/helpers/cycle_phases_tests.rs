@@ -198,7 +198,7 @@ fn test_urgency_warmup_pattern_for_short_history() {
     service.stats.total_cycles = 100;
     let threshold = service.config.learning_threshold;
     // With no error history, pattern should be "Warmup"
-    let result = service.compute_urgency_and_error_pattern(0.01, false, threshold);
+    let result = service.compute_urgency_and_error_pattern(0.01, true, false, threshold);
     assert_eq!(
         result.error_pattern, "Warmup",
         "Short error history should yield Warmup pattern"
@@ -219,7 +219,7 @@ fn test_urgency_consecutive_low_error_tracking() {
     service.carryover.urgency.consecutive_low_error = 0;
     // Low error below threshold should increment consecutive counter
     let low_error = threshold * 0.5;
-    let _result = service.compute_urgency_and_error_pattern(low_error, false, threshold);
+    let _result = service.compute_urgency_and_error_pattern(low_error, true, false, threshold);
     assert!(
         service.carryover.urgency.consecutive_low_error > 0,
         "Low error should increment consecutive_low_error"
@@ -235,11 +235,66 @@ fn test_urgency_consecutive_low_error_resets_on_high_error() {
     service.carryover.urgency.consecutive_low_error = 20;
     // High error above threshold should reset consecutive counter
     let high_error = threshold * 2.0;
-    let _result = service.compute_urgency_and_error_pattern(high_error, false, threshold);
+    let _result = service.compute_urgency_and_error_pattern(high_error, true, false, threshold);
     assert_eq!(
         service.carryover.urgency.consecutive_low_error, 0,
         "High error should reset consecutive_low_error"
     );
+}
+
+#[test]
+fn public_cycle_result_marks_first_cycle_prediction_error_invalid() {
+    let mut service =
+        CognitiveLoopService::new(super::super::super::CognitiveLoopConfig::default()).unwrap();
+
+    let result = service.cycle("first cycle has no prior prediction");
+
+    assert!(
+        !result.prediction_error_valid,
+        "a cycle without a prior prediction must not expose its fallback estimate as observed PE"
+    );
+    assert!(
+        result.prediction_error.is_finite(),
+        "the neutral estimate must remain finite for telemetry consumers"
+    );
+}
+
+#[test]
+fn invalid_prediction_comparison_does_not_create_a_replay_experience() {
+    let mut service =
+        CognitiveLoopService::new(super::super::super::CognitiveLoopConfig::default()).unwrap();
+
+    service.create_experience(&[0.1, 0.2], &[0.3, 0.4], None);
+    assert!(
+        service.buffer.is_empty(),
+        "missing PE must not be recorded as a successful zero-error transition"
+    );
+
+    // Once a genuine comparison exists, the previous transition may be recorded.
+    service.create_experience(&[0.2, 0.3], &[0.4, 0.5], Some(0.25));
+    assert_eq!(service.buffer.len(), 1);
+    assert!(
+        (service.buffer.front().unwrap().error - 0.25).abs() < f32::EPSILON
+    );
+}
+
+#[test]
+fn invalid_prediction_error_does_not_advance_low_error_or_history() {
+    let mut service = make_service();
+    let threshold = service.config.learning_threshold;
+    service.carryover.urgency.consecutive_low_error = 3;
+
+    let result = service.compute_urgency_and_error_pattern(0.0, false, false, threshold);
+
+    assert_eq!(
+        service.carryover.urgency.consecutive_low_error, 0,
+        "missing prediction evidence must break, not advance, a low-error streak"
+    );
+    assert!(
+        service.carryover.history.error_history.is_empty(),
+        "missing PE must not enter the measured-error history"
+    );
+    assert_eq!(result.error_pattern, "Warmup");
 }
 
 #[test]
@@ -252,7 +307,7 @@ fn test_urgency_mode_transition_increments_stat() {
     service.carryover.urgency.consecutive_low_error = 0;
     let transitions_before = service.stats.mode_transitions;
     // Trigger a Normal urgency (default cognitive depth = Cortical, high enough error)
-    let _result = service.compute_urgency_and_error_pattern(threshold * 1.5, false, threshold);
+    let _result = service.compute_urgency_and_error_pattern(threshold * 1.5, true, false, threshold);
     // Since prev_urgency was Cruise and the new one is likely Normal/Critical,
     // a mode transition should have been counted
     assert!(
@@ -271,7 +326,7 @@ fn test_urgency_stable_pattern_from_constant_errors() {
     for _ in 0..5 {
         service.carryover.history.error_history.push_back(0.05);
     }
-    let result = service.compute_urgency_and_error_pattern(0.05, false, threshold);
+    let result = service.compute_urgency_and_error_pattern(0.05, true, false, threshold);
     // With constant errors, slope should be near-zero: pattern = "Stable"
     assert_eq!(
         result.error_pattern, "Stable",
@@ -288,7 +343,7 @@ fn test_urgency_prediction_coherence_bias_low_coherence() {
     let threshold = service.config.learning_threshold;
     // Set low prediction coherence to trigger the bias
     service.stats.avg_prediction_coherence = 0.2; // < 0.3 and > 0.0
-    let result = service.compute_urgency_and_error_pattern(0.05, false, threshold);
+    let result = service.compute_urgency_and_error_pattern(0.05, true, false, threshold);
     // coherence_mod = 0.85, bias = 0.85 - 1.0 = -0.15
     assert!(
         (result.prediction_coherence_urgency_bias - (-0.15)).abs() < 0.01,
@@ -305,7 +360,7 @@ fn test_urgency_prediction_coherence_bias_high_coherence() {
     let threshold = service.config.learning_threshold;
     // Set high prediction coherence
     service.stats.avg_prediction_coherence = 0.8; // > 0.7
-    let result = service.compute_urgency_and_error_pattern(0.05, false, threshold);
+    let result = service.compute_urgency_and_error_pattern(0.05, true, false, threshold);
     // coherence_mod = 1.1, bias = 1.1 - 1.0 = 0.1
     assert!(
         (result.prediction_coherence_urgency_bias - 0.1).abs() < 0.01,

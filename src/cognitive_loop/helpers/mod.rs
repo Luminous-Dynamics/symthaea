@@ -170,25 +170,33 @@ impl CognitiveLoopService {
 
         // 7. Feed prediction back to encoder: deferred to after last &prediction use
 
-        // 8. Compute prediction error against previous prediction
-        let prediction_error = if let Some(ref prev) = self.last_prediction {
-            let n = compressed_state.len().min(prev.len());
-            if n == 0 {
-                0.0
+        // 8. Compute prediction error only when a previous prediction can be compared.
+        let (prediction_error, prediction_error_valid) =
+            if let Some(ref prev) = self.last_prediction {
+                let n = compressed_state.len().min(prev.len());
+                if n == 0 {
+                    (0.0, false)
+                } else {
+                    (
+                        compressed_state[..n]
+                            .iter()
+                            .zip(prev[..n].iter())
+                            .map(|(a, b)| (a - b).powi(2))
+                            .sum::<f32>()
+                            / n as f32,
+                        true,
+                    )
+                }
             } else {
-                compressed_state[..n]
-                    .iter()
-                    .zip(prev[..n].iter())
-                    .map(|(a, b)| (a - b).powi(2))
-                    .sum::<f32>()
-                    / n as f32
-            }
-        } else {
-            0.0
-        };
+                (0.0, false)
+            };
 
         // 9. Store experience
-        self.create_experience(&compressed_state, &prediction, prediction_error);
+        self.create_experience(
+            &compressed_state,
+            &prediction,
+            prediction_error_valid.then_some(prediction_error),
+        );
 
         // 7 (deferred). Move prediction to encoder (no clone needed)
         self.encoder.set_prediction(prediction);
@@ -210,13 +218,15 @@ impl CognitiveLoopService {
             }
         }
 
-        // 11. Update error history — capacity bound: 100 elements, evict before push
-        if self.error_history.len() >= super::thresholds::ERROR_HISTORY_CAPACITY {
-            self.error_history.pop_front();
+        // 11. Update error history only from a genuine comparison.
+        if prediction_error_valid {
+            if self.error_history.len() >= super::thresholds::ERROR_HISTORY_CAPACITY {
+                self.error_history.pop_front();
+            }
+            self.error_history.push_back(prediction_error);
+            self.stats.avg_prediction_error =
+                self.error_history.iter().sum::<f32>() / self.error_history.len().max(1) as f32;
         }
-        self.error_history.push_back(prediction_error);
-        self.stats.avg_prediction_error =
-            self.error_history.iter().sum::<f32>() / self.error_history.len().max(1) as f32;
 
         // Pre-compute identity fields before moving output
         #[cfg(feature = "identity")]
@@ -234,6 +244,7 @@ impl CognitiveLoopService {
         Ok(CycleResult {
             output,
             prediction_error,
+            prediction_error_valid,
             peak_attention: 0.0, // No text-based attention for embedding input
             detected_primitives: Vec::new(), // No text primitives for embedding input
             learning_occurred,
@@ -322,25 +333,34 @@ impl CognitiveLoopService {
 
         // 5. Feed prediction back to encoder: deferred to after last &prediction use
 
-        // 6. Compute prediction error against previous prediction
-        let prediction_error = if let Some(ref prev) = self.last_prediction {
-            let n = compressed_state.len().min(prev.len());
-            if n == 0 {
-                0.0
+        // 6. Compute prediction error against a real previous prediction.
+        // Missing or dimensionally empty comparisons are not evidence of zero error.
+        let (prediction_error, prediction_error_valid) =
+            if let Some(ref prev) = self.last_prediction {
+                let n = compressed_state.len().min(prev.len());
+                if n == 0 {
+                    (0.0, false)
+                } else {
+                    (
+                        compressed_state[..n]
+                            .iter()
+                            .zip(prev[..n].iter())
+                            .map(|(a, b)| (a - b).powi(2))
+                            .sum::<f32>()
+                            / n as f32,
+                        true,
+                    )
+                }
             } else {
-                compressed_state[..n]
-                    .iter()
-                    .zip(prev[..n].iter())
-                    .map(|(a, b)| (a - b).powi(2))
-                    .sum::<f32>()
-                    / n as f32
-            }
-        } else {
-            0.0
-        };
+                (0.0, false)
+            };
 
         // 7. Store experience
-        self.create_experience(&compressed_state, &prediction, prediction_error);
+        self.create_experience(
+            &compressed_state,
+            &prediction,
+            prediction_error_valid.then_some(prediction_error),
+        );
 
         // 5 (deferred). Move prediction to encoder (no clone needed)
         self.encoder.set_prediction(prediction);
@@ -389,8 +409,11 @@ impl CognitiveLoopService {
             (false, None)
         };
 
-        // 10. Update statistics
-        self.update_stats(prediction_error, cycle_start.elapsed());
+        // 10. Update statistics. None marks the initial cycle without a comparison.
+        self.update_stats(
+            prediction_error_valid.then_some(prediction_error),
+            cycle_start.elapsed(),
+        );
         self.stats.temporal_coherence = coherence;
 
         // 10b. Modality-agnostic consciousness computation.
@@ -448,6 +471,7 @@ impl CognitiveLoopService {
         super::CycleResult {
             output,
             prediction_error,
+            prediction_error_valid,
             peak_attention: 0.0,
             detected_primitives: Vec::new(),
             learning_occurred,
@@ -553,16 +577,22 @@ impl CognitiveLoopService {
         }
     }
 
-    pub(super) fn create_experience(&mut self, state: &[f32], prediction: &[f32], error: f32) {
-        // Update last experience with next_state
-        // Own the taken value (not `ref`) so we can move it into Experience without cloning
-        if let Some(last_state) = self.last_state.take() {
-            if let Some(last_pred) = self.last_prediction.take() {
-                // Calculate importance based on error
+    pub(super) fn create_experience(
+        &mut self,
+        state: &[f32],
+        prediction: &[f32],
+        error: Option<f32>,
+    ) {
+        // Missing/degenerate prediction comparisons must not enter replay as a
+        // zero-error (successful) experience. Still advance the state window so
+        // the next cycle can compare against the current prediction.
+        if let Some(error) = error {
+            if let (Some(last_state), Some(last_pred)) =
+                (self.last_state.take(), self.last_prediction.take())
+            {
                 let importance = error + EXPERIENCE_BASE_IMPORTANCE;
-
                 let exp = Experience {
-                    state: last_state, // move, not clone
+                    state: last_state,
                     prediction: last_pred,
                     next_state: Some(state.to_vec()),
                     error,
@@ -576,7 +606,8 @@ impl CognitiveLoopService {
             }
         }
 
-        // Store current state for next cycle
+        // Always roll the current state/prediction forward, independent of whether
+        // this cycle supplied a valid error observation.
         self.last_state = Some(state.to_vec());
         self.last_prediction = Some(prediction.to_vec());
     }
@@ -601,20 +632,23 @@ impl CognitiveLoopService {
         }
     }
 
-    pub(super) fn update_stats(&mut self, error: f32, cycle_time: Duration) {
-        // EMA for error
-        let alpha = ERROR_EMA_ALPHA;
-        self.stats.avg_prediction_error =
-            self.stats.avg_prediction_error * (1.0 - alpha) + error * alpha;
-        self.stats.avg_prediction_error_sq =
-            self.stats.avg_prediction_error_sq * (1.0 - alpha) + (error * error) * alpha;
+    pub(super) fn update_stats(&mut self, error: Option<f32>, cycle_time: Duration) {
+        // Prediction statistics must only consume valid comparisons. Timing,
+        // attention, and other structural telemetry below still update every cycle.
+        if let Some(error) = error {
+            let alpha = ERROR_EMA_ALPHA;
+            self.stats.avg_prediction_error =
+                self.stats.avg_prediction_error * (1.0 - alpha) + error * alpha;
+            self.stats.avg_prediction_error_sq =
+                self.stats.avg_prediction_error_sq * (1.0 - alpha) + (error * error) * alpha;
 
-        // Error trend — capacity bound: 100 elements, evict before push
-        if self.error_history.len() >= super::thresholds::ERROR_HISTORY_CAPACITY {
-            self.error_history.pop_front();
+            // Error trend — capacity bound: 100 elements, evict before push
+            if self.error_history.len() >= super::thresholds::ERROR_HISTORY_CAPACITY {
+                self.error_history.pop_front();
+            }
+            self.error_history.push_back(error);
+            self.stats.error_trend = self.compute_error_trend();
         }
-        self.error_history.push_back(error);
-        self.stats.error_trend = self.compute_error_trend();
 
         // Attention stats from encoder
         let encoder_stats = self.encoder.stats();

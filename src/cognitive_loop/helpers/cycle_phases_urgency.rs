@@ -77,11 +77,13 @@ impl CognitiveLoopService {
     pub(in crate::cognitive_loop) fn compute_urgency_and_error_pattern(
         &mut self,
         prediction_error: f32,
+        prediction_error_valid: bool,
         surprise_triggered: bool,
         effective_threshold: f32,
     ) -> UrgencyResult {
-        // Track consecutive low-error cycles for Cruise eligibility
-        if prediction_error < effective_threshold {
+        // Only genuine comparisons may advance a consecutive-low-error streak.
+        // Missing evidence breaks the streak but is not itself low or high error.
+        if prediction_error_valid && prediction_error < effective_threshold {
             self.carryover.urgency.consecutive_low_error = self
                 .carryover
                 .urgency
@@ -94,11 +96,19 @@ impl CognitiveLoopService {
         // Use smoothed error for urgency to prevent jitter from single-cycle noise spikes.
         // Science: Dynamical systems — threshold-based switching needs hysteresis to prevent
         // oscillation. EMA smoothing damps transient spikes; prev_urgency adds hysteresis.
-        let smoothed_urgency_error = if self.stats.total_cycles > 5 {
-            // Blend instantaneous (70%) with running average (30%) for responsiveness + smoothing
-            prediction_error * 0.7 + self.stats.avg_prediction_error * 0.3
+        let smoothed_urgency_error = if prediction_error_valid {
+            if self.stats.total_cycles > 5 {
+                // Blend instantaneous (70%) with running average (30%) for responsiveness + smoothing
+                prediction_error * 0.7 + self.stats.avg_prediction_error * 0.3
+            } else {
+                prediction_error // Use raw error during bootstrap
+            }
+        } else if !self.error_history.is_empty() {
+            // Reuse recent measured error rather than interpreting absent evidence as perfect prediction.
+            self.stats.avg_prediction_error
         } else {
-            prediction_error // Use raw error during bootstrap
+            // No PE evidence exists yet: keep the error-driven urgency component neutral.
+            effective_threshold
         };
 
         // Hysteresis: require stronger signal to LEAVE current urgency level
@@ -186,12 +196,23 @@ impl CognitiveLoopService {
         };
         let hysteresis_threshold =
             base_hysteresis * pattern_mod * coherence_mod * transition_cost_mod * consolidation_mod;
-        let error_urgency = super::super::CycleUrgency::from_state(
-            smoothed_urgency_error,
-            hysteresis_threshold,
-            surprise_triggered,
-            self.carryover.urgency.consecutive_low_error,
-        );
+        let has_prediction_error_history =
+            !self.error_history.is_empty() || !self.carryover.history.error_history.is_empty();
+        // Without a valid current or historical PE, preserve the prior urgency
+        // unless an independent surprise signal requests reassessment.
+        let error_urgency = if !prediction_error_valid
+            && !has_prediction_error_history
+            && !surprise_triggered
+        {
+            self.carryover.urgency.urgency
+        } else {
+            super::super::CycleUrgency::from_state(
+                smoothed_urgency_error,
+                hysteresis_threshold,
+                surprise_triggered,
+                self.carryover.urgency.consecutive_low_error,
+            )
+        };
 
         // Session 15 Item 2: Early warning at 5+ consecutive low-coherence cycles.
         // Mild exploration boost + confidence dampening before the hard Critical at 10.
@@ -248,10 +269,12 @@ impl CognitiveLoopService {
         // trajectories across time, not just instantaneous snapshots.
         // Maintain rolling window of prediction errors, classify pattern.
         let error_history = &mut self.carryover.history.error_history;
-        while error_history.len() >= 16 {
-            error_history.pop_front();
+        if prediction_error_valid {
+            while error_history.len() >= 16 {
+                error_history.pop_front();
+            }
+            error_history.push_back(prediction_error);
         }
-        error_history.push_back(prediction_error);
 
         let (error_pattern, predicted_urgency, error_slope, oscillation_ratio) =
             if error_history.len() >= 4 {

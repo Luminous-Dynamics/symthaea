@@ -51,7 +51,8 @@ impl CognitiveLoopService {
         let _t_core = Instant::now();
         let consciousness_awake =
             self.carryover.history.consciousness_level > 0.0 || self.stats.total_cycles < 20;
-        let (learning_occurred, training_loss) = if prediction_error > neuromod_threshold
+        let (learning_occurred, training_loss) = if perception.urgency.prediction_error_valid
+            && prediction_error > neuromod_threshold
             && !self.behavior.adaptive_behavior.pause_learning
             && !self.training_frozen
             && !self.carryover.quality.narrative_veto_active
@@ -215,16 +216,25 @@ impl CognitiveLoopService {
             }
         }
 
-        // 12. Update statistics
-        self.update_stats(prediction_error, cycle_start.elapsed());
+        // 12. Update statistics. Always retain timing/structural telemetry, but
+        // update prediction statistics only when this cycle had a real comparison.
+        self.update_stats(
+            perception
+                .urgency
+                .prediction_error_valid
+                .then_some(prediction_error),
+            cycle_start.elapsed(),
+        );
 
         self.stats.ltc_consciousness = self.temporal_network.state_diversity();
 
         let consciousness_resize_factor = 1.0
             + (self.carryover.history.consciousness_level as f32 - CONSCIOUSNESS_RESIZE_CENTER)
                 * CONSCIOUSNESS_RESIZE_SCALE;
-        self.temporal_network
-            .maybe_resize(prediction_error * consciousness_resize_factor);
+        if perception.urgency.prediction_error_valid {
+            self.temporal_network
+                .maybe_resize(prediction_error * consciousness_resize_factor);
+        }
 
         self.stats.temporal_coherence = coherence;
         self.stats.effective_learning_rate = effective_lr;
@@ -385,12 +395,19 @@ impl CognitiveLoopService {
         };
         let pp_learning_threshold = self.config.learning_threshold;
 
-        let cycle_reward = self.compute_reward_signal(prediction_error, pp_learning_threshold);
+        // Missing PE evidence is neither reward-worthy success nor a failure.
+        let cycle_reward = if perception.urgency.prediction_error_valid {
+            self.compute_reward_signal(prediction_error, pp_learning_threshold)
+        } else {
+            0.0
+        };
 
         let cycle_learning_result = CycleLearningResult {
             reward: cycle_reward,
             strategy_used: selected_strategy,
-            successful: prediction_error < pp_learning_threshold && pp_in_flow,
+            successful: perception.urgency.prediction_error_valid
+                && prediction_error < pp_learning_threshold
+                && pp_in_flow,
             prediction_error,
             coherence,
         };
@@ -445,16 +462,22 @@ impl CognitiveLoopService {
                     )
                 };
                 let episodic_fn = || {
-                    helpers::parallel_episodic_learning(
-                        episodic_memory,
-                        resonator_memory,
-                        primitive_belief_bridge,
-                        prev_primitive_state,
-                        fep_learning_signal,
-                        closed_learning_loop,
-                        &episodic_ctx,
-                        cycle_learning_result,
-                    )
+                    if perception.urgency.prediction_error_valid {
+                        helpers::parallel_episodic_learning(
+                            episodic_memory,
+                            resonator_memory,
+                            primitive_belief_bridge,
+                            prev_primitive_state,
+                            fep_learning_signal,
+                            closed_learning_loop,
+                            &episodic_ctx,
+                            cycle_learning_result,
+                        )
+                    } else {
+                        // No observed outcome: do not teach the closed learning loop
+                        // a synthetic success/failure. Semantic processing still runs.
+                        0.0
+                    }
                 };
                 #[cfg(feature = "parallel")]
                 {
@@ -569,7 +592,9 @@ impl CognitiveLoopService {
     ) {
         let detected_primitives = &perception.encoding.encoding_result.detected_primitives;
         let broca_psi = self.unification_engine.psi as f32;
-        let broca_novelty = prediction_error > self.config.learning_threshold || surprise_triggered;
+        let broca_novelty = (perception.urgency.prediction_error_valid
+            && prediction_error > self.config.learning_threshold)
+            || surprise_triggered;
         // Attention fatigue → Broca cadence gating.
         // High fatigue → widen spacing (don't generate when attention depleted).
         // Science: Mackworth (1948) — vigilance decrement degrades production quality.

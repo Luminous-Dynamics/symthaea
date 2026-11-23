@@ -6,18 +6,18 @@
 //! Contains:
 //! - `run_strategy_selection`: Closed Learning Loop strategy selection + agency override
 //! - `run_encoding_and_preprocessing`: HDC encoding, soul alignment, phi attention gating,
-//!   surprise exploration, codebook diversity, input memoization, ethics engine, urgency
+//!   the single stateful surprise/exploration update, codebook diversity, memoization, and ethics.
+//!   It returns the exploration result; adaptive threshold and urgency are finalized downstream.
 
 use std::time::Instant;
 use symthaea_core::hdc::binary_hv::BinaryHV;
 use symthaea_core::hdc::phi_topology_validation::real_hv_to_hv16;
-use symthaea_core::hdc::predictive_encoder::EncodingResult;
+use symthaea_core::hdc::predictive_encoder::{EncodingResult, PredictionDegeneracy};
 
 use super::helpers;
 use super::thresholds::{
     CANTOR_META_DEPTH_STILLNESS_THRESHOLD, CANTOR_RESONANCE_BOOST_HARMONY_THRESHOLD,
-    CONFIDENCE_SCALE_MIDPOINT, CONFIDENCE_SCALE_SENSITIVITY, EXPLORATION_SCALE_MIDPOINT,
-    EXPLORATION_SCALE_SENSITIVITY, KNOWLEDGE_NOVELTY_EXPLORATION_THRESHOLD,
+    KNOWLEDGE_NOVELTY_EXPLORATION_THRESHOLD,
     MCTS_PLAN_CONFIDENCE_THRESHOLD, MEMO_DIVERSITY_HIGH, MEMO_DIVERSITY_HIGH_SCALE,
     MEMO_DIVERSITY_LOW, MEMO_DIVERSITY_LOW_SCALE, MEMO_THRESHOLD_CEILING, MEMO_THRESHOLD_FLOOR,
     MORAL_CONCERN_THRESHOLD, NEUROMOD_STILLNESS_ADENOSINE_WEIGHT, NEUROMOD_STILLNESS_CLAMP_MAX,
@@ -46,7 +46,7 @@ pub(crate) struct StrategySelectionResult {
     pub(crate) social_strategy_bias: bool,
 }
 
-/// Result from the encoding and preprocessing phase (Phases 1–1.2).
+/// Result from encoding and preprocessing, before urgency finalization.
 pub(crate) struct EncodingPhaseResult {
     pub(crate) encoding_result: EncodingResult,
     pub(crate) hv16_cached: BinaryHV,
@@ -58,15 +58,13 @@ pub(crate) struct EncodingPhaseResult {
     pub(crate) memo_threshold: f32,
     pub(crate) input_similarity: f32,
     pub(crate) input_memoized: bool,
-    pub(crate) effective_threshold: f32,
-    pub(crate) urgency: super::CycleUrgency,
-    pub(crate) error_pattern: &'static str,
-    pub(crate) predicted_urgency: &'static str,
-    pub(crate) prediction_coherence_urgency_bias: f32,
+    /// Effective PE estimate for control calculations. If this cycle has no valid
+    /// comparison, carries forward the running mean or uses the configured neutral
+    /// threshold prior. Consumers must check prediction_error_valid before learning.
     pub(crate) prediction_error: f32,
+    /// Whether the PE came from a genuine prediction comparison.
+    pub(crate) prediction_error_valid: bool,
     pub(crate) temporal_binding_strength: f32,
-    pub(crate) error_slope: f32,
-    pub(crate) oscillation_ratio: f32,
 }
 
 impl CognitiveLoopService {
@@ -279,7 +277,7 @@ impl CognitiveLoopService {
     /// - Codebook diversity → memoization threshold adaptation
     /// - Input similarity memoization (Tulving & Schacter 1990)
     /// - Unified Ethics Engine evaluation
-    /// - Adaptive learning threshold + urgency computation
+    /// - Stateful surprise/exploration; the adaptive threshold and urgency are finalized downstream
     pub(super) fn run_encoding_and_preprocessing(
         &mut self,
         input: &str,
@@ -288,14 +286,26 @@ impl CognitiveLoopService {
         // 1. HDC encode with attention from previous prediction
         let _t_core = Instant::now();
         let mut encoding_result = self.encoder.encode(input);
-        let prediction_error = encoding_result.prediction_error;
+        // Degenerate 1.0 values remain on EncodingResult as explicit legacy
+        // sentinels, but they are not observations of surprise. For scalar-only
+        // downstream controllers, use the last measured running mean; before any
+        // valid comparison exists, use the configured threshold as a neutral prior.
+        // The validity bit prevents this fallback estimate from entering learning.
+        let prediction_error_valid =
+            self.encoder.last_prediction_degeneracy() == PredictionDegeneracy::Genuine;
+        let prediction_error = if prediction_error_valid {
+            encoding_result.prediction_error
+        } else if !self.error_history.is_empty() {
+            self.stats.avg_prediction_error.clamp(0.0, 1.0)
+        } else {
+            self.config.learning_threshold.clamp(0.0, 1.0)
+        };
         module_timings.core_hdc_encode = _t_core.elapsed().as_micros() as u64;
 
         // Surface degenerate prediction errors: PE=1.0 from an empty/zero-norm
         // prediction is a broken upstream signal, not real surprise (rate-limited
         // to powers of two so a persistent break doesn't flood the log).
         {
-            use symthaea_core::hdc::predictive_encoder::PredictionDegeneracy;
             if self.encoder.last_prediction_degeneracy() == PredictionDegeneracy::ZeroPrediction {
                 let n = self.encoder.stats().degenerate_zero_prediction_cycles;
                 if n.is_power_of_two() {
@@ -496,7 +506,7 @@ impl CognitiveLoopService {
             // amplify dimensions that differ most from last prediction.
             // Feldman & Friston (2010): precision-weighted prediction errors
             // gate information flow at the dimension level.
-            if prediction_error > SURPRISE_PE_THRESHOLD {
+            if prediction_error_valid && prediction_error > SURPRISE_PE_THRESHOLD {
                 if let Some(ref last_pred) = self.last_prediction {
                     if last_pred.len() == raw.len() {
                         let pred_slice = last_pred.as_slice();
@@ -572,9 +582,13 @@ impl CognitiveLoopService {
             compressed_state
         };
 
+        // Surprise exploration is stateful, so compute it once and pass the result
+        // into the perception phase. Threshold and urgency are finalized after the
+        // remainder of encoding/preprocessing has updated the relevant state.
+        let _t_surprise = Instant::now();
         let (surprise_triggered, exploration_action) =
             self.run_surprise_exploration(&compressed_state);
-        module_timings.surprise_exploration = _t.elapsed().as_micros() as u64;
+        module_timings.surprise_exploration = _t_surprise.elapsed().as_micros() as u64;
 
         // ── Phase 21: Codebook diversity → memoization threshold adaptation ─
         let base_memo_threshold = super::thresholds::INPUT_MEMO_THRESHOLD;
@@ -894,28 +908,6 @@ impl CognitiveLoopService {
         // 1.2 Adaptive Learning Threshold + Urgency
         // ═══════════════════════════════════════════════════════════════════════
         // Science: Friston (2010) — precision (inverse uncertainty) modulates PE weighting.
-        let confidence_scale = (1.0
-            + (self.prediction_confidence - CONFIDENCE_SCALE_MIDPOINT as f64)
-                * CONFIDENCE_SCALE_SENSITIVITY as f64) as f32;
-        let exploration_scale = (1.0
-            - (self.behavior.curiosity_drive.exploration_urge - EXPLORATION_SCALE_MIDPOINT as f64)
-                * EXPLORATION_SCALE_SENSITIVITY as f64) as f32;
-        let effective_threshold = self.config.learning_threshold
-            * self.carryover.learning.adaptive_threshold_scale as f32
-            * confidence_scale
-            * exploration_scale;
-        let urgency_result = self.compute_urgency_and_error_pattern(
-            prediction_error,
-            surprise_triggered,
-            effective_threshold,
-        );
-        let urgency = urgency_result.urgency;
-        let error_pattern = urgency_result.error_pattern;
-        let predicted_urgency = urgency_result.predicted_urgency;
-        let prediction_coherence_urgency_bias = urgency_result.prediction_coherence_urgency_bias;
-        let error_slope = urgency_result.error_slope;
-        let oscillation_ratio = urgency_result.oscillation_ratio;
-
         EncodingPhaseResult {
             encoding_result,
             hv16_cached,
@@ -927,15 +919,9 @@ impl CognitiveLoopService {
             memo_threshold,
             input_similarity,
             input_memoized,
-            effective_threshold,
-            urgency,
-            error_pattern,
-            predicted_urgency,
-            prediction_coherence_urgency_bias,
             prediction_error,
+            prediction_error_valid,
             temporal_binding_strength,
-            error_slope,
-            oscillation_ratio,
         }
     }
 }
@@ -943,9 +929,29 @@ impl CognitiveLoopService {
 #[cfg(test)]
 mod tests {
     use crate::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService, ResponseStrategy};
+    use symthaea_core::hdc::predictive_encoder::PredictionDegeneracy;
 
     fn make_service() -> CognitiveLoopService {
         CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap()
+    }
+
+    #[test]
+    fn degenerate_encoder_sentinel_is_not_promoted_to_control_signal() {
+        let mut svc = make_service();
+        let mut timings = ModuleTimings::default();
+
+        let result =
+            svc.run_encoding_and_preprocessing("first input without a prior prediction", &mut timings);
+
+        assert_eq!(result.encoding_result.prediction_error, 1.0);
+        assert_eq!(
+            svc.encoder.last_prediction_degeneracy(),
+            PredictionDegeneracy::NoPrediction
+        );
+        assert_eq!(result.prediction_error, svc.config.learning_threshold);
+        assert!(!result.prediction_error_valid);
+        // The raw result retains its diagnostic sentinel; control paths use a
+        // neutral prior, and learning consumers receive no PE evidence.
     }
 
     #[test]

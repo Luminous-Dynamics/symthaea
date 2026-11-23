@@ -33,6 +33,7 @@ fn decode_action(
     exam_answers: usize,
 ) -> Action {
     let pe = result.prediction_error;
+    let pe_valid = result.prediction_error_valid;
     let phi = result.metadata.consciousness.consciousness_level;
 
     // Browser embodiment learning mode: lower threshold for first interactions
@@ -49,7 +50,9 @@ fn decode_action(
         0.03
     }; // Default = very low for browser (safe actions)
 
-    if pe > 0.7 || cycles_since_observe > 4 {
+    // Invalid PE is missing evidence; refresh observations instead of allowing a
+    // stale or neutral fallback estimate to authorize an action.
+    if !pe_valid || pe > 0.7 || cycles_since_observe > 4 {
         return Action::Observe;
     }
     if phi < phi_threshold {

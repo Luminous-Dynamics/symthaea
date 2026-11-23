@@ -374,6 +374,7 @@ impl CognitiveLoopService {
         module_timings: &mut super::ModuleTimings,
     ) -> DynamicsPhaseResult {
         let prediction_error = perception.urgency.prediction_error;
+        let prediction_error_valid = perception.urgency.prediction_error_valid;
         let urgency = perception.urgency.urgency;
         let phi_attention_weight = perception.encoding.phi_attention_weight;
         let surprise_triggered = perception.exploration.surprise_triggered;
@@ -2047,7 +2048,7 @@ impl CognitiveLoopService {
         self.create_experience(
             &perception.encoding.compressed_state,
             &prediction,
-            prediction_error,
+            prediction_error_valid.then_some(prediction_error),
         );
 
         // 10. Update coherence bridge (zero-clone on CfC hot path)
@@ -2086,10 +2087,15 @@ impl CognitiveLoopService {
             pitch_stability: pattern_confidence,
             coarticulation_smoothness: coherence.clamp(0.0, 1.0)
                 * super::thresholds::VOICE_HEARTBEAT_COARTICULATION_WEIGHT,
-            listener_prediction: if prediction_error < self.config.learning_threshold {
-                super::thresholds::VOICE_HEARTBEAT_LISTENER_SUCCESS
+            listener_prediction: if prediction_error_valid {
+                if prediction_error < self.config.learning_threshold {
+                    super::thresholds::VOICE_HEARTBEAT_LISTENER_SUCCESS
+                } else {
+                    super::thresholds::VOICE_HEARTBEAT_LISTENER_FAIL
+                }
             } else {
-                super::thresholds::VOICE_HEARTBEAT_LISTENER_FAIL
+                // Hold the existing confidence estimate when no outcome was observed.
+                self.prediction_confidence as f32
             },
             duration_accuracy: 0.7,
             energy_consistency: 0.8,
@@ -2133,16 +2139,20 @@ impl CognitiveLoopService {
             );
         }
 
-        // 10d. Update prediction confidence
-        self.update_prediction_confidence(pattern, prediction_error, pattern_confidence);
+        // 10d. Update prediction confidence only from an actual prediction comparison.
+        if prediction_error_valid {
+            self.update_prediction_confidence(pattern, prediction_error, pattern_confidence);
+        }
 
         // ═══════════════════════════════════════════════════════════════════════
         // 10d.5 Active Inference Bridge
         // ═══════════════════════════════════════════════════════════════════════
-        let prediction_success = prediction_error < self.config.learning_threshold;
-        self.fep
-            .active_inference_bridge
-            .observe_resolution(self.prediction_confidence, prediction_success);
+        if prediction_error_valid {
+            let prediction_success = prediction_error < self.config.learning_threshold;
+            self.fep
+                .active_inference_bridge
+                .observe_resolution(self.prediction_confidence, prediction_success);
+        }
 
         // ═══════════════════════════════════════════════════════════════════════
         // 10d.6 FEP Active Inference
@@ -2219,7 +2229,7 @@ impl CognitiveLoopService {
         }
 
         // ── Track 5b: MCTS plan post-hoc evaluation ─────────────────────────
-        let mcts_plan_effectiveness: f32 =
+        let mcts_plan_effectiveness: f32 = if prediction_error_valid {
             if let Some((_prev_action, _prev_confidence, prev_error)) =
                 self.carryover.history.mcts_plan_applied.take()
             {
@@ -2251,13 +2261,19 @@ impl CognitiveLoopService {
                 effectiveness
             } else {
                 0.0
-            };
+            }
+        } else {
+            // Keep a pending plan until a real prediction outcome is available.
+            0.0
+        };
 
         // ── Apply previous cycle's MCTS plan ──────────────
         if let Some((plan_action, plan_confidence)) = self.carryover.history.mcts_plan.take() {
             if plan_confidence > MCTS_PLAN_CONFIDENCE_THRESHOLD && plan_action != fep_action_idx {
-                self.carryover.history.mcts_plan_applied =
-                    Some((plan_action, plan_confidence, prediction_error));
+                if prediction_error_valid {
+                    self.carryover.history.mcts_plan_applied =
+                        Some((plan_action, plan_confidence, prediction_error));
+                }
                 let plan_weight = plan_confidence * MCTS_PLAN_WEIGHT_SCALE;
                 match plan_action {
                     0 => {
@@ -2869,7 +2885,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let run_enhanced = surprise_triggered
             || is_surprised
-            || prediction_error > self.config.learning_threshold
+            || (prediction_error_valid && prediction_error > self.config.learning_threshold)
             || urgency.should_run(self.stats.total_cycles, 1, 4, 8);
         let enhanced_result = if run_enhanced {
             let r = self.fep.enhanced_bridge.cycle(
@@ -3185,7 +3201,12 @@ impl CognitiveLoopService {
         }
 
         // 10e–g. Update flow state, curiosity drive, self-reflection
-        self.update_drives_and_reflection(pattern, prediction_error, coherence);
+        self.update_drives_and_reflection(
+            pattern,
+            prediction_error,
+            prediction_error_valid,
+            coherence,
+        );
 
         // Unified Psi + Experience Bus + Guiding Question computed by
         // run_neuromodulator_and_psi_phase() above — values already in neuromod_result.

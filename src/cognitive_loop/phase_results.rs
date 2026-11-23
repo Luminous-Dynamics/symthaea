@@ -85,7 +85,10 @@ pub(super) struct PercUrgency {
     pub(super) error_pattern: &'static str,
     pub(super) predicted_urgency: &'static str,
     pub(super) prediction_coherence_urgency_bias: f32,
+    /// Effective control PE, not a raw diagnostic sentinel.
     pub(super) prediction_error: f32,
+    /// False means no valid comparison was available on this cycle.
+    pub(super) prediction_error_valid: bool,
     pub(super) error_slope: f32,
     pub(super) oscillation_ratio: f32,
 }

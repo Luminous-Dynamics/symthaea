@@ -344,16 +344,32 @@ impl CognitiveLoopService {
         // PHASE 1.1: Surprise and Exploration
         // ═══════════════════════════════════════════════════════════════════════
         let prediction_error = encoding_res.prediction_error;
-        let (surprise_triggered, exploration_action) =
-            self.run_surprise_exploration(&encoding_res.compressed_state);
+        let prediction_error_valid = encoding_res.prediction_error_valid;
+        let surprise_triggered = encoding_res.surprise_triggered;
+        let exploration_action = encoding_res.exploration_action;
+
+        // Exploration can change confidence/curiosity state, so compute the
+        // adaptive threshold after the single exploration update for this cycle.
+        let confidence_scale = (1.0
+            + (self.prediction_confidence - super::thresholds::CONFIDENCE_SCALE_MIDPOINT as f64)
+                * super::thresholds::CONFIDENCE_SCALE_SENSITIVITY as f64) as f32;
+        let exploration_scale = (1.0
+            - (self.behavior.curiosity_drive.exploration_urge
+                - super::thresholds::EXPLORATION_SCALE_MIDPOINT as f64)
+                * super::thresholds::EXPLORATION_SCALE_SENSITIVITY as f64) as f32;
+        let effective_threshold = self.config.learning_threshold
+            * self.carryover.learning.adaptive_threshold_scale as f32
+            * confidence_scale
+            * exploration_scale;
 
         // ═══════════════════════════════════════════════════════════════════════
         // PHASE 1.2: Urgency Phase
         // ═══════════════════════════════════════════════════════════════════════
         let urgency_result = self.compute_urgency_and_error_pattern(
             prediction_error,
+            prediction_error_valid,
             surprise_triggered,
-            encoding_res.effective_threshold,
+            effective_threshold,
         );
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -538,6 +554,7 @@ impl CognitiveLoopService {
                 predicted_urgency: urgency_result.predicted_urgency,
                 prediction_coherence_urgency_bias: urgency_result.prediction_coherence_urgency_bias,
                 prediction_error,
+                prediction_error_valid,
                 error_slope: urgency_result.error_slope,
                 oscillation_ratio: urgency_result.oscillation_ratio,
             },
