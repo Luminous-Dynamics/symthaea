@@ -125,9 +125,12 @@ The module contains tests for:
 15. non-decreasing knowledge time;
 16. erasure of a consent grant invalidating dependent claims;
 17. rejection of source observations after the system's knowledge time;
-18. rejection of retractions carrying an invalid consent identifier.
+18. rejection of retractions carrying an invalid consent identifier;
+19. valid ledger serialization/deserialization round-trip;
+20. rejection of a serialized correction with a missing target;
+21. binding an existing SemanticEntry without changing its public layout.
 
-Ledger deserialization uses a custom validating implementation: decoded snapshots pass the same cross-event checks as EvidenceLedger::new. EvidenceBound<T> is deliberately not deserializable. Two codec tests cover valid ledger round-trip and rejection of a serialized correction with a missing target. These 20 tests are authored but have not been compiled or executed in this environment.
+Ledger deserialization uses a custom validating implementation: decoded snapshots pass the same cross-event checks as EvidenceLedger::new. EvidenceBound<T> is deliberately not deserializable. Two codec tests cover valid ledger round-trip and rejection of a serialized correction with a missing target. These 21 tests are authored but have not been compiled or executed in this environment.
 
 ## Benchmark plan and comparison
 
