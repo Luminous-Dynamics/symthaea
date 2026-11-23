@@ -270,6 +270,11 @@ class MaceLongMemEvalV2IngressTests(unittest.TestCase):
                 "candidate_record_count": 1,
                 "candidate_set_sha256": candidate_set_sha256,
             }
+            invalid_commitment = dict(response, candidate_set_sha256="0" * 64)
+            with self.assertRaisesRegex(RuntimeError, "candidate-set digest mismatch"):
+                memory._persist_candidate_envelope(
+                    "opaque-invocation-1", query, invalid_commitment
+                )
 
             memory._persist_candidate_envelope("opaque-invocation-1", query, response)
             files = list(memory.candidate_evidence_dir.iterdir())
