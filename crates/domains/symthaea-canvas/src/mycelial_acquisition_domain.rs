@@ -9,11 +9,15 @@
 //! has perfect biological recall. Those claims require independent provenance,
 //! calibration, and benchmark qualification.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
 use std::fmt;
 
 use serde::{Deserialize, Serialize};
+
+use crate::mycelial_observation_coverage::{
+    MycelialObservationCoverageLedger, mycelial_observation_id_inventory_digest,
+};
 
 pub const MYCELIAL_ACQUISITION_DOMAIN_SCHEMA_VERSION: u16 = 1;
 pub const MYCELIAL_EXTRACTION_RECEIPT_SCHEMA_VERSION: u16 = 1;
@@ -193,6 +197,13 @@ pub enum MycelialAcquisitionDomainError {
     InvalidDispositionReason,
     ManifestDigestMismatch,
     ReceiptUnitInventoryMismatch,
+    IncompleteExtractionBlocksObservationInventory,
+    ObservationLedgerInvalid,
+    ObservationSourceBindingMismatch,
+    ObservationSourceUnitMissing(String),
+    ObservationSourceUnitOutsideScope(String),
+    ObservationUnitInventoryCountMismatch(MycelialAcquisitionUnitKey),
+    ObservationUnitInventoryDigestMismatch(MycelialAcquisitionUnitKey),
     InvalidUnitDisposition { reason: &'static str },
     InvalidExclusionReason,
     DigestResourceLimitExceeded,
@@ -287,6 +298,42 @@ impl fmt::Display for MycelialAcquisitionDomainError {
                 write!(
                     f,
                     "extraction receipt does not exactly cover the in-scope unit inventory"
+                )
+            }
+            Self::IncompleteExtractionBlocksObservationInventory => {
+                write!(
+                    f,
+                    "partial extraction cannot qualify a complete observation inventory"
+                )
+            }
+            Self::ObservationLedgerInvalid => {
+                write!(f, "observation coverage ledger failed semantic validation")
+            }
+            Self::ObservationSourceBindingMismatch => {
+                write!(
+                    f,
+                    "observation ledger source, replicate or coordinate bindings disagree with acquisition manifest"
+                )
+            }
+            Self::ObservationSourceUnitMissing(id) => {
+                write!(f, "observation {id} has no acquisition-unit binding")
+            }
+            Self::ObservationSourceUnitOutsideScope(id) => {
+                write!(
+                    f,
+                    "observation {id} references an acquisition unit outside the declared scope"
+                )
+            }
+            Self::ObservationUnitInventoryCountMismatch(unit) => {
+                write!(
+                    f,
+                    "observation count for acquisition unit {unit:?} disagrees with extraction receipt"
+                )
+            }
+            Self::ObservationUnitInventoryDigestMismatch(unit) => {
+                write!(
+                    f,
+                    "observation ID digest for acquisition unit {unit:?} disagrees with extraction receipt"
                 )
             }
             Self::InvalidUnitDisposition { reason } => {
@@ -766,6 +813,88 @@ impl MycelialExtractionCoverageReceipt {
                 return Err(MycelialAcquisitionDomainError::ReceiptUnitInventoryMismatch);
             }
             Self::validate_unit_outcome(outcome)?;
+        }
+        Ok(())
+    }
+
+    /// Reconcile the extraction receipt against the complete observation ledger.
+    ///
+    /// This checks that every observation is assigned to an in-scope acquisition unit,
+    /// that source/replicate/coordinate bindings match, and that the canonical digest
+    /// and count of IDs for each unit exactly match that unit's extraction output.
+    /// It requires a complete extraction; partial receipts cannot certify a complete
+    /// observation inventory.
+    pub fn validate_observation_ledger(
+        &self,
+        manifest: &MycelialAcquisitionDomainManifest,
+        ledger: &MycelialObservationCoverageLedger,
+    ) -> Result<(), MycelialAcquisitionDomainError> {
+        let summary = self.summarize(manifest)?;
+        if summary.status == MycelialExtractionCoverageStatus::Partial {
+            return Err(
+                MycelialAcquisitionDomainError::IncompleteExtractionBlocksObservationInventory,
+            );
+        }
+        ledger
+            .validate()
+            .map_err(|_| MycelialAcquisitionDomainError::ObservationLedgerInvalid)?;
+        if ledger.source_dataset_id != manifest.source_artifact_id
+            || ledger.source_dataset_digest != manifest.source_artifact_digest
+            || ledger.coordinate_frame_id != manifest.coordinate_frame_id
+            || ledger.spatial_transform_digest != manifest.spatial_transform_digest
+            || ledger.calibration_digest != manifest.calibration_digest
+            || ledger.records.iter().any(|record| {
+                record.biological_replicate_id != manifest.biological_replicate_id
+            })
+        {
+            return Err(MycelialAcquisitionDomainError::ObservationSourceBindingMismatch);
+        }
+
+        let in_scope = manifest.in_scope_unit_keys()?;
+        let mut observations_by_unit: BTreeMap<MycelialAcquisitionUnitKey, Vec<String>> =
+            BTreeMap::new();
+        for record in &ledger.records {
+            let Some(unit) = record.source_unit_key else {
+                return Err(MycelialAcquisitionDomainError::ObservationSourceUnitMissing(
+                    record.observation_id.clone(),
+                ));
+            };
+            if in_scope.binary_search(&unit).is_err() {
+                return Err(MycelialAcquisitionDomainError::ObservationSourceUnitOutsideScope(
+                    record.observation_id.clone(),
+                ));
+            }
+            observations_by_unit
+                .entry(unit)
+                .or_default()
+                .push(record.observation_id.clone());
+        }
+
+        for outcome in &self.units {
+            let ids = observations_by_unit.remove(&outcome.unit).unwrap_or_default();
+            let count = u64::try_from(ids.len()).map_err(|_| {
+                MycelialAcquisitionDomainError::ObservationUnitInventoryCountMismatch(
+                    outcome.unit,
+                )
+            })?;
+            if outcome.output_observation_count != Some(count) {
+                return Err(
+                    MycelialAcquisitionDomainError::ObservationUnitInventoryCountMismatch(
+                        outcome.unit,
+                    ),
+                );
+            }
+            let digest = mycelial_observation_id_inventory_digest(&ids);
+            if outcome.output_observation_inventory_digest.as_deref() != Some(digest.as_str()) {
+                return Err(
+                    MycelialAcquisitionDomainError::ObservationUnitInventoryDigestMismatch(
+                        outcome.unit,
+                    ),
+                );
+            }
+        }
+        if !observations_by_unit.is_empty() {
+            return Err(MycelialAcquisitionDomainError::ReceiptUnitInventoryMismatch);
         }
         Ok(())
     }
