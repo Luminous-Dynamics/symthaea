@@ -422,8 +422,7 @@ fn validate_pitch_track(
     }
     let minimum_unambiguous_spacing = timestamp_tolerance_ns.saturating_mul(2);
     if track.frames.windows(2).any(|pair| {
-        pair[1].source_timestamp_ns - pair[0].source_timestamp_ns
-            <= minimum_unambiguous_spacing
+        pair[1].source_timestamp_ns - pair[0].source_timestamp_ns <= minimum_unambiguous_spacing
     }) {
         return Err(PitchTrackEvaluationError::new(format!(
             "{label} frame spacing must exceed twice the timestamp tolerance for unambiguous one-to-one alignment"
@@ -560,12 +559,7 @@ mod tests {
         let mut estimated = track("estimated", &[Some(100.0), Some(110.0)]);
         estimated.frames[1].source_timestamp_ns = 3_000_000;
         assert!(
-            score_pitch_tracks(
-                &reference,
-                &estimated,
-                PitchTrackScoreConfigV1::default()
-            )
-            .is_err()
+            score_pitch_tracks(&reference, &estimated, PitchTrackScoreConfigV1::default()).is_err()
         );
     }
 
