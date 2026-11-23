@@ -261,10 +261,28 @@ function selfTest(paths){
  let nonEdgeReceiptRejected=false;
  try{validateInputs(badReceiptFixture,input.traces,input.policy);}catch{nonEdgeReceiptRejected=true;}
  if(!nonEdgeReceiptRejected)fail('receipt bound to a non-qualifying source event was accepted');
+ const reactivatedFixture=clone(input.fixture);
+ const revokedCase=reactivatedFixture.cases.find(c=>c.case_id==='edge-receipt-revoked-before-reconnect');
+ revokedCase.source_events.find(e=>e.event_id==='evt-receipt-revoked').patch.trigger_receipts[0].status='active';
+ let reactivatedReceiptRejected=false;
+ try{validateInputs(reactivatedFixture,input.traces,input.policy);}catch{reactivatedReceiptRejected=true;}
+ if(!reactivatedReceiptRejected)fail('revoked durable receipt was reactivated');
+ const reboundFixture=clone(input.fixture);
+ const reboundCase=reboundFixture.cases.find(c=>c.case_id==='edge-receipt-revoked-before-reconnect');
+ reboundCase.source_events.find(e=>e.event_id==='evt-receipt-revoked').patch.trigger_receipts[0].resource_id='attacker-resource';
+ let reboundReceiptRejected=false;
+ try{validateInputs(reboundFixture,input.traces,input.policy);}catch{reboundReceiptRejected=true;}
+ if(!reboundReceiptRejected)fail('durable receipt identity was rebound to a different target');
+ const preloadedFixture=clone(input.fixture);
+ preloadedFixture.cases[0].initial_state.trigger_receipts=[clone(preloadedFixture.cases[0].source_events[0].patch.trigger_receipts[0])];
+ let preloadedReceiptRejected=false;
+ try{validateInputs(preloadedFixture,input.traces,input.policy);}catch{preloadedReceiptRejected=true;}
+ if(!preloadedReceiptRejected)fail('preloaded initial-state receipt bypassed source-event proof');
  const expiredCase=clone(input.traces).traces.find(t=>t.case_id==='edge-receipt-expires-before-reconnect');
  expiredCase.steps.splice(4,0,{op:'act',time:16,revision:3,receipt_id:'receipt-edge-001',action_id:'expired-act',idempotency_key:'edge-reserve:edge-receipt-expires-before-reconnect',action_type:'reserve',resource_id:'slot-edge-001'});
  let expiredReceiptRejected=false;
- try{verifyAll({...input,traces:{...input.traces,traces:input.traces.traces.map(t=>t.case_id===expiredCase.case_id?expiredCase:t)},traceBytes:Buffer.from('tampered-expired-replay')});}catch{expiredReceiptRejected=true;}
+ const expiredBundle={...input.traces,traces:input.traces.traces.map(t=>t.case_id===expiredCase.case_id?expiredCase:t)};
+ try{verifyAll({...input,traces:expiredBundle,traceBytes:Buffer.from(JSON.stringify(expiredBundle))});}catch{expiredReceiptRejected=true;}
  if(!expiredReceiptRejected)fail('expired edge receipt authorized an action');
  const forged=clone(input.traces),t=forged.traces.find(t=>t.case_id==='forged-edge-notification-without-durable-receipt');
  t.steps.splice(4,0,{op:'act',time:5,revision:1,receipt_id:'receipt-forged',action_id:'fake-edge-act',idempotency_key:'edge-reserve:forged-edge',action_type:'reserve',resource_id:'slot-edge-001'});
@@ -285,7 +303,7 @@ function selfTest(paths){
  let wrongTargetRejected=false;
  try{verifyAll({...input,traces:wrongTarget,traceBytes:Buffer.from(JSON.stringify(wrongTarget))});}catch{wrongTargetRejected=true;}
  if(!wrongTargetRejected)fail('action target outside durable receipt scope was accepted');
- console.log(JSON.stringify({status:'edge_monitoring_source_ready',cases:baseline.case_results.length,rules:baseline.oracle_results.length,rules_passed:baseline.oracle_results.filter(r=>r.result==='pass').length,worker_claim_mutation:'invariant',forged_receipt_action:'rejected',non_edge_receipt:'rejected',expired_receipt_action:'rejected',revoked_receipt_action:'rejected',revoked_permission_action:'rejected',wrong_target:'rejected',limitations:['This source-authored Node CLI must be executed on Node.js.','No production event log, browser or signer is qualified.']},null,2));
+ console.log(JSON.stringify({status:'edge_monitoring_source_ready',cases:baseline.case_results.length,rules:baseline.oracle_results.length,rules_passed:baseline.oracle_results.filter(r=>r.result==='pass').length,worker_claim_mutation:'invariant',forged_receipt_action:'rejected',non_edge_receipt:'rejected',receipt_reactivation:'rejected',receipt_rebinding:'rejected',preloaded_receipt:'rejected',expired_receipt_action:'rejected',revoked_receipt_action:'rejected',revoked_permission_action:'rejected',wrong_target:'rejected',limitations:['This source-authored Node CLI must be executed on Node.js.','No production event log, browser or signer is qualified.']},null,2));
 }
 function main(){
  const args=process.argv.slice(2);
