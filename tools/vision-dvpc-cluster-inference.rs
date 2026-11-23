@@ -258,7 +258,7 @@ fn parse_config(meta: &BTreeMap<String, String>) -> Result<Config, String> {
         ));
     }
     let per_tail = (1.0 - familywise_confidence) / (2.0 * family_size as f64);
-    if (bootstrap_replicates as f64 * per_tail < 20.0) {
+    if bootstrap_replicates as f64 * per_tail < 20.0 {
         return Err(invalid(
             "bootstrap_replicates provides fewer than 20 resamples in a Bonferroni-adjusted tail; increase the precommitted replicate count",
         ));
@@ -688,8 +688,6 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     const LOCK: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     const CLUSTER_ASSIGNMENT_MANIFEST: &str =
         "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
@@ -755,7 +753,7 @@ DELTA_HEADER\tcomparison_id\tcandidate_id\tbaseline_id\tcluster_id\tdelta\n",
     #[test]
     fn reordered_rows_do_not_change_analysis() {
         let source = fixture();
-        let mut lines: Vec<&str> = source.lines().collect();
+        let lines: Vec<&str> = source.lines().collect();
         let header_index = lines
             .iter()
             .position(|line| line.starts_with("DELTA_HEADER"))
@@ -837,7 +835,8 @@ DELTA_HEADER\tcomparison_id\tcandidate_id\tbaseline_id\tcluster_id\tdelta\n",
 
     #[test]
     fn missing_cluster_in_comparison_fails() {
-        let mut lines: Vec<&str> = fixture().lines().collect();
+        let source = fixture();
+        let mut lines: Vec<&str> = source.lines().collect();
         let mut found = false;
         lines.retain(|line| {
             if !found
