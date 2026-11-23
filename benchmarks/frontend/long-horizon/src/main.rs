@@ -481,6 +481,26 @@ fn run_case(fixture: &Value, case: &Value, events: &BTreeMap<String, Value>) -> 
 
 fn reject_control(fixture: &Value, events: &BTreeMap<String, Value>, control: &Value) -> Result<(), String> {
     let control_id = field_str(control, "control_id")?;
+    if field_str(control, "operation")? == "second_pending_action_same_job" {
+        let actions = control.get("actions").and_then(Value::as_array)
+            .filter(|items| items.len() == 2)
+            .ok_or("pending-action negative control requires two actions")?;
+        let mut state = State::new(&fixture["initial_state"])?;
+        state.submit(&actions[0])?;
+        state.submit(&actions[1])?;
+        let first_id = field_str(&actions[0], "action_id")?;
+        let second_id = field_str(&actions[1], "action_id")?;
+        let expected_reason = field_str(control, "expected_reason")?;
+        let first_pending = state.pending.contains_key(first_id);
+        let second_result = state.action_results.get(second_id)
+            .ok_or("second pending-action result missing")?;
+        if !first_pending
+            || second_result.get("status").and_then(Value::as_str) != Some("rejected")
+            || second_result.get("reason").and_then(Value::as_str) != Some(expected_reason) {
+            return Err(format!("{control_id}: second optimistic action was not rejected for the expected reason"));
+        }
+        return Ok(());
+    }
     let original = events.get(field_str(control, "event_id")?).ok_or("negative control event missing")?;
     let mut state = State::new(&fixture["initial_state"])?;
     let mut altered = original.clone();
@@ -870,7 +890,7 @@ mod tests {
     fn all_golden_cases_metamorphic_pairs_and_negative_controls_match() {
         let (id, cases, relations, negatives) = run_fixture(&fixture()).expect("event fixture should pass");
         assert_eq!(id, "SFEB-INT-004-EVENTS-001");
-        assert_eq!((cases, relations, negatives), (6, 1, 6));
+        assert_eq!((cases, relations, negatives), (6, 1, 7));
     }
 
     #[test]
