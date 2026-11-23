@@ -1112,6 +1112,106 @@ mod tests {
         })
     }
 
+    fn candidate_receipt_record(run_id: &str, pair_block_id: &str) -> Value {
+        let method = "typed_content_hdc";
+        let decision_need_sha256 = "a".repeat(64);
+        let candidate_evidence_sha256 = "b".repeat(64);
+        let candidate_input_sha256 =
+            expected_candidate_input_sha256(&decision_need_sha256, &candidate_evidence_sha256);
+        let candidate_observation_id =
+            expected_candidate_observation_id(method, &candidate_input_sha256);
+        json!({
+            "schema_version": INPUT_SCHEMA,
+            "record_type": "candidate_decision",
+            "run_id": run_id,
+            "pair_block_id": pair_block_id,
+            "candidate_observation_id": candidate_observation_id,
+            "method": method,
+            "candidate_input_sha256": candidate_input_sha256,
+            "decision_need_sha256": decision_need_sha256,
+            "candidate_evidence_sha256": candidate_evidence_sha256,
+            "retrieved_event_ids": [3, 7],
+            "decision": "action_a",
+            "index_bytes": 2048,
+            "retrieval_profile_sha256": "c".repeat(64)
+        })
+    }
+
+    fn evaluator_receipt_record(candidate: &CandidateReceipt, pair_block_id: &str) -> Value {
+        json!({
+            "run_id": candidate.run_id,
+            "pair_block_id": pair_block_id,
+            "candidate_observation_id": expected_candidate_observation_id(
+                &candidate.method,
+                &candidate.candidate_input_sha256
+            ),
+            "method": candidate.method,
+            "candidate_input_sha256": candidate.candidate_input_sha256,
+            "decision": candidate.decision,
+            "retrieved_event_ids": candidate.retrieved_event_ids,
+            "index_bytes": candidate.index_bytes,
+            "retrieval_profile_sha256": candidate.retrieval_profile_sha256
+        })
+    }
+
+    #[test]
+    fn candidate_receipt_recomputes_input_and_observation_identities() {
+        let record = candidate_receipt_record("run-1", "world-1:task-a");
+        let (key, receipt) = parse_candidate_receipt(&record).unwrap();
+        assert_eq!(key.0, "world-1:task-a");
+        assert_eq!(receipt.run_id, "run-1");
+
+        let mut bad_observation = record.clone();
+        bad_observation["candidate_observation_id"] = json!("obs-0000000000000000");
+        assert!(parse_candidate_receipt(&bad_observation)
+            .unwrap_err()
+            .contains("candidate_observation_id"));
+
+        let mut bad_input = record;
+        bad_input["candidate_input_sha256"] = json!("d".repeat(64));
+        assert!(parse_candidate_receipt(&bad_input)
+            .unwrap_err()
+            .contains("candidate_input_sha256"));
+    }
+
+    #[test]
+    fn evaluator_score_must_match_candidate_decision_receipt() {
+        let record = candidate_receipt_record("run-1", "world-1:task-a");
+        let (key, receipt) = parse_candidate_receipt(&record).unwrap();
+        let valid = evaluator_receipt_record(&receipt, &key.0);
+        assert!(validate_score_against_candidate(&valid, &key.0, &receipt).is_ok());
+
+        let mut wrong_decision = valid.clone();
+        wrong_decision["decision"] = json!("action_b");
+        assert!(validate_score_against_candidate(&wrong_decision, &key.0, &receipt)
+            .unwrap_err()
+            .contains("decision differs"));
+
+        let mut wrong_retrieved = valid.clone();
+        wrong_retrieved["retrieved_event_ids"] = json!([3]);
+        assert!(validate_score_against_candidate(&wrong_retrieved, &key.0, &receipt)
+            .unwrap_err()
+            .contains("retrieved_event_ids"));
+
+        let mut wrong_size = valid.clone();
+        wrong_size["index_bytes"] = json!(999);
+        assert!(validate_score_against_candidate(&wrong_size, &key.0, &receipt)
+            .unwrap_err()
+            .contains("index_bytes"));
+
+        let mut wrong_profile = valid.clone();
+        wrong_profile["retrieval_profile_sha256"] = json!("d".repeat(64));
+        assert!(validate_score_against_candidate(&wrong_profile, &key.0, &receipt)
+            .unwrap_err()
+            .contains("retrieval_profile_sha256"));
+
+        let mut wrong_run = valid;
+        wrong_run["run_id"] = json!("run-2");
+        assert!(validate_score_against_candidate(&wrong_run, &key.0, &receipt)
+            .unwrap_err()
+            .contains("run_id"));
+    }
+
     fn refresh_manifest_digests(record: &mut Value) {
         let baseline_evidence_sha256 = record["baseline_evidence_sha256"]
             .as_str()
