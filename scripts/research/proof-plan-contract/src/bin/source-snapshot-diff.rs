@@ -371,7 +371,9 @@ fn compare(
             baseline_sorry_ax_present: left.trust_profile.sorry_ax_present,
             candidate_sorry_ax_present: right.trust_profile.sorry_ax_present,
             baseline_transitive_declaration_count: left.trust_profile.transitive_declaration_count,
-            candidate_transitive_declaration_count: right.trust_profile.transitive_declaration_count,
+            candidate_transitive_declaration_count: right
+                .trust_profile
+                .transitive_declaration_count,
         });
     }
 
