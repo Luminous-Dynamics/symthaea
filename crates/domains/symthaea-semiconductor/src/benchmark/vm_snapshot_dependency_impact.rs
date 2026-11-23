@@ -175,6 +175,7 @@ fn json_sha256<T: Serialize + ?Sized>(value: &T) -> Result<String, VmImpactClosu
 fn edge_digest(edge: &VmSnapshotDependencyEdgeV1) -> Result<String, VmImpactClosureErrorV1> {
     let mut canonical = edge.clone();
     canonical.edge_sha256.clear();
+    canonical.inherited_dimensions.sort();
     json_sha256(&canonical)
 }
 
@@ -377,6 +378,37 @@ fn validate_graph(
                 edge.edge_id
             )));
         }
+        let inherits_model_state = edge.inherited_dimensions.iter().any(|dimension| {
+            matches!(
+                dimension,
+                VmDependencyDimensionV1::ModelWeights
+                    | VmDependencyDimensionV1::FeatureSchema
+                    | VmDependencyDimensionV1::CalibrationState
+            )
+        });
+        let requires_dimension = match child.derivation_kind {
+            VmModelDerivationKindV1::FineTuneFromParent
+            | VmModelDerivationKindV1::WarmStartFromParent
+            | VmModelDerivationKindV1::EnsembleOfParents
+            | VmModelDerivationKindV1::DistilledFromParent => {
+                Some(VmDependencyDimensionV1::ModelWeights)
+            }
+            VmModelDerivationKindV1::CalibrationHeadFromParent => {
+                Some(VmDependencyDimensionV1::FeatureSchema)
+            }
+            VmModelDerivationKindV1::IndependentRetrain => None,
+            VmModelDerivationKindV1::EvaluationOnly => {
+                Some(VmDependencyDimensionV1::EvaluationTarget)
+            }
+        };
+        if let Some(required) = requires_dimension
+            && !edge.inherited_dimensions.contains(&required)
+        {
+            return Err(VmImpactClosureErrorV1(format!(
+                "edge {} does not declare the required {:?} dependency for child {}",
+                edge.edge_id, required, child.snapshot_id
+            )));
+        }
         if child.derivation_kind == VmModelDerivationKindV1::IndependentRetrain
             && edge
                 .inherited_dimensions
@@ -388,12 +420,10 @@ fn validate_graph(
             )));
         }
         if child.derivation_kind == VmModelDerivationKindV1::EvaluationOnly
-            && !edge
-                .inherited_dimensions
-                .contains(&VmDependencyDimensionV1::EvaluationTarget)
+            && inherits_model_state
         {
             return Err(VmImpactClosureErrorV1(format!(
-                "evaluation-only node {} must declare its evaluated-model dependency",
+                "evaluation-only node {} cannot declare model-state inheritance",
                 child.snapshot_id
             )));
         }
@@ -430,12 +460,7 @@ fn inherited_risk(
     parent_risk: ImpactRiskV1,
     dimensions: &[VmDependencyDimensionV1],
 ) -> ImpactRiskV1 {
-    if dimensions.contains(&VmDependencyDimensionV1::EvaluationTarget) {
-        return match parent_risk {
-            ImpactRiskV1::Blocked | ImpactRiskV1::Historical => ImpactRiskV1::Historical,
-            other => other,
-        };
-    }
+    let mut propagated = ImpactRiskV1::None;
     if dimensions.iter().any(|dimension| {
         matches!(
             dimension,
@@ -444,9 +469,16 @@ fn inherited_risk(
                 | VmDependencyDimensionV1::CalibrationState
         )
     }) {
-        return parent_risk;
+        propagated = propagated.max(parent_risk);
     }
-    ImpactRiskV1::None
+    if dimensions.contains(&VmDependencyDimensionV1::EvaluationTarget) {
+        let evaluation_risk = match parent_risk {
+            ImpactRiskV1::Blocked | ImpactRiskV1::Historical => ImpactRiskV1::Historical,
+            other => other,
+        };
+        propagated = propagated.max(evaluation_risk);
+    }
+    propagated
 }
 
 fn impact_state(risk: ImpactRiskV1, direct: bool) -> VmSnapshotImpactStateV1 {
@@ -756,19 +788,13 @@ mod tests {
             requalified_at_k1_unix_seconds: 1_880_000_000,
             current_disposition: disposition,
             consumed_label_count: 1,
-            current_eligible_count: usize::from(
-                disposition == VmSnapshotCurrentDispositionV1::CurrentEligible,
-            ),
-            current_unknown_count: usize::from(
-                disposition == VmSnapshotCurrentDispositionV1::Indeterminate,
-            ),
-            current_blocked_count: usize::from(
-                matches!(
-                    disposition,
-                    VmSnapshotCurrentDispositionV1::RebuildRequired
-                        | VmSnapshotCurrentDispositionV1::HistoricalOnly
-                ),
-            ),
+            current_eligible_count: if disposition == VmSnapshotCurrentDispositionV1::CurrentEligible { 1 } else { 0 },
+            current_unknown_count: if disposition == VmSnapshotCurrentDispositionV1::Indeterminate { 1 } else { 0 },
+            current_blocked_count: if matches!(
+                disposition,
+                VmSnapshotCurrentDispositionV1::RebuildRequired
+                    | VmSnapshotCurrentDispositionV1::HistoricalOnly
+            ) { 1 } else { 0 },
             label_statuses: vec![VmSnapshotLabelCurrentStatusV1 {
                 label_id: format!("label-{snapshot_id}"),
                 k0_projection_sha256: digest('k'),
