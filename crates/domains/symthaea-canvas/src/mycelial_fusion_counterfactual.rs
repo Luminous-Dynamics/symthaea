@@ -21,8 +21,8 @@ use std::fmt;
 use serde::{Deserialize, Serialize};
 
 use crate::mycelial_reconstruction_metrics::{
-    AnnotatedJunctionKind, AnnotatedMycelialSkeleton, ReconstructionLengthUnit,
-    ReconstructionPoint3,
+    AnnotatedJunctionKind, AnnotatedMycelialSkeleton, ReconstructionDimensionality,
+    ReconstructionLengthUnit, ReconstructionPoint3,
 };
 
 pub const MYCELIAL_FUSION_COUNTERFACTUAL_SCHEMA_VERSION: u16 = 1;
@@ -141,6 +141,8 @@ pub struct MycelialFusionDemandDelta {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MycelialFusionDisruptionDelta {
     pub scenario_id: String,
+    pub failed_segment_ids: Vec<String>,
+    pub failed_junction_ids: Vec<String>,
     pub rejected: MycelialFusionViewMetrics,
     pub accepted_for_analysis: MycelialFusionViewMetrics,
     pub reachable_demand_weight_delta: i128,
@@ -152,6 +154,10 @@ pub struct MycelialFusionDisruptionDelta {
 pub struct MycelialFusionCandidateImpact {
     pub candidate_id: String,
     pub candidate_digest: String,
+    pub source_tip_junction_id: String,
+    pub target: MycelialFusionTarget,
+    pub bridge_length: f64,
+    pub bridge_length_unit: ReconstructionLengthUnit,
     pub calibration_policy_id: String,
     pub probability_evidence_digest: String,
     pub fusion_probability: f64,
@@ -177,6 +183,12 @@ pub struct MycelialFusionCandidateImpact {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MycelialFusionCounterfactualReport {
     pub schema_version: u16,
+    pub source_skeleton_schema_version: u16,
+    pub frame_id: String,
+    pub coordinate_frame_id: String,
+    pub calibration_digest: String,
+    pub dimensionality: ReconstructionDimensionality,
+    pub length_unit: ReconstructionLengthUnit,
     pub source_observation_digest: String,
     pub source_graph_digest: String,
     pub candidate_inventory_digest: String,
@@ -1004,6 +1016,8 @@ fn build_candidate_impact(
         let (after, _) = view_metrics(&accepted_view, demands, &failed_segments, &failed_junctions);
         disruption_deltas.push(MycelialFusionDisruptionDelta {
             scenario_id: scenario.scenario_id.clone(),
+            failed_segment_ids: scenario.failed_segment_ids.clone(),
+            failed_junction_ids: scenario.failed_junction_ids.clone(),
             reachable_demand_weight_delta: i128::from(after.reachable_demand_weight)
                 - i128::from(before.reachable_demand_weight),
             connected_component_delta: signed_difference(
@@ -1020,6 +1034,10 @@ fn build_candidate_impact(
     Ok(MycelialFusionCandidateImpact {
         candidate_id: candidate.candidate_id.clone(),
         candidate_digest: candidate_digest(candidate),
+        source_tip_junction_id: candidate.source_tip_junction_id.clone(),
+        target: candidate.target.clone(),
+        bridge_length: candidate.bridge_length,
+        bridge_length_unit: candidate.bridge_length_unit,
         calibration_policy_id: candidate.calibration_policy_id.clone(),
         probability_evidence_digest: candidate.probability_evidence_digest.clone(),
         fusion_probability: candidate.fusion_probability,
@@ -1147,6 +1165,7 @@ fn validate_inputs(
         if !valid_id(&demand.demand_id)
             || !demand_ids.insert(demand.demand_id.as_str())
             || demand.weight == 0
+            || demand.source_junction_id == demand.target_junction_id
         {
             return Err(MycelialFusionCounterfactualError::InvalidDemand(
                 demand.demand_id.clone(),
@@ -1258,6 +1277,12 @@ pub fn evaluate_mycelial_fusion_counterfactuals(
     }
     Ok(MycelialFusionCounterfactualReport {
         schema_version: MYCELIAL_FUSION_COUNTERFACTUAL_SCHEMA_VERSION,
+        source_skeleton_schema_version: skeleton.schema_version,
+        frame_id: skeleton.frame_id.clone(),
+        coordinate_frame_id: skeleton.coordinate_frame_id.clone(),
+        calibration_digest: skeleton.calibration_digest.clone(),
+        dimensionality: skeleton.dimensionality,
+        length_unit: skeleton.length_unit,
         source_observation_digest: skeleton.source_observation_digest.clone(),
         source_graph_digest,
         candidate_inventory_digest: candidate_inventory_digest(candidates),
