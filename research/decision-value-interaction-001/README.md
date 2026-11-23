@@ -61,6 +61,8 @@ The pairing certificate also validates the arm-local decision-time information f
 
 This is a DVPC semantic adapter over driver-supplied event references. Generic canonical event encoding, SHA-256 hash-chain receipts, oracle isolation and signing remain with #9437/#8715; the driver-owned information ledger remains with #8732. The validator does not prove policy non-anticipativity without an actual driver replay and future-suffix mutation test.
 
+The evaluator also exposes `validate_causal_pairing_with_interaction`, which joins the four causal trajectory receipts to the #13281 regret outcomes. Applied outcomes must match the exact world tick, action digest and consumer application timestamp. Non-applied outcomes must match the terminal timestamp and reason. The combined certificate carries the exact same thirteen-field `PairedRunIdentity` as the regret certificate, so individually valid but unrelated trajectory and regret payloads cannot be joined.
+
 ## Run
 
     cargo fmt --manifest-path research/decision-value-interaction-001/Cargo.toml -- --check
