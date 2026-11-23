@@ -10,10 +10,8 @@ use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use thiserror::Error;
 
-pub const VM_PRIVACY_ATTACK_SCHEMA_V1: &str =
-    "luminous.semi-bench.vm-update-inversion-attack.v1";
-pub const VM_PRIVACY_REPORT_SCHEMA_V1: &str =
-    "luminous.semi-bench.vm-update-inversion-report.v1";
+pub const VM_PRIVACY_ATTACK_SCHEMA_V1: &str = "luminous.semi-bench.vm-update-inversion-attack.v1";
+pub const VM_PRIVACY_REPORT_SCHEMA_V1: &str = "luminous.semi-bench.vm-update-inversion-report.v1";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -141,7 +139,10 @@ fn validate_inputs(
     if config.run_id.trim().is_empty() {
         return Err(VmPrivacyAttackErrorV1("run_id must be non-empty".into()));
     }
-    if records.is_empty() || model_weights.is_empty() || model_bias.is_nan() || !model_bias.is_finite()
+    if records.is_empty()
+        || model_weights.is_empty()
+        || model_bias.is_nan()
+        || !model_bias.is_finite()
     {
         return Err(VmPrivacyAttackErrorV1(
             "records, model weights and finite bias are required".into(),
@@ -193,10 +194,7 @@ fn logistic_gradient(
         .sum::<f64>()
         + model_bias;
     let residual = sigmoid(logit) - if label { 1.0 } else { 0.0 };
-    let mut gradient: Vec<f64> = features
-        .iter()
-        .map(|feature| residual * feature)
-        .collect();
+    let mut gradient: Vec<f64> = features.iter().map(|feature| residual * feature).collect();
     gradient.push(residual);
     gradient
 }
@@ -205,7 +203,11 @@ fn clip_gradient(gradient: &mut [f64], clipping_norm: f64) {
     if clipping_norm <= 0.0 {
         return;
     }
-    let norm = gradient.iter().map(|value| value * value).sum::<f64>().sqrt();
+    let norm = gradient
+        .iter()
+        .map(|value| value * value)
+        .sum::<f64>()
+        .sqrt();
     if norm > clipping_norm && norm > 0.0 {
         let scale = clipping_norm / norm;
         for value in gradient {
@@ -214,11 +216,7 @@ fn clip_gradient(gradient: &mut [f64], clipping_norm: f64) {
     }
 }
 
-fn add_noise(
-    gradient: &mut [f64],
-    noise_stddev: f64,
-    rng: &mut PrivacySplitMix64,
-) {
+fn add_noise(gradient: &mut [f64], noise_stddev: f64, rng: &mut PrivacySplitMix64) {
     if noise_stddev <= 0.0 {
         return;
     }
@@ -361,9 +359,8 @@ pub fn evaluate_vm_update_inversion_v1(
     } else {
         None
     };
-    let label_inference_accuracy = (attack_attempted && reconstructed_record_count > 0).then(|| {
-        correct_labels as f64 / reconstructed_record_count as f64
-    });
+    let label_inference_accuracy = (attack_attempted && reconstructed_record_count > 0)
+        .then(|| correct_labels as f64 / reconstructed_record_count as f64);
 
     let attack_status = if !attack_attempted {
         PrivacyAttackStatusV1::PerRecordAttackNotApplicableToAggregateVisibility
@@ -501,14 +498,13 @@ mod tests {
 
     #[test]
     fn aggregate_visibility_does_not_mislabel_unattempted_attack_as_privacy_proof() {
-        let batch =
-            evaluate_vm_update_inversion_v1(
-                &records(),
-                &[0.15, -0.2, 0.3],
-                0.1,
-                &config(UpdateVisibilityV1::PerClientBatch),
-            )
-            .unwrap();
+        let batch = evaluate_vm_update_inversion_v1(
+            &records(),
+            &[0.15, -0.2, 0.3],
+            0.1,
+            &config(UpdateVisibilityV1::PerClientBatch),
+        )
+        .unwrap();
         let secure_aggregate = evaluate_vm_update_inversion_v1(
             &records(),
             &[0.15, -0.2, 0.3],
