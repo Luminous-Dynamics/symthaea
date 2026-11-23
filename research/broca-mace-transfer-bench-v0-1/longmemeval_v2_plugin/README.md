@@ -70,6 +70,8 @@ The official harness then discovers `mace_lmev2_bm25_text` through its normal me
 
 Use a separate clean workspace for each domain/run. The configured screenshot root must contain all source screenshot files. The shim rejects absolute or relative screenshot references that resolve outside that root, copies selected source bytes into a private workspace, and records both the canonical source-trajectory digest and each copied screenshot's SHA-256.
 
+For ingress, the plugin pins the configured screenshot root with a directory descriptor. It opens each intermediate directory and the final file relative to that descriptor using no-follow semantics; it rejects symlink replacement at both file and directory components. It reads through the opened file descriptor, requires a regular file, applies the byte cap while reading, and compares file identity, size, modification time and change time before/after the read. This closes the ordinary path-check/read symlink-swap window. The configured root itself must still be trusted, and the official reader's later open remains a separate boundary protected by the private evaluation workspace and sidecar pixel-digest verification.
+
 The Rust sidecar checks screenshot path containment and verifies the copied screenshot bytes against the digest embedded at ingestion before returning an image context item. The official reader still performs its own image opening and context-token accounting.
 
 ## Evidence and privacy boundaries
@@ -96,7 +98,7 @@ The sidecar crate's focused test command is:
 cargo test --manifest-path research/broca-mace-transfer-bench-v0-1/aml-adapter/Cargo.toml --bin mace_lmev2_stdio
 ```
 
-Six Python ingress/protocol tests are provided in `tests/test_mace_lmev2_memory.py` for byte-preserving image copy/digest binding, canonical original-trajectory preservation, absolute/traversal/symlink escape rejection, screenshot size limits domain isolation, and fail-closed behavior after a sidecar response is lost. An ambiguous RPC outcome poisons the sidecar process; the plugin refuses further operations until the memory is reloaded/reconciled instead of silently restarting an empty sidecar. The Rust sidecar also has three unit tests for official context-item output, duplicate inserts and screenshot-byte substitution. Copy this test file into the official repository's `tests/` directory after installing the plugin. The prescribed command is:
+Nine Python ingress/protocol tests are provided in `tests/test_mace_lmev2_memory.py` for byte-preserving image copy/digest binding, canonical original-trajectory preservation, absolute/traversal/symlink escape rejection, file and intermediate-directory symlink swaps after path validation, screenshot size limits, domain isolation, and fail-closed behavior after a sidecar response is lost. An ambiguous RPC outcome poisons the sidecar process; the plugin refuses further operations until the memory is reloaded/reconciled instead of silently restarting an empty sidecar. The Rust sidecar also has three unit tests for official context-item output, duplicate inserts and screenshot-byte substitution. Copy this test file into the official repository's `tests/` directory after installing the plugin. The prescribed command is:
 
 ```sh
 python -m unittest tests.test_mace_lmev2_memory
