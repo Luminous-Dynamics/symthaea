@@ -185,6 +185,12 @@ pub fn rank_covariance_aware_experiments(
                 let first = predictions[first_id.as_str()].means.as_slice();
                 let second = predictions[second_id.as_str()].means.as_slice();
                 let delta: Vec<f64> = first.iter().zip(second).map(|(a, b)| a - b).collect();
+                if delta.iter().any(|value| !value.is_finite()) {
+                    return Err(CovarianceDesignError::NumericalFailure(format!(
+                        "non-finite mean difference for {} vs {} in {}",
+                        first_id, second_id, experiment.experiment_id
+                    )));
+                }
                 let covariance = covariances[&(first_id.as_str(), second_id.as_str())];
                 match mahalanobis_squared(&delta, &covariance.covariance)? {
                     PairScore::Finite(score) => {
@@ -282,7 +288,7 @@ fn mahalanobis_squared(
     for i in 0..n {
         if covariance[i][i] == 0.0 {
             if delta[i] != 0.0 {
-                let norm = delta.iter().map(|v| v * v).sum::<f64>().sqrt();
+                let norm = delta.iter().fold(0.0_f64, |acc, value| acc.hypot(*value));
                 return Ok(PairScore::OutsideSupport { residual: delta[i].abs(), norm });
             }
         } else {
@@ -300,10 +306,15 @@ fn mahalanobis_squared(
     for (row, &i) in active.iter().enumerate() {
         standardized_delta[row] = delta[i] / scales[i];
         for (column, &j) in active.iter().enumerate() {
-            correlation[row][column] = covariance[i][j] / (scales[i] * scales[j]);
+            correlation[row][column] = covariance[i][j] / scales[i] / scales[j];
         }
     }
-    let norm = standardized_delta.iter().map(|v| v * v).sum::<f64>().sqrt();
+    if standardized_delta.iter().any(|value| !value.is_finite()) {
+        return Err(CovarianceDesignError::NumericalFailure(
+            "standardized mean difference overflowed".to_owned(),
+        ));
+    }
+    let norm = standardized_delta.iter().fold(0.0_f64, |acc, value| acc.hypot(*value));
     let (eigenvalues, eigenvectors) = jacobi_symmetric_eigen(&correlation)
         .ok_or_else(|| CovarianceDesignError::NumericalFailure("Jacobi eigensolver did not converge".to_owned()))?;
     let max_eigenvalue = eigenvalues.iter().copied().fold(0.0_f64, f64::max).max(1.0);
@@ -553,7 +564,7 @@ fn correlation_matrix(covariance: &[Vec<f64>]) -> Option<Vec<Vec<f64>>> {
                     return None;
                 }
             } else {
-                correlation[i][j] = covariance[i][j] / (scales[i] * scales[j]);
+                correlation[i][j] = covariance[i][j] / scales[i] / scales[j];
                 if !correlation[i][j].is_finite() {
                     return None;
                 }
