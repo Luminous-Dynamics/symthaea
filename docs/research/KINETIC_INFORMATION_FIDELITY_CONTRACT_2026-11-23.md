@@ -3,7 +3,7 @@
 **Date:** 23 November 2026  
 **Status:** Research specification; not yet implemented or experimentally qualified  
 **Scope:** Periodic 1D1V collisionless Vlasov–Poisson as the first common cohort  
-**Owners / related work:** [#12907](https://github.com/Luminous-Dynamics/symthaea/issues/12907), [#12910](https://github.com/Luminous-Dynamics/symthaea/issues/12910), [#12914](https://github.com/Luminous-Dynamics/symthaea/issues/12914), [#12921](https://github.com/Luminous-Dynamics/symthaea/issues/12921), [#12942](https://github.com/Luminous-Dynamics/symthaea/issues/12942), [#12976](https://github.com/Luminous-Dynamics/symthaea/issues/12976), [#12979](https://github.com/Luminous-Dynamics/symthaea/issues/12979), [#13104](https://github.com/Luminous-Dynamics/symthaea/issues/13104), [#13132](https://github.com/Luminous-Dynamics/symthaea/issues/13132), [#13138](https://github.com/Luminous-Dynamics/symthaea/issues/13138), [#13156](https://github.com/Luminous-Dynamics/symthaea/issues/13156), [#13169](https://github.com/Luminous-Dynamics/symthaea/issues/13169), [#13177](https://github.com/Luminous-Dynamics/symthaea/issues/13177)
+**Owners / related work:** [#12907](https://github.com/Luminous-Dynamics/symthaea/issues/12907), [#12910](https://github.com/Luminous-Dynamics/symthaea/issues/12910), [#12914](https://github.com/Luminous-Dynamics/symthaea/issues/12914), [#12921](https://github.com/Luminous-Dynamics/symthaea/issues/12921), [#12942](https://github.com/Luminous-Dynamics/symthaea/issues/12942), [#12976](https://github.com/Luminous-Dynamics/symthaea/issues/12976), [#12979](https://github.com/Luminous-Dynamics/symthaea/issues/12979), [#13104](https://github.com/Luminous-Dynamics/symthaea/issues/13104), [#13132](https://github.com/Luminous-Dynamics/symthaea/issues/13132), [#13138](https://github.com/Luminous-Dynamics/symthaea/issues/13138), [#13156](https://github.com/Luminous-Dynamics/symthaea/issues/13156), [#13169](https://github.com/Luminous-Dynamics/symthaea/issues/13169), [#13177](https://github.com/Luminous-Dynamics/symthaea/issues/13177), [#13404](https://github.com/Luminous-Dynamics/symthaea/issues/13404)
 
 ## Executive thesis
 
@@ -111,7 +111,7 @@ At minimum, score separately:
 - missing, extra and mis-associated response branches;
 - control consistency (no-pulse, no-second-pulse, phase-mismatch, filtered-state and injected-noise controls).
 
-A successful two-pulse echo is not evidence of arbitrary future-response preservation. The guarantee is bounded by the declared intervention family, parameter support and tested horizon.
+A successful two-pulse echo is not evidence of arbitrary future-response preservation. The guarantee is bounded by the declared intervention family, parameter support and tested horizon. Fixed registered suites should be supplemented with adversarial probe search: #13404 searches for admissible pulses that expose a response discrepancy missed by the ordinary suite. Such a search discovers empirical witnesses; it does not certify a continuous worst-case bound without an independent covering / regularity argument.
 
 ### 1.4 Sensitivity fidelity
 
@@ -422,6 +422,7 @@ This specification is a shared metric/contract layer. It does not replace the ex
 | [#13132](https://github.com/Luminous-Dynamics/symthaea/issues/13132) | Goal-oriented QoI and sensitivity allocation |
 | [#13138](https://github.com/Luminous-Dynamics/symthaea/issues/13138) and [#13169](https://github.com/Luminous-Dynamics/symthaea/issues/13169) | Two-pulse physical echo anchor and finite multi-pulse response graph |
 | [#13177](https://github.com/Luminous-Dynamics/symthaea/issues/13177) | Multi-component representation, conservative overlap, split/merge and lineage |
+| [#13404](https://github.com/Luminous-Dynamics/symthaea/issues/13404) | Adversarially search admissible interventions that expose future-response information loss; confirm witnesses independently and report empirical coverage rather than unsupported worst-case guarantees |
 
 The ICF nonlocal electron heat-flux programme in [#12938](https://github.com/Luminous-Dynamics/symthaea/issues/12938) remains a separate physical task. It can reuse the contract vocabulary, but its equations, reference data, observables and scorecard must not be pooled with periodic electrostatic Landau damping.
 
@@ -432,7 +433,7 @@ The following work can proceed without waiting for long echo/recurrence workflow
 1. **Close the measurement contract around #13378.** Add signed physical runs, zero-pulse baselines, complex response matrix, phase controls, amplitude sweeps and convergence analysis. The current PR adds the parity primitive; it does not yet supply those experiment results.
 2. **Reproduce the FNO comparator in the existing owner lanes.** [#12907](https://github.com/Luminous-Dynamics/symthaea/issues/12907) owns source/artifact admission and exact 2025/2026 reproductions; [#12910](https://github.com/Luminous-Dynamics/symthaea/issues/12910) owns RK-substage memory semantics; [#12914](https://github.com/Luminous-Dynamics/symthaea/issues/12914) owns accuracy/admissibility/OOD/portability envelopes; [#12921](https://github.com/Luminous-Dynamics/symthaea/issues/12921) owns the explicit-window versus latent-memory tournament. Use the public [Zenodo code and training data](https://doi.org/10.5281/zenodo.22800112), verify the record-level file manifest and licence, reproduce the published profiles first, then add response and longer-horizon cohorts.
 3. **Resolve and execute VlasovTT.** Keep source-default and paper-faithful profiles separate; execute upstream tests, dense path and compressed path before any modified settings.
-4. **Calibrate native memory indicators (#13156).** Fit each representation's own indicators to independently measured response loss; test held-out complete trajectories and representations.
+4. **Calibrate native memory indicators (#13156) and adversarial probes (#13404).** Fit each representation's own indicators to independently measured response loss; search for additional response-loss witnesses; confirm every witness with a separately refined reference; test held-out complete trajectories and intervention families.
 5. **Connect to goal-oriented adaptation (#13132).** Protect declared QoIs and gradients, while retaining mandatory physical-state gates.
 6. **Run representation ablations (#13104 / #13177).** Static dense, static TT, static Hermite, closure-only, micro-error-only adaptation, QoI-only adaptation and response-aware adaptation.
 7. **Publish matched Pareto results.** A method wins only on the subset where it passes the same declared contract.
