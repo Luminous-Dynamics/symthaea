@@ -894,6 +894,42 @@ mod tests {
     }
 
     #[test]
+    fn trace_rejects_unbounded_identifiers_and_evidence_fanout() {
+        let mut memory = RetrievalPolicyMemoryV1::default();
+        let mut long_tool = trace(
+            "long-tool",
+            "a393939393939393939393939393939393939393939393939393939393939393",
+            "web-shop-a",
+            ENV_A,
+            TOOL_PROFILE_A,
+            ACTION_SEARCH,
+        );
+        long_tool.operations[0].tool_id = "t".repeat(MAX_IDENTIFIER_BYTES_V1 + 1);
+        assert_eq!(
+            memory.record_trace(long_tool),
+            Err(RetrievalPolicyRejectV1::InvalidOperation)
+        );
+
+        let mut too_many_ids = trace(
+            "too-many-ids",
+            "a494949494949494949494949494949494949494949494949494949494949494",
+            "web-shop-a",
+            ENV_A,
+            TOOL_PROFILE_A,
+            ACTION_SEARCH,
+        );
+        too_many_ids.operations[0].observed_evidence_ids =
+            (0..=MAX_EVIDENCE_IDS_PER_TRACE_V1)
+                .map(|index| format!("source:{index}"))
+                .collect();
+        assert_eq!(
+            memory.record_trace(too_many_ids),
+            Err(RetrievalPolicyRejectV1::InvalidOperation)
+        );
+        assert_eq!(memory.trace_count(), 0);
+    }
+
+    #[test]
     fn trace_rejects_unaccounted_cost_and_missing_evidence_for_success() {
         let mut memory = RetrievalPolicyMemoryV1::default();
         let mut invalid_cost = trace(
