@@ -153,6 +153,11 @@ jobs:
         run: |
           set -euo pipefail
           export CARGO_TARGET_DIR="$RUNNER_TEMP/proof-plan-target"
-          cargo test --manifest-path scripts/research/proof-plan-contract/Cargo.toml
-          cargo run --manifest-path scripts/research/proof-plan-contract/Cargo.toml -- \
+          cargo generate-lockfile --manifest-path scripts/research/proof-plan-contract/Cargo.toml
+          echo "PROOF_PLAN_LOCK_B64_BEGIN"
+          base64 -w0 scripts/research/proof-plan-contract/Cargo.lock
+          echo
+          echo "PROOF_PLAN_LOCK_B64_END"
+          cargo test --locked --manifest-path scripts/research/proof-plan-contract/Cargo.toml
+          cargo run --locked --manifest-path scripts/research/proof-plan-contract/Cargo.toml -- \
             docs/research/PROOF_PLAN_AND_COMM_V1.json
