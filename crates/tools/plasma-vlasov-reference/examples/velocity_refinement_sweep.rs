@@ -156,7 +156,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         coarse_config.nx * coarse_config.nv * std::mem::size_of::<f64>(),
     );
     println!(
-        "refine_before_guard,{},{},{:.8},{:.8},{:.8},{:.8},{early_refine_time:.8},{early_guardband:.12e},{:.12e},{early_characteristic_error:.12e},{early_fine_recurrence_error:.12e},{:.12e},{:.12e},{},{},",
+        "refine_before_guard,{},{},{:.8},{:.8},{:.8},{:.8},{early_refine_time:.8},{early_guardband:.12e},{:.12e},{early_characteristic_error:.12e},{early_fine_recurrence_error:.12e},{:.12e},{:.12e},{},{}",
         early_report.old_nv,
         early_report.new_nv,
         old_horizon.nyquist_encounter_time,
@@ -170,7 +170,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         early_report.new_state_bytes,
     );
     println!(
-        "refine_after_alias,{},{},{:.8},{:.8},{:.8},{:.8},{late_refine_time:.8},{late_guardband:.12e},{:.12e},{late_characteristic_error:.12e},NaN,{:.12e},{:.12e},{},{},",
+        "refine_after_alias,{},{},{:.8},{:.8},{:.8},{:.8},{late_refine_time:.8},{late_guardband:.12e},{:.12e},{late_characteristic_error:.12e},NaN,{:.12e},{:.12e},{},{}",
         late_report.old_nv,
         late_report.new_nv,
         old_horizon.nyquist_encounter_time,
