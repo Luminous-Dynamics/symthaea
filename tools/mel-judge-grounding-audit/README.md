@@ -1,0 +1,32 @@
+# MEL Judge Grounding Audit
+
+A standalone Rust reference evaluator for causal and metamorphic probes of music judges. It asks whether a judge actually uses audio evidence, remains stable under instruction paraphrase, ignores declared nuisance transformations, and responds to controlled semantic mismatches.
+
+## Run
+
+    cargo run --manifest-path tools/mel-judge-grounding-audit/Cargo.toml -- \
+      audit tools/mel-judge-grounding-audit/fixtures/valid-probe-panel-v1.json \
+      report.json
+
+    cargo test --manifest-path tools/mel-judge-grounding-audit/Cargo.toml
+    cargo clippy --manifest-path tools/mel-judge-grounding-audit/Cargo.toml --all-targets -- -D warnings
+
+## Probe conditions
+
+Each case binds a baseline audio A/B score and exact prompt, instruction and audio digests. It may contain:
+
+- \`prompt_only\`: remove both audios while keeping the prompt and rubric. The pairwise discrimination margin should collapse relative to the full audio+prompt condition.
+- \`audio_swap\`: exchange the two audio assets while keeping prompt, instruction and candidate slots fixed. The score margin should reverse.
+- \`instruction_paraphrase\`: keep audio and prompt fixed while replacing the rubric with a reviewed semantic paraphrase. The pairwise ranking should remain stable.
+- \`nuisance_transform\`: replace one or both audio assets with a validated semantics-preserving transform. The pairwise margin should remain within a per-probe tolerance.
+- \`semantic_mismatch\`: alter exactly one candidate's audio to violate a declared prompt attribute. That candidate's score should fall by at least the per-probe minimum.
+
+The scoring-time probe panel is assembled only after the judge-output package is frozen and the independent human reference is released. The assembled panel contains both probe outputs and post-freeze human-reference directions; it must never be mounted or sent to the judge. The evaluator reports baseline human-reference accuracy on clear cases. The sealed execution workflow in MEL-SEALED-EVAL-001 remains responsible for proving prediction freeze precedes reference release.
+
+## Interpretation
+
+This is not a music-quality model. It is an *instrument qualification* tool: it can expose prompt dependence, failure to follow audio swaps, rubric instability, nuisance sensitivity and semantic-mismatch blindness. A judge can pass one probe and fail another; no single composite score is emitted.
+
+All tolerance values are predeclared in the probe panel. Nuisance transforms must be human-validated as semantics-preserving for the target task. A tempo change is not a nuisance when the prompt specifies tempo; a channel conversion is not automatically safe if it removes spatial cues relevant to the prompt.
+
+The evaluator checks supplied digest-shaped identifiers and declared relationships. It does not open audio files, verify transformations, authenticate model execution, or prove the judge was isolated from the human reference. Synthetic fixtures establish only Rust evaluator conformance.
