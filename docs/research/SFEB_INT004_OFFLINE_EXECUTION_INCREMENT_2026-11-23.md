@@ -26,7 +26,7 @@ The independent JavaScript model was executed against the fixture bytes:
 - Pointer/keyboard metamorphic relation: **1/1**
 - Adversarial negative controls rejected: **4/4**
 - Event deliveries represented in golden traces: **17**
-- Fixture SHA-256: `12dbf68797439c88c36042a067b11d6a2e870a699325052181013c2f4632d2db`
+- Fixture SHA-256: `b3c09e0a7c343c058d271e97c24f576ad64e2b52a5f8d84c354b7d570e26a703`
 
 This is a reference-model result. It does not demonstrate that a browser candidate behaves correctly.
 
