@@ -582,12 +582,12 @@ mod tests {
 
     #[test]
     fn rejects_oversized_records_and_batches_before_parsing() {
-        let oversized_record = " ".repeat(MAX_CANDIDATE_EVIDENCE_RECORD_BYTES + 1);
+        let oversized_record = "x".repeat(MAX_CANDIDATE_EVIDENCE_RECORD_BYTES + 1);
         assert_eq!(
             parse_candidate_evidence_jsonl(&oversized_record),
             Err(CandidateEvidenceReject::RecordTooLarge)
         );
-        let oversized_batch = " ".repeat(MAX_CANDIDATE_EVIDENCE_BATCH_BYTES + 1);
+        let oversized_batch = "x".repeat(MAX_CANDIDATE_EVIDENCE_BATCH_BYTES + 1);
         assert_eq!(
             parse_candidate_evidence_jsonl(&oversized_batch),
             Err(CandidateEvidenceReject::BatchTooLarge)
