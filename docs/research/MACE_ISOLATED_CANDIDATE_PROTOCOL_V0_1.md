@@ -48,7 +48,7 @@ The candidate envelope binds:
 - schema version, run ID, pair/task ID, opaque observation sequence and custodian nonce;
 - candidate method;
 - the candidate-visible `DecisionNeedV1` task contract, including exact action alternatives, semantic estimand and qualification-profile digest;
-- candidate-visible evidence records and their source/lifecycle/causal descriptors.
+- candidate-visible evidence records and their source/lifecycle/causal descriptors. The parent projects these records to the exact `DecisionNeedV1` scope and allowed action alternatives before sending the envelope; unrelated regimes, objectives and actions are not disclosed.
 
 It intentionally has no field for evaluator truth, realized utility labels, optimal action, intervention identity/kind, target key, removed evidence IDs, score, evaluator seed or evaluator instructions. Such fields are rejected as unknown rather than ignored.
 
@@ -62,7 +62,7 @@ The receipt binds:
 - decision and support/retrieval event IDs;
 - retrieval-profile digest, index payload bytes and candidate-process latency.
 
-The observation identity follows the same canonical formula as the paired evaluator receipt contract in PR #13331. A digest establishes byte identity, not who supplied the bytes.
+The receipt also records the candidate-visible event count separately from the full available-event count in the parent-authored candidate/evaluator rows. This makes the scope projection auditable. The observation identity follows the same canonical formula as the paired evaluator receipt contract in PR #13331. A digest establishes byte identity, not who supplied the bytes.
 
 ## Invocation
 
@@ -137,6 +137,7 @@ The paired runner now uses `CandidateProcessSession` for the exact-scope and typ
 - the parent sends a fresh random 24-byte nonce and one candidate-only JSON envelope per observation;
 - the worker emits one receipt for each request and keeps no cross-request memory state;
 - the parent validates the exact request digest, nonce digest, run/task/sequence/method, DecisionNeed/evidence/input digests and observation ID;
+- candidate-visible evidence is filtered to the declared task scope/action set; the candidate parser rejects any out-of-scope record even if the parent projection is faulty;
 - support IDs must be a subset of retrieved IDs; every retrieved ID must resolve to a supplied canonical record in the declared scope/action set;
 - evaluator intervention labels and outcome truth remain in the evaluator loop and are not fields in the candidate envelope.
 
