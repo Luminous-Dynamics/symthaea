@@ -14,7 +14,9 @@ use thiserror::Error;
 
 use super::calibration_requalification::MeasurementTimeBoundsV1;
 use super::metrology_qualification_gate::{
-    CalibrationCertificateV1, MeasurementEvidenceV1,
+    CalibrationCertificateV1, MeasurementEvidenceV1, MeasurementQualificationPolicyV1,
+    MeasurementQualificationReportV1, MeasurementQualificationStatusV1,
+    qualify_measurement_evidence_v1,
 };
 
 pub const REFERENCE_DRIFT_INPUT_SCHEMA_V1: &str =
@@ -64,6 +66,8 @@ pub enum ReferenceDriftReasonV1 {
     CorrectionAnchorMismatch,
     PredictionUncertaintyExceedsPolicy,
     MeasurementTimeBoundsInvalid,
+    BaseMeasurementQualificationUnknown,
+    BaseMeasurementQualificationRejected,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -119,6 +123,8 @@ pub struct ReferenceDriftPredictionInputV1 {
     pub input_id: String,
     pub measurement: MeasurementEvidenceV1,
     pub calibration_certificate: CalibrationCertificateV1,
+    pub measurement_qualification_policy: MeasurementQualificationPolicyV1,
+    pub measurement_qualification_report: MeasurementQualificationReportV1,
     pub measurement_time_bounds: MeasurementTimeBoundsV1,
     /// A knowledge frontier; models not yet available at this time are excluded.
     pub as_known_at_unix_seconds: i64,
@@ -190,6 +196,14 @@ fn model_digest(model: &ReferenceStandardDriftModelV1) -> Result<String, Referen
     let mut canonical = model.clone();
     canonical.model_sha256.clear();
     json_sha256(&canonical)
+}
+
+/// Seals the exact structured model packet. The digest is content identity,
+/// not proof that the model issuer or reference-standard history is authentic.
+pub fn seal_reference_standard_drift_model_v1(
+    model: &ReferenceStandardDriftModelV1,
+) -> Result<String, ReferenceDriftErrorV1> {
+    model_digest(model)
 }
 
 fn report_digest(report: &ReferenceDriftPredictionReportV1) -> Result<String, ReferenceDriftErrorV1> {
@@ -337,6 +351,34 @@ pub fn predict_reference_standard_drift_v1(
     require_text(&input.input_id, "input.input_id")?;
     validate_policy(&input.policy)?;
     validate_model_shape(&input.model)?;
+
+    let reproduced_qualification = qualify_measurement_evidence_v1(
+        &input.measurement,
+        Some(&input.calibration_certificate),
+        &input.measurement_qualification_policy,
+    )
+    .map_err(|error| ReferenceDriftErrorV1(error.to_string()))?;
+    if reproduced_qualification != input.measurement_qualification_report {
+        return Err(ReferenceDriftErrorV1(
+            "base calibration qualification receipt does not replay from frozen inputs".into(),
+        ));
+    }
+    if reproduced_qualification.status != MeasurementQualificationStatusV1::Qualified {
+        let (status, reason) = match reproduced_qualification.status {
+            MeasurementQualificationStatusV1::Unknown => (
+                ReferenceDriftPredictionStatusV1::Unknown,
+                ReferenceDriftReasonV1::BaseMeasurementQualificationUnknown,
+            ),
+            MeasurementQualificationStatusV1::Rejected => (
+                ReferenceDriftPredictionStatusV1::Rejected,
+                ReferenceDriftReasonV1::BaseMeasurementQualificationRejected,
+            ),
+            MeasurementQualificationStatusV1::Qualified => unreachable!(),
+        };
+        let mut report = blank_report(input, status, vec![reason]);
+        report.report_sha256 = report_digest(&report)?;
+        return Ok(report);
+    }
 
     let lower = input.measurement_time_bounds.earliest_measured_at_unix_seconds;
     let upper = input.measurement_time_bounds.latest_measured_at_unix_seconds;
