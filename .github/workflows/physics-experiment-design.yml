@@ -33,6 +33,8 @@ jobs:
           components: clippy, rustfmt
       - name: Verify shared Galileo handoff fixture fingerprint
         run: test "$(git hash-object crates/domains/symthaea-experiment-design/fixtures/galileo-discrimination-v0.1.json)" = "0548cf58562517e69c93e5f810bfee822acee1a2"
+      - name: Verify covariance redundancy fixture fingerprint
+        run: test "$(git hash-object crates/domains/symthaea-experiment-design/fixtures/covariance-redundancy-v0.1.json)" = "17e4561b2ebbb0abaa090c4a38768fbac725172c"
       - name: Check planner formatting
         run: cargo fmt --package symthaea-experiment-design -- --check
       - name: Run planner tests with locked dependencies
@@ -41,5 +43,7 @@ jobs:
         run: cargo clippy --locked -p symthaea-experiment-design --all-targets -- -D warnings
       - name: Run bundled Galileo discrimination demo
         run: cargo run --locked -p symthaea-experiment-design -- --demo
+      - name: Run covariance redundancy control
+        run: cargo run --locked -p symthaea-experiment-design -- --covariance-demo
       - name: Exercise JSON input/output contract
         run: cargo run --locked --quiet -p symthaea-experiment-design < crates/domains/symthaea-experiment-design/fixtures/galileo-discrimination-v0.1.json
