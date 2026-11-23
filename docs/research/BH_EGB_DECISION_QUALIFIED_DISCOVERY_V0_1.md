@@ -75,6 +75,7 @@ A covariance-aware score is a screening statistic, not automatically EIG, a Baye
 | ASI-Bench | 60 tasks / 11 domains; B1–B4 guidance gradient; 26 aggregate rows in the 10 Nov 2026 snapshot. Highest listed row: GPT-6.1 Sol + Codex, ultra, 63.90. | Project-level scientific execution as method guidance is removed; sandboxed artifacts and scored outputs. | Correctness of 5D EGB equations, interval theorems or physical stability. |
 | SciWorkBench | 98 workflow tasks; strongest reported model–harness mean 57.38/100 in the 17 Nov 2026 preprint. | Real science workflow across biology, chemistry/materials and physics. | Domain-specific numerical-gravity qualification or calibrated decision value. |
 | FIRE-Bench | 30 rediscovery tasks; official page reports best F1 46.7 and high run-to-run variance. | Full-cycle rediscovery of previously verified findings, with experimental design and evidence-backed conclusions. | Novel EGB discoveries or completeness of an EGB branch. |
+| NewtonBench | 324 interactive scientific-law tasks across 12 physics domains; its study reports cases where tool availability can prompt premature exploration-to-exploitation transitions. | Causal evaluation of when tools help or harm law discovery under varying complexity/noise and changing laws. | A direct EGB numerical-gravity solver benchmark or a universal conclusion that tools hurt. |
 | AstaBench | 2,400+ tasks across literature, coding/execution, data analysis and end-to-end discovery; Spring 2026 update reports Opus 4.7 at 58.0% / $3.54 per problem and GPT-5.5 at 52.9% / $1.61. | Breadth, end-to-end completion and quality-cost trade-offs. | A matched physics solver comparison; its E2E scorer and general scientific tasks are distinct. |
 
 Treat each score as a dated model+harness+effort+scorer result, not a property of a model alone. Re-run official protocols and preserve the execution bundle before claiming an external SOTA comparison.
@@ -142,6 +143,7 @@ A passing fixture proves only this exact synthetic linear-algebra construction a
 - ASI-Bench, leaderboard and project-level benchmark: https://asibench.apexin.ai/ (10 Nov 2026 snapshot).
 - SciWorkBench, arXiv:2611.22490 (17 Nov 2026): https://arxiv.org/abs/2611.22490.
 - FIRE-Bench, ICML 2026 / PMLR 306: https://proceedings.mlr.press/v306/wang26d.html and https://firebench.github.io/.
+- NewtonBench, 324 interactive scientific-law tasks / 12 physics domains (ICLR 2026): https://arxiv.org/abs/2510.07172 and https://github.com/HKUST-KnowComp/NewtonBench.
 - AstaBench update (Spring 2026): https://allenai.org/blog/astabench-update-spring-2026.
 - López-Fidalgo & Wong, “Optimal Designs for Correlated Data,” Annual Review of Statistics and Its Application 13 (2026): https://doi.org/10.1146/annurev-statistics-042324-012947.
 - Tang, Sloman & Kaski, “Representative, Informative, and De-Amplifying…,” AISTATS 2026 / PMLR 300: https://proceedings.mlr.press/v300/tang26d.html.
@@ -203,3 +205,10 @@ Artifacts:
 - **BH_EGB_DECISION_VALUE_VERIFICATION_RECEIPT_V0_1.json** — replay receipt.
 
 This is a deterministic toy oracle, not a learned policy, real-world utility function, or calibrated EGB action model. Before using this logic in the live #8721/#11171 Stage-A policy, actions must bind to actual claim dispositions and independently measured resource costs; any probability forecast must be calibrated prospectively.
+
+
+### NewtonBench as the Stage-A tool-allocation comparator
+
+NewtonBench is particularly relevant to the research-action policy, not just the Stage-B numerical design. Its 324 interactive tasks span 12 physics domains and include controlled changes in laws, systems, complexity and observation noise. The reported finding that optional tool access can sometimes encourage premature exploitation motivates testing **tool availability versus tool allocation** as separate causal factors. It does not imply tools are generally harmful.
+
+Use the existing Symthaea #8721 adapter/owner rather than duplicate its benchmark. Keep the NewtonBench scorecard separate from the EGB numerical-gravity scorecard. For an EGB-specific slice, transplant only compatible task mechanics (prospective probe choice, law/parameter shifts, noisy and misleading early evidence, non-identifiability, stopping and cost); the evaluator must preserve the EGB truth/holdout outside the policy process. The finite Stage-A decision-value fixture in this campaign is a tiny known-answer contract test, not a NewtonBench reproduction.
