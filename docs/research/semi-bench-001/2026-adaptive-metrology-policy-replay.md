@@ -53,6 +53,20 @@ The paper reports strong low-label results, including 10-label cases, while also
 
 Do not merge correction recommendation, inspection allocation and process actuation into one leaderboard. They have different action spaces, loss functions and authority requirements.
 
+## Standards and architecture alignment: NIST TIDAL
+
+NIST's ongoing 2026 **Super Intelligence for Manufacturing** programme organizes research around TIDAL: Teamed, Integrated, Digital-twin-assured and Layered Intelligence. Its threads include trustworthy-manufacturing fundamentals, human-machine teaming, contextualized manufacturing data, digital-twin VVUQ, and an integration/test-bench programme spanning industrial information architectures and benchmark studies. This is a useful direction-of-travel signal, not a claim that our project has been endorsed or validated by NIST.
+
+Luminous should align through concrete interoperability rather than terminology:
+
+- **Asset / site / enterprise context:** preserve equipment, tool, chamber, wafer, lot, recipe, process-step, site and ownership identifiers with explicit scope and provenance.
+- **MOM / OT integration:** build read-only adapters and replay fixtures first; do not add write paths to APC, R2R or equipment controllers.
+- **Human-machine teaming:** each recommendation names the decision owner, reviewer, uncertainty, evidence dependencies, expiry and reconciliation condition.
+- **Digital-twin VVUQ:** attach model/version, calibration, source, uncertainty, intended-use and applicability evidence; a simulated state is never represented as a physical observation.
+- **Standards mapping:** map evidence envelopes and context links to applicable SEMI/ISA-95/OPC UA/I3X concepts only after the relevant standard text and conformance requirements are independently checked.
+
+The potential paradigm shift is not an “agent that controls a fab.” It is a portable evidence contract that lets multiple models and vendors exchange contextualized observations, decisions and verification receipts without granting them authority they have not earned.
+
 ## Where Luminous should differentiate
 
 The opportunity is an **evidence and decision assurance layer** around VM and manufacturing analytics:
