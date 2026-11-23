@@ -68,6 +68,36 @@
       "severity": "high",
       "change": "Remove width:100%;min-width:0 from the reference and candidate filter input/select rules.",
       "expected_detection": "Continuous viewport sweep detects document-level horizontal overflow or a filter control extending beyond the viewport; the baseline must remain clean at every integer width from 320px through 1440px."
+    },
+    {
+      "id": "MUT-URL-012",
+      "severity": "high",
+      "change": "Accept raw reserved or non-ASCII bytes in the state URL component.",
+      "expected_detection": "Shared URL conformance vectors reject raw plus, raw JSON punctuation and raw Unicode."
+    },
+    {
+      "id": "MUT-URL-013",
+      "severity": "high",
+      "change": "Default missing state fields or ignore unknown state fields.",
+      "expected_detection": "Exact eight-field state conformance vectors reject both omissions and additions."
+    },
+    {
+      "id": "MUT-QUERY-014",
+      "severity": "medium",
+      "change": "Use Unicode lowercasing instead of ASCII-only case folding.",
+      "expected_detection": "ASCII fold control distinguishes non-ASCII code points and preserves the declared task semantics."
+    },
+    {
+      "id": "MUT-QUERY-015",
+      "severity": "high",
+      "change": "Allow C1 control characters U+0080 through U+009F in query text.",
+      "expected_detection": "The shared C1 control state vector must reject U+0085."
+    },
+    {
+      "id": "MUT-QUERY-016",
+      "severity": "high",
+      "change": "Accept monetary values above the JavaScript safe integer range.",
+      "expected_detection": "The shared unsafe-integer state vector rejects values above 9,007,199,254,740,991."
     }
   ],
   "positive_controls": [
@@ -95,6 +125,11 @@
       "id": "POS-SEARCH-005",
       "change": "Open a shared URL in a fresh session.",
       "expected_invariant": "All query-state fields restore."
+    },
+    {
+      "id": "POS-URL-006",
+      "change": "Round-trip a URL state containing accented Unicode, plus, ampersand and reserved punctuation using percent-encoded UTF-8.",
+      "expected_invariant": "All eight fields and exact query text restore unchanged."
     }
   ],
   "metamorphic_relations": [
@@ -102,7 +137,8 @@
     "Adding available_only cannot add results to a category-filtered result set.",
     "Concatenating pages yields the full filtered/sorted result exactly once.",
     "Equal prices are tied by ascending immutable asset ID.",
-    "Encoding then decoding query state preserves every field."
+    "Encoding then decoding query state preserves every field.",
+    "Encoding and decoding state containing Unicode and reserved characters preserves all eight fields."
   ],
   "qualification_rule": "Do not claim oracle qualification until all mutations are caught, positives pass and independent replay succeeds."
 }

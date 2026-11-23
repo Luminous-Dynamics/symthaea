@@ -11,6 +11,7 @@ const ROOT = dirname(fileURLToPath(import.meta.url));
 const readJson = async (path) => JSON.parse(await readFile(join(ROOT, path), 'utf8'));
 const dataset = await readJson('../fixtures/search-filter-explorer/dataset.json');
 const oracle = await readJson('../fixtures/search-filter-explorer/oracle-cases.json');
+const urlVectors = await readJson('../fixtures/search-filter-explorer/url-state-conformance-v1.json');
 
 const DEFAULT = Object.freeze({
   q: '', category: null, available_only: false, min_price_cents: null,
@@ -38,7 +39,13 @@ function validateDataset(doc) {
 
 function validateQuery(q) {
   assert.ok(typeof q.q === 'string' && [...q.q].length <= 80, 'query_too_long');
-  assert.ok(!/[\u0000-\u001f\u007f]/u.test(q.q), 'query_contains_control_character');
+  assert.ok(!/[\u0000-\u001f\u007f-\u009f]/u.test(q.q), 'query_contains_control_character');
+  assert.ok(q.category === null || typeof q.category === 'string', 'invalid_category');
+  assert.ok(typeof q.available_only === 'boolean', 'invalid_available_only');
+  for (const field of ['min_price_cents', 'max_price_cents']) {
+    const value = q[field];
+    assert.ok(value === null || (Number.isSafeInteger(value) && value >= 0), 'price_amount_unsafe_for_cross_language_integer');
+  }
   assert.ok(q.category !== '', 'empty_category');
   assert.ok(!(q.min_price_cents !== null && q.max_price_cents !== null && q.min_price_cents > q.max_price_cents), 'min_price_cents_exceeds_max_price_cents');
   assert.ok(Number.isInteger(q.page_size) && q.page_size >= 1 && q.page_size <= 50, 'invalid_page_size');
@@ -57,8 +64,8 @@ function evaluate(assets, input, fault = null) {
   if (fault === 'paginate_before_filter') source = source.slice((q.page - 1) * q.page_size, q.page * q.page_size);
   const matches = source.filter((asset) => {
     const fields = fault === 'name_only' ? [asset.name] : [asset.name, asset.sku, asset.description];
-    const haystack = fields.map((value) => fault === 'case_sensitive' ? value : value.toLowerCase());
-    const term = fault === 'case_sensitive' ? query : query.toLowerCase();
+    const haystack = fields.map((value) => fault === 'case_sensitive' ? value : asciiLower(value));
+    const term = fault === 'case_sensitive' ? query : asciiLower(query);
     const searchOk = term === '' || haystack.some((value) => value.includes(term));
     const categoryOk = q.category === null || asset.category === q.category;
     const stockOk = !q.available_only || asset.stock_count > 0;
@@ -69,7 +76,7 @@ function evaluate(assets, input, fault = null) {
     return searchOk && filterOk && minOk && maxOk;
   });
   const comparePrimary = {
-    name_asc: (a, b) => lexical(a.name.toLowerCase(), b.name.toLowerCase()),
+    name_asc: (a, b) => lexical(asciiLower(a.name), asciiLower(b.name)),
     price_asc: (a, b) => a.price_cents - b.price_cents,
     price_desc: (a, b) => b.price_cents - a.price_cents,
     stock_asc: (a, b) => a.stock_count - b.stock_count,
@@ -85,6 +92,7 @@ function evaluate(assets, input, fault = null) {
 }
 
 function lexical(a, b) { return a < b ? -1 : a > b ? 1 : 0; }
+function asciiLower(value) { return value.replace(/[A-Z]/g, (letter) => String.fromCharCode(letter.charCodeAt(0) + 32)); }
 function orderedState(q) {
   return Object.fromEntries(STATE_FIELDS.map((field) => [field, q[field]]));
 }
@@ -103,7 +111,7 @@ function percentDecodeUtf8(value) {
       bytes.push(Number.parseInt(value.slice(i + 1, i + 3), 16)); i += 3;
     } else {
       const code = value.charCodeAt(i++);
-      assert.ok(code < 128, 'state URL must percent-encode non-ASCII bytes');
+      assert.ok(code < 128 && /^[A-Za-z0-9._~-]$/.test(value[i - 1]), 'state_url_must_percent_encode_reserved_or_non_ascii_bytes');
       bytes.push(code);
     }
   }
@@ -117,6 +125,9 @@ function encodeStateUrl(input) {
 function decodeStateUrl(url) {
   assert.ok(url.startsWith('?state=') && !url.slice(7).includes('&'), 'state_url_must_contain_only_state_parameter');
   const parsed = JSON.parse(percentDecodeUtf8(url.slice(7)));
+  assert.ok(parsed && typeof parsed === 'object' && !Array.isArray(parsed), 'state_url_fields_mismatch');
+  const keys = Object.keys(parsed);
+  assert.ok(keys.length === STATE_FIELDS.length && STATE_FIELDS.every((field) => Object.hasOwn(parsed, field)), 'state_url_fields_mismatch');
   const q = { ...DEFAULT, ...parsed };
   validateQuery(q);
   return orderedState(q);
@@ -142,6 +153,21 @@ function differsFromGolden(fault) {
 validateDataset(dataset);
 assert.equal(oracle.schema, 'sfeb-search-filter-oracle-cases-v1');
 assert.equal(oracle.dataset_id, dataset.dataset_id);
+assert.equal(urlVectors.schema, 'sfeb-url-state-conformance-v1');
+assert.equal(urlVectors.policy.parameter_count, 1);
+assert.equal(urlVectors.policy.safe_integer_max, Number.MAX_SAFE_INTEGER);
+for (const item of urlVectors.valid_states) {
+  const restored = decodeStateUrl(encodeStateUrl(item.state));
+  assert.deepEqual(restored, orderedState(item.state), `valid URL vector ${item.id}`);
+}
+for (const item of urlVectors.invalid_states) {
+  const encoded = percentEncodeUtf8(JSON.stringify(item.state));
+  assert.throws(() => decodeStateUrl(`?state=${encoded}`), (error) => error.message.includes(item.error), `invalid state vector ${item.id}`);
+}
+for (const item of urlVectors.invalid_urls) {
+  assert.throws(() => decodeStateUrl(item.url), undefined, `invalid URL vector ${item.id}`);
+}
+assert.equal(asciiLower('İX-A'), 'İx-a', 'case folding is ASCII-only');
 const goldenFailures = [];
 for (const item of oracle.cases) {
   try {
@@ -215,6 +241,7 @@ const output = {
   generated_properties: { passed: 5000, failed: 0, seed: 20261122 },
   semantic_fault_models: { detected: faultResults.length, total: faultResults.length, results: faultResults },
   url_field_omissions: { detected: omitted.filter((item) => item.detected).length, total: omitted.length },
+  url_state_conformance: { valid: urlVectors.valid_states.length, invalid_state_cases: urlVectors.invalid_states.length, invalid_url_components: urlVectors.invalid_urls.length, total: urlVectors.valid_states.length + urlVectors.invalid_states.length + urlVectors.invalid_urls.length },
   boundaries: { exact_min_and_max_are_inclusive: true },
   scope: 'Independent JavaScript model preflight only; not Rust execution, Leptos browser qualification, XSS DOM assertion or the complete mutation campaign.',
 };

@@ -15,11 +15,12 @@ struct PageView {
     rows: Vec<Asset>,
 }
 
-fn initial_query() -> QueryState {
-    let Some(window) = web_sys::window() else { return QueryState::default(); };
-    let Ok(search) = window.location().search() else { return QueryState::default(); };
-    if search.is_empty() { return QueryState::default(); }
-    search_filter::decode_state_url(&search).unwrap_or_default()
+fn initial_query() -> Result<QueryState, String> {
+    let Some(window) = web_sys::window() else { return Ok(QueryState::default()); };
+    let search = window.location().search()
+        .map_err(|_| "browser could not read the initial URL query".to_string())?;
+    if search.is_empty() { return Ok(QueryState::default()); }
+    search_filter::decode_state_url(&search)
 }
 
 fn cents_to_decimal(cents: u64) -> String {
@@ -75,12 +76,19 @@ fn App() -> impl IntoView {
         .expect("bundled public-pilot dataset must be valid");
     let categories: Vec<String> = assets.iter().map(|asset| asset.category.clone())
         .collect::<BTreeSet<_>>().into_iter().collect();
-    let query = RwSignal::new(initial_query());
+    let (initial_state, initial_url_error) = match initial_query() {
+        Ok(state) => (state, None),
+        Err(error) => (QueryState::default(), Some(error)),
+    };
+    let query = RwSignal::new(initial_state);
+    let initial_url_error = RwSignal::new(initial_url_error);
     let input_error = RwSignal::new(None::<String>);
     let page = Memo::new(move |_| compute_page(&assets, &query.get()));
 
-    // The complete typed state, not browser history, is the reproducible source of truth.
-    Effect::new(move |_| persist_url(query.get()));
+    // Do not overwrite an invalid deep link until the user deliberately changes state.
+    Effect::new(move |_| {
+        if initial_url_error.get().is_none() { persist_url(query.get()); }
+    });
 
     view! {
         <div class="app-shell" data-sfeb-id="inventory.shell">
@@ -111,6 +119,7 @@ fn App() -> impl IntoView {
                     <div class="section-heading">
                         <div><p class="eyebrow">"REFINE RESULTS"</p><h2 id="filter-title">"Search and filters"</h2></div>
                         <button class="quiet-button" type="button" on:click=move |_| {
+                            initial_url_error.set(None);
                             query.set(QueryState::default());
                             input_error.set(None);
                         }>"Clear all"</button>
@@ -123,6 +132,7 @@ fn App() -> impl IntoView {
                                 prop:value=move || query.get().q
                                 on:input=move |event| {
                                     let value = event_target_value(&event);
+                                    initial_url_error.set(None);
                                     query.update(|state| { state.q = value; state.page = 1; });
                                 } />
                         </div>
@@ -131,6 +141,7 @@ fn App() -> impl IntoView {
                             <select id="asset-category" prop:value=move || query.get().category.unwrap_or_default()
                                 on:change=move |event| {
                                     let value = event_target_value(&event);
+                                    initial_url_error.set(None);
                                     query.update(|state| {
                                         state.category = if value.is_empty() { None } else { Some(value) };
                                         state.page = 1;
@@ -149,6 +160,7 @@ fn App() -> impl IntoView {
                                 on:input=move |event| {
                                     match parse_price_cents(&event_target_value(&event)) {
                                         Some(value) => {
+                                            initial_url_error.set(None);
                                             input_error.set(None);
                                             query.update(|state| { state.min_price_cents = value; state.page = 1; });
                                         }
@@ -163,6 +175,7 @@ fn App() -> impl IntoView {
                                 on:input=move |event| {
                                     match parse_price_cents(&event_target_value(&event)) {
                                         Some(value) => {
+                                            initial_url_error.set(None);
                                             input_error.set(None);
                                             query.update(|state| { state.max_price_cents = value; state.page = 1; });
                                         }
@@ -174,6 +187,7 @@ fn App() -> impl IntoView {
                             <input id="available-only" type="checkbox" prop:checked=move || query.get().available_only
                                 on:change=move |event| {
                                     let checked = event_target_checked(&event);
+                                    initial_url_error.set(None);
                                     query.update(|state| { state.available_only = checked; state.page = 1; });
                                 } />
                             <span>"In stock only"</span>
@@ -183,6 +197,7 @@ fn App() -> impl IntoView {
                         <span>"Filters combine together; price bounds are inclusive."</span>
                         <span>"Money is evaluated in integer cents."</span>
                     </div>
+                    {move || initial_url_error.get().map(|message| view! { <p class="field-error" role="alert">{format!("Invalid shared URL: {message}. Change a filter or clear all to create a new valid state URL.")}</p> })}
                     {move || input_error.get().map(|message| view! { <p class="field-error" role="alert">{message}</p> })}
                 </section>
 
@@ -202,6 +217,7 @@ fn App() -> impl IntoView {
                             <select id="sort-order" aria-label="Sort assets" prop:value=move || query.get().sort
                                 on:change=move |event| {
                                     let value = event_target_value(&event);
+                                    initial_url_error.set(None);
                                     query.update(|state| { state.sort = value; state.page = 1; });
                                 }>
                                 <option value="name_asc">"Name A to Z"</option>
@@ -267,12 +283,16 @@ fn App() -> impl IntoView {
                                     prop:value=move || query.get().page_size.to_string()
                                     on:change=move |event| {
                                         if let Ok(size) = event_target_value(&event).parse::<u32>() {
+                                            initial_url_error.set(None);
                                             query.update(|state| { state.page_size = size.clamp(1, 50); state.page = 1; });
                                         }
                                     } />
                             </label>
                             <button type="button" class="page-button" disabled=move || query.get().page <= 1
-                                on:click=move |_| query.update(|state| state.page = state.page.saturating_sub(1).max(1))>"Previous"</button>
+                                on:click=move |_| {
+                                    initial_url_error.set(None);
+                                    query.update(|state| state.page = state.page.saturating_sub(1).max(1));
+                                }>"Previous"</button>
                             <span class="page-number" aria-live="polite">{move || match page.get() {
                                 Ok(data) => format!("{} / {}", data.result.page, data.result.page_count.max(1)),
                                 Err(_) => "—".to_string(),
@@ -284,6 +304,7 @@ fn App() -> impl IntoView {
                                 }
                                 on:click=move |_| if let Ok(data) = page.get() {
                                     let last = data.result.page_count.max(1) as u32;
+                                    initial_url_error.set(None);
                                     query.update(|state| state.page = state.page.saturating_add(1).min(last));
                                 }>"Next"</button>
                         </div>
@@ -318,6 +339,11 @@ mod tests {
         for invalid in ["-1", "+1", "1.234", "1.2.3", "abc"] {
             assert_eq!(parse_price_cents(invalid), None, "{invalid}");
         }
+    }
+
+    #[test]
+    fn invalid_initial_url_is_rejected_without_defaulting() {
+        assert!(search_filter::decode_state_url("?state=%").is_err());
     }
 
     #[test]

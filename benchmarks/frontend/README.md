@@ -7,6 +7,7 @@ This directory contains the **Symthaea Frontend Engineering Benchmark (SFEB)**.
 - `sfeb-v0.json` contains 12 staged task specifications; the end-to-end SFEB benchmark remains `specification_only`.
 - Two original local reference-fixture bundles are checked in as **public-pilot** material: the service dashboard (SFEB-L1-004) and the search/filter explorer (SFEB-L2-005). The latter also has a synthetic dataset, deterministic Rust reference model, independent JavaScript model and authored Leptos candidate source. Public-pilot assets are not hidden holdouts.
 - SFEB-L2-005 is the one fixture-ready task in the 30-task family plan; it is **not runnable**. Rust compilation/tests, WASM build, candidate-browser journeys and independent browser-oracle execution remain pending. The plan's runnable task count remains zero.
+- Rust, JavaScript and Leptos URL-state source now share a stricter conformance contract: exactly eight state fields, percent-encoded UTF-8 for reserved/non-ASCII bytes, ASCII-only case folding, C0/C1 control rejection and JavaScript-safe integer bounds. Shared vectors are in `fixtures/search-filter-explorer/url-state-conformance-v1.json`; source changes are committed but Rust/WASM/browser execution remains pending.
 - `contract-check/` validates interface/task schemas, source anchors, fixture digests, provenance and retrieval-query references. Its Rust source and tests are authored but have not been compiled or executed here.
 - `retrieval-eval/` contains keyword, BM25, TF-IDF, deterministic bipolar-HDC and hybrid-RRF retrieval methods. It has not been compiled or run; no retrieval score exists yet.
 - `symthaea-browser` contains the CDP evidence-capture primitive, but the isolated full browser runner and task-level independent oracles remain pending.
@@ -105,7 +106,7 @@ The first checked-in task bundle is:
 
 
 - SFEB-L2-005: tasks/sfeb-l2-search-filter-v1.json; fixture assets and synthetic dataset under fixtures/search-filter-explorer/.
-- Thirteen synthetic assets, eleven golden cases, four journeys and twelve task assertions.
+- Thirteen synthetic assets, eleven golden cases, five journeys and fourteen task assertions.
 - A pure Rust search/filter/sort/pagination reference model and Leptos 0.8.20 CSR candidate share the intended behavior; the candidate package has no remote runtime dependencies.
 - The dependency-free JavaScript oracle locally reported 11/11 golden outcomes, 5,000 generated states, 9/9 simulated semantic faults and 8/8 URL-field omissions. These are independent-model results, not Rust execution or a compiled candidate-browser pass.
 - The task is fixture_ready, not runnable. Its candidate has not been compiled, tested, formatted, linted, built to WASM or qualified in Chromium. The overall task-family plan remains at zero runnable tasks.

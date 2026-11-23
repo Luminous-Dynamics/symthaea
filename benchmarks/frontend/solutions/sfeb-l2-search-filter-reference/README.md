@@ -41,3 +41,12 @@ This package is authored source, not a verified build. It has **not** been
 compiled, tested, formatted, linted or opened in Chromium in the authoring
 environment. Its existence does not make SFEB-L2-005 runnable and does not
 increase the runnable task count.
+
+
+## Canonical URL state and invalid links
+
+Shared state URLs use exactly one `?state=` parameter with exactly eight fields. Reserved and non-ASCII UTF-8 bytes are percent-encoded; raw URL-component bytes are limited to RFC 3986 unreserved characters. Search/name sorting use ASCII-only case folding and C0/C1 query controls are rejected. Price values remain within the JavaScript safe-integer range.
+
+A malformed or partial initial URL is shown as an accessible error. The candidate does not replace the user's URL with default state until the user deliberately changes a filter or clears the state. These behaviors are source-authored and require browser qualification; they are not yet browser-verified.
+
+Shared conformance vectors: `benchmarks/frontend/fixtures/search-filter-explorer/url-state-conformance-v1.json`.

@@ -75,7 +75,10 @@
       "All ties use ascending immutable asset ID.",
       "Filter/sort before one-based pagination; page size 1..50.",
       "State URL round-trips all query fields.",
-      "Invalid and empty states are distinct."
+      "Invalid and empty states are distinct.",
+      "Shared URLs contain exactly one state parameter with exactly eight fields; reserved and non-ASCII UTF-8 bytes are percent-encoded.",
+      "Malformed or incomplete shared URLs show an explicit error and are not silently replaced until the user deliberately changes or clears state.",
+      "Search and name sorting use ASCII-only case folding; query text rejects C0/C1 controls and price values stay within JavaScript safe-integer bounds."
     ]
   },
   "implementation_constraints": {
@@ -264,6 +267,21 @@
         "Reversed range rejects.",
         "Valid zero-match state shows empty results."
       ]
+    },
+    {
+      "id": "inventory.invalid-deep-link",
+      "goal": "Handle malformed and incomplete shared state safely.",
+      "steps": [
+        "Open a URL with a missing state field.",
+        "Observe the invalid shared URL alert.",
+        "Verify the URL is not silently replaced by default state.",
+        "Clear all filters to create a complete valid state URL."
+      ],
+      "oracle": [
+        "The application reports invalid shared state accessibly.",
+        "The original URL remains unchanged until explicit user action.",
+        "Clear all creates a canonical eight-field state URL."
+      ]
     }
   ],
   "assertions": [
@@ -369,6 +387,22 @@
       "operator": "equals",
       "expected": 0,
       "hard_gate": true
+    },
+    {
+      "id": "inventory.url-canonical-grammar",
+      "evaluator": "interaction",
+      "target": "shared query-state URL",
+      "operator": "manual_pass",
+      "expected": "Exactly one state parameter, reserved/non-ASCII bytes percent-encoded, exact eight fields",
+      "hard_gate": true
+    },
+    {
+      "id": "inventory.invalid-deep-link",
+      "evaluator": "interaction",
+      "target": "malformed or partial state URL",
+      "operator": "manual_pass",
+      "expected": "Visible invalid-state error; URL not silently replaced before user action",
+      "hard_gate": true
     }
   ],
   "hard_gates": [
@@ -387,7 +421,9 @@
     "State URL and browser trace.",
     "Screenshots and accessibility tree.",
     "Swept-width layout report.",
-    "Network log."
+    "Network log.",
+    "Shared Rust/JavaScript URL-state conformance-vector report.",
+    "Shared Rust/JavaScript URL-state conformance-vector report."
   ],
   "budget": {
     "wall_time_minutes": 50,
@@ -399,6 +435,8 @@
     "HTML/CSS supplies visual reference; it is not proof candidate passes.",
     "Rust model can be checked offline; browser/keyboard/accessibility qualification still requires runner.",
     "Public pilot only, not hidden holdout.",
-    "Responsive stress preflight: sweep every integer CSS width from 320 through 1440 to detect breakpoint cliffs; the named five-width matrix remains mandatory, and the candidate must pass the same sweep before promotion."
+    "Responsive stress preflight: sweep every integer CSS width from 320 through 1440 to detect breakpoint cliffs; the named five-width matrix remains mandatory, and the candidate must pass the same sweep before promotion.",
+    "URL-state contract requires exactly eight fields, one ?state= parameter, RFC 3986 unreserved literal bytes only, percent-encoded UTF-8 for all other bytes, ASCII-only case folding and rejection of C0/C1 controls and unsafe cross-language integers.",
+    "URL-state contract requires exactly eight fields, one ?state= parameter, RFC 3986 unreserved literal bytes only, percent-encoded UTF-8 for all other bytes, ASCII-only case folding and rejection of C0/C1 controls and unsafe cross-language integers."
   ]
 }

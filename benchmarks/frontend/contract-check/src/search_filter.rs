@@ -46,6 +46,10 @@ pub fn parse_dataset(source: &str) -> Result<(String, Vec<Asset>), String> {
     let mut ids = BTreeSet::new();
     let mut skus = BTreeSet::new();
     for asset in &document.assets {
+        const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
+        if asset.price_cents > MAX_SAFE_INTEGER || asset.stock_count > MAX_SAFE_INTEGER {
+            return Err(format!("asset {} has numeric data outside the cross-language safe integer range", asset.id));
+        }
         if asset.id.is_empty() || asset.name.is_empty() || asset.sku.is_empty()
             || asset.category.is_empty() || asset.description.is_empty() {
             return Err("asset identity, category and text fields must be non-empty".to_string());
@@ -58,6 +62,11 @@ pub fn parse_dataset(source: &str) -> Result<(String, Vec<Asset>), String> {
 fn validate_query(query: &QueryState) -> Result<(), String> {
     if query.q.chars().count() > 80 { return Err("query_too_long".to_string()); }
     if query.q.chars().any(char::is_control) { return Err("query_contains_control_character".to_string()); }
+    const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
+    if query.min_price_cents.is_some_and(|value| value > MAX_SAFE_INTEGER)
+        || query.max_price_cents.is_some_and(|value| value > MAX_SAFE_INTEGER) {
+        return Err("price_amount_unsafe_for_cross_language_integer".to_string());
+    }
     if query.category.as_deref() == Some("") { return Err("empty_category".to_string()); }
     if query.min_price_cents.zip(query.max_price_cents)
         .is_some_and(|(minimum, maximum)| minimum > maximum) {
@@ -128,7 +137,14 @@ fn percent_decode_component(encoded: &str) -> Result<Vec<u8>, String> {
                 .ok_or_else(|| "invalid_state_url_percent_escape".to_string())?;
             decoded.push(((high << 4) | low) as u8);
             index += 3;
-        } else { decoded.push(bytes[index]); index += 1; }
+        } else {
+            let byte = bytes[index];
+            if !byte.is_ascii() || !(byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~')) {
+                return Err("state_url_must_percent_encode_reserved_or_non_ascii_bytes".to_string());
+            }
+            decoded.push(byte);
+            index += 1;
+        }
     }
     Ok(decoded)
 }
@@ -145,7 +161,13 @@ pub fn decode_state_url(url: &str) -> Result<QueryState, String> {
     }
     let decoded = percent_decode_component(encoded)?;
     let json = std::str::from_utf8(&decoded).map_err(|error| format!("state URL is not UTF-8: {error}"))?;
-    let query: QueryState = serde_json::from_str(json).map_err(|error| format!("state URL JSON is invalid: {error}"))?;
+    let document: Value = serde_json::from_str(json).map_err(|error| format!("state URL JSON is invalid: {error}"))?;
+    const REQUIRED_FIELDS: [&str; 8] = ["q", "category", "available_only", "min_price_cents", "max_price_cents", "sort", "page", "page_size"];
+    let object = document.as_object().ok_or_else(|| "state_url_fields_mismatch".to_string())?;
+    if object.len() != REQUIRED_FIELDS.len() || REQUIRED_FIELDS.iter().any(|field| !object.contains_key(*field)) {
+        return Err("state_url_fields_mismatch".to_string());
+    }
+    let query: QueryState = serde_json::from_value(document).map_err(|error| format!("state URL JSON is invalid: {error}"))?;
     validate_query(&query)?;
     Ok(query)
 }
@@ -251,6 +273,34 @@ mod tests {
     fn extra_state_url_parameters_are_rejected() {
         assert_eq!(decode_state_url("?state=%7B%7D&admin=true").unwrap_err(),
             "state_url_must_contain_only_state_parameter");
+    }
+
+
+    #[test]
+    fn url_state_shared_conformance_vectors() {
+        let vectors: Value = serde_json::from_str(include_str!(
+            "../../fixtures/search-filter-explorer/url-state-conformance-v1.json"
+        )).expect("shared URL conformance vectors parse");
+        assert_eq!(vectors["schema"], "sfeb-url-state-conformance-v1");
+        for item in vectors["valid_states"].as_array().unwrap() {
+            let state: QueryState = serde_json::from_value(item["state"].clone()).unwrap();
+            let encoded = encode_state_url(&state).unwrap();
+            assert_eq!(decode_state_url(&encoded).unwrap(), state, "{}", item["id"]);
+        }
+        for item in vectors["invalid_states"].as_array().unwrap() {
+            let json = serde_json::to_vec(&item["state"]).unwrap();
+            let encoded = percent_encode_component(&json);
+            let url = format!("?state={encoded}");
+            assert_eq!(decode_state_url(&url).unwrap_err(), item["error"].as_str().unwrap(), "{}", item["id"]);
+        }
+        for item in vectors["invalid_urls"].as_array().unwrap() {
+            assert!(decode_state_url(item["url"].as_str().unwrap()).is_err(), "{}", item["id"]);
+        }
+    }
+
+    #[test]
+    fn search_case_folding_is_ascii_only() {
+        assert_eq!("İX-A".to_ascii_lowercase(), "İx-a");
     }
 
     #[test]
