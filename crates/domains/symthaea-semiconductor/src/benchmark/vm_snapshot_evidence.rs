@@ -74,6 +74,7 @@ pub struct VmSnapshotLabelManifestEntryV1 {
     pub measurand_id: String,
     pub measurement_event_id: String,
     pub label_source_artifact_sha256: String,
+    pub label_payload_sha256: String,
     pub measurement_sha256: String,
     pub qualification_report_sha256: String,
     pub calibration_certificate_id: String,
@@ -451,13 +452,13 @@ pub fn build_vm_training_snapshot_manifest_v1(
                 label.label_id
             )));
         }
-        if let Some(selection_digest) = packet.selection_receipt_sha256.as_deref() {
-            if !valid_sha256(selection_digest) {
-                return Err(VmSnapshotEvidenceErrorV1(format!(
-                    "label {} has malformed selection receipt digest",
-                    label.label_id
-                )));
-            }
+        if let Some(selection_digest) = packet.selection_receipt_sha256.as_deref()
+            && !valid_sha256(selection_digest)
+        {
+            return Err(VmSnapshotEvidenceErrorV1(format!(
+                "label {} has malformed selection receipt digest",
+                label.label_id
+            )));
         }
 
         let report = assess_label_consumption_eligibility_v1(
@@ -483,6 +484,7 @@ pub fn build_vm_training_snapshot_manifest_v1(
             measurand_id: label.measurand_id.clone(),
             measurement_event_id: label.measurement_event_id.clone(),
             label_source_artifact_sha256: label.source_artifact_sha256.clone(),
+            label_payload_sha256: report.label_sha256,
             measurement_sha256: report.measurement_sha256,
             qualification_report_sha256: report.qualification_report_sha256,
             calibration_certificate_id: report.calibration_certificate_id,
@@ -978,6 +980,22 @@ mod tests {
         input.consumed_labels.reverse();
         let second = build_vm_training_snapshot_manifest_v1(&input).unwrap();
         assert_eq!(first.manifest_sha256, second.manifest_sha256);
+    }
+
+    #[test]
+    fn numeric_label_metadata_is_explicitly_bound_into_snapshot_manifest() {
+        let original = snapshot_input();
+        let first = build_vm_training_snapshot_manifest_v1(&original).unwrap();
+
+        let mut changed = snapshot_input();
+        changed.consumed_labels[0].label.standard_uncertainty = Some(0.10);
+        let second = build_vm_training_snapshot_manifest_v1(&changed).unwrap();
+
+        assert_ne!(
+            first.entries[0].label_payload_sha256,
+            second.entries[0].label_payload_sha256
+        );
+        assert_ne!(first.manifest_sha256, second.manifest_sha256);
     }
 
     #[test]
