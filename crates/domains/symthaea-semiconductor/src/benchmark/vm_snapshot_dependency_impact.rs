@@ -15,10 +15,8 @@ use super::vm_snapshot_evidence::{
     VmSnapshotCurrentDispositionV1, VmSnapshotPurposeV1, VmSnapshotRequalificationReportV1,
 };
 
-pub const VM_DEPENDENCY_GRAPH_SCHEMA_V1: &str =
-    "luminous.semi-bench.vm-dependency-graph.v1";
-pub const VM_DEPENDENCY_EDGE_SCHEMA_V1: &str =
-    "luminous.semi-bench.vm-dependency-edge.v1";
+pub const VM_DEPENDENCY_GRAPH_SCHEMA_V1: &str = "luminous.semi-bench.vm-dependency-graph.v1";
+pub const VM_DEPENDENCY_EDGE_SCHEMA_V1: &str = "luminous.semi-bench.vm-dependency-edge.v1";
 pub const VM_IMPACT_CLOSURE_INPUT_SCHEMA_V1: &str =
     "luminous.semi-bench.vm-impact-closure-input.v1";
 pub const VM_IMPACT_CLOSURE_REPORT_SCHEMA_V1: &str =
@@ -182,7 +180,9 @@ fn edge_digest(edge: &VmSnapshotDependencyEdgeV1) -> Result<String, VmImpactClos
 fn graph_digest(graph: &VmSnapshotDependencyGraphV1) -> Result<String, VmImpactClosureErrorV1> {
     let mut canonical = graph.clone();
     canonical.graph_sha256.clear();
-    canonical.nodes.sort_by(|a, b| a.snapshot_id.cmp(&b.snapshot_id));
+    canonical
+        .nodes
+        .sort_by(|a, b| a.snapshot_id.cmp(&b.snapshot_id));
     canonical.edges.sort_by(|a, b| a.edge_id.cmp(&b.edge_id));
     for edge in &mut canonical.edges {
         edge.inherited_dimensions.sort();
@@ -239,13 +239,17 @@ fn validate_node(node: &VmModelSnapshotNodeV1) -> Result<(), VmImpactClosureErro
 
 fn validate_edge(edge: &VmSnapshotDependencyEdgeV1) -> Result<(), VmImpactClosureErrorV1> {
     if edge.schema != VM_DEPENDENCY_EDGE_SCHEMA_V1 {
-        return Err(VmImpactClosureErrorV1("dependency edge schema is unsupported".into()));
+        return Err(VmImpactClosureErrorV1(
+            "dependency edge schema is unsupported".into(),
+        ));
     }
     require_text(&edge.edge_id, "edge.edge_id")?;
     require_text(&edge.parent_snapshot_id, "edge.parent_snapshot_id")?;
     require_text(&edge.child_snapshot_id, "edge.child_snapshot_id")?;
     if edge.parent_snapshot_id == edge.child_snapshot_id {
-        return Err(VmImpactClosureErrorV1("self-dependency edge is not permitted".into()));
+        return Err(VmImpactClosureErrorV1(
+            "self-dependency edge is not permitted".into(),
+        ));
     }
     if !valid_sha256(&edge.parent_artifact_sha256)
         || !valid_sha256(&edge.derivation_evidence_sha256)
@@ -284,8 +288,7 @@ fn topological_order(
     nodes: &BTreeMap<String, VmModelSnapshotNodeV1>,
     edges: &[VmSnapshotDependencyEdgeV1],
 ) -> Result<Vec<String>, VmImpactClosureErrorV1> {
-    let mut indegree: BTreeMap<String, usize> =
-        nodes.keys().map(|id| (id.clone(), 0)).collect();
+    let mut indegree: BTreeMap<String, usize> = nodes.keys().map(|id| (id.clone(), 0)).collect();
     let mut outgoing: BTreeMap<String, Vec<String>> = BTreeMap::new();
 
     for edge in edges {
@@ -331,7 +334,9 @@ fn validate_graph(
     graph: &VmSnapshotDependencyGraphV1,
 ) -> Result<(BTreeMap<String, VmModelSnapshotNodeV1>, Vec<String>), VmImpactClosureErrorV1> {
     if graph.schema != VM_DEPENDENCY_GRAPH_SCHEMA_V1 {
-        return Err(VmImpactClosureErrorV1("dependency graph schema is unsupported".into()));
+        return Err(VmImpactClosureErrorV1(
+            "dependency graph schema is unsupported".into(),
+        ));
     }
     require_text(&graph.graph_id, "graph.graph_id")?;
     if !valid_sha256(&graph.graph_sha256) || graph_digest(graph)? != graph.graph_sha256 {
@@ -343,7 +348,10 @@ fn validate_graph(
     let mut nodes = BTreeMap::new();
     for node in &graph.nodes {
         validate_node(node)?;
-        if nodes.insert(node.snapshot_id.clone(), node.clone()).is_some() {
+        if nodes
+            .insert(node.snapshot_id.clone(), node.clone())
+            .is_some()
+        {
             return Err(VmImpactClosureErrorV1(format!(
                 "duplicate snapshot node {}",
                 node.snapshot_id
@@ -357,7 +365,9 @@ fn validate_graph(
     for edge in &graph.edges {
         validate_edge(edge)?;
         if !edge_ids.insert(edge.edge_id.as_str()) {
-            return Err(VmImpactClosureErrorV1("duplicate dependency edge ID".into()));
+            return Err(VmImpactClosureErrorV1(
+                "duplicate dependency edge ID".into(),
+            ));
         }
         if !endpoint_pairs.insert((
             edge.parent_snapshot_id.as_str(),
@@ -422,8 +432,7 @@ fn validate_graph(
                 child.snapshot_id
             )));
         }
-        if child.derivation_kind == VmModelDerivationKindV1::EvaluationOnly
-            && inherits_model_state
+        if child.derivation_kind == VmModelDerivationKindV1::EvaluationOnly && inherits_model_state
         {
             return Err(VmImpactClosureErrorV1(format!(
                 "evaluation-only node {} cannot declare model-state inheritance",
@@ -448,9 +457,7 @@ fn validate_graph(
     Ok((nodes, ordered))
 }
 
-fn direct_risk(
-    disposition: VmSnapshotCurrentDispositionV1,
-) -> ImpactRiskV1 {
+fn direct_risk(disposition: VmSnapshotCurrentDispositionV1) -> ImpactRiskV1 {
     match disposition {
         VmSnapshotCurrentDispositionV1::CurrentEligible => ImpactRiskV1::None,
         VmSnapshotCurrentDispositionV1::RebuildRequired => ImpactRiskV1::Blocked,
@@ -467,8 +474,7 @@ fn inherited_risk(
     if dimensions.iter().any(|dimension| {
         matches!(
             dimension,
-            VmDependencyDimensionV1::ModelWeights
-                | VmDependencyDimensionV1::CalibrationState
+            VmDependencyDimensionV1::ModelWeights | VmDependencyDimensionV1::CalibrationState
         )
     }) {
         propagated = propagated.max(parent_risk);
@@ -551,7 +557,9 @@ pub fn compute_vm_snapshot_impact_closure_v1(
     input: &VmImpactClosureInputV1,
 ) -> Result<VmImpactClosureReportV1, VmImpactClosureErrorV1> {
     if input.schema != VM_IMPACT_CLOSURE_INPUT_SCHEMA_V1 {
-        return Err(VmImpactClosureErrorV1("impact input schema is unsupported".into()));
+        return Err(VmImpactClosureErrorV1(
+            "impact input schema is unsupported".into(),
+        ));
     }
     require_text(&input.input_id, "input.input_id")?;
     if !input.graph.inventory_complete {
@@ -934,19 +942,19 @@ mod tests {
                 VmSnapshotCurrentDispositionV1::CurrentEligible,
             ),
         ];
-        let report =
-            compute_vm_snapshot_impact_closure_v1(&input(g, reports)).unwrap();
-        assert_eq!(
-            report.direct_impact_snapshot_ids,
-            vec!["root".to_string()]
-        );
+        let report = compute_vm_snapshot_impact_closure_v1(&input(g, reports)).unwrap();
+        assert_eq!(report.direct_impact_snapshot_ids, vec!["root".to_string()]);
         assert_eq!(
             report.transitive_impact_snapshot_ids,
             vec!["child".to_string(), "grandchild".to_string()]
         );
         assert_eq!(
             report.rebuild_order_snapshot_ids,
-            vec!["root".to_string(), "child".to_string(), "grandchild".to_string()]
+            vec![
+                "root".to_string(),
+                "child".to_string(),
+                "grandchild".to_string()
+            ]
         );
     }
 
@@ -994,10 +1002,7 @@ mod tests {
         ))
         .unwrap();
         assert_eq!(report.transitive_impact_snapshot_ids, Vec::<String>::new());
-        assert_eq!(
-            report.entries[1].state,
-            VmSnapshotImpactStateV1::Unaffected
-        );
+        assert_eq!(report.entries[1].state, VmSnapshotImpactStateV1::Unaffected);
     }
 
     #[test]
@@ -1043,7 +1048,11 @@ mod tests {
             ],
         ))
         .unwrap();
-        let entry = report.entries.iter().find(|entry| entry.snapshot_id == "eval").unwrap();
+        let entry = report
+            .entries
+            .iter()
+            .find(|entry| entry.snapshot_id == "eval")
+            .unwrap();
         assert_eq!(entry.state, VmSnapshotImpactStateV1::HistoricalOnly);
         assert!(!entry.rebuild_candidate);
     }
@@ -1128,8 +1137,20 @@ mod tests {
 
     #[test]
     fn cycle_is_rejected() {
-        let a = node("a", VmModelDerivationKindV1::FineTuneFromParent, VmSnapshotPurposeV1::Training, 'a', 'b');
-        let b = node("b", VmModelDerivationKindV1::FineTuneFromParent, VmSnapshotPurposeV1::Training, 'c', 'd');
+        let a = node(
+            "a",
+            VmModelDerivationKindV1::FineTuneFromParent,
+            VmSnapshotPurposeV1::Training,
+            'a',
+            'b',
+        );
+        let b = node(
+            "b",
+            VmModelDerivationKindV1::FineTuneFromParent,
+            VmSnapshotPurposeV1::Training,
+            'c',
+            'd',
+        );
         let g = graph(
             vec![a.clone(), b.clone()],
             vec![
@@ -1285,7 +1306,12 @@ mod tests {
             &child,
             vec![VmDependencyDimensionV1::ModelWeights],
         );
-        let mut first = graph(vec![root.clone(), child.clone()], vec![edge.clone()], true, true);
+        let mut first = graph(
+            vec![root.clone(), child.clone()],
+            vec![edge.clone()],
+            true,
+            true,
+        );
         let first_digest = first.graph_sha256.clone();
         first.nodes.reverse();
         first.edges.reverse();
