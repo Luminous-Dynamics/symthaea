@@ -290,3 +290,9 @@ The local/global receipt places the optional typed propositional sequent in the 
 This closes a semantic-binding gap: a valid countermodel of an unrelated inference cannot be attached to an invalid-warrant label. Validation evaluates the hidden valuation against the exact candidate-visible sequent, checks complete atom coverage, rejects duplicate and unused atom assignments, and recomputes the sequent digest. Local and global stages must bind to the same typed sequent through the existing complete scope-equality gate.
 
 The truth-table oracle now searches assignments by increasing support size (fewest true atoms relative to the all-false baseline), then ascending bitmask order over sorted atom names. The stored evaluator witness can be compared with this deterministic minimum-support result. This is a pedagogical witness-selection policy for the bounded classical Boolean fragment, not a general measure of mathematical simplicity or proof complexity.
+
+## 16. Candidate text is bound to the typed Boolean sequent
+
+For the finite propositional tier, ScopeBinding now renders each formula through a fully parenthesized canonical display (¬, ∧, ∨, →, ↔). The visible premise list, conclusion text and root-goal text must exactly match the typed candidate sequent. This prevents a hidden valuation from being correctly checked against one AST while the candidate reads a different plain-text inference.
+
+The display is deliberately a canonical controlled-language representation, not a general natural-language parser. Free-form mathematical prose, Lean dependent binders, implicit arguments, typeclass assumptions and notation/coercion elaboration still require the separate formal identity and translation-review gates.

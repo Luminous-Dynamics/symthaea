@@ -16,19 +16,19 @@
         "source_path": "truth_tables/implication_converse.json",
         "declaration": "synthetic.non_entailment.implication_converse",
         "theorem_id": "SYNTHETIC-NON-ENTAILMENT-IMPLICATION-CONVERSE",
-        "root_goal_sha256": "bbb618308c32c76a267fa6732a646517c7b06a284a74d94e92e0a438eda69f41",
+        "root_goal_sha256": "e0fd61c424cba2e3444d7c8e433e19138f547975adba4254a41343ca8633f9ee",
         "hypothesis_set_sha256": "056fde24724099f0fc73830cb5d2b1f3500104723e2178d374205c7c9ce5057f",
-        "premise_set_sha256": "0037aec23cf082bbf22c897a7ab53b559fcfc03edfc909ce4b6a1cb8fb0515a9",
-        "conclusion_sha256": "8dfa91d02cd91ca5206a395601e21078544cf53e73d638f1c0b44afc80c14390",
+        "premise_set_sha256": "d4ecae3e4bbacc2d820fa77b0d0320e8b0c6517d803908823b4af3a399adbeca",
+        "conclusion_sha256": "4d8ea47ef4580219b4f715e337508a1da28c81ac5a1af5fdb17992c16e8e53f1",
         "warrant_id": "W-IMPLICATION-CONVERSE",
-        "warrant_sha256": "e0f314a8ac8a0f83c135d6240eb076918242ef0a3d8ba71549b2e814ed9e0a8e",
-        "root_goal_text": "q → p",
+        "warrant_sha256": "94dd994ac8b135cba74a010ae96a4980a014f367fe6f0be4f7e6800f52a662b9",
+        "root_goal_text": "(q → p)",
         "hypotheses": [],
         "premises": [
-          "p → q"
+          "(p → q)"
         ],
-        "conclusion_text": "q → p",
-        "warrant_text": "From p → q infer q → p.",
+        "conclusion_text": "(q → p)",
+        "warrant_text": "From (p → q) infer (q → p).",
         "finite_boolean_sequent": {
           "premises": [
             {
@@ -78,19 +78,19 @@
         "source_path": "truth_tables/implication_converse.json",
         "declaration": "synthetic.non_entailment.implication_converse",
         "theorem_id": "SYNTHETIC-NON-ENTAILMENT-IMPLICATION-CONVERSE",
-        "root_goal_sha256": "bbb618308c32c76a267fa6732a646517c7b06a284a74d94e92e0a438eda69f41",
+        "root_goal_sha256": "e0fd61c424cba2e3444d7c8e433e19138f547975adba4254a41343ca8633f9ee",
         "hypothesis_set_sha256": "056fde24724099f0fc73830cb5d2b1f3500104723e2178d374205c7c9ce5057f",
-        "premise_set_sha256": "0037aec23cf082bbf22c897a7ab53b559fcfc03edfc909ce4b6a1cb8fb0515a9",
-        "conclusion_sha256": "8dfa91d02cd91ca5206a395601e21078544cf53e73d638f1c0b44afc80c14390",
+        "premise_set_sha256": "d4ecae3e4bbacc2d820fa77b0d0320e8b0c6517d803908823b4af3a399adbeca",
+        "conclusion_sha256": "4d8ea47ef4580219b4f715e337508a1da28c81ac5a1af5fdb17992c16e8e53f1",
         "warrant_id": "W-IMPLICATION-CONVERSE",
-        "warrant_sha256": "e0f314a8ac8a0f83c135d6240eb076918242ef0a3d8ba71549b2e814ed9e0a8e",
-        "root_goal_text": "q → p",
+        "warrant_sha256": "94dd994ac8b135cba74a010ae96a4980a014f367fe6f0be4f7e6800f52a662b9",
+        "root_goal_text": "(q → p)",
         "hypotheses": [],
         "premises": [
-          "p → q"
+          "(p → q)"
         ],
-        "conclusion_text": "q → p",
-        "warrant_text": "From p → q infer q → p.",
+        "conclusion_text": "(q → p)",
+        "warrant_text": "From (p → q) infer (q → p).",
         "finite_boolean_sequent": {
           "premises": [
             {

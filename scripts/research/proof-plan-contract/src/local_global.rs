@@ -173,6 +173,35 @@ pub struct BooleanCountermodel {
 }
 
 impl BooleanFormula {
+    /// Canonical candidate-facing rendering for the finite propositional tier.
+    /// The fully parenthesized form is deliberately unambiguous and stable.
+    pub fn canonical_surface_text(&self) -> String {
+        match self {
+            Self::Atom { name } => name.clone(),
+            Self::Not { arg } => format!("¬({})", arg.canonical_surface_text()),
+            Self::And { left, right } => format!(
+                "({} ∧ {})",
+                left.canonical_surface_text(),
+                right.canonical_surface_text()
+            ),
+            Self::Or { left, right } => format!(
+                "({} ∨ {})",
+                left.canonical_surface_text(),
+                right.canonical_surface_text()
+            ),
+            Self::Implies { left, right } => format!(
+                "({} → {})",
+                left.canonical_surface_text(),
+                right.canonical_surface_text()
+            ),
+            Self::Iff { left, right } => format!(
+                "({} ↔ {})",
+                left.canonical_surface_text(),
+                right.canonical_surface_text()
+            ),
+        }
+    }
+
     fn collect_atoms(&self, atoms: &mut HashSet<String>) -> Result<(), String> {
         match self {
             Self::Atom { name } => {
@@ -564,6 +593,31 @@ fn validate_scope(scope: &ScopeBinding, errors: &mut Vec<String>, label: &str) {
             if sequent.premises.is_empty() {
                 errors.push(format!(
                     "{label}.finite_boolean_sequent must contain at least one premise"
+                ));
+            }
+            if scope.premises.len() != sequent.premises.len() {
+                errors.push(format!(
+                    "{label}.premises length does not match finite_boolean_sequent.premises"
+                ));
+            } else {
+                for (index, (display, formula)) in
+                    scope.premises.iter().zip(&sequent.premises).enumerate()
+                {
+                    if display != &formula.canonical_surface_text() {
+                        errors.push(format!(
+                            "{label}.premises[{index}] does not match the canonical typed sequent display"
+                        ));
+                    }
+                }
+            }
+            if scope.conclusion_text != sequent.conclusion.canonical_surface_text() {
+                errors.push(format!(
+                    "{label}.conclusion_text does not match the canonical typed sequent display"
+                ));
+            }
+            if scope.root_goal_text != sequent.conclusion.canonical_surface_text() {
+                errors.push(format!(
+                    "{label}.root_goal_text does not match the canonical typed sequent conclusion"
                 ));
             }
             for (index, premise) in sequent.premises.iter().enumerate() {
@@ -1224,6 +1278,35 @@ mod tests {
         assert!(premise_value);
     }
 
+
+
+    #[test]
+    fn canonical_surface_renderer_is_unambiguous() {
+        let formula = BooleanFormula::Implies {
+            left: Box::new(BooleanFormula::Atom { name: "p".to_owned() }),
+            right: Box::new(BooleanFormula::Atom { name: "q".to_owned() }),
+        };
+        assert_eq!(formula.canonical_surface_text(), "(p → q)");
+    }
+
+    #[test]
+    fn candidate_display_text_must_match_typed_sequent_even_after_valid_rehash() {
+        let mut pair = fixture();
+        {
+            let scope = &mut pair.candidate.local_stage.scope_binding;
+            scope.premises[0] = "(p ↔ q)".to_owned();
+            let canonical = canonical_string_set(&scope.premises, "premises").unwrap();
+            scope.premise_set_sha256 =
+                domain_separated_sha256("premises", &canonical).unwrap();
+        }
+        pair.candidate.global_stage.scope_binding =
+            pair.candidate.local_stage.scope_binding.clone();
+        assert!(
+            validate_pair(&pair)
+                .iter()
+                .any(|error| error.contains("does not match the canonical typed sequent display"))
+        );
+    }
 
     #[test]
     fn countermodel_is_bound_to_candidate_visible_sequent() {
