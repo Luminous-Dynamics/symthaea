@@ -106,8 +106,9 @@ These tests are linear-algebra controls, not EGB calculations, not physical cova
 
     cargo test --locked -p symthaea-experiment-design
     cargo run --locked -p symthaea-experiment-design -- --covariance-demo
+    cargo run --locked -p symthaea-experiment-design -- --covariance < crates/domains/symthaea-experiment-design/fixtures/covariance-redundancy-v0.1.json
 
-The second command emits the base and exactly-redundant candidates with the same D²=4 score and an empty support-review list.
+The demo command emits the base and exactly-redundant candidates with the same D²=4 score and an empty support-review list. The stdin command exercises the public covariance JSON contract against the same frozen fixture; callers can replace that fixture with an episode-specific request matching the documented schema.
 
 ## Required next qualifications
 
