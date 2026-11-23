@@ -28,12 +28,6 @@ pub struct AuthorityProfile {
     pub may_erase: bool,
 }
 
-impl AuthorityProfile {
-    fn permits(&self, scope: &str, purpose: &str) -> bool {
-        self.allowed_scopes.contains(scope) && self.allowed_purposes.contains(purpose)
-    }
-}
-
 /// Trusted identity/authority lookup supplied by the embedding application.
 ///
 /// This trait is a trust boundary, not a cryptographic implementation. A fake
@@ -192,6 +186,12 @@ impl TrustedWitness {
         self.generation
     }
 
+    /// Current committed store head, to be persisted with this witness outside
+    /// the rollback domain of the memory snapshot.
+    pub fn store_head_sha256(&self) -> &str {
+        &self.store_head_sha256
+    }
+
     pub fn revoked_ids(&self) -> &BTreeSet<String> {
         &self.revoked_ids
     }
@@ -305,6 +305,7 @@ pub fn commit_record(
             )?;
         }
     }
+    ensure_generation_available(snapshot)?;
     snapshot.records.insert(record.id.clone(), record);
     advance_head(snapshot, witness)
 }
@@ -351,6 +352,7 @@ pub fn revoke_record(
             generation: witness.generation,
         });
     }
+    ensure_generation_available(snapshot)?;
     witness.revoked_ids.insert(record_id.to_owned());
     let descendants = descendant_closure(snapshot, record_id);
     advance_head(snapshot, witness)?;
@@ -388,6 +390,7 @@ pub fn erase_record(
     if !profile.may_erase {
         return Err(LifecycleError::EraserNotAuthorized);
     }
+    ensure_generation_available(snapshot)?;
     let closure = descendant_closure(snapshot, record_id);
     for id in &closure {
         witness.erased_ids.insert(id.clone());
@@ -574,14 +577,20 @@ fn verify_store_head(
     Ok(())
 }
 
+fn ensure_generation_available(snapshot: &MemorySnapshot) -> Result<(), LifecycleError> {
+    snapshot
+        .generation
+        .checked_add(1)
+        .map(|_| ())
+        .ok_or(LifecycleError::GenerationOverflow)
+}
+
 fn advance_head(
     snapshot: &mut MemorySnapshot,
     witness: &mut TrustedWitness,
 ) -> Result<(), LifecycleError> {
-    let generation = snapshot
-        .generation
-        .checked_add(1)
-        .ok_or(LifecycleError::GenerationOverflow)?;
+    ensure_generation_available(snapshot)?;
+    let generation = snapshot.generation + 1;
     snapshot.generation = generation;
     witness.generation = generation;
     witness.store_head_sha256 = snapshot.head_sha256();
@@ -728,6 +737,25 @@ mod tests {
     }
 
     #[test]
+    fn derived_record_requires_derivation_authority() {
+        let (mut store, mut witness, mut authority) = setup();
+        commit_record(&mut store, &mut witness, record("root", "source-a", &[]), &authority)
+            .expect("root");
+        let mut writer_only = full_profile();
+        writer_only.may_derive = false;
+        authority.allow("source-b", writer_only);
+        assert_eq!(
+            commit_record(
+                &mut store,
+                &mut witness,
+                record("derived", "source-b", &["root"]),
+                &authority
+            ),
+            Err(LifecycleError::IssuerCannotDerive)
+        );
+    }
+
+    #[test]
     fn derived_record_cannot_launder_a_revoked_parent() {
         let (mut store, mut witness, authority) = setup();
         commit_record(&mut store, &mut witness, record("root", "source-a", &[]), &authority)
@@ -858,6 +886,12 @@ mod tests {
         malformed.parents = vec!["b".to_owned(), "a".to_owned()];
         assert_eq!(
             commit_record(&mut store, &mut witness, malformed, &authority),
+            Err(LifecycleError::NonCanonicalParents)
+        );
+        let mut duplicate = record("d", "source-a", &["a", "b"]);
+        duplicate.parents = vec!["a".to_owned(), "a".to_owned()];
+        assert_eq!(
+            commit_record(&mut store, &mut witness, duplicate, &authority),
             Err(LifecycleError::NonCanonicalParents)
         );
     }
