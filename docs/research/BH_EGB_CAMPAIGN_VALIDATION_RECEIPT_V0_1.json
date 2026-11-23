@@ -13,12 +13,20 @@
   },
   "inputs": {
     "manifest_path": "docs/research/BH_EGB_CAMPAIGN_EPISODES_V0_1.json",
-    "manifest_git_blob_sha1": "8a0791e46f93fef37130738242f43ebd0713472c",
+    "manifest_git_blob_sha1": "0296ba4a424186a3061c33efb7d9811b4639cc21",
     "schema_path": "docs/research/BH_EGB_CAMPAIGN_EPISODES_V0_1.schema.json",
     "schema_git_blob_sha1": "77dd2e9e33f94e33bbe2b930286580f4d43ebf6f",
     "covariance_redundancy_fixture": {
       "path": "docs/research/BH_EGB_COVARIANCE_REDUNDANCY_CONTROL_V0_1.json",
       "git_blob_sha1": "8f9ed0654b88376deeee2c7d466682dc37dbc8fd"
+    },
+    "decision_value_control": {
+      "fixture_path": "docs/research/BH_EGB_DECISION_VALUE_CONTROL_V0_1.json",
+      "fixture_git_blob_sha1": "46cd9fac730f7375eaa15b5c84541fb113324ecd",
+      "verifier_path": "docs/research/verify_bh_egb_decision_value.py",
+      "verifier_git_blob_sha1": "2b0fc3511b13ec4bb545a8e7873f7c6292c51e0e",
+      "receipt_path": "docs/research/BH_EGB_DECISION_VALUE_VERIFICATION_RECEIPT_V0_1.json",
+      "receipt_git_blob_sha1": "23165b2f5093b9a0015f5f4f09541615b00b70b4"
     }
   },
   "checks": {
@@ -28,17 +36,18 @@
     "unique_episode_ids": true,
     "unique_action_ids": true,
     "all_episode_action_references_resolve": true,
-    "all_declared_source_git_blob_ids_match_live_fetch": "manually_replayed_25_of_25_exact_public_git_blob_ids",
+    "all_declared_source_git_blob_ids_match_live_fetch": "manually_replayed_28_of_28_exact_public_git_blob_ids",
     "policy_arm_count": 11,
     "episode_count": 8,
     "action_count": 10,
     "frozen_negative_control_count": 14,
-    "source_pin_count": 25,
-    "source_pin_matches": 25,
+    "source_pin_count": 28,
+    "source_pin_matches": 28,
     "source_pin_mismatches": 0,
     "acquisition_stage_count": 2,
     "covariance_redundancy_control_pinned": true,
-    "confirmatory_preconditions_all_unset": true
+    "confirmatory_preconditions_all_unset": true,
+    "decision_value_control_pinned": true
   },
   "source_pin_replay": [
     {
@@ -215,6 +224,27 @@
       "path": "docs/research/BH_EGB_COVARIANCE_REDUNDANCY_CONTROL_V0_1.json",
       "git_blob_sha1": "8f9ed0654b88376deeee2c7d466682dc37dbc8fd",
       "role": "symthaea_covariance_redundancy_synthetic_control"
+    },
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "ref": "research/bh-egb-symthaea-campaign-2026-11-23",
+      "path": "docs/research/BH_EGB_DECISION_VALUE_CONTROL_V0_1.json",
+      "git_blob_sha1": "46cd9fac730f7375eaa15b5c84541fb113324ecd",
+      "role": "symthaea_decision_value_vs_information_gain_synthetic_control"
+    },
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "ref": "research/bh-egb-symthaea-campaign-2026-11-23",
+      "path": "docs/research/verify_bh_egb_decision_value.py",
+      "git_blob_sha1": "2b0fc3511b13ec4bb545a8e7873f7c6292c51e0e",
+      "role": "symthaea_decision_value_vs_information_gain_synthetic_control"
+    },
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "ref": "research/bh-egb-symthaea-campaign-2026-11-23",
+      "path": "docs/research/BH_EGB_DECISION_VALUE_VERIFICATION_RECEIPT_V0_1.json",
+      "git_blob_sha1": "23165b2f5093b9a0015f5f4f09541615b00b70b4",
+      "role": "symthaea_decision_value_vs_information_gain_synthetic_control"
     }
   ],
   "exclusions": [
@@ -308,6 +338,17 @@
         "negative_controls_rejected": 4
       },
       "claim_ceiling": "One exact synthetic rational linear-algebra fixture only; not EGB physics, calibration, selector qualification, or policy performance."
+    },
+    "decision_value_control": {
+      "status": "exact_finite_state_oracle_control_passed",
+      "fixture_git_blob_sha1": "46cd9fac730f7375eaa15b5c84541fb113324ecd",
+      "verifier_git_blob_sha1": "2b0fc3511b13ec4bb545a8e7873f7c6292c51e0e",
+      "equal_information_gain_bits": "1",
+      "entropy_only_action_net_value": "-1/10",
+      "decision_relevant_action_net_value": "2/5",
+      "selected_action": "B_decision_relevant",
+      "negative_controls_rejected": 4,
+      "claim_ceiling": "Synthetic finite oracle only; not the live Symthaea VoC policy."
     }
   }
 }
