@@ -109,25 +109,10 @@ pub struct CalibrationChangeEventV1 {
     pub scope: Option<CalibrationChangeScopeV1>,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum CalibrationMeasurementInventoryStateV1 {
-    CompleteFrozen,
-    Incomplete,
-    Unknown,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum CalibrationMeasurementOrderingStateV1 {
-    Total,
-    Unknown,
-}
-
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct CalibrationEventFrontierV1 {
-    pub inventory_state: CalibrationMeasurementInventoryStateV1,
-    pub ordering_state: CalibrationMeasurementOrderingStateV1,
+    pub inventory_state: CalibrationEventInventoryStateV1,
+    pub ordering_state: CalibrationEventOrderingStateV1,
     /// Event IDs actually materialized into the candidate-visible context.
     pub materialized_event_ids: Vec<String>,
 }
@@ -179,6 +164,8 @@ pub enum CalibrationRequalificationReasonV1 {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CalibrationRequalificationFrontierReportV1 {
+    /// Digest of only the evidence admissible at this knowledge frontier.
+    pub frontier_input_sha256: String,
     pub status: MeasurementQualificationStatusV1,
     pub current_consumption_allowed: bool,
     pub reason_codes: Vec<CalibrationRequalificationReasonV1>,
@@ -432,6 +419,10 @@ fn scope_applicability(
         return ApplicabilityV1::Unknown;
     };
 
+    let certificate_target = matches!(
+        &scope.target,
+        CalibrationChangeTargetV1::Certificate { .. }
+    );
     let target_matches = match &scope.target {
         CalibrationChangeTargetV1::Certificate {
             certificate_id,
@@ -449,13 +440,23 @@ fn scope_applicability(
                     == Some(reference_certificate_sha256)
         }
     };
-    if !target_matches
-        || scope.instrument_id != input.measurement.instrument_id
-        || scope.measurand_id != input.measurement.measurand_id
-        || scope.unit != input.measurement.unit
-        || scope.method_revision != input.measurement.method_revision
-    {
+    if !target_matches {
         return ApplicabilityV1::No;
+    }
+
+    let dimensions_match = scope.instrument_id == input.measurement.instrument_id
+        && scope.measurand_id == input.measurement.measurand_id
+        && scope.unit == input.measurement.unit
+        && scope.method_revision == input.measurement.method_revision;
+    if !dimensions_match {
+        // A direct certificate-ID match with contradictory dimensions is an
+        // inconsistent scope declaration. A shared reference standard may
+        // legitimately cover other exact measurement dimensions.
+        return if certificate_target {
+            ApplicabilityV1::Unknown
+        } else {
+            ApplicabilityV1::No
+        };
     }
 
     match scope.operating_range {
@@ -495,11 +496,36 @@ fn set_unknown(
     }
 }
 
+fn frontier_input_sha256(
+    input: &CalibrationRequalificationInputV1,
+    frontier: &CalibrationEventFrontierV1,
+    cutoff: i64,
+) -> Result<String, CalibrationRequalificationErrorV1> {
+    let mut visible_events: Vec<CalibrationChangeEventV1> = input
+        .owner_events
+        .iter()
+        .filter(|event| event.observed_at_unix_seconds <= cutoff)
+        .cloned()
+        .collect();
+    visible_events.sort_by(|left, right| left.event_id.cmp(&right.event_id));
+    let mut materialized_event_ids = frontier.materialized_event_ids.clone();
+    materialized_event_ids.sort();
+    json_sha256(&(
+        &input.input_id,
+        &input.original_qualification_at_k0.report_sha256,
+        cutoff,
+        frontier.inventory_state,
+        frontier.ordering_state,
+        materialized_event_ids,
+        visible_events,
+    ))
+}
+
 fn assess_frontier(
     input: &CalibrationRequalificationInputV1,
     frontier: &CalibrationEventFrontierV1,
     cutoff: i64,
-) -> CalibrationRequalificationFrontierReportV1 {
+) -> Result<CalibrationRequalificationFrontierReportV1, CalibrationRequalificationErrorV1> {
     let mut status = input.original_qualification_at_k0.status;
     let mut reasons = BTreeSet::new();
     let mut potentially_applicable = BTreeSet::new();
@@ -508,11 +534,11 @@ fn assess_frontier(
     if status != MeasurementQualificationStatusV1::Qualified {
         reasons.insert(CalibrationRequalificationReasonV1::OriginalQualificationNotQualified);
     }
-    if frontier.inventory_state != CalibrationMeasurementInventoryStateV1::CompleteFrozen {
+    if frontier.inventory_state != CalibrationEventInventoryStateV1::CompleteFrozen {
         reasons.insert(CalibrationRequalificationReasonV1::EventInventoryIncomplete);
         set_unknown(&mut status);
     }
-    if frontier.ordering_state != CalibrationMeasurementOrderingStateV1::Total {
+    if frontier.ordering_state != CalibrationEventOrderingStateV1::Total {
         reasons.insert(CalibrationRequalificationReasonV1::EventOrderingUnknown);
         set_unknown(&mut status);
     }
@@ -619,13 +645,14 @@ fn assess_frontier(
         reasons.insert(CalibrationRequalificationReasonV1::NoApplicableChange);
     }
 
-    CalibrationRequalificationFrontierReportV1 {
+    Ok(CalibrationRequalificationFrontierReportV1 {
+        frontier_input_sha256: frontier_input_sha256(input, frontier, cutoff)?,
         status,
         current_consumption_allowed: status == MeasurementQualificationStatusV1::Qualified,
         reason_codes: reasons.into_iter().collect(),
         potentially_applicable_event_ids: potentially_applicable.into_iter().collect(),
         applied_event_ids: applied,
-    }
+    })
 }
 
 fn canonical_input_sha256(
@@ -655,8 +682,8 @@ pub fn requalify_calibration_measurement_v1(
 ) -> Result<CalibrationRequalificationReportV1, CalibrationRequalificationErrorV1> {
     validate_input(input)?;
 
-    let as_known_at_k0 = assess_frontier(input, &input.k0, input.k0_unix_seconds);
-    let current_at_k1 = assess_frontier(input, &input.k1, input.k1_unix_seconds);
+    let as_known_at_k0 = assess_frontier(input, &input.k0, input.k0_unix_seconds)?;
+    let current_at_k1 = assess_frontier(input, &input.k1, input.k1_unix_seconds)?;
 
     let mut report = CalibrationRequalificationReportV1 {
         schema: CALIBRATION_REQUALIFICATION_REPORT_SCHEMA_V1.into(),
@@ -817,13 +844,13 @@ mod tests {
             owner_event_inventory_sha256: seal_calibration_event_inventory_v1(&[]).unwrap(),
             owner_events: vec![],
             k0: CalibrationEventFrontierV1 {
-                inventory_state: CalibrationMeasurementInventoryStateV1::CompleteFrozen,
-                ordering_state: CalibrationMeasurementOrderingStateV1::Total,
+                inventory_state: CalibrationEventInventoryStateV1::CompleteFrozen,
+                ordering_state: CalibrationEventOrderingStateV1::Total,
                 materialized_event_ids: vec![],
             },
             k1: CalibrationEventFrontierV1 {
-                inventory_state: CalibrationMeasurementInventoryStateV1::CompleteFrozen,
-                ordering_state: CalibrationMeasurementOrderingStateV1::Total,
+                inventory_state: CalibrationEventInventoryStateV1::CompleteFrozen,
+                ordering_state: CalibrationEventOrderingStateV1::Total,
                 materialized_event_ids: vec![],
             },
         }
@@ -874,6 +901,43 @@ mod tests {
         assert!(!report.current_at_k1.current_consumption_allowed);
         assert!(!report.source_authenticity_proven);
         assert!(!report.equipment_control_authority);
+    }
+
+    #[test]
+    fn post_k0_events_do_not_change_the_k0_frontier_digest() {
+        let baseline = base_input();
+        let baseline_report = requalify_calibration_measurement_v1(&baseline).unwrap();
+
+        let mut with_late_event = base_input();
+        install_events(
+            &mut with_late_event,
+            vec![event(
+                "late-revocation",
+                CalibrationChangeKindV1::Revoked,
+                1_840_000_000,
+                1_870_000_000,
+                1,
+            )],
+        );
+        let late_report = requalify_calibration_measurement_v1(&with_late_event).unwrap();
+
+        assert_eq!(
+            baseline_report.as_known_at_k0.frontier_input_sha256,
+            late_report.as_known_at_k0.frontier_input_sha256
+        );
+        assert_eq!(
+            baseline_report.as_known_at_k0.status,
+            late_report.as_known_at_k0.status
+        );
+        assert_ne!(
+            baseline_report.current_at_k1.frontier_input_sha256,
+            late_report.current_at_k1.frontier_input_sha256
+        );
+        assert_eq!(
+            late_report.current_at_k1.status,
+            MeasurementQualificationStatusV1::Rejected
+        );
+        assert_ne!(baseline_report.report_sha256, late_report.report_sha256);
     }
 
     #[test]
@@ -1007,7 +1071,7 @@ mod tests {
     #[test]
     fn incomplete_owner_inventory_blocks_current_support() {
         let mut input = base_input();
-        input.k1.inventory_state = CalibrationMeasurementInventoryStateV1::Incomplete;
+        input.k1.inventory_state = CalibrationEventInventoryStateV1::Incomplete;
 
         let report = requalify_calibration_measurement_v1(&input).unwrap();
         assert_eq!(
