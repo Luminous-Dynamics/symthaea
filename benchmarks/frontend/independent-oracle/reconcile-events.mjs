@@ -81,6 +81,27 @@ const eventById=new Map(fixture.events.map(e=>[e.event_id,e]));if(eventById.size
 function runCase(c){const s=newState(fixture.initial_state);for(const step of c.steps){if(step.op==='submit')submit(s,step.action);else if(step.op==='deliver'){const e=eventById.get(step.event_id);if(!e)throw new Error(`${c.case_id}: unknown event`);deliver(s,e);}else throw new Error(`${c.case_id}: unknown step`);}const out=snapshot(s);assertSubset(out,c.expected);return out;}
 const results=new Map(fixture.cases.map(c=>[c.case_id,runCase(c)]));
 for(const r of fixture.metamorphic_pairs){if(!results.has(r.left_case)||!results.has(r.right_case))throw new Error(`${r.relation_id}: case missing`);if(JSON.stringify(results.get(r.left_case))!==JSON.stringify(results.get(r.right_case)))throw new Error(`${r.relation_id}: outputs differ`);}
+// Exhaust every delivery order for the fixture's authoritative event stream.
+// Each permutation is then replayed in reverse to verify identity idempotency.
+function verifyAllDeliveryOrders(){
+ const events=fixture.events,canonical=newState(fixture.initial_state);
+ for(const event of events)deliver(canonical,event);
+ const expected=snapshot(canonical);expected.duplicate_deliveries=events.length;
+ const order=events.map((_,i)=>i);let checked=0;
+ function visit(start){
+  if(start===order.length){
+   const state=newState(fixture.initial_state);
+   for(const index of order)deliver(state,events[index]);
+   for(const index of [...order].reverse())deliver(state,events[index]);
+   const actual=snapshot(state);
+   if(JSON.stringify(actual)!==JSON.stringify(expected))throw new Error(`event delivery order failed to converge: ${order.join(',')}`);
+   checked++;return;
+  }
+  for(let i=start;i<order.length;i++){[order[start],order[i]]=[order[i],order[start]];visit(start+1);[order[start],order[i]]=[order[i],order[start]];}
+ }
+ visit(0);return checked;
+}
+const deliveryOrderPermutations=verifyAllDeliveryOrders();
 function mustReject(control,fn){try{fn();}catch(error){if(String(error.message).includes(control.expected_error_fragment))return;throw new Error(`${control.control_id}: unexpected rejection: ${error.message}`);}throw new Error(`${control.control_id}: adversarial mutation was accepted`);}
 for(const c of fixture.negative_controls){const s=newState(fixture.initial_state),e=eventById.get(c.event_id);if(!e)throw new Error(`${c.control_id}: event missing`);if(c.operation==='alter_duplicate_payload'){deliver(s,e);mustReject(c,()=>deliver(s,{...e,...c.patch}));}else if(c.operation==='reuse_sequence_with_new_id'){deliver(s,e);mustReject(c,()=>deliver(s,{...e,event_id:c.alternate_event_id}));}else if(c.operation==='replace_actor'){deliver(s,eventById.get('evt-001'));deliver(s,eventById.get('evt-002'));mustReject(c,()=>deliver(s,{...e,actor_id:c.actor_id}));}else if(c.operation==='invalid_event_is_rolled_back_atomically'){mustReject(c,()=>deliver(s,{...e,to_status:c.to_status}));deliver(s,e);if(s.lastSequence!==e.sequence||s.audit.at(-1)!==e.event_id)throw new Error(`${c.control_id}: valid retry did not apply after rejection`);}else if(c.operation==='excessive_reorder_window'){mustReject(c,()=>deliver(s,{...e,sequence:c.sequence}));if(s.seenById.has(e.event_id)||s.sequenceOwner.size!==0||s.buffered.size!==0)throw new Error(`${c.control_id}: rejected event mutated stream state`);deliver(s,e);}else if(c.operation==='unknown_event_field'){mustReject(c,()=>deliver(s,{...e,[c.field]:c.value}));}else throw new Error(`${c.control_id}: unsupported control`);}
-console.log(JSON.stringify({schema:'sfeb-event-reconciliation-preflight-v1',fixture_id:fixture.fixture_id,fixture_sha256:crypto.createHash('sha256').update(fixtureBytes).digest('hex'),golden_cases:fixture.cases.length,golden_cases_passed:results.size,metamorphic_relations:fixture.metamorphic_pairs.length,metamorphic_relations_passed:fixture.metamorphic_pairs.length,negative_controls:fixture.negative_controls.length,negative_controls_rejected:fixture.negative_controls.length,total_event_deliveries:fixture.cases.reduce((n,c)=>n+c.steps.filter(s=>s.op==='deliver').length,0),status:'reference_model_passed',limitations:['JavaScript reference only; Rust compilation/execution pending.','No Leptos candidate, DOM/browser, keyboard journey, accessibility or isolated network result.','Deterministic schedule is a synthetic benchmark fixture, not a production event service.','Public pilot fixture; not a hidden holdout.']},null,2));
+console.log(JSON.stringify({schema:'sfeb-event-reconciliation-preflight-v1',fixture_id:fixture.fixture_id,fixture_sha256:crypto.createHash('sha256').update(fixtureBytes).digest('hex'),golden_cases:fixture.cases.length,golden_cases_passed:results.size,metamorphic_relations:fixture.metamorphic_pairs.length,metamorphic_relations_passed:fixture.metamorphic_pairs.length,negative_controls:fixture.negative_controls.length,negative_controls_rejected:fixture.negative_controls.length,total_event_deliveries:fixture.cases.reduce((n,c)=>n+c.steps.filter(s=>s.op==='deliver').length,0),delivery_order_permutations:deliveryOrderPermutations,delivery_order_convergences:deliveryOrderPermutations,status:'reference_model_passed',limitations:['JavaScript reference only; Rust compilation/execution pending.','No Leptos candidate, DOM/browser, keyboard journey, accessibility or isolated network result.','Deterministic schedule is a synthetic benchmark fixture, not a production event service.','Public pilot fixture; not a hidden holdout.']},null,2));
