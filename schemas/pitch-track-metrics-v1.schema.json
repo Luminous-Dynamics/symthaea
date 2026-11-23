@@ -1,0 +1,187 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitch-track-metrics-v1.schema.json",
+  "title": "Source-bound Pitch Track Metrics v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "reference_frame_count",
+    "estimated_frame_count",
+    "aligned_frame_count",
+    "missing_estimated_frame_count",
+    "unmatched_estimated_frame_count",
+    "jointly_voiced_frame_count",
+    "voiced_true_positive",
+    "voiced_false_positive",
+    "voiced_false_negative",
+    "unvoiced_true_negative",
+    "voicing_precision",
+    "voicing_recall",
+    "voicing_f1",
+    "voicing_error_rate",
+    "frame_coverage",
+    "f0_rmse_hz",
+    "median_absolute_f0_error_cents",
+    "mean_signed_f0_error_cents",
+    "gross_pitch_error_rate",
+    "octave_error_rate"
+  ],
+  "properties": {
+    "reference_frame_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "estimated_frame_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "aligned_frame_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "missing_estimated_frame_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "unmatched_estimated_frame_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "jointly_voiced_frame_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "voiced_true_positive": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "voiced_false_positive": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "voiced_false_negative": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "unvoiced_true_negative": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "voicing_precision": {
+      "oneOf": [
+        {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "voicing_recall": {
+      "oneOf": [
+        {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "voicing_f1": {
+      "oneOf": [
+        {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "voicing_error_rate": {
+      "oneOf": [
+        {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "frame_coverage": {
+      "oneOf": [
+        {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "f0_rmse_hz": {
+      "oneOf": [
+        {
+          "type": "number",
+          "minimum": 0
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "median_absolute_f0_error_cents": {
+      "oneOf": [
+        {
+          "type": "number",
+          "minimum": 0
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "mean_signed_f0_error_cents": {
+      "oneOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "gross_pitch_error_rate": {
+      "oneOf": [
+        {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "octave_error_rate": {
+      "oneOf": [
+        {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  }
+}

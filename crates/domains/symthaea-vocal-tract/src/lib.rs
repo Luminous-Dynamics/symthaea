@@ -40,6 +40,7 @@ pub mod formant_extraction;
 pub mod metrics;
 pub mod phonetics;
 pub mod pipeline;
+pub mod pitch_track_eval;
 pub mod speech;
 pub mod types;
 

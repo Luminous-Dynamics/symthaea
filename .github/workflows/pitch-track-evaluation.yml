@@ -1,0 +1,59 @@
+name: Source-bound pitch-track evaluation
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "crates/domains/symthaea-vocal-tract/src/pitch_track_eval.rs"
+      - "crates/domains/symthaea-vocal-tract/src/lib.rs"
+      - "schemas/pitch-track-evaluation-v1.schema.json"
+      - "schemas/pitch-track-metrics-v1.schema.json"
+      - "docs/research/pitch-track-evaluation-v1/**"
+      - ".github/workflows/pitch-track-evaluation.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pitch-track-evaluation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  exact-head:
+    name: Exact-head pitch-track scorer tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Install repository-pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: clippy, rustfmt
+
+      - name: Assert exact checkout and toolchain
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "$(rustc --version | awk '{print $2}')" = "1.96.0"
+
+      - name: Validate schema syntax
+        run: python3 -m json.tool schemas/pitch-track-evaluation-v1.schema.json > /dev/null
+
+      - name: Validate metrics schema syntax
+        run: python3 -m json.tool schemas/pitch-track-metrics-v1.schema.json > /dev/null
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path Cargo.toml -p symthaea-vocal-tract -- --check
+
+      - name: Run source-bound pitch evaluation tests
+        run: cargo test --manifest-path Cargo.toml -p symthaea-vocal-tract --lib --locked
+
+      - name: Run strict target-crate Clippy
+        run: cargo clippy --no-deps --manifest-path Cargo.toml -p symthaea-vocal-tract --lib --locked -- -D warnings

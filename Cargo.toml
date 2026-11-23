@@ -20,6 +20,16 @@ exclude = [
     # `nixward` path dependency. Keep it out of the workspace and build it
     # standalone (`cargo build -p nixward-web` from its own directory).
     "crates/core/nixward-web",
+    # Workspace-glob namespace directories that are not standalone Cargo packages.
+    # Re-admit each path only after its own Cargo.toml is created.
+    "crates/core/symthaea",
+    "crates/core/symthaea-iit",
+    "crates/core/symthaea-observation-attestation",
+    "crates/domains/symthaea-architecture-engineering",
+    "crates/domains/symthaea-dishwasher-design",
+    "crates/domains/symthaea-marine-geometry",
+    "crates/domains/symthaea-rea-compat",
+    "crates/domains/symthaea-rea-evidence-verifier",
     "crates/core/symthaea-zkproof/methods",
     "crates/core/symthaea-zkproof/host",
     "crates/domains/symthaea-spore/fuzz",
