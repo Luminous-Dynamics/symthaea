@@ -1,0 +1,61 @@
+{
+  "schema": "sfeb-event-execution-trace-v1",
+  "trace_id": "SFEB-INT004-TRACE-DEMO-001",
+  "case_id": "late-event-rolls-back-optimistic-action",
+  "fixture_id": "SFEB-INT-004-EVENTS-001",
+  "steps": [
+    {
+      "op": "submit",
+      "action": {
+        "action_id": "act-stale",
+        "job_id": "JOB-A",
+        "actor_id": "alice",
+        "capability": "job.transition",
+        "expected_version": 1,
+        "from_status": "open",
+        "to_status": "in_progress",
+        "input_mode": "pointer"
+      }
+    },
+    {
+      "op": "deliver",
+      "event": {
+        "type": "job_transition",
+        "event_id": "evt-001",
+        "sequence": 1,
+        "job_id": "JOB-A",
+        "expected_version": 1,
+        "next_version": 2,
+        "from_status": "open",
+        "to_status": "blocked",
+        "actor_id": "admin",
+        "capability": "job.transition",
+        "action_id": null
+      }
+    },
+    {
+      "op": "deliver",
+      "event": {
+        "type": "job_transition",
+        "event_id": "evt-001",
+        "sequence": 1,
+        "job_id": "JOB-A",
+        "expected_version": 1,
+        "next_version": 2,
+        "from_status": "open",
+        "to_status": "blocked",
+        "actor_id": "admin",
+        "capability": "job.transition",
+        "action_id": null
+      }
+    }
+  ],
+  "worker_claims": {
+    "disposition": "accepted",
+    "observed_oracle_ids": [
+      "worker.claimed.pass",
+      "worker.claimed.security"
+    ],
+    "note": "Deliberately false claims; the verifier must ignore them."
+  }
+}
