@@ -458,6 +458,7 @@ mod tests {
             constant_info_dependency_closure: closure,
             unresolved_dependencies: Vec::new(),
             edges: Vec::new(),
+            helper_nodes: Vec::new(),
             trust_profile: TrustProfile {
                 closure_status: "complete".to_owned(),
                 transitive_declaration_count: 3,
