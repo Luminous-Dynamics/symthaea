@@ -280,3 +280,22 @@ Runtime: Node.js v22.16.0. Source SHA-256: `5ff04d8c395aad6fa7d3e756dbceac4fca51
 The lost-response case produced exactly one mock side effect and recovered the original operation receipt by the same idempotency key. The negative controls produced no side effect.
 
 This is a Node.js execution of the newly committed pure reference kernel, not a run of the pre-existing MON-001 verifier and not a real database, broker, signed receipt issuer, external authorization plane, action sink, browser, scheduler or independent verifier. The mock sink's atomicity is a model assumption; production transactionality remains an open gate.
+
+
+## 13. Objective-ledger transition preflight (2026-11-23)
+
+Companion source: `benchmarks/frontend/monitoring/mon003-objective-ledger-v1.mjs`  
+Machine-readable report: `benchmarks/frontend/monitoring/mon003-objective-ledger-report-v1.json`
+
+Executed with Node.js v22.16.0:
+```sh
+node --check mon003-objective-ledger-v1.mjs
+node mon003-objective-ledger-v1.mjs
+```
+
+**Executed result: 3/3 deterministic cases passed.** The tests reject stale objective-version writes, illegal jumps and success without execution receipt plus independent postcondition evidence; the unknown-outcome path preserves the original operation ID before transitioning to success.
+
+Exact source Git blob SHA: `1407b6c5240ca98071e062513588da5e17166ef5`.  
+Exact source SHA-256: `f42218fee255b7b5e78c5b7bf0c9fd05e46aa998c63addbcf721bf7d2d090a59`.
+
+This is a separate in-memory state-machine reference test, not persistence or distributed compare-and-swap qualification. The postcondition proof is a fixture token, not a cryptographically verified independent observation.
