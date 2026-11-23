@@ -733,7 +733,7 @@ mod tests {
             export_cluster_deltas(&rows, &assignments(), &metadata())
                 .unwrap_err()
                 .to_string()
-                .contains("more than one independent cluster")
+                .contains("disagrees with frozen cluster-assignment manifest")
         );
     }
 
@@ -829,8 +829,12 @@ mod tests {
             .into_iter()
             .filter(|row| row.cluster_id.as_str() <= "scene-02")
             .collect();
+        let frozen: Vec<_> = assignments()
+            .into_iter()
+            .filter(|assignment| assignment.cluster_id.as_str() <= "scene-02")
+            .collect();
         assert!(
-            export_cluster_deltas(&rows, &assignments(), &metadata())
+            export_cluster_deltas(&rows, &frozen, &metadata())
                 .unwrap_err()
                 .to_string()
                 .contains("at least 5 independent clusters")
