@@ -815,10 +815,7 @@ pub struct ModeResponseMatrix {
 }
 
 impl ModeResponseMatrix {
-    pub fn new(
-        input_modes: Vec<u32>,
-        output_modes: Vec<u32>,
-    ) -> Result<Self, ContractError> {
+    pub fn new(input_modes: Vec<u32>, output_modes: Vec<u32>) -> Result<Self, ContractError> {
         if input_modes.is_empty() || output_modes.is_empty() {
             return Err(ContractError::EmptyResponseModeRegistry);
         }
@@ -879,12 +876,8 @@ impl ModeResponseMatrix {
     ///
     /// Both matrices must declare exactly matching ordered mode registries.
     /// A zero reference norm is not assigned an arbitrary finite relative error.
-    pub fn relative_frobenius_error(
-        &self,
-        reference: &Self,
-    ) -> Result<f64, ContractError> {
-        if self.input_modes != reference.input_modes
-            || self.output_modes != reference.output_modes
+    pub fn relative_frobenius_error(&self, reference: &Self) -> Result<f64, ContractError> {
+        if self.input_modes != reference.input_modes || self.output_modes != reference.output_modes
         {
             return Err(ContractError::ResponseMatrixAxisMismatch);
         }
@@ -913,11 +906,7 @@ impl ModeResponseMatrix {
         Ok(error)
     }
 
-    fn entry_index(
-        &self,
-        input_mode: u32,
-        output_mode: u32,
-    ) -> Result<usize, ContractError> {
+    fn entry_index(&self, input_mode: u32, output_mode: u32) -> Result<usize, ContractError> {
         let input_index = self
             .input_modes
             .iter()
@@ -963,9 +952,7 @@ pub fn signed_response_coefficients(
     {
         return Err(ContractError::InvalidResponseAmplitude);
     }
-    let first = positive
-        .sub(negative)?
-        .scale(1.0 / first_denominator)?;
+    let first = positive.sub(negative)?.scale(1.0 / first_denominator)?;
     let second = positive
         .add(negative)?
         .sub(zero.scale(2.0)?)?
@@ -1412,7 +1399,10 @@ mod tests {
             .unwrap();
         assert_eq!(
             matrix.get(3, 2).unwrap(),
-            Some(ComplexResponse { real: 0.5, imag: -0.25 })
+            Some(ComplexResponse {
+                real: 0.5,
+                imag: -0.25
+            })
         );
         assert_eq!(matrix.get(1, 2).unwrap(), None);
         assert_eq!(matrix.get(7, 2), Err(ContractError::UnknownResponseMode(7)));
@@ -1438,7 +1428,14 @@ mod tests {
     fn response_matrix_requires_finite_measurements() {
         let mut matrix = ModeResponseMatrix::new(vec![1], vec![2]).unwrap();
         assert_eq!(
-            matrix.set(1, 2, ComplexResponse { real: f64::NAN, imag: 0.0 }),
+            matrix.set(
+                1,
+                2,
+                ComplexResponse {
+                    real: f64::NAN,
+                    imag: 0.0
+                }
+            ),
             Err(ContractError::NonFiniteResponseValue)
         );
     }
@@ -1471,7 +1468,9 @@ mod tests {
     fn response_matrix_relative_error_rejects_missing_entries_and_zero_reference() {
         let mut reference = ModeResponseMatrix::new(vec![1], vec![1]).unwrap();
         let candidate = ModeResponseMatrix::new(vec![1], vec![1]).unwrap();
-        reference.set(1, 1, ComplexResponse::new(1.0, 0.0).unwrap()).unwrap();
+        reference
+            .set(1, 1, ComplexResponse::new(1.0, 0.0).unwrap())
+            .unwrap();
         assert_eq!(
             candidate.relative_frobenius_error(&reference),
             Err(ContractError::MissingResponseEntry)
