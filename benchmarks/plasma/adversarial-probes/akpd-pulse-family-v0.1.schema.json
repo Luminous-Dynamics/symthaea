@@ -104,7 +104,8 @@
       "required": [
         "operator_id",
         "definition",
-        "amplitude_semantics"
+        "amplitude_semantics",
+        "application_semantics"
       ],
       "properties": {
         "operator_id": {
