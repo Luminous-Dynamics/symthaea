@@ -730,10 +730,10 @@ fn union_components(parent: &mut HashMap<u32, u32>, left: u32, right: u32) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::CognitiveTopology;
     use crate::mycelial_model::{
         MycelialFilament, OrbitalCell, PresenceMode, build_mycelial_model,
     };
-    use crate::CognitiveTopology;
 
     fn filament(
         id: u32,
