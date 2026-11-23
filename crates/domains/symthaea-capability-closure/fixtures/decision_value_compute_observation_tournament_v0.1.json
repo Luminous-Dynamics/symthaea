@@ -269,8 +269,8 @@
     "held_out_negative_or_zero_interaction_workloads": "at_least_one",
     "lower_resource_cost_at_noninferior_regret": "20_percent_aspirational"
   },
-  "authored_tests": 24,
-  "executed_tests": 24,
+  "authored_tests": 30,
+  "executed_tests": 30,
   "benchmark_runs": 0,
   "hardware_energy_measurements": 0,
   "claims": {
@@ -285,8 +285,8 @@
     "cluster_statistics_executed": false
   },
   "rust_reference_path": "research/decision-value-interaction-001/",
-  "authored_rust_tests": 24,
-  "executed_rust_tests": 24,
+  "authored_rust_tests": 30,
+  "executed_rust_tests": 30,
   "shared_pairing_identity_fields": [
     "episode_id",
     "hidden_world_id",
@@ -310,11 +310,11 @@
     "preserve_application_or_terminal_timestamps": true
   },
   "rust_reference_test_evidence": {
-    "qualification_head_sha": "99a1ed303d8fc9d7539de8505349a1c1ea5f41f2",
-    "workflow_run_id": 45119544918,
+    "qualification_head_sha": "8f6d2e9b605e3ef07af5c593b1f209bc9a2c410e",
+    "workflow_run_id": 45133813434,
     "toolchain": "Rust 1.96.0",
     "format": "passed",
-    "tests": "24_passed_0_failed",
+    "tests": "30_passed_0_failed",
     "strict_clippy": "passed"
   },
   "cluster_inference": {
@@ -339,6 +339,10 @@
     "minimum_cluster_count_is_not_scientific_power_claim": true,
     "cluster_analyzer_benchmark_executed": false,
     "analyzer_exact_head_run_observable": false,
-    "cluster_inference_result_claimed": false
+    "cluster_inference_result_claimed": false,
+    "assignment_manifest_sha256": "8257074ad9d509a144c807fe1eeca8c0f29fb9c5101589a3e220d207236d0aab",
+    "adapter_hashes_canonical_typed_assignments": true,
+    "adapter_sha256_standard_vectors_tested": true,
+    "adapter_hash_mismatch_control": true
   }
 }
