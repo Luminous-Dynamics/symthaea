@@ -24,11 +24,21 @@ MEMBER_GLOBS=(crates/core/* crates/domains/* crates/bridges/*)
 
 # Excluded members — must mirror [workspace].exclude in Cargo.toml.
 EXCLUDES=(
+  "crates/core/nixward-web"
+  "crates/core/symthaea"
+  "crates/core/symthaea-iit"
+  "crates/core/symthaea-observation-attestation"
   "crates/core/symthaea-zkproof/methods"
   "crates/core/symthaea-zkproof/host"
+  "crates/domains/symthaea-architecture-engineering"
+  "crates/domains/symthaea-dishwasher-design"
+  "crates/domains/symthaea-marine-geometry"
+  "crates/domains/symthaea-rea-compat"
+  "crates/domains/symthaea-rea-evidence-verifier"
   "crates/domains/symthaea-spore/fuzz"
   "crates/domains/spark-engine"
   "crates/domains/symthaea-lab"
+  "crates/domains/symthaea-perception"
 )
 
 is_excluded() {
@@ -49,8 +59,12 @@ has_target() {
 fail=0
 for glob in "${MEMBER_GLOBS[@]}"; do
   for dir in $glob; do
-    [[ -f "$dir/Cargo.toml" ]] || continue
     is_excluded "$dir" && continue
+    if [[ ! -f "$dir/Cargo.toml" ]]; then
+      echo "MISSING MANIFEST: $dir  (matched by a workspace member glob but has no Cargo.toml; add it to [workspace].exclude or create the manifest)"
+      fail=1
+      continue
+    fi
     if ! has_target "$dir"; then
       echo "MISSING TARGET: $dir  (Cargo.toml but no src/lib.rs, src/main.rs, src/bin/*.rs, [lib], or [[bin]])"
       fail=1
