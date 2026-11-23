@@ -391,7 +391,7 @@
         "notes": "The article is listed as CC BY by the Utrecht University research portal. Confirm the raw Figshare record's own license, file-level terms and any third-party image/metadata rights before reuse or redistribution."
       },
       "ingestion_status": "metadata_only_not_ingested",
-      "published_sample_summary": "Longitudinal imaging of Agaricus bisporus vegetative colonization and fructification. Optical grayscale intensity is used as a proxy for substrate colonization density; cord abundance is quantified by surface area, with cord widening observed during mushroom development. Directional extension into newly encountered substrate and cord formation in new and pre-existing regions are reported.",
+      "published_sample_summary": "Longitudinal Agaricus bisporus imaging with a directional new-substrate assay and a separate horizontal-box fructification time series. The directional-growth scan experiment used six biological replicates per treatment. The longitudinal cultivation experiment comprised three independent cultivation cycles, each with two flushes. Optical grayscale intensity is a colonization proxy; cord abundance is quantified by surface area; cord widening was observed near expanding primordia. Cord abundance varied substantially across cultivation cycles, and cord formation was not significantly correlated with total mushroom yield.",
       "benchmark_tasks": [
         "longitudinal mycelial-density proxy",
         "cord-area fraction and abundance",
@@ -400,18 +400,23 @@
         "demand-responsive morphogenesis forecasting",
         "cross-validation against independent isotope source-to-sink outcomes"
       ],
-      "independent_unit": "Recover the biological replicate, cultivation box, substrate region and imaging-series mapping from the raw data and methods before splitting; do not treat frames or image crops as independent units.",
+      "independent_unit": "For the directional-growth assay, preserve biological replicate/treatment groups; for the horizontal-box longitudinal series, preserve the cultivation-cycle/box and all timepoints/flushes. Resolve exact IDs from raw Figshare files before split assignment; do not treat frames, regions or repeated scans as independent.",
       "split_requirements": [
-        "Keep every image/timepoint/region from one biological replicate and cultivation box together unless the published design defines a different independent randomization unit.",
-        "Do not split repeated scans, crops or multiple substrate regions from the same cultivation unit across train/test.",
-        "Use held-out cultivation replicate and, separately, held-out substrate/demand condition for transfer evaluation.",
-        "Keep isotope transfer outcomes from the companion study as a separate outcome family and match replicate identity only where the experimental design supports it."
+        "Keep all scans, frames, substrate strata and repeated measures from the same biological replicate/cultivation box in one split.",
+        "Use leave-one-independent-cultivation-cycle-out evaluation for the longitudinal horizontal-box series; only three cycles are reported, so uncertainty will be wide and should not be overstated.",
+        "Keep directional-growth assay replicates distinct from longitudinal cultivation cycles unless the raw manifest proves a shared randomized unit.",
+        "Use leave-treatment-out tests for new-substrate directionality and leave-cycle-out tests for fructification dynamics.",
+        "Do not split repeated scans, crops, regions, flushes or timepoints from one experimental unit across train/test.",
+        "Keep isotope transfer outcomes as a separate dataset/task; join with the cordogenesis data only if raw manifests establish a true shared experimental unit or paired experiment."
       ],
       "known_limitations": [
         "Grayscale intensity is a colonization proxy, not a direct measurement of fungal biomass.",
         "Cord area and width are structural measurements, not direct conductance or flux observations.",
-        "The reported association between demand/development and cord formation does not establish a causal effect.",
-        "Raw Figshare artifact rights and replicate mapping must be verified before ingestion."
+        "The longitudinal fructification study comprised only three independent cultivation cycles and reported substantial between-cycle variation in cord-formation timing and magnitude.",
+        "The authors reported no significant correlation between cord formation and total mushroom yield; increased cord abundance must not be used as a general yield proxy.",
+        "Water availability may constrain cord formation, including near the casing layer; hydration is a potential moderator and must be retained where measured.",
+        "The reported association between new-substrate extension, developing primordia and cord formation does not establish a causal effect.",
+        "Raw Figshare rights and exact sample/replicate mapping must be audited before ingestion."
       ],
       "source_manifest_requirements": [
         "Figshare record/version and per-file content digests",
