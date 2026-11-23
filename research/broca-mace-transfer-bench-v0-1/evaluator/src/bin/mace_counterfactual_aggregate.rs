@@ -9,7 +9,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
-use std::fs::File;
+use std::fs::{self, File};
 use std::io::{BufRead, BufReader, BufWriter, Write};
 
 use serde_json::{json, Value};
@@ -657,11 +657,187 @@ fn paired_record(
     })
 }
 
+#[derive(Clone, Debug)]
+struct CandidateReceipt {
+    run_id: String,
+    method: String,
+    candidate_input_sha256: String,
+    decision: String,
+    retrieved_event_ids: Vec<u32>,
+    index_bytes: u64,
+    retrieval_profile_sha256: Option<String>,
+}
+
+fn expected_candidate_observation_id(method: &str, candidate_input_sha256: &str) -> String {
+    let identity = format!("{method}:{candidate_input_sha256}");
+    let digest = hex_digest(Sha256::digest(identity.as_bytes()).as_slice());
+    format!("obs-{}", &digest[..16])
+}
+
+fn expected_candidate_input_sha256(
+    decision_need_sha256: &str,
+    candidate_evidence_sha256: &str,
+) -> String {
+    let payload = format!(
+        "mace-candidate-input-v1|need={decision_need_sha256}|evidence={candidate_evidence_sha256}"
+    );
+    hex_digest(Sha256::digest(payload.as_bytes()).as_slice())
+}
+
+fn parse_candidate_receipt(record: &Value) -> Result<((String, String), CandidateReceipt), String> {
+    if required_string(record, "schema_version")? != INPUT_SCHEMA {
+        return Err("unsupported candidate stream schema version".to_string());
+    }
+    if required_string(record, "record_type")? != "candidate_decision" {
+        return Err("expected candidate_decision record".to_string());
+    }
+    let run_id = required_string(record, "run_id")?.to_string();
+    let pair_block_id = required_string(record, "pair_block_id")?.to_string();
+    parse_cluster(&pair_block_id)
+        .map_err(|error| format!("invalid candidate pair_block_id: {error}"))?;
+    let candidate_observation_id =
+        required_string(record, "candidate_observation_id")?.to_string();
+    let method = required_string(record, "method")?.to_string();
+    let candidate_input_sha256 =
+        required_string(record, "candidate_input_sha256")?.to_string();
+    let decision_need_sha256 =
+        required_string(record, "decision_need_sha256")?.to_string();
+    let candidate_evidence_sha256 =
+        required_string(record, "candidate_evidence_sha256")?.to_string();
+
+    for (field, digest) in [
+        ("candidate_input_sha256", candidate_input_sha256.as_str()),
+        ("decision_need_sha256", decision_need_sha256.as_str()),
+        ("candidate_evidence_sha256", candidate_evidence_sha256.as_str()),
+    ] {
+        if !valid_sha256(digest) {
+            return Err(format!("invalid {field} in candidate receipt"));
+        }
+    }
+    if expected_candidate_input_sha256(&decision_need_sha256, &candidate_evidence_sha256)
+        != candidate_input_sha256
+    {
+        return Err("candidate_input_sha256 does not bind DecisionNeed and evidence digests".to_string());
+    }
+    if expected_candidate_observation_id(&method, &candidate_input_sha256)
+        != candidate_observation_id
+    {
+        return Err("candidate_observation_id does not match method/input digest".to_string());
+    }
+
+    let decision = required_string(record, "decision")?.to_string();
+    if !matches!(decision.as_str(), "action_a" | "action_b" | "abstain") {
+        return Err("candidate receipt contains unsupported decision value".to_string());
+    }
+    let retrieved_event_ids = required_event_ids(record, "retrieved_event_ids")?;
+    let index_bytes = required_u64(record, "index_bytes")?;
+    let retrieval_profile_sha256 = record
+        .get("retrieval_profile_sha256")
+        .and_then(Value::as_str)
+        .map(str::to_string);
+    if retrieval_profile_sha256
+        .as_deref()
+        .is_some_and(|digest| !valid_sha256(digest))
+    {
+        return Err("invalid retrieval_profile_sha256 in candidate receipt".to_string());
+    }
+
+    Ok((
+        (pair_block_id, candidate_observation_id),
+        CandidateReceipt {
+            run_id,
+            method,
+            candidate_input_sha256,
+            decision,
+            retrieved_event_ids,
+            index_bytes,
+            retrieval_profile_sha256,
+        },
+    ))
+}
+
+fn validate_score_against_candidate(
+    score: &Value,
+    pair_block_id: &str,
+    candidate: &CandidateReceipt,
+) -> Result<(), String> {
+    if required_string(score, "run_id")? != candidate.run_id {
+        return Err("evaluator score run_id differs from candidate receipt".to_string());
+    }
+    if required_string(score, "method")? != candidate.method {
+        return Err("evaluator score method differs from candidate receipt".to_string());
+    }
+    if required_string(score, "candidate_input_sha256")? != candidate.candidate_input_sha256 {
+        return Err("evaluator score candidate_input_sha256 differs from candidate receipt".to_string());
+    }
+    if required_string(score, "decision")? != candidate.decision {
+        return Err("evaluator score decision differs from candidate receipt".to_string());
+    }
+    if required_event_ids(score, "retrieved_event_ids")? != candidate.retrieved_event_ids {
+        return Err("evaluator score retrieved_event_ids differ from candidate receipt".to_string());
+    }
+    if required_u64(score, "index_bytes")? != candidate.index_bytes {
+        return Err("evaluator score index_bytes differ from candidate receipt".to_string());
+    }
+    let score_profile = score
+        .get("retrieval_profile_sha256")
+        .and_then(Value::as_str)
+        .map(str::to_string);
+    if score_profile != candidate.retrieval_profile_sha256 {
+        return Err("evaluator score retrieval_profile_sha256 differs from candidate receipt".to_string());
+    }
+    let score_pair_block = required_string(score, "pair_block_id")?;
+    if score_pair_block != pair_block_id {
+        return Err("evaluator score pair_block_id differs from candidate key".to_string());
+    }
+    Ok(())
+}
+
+fn load_candidate_receipts(
+    path: &str,
+) -> Result<(BTreeMap<(String, String), CandidateReceipt>, String, usize, String), String> {
+    let bytes = fs::read(path)
+        .map_err(|error| format!("read candidate stream {path}: {error}"))?;
+    let content = std::str::from_utf8(&bytes)
+        .map_err(|error| format!("candidate stream is not UTF-8: {error}"))?;
+    let stream_sha256 = hex_digest(Sha256::digest(&bytes).as_slice());
+
+    let mut receipts = BTreeMap::new();
+    let mut expected_run_id: Option<String> = None;
+    let mut record_count = 0_usize;
+    for (line_index, line) in content.lines().enumerate() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let record: Value = serde_json::from_str(line)
+            .map_err(|error| format!("parse candidate JSONL line {}: {error}", line_index + 1))?;
+        let (key, receipt) = parse_candidate_receipt(&record)
+            .map_err(|error| format!("candidate JSONL line {}: {error}", line_index + 1))?;
+        if let Some(run_id) = &expected_run_id {
+            if run_id != &receipt.run_id {
+                return Err("candidate stream mixes run IDs".to_string());
+            }
+        } else {
+            expected_run_id = Some(receipt.run_id.clone());
+        }
+        if receipts.insert(key, receipt).is_some() {
+            return Err("candidate stream contains duplicate pair-block/observation identity".to_string());
+        }
+        record_count += 1;
+    }
+    let run_id = expected_run_id
+        .ok_or_else(|| "candidate stream contains no candidate_decision records".to_string())?;
+    Ok((receipts, stream_sha256, record_count, run_id))
+}
+
 fn reduce(
-    input_path: &str,
+    candidate_path: &str,
+    evaluator_path: &str,
     output_path: &str,
     seed: u64,
 ) -> Result<(usize, usize), String> {
+    let (candidate_receipts, candidate_stream_sha256, candidate_record_count, candidate_run_id) =
+        load_candidate_receipts(candidate_path)?;
     let input = File::open(input_path)
         .map_err(|error| format!("open evaluator input {input_path}: {error}"))?;
     let reader = BufReader::new(input);
