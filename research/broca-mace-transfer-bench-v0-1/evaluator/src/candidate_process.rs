@@ -351,11 +351,16 @@ impl CandidateProcessSession {
             u64::try_from(request_build_started.elapsed().as_nanos()).unwrap_or(u64::MAX);
 
         let ipc_started = Instant::now();
-        self.stdin
+        if let Err(error) = self.stdin
             .write_all(&request_bytes)
             .and_then(|_| self.stdin.write_all(b"\n"))
             .and_then(|_| self.stdin.flush())
-            .map_err(|error| format!("send candidate request: {error}"))?;
+        {
+            let reason = format!("send candidate request: {error}");
+            let _ = self.child.kill();
+            let _ = self.child.wait();
+            return Err(self.worker_error(reason));
+        }
 
         let line = match self.responses.recv_timeout(REQUEST_TIMEOUT) {
             Ok(Ok(line)) => line,
@@ -369,9 +374,16 @@ impl CandidateProcessSession {
         let process_wall_ns = u64::try_from(ipc_started.elapsed().as_nanos()).unwrap_or(u64::MAX);
 
         let validation_started = Instant::now();
-        let receipt: CandidateReceiptWire = serde_json::from_str(&line)
-            .map_err(|error| format!("invalid candidate receipt JSON: {error}"))?;
-        validate_receipt(
+        let receipt: CandidateReceiptWire = match serde_json::from_str(&line) {
+            Ok(receipt) => receipt,
+            Err(error) => {
+                let reason = format!("invalid candidate receipt JSON: {error}");
+                let _ = self.child.kill();
+                let _ = self.child.wait();
+                return Err(self.worker_error(reason));
+            }
+        };
+        if let Err(error) = validate_receipt(
             &receipt,
             run_id,
             pair_block_id,
@@ -386,7 +398,11 @@ impl CandidateProcessSession {
             &ordered_memory,
             need.scope,
             need.action_alternatives,
-        )?;
+        ) {
+            let _ = self.child.kill();
+            let _ = self.child.wait();
+            return Err(self.worker_error(error));
+        }
         let receipt_validation_ns =
             u64::try_from(validation_started.elapsed().as_nanos()).unwrap_or(u64::MAX);
         let end_to_end_ns =
