@@ -5,8 +5,8 @@
 //! it is not full equivalence, a Lean kernel proof, or expert semantic review.
 
 use crate::local_global::{
-    BooleanAssignment, BooleanFormula, FiniteTruthTableResult,
-    MAX_FINITE_BOOLEAN_ATOMS, check_finite_propositional_entailment,
+    BooleanAssignment, BooleanFormula, FiniteTruthTableResult, MAX_FINITE_BOOLEAN_ATOMS,
+    check_finite_propositional_entailment,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -76,12 +76,17 @@ pub enum ObligationDirection {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(tag = "status", rename_all = "snake_case")]
 pub enum ObligationStatus {
-    PassedFiniteTruthTable { assignments_checked: usize },
+    PassedFiniteTruthTable {
+        assignments_checked: usize,
+    },
     CounterexampleFound {
         assignments_checked: usize,
         valuation: Vec<BooleanAssignment>,
     },
-    UnknownAtomBudgetExceeded { atom_count: usize, max_atoms: usize },
+    UnknownAtomBudgetExceeded {
+        atom_count: usize,
+        max_atoms: usize,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -186,7 +191,11 @@ pub fn validate_receipt(receipt: &TheoremSandwichReceiptV1) -> Vec<String> {
             errors.push(format!("candidate.{field} must be non-empty"));
         }
     }
-    if candidate.visible_assumptions.iter().any(|value| !non_empty(value)) {
+    if candidate
+        .visible_assumptions
+        .iter()
+        .any(|value| !non_empty(value))
+    {
         errors.push("candidate.visible_assumptions must not contain empty entries".to_owned());
     }
     validate_formula(
@@ -206,15 +215,23 @@ pub fn validate_receipt(receipt: &TheoremSandwichReceiptV1) -> Vec<String> {
             errors.push("evaluator_only.adjudication_authority must be non-empty".to_owned());
         }
         if evaluator.adjudication_refs.is_empty()
-            || evaluator.adjudication_refs.iter().any(|value| !non_empty(value))
+            || evaluator
+                .adjudication_refs
+                .iter()
+                .any(|value| !non_empty(value))
         {
-            errors.push("evaluator_only.adjudication_refs must contain non-empty references".to_owned());
+            errors.push(
+                "evaluator_only.adjudication_refs must contain non-empty references".to_owned(),
+            );
         }
 
         let mut ids = HashSet::new();
         for obligation in &evaluator.stronger_obligations {
             if !non_empty(&obligation.id) || !ids.insert(obligation.id.as_str()) {
-                errors.push(format!("invalid or duplicate stronger obligation ID: {}", obligation.id));
+                errors.push(format!(
+                    "invalid or duplicate stronger obligation ID: {}",
+                    obligation.id
+                ));
             }
             validate_formula(
                 &obligation.stronger_formula,
@@ -224,7 +241,10 @@ pub fn validate_receipt(receipt: &TheoremSandwichReceiptV1) -> Vec<String> {
         }
         for obligation in &evaluator.corollary_obligations {
             if !non_empty(&obligation.id) || !ids.insert(obligation.id.as_str()) {
-                errors.push(format!("invalid or duplicate corollary obligation ID: {}", obligation.id));
+                errors.push(format!(
+                    "invalid or duplicate corollary obligation ID: {}",
+                    obligation.id
+                ));
             }
             validate_formula(
                 &obligation.corollary_formula,
@@ -234,7 +254,11 @@ pub fn validate_receipt(receipt: &TheoremSandwichReceiptV1) -> Vec<String> {
         }
 
         let mut refs = HashSet::new();
-        if evaluator.adjudication_refs.iter().any(|value| !refs.insert(value)) {
+        if evaluator
+            .adjudication_refs
+            .iter()
+            .any(|value| !refs.insert(value))
+        {
             errors.push("evaluator_only.adjudication_refs must be unique".to_owned());
         }
         validate_formula(
@@ -248,35 +272,48 @@ pub fn validate_receipt(receipt: &TheoremSandwichReceiptV1) -> Vec<String> {
 
 fn to_status(result: FiniteTruthTableResult) -> ObligationStatus {
     match result {
-        FiniteTruthTableResult::Countermodel { valuation, assignments_checked } => {
-            ObligationStatus::CounterexampleFound { assignments_checked, valuation }
-        }
-        FiniteTruthTableResult::NoCountermodelFound { assignments_checked } => {
-            ObligationStatus::PassedFiniteTruthTable { assignments_checked }
-        }
-        FiniteTruthTableResult::AtomBudgetExceeded { atom_count, max_atoms } => {
-            ObligationStatus::UnknownAtomBudgetExceeded { atom_count, max_atoms }
+        FiniteTruthTableResult::Countermodel {
+            valuation,
+            assignments_checked,
+        } => ObligationStatus::CounterexampleFound {
+            assignments_checked,
+            valuation,
+        },
+        FiniteTruthTableResult::NoCountermodelFound {
+            assignments_checked,
+        } => ObligationStatus::PassedFiniteTruthTable {
+            assignments_checked,
+        },
+        FiniteTruthTableResult::AtomBudgetExceeded {
+            atom_count,
+            max_atoms,
+        } => ObligationStatus::UnknownAtomBudgetExceeded {
+            atom_count,
+            max_atoms,
         }
     }
 }
 
 fn all_pass(results: &[ObligationResult]) -> bool {
-    results.iter().all(|item| matches!(
-        &item.status,
-        ObligationStatus::PassedFiniteTruthTable { .. }
-    ))
+    results.iter().all(|item| {
+        matches!(
+            &item.status,
+            ObligationStatus::PassedFiniteTruthTable { .. }
+        )
+    })
 }
 fn any_fail(results: &[ObligationResult]) -> bool {
-    results.iter().any(|item| matches!(
-        &item.status,
-        ObligationStatus::CounterexampleFound { .. }
-    ))
+    results
+        .iter()
+        .any(|item| matches!(&item.status, ObligationStatus::CounterexampleFound { .. }))
 }
 fn any_unknown(results: &[ObligationResult]) -> bool {
-    results.iter().any(|item| matches!(
-        &item.status,
-        ObligationStatus::UnknownAtomBudgetExceeded { .. }
-    ))
+    results.iter().any(|item| {
+        matches!(
+            &item.status,
+            ObligationStatus::UnknownAtomBudgetExceeded { .. }
+        )
+    })
 }
 
 fn evaluate_obligation(
@@ -285,12 +322,13 @@ fn evaluate_obligation(
     premises: &[BooleanFormula],
     conclusion: &BooleanFormula,
 ) -> Result<ObligationResult, String> {
-    let result = check_finite_propositional_entailment(
-        premises,
-        conclusion,
-        MAX_FINITE_BOOLEAN_ATOMS,
-    )?;
-    Ok(ObligationResult { id: id.to_owned(), direction, status: to_status(result) })
+    let result =
+        check_finite_propositional_entailment(premises, conclusion, MAX_FINITE_BOOLEAN_ATOMS)?;
+    Ok(ObligationResult {
+        id: id.to_owned(),
+        direction,
+        status: to_status(result),
+    })
 }
 
 /// Success means consistency with selected finite controls only.
@@ -302,7 +340,9 @@ pub fn evaluate_receipt(
         return Err(errors);
     }
     let Some(evaluator) = &receipt.evaluator_only else {
-        return Err(vec!["post-hoc theorem-sandwich evaluation requires evaluator_only data".to_owned()]);
+        return Err(vec![
+            "post-hoc theorem-sandwich evaluation requires evaluator_only data".to_owned(),
+        ]);
     };
 
     let mut evaluator_controls = Vec::new();
@@ -331,22 +371,28 @@ pub fn evaluate_receipt(
 
     let mut upper = Vec::new();
     for item in &evaluator.stronger_obligations {
-        upper.push(evaluate_obligation(
-            &item.id,
-            ObligationDirection::StrongerImpliesCandidate,
-            std::slice::from_ref(&item.stronger_formula),
-            &receipt.candidate.statement_formula,
-        ).map_err(|error| vec![format!("upper obligation {}: {error}", item.id)])?);
+        upper.push(
+            evaluate_obligation(
+                &item.id,
+                ObligationDirection::StrongerImpliesCandidate,
+                std::slice::from_ref(&item.stronger_formula),
+                &receipt.candidate.statement_formula,
+            )
+            .map_err(|error| vec![format!("upper obligation {}: {error}", item.id)])?,
+        );
     }
 
     let mut lower = Vec::new();
     for item in &evaluator.corollary_obligations {
-        lower.push(evaluate_obligation(
-            &item.id,
-            ObligationDirection::CandidateImpliesCorollary,
-            std::slice::from_ref(&receipt.candidate.statement_formula),
-            &item.corollary_formula,
-        ).map_err(|error| vec![format!("lower obligation {}: {error}", item.id)])?);
+        lower.push(
+            evaluate_obligation(
+                &item.id,
+                ObligationDirection::CandidateImpliesCorollary,
+                std::slice::from_ref(&receipt.candidate.statement_formula),
+                &item.corollary_formula,
+            )
+            .map_err(|error| vec![format!("lower obligation {}: {error}", item.id)])?,
+        );
     }
 
     let classification = if any_fail(&evaluator_controls) {
@@ -354,7 +400,12 @@ pub fn evaluate_receipt(
     } else if any_unknown(&evaluator_controls) || any_unknown(&upper) || any_unknown(&lower) {
         SandwichClassification::Unknown
     } else {
-        match (all_pass(&upper), all_pass(&lower), any_fail(&upper), any_fail(&lower)) {
+        match (
+            all_pass(&upper),
+            all_pass(&lower),
+            any_fail(&upper),
+            any_fail(&lower),
+        ) {
             (true, true, false, false) => SandwichClassification::ConsistentWithSelectedControls,
             (false, true, true, false) => SandwichClassification::CandidateMayBeTooStrong,
             (true, false, false, true) => SandwichClassification::CandidateMayBeTooWeak,
@@ -368,7 +419,9 @@ pub fn evaluate_receipt(
         upper_obligations: upper,
         lower_obligations: lower,
         classification,
-        claim_ceiling: "finite_propositional_selected_controls_only_not_full_equivalence_or_lean_kernel_proof".to_owned(),
+        claim_ceiling:
+            "finite_propositional_selected_controls_only_not_full_equivalence_or_lean_kernel_proof"
+                .to_owned(),
     })
 }
 
@@ -387,24 +440,37 @@ mod tests {
     use serde_json::Value;
 
     fn fixture() -> TheoremSandwichReceiptV1 {
-        evaluate_receipt_json(FIXTURE).expect("valid theorem-sandwich fixture").0
+        evaluate_receipt_json(FIXTURE)
+            .expect("valid theorem-sandwich fixture")
+            .0
     }
     fn atom(name: &str) -> BooleanFormula {
-        BooleanFormula::Atom { name: name.to_owned() }
+        BooleanFormula::Atom {
+            name: name.to_owned(),
+        }
     }
     fn implies(left: BooleanFormula, right: BooleanFormula) -> BooleanFormula {
-        BooleanFormula::Implies { left: Box::new(left), right: Box::new(right) }
+        BooleanFormula::Implies {
+            left: Box::new(left),
+            right: Box::new(right),
+        }
     }
     fn and(left: BooleanFormula, right: BooleanFormula) -> BooleanFormula {
-        BooleanFormula::And { left: Box::new(left), right: Box::new(right) }
+        BooleanFormula::And {
+            left: Box::new(left),
+            right: Box::new(right),
+        }
     }
-
 
     #[test]
     fn hidden_stronger_control_must_imply_hidden_target() {
         let mut receipt = fixture();
-        receipt.evaluator_only.as_mut().unwrap().stronger_obligations[0].stronger_formula =
-            atom("p");
+        receipt
+            .evaluator_only
+            .as_mut()
+            .unwrap()
+            .stronger_obligations[0]
+            .stronger_formula = atom("p");
         let report = evaluate_receipt(&receipt).expect("syntactically valid receipt");
         assert_eq!(
             report.classification,
@@ -416,8 +482,12 @@ mod tests {
     #[test]
     fn hidden_target_must_imply_each_selected_corollary() {
         let mut receipt = fixture();
-        receipt.evaluator_only.as_mut().unwrap().corollary_obligations[0].corollary_formula =
-            atom("q");
+        receipt
+            .evaluator_only
+            .as_mut()
+            .unwrap()
+            .corollary_obligations[0]
+            .corollary_formula = atom("q");
         let report = evaluate_receipt(&receipt).expect("syntactically valid receipt");
         assert_eq!(
             report.classification,
@@ -439,7 +509,10 @@ mod tests {
     #[test]
     fn exact_candidate_passes_selected_upper_and_lower_controls() {
         let report = evaluate_receipt(&fixture()).expect("well-formed fixture");
-        assert_eq!(report.classification, SandwichClassification::ConsistentWithSelectedControls);
+        assert_eq!(
+            report.classification,
+            SandwichClassification::ConsistentWithSelectedControls
+        );
         assert!(all_pass(&report.upper_obligations));
         assert!(all_pass(&report.lower_obligations));
     }
@@ -449,7 +522,10 @@ mod tests {
         let mut receipt = fixture();
         receipt.candidate.statement_formula = and(implies(atom("p"), atom("q")), atom("s"));
         let report = evaluate_receipt(&receipt).expect("well-formed stronger candidate");
-        assert_eq!(report.classification, SandwichClassification::CandidateMayBeTooStrong);
+        assert_eq!(
+            report.classification,
+            SandwichClassification::CandidateMayBeTooStrong
+        );
         assert!(any_fail(&report.upper_obligations));
         assert!(all_pass(&report.lower_obligations));
     }
@@ -459,7 +535,10 @@ mod tests {
         let mut receipt = fixture();
         receipt.candidate.statement_formula = implies(atom("r"), implies(atom("p"), atom("q")));
         let report = evaluate_receipt(&receipt).expect("well-formed weaker candidate");
-        assert_eq!(report.classification, SandwichClassification::CandidateMayBeTooWeak);
+        assert_eq!(
+            report.classification,
+            SandwichClassification::CandidateMayBeTooWeak
+        );
         assert!(all_pass(&report.upper_obligations));
         assert!(any_fail(&report.lower_obligations));
     }
@@ -477,18 +556,29 @@ mod tests {
     fn missing_evaluator_partition_is_not_a_pass() {
         let mut receipt = fixture();
         receipt.evaluator_only = None;
-        assert!(evaluate_receipt(&receipt).unwrap_err().iter().any(|error| {
-            error.contains("requires evaluator_only")
-        }));
+        assert!(
+            evaluate_receipt(&receipt)
+                .unwrap_err()
+                .iter()
+                .any(|error| { error.contains("requires evaluator_only") })
+        );
     }
 
     #[test]
     fn malformed_hidden_obligation_is_rejected() {
         let mut receipt = fixture();
-        receipt.evaluator_only.as_mut().unwrap().stronger_obligations[0].id.clear();
-        assert!(validate_receipt(&receipt).iter().any(|error| {
-            error.contains("invalid or duplicate stronger obligation ID")
-        }));
+        receipt
+            .evaluator_only
+            .as_mut()
+            .unwrap()
+            .stronger_obligations[0]
+            .id
+            .clear();
+        assert!(
+            validate_receipt(&receipt)
+                .iter()
+                .any(|error| { error.contains("invalid or duplicate stronger obligation ID") })
+        );
     }
 
     #[test]
@@ -496,8 +586,11 @@ mod tests {
         let mut value: Value = serde_json::from_str(FIXTURE).expect("fixture JSON");
         value["candidate"]["untrusted_gold"] = Value::Bool(true);
         let input = serde_json::to_string(&value).expect("serialize mutation");
-        assert!(evaluate_receipt_json(&input).unwrap_err().iter().any(|error| {
-            error.contains("unknown field")
-        }));
+        assert!(
+            evaluate_receipt_json(&input)
+                .unwrap_err()
+                .iter()
+                .any(|error| { error.contains("unknown field") })
+        );
     }
 }

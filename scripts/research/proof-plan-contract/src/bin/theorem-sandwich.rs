@@ -2,7 +2,7 @@ use std::env;
 use std::fs;
 use std::process::ExitCode;
 
-use proof_plan_contract::semantic_contract::{evaluate_receipt_json, ObligationStatus};
+use proof_plan_contract::semantic_contract::{ObligationStatus, evaluate_receipt_json};
 
 fn main() -> ExitCode {
     let Some(path) = env::args().nth(1) else {
@@ -20,17 +20,27 @@ fn main() -> ExitCode {
         Ok(value) => value,
         Err(errors) => {
             eprintln!("THEOREM_SANDWICH_RECEIPT_INVALID");
-            for error in errors { eprintln!("- {error}"); }
+            for error in errors {
+                eprintln!("- {error}");
+            }
             return ExitCode::from(1);
         }
     };
     let count_pass = |items: &[proof_plan_contract::semantic_contract::ObligationResult]| {
-        items.iter().filter(|item| matches!(
-            &item.status,
-            ObligationStatus::PassedFiniteTruthTable { .. }
-        )).count()
+        items
+            .iter()
+            .filter(|item| {
+                matches!(
+                    &item.status,
+                    ObligationStatus::PassedFiniteTruthTable { .. }
+                )
+            })
+            .count()
     };
-    println!("THEOREM_SANDWICH_RECEIPT_VALID task_id={}", receipt.candidate.task_id);
+    println!(
+        "THEOREM_SANDWICH_RECEIPT_VALID task_id={}",
+        receipt.candidate.task_id
+    );
     let control_passed = count_pass(&report.evaluator_control_obligations);
     println!("classification={}", report.classification.as_str());
     println!(
