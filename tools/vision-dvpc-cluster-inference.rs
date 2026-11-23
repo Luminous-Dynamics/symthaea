@@ -710,7 +710,7 @@ META\tsplit\ttest\n\
 META\tcluster_unit\tsequence\n\
 META\tprimary_metric\tdecision_utility\n\
 META\tpositive_is_better\ttrue\n\
-META\tbundle_lock_sha256\taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\
+META\tbundle_lock_sha256\taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\
 META\tcluster_assignment_manifest_sha256\tbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n\
 META\tcomparison_family_size\t2\n\
 META\tbootstrap_seed\t42\n\
