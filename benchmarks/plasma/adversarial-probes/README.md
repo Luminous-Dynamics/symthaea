@@ -38,3 +38,17 @@ A finite search provides empirical intervention coverage; it is not a continuous
 
 
 A family also declares a strictly positive minimum post-pulse observation duration. The latest admissible pulse time plus this duration must fit inside the physical horizon; a pulse at the final time cannot count as a future-response probe.
+
+
+## Matrix-free empirical response Gramian primitive
+
+The symthaea-plasma-probes crate also exposes EmpiricalGramian. It stores weighted direction factors g_i = sqrt(w_i) d_i and represents W = sum_i g_i g_i^T without materializing a dense state-by-state matrix. It provides:
+- matrix-free Wv;
+- quadratic form v^T Wv;
+- trace;
+- response-Gramian trace captured by a caller-supplied orthonormal retained basis;
+- factor / scalar-storage counts.
+
+For reachability, factors can be propagated intervention increments. For observability, factors can be pullbacks of output-sensitivity directions to the checkpoint state. The caller must derive these from the actual discrete solver and frozen control/QoI contract.
+
+The current implementation is a positive-semidefinite factorized Gramian primitive only. It does not compute tangent operators, solve adjoints, perform balancing / SVD, certify nonlinear response bounds, or authorize a representation transition. Five additional manufactured small-matrix tests check the factorized operator against the explicit 2x2 Gramian, validate cost / dimension / finiteness guards, and check basis trace capture. These tests are authored but require Rust compilation and execution before being treated as passing.
