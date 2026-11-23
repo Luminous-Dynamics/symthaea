@@ -7,7 +7,7 @@
 //! Oversized chunks are rejected before encoding; payload bytes are never silently
 //! truncated while retaining the original sample count.
 
-use super::rdp_protocol_ext::{AudioEncoding, AudioFrame, RDP_AUDIO_MAX_CHUNK_BYTES};
+use super::rdp_protocol::{AudioEncoding, AudioFrame, RDP_AUDIO_MAX_CHUNK_BYTES};
 
 /// Raw audio chunk from capture source.
 ///
@@ -448,6 +448,19 @@ mod tests {
         assert_eq!(chunk.samples.len(), 256); // 128 frames × 2 channels
         assert_eq!(chunk.sample_rate, 44100);
         assert!(source.is_active());
+    }
+
+    #[test]
+    fn encoded_frame_uses_the_rdp_wire_protocol_type() {
+        use super::super::rdp_protocol::RdpFrame;
+
+        let chunk = AudioChunk {
+            samples: vec![0.1, -0.1],
+            sample_rate: 48_000,
+            channels: 2,
+        };
+        let frame = encode_audio_frame(&chunk, 1, 0, 0.8, 0.0, 0).unwrap();
+        let _wire_frame = RdpFrame::Audio(frame);
     }
 
     fn stereo_chunk(sample_frames: usize) -> AudioChunk {
