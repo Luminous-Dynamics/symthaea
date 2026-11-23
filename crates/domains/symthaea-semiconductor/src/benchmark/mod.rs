@@ -1,6 +1,7 @@
 //! Versioned benchmark protocols and independent scoring primitives.
 
 pub mod binary_metrics;
+pub mod conformal_abstention;
 pub mod dtco_manifest;
 pub mod mf_acquisition;
 pub mod pair_manifest;
@@ -13,6 +14,13 @@ pub mod secom_raw;
 pub mod secom_tabular_baselines;
 pub mod split_manifest;
 pub mod stratified_repeat;
+
+pub use conformal_abstention::{
+    ConformalCalibrationSampleV1, ConformalClassEvaluationV1, ConformalClassThresholdV1,
+    ConformalError, ConformalEvaluationV1, ConformalPredictionSampleV1, ConformalPredictionSetV1,
+    ConformalReportV1, ConformalSubjectV1, ConformalTruthSampleV1, SelectiveDecisionV1,
+    build_mondrian_conformal_sets_v1, evaluate_conformal_sets_v1,
+};
 
 pub use binary_metrics::{
     BinaryClassCounts, BinaryMetricReportV1, BinaryMetricsError, BinaryScoreSampleV1,

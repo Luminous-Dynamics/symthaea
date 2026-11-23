@@ -465,3 +465,24 @@ A validated numeric target requires a finite point value, unit and standard unce
 **Critical invariant:** an old measurement event is not a usable training target until its result is available. Training and evaluation must never backfill a later lab result into an earlier model snapshot. Unaligned clock domains are excluded rather than guessed.
 
 Rust tests cover event/availability separation, delayed labels, late-arriving event exclusion, clock-domain mismatch, future timestamps, unresolved graph edges, label/subject consistency and immutable revision lineage. The graph validator establishes schema/time/identity integrity only; it does not prove sensor accuracy, physical causality, VM calibration, transfer or process-control authority.
+
+
+## Class-conditional conformal prediction sets and metrology-aware abstention
+
+The Rust module \`benchmark::conformal_abstention\` provides a label-free inference stage that turns a model score into a class-conditional prediction set. Only a singleton set is converted into a class prediction:
+- \`{0}\` -> predict negative;
+- \`{1}\` -> predict positive;
+- \`{0,1}\` -> abstain / request qualified evidence;
+- \`{}\` -> abstain / unsupported.
+
+Calibration is Mondrian/class-conditional:
+- positive-class nonconformity is \(1-s(x)\);
+- negative-class nonconformity is \(s(x)\);
+- each class receives its own finite-sample order-statistic threshold;
+- the \(\lceil(n+1)(1-\alpha)\rceil\) rank is recorded; rank \(n+1\) is represented as an unbounded threshold (all candidates for that class included).
+
+The calibration set must be disjoint from model training and outer prediction rows. Each calibration row has a label identity that must occur in the process-event graph snapshot's \`matured_validated_label_ids\`. The snapshot's graph digest and cutoff ID are bound into the report. Prediction inputs contain only sample ID and score; truth labels are accepted only by the separate evaluator after prediction-set construction. The prediction-set digest is recomputed and verified before evaluation.
+
+The evaluator reports class-conditional empirical coverage, singleton accuracy, abstention/empty/doubleton rates, mean set size and marginal coverage. Minority-class calibration counts and exact finite-sample ranks are retained; very small failure support yields coarse or unbounded thresholds rather than fake precision.
+
+**Guarantee boundary:** class-conditional split conformal coverage is finite-sample marginally valid only under exchangeability within each class, using calibration data disjoint from model training/test. It is not per-wafer conditional coverage and does not survive arbitrary time, tool, chamber, recipe or fab shift. The event-graph maturity snapshot prevents future/immature labels from entering calibration; it does not make an exchangeability assumption true. Under shift, the system must track coverage degradation and use a separately specified online/delayed-feedback conformal method. Abstention is a decision-support state, not a wafer hold/release command.
