@@ -51,6 +51,16 @@ pub struct PolicyAssignment {
     pub block_position: usize,
 }
 
+/// Frozen evaluator-owned task schedule. Every randomized profile must receive
+/// every task identity exactly once; otherwise missing tasks could disappear
+/// from both arms and inflate the apparent result.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ScheduledTask {
+    pub episode_id: String,
+    pub task_family: String,
+}
+
 /// Evaluator-scored terminal outcome. Every randomized profile must have
 /// rows for all scheduled tasks, including refusal, failure and abandonment.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -188,10 +198,22 @@ struct ProfileMean {
 /// contributes one cluster mean, regardless of its turn or episode count.
 pub fn estimate_total_effect(
     assignments: &[PolicyAssignment],
+    expected_tasks: &[ScheduledTask],
     outcomes: &[EpisodeOutcome],
 ) -> Result<TotalEffectReport, String> {
-    if assignments.is_empty() || outcomes.is_empty() {
-        return Err("assignments and terminal outcomes must be non-empty".to_string());
+    if assignments.is_empty() || expected_tasks.is_empty() || outcomes.is_empty() {
+        return Err("assignments, expected task schedule and terminal outcomes must be non-empty".to_string());
+    }
+
+    let mut expected_schedule = BTreeSet::new();
+    for task in expected_tasks {
+        if task.episode_id.trim().is_empty() || task.task_family.trim().is_empty() {
+            return Err("expected task episode_id and task_family must not be empty".to_string());
+        }
+        expected_schedule.insert((task.task_family.clone(), task.episode_id.clone()));
+    }
+    if expected_schedule.len() != expected_tasks.len() {
+        return Err("expected task schedule contains duplicate task identities".to_string());
     }
 
     let mut assigned = BTreeMap::new();
@@ -243,19 +265,14 @@ pub fn estimate_total_effect(
     // Identical task-family counts prevent different task mixes from looking
     // like a policy effect. Every randomized profile is scored on the same
     // frozen schedule.
-    let mut reference_schedule: Option<BTreeSet<(String, String)>> = None;
     let mut profile_means = Vec::with_capacity(assignments.len());
     for (profile_id, episodes) in grouped {
         let mut schedule = BTreeSet::new();
         for row in &episodes {
             schedule.insert((row.task_family.clone(), row.episode_id.clone()));
         }
-        if let Some(reference) = &reference_schedule {
-            if reference != &schedule {
-                return Err(format!("task identity schedule differs for {}", profile_id));
-            }
-        } else {
-            reference_schedule = Some(schedule);
+        if schedule != expected_schedule {
+            return Err(format!("profile {} does not match the frozen task schedule", profile_id));
         }
 
         let n = episodes.len() as f64;
@@ -332,7 +349,7 @@ pub fn estimate_total_effect(
 
 fn summarize_arm(profiles: &[&ProfileMean]) -> ArmSummary {
     let episodes = profiles.iter().map(|p| p.episodes).sum();
-    let values = |f: fn(&ProfileMean) -> f64| profiles.iter().map(|p| f(p)).collect::<Vec<_>>();
+    let values = |f: fn(&ProfileMean) -> f64| profiles.iter().map(|p| f(*p)).collect::<Vec<_>>();
     ArmSummary {
         profile_clusters: profiles.len(),
         episodes,
@@ -371,23 +388,44 @@ mod tests {
         }).collect()
     }
 
+    fn expected_tasks() -> Vec<ScheduledTask> {
+        vec![
+            ScheduledTask { episode_id: "task-1".into(), task_family: "planning".into() },
+            ScheduledTask { episode_id: "task-2".into(), task_family: "planning".into() },
+        ]
+    }
+
     fn make_outcomes(rows: &[PolicyAssignment]) -> Vec<EpisodeOutcome> {
-        rows.iter().map(|a| {
-            let treatment = a.arm == PolicyArm::Treatment;
-            EpisodeOutcome {
-                profile_id: a.profile_id.clone(),
-                episode_id: "task-1".to_string(),
-                task_family: "planning".to_string(),
-                arm: a.arm,
-                utility: if treatment { 0.9 } else { 0.4 },
-                task_success: treatment,
-                question_count: if treatment { 1 } else { 3 },
-                all_in_cost: if treatment { 0.2 } else { 0.4 },
-                user_refused: false,
-                privacy_violations: 0,
-                unauthorized_actions: 0,
+        let mut outcomes = Vec::new();
+        for assignment in rows {
+            let treatment = assignment.arm == PolicyArm::Treatment;
+            let second_task_utility = if assignment.profile_id == "profile-000" {
+                0.0
+            } else if treatment {
+                0.9
+            } else {
+                0.4
+            };
+            for (episode_id, utility) in [
+                ("task-1", if treatment { 0.9 } else { 0.4 }),
+                ("task-2", second_task_utility),
+            ] {
+                outcomes.push(EpisodeOutcome {
+                    profile_id: assignment.profile_id.clone(),
+                    episode_id: episode_id.to_string(),
+                    task_family: "planning".to_string(),
+                    arm: assignment.arm,
+                    utility,
+                    task_success: treatment,
+                    question_count: if treatment { 1 } else { 3 },
+                    all_in_cost: if treatment { 0.2 } else { 0.4 },
+                    user_refused: false,
+                    privacy_violations: 0,
+                    unauthorized_actions: 0,
+                });
             }
-        }).collect()
+        }
+        outcomes
     }
 
     #[test]
@@ -419,25 +457,8 @@ mod tests {
     #[test]
     fn total_effect_weights_profile_clusters_not_turn_counts() {
         let assignments = make_assignments();
-        let mut outcomes = make_outcomes(&assignments);
-        for assignment in &assignments {
-            let treatment = assignment.arm == PolicyArm::Treatment;
-            let is_extra_control = assignment.profile_id == "profile-000";
-            outcomes.push(EpisodeOutcome {
-                profile_id: assignment.profile_id.clone(),
-                episode_id: "task-2".to_string(),
-                task_family: "planning".to_string(),
-                arm: assignment.arm,
-                utility: if is_extra_control { 0.0 } else if treatment { 0.9 } else { 0.4 },
-                task_success: treatment,
-                question_count: if treatment { 1 } else { 3 },
-                all_in_cost: if treatment { 0.2 } else { 0.4 },
-                user_refused: false,
-                privacy_violations: 0,
-                unauthorized_actions: 0,
-            });
-        }
-        let report = estimate_total_effect(&assignments, &outcomes).unwrap();
+        let outcomes = make_outcomes(&assignments);
+        let report = estimate_total_effect(&assignments, &expected_tasks(), &outcomes).unwrap();
         assert_eq!(report.utility_effect.control_profiles, 4);
         assert_eq!(report.utility_effect.treatment_profiles, 4);
         assert!((report.control.mean_utility - 0.35).abs() < 1e-12);
@@ -451,7 +472,7 @@ mod tests {
         let mut outcomes = make_outcomes(&assignments);
         outcomes[0].utility = 1.0;
         outcomes[0].privacy_violations = 1;
-        let report = estimate_total_effect(&assignments, &outcomes).unwrap();
+        let report = estimate_total_effect(&assignments, &expected_tasks(), &outcomes).unwrap();
         assert!(!report.hard_gates_passed);
         assert_eq!(report.control.privacy_violations, 1);
     }
@@ -461,7 +482,7 @@ mod tests {
         let assignments = make_assignments();
         let mut outcomes = make_outcomes(&assignments);
         outcomes[0].arm = PolicyArm::Treatment;
-        assert!(estimate_total_effect(&assignments, &outcomes).is_err());
+        assert!(estimate_total_effect(&assignments, &expected_tasks(), &outcomes).is_err());
     }
 
     #[test]
@@ -469,12 +490,16 @@ mod tests {
         let assignments = make_assignments();
         let mut outcomes = make_outcomes(&assignments);
         outcomes[0].episode_id = "different-task".into();
-        assert!(estimate_total_effect(&assignments, &outcomes).is_err());
+        assert!(estimate_total_effect(&assignments, &expected_tasks(), &outcomes).is_err());
 
         let mut outcomes = make_outcomes(&assignments);
         outcomes[0].task_family = "other".into();
-        assert!(estimate_total_effect(&assignments, &outcomes).is_err());
-        assert!(estimate_total_effect(&assignments, &make_outcomes(&assignments[..7])).is_err());
+        assert!(estimate_total_effect(&assignments, &expected_tasks(), &outcomes).is_err());
+        assert!(estimate_total_effect(&assignments, &expected_tasks(), &make_outcomes(&assignments[..7])).is_err());
+
+        let mut missing_same_task_in_both_arms = make_outcomes(&assignments);
+        missing_same_task_in_both_arms.retain(|row| row.episode_id == "task-1");
+        assert!(estimate_total_effect(&assignments, &expected_tasks(), &missing_same_task_in_both_arms).is_err());
     }
 
     #[test]
@@ -482,8 +507,8 @@ mod tests {
         let assignments = make_assignments();
         let mut outcomes = make_outcomes(&assignments);
         outcomes[0].utility = f64::NAN;
-        assert!(estimate_total_effect(&assignments, &outcomes).is_err());
+        assert!(estimate_total_effect(&assignments, &expected_tasks(), &outcomes).is_err());
         outcomes[0].utility = 1.1;
-        assert!(estimate_total_effect(&assignments, &outcomes).is_err());
+        assert!(estimate_total_effect(&assignments, &expected_tasks(), &outcomes).is_err());
     }
 }
