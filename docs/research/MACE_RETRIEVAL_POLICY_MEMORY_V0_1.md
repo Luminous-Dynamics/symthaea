@@ -134,7 +134,7 @@ The companion V2 sidecar now emits one policy trace for each official query invo
 - latency: measured end-to-end sidecar query work;
 - inspected bytes: explicitly incomplete because the current BM25 index does not expose posting/index bytes read.
 
-The official opaque query invocation ID is used as the trace key. Python persists the receipt with the candidate-evidence receipt, independently recomputes the receipt SHA-256 and verifies that both records carry the same candidate-set digest.
+The official opaque query invocation ID is used as the trace key. Python persists the receipt with the candidate-evidence receipt, independently recomputes the receipt SHA-256 and verifies that both records carry the same candidate-set digest. Rust and Python share a pinned receipt-hash reference vector.
 
 This is **single-operation trace capture**, not multi-step strategy learning. The V2 BM25 adapter does not yet choose alternate tools or promote a search sequence. The Rust policy-memory state remains process-local; Python stores audit/replay receipt JSON but does not restore the in-memory promotion state on process restart. Cross-query consolidation and durable promotion remain future work.
 
@@ -148,7 +148,7 @@ research/broca-mace-transfer-bench-v0-1/aml-adapter/src/retrieval_policy_memory.
 - promote_strategy(refs, algorithm_revision, promoted_at, expires_at) deterministically creates a note from supporting traces.
 - applicable_notes(domain, environment_revision, tool_profile, now) returns only currently valid notes matching every scope/version constraint.
 
-The nine tests cover invocation idempotency/rebinding, minimum support, duplicate query exclusion, domain/environment/tool-profile/strategy isolation, expiry, resource accounting, invalid success claims, insufficient search budgets and input-size limits.
+The eleven tests cover invocation idempotency/rebinding, minimum support, duplicate query exclusion, domain/environment/tool-profile/strategy isolation, expiry, resource accounting, invalid success claims, insufficient search budgets, input-size limits, explicit byte-accounting completeness and a cross-language retrieval-trace receipt hash vector.
 
 ## 10. Next implementation stages
 
