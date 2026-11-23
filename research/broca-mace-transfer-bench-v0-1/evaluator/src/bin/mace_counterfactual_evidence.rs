@@ -962,6 +962,9 @@ fn run() -> Result<(), String> {
     let mut candidate_records = Vec::new();
     let mut evaluator_records = Vec::new();
     let mut next_candidate_observation_sequence = 0_u64;
+    // Each request is self-contained, so one stateless candidate worker can
+    // serve the full run without exposing evaluator state or restarting per task.
+    let mut candidate_process = CandidateProcessSession::from_environment()?;
 
     for case in &cases {
         let manifest = build_manifest(&case.memory, public_seed, max_root_pairs)
@@ -973,9 +976,6 @@ fn run() -> Result<(), String> {
             case.decision_need,
             &manifest.baseline_evidence_sha256,
         );
-        // One stateless candidate worker per task block amortizes process startup
-        // while keeping the evaluator's intervention/truth state out of its requests.
-        let mut candidate_process = CandidateProcessSession::from_environment()?;
         let mut baseline_observations = Vec::with_capacity(CandidateMode::ALL.len());
         for mode in CandidateMode::ALL {
             let observation_sequence = next_candidate_observation_sequence;
