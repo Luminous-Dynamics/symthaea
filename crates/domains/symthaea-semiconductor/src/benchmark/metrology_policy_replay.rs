@@ -1287,6 +1287,8 @@ mod tests {
         assert_eq!(report.population_count, 128);
         assert_eq!(report.selected_count, 32);
         assert_eq!(report.measured_fraction, 0.25);
+        assert_eq!(report.measurement_reduction_fraction, 0.75);
+        assert_eq!(report.total_selected_cost, 32);
         assert!(report.horvitz_thompson_prevalence.is_finite());
         assert!(report.horvitz_thompson_absolute_error.is_finite());
         assert!(report.design_variance_qualified);
@@ -1323,6 +1325,10 @@ mod tests {
         assert_eq!(risk_run.selection.randomized_audit_count, 16);
         assert!(random_run.evaluation.design_variance_qualified);
         assert!(risk_run.evaluation.design_variance_qualified);
+        assert!(risk_run.evaluation.defect_capture_fraction.is_some());
+        assert!(risk_run.evaluation.escaped_defect_fraction.is_some());
+        assert!(risk_run.evaluation.cost_per_defect_captured.is_some());
+        assert_eq!(risk_run.evaluation.measurement_reduction_fraction, 0.75);
     }
 
     #[test]
