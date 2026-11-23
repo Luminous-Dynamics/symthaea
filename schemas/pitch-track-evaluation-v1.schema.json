@@ -1,0 +1,162 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitch-track-evaluation-v1.schema.json",
+  "title": "Source-bound Pitch Track Evaluation v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "reference",
+    "estimated",
+    "config"
+  ],
+  "properties": {
+    "reference": {
+      "$ref": "#/$defs/pitchTrack"
+    },
+    "estimated": {
+      "$ref": "#/$defs/pitchTrack"
+    },
+    "config": {
+      "$ref": "#/$defs/scoreConfig"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{64}$"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_content_sha256",
+        "clock_domain_id",
+        "clock_generation",
+        "source_start_ns",
+        "source_end_ns"
+      ],
+      "properties": {
+        "source_content_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "clock_domain_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "clock_generation": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "source_start_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "source_end_ns": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "pitchFrame": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "frame_index",
+        "source_timestamp_ns",
+        "f0_hz",
+        "periodicity"
+      ],
+      "properties": {
+        "frame_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "source_timestamp_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "f0_hz": {
+          "oneOf": [
+            {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "periodicity": {
+          "oneOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "pitchTrack": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "track_id",
+        "producer_id",
+        "source",
+        "frames"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "track_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "producer_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source": {
+          "$ref": "#/$defs/source"
+        },
+        "frames": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/pitchFrame"
+          }
+        }
+      }
+    },
+    "scoreConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "timestamp_tolerance_ns",
+        "gross_pitch_error_ratio",
+        "octave_ratio_tolerance"
+      ],
+      "properties": {
+        "timestamp_tolerance_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "gross_pitch_error_ratio": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "octave_ratio_tolerance": {
+          "type": "number",
+          "minimum": 0,
+          "exclusiveMaximum": 0.5
+        }
+      }
+    }
+  }
+}
