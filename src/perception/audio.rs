@@ -203,6 +203,26 @@ pub struct AcousticProsodyFrameV1 {
     pub energy_utterance_peak_normalized: f32,
 }
 
+/// Compute RMS in the source PCM units using a wider accumulator.
+///
+/// Input samples are f32, but squaring in f32 can overflow for finite
+/// full-scale or malformed inputs. Accumulate in f64 and return f32; for any
+/// finite f32 input, the RMS is bounded by the maximum absolute input sample.
+fn rms_source_pcm(samples: &[f32]) -> f32 {
+    if samples.is_empty() {
+        return 0.0;
+    }
+    let mean_square = samples
+        .iter()
+        .map(|sample| {
+            let value = f64::from(*sample);
+            value * value
+        })
+        .sum::<f64>()
+        / samples.len() as f64;
+    mean_square.sqrt() as f32
+}
+
 /// Frame-aligned acoustic prosody features.
 ///
 /// Summary fields are optional because silence or unvoiced input may provide no
@@ -489,16 +509,7 @@ impl AudioPerception {
                         .unwrap_or(samples.len())
                         .min(samples.len());
                 let source_frame = samples.get(local_start..local_end).unwrap_or(&[]);
-                let rms_source_pcm = if source_frame.is_empty() {
-                    0.0
-                } else {
-                    (source_frame
-                        .iter()
-                        .map(|sample| sample * sample)
-                        .sum::<f32>()
-                        / source_frame.len() as f32)
-                        .sqrt()
-                };
+                let rms_source_pcm = rms_source_pcm(source_frame);
                 let f0_hz =
                     if frame.f0 > 0.0 && frame.voicing >= extraction_config.voicing_threshold {
                         Some(frame.f0)
@@ -919,6 +930,15 @@ mod tests {
                 .process_samples_at_rate(&[0.0; 160], 48_000)
                 .is_err()
         );
+    }
+
+    #[test]
+    fn source_pcm_rms_uses_wide_accumulation_for_large_finite_samples() {
+        let samples = [1.0e20_f32, -1.0e20_f32];
+        let rms = rms_source_pcm(&samples);
+        assert!(rms.is_finite());
+        assert!((rms / 1.0e20_f32 - 1.0).abs() < 0.0001);
+        assert_eq!(rms_source_pcm(&[]), 0.0);
     }
 
     #[test]
