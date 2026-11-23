@@ -12,16 +12,25 @@
     "coordinate_unit": "L"
   },
   "normalization": {
-    "method": "per_sample_minmax_to_periodic_interval",
+    "method": "neopic_arxiv_v1_per_sample_minmax",
     "output_interval": [
-      -3.141592653589793,
-      3.141592653589793
+      0,
+      1
     ],
-    "formula": "z(x) = -pi + 2*pi*(x-min(X))/(max(X)-min(X))",
+    "formula": "z(x) = (x-min(X))/(max(X)-min(X))",
     "normalization_is_position_only": true,
     "particle_weights_affect_extrema": false,
-    "source_faithful_to_neopic": false,
-    "output_interval_role": "illustrative_synthetic_interval_only"
+    "source_faithful_to_neopic": true,
+    "source_tag": "neopic-arxiv-v1",
+    "annotated_tag_object_sha256": "8e872e5fa520843a9c9db4a68d43036a66355c19",
+    "peeled_commit_sha": "2cf6a15e0ddb6c408a4ef6d162c31faf1deb9431",
+    "source_file": "operator_learning/data/pic_dataset.py",
+    "source_file_blob_sha": "dcb046656830dd8c5707e98bdd1d611c8376b412",
+    "source_line_ranges": [
+      "129-139",
+      "141-152",
+      "415-423"
+    ]
   },
   "base_cloud": {
     "positions": [
@@ -39,11 +48,11 @@
       0.2
     ],
     "normalized_positions": [
-      -3.141592653589793,
-      -1.5707963267948966,
       0,
-      1.5707963267948966,
-      3.141592653589793
+      0.25,
+      0.5,
+      0.75,
+      1
     ]
   },
   "perturbed_cloud": {
@@ -64,12 +73,12 @@
       0.1999999999998
     ],
     "normalized_positions": [
-      -3.141592653589793,
-      -2.443460952792061,
-      -1.0471975511965979,
-      0.34906585039886595,
-      1.7453292519943293,
-      3.141592653589793
+      0,
+      0.1111111111111111,
+      0.3333333333333333,
+      0.5555555555555556,
+      0.7777777777777778,
+      1
     ]
   },
   "matched_inlier_comparison": {
@@ -81,33 +90,37 @@
       0.9
     ],
     "normalized_before": [
-      -3.141592653589793,
-      -1.5707963267948966,
       0,
-      1.5707963267948966,
-      3.141592653589793
+      0.25,
+      0.5,
+      0.75,
+      1
     ],
     "normalized_after": [
-      -2.443460952792061,
-      -1.0471975511965979,
-      0.34906585039886595,
-      1.7453292519943293,
-      3.141592653589793
+      0.1111111111111111,
+      0.3333333333333333,
+      0.5555555555555556,
+      0.7777777777777778,
+      1
     ],
     "signed_displacement": [
-      0.6981317007977319,
-      0.5235987755982987,
-      0.34906585039886595,
-      0.17453292519943275,
+      0.1111111111111111,
+      0.08333333333333333,
+      0.05555555555555555,
+      0.027777777777777776,
       0
     ],
-    "max_absolute_displacement_rad": 0.6981317007977319,
-    "mean_absolute_displacement_rad": 0.34906585039886584
+    "max_absolute_displacement_rad": null,
+    "mean_absolute_displacement_rad": 0.34906585039886584,
+    "max_absolute_displacement": 0.1111111111111111,
+    "mean_absolute_displacement": 0.05555555555555555,
+    "max_absolute_displacement_coordinate_units": 0.1111111111111111,
+    "mean_absolute_displacement_coordinate_units": 0.05555555555555555
   },
   "interpretation": {
-    "empirical_measure_change": "At most the mass assigned to the added outlier (1e-12) before renormalization.",
-    "normalization_change": "The min/max support changes from [0.1,0.9] to [0,0.9], remapping every inlier position except the upper endpoint.",
+    "empirical_measure_change": "The added outlier has weight 1e-12; the physical mass of the original inliers is unchanged before any optional renormalization of total weights.",
+    "normalization_change": "The exact NEOPIC arXiv v1 transform independently maps each sample to [0,1]. The sample support changes from [0.1,0.9] to [0,0.9], remapping every existing inlier except the upper endpoint even though the new particle weight is negligible.",
     "expected_disposition": "Detect and report normalization-induced global coordinate drift separately from sampling / learned-operator error.",
-    "scope_limit": "This is an analytic synthetic normalization witness using an illustrative [-pi, pi] interval, not a paper-faithful reproduction of NEOPIC's exact source normalization scale or a learned-field output error, kinetic simulation, or claim that all physical particle clouds contain such outliers. Pin the paper-tag source and exact transform in issue #12952 before a faithful comparator run."
+    "scope_limit": "The normalization formula and [0,1] output interval match the pinned NEOPIC arXiv v1 code. This is still a synthetic coordinate-map witness, not a learned field-output error, physical kinetic simulation or proof of failure in the published model. It exercises a single coordinate channel with an illustrative unit-interval sample."
   }
 }
