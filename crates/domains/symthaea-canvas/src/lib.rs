@@ -120,18 +120,16 @@ pub use mycelial_failure_resilience::{
     evaluate_mycelial_failure_attack_plan,
 };
 pub use mycelial_fusion_counterfactual::{
-    MAX_MYCELIAL_FUSION_COUNTERFACTUAL_CANDIDATES,
-    MAX_MYCELIAL_FUSION_COUNTERFACTUAL_JUNCTIONS,
-    MAX_MYCELIAL_FUSION_COUNTERFACTUAL_SEGMENTS,
-    MAX_MYCELIAL_FUSION_DEMAND_PAIRS, MAX_MYCELIAL_FUSION_DISRUPTION_SCENARIOS,
-    MAX_MYCELIAL_FUSION_ID_BYTES, MAX_MYCELIAL_FUSION_TOTAL_DEMAND_WEIGHT,
-    MAX_SIDE_CONTACT_FRACTION_MICROS, MIN_SIDE_CONTACT_FRACTION_MICROS,
-    MYCELIAL_FUSION_COUNTERFACTUAL_SCHEMA_VERSION, MycelialFusionCandidate,
-    MycelialFusionCounterfactualError, MycelialFusionCounterfactualReport,
-    MycelialFusionDemandDelta, MycelialFusionDemandOutcome, MycelialFusionDemandPair,
-    MycelialFusionDisruptionDelta, MycelialFusionDisruptionScenario,
+    MAX_MYCELIAL_FUSION_COUNTERFACTUAL_CANDIDATES, MAX_MYCELIAL_FUSION_COUNTERFACTUAL_JUNCTIONS,
+    MAX_MYCELIAL_FUSION_COUNTERFACTUAL_SEGMENTS, MAX_MYCELIAL_FUSION_DEMAND_PAIRS,
+    MAX_MYCELIAL_FUSION_DISRUPTION_SCENARIOS, MAX_MYCELIAL_FUSION_ID_BYTES,
+    MAX_MYCELIAL_FUSION_TOTAL_DEMAND_WEIGHT, MAX_SIDE_CONTACT_FRACTION_MICROS,
+    MIN_SIDE_CONTACT_FRACTION_MICROS, MYCELIAL_FUSION_COUNTERFACTUAL_SCHEMA_VERSION,
+    MycelialFusionCandidate, MycelialFusionCandidateImpact, MycelialFusionCounterfactualError,
+    MycelialFusionCounterfactualReport, MycelialFusionDemandDelta, MycelialFusionDemandOutcome,
+    MycelialFusionDemandPair, MycelialFusionDisruptionDelta, MycelialFusionDisruptionScenario,
     MycelialFusionTarget, MycelialFusionTopologyEffect, MycelialFusionViewMetrics,
-    MycelialFusionCandidateImpact, evaluate_mycelial_fusion_counterfactuals,
+    evaluate_mycelial_fusion_counterfactuals,
 };
 
 pub use mycelial_junction_graph::{
