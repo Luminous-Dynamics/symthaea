@@ -137,6 +137,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut sponge_control = VlasovPoisson1d1v::new(coarse_config, coarse_initial.clone())?;
 
     let initial_c2 = sponge_pulse.quadratic_casimir_budget()?.total_casimir;
+    let initial_diagnostics = sponge_pulse.diagnostics()?;
     let mut sponge_removed_c2 = 0.0;
     let mut sponge_control_removed_c2 = 0.0;
     let mut sponge_removed_f_strophy = 0.0;
@@ -262,15 +263,38 @@ fn main() -> Result<(), Box<dyn Error>> {
     let fine_peak = measure_peak(&fine_trace);
     let sponge_peak = measure_peak(&sponge_trace);
     let sponge_final_c2 = sponge_pulse.quadratic_casimir_budget()?.total_casimir;
+    let sponge_final_diagnostics = sponge_pulse.diagnostics()?;
+    let sponge_control_final_diagnostics = sponge_control.diagnostics()?;
     let sponge_direct_c2_drop = initial_c2 - sponge_final_c2;
     let c2_closure_error =
         (sponge_removed_c2 - sponge_direct_c2_drop).abs() / initial_c2.abs().max(f64::MIN_POSITIVE);
+    let sponge_phase_error =
+        (sponge_peak.phase - fine_peak.phase + std::f64::consts::PI)
+            .rem_euclid(TAU)
+            - std::f64::consts::PI;
+    let sponge_fwhm_relative_error =
+        (sponge_peak.fwhm - fine_peak.fwhm) / fine_peak.fwhm.abs().max(f64::MIN_POSITIVE);
+    let sponge_amplitude_relative_error =
+        (sponge_peak.amplitude - fine_peak.amplitude)
+            / fine_peak.amplitude.abs().max(f64::MIN_POSITIVE);
+    let total_energy_scale = initial_diagnostics.total_energy.abs().max(f64::MIN_POSITIVE);
+    let sponge_total_energy_relative_delta =
+        (sponge_final_diagnostics.total_energy - initial_diagnostics.total_energy)
+            / total_energy_scale;
+    let sponge_mass_relative_delta =
+        (sponge_final_diagnostics.total_mass - initial_diagnostics.total_mass)
+            / initial_diagnostics.total_mass.abs().max(f64::MIN_POSITIVE);
+    let sponge_minimum_f = sponge_final_diagnostics.minimum_distribution;
+    let sponge_boundary_ratio = sponge_final_diagnostics.velocity_boundary_ratio;
+    let control_total_energy_relative_delta =
+        (sponge_control_final_diagnostics.total_energy - initial_diagnostics.total_energy)
+            / total_energy_scale;
 
     println!(
-        "summary,case,nv,coarse_t_nyquist,coarse_t_recurrence,fine_t_nyquist,fine_t_recurrence,echo_mode,predicted_rephase_time,coarse_peak_time,coarse_amplitude,coarse_phase,coarse_fwhm,fine_peak_time,fine_amplitude,fine_phase,fine_fwhm,sponge_peak_time,sponge_amplitude,sponge_phase,sponge_fwhm,sponge_to_fine_amplitude_ratio,sponge_pulse_removed_C2_fraction,sponge_C2_closure_error,sponge_pulse_removed_f_strophy,sponge_control_removed_C2_fraction,sponge_control_removed_f_strophy,coarse_initial_E,fine_initial_E,sponge_initial_E"
+        "summary,case,nv,coarse_t_nyquist,coarse_t_recurrence,fine_t_nyquist,fine_t_recurrence,echo_mode,predicted_rephase_time,coarse_peak_time,coarse_amplitude,coarse_phase,coarse_fwhm,fine_peak_time,fine_amplitude,fine_phase,fine_fwhm,sponge_peak_time,sponge_amplitude,sponge_phase,sponge_fwhm,sponge_to_fine_amplitude_ratio,sponge_amplitude_relative_error,sponge_phase_error,sponge_peak_time_error,sponge_fwhm_relative_error,sponge_pulse_removed_C2_fraction,sponge_C2_closure_error,sponge_pulse_removed_f_strophy,sponge_control_removed_C2_fraction,sponge_control_removed_f_strophy,sponge_total_energy_relative_delta,sponge_mass_relative_delta,sponge_minimum_f,sponge_velocity_boundary_ratio,control_total_energy_relative_delta,coarse_initial_E,fine_initial_E,sponge_initial_E"
     );
     println!(
-        "summary,delayed_echo,{},{:.8},{:.8},{:.8},{:.8},{},{:.8},{:.8},{:.12e},{:.8},{:.8},{:.8},{:.12e},{:.8},{:.8},{:.8},{:.12e},{:.8},{:.8},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e}",
+        "summary,delayed_echo,{},{:.8},{:.8},{:.8},{:.8},{},{:.8},{:.8},{:.12e},{:.8},{:.8},{:.8},{:.12e},{:.8},{:.8},{:.8},{:.12e},{:.8},{:.8},{:.12e},{:.12e},{:.12e},{:.8},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e}",
         coarse_config.nv,
         coarse_horizon.nyquist_encounter_time,
         coarse_horizon.discrete_recurrence_time,
@@ -291,11 +315,20 @@ fn main() -> Result<(), Box<dyn Error>> {
         sponge_peak.phase,
         sponge_peak.fwhm,
         sponge_peak.amplitude / fine_peak.amplitude.max(f64::MIN_POSITIVE),
+        sponge_amplitude_relative_error,
+        sponge_phase_error,
+        sponge_peak.time - fine_peak.time,
+        sponge_fwhm_relative_error,
         sponge_removed_c2 / initial_c2.abs().max(f64::MIN_POSITIVE),
         c2_closure_error,
         sponge_removed_f_strophy,
         sponge_control_removed_c2 / initial_c2.abs().max(f64::MIN_POSITIVE),
         sponge_control_removed_f_strophy,
+        sponge_total_energy_relative_delta,
+        sponge_mass_relative_delta,
+        sponge_minimum_f,
+        sponge_boundary_ratio,
+        control_total_energy_relative_delta,
         initial_field_coarse.amplitude(),
         initial_field_fine.amplitude(),
         initial_field_sponge.amplitude(),
