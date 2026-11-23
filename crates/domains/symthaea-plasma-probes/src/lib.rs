@@ -2021,7 +2021,7 @@ fn validate_kird_distortion_tier(
     field: &'static str,
     is_physical: bool,
 ) -> Result<(), ContractError> {
-    let status = kird_string(root, field)?;
+    let status = kird_string(root, kird_join_field(field, "status"))?;
     if !matches!(status, "PASS" | "FAIL" | "UNKNOWN" | "UNSUPPORTED") {
         return Err(kird_error(field, "unsupported distortion status"));
     }
@@ -2123,6 +2123,10 @@ fn kird_error(field: &'static str, reason: &'static str) -> ContractError {
 
 fn kird_join_field(parent: &'static str, child: &'static str) -> &'static str {
     match (parent, child) {
+        ("distortion.microscopic", "status") => "distortion.microscopic.status",
+        ("distortion.weak_observable", "status") => "distortion.weak_observable.status",
+        ("distortion.macroscopic_qoi", "status") => "distortion.macroscopic_qoi.status",
+        ("distortion.sensitivity", "status") => "distortion.sensitivity.status",
         ("distortion.microscopic", "metric_id") => "distortion.microscopic.metric_id",
         ("distortion.microscopic", "observed_error") => "distortion.microscopic.observed_error",
         ("distortion.microscopic", "tolerance") => "distortion.microscopic.tolerance",
