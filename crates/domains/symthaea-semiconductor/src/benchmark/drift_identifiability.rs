@@ -259,15 +259,15 @@ fn matrix_rank(rows: &[[f64; DRIFT_IDENTIFIABILITY_DIMENSIONS_V1]]) -> usize {
         }
         let normalized_pivot_tail = matrix[pivot_row][column..].to_vec();
 
-        for row in 0..row_count {
-            if row == pivot_row {
+        for (row_index, row_values) in matrix.iter_mut().enumerate() {
+            if row_index == pivot_row {
                 continue;
             }
-            let factor = matrix[row][column];
+            let factor = row_values[column];
             if factor.abs() <= RANK_TOLERANCE_V1 {
                 continue;
             }
-            for (value, pivot_value) in matrix[row][column..].iter_mut().zip(&normalized_pivot_tail)
+            for (value, pivot_value) in row_values[column..].iter_mut().zip(&normalized_pivot_tail)
             {
                 *value -= factor * pivot_value;
             }
