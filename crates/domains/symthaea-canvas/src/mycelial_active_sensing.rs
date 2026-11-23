@@ -660,10 +660,7 @@ mod tests {
     }
 
     fn close(left: f64, right: f64) {
-        assert!(
-            (left - right).abs() < 1.0e-12,
-            "{left} != {right}"
-        );
+        assert!((left - right).abs() < 1.0e-12, "{left} != {right}");
     }
 
     fn skeleton() -> AnnotatedMycelialSkeleton {
