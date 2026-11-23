@@ -2336,6 +2336,7 @@ fn hex_digest(bytes: &[u8; 32]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::BTreeMap;
     use crate::mycelial_junction_graph::{
         JunctionKind, MYCELIAL_JUNCTION_GRAPH_SCHEMA_VERSION, MycelialHyphaSegment,
         MycelialJunction, MycelialJunctionHyphaGraph, PARAMETER_SCALE,
