@@ -377,3 +377,24 @@ The schemas define wire shape, not authenticity or authorization. The runtime mu
 - A candidate's reported support is not proof of causal influence.
 - AMemGym reproduction is not proof of general real-world personalization.
 - No SOTA, privacy, safety or causal claim is valid without matched protocols, independent evaluation and the hard gates above.
+
+
+## 14. Executable analysis increment
+
+The research branch now includes a Rust analysis primitive at
+[`crates/domains/symthaea-psych-bench/src/benchmarks/memory_agent/on_policy.rs`](../../crates/domains/symthaea-psych-bench/src/benchmarks/memory_agent/on_policy.rs).
+It adds:
+
+- deterministic keyed pseudorandom allocation, balanced within profile strata;
+- one fixed policy assignment per profile cluster;
+- validation that terminal outcomes exist for every randomized profile;
+- validation that all profiles have the same task identities and task-family schedule;
+- profile-mean aggregation before treatment/control comparison, so repeated episodes do not inflate the independent sample count;
+- a clearly labelled normal-approximation 95% interval and a 30-independent-profiles-per-arm confirmatory floor;
+- separate privacy and unauthorized-action hard gates that cannot be traded against utility.
+
+The primary estimator deliberately has no post-assignment disclosure, transcript-length or turn-count covariates. Those variables may be reported as outcomes or explored in a separately preregistered mediation analysis, but must not be used to adjust the primary total-effect estimate.
+
+Seven unit tests cover allocation balance/repeatability, duplicate assignments, profile-cluster weighting, non-compensable privacy gates, arm mismatch, task-identity mismatch, missing outcomes and invalid utility. **They are authored but not compiled or executed in this environment.** The Wald interval is an exploratory primitive, not a substitute for a preregistered stratified randomization test or independent confirmatory analysis.
+
+See [MACE benchmark landscape and competitive qualification plan](MACE_BENCHMARK_LANDSCAPE_2026-11-23.md) for the current external benchmark crosswalk and prospective targets.
