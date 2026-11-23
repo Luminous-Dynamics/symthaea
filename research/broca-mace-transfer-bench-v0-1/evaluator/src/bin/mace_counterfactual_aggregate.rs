@@ -163,7 +163,7 @@ struct InputProvenance {
     source_code_sha256: String,
     fixture_sha256: String,
     schema_sha256: String,
-    source_revision: Option<String>,
+    source_revision: String,
 }
 
 fn valid_sha256(value: &str) -> bool {
@@ -221,11 +221,7 @@ fn parse_manifest(record: &Value) -> Result<(InputProvenance, String), String> {
         source_code_sha256: required_string(record, "source_code_sha256")?.to_string(),
         fixture_sha256: required_string(record, "fixture_sha256")?.to_string(),
         schema_sha256: required_string(record, "schema_sha256")?.to_string(),
-        source_revision: match record.get("source_revision") {
-            Some(Value::Null) => None,
-            Some(Value::String(value)) => Some(value.clone()),
-            _ => return Err("source_revision must be present as a string or null".to_string()),
-        },
+        source_revision: required_string(record, "source_revision")?.to_string(),
     };
     for (field, digest) in [
         ("source_code_sha256", provenance.source_code_sha256.as_str()),
@@ -239,17 +235,13 @@ fn parse_manifest(record: &Value) -> Result<(InputProvenance, String), String> {
     if provenance.run_id.is_empty() {
         return Err("intervention manifest run_id must not be empty".to_string());
     }
-    if provenance
-        .source_revision
-        .as_deref()
-        .is_some_and(|revision| {
-            !matches!(revision.len(), 40 | 64)
-                || !revision
-                    .bytes()
-                    .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-        })
+    if !matches!(provenance.source_revision.len(), 40 | 64)
+        || !provenance
+            .source_revision
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
     {
-        return Err("intervention manifest has invalid source_revision".to_string());
+        return Err("intervention manifest source_revision must be a 40- or 64-character lowercase Git SHA".to_string());
     }
 
     let pair_block_id = required_string(record, "pair_block_id")?;
@@ -384,7 +376,7 @@ fn parse_manifest(record: &Value) -> Result<(InputProvenance, String), String> {
         "source_code_sha256": provenance.source_code_sha256.as_str(),
         "fixture_sha256": provenance.fixture_sha256.as_str(),
         "schema_sha256": provenance.schema_sha256.as_str(),
-        "source_revision": provenance.source_revision.as_deref()
+        "source_revision": provenance.source_revision.as_str()
     }))
     .map_err(|error| format!("serialize intervention manifest receipt: {error}"))?;
     let computed_receipt_sha256 =
