@@ -75,7 +75,7 @@ Unknown labels, missing fields, malformed rows, duplicate case IDs, non-finite n
 
 ## What this v0.2 gate verifies—and what it does not
 
-It verifies **policy routing and internal consistency**: digest shape/equality, epoch freshness, explicit shift status, eight separate adequacy statuses, the lower-bound decision-lift threshold, independent action authorization, strict parsing and deterministic reasons.
+It verifies **policy routing and internal consistency**: digest shape/equality, epoch freshness, explicit shift status, ten separate adequacy statuses, the lower-bound decision-lift threshold, independent action authorization, strict parsing and deterministic reasons.
 
 It does **not** cryptographically verify that a digest corresponds to the real artifact, verify signatures, recompute upstream confidence intervals, re-run physical/reference evaluators, prove that a caller's status accurately summarizes its evidence, or authenticate the evidence ledger. The TSV must come from a trusted wrapper that independently verifies every report and artifact against its frozen profile and manifest. Candidate-authored claims must not be accepted as authoritative gate inputs. Digest equality alone is not proof of authenticity.
 
