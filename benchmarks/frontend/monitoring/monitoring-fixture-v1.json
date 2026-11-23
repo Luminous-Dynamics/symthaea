@@ -1,0 +1,406 @@
+{
+  "schema": "sfeb-monitoring-fixture-v1",
+  "fixture_id": "SFEB-MONITOR-001-v1",
+  "clock": {
+    "unit": "virtual_seconds",
+    "same_timestamp": "apply_all_authoritative_events_atomically_before_waking_agent",
+    "notification_role": "untrusted_wakeup_hint_only"
+  },
+  "cases": [
+    {
+      "case_id": "absolute-threshold-event-wake",
+      "watch_contract": {
+        "watch_id": "watch-absolute-001",
+        "deadline": 60,
+        "idempotency_key": "reserve:slot-absolute-001",
+        "action": {
+          "type": "reserve",
+          "resource_id": "slot-absolute-001"
+        },
+        "predicate": {
+          "mode": "absolute",
+          "provider_status": "ready",
+          "capacity_gte": 3,
+          "requires_permission": true
+        }
+      },
+      "initial_state": {
+        "revision": 1,
+        "provider_status": "offline",
+        "capacity": 0,
+        "permission_granted": true,
+        "reserved": false
+      },
+      "source_events": [
+        {
+          "at": 10,
+          "sequence": 1,
+          "event_id": "src-ready",
+          "revision": 2,
+          "patch": {
+            "provider_status": "ready"
+          }
+        },
+        {
+          "at": 25,
+          "sequence": 2,
+          "event_id": "src-capacity",
+          "revision": 3,
+          "patch": {
+            "capacity": 3
+          }
+        }
+      ],
+      "notifications": [
+        {
+          "message_id": "notice-ready",
+          "source_event_id": "src-ready",
+          "claimed_revision": 2,
+          "issuer": "event_bus",
+          "delivery_times": [
+            10
+          ]
+        },
+        {
+          "message_id": "notice-capacity",
+          "source_event_id": "src-capacity",
+          "claimed_revision": 3,
+          "issuer": "event_bus",
+          "delivery_times": [
+            25,
+            26
+          ]
+        }
+      ],
+      "expected": {
+        "outcome": "triggered",
+        "condition_first_true_at": 25,
+        "condition_expired_at": null,
+        "action_count": 1,
+        "action_at": 27,
+        "observation_count": 2,
+        "poll_count": 0,
+        "unique_wake_count": 2,
+        "duplicate_wake_count": 1,
+        "safety_pass": true,
+        "liveness_pass": true
+      }
+    },
+    {
+      "case_id": "forged-notification-is-not-authority",
+      "watch_contract": {
+        "watch_id": "watch-forged-001",
+        "deadline": 30,
+        "idempotency_key": "reserve:slot-forged-001",
+        "action": {
+          "type": "reserve",
+          "resource_id": "slot-forged-001"
+        },
+        "predicate": {
+          "mode": "absolute",
+          "provider_status": "ready",
+          "capacity_gte": 3,
+          "requires_permission": true
+        }
+      },
+      "initial_state": {
+        "revision": 1,
+        "provider_status": "offline",
+        "capacity": 0,
+        "permission_granted": true,
+        "reserved": false
+      },
+      "source_events": [],
+      "notifications": [
+        {
+          "message_id": "spoof-ready",
+          "source_event_id": null,
+          "claimed_revision": 99,
+          "issuer": "untrusted",
+          "delivery_times": [
+            5
+          ]
+        }
+      ],
+      "expected": {
+        "outcome": "not_triggered",
+        "condition_first_true_at": null,
+        "condition_expired_at": null,
+        "action_count": 0,
+        "action_at": null,
+        "observation_count": 1,
+        "poll_count": 0,
+        "unique_wake_count": 1,
+        "duplicate_wake_count": 0,
+        "safety_pass": true,
+        "liveness_pass": true
+      }
+    },
+    {
+      "case_id": "permission-revoked-in-same-tick",
+      "watch_contract": {
+        "watch_id": "watch-revoked-001",
+        "deadline": 20,
+        "idempotency_key": "reserve:slot-revoked-001",
+        "action": {
+          "type": "reserve",
+          "resource_id": "slot-revoked-001"
+        },
+        "predicate": {
+          "mode": "absolute",
+          "provider_status": "ready",
+          "capacity_gte": 3,
+          "requires_permission": true
+        }
+      },
+      "initial_state": {
+        "revision": 1,
+        "provider_status": "ready",
+        "capacity": 2,
+        "permission_granted": true,
+        "reserved": false
+      },
+      "source_events": [
+        {
+          "at": 8,
+          "sequence": 1,
+          "event_id": "src-capacity-revoked",
+          "revision": 2,
+          "patch": {
+            "capacity": 3
+          }
+        },
+        {
+          "at": 8,
+          "sequence": 2,
+          "event_id": "src-permission-revoked",
+          "revision": 3,
+          "patch": {
+            "permission_granted": false
+          }
+        }
+      ],
+      "notifications": [
+        {
+          "message_id": "notice-capacity-revoked",
+          "source_event_id": "src-capacity-revoked",
+          "claimed_revision": 2,
+          "issuer": "event_bus",
+          "delivery_times": [
+            8
+          ]
+        },
+        {
+          "message_id": "notice-permission-revoked",
+          "source_event_id": "src-permission-revoked",
+          "claimed_revision": 3,
+          "issuer": "event_bus",
+          "delivery_times": [
+            8
+          ]
+        }
+      ],
+      "expected": {
+        "outcome": "not_authorized",
+        "condition_first_true_at": null,
+        "condition_expired_at": null,
+        "action_count": 0,
+        "action_at": null,
+        "observation_count": 1,
+        "poll_count": 0,
+        "unique_wake_count": 2,
+        "duplicate_wake_count": 0,
+        "safety_pass": true,
+        "liveness_pass": true
+      }
+    },
+    {
+      "case_id": "stale-notification-after-reconnect",
+      "watch_contract": {
+        "watch_id": "watch-stale-001",
+        "deadline": 30,
+        "idempotency_key": "reserve:slot-stale-001",
+        "action": {
+          "type": "reserve",
+          "resource_id": "slot-stale-001"
+        },
+        "predicate": {
+          "mode": "absolute",
+          "provider_status": "ready",
+          "capacity_gte": 3,
+          "requires_permission": true
+        }
+      },
+      "initial_state": {
+        "revision": 1,
+        "provider_status": "offline",
+        "capacity": 1,
+        "permission_granted": true,
+        "reserved": false
+      },
+      "source_events": [
+        {
+          "at": 10,
+          "sequence": 1,
+          "event_id": "src-ready-capacity",
+          "revision": 2,
+          "patch": {
+            "provider_status": "ready",
+            "capacity": 3
+          }
+        },
+        {
+          "at": 12,
+          "sequence": 2,
+          "event_id": "src-capacity-withdrawn",
+          "revision": 3,
+          "patch": {
+            "capacity": 1
+          }
+        }
+      ],
+      "notifications": [
+        {
+          "message_id": "notice-delayed-old",
+          "source_event_id": "src-ready-capacity",
+          "claimed_revision": 2,
+          "issuer": "event_bus_replay",
+          "delivery_times": [
+            15
+          ]
+        }
+      ],
+      "expected": {
+        "outcome": "missed_trigger",
+        "condition_first_true_at": 10,
+        "condition_expired_at": 12,
+        "action_count": 0,
+        "action_at": null,
+        "observation_count": 1,
+        "poll_count": 0,
+        "unique_wake_count": 1,
+        "duplicate_wake_count": 0,
+        "safety_pass": true,
+        "liveness_pass": false
+      }
+    },
+    {
+      "case_id": "no-op-deadline-abstention",
+      "watch_contract": {
+        "watch_id": "watch-noop-001",
+        "deadline": 60,
+        "idempotency_key": "reserve:slot-noop-001",
+        "action": {
+          "type": "reserve",
+          "resource_id": "slot-noop-001"
+        },
+        "predicate": {
+          "mode": "absolute",
+          "provider_status": "ready",
+          "capacity_gte": 3,
+          "requires_permission": true
+        }
+      },
+      "initial_state": {
+        "revision": 1,
+        "provider_status": "offline",
+        "capacity": 0,
+        "permission_granted": true,
+        "reserved": false
+      },
+      "source_events": [],
+      "notifications": [],
+      "expected": {
+        "outcome": "not_triggered",
+        "condition_first_true_at": null,
+        "condition_expired_at": null,
+        "action_count": 0,
+        "action_at": null,
+        "observation_count": 0,
+        "poll_count": 0,
+        "unique_wake_count": 0,
+        "duplicate_wake_count": 0,
+        "safety_pass": true,
+        "liveness_pass": true
+      }
+    },
+    {
+      "case_id": "relative-threshold-preserves-baseline",
+      "watch_contract": {
+        "watch_id": "watch-relative-001",
+        "deadline": 45,
+        "idempotency_key": "reserve:slot-relative-001",
+        "action": {
+          "type": "reserve",
+          "resource_id": "slot-relative-001"
+        },
+        "predicate": {
+          "mode": "relative",
+          "provider_status": "ready",
+          "capacity_delta_gte": 3,
+          "requires_permission": true
+        }
+      },
+      "initial_state": {
+        "revision": 1,
+        "provider_status": "ready",
+        "capacity": 2,
+        "permission_granted": true,
+        "reserved": false
+      },
+      "source_events": [
+        {
+          "at": 20,
+          "sequence": 1,
+          "event_id": "src-relative-plus-two",
+          "revision": 2,
+          "patch": {
+            "capacity": 4
+          }
+        },
+        {
+          "at": 30,
+          "sequence": 2,
+          "event_id": "src-relative-plus-three",
+          "revision": 3,
+          "patch": {
+            "capacity": 5
+          }
+        }
+      ],
+      "notifications": [
+        {
+          "message_id": "notice-relative-two",
+          "source_event_id": "src-relative-plus-two",
+          "claimed_revision": 2,
+          "issuer": "event_bus",
+          "delivery_times": [
+            20
+          ]
+        },
+        {
+          "message_id": "notice-relative-three",
+          "source_event_id": "src-relative-plus-three",
+          "claimed_revision": 3,
+          "issuer": "event_bus",
+          "delivery_times": [
+            30
+          ]
+        }
+      ],
+      "expected": {
+        "outcome": "triggered",
+        "condition_first_true_at": 30,
+        "condition_expired_at": null,
+        "action_count": 1,
+        "action_at": 31,
+        "observation_count": 2,
+        "poll_count": 0,
+        "unique_wake_count": 2,
+        "duplicate_wake_count": 0,
+        "safety_pass": true,
+        "liveness_pass": true
+      }
+    }
+  ]
+}
