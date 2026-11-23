@@ -81,3 +81,13 @@ The comparator now emits helper_expansion_explains_direct_drift. It is true only
 3. The union of root and generated-helper proof dependencies has Jaccard at least 0.9.
 
 This is a diagnostic for dependency representation/repackaging, not proof equivalence, proof-plan fidelity or mathematical essentiality. It does not suppress or replace raw direct-edge differences. On this four-theorem cohort it should trigger for Nat.choose_pos and not for Set.countable_union.
+
+## 5. Typed value-edge semantics correction
+
+The initial four-theorem extraction compared type references with all ConstantInfo.value? references but labelled every value edge proof_dependency. That was accurate for the four root theorem declarations, but not for generated helpers: Nat.choose_pos._f is a definition, so its body references are definition dependencies, not theorem proof dependencies.
+
+The extractor now classifies an available value by declaration kind: theorem_proof, definition_body, opaque_value, other_value, or unavailable. Corresponding edge relations are proof_dependency, definition_dependency, opaque_value_dependency, and other_value_dependency. The generic value_dependencies array is used to reconcile Lean's merged ConstantInfo closure; proof_value_dependencies is theorem-only, while definition and opaque references are separately reported.
+
+The differential comparator reconciles closure as type_dependencies union value_dependencies, keeps the theorem-proof metric separate, and includes definition helper bodies in helper expansion. Legacy snapshots without value_dependencies remain loadable, but are explicitly marked legacy_unclassified and use their old value array only for backward-compatible closure reconciliation.
+
+This aligns the extraction representation more closely with LeanGraph-style typed edge classes such as sig, proof, and def. It does not establish exact equivalence with the external LeanGraph raw export; that still requires a pinned, same-revision edge-by-edge differential.

@@ -160,3 +160,10 @@ For the two revisions inspected, the source blob for `Lean/Util/FoldConsts.lean`
 - `Lake.Check.runForUsedConsts` visits type references, the declaration's own name, value references, and additional inductive/constructor/recursor relations. Its traversal is a useful compatibility baseline, but because it emits a flat stream of names it does not replace our typed-edge serializer.
 
 A source-level API match is not a built or executed extractor. The Mathlib `lake build`, native extraction run, and byte-identical replay remain pending.
+## 10. Value dependency classes: proof versus computation
+
+ConstantInfo.value? is not synonymous with a theorem proof. The extractor classifies an available value by declaration kind: theorem proof (thmInfo), definition body (defnInfo), opaque value (opaqueInfo), or other/unavailable. It emits distinct edge relations proof_dependency, definition_dependency, opaque_value_dependency, and other_value_dependency.
+
+Every output carries a generic value_dependencies array for reconciling the complete type/value closure; proof_value_dependencies is now strictly theorem proof content. Generated/private helpers are traversed using generic value references, so a helper definition's body is no longer mislabelled as proof reasoning.
+
+The v4.37 and v4.29 focused workflow jobs assert that the four root pilot declarations are theorem-proof values and generated Nat.choose_pos helper nodes are definition bodies with no theorem-proof references. The source-snapshot comparator tests generic-value closure, theorem-only proof edges and definition-body helper expansion independently.

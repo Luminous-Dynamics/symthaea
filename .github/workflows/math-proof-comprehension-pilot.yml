@@ -287,7 +287,7 @@ jobs:
               and .trust_profile.closure_status == "complete"
               and (.trust_profile.unresolved_declarations | length) == 0
               and (.trust_profile.transitive_declaration_count > 0)
-              and (if $declaration == "Nat.choose_pos" then ((.helper_nodes | length) > 0 and all(.helper_nodes[]; .trust_profile.closure_status == "complete" and (.trust_profile.unresolved_declarations | length) == 0)) else true end)' "$file" >/dev/null
+              and (if $declaration == "Nat.choose_pos" then ((.helper_nodes | length) > 0 and all(.helper_nodes[]; .trust_profile.closure_status == "complete" and (.trust_profile.unresolved_declarations | length) == 0 and .value_kind == "definition_body" and (.proof_value_dependencies | length) == 0 and .value_dependencies == .definition_value_dependencies)) else true end)' "$file" >/dev/null
           done
           echo "MATHLIB_ELABORATED_DEPENDENCY_EXTRACTION_PASS"
 
@@ -348,7 +348,7 @@ jobs:
           for declaration in Nat.choose_pos Set.countable_union Multiset.map_id Finset.card_map; do
             file="proof-comprehension-extract-${declaration}.json"
             test -s "$file"
-            jq -e --arg declaration "$declaration" '.schema_version == "1.0.0" and .source_revision == "8a178386ffc0f5fef0b77738bb5449d50efeea95" and .lean_revision == "98dc76e3c0a9b856c9b98726b713fb04fab16740" and .declaration == $declaration and (.unresolved_dependencies | length) == 0 and (.edges | length) > 0 and .value_kind == "theorem_proof" and .value_dependencies == .proof_value_dependencies and (.definition_value_dependencies | length) == 0 and (.opaque_value_dependencies | length) == 0 and .trust_profile.closure_status == "complete" and (.trust_profile.unresolved_declarations | length) == 0 and (.trust_profile.transitive_declaration_count > 0) and (if $declaration == "Nat.choose_pos" then ((.helper_nodes | length) > 0 and all(.helper_nodes[]; .trust_profile.closure_status == "complete" and (.trust_profile.unresolved_declarations | length) == 0)) else true end)' "$file" >/dev/null
+            jq -e --arg declaration "$declaration" '.schema_version == "1.0.0" and .source_revision == "8a178386ffc0f5fef0b77738bb5449d50efeea95" and .lean_revision == "98dc76e3c0a9b856c9b98726b713fb04fab16740" and .declaration == $declaration and (.unresolved_dependencies | length) == 0 and (.edges | length) > 0 and .value_kind == "theorem_proof" and .value_dependencies == .proof_value_dependencies and (.definition_value_dependencies | length) == 0 and (.opaque_value_dependencies | length) == 0 and .trust_profile.closure_status == "complete" and (.trust_profile.unresolved_declarations | length) == 0 and (.trust_profile.transitive_declaration_count > 0) and (if $declaration == "Nat.choose_pos" then ((.helper_nodes | length) > 0 and all(.helper_nodes[]; .trust_profile.closure_status == "complete" and (.trust_profile.unresolved_declarations | length) == 0 and .value_kind == "definition_body" and (.proof_value_dependencies | length) == 0 and .value_dependencies == .definition_value_dependencies)) else true end)' "$file" >/dev/null
           done
           echo "MATHLIB_V429_DIRECT_EXTRACTION_PASS"
 
@@ -397,9 +397,10 @@ jobs:
             and .source_revisions_differ == true
             and .lean_toolchains_differ == true
             and (.declarations | length) == 4
-            and ([.declarations[] | select(.classification == "identical_type_proof_and_closure_sets")] | length) == 2
-            and ([.declarations[] | select(.declaration == "Nat.choose_pos" and .classification == "stable_type_interface_proof_value_drift" and .type_dependencies.jaccard == 1)] | length) == 1
-            and ([.declarations[] | select(.declaration == "Nat.choose_pos" and .helper_expansion_explains_direct_drift == true and .helper_expanded_proof_dependencies.jaccard >= 0.9 and .proof_value_dependencies.jaccard < 0.5)] | length) == 1
+            and all(.declarations[]; .baseline_value_kind == "theorem_proof" and .candidate_value_kind == "theorem_proof")
+            and ([.declarations[] | select(.classification == "identical_type_value_and_closure_sets")] | length) == 2
+            and ([.declarations[] | select(.declaration == "Nat.choose_pos" and .classification == "stable_type_interface_value_drift" and .type_dependencies.jaccard == 1)] | length) == 1
+            and ([.declarations[] | select(.declaration == "Nat.choose_pos" and .helper_expansion_explains_direct_drift == true and .helper_expanded_value_dependencies.jaccard >= 0.9 and .value_dependencies.jaccard < 0.5 and .proof_value_dependencies.jaccard < 0.5)] | length) == 1
             and ([.declarations[] | select(.declaration == "Set.countable_union" and .classification == "type_and_or_closure_dependency_drift")] | length) == 1
             and ([.declarations[] | select(.baseline_closure_reconciles == false or .candidate_closure_reconciles == false or .baseline_unresolved_count != 0 or .candidate_unresolved_count != 0)] | length) == 0
             and ([.declarations[] | select(.declaration == "Nat.choose_pos" and (.helper_nodes_baseline | length) > 0 and (.helper_nodes_candidate | length) > 0)] | length) == 1' \
@@ -485,7 +486,7 @@ jobs:
               and .trust_profile.closure_status == "complete"
               and (.trust_profile.unresolved_declarations | length) == 0
               and (.trust_profile.transitive_declaration_count > 0)
-              and (if $declaration == "Nat.choose_pos" then ((.helper_nodes | length) > 0 and all(.helper_nodes[]; .trust_profile.closure_status == "complete" and (.trust_profile.unresolved_declarations | length) == 0)) else true end)' "$file" >/dev/null
+              and (if $declaration == "Nat.choose_pos" then ((.helper_nodes | length) > 0 and all(.helper_nodes[]; .trust_profile.closure_status == "complete" and (.trust_profile.unresolved_declarations | length) == 0 and .value_kind == "definition_body" and (.proof_value_dependencies | length) == 0 and .value_dependencies == .definition_value_dependencies)) else true end)' "$file" >/dev/null
           done
           echo "MATHLIB_ELABORATED_DEPENDENCY_EXTRACTION_PASS"
 
@@ -546,7 +547,7 @@ jobs:
           for declaration in Nat.choose_pos Set.countable_union Multiset.map_id Finset.card_map; do
             file="proof-comprehension-extract-${declaration}.json"
             test -s "$file"
-            jq -e --arg declaration "$declaration" '.schema_version == "1.0.0" and .source_revision == "8a178386ffc0f5fef0b77738bb5449d50efeea95" and .lean_revision == "98dc76e3c0a9b856c9b98726b713fb04fab16740" and .declaration == $declaration and (.unresolved_dependencies | length) == 0 and (.edges | length) > 0 and .trust_profile.closure_status == "complete" and (.trust_profile.unresolved_declarations | length) == 0 and (.trust_profile.transitive_declaration_count > 0) and (if $declaration == "Nat.choose_pos" then ((.helper_nodes | length) > 0 and all(.helper_nodes[]; .trust_profile.closure_status == "complete" and (.trust_profile.unresolved_declarations | length) == 0)) else true end)' "$file" >/dev/null
+            jq -e --arg declaration "$declaration" '.schema_version == "1.0.0" and .source_revision == "8a178386ffc0f5fef0b77738bb5449d50efeea95" and .lean_revision == "98dc76e3c0a9b856c9b98726b713fb04fab16740" and .declaration == $declaration and (.unresolved_dependencies | length) == 0 and (.edges | length) > 0 and .trust_profile.closure_status == "complete" and (.trust_profile.unresolved_declarations | length) == 0 and (.trust_profile.transitive_declaration_count > 0) and (if $declaration == "Nat.choose_pos" then ((.helper_nodes | length) > 0 and all(.helper_nodes[]; .trust_profile.closure_status == "complete" and (.trust_profile.unresolved_declarations | length) == 0 and .value_kind == "definition_body" and (.proof_value_dependencies | length) == 0 and .value_dependencies == .definition_value_dependencies)) else true end)' "$file" >/dev/null
           done
           echo "MATHLIB_V429_DIRECT_EXTRACTION_PASS"
 
@@ -595,9 +596,9 @@ jobs:
             and .source_revisions_differ == true
             and .lean_toolchains_differ == true
             and (.declarations | length) == 4
-            and ([.declarations[] | select(.classification == "identical_type_proof_and_closure_sets")] | length) == 2
-            and ([.declarations[] | select(.declaration == "Nat.choose_pos" and .classification == "stable_type_interface_proof_value_drift" and .type_dependencies.jaccard == 1)] | length) == 1
-            and ([.declarations[] | select(.declaration == "Nat.choose_pos" and .helper_expansion_explains_direct_drift == true and .helper_expanded_proof_dependencies.jaccard >= 0.9 and .proof_value_dependencies.jaccard < 0.5)] | length) == 1
+            and ([.declarations[] | select(.classification == "identical_type_value_and_closure_sets")] | length) == 2
+            and ([.declarations[] | select(.declaration == "Nat.choose_pos" and .classification == "stable_type_interface_value_drift" and .type_dependencies.jaccard == 1)] | length) == 1
+            and ([.declarations[] | select(.declaration == "Nat.choose_pos" and .helper_expansion_explains_direct_drift == true and .helper_expanded_value_dependencies.jaccard >= 0.9 and .proof_value_dependencies.jaccard < 0.5)] | length) == 1
             and ([.declarations[] | select(.declaration == "Set.countable_union" and .classification == "type_and_or_closure_dependency_drift")] | length) == 1
             and ([.declarations[] | select(.baseline_closure_reconciles == false or .candidate_closure_reconciles == false or .baseline_unresolved_count != 0 or .candidate_unresolved_count != 0)] | length) == 0
             and ([.declarations[] | select(.declaration == "Nat.choose_pos" and (.helper_nodes_baseline | length) > 0 and (.helper_nodes_candidate | length) > 0)] | length) == 1' \
