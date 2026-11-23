@@ -19,6 +19,17 @@ function assertKeys(value,allowed,required,label){
  for(const key of Object.keys(value))if(!allowed.includes(key))fail(label+' has unknown field: '+key);
  for(const key of required)if(!Object.hasOwn(value,key))fail(label+' missing field: '+key);
 }
+function deriveQualifyingEdgeEvents(caseData){
+ const state=clone(caseData.initial_state);
+ const qualifying=new Set();
+ for(const event of [...caseData.source_events].sort((a,b)=>a.at-b.at||a.sequence-b.sequence)){
+  const priorCapacity=state.capacity;
+  Object.assign(state,clone(event.patch));
+  if(priorCapacity<3&&state.capacity>=3&&state.provider_status==='ready')qualifying.add(event.event_id);
+  state.revision=event.revision;
+ }
+ return qualifying;
+}
 function validateInputs(fixture,traces,policy){
  assertKeys(fixture,['schema','fixture_id','clock','cases'],['schema','fixture_id','clock','cases'],'edge fixture');
  assertKeys(fixture.clock,['unit','same_timestamp','notification_role','receipt_role'],['unit','same_timestamp','notification_role','receipt_role'],'edge clock');
@@ -51,6 +62,7 @@ function validateInputs(fixture,traces,policy){
    if(Object.hasOwn(e.patch,'trigger_receipts')&&!Array.isArray(e.patch.trigger_receipts))fail(c.case_id+': trigger_receipts patch must be an array');
    eventIds.add(e.event_id);eventMap.set(e.event_id,e);revision=e.revision;prevAt=e.at;prevSequence=e.sequence;
   }
+  const qualifyingEdgeEvents=deriveQualifyingEdgeEvents(c);
   for(const e of sorted){
    if(!Object.hasOwn(e.patch,'trigger_receipts'))continue;
    for(const r of e.patch.trigger_receipts){
@@ -58,6 +70,7 @@ function validateInputs(fixture,traces,policy){
     const source=eventMap.get(r.source_event_id);
     if(typeof r.receipt_id!=='string'||!r.receipt_id||!source||source.revision!==r.source_revision||r.source_revision>e.revision||r.occurred_at!==source.at||r.valid_until<=r.occurred_at||!['active','revoked'].includes(r.status))fail(c.case_id+': malformed or unbound durable receipt');
     if(typeof r.event_type!=='string'||typeof r.action_type!=='string'||typeof r.resource_id!=='string'||typeof r.permission_scope!=='string')fail(c.case_id+': invalid receipt binding');
+    if(r.event_type==='capacity_threshold_crossed'&&!qualifyingEdgeEvents.has(r.source_event_id))fail(c.case_id+': receipt source event did not prove the watched threshold edge');
    }
   }
   const noticeIds=new Set();
@@ -109,7 +122,7 @@ function validateInputs(fixture,traces,policy){
 }
 function evaluateCase(c,t){
  const w=c.watch_contract,state=clone(c.initial_state),events=[...c.source_events].sort((a,b)=>a.at-b.at||a.sequence-b.sequence);
- const eventMap=new Map(events.map(e=>[e.event_id,e])),notices=new Map(c.notifications.map(n=>[n.message_id,n]));
+ const eventMap=new Map(events.map(e=>[e.event_id,e])),qualifyingEdgeEvents=deriveQualifyingEdgeEvents(c),notices=new Map(c.notifications.map(n=>[n.message_id,n]));
  let now=0,index=0,registered=false,finished=false,dirty=false,lastObserved=null,observations=0,polls=0,uniqueWakes=0,duplicateWakes=0,staleHints=0,actionCount=0,actionAt=null,duplicateActionAttempts=0;
  const wakeIds=new Set(),deliveryIndex=new Map(),actions=new Map();
  function advance(time){
@@ -152,7 +165,7 @@ function evaluateCase(c,t){
     const receipt=state.trigger_receipts.find(r=>r.receipt_id===step.receipt_id);
     if(!receipt)fail(c.case_id+': durable receipt missing');
     const source=eventMap.get(receipt.source_event_id);
-    if(!source||source.revision!==receipt.source_revision||source.at!==receipt.occurred_at||receipt.event_type!==w.event_type||receipt.permission_scope!==w.permission_scope)fail(c.case_id+': durable receipt source binding failed');
+    if(!source||source.revision!==receipt.source_revision||source.at!==receipt.occurred_at||receipt.event_type!==w.event_type||receipt.permission_scope!==w.permission_scope||!qualifyingEdgeEvents.has(receipt.source_event_id))fail(c.case_id+': durable receipt source binding failed');
     if(receipt.status!=='active')fail(c.case_id+': durable receipt is revoked');
     if(now<receipt.occurred_at||now>receipt.valid_until)fail(c.case_id+': durable receipt outside action window');
     if(state.permission_granted!==true)fail(c.case_id+': current permission revoked');
@@ -231,11 +244,23 @@ function selfTest(paths){
  const mutated=clone(input.traces);mutated.traces.forEach(t=>t.worker_claims={disposition:'rejected',observed_oracle_ids:['fake.fail']});
  const second=verifyAll({...input,traces:mutated,traceBytes:Buffer.from(JSON.stringify(mutated))});
  if(JSON.stringify(baseline.case_results)!==JSON.stringify(second.case_results))fail('edge worker claims changed results');
+ const badReceiptFixture=clone(input.fixture);
+ const withdrawCase=badReceiptFixture.cases.find(c=>c.case_id==='durable-edge-receipt-survives-reconnect');
+ const withdrawEvent=withdrawCase.source_events.find(e=>e.event_id==='evt-edge-withdrawn');
+ withdrawEvent.patch.trigger_receipts=[{...withdrawCase.source_events[0].patch.trigger_receipts[0],source_event_id:'evt-edge-withdrawn',source_revision:3,occurred_at:12,valid_until:20}];
+ let nonEdgeReceiptRejected=false;
+ try{validateInputs(badReceiptFixture,input.traces,input.policy);}catch{nonEdgeReceiptRejected=true;}
+ if(!nonEdgeReceiptRejected)fail('receipt bound to a non-qualifying source event was accepted');
+ const expiredCase=clone(input.traces).traces.find(t=>t.case_id==='edge-receipt-expires-before-reconnect');
+ expiredCase.steps.splice(4,0,{op:'act',time:16,revision:3,receipt_id:'receipt-edge-001',action_id:'expired-act',idempotency_key:'edge-reserve:edge-receipt-expires-before-reconnect',action_type:'reserve',resource_id:'slot-edge-001'});
+ let expiredReceiptRejected=false;
+ try{verifyAll({...input,traces:{...input.traces,traces:input.traces.traces.map(t=>t.case_id===expiredCase.case_id?expiredCase:t)},traceBytes:Buffer.from('tampered-expired-replay')});}catch{expiredReceiptRejected=true;}
+ if(!expiredReceiptRejected)fail('expired edge receipt authorized an action');
  const forged=clone(input.traces),t=forged.traces.find(t=>t.case_id==='forged-edge-notification-without-durable-receipt');
  t.steps.splice(4,0,{op:'act',time:5,revision:1,receipt_id:'receipt-forged',action_id:'fake-edge-act',idempotency_key:'edge-reserve:forged-edge',action_type:'reserve',resource_id:'slot-edge-001'});
  let rejected=false;try{verifyAll({...input,traces:forged,traceBytes:Buffer.from(JSON.stringify(forged))});}catch{rejected=true;}
  if(!rejected)fail('claimed edge receipt without a source record authorized an action');
- console.log(JSON.stringify({status:'edge_monitoring_source_ready',cases:baseline.case_results.length,rules:baseline.oracle_results.length,rules_passed:baseline.oracle_results.filter(r=>r.result==='pass').length,worker_claim_mutation:'invariant',forged_receipt_action:'rejected',limitations:['This source-authored Node CLI must be executed on Node.js.','No production event log, browser or signer is qualified.']},null,2));
+ console.log(JSON.stringify({status:'edge_monitoring_source_ready',cases:baseline.case_results.length,rules:baseline.oracle_results.length,rules_passed:baseline.oracle_results.filter(r=>r.result==='pass').length,worker_claim_mutation:'invariant',forged_receipt_action:'rejected',non_edge_receipt:'rejected',expired_receipt_action:'rejected',limitations:['This source-authored Node CLI must be executed on Node.js.','No production event log, browser or signer is qualified.']},null,2));
 }
 function main(){
  const args=process.argv.slice(2);
