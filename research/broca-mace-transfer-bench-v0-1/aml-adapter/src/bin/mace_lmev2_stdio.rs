@@ -478,7 +478,7 @@ mod tests {
             domain: "web".to_owned(),
             run_id: "fixture-run".to_owned(),
             backend_revision_sha256: "1111111111111111111111111111111111111111111111111111111111111111".to_owned(),
-            dataset_root: root,
+            dataset_root: root.clone(),
             top_k: 4,
             slice_radius: 0,
             neighbor_radius: 0,
@@ -523,6 +523,8 @@ mod tests {
         let expected_image = fs::canonicalize(root.join("trajectory-1/state.png"))
             .expect("canonical fixture image");
         let config = fixture_config(root.clone());
+        let policy_trace_store = RetrievalPolicyTraceFileStoreV1::open(&config.policy_trace_dir)
+            .expect("open policy trace store");
         let mut trajectories = Vec::new();
         let mut index = None;
         let mut policy_memory = RetrievalPolicyMemoryV1::default();
@@ -585,6 +587,8 @@ mod tests {
         let root = fixture_root("duplicate");
         let trajectory = fixture_trajectory(&root, b"image bytes");
         let config = fixture_config(root.clone());
+        let policy_trace_store = RetrievalPolicyTraceFileStoreV1::open(&config.policy_trace_dir)
+            .expect("open policy trace store");
         let mut trajectories = Vec::new();
         let mut index = None;
         let mut policy_memory = RetrievalPolicyMemoryV1::default();
@@ -595,6 +599,7 @@ mod tests {
             &mut trajectories,
             &mut index,
             &mut policy_memory,
+            &policy_trace_store,
         ).expect("first insert");
         let result = handle_request(
             json!({"op": "insert", "trajectory": trajectory}),
@@ -614,6 +619,8 @@ mod tests {
         let root = fixture_root("digest-mismatch");
         let trajectory = fixture_trajectory(&root, b"original bytes");
         let config = fixture_config(root.clone());
+        let policy_trace_store = RetrievalPolicyTraceFileStoreV1::open(&config.policy_trace_dir)
+            .expect("open policy trace store");
         let image_path = root.join("trajectory-1/state.png");
         let mut trajectories = Vec::new();
         let mut index = None;
@@ -625,6 +632,7 @@ mod tests {
             &mut trajectories,
             &mut index,
             &mut policy_memory,
+            &policy_trace_store,
         ).expect("insert");
         fs::write(&image_path, b"replaced bytes").expect("tamper image bytes");
 
@@ -634,6 +642,7 @@ mod tests {
             &mut trajectories,
             &mut index,
             &mut policy_memory,
+            &policy_trace_store,
         );
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("ScreenshotDigestMismatch"));
