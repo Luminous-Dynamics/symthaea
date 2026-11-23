@@ -132,6 +132,34 @@ For longitudinal cord and hyphal architecture:
 
 Do not treat optical density as a complete 3D reconstruction. Preserve the imaging modality and observed coverage.
 
+### 4.6. Local source–sink flow under depletion and hydraulic resistance
+
+The 2026 *Agaricus bisporus* isotope-uptake study changes the functional benchmark from a generic "transport prediction" task to a **local source–sink allocation** task. Individual mushrooms within the same flush can draw different resource proportions from substrate strata. Cord abundance and wider cord pathways can reduce resistance for longer-distance transfer, but this becomes more important when nearby substrate is depleted; extra cords do not necessarily change the source distribution while local resources remain available.
+
+This creates a critical negative control for our graph work: two sinks can be equally connected and have comparable shortest paths, yet receive different measured resource flows because local resource availability, hydraulic resistance and sink demand differ.
+
+Required model comparison:
+1. distance-only graph model;
+2. unweighted topology / reachability model;
+3. measured-geometry resistance model;
+4. local source availability + sink demand + colonization / flush model;
+5. joint model with measured flow or tracer constraints;
+6. image-only / substrate-covariate baseline without graph topology.
+
+Only use a Poiseuille-style radius prior where its assumptions are defensible and the relevant lumen radius, viscosity and boundary conditions are measured. Edge existence and segment length alone do not specify conductance. Do not infer physical hydraulic resistance from graph weights unless the measurement contract records what those weights mean.
+
+Per-sink metrics:
+- individual fruiting-body tracer recovery / uptake error and distributional CRPS;
+- source-stratum attribution Brier score and calibrated probabilities;
+- time-to-arrival and censored-arrival scores;
+- predictive interval coverage for individual sink uptake;
+- calibration and error stratified by flush, substrate depth, colonization time, treatment and cultivation box;
+- counterfactual prediction under held-out local resource-depletion regimes.
+
+The cultivation box is the grouping unit for splits and bootstrap intervals. Keep each fruiting body, layer, flush and timepoint nested under its originating biological box. Do not randomly split mushrooms from the same box into train and test.
+
+Related implementation programme: [#13409 — local source–sink flow under depletion and hydraulic resistance](https://github.com/Luminous-Dynamics/symthaea/issues/13409).
+
 ## 5. Split design and leakage controls
 
 Primary split unit is the **biological replicate**, not a random frame, crop, edge or trajectory.
@@ -180,12 +208,13 @@ These are proposed targets, not measured performance or claims of superiority to
 
 ## 9. Execution sequence
 
-1. Audit and ingest the CC BY Figshare raw uptake dataset and its associated published imaging/morphology data, recording each file-level license and hash.
+1. Audit the Figshare raw uptake dataset and its associated published imaging/morphology data; record each file-level license and hash before ingestion.
 2. Inspect the Hyphal Highways Zenodo record and supplementary macros; produce a reproducible intake manifest before converting anything.
 3. Request access to the AM fungal flow dataset, including the raw kymographs / per-trajectory data and reuse terms.
 4. Implement assay-specific benchmark adapters and grouped split manifests.
 5. Publish baseline performance and uncertainty before tuning graph-aware models.
 6. Couple functional prediction scores to active-sensing value-of-information and fusion counterfactuals only after independent outcome bindings exist.
+7. For isotope-tracer studies, fit source–sink allocation by individual fruiting body and stratum; test the depletion-conditioned resistance hypothesis separately from topology-only predictions.
 
 ## 10. Claim boundary
 
