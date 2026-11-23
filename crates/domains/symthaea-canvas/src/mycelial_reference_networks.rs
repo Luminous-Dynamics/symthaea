@@ -635,8 +635,7 @@ fn euclidean_global_efficiency(
     let mut scored_pairs = 0usize;
     for source in 0..count {
         let distances = shortest_path_distances(adjacency, source);
-        for target in (source + 1)..count {
-            let path_length = distances[target];
+        for (target, path_length) in distances.iter().copied().enumerate().skip(source + 1) {
             if !path_length.is_finite() {
                 continue;
             }
