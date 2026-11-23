@@ -61,6 +61,8 @@ jobs:
       - name: Re-run baseline/sham/active/reversal evaluator tests
         run: cargo +1.96.0 test --locked -p symthaea-muse --lib realization_effect::tests
 
+      # Muse currently has existing Clippy warnings in many untouched modules.
+      # Keep the compile gate and fail only on lints in the two changed effect modules.
       - name: Clippy compile and changed-source lint gate
         shell: bash
         run: |
