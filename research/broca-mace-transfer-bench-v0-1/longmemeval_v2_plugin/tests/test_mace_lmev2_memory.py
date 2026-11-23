@@ -264,10 +264,11 @@ class MaceLongMemEvalV2IngressTests(unittest.TestCase):
                 "derivation_receipt_sha256": None,
             }
             candidate_jsonl = json.dumps(candidate, sort_keys=True, separators=(",", ":"))
+            candidate_set_sha256 = memory._candidate_set_digest_from_records([candidate])
             response = {
                 "candidate_evidence_jsonl": candidate_jsonl,
                 "candidate_record_count": 1,
-                "candidate_set_sha256": "d" * 64,
+                "candidate_set_sha256": candidate_set_sha256,
             }
 
             memory._persist_candidate_envelope("opaque-invocation-1", query, response)
@@ -277,7 +278,7 @@ class MaceLongMemEvalV2IngressTests(unittest.TestCase):
             receipt = json.loads(receipt_file.read_text(encoding="utf-8"))
             self.assertEqual(receipt["run_id"], memory.run_id)
             self.assertEqual(receipt["candidate_id"], "opaque-invocation-1")
-            self.assertEqual(receipt["candidate_set_sha256"], "d" * 64)
+            self.assertEqual(receipt["candidate_set_sha256"], candidate_set_sha256)
             self.assertEqual(
                 receipt["candidate_jsonl_sha256"],
                 hashlib.sha256(candidate_jsonl.encode("utf-8")).hexdigest(),
@@ -292,7 +293,12 @@ class MaceLongMemEvalV2IngressTests(unittest.TestCase):
             changed = dict(candidate)
             changed["payload_sha256"] = "e" * 64
             changed_jsonl = json.dumps(changed, sort_keys=True, separators=(",", ":"))
-            changed_response = dict(response, candidate_evidence_jsonl=changed_jsonl)
+            changed_candidate_set_sha256 = memory._candidate_set_digest_from_records([changed])
+            changed_response = dict(
+                response,
+                candidate_evidence_jsonl=changed_jsonl,
+                candidate_set_sha256=changed_candidate_set_sha256,
+            )
             with self.assertRaisesRegex(RuntimeError, "different evidence"):
                 memory._persist_candidate_envelope(
                     "opaque-invocation-1", query, changed_response
