@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
-const SCHEMA_VERSION: &str = "mel-musical-forecast-panel-v1";
+const SCHEMA_VERSION: &str = "mel-musical-forecast-panel-v2";
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -28,6 +28,7 @@ struct ForecastPanelV1 {
     displays: Vec<ForecastDisplayV1>,
     dispositions: Vec<ForecastDispositionV1>,
     realizations: Vec<ForecastRealizationV1>,
+    observation_closures: Vec<ObservationClosureV1>,
     claim_ceiling: Vec<String>,
 }
 
@@ -101,12 +102,25 @@ struct ForecastRealizationV1 {
     started_at_ns: u64,
     completed_at_ns: u64,
     artifact_sha256: String,
-    events: Vec<RealizedEventV1>,
+    observation_capture_id: String,
+    observed_event_manifest_sha256: String,
+    events: Vec<ProducedEventV1>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct RealizedEventV1 {
+struct ProducedEventV1 {
+    event_id: String,
+    forecast_event_id: Option<String>,
+    role: String,
+    #[serde(rename = "beat_index")]
+    _beat_index: u64,
+    onset_ns: u64,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ObservedEventV1 {
     event_id: String,
     forecast_event_id: Option<String>,
     role: String,
@@ -114,15 +128,58 @@ struct RealizedEventV1 {
     onset_ns: u64,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ObservationClosureV1 {
+    forecast_id: String,
+    capture_id: String,
+    source_kind: String,
+    observer_id: String,
+    producer_id: String,
+    event_observer_id: String,
+    event_observer_qualification_id: String,
+    event_observer_build_sha256: String,
+    event_observer_config_sha256: String,
+    event_observer_qualification_receipt_sha256: String,
+    observed_event_manifest_sha256: String,
+    event_observer_receipt_sha256: String,
+    observed_events: Vec<ObservedEventV1>,
+    clock_domain_id: String,
+    coverage_start_ns: u64,
+    coverage_end_ns: u64,
+    terminal_watermark_ns: u64,
+    closed_at_ns: u64,
+    first_sequence: u64,
+    end_sequence_exclusive: u64,
+    expected_sequence_count: u64,
+    observed_sequence_count: u64,
+    missing_sequence_count: u64,
+    duplicate_sequence_count: u64,
+    sample_rate_hz: u32,
+    channel_count: u16,
+    expected_sample_frames: u64,
+    observed_sample_frames: u64,
+    dropped_sample_frames: u64,
+    xrun_count: u32,
+    heartbeat_interval_ns: u64,
+    expected_heartbeat_count: u64,
+    observed_heartbeat_count: u64,
+    missing_heartbeat_count: u64,
+    capture_route_sha256: String,
+    capture_payload_sha256: String,
+    observer_build_sha256: String,
+    closure_receipt_sha256: String,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct EventForecastFinding {
     pub forecast_id: String,
     pub forecast_event_id: String,
-    pub realized_event_id: Option<String>,
+    pub observed_event_id: Option<String>,
     pub predicted_role: String,
-    pub realized_role: Option<String>,
+    pub observed_role: Option<String>,
     pub predicted_beat_index: u64,
-    pub realized_beat_index: Option<u64>,
+    pub observed_beat_index: Option<u64>,
     pub beat_index_match: Option<bool>,
     pub expected_onset_ns: u64,
     pub observed_onset_ns: Option<u64>,
@@ -131,8 +188,8 @@ pub struct EventForecastFinding {
     pub worst_case_absolute_onset_error_beats: Option<f64>,
     pub within_onset_tolerance: Option<bool>,
     pub presence_probability: f64,
-    pub presence_observed: bool,
-    pub presence_brier_score: f64,
+    pub presence_observed: Option<bool>,
+    pub presence_brier_score: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -164,10 +221,19 @@ pub struct ForecastAuditReport {
     pub forecasts_without_display: usize,
     pub disposition_count: usize,
     pub realization_count: usize,
-    pub realized_event_count: usize,
+    pub observation_closure_count: usize,
+    pub complete_observation_closure_count: usize,
+    pub incomplete_observation_closure_count: usize,
+    pub forecasts_without_observation_closure: usize,
+    pub output_observation_structurally_eligible: bool,
+    pub producer_reported_event_record_count: usize,
+    pub observed_event_record_count: usize,
+    pub qualified_observed_event_record_count: usize,
     pub matched_forecast_event_count: usize,
     pub unfulfilled_forecast_event_count: usize,
-    pub unforecasted_realized_event_count: usize,
+    pub unobserved_forecast_event_count: usize,
+    pub presence_brier_sample_count: usize,
+    pub unforecasted_observed_event_count: usize,
     pub role_match_rate: Option<f64>,
     pub beat_index_match_rate: Option<f64>,
     pub conditional_presence_brier_score: Option<f64>,
@@ -387,11 +453,9 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
 
     let mut realization_ids = BTreeSet::new();
     let mut realized_forecast_ids = BTreeSet::new();
-    let mut realized_event_ids = BTreeSet::new();
-    let mut realized_by_forecast_event =
-        BTreeMap::<(&str, &str), (&ForecastRealizationV1, &RealizedEventV1)>::new();
-    let mut unforecasted_realized_event_count = 0usize;
-    let mut realized_event_count = 0usize;
+    let mut producer_event_ids = BTreeSet::new();
+    let mut produced_forecast_event_ids = BTreeSet::new();
+    let mut producer_reported_event_record_count = 0usize;
 
     for realization in &panel.realizations {
         if !realization_ids.insert(realization.realization_id.as_str()) {
@@ -416,6 +480,14 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
                 )
             })?;
         require_digest(&realization.artifact_sha256, "realization artifact digest")?;
+        require_text(
+            &realization.observation_capture_id,
+            "realization observation_capture_id",
+        )?;
+        require_digest(
+            &realization.observed_event_manifest_sha256,
+            "realization observed event manifest digest",
+        )?;
         if realization.started_at_ns < forecast.committed_at_ns
             || realization.completed_at_ns < realization.started_at_ns
         {
@@ -478,56 +550,163 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
             ));
         }
 
+        // Producer-side event claims remain visible, but they are never used as
+        // the observation ground truth for forecast presence or timing scores.
         for event in &realization.events {
-            require_text(&event.event_id, "realized event_id")?;
-            require_text(&event.role, "realized event role")?;
-            if !realized_event_ids.insert(event.event_id.as_str()) {
-                return Err(format!("duplicate realized event_id: {}", event.event_id));
+            require_text(&event.event_id, "producer event_id")?;
+            require_text(&event.role, "producer event role")?;
+            if !producer_event_ids.insert(event.event_id.as_str()) {
+                return Err(format!("duplicate producer event_id: {}", event.event_id));
             }
             if event.onset_ns < realization.started_at_ns
                 || event.onset_ns > realization.completed_at_ns
             {
                 return Err(format!(
-                    "realized event {} falls outside its realization interval",
+                    "producer event {} falls outside its realization interval",
                     event.event_id
                 ));
             }
-            realized_event_count += 1;
-            match event.forecast_event_id.as_deref() {
-                Some(forecast_event_id) => {
-                    if !forecast_events
-                        .contains_key(&(forecast.forecast_id.as_str(), forecast_event_id))
-                    {
-                        return Err(format!(
-                            "realized event {} references unknown forecast event {}",
-                            event.event_id, forecast_event_id
-                        ));
-                    }
-                    if event.onset_ns < forecast.target_start_ns
-                        || event.onset_ns >= forecast.target_end_ns
-                    {
-                        findings.push(format!(
-                            "realized event {} falls outside forecast {} target window",
-                            event.event_id, forecast.forecast_id
-                        ));
-                    }
-                    if realized_by_forecast_event
-                        .insert(
-                            (forecast.forecast_id.as_str(), forecast_event_id),
-                            (realization, event),
-                        )
-                        .is_some()
-                    {
-                        return Err(format!(
-                            "forecast event {} was realized more than once",
-                            forecast_event_id
-                        ));
-                    }
+            producer_reported_event_record_count += 1;
+            if let Some(forecast_event_id) = event.forecast_event_id.as_deref() {
+                if !forecast_events
+                    .contains_key(&(forecast.forecast_id.as_str(), forecast_event_id))
+                {
+                    return Err(format!(
+                        "producer event {} references unknown forecast event {}",
+                        event.event_id, forecast_event_id
+                    ));
                 }
-                None => unforecasted_realized_event_count += 1,
+                if !produced_forecast_event_ids
+                    .insert((forecast.forecast_id.as_str(), forecast_event_id))
+                {
+                    return Err(format!(
+                        "forecast event {} was emitted more than once",
+                        forecast_event_id
+                    ));
+                }
+                if event.onset_ns < forecast.target_start_ns
+                    || event.onset_ns >= forecast.target_end_ns
+                {
+                    findings.push(format!(
+                        "producer event {} falls outside forecast {} target window",
+                        event.event_id, forecast.forecast_id
+                    ));
+                }
             }
         }
     }
+
+    let mut closure_by_forecast = BTreeMap::<&str, bool>::new();
+    let mut observed_by_forecast_event = BTreeMap::<(&str, &str), &ObservedEventV1>::new();
+    let mut observed_event_ids = BTreeSet::new();
+    let mut unforecasted_observed_by_forecast = BTreeMap::<&str, usize>::new();
+    let mut observed_event_record_count = 0usize;
+    let mut qualified_observed_event_record_count = 0usize;
+    let mut complete_observation_closure_count = 0usize;
+    let mut incomplete_observation_closure_count = 0usize;
+
+    for closure in &panel.observation_closures {
+        let forecast = forecast_ids
+            .get(closure.forecast_id.as_str())
+            .copied()
+            .ok_or_else(|| {
+                format!(
+                    "observation closure references unknown forecast {}",
+                    closure.forecast_id
+                )
+            })?;
+        if closure_by_forecast.contains_key(closure.forecast_id.as_str()) {
+            return Err(format!(
+                "forecast {} has more than one observation closure",
+                closure.forecast_id
+            ));
+        }
+        validate_observation_closure_shape(closure)?;
+        for event in &closure.observed_events {
+            require_text(&event.event_id, "observed event_id")?;
+            require_text(&event.role, "observed event role")?;
+            if !observed_event_ids.insert(event.event_id.as_str()) {
+                return Err(format!("duplicate observed event_id: {}", event.event_id));
+            }
+            if event.onset_ns < closure.coverage_start_ns
+                || event.onset_ns >= closure.coverage_end_ns
+            {
+                return Err(format!(
+                    "observed event {} falls outside its capture interval",
+                    event.event_id
+                ));
+            }
+            if event.onset_ns < forecast.target_start_ns || event.onset_ns >= forecast.target_end_ns
+            {
+                return Err(format!(
+                    "observed event {} falls outside forecast {} target window",
+                    event.event_id, forecast.forecast_id
+                ));
+            }
+            observed_event_record_count += 1;
+            if let Some(forecast_event_id) = event.forecast_event_id.as_deref() {
+                if !forecast_events
+                    .contains_key(&(forecast.forecast_id.as_str(), forecast_event_id))
+                {
+                    return Err(format!(
+                        "observed event {} references unknown forecast event {}",
+                        event.event_id, forecast_event_id
+                    ));
+                }
+                if observed_by_forecast_event
+                    .insert((forecast.forecast_id.as_str(), forecast_event_id), event)
+                    .is_some()
+                {
+                    return Err(format!(
+                        "forecast event {} was observed more than once",
+                        forecast_event_id
+                    ));
+                }
+            } else {
+                *unforecasted_observed_by_forecast
+                    .entry(forecast.forecast_id.as_str())
+                    .or_default() += 1;
+            }
+        }
+
+        let closure_findings = observation_closure_incompleteness(closure, forecast, panel);
+        let complete = closure_findings.is_empty();
+        if complete {
+            complete_observation_closure_count += 1;
+            qualified_observed_event_record_count += closure.observed_events.len();
+        } else {
+            incomplete_observation_closure_count += 1;
+            for reason in closure_findings {
+                findings.push(format!(
+                    "forecast {} observation closure {} is incomplete: {}",
+                    closure.forecast_id, closure.capture_id, reason
+                ));
+            }
+        }
+        closure_by_forecast.insert(closure.forecast_id.as_str(), complete);
+    }
+    let forecasts_without_observation_closure = panel
+        .forecasts
+        .iter()
+        .filter(|forecast| !closure_by_forecast.contains_key(forecast.forecast_id.as_str()))
+        .count();
+    for forecast in &panel.forecasts {
+        if !closure_by_forecast.contains_key(forecast.forecast_id.as_str()) {
+            findings.push(format!(
+                "forecast {} has no observation closure; event absence remains unobserved",
+                forecast.forecast_id
+            ));
+        }
+    }
+
+    let unforecasted_observed_event_count = unforecasted_observed_by_forecast
+        .iter()
+        .filter_map(|(forecast_id, count)| {
+            closure_by_forecast
+                .get(*forecast_id)
+                .and_then(|complete| if *complete { Some(*count) } else { None })
+        })
+        .sum::<usize>();
 
     let mut event_findings = Vec::new();
     let mut brier_sum = 0.0;
@@ -536,23 +715,33 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
     let mut beat_index_matches = 0usize;
     let mut matched_count = 0usize;
     let mut unfulfilled_count = 0usize;
+    let mut unobserved_count = 0usize;
     let mut onset_errors = Vec::new();
 
     for forecast in &panel.forecasts {
+        let observation_complete = closure_by_forecast
+            .get(forecast.forecast_id.as_str())
+            .copied()
+            .unwrap_or(false);
         for predicted in &forecast.events {
-            let realized = realized_by_forecast_event.get(&(
+            let observed_candidate = observed_by_forecast_event.get(&(
                 forecast.forecast_id.as_str(),
                 predicted.forecast_event_id.as_str(),
             ));
+            let observed = if observation_complete {
+                observed_candidate
+            } else {
+                None
+            };
             let (
-                realized_event_id,
-                realized_role,
-                realized_beat_index,
+                observed_event_id,
+                observed_role,
+                observed_beat_index,
                 beat_index_match,
                 observed_onset_ns,
                 signed_error_ns,
                 phase_error,
-            ) = if let Some((_, actual)) = realized {
+            ) = if let Some(actual) = observed {
                 let signed = i128::from(actual.onset_ns) - i128::from(predicted.expected_onset_ns);
                 let phase = signed as f64 / predicted.local_beat_period_ns as f64;
                 role_matches += usize::from(actual.role == predicted.role);
@@ -570,14 +759,22 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
                     Some(phase),
                 )
             } else {
-                unfulfilled_count += 1;
+                if observation_complete {
+                    unfulfilled_count += 1;
+                } else {
+                    unobserved_count += 1;
+                }
                 (None, None, None, None, None, None, None)
             };
-            let presence_observed = realized.is_some();
-            let observed_probability = if presence_observed { 1.0 } else { 0.0 };
-            let brier = (predicted.presence_probability - observed_probability).powi(2);
-            brier_sum += brier;
-            brier_count += 1;
+            let presence_observed = observation_complete.then_some(observed.is_some());
+            let brier = presence_observed.map(|observed| {
+                let observed_probability = if observed { 1.0 } else { 0.0 };
+                (predicted.presence_probability - observed_probability).powi(2)
+            });
+            if let Some(value) = brier {
+                brier_sum += value;
+                brier_count += 1;
+            }
             let worst_case_phase_error = signed_error_ns.map(|signed| {
                 (signed.unsigned_abs() as f64 + panel.time_alignment_max_uncertainty_ns as f64)
                     / predicted.local_beat_period_ns as f64
@@ -593,11 +790,11 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
             event_findings.push(EventForecastFinding {
                 forecast_id: forecast.forecast_id.clone(),
                 forecast_event_id: predicted.forecast_event_id.clone(),
-                realized_event_id,
+                observed_event_id,
                 predicted_role: predicted.role.clone(),
-                realized_role,
+                observed_role,
                 predicted_beat_index: predicted.beat_index,
-                realized_beat_index,
+                observed_beat_index,
                 beat_index_match,
                 expected_onset_ns: predicted.expected_onset_ns,
                 observed_onset_ns,
@@ -634,7 +831,7 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
     let p95_absolute_onset_error_beats = percentile(&absolute_sorted, 95);
     let structurally_valid = findings.is_empty();
     Ok(ForecastAuditReport {
-        schema_version: "mel-musical-forecast-report-v1".to_owned(),
+        schema_version: "mel-musical-forecast-report-v2".to_owned(),
         session_id: panel.session_id.clone(),
         case_id: panel.case_id.clone(),
         reference_time_map_id: panel.reference_time_map_id.clone(),
@@ -653,10 +850,20 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
         forecasts_without_display,
         disposition_count: panel.dispositions.len(),
         realization_count: panel.realizations.len(),
-        realized_event_count,
+        observation_closure_count: panel.observation_closures.len(),
+        complete_observation_closure_count,
+        incomplete_observation_closure_count,
+        forecasts_without_observation_closure,
+        output_observation_structurally_eligible: complete_observation_closure_count
+            == panel.forecasts.len(),
+        producer_reported_event_record_count,
+        observed_event_record_count,
+        qualified_observed_event_record_count,
         matched_forecast_event_count: matched_count,
         unfulfilled_forecast_event_count: unfulfilled_count,
-        unforecasted_realized_event_count,
+        unobserved_forecast_event_count: unobserved_count,
+        presence_brier_sample_count: brier_count,
+        unforecasted_observed_event_count,
         role_match_rate: rate(role_matches, matched_count),
         beat_index_match_rate: rate(beat_index_matches, matched_count),
         conditional_presence_brier_score: mean(brier_sum, brier_count),
@@ -753,6 +960,219 @@ fn validate_header(panel: &ForecastPanelV1) -> Result<(), String> {
         return Err("claim_ceiling must contain explicit non-empty limits".to_owned());
     }
     Ok(())
+}
+
+fn validate_observation_closure_shape(closure: &ObservationClosureV1) -> Result<(), String> {
+    require_text(&closure.forecast_id, "observation closure forecast_id")?;
+    require_text(&closure.capture_id, "observation closure capture_id")?;
+    require_text(&closure.observer_id, "observation closure observer_id")?;
+    require_text(&closure.producer_id, "observation closure producer_id")?;
+    require_text(
+        &closure.event_observer_id,
+        "observation closure event_observer_id",
+    )?;
+    require_text(
+        &closure.event_observer_qualification_id,
+        "event observer qualification ID",
+    )?;
+    require_text(
+        &closure.clock_domain_id,
+        "observation closure clock_domain_id",
+    )?;
+    for (digest, name) in [
+        (&closure.capture_route_sha256, "capture route digest"),
+        (&closure.capture_payload_sha256, "capture payload digest"),
+        (&closure.observer_build_sha256, "observer build digest"),
+        (
+            &closure.event_observer_build_sha256,
+            "event observer build digest",
+        ),
+        (
+            &closure.event_observer_config_sha256,
+            "event observer config digest",
+        ),
+        (
+            &closure.event_observer_qualification_receipt_sha256,
+            "event observer qualification receipt digest",
+        ),
+        (
+            &closure.observed_event_manifest_sha256,
+            "observed event manifest digest",
+        ),
+        (
+            &closure.event_observer_receipt_sha256,
+            "event observer receipt digest",
+        ),
+        (
+            &closure.closure_receipt_sha256,
+            "observation closure receipt digest",
+        ),
+    ] {
+        require_digest(digest, name)?;
+    }
+    if closure.coverage_start_ns >= closure.coverage_end_ns {
+        return Err(format!(
+            "observation closure {} must have a positive coverage interval",
+            closure.capture_id
+        ));
+    }
+    if closure.closed_at_ns < closure.coverage_end_ns
+        || closure.terminal_watermark_ns > closure.closed_at_ns
+    {
+        return Err(format!(
+            "observation closure {} has an impossible terminal watermark or close time",
+            closure.capture_id
+        ));
+    }
+    let sequence_span = closure
+        .end_sequence_exclusive
+        .checked_sub(closure.first_sequence)
+        .ok_or_else(|| "observation sequence range is reversed".to_owned())?;
+    if sequence_span != closure.expected_sequence_count
+        || closure
+            .observed_sequence_count
+            .checked_add(closure.missing_sequence_count)
+            != Some(closure.expected_sequence_count)
+    {
+        return Err(format!(
+            "observation closure {} has inconsistent sequence accounting",
+            closure.capture_id
+        ));
+    }
+
+    let duration_ns = closure.coverage_end_ns - closure.coverage_start_ns;
+    match closure.source_kind.as_str() {
+        "rendered_audio_loopback" => {
+            if closure.sample_rate_hz < 8_000
+                || closure.channel_count == 0
+                || closure.expected_sample_frames == 0
+                || closure.heartbeat_interval_ns != 0
+                || closure.expected_heartbeat_count != 0
+                || closure.observed_heartbeat_count != 0
+                || closure.missing_heartbeat_count != 0
+            {
+                return Err(format!(
+                    "audio-loopback closure {} has invalid sample or heartbeat accounting",
+                    closure.capture_id
+                ));
+            }
+            let expected_frames =
+                (u128::from(duration_ns) * u128::from(closure.sample_rate_hz)) / 1_000_000_000;
+            if expected_frames != u128::from(closure.expected_sample_frames)
+                || closure
+                    .observed_sample_frames
+                    .checked_add(closure.dropped_sample_frames)
+                    != Some(closure.expected_sample_frames)
+            {
+                return Err(format!(
+                    "audio-loopback closure {} has inconsistent sample-frame accounting",
+                    closure.capture_id
+                ));
+            }
+        }
+        "midi_output_monitor" => {
+            if closure.sample_rate_hz != 0
+                || closure.channel_count != 0
+                || closure.expected_sample_frames != 0
+                || closure.observed_sample_frames != 0
+                || closure.dropped_sample_frames != 0
+                || closure.xrun_count != 0
+                || closure.heartbeat_interval_ns == 0
+                || closure.expected_heartbeat_count == 0
+                || closure
+                    .observed_heartbeat_count
+                    .checked_add(closure.missing_heartbeat_count)
+                    != Some(closure.expected_heartbeat_count)
+            {
+                return Err(format!(
+                    "MIDI monitor closure {} has invalid heartbeat or sample accounting",
+                    closure.capture_id
+                ));
+            }
+            let expected_heartbeats = duration_ns
+                .div_ceil(closure.heartbeat_interval_ns)
+                .checked_add(1)
+                .ok_or_else(|| "MIDI heartbeat schedule count overflows u64".to_owned())?;
+            if expected_heartbeats != closure.expected_heartbeat_count {
+                return Err(format!(
+                    "MIDI monitor closure {} heartbeat schedule does not cover its declared interval",
+                    closure.capture_id
+                ));
+            }
+        }
+        _ => {
+            return Err(format!(
+                "unsupported observation source_kind {}",
+                closure.source_kind
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn observation_closure_incompleteness(
+    closure: &ObservationClosureV1,
+    forecast: &ForecastV1,
+    panel: &ForecastPanelV1,
+) -> Vec<String> {
+    let mut reasons = Vec::new();
+    if closure.observer_id == closure.producer_id {
+        reasons.push("observer identity is not independent of the output producer".to_owned());
+    }
+    if closure.event_observer_id == closure.producer_id {
+        reasons
+            .push("event observer identity is not independent of the output producer".to_owned());
+    }
+    if let Some(realization) = panel
+        .realizations
+        .iter()
+        .find(|item| item.forecast_id == forecast.forecast_id)
+    {
+        if realization.observation_capture_id != closure.capture_id {
+            reasons.push("realization references a different observation capture".to_owned());
+        }
+        if realization.observed_event_manifest_sha256 != closure.observed_event_manifest_sha256 {
+            reasons
+                .push("realization event manifest does not match the observer receipt".to_owned());
+        }
+    }
+    if closure.clock_domain_id != panel.clock_domain_id {
+        reasons.push("capture clock domain does not match the evaluator clock domain".to_owned());
+    }
+    if closure.coverage_start_ns > forecast.target_start_ns {
+        reasons.push("capture begins after the forecast target window starts".to_owned());
+    }
+    if closure.coverage_end_ns < forecast.target_end_ns {
+        reasons.push("capture ends before the forecast target window ends".to_owned());
+    }
+    if closure.terminal_watermark_ns < closure.coverage_end_ns {
+        reasons.push("terminal watermark does not close the complete captured interval".to_owned());
+    }
+    if closure.missing_sequence_count > 0 || closure.duplicate_sequence_count > 0 {
+        reasons.push("capture sequence has missing or duplicated records".to_owned());
+    }
+    if closure.observed_sequence_count != closure.expected_sequence_count {
+        reasons.push("capture sequence count does not match the expected count".to_owned());
+    }
+    match closure.source_kind.as_str() {
+        "rendered_audio_loopback" => {
+            if closure.observed_sample_frames != closure.expected_sample_frames
+                || closure.dropped_sample_frames > 0
+                || closure.xrun_count > 0
+            {
+                reasons.push("audio capture contains missing frames or an xrun".to_owned());
+            }
+        }
+        "midi_output_monitor"
+            if closure.missing_heartbeat_count > 0
+                || closure.observed_heartbeat_count != closure.expected_heartbeat_count =>
+        {
+            reasons.push("MIDI monitor heartbeat coverage contains a gap".to_owned());
+        }
+        "midi_output_monitor" => {}
+        _ => {}
+    }
+    reasons
 }
 
 fn validate_forecast(forecast: &ForecastV1, panel: &ForecastPanelV1) -> Result<(), String> {
@@ -983,7 +1403,7 @@ mod tests {
     use super::*;
     use serde_json::Value;
 
-    const FIXTURE: &str = include_str!("../fixtures/valid-musical-forecast-v1.json");
+    const FIXTURE: &str = include_str!("../fixtures/valid-musical-forecast-v2.json");
 
     fn panel() -> Value {
         serde_json::from_str(FIXTURE).expect("known-answer forecast fixture")
@@ -1003,7 +1423,16 @@ mod tests {
             "muse-performance-time-v1"
         );
         assert_eq!(report.displayed_before_target_count, 1);
+        assert_eq!(report.producer_reported_event_record_count, 1);
+        assert_eq!(report.qualified_observed_event_record_count, 1);
         assert_eq!(report.matched_forecast_event_count, 1);
+        assert_eq!(report.observation_closure_count, 1);
+        assert_eq!(report.complete_observation_closure_count, 1);
+        assert_eq!(report.incomplete_observation_closure_count, 0);
+        assert!(report.output_observation_structurally_eligible);
+        assert_eq!(report.unobserved_forecast_event_count, 0);
+        assert_eq!(report.presence_brier_sample_count, 1);
+        assert_eq!(report.event_findings[0].presence_observed, Some(true));
         assert_eq!(report.role_match_rate, Some(1.0));
         assert_eq!(report.beat_index_match_rate, Some(1.0));
         assert!((report.conditional_presence_brier_score.unwrap() - 0.0025).abs() < 1e-9);
@@ -1203,10 +1632,13 @@ mod tests {
     #[test]
     fn user_deviation_is_reported_but_not_scored_as_disobedience() {
         let mut value = panel();
-        value["realizations"][0]["events"][0]["forecast_event_id"] = serde_json::Value::Null;
+        value["observation_closures"][0]["observed_events"][0]["forecast_event_id"] =
+            serde_json::Value::Null;
+        value["realizations"][0]["events"] = serde_json::json!([]);
         let report = audit(&value).expect("unforecasted contribution is allowed");
         assert!(report.structurally_valid_anticipatory_trace);
-        assert_eq!(report.unforecasted_realized_event_count, 1);
+        assert_eq!(report.unforecasted_observed_event_count, 1);
+        assert_eq!(report.qualified_observed_event_record_count, 1);
         assert_eq!(report.matched_forecast_event_count, 0);
     }
 
@@ -1233,13 +1665,13 @@ mod tests {
             .unwrap()
             .push(extra);
         let error = audit(&value).expect_err("forecast event cannot be used twice");
-        assert!(error.contains("duplicate realized event_id"));
+        assert!(error.contains("duplicate producer event_id"));
     }
 
     #[test]
     fn off_beat_realization_is_reported_even_when_onset_is_close() {
         let mut value = panel();
-        value["realizations"][0]["events"][0]["beat_index"] = serde_json::json!(5);
+        value["observation_closures"][0]["observed_events"][0]["beat_index"] = serde_json::json!(5);
         let report = audit(&value).expect("off-beat structure should be reported");
         assert!(report.structurally_valid_anticipatory_trace);
         assert_eq!(report.beat_index_match_rate, Some(0.0));
@@ -1253,5 +1685,223 @@ mod tests {
         value["forecasts"][0]["events"][0]["presence_probability"] = serde_json::json!(0.2);
         let report = audit(&value).expect("low-confidence but correct forecast is reportable");
         assert!((report.conditional_presence_brier_score.unwrap() - 0.64).abs() < 1e-9);
+    }
+
+    #[test]
+    fn incomplete_capture_makes_absence_unknown_not_false() {
+        let mut value = panel();
+        value["observation_closures"][0]["coverage_end_ns"] = serde_json::json!(1_400_000_000_u64);
+        value["observation_closures"][0]["terminal_watermark_ns"] =
+            serde_json::json!(1_400_000_000_u64);
+        value["observation_closures"][0]["closed_at_ns"] = serde_json::json!(1_410_000_000_u64);
+        value["observation_closures"][0]["expected_sample_frames"] = serde_json::json!(19_680_u64);
+        value["observation_closures"][0]["observed_sample_frames"] = serde_json::json!(19_680_u64);
+        let report = audit(&value).expect("partial capture remains reportable");
+        assert_eq!(report.event_findings[0].presence_observed, None);
+        assert_eq!(report.event_findings[0].presence_brier_score, None);
+        assert_eq!(report.matched_forecast_event_count, 0);
+        assert_eq!(report.producer_reported_event_record_count, 1);
+        assert_eq!(report.observed_event_record_count, 1);
+        assert_eq!(report.qualified_observed_event_record_count, 0);
+        assert_eq!(report.unfulfilled_forecast_event_count, 0);
+        assert_eq!(report.unobserved_forecast_event_count, 1);
+        assert_eq!(report.presence_brier_sample_count, 0);
+        assert_eq!(report.conditional_presence_brier_score, None);
+        assert!(!report.structurally_valid_anticipatory_trace);
+    }
+
+    #[test]
+    fn missing_capture_receipt_does_not_turn_a_missing_event_into_a_negative() {
+        let mut value = panel();
+        value["observation_closures"] = serde_json::json!([]);
+        let report = audit(&value).expect("missing observation remains reportable");
+        assert_eq!(report.forecasts_without_observation_closure, 1);
+        assert!(!report.output_observation_structurally_eligible);
+        assert_eq!(report.event_findings[0].presence_observed, None);
+        assert_eq!(report.unobserved_forecast_event_count, 1);
+        assert_eq!(report.unfulfilled_forecast_event_count, 0);
+        assert_eq!(report.conditional_presence_brier_score, None);
+    }
+
+    #[test]
+    fn complete_capture_without_observer_event_scores_absence_despite_producer_claim() {
+        let mut value = panel();
+        value["observation_closures"][0]["observed_events"] = serde_json::json!([]);
+        let report = audit(&value).expect("closed complete capture should score absence");
+        assert_eq!(report.event_findings[0].presence_observed, Some(false));
+        assert!((report.event_findings[0].presence_brier_score.unwrap() - 0.9025).abs() < 1e-9);
+        assert_eq!(report.unfulfilled_forecast_event_count, 1);
+        assert_eq!(report.unobserved_forecast_event_count, 0);
+    }
+
+    #[test]
+    fn dropped_audio_frames_make_the_observation_window_incomplete() {
+        let mut value = panel();
+        value["observation_closures"][0]["observed_sample_frames"] = serde_json::json!(24_959_u64);
+        value["observation_closures"][0]["dropped_sample_frames"] = serde_json::json!(1_u64);
+        let report = audit(&value).expect("dropped audio frame is reportable");
+        assert_eq!(report.event_findings[0].presence_observed, None);
+        assert_eq!(report.event_findings[0].presence_brier_score, None);
+        assert_eq!(report.incomplete_observation_closure_count, 1);
+        assert!(!report.output_observation_structurally_eligible);
+    }
+
+    #[test]
+    fn missing_midi_monitor_heartbeat_makes_absence_unobservable() {
+        let mut value = panel();
+        let closure = &mut value["observation_closures"][0];
+        closure["source_kind"] = serde_json::json!("midi_output_monitor");
+        closure["sample_rate_hz"] = serde_json::json!(0);
+        closure["channel_count"] = serde_json::json!(0);
+        closure["expected_sample_frames"] = serde_json::json!(0);
+        closure["observed_sample_frames"] = serde_json::json!(0);
+        closure["dropped_sample_frames"] = serde_json::json!(0);
+        closure["xrun_count"] = serde_json::json!(0);
+        closure["heartbeat_interval_ns"] = serde_json::json!(10_000_000_u64);
+        closure["expected_heartbeat_count"] = serde_json::json!(53_u64);
+        closure["observed_heartbeat_count"] = serde_json::json!(52_u64);
+        closure["missing_heartbeat_count"] = serde_json::json!(1_u64);
+        closure["expected_sequence_count"] = serde_json::json!(0);
+        closure["observed_sequence_count"] = serde_json::json!(0);
+        closure["missing_sequence_count"] = serde_json::json!(0);
+        closure["duplicate_sequence_count"] = serde_json::json!(0);
+        closure["first_sequence"] = serde_json::json!(0);
+        closure["end_sequence_exclusive"] = serde_json::json!(0);
+        let report = audit(&value).expect("heartbeat gap is a qualification finding");
+        assert_eq!(report.event_findings[0].presence_observed, None);
+        assert_eq!(report.unobserved_forecast_event_count, 1);
+    }
+
+    #[test]
+    fn producer_cannot_certify_its_own_output_observation() {
+        let mut value = panel();
+        value["observation_closures"][0]["observer_id"] =
+            value["observation_closures"][0]["producer_id"].clone();
+        let report = audit(&value).expect("common-mode observer is reportable but ineligible");
+        assert_eq!(report.event_findings[0].presence_observed, None);
+        assert!(!report.structurally_valid_anticipatory_trace);
+        assert!(
+            report
+                .qualification_findings
+                .iter()
+                .any(|finding| finding.contains("not independent"))
+        );
+    }
+
+    #[test]
+    fn closure_receipt_digest_is_required() {
+        let mut value = panel();
+        value["observation_closures"][0]["closure_receipt_sha256"] = serde_json::json!("bad");
+        let error = audit(&value).expect_err("malformed closure receipts must be rejected");
+        assert!(error.contains("observation closure receipt digest"));
+    }
+
+    #[test]
+    fn duplicate_observation_closures_for_one_forecast_are_rejected() {
+        let mut value = panel();
+        let duplicate = value["observation_closures"][0].clone();
+        value["observation_closures"]
+            .as_array_mut()
+            .unwrap()
+            .push(duplicate);
+        let error = audit(&value).expect_err("one forecast may have only one closure decision");
+        assert!(error.contains("more than one observation closure"));
+    }
+
+    #[test]
+    fn mismatched_event_manifest_cannot_establish_presence_or_absence() {
+        let mut value = panel();
+        value["realizations"][0]["observed_event_manifest_sha256"] =
+            serde_json::json!("9999999999999999999999999999999999999999999999999999999999999999");
+        let report = audit(&value).expect("unbound event manifest remains reportable");
+        assert_eq!(report.event_findings[0].presence_observed, None);
+        assert_eq!(report.event_findings[0].presence_brier_score, None);
+        assert_eq!(report.unobserved_forecast_event_count, 1);
+        assert!(!report.output_observation_structurally_eligible);
+        assert!(
+            report
+                .qualification_findings
+                .iter()
+                .any(|finding| finding.contains("event manifest does not match"))
+        );
+    }
+
+    #[test]
+    fn missing_event_observer_receipt_cannot_establish_absence() {
+        let mut value = panel();
+        value["observation_closures"][0]["event_observer_qualification_id"] = serde_json::json!("");
+        let error = audit(&value).expect_err("missing observer qualification reference must fail");
+        assert!(error.contains("event observer qualification ID"));
+    }
+
+    #[test]
+    fn producer_cannot_claim_to_be_independent_event_detector() {
+        let mut value = panel();
+        value["observation_closures"][0]["event_observer_id"] =
+            value["observation_closures"][0]["producer_id"].clone();
+        let report =
+            audit(&value).expect("producer detector claim remains reportable but ineligible");
+        assert_eq!(report.event_findings[0].presence_observed, None);
+        assert!(!report.output_observation_structurally_eligible);
+        assert!(
+            report
+                .qualification_findings
+                .iter()
+                .any(|finding| finding.contains("event observer identity is not independent"))
+        );
+    }
+
+    #[test]
+    fn complete_capture_manifest_is_sufficient_without_producer_realization() {
+        let mut value = panel();
+        value["realizations"] = serde_json::json!([]);
+        let report = audit(&value).expect("independent observer evidence stands alone");
+        assert!(report.output_observation_structurally_eligible);
+        assert_eq!(report.event_findings[0].presence_observed, Some(true));
+        assert!((report.event_findings[0].presence_brier_score.unwrap() - 0.0025).abs() < 1e-9);
+        assert_eq!(report.producer_reported_event_record_count, 0);
+        assert_eq!(report.observed_event_record_count, 1);
+        assert_eq!(report.qualified_observed_event_record_count, 1);
+        assert_eq!(report.unobserved_forecast_event_count, 0);
+        assert!((report.conditional_presence_brier_score.unwrap() - 0.0025).abs() < 1e-9);
+    }
+
+    #[test]
+    fn complete_empty_capture_manifest_scores_absence_without_producer_realization() {
+        let mut value = panel();
+        value["realizations"] = serde_json::json!([]);
+        value["observation_closures"][0]["observed_events"] = serde_json::json!([]);
+        let report =
+            audit(&value).expect("complete empty observer manifest is evidence of absence");
+        assert!(report.output_observation_structurally_eligible);
+        assert_eq!(report.event_findings[0].presence_observed, Some(false));
+        assert!((report.event_findings[0].presence_brier_score.unwrap() - 0.9025).abs() < 1e-9);
+        assert_eq!(report.producer_reported_event_record_count, 0);
+        assert_eq!(report.observed_event_record_count, 0);
+        assert_eq!(report.qualified_observed_event_record_count, 0);
+        assert_eq!(report.unfulfilled_forecast_event_count, 1);
+        assert_eq!(report.unobserved_forecast_event_count, 0);
+    }
+
+    #[test]
+    fn independent_observer_manifest_scores_event_without_producer_event_claim() {
+        let mut value = panel();
+        value["realizations"][0]["events"] = serde_json::json!([]);
+        let report = audit(&value).expect("independent observation should be scored");
+        assert_eq!(report.event_findings[0].presence_observed, Some(true));
+        assert_eq!(report.producer_reported_event_record_count, 0);
+        assert_eq!(report.observed_event_record_count, 1);
+        assert_eq!(report.qualified_observed_event_record_count, 1);
+        assert_eq!(report.matched_forecast_event_count, 1);
+    }
+
+    #[test]
+    fn independent_event_detector_may_differ_from_capture_recorder() {
+        let mut value = panel();
+        value["observation_closures"][0]["event_observer_id"] =
+            serde_json::json!("separate-independent-event-detector-v1");
+        let report = audit(&value).expect("distinct independent event detector is valid");
+        assert!(report.output_observation_structurally_eligible);
+        assert_eq!(report.event_findings[0].presence_observed, Some(true));
     }
 }

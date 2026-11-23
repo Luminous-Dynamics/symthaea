@@ -74,3 +74,13 @@ The musical forecast auditor checks precommitted, input-snapshot-bound forecasts
       tools/mel-judge-grounding-audit/fixtures/valid-musical-forecast-v1.json report.json
 
 The fixture is synthetic. Its Brier score is conditional on predicted event slots, not a general recall/calibration result. See docs/research/MEL_PREDICTIVE_TRANSPARENCY_AUDITOR_V1_2026-11-23.md.
+
+
+## Output-observation closure for predictive forecasts
+
+The v2 musical forecast panel binds one independent capture-closure record per scored forecast. The audit distinguishes detector-reported present, detector-reported absent and unobserved outcomes. Missing events are scored as absent only when the full target window has been closed by an independent output observer with complete sequence/frame or MIDI-heartbeat accounting, an optional producer realization cross-checked against the capture and event-observer manifest, and an explicit observer event list. A complete independent capture remains scoreable when the producer emitted no realization record. Producer-side realization events are retained as claims but are never used as observation ground truth. Partial captures remain unobserved and are excluded from both presence Brier scoring and event-level realization metrics.
+
+    cargo +1.96.0 run --locked --manifest-path tools/mel-judge-grounding-audit/Cargo.toml --bin mel-musical-forecast-audit -- audit \
+      tools/mel-judge-grounding-audit/fixtures/valid-musical-forecast-v2.json report.json
+
+The synthetic fixture demonstrates schema/evaluator behavior only. Capture digests are shape-checked, not authenticated; detector sensitivity/specificity and actual loopback completeness require independent live qualification. See docs/research/MEL_OUTPUT_OBSERVATION_CLOSURE_V1_2026-11-23.md.
