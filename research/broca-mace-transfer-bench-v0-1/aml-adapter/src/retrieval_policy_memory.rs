@@ -966,6 +966,40 @@ mod tests {
     }
 
     #[test]
+    fn retrieval_trace_receipt_matches_cross_language_reference_vector() {
+        let receipt = RetrievalTraceReceiptV1 {
+            run_id: "run-trace-test".to_owned(),
+            query_invocation_id: "opaque-trace-invocation".to_owned(),
+            domain_id: "web".to_owned(),
+            environment_revision_sha256: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_owned(),
+            tool_profile_sha256: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_owned(),
+            query_sha256: "fcef6f729579a929adf41fb9249bf3c2fa8fb4de403fe1019163ba6729646fb1".to_owned(),
+            candidate_set_sha256: None,
+            operations: vec![RetrievalOperationV1 {
+                tool_id: "trajectory.bm25.search".to_owned(),
+                tool_revision_sha256: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_owned(),
+                action_template_sha256: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc".to_owned(),
+                observed_evidence_ids: Vec::new(),
+                outcome: RetrievalOperationOutcomeV1::NoEvidence,
+                elapsed_ns: 17,
+                inspected_bytes: 0,
+                inspected_bytes_measured: false,
+            }],
+            stop_reason: RetrievalStopReasonV1::NoCandidateEvidence,
+            tool_call_budget: 1,
+            tool_calls_used: 1,
+            elapsed_ns: 17,
+            inspected_bytes: 0,
+            inspected_bytes_complete: false,
+            created_at_unix: 100,
+        };
+        assert_eq!(
+            receipt.receipt_sha256(),
+            "e818d458148b2edd093a95d45afffb3d86b65291ee1b399149abf4ca4d18edb6"
+        );
+    }
+
+    #[test]
     fn inspected_byte_completeness_is_explicit_and_committed() {
         let mut receipt = trace(
             "byte-accounting",
