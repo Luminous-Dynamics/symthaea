@@ -38,6 +38,13 @@
           "observed_date": "2026-11-22",
           "selected_season": "S4-2026",
           "display": "No results yet for this season"
+        },
+        {
+          "kind": "direct_page_state",
+          "observed_date": "2026-11-23",
+          "selected_season": "S4-2026",
+          "display": "No results yet for this season",
+          "interpretation": "Direct page render shows no entries for the selected season despite the historical S4-2026 Claude-Fable-5 row reported in an indexed leaderboard snapshot. Retain the 82.3 row as historical only."
         }
       ],
       "limitations": [
@@ -420,6 +427,16 @@
           "preference_dataset_prompt_license": "CC-BY-4.0",
           "model_output_terms": "governed by respective model-provider terms",
           "correctness_dataset_license": "CC-BY-4.0"
+        },
+        {
+          "kind": "2026-11-12_research_page_snapshot",
+          "published_date": "2026-11-12",
+          "last_updated": "2026-11-13",
+          "broken_requirement_detection_code_only_percent": 63,
+          "broken_requirement_detection_interaction_judge_percent": 71.1,
+          "iterative_repair_code_only_percent": 55.4,
+          "iterative_repair_interaction_judge_percent": 75.5,
+          "interpretation": "The research page's highlighted results for its own datasets/protocol; these are diagnostic-evaluator results, not deterministic acceptance rates or SFEB outcomes."
         }
       ],
       "limitations": [
@@ -427,7 +444,8 @@
         "Reported gains are on the paper's specific data, models, judge configurations and protocols; they are not general frontend accuracy rates or SFEB results.",
         "Human preference prediction and requirement correctness are distinct target variables.",
         "Computer-use judges can miss states, be manipulated by page content or misinterpret task intent; deterministic and human-calibrated checks remain necessary.",
-        "The preference dataset card lists CC-BY-4.0 for user prompts but model outputs remain under provider terms; review component assets/privacy before reuse."
+        "The preference dataset card lists CC-BY-4.0 for user prompts but model outputs remain under provider terms; review component assets/privacy before reuse.",
+        "The research page's highlighted broken-requirement detection result is 63.0% to 71.1%; iterative repair is 55.4% to 75.5%. Keep these distinct from preference-prediction agreement, released dataset counts, and deterministic oracle acceptance."
       ],
       "sources": [
         "https://arena.ai/blog/interaction-as-a-judge",
@@ -566,7 +584,7 @@
       "name": "FrontierCode 2.0",
       "scope": "Maintainer-oriented repository software engineering and patch mergeability, including correctness, scope discipline, design, test quality and codebase conventions; adjacent comparator for SFEB's full-stack/maintenance lane.",
       "task_count": 132,
-      "snapshot_status": "historical_published_snapshot",
+      "snapshot_status": "current_live_snapshot",
       "observations": [
         {
           "kind": "benchmark_scope",
@@ -621,13 +639,28 @@
             "compilation": 0.7,
             "lint_format_typecheck": 0.5
           }
+        },
+        {
+          "kind": "current_leaderboard_snapshot",
+          "observed_date": "2026-11-23",
+          "source": "official_frontiercode_leaderboard",
+          "model": "Claude Fable 5.2",
+          "harness": "Claude Code",
+          "reasoning_effort": "xhigh",
+          "weighted_score_percent": 50.2,
+          "pass_rate_percent": 54.7,
+          "mean_usd_per_rollout": 17.73,
+          "output_tokens_per_rollout": 156000,
+          "interpretation": "Current leaderboard row at observation time. Weighted rubric score and pass rate are separate. Any failed blocking criterion scores zero."
         }
       ],
       "limitations": [
         "This evaluates mergeability of repository patches, not visual reconstruction or end-to-end browser journey quality.",
         "The grading rubric includes subjective maintainer criteria; reproduce its native protocol before making numeric comparisons.",
         "A benchmark score must be associated with its exact model, reasoning effort, agent harness and scoring revision.",
-        "The 47.3% Opus 5.5 score is the official October 27 launch snapshot; later leaderboard entries may differ and must be timestamped separately."
+        "The 47.3% Opus 5.5 score is the official October 27 launch snapshot; later leaderboard entries may differ and must be timestamped separately.",
+        "The current 2026-11-23 row for Claude Fable 5.2 (50.2 weighted score, 54.7% pass rate) supersedes the October launch snapshot as the current leaderboard observation; retain both snapshots with their dates and do not conflate weighted score with pass rate.",
+        "The official site notes 20+ maintainer-authors spent more than 40 hours per task, uses unit tests, rubrics and verifiers, and zeroes runs that use solution-bearing sources; SFEB should match the rigor and independently qualify its own tasks."
       ],
       "sources": [
         "https://cognition.com/blog/frontier-code-2.0",
@@ -675,13 +708,23 @@
             "proactive_interaction": 6
           },
           "note": "Challenge labels are non-exclusive; counts may overlap."
+        },
+        {
+          "kind": "live_leaderboard_search_snapshot",
+          "observed_date": "2026-11-23",
+          "model": "Claude Opus 5",
+          "approach": "Max Batch tool v2.1",
+          "binary_accuracy_percent": 44.33,
+          "partial_score_percent": 77.67,
+          "interpretation": "Search-indexed live leaderboard row at observation time. The website exposes selectable step-budget and release filters; exact selected filter state was not independently recovered, so this row is not substituted for the paper's stated 500-step primary result."
         }
       ],
       "limitations": [
         "Measures long-horizon computer-use workflow completion, not application source-code generation or mergeability.",
         "The 20.6% binary-completion result and 54.8% partial score are the paper-reported 500-step results; do not substitute unrelated version/leaderboard percentages.",
         "Its task set, step budgets, authentic input artifacts and self-hosted applications differ from SFEB and WebdriverIO; do not pool results.",
-        "Use its dynamic-state, conflict-disambiguation, proactive-clarification and hidden-state phenomena to design stress tasks, not to claim direct numeric superiority."
+        "Use its dynamic-state, conflict-disambiguation, proactive-clarification and hidden-state phenomena to design stress tasks, not to claim direct numeric superiority.",
+        "The 2026-11-23 site leaderboard search snapshot displays 44.33% binary and 77.67% partial for Claude Opus 5 / Max Batch tool v2.1, but the selected step-budget/release filter was not independently captured; treat as a provisional live-page observation, not as the paper's 500-step result."
       ],
       "sources": [
         "https://osworld-v2.xlang.ai/",
