@@ -75,6 +75,10 @@ pub struct VelocityFourierSpongeReport {
     pub removed_fluctuation_f_strophy: f64,
     /// Independent Parseval sum of damped velocity-Fourier modal energy.
     pub spectral_removed_casimir: f64,
+    /// Maximum imaginary residual after inverse transforming real input.
+    pub max_imaginary_residual: f64,
+    /// Maximum absolute real value in the inverse-transformed candidate.
+    pub max_real_magnitude: f64,
     /// (C2 before - C2 after) - spectral modal loss.
     pub casimir_accounting_residual: f64,
 }
@@ -141,6 +145,12 @@ impl VlasovPoisson1d1v {
                 removed_spatial_mean_casimir: 0.0,
                 removed_fluctuation_f_strophy: 0.0,
                 spectral_removed_casimir: 0.0,
+                max_imaginary_residual: 0.0,
+                max_real_magnitude: self
+                    .distribution
+                    .iter()
+                    .map(|value| value.abs())
+                    .fold(0.0_f64, f64::max),
                 casimir_accounting_residual: 0.0,
             });
         }
@@ -169,6 +179,8 @@ impl VlasovPoisson1d1v {
 
         let nyquist_mode = config.nv / 2;
         let mut spectral_removed_casimir = 0.0;
+        let mut max_imaginary_residual = 0.0_f64;
+        let mut max_real_magnitude = 0.0_f64;
         let spectral_weight = config.dx() * config.dv() / config.nv as f64;
 
         for ix in 0..config.nx {
@@ -209,13 +221,14 @@ impl VlasovPoisson1d1v {
                 if !value.re.is_finite() || !value.im.is_finite() {
                     return Err(VelocityFourierSpongeError::NonFiniteTransform);
                 }
+                max_imaginary_residual = max_imaginary_residual.max(value.im.abs());
+                max_real_magnitude = max_real_magnitude.max(value.re.abs());
                 candidate.push(value.re);
             }
         }
 
-        let previous_distribution = self.distribution.clone();
-        let previous_field = self.electric_field.clone();
-        self.distribution = candidate;
+        let previous_distribution = std::mem::replace(&mut self.distribution, candidate);
+        let previous_field = std::mem::take(&mut self.electric_field);
 
         if let Err(error) = self
             .refresh_electric_field()
@@ -224,6 +237,14 @@ impl VlasovPoisson1d1v {
             self.distribution = previous_distribution;
             self.electric_field = previous_field;
             return Err(VelocityFourierSpongeError::Solver(error));
+        }
+
+        let imaginary_tolerance =
+            256.0 * f64::EPSILON * max_real_magnitude.max(f64::MIN_POSITIVE);
+        if max_imaginary_residual > imaginary_tolerance {
+            self.distribution = previous_distribution;
+            self.electric_field = previous_field;
+            return Err(VelocityFourierSpongeError::NonFiniteTransform);
         }
 
         let after = match self.quadratic_casimir_budget() {
@@ -276,6 +297,8 @@ impl VlasovPoisson1d1v {
             removed_spatial_mean_casimir,
             removed_fluctuation_f_strophy,
             spectral_removed_casimir,
+            max_imaginary_residual,
+            max_real_magnitude,
             casimir_accounting_residual,
         })
     }
@@ -366,6 +389,8 @@ mod tests {
         assert_eq!(solver.time(), time_before);
         assert!((report.nyquist_attenuation - (-1.0_f64).exp()).abs() < 1.0e-14);
         assert!(report.removed_total_casimir > 0.0);
+        assert!(report.max_imaginary_residual < 256.0 * f64::EPSILON * report.max_real_magnitude);
+        assert!(report.max_real_magnitude > 0.0);
     }
 
     #[test]
