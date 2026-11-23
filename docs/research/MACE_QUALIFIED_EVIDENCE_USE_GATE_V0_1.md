@@ -75,9 +75,33 @@ The Rust gate rejects:
 
 The exact candidate-ID-set digest is recomputed by the module over the sorted evidence IDs and compared with the signed receipt. The broader candidate-set digest still needs to be independently recomputed from the canonical candidate-evidence envelope by the production qualification service. The module does not pretend that a caller-provided digest authenticates source bytes.
 
-## 5. External verifier boundary
+## 5. Pinned Ed25519 verifier
 
-The trait is an integration seam, not a cryptographic implementation. A production implementation must:
+The follow-on Rust module `qualification_trust.rs` now provides `PinnedEd25519QualificationVerifierV1`. It implements the external signature-verifier interface using Ed25519 (`ed25519-dalek = 2.1.0`).
+
+The trust profile is a directly pinned leaf-key set. Its versioned digest commits to the verifier ID, profile version, public keys, derived key IDs, key status and validity intervals. The constructor requires an expected profile digest supplied out-of-band; it rejects a changed profile, malformed/duplicate keys, noncanonical key ordering and invalid public keys. Key IDs are derived from a domain-separated SHA-256 preimage rather than accepted as arbitrary labels.
+
+At verification the implementation:
+- rejects unknown or revoked keys;
+- checks that both receipt issuance and current consumption time fall inside the key validity window;
+- requires the receipt's verifier-profile digest to match the exact pinned profile;
+- requires a 64-byte Ed25519 signature and applies strict verification to the exact lowercase-hex payload digest.
+
+The signed bytes are the ASCII representation of `signing_payload_sha256()` (64 lowercase hexadecimal bytes). That method uses a domain-separated, length-prefixed encoding of the typed receipt. This is a versioned MACE signature contract, **not DSSE**. We should adopt a standard DSSE/in-toto or COSE binding in a later wire-format revision rather than describe this custom signature input as interoperable with those formats.
+
+The trust profile pin must be delivered through a trust channel outside the candidate backend and the memory store's rollback domain. A profile digest read from the same mutable store as the profile is not an independent pin. Key revocation takes effect when consumers receive and pin the updated profile; remote profile distribution, transparency logging and rollback-resistant pin updates remain future work.
+
+The trust profile is a verifier trust root, not a source-authority registry. It authenticates the qualification service's statement. The signed qualification policy, purpose, subject-scope, domain, candidate and lifecycle bindings still determine what that verifier is attesting to; live authorization remains the executor's responsibility.
+
+### Current protocol alignment
+
+The current agent decision-receipt Internet-Draft (draft-gruszka-audit-decision-receipts-10, 17 November 2026) specifies offline-verifiable signed decision/outcome records and DSSE/in-toto and COSE bindings. It also explicitly distinguishes a receipt as evidence from authorization and describes at-most-once consumption for *approvals*. MACE's qualification receipt is not an approval and must not become an action credential. The useful design lesson is to keep the evidence qualification receipt, the eventual decision receipt, and the executor's consume-once authorization state as separate objects.
+
+The active Agent Memory Integrity Internet-Draft is now draft-khandelwal-bpm-agent-memory-integrity-00 (1 November 2026), which adds T10 erasure resurrection by restoring a pre-erasure store snapshot. It distinguishes that case from T9 whole-store rollback and explains why a high-water mark alone can catch T9 but still fail T10. These remain work-in-progress benchmark methods, not IETF standards.
+
+## 6. External verifier and source qualification boundary
+
+The trait remains an integration seam, but there is now a concrete Ed25519 implementation for locally pinned verifier profiles. The broader production service must:
 
 1. Resolve the verifier profile to separately governed trust roots.
 2. Authenticate the receipt signer and reject unknown, expired or revoked keys.
@@ -89,11 +113,11 @@ The trait is an integration seam, not a cryptographic implementation. A producti
 
 The downstream executor must perform live authorization and lifecycle checks again at consequential use. A qualification token is purpose- and time-scoped; it is not a standing access credential.
 
-No signature algorithm, key custody, issuer registry, remote source-observation API, rights engine, tenant-isolation service or external rollback witness is implemented by this module. The subject-scope digest must commit to the effective authorization-scope manifest; it must not be treated as a raw user/tenant identifier or as a substitute for live access control.
+The Ed25519 verification algorithm and direct pinned leaf-key profile are now implemented, but private-key custody, remote key provisioning/revocation, issuer/source-authority registry, remote source-observation API, rights engine, tenant-isolation service, transparency log, one-time action-consumption ledger and external rollback witness are not implemented. The subject-scope digest must commit to the effective authorization-scope manifest; it must not be treated as a raw user/tenant identifier or as a substitute for live access control.
 
 ## 6. Test inventory
 
-Fourteen Rust unit tests are authored in the module:
+Sixteen Rust unit tests in the qualification gate and seven in the pinned-trust module are authored:
 
 1. Only independently admissible evidence IDs cross the gate.
 2. DecisionNeed binding cannot be changed.
@@ -109,10 +133,12 @@ Fourteen Rust unit tests are authored in the module:
 12. Consumer/tenant scope cannot be rebound.
 13. Three candidate-producing traces may promote an advisory search strategy, while the independent evidence gate still rejects the poisoned candidate and yields no admissible evidence.
 14. The versioned JSON receipt codec round-trips typed values and rejects unknown fields.
+15. A pinned Ed25519 profile verifies a complete qualification receipt using a real signature.
+16. A changed trust profile, revoked key, unknown key, invalid key window or altered signature is rejected by the pinned verifier.
 
 The module's test verifier is intentionally a deterministic test double; it is not a production signature scheme.
 
-**Rust execution status:** unexecuted. The environment currently has no `rustc`, `cargo` or `rustfmt`. No compile, Rust unit-test, Clippy, Rust codec, integration or CI pass is claimed.
+**Rust execution status:** unexecuted. The environment currently has no `rustc`, `cargo` or `rustfmt`. No compile, Rust unit-test, Clippy, Rust codec, integration or CI pass is claimed. The standalone adapter now directly pins `ed25519-dalek = 2.1.0`; a generated Cargo.lock and exact dependency-graph review remain pending.
 
 **Independent schema preflight:** the Draft 2020-12 schema definition was checked with Python `jsonschema` 4.26.0. One valid receipt fixture was accepted and three negative controls (unknown top-level field, invalid disposition, signature octet above 255) were rejected. This validates the schema definition only; it does not execute the Rust codec or verify cryptographic signatures.
 
@@ -165,16 +191,17 @@ Other current benchmarks expose additional gaps that the MACE comparison matrix 
 
 These are distinct tasks and scoring protocols. Do not pool their scores with AML, LongMemEval-V2 or each other. Use them as separate benchmark adapters and as guides to MACE's own cross-protocol assurance axes. In particular, StateMem's reported gains from explicit supersession/state structure and TimlMemBench's raw-native governance failures reinforce that MACE needs current-at-use qualification, not only high-quality storage and recall.
 
-## 9. Next integration milestones
+## 12. Next integration milestones
 
-1. Implement the external signature verifier, trust-profile resolution, key revocation and separate custody.
-2. Independently recompute the complete candidate-evidence envelope digest and verify the transitive source/derivation closure before signing a qualification receipt.
-3. Connect authenticated source-observation receipts and rights/purpose checks to the qualification service.
-4. Add a V2 sidecar protocol operation that obtains the qualification receipt before exposing candidates to a consequential reader; keep the controller multi-step and policy notes advisory.
-5. Make missing, expired, mismatched or indeterminate qualifications result in no admissible evidence and a visible abstention/repair path.
-6. Add current-at-use revalidation, correction/revocation propagation and bitemporal valid-time / knowledge-time snapshots.
-7. Add external witness custody for T9/T10; do not count local filesystem persistence as rollback protection.
-8. Run the adversarial decision episodes in #13397 and matched baselines in #13261 under independently isolated evaluator custody in #13287.
+1. Provision the pinned Ed25519 trust profile through an external trust channel, define rotation/revocation publication and independently protect the expected trust-profile digest.
+2. Decide the standard wire binding: DSSE/in-toto or COSE, with JCS canonical JSON and test vectors. Keep the present domain-separated typed digest as the internal receipt commitment, not a claim of DSSE interoperability.
+3. Independently recompute the complete candidate-evidence envelope digest and verify the transitive source/derivation closure before signing a qualification receipt.
+4. Connect authenticated source-observation receipts and rights/purpose checks to the qualification service.
+5. Add a V2 sidecar protocol operation that obtains the qualification receipt before exposing candidates to a consequential reader; keep the controller multi-step and policy notes advisory.
+6. Make missing, expired, mismatched or indeterminate qualifications result in no admissible evidence and a visible abstention/repair path.
+7. Add current-at-use revalidation, correction/revocation propagation and bitemporal valid-time / knowledge-time snapshots.
+8. Add an external witness and consume-once decision-use receipt for T9/T10 and consequential actions; do not count local filesystem persistence as rollback protection.
+9. Run the adversarial decision episodes in #13397 and matched baselines in #13261 under independently isolated evaluator custody in #13287.
 
 
 ## 11. References
@@ -199,3 +226,21 @@ These references describe different evaluation protocols. Published scores, samp
 ## 12. Claim boundary
 
 This PR adds a Rust interface prototype and authored unit tests only. It does not qualify any actual source, authenticate an issuer, authorize a tool call, secure a benchmark sandbox, prevent whole-store rollback, prove erasure, change the LongMemEval-V2 result, or establish any SOTA advantage. The next proof must include a real external verifier, executed tests, an exact-head integration run and independent counterfactual evaluation.
+
+
+## 14. Fresh benchmark findings — 2026-11-23
+
+- The current LongMemEval-V2 benchmark description reports 451 questions, up to 500 web-agent trajectories and 25M–115M tokens, with five abilities: static state recall, dynamic state tracking, workflow knowledge, environment gotchas and premise awareness. The released AgentRunbook-C baseline is 74.9% / 108.3s on Small and 70.1% / 139.9s on Medium. The current public page's dynamic leaderboard section may be refreshed separately; do not treat cached search snapshots as a stable official table. Compare under a frozen page/repository revision and retain the fixed Reader / Insert / Query contract.
+- AMA-Bench's ICML 2026 paper reports AMA-Agent at 57.22% and an 11.16 percentage-point gain over its strongest baseline. Its tasks use long-horizon agent/environment trajectories, not ordinary dialogue recall. This is a useful external research result, but not numerically comparable with AML or LongMemEval-V2.
+- MemoryArena's ICML 2026 paper highlights interdependent multi-session tasks where earlier interactions must inform later actions; systems with near-saturated LoCoMo scores can still perform poorly in the Memory-Agent-Environment loop. This supports making decision/action utility a primary MACE evaluation endpoint rather than a side metric.
+- The current at-rest integrity draft's T9/T10 cases require the SUT to be stopped before the storage edit, restarted, and read through its ordinary interface. It also requires no-op reload, genuine-write-after-restart and edit-landed controls; if the edit does not land, the case is an error and excluded, not a pass. MACE's local trace store should be tested under this stopped/restart procedure, but it cannot pass T9/T10 until the trust anchor is outside the rollback domain.
+- The current decision-receipt draft explicitly says a signed approval must be consumed at most once, with a durable complete consumption state that survives rotation/compaction. MACE should reuse this principle for any future action authorization, but should not mislabel an evidence-admissibility receipt as an approval or action permit.
+
+Research links:
+- LongMemEval-V2: https://xiaowu0162.github.io/longmemeval-v2/
+- AMA-Bench: https://proceedings.mlr.press/v306/zhao26bs.html
+- MemoryArena: https://proceedings.mlr.press/v306/he26am.html
+- Agent Memory Integrity draft: https://datatracker.ietf.org/doc/html/draft-khandelwal-bpm-agent-memory-integrity
+- Decision Receipts draft: https://datatracker.ietf.org/doc/html/draft-gruszka-audit-decision-receipts-10
+
+These are complementary protocols. MACE results must remain separate, protocol-matched and fully reproducible.
