@@ -221,8 +221,9 @@ pub use mycelial_network::{
 };
 pub use mycelial_morphogenesis_observation::{
     MYCELIAL_MORPHOGENESIS_OBSERVATION_SCHEMA_VERSION, MycelialDevelopmentStage,
-    MycelialMorphogenesisMeasurement, MycelialMorphogenesisObservation,
-    MycelialMorphogenesisObservationError, MycelialMorphogenesisRegionKind,
+    MycelialMorphogenesisMeasurement, MycelialMorphogenesisMissingStatus,
+    MycelialMorphogenesisObservation, MycelialMorphogenesisObservationError,
+    MycelialMorphogenesisRegionKind,
 };
 pub use mycelial_observation_coverage::{
     MAX_MYCELIAL_COVERAGE_CANDIDATES_PER_OBSERVATION, MAX_MYCELIAL_OBSERVATION_COVERAGE_RECORDS,
