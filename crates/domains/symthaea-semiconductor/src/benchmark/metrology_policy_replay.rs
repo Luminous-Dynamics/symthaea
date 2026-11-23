@@ -56,6 +56,8 @@ pub struct SyntheticFabScenarioConfigV1 {
     pub schema: String,
     pub scenario_id: String,
     pub seed: u64,
+    /// Independent deterministic random stream for synthetic assay errors.
+    pub measurement_seed: u64,
     pub wafer_count: usize,
     pub tool_count: usize,
     pub chamber_count: usize,
@@ -138,6 +140,9 @@ pub struct SyntheticFabPolicyEvaluationV1 {
     pub true_defect_prevalence: f64,
     pub metrology_sensitivity: f64,
     pub metrology_specificity: f64,
+    /// Measurement-error seed and realized selected-assay outcome digest.
+    pub assay_measurement_seed: u64,
+    pub assay_outcomes_sha256: String,
     pub assay_observed_ht_positive_rate: f64,
     pub assay_adjusted_ht_prevalence: Option<f64>,
     pub assay_adjusted_ht_absolute_error: Option<f64>,
@@ -1269,7 +1274,7 @@ pub fn generate_synthetic_fab_episode_v1(
         observation_packet_sha256,
         defect_threshold: config.defect_threshold,
         metrology_characteristics: config.metrology_characteristics,
-        measurement_seed: config.seed ^ 0x5345_4d49_4d45_5452,
+        measurement_seed: config.measurement_seed,
         hidden_truth,
     })
 }
@@ -1388,6 +1393,7 @@ pub fn evaluate_synthetic_metrology_policy_v1(
     let mut metrology_detected_true_positive_count = 0_usize;
     let mut metrology_false_positive_count = 0_usize;
     let mut metrology_false_negative_count = 0_usize;
+    let mut assay_outcomes = Vec::<(String, bool)>::new();
     let mut latent_process_state_total = 0.0;
     let mut defect_score_total = 0.0;
     let mut ht_positive_total = 0.0;
@@ -1442,6 +1448,7 @@ pub fn evaluate_synthetic_metrology_policy_v1(
                 &observed.candidate_id,
                 truth.defect_positive,
             );
+            assay_outcomes.push((observed.candidate_id.clone(), assay_positive));
             if assay_positive {
                 assay_ht_positive_total += 1.0 / row.inclusion_probability;
             }
@@ -1571,6 +1578,7 @@ pub fn evaluate_synthetic_metrology_policy_v1(
         design_variance_qualified.then(|| brier_total_variance.sqrt() / population_count as f64);
 
     let assay_observed_ht_positive_rate = assay_ht_positive_total / population_count as f64;
+    let assay_outcomes_sha256 = json_sha256(&assay_outcomes)?;
     let assay_informativeness = episode.metrology_characteristics.sensitivity
         + episode.metrology_characteristics.specificity
         - 1.0;
@@ -1642,6 +1650,8 @@ pub fn evaluate_synthetic_metrology_policy_v1(
         true_defect_prevalence,
         metrology_sensitivity: episode.metrology_characteristics.sensitivity,
         metrology_specificity: episode.metrology_characteristics.specificity,
+        assay_measurement_seed: episode.measurement_seed,
+        assay_outcomes_sha256,
         assay_observed_ht_positive_rate,
         assay_adjusted_ht_prevalence,
         assay_adjusted_ht_absolute_error,
@@ -1685,6 +1695,7 @@ mod tests {
             schema: REPLAY_SCENARIO_SCHEMA_V1.into(),
             scenario_id: "synthetic-cmp-drift-01".into(),
             seed,
+            measurement_seed: seed ^ 0x4d45_5452_4f4c,
             wafer_count: 128,
             tool_count: 2,
             chamber_count: 2,
