@@ -321,9 +321,29 @@ pub struct SyntheticMetrologyPolicyTournamentSummaryV1 {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct SyntheticMetrologyPairedPolicyComparisonV1 {
+    pub reference_policy_id: String,
+    pub comparison_policy_id: String,
+    pub paired_scenario_count: usize,
+    pub detection_capture_support: usize,
+    /// Comparison policy minus reference policy; positive means more defects detected.
+    pub detection_capture_mean_delta: Option<f64>,
+    pub detection_capture_sample_stddev_delta: Option<f64>,
+    pub undetected_defect_fraction_support: usize,
+    /// Comparison policy minus reference policy; negative is better.
+    pub undetected_defect_fraction_mean_delta: Option<f64>,
+    pub undetected_defect_fraction_sample_stddev_delta: Option<f64>,
+    pub assay_adjusted_error_support: usize,
+    /// Comparison policy minus reference policy; negative is better.
+    pub assay_adjusted_prevalence_absolute_error_mean_delta: Option<f64>,
+    pub assay_adjusted_prevalence_absolute_error_sample_stddev_delta: Option<f64>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SyntheticMetrologyPolicyTournamentV1 {
     pub schema: String,
     pub tournament_id: String,
+    pub reference_policy_id: String,
     pub scenario_manifest_sha256: String,
     pub policy_manifest_sha256: String,
     pub total_cost_budget: u64,
@@ -331,6 +351,7 @@ pub struct SyntheticMetrologyPolicyTournamentV1 {
     pub policy_count: usize,
     pub runs: Vec<SyntheticMetrologyPolicyTournamentRunV1>,
     pub summaries: Vec<SyntheticMetrologyPolicyTournamentSummaryV1>,
+    pub paired_comparisons: Vec<SyntheticMetrologyPairedPolicyComparisonV1>,
     pub tournament_sha256: String,
 }
 
@@ -358,12 +379,17 @@ fn mean_sample_stddev(values: &[f64]) -> Option<(f64, f64)> {
 /// All policies must use the same total cost budget.
 pub fn run_synthetic_metrology_policy_tournament_v1(
     tournament_id: &str,
+    reference_policy_id: &str,
     scenarios: &[SyntheticFabScenarioConfigV1],
     policy_templates: &[SyntheticMetrologyPolicyConfigV1],
 ) -> Result<SyntheticMetrologyPolicyTournamentV1, SyntheticFabReplayError> {
-    if tournament_id.trim().is_empty() || scenarios.is_empty() || policy_templates.is_empty() {
+    if tournament_id.trim().is_empty()
+        || reference_policy_id.trim().is_empty()
+        || scenarios.is_empty()
+        || policy_templates.is_empty()
+    {
         return Err(SyntheticFabReplayError(
-            "tournament requires an ID, scenarios and policy templates".into(),
+            "tournament requires an ID, reference policy, scenarios and policy templates".into(),
         ));
     }
     let common_cost_budget = policy_templates[0].total_cost_budget;
@@ -407,6 +433,12 @@ pub fn run_synthetic_metrology_policy_tournament_v1(
                 "tournament cost budgets must be matched".into(),
             ));
         }
+    }
+
+    if !policy_ids.contains(reference_policy_id) {
+        return Err(SyntheticFabReplayError(
+            "reference_policy_id must name one of the tournament policy templates".into(),
+        ));
     }
 
     let scenario_manifest_sha256 = json_sha256(scenarios)?;
@@ -497,9 +529,77 @@ pub fn run_synthetic_metrology_policy_tournament_v1(
         });
     }
 
+    let reference_runs: BTreeMap<_, _> = runs
+        .iter()
+        .filter(|run| run.policy_id == reference_policy_id)
+        .map(|run| ((run.scenario_id.clone(), run.scenario_seed), run))
+        .collect();
+    let mut paired_comparisons = Vec::new();
+    for template in policy_templates {
+        if template.policy_id == reference_policy_id {
+            continue;
+        }
+        let comparison_runs: BTreeMap<_, _> = runs
+            .iter()
+            .filter(|run| run.policy_id == template.policy_id)
+            .map(|run| ((run.scenario_id.clone(), run.scenario_seed), run))
+            .collect();
+        let mut detection_capture_deltas = Vec::new();
+        let mut undetected_fraction_deltas = Vec::new();
+        let mut assay_error_deltas = Vec::new();
+
+        for (scenario_key, reference_run) in &reference_runs {
+            let Some(comparison_run) = comparison_runs.get(scenario_key) else {
+                return Err(SyntheticFabReplayError(format!(
+                    "policy {} is missing paired scenario {:?}",
+                    template.policy_id, scenario_key
+                )));
+            };
+            if let (Some(comparison), Some(reference)) = (
+                comparison_run.evaluation.detection_capture_fraction,
+                reference_run.evaluation.detection_capture_fraction,
+            ) {
+                detection_capture_deltas.push(comparison - reference);
+            }
+            if let (Some(comparison), Some(reference)) = (
+                comparison_run.evaluation.total_undetected_defect_fraction,
+                reference_run.evaluation.total_undetected_defect_fraction,
+            ) {
+                undetected_fraction_deltas.push(comparison - reference);
+            }
+            if let (Some(comparison), Some(reference)) = (
+                comparison_run.evaluation.assay_adjusted_ht_absolute_error,
+                reference_run.evaluation.assay_adjusted_ht_absolute_error,
+            ) {
+                assay_error_deltas.push(comparison - reference);
+            }
+        }
+
+        let detection_stats = mean_sample_stddev(&detection_capture_deltas);
+        let undetected_stats = mean_sample_stddev(&undetected_fraction_deltas);
+        let assay_error_stats = mean_sample_stddev(&assay_error_deltas);
+        paired_comparisons.push(SyntheticMetrologyPairedPolicyComparisonV1 {
+            reference_policy_id: reference_policy_id.into(),
+            comparison_policy_id: template.policy_id.clone(),
+            paired_scenario_count: reference_runs.len(),
+            detection_capture_support: detection_capture_deltas.len(),
+            detection_capture_mean_delta: detection_stats.map(|stats| stats.0),
+            detection_capture_sample_stddev_delta: detection_stats.map(|stats| stats.1),
+            undetected_defect_fraction_support: undetected_fraction_deltas.len(),
+            undetected_defect_fraction_mean_delta: undetected_stats.map(|stats| stats.0),
+            undetected_defect_fraction_sample_stddev_delta: undetected_stats.map(|stats| stats.1),
+            assay_adjusted_error_support: assay_error_deltas.len(),
+            assay_adjusted_prevalence_absolute_error_mean_delta: assay_error_stats
+                .map(|stats| stats.0),
+            assay_adjusted_prevalence_absolute_error_sample_stddev_delta: assay_error_stats
+                .map(|stats| stats.1),
+        });
+    }
+
     let mut tournament = SyntheticMetrologyPolicyTournamentV1 {
         schema: REPLAY_TOURNAMENT_SCHEMA_V1.into(),
         tournament_id: tournament_id.into(),
+        reference_policy_id: reference_policy_id.into(),
         scenario_manifest_sha256,
         policy_manifest_sha256,
         total_cost_budget: common_cost_budget,
@@ -507,6 +607,7 @@ pub fn run_synthetic_metrology_policy_tournament_v1(
         policy_count: policy_templates.len(),
         runs,
         summaries,
+        paired_comparisons,
         tournament_sha256: String::new(),
     };
     tournament.tournament_sha256 = json_sha256(&tournament)?;
@@ -1970,12 +2071,14 @@ mod tests {
 
         let first = run_synthetic_metrology_policy_tournament_v1(
             "paired-three-seed-test",
+            "random-audit",
             &scenarios,
             &policies,
         )
         .unwrap();
         let second = run_synthetic_metrology_policy_tournament_v1(
             "paired-three-seed-test",
+            "random-audit",
             &scenarios,
             &policies,
         )
@@ -1985,6 +2088,14 @@ mod tests {
         assert_eq!(first.policy_count, 3);
         assert_eq!(first.runs.len(), 9);
         assert_eq!(first.summaries.len(), 3);
+        assert_eq!(first.reference_policy_id, "random-audit");
+        assert_eq!(first.paired_comparisons.len(), 2);
+        assert!(
+            first
+                .paired_comparisons
+                .iter()
+                .all(|comparison| comparison.paired_scenario_count == 3)
+        );
         assert_eq!(first.tournament_sha256, second.tournament_sha256);
         for summary in &first.summaries {
             assert_eq!(summary.run_count, 3);
@@ -2003,6 +2114,7 @@ mod tests {
         assert!(
             run_synthetic_metrology_policy_tournament_v1(
                 "unmatched-budget-test",
+                "budget-a",
                 &[scenario],
                 &[first, second]
             )
