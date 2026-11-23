@@ -11,7 +11,8 @@
     "start_url": { "type": "string", "minLength": 1 },
     "outcome": { "type": ["string", "null"] },
     "states": {
-      "type": "array", "minItems": 1,
+      "type": "array",
+      "minItems": 1,
       "items": {
         "type": "object",
         "required": ["url", "screenshot"],
