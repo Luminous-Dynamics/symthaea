@@ -1,0 +1,16 @@
+[package]
+name = "symthaea-plasma-probes"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+description = "Deterministic, evidence-oriented pulse-family contracts for kinetic plasma probe design"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+keywords = ["plasma", "vlasov", "kinetic", "benchmark", "scientific-computing"]
+categories = ["science", "simulation"]
+
+[dependencies]
+blake3 = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
