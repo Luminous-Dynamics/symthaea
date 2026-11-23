@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/PROOF_PLAN_MUTATION_FIXTURES_V1.schema.json",
+  "title": "ProofPlanV1 mutation fixture set",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "fixture_set_id",
+    "status",
+    "base_plan_id",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "fixture_set_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": [
+        "authored_expected_diagnostics_not_executed",
+        "executed",
+        "reviewed",
+        "frozen"
+      ]
+    },
+    "base_plan_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "mutation_kind",
+          "description",
+          "expected_diagnostic",
+          "mathematical_disposition",
+          "claim_ceiling",
+          "oracle_status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "mutation_kind": {
+            "enum": [
+              "remove_plan_action",
+              "replace_justification",
+              "change_root_statement",
+              "remove_evidence_reference",
+              "replace_proof_route",
+              "remove_side_condition",
+              "drop_subgoal",
+              "change_quantifier",
+              "change_domain"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expected_diagnostic": {
+            "enum": [
+              "uncovered_goal",
+              "warrant_or_type_mismatch",
+              "theorem_identity_mismatch",
+              "missing_evidence",
+              "proof_route_changed",
+              "missing_side_condition",
+              "missing_subgoal",
+              "statement_semantics_changed",
+              "unknown"
+            ]
+          },
+          "mathematical_disposition": {
+            "enum": [
+              "proved",
+              "refuted_by_checked_witness",
+              "unknown",
+              "ill_formed",
+              "not_refuted"
+            ]
+          },
+          "claim_ceiling": {
+            "type": "string",
+            "minLength": 1
+          },
+          "oracle_status": {
+            "enum": [
+              "not_run",
+              "passed",
+              "failed",
+              "inconclusive"
+            ]
+          }
+        }
+      }
+    }
+  }
+}
