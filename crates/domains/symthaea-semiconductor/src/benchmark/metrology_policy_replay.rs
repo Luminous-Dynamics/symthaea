@@ -7,7 +7,7 @@
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
 
 use crate::benchmark::metrology_audit::{
@@ -102,7 +102,10 @@ pub struct SyntheticFabPolicyEvaluationV1 {
     pub selected_sample_prevalence: f64,
     pub horvitz_thompson_prevalence: f64,
     pub horvitz_thompson_absolute_error: f64,
+    pub standard_error_ht_prevalence: Option<f64>,
     pub horvitz_thompson_mean_brier: f64,
+    pub standard_error_ht_mean_brier: Option<f64>,
+    pub design_variance_qualified: bool,
     pub true_population_mean_brier: f64,
     pub measured_fraction: f64,
     pub effective_sample_size: f64,
@@ -192,6 +195,171 @@ fn selection_digest(
 fn seal_selection_for_test(selection: &mut MetrologyAuditSelectionReportV1) {
     selection.selection_sha256.clear();
     selection.selection_sha256 = selection_digest(selection).expect("selection should hash");
+}
+
+fn validate_selection_design(
+    selection: &MetrologyAuditSelectionReportV1,
+) -> Result<(), SyntheticFabReplayError> {
+    let mut residual_population_by_stratum = BTreeMap::<String, usize>::new();
+    let mut randomized_selected_by_stratum = BTreeMap::<String, usize>::new();
+    let mut maximum_cost_by_stratum = BTreeMap::<String, u64>::new();
+    let mut exploit_count = 0_usize;
+    let mut randomized_audit_count = 0_usize;
+    let mut exploit_cost_used = 0_u64;
+    let mut audit_cost_used = 0_u64;
+    let mut total_selected_cost = 0_u64;
+
+    for (index, row) in selection.rows.iter().enumerate() {
+        if row.measurement_cost == 0 {
+            return Err(SyntheticFabReplayError(format!(
+                "selection.rows[{index}].measurement_cost must be positive"
+            )));
+        }
+        match &row.method {
+            MetrologySelectionMethodV1::DeterministicExploit => {
+                if !row.selected || row.inclusion_probability != 1.0 {
+                    return Err(SyntheticFabReplayError(format!(
+                        "selection.rows[{index}]: exploit must be selected with pi=1"
+                    )));
+                }
+                exploit_count += 1;
+                exploit_cost_used = exploit_cost_used
+                    .checked_add(row.measurement_cost)
+                    .ok_or_else(|| SyntheticFabReplayError("exploit cost overflow".into()))?;
+                total_selected_cost = total_selected_cost
+                    .checked_add(row.measurement_cost)
+                    .ok_or_else(|| SyntheticFabReplayError("selected cost overflow".into()))?;
+            }
+            MetrologySelectionMethodV1::RandomizedAudit => {
+                if !row.selected {
+                    return Err(SyntheticFabReplayError(format!(
+                        "selection.rows[{index}]: randomized audit must be selected"
+                    )));
+                }
+                randomized_audit_count += 1;
+                *residual_population_by_stratum
+                    .entry(row.stratum_id.clone())
+                    .or_default() += 1;
+                *randomized_selected_by_stratum
+                    .entry(row.stratum_id.clone())
+                    .or_default() += 1;
+                let maximum = maximum_cost_by_stratum
+                    .entry(row.stratum_id.clone())
+                    .or_default();
+                *maximum = (*maximum).max(row.measurement_cost);
+                audit_cost_used = audit_cost_used
+                    .checked_add(row.measurement_cost)
+                    .ok_or_else(|| SyntheticFabReplayError("audit cost overflow".into()))?;
+                total_selected_cost = total_selected_cost
+                    .checked_add(row.measurement_cost)
+                    .ok_or_else(|| SyntheticFabReplayError("selected cost overflow".into()))?;
+            }
+            MetrologySelectionMethodV1::NotSelected => {
+                if row.selected {
+                    return Err(SyntheticFabReplayError(format!(
+                        "selection.rows[{index}]: not_selected conflicts with selected=true"
+                    )));
+                }
+                *residual_population_by_stratum
+                    .entry(row.stratum_id.clone())
+                    .or_default() += 1;
+                let maximum = maximum_cost_by_stratum
+                    .entry(row.stratum_id.clone())
+                    .or_default();
+                *maximum = (*maximum).max(row.measurement_cost);
+            }
+        }
+    }
+
+    if exploit_count != selection.exploit_count
+        || randomized_audit_count != selection.randomized_audit_count
+        || residual_population_by_stratum != selection.residual_population_by_stratum
+    {
+        return Err(SyntheticFabReplayError(
+            "selection report counts do not reconcile with row-level methods".into(),
+        ));
+    }
+    if residual_population_by_stratum.keys().collect::<BTreeSet<_>>()
+        != selection.audit_quota_by_stratum.keys().collect::<BTreeSet<_>>()
+    {
+        return Err(SyntheticFabReplayError(
+            "audit quotas do not exactly cover residual strata".into(),
+        ));
+    }
+
+    let mut quota_total = 0_usize;
+    let mut audit_worst_case_cost = 0_u64;
+    for (stratum, residual_population) in &residual_population_by_stratum {
+        let quota = selection.audit_quota_by_stratum[stratum];
+        if quota == 0 || quota > *residual_population {
+            return Err(SyntheticFabReplayError(format!(
+                "stratum {stratum}: audit quota outside [1, residual population]"
+            )));
+        }
+        let sampled = randomized_selected_by_stratum.get(stratum).copied().unwrap_or(0);
+        if sampled != quota {
+            return Err(SyntheticFabReplayError(format!(
+                "stratum {stratum}: selected audit count differs from declared quota"
+            )));
+        }
+        let expected_probability = quota as f64 / *residual_population as f64;
+        for row in selection.rows.iter().filter(|row| {
+            row.stratum_id == *stratum
+                && !matches!(
+                    &row.method,
+                    MetrologySelectionMethodV1::DeterministicExploit
+                )
+        }) {
+            if (row.inclusion_probability - expected_probability).abs() > 1.0e-12 {
+                return Err(SyntheticFabReplayError(format!(
+                    "stratum {stratum}: row inclusion probability disagrees with quota/population"
+                )));
+            }
+        }
+        quota_total += quota;
+        let maximum_cost = maximum_cost_by_stratum.get(stratum).copied().unwrap_or(0);
+        audit_worst_case_cost = audit_worst_case_cost
+            .checked_add(maximum_cost.checked_mul(quota as u64).ok_or_else(|| {
+                SyntheticFabReplayError(format!("stratum {stratum}: worst-case cost overflow"))
+            })?)
+            .ok_or_else(|| SyntheticFabReplayError("worst-case audit cost overflow".into()))?;
+    }
+
+    if quota_total != selection.randomized_audit_count
+        || exploit_cost_used != selection.exploit_cost_used
+        || audit_cost_used != selection.audit_cost_used
+        || total_selected_cost != selection.total_selected_cost
+        || audit_worst_case_cost != selection.audit_worst_case_cost
+    {
+        return Err(SyntheticFabReplayError(
+            "selection report costs/counts do not reconcile with its rows".into(),
+        ));
+    }
+    if selection.total_cost_budget == 0
+        || exploit_cost_used > selection.exploit_cost_budget
+        || audit_cost_used > selection.audit_cost_budget
+        || audit_worst_case_cost > selection.audit_cost_budget
+        || total_selected_cost > selection.total_cost_budget
+    {
+        return Err(SyntheticFabReplayError(
+            "selection rows exceed a declared cost budget".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn finite_population_sample_variance(values: &[f64]) -> Option<f64> {
+    if values.len() < 2 {
+        return None;
+    }
+    let mean = values.iter().sum::<f64>() / values.len() as f64;
+    Some(
+        values
+            .iter()
+            .map(|value| (value - mean).powi(2))
+            .sum::<f64>()
+            / (values.len() - 1) as f64,
+    )
 }
 
 fn validate_config(config: &SyntheticFabScenarioConfigV1) -> Result<(), SyntheticFabReplayError> {
@@ -376,6 +544,7 @@ pub fn evaluate_synthetic_metrology_policy_v1(
     validate_binary_measurand_semantics_v1(&selection.binary_semantics).map_err(|error| {
         SyntheticFabReplayError(format!("selection class semantics rejected: {error}"))
     })?;
+    validate_selection_design(selection)?;
 
     let mut selection_by_id = BTreeMap::new();
     for (index, row) in selection.rows.iter().enumerate() {
