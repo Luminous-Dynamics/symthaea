@@ -1,0 +1,305 @@
+{
+  "schema": "symthaea.decision_value_of_computation_benchmark",
+  "version": "0.1.0",
+  "tracking_issue": 11561,
+  "parent_issue": 13060,
+  "temporal_continuation_issue": 13097,
+  "evaluator_oracle_pr": 13152,
+  "mixed_strategy_oracle_pr": 13165,
+  "active_sensing_issue": 9563,
+  "expected_observation_value_owner": 12567,
+  "robust_observation_support_pr": 13202,
+  "joint_allocation_issue": 9666,
+  "work_receipts": [
+    13061,
+    13062,
+    13140
+  ],
+  "freshness_receipts": [
+    13091,
+    13093,
+    13142
+  ],
+  "evaluator_isolation_issue": 9437,
+  "status": "protocol_authored_not_executed",
+  "time_unit": "microseconds",
+  "decision_deadline_us": 100,
+  "action_application_deadline_us": 120,
+  "compute_budget_native_units": 32,
+  "compute_blocks": [
+    4,
+    8,
+    16,
+    32
+  ],
+  "epsilon_regret_tolerance_ppm": 100000,
+  "candidate_visible_checkpoint_fields": [
+    "checkpoint_id_opaque",
+    "candidate_output_digest",
+    "candidate_action_proposal",
+    "candidate_estimated_regret",
+    "candidate_estimated_compute_value",
+    "native_work_so_far",
+    "wall_time_elapsed_us",
+    "observation_history_digest",
+    "candidate_state_digest",
+    "remaining_deadline_us"
+  ],
+  "evaluator_only_fields": [
+    "hidden_world_id",
+    "future_trajectory",
+    "checkpoint_future_correctness",
+    "realized_action_loss",
+    "oracle_regret",
+    "possible_continuation_outcomes"
+  ],
+  "policy_arms": [
+    "fixed_compute_4_8_16_32",
+    "fixed_wall_time",
+    "uniform_continuation",
+    "confidence_threshold",
+    "entropy_or_margin_threshold",
+    "checkpoint_stability_threshold",
+    "aera_style_adaptive_compute",
+    "constrained_lagrangian_compute",
+    "candidate_decision_value_of_computation",
+    "direct_fast_policy",
+    "evaluator_only_finite_continuation_oracle"
+  ],
+  "mechanisms": [
+    "early_exit",
+    "operator_boundary_preemption",
+    "sub_operator_or_full_preemption",
+    "transactional_temporal_solver_continuation",
+    "cancel_and_restart",
+    "alternate_solver"
+  ],
+  "cases": [
+    {
+      "id": "high_confidence_trap",
+      "checkpoint_profile": "confident_wrong_then_correct",
+      "expected": "continue_if_admissible_future_block_has_positive_predicted_value; evaluate using actual future regret only in evaluator"
+    },
+    {
+      "id": "low_confidence_decision_sufficient",
+      "checkpoint_profile": "low_confidence_common_action_within_epsilon",
+      "expected": "stop_for_current_decision_when_every plausible continuation preserves epsilon action envelope; keep external hard gates"
+    },
+    {
+      "id": "non_monotonic_checkpoint_quality",
+      "checkpoint_profile": "correct_then_wrong_then_correct",
+      "expected": "confidence/stability alone cannot be treated as correctness or future-value evidence"
+    },
+    {
+      "id": "overthinking_deadline",
+      "checkpoint_profile": "prediction_improves_but_action_arrives_after_deadline",
+      "expected": "earlier admissible action wins at application state if late proposal expired"
+    },
+    {
+      "id": "prediction_only_improvement",
+      "checkpoint_profile": "forecast_error_reduces_action_regret_unchanged",
+      "expected": "no decision-value credit solely for prediction metric improvement"
+    },
+    {
+      "id": "dynamic_world_reversal",
+      "checkpoint_profile": "action_valid_at_compute_start_invalid_at_application",
+      "expected": "score state and admissibility at application time"
+    },
+    {
+      "id": "safe_anytime_proposal",
+      "checkpoint_profile": "valid_intermediate_then_refined_proposal",
+      "expected": "first proposal remains an independent applied decision; later action only supersedes prospectively"
+    },
+    {
+      "id": "contention_and_input_invalidation",
+      "checkpoint_profile": "compute_latency_spike_or_input_revision",
+      "expected": "fail_closed_fallback_or_owner-approved_restart; no stale continuation acceptance"
+    },
+    {
+      "id": "future_leakage_negative_control",
+      "checkpoint_profile": "opaque_id_order_seed_and_future_suffix_permutation",
+      "expected": "candidate action invariant under nuisance relabeling and identical authorized prefixes"
+    },
+    {
+      "id": "redundant_cognition",
+      "checkpoint_profile": "more_compute_but_same_epsilon_action_envelope",
+      "expected": "no decision-value reward for representational change with no action/regret effect"
+    }
+  ],
+  "authored_tests": 0,
+  "executed_tests": 0,
+  "benchmark_runs": 0,
+  "hardware_energy_measurements": 0,
+  "claims": {
+    "sota_improvement": false,
+    "universal_optimal_stopping": false,
+    "physical_energy_advantage": false,
+    "deployment_qualification": false
+  },
+  "golden_regret_controls": [
+    {
+      "id": "compute_resolves_opposed_actions",
+      "epsilon_regret_ppm": 0,
+      "worlds": [
+        {
+          "id": "w1",
+          "loss": {
+            "left": 0,
+            "right": 1000000
+          }
+        },
+        {
+          "id": "w2",
+          "loss": {
+            "left": 1000000,
+            "right": 0
+          }
+        }
+      ],
+      "before_information_sets": [
+        [
+          "w1",
+          "w2"
+        ]
+      ],
+      "after_information_sets": [
+        [
+          "w1"
+        ],
+        [
+          "w2"
+        ]
+      ],
+      "expected": {
+        "before_minimax_regret_ppm": 1000000,
+        "after_worst_case_minimax_regret_ppm": 0,
+        "guaranteed_regret_reduction_ppm": 1000000,
+        "before_epsilon_sufficient": false,
+        "after_epsilon_sufficient": true
+      }
+    },
+    {
+      "id": "more_confidence_no_decision_value",
+      "epsilon_regret_ppm": 0,
+      "worlds": [
+        {
+          "id": "w1",
+          "loss": {
+            "continue": 0,
+            "stop": 100000
+          }
+        },
+        {
+          "id": "w2",
+          "loss": {
+            "continue": 0,
+            "stop": 200000
+          }
+        }
+      ],
+      "before_information_sets": [
+        [
+          "w1",
+          "w2"
+        ]
+      ],
+      "after_information_sets": [
+        [
+          "w1"
+        ],
+        [
+          "w2"
+        ]
+      ],
+      "expected": {
+        "before_minimax_regret_ppm": 0,
+        "after_worst_case_minimax_regret_ppm": 0,
+        "guaranteed_regret_reduction_ppm": 0,
+        "before_epsilon_sufficient": true,
+        "after_epsilon_sufficient": true
+      }
+    },
+    {
+      "id": "late_compute_checkpoint",
+      "epsilon_regret_ppm": 0,
+      "deadline_us": 100,
+      "checkpoint_available_at_us": 101,
+      "worlds": [
+        {
+          "id": "w1",
+          "loss": {
+            "left": 0,
+            "right": 1000000
+          }
+        },
+        {
+          "id": "w2",
+          "loss": {
+            "left": 1000000,
+            "right": 0
+          }
+        }
+      ],
+      "before_information_sets": [
+        [
+          "w1",
+          "w2"
+        ]
+      ],
+      "after_information_sets": [
+        [
+          "w1",
+          "w2"
+        ]
+      ],
+      "expected": {
+        "before_minimax_regret_ppm": 1000000,
+        "after_worst_case_minimax_regret_ppm": 1000000,
+        "guaranteed_regret_reduction_ppm": 0,
+        "before_epsilon_sufficient": false,
+        "after_epsilon_sufficient": false,
+        "visible_checkpoint": "no_result_by_decision_deadline"
+      }
+    },
+    {
+      "id": "epsilon_sufficient_without_exact_identifiability",
+      "epsilon_regret_ppm": 100000,
+      "worlds": [
+        {
+          "id": "w1",
+          "loss": {
+            "left": 0,
+            "right": 100000
+          }
+        },
+        {
+          "id": "w2",
+          "loss": {
+            "left": 100000,
+            "right": 0
+          }
+        }
+      ],
+      "before_information_sets": [
+        [
+          "w1",
+          "w2"
+        ]
+      ],
+      "after_information_sets": [
+        [
+          "w1",
+          "w2"
+        ]
+      ],
+      "expected": {
+        "before_minimax_regret_ppm": 100000,
+        "after_worst_case_minimax_regret_ppm": 100000,
+        "guaranteed_regret_reduction_ppm": 0,
+        "before_epsilon_sufficient": true,
+        "after_epsilon_sufficient": true,
+        "exact_common_optimal_action": false
+      }
+    }
+  ]
+}
