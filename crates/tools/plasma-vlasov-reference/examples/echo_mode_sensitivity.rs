@@ -17,7 +17,6 @@ const NV: usize = 128;
 const DT: f64 = 0.02;
 const FIRST_MODE: usize = 1;
 const SECOND_MODE: usize = 2;
-const FIRST_TIME: f64 = 0.0;
 const SECOND_TIME: f64 = 2.0;
 const OBSERVATION_TIME: f64 = 7.2;
 const INITIAL_AMPLITUDE: f64 = 1.0e-3;
