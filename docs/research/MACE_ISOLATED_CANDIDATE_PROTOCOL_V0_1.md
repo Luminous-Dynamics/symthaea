@@ -99,7 +99,7 @@ Not established:
 2. **Isolation:** a Cargo package is not an OS security boundary. The next process-integration increment must use default-deny filesystem and network, dedicated UID/namespaces, bounded CPU/memory/pids/FDs, read-only runtime and no evaluator mounts. Then qualify Firecracker or gVisor (or an equivalently strong isolated runner) using negative controls.
 3. **Evaluator custody:** the evaluator remains public and co-located in the current runner. An independent custodian must own hidden labels and intervention plans and expose a one-way task envelope.
 4. **Receipt authenticity:** output hashes are self-reported. The custodian must sign or independently attest the candidate artifact digest, request digest, evaluator/data/split/scoring digests and measured resource envelope.
-5. **Resource accounting:** `latency_ns` is process-local candidate execution time. It excludes orchestration, IPC, ingress verification, evaluator, memory write/update, tokenization, model calls and external environment work. Report end-to-end p50/p95/p99 and all-in compute, energy, storage and money separately.
+5. **Resource accounting:** `latency_ns` currently measures the candidate retrieval/policy call only; it excludes envelope parsing/validation, input hashing, receipt serialization, process launch, IPC, ingress verification, evaluator, memory write/update, tokenization, model calls and external environment work. Report end-to-end p50/p95/p99 and all-in compute, energy, storage and money separately.
 6. **Runtime verification:** JSON schemas and parser tests are authored, but no Rust compilation, test execution or sandbox negative-control execution is claimed here.
 
 ## Required next boundary: evaluator-to-candidate IPC
