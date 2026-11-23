@@ -223,12 +223,29 @@ Report denominators, missingness, assay failure, confidence intervals, effect si
 
 **Competitive recommendation:** do not rebuild the viewers or claim superior segmentation. Integrate with arivis, Imaris and SNT, preserve foreign object IDs and their provenance, and compete on a different axis: alternative graph hypotheses, source-bound evidence, explicit information loss, model-adequacy/abstention, decision-value acquisition, counterfactual resilience and independent functional/interventional qualification.
 
-### Independent biological evidence
+### Independent biological evidence and accessible benchmark artifacts
 
-- The 2025 plant–fungal trade study linked ~100,000 cytoplasmic-flow trajectories to a growing network with >500,000 tracked nodes: https://doi.org/10.1038/s41586-025-08614-x. It reports simultaneous antiparallel particle streams within individual hyphae and time/space variation. Its Petri-plate network is constrained to 2D growth, so it is a valuable dynamic benchmark rather than full 3D soil truth.
-- The 2026 AM-fungal study reports ~25,000 flow trajectories from 5,000 videos; its data are available upon request, so ingestion requires author permission: https://doi.org/10.1016/j.funbio.2026.101775.
-- The 2026 *Agaricus bisporus* stable-isotope study provides source-to-sink uptake measurements conditioned by colonization time, substrate depletion and network architecture: https://doi.org/10.1111/1462-2920.70345.
-- The 21 September 2026 Hyphal Highways Device study provides a distinct bacterial-dispersal assay along *Pythium* hyphae under unsaturated conditions and demonstrates the role of liquid movement: https://doi.org/10.1093/femsml/uqag035.
+The data-access and adapter work is tracked separately in [#13425 — rights-aware benchmark registry](https://github.com/Luminous-Dynamics/symthaea/issues/13425). The following dataset families are not interchangeable.
+
+1. **2D reconstruction — Sten et al. 2024.** Paper: https://doi.org/10.1016/j.ecoinf.2024.102670. Public code/data repository: https://gitlab.iit.it/oscar.sten/mycelium-network-analysis-tool. The paper reports 135 real images, filament detection F1 0.88–0.94 and crossing F1 0.89. The repository states that selected branch/crossing cases require manual visual adjudication/correction. Reproduce that protocol explicitly; do not compare an automated-only score to their corrected score without reporting the distinction. The repository's permissive software license must not be assumed to license all third-party source images.
+
+2. **3D z-stack reconstruction and synthetic geometry — Sten et al. 2025.** Paper: https://doi.org/10.1016/j.ecoinf.2025.103317. Code/data package: https://doi.org/10.5281/zenodo.15382388. The record describes *Rhizophagus irregularis* z-stacks, overlap annotations, time-lapse images and 3D-printed filament prototypes. The paper's 0.91–0.92 overlap F1 is based on six manually annotated real fungal images; physical 3D-printed prototypes are a separate known-geometry task. File-level image rights require auditing: the record identifies some subcollections as copyrighted by Cardini et al. (2020) or Oscar Sten. The software package license is not a blanket license for every embedded image.
+
+3. **Dynamic topology and bidirectional cytoplasmic flow — 2025 Nature plant–fungal trade.** Paper: https://doi.org/10.1038/s41586-025-08614-x. Source data for the main analysis and figures: https://doi.org/10.6084/M9.FIGSHARE.27889143. Analysis code is available under MIT at https://github.com/Cocopyth/AMFTravellingWave. The study links ~100,000 flow trajectories to >500,000 tracked nodes across three AM fungal strains. It reports bidirectional/antiparallel streams. The plate-based growth geometry is 2D, so this is a high-value dynamic/functional benchmark, not full 3D soil-network ground truth. Audit per-artifact data terms before redistribution.
+
+4. **Host-independent AM-fungal flow — 2026 *Fungal Biology*.** Paper: https://doi.org/10.1016/j.funbio.2026.101775. It reports 5,000 videos and ~25,000 trajectories across two *Rhizophagus irregularis* strains. The article's data statement is “all data available upon request”; this is a collaboration/request-only benchmark, not an assumed open download.
+
+5. **Isotope source-to-sink transfer — 2026 *Agaricus bisporus*.** Paper: https://doi.org/10.1111/1462-2920.70345. Raw data: https://doi.org/10.6084/m9.figshare.30818828. The article treats a cultivation box, not each mushroom, as the experimental unit in treatment analyses. Mushrooms within the same box/flush can have strongly heterogeneous tracer uptake, so all mushrooms from a box must remain in the same split. The raw-data artifact's own license/redistribution terms must be recorded separately from the article's CC BY license.
+
+6. **Bacterial dispersal along hyphae — 2026 Hyphal Highways Device.** Paper: https://doi.org/10.1093/femsml/uqag035. Data: https://doi.org/10.5281/zenodo.20071448; semiautomated analysis macros are included in the supplement. The article reports bacterial outlet CFUs in only 4 of 8 co-inoculated devices. Preserve non-arrival and assay outcomes instead of conditioning the benchmark on success. This is bacterial dispersal along *Pythium ultimum* hyphae under unsaturated conditions, not intracellular fungal flow.
+
+**Benchmark consequence:** use separate task cards and metrics:
+- reconstruction: filament/crossing detection, false-fusion rate, graph-event calibration and geometric error;
+- dynamic flow: forward and reverse speed distributions, event timing and temporal graph prediction;
+- isotope: per-sink tracer uptake, source attribution, depletion and arrival/recovery;
+- hyphal highways: bacterial arrival probability/time, along-channel signal and CFU recovery with censoring.
+
+No random frame/crop/trajectory/mushroom split may cross its independent biological unit (replicate, cultivation box or device/culture run). Keep source artifacts immutable; only build adapters after file-level rights and provenance are checked. This distinction is the point of [#13425](https://github.com/Luminous-Dynamics/symthaea/issues/13425).
 
 ### Interchange and OME-NGFF status
 
