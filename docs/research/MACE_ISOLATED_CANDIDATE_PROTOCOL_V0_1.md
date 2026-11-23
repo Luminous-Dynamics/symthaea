@@ -78,7 +78,7 @@ cargo test --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml \
 
 The program reads the envelope from stdin. Capture stdout as the candidate receipt and stderr as diagnostic output. Do not combine the candidate's stdout with evaluator output or let candidate code read evaluator paths.
 
-The benchmark evaluator has **not yet been rewired** to launch this process. The current paired runner still performs candidate execution and hidden-label scoring inside the public evaluator package. Until the runner is changed and the process boundary is verified, existing paired results remain diagnostic-only.
+The paired evaluator has since been wired in source to launch the candidate worker for exact-scope scan and typed-content HDC; see the evaluator subprocess integration section below. The evaluator and synthetic truth/fixture generator remain public and co-located, and three legacy baselines remain in-process. No runtime execution has been verified, so all current paired results remain diagnostic-only.
 
 ## Security properties of this increment
 
@@ -96,22 +96,22 @@ Implemented in source/schema:
 Not established:
 
 1. **Authenticity:** source-root SHA-256 digests identify roots but do not authenticate issuers. The booleans for trusted/retracted/reconciled status are inputs. Production admission must derive them from an independently verified Mycelix/ingress receipt, not trust caller-supplied flags.
-2. **Isolation:** a Cargo package is not an OS security boundary. The next process-integration increment must use default-deny filesystem and network, dedicated UID/namespaces, bounded CPU/memory/pids/FDs, read-only runtime and no evaluator mounts. Then qualify Firecracker or gVisor (or an equivalently strong isolated runner) using negative controls.
+2. **Isolation:** a child process under the same OS identity is not an OS security boundary. The next increment must use default-deny filesystem and network, dedicated UID/namespaces, bounded CPU/memory/pids/FDs, read-only runtime and no evaluator mounts. Then qualify Firecracker or gVisor (or an equivalently strong isolated runner) using negative controls.
 3. **Evaluator custody:** the evaluator remains public and co-located in the current runner. An independent custodian must own hidden labels and intervention plans and expose a one-way task envelope.
 4. **Receipt authenticity:** output hashes are self-reported. The custodian must sign or independently attest the candidate artifact digest, request digest, evaluator/data/split/scoring digests and measured resource envelope.
-5. **Resource accounting:** `latency_ns` currently measures the candidate retrieval/policy call only; it excludes envelope parsing/validation, input hashing, receipt serialization, process launch, IPC, ingress verification, evaluator, memory write/update, tokenization, model calls and external environment work. Report end-to-end p50/p95/p99 and all-in compute, energy, storage and money separately.
+5. **Resource accounting:** `latency_ns` measures candidate retrieval/policy work. The parent separately records request construction, request/response wall time, receipt validation and parent-side end-to-end invocation; process startup is recorded once per worker (and repeated in rows for correlation). The current end-to-end field excludes worker startup, ingress verification, evaluator work, memory write/update, external model calls and the rest of the environment loop. Report end-to-end p50/p95/p99 and all-in compute, energy, storage and money separately.
 6. **Runtime verification:** JSON schemas and parser tests are authored, but no Rust compilation, test execution or sandbox negative-control execution is claimed here.
 
-## Required next boundary: evaluator-to-candidate IPC
+## Required next boundary: sandboxing, evaluator custody and replay
 
-The next engineering increment should replace the evaluator's in-process `run_candidate` calls with a process client:
+The next engineering increment is to qualify the subprocess with a real OS sandbox and split evaluator custody:
 
-1. Custodian freezes the task/evidence envelope and hidden intervention metadata independently.
-2. The process launcher pins the candidate binary and dependency digest, passes one envelope over stdin, captures bounded stdout/stderr and enforces a hard deadline.
-3. The candidate process has no evaluator mount, network route, mutable shared directory, evaluator environment variable or secret seed.
-4. The custodian validates receipt schema, request digest, nonce, observation identity, decision support IDs and resource telemetry.
-5. Only the evaluator joins the accepted receipt to the sealed outcome/intervention record and computes regret/utility.
-6. A replay tool reproduces scoring from signed receipts without executing candidate source.
+1. Put candidate execution in a default-deny sandbox with no evaluator mounts, network route, shared writable directory, evaluator environment variable or secret seed; apply CPU/memory/pid/FD/deadline limits.
+2. Keep hidden outcomes, intervention labels, scoring and held-out seeds in a separately operated evaluator custodian that sends one-way candidate envelopes.
+3. Bind the candidate binary, dependency tree, request, evaluator/data/split/scoring revisions and sandbox resource envelope into authenticated receipts.
+4. Validate receipt schema, request digest, nonce, observation identity, both retrieved and decision-support IDs, process timing and resource telemetry.
+5. Independently replay scores from sealed evaluator data and receipts without executing candidate source.
+6. Keep legacy in-process baselines as explicitly diagnostic comparisons until detached equivalents exist; do not silently pool execution boundaries.
 
 Negative controls must prove that mutating evaluator truth, permuting intervention IDs, changing scoring labels or altering hidden seeds leaves candidate request bytes and output unchanged; candidate attempts to read evaluator files, environment, mounts, sockets or network must fail closed. Altering the candidate binary or dependencies after qualification invalidates prior receipts.
 
