@@ -968,6 +968,16 @@ mod tests {
     }
 
     #[test]
+    fn evaluator_rejects_a_resealed_but_false_inclusion_probability() {
+        let episode =
+            generate_synthetic_fab_episode_v1(&config(SyntheticFabRegimeV1::Stable, 27)).unwrap();
+        let mut selection = fake_selection(&episode);
+        selection.rows[0].inclusion_probability = 0.5;
+        seal_selection_for_test(&mut selection);
+        assert!(evaluate_synthetic_metrology_policy_v1(&episode, &selection).is_err());
+    }
+
+    #[test]
     fn structural_sensor_absence_is_not_encoded_as_communication_loss() {
         let episode = generate_synthetic_fab_episode_v1(&config(
             SyntheticFabRegimeV1::CorrelatedSensorOutage,
