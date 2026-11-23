@@ -2239,6 +2239,9 @@ fn is_sha256_hex(value: &str) -> bool {
 pub const KIRD_SYNTHETIC_FIXTURE: &str = include_str!(
     "../../../../benchmarks/plasma/rate-distortion/fixtures/synthetic-kird-point-v0.1.json"
 );
+pub const KIRD_SYNTHETIC_CERTIFIED_FIXTURE: &str = include_str!(
+    "../../../../benchmarks/plasma/rate-distortion/fixtures/synthetic-kird-certified-cover-v0.1.json"
+);
 
 /// Checked-in KIRD JSON Schema. Consumers should still run a Draft 2020-12
 /// validator; this constant makes the exact source available to integration tests.
@@ -2258,38 +2261,8 @@ mod tests {
     }
 
     fn certified_kird_value() -> serde_json::Value {
-        let mut value: serde_json::Value =
-            serde_json::from_str(KIRD_SYNTHETIC_FIXTURE).unwrap();
-        value["response_scope"]["coverage_kind"] = serde_json::json!("certified_global");
-        value["response_scope"]["registered_probe_count"] = serde_json::json!(5);
-        value["response_scope"]["confirmed_probe_count"] = serde_json::json!(5);
-        value["response_scope"]["globally_bounded"] = serde_json::json!(true);
-        value["response_scope"]["bound_method"] =
-            serde_json::json!("validated-interval-derivative-bound-v1");
-        value["response_scope"]["bound_evidence_sha256"] =
-            serde_json::json!("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
-        value["response_scope"]["coverage_metric_id"] =
-            serde_json::json!("normalized-response-max-v1");
-        value["response_scope"]["covering_radius"] = serde_json::json!(0.1);
-        value["response_scope"]["verified_lipschitz_constant"] = serde_json::json!(2.0);
-        value["response_scope"]["reference_uncertainty"] = serde_json::json!(0.01);
-        value["response_scope"]["candidate_uncertainty"] = serde_json::json!(0.02);
-        value["response_scope"]["measurement_uncertainty"] = serde_json::json!(0.02);
-        value["response_scope"]["maximum_sampled_normalized_error"] = serde_json::json!(0.5);
-        value["response_scope"]["global_normalized_error_bound"] = serde_json::json!(0.75);
-        value["response_scope"]["covering_set_sha256"] =
-            serde_json::json!("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
-        value["response_scope"]["branch_association_stable"] = serde_json::json!(true);
-        value["response_scope"]["branch_stability_evidence_sha256"] =
-            serde_json::json!("cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc");
-        value["response_scope"]["independent_checker_revision"] =
-            serde_json::json!("kird-checker-v0.1.0");
-        value["distortion"]["intervention_response"]["status"] = serde_json::json!("PASS");
-        value["distortion"]["intervention_response"]["worst_confirmed_normalized_error"] =
-            serde_json::json!(0.5);
-        value["distortion"]["intervention_response"]["evidence_sha256"] =
-            serde_json::json!("dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd");
-        value
+        serde_json::from_str(KIRD_SYNTHETIC_CERTIFIED_FIXTURE)
+            .expect("synthetic certified cover fixture must be valid JSON")
     }
 
     fn parse_value(value: &serde_json::Value) -> Result<PulseFamilyContract, ContractError> {
