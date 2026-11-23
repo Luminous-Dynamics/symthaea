@@ -369,23 +369,38 @@ impl fmt::Display for CausalPairingError {
                 formatter,
                 "arm {arm:?} action applied at {action_applied_at_us} before decision at {decision_at_us} microseconds"
             ),
-            Self::EvidenceAvailableAfterDelivery { arm, event_id_sha256 } => write!(
+            Self::EvidenceAvailableAfterDelivery {
+                arm,
+                event_id_sha256,
+            } => write!(
                 formatter,
                 "arm {arm:?} evidence {event_id_sha256:02x?} was delivered before it became available"
             ),
-            Self::EvidenceDeliveredAfterDecision { arm, event_id_sha256 } => write!(
+            Self::EvidenceDeliveredAfterDecision {
+                arm,
+                event_id_sha256,
+            } => write!(
                 formatter,
                 "arm {arm:?} evidence {event_id_sha256:02x?} was delivered after the decision"
             ),
-            Self::DuplicateEvidenceDelivery { arm, event_id_sha256 } => write!(
+            Self::DuplicateEvidenceDelivery {
+                arm,
+                event_id_sha256,
+            } => write!(
                 formatter,
                 "arm {arm:?} evidence {event_id_sha256:02x?} was delivered more than once"
             ),
-            Self::DuplicateConsumedEvidence { arm, event_id_sha256 } => write!(
+            Self::DuplicateConsumedEvidence {
+                arm,
+                event_id_sha256,
+            } => write!(
                 formatter,
                 "arm {arm:?} decision references evidence {event_id_sha256:02x?} more than once"
             ),
-            Self::ConsumedEvidenceNotDelivered { arm, event_id_sha256 } => write!(
+            Self::ConsumedEvidenceNotDelivered {
+                arm,
+                event_id_sha256,
+            } => write!(
                 formatter,
                 "arm {arm:?} consumed evidence {event_id_sha256:02x?} outside its delivered prefix"
             ),
