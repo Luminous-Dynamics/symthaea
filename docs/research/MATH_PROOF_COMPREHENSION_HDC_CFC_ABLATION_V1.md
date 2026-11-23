@@ -78,3 +78,7 @@ If HDC/CfC do not beat matched baselines, retain the negative result and do not 
 4. Per-task/per-family results and uncertainty.
 5. Error analysis separating identity failure, role confusion, missing side conditions, sequence errors and invalid inference.
 6. Decision record: integrate, retain as experimental, or reject each component.
+
+## 8. Additional mandatory transformation baseline (2026-11-24)
+
+Use the expert-authored equivalent-reformulation controls from [MathAdv](https://arxiv.org/abs/2608.25449) as an adjacent baseline. Keep its equivalent presentation transformations separate from our semantic mutations: alpha-renaming/reordering/equivalent rewrites should preserve semantic disposition, while changed domains, removed assumptions, reversed warrants and changed definitions should trigger their appropriate changed/unknown dispositions. Report invariance and mutation sensitivity separately; a model that is invariant to every change is just as defective as one that changes under harmless renaming.

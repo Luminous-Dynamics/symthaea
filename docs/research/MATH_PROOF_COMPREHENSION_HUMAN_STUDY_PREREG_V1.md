@@ -176,3 +176,9 @@ Add two independent experimental tracks:
 Report whether the proof plan helps, harms or has no detectable effect on each outcome. Do not assume a positive teaching effect transfers to theorem-proving performance, or vice versa.
 
 The machine baselines should include ProofGrid's proof writing/checking/masking/gap-filling and first-failure localization, plus generative verifier prompt-sensitivity/calibration controls from [Mahdavi et al. (ICML 2026)](https://proceedings.mlr.press/v306/mahdavi26a.html). No LLM judge should authorize a formal verdict.
+
+## 18. Interactive formal-exploration comparator and delayed-transfer distinction (2026-11-24)
+
+The study design now treats *Explorable Proofs* (UIST 2026, Kambhamettu et al., arXiv:2604.02598) as an adjacent benchmark rather than an unstudied novelty claim. That system links written proofs to generated Lean proofs, exposes worked examples, proof states and dependency traces, and reports an n=16 lab study with better proof descriptions than a chatbot baseline. Its authors explicitly identify remaining uncertainty around AI translation mismatch, longer/research-level proofs, retention and transfer to new problems.
+
+Where the implementation and task assets can be reproduced, add an interactive-formal-exploration arm as a comparator to the evidence-linked proof-plan arm. If it cannot be reproduced, report it as a non-comparable published baseline, not as a missing result. The confirmatory endpoint remains delayed near-transfer accuracy; immediate proof-reading comprehension is a separate secondary outcome. Any interactive interface must expose source/statement identity and allow the reader to inspect the exact proof state and counterexample provenance.

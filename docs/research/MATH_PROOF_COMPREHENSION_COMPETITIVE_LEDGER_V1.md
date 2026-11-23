@@ -452,3 +452,36 @@ The 64 library tests include canonical preimage hashing, local/global scope and 
 **Claim ceiling:** The local/global 1/1 score is synthetic arithmetic only. The two reviewer IDs in the fixture are stipulated records, not real independent mathematicians. No model-produced CIRR, Lean kernel replay of the And.comm plan, expert proof-plan gold set, participant recruitment, or human delayed-transfer result has been produced.
 
 The focused run's sibling workflows (general CI, PR Governance, Benchmark Suite, Workflow Syntax and Showroom Integrity) were skipped because the PR remains a draft; they are not claimed as passes. A subsequent documentation-only benchmark-target revision followed this tested code head; a final exact-head focused rerun is requested separately.
+
+## 16. Interactive comprehension and diagnostic reformulation baselines (2026-11-24)
+
+### Explorable Proofs: immediate comprehension is already studied
+
+Kambhamettu et al., *Making Written Theorems Explorable by Grounding Them in Formal Representations* (UIST 2026; [paper](https://arxiv.org/abs/2604.02598)), links a written proof with a generated Lean proof, extracts intermediate states, provides worked examples, supports custom examples/counterexamples and traces dependencies. Its n=16 lab study found better, more correct and more detailed proof descriptions than a chatbot baseline.
+
+This rules out any claim that formal-backed interactive proof exploration is itself new. The paper also states concrete limitations: generated Lean can diverge structurally from the written proof, LLM mistranslation can present incorrect worked mathematics with undue authority, the study used relatively short proofs and undergraduate CS students, and it did not measure retention, transfer or independent proof construction. Those gaps motivate Symthaea's stricter identity/translation receipts, hidden semantic controls, plan-role validation and delayed transfer—but these must be measured before any superiority claim.
+
+### MathAdv: reformulation robustness is a required baseline
+
+[MathAdv](https://arxiv.org/abs/2608.25449) spans 13 undergraduate and graduate mathematics domains and combines Lean proving with knowledge, informal-reasoning and expert-authored equivalent-reformulation tasks. Our transformation suite must reuse its lessons: equivalence-preserving statement rewrites are distinct from semantic changes, and aggregate proving accuracy hides formalization and domain bottlenecks.
+
+### ProofRank and ProofOptimizer: quality/compression are mature axes
+
+[ProofRank](https://arxiv.org/abs/2605.10379) evaluates conciseness, computational ease, cognitive simplicity, diversity and adaptivity over 382 competition tasks. [ProofOptimizer](https://proceedings.iclr.cc/paper_files/paper/2026/hash/60917970c4257e50aff60d1d7bde2edf-Abstract-Conference.html) reports substantial automated proof-size reductions on miniF2F, PutnamBench and IMO proof sets. We therefore should not position proof compression or a generic "quality score" as novelty. Our proposed Minimum Sufficient Explanation objective is compression constrained by theorem/assumption fidelity and human delayed-transfer non-inferiority.
+
+### Current Mathlib retrieval reference requires a second matched cohort
+
+The [Legendre leaderboard](https://www.legendre-leaderboard.com/) runs multiple search engines against a common set of 894 resolved MathlibQR queries (out of 946 possible query slots). It reports Lean Finder v2 at Recall@10 89.4%, Recall@100 97.3% and nDCG@10 0.725. The leaderboard also documents the 11 gold declarations absent at its pinned corpus revision; unresolved queries are not scored as misses. These 894 queries are not the 810-query fair subset used in the LeanGraphSearch paper, so the figures cannot be interchanged. Symthaea needs separate, same-query reruns against Lean Finder v2 and LeanGraphSearch.
+
+### Updated research differentiation
+
+The best opportunity is a *proof-comprehension reliability benchmark*, not another explorable interface:
+
+- formal statement identity with hidden theorem-sandwich and successor-test controls;
+- a proof-plan graph validated against typed source evidence and expert mathematical roles;
+- counterfactual predictions with checked witnesses, including minimum-support witnesses in the finite propositional tier;
+- local-to-global warrant consistency under immutable semantic scope;
+- source-linked explanations with formal fact / interpretation / analogy / unknown claim types;
+- a human study whose primary endpoint is delayed transfer and whose baselines include raw source, generic explanation and an interactive formally-backed explorable proof arm where reproducible.
+
+The study must separate immediate interface comprehension from durable learning. Existing n=16 evidence is a valuable pilot baseline, not a substitute for a powered replication on held-out theorem families.

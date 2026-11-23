@@ -161,3 +161,47 @@ Those are falsifiable contributions. A graph with more nodes, a higher embedding
 ### HDC / CfC ablations
 
 The proof-comprehension programme has a dedicated HDC/CfC ablation protocol in [MATH_PROOF_COMPREHENSION_HDC_CFC_ABLATION_V1.md](MATH_PROOF_COMPREHENSION_HDC_CFC_ABLATION_V1.md) and issue [#13440](https://github.com/Luminous-Dynamics/symthaea/issues/13440). HDC is tested for role binding under renaming/compositional changes; CfC is tested for proof-state transition reconstruction; hybrid systems are compared against BM25, dense, LeanSearch v2, LeanGraphSearch/PPR and symbolic baselines under matched data/compute/resource budgets. These are hypotheses, not assumed advantages.
+
+## 9. Updated external baselines — interactive comprehension, reformulation, proof quality (2026-11-24)
+
+The novelty claim must account for work published by November 24, 2026. These systems overlap parts of the proposed capability; the table below narrows the differentiated claim rather than treating proof comprehension as an untouched field.
+
+| Work | Public result | What is already demonstrated | Required Symthaea comparison / remaining distinction |
+|---|---|---|---|
+| [Explorable Proofs](https://arxiv.org/abs/2604.02598), UIST 2026 | Lean-linked proof reading with worked examples, proof-state inspection and dependency tracing; lab study n=16 found better, more correct and more detailed proof descriptions than a chatbot baseline | Interactive, executable proof explanations can improve immediate proof-reading comprehension | Direct interface baseline where feasible. Extend evaluation to exact theorem/assumption receipts, checked counterfactual interventions, plan reconstruction, long/research-level proofs and delayed/cross-family transfer. The paper explicitly identifies AI translation mismatch, short-proof/undergraduate-sample limits and the absence of long-term retention/transfer measures |
+| [MathAdv](https://arxiv.org/abs/2608.25449) | 13 undergraduate/graduate domains; formal proving plus knowledge, informal reasoning and expert-authored equivalent reformulations | Multi-dimensional mathematical diagnosis and reformulation robustness are established benchmark dimensions | Reuse its transformation categories and holdout discipline. Add typed proof-plan evidence, local/global consistency and source-bound explanation claims |
+| [ProofRank](https://arxiv.org/abs/2605.10379) | 382 challenging competition tasks; conciseness, computational ease, cognitive simplicity, diversity and adaptivity | Proof quality is broader than correctness, and quality dimensions can trade off | Report the relevant quality proxies alongside—never instead of—expert plan fidelity and human transfer |
+| [ProofOptimizer](https://proceedings.iclr.cc/paper_files/paper/2026/hash/60917970c4257e50aff60d1d7bde2edf-Abstract-Conference.html) | Reported proof-length reductions of 87% on miniF2F, 57% on PutnamBench and 50% on Seed-Prover IMO 2025 proofs | Automated proof compression is already a strong capability | Do not compete on token/line reduction alone. Measure minimum-sufficient explanations at matched comprehension and delayed transfer; preserve assumptions, side conditions and source evidence |
+| [Legendre Mathlib search leaderboard](https://www.legendre-leaderboard.com/) | On its 894 resolved MathlibQR queries, Lean Finder v2 reports Recall@10 89.4%, Recall@100 97.3%, nDCG@10 0.725 | A stronger, current public retrieval reference than relying on older paper cutoffs alone | Add the exact 894-query benchmark as a separate mandatory replication. Do not compare its 97.3% directly with LeanGraphSearch's 94.7% on the distinct 810-query fair subset; run both systems on the same candidate pool and queries |
+ 
+### Updated retrieval targets
+
+Keep the distinct cohorts separate:
+
+| Cohort | Current public reference | Prospective Symthaea stretch target | Required match |
+|---|---:|---:|---|
+| MathlibQR 810-query fair subset | LeanGraphSearch Recall@100 94.7% | ≥96.0% Recall@100 | Same 810 queries, 171 shared declarations, same candidate pool and index timestamp |
+| Legendre 894 resolved queries | Lean Finder v2 R@10 89.4%, R@100 97.3%, nDCG@10 0.725 | ≥90.5% R@10, ≥98.0% R@100, ≥0.74 nDCG@10 | Same 894 queries, renderer, full-name gold resolution, candidate revision, and live-service/index snapshot; re-query the baseline as part of the experiment |
+| MathlibMPR complete proof routes | LeanGraphSearch Covered@20 42.8%, @50 44.2% | ≥45.0% @20, ≥47.0% @50 | Same annotated route groups and query split; full route coverage requires every premise group in at least one gold route |
+
+These are prospective targets. No Symthaea retrieval results on either MathlibQR retrieval cohort have been produced by the four-declaration extraction pilot.
+
+### Revised core claim
+
+The differentiated research contribution is not simply "explorable proofs" or "graphs explain proofs." It is a joined, auditable evaluation of:
+
+1. **Formal identity and statement fidelity:** exact source/toolchain/type/assumption identity, plus hidden theorem-sandwich and downstream-successor controls.
+2. **Evidence-bound proof-plan reconstruction:** reconstruct goal transformations, consumed warrants, side conditions, subgoals, invariants and alternative routes—not tactic names or a flat dependency list.
+3. **Intervention completeness:** predict the effect of assumption, definition, inference-direction and route-only mutations before consulting the oracle; distinguish theorem falsity from proof-route failure.
+4. **Cross-context consistency:** test whether a locally rejected invalid warrant returns as material global support under identical scope, with independent adjudication and unresolved-outcome bounds.
+5. **Human learning rather than interface fluency:** compare immediate comprehension, delayed near transfer and cross-family transfer; score false-fact rate and statement fidelity as hard gates.
+6. **Evidence-preserving compression:** optimize explanation length only subject to non-inferiority in delayed transfer and exact assumption/side-condition preservation.
+
+### Counterexample quality diagnostic
+
+For the bounded classical propositional tier, record three separate outcomes:
+- **witness validity:** every premise evaluates true and the conclusion false under the exact candidate sequent;
+- **support size:** number of true atoms relative to the declared all-false baseline;
+- **minimum-support gap:** emitted witness support size minus the oracle's minimum-support countermodel size.
+
+The minimum-support oracle is a deterministic witness-selection aid over at most 16 atoms, not a general measure of mathematical simplicity. For dependent types and non-propositional mathematics, use checker-backed witnesses or explicit unknown. This diagnostic should never replace semantic correctness or proof-plan validity.
