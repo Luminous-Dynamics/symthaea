@@ -97,7 +97,7 @@ Use proper predictive scores appropriate to the observation type:
 
 Posterior predictive checks are diagnostics, not proof of model truth. Prefer a held-out predictive check when the same data would otherwise be used both to fit and to assess the model.
 
-Reference: Talts et al., “Validating Bayesian Inference Algorithms with Simulation-Based Calibration” and the holdout predictive checks literature; in particular, Talts et al., “Holdout predictive checks for Bayesian model criticism,” JRSS B (2024), https://doi.org/10.1093/jrsssb/qkad105.
+Reference: Moran, Blei and Ranganath, “Holdout predictive checks for Bayesian model criticism,” Journal of the Royal Statistical Society: Series B (2024), https://doi.org/10.1093/jrsssb/qkad105. Their holdout predictive check compares posterior-predictive draws with an independent held-out population sample, addressing the data-reuse problem of ordinary posterior predictive checks.
 
 ## 5. Common-cause and dependent evidence
 
