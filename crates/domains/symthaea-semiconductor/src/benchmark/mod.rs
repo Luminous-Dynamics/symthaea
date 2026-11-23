@@ -32,10 +32,9 @@ pub use pair_manifest::{
     ContrastivePairManifestV1, PairManifestError, PairValidationReportV1, validate_pair_manifest_v1,
 };
 pub use vm_privacy_redteam::{
-    VM_PRIVACY_ATTACK_SCHEMA_V1, VM_PRIVACY_REPORT_SCHEMA_V1,
     PrivacyAttackStatusV1, SyntheticPrivacyRecordV1, UpdateVisibilityV1,
-    VmPrivacyAttackConfigV1, VmPrivacyAttackErrorV1, VmPrivacyAttackReportV1,
-    evaluate_vm_update_inversion_v1,
+    VM_PRIVACY_ATTACK_SCHEMA_V1, VM_PRIVACY_REPORT_SCHEMA_V1, VmPrivacyAttackConfigV1,
+    VmPrivacyAttackErrorV1, VmPrivacyAttackReportV1, evaluate_vm_update_inversion_v1,
 };
 
 pub use stratified_repeat::{
