@@ -42,9 +42,7 @@ impl EvidenceStatus {
             "PASS" => Ok(Self::Pass),
             "FAIL" => Ok(Self::Fail),
             "UNKNOWN" => Ok(Self::Unknown),
-            _ => Err(format!(
-                "{field} must be exactly PASS, FAIL, or UNKNOWN"
-            )),
+            _ => Err(format!("{field} must be exactly PASS, FAIL, or UNKNOWN")),
         }
     }
 
