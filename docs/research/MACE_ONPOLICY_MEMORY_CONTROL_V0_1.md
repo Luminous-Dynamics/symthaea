@@ -52,6 +52,23 @@ The current public repository snapshot exposes four directly comparable agent co
 | AWE | `configs/agent/awe-2-4-30.json` | `gpt-4.1-mini`; Milvus; `text-embedding-3-small`; `top_k=30`; LLM memory policy enabled |
 | RAG | `configs/agent/rag-2-4-30.json` | Same listed backend/model/top-k as AWE, with LLM memory policy disabled |
 
+### Published AMemGym reference scores and MACE targets
+
+The official AMemGym project page currently lists these memory-agent references under its published setup:
+
+| Agent | Overall score | Memory score |
+|---|---:|---:|
+| AWE-(2,4,30) | 0.434 | 0.296 |
+| Mem0-G | 0.426 | 0.284 |
+| RAG-(2,4,30) | 0.384 | 0.223 |
+| AWI | 0.353 | 0.177 |
+
+Source: https://agi-eval-official.github.io/amemgym/ (public results displayed 2026-11-23). The site states that these memory-agent comparisons use `gpt-4.1-mini` as the shared base LLM. These are AMemGym-specific normalized scores; they are not comparable to AML, LongMemEval, AMA-Bench or other benchmark percentages.
+
+**MACE prospective challenge:** first reproduce AWE-(2,4,30) and Mem0-G under the same dataset, simulator, model, metric and resource protocol. Then target at least **0.346 Memory Score** (five absolute points above the listed 0.296 AWE reference) while keeping Overall at least 0.434 and without worsening Write, Read or Utilization failures. A second target is a strictly better utility/cost Pareto point, such as at least 10% lower all-in lifecycle cost at non-inferior Memory Score. Treat these as stretch goals; the published figures must be revalidated under the exact pinned release before becoming confirmatory baselines.
+
+The AMemGym paper/project also reports that off-policy replay can change configuration rankings by up to three positions. Therefore, never optimize MACE against the off-policy result and assume that the selected memory policy remains optimal on-policy.
+
 Published baseline config blob SHAs at the inspected snapshot:
 
 - AWI: `e665b6ad3d87c423ace125318598fb785eb8cf28`
@@ -69,7 +86,7 @@ The released interaction generator (`src/amemgym/env/sample_interactions.py`, bl
 
 The overall runner (`src/amemgym/eval/overall.py`, blob `c185fad8847ff0d8545429af001c4d8058dd6829`) has distinct on-policy and off-policy paths. On-policy generates new sessions through the interactive simulator; off-policy loads saved interaction transcripts. They must be run and reported separately. The current metric list contains `accuracy`. When answer JSON parsing fails, the runner substitutes a random choice and records a `json_error` internally; the top-level metric file does not expose the format-error rate. Preserve official scores for exact reproduction, but additionally report malformed-response count/rate as a separate diagnostic and never let random fallback be mistaken for valid model output in MACE-specific scoring.
 
-The separate evolution runner can update the memory prompt after each period. Its code supports feedback types that include `with_answer`, which inserts the gold answer into evolution feedback. The published `complete.json` and `question-only.json` configs use different feedback modes, while `no-evolution.json` is a control. For MACE held-out evaluation, policy adaptation must be trained on training/calibration profiles only and frozen before held-out episodes; no held-out answer or evaluator label may enter adaptation feedback.
+The separate evolution runner can update the memory prompt after each period. Its feedback vocabulary includes `with_answer`, which inserts the gold answer into evolution feedback. **There is a source/configuration discrepancy to resolve before claiming exact reproduction:** at the inspected public repository snapshot, `configs/agent/awi-evolve/complete.json` sets `feedback_types` to `["vanilla"]`, while `collect_evolution_feedback` adds the gold `ground_truth` field only when `with_answer` is present. The official project page describes its Complete condition as including the ground-truth answer. Do not silently change the config or infer which artifact generated the published result; obtain the exact run config/code receipt or report a separate, clearly labelled `with_answer` ablation. The `question-only.json` config is a distinct feedback condition and `no-evolution.json` is a no-update control. For MACE held-out evaluation, policy adaptation must be trained on training/calibration profiles only and frozen before held-out episodes; no held-out answer or evaluator label may enter adaptation feedback.
 
 ### 2.2 MACE adapter requirements
 
