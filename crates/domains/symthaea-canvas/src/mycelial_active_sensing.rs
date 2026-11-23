@@ -21,7 +21,6 @@ use serde::{Deserialize, Serialize};
 use crate::mycelial_fusion_counterfactual::MycelialFusionCandidate;
 use crate::mycelial_graph_hypothesis_posterior::{
     MycelialGraphHypothesisPosterior, MycelialGraphHypothesisPosteriorError,
-    evaluate_mycelial_graph_hypothesis_posterior,
 };
 use crate::mycelial_reconstruction_metrics::AnnotatedMycelialSkeleton;
 
