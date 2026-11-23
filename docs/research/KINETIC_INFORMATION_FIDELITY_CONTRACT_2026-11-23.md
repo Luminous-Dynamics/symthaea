@@ -403,7 +403,7 @@ New companion programme: [#13416 — support-stable particle-measure normalizati
 
 The NEOPIC preprint (Muralikrishnan et al., arXiv:2610.40528) is an important particle-measure competitor: its operator acts directly on empirical particle measures, avoids grid deposition/aliasing in its field input, reports O(Np) evaluation and separates sampling, learning and time-stepping error contributions. Its Appendix A.1 explicitly notes that the implemented per-sample min–max coordinate normalization depends on extreme particles, is Lipschitz in the maximum particle displacement rather than the average displacement used in the main error argument, and introduces particle-count dependence of the sample bounding box not covered by the fixed-normalization analysis.
 
-The exact NEOPIC arXiv v1 code path is now inspected and pinned in [draft PR #13417](https://github.com/Luminous-Dynamics/symthaea/pull/13417): repository `srikrrish/operator_learning`, tag `neopic-arxiv-v1`, peeled commit `2cf6a15e0ddb6c408a4ef6d162c31faf1deb9431`, file `operator_learning/data/pic_dataset.py`, blob `dcb046656830dd8c5707e98bdd1d611c8376b412`. Its `normalize_per_sample` (lines 129–139) maps each unweighted sample to [0,1] using min/max over the particle-position axis, and the preprocessing applies that transform to each coordinate channel at lines 415–423.
+The exact NEOPIC arXiv v1 code path is pinned in [draft PR #13417](https://github.com/Luminous-Dynamics/symthaea/pull/13417): repository `srikrrish/operator_learning`, tag `neopic-arxiv-v1`, peeled commit `2cf6a15e0ddb6c408a4ef6d162c31faf1deb9431`, file `operator_learning/data/pic_dataset.py`, blob `dcb046656830dd8c5707e98bdd1d611c8376b412`. Its `normalize_per_sample` (lines 129–139) maps each unweighted sample to [0,1] using min/max over the particle-position axis, and the preprocessing applies it to each coordinate channel at lines 291–298. The paper writes the equivalent torus coordinate as `zeta=-pi+2*pi*xi` in [-pi,pi), and Appendix A.1 explains that the implementation uses `xi in [0,1]` with Fourier characters `exp(2*pi*i*k*xi)`. The same appendix notes that the learned linear lifting acts on `xi` itself rather than a periodic function, so seam-crossing can make the lifted feature discontinuous.
 
 Keep two tests separate: (A) the source-faithful unweighted sample-count/support perturbation; and (B) a weighted-measure extension where a negligible-mass extreme point changes the same position-only map because weights are ignored. The weighted extension is not the paper's native unweighted input interface. The tagged code's degenerate-support fallback sets the denominator to one, mapping a constant sample to zeros; the local Rust helper rejects degenerate support as UNKNOWN / unqualified. These are coordinate-map tests, not NEOPIC model-output or physical-simulation results.
 
@@ -412,6 +412,26 @@ This is a well-defined qualification opportunity, not a claim that NEOPIC's main
 Fixed-domain normalization is valid when physical domain and origin are known. Robust quantiles can reduce outlier sensitivity but may discard rare physical tails; any such tail loss must be measured and cannot silently become a successful representation change. #13416 owns this normalization stability experiment; #12952 retains source-faithful NEOPIC reproduction, and #12944 owns active selection of expensive kinetic runs.
 
 Source: [NEOPIC, arXiv:2610.40528](https://arxiv.org/abs/2610.40528), particularly §§4.2 and 5 and Appendix A.1.
+
+## Topology-aware particle lifting (TAPL)
+
+New companion programme: [#13447 — qualify topology-aware particle lifting and periodic seam equivariance](https://github.com/Luminous-Dynamics/symthaea/issues/13447).
+
+The NEOPIC paper's Appendix A.1 identifies a separate geometry issue from sample-support normalization: Fourier features are periodic on the normalized torus, but the position lifting is a linear map on `xi in [0,1]`, not a periodic function. The authors note that a particle crossing the seam can therefore change its lifted features discontinuously. This is a specific, testable limitation of the linear-lift design, not a claim that its field outputs fail.
+
+TAPL compares:
+- the source-faithful linear lift;
+- per-coordinate `[cos(2*pi*xi), sin(2*pi*xi)]` torus features;
+- bounded multi-harmonic Fourier-character lifts;
+- periodic splines / circular bases;
+- open-boundary coordinate-plus-boundary-distance lifts;
+- a boundary-conditioned hybrid that selects the lift from an explicit physical boundary contract.
+
+The benchmark must separate periodic from open / mixed boundary cohorts. Periodic lifts should be seam-continuous and translation-equivariant; open-boundary lifts must not wrap the two faces together. The target is physically topology-aware particle operators, not merely adding sinusoidal features to a neural network.
+
+The first fixtures are analytic seam continuity / derivative tests, global periodic translations, particle permutation, and exact split/merge equivalence. Only then compare trained field operators on Landau damping, two-stream, and open-boundary cohorts at matched architecture and compute budget.
+
+
 
 ## Kinetic Response Spectroscopy (KRS)
 
@@ -456,7 +476,7 @@ R_{\rm KIRD}(\epsilon;\mathcal U,\mathcal Q,T)
 \mathrm{bits}(\mathrm{serialize}(\hat f)),
 \]
 
-subject to all applicable physical-admissibility gates. The distortion is the task-conditioned future-response discrepancy defined above, not merely present-state reconstruction error.
+subject to all applicable physical-admissibility and structure-preservation gates. The distortion is the task-conditioned future-response discrepancy defined above, not merely present-state reconstruction error. A representation point is admissible only when its response gate and its relevant Hamiltonian / Poisson / invariant gates both pass; see #13448.
 
 Prior art is important:
 - Tulpule & Vaidya (2021), [Information-Theoretic Approach for Model Reduction Over Finite Time Horizon](https://arxiv.org/abs/2111.12539), develop finite-step KL-rate / information-transfer ideas for dynamical-system model reduction.
@@ -519,6 +539,24 @@ RBKR must be tested against:
 The nonlinear extension must separately qualify tangent response, signed finite-amplitude response, second-order cross-pulse effects and finite pulse-graph branch association. A tangent Gramian cannot be assumed to capture nonlinear echo creation.
 
 Success means greater held-out intervention-response fidelity per retained byte/rank at matched total construction and simulation cost, without worsening mandatory physical gates. It does not mean a good singular-value capture plot, nor does it imply a universal nonlinear error bound.
+
+## Hamiltonian response-balanced kinetic reduction (HRBKR)
+
+New structural extension: [#13448 — combine response-balanced reduction with Hamiltonian structure preservation](https://github.com/Luminous-Dynamics/symthaea/issues/13448).
+
+The RBKR objective must not select future-response directions and then ignore whether the reduced evolution preserves the physical geometric structure. HRBKR makes response fidelity a constrained objective under Hamiltonian / Poisson-preserving projection, adaptive rank and qualified chart transitions.
+
+The initial benchmark uses a source-pinned finite-dimensional canonical particle Hamiltonian reference. For \(\dot z=J\nabla H(z)\), a reduced basis \(V\) must satisfy \(V^TJV=J_r\) and the reduced vector field must be derived consistently from the reduced Hamiltonian. For Eulerian Vlasov dynamics, the noncanonical Poisson bracket and selected Casimirs must be treated explicitly; a canonical symplectic constraint must not be applied by analogy. For collisional Vlasov–Poisson–Landau, qualify the correct metriplectic / discrete-gradient energy and entropy-production laws rather than claiming a conservative symplectic system.
+
+Prior art makes this a synthesis and extension, not a claim that geometric MOR is new:
+- Hesthaven, Pagliantini & Ripamonti (2024), adaptive symplectic MOR for particle Vlasov–Poisson, DOI 10.1090/mcom/3885: https://arxiv.org/abs/2201.05555
+- Pagliantini & Vismara (2025), fully adaptive structure-preserving hyper-reduction, DOI 10.1137/23M1601225: https://doi.org/10.1137/23M1601225
+- Pagliantini & Vismara (2026), adaptive hyper-reduction of non-sparse Vlasov–Poisson operators, JCP 549, 114609: https://arxiv.org/abs/2504.00604
+- Finn et al. (2026), discrete-gradient structure preservation for Vlasov–Poisson–Landau, JCP 554, 114749: https://doi.org/10.1016/j.jcp.2026.114749
+- Shao, Wang & Wu (2026), conservative adaptive Hermite projection: https://arxiv.org/abs/2605.17820
+- Padovan (2026), empirical response / reachability-observability balancing: https://arxiv.org/abs/2610.15219
+
+The decisive requirement is dual qualification: a low-byte state that preserves an echo but destroys Hamiltonian structure is not a pass; a symplectic state that discards an echo-sensitive direction is not a pass. Adaptive basis transitions need both a structure-transfer record and a future-response distortion record. The initial work is on manufactured oscillator / Hamiltonian fixtures, then a geometric particle Vlasov reference, and only later the noncanonical / collisional extension.
 
 ## Revised quantitative reading of the October 2026 FNO result
 
