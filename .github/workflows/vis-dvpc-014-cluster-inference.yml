@@ -8,6 +8,7 @@ on:
       - "tools/vision-dvpc-cluster-inference.rs"
       - "docs/research/VIS_DVPC_014_CLUSTER_LEVEL_INFERENCE_V1.md"
       - "fixtures/vis-dvpc-compute-observation-cluster-deltas-v0.1.tsv"
+      - "fixtures/vis-dvpc-compute-observation-cluster-assignments-v0.1.tsv"
       - ".github/workflows/vis-dvpc-014-cluster-inference.yml"
   push:
     branches: ["research/vis-dvpc-014-cluster-inference-rebuild-20261123"]
@@ -15,6 +16,7 @@ on:
       - "tools/vision-dvpc-cluster-inference.rs"
       - "docs/research/VIS_DVPC_014_CLUSTER_LEVEL_INFERENCE_V1.md"
       - "fixtures/vis-dvpc-compute-observation-cluster-deltas-v0.1.tsv"
+      - "fixtures/vis-dvpc-compute-observation-cluster-assignments-v0.1.tsv"
       - ".github/workflows/vis-dvpc-014-cluster-inference.yml"
 
 permissions:
@@ -54,35 +56,36 @@ jobs:
       - name: Build optimized standalone analyzer
         run: rustc --edition=2024 -O -D warnings tools/vision-dvpc-cluster-inference.rs -o /tmp/vis-dvpc-014
 
+      - name: Verify frozen cluster-assignment manifest digest
+        run: |
+          actual=$(sha256sum fixtures/vis-dvpc-compute-observation-cluster-assignments-v0.1.tsv | cut -d' ' -f1)
+          test "$actual" = b09e820031edb9f7dfe482f999f0d79031ab661c212888c90ae665a524b70425
+          echo "CLUSTER_MANIFEST_SHA256=$actual" >> "$GITHUB_ENV"
+
       - name: Analyze compute-observation adapter fixture
         run: |
-          /tmp/vis-dvpc-014 fixtures/vis-dvpc-compute-observation-cluster-deltas-v0.1.tsv aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa > /tmp/vis-dvpc-014-receipt.tsv
+          /tmp/vis-dvpc-014 fixtures/vis-dvpc-compute-observation-cluster-deltas-v0.1.tsv aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa "$CLUSTER_MANIFEST_SHA256" > /tmp/vis-dvpc-014-receipt.tsv
           grep -F $'ANALYSIS\tstatus\tCLUSTER_LEVEL_INFERENCE_ONLY' /tmp/vis-dvpc-014-receipt.tsv
           grep -F $'ANALYSIS\tperformance_claim\tNONE' /tmp/vis-dvpc-014-receipt.tsv
+          grep -F $'ANALYSIS\tcluster_assignment_manifest_sha256\t'"$CLUSTER_MANIFEST_SHA256" /tmp/vis-dvpc-014-receipt.tsv
           test "$(grep -c '^RESULT' /tmp/vis-dvpc-014-receipt.tsv)" -eq 4
-          test "$(grep -F  | wc -l)" -eq 1
+          test "$(grep -F $'ANALYSIS\tindependent_clusters\t6' /tmp/vis-dvpc-014-receipt.tsv | wc -l)" -eq 1
 
       - name: Verify deterministic replay
         run: |
-          /tmp/vis-dvpc-014 fixtures/vis-dvpc-compute-observation-cluster-deltas-v0.1.tsv aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa > /tmp/vis-dvpc-014-receipt-repeat.tsv
+          /tmp/vis-dvpc-014 fixtures/vis-dvpc-compute-observation-cluster-deltas-v0.1.tsv aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa "$CLUSTER_MANIFEST_SHA256" > /tmp/vis-dvpc-014-receipt-repeat.tsv
           cmp /tmp/vis-dvpc-014-receipt.tsv /tmp/vis-dvpc-014-receipt-repeat.tsv
 
-      - name: Verify external lock mismatch is rejected
+      - name: Verify external bundle-lock mismatch is rejected
         run: |
-          if /tmp/vis-dvpc-014 fixtures/vis-dvpc-compute-observation-cluster-deltas-v0.1.tsv bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb > /tmp/vis-dvpc-014-invalid.tsv 2>&1; then
+          if /tmp/vis-dvpc-014 fixtures/vis-dvpc-compute-observation-cluster-deltas-v0.1.tsv bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb "$CLUSTER_MANIFEST_SHA256" > /tmp/vis-dvpc-014-invalid-lock.tsv 2>&1; then
             echo "analyzer accepted a mismatched external bundle lock" >&2
             exit 1
           fi
-ANALYSIS\tindependent_clusters\t6' /tmp/vis-dvpc-014-receipt.tsv | wc -l)" -eq 1
 
-      - name: Verify deterministic replay
+      - name: Verify cluster-assignment digest mismatch is rejected
         run: |
-          /tmp/vis-dvpc-014 fixtures/vis-dvpc-compute-observation-cluster-deltas-v0.1.tsv aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa > /tmp/vis-dvpc-014-receipt-repeat.tsv
-          cmp /tmp/vis-dvpc-014-receipt.tsv /tmp/vis-dvpc-014-receipt-repeat.tsv
-
-      - name: Verify external lock mismatch is rejected
-        run: |
-          if /tmp/vis-dvpc-014 fixtures/vis-dvpc-compute-observation-cluster-deltas-v0.1.tsv bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb > /tmp/vis-dvpc-014-invalid.tsv 2>&1; then
-            echo "analyzer accepted a mismatched external bundle lock" >&2
+          if /tmp/vis-dvpc-014 fixtures/vis-dvpc-compute-observation-cluster-deltas-v0.1.tsv aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc > /tmp/vis-dvpc-014-invalid-clusters.tsv 2>&1; then
+            echo "analyzer accepted a mismatched cluster-assignment manifest digest" >&2
             exit 1
           fi
