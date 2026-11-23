@@ -82,4 +82,14 @@ This is byte accounting, not a rate–distortion evaluator. It does not calculat
 
 The crate exposes MinMaxCoordinateMap as a testable affine min–max transform. Its fitted input support and caller-selected output interval are explicit; empty samples, degenerate support, non-finite coordinates and invalid output intervals fail closed. Values outside the fitted interval extrapolate and are not silently clipped.
 
-A synthetic Rust regression test adds a point at x=0 to the inlier set [0.1, 0.3, 0.5, 0.7, 0.9] and measures the resulting displacement of every existing inlier under the illustrative [-pi, pi] output interval. This validates the coordinate-map mechanism only; it does not reproduce NEOPIC's exact tagged source configuration, train/evaluate its operator, or establish a learned field error. See [#13416](https://github.com/Luminous-Dynamics/symthaea/issues/13416) and [the normalization-only fixture PR #13417](https://github.com/Luminous-Dynamics/symthaea/pull/13417).
+A synthetic Rust regression test adds a point at x=0 to the inlier set [0.1, 0.3, 0.5, 0.7, 0.9] and measures the resulting displacement of every existing inlier under an explicitly supplied illustrative [-pi, pi] interval. The generic Rust primitive is not itself a NEOPIC implementation. The separate source-pinned fixture [PR #13417](https://github.com/Luminous-Dynamics/symthaea/pull/13417) uses the exact tagged NEOPIC arXiv v1 affine map to [0,1], and splits the native equal-weight sample perturbation from the weighted-measure extension. Neither test measures learned field error. See [#13416](https://github.com/Luminous-Dynamics/symthaea/issues/13416).
+
+
+## Topology-aware particle lifting primitives
+
+The crate also exposes two separate feature maps for the TAPL programme (#13447):
+
+- `PeriodicTorusLift` emits interleaved cosine/sine Fourier-character features for harmonics 1 through a bounded maximum. It wraps the coordinate modulo one and does not append the raw coordinate, so features and their derivatives agree at the periodic seam.
+- `OpenBoundaryCoordinateLift` retains the normalized coordinate plus distances to the lower and upper physical faces. It does not wrap and rejects coordinates outside [0,1].
+
+Manufactured tests check exact seam equivalence at xi=0 and xi=1, near-seam continuity, derivative continuity, integer-period translations, and the distinction between the two open-boundary faces. These are analytic feature-map tests only: they do not train or evaluate a particle-field operator, prove field equivariance, or validate a physical plasma trajectory. Boundary type must come from the physical cohort contract, never from the current particle cloud.
