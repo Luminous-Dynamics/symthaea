@@ -8,7 +8,7 @@
 //! not part of the wire types; serde rejects unknown fields at every level.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::io::{self, Read, Write};
+use std::io::{self, BufRead, BufReader, Read, Write};
 use std::time::Instant;
 
 use broca_mace_hdc_retrieval::{
@@ -578,7 +578,59 @@ fn execute_request(bytes: &[u8]) -> Result<CandidateReceiptV1, String> {
     })
 }
 
+fn run_stream() -> Result<(), String> {
+    let stdin = io::stdin();
+    let mut reader = BufReader::new(stdin.lock());
+    let stdout = io::stdout();
+    let mut writer = stdout.lock();
+
+    // The parent validates this exact line before sending any candidate input.
+    writer
+        .write_all(b"MACE_CANDIDATE_STREAM_READY_V1\n")
+        .map_err(|error| format!("write stream readiness: {error}"))?;
+    writer
+        .flush()
+        .map_err(|error| format!("flush stream readiness: {error}"))?;
+
+    loop {
+        let mut line = Vec::new();
+        let read = reader
+            .read_until(b'\n', &mut line)
+            .map_err(|error| format!("read candidate request line: {error}"))?;
+        if read == 0 {
+            break;
+        }
+        if line.len() > MAX_REQUEST_BYTES + 1 {
+            return Err(format!("request line exceeds {MAX_REQUEST_BYTES} bytes"));
+        }
+        while matches!(line.last(), Some(b'\n' | b'\r')) {
+            line.pop();
+        }
+        if line.is_empty() {
+            return Err("empty candidate request line".to_string());
+        }
+        let receipt = execute_request(&line)?;
+        serde_json::to_writer(&mut writer, &receipt)
+            .map_err(|error| format!("serialize candidate receipt: {error}"))?;
+        writer
+            .write_all(b"\n")
+            .map_err(|error| format!("terminate candidate receipt line: {error}"))?;
+        writer
+            .flush()
+            .map_err(|error| format!("flush candidate receipt: {error}"))?;
+    }
+    Ok(())
+}
+
 fn main() {
+    if std::env::args().nth(1).as_deref() == Some("--stream") {
+        if let Err(error) = run_stream() {
+            eprintln!("mace_candidate: {error}");
+            std::process::exit(1);
+        }
+        return;
+    }
+
     let mut input = Vec::new();
     let read_result = io::stdin()
         .take((MAX_REQUEST_BYTES + 1) as u64)
