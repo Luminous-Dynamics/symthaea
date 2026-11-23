@@ -3323,10 +3323,9 @@ let degree = build_mycelial_failure_attack_plan(
         let original_digest = first.canonical_digest_hex().unwrap();
         let mut tampered = first.clone();
         let original_reachability = tampered.trials[0].weighted_reachability;
-        tampered.trials[0].weighted_reachability = Some(original_reachability.map_or(
-            0.25,
-            |value| if value == 0.25 { 0.5 } else { 0.25 },
-        ));
+        tampered.trials[0].weighted_reachability = Some(
+            original_reachability.map_or(0.25, |value| if value == 0.25 { 0.5 } else { 0.25 }),
+        );
         assert_ne!(tampered.canonical_digest_hex().unwrap(), original_digest);
         assert!(
             tampered
