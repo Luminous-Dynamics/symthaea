@@ -677,10 +677,7 @@ fn main() {
     match run_cli(&args) {
         Ok(receipt) => print!("{receipt}"),
         Err(error) => {
-            eprintln!(
-                "REJECT\treason\t{}",
-                error.replace(['\t', '\n'], " ")
-            );
+            eprintln!("REJECT\treason\t{}", error.replace(['\t', '\n'], " "));
             std::process::exit(2);
         }
     }
