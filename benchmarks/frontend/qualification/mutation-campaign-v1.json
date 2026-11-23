@@ -1,0 +1,347 @@
+{
+  "schema": "sfeb-benchmark-mutation-campaign-v1",
+  "version": "1.0.0",
+  "campaign_id": "SFEB-QUAL-001",
+  "as_of": "2026-11-22",
+  "status": "designed_not_executed",
+  "benchmark": "SFEB",
+  "fixture_exposure": "public_pilot",
+  "purpose": "Test whether independent SFEB oracles reject seeded implementation and evidence failures while accepting semantics-preserving changes.",
+  "execution_boundary": "Apply these mutations only to disposable local benchmark fixtures. Never mutate production source, real user data, or a public service.",
+  "scoring_rule": "A mutation is killed only when the independent evaluator rejects the resulting run for the expected reason. Agent self-reports and schema-only checks do not count as detection.",
+  "mutations": [
+    {
+      "id": "MUT-FUNC-001",
+      "category": "functional",
+      "severity": "critical",
+      "mutation": "Replace a required form submit handler with a no-op while leaving the control visually enabled.",
+      "expected_oracles": [
+        "journey_completion",
+        "state_transition",
+        "submit_result"
+      ],
+      "expected_disposition": "reject"
+    },
+    {
+      "id": "MUT-FUNC-002",
+      "category": "functional",
+      "severity": "high",
+      "mutation": "Change a required in-app route target so that the visible navigation control opens the wrong page.",
+      "expected_oracles": [
+        "route_identity",
+        "navigation_trace"
+      ],
+      "expected_disposition": "reject"
+    },
+    {
+      "id": "MUT-FUNC-003",
+      "category": "functional",
+      "severity": "high",
+      "mutation": "Keep a stale connected status after the WebSocket has entered Closing or Closed.",
+      "expected_oracles": [
+        "transport_state_observation",
+        "status_semantics"
+      ],
+      "expected_disposition": "reject"
+    },
+    {
+      "id": "MUT-FUNC-004",
+      "category": "functional",
+      "severity": "medium",
+      "mutation": "Leave the loading indicator active after a failed asynchronous request and expose no retry action.",
+      "expected_oracles": [
+        "async_state_machine",
+        "retry_journey"
+      ],
+      "expected_disposition": "reject"
+    },
+    {
+      "id": "MUT-A11Y-001",
+      "category": "accessibility",
+      "severity": "critical",
+      "mutation": "Remove the accessible name or programmatic label from a task-critical input.",
+      "expected_oracles": [
+        "accessibility_tree",
+        "label_association",
+        "keyboard_journey"
+      ],
+      "expected_disposition": "reject"
+    },
+    {
+      "id": "MUT-A11Y-002",
+      "category": "accessibility",
+      "severity": "critical",
+      "mutation": "Introduce a keyboard trap or remove keyboard reachability from a task-critical control.",
+      "expected_oracles": [
+        "keyboard_action_trace",
+        "focus_order",
+        "journey_completion"
+      ],
+      "expected_disposition": "reject"
+    },
+    {
+      "id": "MUT-A11Y-003",
+      "category": "accessibility",
+      "severity": "high",
+      "mutation": "Remove the live-region announcement for a task-critical asynchronous state change.",
+      "expected_oracles": [
+        "accessibility_tree",
+        "status_announcement_review"
+      ],
+      "expected_disposition": "reject"
+    },
+    {
+      "id": "MUT-RESP-001",
+      "category": "responsive_visual",
+      "severity": "high",
+      "mutation": "Add a fixed minimum width that causes horizontal page overflow below the declared mobile viewport.",
+      "expected_oracles": [
+        "viewport_sweep",
+        "document_overflow",
+        "region_geometry"
+      ],
+      "expected_disposition": "reject"
+    },
+    {
+      "id": "MUT-RESP-002",
+      "category": "responsive_visual",
+      "severity": "critical",
+      "mutation": "Hide a required action at the mobile breakpoint without providing an accessible alternative.",
+      "expected_oracles": [
+        "viewport_sweep",
+        "required_control_presence",
+        "keyboard_journey"
+      ],
+      "expected_disposition": "reject"
+    },
+    {
+      "id": "MUT-RESP-003",
+      "category": "responsive_visual",
+      "severity": "medium",
+      "mutation": "Create a collision or clipped control only at an intermediate width between the fixed reference viewports.",
+      "expected_oracles": [
+        "randomized_width_sweep",
+        "region_overlap",
+        "control_visibility"
+      ],
+      "expected_disposition": "reject"
+    },
+    {
+      "id": "MUT-SEC-001",
+      "category": "security",
+      "severity": "critical",
+      "mutation": "Allow a role-restricted state transition to execute for a fixture user lacking the required permission.",
+      "expected_oracles": [
+        "authorization_oracle",
+        "negative_role_journey"
+      ],
+      "expected_disposition": "reject"
+    },
+    {
+      "id": "MUT-SEC-002",
+      "category": "security",
+      "severity": "critical",
+      "mutation": "Add an unapproved external fetch or image/script dependency to a fixture expected to be network-closed.",
+      "expected_oracles": [
+        "network_egress_log",
+        "resource_policy",
+        "fixture_integrity"
+      ],
+      "expected_disposition": "reject"
+    },
+    {
+      "id": "MUT-EVID-001",
+      "category": "evidence_integrity",
+      "severity": "critical",
+      "mutation": "Change screenshot bytes after capture without updating the artifact digest.",
+      "expected_oracles": [
+        "artifact_sha256",
+        "artifact_length",
+        "receipt_integrity"
+      ],
+      "expected_disposition": "reject"
+    },
+    {
+      "id": "MUT-EVID-002",
+      "category": "evidence_integrity",
+      "severity": "critical",
+      "mutation": "Reuse a receipt from the parent source revision after the implementation commit changes.",
+      "expected_oracles": [
+        "source_commit_binding",
+        "receipt_context"
+      ],
+      "expected_disposition": "reject"
+    },
+    {
+      "id": "MUT-EVID-003",
+      "category": "evidence_integrity",
+      "severity": "high",
+      "mutation": "Record a CSS viewport or device scale factor inconsistent with the PNG pixel dimensions.",
+      "expected_oracles": [
+        "png_ihdr",
+        "viewport_dpr_consistency"
+      ],
+      "expected_disposition": "reject"
+    },
+    {
+      "id": "MUT-EVID-004",
+      "category": "evidence_integrity",
+      "severity": "critical",
+      "mutation": "Omit the accessibility-tree artifact while retaining a nominal success result.",
+      "expected_oracles": [
+        "required_artifact_set",
+        "receipt_completeness"
+      ],
+      "expected_disposition": "reject"
+    },
+    {
+      "id": "MUT-EVID-005",
+      "category": "evidence_integrity",
+      "severity": "high",
+      "mutation": "Copy a valid receipt across two different fixture IDs or task IDs.",
+      "expected_oracles": [
+        "fixture_identity_binding",
+        "task_identity_binding"
+      ],
+      "expected_disposition": "reject"
+    },
+    {
+      "id": "MUT-GAME-001",
+      "category": "benchmark_gaming",
+      "severity": "critical",
+      "mutation": "Delete a requirement and its local assertion from the implementation contract while the frozen product brief still requires it.",
+      "expected_oracles": [
+        "brief_to_contract_independent_check",
+        "requirement_traceability"
+      ],
+      "expected_disposition": "reject"
+    },
+    {
+      "id": "MUT-GAME-002",
+      "category": "benchmark_gaming",
+      "severity": "high",
+      "mutation": "Hard-code layout behavior for the five visible viewport widths while breaking unseen widths between them.",
+      "expected_oracles": [
+        "randomized_width_sweep",
+        "hidden_viewport_holdout"
+      ],
+      "expected_disposition": "reject"
+    },
+    {
+      "id": "MUT-GAME-003",
+      "category": "benchmark_gaming",
+      "severity": "high",
+      "mutation": "Return placeholder or empty content while satisfying a weak screenshot-only check.",
+      "expected_oracles": [
+        "semantic_content_assertions",
+        "journey_completion",
+        "human_review"
+      ],
+      "expected_disposition": "reject"
+    }
+  ],
+  "positive_controls": [
+    {
+      "id": "POS-001",
+      "transformation": "Reformat Rust source without changing the compiled program or rendered interface.",
+      "invariants": [
+        "journey_results",
+        "accessibility_tree",
+        "layout_geometry"
+      ],
+      "expected_disposition": "accept"
+    },
+    {
+      "id": "POS-002",
+      "transformation": "Rename a private local variable without changing public API or behavior.",
+      "invariants": [
+        "journey_results",
+        "source_anchor_mapping"
+      ],
+      "expected_disposition": "accept"
+    },
+    {
+      "id": "POS-003",
+      "transformation": "Insert a semantically neutral wrapper element that preserves computed layout, accessibility semantics and interaction behavior.",
+      "invariants": [
+        "accessibility_tree_semantics",
+        "layout_geometry",
+        "journey_results"
+      ],
+      "expected_disposition": "accept"
+    },
+    {
+      "id": "POS-004",
+      "transformation": "Replace a CSS literal with an equivalent design-token alias that produces the same computed style.",
+      "invariants": [
+        "computed_styles",
+        "region_geometry",
+        "responsive_sweep"
+      ],
+      "expected_disposition": "accept"
+    },
+    {
+      "id": "POS-005",
+      "transformation": "Activate the same supported control by keyboard instead of pointer and reach the same contract-defined state.",
+      "invariants": [
+        "terminal_state",
+        "navigation_destination",
+        "action_result"
+      ],
+      "expected_disposition": "accept"
+    }
+  ],
+  "metamorphic_relations": [
+    {
+      "id": "META-001",
+      "name": "pointer-keyboard equivalence",
+      "transformation": "Execute the same supported journey using pointer events and keyboard events.",
+      "invariant": "Both traces reach the same contract-defined terminal state and expose equivalent result semantics.",
+      "oracle": "journey_state_and_accessibility"
+    },
+    {
+      "id": "META-002",
+      "name": "deep-link navigation equivalence",
+      "transformation": "Reach a route via in-app navigation and via direct URL entry or refresh.",
+      "invariant": "Both paths render the same route identity and contract-defined persistent state.",
+      "oracle": "route_and_state_oracle"
+    },
+    {
+      "id": "META-003",
+      "name": "responsive continuity",
+      "transformation": "Sweep widths between declared desktop, tablet and mobile reference widths.",
+      "invariant": "Required content and controls remain present, readable and operable; no overflow or collision is introduced.",
+      "oracle": "viewport_layout_sweep"
+    },
+    {
+      "id": "META-004",
+      "name": "semantics-preserving source refactor",
+      "transformation": "Apply a refactor declared to preserve component behavior and accessibility semantics.",
+      "invariant": "Contract journeys, semantic roles, accessible names and interaction outcomes remain unchanged.",
+      "oracle": "independent_journey_and_accessibility_oracles"
+    },
+    {
+      "id": "META-005",
+      "name": "receipt identity stability",
+      "transformation": "Re-run an unchanged fixture and implementation with a new run ID but identical pinned inputs.",
+      "invariant": "Source, fixture and environment identities remain the same while run-scoped receipt identity and artifact digests are internally consistent.",
+      "oracle": "receipt_binding_and_digest_verifier"
+    }
+  ],
+  "acceptance_targets": {
+    "critical_mutation_kill_rate_min": 1,
+    "security_mutation_kill_rate_min": 1,
+    "evidence_integrity_mutation_kill_rate_min": 1,
+    "high_severity_mutation_kill_rate_min": 0.95,
+    "overall_mutation_kill_rate_min": 0.9,
+    "positive_control_false_reject_rate_max": 0
+  },
+  "reporting_requirements": [
+    "Report every mutation and positive control individually with expected and observed disposition.",
+    "Report denominators and numerators per class and severity; do not hide unexecuted cases.",
+    "Retain exact task, fixture, source, browser, evaluator and environment digests.",
+    "A mutation counts as killed only when the evaluator rejects it for the relevant independent oracle, not merely because a build fails for an unrelated reason.",
+    "A positive control counts as accepted only when all required positive assertions still execute.",
+    "Do not pool this public-pilot campaign with private hidden-holdout benchmark scores."
+  ]
+}

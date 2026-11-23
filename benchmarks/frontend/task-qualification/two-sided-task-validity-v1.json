@@ -1,0 +1,157 @@
+{
+  "schema": "sfeb-two-sided-task-validity-v1",
+  "status": "protocol_defined_not_executed",
+  "as_of": "2026-11-23",
+  "principle": "A task is eligible for agent scoring only when its scoring machinery demonstrates both sensitivity to a valid reviewed solution and rejection of a no-op or known-broken baseline, while the prompt fully specifies the graded behavior.",
+  "task_modes": [
+    {
+      "mode": "feature_implementation",
+      "negative_control": "empty_patch",
+      "negative_expected": "reject_target_requirements",
+      "positive_witness": "reviewed_reference_patch",
+      "positive_expected": "accept_all_declared_requirements",
+      "preservation": "all_preexisting_journeys_remain_accepted"
+    },
+    {
+      "mode": "seeded_defect_repair",
+      "negative_control": "seeded_defect_baseline_and_placebo_patch",
+      "negative_expected": "reject_target_defect_and_placebo_does_not_clear_it",
+      "positive_witness": "reviewed_minimal_repair_patch",
+      "positive_expected": "accept_target_oracles",
+      "preservation": "all_unrelated_invariants_remain_accepted"
+    },
+    {
+      "mode": "maintenance_change",
+      "negative_control": "no_op_or_unmodified_baseline",
+      "negative_expected": "reject_new_feature_or_maintenance_requirements",
+      "positive_witness": "reviewed_reference_patch",
+      "positive_expected": "accept_new_requirements",
+      "preservation": "all_preexisting_contract_journeys_and_dependency_constraints_remain_accepted"
+    }
+  ],
+  "common_gates": [
+    {
+      "id": "BRIEF_ORACLE_BIDIRECTIONAL_TRACE",
+      "requirement": "Every normative brief requirement maps to one or more explicit acceptance assertions, and every scored assertion maps back to a brief requirement. Undocumented test-only requirements are forbidden.",
+      "required_evidence": [
+        "requirement_assertion_traceability_matrix",
+        "independent_review_record"
+      ],
+      "failure": "reject_task"
+    },
+    {
+      "id": "TWO_SIDED_WITNESS_GATE",
+      "requirement": "A reviewed reference/witness patch applied to the exact pristine base passes every required target oracle; an empty/no-op or seeded-defect baseline fails the intended target oracle. A failure caused by unrelated infrastructure does not satisfy either side.",
+      "required_evidence": [
+        "base_revision_digest",
+        "witness_patch_digest",
+        "negative_control_patch_digest",
+        "per_oracle_results",
+        "clean_replay_receipts"
+      ],
+      "failure": "reject_task"
+    },
+    {
+      "id": "BLIND_HUMAN_SOLVABILITY",
+      "requirement": "At least one qualified engineer who did not author the tests can solve from the task brief and permitted references without access to hidden test logic, gold patches or verifier internals; two reviewers independently assess ambiguity and requirement sufficiency.",
+      "required_evidence": [
+        "reviewer_roles",
+        "brief_only_solve_record",
+        "ambiguity_log",
+        "adjudication_record"
+      ],
+      "failure": "reject_or_rewrite_task"
+    },
+    {
+      "id": "TEST_AUTHORITY_SEPARATION",
+      "requirement": "Candidate changes cannot modify the evaluator, tests, hidden fixtures, scoring policy, expected outputs, dependency cache or runner configuration. Only the candidate patch is transferred into the evaluation image.",
+      "required_evidence": [
+        "allowed_patch_scope",
+        "protected_path_policy",
+        "before_after_evaluator_digest"
+      ],
+      "failure": "reject_run"
+    },
+    {
+      "id": "PRISTINE_REGRADING",
+      "requirement": "Reapply the exact candidate patch to a fresh evaluator-owned image derived from the frozen base; rerun all required tests and journeys after candidate execution. Preserve both in-run and pristine regrade outcomes.",
+      "required_evidence": [
+        "base_image_digest",
+        "candidate_patch_digest",
+        "pristine_regrade_image_digest",
+        "regrade_logs"
+      ],
+      "failure": "reject_run"
+    },
+    {
+      "id": "NETWORK_AND_SOLUTION_LEAKAGE",
+      "requirement": "Deny access to fixing commits, hidden source, verifier policy and unapproved code-host endpoints. Permit only the model endpoint and explicitly declared fixture-local services when the task design requires them.",
+      "required_evidence": [
+        "egress_policy_digest",
+        "request_and_redirect_log",
+        "network_denial_evidence",
+        "solution_access_scan"
+      ],
+      "failure": "reject_run"
+    },
+    {
+      "id": "TASK_FAMILY_AND_EXPOSURE",
+      "requirement": "Label public, controller-only and hidden exposure before evaluation. Public pilot tasks cannot later be represented as hidden holdout results; hold out whole task families and interaction patterns.",
+      "required_evidence": [
+        "exposure_label",
+        "task_family_id",
+        "holdout_partition_manifest"
+      ],
+      "failure": "exclude_from_hidden_results"
+    },
+    {
+      "id": "COUNTERFACTUAL_PRESERVATION",
+      "requirement": "For repair/maintenance tasks, verify the target defect changes as expected, a placebo does not receive credit, and unrelated contract invariants remain preserved.",
+      "required_evidence": [
+        "pre_intervention_oracle_results",
+        "post_intervention_oracle_results",
+        "placebo_results",
+        "unrelated_invariant_results"
+      ],
+      "failure": "reject_task_or_repair_claim"
+    }
+  ],
+  "reporting": {
+    "required_fields": [
+      "task_id",
+      "task_revision",
+      "task_family",
+      "exposure",
+      "base_revision_digest",
+      "environment_digest",
+      "oracle_policy_digest",
+      "witness_patch_digest",
+      "negative_control_digest",
+      "reviewer_ids_or_roles",
+      "per_oracle_results",
+      "pristine_regrade_digest",
+      "network_policy_digest",
+      "status"
+    ],
+    "statuses": [
+      "not_reviewed",
+      "reviewed_not_two_sided",
+      "two_sided_validity_passed",
+      "runner_pending",
+      "runnable_qualified",
+      "rejected"
+    ],
+    "rules": [
+      "A task is runnable only after its two-sided validity gate and all execution/evidence gates pass.",
+      "A two-sided validity pass does not imply browser, accessibility, security or task-score qualification.",
+      "Infrastructure failures and inconclusive outcomes are never silently converted into pass or product failure.",
+      "Publish per-task evidence and failure reasons; do not hide excluded tasks or denominator changes."
+    ]
+  },
+  "limitations": [
+    "This is a task-quality protocol, not an execution result or benchmark score.",
+    "Reference patches are witnesses of satisfiability, not necessarily the only acceptable implementation.",
+    "The witness patch and hidden scoring policy must remain outside the agent workspace during evaluation.",
+    "The protocol must be integrated with trusted isolated execution and independent oracle replay before it can promote SFEB tasks."
+  ]
+}

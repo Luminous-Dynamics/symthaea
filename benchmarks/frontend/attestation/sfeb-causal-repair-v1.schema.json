@@ -1,0 +1,251 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/sfeb/causal-repair-v1.schema.json",
+  "title": "SFEB evidence-linked causal repair record v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "repair_id",
+    "task_id",
+    "requirement_id",
+    "assertion_id",
+    "fixture_sha256",
+    "environment_manifest_sha256",
+    "failure_statement_sha256",
+    "diagnosis",
+    "intervention",
+    "counterfactual_evaluation"
+  ],
+  "properties": {
+    "schema": {
+      "const": "sfeb-causal-repair-v1"
+    },
+    "repair_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "task_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "requirement_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "assertion_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "fixture_sha256": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "environment_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "failure_statement_sha256": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "diagnosis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hypotheses",
+        "selected_hypothesis_id"
+      ],
+      "properties": {
+        "hypotheses": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "hypothesis_id",
+              "rank",
+              "source_anchor",
+              "region_id",
+              "supporting_event_sha256",
+              "confidence"
+            ],
+            "properties": {
+              "hypothesis_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "rank": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "source_anchor": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "region_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "supporting_event_sha256": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Fa-f0-9]{64}$"
+                }
+              },
+              "confidence": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            }
+          }
+        },
+        "selected_hypothesis_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    },
+    "intervention": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "before_source_commit",
+        "after_source_commit",
+        "patch_sha256",
+        "changed_paths",
+        "changed_line_count"
+      ],
+      "properties": {
+        "before_source_commit": {
+          "type": "string",
+          "pattern": "^[A-Fa-f0-9]{40,64}$"
+        },
+        "after_source_commit": {
+          "type": "string",
+          "pattern": "^[A-Fa-f0-9]{40,64}$"
+        },
+        "patch_sha256": {
+          "type": "string",
+          "pattern": "^[A-Fa-f0-9]{64}$"
+        },
+        "changed_paths": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          }
+        },
+        "changed_line_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "counterfactual_evaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "verifier_revision",
+        "pre_repair_statement_sha256",
+        "post_repair_statement_sha256",
+        "placebo_statement_sha256",
+        "target_oracle_ids",
+        "invariant_results",
+        "same_fixture_and_environment"
+      ],
+      "properties": {
+        "verifier_revision": {
+          "type": "string",
+          "pattern": "^[A-Fa-f0-9]{40,64}$"
+        },
+        "pre_repair_statement_sha256": {
+          "type": "string",
+          "pattern": "^[A-Fa-f0-9]{64}$"
+        },
+        "post_repair_statement_sha256": {
+          "type": "string",
+          "pattern": "^[A-Fa-f0-9]{64}$"
+        },
+        "placebo_statement_sha256": {
+          "type": "string",
+          "pattern": "^[A-Fa-f0-9]{64}$"
+        },
+        "target_oracle_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "invariant_results": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "invariant_id",
+              "before_outcome",
+              "after_outcome",
+              "result"
+            ],
+            "properties": {
+              "invariant_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "before_outcome": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "after_outcome": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "result": {
+                "enum": [
+                  "preserved",
+                  "violated",
+                  "inconclusive"
+                ]
+              }
+            }
+          }
+        },
+        "same_fixture_and_environment": {
+          "const": true
+        }
+      }
+    },
+    "causal_claim_level": {
+      "enum": [
+        "diagnostic_only",
+        "single_intervention_supported",
+        "replicated_intervention_supported"
+      ]
+    }
+  }
+}

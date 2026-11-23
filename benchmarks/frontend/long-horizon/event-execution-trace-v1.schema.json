@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/sfeb/event-execution-trace-v1.schema.json",
+  "title": "SFEB event execution trace v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "trace_id",
+    "case_id",
+    "fixture_id",
+    "fixture_sha256",
+    "steps"
+  ],
+  "properties": {
+    "schema": {
+      "const": "sfeb-event-execution-trace-v1"
+    },
+    "trace_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "fixture_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10000,
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "op",
+              "action"
+            ],
+            "properties": {
+              "op": {
+                "const": "submit"
+              },
+              "action": {
+                "type": "object"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "op",
+              "event"
+            ],
+            "properties": {
+              "op": {
+                "const": "deliver"
+              },
+              "event": {
+                "type": "object"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "worker_claims": {
+      "type": "object",
+      "description": "Untrusted diagnostic content. The verifier must not consume it when deriving oracle outcomes.",
+      "additionalProperties": true
+    },
+    "fixture_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  }
+}

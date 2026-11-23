@@ -1,0 +1,182 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/sfeb/comparative-evaluation-design-v1.schema.json",
+  "title": "SFEB Comparative Evaluation Design v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "version",
+    "study_id",
+    "as_of",
+    "status",
+    "purpose",
+    "task_corpus",
+    "comparison_arms",
+    "pairing",
+    "judging",
+    "metrics",
+    "analysis",
+    "success_criteria",
+    "external_comparators",
+    "limits"
+  ],
+  "properties": {
+    "schema": {
+      "const": "sfeb-comparative-evaluation-design-v1"
+    },
+    "version": {
+      "type": "string"
+    },
+    "study_id": {
+      "type": "string",
+      "pattern": "^SFEB-COMP-[0-9]{3}$"
+    },
+    "as_of": {
+      "type": "string",
+      "format": "date"
+    },
+    "status": {
+      "enum": [
+        "protocol_designed_not_executed",
+        "executed"
+      ]
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 30
+    },
+    "task_corpus": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "initial_public_pilot",
+        "comparative_phase",
+        "publication_phase_minimum",
+        "levels",
+        "target_distribution_per_level_at_150",
+        "exposure_partitions",
+        "holdout_fraction_min",
+        "hidden_holdout_fraction_target",
+        "high_variance_trials_min",
+        "ordinary_trials_min"
+      ]
+    },
+    "comparison_arms": {
+      "type": "array",
+      "minItems": 6,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "description"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "pairing": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "unit",
+        "rule",
+        "order",
+        "repeats",
+        "independence",
+        "control"
+      ]
+    },
+    "judging": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "primary",
+        "visual",
+        "accessibility",
+        "security",
+        "blinding",
+        "disagreement",
+        "audit_sample_fraction",
+        "human_review"
+      ]
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "primary",
+        "secondary",
+        "hard_gates",
+        "cost_definition"
+      ]
+    },
+    "analysis": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "binary_paired_outcome",
+        "proportions",
+        "continuous_metrics",
+        "multiple_comparisons",
+        "repeated_trials",
+        "calibration",
+        "minimum_effect",
+        "power",
+        "stop_rule"
+      ]
+    },
+    "success_criteria": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "benchmark_qualification",
+        "superiority",
+        "noninferiority_efficiency",
+        "no_cross_benchmark_blending"
+      ]
+    },
+    "external_comparators": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "scope",
+          "reference"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "reference": {
+            "type": "string",
+            "format": "uri"
+          }
+        }
+      }
+    },
+    "limits": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "string",
+        "minLength": 20
+      }
+    }
+  }
+}

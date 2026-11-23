@@ -1,0 +1,527 @@
+{
+  "contract_version": "1.0.0",
+  "contract_id": "symthaea-ui.converse-observe.v0",
+  "status": "source_observed",
+  "source": {
+    "repository": "Luminous-Dynamics/symthaea",
+    "commit": "808998bb903202e813b5bd275fe4a395bcff528e",
+    "paths": [
+      "crates/bridges/symthaea-ui/src/app.rs",
+      "crates/bridges/symthaea-ui/src/api.rs",
+      "crates/bridges/symthaea-ui/style.css",
+      "crates/bridges/symthaea-ui/Cargo.toml"
+    ]
+  },
+  "product": {
+    "name": "Symthaea Converse + Observe",
+    "goal": "Provide a small Rust/WASM web interface for querying the Symthaea service gateway and observing daemon liveness and turn-synchronous cognitive telemetry.",
+    "user_roles": [
+      "operator connecting to a Symthaea service gateway",
+      "developer inspecting conversation and telemetry behavior"
+    ],
+    "non_goals": [
+      "This v0 contract does not specify the deferred Steward or Bench panes.",
+      "This contract does not claim telemetry is continuously emitted while the daemon is idle.",
+      "This is a source-observed baseline, not a product approval or browser conformance report."
+    ]
+  },
+  "framework": {
+    "name": "Leptos",
+    "api_family": "0.8",
+    "rendering_model": "csr",
+    "build_tool": "Trunk",
+    "rust_edition": "2024"
+  },
+  "routes": [
+    {
+      "path": "/",
+      "title": "Symthaea",
+      "description": "Single-page Converse and Observe interface.",
+      "authentication": "none"
+    }
+  ],
+  "regions": [
+    {
+      "id": "symthaea-ui.shell",
+      "tag": "main",
+      "purpose": "Primary application landmark and page layout.",
+      "source_anchor": "symthaea-ui.shell",
+      "semantic_role": "main",
+      "accessible_name": null,
+      "conditional": false
+    },
+    {
+      "id": "symthaea-ui.header",
+      "tag": "header",
+      "purpose": "Application identity, gateway selection and daemon status.",
+      "source_anchor": "symthaea-ui.header",
+      "semantic_role": null,
+      "accessible_name": null,
+      "conditional": false
+    },
+    {
+      "id": "symthaea-ui.title",
+      "tag": "h1",
+      "purpose": "Identifies the application.",
+      "source_anchor": "symthaea-ui.title",
+      "semantic_role": "heading",
+      "accessible_name": "Symthaea",
+      "conditional": false
+    },
+    {
+      "id": "gateway.endpoint",
+      "tag": "div",
+      "purpose": "Gateway endpoint selector group.",
+      "source_anchor": "gateway.endpoint",
+      "semantic_role": null,
+      "accessible_name": "gateway",
+      "conditional": false
+    },
+    {
+      "id": "gateway.input",
+      "tag": "input",
+      "purpose": "User-editable HTTP gateway base URL.",
+      "source_anchor": "gateway.input",
+      "semantic_role": "textbox",
+      "accessible_name": "gateway",
+      "conditional": false
+    },
+    {
+      "id": "gateway.status",
+      "tag": "div",
+      "purpose": "Reports daemon liveness independently from telemetry.",
+      "source_anchor": "gateway.status",
+      "semantic_role": "status",
+      "accessible_name": "daemon status",
+      "conditional": false
+    },
+    {
+      "id": "vitals.panel",
+      "tag": "section",
+      "purpose": "Groups cognitive telemetry and living-organism visualization.",
+      "source_anchor": "vitals.panel",
+      "semantic_role": "region",
+      "accessible_name": "Live cognitive telemetry",
+      "conditional": false
+    },
+    {
+      "id": "vitals.orb",
+      "tag": "div",
+      "purpose": "Visualizes affective valence and thermodynamic load.",
+      "source_anchor": "vitals.orb",
+      "semantic_role": null,
+      "accessible_name": null,
+      "conditional": false,
+      "notes": [
+        "Decorative visual is hidden from the accessibility tree."
+      ]
+    },
+    {
+      "id": "vitals.readouts",
+      "tag": "dl",
+      "purpose": "Displays the most recently received CycleMetadata fields.",
+      "source_anchor": "vitals.readouts",
+      "semantic_role": "description list",
+      "accessible_name": null,
+      "conditional": false
+    },
+    {
+      "id": "projections.region",
+      "tag": "section",
+      "purpose": "Displays cognitive self-portrait and imagination projections when present.",
+      "source_anchor": "projections.region",
+      "semantic_role": "region",
+      "accessible_name": "Cognitive projections",
+      "conditional": true
+    },
+    {
+      "id": "conversation.panel",
+      "tag": "section",
+      "purpose": "Groups transcript, errors and message composer.",
+      "source_anchor": "conversation.panel",
+      "semantic_role": "region",
+      "accessible_name": "Conversation",
+      "conditional": false
+    },
+    {
+      "id": "conversation.transcript",
+      "tag": "div",
+      "purpose": "Appends user and Symthaea conversation turns.",
+      "source_anchor": "conversation.transcript",
+      "semantic_role": "log",
+      "accessible_name": "Conversation transcript",
+      "conditional": false
+    },
+    {
+      "id": "conversation.error",
+      "tag": "div",
+      "purpose": "Announces the most recent query or gateway error.",
+      "source_anchor": "conversation.error",
+      "semantic_role": "alert",
+      "accessible_name": null,
+      "conditional": true
+    },
+    {
+      "id": "conversation.composer",
+      "tag": "form",
+      "purpose": "Submits a non-empty user message to the gateway.",
+      "source_anchor": "conversation.composer",
+      "semantic_role": "form",
+      "accessible_name": null,
+      "conditional": false
+    },
+    {
+      "id": "conversation.input",
+      "tag": "input",
+      "purpose": "Accepts a text message for Symthaea.",
+      "source_anchor": "conversation.input",
+      "semantic_role": "textbox",
+      "accessible_name": "Message Symthaea",
+      "conditional": false
+    },
+    {
+      "id": "conversation.send",
+      "tag": "button",
+      "purpose": "Submits the current message; disabled while a request is in flight.",
+      "source_anchor": "conversation.send",
+      "semantic_role": "button",
+      "accessible_name": "send",
+      "conditional": false
+    },
+    {
+      "id": "gateway.telemetry-state",
+      "tag": "span",
+      "purpose": "Communicates disconnected, connecting, connected or reconnecting telemetry state.",
+      "source_anchor": "gateway.telemetry-state",
+      "semantic_role": "status",
+      "accessible_name": null,
+      "conditional": false,
+      "notes": [
+        "Polite live region; updates only when the telemetry lifecycle state changes."
+      ]
+    }
+  ],
+  "state_machines": [
+    {
+      "id": "telemetry_connection",
+      "initial_state": "disconnected",
+      "states": [
+        "disconnected",
+        "connecting",
+        "open",
+        "retry_wait"
+      ],
+      "transitions": [
+        {
+          "from": "disconnected",
+          "event": "connection_attempt_started",
+          "to": "connecting"
+        },
+        {
+          "from": "connecting",
+          "event": "browser_ready_state_open",
+          "to": "open",
+          "guard": "gloo-net WebSocket state() returns State::Open before the 10-second handshake timeout."
+        },
+        {
+          "from": "connecting",
+          "event": "handshake_timeout_or_socket_closed",
+          "to": "retry_wait"
+        },
+        {
+          "from": "open",
+          "event": "socket_error_or_close",
+          "to": "retry_wait"
+        },
+        {
+          "from": "retry_wait",
+          "event": "backoff_elapsed",
+          "to": "connecting",
+          "side_effect": "Retry the current gateway endpoint."
+        }
+      ],
+      "observability": "The UI exposes four separate visible labels: telemetry disconnected, telemetry connecting, telemetry connected and telemetry reconnecting. Connected is shown only after the browser WebSocket state reaches OPEN."
+    },
+    {
+      "id": "conversation_submission",
+      "initial_state": "idle",
+      "states": [
+        "idle",
+        "sending",
+        "completed",
+        "failed"
+      ],
+      "transitions": [
+        {
+          "from": "idle",
+          "event": "non_empty_submit",
+          "to": "sending"
+        },
+        {
+          "from": "sending",
+          "event": "query_response_with_content",
+          "to": "completed",
+          "side_effect": "Append the assistant response to the transcript."
+        },
+        {
+          "from": "sending",
+          "event": "gateway_error_or_transport_error",
+          "to": "failed",
+          "side_effect": "Expose the error in an alert region."
+        },
+        {
+          "from": "completed",
+          "event": "next_non_empty_submit",
+          "to": "sending"
+        },
+        {
+          "from": "failed",
+          "event": "next_non_empty_submit",
+          "to": "sending"
+        }
+      ],
+      "observability": "The send control is disabled while sending; the user turn is appended before the request completes."
+    }
+  ],
+  "data_sources": [
+    {
+      "id": "gateway.query",
+      "transport": "http",
+      "method": "POST",
+      "path": "/v1/service",
+      "purpose": "Send a user query to the Symthaea service facade.",
+      "request_shape": "JSON { type: query, content: string }.",
+      "response_shape": "JSON response with content or error type/message.",
+      "failure_states": [
+        "request transport failure",
+        "response JSON parse failure",
+        "service error response"
+      ]
+    },
+    {
+      "id": "gateway.status",
+      "transport": "http",
+      "method": "POST",
+      "path": "/v1/service",
+      "purpose": "Poll daemon status every five seconds.",
+      "request_shape": "JSON { type: status }.",
+      "response_shape": "JSON status with uptime_seconds, requests_processed and sleep_cycles.",
+      "failure_states": [
+        "transport failure",
+        "service error response",
+        "malformed response"
+      ]
+    },
+    {
+      "id": "gateway.telemetry",
+      "transport": "websocket",
+      "method": "WS",
+      "path": "/v1/ws/live",
+      "purpose": "Receive turn-synchronous CycleMetadata telemetry when the daemon experience bridge is enabled.",
+      "request_shape": null,
+      "response_shape": "JSON payload with flattened CycleMetadata fields and optional projection data.",
+      "failure_states": [
+        "WebSocket constructor failure",
+        "handshake does not reach OPEN within ten seconds",
+        "socket error or close",
+        "invalid JSON payload"
+      ]
+    }
+  ],
+  "responsive": {
+    "breakpoints": [
+      {
+        "name": "compact",
+        "max_width_px": 560
+      }
+    ],
+    "reference_viewports": [
+      {
+        "name": "mobile",
+        "width": 375,
+        "height": 812,
+        "purpose": "Narrow touch layout."
+      },
+      {
+        "name": "tablet",
+        "width": 768,
+        "height": 1024,
+        "purpose": "Intermediate layout and wrapping."
+      },
+      {
+        "name": "desktop",
+        "width": 1280,
+        "height": 800,
+        "purpose": "Primary wide layout."
+      }
+    ],
+    "invariants": [
+      "No horizontal page overflow at any declared reference viewport.",
+      "Gateway input remains visible and editable when the header wraps.",
+      "Conversation turns remain within the viewport width.",
+      "Message input and submit action remain usable without horizontal scrolling.",
+      "Required telemetry readouts remain available when the layout reflows."
+    ]
+  },
+  "accessibility": {
+    "target": "WCAG 2.2 AA as the design target; no conformance claim is made by this source-observed contract.",
+    "semantics": [
+      "One main landmark contains the application.",
+      "Gateway liveness is exposed as a polite status region.",
+      "Conversation updates use a polite log region.",
+      "Query errors are announced as alerts.",
+      "Message input has the accessible name Message Symthaea.",
+      "The decorative telemetry orb is excluded from the accessibility tree."
+    ],
+    "keyboard_requirements": [
+      "Gateway input, message input and send button are keyboard reachable.",
+      "Visible focus styling is present for primary input and submit controls.",
+      "A keyboard-only user can submit a message and find the resulting transcript entry."
+    ],
+    "reduced_motion": "The telemetry orb animation is disabled when prefers-reduced-motion is reduce.",
+    "manual_checks_required": [
+      "Verify keyboard-only completion in a real browser.",
+      "Verify screen-reader announcements for transcript updates, status and errors.",
+      "Verify focus order and visibility at mobile and desktop viewport sizes.",
+      "Verify the reduced-motion behavior in a browser with the preference enabled."
+    ]
+  },
+  "security": {
+    "untrusted_inputs": [
+      "Gateway status, query responses and telemetry JSON are remote/untrusted inputs.",
+      "Mental-movie frame dimensions, channel count and base64 frame data are validated before allocation and indexing.",
+      "Telemetry portrait SVG is rendered as a bounded data image rather than inserted as live SVG markup."
+    ],
+    "credential_handling": [
+      "The UI does not ask the user to embed credentials in the gateway URL.",
+      "Evidence captures must redact secret-bearing URL query parameters and sensitive input values.",
+      "Screenshots and page-derived artifacts are potentially sensitive and must be stored separately."
+    ],
+    "browser_network_policy": [
+      "The default development gateway is loopback at http://127.0.0.1:8090.",
+      "SFEB must use a disposable browser and fixture-only network policy.",
+      "Do not expose the host CDP debugging port or grant arbitrary private-network navigation to an agent."
+    ],
+    "artifact_handling": [
+      "Evidence artifacts are content-addressed and verified before evaluation.",
+      "A missing or mismatched digest invalidates the evidence receipt."
+    ]
+  },
+  "acceptance": {
+    "hard_gates": [
+      "No critical keyboard trap or missing accessible name on a required control.",
+      "No unredacted sensitive input value in a durable accessibility artifact.",
+      "No horizontal page overflow at any declared reference viewport.",
+      "The telemetry connected indicator must reflect browser readyState OPEN, not WebSocket construction.",
+      "All required browser journeys must pass on the pinned fixture environment."
+    ],
+    "journeys": [
+      {
+        "id": "converse.success",
+        "goal": "Submit a valid query and receive a visible Symthaea response.",
+        "steps": [
+          "Enter non-empty text.",
+          "Submit the form.",
+          "Observe the user turn in the log.",
+          "Observe the assistant response."
+        ],
+        "oracle": [
+          "Fixture gateway request log contains the expected query.",
+          "Transcript contains the matching user and assistant turns.",
+          "Send control is re-enabled after completion."
+        ],
+        "status": "source_observed"
+      },
+      {
+        "id": "converse.failure",
+        "goal": "Communicate a service or transport failure without losing the interface.",
+        "steps": [
+          "Submit a non-empty query to a fixture endpoint that fails.",
+          "Observe the error alert.",
+          "Submit a subsequent query after the fixture recovers."
+        ],
+        "oracle": [
+          "Error is exposed in a role=alert region.",
+          "Send control returns to enabled state.",
+          "A subsequent query can complete."
+        ],
+        "status": "source_observed"
+      },
+      {
+        "id": "telemetry.handshake",
+        "goal": "Only show telemetry connected after the browser WebSocket reaches OPEN.",
+        "steps": [
+          "Start with a fixture gateway whose handshake is delayed.",
+          "Observe disconnected state while readyState is CONNECTING.",
+          "Allow handshake to complete.",
+          "Observe connected state.",
+          "Observe the distinct connecting and connected labels."
+        ],
+        "oracle": [
+          "Connected indicator remains false during CONNECTING.",
+          "Connected indicator becomes true only at readyState OPEN.",
+          "The live status label says telemetry connecting during CONNECTING and telemetry connected only after readyState OPEN."
+        ],
+        "status": "source_observed"
+      },
+      {
+        "id": "telemetry.retry",
+        "goal": "Recover from a closed or failed telemetry stream without duplicate concurrent sockets.",
+        "steps": [
+          "Establish a fixture WebSocket connection.",
+          "Close the connection.",
+          "Observe retry delay and a new connection attempt.",
+          "Repeat with multiple failures."
+        ],
+        "oracle": [
+          "Only one stream attempt is active at a time.",
+          "Retry delays follow 1, 2, 4, 8, 16, then 30 seconds.",
+          "The current gateway value is used on the next attempt.",
+          "A connection lasting at least 60 seconds resets accumulated retry backoff; shorter sessions preserve the failure sequence.",
+          "The status label changes to telemetry reconnecting while waiting for the next bounded retry."
+        ],
+        "status": "source_observed"
+      },
+      {
+        "id": "responsive.layout",
+        "goal": "Preserve readable and operable Converse/Observe regions across viewport classes.",
+        "steps": [
+          "Capture at 375x812.",
+          "Capture at 768x1024.",
+          "Capture at 1280x800.",
+          "Sweep intermediate widths from 320 to 1440."
+        ],
+        "oracle": [
+          "No horizontal overflow.",
+          "No clipped primary controls.",
+          "Named region geometry is recorded for all 16 source anchors."
+        ],
+        "status": "oracle_pending"
+      },
+      {
+        "id": "accessibility.keyboard",
+        "goal": "Complete the query journey with keyboard-only input.",
+        "steps": [
+          "Tab to the message input.",
+          "Enter a query.",
+          "Move to send and submit.",
+          "Reach the new transcript entry."
+        ],
+        "oracle": [
+          "All controls are keyboard reachable.",
+          "Focus remains visible.",
+          "Transcript updates are announced politely."
+        ],
+        "status": "oracle_pending"
+      }
+    ]
+  },
+  "notes": [
+    "The contract is derived from source code at source.commit and must not be interpreted as proof of browser behavior.",
+    "Changing the gateway endpoint while a WebSocket is already open does not forcibly replace that live connection; the new value is read by the next retry attempt.",
+    "No SFEB browser fixture, screenshot baseline or independent acceptance run is included in this contract.",
+    "Telemetry retry backoff is reset only after a connection remains open for at least 60 seconds; this avoids resetting after a rapidly flapping socket.",
+    "The header element is nested inside the page's main landmark; it is a header section but does not create the document banner landmark implied by a top-level header.",
+    "Telemetry lifecycle state is now exposed as a polite status region; the four states are visually and textually distinct."
+  ]
+}

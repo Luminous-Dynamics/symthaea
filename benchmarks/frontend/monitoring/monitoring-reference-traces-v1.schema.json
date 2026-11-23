@@ -1,0 +1,240 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/sfeb/monitoring-reference-traces-v1.schema.json",
+  "title": "SFEB monitoring reference traces v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "fixture_id",
+    "fixture_sha256",
+    "traces"
+  ],
+  "properties": {
+    "schema": {
+      "const": "sfeb-monitoring-reference-traces-v1"
+    },
+    "fixture_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "fixture_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "traces": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "steps"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "worker_claims": {
+            "type": "object",
+            "description": "Untrusted diagnostics only; never an input to verdict derivation.",
+            "additionalProperties": true
+          },
+          "steps": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 10000,
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "op",
+                    "time",
+                    "watch_id"
+                  ],
+                  "properties": {
+                    "op": {
+                      "const": "register_watch"
+                    },
+                    "time": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "watch_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "op",
+                    "time"
+                  ],
+                  "properties": {
+                    "op": {
+                      "const": "wait_until"
+                    },
+                    "time": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "op",
+                    "time",
+                    "message_id"
+                  ],
+                  "properties": {
+                    "op": {
+                      "const": "wake"
+                    },
+                    "time": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "message_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "op",
+                    "time",
+                    "revision",
+                    "authority"
+                  ],
+                  "properties": {
+                    "op": {
+                      "const": "observe"
+                    },
+                    "time": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "revision": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "authority": {
+                      "const": "source_of_record"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "op",
+                    "time",
+                    "revision"
+                  ],
+                  "properties": {
+                    "op": {
+                      "const": "poll"
+                    },
+                    "time": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "revision": {
+                      "type": "integer",
+                      "minimum": 1
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "op",
+                    "time",
+                    "revision",
+                    "action_id",
+                    "idempotency_key",
+                    "action_type",
+                    "resource_id"
+                  ],
+                  "properties": {
+                    "op": {
+                      "const": "act"
+                    },
+                    "time": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "revision": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "action_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    },
+                    "idempotency_key": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 256
+                    },
+                    "action_type": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "resource_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "op",
+                    "time",
+                    "claimed_outcome"
+                  ],
+                  "properties": {
+                    "op": {
+                      "const": "finish"
+                    },
+                    "time": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "claimed_outcome": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}

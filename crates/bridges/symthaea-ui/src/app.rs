@@ -94,24 +94,32 @@ impl Movie {
     fn from_json(v: &Value) -> Option<Movie> {
         use base64::Engine as _;
         let m = v.get("mental_movie")?;
-        let width = m["width"].as_u64()? as u32;
-        let height = m["height"].as_u64()? as u32;
-        let channels = m["channels"].as_u64()? as usize;
+        // The gateway is an external trust boundary. Reject narrowing casts
+        // and unsupported wire layouts before calculating frame sizes or
+        // indexing the decoded payload.
+        let width = u32::try_from(m["width"].as_u64()?).ok()?;
+        let height = u32::try_from(m["height"].as_u64()?).ok()?;
+        let channels = usize::try_from(m["channels"].as_u64()?).ok()?;
+        if channels != 1 && channels != 3 {
+            return None;
+        }
+
         let engine = base64::engine::general_purpose::STANDARD;
         let px = (width as usize).checked_mul(height as usize)?;
         if px == 0 || px > MAX_MOVIE_PIXELS {
             return None;
         }
+        let frame_bytes = px.checked_mul(channels)?;
         let rgba_capacity = px.checked_mul(4)?;
         let frames_rgba: Vec<Vec<u8>> = m["frames_b64"]
             .as_array()?
             .iter()
             .filter_map(|f| engine.decode(f.as_str()?).ok())
-            .filter(|raw| raw.len() >= px * channels.max(1))
+            .filter(|raw| raw.len() >= frame_bytes)
             .map(|raw| {
                 let mut rgba = Vec::with_capacity(rgba_capacity);
                 for i in 0..px {
-                    let (r, g, b) = if channels >= 3 {
+                    let (r, g, b) = if channels == 3 {
                         (
                             raw[i * channels],
                             raw[i * channels + 1],
@@ -153,10 +161,99 @@ fn portrait_from_json(v: &Value) -> Option<String> {
     Some(format!("data:image/svg+xml;base64,{encoded}"))
 }
 
+/// A connection stable for at least a minute clears accumulated failure
+/// backoff; quick flaps continue to increase the retry delay.
+fn telemetry_connection_is_stable(duration_ms: u128) -> bool {
+    duration_ms >= 60_000
+}
+
+/// Deterministic reconnect backoff: 1s, 2s, 4s, 8s, 16s, then 30s.
+fn telemetry_retry_delay_ms(attempt: u32) -> u32 {
+    1_000_u32
+        .saturating_mul(1_u32 << attempt.min(5))
+        .min(30_000)
+}
+
+#[cfg(test)]
+mod telemetry_retry_tests {
+    use super::telemetry_retry_delay_ms;
+
+    #[test]
+    fn reconnect_backoff_doubles_and_caps_at_thirty_seconds() {
+        assert_eq!(telemetry_retry_delay_ms(0), 1_000);
+        assert_eq!(telemetry_retry_delay_ms(1), 2_000);
+        assert_eq!(telemetry_retry_delay_ms(2), 4_000);
+        assert_eq!(telemetry_retry_delay_ms(3), 8_000);
+        assert_eq!(telemetry_retry_delay_ms(4), 16_000);
+        assert_eq!(telemetry_retry_delay_ms(5), 30_000);
+        assert_eq!(telemetry_retry_delay_ms(6), 30_000);
+        assert_eq!(telemetry_retry_delay_ms(u32::MAX), 30_000);
+    }
+
+    #[test]
+    fn only_a_stable_minute_resets_failure_backoff() {
+        assert!(!telemetry_connection_is_stable(0));
+        assert!(!telemetry_connection_is_stable(59_999));
+        assert!(telemetry_connection_is_stable(60_000));
+        assert!(telemetry_connection_is_stable(600_000));
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum TelemetryState {
+    Disconnected,
+    Connecting,
+    Connected,
+    Reconnecting,
+}
+
+impl TelemetryState {
+    fn label(self) -> &'static str {
+        match self {
+            Self::Disconnected => "telemetry disconnected",
+            Self::Connecting => "telemetry connecting",
+            Self::Connected => "telemetry connected",
+            Self::Reconnecting => "telemetry reconnecting",
+        }
+    }
+
+    fn dot_class(self) -> &'static str {
+        match self {
+            Self::Disconnected => "dot dot-dark",
+            Self::Connecting => "dot dot-connecting",
+            Self::Connected => "dot dot-live",
+            Self::Reconnecting => "dot dot-retrying",
+        }
+    }
+}
+
+#[cfg(test)]
+mod telemetry_state_tests {
+    use super::TelemetryState;
+
+    #[test]
+    fn telemetry_states_have_distinct_accessible_labels_and_visual_classes() {
+        let states = [
+            TelemetryState::Disconnected,
+            TelemetryState::Connecting,
+            TelemetryState::Connected,
+            TelemetryState::Reconnecting,
+        ];
+        let labels: std::collections::BTreeSet<_> =
+            states.iter().map(|state| state.label()).collect();
+        let classes: std::collections::BTreeSet<_> =
+            states.iter().map(|state| state.dot_class()).collect();
+
+        assert_eq!(labels.len(), states.len());
+        assert_eq!(classes.len(), states.len());
+        assert_eq!(TelemetryState::Connected.label(), "telemetry connected");
+    }
+}
+
 #[component]
 pub fn App() -> impl IntoView {
     let gateway = RwSignal::new(DEFAULT_GATEWAY.to_string());
-    let ws_connected = RwSignal::new(false);
+    let telemetry_state = RwSignal::new(TelemetryState::Disconnected);
     let vitals = RwSignal::new(Vitals::default());
     let telemetry_count = RwSignal::new(0_u64);
 
@@ -174,27 +271,59 @@ pub fn App() -> impl IntoView {
     let movie_frame = RwSignal::new(0_usize);
     let movie_canvas = NodeRef::<leptos::html::Canvas>::new();
 
-    // Open the telemetry stream once, on mount, against whatever gateway
-    // URL is set at that moment. Reconnecting on URL change is a v1 nicety
-    // — not required for the wiring to be real and useful today.
+    // Keep one telemetry stream alive. Connection state is reported only
+    // after the browser WebSocket reaches OPEN. Failed/short-lived streams use
+    // capped exponential backoff; a connection stable for at least one minute
+    // resets the backoff. Gateway changes are picked up on the next attempt.
     Effect::new(move |_| {
-        let gw = gateway.get_untracked();
-        ws_connected.set(false);
+        telemetry_state.set(TelemetryState::Disconnected);
         spawn_local(async move {
-            ws_connected.set(true);
-            api::stream_telemetry(&gw, move |payload| {
-                vitals.set(Vitals::from_json(&payload));
-                telemetry_count.update(|n| *n += 1);
-                if let Some(svg) = portrait_from_json(&payload) {
-                    portrait.set(Some(svg));
-                }
-                if let Some(m) = Movie::from_json(&payload) {
-                    movie.set(Some(m));
-                    movie_frame.set(0);
-                }
-            })
-            .await;
-            ws_connected.set(false);
+            let retry_attempt = std::rc::Rc::new(std::cell::Cell::new(0_u32));
+            let connected_since =
+                std::rc::Rc::new(std::cell::Cell::<Option<std::time::Instant>>::new(None));
+            loop {
+                telemetry_state.set(TelemetryState::Connecting);
+                let gw = gateway.get_untracked();
+                let retry_state = std::rc::Rc::clone(&retry_attempt);
+                let connected_state = std::rc::Rc::clone(&connected_since);
+                api::stream_telemetry(
+                    &gw,
+                    move |payload| {
+                        vitals.set(Vitals::from_json(&payload));
+                        telemetry_count.update(|n| *n += 1);
+                        if let Some(svg) = portrait_from_json(&payload) {
+                            portrait.set(Some(svg));
+                        }
+                        if let Some(m) = Movie::from_json(&payload) {
+                            movie.set(Some(m));
+                            movie_frame.set(0);
+                        }
+                    },
+                    move |connected| {
+                        telemetry_state.set(if connected {
+                            TelemetryState::Connected
+                        } else {
+                            TelemetryState::Disconnected
+                        });
+                        if connected {
+                            connected_state.set(Some(std::time::Instant::now()));
+                        } else if let Some(started) = connected_state.take() {
+                            if telemetry_connection_is_stable(
+                                started.elapsed().as_millis(),
+                            ) {
+                                retry_state.set(0);
+                            }
+                        }
+                    },
+                )
+                .await;
+
+                telemetry_state.set(TelemetryState::Reconnecting);
+                let attempt = retry_attempt.get();
+                let delay_ms = telemetry_retry_delay_ms(attempt);
+                retry_attempt.set(attempt.saturating_add(1));
+                gloo_timers::future::TimeoutFuture::new(delay_ms).await;
+            }
         });
     });
 
@@ -298,20 +427,30 @@ pub fn App() -> impl IntoView {
     };
 
     view! {
-        <div class="shell">
-            <header class="shell-header">
-                <h1>"Symthaea"</h1>
-                <div class="gateway-row">
+        <main class="shell" data-sfeb-id="symthaea-ui.shell">
+            <header class="shell-header" data-sfeb-id="symthaea-ui.header">
+                <h1 data-sfeb-id="symthaea-ui.title">"Symthaea"</h1>
+                <div class="gateway-row" data-sfeb-id="gateway.endpoint">
                     <label for="gateway">"gateway"</label>
-                    <input id="gateway" type="text"
+                    <input id="gateway" type="text" data-sfeb-id="gateway.input"
                         prop:value=move || gateway.get()
                         on:change=move |ev| gateway.set(event_target_value(&ev))
                     />
-                    <span class=move || if ws_connected.get() { "dot dot-live" } else { "dot dot-dark" }
-                        title=move || if ws_connected.get() { "telemetry connected" } else { "telemetry disconnected" }
+                    <span
+                        class=move || telemetry_state.get().dot_class()
+                        title=move || telemetry_state.get().label()
+                        aria-hidden="true"
                     ></span>
+                    <span
+                        class="telemetry-state"
+                        role="status"
+                        aria-live="polite"
+                        data-sfeb-id="gateway.telemetry-state"
+                    >
+                        {move || telemetry_state.get().label()}
+                    </span>
                 </div>
-                <div class="daemon-status">
+                <div class="daemon-status" role="status" aria-live="polite" data-sfeb-id="gateway.status">
                     {move || match daemon_status.get() {
                         Some(s) => format!(
                             "up {}s · {} requests · {} sleep cycles",
@@ -324,9 +463,9 @@ pub fn App() -> impl IntoView {
                 </div>
             </header>
 
-            <section class="vitals">
+            <section class="vitals" aria-label="Live cognitive telemetry" data-sfeb-id="vitals.panel">
                 <div class="orb-wrap">
-                    <div class="orb"
+                    <div class="orb" aria-hidden="true" data-sfeb-id="vitals.orb"
                         style:animation-duration=move || {
                             let load = vitals.get().thermodynamic_load.clamp(0.0, 1.0);
                             format!("{:.2}s", 2.6 - (load as f64 * 1.8))
@@ -339,7 +478,7 @@ pub fn App() -> impl IntoView {
                         }
                     ></div>
                 </div>
-                <dl class="readouts">
+                <dl class="readouts" data-sfeb-id="vitals.readouts">
                     <div><dt>"consciousness"</dt><dd>{move || format!("{:.1}%", vitals.get().consciousness_level * 100.0)}</dd></div>
                     <div><dt>"valence"</dt><dd>{move || format!("{:+.2}", vitals.get().valence)}</dd></div>
                     <div><dt>"arousal"</dt><dd>{move || format!("{:.2}", vitals.get().arousal)}</dd></div>
@@ -362,7 +501,7 @@ pub fn App() -> impl IntoView {
 
             // Projections: what she renders of herself. Panes appear only
             // once the corresponding stream has actually delivered content.
-            <section class="projections" style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start;">
+            <section class="projections" aria-label="Cognitive projections" data-sfeb-id="projections.region" style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start;">
                 {move || portrait.get().map(|portrait_src| view! {
                     <div class="projection-pane">
                         <h2 style="font-size:0.9em;opacity:0.7;">"self-portrait"</h2>
@@ -385,8 +524,8 @@ pub fn App() -> impl IntoView {
                 </div>
             </section>
 
-            <section class="converse">
-                <div class="transcript">
+            <section class="converse" aria-label="Conversation" data-sfeb-id="conversation.panel">
+                <div class="transcript" role="log" aria-live="polite" aria-relevant="additions" aria-label="Conversation transcript" data-sfeb-id="conversation.transcript">
                     <For
                         each=move || history.get().into_iter().enumerate()
                         key=|(i, _)| *i
@@ -400,17 +539,91 @@ pub fn App() -> impl IntoView {
                         }
                     />
                 </div>
-                {move || last_error.get().map(|e| view! { <div class="error">{e}</div> })}
-                <form class="composer" on:submit=move |ev| { ev.prevent_default(); send(); }>
-                    <input type="text" placeholder="talk to symthaea..."
+                {move || last_error.get().map(|e| view! { <div class="error" role="alert" aria-live="assertive" data-sfeb-id="conversation.error">{e}</div> })}
+                <form class="composer" data-sfeb-id="conversation.composer" on:submit=move |ev| { ev.prevent_default(); send(); }>
+                    <input type="text" id="message" aria-label="Message Symthaea" data-sfeb-id="conversation.input" placeholder="talk to symthaea..."
                         prop:value=move || draft.get()
                         on:input=move |ev| draft.set(event_target_value(&ev))
                     />
-                    <button type="submit" disabled=move || sending.get()>
+                    <button type="submit" data-sfeb-id="conversation.send" disabled=move || sending.get()>
                         {move || if sending.get() { "…" } else { "send" }}
                     </button>
                 </form>
             </section>
-        </div>
+        </main>
+    }
+}
+
+#[cfg(test)]
+mod movie_payload_tests {
+    use super::Movie;
+    use base64::Engine as _;
+    use serde_json::{Value, json};
+
+    fn payload(width: u64, height: u64, channels: u64, frame: &[u8]) -> Value {
+        json!({
+            "mental_movie": {
+                "width": width,
+                "height": height,
+                "channels": channels,
+                "frames_b64": [
+                    base64::engine::general_purpose::STANDARD.encode(frame)
+                ],
+                "semantic_coherence": 0.75
+            }
+        })
+    }
+
+    #[test]
+    fn decodes_grayscale_frames_to_opaque_rgba() {
+        let value = payload(2, 1, 1, &[10, 30]);
+        let movie = Movie::from_json(&value).expect("valid grayscale frame");
+
+        assert_eq!(movie.width, 2);
+        assert_eq!(movie.height, 1);
+        assert_eq!(movie.frames_rgba, vec![vec![
+            10, 10, 10, 255,
+            30, 30, 30, 255,
+        ]]);
+    }
+
+    #[test]
+    fn decodes_rgb_frames_to_opaque_rgba() {
+        let value = payload(2, 1, 3, &[1, 2, 3, 4, 5, 6]);
+        let movie = Movie::from_json(&value).expect("valid RGB frame");
+
+        assert_eq!(movie.frames_rgba, vec![vec![
+            1, 2, 3, 255,
+            4, 5, 6, 255,
+        ]]);
+    }
+
+    #[test]
+    fn rejects_unsupported_channel_counts() {
+        for channels in [0, 2, 4, u64::MAX] {
+            let value = payload(1, 1, channels, &[1, 2, 3, 4]);
+            assert!(
+                Movie::from_json(&value).is_none(),
+                "channels={channels} must be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_dimensions_that_would_narrow_to_u32() {
+        let value = payload(u32::MAX as u64 + 2, 1, 1, &[7]);
+        assert!(Movie::from_json(&value).is_none());
+    }
+
+    #[test]
+    fn rejects_frames_shorter_than_the_declared_layout() {
+        let value = payload(2, 1, 3, &[1, 2, 3, 4, 5]);
+        assert!(Movie::from_json(&value).is_none());
+    }
+
+    #[test]
+    fn rejects_frames_over_the_pixel_limit() {
+        let value = payload(4097, 4097, 1, &[]);
+        assert!(Movie::from_json(&value).is_none());
     }
 }

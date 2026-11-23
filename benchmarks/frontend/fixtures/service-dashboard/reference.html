@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A fixture reference for the SFEB service operations dashboard task.">
+  <title>Service overview · Luminous Fieldwork</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+  <div class="app-shell" data-sfeb-id="dashboard.shell">
+    <header class="topbar" data-sfeb-id="dashboard.header">
+      <a class="brand" href="#overview" aria-label="Luminous Fieldwork home">
+        <span class="brand-mark" aria-hidden="true">✳</span>
+        <span><strong>Luminous</strong><small>FIELDWORK</small></span>
+      </a>
+      <nav class="top-nav" aria-label="Primary navigation">
+        <a class="active" href="#overview">Overview</a>
+        <a href="#activity">Activity</a>
+        <a href="#schedule">Schedule</a>
+      </nav>
+      <div class="profile">
+        <span class="profile-dot" aria-hidden="true"></span>
+        <span><strong>Operations</strong><small>Field team</small></span>
+      </div>
+    </header>
+
+    <div class="workspace">
+      <aside class="sidebar" aria-label="Workspace" data-sfeb-id="dashboard.sidebar">
+        <p class="eyebrow">WORKSPACE</p>
+        <nav aria-label="Workspace navigation">
+          <a class="selected" href="#overview"><span aria-hidden="true">⌂</span> Overview</a>
+          <a href="#work-orders"><span aria-hidden="true">▤</span> Work orders <span class="nav-count">24</span></a>
+          <a href="#team"><span aria-hidden="true">◉</span> Team</a>
+          <a href="#assets"><span aria-hidden="true">◇</span> Assets</a>
+        </nav>
+        <div class="sidebar-note">
+          <span class="pulse" aria-hidden="true"></span>
+          <div><strong>All systems steady</strong><small>Last updated just now</small></div>
+        </div>
+      </aside>
+
+      <main id="main-content" class="main-content" data-sfeb-id="dashboard.main">
+        <section id="overview" class="page-heading" aria-labelledby="dashboard-title" data-sfeb-id="dashboard.heading">
+          <div>
+            <p class="eyebrow">SUNDAY, 22 NOVEMBER</p>
+            <h1 id="dashboard-title">Service overview</h1>
+            <p class="muted">A clear view of the work happening across your field team.</p>
+          </div>
+          <a class="primary-link" href="#new-work-order">＋ <span>Create work order</span></a>
+        </section>
+
+        <section class="metric-grid" aria-label="Operational summary" data-sfeb-id="dashboard.metrics">
+          <article class="metric-card" data-sfeb-id="dashboard.metric-card.active">
+            <div class="metric-top"><span>Active work orders</span><span class="metric-icon green" aria-hidden="true">▤</span></div>
+            <strong class="metric-value">24</strong>
+            <p><span class="trend up">↑ 12%</span> <span class="muted">from last week</span></p>
+          </article>
+          <article class="metric-card" data-sfeb-id="dashboard.metric-card.scheduled">
+            <div class="metric-top"><span>Scheduled today</span><span class="metric-icon gold" aria-hidden="true">◷</span></div>
+            <strong class="metric-value">08</strong>
+            <p><span class="trend neutral">On track</span> <span class="muted">for today's plan</span></p>
+          </article>
+          <article class="metric-card" data-sfeb-id="dashboard.metric-card.team">
+            <div class="metric-top"><span>Technicians online</span><span class="metric-icon blue" aria-hidden="true">◉</span></div>
+            <strong class="metric-value">12<span class="metric-total"> / 14</span></strong>
+            <p><span class="trend up">86%</span> <span class="muted">team availability</span></p>
+          </article>
+        </section>
+
+        <div class="content-grid">
+          <section id="activity" class="panel activity-panel" aria-labelledby="activity-title" data-sfeb-id="dashboard.activity">
+            <div class="panel-heading">
+              <div><p class="eyebrow">LIVE WORK</p><h2 id="activity-title">Recent activity</h2></div>
+              <a href="#all-activity" class="subtle-link">View all <span aria-hidden="true">→</span></a>
+            </div>
+            <ol class="activity-list">
+              <li><span class="activity-icon completed" aria-hidden="true">✓</span><div><strong>HVAC inspection completed</strong><small>North Campus · Maya Chen</small></div><time datetime="2026-11-22T09:42">9:42 AM</time></li>
+              <li><span class="activity-icon assigned" aria-hidden="true">↗</span><div><strong>New work order assigned</strong><small>Solar array maintenance · Eli Brooks</small></div><time datetime="2026-11-22T09:18">9:18 AM</time></li>
+              <li><span class="activity-icon update" aria-hidden="true">↻</span><div><strong>Parts request updated</strong><small>Workshop 03 · Noah Patel</small></div><time datetime="2026-11-22T08:56">8:56 AM</time></li>
+              <li><span class="activity-icon completed" aria-hidden="true">✓</span><div><strong>Safety checklist approved</strong><small>East Plant · Amara Okafor</small></div><time datetime="2026-11-22T08:31">8:31 AM</time></li>
+            </ol>
+          </section>
+
+          <section id="schedule" class="panel schedule-panel" aria-labelledby="schedule-title" data-sfeb-id="dashboard.schedule">
+            <div class="panel-heading">
+              <div><p class="eyebrow">UP NEXT</p><h2 id="schedule-title">Today's schedule</h2></div>
+              <span class="date-chip">22 Nov</span>
+            </div>
+            <ol class="schedule-list">
+              <li><time datetime="2026-11-22T10:30">10:30</time><span class="schedule-bar green-bar"></span><div><strong>Generator service</strong><small>West facility · Maya Chen</small></div></li>
+              <li><time datetime="2026-11-22T12:00">12:00</time><span class="schedule-bar gold-bar"></span><div><strong>Site assessment</strong><small>River works · Eli Brooks</small></div></li>
+              <li><time datetime="2026-11-22T14:15">14:15</time><span class="schedule-bar blue-bar"></span><div><strong>Equipment handover</strong><small>Central depot · Noah Patel</small></div></li>
+            </ol>
+            <a class="schedule-link" href="#full-schedule">Open full schedule <span aria-hidden="true">→</span></a>
+          </section>
+        </div>
+
+        <section id="new-work-order" class="visually-contained-footer" aria-label="Work order action destination">
+          <p class="muted">Work order creation is outside the scope of this static reconstruction task.</p>
+        </section>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

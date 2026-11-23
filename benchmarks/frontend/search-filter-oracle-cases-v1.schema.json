@@ -1,0 +1,211 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/sfeb/search-filter-oracle-cases-v1.schema.json",
+  "title": "SFEB Search/Filter Golden Oracle Cases v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "dataset_id",
+    "cases",
+    "metamorphic_relations"
+  ],
+  "properties": {
+    "schema": {
+      "const": "sfeb-search-filter-oracle-cases-v1"
+    },
+    "dataset_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 8,
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    },
+    "metamorphic_relations": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "relation"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "relation": {
+            "type": "string",
+            "minLength": 10
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "query": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "q",
+        "category",
+        "available_only",
+        "min_price_cents",
+        "max_price_cents",
+        "sort",
+        "page",
+        "page_size"
+      ],
+      "properties": {
+        "q": {
+          "type": "string",
+          "maxLength": 80,
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+        },
+        "category": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "available_only": {
+          "type": "boolean"
+        },
+        "min_price_cents": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "max_price_cents": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "sort": {
+          "enum": [
+            "name_asc",
+            "price_asc",
+            "price_desc",
+            "stock_asc"
+          ]
+        },
+        "page": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000
+        },
+        "page_size": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        }
+      }
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "asset_ids",
+        "total_matches",
+        "page",
+        "page_size",
+        "page_count"
+      ],
+      "properties": {
+        "asset_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "total_matches": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "page": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "page_size": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        },
+        "page_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "kind",
+        "input"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "pattern": "^SFEB-SEARCH-[0-9]{3}$"
+        },
+        "kind": {
+          "enum": [
+            "positive",
+            "negative"
+          ]
+        },
+        "input": {
+          "$ref": "#/$defs/query"
+        },
+        "expected": {
+          "$ref": "#/$defs/expected"
+        },
+        "expected_error": {
+          "enum": [
+            "min_price_cents_exceeds_max_price_cents",
+            "invalid_page_size",
+            "invalid_page",
+            "unsupported_sort",
+            "query_too_long",
+            "query_contains_control_character",
+            "price_amount_unsafe_for_cross_language_integer"
+          ]
+        }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "expected"
+          ],
+          "not": {
+            "required": [
+              "expected_error"
+            ]
+          }
+        },
+        {
+          "required": [
+            "expected_error"
+          ],
+          "not": {
+            "required": [
+              "expected"
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

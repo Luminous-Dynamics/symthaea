@@ -1,0 +1,52 @@
+{
+  "schema": "sfeb-monitoring-schema-validation-report-v1",
+  "status": "passed",
+  "validator": {
+    "name": "jsonschema",
+    "version": "4.26.0",
+    "dialect": "JSON Schema Draft 2020-12"
+  },
+  "schemas": {
+    "fixture": {
+      "path": "benchmarks/frontend/monitoring/monitoring-fixture-v1.schema.json",
+      "repository_blob_sha_after_fix": "215766f6aa9b6f8a6eff2e71cd4bc093fb74a8db",
+      "local_validation": "pass"
+    },
+    "traces": {
+      "path": "benchmarks/frontend/monitoring/monitoring-reference-traces-v1.schema.json",
+      "repository_blob_sha": "ac332549394b84cde903186f37a7fbefafe66720",
+      "local_validation": "pass"
+    },
+    "policy": {
+      "path": "benchmarks/frontend/monitoring/monitoring-policy-v1.schema.json",
+      "repository_blob_sha": "fe308fa9662fa7c6b739926608a26c4dad171403",
+      "local_validation": "pass"
+    }
+  },
+  "positive_cases": {
+    "fixture": {
+      "schema_valid": true,
+      "validation_errors": 0
+    },
+    "traces": {
+      "schema_valid": true,
+      "validation_errors": 0
+    },
+    "policy": {
+      "schema_valid": true,
+      "validation_errors": 0
+    }
+  },
+  "negative_controls": {
+    "fixture_unknown_property_rejected": true,
+    "fixture_invalid_id_rejected": true,
+    "trace_invalid_fixture_digest_rejected": true,
+    "policy_missing_rule_rejected": true
+  },
+  "fixture_sha256": "d15e2fe36d2683618ec939f80f041155a3cfec9ab36230c864c8fcf0f4311d28",
+  "trace_fixture_digest_matches": true,
+  "limitations": [
+    "Local Draft 2020-12 validation used a mirror transcribed from the fetched repository schemas; the fixture schema's case-sensitive pattern was corrected in the repository.",
+    "This validates JSON shape only, not verifier semantics, production runtime, browser evidence or scheduler behavior."
+  ]
+}

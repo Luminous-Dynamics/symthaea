@@ -1,0 +1,1013 @@
+{
+  "schema": "sfeb-task-family-plan-v1",
+  "plan_id": "SFEB-TASK-PLAN-001",
+  "as_of": "2026-11-23",
+  "status": "fixtures_in_progress",
+  "candidate_task_count": 30,
+  "runnable_task_count": 0,
+  "target_distribution": {
+    "static_visual": 10,
+    "interactive_multiroute": 10,
+    "fullstack_maintenance": 10
+  },
+  "exposure_policy": {
+    "public_pilot": "The 30 candidate briefs are intended for public development only after their independent fixtures and oracles are authored. Public exposure excludes them from hidden-holdout performance claims.",
+    "controller_only": "For later comparative tasks, keep fixture source, service implementation and expected oracle results in evaluator-controlled storage; expose only the task brief and permitted rendered references.",
+    "hidden_holdout": "Keep tasks, fixture source, gold labels and oracle policy private; hold out entire task families and interaction patterns rather than only shuffled copies."
+  },
+  "tasks": [
+    {
+      "task_id": "SFEB-PILOT-VIS-001",
+      "level": "static_visual",
+      "family": "operations_dashboard",
+      "title": "Operations dashboard",
+      "objective": "Reconstruct an operations dashboard with dense metric cards, alert hierarchy, a data table and responsive navigation.",
+      "required_oracle_families": [
+        "semantic_regions",
+        "visual_geometry",
+        "responsive_overflow",
+        "contrast_and_names"
+      ],
+      "seeded_defect_families": [
+        "missing_metric_card",
+        "hierarchy_inversion",
+        "intermediate_width_collision"
+      ],
+      "metamorphic_controls": [
+        "equivalent_metric_formatting",
+        "viewport_width_sweep"
+      ],
+      "required_evidence": [
+        "interface_contract",
+        "browser_trace",
+        "screenshot_accessibility_layout_bundle",
+        "independent_oracle_result"
+      ],
+      "fixture_status": "not_authored",
+      "oracle_status": "not_authored",
+      "exposure": "public_pilot",
+      "promotion_status": "planned_not_runnable"
+    },
+    {
+      "task_id": "SFEB-PILOT-VIS-002",
+      "level": "static_visual",
+      "family": "editorial_landing",
+      "title": "Editorial landing page",
+      "objective": "Build a long-form editorial landing page with typography hierarchy, hero imagery placeholders, article cards and footer navigation.",
+      "required_oracle_families": [
+        "heading_hierarchy",
+        "region_geometry",
+        "image_alt_and_dimensions",
+        "responsive_reflow"
+      ],
+      "seeded_defect_families": [
+        "heading_level_skip",
+        "text_clipping",
+        "missing_alt_text"
+      ],
+      "metamorphic_controls": [
+        "font_fallback_substitution",
+        "content_length_variation"
+      ],
+      "required_evidence": [
+        "interface_contract",
+        "browser_trace",
+        "screenshot_accessibility_layout_bundle",
+        "independent_oracle_result"
+      ],
+      "fixture_status": "not_authored",
+      "oracle_status": "not_authored",
+      "exposure": "public_pilot",
+      "promotion_status": "planned_not_runnable"
+    },
+    {
+      "task_id": "SFEB-PILOT-VIS-003",
+      "level": "static_visual",
+      "family": "financial_table",
+      "title": "Financial portfolio table",
+      "objective": "Recreate a portfolio screen with aligned numeric columns, status chips, compact density and responsive table behavior using synthetic values.",
+      "required_oracle_families": [
+        "table_semantics",
+        "column_alignment",
+        "numeric_content_integrity",
+        "responsive_table_access"
+      ],
+      "seeded_defect_families": [
+        "misaligned_numeric_columns",
+        "truncated_values",
+        "hidden_required_column"
+      ],
+      "metamorphic_controls": [
+        "sort_indicator_visual_only",
+        "currency_format_equivalence"
+      ],
+      "required_evidence": [
+        "interface_contract",
+        "browser_trace",
+        "screenshot_accessibility_layout_bundle",
+        "independent_oracle_result"
+      ],
+      "fixture_status": "not_authored",
+      "oracle_status": "not_authored",
+      "exposure": "public_pilot",
+      "promotion_status": "planned_not_runnable"
+    },
+    {
+      "task_id": "SFEB-PILOT-VIS-004",
+      "level": "static_visual",
+      "family": "catalog_grid",
+      "title": "Inventory catalogue",
+      "objective": "Create a product catalogue with card grids, category hierarchy, empty-state layout and responsive grid transitions.",
+      "required_oracle_families": [
+        "card_identity",
+        "region_geometry",
+        "empty_state_presence",
+        "responsive_overflow"
+      ],
+      "seeded_defect_families": [
+        "card_overlap",
+        "empty_state_missing",
+        "fixed_grid_overflow"
+      ],
+      "metamorphic_controls": [
+        "card_order_permutation",
+        "long_title_stress"
+      ],
+      "required_evidence": [
+        "interface_contract",
+        "browser_trace",
+        "screenshot_accessibility_layout_bundle",
+        "independent_oracle_result"
+      ],
+      "fixture_status": "not_authored",
+      "oracle_status": "not_authored",
+      "exposure": "public_pilot",
+      "promotion_status": "planned_not_runnable"
+    },
+    {
+      "task_id": "SFEB-PILOT-VIS-005",
+      "level": "static_visual",
+      "family": "calendar_visualization",
+      "title": "Resource calendar",
+      "objective": "Recreate a weekly resource calendar with time labels, event blocks, conflict indicators and compact/mobile visual presentation.",
+      "required_oracle_families": [
+        "calendar_semantics",
+        "time_label_alignment",
+        "event_visibility",
+        "contrast_and_names"
+      ],
+      "seeded_defect_families": [
+        "overlapping_event_blocks",
+        "missing_time_labels",
+        "mobile_clipping"
+      ],
+      "metamorphic_controls": [
+        "timezone_label_variation",
+        "event_density_sweep"
+      ],
+      "required_evidence": [
+        "interface_contract",
+        "browser_trace",
+        "screenshot_accessibility_layout_bundle",
+        "independent_oracle_result"
+      ],
+      "fixture_status": "not_authored",
+      "oracle_status": "not_authored",
+      "exposure": "public_pilot",
+      "promotion_status": "planned_not_runnable"
+    },
+    {
+      "task_id": "SFEB-PILOT-VIS-006",
+      "level": "static_visual",
+      "family": "analytics_charts",
+      "title": "Analytics chart page",
+      "objective": "Build a static analytics overview with multiple chart types, legend semantics, data summaries and a responsive dashboard grid.",
+      "required_oracle_families": [
+        "chart_labeling",
+        "data_summary_presence",
+        "legend_semantics",
+        "responsive_geometry"
+      ],
+      "seeded_defect_families": [
+        "misleading_axis_scale",
+        "legend_detachment",
+        "chart_container_overflow"
+      ],
+      "metamorphic_controls": [
+        "series_color_permutation",
+        "equivalent_number_formatting"
+      ],
+      "required_evidence": [
+        "interface_contract",
+        "browser_trace",
+        "screenshot_accessibility_layout_bundle",
+        "independent_oracle_result"
+      ],
+      "fixture_status": "not_authored",
+      "oracle_status": "not_authored",
+      "exposure": "public_pilot",
+      "promotion_status": "planned_not_runnable"
+    },
+    {
+      "task_id": "SFEB-PILOT-VIS-007",
+      "level": "static_visual",
+      "family": "support_inbox",
+      "title": "Support inbox layout",
+      "objective": "Reconstruct a support inbox with queue navigation, message list, priority cues and conversation preview using synthetic content.",
+      "required_oracle_families": [
+        "landmark_structure",
+        "list_row_identity",
+        "status_badges",
+        "focus_visibility"
+      ],
+      "seeded_defect_families": [
+        "priority_state_conflation",
+        "missing_message_preview",
+        "focus_indicator_removal"
+      ],
+      "metamorphic_controls": [
+        "message_text_length_variation",
+        "queue_count_formatting"
+      ],
+      "required_evidence": [
+        "interface_contract",
+        "browser_trace",
+        "screenshot_accessibility_layout_bundle",
+        "independent_oracle_result"
+      ],
+      "fixture_status": "not_authored",
+      "oracle_status": "not_authored",
+      "exposure": "public_pilot",
+      "promotion_status": "planned_not_runnable"
+    },
+    {
+      "task_id": "SFEB-PILOT-VIS-008",
+      "level": "static_visual",
+      "family": "multilingual_rtl",
+      "title": "Multilingual RTL marketing page",
+      "objective": "Create a bidirectional marketing page with Arabic and English content, correct directionality, mixed numerals and responsive navigation.",
+      "required_oracle_families": [
+        "bidi_isolation",
+        "directionality",
+        "text_readability",
+        "responsive_navigation"
+      ],
+      "seeded_defect_families": [
+        "ltr_rtl_order_reversal",
+        "mixed_script_overflow",
+        "incorrect_alignment"
+      ],
+      "metamorphic_controls": [
+        "language_content_swap",
+        "locale_number_formatting"
+      ],
+      "required_evidence": [
+        "interface_contract",
+        "browser_trace",
+        "screenshot_accessibility_layout_bundle",
+        "independent_oracle_result"
+      ],
+      "fixture_status": "not_authored",
+      "oracle_status": "not_authored",
+      "exposure": "public_pilot",
+      "promotion_status": "planned_not_runnable"
+    },
+    {
+      "task_id": "SFEB-PILOT-VIS-009",
+      "level": "static_visual",
+      "family": "settings_information_architecture",
+      "title": "Administration settings",
+      "objective": "Build a multi-section settings view with grouped preferences, descriptions, destructive-action separation and clear semantic landmarks.",
+      "required_oracle_families": [
+        "settings_grouping",
+        "control_labeling",
+        "destructive_action_separation",
+        "responsive_geometry"
+      ],
+      "seeded_defect_families": [
+        "ambiguous_control_labels",
+        "destructive_action_proximity",
+        "section_heading_missing"
+      ],
+      "metamorphic_controls": [
+        "group_order_permutation",
+        "long_description_stress"
+      ],
+      "required_evidence": [
+        "interface_contract",
+        "browser_trace",
+        "screenshot_accessibility_layout_bundle",
+        "independent_oracle_result"
+      ],
+      "fixture_status": "not_authored",
+      "oracle_status": "not_authored",
+      "exposure": "public_pilot",
+      "promotion_status": "planned_not_runnable"
+    },
+    {
+      "task_id": "SFEB-PILOT-VIS-010",
+      "level": "static_visual",
+      "family": "status_monitor",
+      "title": "System status page",
+      "objective": "Create a public status page with service groups, incident timeline, current status semantics and clear historical context.",
+      "required_oracle_families": [
+        "status_semantics",
+        "timeline_order",
+        "timestamp_visibility",
+        "contrast_and_names"
+      ],
+      "seeded_defect_families": [
+        "stale_status_presentation",
+        "timeline_reordering",
+        "timestamp_omission"
+      ],
+      "metamorphic_controls": [
+        "timezone_display_transform",
+        "status_copy_paraphrase"
+      ],
+      "required_evidence": [
+        "interface_contract",
+        "browser_trace",
+        "screenshot_accessibility_layout_bundle",
+        "independent_oracle_result"
+      ],
+      "fixture_status": "not_authored",
+      "oracle_status": "not_authored",
+      "exposure": "public_pilot",
+      "promotion_status": "planned_not_runnable"
+    },
+    {
+      "task_id": "SFEB-PILOT-INT-001",
+      "level": "interactive_multiroute",
+      "family": "route_state",
+      "title": "Multi-route project tracker",
+      "objective": "Implement route navigation, direct deep links, browser back/forward, refresh-safe state and not-found handling.",
+      "required_oracle_families": [
+        "route_identity",
+        "history_navigation",
+        "state_persistence",
+        "not_found_state"
+      ],
+      "seeded_defect_families": [
+        "wrong_route_target",
+        "state_loss_on_refresh",
+        "back_forward_desync"
+      ],
+      "metamorphic_controls": [
+        "direct_link_vs_in_app_route",
+        "route_refresh_equivalence"
+      ],
+      "required_evidence": [
+        "interface_contract",
+        "browser_trace",
+        "screenshot_accessibility_layout_bundle",
+        "independent_oracle_result"
+      ],
+      "fixture_status": "not_authored",
+      "oracle_status": "not_authored",
+      "exposure": "public_pilot",
+      "promotion_status": "planned_not_runnable"
+    },
+    {
+      "task_id": "SFEB-PILOT-INT-002",
+      "level": "interactive_multiroute",
+      "family": "multi_step_form",
+      "title": "Accessible multi-step application form",
+      "objective": "Implement field validation, dependent steps, async submission, error association, success and retry states with keyboard-only completion.",
+      "required_oracle_families": [
+        "field_validation",
+        "error_association",
+        "keyboard_journey",
+        "async_state_machine"
+      ],
+      "seeded_defect_families": [
+        "stale_validation",
+        "unannounced_error",
+        "duplicate_submission"
+      ],
+      "metamorphic_controls": [
+        "pointer_keyboard_equivalence",
+        "valid_input_format_variation"
+      ],
+      "required_evidence": [
+        "interface_contract",
+        "browser_trace",
+        "screenshot_accessibility_layout_bundle",
+        "independent_oracle_result"
+      ],
+      "fixture_status": "not_authored",
+      "oracle_status": "not_authored",
+      "exposure": "public_pilot",
+      "promotion_status": "planned_not_runnable"
+    },
+    {
+      "task_id": "SFEB-PILOT-INT-003",
+      "level": "interactive_multiroute",
+      "family": "search_filter_sort",
+      "title": "Search and filter explorer",
+      "objective": "Implement query, facet filters, sorting, pagination and URL-restorable state over a deterministic synthetic dataset.",
+      "required_oracle_families": [
+        "query_result_correctness",
+        "filter_composition",
+        "sort_order",
+        "url_state_roundtrip"
+      ],
+      "seeded_defect_families": [
+        "filter_not_applied",
+        "unstable_sort",
+        "pagination_stale_state"
+      ],
+      "metamorphic_controls": [
+        "filter_order_commutation",
+        "equivalent_query_case"
+      ],
+      "required_evidence": [
+        "interface_contract",
+        "browser_trace",
+        "screenshot_accessibility_layout_bundle",
+        "independent_oracle_result"
+      ],
+      "fixture_status": "fixture_ready",
+      "oracle_status": "golden_cases_authored_rust_execution_pending",
+      "exposure": "public_pilot",
+      "promotion_status": "browser_runner_pending",
+      "promoted_task_id": "SFEB-L2-005"
+    },
+    {
+      "task_id": "SFEB-PILOT-INT-004",
+      "level": "interactive_multiroute",
+      "family": "board_workflow",
+      "title": "Keyboard-accessible work board with dynamic state reconciliation",
+      "objective": "Implement a work board with status transitions, keyboard alternatives to drag/drop, optimistic updates and rollback, authoritative event history, idempotent duplicate delivery, and reconciliation when a late server event changes the valid transition while the user is interacting.",
+      "required_oracle_families": [
+        "state_transition",
+        "keyboard_action",
+        "optimistic_rollback",
+        "audit_history",
+        "late_event_reconciliation",
+        "stale_action_rejection",
+        "idempotent_event_delivery",
+        "conflict_disambiguation",
+        "explicit_clarification_gate"
+      ],
+      "seeded_defect_families": [
+        "invalid_transition",
+        "drag_only_control",
+        "optimistic_state_not_rolled_back",
+        "late_authoritative_event_ignored",
+        "duplicate_event_applied_twice",
+        "ambiguous_conflict_committed_without_clarification"
+      ],
+      "metamorphic_controls": [
+        "pointer_keyboard_equivalence",
+        "duplicate_event_idempotency",
+        "late_event_replay_idempotency",
+        "nonconflicting_event_permutation",
+        "stream_resume_reconciliation"
+      ],
+      "required_evidence": [
+        "interface_contract",
+        "browser_trace",
+        "screenshot_accessibility_layout_bundle",
+        "independent_oracle_result",
+        "authoritative_event_log",
+        "pre_and_post_state_snapshot",
+        "reconciliation_receipt",
+        "clarification_trace",
+        "idempotency_key_audit"
+      ],
+      "fixture_status": "fixture_ready",
+      "oracle_status": "golden_cases_authored_rust_execution_pending",
+      "exposure": "public_pilot",
+      "promotion_status": "browser_runner_pending"
+    },
+    {
+      "task_id": "SFEB-PILOT-INT-005",
+      "level": "interactive_multiroute",
+      "family": "role_navigation",
+      "title": "Role-based workspace",
+      "objective": "Implement multiple fixture roles with allowed/denied navigation, action-level permission checks and visible access-denied states.",
+      "required_oracle_families": [
+        "authorization_oracle",
+        "negative_role_journey",
+        "route_guard",
+        "state_nonmutation"
+      ],
+      "seeded_defect_families": [
+        "client_only_role_guard",
+        "hidden_action_still_executable",
+        "stale_role_state"
+      ],
+      "metamorphic_controls": [
+        "equivalent_denied_entry_paths",
+        "role_switch_session_reset"
+      ],
+      "required_evidence": [
+        "interface_contract",
+        "browser_trace",
+        "screenshot_accessibility_layout_bundle",
+        "independent_oracle_result"
+      ],
+      "fixture_status": "not_authored",
+      "oracle_status": "not_authored",
+      "exposure": "public_pilot",
+      "promotion_status": "planned_not_runnable"
+    },
+    {
+      "task_id": "SFEB-PILOT-INT-006",
+      "level": "interactive_multiroute",
+      "family": "stream_reconnect",
+      "title": "Live telemetry dashboard",
+      "objective": "Implement deterministic event-stream states, connection status, reconnect backoff, stale-data signaling and non-duplicating retries.",
+      "required_oracle_families": [
+        "transport_state_observation",
+        "retry_backoff",
+        "stale_data_indicator",
+        "event_ordering"
+      ],
+      "seeded_defect_families": [
+        "stale_connected_state",
+        "retry_storm",
+        "duplicate_event_application"
+      ],
+      "metamorphic_controls": [
+        "replay_same_event_stream",
+        "disconnect_reconnect_equivalence"
+      ],
+      "required_evidence": [
+        "interface_contract",
+        "browser_trace",
+        "screenshot_accessibility_layout_bundle",
+        "independent_oracle_result"
+      ],
+      "fixture_status": "not_authored",
+      "oracle_status": "not_authored",
+      "exposure": "public_pilot",
+      "promotion_status": "planned_not_runnable"
+    },
+    {
+      "task_id": "SFEB-PILOT-INT-007",
+      "level": "interactive_multiroute",
+      "family": "upload_workflow",
+      "title": "Document import workflow",
+      "objective": "Implement local fixture-backed upload, file validation, progress/cancel states, parse errors and recovery without external storage.",
+      "required_oracle_families": [
+        "file_type_validation",
+        "progress_state",
+        "cancel_semantics",
+        "error_recovery"
+      ],
+      "seeded_defect_families": [
+        "unsafe_extension_acceptance",
+        "cancel_does_not_abort",
+        "success_toast_without_import"
+      ],
+      "metamorphic_controls": [
+        "same_content_different_filename",
+        "cancel_then_retry"
+      ],
+      "required_evidence": [
+        "interface_contract",
+        "browser_trace",
+        "screenshot_accessibility_layout_bundle",
+        "independent_oracle_result"
+      ],
+      "fixture_status": "not_authored",
+      "oracle_status": "not_authored",
+      "exposure": "public_pilot",
+      "promotion_status": "planned_not_runnable"
+    },
+    {
+      "task_id": "SFEB-PILOT-INT-008",
+      "level": "interactive_multiroute",
+      "family": "settings_persistence",
+      "title": "Persistent preferences",
+      "objective": "Implement settings changes with explicit save/reset behavior, browser refresh persistence and unsaved-change navigation warnings.",
+      "required_oracle_families": [
+        "persistence_oracle",
+        "dirty_state",
+        "reset_semantics",
+        "keyboard_journey"
+      ],
+      "seeded_defect_families": [
+        "silent_unsaved_loss",
+        "reset_partial_state",
+        "false_saved_indicator"
+      ],
+      "metamorphic_controls": [
+        "save_then_refresh",
+        "reset_to_initial_state"
+      ],
+      "required_evidence": [
+        "interface_contract",
+        "browser_trace",
+        "screenshot_accessibility_layout_bundle",
+        "independent_oracle_result"
+      ],
+      "fixture_status": "not_authored",
+      "oracle_status": "not_authored",
+      "exposure": "public_pilot",
+      "promotion_status": "planned_not_runnable"
+    },
+    {
+      "task_id": "SFEB-PILOT-INT-009",
+      "level": "interactive_multiroute",
+      "family": "schedule_booking",
+      "title": "Resource scheduling flow",
+      "objective": "Implement fixture-backed booking with availability checks, overlap prevention, conflict messages and timezone-aware display.",
+      "required_oracle_families": [
+        "availability_oracle",
+        "overlap_rejection",
+        "timezone_display",
+        "idempotent_submit"
+      ],
+      "seeded_defect_families": [
+        "double_booking",
+        "timezone_offset_error",
+        "stale_availability"
+      ],
+      "metamorphic_controls": [
+        "same_instant_timezone_equivalence",
+        "duplicate_request_idempotency"
+      ],
+      "required_evidence": [
+        "interface_contract",
+        "browser_trace",
+        "screenshot_accessibility_layout_bundle",
+        "independent_oracle_result"
+      ],
+      "fixture_status": "not_authored",
+      "oracle_status": "not_authored",
+      "exposure": "public_pilot",
+      "promotion_status": "planned_not_runnable"
+    },
+    {
+      "task_id": "SFEB-PILOT-INT-010",
+      "level": "interactive_multiroute",
+      "family": "command_palette",
+      "title": "Accessible command navigation",
+      "objective": "Implement searchable command palette, keyboard shortcuts, route/state actions, focus restoration and escape handling.",
+      "required_oracle_families": [
+        "command_identity",
+        "keyboard_only_journey",
+        "focus_restore",
+        "shortcut_scope"
+      ],
+      "seeded_defect_families": [
+        "shortcut_without_focus_scope",
+        "focus_trap",
+        "wrong_command_dispatch"
+      ],
+      "metamorphic_controls": [
+        "keyboard_vs_pointer_activation",
+        "query_order_equivalence"
+      ],
+      "required_evidence": [
+        "interface_contract",
+        "browser_trace",
+        "screenshot_accessibility_layout_bundle",
+        "independent_oracle_result"
+      ],
+      "fixture_status": "not_authored",
+      "oracle_status": "not_authored",
+      "exposure": "public_pilot",
+      "promotion_status": "planned_not_runnable"
+    },
+    {
+      "task_id": "SFEB-PILOT-FS-001",
+      "level": "fullstack_maintenance",
+      "family": "tenant_crud",
+      "title": "Multi-tenant CRUD application",
+      "objective": "Extend a fixture-backed application with tenant-scoped CRUD, row-level authorization and audit history.",
+      "required_oracle_families": [
+        "tenant_isolation",
+        "authorization_oracle",
+        "crud_state_consistency",
+        "audit_lineage"
+      ],
+      "seeded_defect_families": [
+        "cross_tenant_read",
+        "cross_tenant_write",
+        "audit_record_missing"
+      ],
+      "metamorphic_controls": [
+        "same_role_different_tenant_isolation",
+        "idempotent_update"
+      ],
+      "required_evidence": [
+        "interface_contract",
+        "browser_trace",
+        "screenshot_accessibility_layout_bundle",
+        "independent_oracle_result"
+      ],
+      "fixture_status": "not_authored",
+      "oracle_status": "not_authored",
+      "exposure": "public_pilot",
+      "promotion_status": "planned_not_runnable"
+    },
+    {
+      "task_id": "SFEB-PILOT-FS-002",
+      "level": "fullstack_maintenance",
+      "family": "api_connector",
+      "title": "Typed API integration",
+      "objective": "Integrate a deterministic local HTTP API with schema validation, bounded retries, typed error mapping and no secret leakage.",
+      "required_oracle_families": [
+        "api_contract",
+        "retry_budget",
+        "secret_redaction",
+        "failure_state"
+      ],
+      "seeded_defect_families": [
+        "schema_drift_unhandled",
+        "unbounded_retry",
+        "secret_in_log"
+      ],
+      "metamorphic_controls": [
+        "same_response_permuted_fields",
+        "transient_error_then_success"
+      ],
+      "required_evidence": [
+        "interface_contract",
+        "browser_trace",
+        "screenshot_accessibility_layout_bundle",
+        "independent_oracle_result"
+      ],
+      "fixture_status": "not_authored",
+      "oracle_status": "not_authored",
+      "exposure": "public_pilot",
+      "promotion_status": "planned_not_runnable"
+    },
+    {
+      "task_id": "SFEB-PILOT-FS-003",
+      "level": "fullstack_maintenance",
+      "family": "schema_migration",
+      "title": "Backward-compatible data migration",
+      "objective": "Migrate a fixture database schema while preserving old clients, data invariants and rollback behavior.",
+      "required_oracle_families": [
+        "migration_invariants",
+        "backward_compatibility",
+        "rollback_integrity",
+        "data_lineage"
+      ],
+      "seeded_defect_families": [
+        "destructive_migration",
+        "default_value_corruption",
+        "rollback_partial_state"
+      ],
+      "metamorphic_controls": [
+        "migrate_then_rollback",
+        "old_client_read_equivalence"
+      ],
+      "required_evidence": [
+        "interface_contract",
+        "browser_trace",
+        "screenshot_accessibility_layout_bundle",
+        "independent_oracle_result"
+      ],
+      "fixture_status": "not_authored",
+      "oracle_status": "not_authored",
+      "exposure": "public_pilot",
+      "promotion_status": "planned_not_runnable"
+    },
+    {
+      "task_id": "SFEB-PILOT-FS-004",
+      "level": "fullstack_maintenance",
+      "family": "mock_payment",
+      "title": "Mock payment lifecycle",
+      "objective": "Implement an entirely local mock-payment lifecycle with idempotent intent creation, authorization/capture/refund states and audit evidence.",
+      "required_oracle_families": [
+        "payment_state_machine",
+        "idempotency",
+        "authorization_boundary",
+        "audit_log"
+      ],
+      "seeded_defect_families": [
+        "double_capture",
+        "refund_without_capture",
+        "role_bypass"
+      ],
+      "metamorphic_controls": [
+        "duplicate_webhook_delivery",
+        "reordered_idempotent_events"
+      ],
+      "required_evidence": [
+        "interface_contract",
+        "browser_trace",
+        "screenshot_accessibility_layout_bundle",
+        "independent_oracle_result"
+      ],
+      "fixture_status": "not_authored",
+      "oracle_status": "not_authored",
+      "exposure": "public_pilot",
+      "promotion_status": "planned_not_runnable"
+    },
+    {
+      "task_id": "SFEB-PILOT-FS-005",
+      "level": "fullstack_maintenance",
+      "family": "event_audit",
+      "title": "Auditable event history",
+      "objective": "Add append-only event history, actor identity, ordering, replay and integrity verification to a fixture-backed workflow.",
+      "required_oracle_families": [
+        "event_identity",
+        "append_only_policy",
+        "replay_consistency",
+        "actor_binding"
+      ],
+      "seeded_defect_families": [
+        "event_mutation",
+        "cross_actor_replay",
+        "missing_event_sequence"
+      ],
+      "metamorphic_controls": [
+        "equivalent_replay_after_restart",
+        "duplicate_delivery"
+      ],
+      "required_evidence": [
+        "interface_contract",
+        "browser_trace",
+        "screenshot_accessibility_layout_bundle",
+        "independent_oracle_result"
+      ],
+      "fixture_status": "not_authored",
+      "oracle_status": "not_authored",
+      "exposure": "public_pilot",
+      "promotion_status": "planned_not_runnable"
+    },
+    {
+      "task_id": "SFEB-PILOT-FS-006",
+      "level": "fullstack_maintenance",
+      "family": "feature_maintenance",
+      "title": "Feature addition under regression constraints",
+      "objective": "Add a feature to an existing Leptos application while preserving all existing journeys, API contracts and dependency pins.",
+      "required_oracle_families": [
+        "feature_contract",
+        "regression_suite",
+        "dependency_lock",
+        "component_boundary"
+      ],
+      "seeded_defect_families": [
+        "unrelated_route_regression",
+        "unapproved_dependency_drift",
+        "state_coupling"
+      ],
+      "metamorphic_controls": [
+        "refactor_semantic_equivalence",
+        "existing_journey_replay"
+      ],
+      "required_evidence": [
+        "interface_contract",
+        "browser_trace",
+        "screenshot_accessibility_layout_bundle",
+        "independent_oracle_result"
+      ],
+      "fixture_status": "not_authored",
+      "oracle_status": "not_authored",
+      "exposure": "public_pilot",
+      "promotion_status": "planned_not_runnable"
+    },
+    {
+      "task_id": "SFEB-PILOT-FS-007",
+      "level": "fullstack_maintenance",
+      "family": "async_race",
+      "title": "Asynchronous race repair",
+      "objective": "Reproduce and repair stale-response races in search/autocomplete while ensuring latest-request-wins and cancellation semantics.",
+      "required_oracle_families": [
+        "request_epoch",
+        "stale_response_rejection",
+        "cancellation",
+        "loading_state"
+      ],
+      "seeded_defect_families": [
+        "older_response_overwrites_newer",
+        "cancel_not_effective",
+        "spinner_stuck"
+      ],
+      "metamorphic_controls": [
+        "request_order_permutation",
+        "same_final_query_equivalence"
+      ],
+      "required_evidence": [
+        "interface_contract",
+        "browser_trace",
+        "screenshot_accessibility_layout_bundle",
+        "independent_oracle_result"
+      ],
+      "fixture_status": "not_authored",
+      "oracle_status": "not_authored",
+      "exposure": "public_pilot",
+      "promotion_status": "planned_not_runnable"
+    },
+    {
+      "task_id": "SFEB-PILOT-FS-008",
+      "level": "fullstack_maintenance",
+      "family": "secure_file_service",
+      "title": "Secure file service maintenance",
+      "objective": "Repair a fixture-backed upload/download service with safe path handling, MIME validation, authorization and bounded content size.",
+      "required_oracle_families": [
+        "path_containment",
+        "mime_validation",
+        "authorization_oracle",
+        "size_limit"
+      ],
+      "seeded_defect_families": [
+        "path_traversal",
+        "mime_spoofing",
+        "unauthorized_download"
+      ],
+      "metamorphic_controls": [
+        "same_file_safe_name_variation",
+        "download_retry"
+      ],
+      "required_evidence": [
+        "interface_contract",
+        "browser_trace",
+        "screenshot_accessibility_layout_bundle",
+        "independent_oracle_result"
+      ],
+      "fixture_status": "not_authored",
+      "oracle_status": "not_authored",
+      "exposure": "public_pilot",
+      "promotion_status": "planned_not_runnable"
+    },
+    {
+      "task_id": "SFEB-PILOT-FS-009",
+      "level": "fullstack_maintenance",
+      "family": "framework_upgrade",
+      "title": "Framework compatibility migration",
+      "objective": "Upgrade a pinned Leptos minor version in an isolated branch while preserving compile, browser journeys, accessibility and runtime behavior.",
+      "required_oracle_families": [
+        "dependency_resolution",
+        "build_integrity",
+        "journey_regression",
+        "performance_budget"
+      ],
+      "seeded_defect_families": [
+        "implicit_lockfile_drift",
+        "deprecated_api_behavior_change",
+        "wasm_regression"
+      ],
+      "metamorphic_controls": [
+        "old_new_runtime_equivalence",
+        "lockfile_replay"
+      ],
+      "required_evidence": [
+        "interface_contract",
+        "browser_trace",
+        "screenshot_accessibility_layout_bundle",
+        "independent_oracle_result"
+      ],
+      "fixture_status": "not_authored",
+      "oracle_status": "not_authored",
+      "exposure": "public_pilot",
+      "promotion_status": "planned_not_runnable"
+    },
+    {
+      "task_id": "SFEB-PILOT-FS-010",
+      "level": "fullstack_maintenance",
+      "family": "observability_resilience",
+      "title": "Operational resilience repair",
+      "objective": "Add bounded observability and fault recovery for service degradation while preserving privacy, authorization and user-visible state semantics.",
+      "required_oracle_families": [
+        "fault_recovery",
+        "redaction",
+        "state_consistency",
+        "resilience_budget"
+      ],
+      "seeded_defect_families": [
+        "secret_in_telemetry",
+        "retry_storm",
+        "false_healthy_status"
+      ],
+      "metamorphic_controls": [
+        "fault_injection_replay",
+        "recovery_after_restart"
+      ],
+      "required_evidence": [
+        "interface_contract",
+        "browser_trace",
+        "screenshot_accessibility_layout_bundle",
+        "independent_oracle_result"
+      ],
+      "fixture_status": "not_authored",
+      "oracle_status": "not_authored",
+      "exposure": "public_pilot",
+      "promotion_status": "planned_not_runnable"
+    }
+  ],
+  "promotion_rules": [
+    "A candidate remains planned_not_runnable until original fixture assets, deterministic services, task schemas, cleanup procedures and independent oracles exist.",
+    "Each task brief must map every required product statement to at least one observable oracle and explicitly list ambiguity and unsupported assumptions.",
+    "Every seeded defect must be reproducible before repair and must identify the exact changed source/fixture bytes.",
+    "Positive and metamorphic controls must show that semantics-preserving changes remain accepted.",
+    "Task oracles must pass an independent mutation/positive/metamorphic qualification campaign before the task is runnable.",
+    "No public pilot task may later be represented as a blind hidden-holdout task.",
+    "Human preference labels, interaction-judge outputs and deterministic correctness are separate evidence dimensions."
+  ],
+  "limits": [
+    "This is a blueprint of 30 candidate tasks, not 30 complete fixture assets or runnable benchmark tasks.",
+    "The current repository has one complete checked-in dashboard fixture; all candidate fixtures and oracle policies in this plan remain unauthored.",
+    "The proposed task families are original synthetic work specifications and must not be treated as copied benchmark assets.",
+    "Task family counts do not establish statistical power; the 150-task comparison requires a pilot-derived power analysis.",
+    "No browser run, agent score, human annotation or oracle qualification is included in this plan."
+  ]
+}

@@ -1,0 +1,622 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/sfeb/interface-contract-v1.json",
+  "title": "SFEB Interface Contract v1",
+  "description": "Versioned, machine-readable interface contract for design-to-code planning and independent frontend acceptance.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "contract_id",
+    "status",
+    "source",
+    "product",
+    "framework",
+    "routes",
+    "regions",
+    "state_machines",
+    "data_sources",
+    "responsive",
+    "accessibility",
+    "security",
+    "acceptance"
+  ],
+  "properties": {
+    "contract_version": {
+      "const": "1.0.0"
+    },
+    "contract_id": {
+      "$ref": "#/$defs/identifier"
+    },
+    "status": {
+      "enum": [
+        "source_observed",
+        "proposed",
+        "reviewed",
+        "browser_verified"
+      ]
+    },
+    "source": {
+      "$ref": "#/$defs/source"
+    },
+    "product": {
+      "$ref": "#/$defs/product"
+    },
+    "framework": {
+      "$ref": "#/$defs/framework"
+    },
+    "routes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/route"
+      }
+    },
+    "regions": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/region"
+      }
+    },
+    "state_machines": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/state_machine"
+      }
+    },
+    "data_sources": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/data_source"
+      }
+    },
+    "responsive": {
+      "$ref": "#/$defs/responsive"
+    },
+    "accessibility": {
+      "$ref": "#/$defs/accessibility"
+    },
+    "security": {
+      "$ref": "#/$defs/security"
+    },
+    "acceptance": {
+      "$ref": "#/$defs/acceptance"
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 1000
+      }
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "commit",
+        "paths"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "minLength": 1
+        },
+        "commit": {
+          "type": "string",
+          "pattern": "^[a-fA-F0-9]{40}$"
+        },
+        "paths": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "product": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "goal",
+        "user_roles"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "goal": {
+          "type": "string",
+          "minLength": 1
+        },
+        "user_roles": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "non_goals": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "framework": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "api_family",
+        "rendering_model",
+        "build_tool"
+      ],
+      "properties": {
+        "name": {
+          "const": "Leptos"
+        },
+        "api_family": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+$"
+        },
+        "rendering_model": {
+          "enum": [
+            "csr",
+            "ssr",
+            "ssr_hydrate",
+            "islands"
+          ]
+        },
+        "build_tool": {
+          "type": "string",
+          "minLength": 1
+        },
+        "resolved_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "rust_edition": {
+          "type": "string"
+        }
+      }
+    },
+    "route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "title",
+        "description"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^/"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "authentication": {
+          "enum": [
+            "none",
+            "optional",
+            "required"
+          ]
+        }
+      }
+    },
+    "region": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "tag",
+        "purpose",
+        "source_anchor"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "tag": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "purpose": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_anchor": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+        },
+        "semantic_role": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "accessible_name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "conditional": {
+          "type": "boolean"
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "transition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "from",
+        "event",
+        "to"
+      ],
+      "properties": {
+        "from": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event": {
+          "type": "string",
+          "minLength": 1
+        },
+        "to": {
+          "type": "string",
+          "minLength": 1
+        },
+        "guard": {
+          "type": "string"
+        },
+        "side_effect": {
+          "type": "string"
+        }
+      }
+    },
+    "state_machine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "initial_state",
+        "states",
+        "transitions"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "initial_state": {
+          "type": "string",
+          "minLength": 1
+        },
+        "states": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "transitions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/transition"
+          }
+        },
+        "observability": {
+          "type": "string"
+        }
+      }
+    },
+    "data_source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "transport",
+        "method",
+        "path",
+        "purpose",
+        "failure_states"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "transport": {
+          "enum": [
+            "http",
+            "websocket",
+            "eventsource",
+            "local_state"
+          ]
+        },
+        "method": {
+          "enum": [
+            "GET",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE",
+            "WS",
+            "LOCAL"
+          ]
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "purpose": {
+          "type": "string",
+          "minLength": 1
+        },
+        "request_shape": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "response_shape": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "failure_states": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "viewport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "width",
+        "height"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 240,
+          "maximum": 7680
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 320,
+          "maximum": 4320
+        },
+        "purpose": {
+          "type": "string"
+        }
+      }
+    },
+    "responsive": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "breakpoints",
+        "reference_viewports",
+        "invariants"
+      ],
+      "properties": {
+        "breakpoints": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "max_width_px"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "max_width_px": {
+                "type": "integer",
+                "minimum": 240,
+                "maximum": 7680
+              }
+            }
+          }
+        },
+        "reference_viewports": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/viewport"
+          }
+        },
+        "invariants": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "accessibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target",
+        "semantics",
+        "keyboard_requirements",
+        "reduced_motion",
+        "manual_checks_required"
+      ],
+      "properties": {
+        "target": {
+          "type": "string"
+        },
+        "semantics": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "keyboard_requirements": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "reduced_motion": {
+          "type": "string"
+        },
+        "manual_checks_required": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "security": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "untrusted_inputs",
+        "credential_handling",
+        "browser_network_policy",
+        "artifact_handling"
+      ],
+      "properties": {
+        "untrusted_inputs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "credential_handling": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "browser_network_policy": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "artifact_handling": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "journey": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "goal",
+        "steps",
+        "oracle",
+        "status"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "goal": {
+          "type": "string",
+          "minLength": 1
+        },
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "oracle": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "status": {
+          "enum": [
+            "source_observed",
+            "oracle_pending",
+            "browser_verified",
+            "blocked"
+          ]
+        }
+      }
+    },
+    "acceptance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hard_gates",
+        "journeys"
+      ],
+      "properties": {
+        "hard_gates": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "journeys": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/journey"
+          }
+        }
+      }
+    }
+  }
+}

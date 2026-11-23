@@ -1,0 +1,366 @@
+{
+  "task_version": "1.0.0",
+  "task_id": "SFEB-L1-004",
+  "status": "fixture_ready",
+  "level": 1,
+  "title": "Reconstruct a responsive service operations dashboard in Leptos",
+  "objective": "Implement a complete, visually coherent, responsive Leptos CSR page from an original product brief and a held-back browser-rendered reference fixture. The page must preserve the information hierarchy, semantic regions and usability across desktop, tablet and mobile.",
+  "product_brief": {
+    "users": [
+      "Field service operations coordinator",
+      "Technician reviewing team activity and today's schedule"
+    ],
+    "user_goal": "Understand current operational workload, recent activity and upcoming appointments at a glance.",
+    "content_hierarchy": [
+      "Brand and primary navigation",
+      "Workspace navigation",
+      "Page heading and create-work-order action",
+      "Three operational summary metrics",
+      "Recent activity list",
+      "Today's schedule"
+    ],
+    "visual_direction": {
+      "mood": "Calm, trustworthy, organic and professional; a restrained solarpunk operations product rather than a generic admin template.",
+      "palette": [
+        {
+          "token": "canvas",
+          "value": "#f4f6f2",
+          "purpose": "Soft neutral application background"
+        },
+        {
+          "token": "surface",
+          "value": "#ffffff",
+          "purpose": "Primary content surfaces"
+        },
+        {
+          "token": "ink",
+          "value": "#1d2d24",
+          "purpose": "Primary text"
+        },
+        {
+          "token": "muted",
+          "value": "#758279",
+          "purpose": "Secondary text"
+        },
+        {
+          "token": "green",
+          "value": "#47795b",
+          "purpose": "Primary action and positive states"
+        },
+        {
+          "token": "gold",
+          "value": "#b8873d",
+          "purpose": "Schedule and attention accent"
+        },
+        {
+          "token": "blue",
+          "value": "#547e94",
+          "purpose": "Informational accent"
+        }
+      ],
+      "typography": "Use a native system sans-serif stack; distinct heading hierarchy, compact but readable metadata, tabular numeric values.",
+      "layout_principles": [
+        "Desktop uses a 76px header, a 236px workspace sidebar and a fluid main content region.",
+        "The main content has a three-column metric row and a two-column activity/schedule region.",
+        "Surfaces use subtle borders, modest radii and restrained shadows rather than heavy glass effects.",
+        "At tablet and mobile widths, navigation and workspace regions reflow without hiding required information.",
+        "At narrow mobile widths, metric cards stack into one column and the primary action remains full-width."
+      ]
+    },
+    "interaction_requirements": [
+      "Primary and workspace navigation links move to their corresponding page sections.",
+      "The create-work-order action has a visible, reachable destination anchor; creating or submitting a work order is outside this static task.",
+      "A skip-to-main-content link is available and becomes visible on keyboard focus."
+    ]
+  },
+  "implementation_constraints": {
+    "framework": "Leptos",
+    "framework_family": "0.8",
+    "language": "Rust",
+    "allowed_dependencies": [
+      "Existing Leptos dependencies already present in the selected starter application",
+      "CSS authored in the repository"
+    ],
+    "disallowed_techniques": [
+      "No React, Vue, Angular, Svelte or JavaScript UI framework.",
+      "No CDN scripts, remote fonts, remote images or runtime network dependencies.",
+      "No screenshot hardcoding, canvas painting or one giant embedded screenshot as a substitute for semantic UI.",
+      "No use of aria-label to paper over incorrect native semantics when visible text or a native label is appropriate.",
+      "Do not weaken browser, accessibility or test gates."
+    ]
+  },
+  "environment": {
+    "browser": "Headless Chromium; exact browser build must be recorded by the runner before the task can become runnable.",
+    "viewport_matrix": [
+      {
+        "name": "mobile-narrow",
+        "width": 320,
+        "height": 740
+      },
+      {
+        "name": "mobile",
+        "width": 390,
+        "height": 844
+      },
+      {
+        "name": "tablet",
+        "width": 768,
+        "height": 1024
+      },
+      {
+        "name": "desktop",
+        "width": 1280,
+        "height": 800
+      },
+      {
+        "name": "wide-desktop",
+        "width": 1440,
+        "height": 900
+      }
+    ],
+    "device_scale_factor": 1,
+    "network_policy": "Fixture-only origin; deny external requests. Use an isolated disposable browser/network namespace. Do not expose host CDP or allow arbitrary private-network access.",
+    "font_policy": "Use only fonts installed in the pinned runner image; no remote font requests."
+  },
+  "reference_fixture": {
+    "path": "benchmarks/frontend/fixtures/service-dashboard/",
+    "sha256": "2752de3110ba1e53cf403daf2976b62cf45f46fac8823acee5c0865bf41f692a",
+    "purpose": "Original static HTML/CSS reference fixture. The digest is SHA-256 over UTF-8 bytes of reference.html, one NUL byte, then UTF-8 bytes of style.css. Do not expose fixture source to the evaluated agent when the benchmark is run in screenshot-conditioned mode."
+  },
+  "required_regions": [
+    {
+      "id": "dashboard.shell",
+      "role": "generic container",
+      "accessible_name": null,
+      "required": true
+    },
+    {
+      "id": "dashboard.header",
+      "role": "banner",
+      "accessible_name": null,
+      "required": true
+    },
+    {
+      "id": "dashboard.sidebar",
+      "role": "complementary",
+      "accessible_name": "Workspace",
+      "required": true
+    },
+    {
+      "id": "dashboard.main",
+      "role": "main",
+      "accessible_name": null,
+      "required": true
+    },
+    {
+      "id": "dashboard.heading",
+      "role": "region",
+      "accessible_name": "Service overview",
+      "required": true
+    },
+    {
+      "id": "dashboard.metrics",
+      "role": "region",
+      "accessible_name": "Operational summary",
+      "required": true
+    },
+    {
+      "id": "dashboard.activity",
+      "role": "region",
+      "accessible_name": "Recent activity",
+      "required": true
+    },
+    {
+      "id": "dashboard.schedule",
+      "role": "region",
+      "accessible_name": "Today's schedule",
+      "required": true
+    }
+  ],
+  "viewports": [
+    {
+      "name": "mobile-narrow",
+      "width": 320,
+      "height": 740
+    },
+    {
+      "name": "mobile",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "name": "tablet",
+      "width": 768,
+      "height": 1024
+    },
+    {
+      "name": "desktop",
+      "width": 1280,
+      "height": 800
+    },
+    {
+      "name": "wide-desktop",
+      "width": 1440,
+      "height": 900
+    }
+  ],
+  "acceptance_journeys": [
+    {
+      "id": "dashboard.keyboard-navigation",
+      "goal": "Reach primary page navigation and content using keyboard only.",
+      "steps": [
+        "Load the application at 1280x800.",
+        "Press Tab from the document start.",
+        "Observe and activate the skip link.",
+        "Continue through navigation and the primary action."
+      ],
+      "oracle": [
+        "The skip link becomes visible on focus and moves focus to main content.",
+        "All visible navigation links and the create-work-order action are keyboard operable.",
+        "Focus indication is visible and not obscured."
+      ]
+    },
+    {
+      "id": "dashboard.responsive-reflow",
+      "goal": "Preserve hierarchy and operability as the viewport narrows.",
+      "steps": [
+        "Capture each declared viewport.",
+        "Sweep widths from 320px to 1440px in 37px increments.",
+        "Record document overflow and all required source-region bounding boxes."
+      ],
+      "oracle": [
+        "No horizontal document overflow at any sampled width.",
+        "Required regions remain present and visible.",
+        "Metric cards reflow from three columns to one column at narrow widths.",
+        "The create-work-order action remains visible and operable."
+      ]
+    }
+  ],
+  "assertions": [
+    {
+      "id": "main-landmark.exists",
+      "evaluator": "accessibility",
+      "target": "role=main",
+      "operator": "count_equals",
+      "expected": 1,
+      "hard_gate": true,
+      "rationale": "The interface must have one unambiguous main landmark."
+    },
+    {
+      "id": "page-heading.name",
+      "evaluator": "accessibility",
+      "target": "role=heading[level=1]",
+      "operator": "equals",
+      "expected": "Service overview",
+      "hard_gate": true
+    },
+    {
+      "id": "metric-card.count",
+      "evaluator": "dom",
+      "target": "[data-sfeb-id^='dashboard.metric-card']",
+      "operator": "count_equals",
+      "expected": 3,
+      "hard_gate": false,
+      "rationale": "The three metric cards must be independently identifiable in the implementation."
+    },
+    {
+      "id": "metrics.desktop-columns",
+      "evaluator": "layout",
+      "target": "dashboard.metrics@1280x800",
+      "operator": "equals",
+      "expected": 3,
+      "hard_gate": false,
+      "rationale": "Desktop metric cards should form three columns."
+    },
+    {
+      "id": "metrics.mobile-columns",
+      "evaluator": "layout",
+      "target": "dashboard.metrics@390x844",
+      "operator": "equals",
+      "expected": 1,
+      "hard_gate": false,
+      "rationale": "Metric cards should stack at narrow mobile width."
+    },
+    {
+      "id": "document.no-horizontal-overflow",
+      "evaluator": "layout",
+      "target": "document.scrollWidth - window.innerWidth",
+      "operator": "equals",
+      "expected": 0,
+      "hard_gate": true
+    },
+    {
+      "id": "dashboard.regions.present",
+      "evaluator": "dom",
+      "target": "dashboard.shell,dashboard.header,dashboard.sidebar,dashboard.main,dashboard.heading,dashboard.metrics,dashboard.activity,dashboard.schedule",
+      "operator": "count_equals",
+      "expected": 8,
+      "hard_gate": true
+    },
+    {
+      "id": "skip-link.keyboard-visible",
+      "evaluator": "interaction",
+      "target": "a[href='#main-content']",
+      "operator": "manual_pass",
+      "expected": true,
+      "hard_gate": true
+    },
+    {
+      "id": "external-network.none",
+      "evaluator": "dom",
+      "target": "external script/font/image requests",
+      "operator": "equals",
+      "expected": 0,
+      "hard_gate": true
+    },
+    {
+      "id": "human.visual-hierarchy",
+      "evaluator": "human_review",
+      "target": "visual hierarchy and alignment across desktop/tablet/mobile",
+      "operator": "manual_pass",
+      "expected": true,
+      "hard_gate": false,
+      "tolerance": 0,
+      "rationale": "A blinded reviewer checks hierarchy, spacing, visual rhythm and information density."
+    },
+    {
+      "id": "human.usability",
+      "evaluator": "human_review",
+      "target": "operability and readability at all reference widths",
+      "operator": "manual_pass",
+      "expected": true,
+      "hard_gate": true
+    }
+  ],
+  "hard_gates": [
+    "No horizontal document overflow at any fixed or swept viewport.",
+    "Exactly one main landmark and one level-one page heading with the required accessible name.",
+    "All eight required regions are present and visible.",
+    "No external script, font or image requests.",
+    "Keyboard-only navigation works and the skip link is visible on focus.",
+    "No critical accessibility issue or keyboard trap."
+  ],
+  "evidence": [
+    "Source commit and dependency lock digest.",
+    "Pinned Chromium build, OS image, installed font manifest and viewport list.",
+    "One content-addressed screenshot per fixed viewport.",
+    "Accessibility tree and DOM snapshot.",
+    "Frontend layout evidence receipt including the eight required regions.",
+    "Console and network request log.",
+    "Keyboard navigation trace and human review record."
+  ],
+  "budget": {
+    "wall_time_minutes": 45,
+    "max_tool_calls": 80,
+    "max_repair_cycles": 3
+  },
+  "notes": [
+    "Fixture assets are original and contain no remote resources.",
+    "The fixture source is the visual reference; screenshot-conditioned evaluations should provide screenshots and the product brief, not the fixture HTML/CSS.",
+    "This task is not yet runnable: an isolated fixture server, exact browser pin, screenshot baseline and independent oracle implementation remain pending.",
+    "The reference fixture labels dashboard heading, activity and schedule regions with aria-labelledby, and labels the workspace complementary landmark. Three metric cards carry unique dashboard.metric-card.* source anchors for layout assertions.",
+    "This task and its reference HTML/CSS are publicly visible in this public research branch. It is a public pilot/development task, not a hidden holdout. Do not count it toward blind generalization or anti-contamination claims.",
+    "For future controller_only or hidden_holdout tasks, the runner must mount only the brief and rendered screenshots into the agent workspace, keep source fixtures outside that workspace, and block external retrieval of fixture source."
+  ],
+  "fixture_exposure": "public_pilot"
+}

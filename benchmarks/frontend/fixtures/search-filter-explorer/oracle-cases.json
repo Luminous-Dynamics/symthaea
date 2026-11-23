@@ -1,0 +1,293 @@
+{
+  "schema": "sfeb-search-filter-oracle-cases-v1",
+  "dataset_id": "SFEB-ASSET-CATALOG-001",
+  "cases": [
+    {
+      "case_id": "SFEB-SEARCH-001",
+      "kind": "positive",
+      "input": {
+        "q": "",
+        "category": null,
+        "available_only": false,
+        "min_price_cents": null,
+        "max_price_cents": null,
+        "sort": "name_asc",
+        "page": 1,
+        "page_size": 5
+      },
+      "expected": {
+        "asset_ids": [
+          "AST-004",
+          "AST-012",
+          "AST-013",
+          "AST-002",
+          "AST-010"
+        ],
+        "total_matches": 13,
+        "page": 1,
+        "page_size": 5,
+        "page_count": 3
+      }
+    },
+    {
+      "case_id": "SFEB-SEARCH-002",
+      "kind": "positive",
+      "input": {
+        "q": "",
+        "category": "Power",
+        "available_only": true,
+        "min_price_cents": null,
+        "max_price_cents": null,
+        "sort": "price_asc",
+        "page": 1,
+        "page_size": 10
+      },
+      "expected": {
+        "asset_ids": [
+          "AST-007",
+          "AST-001",
+          "AST-004",
+          "AST-012"
+        ],
+        "total_matches": 4,
+        "page": 1,
+        "page_size": 10,
+        "page_count": 1
+      }
+    },
+    {
+      "case_id": "SFEB-SEARCH-003",
+      "kind": "positive",
+      "input": {
+        "q": "SENSOR",
+        "category": null,
+        "available_only": true,
+        "min_price_cents": null,
+        "max_price_cents": null,
+        "sort": "name_asc",
+        "page": 1,
+        "page_size": 10
+      },
+      "expected": {
+        "asset_ids": [
+          "AST-002",
+          "AST-008"
+        ],
+        "total_matches": 2,
+        "page": 1,
+        "page_size": 10,
+        "page_count": 1
+      }
+    },
+    {
+      "case_id": "SFEB-SEARCH-004",
+      "kind": "positive",
+      "input": {
+        "q": "",
+        "category": null,
+        "available_only": false,
+        "min_price_cents": 54900,
+        "max_price_cents": 129900,
+        "sort": "price_desc",
+        "page": 1,
+        "page_size": 10
+      },
+      "expected": {
+        "asset_ids": [
+          "AST-001",
+          "AST-008",
+          "AST-006",
+          "AST-007",
+          "AST-011",
+          "AST-013"
+        ],
+        "total_matches": 6,
+        "page": 1,
+        "page_size": 10,
+        "page_count": 1
+      }
+    },
+    {
+      "case_id": "SFEB-SEARCH-005",
+      "kind": "positive",
+      "input": {
+        "q": "",
+        "category": null,
+        "available_only": false,
+        "min_price_cents": null,
+        "max_price_cents": null,
+        "sort": "name_asc",
+        "page": 2,
+        "page_size": 5
+      },
+      "expected": {
+        "asset_ids": [
+          "AST-005",
+          "AST-006",
+          "AST-009",
+          "AST-007",
+          "AST-001"
+        ],
+        "total_matches": 13,
+        "page": 2,
+        "page_size": 5,
+        "page_count": 3
+      }
+    },
+    {
+      "case_id": "SFEB-SEARCH-006",
+      "kind": "positive",
+      "input": {
+        "q": "quantum",
+        "category": null,
+        "available_only": false,
+        "min_price_cents": null,
+        "max_price_cents": null,
+        "sort": "name_asc",
+        "page": 1,
+        "page_size": 5
+      },
+      "expected": {
+        "asset_ids": [],
+        "total_matches": 0,
+        "page": 1,
+        "page_size": 5,
+        "page_count": 0
+      }
+    },
+    {
+      "case_id": "SFEB-SEARCH-007",
+      "kind": "negative",
+      "input": {
+        "q": "",
+        "category": null,
+        "available_only": false,
+        "min_price_cents": 200000,
+        "max_price_cents": 100000,
+        "sort": "name_asc",
+        "page": 1,
+        "page_size": 5
+      },
+      "expected_error": "min_price_cents_exceeds_max_price_cents"
+    },
+    {
+      "case_id": "SFEB-SEARCH-008",
+      "kind": "positive",
+      "input": {
+        "q": "",
+        "category": "Devices",
+        "available_only": false,
+        "min_price_cents": null,
+        "max_price_cents": null,
+        "sort": "price_asc",
+        "page": 1,
+        "page_size": 10
+      },
+      "expected": {
+        "asset_ids": [
+          "AST-011",
+          "AST-013",
+          "AST-006"
+        ],
+        "total_matches": 3,
+        "page": 1,
+        "page_size": 10,
+        "page_count": 1
+      }
+    },
+    {
+      "case_id": "SFEB-SEARCH-009",
+      "kind": "positive",
+      "input": {
+        "q": "sensor",
+        "category": null,
+        "available_only": false,
+        "min_price_cents": null,
+        "max_price_cents": null,
+        "sort": "name_asc",
+        "page": 1,
+        "page_size": 10
+      },
+      "expected": {
+        "asset_ids": [
+          "AST-002",
+          "AST-005",
+          "AST-008"
+        ],
+        "total_matches": 3,
+        "page": 1,
+        "page_size": 10,
+        "page_count": 1
+      }
+    },
+    {
+      "case_id": "SFEB-SEARCH-010",
+      "kind": "positive",
+      "input": {
+        "q": "",
+        "category": "Sensors",
+        "available_only": true,
+        "min_price_cents": null,
+        "max_price_cents": null,
+        "sort": "name_asc",
+        "page": 1,
+        "page_size": 5
+      },
+      "expected": {
+        "asset_ids": [
+          "AST-002",
+          "AST-008"
+        ],
+        "total_matches": 2,
+        "page": 1,
+        "page_size": 5,
+        "page_count": 1
+      }
+    },
+    {
+      "case_id": "SFEB-SEARCH-011",
+      "kind": "positive",
+      "input": {
+        "q": "SFEB-XSS-CANARY",
+        "category": null,
+        "available_only": false,
+        "min_price_cents": null,
+        "max_price_cents": null,
+        "sort": "name_asc",
+        "page": 1,
+        "page_size": 5
+      },
+      "expected": {
+        "asset_ids": [
+          "AST-009"
+        ],
+        "total_matches": 1,
+        "page": 1,
+        "page_size": 5,
+        "page_count": 1
+      }
+    }
+  ],
+  "metamorphic_relations": [
+    {
+      "id": "META-SEARCH-CASEFOLD",
+      "relation": "Changing the ASCII case of q preserves ordered result IDs."
+    },
+    {
+      "id": "META-SEARCH-SUBSET",
+      "relation": "Adding available_only cannot add results to a category-filtered result set."
+    },
+    {
+      "id": "META-SEARCH-PAGINATION",
+      "relation": "Concatenating pages yields the full filtered/sorted result exactly once."
+    },
+    {
+      "id": "META-SEARCH-STABLE-TIES",
+      "relation": "Equal prices are tied by ascending immutable asset ID."
+    },
+    {
+      "id": "META-SEARCH-URL",
+      "relation": "Encoding then decoding query state preserves every field."
+    }
+  ]
+}

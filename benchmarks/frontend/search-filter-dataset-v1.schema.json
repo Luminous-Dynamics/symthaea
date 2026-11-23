@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/sfeb/search-filter-dataset-v1.schema.json",
+  "title": "SFEB Synthetic Asset Dataset v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "dataset_id",
+    "version",
+    "currency",
+    "price_unit",
+    "search_fields",
+    "assets"
+  ],
+  "properties": {
+    "schema": {
+      "const": "sfeb-search-filter-dataset-v1"
+    },
+    "dataset_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "type": "string"
+    },
+    "currency": {
+      "const": "USD"
+    },
+    "price_unit": {
+      "const": "integer cents"
+    },
+    "search_fields": {
+      "const": [
+        "name",
+        "sku",
+        "description"
+      ]
+    },
+    "assets": {
+      "type": "array",
+      "minItems": 10,
+      "items": {
+        "$ref": "#/$defs/asset"
+      }
+    }
+  },
+  "$defs": {
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "sku",
+        "category",
+        "description",
+        "price_cents",
+        "stock_count"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^AST-[0-9]{3}$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sku": {
+          "type": "string",
+          "minLength": 1
+        },
+        "category": {
+          "enum": [
+            "Devices",
+            "Inspection",
+            "Power",
+            "Safety",
+            "Sensors"
+          ]
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "price_cents": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "stock_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      }
+    }
+  }
+}

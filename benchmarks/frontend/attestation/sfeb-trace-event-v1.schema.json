@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/sfeb/trace-event-v1.schema.json",
+  "title": "SFEB hash-chained execution trace event v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "run_id",
+    "sequence",
+    "elapsed_ns",
+    "event_type",
+    "actor",
+    "redaction_state",
+    "payload",
+    "previous_event_sha256",
+    "event_sha256",
+    "payload_sha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "sfeb-trace-event-v1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "elapsed_ns": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "wall_time": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "event_type": {
+      "enum": [
+        "run_started",
+        "sandbox_policy_applied",
+        "browser_started",
+        "navigation_committed",
+        "user_action",
+        "network_request",
+        "network_response",
+        "console_message",
+        "dom_observation",
+        "accessibility_observation",
+        "layout_observation",
+        "screenshot_captured",
+        "artifact_committed",
+        "browser_closed",
+        "run_finished",
+        "process_exit",
+        "policy_violation"
+      ]
+    },
+    "actor": {
+      "enum": [
+        "controller",
+        "browser",
+        "sandbox",
+        "worker",
+        "artifact_store",
+        "host_observer"
+      ]
+    },
+    "correlation_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "redaction_state": {
+      "enum": [
+        "redacted",
+        "content_digest_only",
+        "non_sensitive"
+      ]
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "payload_sha256": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "previous_event_sha256": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "event_sha256": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "sequence": {
+            "const": 0
+          }
+        },
+        "required": [
+          "sequence"
+        ]
+      },
+      "then": {
+        "properties": {
+          "previous_event_sha256": {
+            "const": "0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        }
+      }
+    }
+  ],
+  "description": "A single event in a run-local SHA-256 chain. The event hash is SHA-256 over RFC 8785 JCS bytes of the complete event object with event_sha256 omitted. The verifier checks sequence continuity, run identity and predecessor linkage across the JSONL stream. The verifier rejects duplicate object keys and integers outside the I-JSON safe range before canonicalization."
+}

@@ -1,0 +1,295 @@
+{
+  "schema": "sfeb-monitoring-reference-traces-v1",
+  "fixture_id": "SFEB-MONITOR-001-v1",
+  "traces": [
+    {
+      "case_id": "absolute-threshold-event-wake",
+      "steps": [
+        {
+          "op": "register_watch",
+          "time": 0,
+          "watch_id": "watch-absolute-001"
+        },
+        {
+          "op": "wait_until",
+          "time": 10
+        },
+        {
+          "op": "wake",
+          "time": 10,
+          "message_id": "notice-ready"
+        },
+        {
+          "op": "observe",
+          "time": 10,
+          "revision": 2,
+          "authority": "source_of_record"
+        },
+        {
+          "op": "wait_until",
+          "time": 25
+        },
+        {
+          "op": "wake",
+          "time": 25,
+          "message_id": "notice-capacity"
+        },
+        {
+          "op": "observe",
+          "time": 25,
+          "revision": 3,
+          "authority": "source_of_record"
+        },
+        {
+          "op": "wait_until",
+          "time": 26
+        },
+        {
+          "op": "wake",
+          "time": 26,
+          "message_id": "notice-capacity"
+        },
+        {
+          "op": "act",
+          "time": 27,
+          "revision": 3,
+          "action_id": "act-absolute-001",
+          "idempotency_key": "reserve:slot-absolute-001",
+          "action_type": "reserve",
+          "resource_id": "slot-absolute-001"
+        },
+        {
+          "op": "act",
+          "time": 28,
+          "revision": 3,
+          "action_id": "act-absolute-001-replay",
+          "idempotency_key": "reserve:slot-absolute-001",
+          "action_type": "reserve",
+          "resource_id": "slot-absolute-001"
+        },
+        {
+          "op": "finish",
+          "time": 28,
+          "claimed_outcome": "triggered"
+        }
+      ],
+      "worker_claims": {
+        "disposition": "accepted",
+        "observed_oracle_ids": [
+          "monitor.all_pass"
+        ]
+      }
+    },
+    {
+      "case_id": "forged-notification-is-not-authority",
+      "steps": [
+        {
+          "op": "register_watch",
+          "time": 0,
+          "watch_id": "watch-forged-001"
+        },
+        {
+          "op": "wait_until",
+          "time": 5
+        },
+        {
+          "op": "wake",
+          "time": 5,
+          "message_id": "spoof-ready"
+        },
+        {
+          "op": "observe",
+          "time": 5,
+          "revision": 1,
+          "authority": "source_of_record"
+        },
+        {
+          "op": "wait_until",
+          "time": 30
+        },
+        {
+          "op": "finish",
+          "time": 30,
+          "claimed_outcome": "triggered"
+        }
+      ],
+      "worker_claims": {
+        "disposition": "accepted",
+        "observed_oracle_ids": [
+          "condition.met"
+        ]
+      }
+    },
+    {
+      "case_id": "permission-revoked-in-same-tick",
+      "steps": [
+        {
+          "op": "register_watch",
+          "time": 0,
+          "watch_id": "watch-revoked-001"
+        },
+        {
+          "op": "wait_until",
+          "time": 8
+        },
+        {
+          "op": "wake",
+          "time": 8,
+          "message_id": "notice-capacity-revoked"
+        },
+        {
+          "op": "wake",
+          "time": 8,
+          "message_id": "notice-permission-revoked"
+        },
+        {
+          "op": "observe",
+          "time": 8,
+          "revision": 3,
+          "authority": "source_of_record"
+        },
+        {
+          "op": "wait_until",
+          "time": 20
+        },
+        {
+          "op": "finish",
+          "time": 20,
+          "claimed_outcome": "not_authorized"
+        }
+      ],
+      "worker_claims": {
+        "disposition": "accepted",
+        "observed_oracle_ids": [
+          "permission.available"
+        ]
+      }
+    },
+    {
+      "case_id": "stale-notification-after-reconnect",
+      "steps": [
+        {
+          "op": "register_watch",
+          "time": 0,
+          "watch_id": "watch-stale-001"
+        },
+        {
+          "op": "wait_until",
+          "time": 15
+        },
+        {
+          "op": "wake",
+          "time": 15,
+          "message_id": "notice-delayed-old"
+        },
+        {
+          "op": "observe",
+          "time": 15,
+          "revision": 3,
+          "authority": "source_of_record"
+        },
+        {
+          "op": "wait_until",
+          "time": 30
+        },
+        {
+          "op": "finish",
+          "time": 30,
+          "claimed_outcome": "triggered"
+        }
+      ],
+      "worker_claims": {
+        "disposition": "accepted",
+        "observed_oracle_ids": [
+          "stale-condition-valid"
+        ]
+      }
+    },
+    {
+      "case_id": "no-op-deadline-abstention",
+      "steps": [
+        {
+          "op": "register_watch",
+          "time": 0,
+          "watch_id": "watch-noop-001"
+        },
+        {
+          "op": "wait_until",
+          "time": 60
+        },
+        {
+          "op": "finish",
+          "time": 60,
+          "claimed_outcome": "triggered"
+        }
+      ],
+      "worker_claims": {
+        "disposition": "accepted",
+        "observed_oracle_ids": [
+          "task-completed"
+        ]
+      }
+    },
+    {
+      "case_id": "relative-threshold-preserves-baseline",
+      "steps": [
+        {
+          "op": "register_watch",
+          "time": 0,
+          "watch_id": "watch-relative-001"
+        },
+        {
+          "op": "wait_until",
+          "time": 20
+        },
+        {
+          "op": "wake",
+          "time": 20,
+          "message_id": "notice-relative-two"
+        },
+        {
+          "op": "observe",
+          "time": 20,
+          "revision": 2,
+          "authority": "source_of_record"
+        },
+        {
+          "op": "wait_until",
+          "time": 30
+        },
+        {
+          "op": "wake",
+          "time": 30,
+          "message_id": "notice-relative-three"
+        },
+        {
+          "op": "observe",
+          "time": 30,
+          "revision": 3,
+          "authority": "source_of_record"
+        },
+        {
+          "op": "act",
+          "time": 31,
+          "revision": 3,
+          "action_id": "act-relative-001",
+          "idempotency_key": "reserve:slot-relative-001",
+          "action_type": "reserve",
+          "resource_id": "slot-relative-001"
+        },
+        {
+          "op": "finish",
+          "time": 31,
+          "claimed_outcome": "triggered"
+        }
+      ],
+      "worker_claims": {
+        "disposition": "accepted",
+        "observed_oracle_ids": [
+          "relative.delta.met"
+        ]
+      }
+    }
+  ],
+  "fixture_sha256": "d15e2fe36d2683618ec939f80f041155a3cfec9ab36230c864c8fcf0f4311d28"
+}

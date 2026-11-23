@@ -1,0 +1,92 @@
+{
+  "schema": "sfeb-edge-monitoring-policy-v1",
+  "policy_id": "SFEB-EDGE-001",
+  "version": "1.0.0",
+  "task_id": "SFEB-EDGE-001",
+  "case_ids": [
+    "durable-edge-receipt-survives-reconnect",
+    "edge-receipt-expires-before-reconnect",
+    "edge-receipt-revoked-before-reconnect",
+    "edge-permission-revoked-before-reconnect",
+    "forged-edge-notification-without-durable-receipt"
+  ],
+  "rules": [
+    {
+      "id": "edge.watch.register_once",
+      "severity": "critical",
+      "required": true,
+      "evaluator": "watch_registration",
+      "description": "Exactly one edge watch is registered before waiting."
+    },
+    {
+      "id": "edge.wake.not_authority",
+      "severity": "critical",
+      "required": true,
+      "evaluator": "notification_hint_only",
+      "description": "A notification or claimed receipt ID never proves an edge occurred."
+    },
+    {
+      "id": "edge.receipt.source_of_record",
+      "severity": "critical",
+      "required": true,
+      "evaluator": "durable_receipt",
+      "description": "The latest source-of-record snapshot must contain the matching durable event receipt."
+    },
+    {
+      "id": "edge.receipt.source_binding",
+      "severity": "critical",
+      "required": true,
+      "evaluator": "receipt_source_binding",
+      "description": "Receipt event ID, source revision, event type and watch scope must match the authoritative event."
+    },
+    {
+      "id": "edge.receipt.action_window",
+      "severity": "critical",
+      "required": true,
+      "evaluator": "receipt_expiry",
+      "description": "An expired edge receipt cannot authorize an action after reconnect."
+    },
+    {
+      "id": "edge.receipt.revocation",
+      "severity": "critical",
+      "required": true,
+      "evaluator": "receipt_revocation",
+      "description": "A revoked receipt blocks action even if an old wake remains pending."
+    },
+    {
+      "id": "edge.permission.current",
+      "severity": "critical",
+      "required": true,
+      "evaluator": "current_permission",
+      "description": "Current permission is checked at resume/action time, independently of permission at event time."
+    },
+    {
+      "id": "edge.action.target_scope",
+      "severity": "critical",
+      "required": true,
+      "evaluator": "target_scope",
+      "description": "Action type, resource and permission scope must match the durable receipt and watch contract."
+    },
+    {
+      "id": "edge.action.idempotency",
+      "severity": "critical",
+      "required": true,
+      "evaluator": "idempotent_action",
+      "description": "Replaying the same action key cannot duplicate the side effect."
+    },
+    {
+      "id": "edge.reconnect.latest_revision",
+      "severity": "high",
+      "required": true,
+      "evaluator": "latest_revision",
+      "description": "The decision is made from the latest revision after reconnect, not the event-time snapshot."
+    },
+    {
+      "id": "edge.no_receipt.abstention",
+      "severity": "critical",
+      "required": true,
+      "evaluator": "no_receipt_abstention",
+      "description": "A forged or orphan wake without a durable receipt results in abstention."
+    }
+  ]
+}

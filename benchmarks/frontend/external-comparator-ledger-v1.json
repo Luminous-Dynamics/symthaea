@@ -1,0 +1,829 @@
+{
+  "schema": "sfeb-external-comparator-ledger-v1",
+  "as_of": "2026-11-23",
+  "comparison_policy": [
+    "Never pool raw scores across benchmarks with different task sets, models, harnesses, judges, metrics or execution environments.",
+    "Store the observation date, model/harness context, task denominator, uncertainty interval and live-versus-historical page state for every result.",
+    "Treat browser-tool benchmarks as tool-operation evidence, not frontend code-generation evidence.",
+    "Reproduce native task splits and scorers before making superiority claims; preserve failed, blocked and unparseable runs in denominators.",
+    "Qualify each benchmark task with a two-sided witness-patch/no-op gate, prompt-to-test traceability and clean-room regrading where the task format permits.",
+    "For long-horizon computer-use benchmarks, preserve the exact task horizon, step budget, binary-completion metric and partial-score metric as separate observations; never substitute one leaderboard snapshot for a paper's primary result."
+  ],
+  "comparators": [
+    {
+      "id": "vision2web",
+      "name": "Vision2Web",
+      "scope": "Visual website development across static responsive pages, interactive multi-page frontends and full-stack applications; GUI workflow verification plus VLM visual judging.",
+      "task_count": 193,
+      "snapshot_status": "historical_published_snapshot",
+      "observations": [
+        {
+          "kind": "benchmark_scale",
+          "categories": 16,
+          "prototype_images": 918,
+          "test_cases": 1255
+        },
+        {
+          "kind": "historical_leader_row",
+          "season": "S4-2026",
+          "model_and_framework": "Claude-Fable-5 + Claude Code",
+          "submission_date": "2026-08-28",
+          "overall": 82.3,
+          "static_average": 87.4,
+          "interactive_average": 83.2,
+          "full_stack_average": 76.3
+        },
+        {
+          "kind": "live_page_state",
+          "observed_date": "2026-11-22",
+          "selected_season": "S4-2026",
+          "display": "No results yet for this season"
+        },
+        {
+          "kind": "direct_page_state",
+          "observed_date": "2026-11-23",
+          "selected_season": "S4-2026",
+          "display": "No results yet for this season",
+          "interpretation": "Direct page render shows no entries for the selected season despite the historical S4-2026 Claude-Fable-5 row reported in an indexed leaderboard snapshot. Retain the 82.3 row as historical only."
+        }
+      ],
+      "limitations": [
+        "The 82.3 row is a historical snapshot, not a verified current-season leader.",
+        "Visual and functional level components are not directly comparable to SFEB's internal scorecard.",
+        "Official evaluation uses its own task set, submission format and current-season VLM/GUI judge."
+      ],
+      "sources": [
+        "https://vision2web-bench.github.io/",
+        "https://arxiv.org/abs/2603.26648"
+      ]
+    },
+    {
+      "id": "design2code",
+      "name": "Design2Code",
+      "scope": "Screenshot-conditioned frontend reconstruction of real-world webpages, with automatic rendering metrics and human evaluation.",
+      "task_count": 484,
+      "snapshot_status": "methodology_only",
+      "observations": [
+        {
+          "kind": "dataset",
+          "real_world_webpages": 484
+        },
+        {
+          "kind": "evaluation",
+          "metrics": "automatic rendering metrics validated with human evaluation"
+        }
+      ],
+      "limitations": [
+        "Primarily measures screenshot-to-code visual reconstruction, not the complete functional, security, causal repair or maintenance loop.",
+        "Fixture and asset reuse requires a separate license and provenance review."
+      ],
+      "sources": [
+        "https://aclanthology.org/2025.naacl-long.199/"
+      ]
+    },
+    {
+      "id": "webdriverio-browser-agent",
+      "name": "WebdriverIO Browser Agent Benchmark",
+      "scope": "Browser-tool comparison: same model, harness and prompt while swapping browser tools; live website tasks judged by WebJudge.",
+      "task_count": 100,
+      "snapshot_status": "historical_published_snapshot",
+      "observations": [
+        {
+          "kind": "benchmark_scale",
+          "sampled_tasks": 100,
+          "source_dataset_tasks": 300,
+          "source_dataset_sites": 136,
+          "models_listed": 2,
+          "tools_listed": 7,
+          "total_agent_runs": 2511,
+          "latest_published_run_date": "2026-10-09"
+        },
+        {
+          "kind": "one_tool_row",
+          "tool": "WebdriverIO session",
+          "tool_version": "@wdio/cli 10.0.2",
+          "reported_success_percent": 62,
+          "successes": 103,
+          "observations": 165,
+          "wilson_95_lower_percent": 55,
+          "wilson_95_upper_percent": 69,
+          "median_cost_usd": 0.013,
+          "median_tokens": 174000,
+          "median_seconds": 156,
+          "median_tool_calls": 26,
+          "model_context": "page lists two model contexts; the indexed aggregate row is not a model-independent result"
+        },
+        {
+          "kind": "separate_model_run",
+          "model": "DeepSeek V4.1 Flash",
+          "run_date": "2026-10-09",
+          "tasks": 100,
+          "example_results": {
+            "stagehand_percent": 56,
+            "webdriverio_session_percent": 58,
+            "playwright_mcp_percent": 48
+          }
+        }
+      ],
+      "limitations": [
+        "The benchmark page's indexed October data shows published rows, while a direct page render on 2026-11-22 displayed an empty run-log state; retain this as an October historical snapshot, not a live leaderboard claim.",
+        "The 62% row aggregates 165 task observations; it must not be described as a clean 62/100 single-run result.",
+        "The benchmark reports roughly ±10 percentage-point intervals for 100 tasks and warns that overlapping intervals are not reliable rankings.",
+        "Live sites, bot blocks and CAPTCHAs reduce repeatability; WebJudge disagrees with human reviewers on about one run in seven.",
+        "This measures browser-tool effectiveness, not generated frontend quality."
+      ],
+      "sources": [
+        "https://benchmark.webdriver.io/",
+        "https://github.com/webdriverio/benchmark",
+        "https://github.com/webdriverio/benchmark/blob/main/results/2026-10-09-run-37883072636/report.md"
+      ]
+    },
+    {
+      "id": "swe-bench-pro-audit",
+      "name": "SWE-Bench Pro task-quality audit",
+      "scope": "Meta-evaluation of benchmark task validity: strictness, underspecification, test coverage and prompt correctness.",
+      "task_count": 731,
+      "snapshot_status": "audit_reference",
+      "observations": [
+        {
+          "kind": "audit",
+          "automated_flags": 200,
+          "automated_flag_percent": 27.4,
+          "human_identified_problematic": 249,
+          "human_percent": 34.1,
+          "publication_date": "2026-07-08"
+        }
+      ],
+      "limitations": [
+        "This is a task-quality audit, not an agent performance leaderboard.",
+        "The reported problem fraction applies to the audited SWE-Bench Pro public split, not to SFEB or Vision2Web."
+      ],
+      "sources": [
+        "https://openai.com/index/separating-signal-from-noise-coding-evaluations/"
+      ]
+    },
+    {
+      "id": "arena-webdev-frontend",
+      "name": "Arena Code Arena — WebDev / Frontend",
+      "scope": "Live pairwise human-preference arena for frontend web-app generation; anonymous model outputs are compared and users vote for the response they prefer.",
+      "task_count": null,
+      "snapshot_status": "current_live_snapshot",
+      "observations": [
+        {
+          "kind": "snapshot",
+          "observed_date": "2026-11-20",
+          "user_votes": 897929,
+          "models": 162,
+          "leader": "Claude Opus 5.5 (Max)",
+          "leader_rating": 1864
+        },
+        {
+          "kind": "model_ranking",
+          "top_models": [
+            {
+              "rank": 1,
+              "model": "Claude Opus 5.5 (Max)",
+              "rating": 1864
+            },
+            {
+              "rank": 2,
+              "model": "Claude Fable 5.2 (xHigh)"
+            },
+            {
+              "rank": 3,
+              "model": "Claude Sonnet 5.5 (xHigh)"
+            },
+            {
+              "rank": 4,
+              "model": "Gemini 4 Neon (High)"
+            },
+            {
+              "rank": 5,
+              "model": "Gemini 4 Carbon (High)"
+            },
+            {
+              "rank": 6,
+              "model": "GPT-6.2 Astra (Max)"
+            },
+            {
+              "rank": 7,
+              "model": "GPT-6 Astra (Max)"
+            },
+            {
+              "rank": 8,
+              "model": "Qwen4-Max (xHigh)"
+            },
+            {
+              "rank": 9,
+              "model": "GPT-6.2 Sol (Max)"
+            },
+            {
+              "rank": 10,
+              "model": "Claude Fable 5.1 (Max)"
+            }
+          ]
+        },
+        {
+          "kind": "cost_frontier",
+          "observed_rows": [
+            {
+              "model": "Claude Opus 5.5 (Max)",
+              "rating": 1864,
+              "median_cost_usd": 9
+            },
+            {
+              "model": "Kimi K3.1 Pro (Max)",
+              "rating": 1700,
+              "median_cost_usd": 0.82
+            },
+            {
+              "model": "MiMo-V2.6-Flash",
+              "rating": 1654,
+              "median_cost_usd": 0.05
+            }
+          ]
+        }
+      ],
+      "limitations": [
+        "This is a human pairwise-preference rating, not a deterministic task-success rate or independent functional oracle.",
+        "Vote count is not the number of unique independent benchmark tasks; prompts, users and comparisons are drawn from Arena traffic.",
+        "Model configuration, reasoning budget and harness labels are part of the submission identity; do not attribute the score to the base model alone.",
+        "Cost frontier values exist only for submissions with cost data; 49 listed models were not plotted due to insufficient cost data.",
+        "Do not compare Elo/rating values directly with Vision2Web scores, SFEB task rates or browser-agent success percentages."
+      ],
+      "sources": [
+        "https://arena.ai/leaderboard/code/webdev/frontend",
+        "https://arena.ai/how-it-works"
+      ]
+    },
+    {
+      "id": "arena-image-to-webdev",
+      "name": "Arena Code Arena — Image-to-WebDev",
+      "scope": "Human pairwise-preference arena for generating working web experiences from visual references.",
+      "task_count": null,
+      "snapshot_status": "current_live_snapshot",
+      "observations": [
+        {
+          "kind": "snapshot",
+          "observed_date": "2026-11-20",
+          "user_votes": 218511,
+          "models": 70,
+          "leader": "Claude Opus 5.5 (Max)",
+          "leader_rating": 1758,
+          "points_ahead_of_rank_2": 12
+        },
+        {
+          "kind": "cost_frontier",
+          "observed_rows": [
+            {
+              "model": "Claude Opus 5.5 (Max)",
+              "rating": 1758,
+              "median_cost_usd": 7.55
+            },
+            {
+              "model": "Hy4",
+              "rating": 1619,
+              "median_cost_usd": 0.45
+            },
+            {
+              "model": "DeepSeek-V4.1-Flash-20260910 (Max)",
+              "rating": 1612,
+              "median_cost_usd": 0.06
+            }
+          ]
+        }
+      ],
+      "limitations": [
+        "Human preference evaluates impressions of paired generated experiences, not requirement completeness or security invariants.",
+        "Ratings are specific to this Arena prompt distribution and model configuration; they are not comparable to the frontend WebDev or Vision2Web numeric scales.",
+        "Cost values are reported only for the displayed Pareto frontier submissions."
+      ],
+      "sources": [
+        "https://arena.ai/leaderboard/code/image-to-webdev",
+        "https://arena.ai/how-it-works"
+      ]
+    },
+    {
+      "id": "arena-fullstack",
+      "name": "Arena Code Arena — Fullstack",
+      "scope": "Human pairwise-preference arena for end-to-end web applications with backend/database/authentication/integration/deployment capabilities.",
+      "task_count": null,
+      "snapshot_status": "current_live_snapshot",
+      "observations": [
+        {
+          "kind": "snapshot",
+          "observed_date": "2026-11-20",
+          "user_votes": 133241,
+          "models": 95,
+          "leader": "Claude Opus 5.5 (Max)",
+          "leader_rating": 1745,
+          "points_ahead_of_rank_2": 1
+        },
+        {
+          "kind": "ranked_models",
+          "top_models": [
+            {
+              "rank": 1,
+              "model": "Claude Opus 5.5 (Max)",
+              "rating": 1745
+            },
+            {
+              "rank": 2,
+              "model": "GPT-6 Astra (Max)"
+            },
+            {
+              "rank": 3,
+              "model": "Claude Fable 5.2 (xHigh)"
+            },
+            {
+              "rank": 4,
+              "model": "GPT-6.1 Sol (Max)"
+            },
+            {
+              "rank": 5,
+              "model": "Gemini 4 Neon (High)"
+            },
+            {
+              "rank": 6,
+              "model": "GPT-6.1 Terra (Max)"
+            },
+            {
+              "rank": 7,
+              "model": "Muse Wonder Full (Max)"
+            }
+          ]
+        },
+        {
+          "kind": "platform_scope",
+          "capabilities": [
+            "PostgreSQL database",
+            "authentication and row-level security",
+            "third-party API integrations",
+            "persistent dev server",
+            "bash and web-search tools",
+            "Vercel deployment"
+          ]
+        }
+      ],
+      "limitations": [
+        "Human pairwise preference is not a production-readiness, reliability, security or test-coverage guarantee.",
+        "No task-count denominator is exposed on the cited leaderboard page; vote count must not be treated as unique task count.",
+        "Model scores are not directly comparable with frontend WebDev or Vision2Web."
+      ],
+      "sources": [
+        "https://arena.ai/leaderboard/code/webdev/fullstack",
+        "https://arena.ai/blog/fullstack-code-arena"
+      ]
+    },
+    {
+      "id": "interaction-as-a-judge",
+      "name": "Interaction-as-a-Judge",
+      "scope": "Research method using computer-use agents to evaluate generated applications through interactions, alongside human preference and correctness labels.",
+      "task_count": null,
+      "snapshot_status": "methodology_only",
+      "observations": [
+        {
+          "kind": "paper_reported_results",
+          "paper_dataset_preference_pairs": 6858,
+          "paper_correctness_applications": 222,
+          "preference_prediction_code_only_percent": 65.6,
+          "preference_prediction_interaction_judge_percent": 69.1,
+          "requirement_verification_code_only_percent": 77,
+          "requirement_verification_interaction_judge_percent": 81.6,
+          "iterative_repair_code_only_percent": 55.4,
+          "iterative_repair_interaction_judge_percent": 75.5,
+          "reward_model_win_rate_uplift_percentage_points": 6.7,
+          "generated_code_length_reduction_percent": 35.7,
+          "build_failure_rate_reduction_percentage_points": 7.2
+        },
+        {
+          "kind": "released_dataset_card_counts",
+          "dataset": "ArenaWebdevPreferences",
+          "application_pairs": 6390,
+          "categories": 7,
+          "contains_agent_traces": true,
+          "preference_labels": true
+        },
+        {
+          "kind": "released_dataset_card_counts",
+          "dataset": "ArenaWebdevCorrectness",
+          "application_versions": 189,
+          "human_verified_requirements": 362,
+          "labels": [
+            "Broken",
+            "Working"
+          ]
+        },
+        {
+          "kind": "count_discrepancy",
+          "paper_preference_pairs": 6858,
+          "dataset_card_preference_pairs": 6390,
+          "paper_correctness_applications": 222,
+          "dataset_card_correctness_versions": 189,
+          "status": "unresolved; paper and released-card counts are different snapshots/definitions and must not be conflated"
+        },
+        {
+          "kind": "data_license",
+          "preference_dataset_prompt_license": "CC-BY-4.0",
+          "model_output_terms": "governed by respective model-provider terms",
+          "correctness_dataset_license": "CC-BY-4.0"
+        },
+        {
+          "kind": "2026-11-12_research_page_snapshot",
+          "published_date": "2026-11-12",
+          "last_updated": "2026-11-13",
+          "broken_requirement_detection_code_only_percent": 63,
+          "broken_requirement_detection_interaction_judge_percent": 71.1,
+          "iterative_repair_code_only_percent": 55.4,
+          "iterative_repair_interaction_judge_percent": 75.5,
+          "interpretation": "The research page's highlighted results for its own datasets/protocol; these are diagnostic-evaluator results, not deterministic acceptance rates or SFEB outcomes."
+        }
+      ],
+      "limitations": [
+        "The paper's 6,858 preference pairs and 222 correctness applications differ from the released dataset cards' 6,390 pairs and 189 app versions; the difference is unresolved and counts must be reported separately.",
+        "Reported gains are on the paper's specific data, models, judge configurations and protocols; they are not general frontend accuracy rates or SFEB results.",
+        "Human preference prediction and requirement correctness are distinct target variables.",
+        "Computer-use judges can miss states, be manipulated by page content or misinterpret task intent; deterministic and human-calibrated checks remain necessary.",
+        "The preference dataset card lists CC-BY-4.0 for user prompts but model outputs remain under provider terms; review component assets/privacy before reuse.",
+        "The research page's highlighted broken-requirement detection result is 63.0% to 71.1%; iterative repair is 55.4% to 75.5%. Keep these distinct from preference-prediction agreement, released dataset counts, and deterministic oracle acceptance."
+      ],
+      "sources": [
+        "https://arena.ai/blog/interaction-as-a-judge",
+        "https://arxiv.org/abs/2610.17895",
+        "https://arena.ai/how-it-works",
+        "https://huggingface.co/datasets/lmarena-ai/arena-webdev-preferences",
+        "https://huggingface.co/datasets/lmarena-ai/arena-webdev-correctness"
+      ]
+    },
+    {
+      "id": "arena-webdev-html",
+      "name": "Arena Code Arena — HTML",
+      "scope": "Human pairwise-preference board for HTML-oriented web-development submissions.",
+      "task_count": null,
+      "snapshot_status": "current_live_snapshot",
+      "observations": [
+        {
+          "kind": "snapshot",
+          "observed_date": "2026-11-20",
+          "user_votes": 213322,
+          "models": 161,
+          "leader": "GPT-6.2 Astra (Max)",
+          "leader_rating": 1854,
+          "points_ahead_of_rank_2": 14
+        }
+      ],
+      "limitations": [
+        "This is a human preference rating, not deterministic requirement completion.",
+        "Model configuration and Arena prompt distribution are part of the submission.",
+        "The HTML board is distinct from general WebDev/Frontend and React boards; do not pool ratings or votes."
+      ],
+      "sources": [
+        "https://arena.ai/leaderboard/code/webdev/html",
+        "https://arena.ai/how-it-works"
+      ]
+    },
+    {
+      "id": "arena-webdev-react",
+      "name": "Arena Code Arena — React",
+      "scope": "Human pairwise-preference board for React-specific web-app development submissions.",
+      "task_count": null,
+      "snapshot_status": "current_live_snapshot",
+      "observations": [
+        {
+          "kind": "snapshot",
+          "observed_date": "2026-11-20",
+          "user_votes": 682332,
+          "models": 146,
+          "leader": "Claude Fable 5.2 (xHigh)",
+          "leader_rating": 1885,
+          "points_ahead_of_rank_2": 14
+        }
+      ],
+      "limitations": [
+        "This is a human preference rating, not deterministic requirement completion.",
+        "React-specific ratings do not represent Leptos capability; use as an ecosystem comparator, not a Rust framework benchmark.",
+        "Do not pool React and general WebDev ratings."
+      ],
+      "sources": [
+        "https://arena.ai/leaderboard/code/webdev/react",
+        "https://arena.ai/how-it-works"
+      ]
+    },
+    {
+      "id": "arena-webdev-overall",
+      "name": "Arena Code Arena — WebDev overall",
+      "scope": "Live pairwise human-preference arena for generated web applications; broader WebDev aggregate, distinct from frontend/HTML/React/Fullstack sub-boards.",
+      "task_count": null,
+      "snapshot_status": "current_live_snapshot",
+      "observations": [
+        {
+          "kind": "snapshot",
+          "observed_date": "2026-11-22",
+          "user_votes": 1044803,
+          "models": 164,
+          "leader": "Claude Fable 5.2 (xHigh)",
+          "leader_rating": 1822,
+          "next_rank": "Claude Opus 5.5 (Max)"
+        }
+      ],
+      "limitations": [
+        "Human preference rating, not deterministic task-success or requirement-correctness evidence.",
+        "The overall board and frontend/HTML/React/Fullstack sub-boards are separately calibrated; do not blend their ratings.",
+        "Vote count is not a count of unique benchmark tasks.",
+        "Model, configuration and reasoning budget are part of submission identity."
+      ],
+      "sources": [
+        "https://arena.ai/leaderboard/code/webdev"
+      ]
+    },
+    {
+      "id": "swe-bench-pro-v2",
+      "name": "SWE-Bench Pro V2",
+      "scope": "Long-horizon repository software-engineering task benchmark; an adjacent precedent for task validity, environment isolation and clean-room patch regrading, not a frontend-specific score comparator.",
+      "task_count": 642,
+      "snapshot_status": "historical_published_snapshot",
+      "observations": [
+        {
+          "kind": "release_snapshot",
+          "observed_date": "2026-09-22",
+          "public_tasks": 642,
+          "source_repositories": 11,
+          "removed_invalid_or_unrepairable_from_v1": 89,
+          "prior_v1_public_tasks": 731
+        },
+        {
+          "kind": "task_prompt_audit",
+          "problem_statements_rewritten": 529,
+          "rule": "Every graded assertion must trace to a sentence in the task statement; corrected instructions were independently implemented blind."
+        },
+        {
+          "kind": "two_sided_release_gate",
+          "reference_patch_resolves": 642,
+          "empty_patch_resolves": 0,
+          "interpretation": "Every task must pass under the reviewed reference patch and fail under the empty patch."
+        },
+        {
+          "kind": "agent_and_regrade_policy",
+          "agent_network_access": "limited to model endpoint",
+          "candidate_diff_regraded_on": "pristine image"
+        }
+      ],
+      "limitations": [
+        "This is a repository issue/patch benchmark, not a browser frontend-generation benchmark.",
+        "The two-sided gate establishes task/test sensitivity for the declared task, not complete semantic correctness or absence of all hidden-test defects.",
+        "Its task set, repository languages, verifier, agent budget and score must not be pooled with SFEB or Vision2Web."
+      ],
+      "sources": [
+        "https://labs.scale.com/blog/swe-bench-pro-v2",
+        "https://github.com/scaleapi/SWE-bench_Pro-os/blob/main/v2/README.md",
+        "https://huggingface.co/datasets/ScaleAI/SWE-bench_Pro"
+      ]
+    },
+    {
+      "id": "frontiercode-2",
+      "name": "FrontierCode 2.0",
+      "scope": "Maintainer-oriented repository software engineering and patch mergeability, including correctness, scope discipline, design, test quality and codebase conventions; adjacent comparator for SFEB's full-stack/maintenance lane.",
+      "task_count": 132,
+      "snapshot_status": "current_live_snapshot",
+      "observations": [
+        {
+          "kind": "benchmark_scope",
+          "tasks": 132,
+          "task_authors": "20+ experienced open-source maintainers/developers",
+          "task_effort": "more than 40 hours per task",
+          "grading": "unit tests, repository-specific rubrics and additional verifiers; blocking criteria can zero a task"
+        },
+        {
+          "kind": "task_scale_change",
+          "reference_solution_file_changes_increase_percent": 67,
+          "reference_solution_line_changes_increase_percent": 89,
+          "codebase_size_increase_percent": 25,
+          "relative_to": "FrontierCode 1.1"
+        },
+        {
+          "kind": "release_date",
+          "observed_date": "2026-10-27"
+        },
+        {
+          "kind": "official_release_model_score",
+          "observed_date": "2026-10-27",
+          "model": "Claude Opus 5.5",
+          "reasoning_effort": "best reported effort",
+          "weighted_score_percent": 47.3,
+          "interpretation": "Official launch comparison score; rubric score is weighted and any failed blocking criterion zeros the task."
+        },
+        {
+          "kind": "official_release_model_score",
+          "observed_date": "2026-10-27",
+          "model": "GPT-6 Astra",
+          "reasoning_effort": "best reported effort",
+          "weighted_score_percent": 44,
+          "interpretation": "Official launch comparison score; not comparable to SFEB completion percentages."
+        },
+        {
+          "kind": "blocker_failure_rates_max_effort",
+          "pooled_models": [
+            "Claude Opus 5.5",
+            "Claude Fable 5.1",
+            "GPT-6.1 Sol",
+            "GPT-6 Astra"
+          ],
+          "failure_percent": {
+            "thoroughness": 15.3,
+            "core_behavior": 12.3,
+            "backwards_compatibility": 5.2,
+            "scope": 4.9,
+            "avoiding_regressions": 2.2,
+            "test_integrity": 1.9,
+            "effective_test_writing": 1.3,
+            "compilation": 0.7,
+            "lint_format_typecheck": 0.5
+          }
+        },
+        {
+          "kind": "current_leaderboard_snapshot",
+          "observed_date": "2026-11-23",
+          "source": "two_third_party_leaderboard_snapshots; official_Cognition_page_dynamic_chart",
+          "model": "Claude Fable 5.2",
+          "harness": "Claude Code",
+          "reasoning_effort": "leaderboard configuration not normalized across mirrors",
+          "weighted_score_percent": 50.2,
+          "interpretation": "A Nov 23 Priors mirror reports Fable 5.2 at 50.2% on its default leaderboard; another mirror lists a different 49.1% high / 47.6% xhigh breakdown. Cognition's direct leaderboard is interactive and settings-dependent. Do not attribute 50.2% specifically to xhigh or merge these observations into one score."
+        },
+        {
+          "kind": "leaderboard_mirror_configuration_crosscheck",
+          "observed_date": "2026-11-23",
+          "sources": [
+            "https://frontierlog.ai/benchmark/frontiercode-2-0",
+            "https://mypriors.com/benchmarks/frontiercode-2.0-main"
+          ],
+          "priors_reported_fable_5_2_score_percent": 50.2,
+          "frontierlog_reported_fable_5_2_high_score_percent": 49.1,
+          "frontierlog_reported_fable_5_2_xhigh_score_percent": 47.6,
+          "interpretation": "Public mirrors expose different configurations/scores; record each with source and effort label instead of asserting 50.2% is xhigh. Cognition's direct page states weighted score semantics and blocking-zero policy."
+        }
+      ],
+      "limitations": [
+        "This evaluates mergeability of repository patches, not visual reconstruction or end-to-end browser journey quality.",
+        "The grading rubric includes subjective maintainer criteria; reproduce its native protocol before making numeric comparisons.",
+        "A benchmark score must be associated with its exact model, reasoning effort, agent harness and scoring revision.",
+        "The 47.3% Opus 5.5 score is the official October 27 launch snapshot; later leaderboard entries may differ and must be timestamped separately.",
+        "The official site notes 20+ maintainer-authors spent more than 40 hours per task, uses unit tests, rubrics and verifiers, and zeroes runs that use solution-bearing sources; SFEB should match the rigor and independently qualify its own tasks.",
+        "The 50.2% Claude Fable 5.2 current row is corroborated by third-party leaderboard mirrors; Cognition's direct page is dynamically rendered and its text view states scoring semantics but does not expose the numeric row. Treat the numeric observation as a timestamped external mirror, not a locally reproduced benchmark run.",
+        "Nov 23 mirrors do not normalize Fable 5.2 reasoning effort: Priors lists 50.2% on its default leaderboard, while Frontierlog lists 49.1% high and 47.6% xhigh. Avoid attaching the 50.2% number to xhigh."
+      ],
+      "sources": [
+        "https://cognition.com/frontiercode",
+        "https://benchlm.ai/benchmarks/frontiercode-2",
+        "https://www.mypriors.com/benchmarks/frontiercode-2.0-main"
+      ]
+    },
+    {
+      "id": "osworld-2",
+      "name": "OSWorld 2.0",
+      "scope": "Long-horizon computer-use workflows over desktop environments and self-hosted websites; adjacent stress benchmark for interaction, hidden-state inference and stateful UI operation, not frontend code generation.",
+      "task_count": 108,
+      "snapshot_status": "historical_published_snapshot",
+      "observations": [
+        {
+          "kind": "benchmark_scale",
+          "observed_date": "2026-06-28",
+          "tasks": 108,
+          "self_hosted_websites": 31,
+          "tasks_over_one_hour_percent": 69.6,
+          "median_human_task_hours": 1.6,
+          "average_agent_tool_calls_opus_4_7_max_effort": 318,
+          "average_scoring_checkpoints": 27.25
+        },
+        {
+          "kind": "paper_reported_primary_metric",
+          "observed_date": "2026-06-28",
+          "model": "Claude Opus 4.8",
+          "reasoning_effort": "maximum thinking with batched tool calls",
+          "step_budget": 500,
+          "binary_completion_percent": 20.6,
+          "partial_score_percent": 54.8
+        },
+        {
+          "kind": "challenge_phenomena",
+          "distribution_over_108_tasks": {
+            "cross_source_reasoning": 46,
+            "visual_spatial_precision": 45,
+            "implicit_state_inference": 43,
+            "multi_item_state_tracking": 43,
+            "conflict_disambiguation": 39,
+            "multimodal_editing": 30,
+            "tutorial_following": 22,
+            "dynamic_environment": 10,
+            "streaming_interaction": 6,
+            "proactive_interaction": 6
+          },
+          "note": "Challenge labels are non-exclusive; counts may overlap."
+        },
+        {
+          "kind": "live_leaderboard_search_snapshot",
+          "observed_date": "2026-11-23",
+          "model": "Claude Opus 5",
+          "approach": "Max Batch tool v2.1",
+          "binary_accuracy_percent": 44.33,
+          "partial_score_percent": 77.67,
+          "interpretation": "Search-indexed live leaderboard row at observation time. The website exposes selectable step-budget and release filters; exact selected filter state was not independently recovered, so this row is not substituted for the paper's stated 500-step primary result."
+        }
+      ],
+      "limitations": [
+        "Measures long-horizon computer-use workflow completion, not application source-code generation or mergeability.",
+        "The 20.6% binary-completion result and 54.8% partial score are the paper-reported 500-step results; do not substitute unrelated version/leaderboard percentages.",
+        "Its task set, step budgets, authentic input artifacts and self-hosted applications differ from SFEB and WebdriverIO; do not pool results.",
+        "Use its dynamic-state, conflict-disambiguation, proactive-clarification and hidden-state phenomena to design stress tasks, not to claim direct numeric superiority.",
+        "The 2026-11-23 site leaderboard search snapshot displays 44.33% binary and 77.67% partial for Claude Opus 5 / Max Batch tool v2.1, but the selected step-budget/release filter was not independently captured; treat as a provisional live-page observation, not as the paper's 500-step result."
+      ],
+      "sources": [
+        "https://osworld-v2.xlang.ai/",
+        "https://arxiv.org/abs/2606.29537"
+      ]
+    },
+    {
+      "id": "sentinelbench",
+      "name": "SentinelBench",
+      "scope": "Long-running monitoring agents operating over time-evolving synthetic web environments; evaluates passive/active and absolute/relative monitoring, no-op abstention, reaction time and resource use.",
+      "task_count": 100,
+      "snapshot_status": "historical_published_snapshot",
+      "observations": [
+        {
+          "kind": "benchmark_scale",
+          "tasks": 100,
+          "synthetic_web_environments": 10,
+          "no_op_tasks": 20,
+          "axes": [
+            "passive_vs_active",
+            "absolute_vs_relative"
+          ]
+        },
+        {
+          "kind": "wait_tool_method",
+          "tool": "wait_for(condition, timeout)",
+          "behavior": "takes baseline textual snapshot then checks for changes once per second; LLM evaluates new diffs"
+        },
+        {
+          "kind": "reported_completion_comparison",
+          "wait_for_correct_tasks": 69,
+          "sleep_correct_tasks": 56,
+          "denominator": 100,
+          "model_family": "three models across two browser-agent variants",
+          "observed_date": "2026-06-08"
+        },
+        {
+          "kind": "reported_cost_comparison",
+          "model": "GPT-5.4",
+          "horizon_minutes": 10,
+          "sleep_median_usd": 1.17,
+          "wait_for_median_usd": 0.23,
+          "cost_reduction_factor": 5.1,
+          "interpretation": "Microsoft reports median cost per task; result is protocol/model-specific, not comparable directly with SFEB."
+        }
+      ],
+      "limitations": [
+        "The wait_for baseline is itself polling-based (one-second page diff), not a push-notification or durable event-cursor implementation.",
+        "The environments are synthetic facades with scripted event timelines; they do not establish production event-bus reliability.",
+        "Current benchmark focuses on persistent conditions and does not fully capture ephemeral must-act-now opportunities.",
+        "MON-001's zero explicit polls are from a synthetic in-memory trace, not a measured production wait service or CPU/network result."
+      ],
+      "sources": [
+        "https://www.microsoft.com/en-us/research/articles/sentinelbench-a-benchmark-for-long-running-monitoring-agents/",
+        "https://www.microsoft.com/en-us/research/publication/sentinelbench-a-benchmark-for-long-running-monitoring-agents/",
+        "https://github.com/microsoft/sentinel_environments"
+      ]
+    },
+    {
+      "id": "odysseys",
+      "name": "Odysseys",
+      "scope": "Realistic long-horizon multi-site web workflows evaluated using multiple graded rubrics and trajectory efficiency; adjacent comparator for sustained computer-use agents.",
+      "task_count": 200,
+      "snapshot_status": "historical_published_snapshot",
+      "observations": [
+        {
+          "kind": "benchmark_scale",
+          "tasks": 200,
+          "mean_graded_rubrics_per_task": 6.1,
+          "evaluation": "rubric-based partial progress over real-world browsing workflows"
+        },
+        {
+          "kind": "published_leading_result",
+          "best_model_success_rate_percent": 44.5,
+          "trajectory_efficiency_percent": 1.15,
+          "trajectory_efficiency_definition": "rubric score per step",
+          "published_date": "2026-04-27"
+        }
+      ],
+      "limitations": [
+        "This is a multi-site web-completion benchmark, not a dedicated monitoring/waiting benchmark.",
+        "Its success and trajectory-efficiency values use its own task set, rubrics, agent/model settings and are not numerically comparable with SFEB.",
+        "SFEB should adapt the emphasis on graded partial outcomes and efficiency while retaining independent state, permission and artifact oracles."
+      ],
+      "sources": [
+        "https://arxiv.org/abs/2604.24964",
+        "https://odysseysbench.com/v1/"
+      ]
+    }
+  ]
+}

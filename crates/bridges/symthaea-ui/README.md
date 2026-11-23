@@ -23,6 +23,34 @@ Not yet built: Steward (sleep/save/introspect/audit) and Bench
 gateway already exposes what they'd need; they're just not wired into this
 UI yet.
 
+## Frontend evidence anchors
+
+The rendered interface exposes stable `data-sfeb-id` attributes for its main
+regions and interaction points (header, gateway status, telemetry, projections,
+conversation transcript and composer). These identifiers are consumed by the
+bounded layout probe in `symthaea-browser` to connect observed geometry to a
+named UI region without extracting arbitrary page text.
+
+The transcript uses a live log role, gateway state uses a status role, errors
+are announced as alerts, and the message input has an explicit accessible
+name. Keyboard focus indicators, a reduced-motion rule for the telemetry orb,
+and narrow-screen layout adjustments are defined in `style.css`.
+
+Telemetry connection state is tied to the browser WebSocket reaching
+`OPEN`, rather than merely constructing a WebSocket object. The live label
+distinguishes `disconnected`, `connecting`, `connected` and `reconnecting`.
+The text state is exposed through a polite status region. Failed handshakes
+are bounded to 10 seconds. Ended streams retry sequentially with deterministic
+backoff (1, 2, 4, 8, 16, then 30 seconds). A stream stable for at least one
+minute resets accumulated failure backoff; short-lived connections continue
+the exponential sequence. The current gateway field is read again for each
+retry, so a changed endpoint is used on the next attempt; an already-open
+stream is not forcibly replaced while it remains alive.
+
+These are source-level changes; a browser-based accessibility and responsive
+acceptance run is still required before claiming that the rendered interface
+passes.
+
 ## Run it
 
 ```bash

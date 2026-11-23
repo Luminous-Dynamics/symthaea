@@ -1,0 +1,442 @@
+{
+  "task_version": "1.0.0",
+  "task_id": "SFEB-L2-005",
+  "status": "fixture_ready",
+  "level": 2,
+  "title": "Implement a searchable, filterable and deterministic asset inventory explorer",
+  "objective": "Implement a Leptos CSR asset inventory page with text search, category and stock filters, inclusive price bounds, stable sorting, deterministic pagination and URL-restorable query state. Results must match the independent deterministic Rust reference model.",
+  "product_brief": {
+    "users": [
+      "Field operations coordinator",
+      "Stores specialist",
+      "Technician checking availability"
+    ],
+    "user_goal": "Find assets by name, SKU or description, apply filters and share a URL that restores the query state.",
+    "content_hierarchy": [
+      "Brand/navigation",
+      "Page title",
+      "Search/filter controls",
+      "Result count and sort",
+      "Semantic table",
+      "Pagination"
+    ],
+    "visual_direction": {
+      "mood": "Calm, precise field-operations software with high information scent.",
+      "palette": [
+        {
+          "token": "canvas",
+          "value": "#f3f6f4",
+          "purpose": "Neutral canvas"
+        },
+        {
+          "token": "surface",
+          "value": "#ffffff",
+          "purpose": "Panels"
+        },
+        {
+          "token": "ink",
+          "value": "#1c2a24",
+          "purpose": "Primary text"
+        },
+        {
+          "token": "muted",
+          "value": "#718078",
+          "purpose": "Metadata"
+        },
+        {
+          "token": "green",
+          "value": "#356e52",
+          "purpose": "Actions"
+        },
+        {
+          "token": "blue",
+          "value": "#496f86",
+          "purpose": "Information"
+        },
+        {
+          "token": "gold",
+          "value": "#946d2f",
+          "purpose": "Attention"
+        }
+      ],
+      "typography": "System sans-serif and tabular numeric values.",
+      "layout_principles": [
+        "Search and filters share one coherent panel.",
+        "Table labels remain semantic.",
+        "Controls reflow on mobile.",
+        "Only table container may scroll horizontally."
+      ]
+    },
+    "interaction_requirements": [
+      "Search case-insensitively across name, SKU and description.",
+      "Category, in-stock and inclusive price filters combine conjunctively.",
+      "Money is integer cents; reversed bounds reject.",
+      "Sorts: name_asc, price_asc, price_desc, stock_asc.",
+      "All ties use ascending immutable asset ID.",
+      "Filter/sort before one-based pagination; page size 1..50.",
+      "State URL round-trips all query fields.",
+      "Invalid and empty states are distinct.",
+      "Shared URLs contain exactly one state parameter with exactly eight fields; reserved and non-ASCII UTF-8 bytes are percent-encoded.",
+      "Malformed or incomplete shared URLs show an explicit error and are not silently replaced until the user deliberately changes or clears state.",
+      "Search and name sorting use ASCII-only case folding; query text rejects C0/C1 controls and price values stay within JavaScript safe-integer bounds."
+    ]
+  },
+  "implementation_constraints": {
+    "framework": "Leptos",
+    "framework_family": "0.8",
+    "language": "Rust",
+    "allowed_dependencies": [
+      "Existing Leptos dependencies",
+      "serde/serde_json",
+      "Repository CSS"
+    ],
+    "disallowed_techniques": [
+      "No JS UI framework.",
+      "No remote API/assets/CDN/fonts.",
+      "No floating-point money.",
+      "No unstable sort tie-break.",
+      "No keyboard-inaccessible control.",
+      "Never render dataset strings as HTML."
+    ]
+  },
+  "environment": {
+    "browser": "Headless Chromium; exact build recorded before browser qualification.",
+    "viewport_matrix": [
+      {
+        "name": "mobile-narrow",
+        "width": 320,
+        "height": 740
+      },
+      {
+        "name": "mobile",
+        "width": 390,
+        "height": 844
+      },
+      {
+        "name": "tablet",
+        "width": 768,
+        "height": 1024
+      },
+      {
+        "name": "desktop",
+        "width": 1280,
+        "height": 800
+      },
+      {
+        "name": "wide-desktop",
+        "width": 1440,
+        "height": 900
+      }
+    ],
+    "device_scale_factor": 1,
+    "network_policy": "No external requests; future API only on isolated fixture origin.",
+    "font_policy": "System fonts only."
+  },
+  "fixture_exposure": "public_pilot",
+  "reference_fixture": {
+    "path": "benchmarks/frontend/fixtures/search-filter-explorer",
+    "sha256": "7938566d80b98ff65223e85acc17ae9cc304e9a83d1f3d0b941a98cada45115b",
+    "purpose": "Original HTML/CSS reference plus synthetic dataset and deterministic local model; digest is SHA-256 of reference.html + NUL + style.css."
+  },
+  "required_regions": [
+    {
+      "id": "inventory.shell",
+      "role": "generic container",
+      "accessible_name": null,
+      "required": true
+    },
+    {
+      "id": "inventory.header",
+      "role": "banner",
+      "accessible_name": null,
+      "required": true
+    },
+    {
+      "id": "inventory.main",
+      "role": "main",
+      "accessible_name": null,
+      "required": true
+    },
+    {
+      "id": "inventory.heading",
+      "role": "region",
+      "accessible_name": "Asset inventory",
+      "required": true
+    },
+    {
+      "id": "inventory.filters",
+      "role": "region",
+      "accessible_name": "Search and filters",
+      "required": true
+    },
+    {
+      "id": "inventory.results",
+      "role": "region",
+      "accessible_name": "All assets",
+      "required": true
+    },
+    {
+      "id": "inventory.table",
+      "role": "table",
+      "accessible_name": "Synthetic field equipment inventory",
+      "required": true
+    },
+    {
+      "id": "inventory.pagination",
+      "role": "navigation",
+      "accessible_name": "Asset result pages",
+      "required": true
+    }
+  ],
+  "viewports": [
+    {
+      "name": "mobile-narrow",
+      "width": 320,
+      "height": 740
+    },
+    {
+      "name": "mobile",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "name": "tablet",
+      "width": 768,
+      "height": 1024
+    },
+    {
+      "name": "desktop",
+      "width": 1280,
+      "height": 800
+    },
+    {
+      "name": "wide-desktop",
+      "width": 1440,
+      "height": 900
+    }
+  ],
+  "acceptance_journeys": [
+    {
+      "id": "inventory.search-and-filter",
+      "goal": "Find available sensors.",
+      "steps": [
+        "Enter SENSOR.",
+        "Select Sensors.",
+        "Enable in-stock only.",
+        "Apply filters."
+      ],
+      "oracle": [
+        "Only AST-002 and AST-008 appear.",
+        "Lowercase sensor preserves result IDs."
+      ]
+    },
+    {
+      "id": "inventory.price-sort-and-ties",
+      "goal": "Verify inclusive prices and stable ties.",
+      "steps": [
+        "Set 50000..130000 cents.",
+        "Sort price descending.",
+        "Filter Devices; sort price ascending."
+      ],
+      "oracle": [
+        "Six assets match.",
+        "Equal-price AST-011 precedes AST-013."
+      ]
+    },
+    {
+      "id": "inventory.pagination-and-url-state",
+      "goal": "Restore paginated query state.",
+      "steps": [
+        "Load default view.",
+        "Go to page 2.",
+        "Copy state URL and open a fresh session."
+      ],
+      "oracle": [
+        "Page 2 IDs match golden case.",
+        "Every state field restores."
+      ]
+    },
+    {
+      "id": "inventory.invalid-and-empty-states",
+      "goal": "Distinguish invalid ranges from no matches.",
+      "steps": [
+        "Set min greater than max.",
+        "Search quantum."
+      ],
+      "oracle": [
+        "Reversed range rejects.",
+        "Valid zero-match state shows empty results."
+      ]
+    },
+    {
+      "id": "inventory.invalid-deep-link",
+      "goal": "Handle malformed and incomplete shared state safely.",
+      "steps": [
+        "Open a URL with a missing state field.",
+        "Observe the invalid shared URL alert.",
+        "Verify the URL is not silently replaced by default state.",
+        "Clear all filters to create a complete valid state URL."
+      ],
+      "oracle": [
+        "The application reports invalid shared state accessibly.",
+        "The original URL remains unchanged until explicit user action.",
+        "Clear all creates a canonical eight-field state URL."
+      ]
+    }
+  ],
+  "assertions": [
+    {
+      "id": "inventory.main-landmark",
+      "evaluator": "accessibility",
+      "target": "role=main",
+      "operator": "count_equals",
+      "expected": 1,
+      "hard_gate": true
+    },
+    {
+      "id": "inventory.search-label",
+      "evaluator": "accessibility",
+      "target": "input[name=q]",
+      "operator": "equals",
+      "expected": "Search assets",
+      "hard_gate": true
+    },
+    {
+      "id": "inventory.filter-labels",
+      "evaluator": "accessibility",
+      "target": "category, price, availability and sort controls",
+      "operator": "manual_pass",
+      "expected": true,
+      "hard_gate": true
+    },
+    {
+      "id": "inventory.result-table",
+      "evaluator": "accessibility",
+      "target": "caption and scoped table headers",
+      "operator": "exists",
+      "expected": true,
+      "hard_gate": true
+    },
+    {
+      "id": "inventory.casefold",
+      "evaluator": "dom",
+      "target": "q=SENSOR vs q=sensor",
+      "operator": "equals",
+      "expected": "same ordered IDs",
+      "hard_gate": true
+    },
+    {
+      "id": "inventory.filter-conjunction",
+      "evaluator": "dom",
+      "target": "Sensors + available only",
+      "operator": "equals",
+      "expected": [
+        "AST-002",
+        "AST-008"
+      ],
+      "hard_gate": true
+    },
+    {
+      "id": "inventory.sort-tie-break",
+      "evaluator": "dom",
+      "target": "Devices + price_asc",
+      "operator": "equals",
+      "expected": [
+        "AST-011",
+        "AST-013",
+        "AST-006"
+      ],
+      "hard_gate": true
+    },
+    {
+      "id": "inventory.page-concatenation",
+      "evaluator": "dom",
+      "target": "all result pages",
+      "operator": "manual_pass",
+      "expected": true,
+      "hard_gate": true
+    },
+    {
+      "id": "inventory.url-roundtrip",
+      "evaluator": "interaction",
+      "target": "serialized query URL",
+      "operator": "manual_pass",
+      "expected": true,
+      "hard_gate": true
+    },
+    {
+      "id": "inventory.invalid-range",
+      "evaluator": "interaction",
+      "target": "minimum exceeds maximum",
+      "operator": "manual_pass",
+      "expected": true,
+      "hard_gate": true
+    },
+    {
+      "id": "inventory.no-external-network",
+      "evaluator": "dom",
+      "target": "external requests",
+      "operator": "equals",
+      "expected": 0,
+      "hard_gate": true
+    },
+    {
+      "id": "inventory.document-overflow",
+      "evaluator": "layout",
+      "target": "scrollWidth - innerWidth",
+      "operator": "equals",
+      "expected": 0,
+      "hard_gate": true
+    },
+    {
+      "id": "inventory.url-canonical-grammar",
+      "evaluator": "interaction",
+      "target": "shared query-state URL",
+      "operator": "manual_pass",
+      "expected": "Exactly one state parameter, reserved/non-ASCII bytes percent-encoded, exact eight fields",
+      "hard_gate": true
+    },
+    {
+      "id": "inventory.invalid-deep-link",
+      "evaluator": "interaction",
+      "target": "malformed or partial state URL",
+      "operator": "manual_pass",
+      "expected": "Visible invalid-state error; URL not silently replaced before user action",
+      "hard_gate": true
+    }
+  ],
+  "hard_gates": [
+    "All deterministic golden cases pass.",
+    "Search, filters, sorting and pagination match Rust reference model.",
+    "Tie-break is ascending ID.",
+    "URL restores every field.",
+    "Invalid ranges reject; zero matches are distinct.",
+    "All controls labeled and keyboard-operable.",
+    "No document overflow or external requests."
+  ],
+  "evidence": [
+    "Task and fixture digests.",
+    "Dataset and oracle receipts.",
+    "Rust model output and source revision.",
+    "State URL and browser trace.",
+    "Screenshots and accessibility tree.",
+    "Swept-width layout report.",
+    "Network log.",
+    "Shared Rust/JavaScript URL-state conformance-vector report.",
+    "Shared Rust/JavaScript URL-state conformance-vector report."
+  ],
+  "budget": {
+    "wall_time_minutes": 50,
+    "max_tool_calls": 100,
+    "max_repair_cycles": 3
+  },
+  "notes": [
+    "Synthetic public asset records only.",
+    "HTML/CSS supplies visual reference; it is not proof candidate passes.",
+    "Rust model can be checked offline; browser/keyboard/accessibility qualification still requires runner.",
+    "Public pilot only, not hidden holdout.",
+    "Responsive stress preflight: sweep every integer CSS width from 320 through 1440 to detect breakpoint cliffs; the named five-width matrix remains mandatory, and the candidate must pass the same sweep before promotion.",
+    "URL-state contract requires exactly eight unique fields, with duplicate JSON keys rejected, one ?state= parameter, RFC 3986 unreserved literal bytes only, percent-encoded UTF-8 for all other bytes, ASCII-only case folding and rejection of C0/C1 controls and unsafe cross-language integers.",
+    "URL-state contract requires exactly eight unique fields, with duplicate JSON keys rejected, one ?state= parameter, RFC 3986 unreserved literal bytes only, percent-encoded UTF-8 for all other bytes, ASCII-only case folding and rejection of C0/C1 controls and unsafe cross-language integers."
+  ]
+}

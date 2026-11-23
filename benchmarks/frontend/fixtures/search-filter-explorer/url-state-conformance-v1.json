@@ -1,0 +1,194 @@
+{
+  "schema": "sfeb-url-state-conformance-v1",
+  "policy": {
+    "prefix": "?state=",
+    "parameter_count": 1,
+    "raw_component_characters": "ASCII RFC 3986 unreserved only: ALPHA / DIGIT / - / . / _ / ~",
+    "reserved_and_non_ascii": "Percent-encode UTF-8 bytes; percent hex is case-insensitive; '+' is literal reserved data and must be %2B.",
+    "state_fields": [
+      "q",
+      "category",
+      "available_only",
+      "min_price_cents",
+      "max_price_cents",
+      "sort",
+      "page",
+      "page_size"
+    ],
+    "field_policy": "Exactly the eight fields are required. Unknown and missing fields are rejected.",
+    "query_case_folding": "ASCII A-Z only; non-ASCII code points are not Unicode-case-folded.",
+    "forbidden_query_controls": [
+      "U+0000..U+001F",
+      "U+007F..U+009F"
+    ],
+    "safe_integer_max": 9007199254740991
+  },
+  "valid_states": [
+    {
+      "id": "default",
+      "state": {
+        "q": "",
+        "category": null,
+        "available_only": false,
+        "min_price_cents": null,
+        "max_price_cents": null,
+        "sort": "name_asc",
+        "page": 1,
+        "page_size": 5
+      }
+    },
+    {
+      "id": "reserved-and-unicode",
+      "state": {
+        "q": "café + pump & sensor",
+        "category": "Power",
+        "available_only": true,
+        "min_price_cents": 5000,
+        "max_price_cents": 250000,
+        "sort": "price_desc",
+        "page": 3,
+        "page_size": 10
+      }
+    },
+    {
+      "id": "ascii-case",
+      "state": {
+        "q": "SENSOR",
+        "category": null,
+        "available_only": false,
+        "min_price_cents": null,
+        "max_price_cents": null,
+        "sort": "name_asc",
+        "page": 1,
+        "page_size": 5
+      }
+    },
+    {
+      "id": "reserved-escaped-quotes-and-backslash",
+      "state": {
+        "q": "café + pump & \"sensor\" / valve\\line 100%",
+        "category": "Power",
+        "available_only": true,
+        "min_price_cents": 5000,
+        "max_price_cents": 250000,
+        "sort": "price_desc",
+        "page": 3,
+        "page_size": 10
+      }
+    }
+  ],
+  "invalid_states": [
+    {
+      "id": "c0-control",
+      "error": "query_contains_control_character",
+      "state": {
+        "q": "bad\u001f",
+        "category": null,
+        "available_only": false,
+        "min_price_cents": null,
+        "max_price_cents": null,
+        "sort": "name_asc",
+        "page": 1,
+        "page_size": 5
+      }
+    },
+    {
+      "id": "c1-control",
+      "error": "query_contains_control_character",
+      "state": {
+        "q": "bad",
+        "category": null,
+        "available_only": false,
+        "min_price_cents": null,
+        "max_price_cents": null,
+        "sort": "name_asc",
+        "page": 1,
+        "page_size": 5
+      }
+    },
+    {
+      "id": "unsafe-integer",
+      "error": "price_amount_unsafe_for_cross_language_integer",
+      "state": {
+        "q": "",
+        "category": null,
+        "available_only": false,
+        "min_price_cents": 9007199254740992,
+        "max_price_cents": null,
+        "sort": "name_asc",
+        "page": 1,
+        "page_size": 5
+      }
+    },
+    {
+      "id": "reversed-bounds",
+      "error": "min_price_cents_exceeds_max_price_cents",
+      "state": {
+        "q": "",
+        "category": null,
+        "available_only": false,
+        "min_price_cents": 200,
+        "max_price_cents": 100,
+        "sort": "name_asc",
+        "page": 1,
+        "page_size": 5
+      }
+    },
+    {
+      "id": "missing-field",
+      "error": "state_url_fields_mismatch",
+      "state": {
+        "q": "",
+        "category": null,
+        "available_only": false,
+        "min_price_cents": null,
+        "max_price_cents": null,
+        "sort": "name_asc",
+        "page": 1
+      }
+    },
+    {
+      "id": "unknown-field",
+      "error": "state_url_fields_mismatch",
+      "state": {
+        "q": "",
+        "category": null,
+        "available_only": false,
+        "min_price_cents": null,
+        "max_price_cents": null,
+        "sort": "name_asc",
+        "page": 1,
+        "page_size": 5,
+        "admin": true
+      }
+    }
+  ],
+  "invalid_urls": [
+    {
+      "id": "raw-plus",
+      "url": "?state=+"
+    },
+    {
+      "id": "raw-reserved",
+      "url": "?state={}",
+      "error": "state_url_must_percent_encode_reserved_or_non_ascii_bytes"
+    },
+    {
+      "id": "malformed-percent",
+      "url": "?state=%"
+    },
+    {
+      "id": "invalid-utf8",
+      "url": "?state=%C0%AF"
+    },
+    {
+      "id": "extra-parameter",
+      "url": "?state=%7B%7D&admin=true"
+    },
+    {
+      "id": "duplicate-state-field",
+      "url": "?state=%7B%22q%22%3A%22first%22%2C%22q%22%3A%22second%22%2C%22category%22%3Anull%2C%22available_only%22%3Afalse%2C%22min_price_cents%22%3Anull%2C%22max_price_cents%22%3Anull%2C%22sort%22%3A%22name_asc%22%2C%22page%22%3A1%2C%22page_size%22%3A5%7D",
+      "error": "state_url_duplicate_field"
+    }
+  ]
+}

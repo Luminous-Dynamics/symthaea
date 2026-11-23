@@ -1,0 +1,184 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/sfeb/pattern-retrieval-result-v1.schema.json",
+  "title": "SFEB Pattern Retrieval Result v1",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema",
+    "status",
+    "corpus_version",
+    "corpus_source_commit",
+    "queries_source",
+    "query_count",
+    "positive_queries",
+    "hard_negative_queries",
+    "hdc_dimensions",
+    "hdc_encoding",
+    "threshold_calibration",
+    "methods",
+    "total_runtime_ms",
+    "important_limitations"
+  ],
+  "properties": {
+    "schema": {
+      "const": "sfeb-pattern-retrieval-result-v1"
+    },
+    "status": {
+      "enum": [
+        "pilot_measurement",
+        "baseline_measurement",
+        "holdout_measurement"
+      ]
+    },
+    "corpus_version": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "corpus_source_commit": {
+      "type": "string"
+    },
+    "queries_source": {
+      "type": "string"
+    },
+    "query_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "positive_queries": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "hard_negative_queries": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "hdc_dimensions": {
+      "type": "integer",
+      "minimum": 256
+    },
+    "hdc_encoding": {
+      "type": "string"
+    },
+    "threshold_calibration": {
+      "type": "string"
+    },
+    "methods": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/method"
+      }
+    },
+    "total_runtime_ms": {
+      "type": "number",
+      "minimum": 0
+    },
+    "important_limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "$defs": {
+    "method": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "method",
+        "positive_queries",
+        "hard_negative_queries",
+        "recall_at_1",
+        "recall_at_3",
+        "mean_reciprocal_rank",
+        "ndcg_at_3",
+        "precision_at_3",
+        "abstention_threshold",
+        "hard_negative_top_score_distribution",
+        "positive_top_score_distribution",
+        "latency_ms_per_query",
+        "per_query",
+        "hit_rate_at_1",
+        "hit_rate_at_3"
+      ],
+      "properties": {
+        "method": {
+          "type": "string"
+        },
+        "positive_queries": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "hard_negative_queries": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "recall_at_1": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "recall_at_3": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "mean_reciprocal_rank": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "ndcg_at_3": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "precision_at_3": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "abstention_threshold": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "hard_negative_top_score_distribution": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "positive_top_score_distribution": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "latency_ms_per_query": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "per_query": {
+          "type": "array"
+        },
+        "hit_rate_at_1": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "hit_rate_at_3": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,398 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/sfeb/execution-predicate-v1.schema.json",
+  "title": "SFEB signed execution predicate v1 (in-toto Statement v1)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "_type",
+    "subject",
+    "predicateType",
+    "predicate"
+  ],
+  "properties": {
+    "_type": {
+      "const": "https://in-toto.io/Statement/v1"
+    },
+    "subject": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "digest"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "digest": {
+            "type": "object",
+            "required": [
+              "sha256"
+            ],
+            "properties": {
+              "sha256": {
+                "type": "string",
+                "pattern": "^[A-Fa-f0-9]{64}$"
+              }
+            },
+            "additionalProperties": true
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "predicateType": {
+      "const": "https://luminousdynamics.io/attestations/sfeb-execution/v1"
+    },
+    "predicate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "run",
+        "platform",
+        "workflow_identity",
+        "isolation",
+        "network",
+        "trace",
+        "artifacts",
+        "termination"
+      ],
+      "properties": {
+        "schema": {
+          "const": "sfeb-execution-predicate-v1"
+        },
+        "run": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "run_id",
+            "report_id",
+            "campaign_id",
+            "case_id",
+            "task_id",
+            "role",
+            "challenge_nonce",
+            "source_commit",
+            "runner_revision",
+            "fixture_sha256",
+            "environment_manifest_sha256",
+            "started_at",
+            "finished_at"
+          ],
+          "properties": {
+            "run_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._-]+$"
+            },
+            "report_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "campaign_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "case_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "task_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "role": {
+              "enum": [
+                "baseline",
+                "candidate",
+                "positive_control",
+                "metamorphic_control"
+              ]
+            },
+            "challenge_nonce": {
+              "type": "string",
+              "pattern": "^[A-Fa-f0-9]{64}$"
+            },
+            "source_commit": {
+              "type": "string",
+              "pattern": "^[A-Fa-f0-9]{40,64}$"
+            },
+            "runner_revision": {
+              "type": "string",
+              "pattern": "^[A-Fa-f0-9]{40,64}$"
+            },
+            "fixture_sha256": {
+              "type": "string",
+              "pattern": "^[A-Fa-f0-9]{64}$"
+            },
+            "environment_manifest_sha256": {
+              "type": "string",
+              "pattern": "^[A-Fa-f0-9]{64}$"
+            },
+            "started_at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "finished_at": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        },
+        "platform": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "executor_image_digest",
+            "browser_binary_sha256",
+            "controller_binary_sha256",
+            "sandbox_policy_sha256"
+          ],
+          "properties": {
+            "executor_image_digest": {
+              "type": "string",
+              "pattern": "^sha256:[A-Fa-f0-9]{64}$"
+            },
+            "browser_binary_sha256": {
+              "type": "string",
+              "pattern": "^[A-Fa-f0-9]{64}$"
+            },
+            "controller_binary_sha256": {
+              "type": "string",
+              "pattern": "^[A-Fa-f0-9]{64}$"
+            },
+            "sandbox_policy_sha256": {
+              "type": "string",
+              "pattern": "^[A-Fa-f0-9]{64}$"
+            }
+          }
+        },
+        "workflow_identity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "issuer",
+            "repository",
+            "workflow_ref",
+            "workflow_sha",
+            "ref",
+            "run_id",
+            "run_attempt"
+          ],
+          "properties": {
+            "issuer": {
+              "const": "https://token.actions.githubusercontent.com"
+            },
+            "repository": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+            },
+            "workflow_ref": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            },
+            "workflow_sha": {
+              "type": "string",
+              "pattern": "^[A-Fa-f0-9]{40,64}$"
+            },
+            "ref": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "run_attempt": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "isolation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "backend",
+            "default_deny_network",
+            "no_host_network",
+            "no_host_home_mount",
+            "no_host_docker_socket",
+            "browser_debug_endpoint_scope",
+            "unprivileged",
+            "read_only_fixture",
+            "resource_limits_enforced"
+          ],
+          "properties": {
+            "backend": {
+              "enum": [
+                "firecracker_microvm",
+                "gvisor",
+                "user_namespace_container",
+                "other_reviewed_isolation"
+              ]
+            },
+            "default_deny_network": {
+              "const": true
+            },
+            "no_host_network": {
+              "const": true
+            },
+            "no_host_home_mount": {
+              "const": true
+            },
+            "no_host_docker_socket": {
+              "const": true
+            },
+            "browser_debug_endpoint_scope": {
+              "const": "sandbox_private"
+            },
+            "unprivileged": {
+              "const": true
+            },
+            "read_only_fixture": {
+              "const": true
+            },
+            "resource_limits_enforced": {
+              "const": true
+            },
+            "isolation_profile_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          }
+        },
+        "network": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "policy_sha256",
+            "allowed_origins",
+            "external_egress_connections",
+            "egress_log_sha256"
+          ],
+          "properties": {
+            "policy_sha256": {
+              "type": "string",
+              "pattern": "^[A-Fa-f0-9]{64}$"
+            },
+            "allowed_origins": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "format": "uri"
+              }
+            },
+            "external_egress_connections": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "egress_log_sha256": {
+              "type": "string",
+              "pattern": "^[A-Fa-f0-9]{64}$"
+            }
+          }
+        },
+        "trace": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schema",
+            "sha256",
+            "event_count",
+            "final_event_sha256",
+            "canonicalization"
+          ],
+          "properties": {
+            "schema": {
+              "const": "sfeb-trace-event-v1"
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[A-Fa-f0-9]{64}$"
+            },
+            "event_count": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "final_event_sha256": {
+              "type": "string",
+              "pattern": "^[A-Fa-f0-9]{64}$"
+            },
+            "canonicalization": {
+              "const": "RFC8785"
+            }
+          }
+        },
+        "artifacts": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "path",
+              "sha256",
+              "byte_length"
+            ],
+            "properties": {
+              "kind": {
+                "enum": [
+                  "screenshot",
+                  "accessibility",
+                  "layout",
+                  "network_log",
+                  "console_log",
+                  "trace_bundle",
+                  "other"
+                ]
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[A-Fa-f0-9]{64}$"
+              },
+              "byte_length": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 67108864
+              }
+            }
+          }
+        },
+        "termination": {
+          "enum": [
+            "normal",
+            "timeout",
+            "crash",
+            "out_of_memory",
+            "policy_violation",
+            "infrastructure_error"
+          ]
+        }
+      }
+    }
+  },
+  "description": "Schema for an in-toto Statement v1. The signed statement binds a per-run manifest and observation bundle to frozen campaign/task/source/environment identities. It deliberately contains no runner-authored oracle verdict or disposition; an independent verifier derives those from the trace and policy."
+}

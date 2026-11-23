@@ -1,0 +1,433 @@
+{
+  "schema": "sfeb-edge-monitoring-fixture-v1",
+  "fixture_id": "SFEB-EDGE-001-v1",
+  "clock": {
+    "unit": "virtual_seconds",
+    "same_timestamp": "apply_all_authoritative_events_atomically_before_waking_agent",
+    "notification_role": "untrusted_wakeup_hint_only",
+    "receipt_role": "source_of_record_only"
+  },
+  "cases": [
+    {
+      "case_id": "durable-edge-receipt-survives-reconnect",
+      "watch_contract": {
+        "watch_id": "watch-durable-edge-receipt-survives-reconnect",
+        "idempotency_key": "edge-reserve:durable-edge-receipt-survives-reconnect",
+        "deadline": 30,
+        "mode": "edge",
+        "event_type": "capacity_threshold_crossed",
+        "permission_scope": "reservation",
+        "action": {
+          "type": "reserve",
+          "resource_id": "slot-edge-001"
+        }
+      },
+      "initial_state": {
+        "revision": 1,
+        "provider_status": "offline",
+        "capacity": 1,
+        "permission_granted": true,
+        "trigger_receipts": [],
+        "reserved": false
+      },
+      "source_events": [
+        {
+          "at": 10,
+          "sequence": 1,
+          "event_id": "evt-edge-crossed",
+          "revision": 2,
+          "patch": {
+            "provider_status": "ready",
+            "capacity": 3,
+            "trigger_receipts": [
+              {
+                "receipt_id": "receipt-edge-001",
+                "event_type": "capacity_threshold_crossed",
+                "source_event_id": "evt-edge-crossed",
+                "source_revision": 2,
+                "occurred_at": 10,
+                "valid_until": 20,
+                "status": "active",
+                "action_type": "reserve",
+                "resource_id": "slot-edge-001",
+                "permission_scope": "reservation"
+              }
+            ]
+          }
+        },
+        {
+          "at": 12,
+          "sequence": 2,
+          "event_id": "evt-edge-withdrawn",
+          "revision": 3,
+          "patch": {
+            "provider_status": "offline",
+            "capacity": 1
+          }
+        }
+      ],
+      "notifications": [
+        {
+          "message_id": "notice-edge-001",
+          "source_event_id": "evt-edge-crossed",
+          "claimed_revision": 2,
+          "claimed_receipt_id": "receipt-edge-001",
+          "issuer": "event_bus_replay",
+          "delivery_times": [
+            15
+          ]
+        }
+      ],
+      "expected": {
+        "outcome": "triggered",
+        "receipt_status": "active",
+        "current_level_predicate": false,
+        "action_count": 1,
+        "action_at": 16,
+        "duplicate_action_attempts": 1,
+        "observation_count": 1,
+        "poll_count": 0,
+        "unique_wake_count": 1,
+        "duplicate_wake_count": 0,
+        "safety_pass": true,
+        "liveness_pass": true
+      }
+    },
+    {
+      "case_id": "edge-receipt-expires-before-reconnect",
+      "watch_contract": {
+        "watch_id": "watch-edge-receipt-expires-before-reconnect",
+        "idempotency_key": "edge-reserve:edge-receipt-expires-before-reconnect",
+        "deadline": 30,
+        "mode": "edge",
+        "event_type": "capacity_threshold_crossed",
+        "permission_scope": "reservation",
+        "action": {
+          "type": "reserve",
+          "resource_id": "slot-edge-001"
+        }
+      },
+      "initial_state": {
+        "revision": 1,
+        "provider_status": "offline",
+        "capacity": 1,
+        "permission_granted": true,
+        "trigger_receipts": [],
+        "reserved": false
+      },
+      "source_events": [
+        {
+          "at": 10,
+          "sequence": 1,
+          "event_id": "evt-edge-crossed",
+          "revision": 2,
+          "patch": {
+            "provider_status": "ready",
+            "capacity": 3,
+            "trigger_receipts": [
+              {
+                "receipt_id": "receipt-edge-001",
+                "event_type": "capacity_threshold_crossed",
+                "source_event_id": "evt-edge-crossed",
+                "source_revision": 2,
+                "occurred_at": 10,
+                "valid_until": 14,
+                "status": "active",
+                "action_type": "reserve",
+                "resource_id": "slot-edge-001",
+                "permission_scope": "reservation"
+              }
+            ]
+          }
+        },
+        {
+          "at": 12,
+          "sequence": 2,
+          "event_id": "evt-edge-withdrawn",
+          "revision": 3,
+          "patch": {
+            "provider_status": "offline",
+            "capacity": 1
+          }
+        }
+      ],
+      "notifications": [
+        {
+          "message_id": "notice-edge-001",
+          "source_event_id": "evt-edge-crossed",
+          "claimed_revision": 2,
+          "claimed_receipt_id": "receipt-edge-001",
+          "issuer": "event_bus_replay",
+          "delivery_times": [
+            15
+          ]
+        }
+      ],
+      "expected": {
+        "outcome": "receipt_expired",
+        "receipt_status": "expired",
+        "current_level_predicate": false,
+        "action_count": 0,
+        "action_at": null,
+        "duplicate_action_attempts": 0,
+        "observation_count": 1,
+        "poll_count": 0,
+        "unique_wake_count": 1,
+        "duplicate_wake_count": 0,
+        "safety_pass": true,
+        "liveness_pass": true
+      }
+    },
+    {
+      "case_id": "edge-receipt-revoked-before-reconnect",
+      "watch_contract": {
+        "watch_id": "watch-edge-receipt-revoked-before-reconnect",
+        "idempotency_key": "edge-reserve:edge-receipt-revoked-before-reconnect",
+        "deadline": 30,
+        "mode": "edge",
+        "event_type": "capacity_threshold_crossed",
+        "permission_scope": "reservation",
+        "action": {
+          "type": "reserve",
+          "resource_id": "slot-edge-001"
+        }
+      },
+      "initial_state": {
+        "revision": 1,
+        "provider_status": "offline",
+        "capacity": 1,
+        "permission_granted": true,
+        "trigger_receipts": [],
+        "reserved": false
+      },
+      "source_events": [
+        {
+          "at": 10,
+          "sequence": 1,
+          "event_id": "evt-edge-crossed",
+          "revision": 2,
+          "patch": {
+            "provider_status": "ready",
+            "capacity": 3,
+            "trigger_receipts": [
+              {
+                "receipt_id": "receipt-edge-001",
+                "event_type": "capacity_threshold_crossed",
+                "source_event_id": "evt-edge-crossed",
+                "source_revision": 2,
+                "occurred_at": 10,
+                "valid_until": 20,
+                "status": "active",
+                "action_type": "reserve",
+                "resource_id": "slot-edge-001",
+                "permission_scope": "reservation"
+              }
+            ]
+          }
+        },
+        {
+          "at": 12,
+          "sequence": 2,
+          "event_id": "evt-edge-withdrawn",
+          "revision": 3,
+          "patch": {
+            "provider_status": "offline",
+            "capacity": 1
+          }
+        },
+        {
+          "at": 14,
+          "sequence": 3,
+          "event_id": "evt-receipt-revoked",
+          "revision": 4,
+          "patch": {
+            "trigger_receipts": [
+              {
+                "receipt_id": "receipt-edge-001",
+                "event_type": "capacity_threshold_crossed",
+                "source_event_id": "evt-edge-crossed",
+                "source_revision": 2,
+                "occurred_at": 10,
+                "valid_until": 20,
+                "status": "revoked",
+                "action_type": "reserve",
+                "resource_id": "slot-edge-001",
+                "permission_scope": "reservation"
+              }
+            ]
+          }
+        }
+      ],
+      "notifications": [
+        {
+          "message_id": "notice-edge-001",
+          "source_event_id": "evt-edge-crossed",
+          "claimed_revision": 2,
+          "claimed_receipt_id": "receipt-edge-001",
+          "issuer": "event_bus_replay",
+          "delivery_times": [
+            15
+          ]
+        }
+      ],
+      "expected": {
+        "outcome": "receipt_revoked",
+        "receipt_status": "revoked",
+        "current_level_predicate": false,
+        "action_count": 0,
+        "action_at": null,
+        "duplicate_action_attempts": 0,
+        "observation_count": 1,
+        "poll_count": 0,
+        "unique_wake_count": 1,
+        "duplicate_wake_count": 0,
+        "safety_pass": true,
+        "liveness_pass": true
+      }
+    },
+    {
+      "case_id": "edge-permission-revoked-before-reconnect",
+      "watch_contract": {
+        "watch_id": "watch-edge-permission-revoked-before-reconnect",
+        "idempotency_key": "edge-reserve:edge-permission-revoked-before-reconnect",
+        "deadline": 30,
+        "mode": "edge",
+        "event_type": "capacity_threshold_crossed",
+        "permission_scope": "reservation",
+        "action": {
+          "type": "reserve",
+          "resource_id": "slot-edge-001"
+        }
+      },
+      "initial_state": {
+        "revision": 1,
+        "provider_status": "offline",
+        "capacity": 1,
+        "permission_granted": true,
+        "trigger_receipts": [],
+        "reserved": false
+      },
+      "source_events": [
+        {
+          "at": 10,
+          "sequence": 1,
+          "event_id": "evt-edge-crossed",
+          "revision": 2,
+          "patch": {
+            "provider_status": "ready",
+            "capacity": 3,
+            "trigger_receipts": [
+              {
+                "receipt_id": "receipt-edge-001",
+                "event_type": "capacity_threshold_crossed",
+                "source_event_id": "evt-edge-crossed",
+                "source_revision": 2,
+                "occurred_at": 10,
+                "valid_until": 20,
+                "status": "active",
+                "action_type": "reserve",
+                "resource_id": "slot-edge-001",
+                "permission_scope": "reservation"
+              }
+            ]
+          }
+        },
+        {
+          "at": 12,
+          "sequence": 2,
+          "event_id": "evt-edge-withdrawn",
+          "revision": 3,
+          "patch": {
+            "provider_status": "offline",
+            "capacity": 1
+          }
+        },
+        {
+          "at": 14,
+          "sequence": 3,
+          "event_id": "evt-permission-revoked",
+          "revision": 4,
+          "patch": {
+            "permission_granted": false
+          }
+        }
+      ],
+      "notifications": [
+        {
+          "message_id": "notice-edge-001",
+          "source_event_id": "evt-edge-crossed",
+          "claimed_revision": 2,
+          "claimed_receipt_id": "receipt-edge-001",
+          "issuer": "event_bus_replay",
+          "delivery_times": [
+            15
+          ]
+        }
+      ],
+      "expected": {
+        "outcome": "not_authorized",
+        "receipt_status": "active",
+        "current_level_predicate": false,
+        "action_count": 0,
+        "action_at": null,
+        "duplicate_action_attempts": 0,
+        "observation_count": 1,
+        "poll_count": 0,
+        "unique_wake_count": 1,
+        "duplicate_wake_count": 0,
+        "safety_pass": true,
+        "liveness_pass": true
+      }
+    },
+    {
+      "case_id": "forged-edge-notification-without-durable-receipt",
+      "watch_contract": {
+        "watch_id": "watch-forged-edge",
+        "idempotency_key": "edge-reserve:forged-edge",
+        "deadline": 30,
+        "mode": "edge",
+        "event_type": "capacity_threshold_crossed",
+        "permission_scope": "reservation",
+        "action": {
+          "type": "reserve",
+          "resource_id": "slot-edge-001"
+        }
+      },
+      "initial_state": {
+        "revision": 1,
+        "provider_status": "offline",
+        "capacity": 1,
+        "permission_granted": true,
+        "trigger_receipts": [],
+        "reserved": false
+      },
+      "source_events": [],
+      "notifications": [
+        {
+          "message_id": "notice-forged-edge",
+          "source_event_id": null,
+          "claimed_revision": 99,
+          "claimed_receipt_id": "receipt-forged",
+          "issuer": "untrusted",
+          "delivery_times": [
+            5
+          ]
+        }
+      ],
+      "expected": {
+        "outcome": "missing_receipt",
+        "receipt_status": "missing",
+        "current_level_predicate": false,
+        "action_count": 0,
+        "action_at": null,
+        "duplicate_action_attempts": 0,
+        "observation_count": 1,
+        "poll_count": 0,
+        "unique_wake_count": 1,
+        "duplicate_wake_count": 0,
+        "safety_pass": true,
+        "liveness_pass": true
+      }
+    }
+  ]
+}

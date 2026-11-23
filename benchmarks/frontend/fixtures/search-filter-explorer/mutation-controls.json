@@ -1,0 +1,155 @@
+{
+  "schema": "sfeb-search-filter-mutation-campaign-v1",
+  "task_id": "SFEB-L2-005",
+  "status": "design_authored_not_executed",
+  "mutations": [
+    {
+      "id": "MUT-SEARCH-001",
+      "severity": "high",
+      "change": "Make search case-sensitive.",
+      "expected_detection": "Case-fold golden and metamorphic control fail."
+    },
+    {
+      "id": "MUT-SEARCH-002",
+      "severity": "high",
+      "change": "Search only names, omitting SKU and description.",
+      "expected_detection": "SKU/description golden cases fail."
+    },
+    {
+      "id": "MUT-FILTER-003",
+      "severity": "critical",
+      "change": "Combine category and availability with OR.",
+      "expected_detection": "Sensors plus in-stock returns extra assets."
+    },
+    {
+      "id": "MUT-PRICE-004",
+      "severity": "high",
+      "change": "Treat inclusive bounds as exclusive.",
+      "expected_detection": "Price-boundary case fails."
+    },
+    {
+      "id": "MUT-SORT-005",
+      "severity": "high",
+      "change": "Use input order as tie-break.",
+      "expected_detection": "Stable tie-break and source-order relation fail."
+    },
+    {
+      "id": "MUT-PAGE-006",
+      "severity": "critical",
+      "change": "Paginate before filtering/sorting.",
+      "expected_detection": "Page 2 and page concatenation fail."
+    },
+    {
+      "id": "MUT-URL-007",
+      "severity": "high",
+      "change": "Omit fields from state URL.",
+      "expected_detection": "State round-trip fails."
+    },
+    {
+      "id": "MUT-PRICE-008",
+      "severity": "critical",
+      "change": "Silently swap reversed price bounds.",
+      "expected_detection": "Negative case must reject."
+    },
+    {
+      "id": "MUT-RENDER-009",
+      "severity": "high",
+      "change": "Interpret dataset strings as raw HTML.",
+      "expected_detection": "Escaped text invariant fails."
+    },
+    {
+      "id": "MUT-STATE-010",
+      "severity": "high",
+      "change": "Restore page but reset other fields.",
+      "expected_detection": "Deep link state restore fails."
+    },
+    {
+      "id": "MUT-RESPONSIVE-011",
+      "severity": "high",
+      "change": "Remove width:100%;min-width:0 from the reference and candidate filter input/select rules.",
+      "expected_detection": "Continuous viewport sweep detects document-level horizontal overflow or a filter control extending beyond the viewport; the baseline must remain clean at every integer width from 320px through 1440px."
+    },
+    {
+      "id": "MUT-URL-012",
+      "severity": "high",
+      "change": "Accept raw reserved or non-ASCII bytes in the state URL component.",
+      "expected_detection": "Shared URL conformance vectors reject raw plus, raw JSON punctuation and raw Unicode."
+    },
+    {
+      "id": "MUT-URL-013",
+      "severity": "high",
+      "change": "Default missing state fields or ignore unknown state fields.",
+      "expected_detection": "Exact eight-field state conformance vectors reject both omissions and additions."
+    },
+    {
+      "id": "MUT-QUERY-014",
+      "severity": "medium",
+      "change": "Use Unicode lowercasing instead of ASCII-only case folding.",
+      "expected_detection": "ASCII fold control distinguishes non-ASCII code points and preserves the declared task semantics."
+    },
+    {
+      "id": "MUT-QUERY-015",
+      "severity": "high",
+      "change": "Allow C1 control characters U+0080 through U+009F in query text.",
+      "expected_detection": "The shared C1 control state vector must reject U+0085."
+    },
+    {
+      "id": "MUT-QUERY-016",
+      "severity": "high",
+      "change": "Accept monetary values above the JavaScript safe integer range.",
+      "expected_detection": "The shared unsafe-integer state vector rejects values above 9,007,199,254,740,991."
+    },
+    {
+      "id": "MUT-URL-017",
+      "severity": "high",
+      "change": "Accept duplicate JSON state fields and let the parser silently keep the first or last value.",
+      "expected_detection": "Shared URL-state conformance vector rejects duplicate query field names as ambiguous."
+    }
+  ],
+  "positive_controls": [
+    {
+      "id": "POS-SEARCH-001",
+      "change": "Reorder dataset records.",
+      "expected_invariant": "Sorted result IDs are unchanged."
+    },
+    {
+      "id": "POS-SEARCH-002",
+      "change": "Change display currency formatting only.",
+      "expected_invariant": "Filtering and sorting in integer cents are unchanged."
+    },
+    {
+      "id": "POS-SEARCH-003",
+      "change": "Change ASCII search text casing.",
+      "expected_invariant": "Result IDs are unchanged."
+    },
+    {
+      "id": "POS-SEARCH-004",
+      "change": "Apply identical state by keyboard or pointer.",
+      "expected_invariant": "Same query state and result IDs."
+    },
+    {
+      "id": "POS-SEARCH-005",
+      "change": "Open a shared URL in a fresh session.",
+      "expected_invariant": "All query-state fields restore."
+    },
+    {
+      "id": "POS-URL-006",
+      "change": "Round-trip a URL state containing accented Unicode, plus, ampersand and reserved punctuation using percent-encoded UTF-8.",
+      "expected_invariant": "All eight fields and exact query text restore unchanged."
+    },
+    {
+      "id": "POS-URL-007",
+      "change": "Reorder the eight unique JSON state fields while preserving their names and values.",
+      "expected_invariant": "The state restores identically; JSON object key order has no semantic meaning."
+    }
+  ],
+  "metamorphic_relations": [
+    "Changing the ASCII case of q preserves ordered result IDs.",
+    "Adding available_only cannot add results to a category-filtered result set.",
+    "Concatenating pages yields the full filtered/sorted result exactly once.",
+    "Equal prices are tied by ascending immutable asset ID.",
+    "Encoding then decoding query state preserves every field.",
+    "Encoding and decoding state containing Unicode and reserved characters preserves all eight fields."
+  ],
+  "qualification_rule": "Do not claim oracle qualification until all mutations are caught, positives pass and independent replay succeeds."
+}

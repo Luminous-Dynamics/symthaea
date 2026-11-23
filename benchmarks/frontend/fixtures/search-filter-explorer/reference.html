@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Asset inventory · Luminous Fieldwork</title>
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+<a class="skip-link" href="#main-content">Skip to main content</a>
+<div class="app-shell" data-sfeb-id="inventory.shell">
+<header class="topbar" data-sfeb-id="inventory.header">
+<a class="brand" href="#main-content">✳ <strong>Luminous Fieldwork</strong></a>
+<nav aria-label="Primary navigation"><a href="#main-content">Inventory</a><a href="#asset-table">Assets</a></nav>
+</header>
+<main id="main-content" data-sfeb-id="inventory.main">
+<section class="page-heading" data-sfeb-id="inventory.heading" aria-labelledby="inventory-title"><p>FIELD OPERATIONS / STORES</p><h1 id="inventory-title">Asset inventory</h1><p>Find equipment and share a reproducible search.</p></section>
+<section class="filter-panel" data-sfeb-id="inventory.filters" aria-labelledby="filter-title"><h2 id="filter-title">Search and filters</h2>
+<form role="search" aria-label="Asset inventory filters">
+<div class="field"><label for="asset-search">Search assets</label><input id="asset-search" name="q" type="search" placeholder="Name, SKU or description"></div>
+<div class="field"><label for="asset-category">Category</label><select id="asset-category" name="category"><option>All categories</option><option>Devices</option><option>Inspection</option><option>Power</option><option>Safety</option><option>Sensors</option></select></div>
+<div class="field"><label for="min-price">Minimum price</label><input id="min-price" type="number" min="0"></div>
+<div class="field"><label for="max-price">Maximum price</label><input id="max-price" type="number" min="0"></div>
+<label for="available-only"><input id="available-only" type="checkbox"> In stock only</label>
+<button type="submit">Apply filters</button><button type="reset">Clear all</button>
+</form></section>
+<section class="results-panel" data-sfeb-id="inventory.results" aria-labelledby="results-title"><h2 id="results-title">All assets</h2><p role="status" aria-live="polite">13 assets</p><label for="sort-order">Sort by</label><select id="sort-order"><option>Name A to Z</option><option>Price low to high</option><option>Price high to low</option><option>Stock low to high</option></select>
+<div class="table-wrap"><table data-sfeb-id="inventory.table"><caption class="visually-hidden">Synthetic field equipment inventory</caption><thead><tr><th scope="col">Asset</th><th scope="col">SKU</th><th scope="col">Category</th><th scope="col">Unit price</th><th scope="col">Stock</th></tr></thead><tbody>
+<tr data-asset-id="AST-004"><th scope="row">Backup Inverter</th><td>PWR-INV-5K</td><td>Power</td><td>$1,899.00</td><td>4</td></tr>
+<tr data-asset-id="AST-012"><th scope="row">Battery Rack</th><td>PWR-BAT-RK</td><td>Power</td><td>$3,499.00</td><td>1</td></tr>
+<tr data-asset-id="AST-013"><th scope="row">Digital Multimeter</th><td>DEV-DMM-7</td><td>Devices</td><td>$549.00</td><td>7</td></tr>
+<tr data-asset-id="AST-002"><th scope="row">Industrial Flow Sensor</th><td>SEN-FLOW-25</td><td>Sensors</td><td>$449.00</td><td>18</td></tr>
+<tr data-asset-id="AST-010"><th scope="row">Lockout Kit</th><td>SAF-LOCK-01</td><td>Safety</td><td>$159.00</td><td>14</td></tr>
+</tbody></table></div>
+<nav class="pagination" data-sfeb-id="inventory.pagination" aria-label="Asset result pages"><span>Showing 1–5 of 13 assets</span><button disabled>Previous</button><button aria-current="page">1</button><button>2</button><button>3</button><button>Next</button></nav>
+</section>
+</main></div>
+</body></html>

@@ -1,0 +1,86 @@
+{
+  "schema": "sfeb-event-oracle-policy-v1",
+  "policy_id": "SFEB-INT004-EVENT-ORACLE-001",
+  "version": "1.0.0",
+  "task_id": "SFEB-PILOT-INT-004",
+  "rules": [
+    {
+      "id": "event.schema.strict",
+      "severity": "critical",
+      "required": true,
+      "evaluator": "strict_event_contract",
+      "evidence": [
+        "raw_event_payloads"
+      ],
+      "inconclusive_on_missing": true
+    },
+    {
+      "id": "event.sequence.contiguous",
+      "severity": "critical",
+      "required": true,
+      "evaluator": "contiguous_sequence_replay",
+      "evidence": [
+        "raw_event_payloads"
+      ],
+      "inconclusive_on_missing": true
+    },
+    {
+      "id": "event.identity.idempotent",
+      "severity": "critical",
+      "required": true,
+      "evaluator": "idempotent_event_identity",
+      "evidence": [
+        "raw_event_payloads",
+        "audit_history"
+      ],
+      "inconclusive_on_missing": true
+    },
+    {
+      "id": "action.optimistic.reconcile",
+      "severity": "high",
+      "required": true,
+      "evaluator": "pending_action_reconciliation",
+      "evidence": [
+        "action_trace",
+        "authoritative_event_log",
+        "final_state"
+      ],
+      "inconclusive_on_missing": true
+    },
+    {
+      "id": "permission.revocation.fail_closed",
+      "severity": "critical",
+      "required": true,
+      "evaluator": "permission_revocation",
+      "evidence": [
+        "permission_events",
+        "action_trace",
+        "final_state"
+      ],
+      "inconclusive_on_missing": true
+    },
+    {
+      "id": "conflict.clarification.gate",
+      "severity": "high",
+      "required": true,
+      "evaluator": "clarification_gate",
+      "evidence": [
+        "conflict_events",
+        "action_trace",
+        "final_state"
+      ],
+      "inconclusive_on_missing": true
+    },
+    {
+      "id": "audit.history.exactly_once",
+      "severity": "critical",
+      "required": true,
+      "evaluator": "exactly_once_audit",
+      "evidence": [
+        "authoritative_event_log",
+        "audit_history"
+      ],
+      "inconclusive_on_missing": true
+    }
+  ]
+}

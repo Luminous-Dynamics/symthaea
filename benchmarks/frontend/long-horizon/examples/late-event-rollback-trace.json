@@ -1,0 +1,180 @@
+{
+  "schema": "sfeb-event-execution-trace-v1",
+  "trace_id": "SFEB-INT004-COMPOSITE-ALL-RULES-001",
+  "case_id": "composite-independent-oracle-all-families",
+  "fixture_id": "SFEB-INT-004-EVENTS-001",
+  "fixture_sha256": "f93030379f3698680ff89703c42f29f10973e1deafb5e84610dbbdd24cbb2d79",
+  "steps": [
+    {
+      "op": "submit",
+      "action": {
+        "action_id": "act-stale",
+        "job_id": "JOB-A",
+        "actor_id": "alice",
+        "capability": "job.transition",
+        "expected_version": 1,
+        "from_status": "open",
+        "to_status": "in_progress",
+        "input_mode": "pointer"
+      }
+    },
+    {
+      "op": "submit",
+      "action": {
+        "action_id": "act-revoked",
+        "job_id": "JOB-B",
+        "actor_id": "alice",
+        "capability": "job.transition",
+        "expected_version": 1,
+        "from_status": "open",
+        "to_status": "in_progress",
+        "input_mode": "keyboard"
+      }
+    },
+    {
+      "op": "deliver",
+      "event": {
+        "type": "job_transition",
+        "event_id": "evt-001",
+        "sequence": 1,
+        "job_id": "JOB-A",
+        "expected_version": 1,
+        "next_version": 2,
+        "from_status": "open",
+        "to_status": "blocked",
+        "actor_id": "admin",
+        "capability": "job.transition",
+        "action_id": null
+      }
+    },
+    {
+      "op": "deliver",
+      "event": {
+        "type": "job_transition",
+        "event_id": "evt-001",
+        "sequence": 1,
+        "job_id": "JOB-A",
+        "expected_version": 1,
+        "next_version": 2,
+        "from_status": "open",
+        "to_status": "blocked",
+        "actor_id": "admin",
+        "capability": "job.transition",
+        "action_id": null
+      }
+    },
+    {
+      "op": "deliver",
+      "event": {
+        "type": "permission_revoked",
+        "event_id": "evt-002",
+        "sequence": 2,
+        "actor_id": "alice",
+        "capability": "job.transition"
+      }
+    },
+    {
+      "op": "deliver",
+      "event": {
+        "type": "owner_changed",
+        "event_id": "evt-003",
+        "sequence": 3,
+        "job_id": "JOB-A",
+        "expected_version": 2,
+        "next_version": 3,
+        "from_owner": "alice",
+        "to_owner": "bob",
+        "actor_id": "admin",
+        "capability": "job.assign"
+      }
+    },
+    {
+      "op": "deliver",
+      "event": {
+        "type": "job_transition",
+        "event_id": "evt-004",
+        "sequence": 4,
+        "job_id": "JOB-A",
+        "expected_version": 3,
+        "next_version": 4,
+        "from_status": "blocked",
+        "to_status": "in_progress",
+        "actor_id": "bob",
+        "capability": "job.transition",
+        "action_id": null
+      }
+    },
+    {
+      "op": "deliver",
+      "event": {
+        "type": "clarification_required",
+        "event_id": "evt-005",
+        "sequence": 5,
+        "job_id": "JOB-B",
+        "conflict_id": "CONFLICT-77"
+      }
+    },
+    {
+      "op": "submit",
+      "action": {
+        "action_id": "act-ambiguous",
+        "job_id": "JOB-B",
+        "actor_id": "bob",
+        "capability": "job.transition",
+        "expected_version": 1,
+        "from_status": "open",
+        "to_status": "in_progress",
+        "input_mode": "keyboard"
+      }
+    },
+    {
+      "op": "deliver",
+      "event": {
+        "type": "clarification_resolved",
+        "event_id": "evt-006",
+        "sequence": 6,
+        "job_id": "JOB-B",
+        "conflict_id": "CONFLICT-77",
+        "resolution": "defer-until-inspection"
+      }
+    },
+    {
+      "op": "submit",
+      "action": {
+        "action_id": "act-clear",
+        "job_id": "JOB-B",
+        "actor_id": "bob",
+        "capability": "job.transition",
+        "expected_version": 1,
+        "from_status": "open",
+        "to_status": "in_progress",
+        "input_mode": "keyboard"
+      }
+    },
+    {
+      "op": "deliver",
+      "event": {
+        "type": "job_transition",
+        "event_id": "evt-007",
+        "sequence": 7,
+        "job_id": "JOB-B",
+        "expected_version": 1,
+        "next_version": 2,
+        "from_status": "open",
+        "to_status": "in_progress",
+        "actor_id": "bob",
+        "capability": "job.transition",
+        "action_id": "act-clear"
+      }
+    }
+  ],
+  "worker_claims": {
+    "disposition": "rejected",
+    "observed_oracle_ids": [
+      "fake.failure",
+      "fake.permission",
+      "fake.clarification"
+    ],
+    "note": "Deliberately false; verifier must ignore these claims."
+  }
+}

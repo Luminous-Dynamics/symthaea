@@ -1,0 +1,208 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/sfeb/qualification-summary-v1.schema.json",
+  "title": "SFEB Qualification Adjudication Summary v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "report_id",
+    "campaign_id",
+    "campaign_sha256",
+    "status",
+    "mutation_kill_rates",
+    "positive_controls",
+    "metamorphic_relations",
+    "case_results",
+    "important_limitations"
+  ],
+  "properties": {
+    "schema": {
+      "const": "sfeb-qualification-summary-v1"
+    },
+    "report_id": {
+      "type": "string"
+    },
+    "campaign_id": {
+      "type": "string"
+    },
+    "campaign_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "status": {
+      "enum": [
+        "qualified",
+        "not_qualified"
+      ]
+    },
+    "mutation_kill_rates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "overall",
+        "critical",
+        "high_severity",
+        "security",
+        "evidence_integrity",
+        "by_category"
+      ],
+      "properties": {
+        "overall": {
+          "$ref": "#/$defs/rate"
+        },
+        "critical": {
+          "$ref": "#/$defs/rate"
+        },
+        "high_severity": {
+          "$ref": "#/$defs/rate"
+        },
+        "security": {
+          "$ref": "#/$defs/rate"
+        },
+        "evidence_integrity": {
+          "$ref": "#/$defs/rate"
+        },
+        "by_category": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/rate"
+          }
+        }
+      }
+    },
+    "positive_controls": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "false_rejections",
+        "false_reject_rate",
+        "accepted_with_all_invariants"
+      ],
+      "properties": {
+        "false_rejections": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "false_reject_rate": {
+          "$ref": "#/$defs/rate"
+        },
+        "accepted_with_all_invariants": {
+          "$ref": "#/$defs/rate"
+        }
+      }
+    },
+    "metamorphic_relations": {
+      "$ref": "#/$defs/rate"
+    },
+    "case_results": {
+      "type": "array",
+      "minItems": 30,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "kind",
+          "expected",
+          "observed"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "mutation",
+              "positive_control",
+              "metamorphic"
+            ]
+          },
+          "expected": {
+            "enum": [
+              "reject",
+              "accept",
+              "equivalent"
+            ]
+          },
+          "observed": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "killed": {
+            "type": "boolean"
+          },
+          "passed": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "important_limitations": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "$defs": {
+    "rate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "successes",
+        "trials",
+        "rate",
+        "wilson_95"
+      ],
+      "properties": {
+        "successes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "trials": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "rate": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "wilson_95": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "lower_95",
+                "upper_95"
+              ],
+              "properties": {
+                "lower_95": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "upper_95": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

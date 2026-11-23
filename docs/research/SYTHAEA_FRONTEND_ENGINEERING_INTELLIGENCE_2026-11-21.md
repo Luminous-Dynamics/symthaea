@@ -1,0 +1,894 @@
+# Symthaea Frontend Engineering Intelligence
+
+**Programme:** SFEB — Symthaea Frontend Engineering Benchmark  
+**Version:** 0.1.0  
+**Status:** Research specification; baseline not yet measured  
+**Date:** 2026-11-21  
+**Repository baseline:** `36eb3adc1dc2d5ad1ae643863fee828d594472d4`
+
+## Executive decision
+
+Use the existing Leptos applications as the first learning and evaluation substrate. Keep the current `0.8` dependency family for the initial baseline; do not upgrade the framework as a side effect of this programme. Build a benchmark and an evidence pipeline before claiming that Symthaea can independently engineer production-quality interfaces.
+
+The research target is not "generate more Leptos code." It is:
+
+> Given a product brief and constraints, Symthaea can construct an explicit interface contract, design and implement the application, run it in an isolated browser, observe the actual result, diagnose failures, repair them, and provide reproducible evidence that the accepted result satisfies the contract.
+
+This specification introduces a staged programme and a task inventory. It does **not** claim that the benchmark runner, browser observation pipeline, or target scores are implemented or passed.
+
+## 1. Repository audit at the baseline commit
+
+The audit was performed against the public `main` head recorded above.
+
+| Surface | Verified state | Consequence |
+|---|---|---|
+| `crates/bridges/symthaea-web` | Leptos `0.8` CSR; `leptos_router`; Trunk; WASM worker and application state | Existing portal is the first source of framework patterns. |
+| `crates/bridges/symthaea-ui` | Leptos `0.8` CSR; service gateway boundary; Converse and Observe scope | Smaller, isolated candidate for the first full engineering exercise. |
+| `crates/domains/symthaea-muse-ui` | Leptos application with separate Studio, Listen and Research design specifications | Existing product-design material can seed interaction and information-architecture tasks. |
+| `crates/bridges/symthaea-ui/src/app.rs` | Typed Rust state and gateway parsing; telemetry, status, chat, visual projections | Useful code-understanding, state-flow and regression tasks. |
+| `crates/bridges/symthaea-ui/style.css` | Responsive auto-fit readouts, a focused visual language and basic focus styling | A useful baseline, not proof of comprehensive responsive/accessibility behavior. |
+| `crates/bridges/symthaea-web/style/main.css` | Existing palette tokens and component styling | Candidate source for design-token extraction and consistency checks. |
+
+Two concrete scope observations matter:
+
+1. The `symthaea-ui` README says its v0 surface is Converse + Observe and explicitly identifies Steward and Bench panes as not yet built. This provides a bounded product extension task.
+2. The `symthaea-ui` root app documents gateway reconnection on URL change as a future nicety. This provides a genuine state-lifecycle and failure-recovery task, rather than an invented toy bug.
+
+The two bridge applications currently declare Leptos `0.8` and CSR features in their Cargo manifests. The baseline is therefore a Leptos learning programme, not an introduction of a new framework.
+
+### Framework version policy
+
+As rechecked on 2026-11-22, the latest published stable 0.8 release is `0.8.23` (published 2026-10-31); `0.9.0-rc1` is a prerelease. The checked-in repository `Cargo.lock` currently resolves `leptos` to `0.8.20`, despite the manifests declaring the `0.8` semver family. Keep the initial benchmark pinned to the lockfile resolution `0.8.20` and record the resolved version plus lockfile object identity in every run receipt. Evaluate upgrading the workspace lock to `0.8.23` as a separate compatibility experiment; never mix framework migration with a frontend-quality comparison.
+
+## 2. Paradigm shifts to investigate
+
+These are testable hypotheses, not established advantages of HDC, CfC, or any other Symthaea subsystem.
+
+### 2.1 Interface Contract Compiler (ICC)
+
+Replace the prompt-to-code-only model with a structured, intermediate interface representation.
+
+A contract should explicitly represent:
+
+- product goal, user roles and user journeys;
+- routes, page regions and semantic content hierarchy;
+- components, properties and composition boundaries;
+- interaction state machines and transition preconditions;
+- design tokens, typography, spacing and visual hierarchy;
+- responsive constraints and supported viewport ranges;
+- accessibility semantics, keyboard behavior and focus order;
+- data contracts, loading states, empty states and error behavior;
+- security boundaries and actions that require user approval;
+- measurable acceptance criteria and their independent oracles.
+
+The same contract should drive implementation planning and test generation. Code and tests derived from one contract can still share a mistake, so the evaluator must also include independent checks and human review.
+
+**Research hypothesis:** reducing ambiguity before implementation will improve first-pass correctness and reduce repair cost on multi-step tasks.
+
+### 2.2 Browser-grounded causal debugging
+
+A screenshot mismatch is an observation, not a diagnosis. Build a repair loop that gathers:
+
+1. screenshot at a declared viewport and device scale;
+2. DOM structure and computed geometry for target regions;
+3. accessibility tree and keyboard/focus observations;
+4. console errors and failed network requests;
+5. route and interaction traces;
+6. performance measurements;
+7. build/test output tied to the exact source revision.
+
+Each benchmark element should have a stable semantic identifier that can be mapped back to a component or source region. A repair should name the observed failure, the hypothesized cause, the source change, and the post-change evidence. Where feasible, use controlled interventions (change one variable, replay the same trace) to distinguish root cause from correlation.
+
+**Research hypothesis:** structured observations and controlled repair will outperform screenshot-only critique on defect localization and regression rate.
+
+### 2.3 Accessibility by construction
+
+Accessibility should be encoded in the component contracts rather than appended during final polish. Prefer semantic HTML, explicit labels, keyboard-operable controls, visible focus, reduced-motion support, status announcements and predictable focus management. Custom widgets need an explicit keyboard and assistive-technology interaction contract.
+
+Automated checks are necessary but insufficient: a passing scanner does not prove that a complete user journey is usable with a keyboard or screen reader.
+
+### 2.4 Responsive design as constraints, not device templates
+
+Represent layout behavior using constraints: minimum and maximum widths, intrinsic content size, wrapping rules, grid/flex relationships, readable line lengths and interaction target dimensions. Viewports are test samples; they are not the whole responsive design.
+
+Test at fixed reference widths and at randomized widths between them to find discontinuities, overflow, collisions and brittle breakpoint assumptions.
+
+### 2.5 Evidence-linked design memory
+
+Store patterns as versioned, provenance-carrying knowledge records:
+
+- framework and dependency versions;
+- pattern or anti-pattern;
+- source example and license/provenance;
+- intended context and preconditions;
+- known failure modes;
+- verification tasks and results;
+- confidence and last revalidation date.
+
+HDC may be useful for associative retrieval across design intent, component role and failure signatures. CfC may be useful for modelling event sequences and temporal interaction patterns. These are experimental retrieval/modeling backends: compare them with sparse keyword search, embeddings and conventional typed indexes on retrieval precision, latency, memory and downstream task success. Do not grant architectural novelty as evidence of performance.
+
+### 2.7 Counterfactual design tournament
+
+Do not force the system to commit to its first plausible layout. For tasks where
+the brief allows multiple valid experiences, ask Symthaea to produce three
+structurally distinct candidates under one shared interface contract:
+
+- a conservative/low-risk design;
+- an information-density-optimized design;
+- a task-flow-optimized design.
+
+Run all candidates through the same independent functional, responsive,
+accessibility and performance gates. Collect blinded human pairwise
+preferences, then maintain a Pareto frontier rather than selecting the
+highest single aggregate. The system should explain which requirements each
+candidate optimizes and what each trade-off costs.
+
+**Research hypothesis:** candidate generation plus independent multi-objective
+selection will improve human preference and requirement satisfaction relative
+to one-shot generation, without increasing accepted-task cost beyond a defined
+budget. Measure preference win rate, Pareto dominance, constraint violations,
+repair cycles and cost per accepted candidate.
+
+### 2.8 Design-intent graph and causal traceability
+
+Treat the interface as a graph with typed edges:
+
+- requirement `requires` semantic region;
+- region `composed_of` component;
+- component `renders` DOM anchor;
+- interaction `transitions` state;
+- state `depends_on` data source;
+- acceptance oracle `observes` rendered or behavioral output.
+
+The graph should support impact analysis: when a requirement changes, find
+affected components, routes, tests and acceptance receipts. When a browser
+observation fails, walk backwards from the violated region or state transition
+to the implementation and its originating requirement.
+
+**Research hypothesis:** an explicit design-intent graph will reduce
+change-impact omissions and shorten defect-localization time on multi-page
+applications. Compare it with ordinary code search and static dependency
+graphs on seeded changes.
+
+### 2.6 Human-governed engineering
+
+Symthaea may propose, implement and test changes in an isolated branch/worktree. She must not silently deploy, alter production data, change credentials, introduce dependencies, weaken gates, or commit destructive behavior. A user-visible review boundary remains before merge or deployment. Unknown execution outcomes must be reconciled before retrying mutations.
+
+## 3. Proposed architecture
+
+```text
+Product brief + constraints
+          |
+          v
+Interface Contract (typed, versioned, reviewable)
+          |
+          v
+Design / component / state plan
+          |
+          v
+Leptos implementation + generated test obligations
+          |
+          v
+Static gates: fmt, clippy, native tests, WASM build
+          |
+          v
+Isolated browser execution (fixed environment and fixtures)
+          |
+          v
+Observation bundle: screenshots, DOM, AX, traces, console, network, perf
+          |
+          v
+Independent evaluators + hard acceptance gates
+          |
+          +---- failure evidence ----> repair hypothesis / patch
+          |                                  |
+          +<----------- replay --------------+
+          |
+          v
+Human review + immutable evidence receipt
+```
+
+### Trust boundaries
+
+- Treat requirements, reference assets, remote API responses and generated code as untrusted input.
+- Run browser workloads in a disposable, network-restricted environment with explicit fixture allowlists.
+- Do not expose host credentials, local filesystem contents or deployment tokens to generated code.
+- Pin browser version, fonts, viewport, device scale, OS image, dependencies and network fixtures.
+- Keep benchmark fixtures deterministic and versioned.
+- Do not let the agent be the sole judge of its own output.
+- Store artifact digests, source SHA, environment manifest, command lines, test results and evaluator versions in each receipt.
+
+### Suggested initial integration boundary
+
+Start with `symthaea-ui`, not a rewrite of `symthaea-web`. It is the smaller service-gateway application and its README already defines a narrow v0 product. Use it to prove the loop. Keep the Leptos/WASM UI independent from the large Symthaea engine, preserving the current gateway boundary.
+
+### Existing browser substrate discovered during implementation
+
+The repository already contains `crates/domains/symthaea-browser`, a CDP browser agent built on `chromiumoxide`. It is not necessary to introduce a second browser automation dependency for the first SFEB lane.
+
+Verified existing capabilities include:
+
+- Chromium launch or attachment through `CdpSession`;
+- bounded accessibility-tree observations with redaction and URL sanitization;
+- viewport PNG screenshots;
+- capability- and policy-governed browser mutations through `BrowserExecutor`;
+- URL scheme, origin, credential and local-network checks (with an explicit warning that a production network boundary must additionally pin DNS resolution and re-check redirects).
+
+This programme extends that substrate with `symthaea_browser::frontend`:
+
+- a fixed-script, bounded layout probe for semantic elements;
+- optional `data-sfeb-id` identifiers linking reference regions to rendered components;
+- viewport and document overflow observations;
+- a capture bundle containing separate PNG, accessibility JSON and layout JSON artifacts;
+- SHA-256 artifact digests, byte lengths, a receipt digest and tamper verification;
+- sensitive-field and URL-secret redaction before serializing the accessibility artifact.
+
+The binary bundle deliberately does not implement JSON serialization: screenshot bytes remain a separate artifact instead of becoming an accidental unbounded JSON byte array.
+
+**Capture limitation:** accessibility, layout and screenshot observations are sequential, not an atomic browser transaction. SFEB fixtures must freeze animations, use deterministic fixture services, wait for fonts/layout readiness, and capture under a pinned browser environment. The capture primitive does not by itself enforce OS-level network isolation or make an arbitrary existing CDP endpoint trustworthy.
+
+For local fixture applications, use a disposable browser/network namespace and a fixture-only allowlist. Do not expose the host browser's debugging port or enable private-network access on a general-purpose browser session merely to make localhost tests work.
+
+Start with `symthaea-ui`, not a rewrite of `symthaea-web`. It is the smaller service-gateway application and its README already defines a narrow v0 product. Use it to prove the loop. Keep the Leptos/WASM UI independent from the large Symthaea engine, preserving the current gateway boundary.
+
+## 4. SFEB benchmark design
+
+SFEB is an internal, versioned benchmark. It complements external leaderboards; it must not be described as an independent public leaderboard until its tasks, fixtures, scoring, and submissions are published with reproducibility instructions.
+
+### Levels
+
+| Level | Task class | Required evidence |
+|---|---|---|
+| L0 — Understand | Requirement extraction, design critique, component/state architecture, version-aware API selection | Contract completeness, correct dependency/version references, human rubric |
+| L1 — Static | Single-page interface from a brief or reference image | Screenshot captures at desktop/tablet/mobile, visual metrics, semantic DOM checks |
+| L2 — Interactive | Multi-page flows, forms, reactive state, loading/error/empty states | Independent browser action traces and expected-state assertions |
+| L3 — Integrated | Complete frontend connected to a fixture-backed service | End-to-end journeys, contract checks, security boundary checks, performance and regression evidence |
+| L4 — Maintain | Diagnose seeded defects, add features without regressions, migrate framework/API versions | Defect localization, patch quality, full replay, compatibility and regression reports |
+
+### Task families
+
+The initial suite inventory is in `benchmarks/frontend/sfeb-v0.json`. It includes:
+
+- screenshot/reference reconstruction;
+- responsive layout under intermediate viewport widths;
+- reusable component extraction;
+- form validation and accessible errors;
+- navigation and state persistence;
+- keyboard and reduced-motion behavior;
+- visual and interaction defect repair;
+- gateway reconnect and failure recovery;
+- observability / status visualization;
+- full-stack feature extension with fixture-backed APIs.
+
+The manifest is a **specification-only inventory**. Reference screenshots, deterministic browser fixtures, independent oracles and a runner still need to be authored. A task is not runnable merely because it appears in the JSON inventory.
+
+### Scoring and anti-gaming policy
+
+Report a vector, not a single unexplained score:
+
+- **Visual fidelity:** region geometry, text/layout alignment, image similarity and human preference.
+- **Functional correctness:** passed required journeys divided by required journeys; report each flow.
+- **Responsive robustness:** pass rate across fixed and randomized viewports; overflow and overlap counts.
+- **Accessibility:** automated findings by severity plus manual keyboard/task checks.
+- **Performance:** LCP, INP, CLS, transfer size, WASM size and interaction latency, in a controlled environment.
+- **Engineering quality:** compile/build, clippy, tests, dependency changes, code complexity, maintainability review.
+- **Reliability:** task completion across repeated seeds, flaky test rate, repair success and regression rate.
+- **Efficiency:** wall time, model/tool calls, token use, compute and cost per accepted task.
+- **Calibration:** confidence versus actual task success and correctness of self-reported evidence state.
+
+Hard gates override weighted averages. A broken required journey, critical accessibility blocker, security violation or missing evidence receipt cannot be compensated for by a beautiful screenshot. Publish raw per-task outcomes and confidence intervals, not only aggregates.
+
+For image-based evaluation, combine deterministic geometric/region metrics, image metrics and blinded human assessment. Do not optimize only for a single SSIM/CLIP/VLM score; those measures can reward superficial similarity while missing semantic or interaction defects. Freeze evaluation assets before submission and keep hidden holdout tasks to detect overfitting.
+
+### Executable contract and first fixture-backed task
+
+This programme now has a first machine-readable interface contract and a first
+original design task, rather than only a benchmark outline.
+
+- `benchmarks/frontend/interface-contract-v1.schema.json` defines JSON Schema
+  2020-12 for product intent, Leptos runtime, routes, named regions, state
+  machines, data sources, responsive constraints, accessibility, security and
+  independent acceptance journeys.
+- `benchmarks/frontend/contracts/symthaea-ui-v0.json` describes the source
+  observed Converse/Observe application: 17 named regions and six journeys.
+  It remains `source_observed`, not `browser_verified`.
+- `benchmarks/frontend/task-oracle-v1.schema.json` defines the SFEB task and
+  assertion contract.
+- `benchmarks/frontend/tasks/sfeb-l1-service-dashboard-v1.json` defines the
+  first Leptos design task: an operational dashboard with 11 assertions, eight
+  required regions, five fixed viewports and two acceptance journeys.
+- `benchmarks/frontend/fixtures/service-dashboard/` contains an original,
+  static HTML/CSS fixture with no remote fonts, scripts or images. Its canonical
+  digest is SHA-256(HTML bytes || NUL || CSS bytes), stored in the task file.
+
+A standalone Rust utility at `benchmarks/frontend/contract-check` validates
+the JSON Schemas, the source-observed contract's exact `data-sfeb-id` mapping,
+the task's fixture digest, required fixture regions, unique assertion IDs and
+the fixture-only resource policy. Tests for the checked-in contract, task and
+tamper/mismatch negative controls are authored.
+
+The standalone validator is intentionally outside the primary workspace and
+does not add dependencies to production crates. It is not yet executed because
+this environment has no Rust toolchain. The HTML/CSS digest was independently
+confirmed using `sha256sum`. A Chromium headless screenshot attempt in the
+available container timed out before producing a capture; the browser-render
+gate therefore remains blocked, not passed. The task stays
+`specification_only` in the SFEB index until its screenshot baselines,
+independent oracles and browser runs exist.
+
+A separate framework compatibility plan is recorded at
+`benchmarks/frontend/compatibility/leptos-0.8.20-to-0.8.23-v1.json`. It has
+seven gates: exact resolution, lockfile diff, fmt/Clippy, package tests, WASM
+builds, browser regressions and performance comparison. The plan is
+specification-only; no 0.8.23 upgrade has been run, and the benchmark baseline
+remains 0.8.20.
+
+The first Leptos implementation also received 17 stable `data-sfeb-id` anchors,
+semantic live/status/alert regions, responsive adjustments, visible focus and
+reduced-motion behavior. The telemetry lifecycle is presented as four distinct
+states—disconnected, connecting, connected and reconnecting—with a polite live
+status label. The connected state is entered only after the actual gloo-net 0.5
+`WebSocket::state() == State::Open` state, has a bounded 10-second handshake
+wait and retries sequentially with capped backoff. The backoff is deterministic
+(1, 2, 4, 8, 16, then 30 seconds); a connection stable for at least 60 seconds
+clears accumulated failure backoff. The current gateway URL is picked up on
+the next retry; an already-live connection is not forcibly replaced.
+
+The evidence capture now uses a dedicated viewport-only screenshot operation
+rather than the existing full-page screenshot action. PNG IHDR dimensions are
+checked against the recorded CSS viewport multiplied by
+`window.devicePixelRatio`, and the compressed artifact is bounded to 32 MiB
+with a maximum 4096-pixel dimension. This prevents a full-page image or
+unexpected device-scale capture from being mislabeled as a fixed-viewport
+visual sample.
+
+### Leptos 0.8 knowledge and provenance
+
+A versioned Leptos knowledge corpus now exists at
+`benchmarks/frontend/knowledge/leptos-0.8/patterns-v0.json`. It contains
+seventeen source-grounded patterns across the existing Symthaea and Muse
+applications: component composition, `RwSignal`, tracked versus untracked
+reads, Effects, `spawn_local`, keyed `For` rendering, typed `NodeRef`,
+HTTP/WebSocket boundaries, Router / Routes / Route, typed context, derived
+`Memo` state, programmatic navigation, pure reducers, persistent DOM resources,
+epoch-tagged browser event adapters, fail-closed authorization, and
+asynchronous initialization.
+
+Each pattern records its primary source file and exact Git blob SHA-1, plus
+related source files when the example spans modules. The corpus has an
+accompanying JSON Schema and a standalone Rust validator mode
+(`--patterns`) which:
+- validates the corpus against the versioned schema;
+- checks pattern ID uniqueness;
+- rejects absolute, parent-traversing and non-normalized source paths;
+- recomputes Git blob IDs from exact source bytes and rejects stale examples or
+  stale related-source references.
+
+A first public retrieval pilot query set now accompanies the corpus at
+`benchmarks/frontend/knowledge/leptos-0.8/retrieval-queries-v0.json`: 34
+positive paraphrases (two per pattern) and eight hard negatives, with exact
+expected pattern IDs.
+The standalone validator's `--retrieval` mode checks query-schema validity,
+unique IDs, positive/negative structure and every gold ID against the corpus.
+This is a dataset validation gate only; no retrieval quality has been measured.
+
+The intended comparison is keyword exact-match, BM25, TF-IDF, dense embeddings,
+HDC associative retrieval and hybrid retrieval under identical corpus and
+hardware constraints. Metrics include recall@1/3, MRR, nDCG@3, precision@3,
+hard-negative false-positive rate, latency, memory and cost. The query set is a
+public pilot; a private holdout is required before claiming an HDC advantage.
+
+The corpus distinguishes `source_observed_not_compiled`,
+`source_observed_reference_checked`, `compiled`, `unit_tested`, and
+`browser_verified`. It currently contains no compiled or browser-verified
+claims. The validator has tests for the known Git blob hash vector, the complete 17-pattern corpus,
+unsafe paths and stale related-source negative controls, but the Rust toolchain
+is not available here to execute them.
+
+### Benchmark contamination boundary
+
+The first dashboard task is deliberately classified as `public_pilot`. Its
+reference HTML/CSS is checked into this public branch so the runner and oracle
+can be developed openly. It is therefore useful for iterative development and
+human-baseline work, but **cannot** count as a blind holdout or support an
+anti-contamination claim.
+
+All SFEB tasks now declare fixture exposure:
+`public_pilot`, `controller_only`, or `hidden_holdout`. Future hidden tasks
+must be stored outside public repositories, and their reference source and
+oracle must remain outside the agent workspace. The controller may render
+screenshots, while the agent receives only the authorized product brief and
+images. External retrieval of hidden source fixtures must be blocked. Public
+and hidden task scores must be reported separately.
+
+A specific knowledge distinction is emphasized: tracked Leptos reads subscribe
+reactive observers, while `get_untracked()` does not. The telemetry retry loop
+intentionally samples the current gateway with an untracked read on each retry;
+it does not make an already-open socket a reactive dependency. Leptos 0.8 docs
+for Effects, RwSignal, Memo and Owner were used to ground these concepts, with
+versioned docs links retained in the corpus README. This is CSR guidance; SSR
+and hydration are separate curriculum tracks.
+
+## 5. External comparison and state of the field
+
+As rechecked on 2026-11-22:
+
+- **Vision2Web** is the closest external end-to-end comparator found in this research. Its official benchmark describes 193 tasks across 16 categories, 918 prototype images and 1,255 test cases, with static, interactive and full-stack levels and verification combining workflow-driven GUI testing with VLM visual judging. The search-indexed S4-2026 leaderboard snapshot (refreshed 2026-10-01) showed 82.3 overall for Claude-Fable-5 + Claude Code on 2026-08-28, with level averages 87.4 static, 83.2 interactive and 76.3 full-stack. The live page's selected season displayed no rows when rechecked on 2026-11-22. These are dated historical reference scores, not a verified current leader or directly transferable SFEB targets.
+- **Design2Code** (2024/NAACL 2025 publication track) contains 484 real-world webpages and evaluates screenshot-to-code rendering with high-level CLIP similarity, block matching, text, position and color metrics, complemented by human pairwise judgments. Its analysis identifies visual-element recall and layout correctness as recurring weaknesses. Use it as a visual-reconstruction reference, subject to task/data license and reproducibility conditions.
+- **WebdriverIO's browser-agent benchmark** is a controlled tool comparison on a fixed random sample of 100 Online-Mind2Web live-site tasks. Its indexed October 2026 snapshot includes an aggregated 62% WebdriverIO session row (103/165) for one of two model contexts; a separate DeepSeek V4.1 Flash run shows 58/100. A direct 2026-11-22 page render displayed an empty run log, so use the October results only as historical snapshots. This measures browser-operation performance, not frontend code generation. The methodology warns of roughly ±10-point intervals at 100 tasks, live-site instability and judge disagreement on about one in seven runs, so close results are ties rather than a definitive SOTA ranking.
+- **Arena Code Arena WebDev/Frontend** is the direct human-preference comparator for text-prompted frontend generation. Its November 20, 2026 model board reports 897,929 votes across 162 models; Claude Opus 5.5 (Max) leads at 1,864 rating. The cost frontier shows substantial quality/cost trade-offs, from $9.00 median task cost for the leader to $0.05 for MiMo-V2.6-Flash at 1,654. It is pairwise user preference over Arena traffic, not deterministic task success or a functional/security oracle.
+- **Arena Image-to-WebDev** separately measures image-conditioned web-app generation: November 20 snapshot, 218,511 votes, 70 models, leader 1,758 (Claude Opus 5.5). **Arena Fullstack** shows 133,241 votes, 95 models and leader 1,745. These are independent preference scales and must not be pooled with WebDev, Vision2Web or SFEB.
+- **Interaction-as-a-Judge (paper vs dataset-card snapshot):** the paper reports 65.6% → 69.1% human-preference prediction, 77.0% → 81.6% requirement verification and 55.4% → 75.5% iterative repair within five attempts. It describes 6,858 preference pairs / 222 correctness applications; the released dataset cards list 6,390 pairs / 189 versions and 362 requirements. These denominators differ and are unresolved.
+- **Arena HTML board:** 213,322 votes / 161 models, GPT-6.2 Astra (Max) 1,854 rating.
+- **Arena React board:** 682,332 votes / 146 models, Claude Fable 5.2 (xHigh) 1,885 rating. It is a React board, not a Leptos score.
+**Interaction-as-a-Judge** (paper dated October 13, 2026) is a particularly relevant evaluation direction: computer-use agents inspect generated applications through interaction. The paper reports preference prediction 65.6% → 69.1%, requirement verification 77.0% → 81.6%, and iterative repair 55.4% → 75.5% within five attempts. It describes 6,858 preference pairs and 222 correctness applications; released dataset cards list 6,390 preference pairs and 189 application versions with 362 human-verified requirements. The count difference is unresolved, so preserve paper and dataset-card denominators separately. Use interaction judging as a calibrated secondary evaluator, not the verifier's trust root. The preference dataset card licenses user prompts CC-BY-4.0, but model outputs remain subject to provider terms.
+- **Leptos upstream** is the API authority. Pin and record the actual lockfile version rather than treating a semver requirement as a resolved version.
+
+External benchmarks measure different capabilities. Do not collapse visual generation, browser operation, software engineering, full-stack completion and framework expertise into one cross-benchmark ranking.
+
+### Fair comparison protocol
+
+1. Fix the task set, prompt, time budget, tool access and browser environment.
+2. Compare the same base model with and without Symthaea's frontend knowledge/retrieval and engineering loop.
+3. Include a strong general coding agent and a human Leptos engineer as reference arms.
+4. Run multiple trials per task; report paired differences and confidence intervals.
+5. Record cost and wall time as well as quality.
+6. Keep a hidden holdout split and preregister task acceptance criteria.
+7. Release exact commits, fixtures, environment manifests and raw result receipts where licensing permits.
+
+The key question is not merely "does Symthaea beat model X?" It is whether the Symthaea architecture creates a reproducible improvement over the same model and tools: better success, fewer regressions, lower repair cost, better accessibility, or more reliable evidence.
+
+## 6. Target milestones (goals, not achieved results)
+
+These are proposed programme targets. They must be calibrated after the first baseline run.
+
+| Milestone | Proposed acceptance target |
+|---|---|
+| M0 — Reproducible baseline | 100% of task definitions versioned; 100% of runs record source/environment/evaluator digests; no unreported task omissions |
+| M1 — Static competence | At least 90/100 aggregate visual score on the held-out internal L1 set; no target viewport below 85; zero critical semantic errors |
+| M2 — Interactive competence | At least 88% required journey pass rate; no critical keyboard trap; all required form errors and status transitions observable |
+| M3 — Full application | At least 82% L3 end-to-end completion; all security and evidence hard gates pass |
+| M4 — Maintenance | At least 80% seeded-defect repair success; regression rate below 5%; every patch tied to reproduced failure evidence |
+| M5 — Competitive claim | Statistically supported improvement over the same base model/harness on a preregistered holdout, without worse critical safety/accessibility outcomes |
+
+Do not compare these internal scores numerically with Vision2Web's public score unless we reproduce its exact scoring pipeline. The internal targets are directional gates, not claims of SOTA.
+
+### Benchmark scale and statistical power targets
+
+The internal suite should grow in controlled stages:
+
+| Stage | Task count | Composition | Holdout policy |
+|---|---:|---|---|
+| Pilot | 30 | 10 static, 10 interactive, 10 integration/maintenance | Public development tasks; no blind claim |
+| Comparative v1 | 150 | 50 per broad level, at least 5 product domains | 30% controller-only/hidden holdout |
+| Competitive v2 | 500+ | At least 150 static, 150 interactive, 150 full-stack, remainder maintenance/repair/adversarial | At least 20% hidden, disjoint by product/domain/template family |
+
+Run at least three independent trials per task for the primary comparison and
+five for high-variance tasks. Use paired task-level differences, bootstrap or
+appropriate hierarchical confidence intervals, and per-domain breakdowns. Do
+not treat multiple viewports from one task as independent tasks. Pre-register
+the task split, evaluator, budgets and primary outcome before the competitive
+run.
+
+### Stretch objectives against the dated external references
+
+The Vision2Web S4 snapshot's reported category averages were 87.4 static, 83.2
+interactive and 76.3 full-stack. Our internal stretch goals of 90 static, 88
+interactive and 82 full-stack are deliberately above those historical numbers,
+but **are not cross-benchmark equivalent**. A credible claim requires either
+running the exact Vision2Web protocol or a matched, independently reviewed
+reproduction. WebdriverIO is a separate browser-tool dimension: its indexed
+62% row is an aggregate over 103/165 observations in one model context, not a
+62/100 single-run result; another model-context run reports 58/100. These
+historical browser-tool numbers must not be blended with code-generation scores.
+Arena WebDev, Image-to-WebDev and Fullstack ratings are separate pairwise
+human-preference scales; report them separately from functional task success.
+
+Additional proposed goals, measured on the same environment:
+- accepted-task cost at or below 70% of the same base agent after quality gates;
+- seeded repair success at least 80%, with regression below 5%;
+- expected calibration error below 0.10 for task-level confidence buckets;
+- zero critical accessibility or security failures, regardless of aggregate score;
+- at least 90% keyboard completion on the required user journeys;
+- report Core Web Vitals separately from local fixture timings and WASM transfer size.
+
+These are stretch goals for research planning, not achieved performance.
+
+## 7. Knowledge curriculum: Leptos first
+
+The first knowledge corpus should be versioned and tested against the repository's actual dependency set.
+
+1. Rust/WASM build model, Trunk, wasm-bindgen and browser APIs.
+2. Leptos component composition, props, children and ownership.
+3. Signals, memos, effects, derived state and lifecycle hazards.
+4. Routing, navigation, URL state and error boundaries.
+5. Forms, validation, async resources, loading/error/empty states.
+6. SSR, hydration and server functions as a separate deployment track (the current bridge apps are CSR).
+7. CSS layout, design tokens, responsive constraints, typography and motion.
+8. HTML semantics, keyboard interaction, focus management and WCAG 2.2.
+9. Browser rendering, paint/layout, performance profiling and image/asset optimization.
+10. Web security, CSP, untrusted content, supply-chain and sandboxing.
+11. Testing: unit/property tests, browser acceptance, visual regression and seeded fault injection.
+12. Maintenance: API compatibility, framework migration, refactoring and regression control.
+
+Each lesson/example must have: version, runnable code, expected output, negative test, provenance and a last-verified commit. Examples that fail on the pinned baseline are quarantined, not silently treated as knowledge.
+
+## 8. First engineering increments
+
+### Increment A — now
+
+- Establish this specification and the task inventory.
+- Keep the current Leptos 0.8 dependency family.
+- Choose `symthaea-ui` as the first bounded engineering target.
+- Draft original, license-clean UI briefs and deterministic service fixtures.
+- Decide the browser adapter after a small Rust-first proof of concept; compare CDP and WebDriver integrations before adding a dependency.
+
+### Increment B — runner and fixtures
+
+- Reuse `symthaea-browser::CdpSession` and `capture_frontend_evidence`; do not add another browser-control framework for the initial Chromium lane.
+- Run the ignored `frontend_capture_smoke` test on a host with Chromium installed, then build the Rust-owned SFEB runner/orchestrator around the verified capture API and a pinned disposable Chromium environment.
+- Add fixed viewport and intermediate-width capture. The current layout probe records viewport, document overflow and bounded semantic element rectangles; `data-sfeb-id` anchors should be added to original fixture components.
+- Extend the receipt pipeline with exact source SHA, Cargo.lock digest, resolved Leptos version, browser build, OS image, font set, fixture revision, network policy and evaluator revision.
+- Record route/action traces, browser console, failed requests and performance observations alongside the three current capture artifacts.
+- Create independent assertions for each task and at least one hidden holdout partition.
+
+### Increment C — baseline and ablations
+
+- Run current repository code as the baseline.
+- Run the same model/harness with documentation retrieval only.
+- Run with the structured interface contract.
+- Run with browser observation and repair.
+- Run with HDC/CfC memory versus conventional retrieval.
+- Report paired outcomes, ablations, costs and confidence intervals.
+
+### Increment D — first production-relevant task
+
+Extend `symthaea-ui` with one bounded, reviewed feature from its README's deferred scope (Steward or Bench), only after its user journey and service contract are made explicit. Include loading, error, empty, reconnect and accessibility behavior. Do not add a visual feature without browser acceptance evidence.
+
+## 9. Evidence status for this increment
+
+| Item | Status |
+|---|---|
+| Public repository baseline inspected | **Verified** at `36eb3ad` |
+| Existing Leptos application surfaces inspected | **Verified** by source/manifests |
+| Existing `symthaea-browser` CDP substrate inspected | **Verified** by source |
+| Frontend layout/AX/screenshot evidence bundle | **Implemented in source**; compile/tests not run |
+| Source anchors and first UI accessibility/responsive refinements | **Implemented in source**; browser validation not run |
+| Bundle unit tests and ignored Chromium smoke test | **Authored**; not executed |
+| External benchmark landscape researched | **Sources reviewed**; benchmark protocols differ |
+| Programme, task/oracle schemas and source-observed contract | **Authored** in this branch |
+| First static design fixture and task definition | **Authored public pilot**; canonical digest confirmed with `sha256sum`; not a hidden holdout |
+| Standalone Rust contract/task/provenance validator | **Implemented in source with tests authored**; compilation/tests not run |
+| Leptos 0.8 pattern corpus | **17 source-grounded entries across seven source files with exact Git blob provenance**; compilation pending |
+| Fixture exposure / anti-contamination policy | **Specified** for public pilot, controller-only and hidden holdout |
+| Viewport-only browser capture | **Implemented in source**; Chromium capture timed out in this container |
+| Runnable SFEB browser evaluator and screenshot baselines | **Not implemented** |
+| Browser execution on SFEB fixtures | **Not run** |
+| Symthaea frontend competence baseline | **Not measured** |
+| SOTA superiority | **Not claimed** |
+| CI | **Not awaited; no CI pass claimed** |
+
+## 10. Decision rule
+
+The programme advances only when the next increment adds one of:
+
+- a runnable benchmark task with an independent oracle;
+- a reusable, version-checked Leptos capability;
+- a browser-observed defect with a reproduced repair;
+- a statistically supported improvement over a matched baseline;
+- a security, accessibility or reliability gate that prevents a real failure.
+
+More architecture, more generated components or more benchmark names are not progress by themselves. The unit of progress is an independently verifiable improvement in a real interface-engineering task.
+
+
+## 11. 2026-11-22 update — qualify the benchmark before optimizing the agent
+
+### New paradigm: benchmark the benchmark
+
+A benchmark score is only as trustworthy as its weakest oracle. SFEB now has a
+separate seeded **oracle-qualification campaign** rather than assuming that
+schema-valid task definitions and well-formed receipts imply a capable evaluator.
+
+The campaign contains 20 planned negative controls, 5 semantics-preserving
+positive controls and 5 metamorphic relations. The negative controls cover
+functional behavior, accessibility, responsive layout, authorization/network
+boundaries, evidence identity/integrity and benchmark gaming. Positive controls
+ensure the evaluator does not reject harmless refactors. Metamorphic relations
+check that equivalent user journeys and source transformations preserve the
+required outcome.
+
+This leads to a stricter promotion rule:
+
+1. A task oracle is authored and schema-validated.
+2. Its negative controls demonstrate that seeded failures are rejected.
+3. Positive controls demonstrate that harmless transformations are accepted.
+4. Metamorphic tests establish required invariants across viewports and interaction paths.
+5. Only then is the oracle eligible for a benchmark run.
+6. The independent runner records all outcomes; a model's own report cannot promote evidence.
+
+Targets for the qualification campaign (not measured results): 100% rejection
+of critical, security and evidence-integrity mutants; at least 95% rejection
+of high-severity mutants; at least 90% overall mutation kill rate; and zero
+false rejections of the five positive controls. Report numerators, denominators,
+per-class scores and confidence intervals—not only a blended mutation score.
+
+### External benchmark landscape and fair comparison
+
+The current public field has several distinct evaluation surfaces:
+
+- **Vision2Web (ICML 2026)** evaluates visual website development across 193
+  tasks, 16 categories, 918 prototype images and 1,255 test cases. Its levels
+  cover static responsive pages, interactive multi-page frontend work and
+  long-horizon full-stack systems. Its verification combines workflow-driven
+  GUI testing with a VLM judge. This is the closest broad external comparator
+  for the end-to-end SFEB objective. The live leaderboard page can display
+  an empty current season; benchmark scale and published historical runs must
+  not be conflated with a live current-season SOTA score.
+  Source: https://proceedings.mlr.press/v306/he26n.html and
+  https://vision2web-bench.github.io/
+- **Design2Code (NAACL 2025)** covers 484 real-world webpages for screenshot-to-code
+  reconstruction and combines automatic metrics with human evaluation. It is
+  valuable for the visual-fidelity lane, but does not by itself measure the
+  full interactive, runtime, security and maintenance loop SFEB targets.
+  Source: https://aclanthology.org/2025.naacl-long.199/
+- **WebdriverIO Browser Agent Benchmark** fixes model, harness and prompt
+  while swapping browser tools. Its indexed October 9, 2026 snapshot lists
+  7 tools, 100 sampled live-web tasks, 2 model contexts and 2,511 total agent
+  runs. One aggregated WebdriverIO session v10.0.2 row reports 62% (103/165;
+  55–69% interval), $0.013 median cost, 174k median tokens and 156 seconds.
+  This is an aggregated row in one model context, not a model-independent
+  62/100 result; a separate DeepSeek V4.1 Flash run reports 58/100 for the
+  WebdriverIO session. A direct page render on 2026-11-22 showed an empty
+  run-log state, so preserve October numbers as historical snapshots rather
+  than current live leaderboard status. The benchmark itself warns that
+  100-task intervals are roughly ±10 points and overlapping intervals do not
+  establish a reliable ranking. This measures browser tools, not code
+  generation.
+  Sources: https://benchmark.webdriver.io/ and
+  https://github.com/webdriverio/benchmark
+
+Do not compare raw scores across these benchmarks. Their task distributions,
+models, tools, judges, sites, environments and scoring functions differ. SFEB
+should reproduce a public comparator protocol where practical and report a
+separate result for each external benchmark.
+
+### What would constitute a credible SOTA advance
+
+The near-term target is not a headline percentage from the 11-task public
+pilot. It is a matched, blinded evaluation:
+
+- Reproduce at least one established visual website benchmark and one
+  interaction/browser-agent benchmark under their stated protocols.
+- Run identical base models and tools with (a) no Symthaea memory,
+  (b) documentation retrieval, (c) interface contracts, (d) browser evidence
+  and repair, and (e) the full system.
+- Use paired task outcomes, repeated trials, bootstrap or Wilson intervals
+  as appropriate, and publish per-task failures and total task cost.
+- Require a positive paired lift whose 95% interval excludes zero, or match
+  success within a predeclared 2-point non-inferiority margin while reducing
+  cost per accepted task by at least 30%.
+- Keep all hard gates independent: zero critical security-boundary failures,
+  zero critical accessibility blockers and complete artifact/source identity.
+
+The existing internal aspirational targets remain separate from achieved
+results: at least 90/100 static visual score with no viewport below 85;
+at least 90% required interactive-journey completion; at least 85% full-stack
+completion; at least 85% seeded-defect repair success with regression rate
+below 5%; at least 95% keyboard-journey completion; ECE below 0.10; and cost
+per accepted task at or below 70% of the matched baseline. These targets
+require a qualified, larger and partly hidden task set before they can be
+meaningfully evaluated.
+
+### Immediate execution order
+
+1. Repair and compile the retrieval evaluator; preserve its distinction from
+   the full SFEB browser runner.
+2. Validate the 17-pattern source corpus and 42 public-pilot retrieval queries.
+3. Qualify task oracles with the mutation and metamorphic campaign.
+4. Run the ignored Chromium capture smoke test on a machine with a responsive,
+   pinned browser; then implement the isolated runner.
+5. Expand from the one public dashboard fixture to 30 public pilot tasks,
+   then 150 comparison tasks with controller-only and hidden holdout partitions.
+6. Submit to the official Vision2Web evaluation when the runner can produce
+   compliant artifacts; report the official result independently of SFEB.
+
+Execution state: source changes and this research plan are authored. Rust
+compilation, unit tests, retrieval measurements, browser smoke tests and
+mutation-campaign execution remain pending; no performance improvement or
+SOTA superiority is claimed.
+
+
+## 12. Retrieval evaluator correctness follow-up
+
+A source review found that the original evaluator fields named `recall_at_1`
+and `recall_at_3` were actually query-level hit rates when more than one gold
+pattern was associated with a query. This was corrected before treating any
+future measurements as comparable:
+
+- `recall_at_k` now counts the fraction of all gold relevant patterns retrieved
+  in the top (k), averaged across positive queries.
+- `hit_rate_at_k` separately counts the fraction of positive queries with at
+  least one relevant pattern in the top (k).
+- The result schema requires both metric families.
+- A regression test uses a two-answer query where only one answer is retrieved:
+  recall remains 0.5 while hit rate is 1.0.
+
+The corpus loader also rejects duplicate pattern IDs, entries with no
+indexable text, corpora above 10,000 entries, and HDC dimensions outside the
+documented 256–65,536 range. The standalone qualification validator now
+requires critical security and evidence-integrity mutants, retains hard 100%
+targets for those classes, enforces at least 95% high-severity and 90% overall
+kill-rate targets, and prohibits positive-control false rejections.
+
+All of these are source-level fixes and authored tests. Rust compilation and
+test execution remain pending; there are no retrieval results yet.
+
+
+## 13. 2026-11-22 — paired counterfactual qualification and comparative evaluation
+
+### Paradigm: qualify the oracle, then qualify the claim
+
+A benchmark is not trustworthy merely because its schema validates or its
+runner executes. OpenAI's 2026-07-08 audit of SWE-Bench Pro reported that an
+automated pipeline flagged 200 of 731 public-split tasks (27.4%) and a human
+annotation campaign flagged 249 (34.1%). Issues included over-strict tests,
+underspecified prompts, low-coverage tests and misleading prompts. The article
+estimated roughly 30% of tasks were broken and emphasized human review of
+flagged cases. This does not estimate defect rates in Vision2Web or SFEB; it
+does show why task-oracle qualification must precede agent leaderboard claims.
+Source: https://openai.com/index/separating-signal-from-noise-coding-evaluations/
+
+The SFEB campaign has now been advanced from a list of intended cases into a
+paired execution-report protocol and a Rust-side adjudicator.
+
+Each mutation, positive control and metamorphic relation has a baseline and
+candidate run with the same fixture digest and environment-manifest digest.
+The report requires distinct run IDs, source revisions, serialized
+`sfeb-frontend-evidence/v1` receipts, and actual screenshot/accessibility/layout
+artifact paths. The adjudicator recomputes artifact SHA-256 and byte lengths,
+verifies receipt identity and SHA, checks PNG dimensions against the declared
+viewport and confirms the layout artifact agrees with its receipt.
+
+The summary reports overall, critical, high-severity, security and
+evidence-integrity mutation kill rates with Wilson 95% intervals. It also
+reports positive-control false rejections and metamorphic equivalence. A mutant
+is credited only if the candidate is rejected and at least one expected oracle
+identifier is recorded. An unrelated build failure or rejection does not count.
+
+**Trust boundary:** this is not yet a cryptographic proof. The adjudicator
+checks evidence bytes and identity bindings, but does not verify a digital
+signature from the runner or independently derive the reported oracle IDs from
+the full browser trace. The browser mutation executor, trusted isolation and
+verifiable workflow-identity attestation remain follow-on work. A report must
+not be described as externally authenticated until that layer exists.
+
+### Paradigm: compare interventions, not just products
+
+Added `benchmarks/frontend/comparative-evaluation-v1.json` and its schema.
+The six arms are:
+
+- A0: matched base agent.
+- A1: conventional documentation retrieval.
+- A2: retrieval plus Interface Contract Compiler.
+- A3: contracts plus browser evidence and repair.
+- A4: full Symthaea.
+- H0: human engineer reference distribution.
+
+The primary causal contrast is A4 minus A0, with A1–A3 enabling ablation
+analysis. Each task is a paired block: same model, prompt, tools, fixture,
+environment and budget. Arm order is randomized; tasks, not repeated trials,
+are the independent resampling unit. The protocol calls for exact McNemar
+testing on paired binary outcomes, task-cluster bootstrap intervals for
+continuous metrics, Wilson intervals for per-arm proportions and Holm
+correction for secondary comparisons.
+
+The scale plan is 30 public-pilot tasks for harness development, 150 matched
+comparison tasks (50 per level), then at least 500 tasks for publication-grade
+evaluation. At least 20% of the comparison corpus is reserved from agent
+exposure and the longer-term target is 30% hidden holdout. Ordinary tasks get
+at least three trials; high-variance tasks get at least five. Power analysis
+must use pilot discordant-pair rates and task-level variance; task count alone
+does not guarantee statistical power.
+
+Subjective visual and accessibility judgments are blinded to arm identity.
+Two independent judges score subjective outcomes; disagreements go to a third
+adjudicator. Report raw agreement and Cohen's kappa, with 0.80 as a target,
+and human-audit a stratified subset plus every disputed case. Automated
+acceptance remains anchored in executable oracles, not a VLM's confidence.
+
+### Current external benchmark evidence — rechecked 2026-11-22
+
+- Vision2Web remains the closest hierarchical website-development benchmark:
+  193 tasks, 16 categories, 918 prototype images and 1,255 test cases. The
+  visible S4-2026 row with overall 82.3 (static 87.4, interactive 83.2,
+  full-stack 76.3) is historical; the selected live season displayed no
+  results on the 2026-11-22 check.
+- Design2Code contributes the narrower visual reconstruction lane: 484
+  real-world webpage screenshots with automatic and human evaluation.
+- Arena Code Arena adds the most direct contemporary preference comparators:
+  WebDev/Frontend (897,929 votes, 162 models, top 1,864), Image-to-WebDev
+  (218,511 votes, 70 models, top 1,758) and Fullstack (133,241 votes,
+  95 models, top 1,745), all observed 2026-11-20. These are anonymous
+  pairwise human-preference ratings, not test pass rates. The exact model
+  configuration is part of each entry; costs are available only for some
+  submissions. Never pool the three Arena ratings or compare them numerically
+  with Vision2Web/SFEB scores.
+- WebdriverIO is a browser-tool comparison, not a code-generation benchmark.
+  Its indexed October 9 snapshot lists 2,511 runs across 7 tools and 2 model
+  contexts; one aggregated WebdriverIO session row is 62% (103/165; 55–69%),
+  while a separate DeepSeek V4.1 Flash run reports 58/100. A direct page
+  render on November 22 showed an empty run-log state, so these figures are
+  historical, model-context-dependent snapshots, not a live leaderboard.
+- Arena's Interaction-as-a-Judge paper reports preference prediction
+  65.6% → 69.1%, requirement verification 77.0% → 81.6%, and iterative repair
+  55.4% → 75.5% within five attempts. The paper describes 6,858 preference
+  pairs/222 correctness applications; released dataset cards list 6,390
+  pairs/189 versions and 362 requirements. This discrepancy is unresolved.
+  Interaction judging remains a calibrated secondary signal, not the trust
+  root. Preference prompts are CC-BY-4.0; generated model outputs remain
+  under provider terms.
+- OpenAI's July 8, 2026 SWE-Bench Pro audit flagged 200/731 tasks automatically
+  and 249/731 through human annotation. These are task-quality findings on
+  that benchmark's public split, not a defect-rate estimate for SFEB.
+
+Sources:
+- Vision2Web: https://proceedings.mlr.press/v306/he26n.html and https://vision2web-bench.github.io/
+- Design2Code: https://aclanthology.org/2025.naacl-long.199/
+- Arena WebDev: https://arena.ai/leaderboard/code/webdev/frontend
+- Arena Image-to-WebDev: https://arena.ai/leaderboard/code/image-to-webdev
+- Arena Fullstack: https://arena.ai/leaderboard/code/webdev/fullstack
+- Interaction-as-a-Judge: https://arena.ai/blog/interaction-as-a-judge and https://arxiv.org/abs/2610.17895
+- ArenaWebdevPreferences: https://huggingface.co/datasets/lmarena-ai/arena-webdev-preferences
+- WebdriverIO: https://benchmark.webdriver.io/ and https://github.com/webdriverio/benchmark
+- SWE-Bench Pro quality audit: https://openai.com/index/separating-signal-from-noise-coding-evaluations/
+
+Raw scores remain non-comparable. Reproduce each comparator's own task set,
+model/prompt/harness, evaluator and uncertainty protocol. Use Arena ratings
+only as a separately reported human-preference dimension.
+ 
+### New SOTA decision rule
+
+A credible SOTA advance must show more than a high static screenshot score:
+
+1. First pass the mutation/oracle qualification campaign on a pinned, trusted
+   runner.
+2. Reproduce a visual website benchmark and an interaction/browser-agent
+   benchmark independently, subject to each benchmark's access and reuse rules.
+3. Run A0–A4 on paired tasks with randomized arm order, independent judges and
+   hidden holdouts.
+4. Require the A4–A0 paired 95% interval to exclude zero while all hard gates
+   pass; or demonstrate non-inferiority within two percentage points and at
+   least 30% lower cost per accepted task.
+5. Publish per-task failures, intervals, judge agreement, model/tool versions,
+   cost, retries and benchmark exposure.
+
+No performance results or SOTA superiority are claimed by this protocol.
+
+
+## 14. Public reference-fixture self-audit
+
+A review of the first SFEB task showed a useful gap between validating a fixture
+digest and checking that the reference itself actually matches its declared
+product brief. The standalone Rust task validator now includes a static
+service-dashboard reference audit:
+
+- exactly one `main` landmark and one level-one heading with the required name;
+- a skip-to-main anchor plus focus CSS;
+- named workspace, summary, activity and schedule regions;
+- exactly three separately identified metric cards;
+- explicit desktop three-column and narrow-screen one-column CSS declarations;
+- no script tags, remote URLs, CSS imports or external CSS asset references.
+
+Regression tests mutate the heading and responsive breakpoint while recomputing
+the fixture digest; both should be rejected by the static semantic audit. A
+separate independent source-content preflight against the checked-in HTML/CSS
+found all ten static conditions present. That preflight is not a Rust test run.
+
+This is deliberately a **reference-fixture sanity check**, not a browser oracle
+for an agent implementation. It cannot prove the browser's computed layout,
+keyboard behavior, accessibility tree, breakpoint rendering, network egress or
+human usability. Those remain responsibilities of the isolated Chromium
+runner and must not be promoted from source-level status.
+
+The standalone contract checker now contains 27 authored unit tests. None have
+been executed because the current environment has no Rust toolchain.

@@ -1,0 +1,635 @@
+{
+  "benchmark_id": "SFEB",
+  "title": "Symthaea Frontend Engineering Benchmark",
+  "version": "0.1.0",
+  "as_of": "2026-11-22",
+  "status": "specification_only",
+  "baseline": {
+    "repository": "Luminous-Dynamics/symthaea",
+    "commit": "36eb3adc1dc2d5ad1ae643863fee828d594472d4",
+    "framework_family": "Leptos 0.8",
+    "lockfile_resolution_required": true
+  },
+  "important_notice": "SFEB remains a staged benchmark, not a completed end-to-end evaluation. A public-pilot dashboard fixture and a second original search/filter fixture with 13 synthetic assets, ten golden cases and a pure offline Rust reference model are checked in. Source presence does not imply Rust compilation, agent browser verification, independent-oracle qualification or benchmark scores. The isolated browser runner and task-level qualification pipeline remain pending.",
+  "scoring": {
+    "report_vector": [
+      "visual_fidelity",
+      "functional_correctness",
+      "responsive_robustness",
+      "accessibility",
+      "performance",
+      "engineering_quality",
+      "reliability",
+      "efficiency",
+      "calibration"
+    ],
+    "hard_gates": [
+      "required_journeys_must_pass",
+      "no_critical_accessibility_blocker",
+      "no_security_boundary_violation",
+      "evidence_receipt_must_be_complete",
+      "no_silent_task_omission"
+    ],
+    "anti_gaming": [
+      "Freeze reference assets and task criteria before each evaluation.",
+      "Use hidden holdout tasks.",
+      "Use deterministic fixture services and pinned browser environments.",
+      "Report per-task results and repeated trials, not only averages.",
+      "A single visual metric or agent self-judgment cannot determine acceptance."
+    ]
+  },
+  "tasks": [
+    {
+      "id": "SFEB-L0-001",
+      "level": 0,
+      "category": "requirements_to_contract",
+      "title": "Translate product brief into an executable interface contract",
+      "target_surface": "new_fixture_application",
+      "inputs": [
+        "original_product_brief",
+        "user_roles",
+        "constraints"
+      ],
+      "acceptance_criteria": [
+        "All required routes, roles, journeys, states, and permissions are represented.",
+        "Every requirement maps to at least one observable acceptance oracle.",
+        "Ambiguities and unsupported assumptions are explicitly listed.",
+        "Contract identifies accessibility and responsive obligations."
+      ],
+      "required_evidence": [
+        "contract_json",
+        "traceability_matrix",
+        "human_review"
+      ],
+      "status": "specification_only",
+      "fixture_exposure": "public_pilot"
+    },
+    {
+      "id": "SFEB-L1-001",
+      "level": 1,
+      "category": "visual_reconstruction",
+      "title": "Reconstruct an original dashboard reference",
+      "target_surface": "new_fixture_application",
+      "inputs": [
+        "original_reference_brief",
+        "reference_screenshots_pending"
+      ],
+      "acceptance_criteria": [
+        "Required content hierarchy, semantic regions, and control inventory are present.",
+        "Desktop reference geometry is within calibrated tolerances.",
+        "No clipping, overlap, or horizontal overflow at declared desktop viewport.",
+        "Visual result is judged using region metrics and blinded human review."
+      ],
+      "required_evidence": [
+        "reference_assets",
+        "desktop_screenshot",
+        "dom_snapshot",
+        "visual_report"
+      ],
+      "status": "specification_only",
+      "fixture_exposure": "public_pilot"
+    },
+    {
+      "id": "SFEB-L1-002",
+      "level": 1,
+      "category": "responsive_constraints",
+      "title": "Preserve content and interaction quality across viewport changes",
+      "target_surface": "new_fixture_application",
+      "inputs": [
+        "same_as_SFEB-L1-001",
+        "viewport_matrix_pending"
+      ],
+      "acceptance_criteria": [
+        "Declared desktop, tablet, and mobile viewports pass.",
+        "Intermediate randomized widths do not introduce horizontal overflow or control collisions.",
+        "Reading order and task-critical controls remain usable.",
+        "Responsive changes do not hide required information without an accessible alternative."
+      ],
+      "required_evidence": [
+        "viewport_matrix",
+        "screenshots_per_viewport",
+        "overflow_report",
+        "interaction_replay"
+      ],
+      "status": "specification_only",
+      "fixture_exposure": "public_pilot"
+    },
+    {
+      "id": "SFEB-L1-003",
+      "level": 1,
+      "category": "component_architecture",
+      "title": "Extract reusable Leptos components without changing behavior",
+      "target_surface": "symthaea-ui",
+      "inputs": [
+        "pinned_source_revision",
+        "component_boundary_brief_pending"
+      ],
+      "acceptance_criteria": [
+        "Component boundaries and public props have explicit responsibilities.",
+        "Existing required behavior is preserved.",
+        "Duplicated presentation logic is reduced without introducing global mutable state.",
+        "Compile, lint, unit, and browser regression checks pass."
+      ],
+      "required_evidence": [
+        "source_diff",
+        "component_map",
+        "build_report",
+        "regression_report"
+      ],
+      "status": "specification_only",
+      "fixture_exposure": "public_pilot"
+    },
+    {
+      "id": "SFEB-L2-001",
+      "level": 2,
+      "category": "forms_and_validation",
+      "title": "Implement an accessible validated multi-step form",
+      "target_surface": "new_fixture_application",
+      "inputs": [
+        "form_contract_pending",
+        "fixture_service_pending"
+      ],
+      "acceptance_criteria": [
+        "Valid and invalid submissions produce the contract-defined result.",
+        "Errors are associated with fields and announced accessibly.",
+        "Keyboard-only completion succeeds.",
+        "Loading, success, failure, and retry states are observable."
+      ],
+      "required_evidence": [
+        "journey_trace",
+        "field_assertions",
+        "keyboard_trace",
+        "accessibility_report"
+      ],
+      "status": "specification_only",
+      "fixture_exposure": "public_pilot"
+    },
+    {
+      "id": "SFEB-L2-002",
+      "level": 2,
+      "category": "navigation_and_state",
+      "title": "Implement multi-page navigation with refresh-safe state",
+      "target_surface": "new_fixture_application",
+      "inputs": [
+        "route_contract_pending",
+        "state_contract_pending"
+      ],
+      "acceptance_criteria": [
+        "Direct route entry and browser refresh preserve the expected page.",
+        "Back and forward navigation match the route contract.",
+        "Unsaved state behavior is explicit and tested.",
+        "Loading and not-found states are handled."
+      ],
+      "required_evidence": [
+        "route_replay",
+        "state_assertions",
+        "console_report"
+      ],
+      "status": "specification_only",
+      "fixture_exposure": "public_pilot"
+    },
+    {
+      "id": "SFEB-L2-003",
+      "level": 2,
+      "category": "accessibility_and_motion",
+      "title": "Complete a representative flow using keyboard interaction",
+      "target_surface": "new_fixture_application",
+      "inputs": [
+        "interaction_contract_pending",
+        "reduced_motion_profile"
+      ],
+      "acceptance_criteria": [
+        "All required controls are reachable and operable using a keyboard.",
+        "Focus order and visible focus match the interaction contract.",
+        "No keyboard trap exists.",
+        "Reduced-motion preferences are respected for non-essential animation."
+      ],
+      "required_evidence": [
+        "keyboard_trace",
+        "focus_snapshots",
+        "reduced_motion_capture",
+        "manual_review"
+      ],
+      "status": "specification_only",
+      "fixture_exposure": "public_pilot"
+    },
+    {
+      "id": "SFEB-L2-004",
+      "level": 2,
+      "category": "visual_defect_repair",
+      "title": "Localize and repair a seeded responsive layout defect",
+      "target_surface": "new_fixture_application",
+      "inputs": [
+        "seeded_defect_commit_pending",
+        "expected_behavior_pending"
+      ],
+      "acceptance_criteria": [
+        "Agent reproduces the defect before editing.",
+        "Repair hypothesis identifies the responsible style or component.",
+        "Patch corrects the target viewports without regressing controls or content.",
+        "Before/after observations and exact source revision are recorded."
+      ],
+      "required_evidence": [
+        "reproduction_trace",
+        "repair_hypothesis",
+        "source_diff",
+        "before_after_screenshots",
+        "regression_report"
+      ],
+      "status": "specification_only",
+      "fixture_exposure": "public_pilot"
+    },
+    {
+      "id": "SFEB-L3-001",
+      "level": 3,
+      "category": "service_integration",
+      "title": "Extend Converse/Observe with deterministic connection recovery",
+      "target_surface": "symthaea-ui",
+      "inputs": [
+        "symthaea_ui_source_revision",
+        "fixture_gateway_contract_pending"
+      ],
+      "acceptance_criteria": [
+        "Gateway URL changes establish a new connection and retire the previous stream.",
+        "Disconnected, reconnecting, connected, and failed states are distinguishable.",
+        "Retries are bounded and do not duplicate user mutations.",
+        "Status and telemetry remain distinct sources of evidence.",
+        "The UI remains usable when telemetry is unavailable but the status endpoint is reachable."
+      ],
+      "required_evidence": [
+        "fixture_gateway_log",
+        "websocket_trace",
+        "status_trace",
+        "browser_screenshots",
+        "regression_report"
+      ],
+      "status": "specification_only",
+      "fixture_exposure": "public_pilot"
+    },
+    {
+      "id": "SFEB-L4-001",
+      "level": 4,
+      "category": "maintenance_and_regression",
+      "title": "Repair a seeded Leptos defect and add a feature without regressions",
+      "target_surface": "symthaea-ui",
+      "inputs": [
+        "seeded_defect_commit_pending",
+        "feature_contract_pending"
+      ],
+      "acceptance_criteria": [
+        "Defect is reproduced and classified before patching.",
+        "The new feature meets its interface and service contracts.",
+        "Existing browser journeys pass after the change.",
+        "No dependency or framework version drift occurs without explicit approval.",
+        "The patch includes tests for the discovered failure mode."
+      ],
+      "required_evidence": [
+        "reproduction_trace",
+        "source_diff",
+        "dependency_diff",
+        "full_regression_report",
+        "review_record"
+      ],
+      "status": "specification_only",
+      "fixture_exposure": "public_pilot"
+    },
+    {
+      "id": "SFEB-L1-004",
+      "level": 1,
+      "category": "brief_to_leptos_dashboard",
+      "title": "Reconstruct a responsive service operations dashboard in Leptos",
+      "target_surface": "new_fixture_application",
+      "task_definition": "benchmarks/frontend/tasks/sfeb-l1-service-dashboard-v1.json",
+      "reference_fixture": "benchmarks/frontend/fixtures/service-dashboard/",
+      "inputs": [
+        "structured_product_brief",
+        "five_reference_viewports",
+        "screenshot_rendered_from_fixture_pending"
+      ],
+      "acceptance_criteria": [
+        "The Leptos 0.8 CSR implementation preserves the required information hierarchy and eight named semantic regions.",
+        "Three operational metric cards remain individually identifiable for layout analysis.",
+        "No horizontal page overflow across fixed and swept viewport widths.",
+        "Keyboard-only navigation and skip-to-main-content work.",
+        "No external network resources are loaded.",
+        "Visual hierarchy is judged independently from semantic and functional assertions."
+      ],
+      "required_evidence": [
+        "content_addressed_reference_fixture",
+        "fixed_viewport_screenshots",
+        "swept_viewport_layout_report",
+        "accessibility_tree",
+        "keyboard_action_trace",
+        "network_and_console_log",
+        "human_visual_review",
+        "fixture-visibility-classification"
+      ],
+      "status": "specification_only",
+      "fixture_exposure": "public_pilot"
+    },
+    {
+      "id": "SFEB-L2-005",
+      "level": 2,
+      "category": "search_filter_sort",
+      "title": "Implement a searchable, filterable and deterministic asset inventory explorer",
+      "target_surface": "new_fixture_application",
+      "task_definition": "benchmarks/frontend/tasks/sfeb-l2-search-filter-v1.json",
+      "reference_fixture": "benchmarks/frontend/fixtures/search-filter-explorer/",
+      "inputs": [
+        "synthetic_asset_dataset",
+        "task_contract",
+        "reference_screenshots_from_fixture"
+      ],
+      "acceptance_criteria": [
+        "Case-insensitive search across name, SKU and description.",
+        "Conjunctive category, stock and inclusive price filters.",
+        "Stable ascending asset-ID sort ties.",
+        "Filter/sort before one-based pagination.",
+        "Complete URL-state round-trip.",
+        "Ten deterministic golden cases pass.",
+        "Browser keyboard/accessibility/responsive/network gates pass."
+      ],
+      "required_evidence": [
+        "task_contract",
+        "dataset_and_oracle_digests",
+        "rust_model_test_receipt",
+        "query_state_url",
+        "browser_journey_trace",
+        "screenshots",
+        "accessibility_tree",
+        "layout_report",
+        "network_log"
+      ],
+      "status": "fixture_ready",
+      "fixture_exposure": "public_pilot"
+    }
+  ],
+  "evaluation_protocol": {
+    "trials_per_task_minimum": 3,
+    "comparison_arms": [
+      "same_base_model_and_tools_without_symthaea_frontend_memory",
+      "same_base_model_with_documentation_retrieval",
+      "same_base_model_with_interface_contract",
+      "same_base_model_with_browser_observation_and_repair",
+      "symthaea_full_system",
+      "human_leptos_engineer_reference"
+    ],
+    "environment_pin_fields": [
+      "source_commit",
+      "cargo_lock_digest",
+      "rust_toolchain",
+      "leptos_resolved_version",
+      "browser_build",
+      "operating_system_image",
+      "font_set",
+      "viewport",
+      "device_scale_factor",
+      "fixture_service_revision",
+      "network_policy",
+      "evaluator_revision"
+    ],
+    "receipt_fields": [
+      "task_id",
+      "trial_id",
+      "source_commit",
+      "environment_digest",
+      "artifact_digests",
+      "command_log",
+      "build_status",
+      "journey_results",
+      "visual_metrics",
+      "accessibility_results",
+      "performance_results",
+      "time_and_cost",
+      "agent_confidence",
+      "independent_judgment",
+      "final_status"
+    ]
+  },
+  "observation_harness": {
+    "status": "library_primitive_implemented_runner_pending",
+    "crate": "crates/domains/symthaea-browser",
+    "browser_control": "chromiumoxide CDP (existing repository dependency)",
+    "entrypoint": "CdpSession::capture_frontend_evidence",
+    "outputs": [
+      "sanitized accessibility-tree JSON",
+      "bounded layout JSON (viewport, overflow, semantic element geometry)",
+      "viewport-matched PNG screenshot",
+      "SHA-256 content-addressed artifact records",
+      "receipt SHA-256 and artifact-integrity verification"
+    ],
+    "instrumentation": "Use stable data-sfeb-id attributes on original fixture components to connect rendered regions to implementation source.",
+    "limits": [
+      "Capture is sequential, not an atomic browser transaction.",
+      "This is not yet an executable SFEB runner.",
+      "The capture library does not enforce OS-level network isolation.",
+      "Screenshot artifacts remain potentially sensitive and must be stored separately with fixture-only data.",
+      "CDP endpoints must not be exposed beyond the isolated benchmark environment."
+    ],
+    "viewport_capture": "PNG pixel dimensions must match recorded CSS viewport multiplied by window.devicePixelRatio.",
+    "source_anchor_count": 17
+  },
+  "evidence_contract": {
+    "schema": "sfeb-frontend-evidence/v1",
+    "required_context": [
+      "run_id",
+      "task_id",
+      "fixture_id",
+      "source_commit",
+      "environment_manifest_sha256"
+    ],
+    "artifact_digests": "SHA-256",
+    "required_artifacts": [
+      {
+        "kind": "screenshot",
+        "media_type": "image/png"
+      },
+      {
+        "kind": "accessibility",
+        "media_type": "application/json"
+      },
+      {
+        "kind": "layout",
+        "media_type": "application/json"
+      }
+    ],
+    "receipt_integrity": "The serialized receipt has its own SHA-256 digest; each artifact length and digest must verify before evaluation."
+  },
+  "interface_contract": {
+    "schema_path": "benchmarks/frontend/interface-contract-v1.schema.json",
+    "example_path": "benchmarks/frontend/contracts/symthaea-ui-v0.json",
+    "schema_draft": "https://json-schema.org/draft/2020-12/schema",
+    "status": "schema_and_source_observed_example_authored",
+    "example_source_commit": "808998bb903202e813b5bd275fe4a395bcff528e",
+    "region_count": 17,
+    "acceptance_journey_count": 6,
+    "browser_verified_journeys": 0,
+    "important_rule": "source_observed and browser_verified are distinct evidence states; an implementation contract cannot promote itself to browser_verified."
+  },
+  "task_oracle_schema": "benchmarks/frontend/task-oracle-v1.schema.json",
+  "knowledge_corpus": {
+    "status": "source_observed_provenance_checked_in_source_validator",
+    "corpus_path": "benchmarks/frontend/knowledge/leptos-0.8/patterns-v0.json",
+    "schema_path": "benchmarks/frontend/knowledge/leptos-0.8/pattern-v1.schema.json",
+    "pattern_count": 17,
+    "framework": "Leptos 0.8 CSR",
+    "source_provenance": "Git blob SHA-1 over the Git object header and exact source bytes",
+    "validator_command": "cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --patterns",
+    "promotion_states": [
+      "source_observed_not_compiled",
+      "source_observed_reference_checked",
+      "compiled",
+      "unit_tested",
+      "browser_verified"
+    ],
+    "compilation_status": "pending_rust_toolchain",
+    "retrieval_evaluation": {
+      "query_set": "benchmarks/frontend/knowledge/leptos-0.8/retrieval-queries-v0.json",
+      "schema": "benchmarks/frontend/knowledge/leptos-0.8/retrieval-v1.schema.json",
+      "query_count": 42,
+      "positives": 34,
+      "hard_negatives": 8,
+      "status": "evaluator_authored_not_executed",
+      "validator_command": "cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --retrieval",
+      "baselines": [
+        "keyword_overlap",
+        "BM25",
+        "sparse_TFIDF",
+        "HDC_associative",
+        "hybrid_RRF_BM25_TFIDF_HDC"
+      ],
+      "primary_metrics": [
+        "recall_at_1",
+        "recall_at_3",
+        "hit_rate_at_1",
+        "hit_rate_at_3",
+        "mean_reciprocal_rank",
+        "ndcg_at_3",
+        "precision_at_3",
+        "abstention_accuracy_after_development_split_calibration",
+        "latency_p50_p95",
+        "memory_bytes",
+        "cost_per_1000_queries"
+      ],
+      "note": "The 42-query set is public-pilot development data; no retrieval scores have been measured and it is not a blind holdout.",
+      "planned_comparison_arms": [
+        "dense_embedding_requires_pinned_model_adapter"
+      ]
+    },
+    "source_commit": "808998bb903202e813b5bd275fe4a395bcff528e",
+    "source_anchor_count": 17,
+    "source_file_count": 7,
+    "framework_locked_version": "0.8.20",
+    "latest_upstream_stable": "0.8.23",
+    "prerelease": "0.9.0-rc1",
+    "retrieval_evaluator": {
+      "status": "source_and_tests_authored_not_executed",
+      "path": "benchmarks/frontend/retrieval-eval/",
+      "result_schema": "benchmarks/frontend/retrieval-eval/result-v1.schema.json",
+      "implemented_methods": [
+        "keyword_overlap",
+        "bm25",
+        "tfidf",
+        "hdc_bipolar",
+        "hybrid_rrf_bm25_tfidf_hdc"
+      ],
+      "hdc_dimensions": 16384,
+      "hdc_encoding": "BLAKE3-seeded bipolar word/bigram/character-trigram feature bundling",
+      "dense_embedding": "not_implemented_requires_pinned_model_adapter",
+      "abstention": "threshold not hardcoded; threshold calibration requires separate development split",
+      "unit_tests": 8
+    }
+  },
+  "anti_contamination_policy": {
+    "public_pilot": "Public task definitions and fixtures may be used for iterative development but do not count as hidden holdout performance.",
+    "controller_only": "Reference source is mounted only into the evaluator container; the agent receives the brief and rendered reference captures.",
+    "hidden_holdout": "Task definition, fixture source, source screenshots and acceptance details remain unavailable to the agent before evaluation. Keep these outside public repositories and block external retrieval.",
+    "reporting": "Never merge public-pilot and hidden-holdout scores into one unlabeled aggregate."
+  },
+  "framework_compatibility": {
+    "status": "specification_only",
+    "experiment": "benchmarks/frontend/compatibility/leptos-0.8.20-to-0.8.23-v1.json",
+    "baseline_version": "0.8.20",
+    "candidate_stable_version": "0.8.23",
+    "excluded_prerelease": "0.9.0-rc1",
+    "verification_gates": 7,
+    "policy": "Keep benchmark runs pinned to Cargo.lock 0.8.20 until the separate 0.8.23 compatibility experiment passes all gates and is deliberately adopted."
+  },
+  "benchmark_qualification": {
+    "status": "campaign_designed_not_executed",
+    "campaign_path": "benchmarks/frontend/qualification/mutation-campaign-v1.json",
+    "schema_path": "benchmarks/frontend/qualification/mutation-campaign-v1.schema.json",
+    "mutation_count": 20,
+    "positive_control_count": 5,
+    "metamorphic_relation_count": 5,
+    "key_rule": "Qualify the evaluator with seeded failures and semantics-preserving controls before using its scores for model comparisons.",
+    "qualification_targets": {
+      "critical_mutation_kill_rate_min": 1,
+      "security_mutation_kill_rate_min": 1,
+      "evidence_integrity_mutation_kill_rate_min": 1,
+      "high_severity_mutation_kill_rate_min": 0.95,
+      "overall_mutation_kill_rate_min": 0.9,
+      "positive_control_false_reject_rate_max": 0
+    },
+    "validator_command": "cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --mutations",
+    "validator_status": "source_authored_not_executed",
+    "report_schema_path": "benchmarks/frontend/qualification/qualification-report-v1.schema.json",
+    "execution_protocol_path": "benchmarks/frontend/qualification/EXECUTION.md",
+    "adjudicator_command": "cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --qualification-report benchmarks/frontend/qualification/qualification-report-v1.schema.json benchmarks/frontend/qualification/mutation-campaign-v1.json path/to/qualification-report.json",
+    "adjudicator_status": "source_and_tests_authored_not_executed",
+    "adjudicator_capabilities": [
+      "bind exact campaign file SHA-256",
+      "require complete mutation/positive/metamorphic case coverage",
+      "enforce baseline/candidate fixture and environment pairing",
+      "verify receipt identity and receipt byte SHA-256",
+      "re-read screenshot/accessibility/layout files and recompute SHA-256 and lengths",
+      "verify PNG dimensions against receipt viewport and layout viewport consistency",
+      "compute per-class mutation kill rates and Wilson 95% intervals",
+      "adjudicate positive and metamorphic semantic equivalence"
+    ],
+    "trust_boundary": "Report integrity and evidence-byte verification are implemented in source. Cryptographic authentication of the report producer and truth of observed oracle IDs are not implemented; a trusted isolated executor and verifiable runner attestation are still required.",
+    "summary_schema_path": "benchmarks/frontend/qualification/qualification-summary-v1.schema.json"
+  },
+  "comparative_evaluation": {
+    "status": "protocol_designed_not_executed",
+    "design_path": "benchmarks/frontend/comparative-evaluation-v1.json",
+    "schema_path": "benchmarks/frontend/comparative-evaluation-v1.schema.json",
+    "comparison_arms": [
+      "A0_matched_base_agent",
+      "A1_documentation_retrieval",
+      "A2_interface_contract",
+      "A3_browser_evidence_and_repair",
+      "A4_full_symthaea",
+      "H0_human_engineer_reference"
+    ],
+    "task_targets": {
+      "public_pilot": 30,
+      "comparative": 150,
+      "publication_minimum": 500
+    },
+    "statistical_methods": [
+      "paired_task_blocks",
+      "exact_McNemar_for_binary_outcomes",
+      "task_cluster_bootstrap_for_continuous_metrics",
+      "Wilson_95_intervals_for_proportions",
+      "Holm_correction_for_secondary_comparisons"
+    ],
+    "primary_contrast": "A4 minus A0",
+    "success_rule": "positive paired 95% interval excluding zero with all hard gates, or noninferiority within 2 percentage points and >=30% lower cost per accepted task"
+  },
+  "reference_fixture_audit": {
+    "status": "source_authored_preflight_checked_tests_not_executed",
+    "task_id": "SFEB-L1-004",
+    "checks": [
+      "exactly one main landmark",
+      "exactly one level-one heading with required name",
+      "skip-link target plus focus-visible style",
+      "named workspace/summary/activity/schedule regions",
+      "exactly three independently identified metric cards",
+      "three-column desktop metric layout declaration",
+      "one-column narrow-screen metric layout declaration",
+      "no scripts or external CSS asset imports"
+    ],
+    "limitation": "Audits original source fixture only; no browser-rendered or agent-output semantics are verified."
+  }
+}
