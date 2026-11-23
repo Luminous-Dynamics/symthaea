@@ -2,8 +2,8 @@
 
 pub mod binary_metrics;
 pub mod calibration_requalification;
-pub mod label_consumption_guard;
 pub mod dtco_manifest;
+pub mod label_consumption_guard;
 pub mod metrology_audit;
 pub mod metrology_qualification_gate;
 pub mod metrology_semantics;
