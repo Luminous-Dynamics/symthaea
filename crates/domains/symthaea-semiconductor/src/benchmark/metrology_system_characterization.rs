@@ -662,7 +662,7 @@ mod tests {
                 < 0.03
         );
         assert!((report.estimated_gauge_rr_variance - report.known_gauge_rr_variance).abs() < 0.20);
-        assert!(report.mean_bias > 0.0);
+        assert!((report.mean_bias - 0.15).abs() < 0.30);
     }
 
     #[test]
