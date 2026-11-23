@@ -462,6 +462,7 @@ For decision sufficiency, compare memory representations on identical world/task
 | #13370 | Backend-neutral candidate evidence envelope | Structural validation, not evidence qualification |
 | #13371 | Official LongMemEval-V2 Memory API shim plus Rust sidecar | Text BM25 with original screenshot evidence; query_image not used for ranking |
 | #13386 | V2 retrieval-to-candidate evidence DAG integration | Explicit state/text/image/neighbor lineage, cross-language candidate-set commitment verification and durable query receipts; no issuer/rights/lifecycle qualification |
+| #13391 | Label-blind retrieval-policy memory prototype | In-memory trace receipts and deterministic strategy promotion; not yet connected to the V2 operation stream or durable service |
 
 No row above should be interpreted as a CI pass or official benchmark score unless a later exact-head run receipt establishes it.
 
@@ -482,7 +483,9 @@ No row above should be interpreted as a CI pass or official benchmark score unle
 
 ### Stage 3 — Improve retrieval without sacrificing source fidelity
 - Reproduce AgentRunbook-C V2 Online as a distinct retrieval-policy-memory arm before building a MACE consolidation controller.
-- Add a label-blind retrieval-trace receipt and bounded strategy-note consolidation prototype; compare cold, warm, shuffled-order and cross-version transfer.
+- Integrate #13391 with actual LongMemEval-V2 tool operations using only the opaque query invocation ID, observed candidate IDs, exact tool/action template digests, measured costs and stop reason; never pass evaluator labels.
+- Add durable, create-once trace receipts and atomic strategy-note promotion outside the candidate process; retain the in-memory #13391 implementation as the deterministic conformance reference.
+- Compare cold, warm, shuffled-order and cross-version transfer, including no-consolidation and random-policy controls.
 - Keep retrieval-policy notes separate from factual/source evidence and require applicability, expiry and source lineage for every strategy note.
 - Add pinned dense retrieval and an explicit hybrid fusion profile.
 - Add a pinned reranker and query expansion only as distinct ablation arms.
