@@ -924,12 +924,16 @@ mod tests {
 
     #[test]
     fn observation_missing_ledger_unit_binding_fails_closed() {
-        let (manifest, receipt, mut ledger, observation) = evidence_fixture();
+        let (manifest, receipt, mut ledger, mut observation) = evidence_fixture();
         ledger.records[0].source_unit_key = None;
-        ledger.records[0].observation_coverage_ledger_digest = digest('8');
-        assert!(observation
-            .validate_against_evidence(&manifest, &receipt, &ledger)
-            .is_err());
+        observation.observation_coverage_ledger_digest =
+            ledger.canonical_digest_hex().unwrap();
+        assert!(matches!(
+            observation.validate_against_evidence(&manifest, &receipt, &ledger),
+            Err(MycelialMorphogenesisObservationError::EvidenceChainMismatch(
+                "acquisition, extraction and observation inventory"
+            ))
+        ));
     }
 
     #[test]
