@@ -31,6 +31,27 @@ It records:
 
 The semantic audit cannot prove that a digest resolves to an authentic external file, establish physical convergence, or turn a finite probe library into a continuous worst-case certificate. It is a fail-closed consistency layer, not a substitute for scientific evidence.
 
+## Certified intervention cover (CIC)
+
+The certified-global path is defined by [#13452](https://github.com/Luminous-Dynamics/symthaea/issues/13452). For a compact intervention metric space U, if the normalized response error e(u) has a verified global Lipschitz constant L and the confirmed probes form an r-net, then
+
+`sup_U e <= max_P e + L*r + eta`
+
+where eta is the sum of independently justified reference, candidate and measurement uncertainty budgets.
+
+The KIRD semantic auditor requires a certified-global record to carry:
+- metric identity, covering radius and verified Lipschitz constant;
+- separate reference, candidate and measurement uncertainty terms;
+- maximum sampled normalized response error and a conservative global upper bound;
+- non-placeholder cover-set, bound-proof and branch-stability digests;
+- an independent checker revision;
+- explicit stable response-branch association.
+
+It verifies the arithmetic `global_bound >= sampled_max + L*cover_radius + total_uncertainty`, checks that the declared sampled maximum is not below the worst confirmed response error, and refuses certification when branch association is unstable. A `PASS` response disposition under certified-global coverage additionally requires the upper bound to be at most one.
+
+The checked-in `synthetic-kird-certified-cover-v0.1.json` is a manufactured mathematical example: U=[0,0.1], e(u)=0.5+2u, one probe at zero, r=0.1, L=2, and eta=0.05; the exact global upper bound is 0.75. This fixture tests the theorem and auditor only. It does not assert Lipschitz continuity of a Vlasov response map or certify any physical plasma model.
+
+
 ## Synthetic fixture
 
 The included fixture uses placeholder all-zero digests, unknown distortion, unknown physical gates and `physical_execution_authorized=false`. Its byte and cost values are illustrative only and must not enter a scientific leaderboard.
