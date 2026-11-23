@@ -1,0 +1,93 @@
+{
+  "format": "SYM-PREDICTION-ADVANTAGE-UPSTREAM-PINS-001-v0.1",
+  "campaign_id": "BENCH-PREDICTION-ADVANTAGE-001",
+  "status": "SOURCE_PINS_RECORDED_NOT_EXECUTED",
+  "generated_context_date": "2026-11-23",
+  "benchmark_repositories": [
+    {
+      "benchmark": "RoboDyna",
+      "repository": "https://github.com/RoboDyna/robodyna",
+      "commit": "066e11e01e983ffa9238ee295e6d50935d321b12",
+      "files": {
+        "README.md": "801feecb677702e08c96dcdd318f7dae358577c9",
+        "task_config/eval_seeds.yml": "0a43c299d26cfa6e35dede73cd62759087448128",
+        "task_config/eval_step_limits.yml": "80558be25826945d48328e7b06f397de83b19645",
+        "scripts/eval/run_pi05_eval.sh": "724122893e82181e8d9e36c38cfb9c7a46c77b73",
+        "scripts/eval/run_xvla_eval.sh": "2cf7a83ae4fa5839c7c96050d0bd85cb768f4703",
+        "scripts/eval/run_fastwam_eval.sh": "5a74b9a4e57876e4a5398df6e17a0216f057b623"
+      },
+      "fixed_seed_manifest_version": 1,
+      "fixed_seeds_per_task_scenario_slot": 10,
+      "task_step_limit_rule": "1.2x longest published expert episode",
+      "control_hz": 16.667,
+      "modes": [
+        "frozen",
+        "async"
+      ],
+      "model_launcher_defaults": {
+        "pi05_checkpoint_id": 25000,
+        "xvla_checkpoint_id": 30000,
+        "fastwam_checkpoint_id": 13170,
+        "fastwam_replan_steps": 24,
+        "fastwam_open_loop_commit_seconds_approx": 1.44
+      },
+      "environment_requirements": {
+        "os": "Linux",
+        "gpu": "NVIDIA CUDA-capable",
+        "python": "3.10",
+        "rendering": "Vulkan",
+        "extra": "FFmpeg"
+      },
+      "status": "source_and_protocol_pinned; assets_and_checkpoints_not_acquired"
+    },
+    {
+      "benchmark": "LIBERO-Dynamic",
+      "repository": "https://github.com/renshaojie233/LIBERO-Dynamic",
+      "commit": "fd45961603cc50debaa959be52116626bc0fda1f",
+      "files": {
+        "README.md": "53c4243f98f79a6d4de000dd870bf5efac4a6993",
+        "docs/formal_dynamic_eval.md": "4feb7f5155850e1221e20c968974f845cad29d30",
+        "docs/reproducibility_notes.md": "daec93b026aab442dee26ed48cf25bd2106184b9",
+        "examples/evaluate_pi05_pytorch_async.py": "2ca74da9f5fbf10507eb9443a8cf787063b43a76"
+      },
+      "episode_population_per_configuration": 1800,
+      "dimensions": {
+        "tasks": 40,
+        "motion_families": 3,
+        "reviewed_trajectories_per_task_family": 5,
+        "speeds_meters_per_second": [
+          0.03,
+          0.06,
+          0.09
+        ]
+      },
+      "formal_action_clock_hz": 20,
+      "reproducibility_environment": {
+        "python": "3.10",
+        "robosuite": "1.4.0",
+        "mujoco": "2.3.7",
+        "pytorch": "2.13.0+cu130",
+        "cuda_user_space": "13.0.3",
+        "renderer": "EGL",
+        "publisher_validation_gpu": "NVIDIA RTX 5090",
+        "publisher_validation_driver": "580.126.18"
+      },
+      "separately_declared_formal_source": {
+        "repository": "https://github.com/renshaojie233/libero_dynamic_base.git",
+        "commit": "f1a86422d738b1f5759ad871f7e341d99c88f7c9",
+        "status": "DECLARED_IN_REPRO_NOTES_BUT_NOT_VERIFIED",
+        "reason": "GitHub source API returned 404 and repository search found no accessible public repository",
+        "blocks_formal_reproduction": true
+      },
+      "status": "paper_protocol_pinned;formal_source_unverified;assets_and_checkpoints_not_acquired"
+    }
+  ],
+  "claim_boundary": {
+    "installed": false,
+    "runtime_assets_downloaded": false,
+    "checkpoints_acquired": false,
+    "official_baselines_reproduced": false,
+    "symthaea_adapter_run": false,
+    "performance_claims": false
+  }
+}
