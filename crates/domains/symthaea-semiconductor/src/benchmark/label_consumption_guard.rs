@@ -353,8 +353,8 @@ pub fn assess_label_consumption_eligibility_v1(
         label_sha256,
         measurement_sha256,
         qualified_corrected_value: qualification.corrected_value,
-        qualified_standard_uncertainty_upper_bound:
-            qualification.conservative_standard_uncertainty_upper_bound,
+        qualified_standard_uncertainty_upper_bound: qualification
+            .conservative_standard_uncertainty_upper_bound,
         qualification_report_sha256: qualification.report_sha256,
         requalification_report_sha256: requalification.report_sha256,
         requalification_frontier_sha256: qualified_frontier.frontier_input_sha256.clone(),
@@ -592,7 +592,11 @@ mod tests {
         )
         .unwrap();
         assert_eq!(report.eligibility, LabelConsumptionEligibilityV1::Blocked);
-        assert!(report.reasons.contains(&LabelConsumptionReasonV1::LabelValueMismatch));
+        assert!(
+            report
+                .reasons
+                .contains(&LabelConsumptionReasonV1::LabelValueMismatch)
+        );
         assert!(!report.downstream_consumption_allowed);
     }
 
@@ -607,8 +611,15 @@ mod tests {
             LabelEvidenceFrontierV1::CurrentAtK1,
         )
         .unwrap();
-        assert_eq!(value_report.eligibility, LabelConsumptionEligibilityV1::Blocked);
-        assert!(value_report.reasons.contains(&LabelConsumptionReasonV1::LabelValueMissing));
+        assert_eq!(
+            value_report.eligibility,
+            LabelConsumptionEligibilityV1::Blocked
+        );
+        assert!(
+            value_report
+                .reasons
+                .contains(&LabelConsumptionReasonV1::LabelValueMissing)
+        );
 
         let mut missing_uncertainty = label();
         missing_uncertainty.standard_uncertainty = None;
@@ -618,7 +629,10 @@ mod tests {
             LabelEvidenceFrontierV1::CurrentAtK1,
         )
         .unwrap();
-        assert_eq!(uncertainty_report.eligibility, LabelConsumptionEligibilityV1::Unknown);
+        assert_eq!(
+            uncertainty_report.eligibility,
+            LabelConsumptionEligibilityV1::Unknown
+        );
         assert!(
             uncertainty_report
                 .reasons
