@@ -13,10 +13,10 @@
 //!   rustc --edition=2024 --test tools/vision-dvpc-cluster-inference.rs -o /tmp/vis-dvpc-014-tests
 //!   /tmp/vis-dvpc-014-tests
 //!   rustc --edition=2024 -O tools/vision-dvpc-cluster-inference.rs -o /tmp/vis-dvpc-014
-//!   /tmp/vis-dvpc-014 DELTAS.tsv EXPECTED_BUNDLE_LOCK_SHA256
+//!   /tmp/vis-dvpc-014 DELTAS.tsv EXPECTED_BUNDLE_LOCK_SHA256 EXPECTED_CLUSTER_ASSIGNMENT_MANIFEST_SHA256
 //!
-//! EXPECTED_BUNDLE_LOCK_SHA256 should be taken from the separately frozen
-//! VIS-DVPC-012 integrity receipt / preregistration, not read from this TSV.
+//! Both expected digests must come from independently frozen integrity
+//! receipts / preregistration, not be trusted from this TSV.
 
 #![deny(unsafe_code)]
 
@@ -37,6 +37,7 @@ const META_KEYS: &[&str] = &[
     "primary_metric",
     "positive_is_better",
     "bundle_lock_sha256",
+    "cluster_assignment_manifest_sha256",
     "comparison_family_size",
     "bootstrap_seed",
     "bootstrap_replicates",
@@ -488,6 +489,7 @@ fn render_receipt(
         "cluster_unit",
         "primary_metric",
         "bundle_lock_sha256",
+        "cluster_assignment_manifest_sha256",
     ] {
         let _ = writeln!(output, "ANALYSIS\t{key}\t{}", table.meta[key]);
     }
@@ -540,13 +542,31 @@ fn render_receipt(
     output
 }
 
-fn analyze(input: &str, expected_bundle_lock_sha256: &str) -> Result<String, String> {
-    let expected_lock = validate_sha256(expected_bundle_lock_sha256, "expected bundle-lock digest")?;
+fn analyze(
+    input: &str,
+    expected_bundle_lock_sha256: &str,
+    expected_cluster_assignment_manifest_sha256: &str,
+) -> Result<String, String> {
+    let expected_lock =
+        validate_sha256(expected_bundle_lock_sha256, "expected bundle-lock digest")?;
+    let expected_cluster_manifest = validate_sha256(
+        expected_cluster_assignment_manifest_sha256,
+        "expected cluster-assignment manifest digest",
+    )?;
     let table = parse_table(input)?;
     let actual_lock = validate_sha256(&table.meta["bundle_lock_sha256"], "bundle_lock_sha256")?;
     if actual_lock != expected_lock {
         return Err(invalid(
             "cluster-delta metadata does not match independently supplied expected bundle-lock digest",
+        ));
+    }
+    let actual_cluster_manifest = validate_sha256(
+        &table.meta["cluster_assignment_manifest_sha256"],
+        "cluster_assignment_manifest_sha256",
+    )?;
+    if actual_cluster_manifest != expected_cluster_manifest {
+        return Err(invalid(
+            "cluster-assignment manifest digest does not match independently supplied preregistered digest",
         ));
     }
     let config = parse_config(&table.meta)?;
@@ -590,14 +610,14 @@ fn analyze(input: &str, expected_bundle_lock_sha256: &str) -> Result<String, Str
 }
 
 fn run_cli(args: &[String]) -> Result<String, String> {
-    if args.len() != 3 {
+    if args.len() != 4 {
         return Err(
-            "usage: vision-dvpc-cluster-inference DELTAS.tsv EXPECTED_BUNDLE_LOCK_SHA256".to_owned(),
+            "usage: vision-dvpc-cluster-inference DELTAS.tsv EXPECTED_BUNDLE_LOCK_SHA256 EXPECTED_CLUSTER_ASSIGNMENT_MANIFEST_SHA256".to_owned(),
         );
     }
     let input = fs::read_to_string(&args[1])
         .map_err(|error| invalid(format!("cannot read delta table: {error}")))?;
-    analyze(&input, &args[2])
+    analyze(&input, &args[2], &args[3])
 }
 
 fn main() {
@@ -616,6 +636,16 @@ mod tests {
     use super::*;
 
     const LOCK: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const CLUSTER_ASSIGNMENT_MANIFEST: &str =
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+
+    fn analyze(input: &str, expected_bundle_lock_sha256: &str) -> Result<String, String> {
+        super::analyze(
+            input,
+            expected_bundle_lock_sha256,
+            CLUSTER_ASSIGNMENT_MANIFEST,
+        )
+    }
 
     fn fixture() -> String {
         let mut content = String::from(
@@ -628,6 +658,7 @@ META\tcluster_unit\tsequence\n\
 META\tprimary_metric\tdecision_utility\n\
 META\tpositive_is_better\ttrue\n\
 META\tbundle_lock_sha256\taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\
+META\tcluster_assignment_manifest_sha256\tbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n\
 META\tcomparison_family_size\t2\n\
 META\tbootstrap_seed\t42\n\
 META\tbootstrap_replicates\t2000\n\
@@ -695,6 +726,19 @@ DELTA_HEADER\tcomparison_id\tcandidate_id\tbaseline_id\tcluster_id\tdelta\n",
     fn changed_bundle_lock_fails_against_external_expected_digest() {
         let broken = fixture().replace(LOCK, "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
         assert!(analyze(&broken, LOCK).unwrap_err().contains("expected bundle-lock digest"));
+    }
+
+    #[test]
+    fn changed_cluster_assignment_manifest_fails_against_external_digest() {
+        let broken = fixture().replace(
+            CLUSTER_ASSIGNMENT_MANIFEST,
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        );
+        assert!(
+            analyze(&broken, LOCK)
+                .unwrap_err()
+                .contains("cluster-assignment manifest digest")
+        );
     }
 
     #[test]
