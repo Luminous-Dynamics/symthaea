@@ -130,16 +130,28 @@ fn best_second_measurement(
     best.map(|(measurement, evaluation, _)| (measurement, evaluation))
 }
 
-fn evaluate_first_branch(
-    case: &DecisionCase,
-    measurements: &[Measurement],
-    first_measurement: &Measurement,
+struct FirstBranchEvaluation<'a> {
+    case: &'a DecisionCase,
+    measurements: &'a [Measurement],
+    first_measurement: &'a Measurement,
     first_outcome: MeasurementOutcome,
     outcome_probability: f64,
-    posterior_values: &[f64],
+    posterior_values: &'a [f64],
     remaining_budget: f64,
-    second_evaluated_count: &mut usize,
-) -> BranchChoice {
+    second_evaluated_count: &'a mut usize,
+}
+
+fn evaluate_first_branch(context: FirstBranchEvaluation<'_>) -> BranchChoice {
+    let FirstBranchEvaluation {
+        case,
+        measurements,
+        first_measurement,
+        first_outcome,
+        outcome_probability,
+        posterior_values,
+        remaining_budget,
+        second_evaluated_count,
+    } = context;
     let mut branch_case = case.clone();
     for (hypothesis, probability) in branch_case.hypotheses.iter_mut().zip(posterior_values) {
         hypothesis.prior = *probability;
@@ -337,42 +349,42 @@ pub fn evaluate_depth_two(
         let mut expected_terminal_loss = 0.0;
         let mut expected_measurement_cost = first_cost;
 
-        if probability_positive > 0.0 {
-            if let Some(posterior_values) = positive_posterior {
-                let choice = evaluate_first_branch(
-                    case,
-                    measurements,
-                    first_measurement,
-                    MeasurementOutcome::Positive,
-                    probability_positive,
-                    &posterior_values,
-                    measurement_budget_units - first_cost,
-                    &mut second_measurements_evaluated,
-                );
-                nonzero_branches += 1;
-                expected_terminal_loss += probability_positive * choice.terminal_loss;
-                expected_measurement_cost += choice.expected_second_cost;
-                branches.push(choice.branch);
-            }
+        if probability_positive > 0.0
+            && let Some(posterior_values) = positive_posterior
+        {
+            let choice = evaluate_first_branch(FirstBranchEvaluation {
+                case,
+                measurements,
+                first_measurement,
+                first_outcome: MeasurementOutcome::Positive,
+                outcome_probability: probability_positive,
+                posterior_values: &posterior_values,
+                remaining_budget: measurement_budget_units - first_cost,
+                second_evaluated_count: &mut second_measurements_evaluated,
+            });
+            nonzero_branches += 1;
+            expected_terminal_loss += probability_positive * choice.terminal_loss;
+            expected_measurement_cost += choice.expected_second_cost;
+            branches.push(choice.branch);
         }
 
-        if probability_negative > 0.0 {
-            if let Some(posterior_values) = negative_posterior {
-                let choice = evaluate_first_branch(
-                    case,
-                    measurements,
-                    first_measurement,
-                    MeasurementOutcome::Negative,
-                    probability_negative,
-                    &posterior_values,
-                    measurement_budget_units - first_cost,
-                    &mut second_measurements_evaluated,
-                );
-                nonzero_branches += 1;
-                expected_terminal_loss += probability_negative * choice.terminal_loss;
-                expected_measurement_cost += choice.expected_second_cost;
-                branches.push(choice.branch);
-            }
+        if probability_negative > 0.0
+            && let Some(posterior_values) = negative_posterior
+        {
+            let choice = evaluate_first_branch(FirstBranchEvaluation {
+                case,
+                measurements,
+                first_measurement,
+                first_outcome: MeasurementOutcome::Negative,
+                outcome_probability: probability_negative,
+                posterior_values: &posterior_values,
+                remaining_budget: measurement_budget_units - first_cost,
+                second_evaluated_count: &mut second_measurements_evaluated,
+            });
+            nonzero_branches += 1;
+            expected_terminal_loss += probability_negative * choice.terminal_loss;
+            expected_measurement_cost += choice.expected_second_cost;
+            branches.push(choice.branch);
         }
 
         let expected_total_loss = expected_terminal_loss + expected_measurement_cost;
