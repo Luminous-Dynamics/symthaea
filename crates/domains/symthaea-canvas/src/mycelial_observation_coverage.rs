@@ -83,7 +83,8 @@ pub struct MycelialObservationCoverageLedger {
     pub schema_version: u16,
     pub source_dataset_id: String,
     pub source_dataset_digest: String,
-    /// Digest of the independently declared observation inventory and scope.
+    /// Canonical digest of the strictly sorted declared observation-ID list.
+    /// Scope, calibration and per-record evidence are committed by the ledger digest.
     pub observation_inventory_digest: String,
     /// Complete sorted inventory. Every ID must have exactly one corresponding record.
     pub declared_observation_ids: Vec<String>,
@@ -652,6 +653,27 @@ mod tests {
         assert_eq!(
             ledger.validate(),
             Err(MycelialObservationCoverageError::ObservationInventoryDigestMismatch)
+        );
+
+        let mut reordered = fixture();
+        reordered.declared_observation_ids.swap(0, 1);
+        assert_eq!(
+            reordered.validate(),
+            Err(MycelialObservationCoverageError::NonCanonicalObservationOrder)
+        );
+    }
+
+    #[test]
+    fn canonical_observation_inventory_digest_is_order_and_content_sensitive() {
+        let first = vec!["a".to_string(), "b".to_string()];
+        let different = vec!["a".to_string(), "c".to_string()];
+        assert_ne!(
+            mycelial_observation_id_inventory_digest(&first),
+            mycelial_observation_id_inventory_digest(&different)
+        );
+        assert_ne!(
+            mycelial_observation_id_inventory_digest(&first),
+            mycelial_observation_id_inventory_digest(&["b".to_string(), "a".to_string()])
         );
     }
 
