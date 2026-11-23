@@ -350,8 +350,8 @@ All modeled invariants passed:
 
 Observed across the 720 schedules: 228 schedules with one effect; 492 with no effect; 324 stale-fence rejections; 312 permission rejections; 108 expiry rejections; 108 idempotent replays; 174 successful reconciliations; and 558 schedules still marked outcome-unknown at the end because the finite event order did not provide a later successful reconciliation.
 
-Exact source Git blob SHA: `88f08084fcf596b8ab499d77d2cc7d91129b7e49`.  
-Exact source SHA-256: `457853ee59e6b66c5bdd8a2188c2554ce05c7ba8cd52e2fefc0748d0ae386371`.
+Exact source Git blob SHA: `ebf2c1a4a289c11c06876925c7207c203c14cd56`.  
+Exact source SHA-256: `c8e8fa9b34d7b314cdb20b45d3a1ea017bacd765d8cb8d70576de422c1f6b95a`.
 
 This is bounded sequential interleaving exploration, not a concurrent memory-model proof. It assumes atomic sink checks and does not cover database isolation anomalies, actual broker durability, clock drift or network partitions beyond the modeled events. It is useful for finding ordering counterexamples before live integration; zero finite-model failures do not establish production failure probability.
 
