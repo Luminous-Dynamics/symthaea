@@ -546,7 +546,6 @@ impl MycelialAcquisitionDomainManifest {
             string_bytes = string_bytes.saturating_add(value.len());
             string_bytes <= MAX_CANONICAL_DOMAIN_STRING_BYTES
         };
-        hasher.update(&[rights_status_tag(self.source_rights_status)]);
         for value in [
             self.source_artifact_id.as_str(),
             self.source_artifact_digest.as_str(),
@@ -577,6 +576,7 @@ impl MycelialAcquisitionDomainManifest {
         let mut hasher = blake3::Hasher::new();
         hasher.update(b"symthaea-mycelial-acquisition-domain-manifest-v1");
         hasher.update(&self.schema_version.to_le_bytes());
+        hasher.update(&[rights_status_tag(self.source_rights_status)]);
         for value in [
             self.source_artifact_id.as_str(),
             self.source_artifact_digest.as_str(),
