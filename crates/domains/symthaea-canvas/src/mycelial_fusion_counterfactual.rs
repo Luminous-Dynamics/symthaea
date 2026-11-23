@@ -426,7 +426,10 @@ fn candidate_edge_identity_digest(candidate_id: &str) -> String {
 }
 
 fn candidate_edge_id(candidate_id: &str) -> String {
-    format!("fusion-edge:{}", candidate_edge_identity_digest(candidate_id))
+    format!(
+        "fusion-edge:{}",
+        candidate_edge_identity_digest(candidate_id)
+    )
 }
 
 fn candidate_inventory_digest(candidates: &[MycelialFusionCandidate]) -> String {
@@ -1014,12 +1017,8 @@ fn build_candidate_impact(
         &BTreeSet::new(),
         None,
     );
-    let (rejected_active_nodes, rejected_active_segments) = active_graph(
-        &rejected_view,
-        &BTreeSet::new(),
-        &BTreeSet::new(),
-        None,
-    );
+    let (rejected_active_nodes, rejected_active_segments) =
+        active_graph(&rejected_view, &BTreeSet::new(), &BTreeSet::new(), None);
     let witness = path_witness_segment_ids(
         &rejected_active_nodes,
         &rejected_active_segments,
@@ -1105,8 +1104,7 @@ fn build_candidate_impact(
             .failed_candidate_ids
             .binary_search(&candidate.candidate_id)
             .is_ok();
-        let failed_candidate_edge_id =
-            candidate_edge_failed.then_some(fusion_edge_id.as_str());
+        let failed_candidate_edge_id = candidate_edge_failed.then_some(fusion_edge_id.as_str());
         let (before, _) = view_metrics(
             &rejected_view,
             demands,
@@ -1927,7 +1925,9 @@ mod tests {
         );
 
         let mut tampered = report.clone();
-        tampered.candidates[0].disruption_deltas[0].failed_candidate_ids.clear();
+        tampered.candidates[0].disruption_deltas[0]
+            .failed_candidate_ids
+            .clear();
         assert!(matches!(
             tampered.validate_against(&source, &[candidate], &demands, &disruptions),
             Err(MycelialFusionCounterfactualError::ReportMismatch)
@@ -1957,13 +1957,9 @@ mod tests {
             failed_junction_ids: Vec::new(),
             failed_candidate_ids: vec!["cycle-edge".to_string()],
         }];
-        let report = evaluate_mycelial_fusion_counterfactuals(
-            &source,
-            &[candidate],
-            &demands,
-            &disruptions,
-        )
-        .unwrap();
+        let report =
+            evaluate_mycelial_fusion_counterfactuals(&source, &[candidate], &demands, &disruptions)
+                .unwrap();
         let delta = &report.candidates[0].disruption_deltas[0];
         assert_eq!(delta.rejected, delta.accepted_for_analysis);
         assert_eq!(delta.accepted_for_analysis.reachable_demand_weight, 5);
@@ -1994,13 +1990,9 @@ mod tests {
             failed_junction_ids: Vec::new(),
             failed_candidate_ids: vec!["fusion".to_string()],
         }];
-        let report = evaluate_mycelial_fusion_counterfactuals(
-            &source,
-            &[candidate],
-            &demands,
-            &disruptions,
-        )
-        .unwrap();
+        let report =
+            evaluate_mycelial_fusion_counterfactuals(&source, &[candidate], &demands, &disruptions)
+                .unwrap();
         let delta = &report.candidates[0].disruption_deltas[0];
         assert_eq!(delta.failed_segment_ids, vec!["ab".to_string()]);
         assert_eq!(delta.failed_candidate_ids, vec!["fusion".to_string()]);
@@ -2038,19 +2030,17 @@ mod tests {
             failed_junction_ids: Vec::new(),
             failed_candidate_ids: vec!["one".to_string()],
         }];
-        let report = evaluate_mycelial_fusion_counterfactuals(
-            &source,
-            &candidates,
-            &[],
-            &disruptions,
-        )
-        .unwrap();
+        let report =
+            evaluate_mycelial_fusion_counterfactuals(&source, &candidates, &[], &disruptions)
+                .unwrap();
         assert_eq!(
             report.candidates[0].disruption_deltas[0].rejected,
             report.candidates[0].disruption_deltas[0].accepted_for_analysis
         );
         assert_eq!(
-            report.candidates[1].disruption_deltas[0].accepted_for_analysis.connected_components,
+            report.candidates[1].disruption_deltas[0]
+                .accepted_for_analysis
+                .connected_components,
             3
         );
         assert_eq!(report.candidates[1].disruption_deltas[0].cycle_rank, 0);
