@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mace_candidate_evidence_v0_1.schema.json",
+  "title": "MACE candidate evidence v0.1",
+  "description": "Untrusted backend candidate evidence. Structural validity does not establish authority, admissibility, lifecycle freshness, rights, or truth.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_type",
+    "run_id",
+    "candidate_id",
+    "backend_id",
+    "backend_revision_sha256",
+    "query_scope",
+    "query_purpose",
+    "query_sha256",
+    "evidence_id",
+    "source_id",
+    "source_sha256",
+    "payload_sha256",
+    "payload_ref",
+    "modality",
+    "retrieval_channel",
+    "retrieval_rank",
+    "parent_evidence_ids"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mace_candidate_evidence_v0_1"
+    },
+    "record_type": {
+      "const": "candidate_evidence"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "candidate_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "backend_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "backend_revision_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "query_scope": {
+      "type": "string",
+      "minLength": 1
+    },
+    "query_purpose": {
+      "type": "string",
+      "minLength": 1
+    },
+    "query_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "evidence_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "payload_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "payload_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "modality": {
+      "enum": [
+        "text",
+        "image",
+        "audio",
+        "video",
+        "structured"
+      ]
+    },
+    "retrieval_channel": {
+      "type": "string",
+      "minLength": 1
+    },
+    "retrieval_rank": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 4294967295
+    },
+    "retrieval_score": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "parent_evidence_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "derivation_receipt_sha256": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
