@@ -281,5 +281,194 @@
     "official_baselines_reproduced": false,
     "symthaea_adapter_run": false,
     "performance_claims": false
+  },
+  "related_research_programs": [
+    {
+      "id": "CMAQ-004",
+      "issue": 9010,
+      "purpose": "Matched direct-policy versus world-model net decision value",
+      "implementation_owners": [
+        "#9122",
+        "#9153"
+      ],
+      "use": "Do not implement a second paired advantage-of-prediction auditor."
+    },
+    {
+      "id": "CMAQ-011",
+      "issue": 9094,
+      "implementation_prs": [
+        "#9095",
+        "#9528"
+      ],
+      "purpose": "External benchmark bridge and per-environment protocol mapping",
+      "use": "This work package owns only RoboDyna/LIBERO-Dynamic adapters and reproduction."
+    },
+    {
+      "id": "CMAQ-017",
+      "issue": 9407,
+      "purpose": "Optimizer-induced distribution shift and multi-step model exploitability",
+      "use": "Use for long-horizon search-exploitation controls."
+    },
+    {
+      "id": "SAM-MODEL-RESIDUAL-001",
+      "issue": 10257,
+      "implementation_pr": 10276,
+      "purpose": "Horizon-conditioned model discrepancy and planner exploitation",
+      "use": "Use for residual-versus-rollout-horizon outputs; do not create a second residual evaluator."
+    },
+    {
+      "id": "CMAQ-018-HEADROOM-001",
+      "issue": 10625,
+      "implementation_pr": 10735,
+      "research_source": "https://arxiv.org/abs/2610.37196",
+      "purpose": "Denoised selectable headroom with repeated and held-out continuations",
+      "current_reference_fixture": {
+        "candidate_count": 64,
+        "selection_continuations": 17,
+        "heldout_continuations": 17,
+        "status": "finite reference oracle; not a learned D3 selector; no physical rollouts executed"
+      },
+      "use": "Feed benchmark-adapter outputs into the existing headroom reference; do not duplicate branch oracle or bootstrap."
+    },
+    {
+      "id": "DVPC-CAUSAL-PAIRING-001",
+      "issue": 13375,
+      "implementation_pr": 13377,
+      "purpose": "Action-coupled trajectory pairing, per-decision information filtration and scored-action binding",
+      "stochastic_draw_owners": {
+        "symtropy_correspondence_and_draw_bundle_pr": 3690,
+        "symtropy_semantic_bundle_verifier_pr": 3755
+      },
+      "use": "Bind exact draw-bundle and semantic-verification receipt digests per arm; do not implement a second PRNG or correspondence verifier."
+    },
+    {
+      "id": "BENCHMARK-RUN-MANIFEST-001",
+      "issue": 9735,
+      "purpose": "Canonical run provenance and measured resource boundaries",
+      "use": "Reuse the run manifest rather than introducing one."
+    }
+  ],
+  "plannable_range_experiment": {
+    "paper": {
+      "title": "The Planning Limits of Latent World Models",
+      "arxiv": "https://arxiv.org/abs/2609.39235",
+      "publication_date": "2026-09-30",
+      "status": "external prior-art protocol; reported values are not Symthaea results"
+    },
+    "independent_variables": {
+      "candidate_count_N": {
+        "values": [
+          1,
+          2,
+          4,
+          8,
+          16,
+          32,
+          64
+        ],
+        "unit": "candidate action sequences"
+      },
+      "imagined_rollout_horizon_K": {
+        "values": [
+          5,
+          10,
+          20,
+          30
+        ],
+        "unit": "control steps"
+      },
+      "target_lookahead_L": {
+        "values": [
+          1,
+          2,
+          3,
+          5,
+          10,
+          20,
+          "task_horizon"
+        ],
+        "unit": "control steps"
+      },
+      "recursive_training_horizon_H_train": {
+        "values": [
+          "checkpoint_defined"
+        ],
+        "unit": "recursive prediction steps"
+      },
+      "executed_action_chunk_A": {
+        "values": [
+          "official_policy_default",
+          "1",
+          "short_chunk",
+          "long_chunk"
+        ],
+        "unit": "actions committed before next decision"
+      },
+      "observation_refresh_interval_R": {
+        "values": [
+          "official_policy_default",
+          "per_action",
+          "chunk_boundary"
+        ],
+        "unit": "decision/observation refresh epochs"
+      },
+      "measured_compute_budget_C": {
+        "values": [
+          "matched_compute",
+          "best_attainable"
+        ],
+        "unit": "measured resource profile"
+      }
+    },
+    "invariants": [
+      "K is imagined rollout length; L is target/subgoal distance; H_train is model training horizon; A is executed action commitment; R is observation refresh interval; C is measured cost.",
+      "K and A are independent treatments and must not be equated.",
+      "Automotive prediction horizons in milliseconds remain separate from robotics control-step horizons.",
+      "No expert/demo-derived subgoal may be labelled deployable; it is evaluator-only oracle upper bound unless a learned/online generator supplies it."
+    ],
+    "primary_measurements": [
+      "expert/action-ranking percentile by K and L",
+      "empirical plannable range P*(K) with task-family uncertainty and exact denominators",
+      "predicted-versus-realized action regret and optimism gap",
+      "closed-loop success/progress and recovery cost",
+      "p50/p95/p99 latency, measured energy, memory, queue underflow and hard-budget misses"
+    ],
+    "recommended_controls": [
+      "direct reactive policy without world-model rollout",
+      "short-horizon MPC with real observation feedback",
+      "longer imagined rollout at matched and best-attainable compute",
+      "expert/demo subgoal upper bound (not deployable)",
+      "learned/online subgoal generation",
+      "VLA-proposed candidate bank ranked by world-model prediction",
+      "stale/optimistic model and shifted object/motion/contact negative controls"
+    ],
+    "owners": [
+      "#10257",
+      "#10252",
+      "#10256",
+      "#9122",
+      "#10625",
+      "#10735",
+      "#9735",
+      "#13375",
+      "#13377"
+    ]
+  },
+  "selectable_headroom_integration": {
+    "paper": "https://arxiv.org/abs/2610.37196",
+    "owner_issue": 10625,
+    "reference_pr": 10735,
+    "separate_axes": {
+      "candidate_count_N": "Number of alternative candidate action sequences.",
+      "selection_continuations_M_select": "Independent continuations used to estimate candidate value during selection.",
+      "heldout_continuations_M_eval": "Continuation IDs not used for selection or tuning; used only after candidate selection is fixed."
+    },
+    "requirements": [
+      "Do not use the same continuation outcomes for selection and held-out scoring.",
+      "Use common random numbers only under the event-scoped causal-coupling contract.",
+      "Retain negative CRN variance-reduction results when pairing increases variance.",
+      "Candidate and continuation costs must be measured separately; matrix-cell counts are not simulator rollout counts.",
+      "The #10735 finite reference selector is not a learned D3 result."
+    ]
   }
 }
