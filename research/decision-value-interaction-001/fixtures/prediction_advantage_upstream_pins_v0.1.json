@@ -1,0 +1,477 @@
+{
+  "format": "SYM-PREDICTION-ADVANTAGE-UPSTREAM-PINS-001-v0.1",
+  "campaign_id": "BENCH-PREDICTION-ADVANTAGE-001",
+  "status": "SOURCE_PINS_RECORDED_NOT_EXECUTED",
+  "generated_context_date": "2026-11-23",
+  "benchmark_repositories": [
+    {
+      "benchmark": "RoboDyna",
+      "repository": "https://github.com/RoboDyna/robodyna",
+      "commit": "066e11e01e983ffa9238ee295e6d50935d321b12",
+      "files": {
+        "README.md": "801feecb677702e08c96dcdd318f7dae358577c9",
+        "task_config/eval_seeds.yml": "0a43c299d26cfa6e35dede73cd62759087448128",
+        "task_config/eval_step_limits.yml": "80558be25826945d48328e7b06f397de83b19645",
+        "scripts/eval/run_pi05_eval.sh": "724122893e82181e8d9e36c38cfb9c7a46c77b73",
+        "scripts/eval/run_xvla_eval.sh": "2cf7a83ae4fa5839c7c96050d0bd85cb768f4703",
+        "scripts/eval/run_fastwam_eval.sh": "5a74b9a4e57876e4a5398df6e17a0216f057b623",
+        "script/eval_metrics.py": "473385e6574de4f6fcc716954559e9111dfd130c",
+        "script/eval_policy.py": "41c781dbbe23445d5147249661f05a2d8708f3fa",
+        "script/evaluation_protocol.py": "f6618cf84ececc6edf83e611dc6c05cf8eac65c3",
+        "envs/_base_task.py": "45890d0e8adc180d0e89f3f32d049525db1bb817"
+      },
+      "fixed_seed_manifest_version": 1,
+      "fixed_seeds_per_task_scenario_slot": 10,
+      "task_step_limit_rule": "1.2x longest published expert episode",
+      "control_hz": 16.667,
+      "modes": [
+        "frozen",
+        "async"
+      ],
+      "model_launcher_defaults": {
+        "pi05_checkpoint_id": 25000,
+        "xvla_checkpoint_id": 30000,
+        "fastwam_checkpoint_id": 13170,
+        "fastwam_replan_steps": 24,
+        "fastwam_open_loop_commit_seconds_approx": 1.44
+      },
+      "environment_requirements": {
+        "os": "Linux",
+        "gpu": "NVIDIA CUDA-capable",
+        "python": "3.10",
+        "rendering": "Vulkan",
+        "extra": "FFmpeg"
+      },
+      "status": "source_and_protocol_pinned; assets_and_checkpoints_not_acquired",
+      "output_contract": {
+        "per_episode_fields": [
+          "episode_id",
+          "seed",
+          "success",
+          "steps_taken",
+          "max_steps",
+          "route_completion",
+          "manipulation_score",
+          "partial_score",
+          "total_penalty_factor",
+          "fail_reason",
+          "metric_detail",
+          "penalty_events"
+        ],
+        "metric_detail_core": [
+          "total_time_sim_s",
+          "total_time_wall_s",
+          "total_steps",
+          "option_label",
+          "route_completion",
+          "manipulation_score",
+          "total_penalty_factor",
+          "fail_reason"
+        ],
+        "aggregate_fields": [
+          "total_episodes",
+          "success_count",
+          "success_rate",
+          "manipulation_score_mean",
+          "manipulation_score_std",
+          "route_completion_mean",
+          "route_completion_std",
+          "partial_score_count",
+          "partial_score_mean",
+          "partial_score_std",
+          "total_time_sim_s_mean",
+          "total_time_sim_s_std",
+          "total_time_wall_s_mean",
+          "total_time_wall_s_std",
+          "total_steps_mean",
+          "total_steps_std",
+          "penalty_clutter_collision_total",
+          "penalty_out_of_bounds_total"
+        ],
+        "episode_cache": "Append-only JSONL, per completed seed, fsync after write; only seeds present in current fixed manifest may be resumed",
+        "inference_semantics": "model.get_action is wrapped in environment inference_window; frozen pauses world, async charges inference duration to simulation time",
+        "expert_gate_default": 0,
+        "expert_gate_semantics": "Expert pass still creates dynamic motion; with gate off, first replayable expert scene is used even if expert verdict fails; gate on can retry and change selected trajectory",
+        "diagnostic_seed_override": "EVAL_SEEDS_OVERRIDE is diagnostic-only; forbidden in confirmatory runs"
+      }
+    },
+    {
+      "benchmark": "LIBERO-Dynamic",
+      "repository": "https://github.com/renshaojie233/LIBERO-Dynamic",
+      "commit": "fd45961603cc50debaa959be52116626bc0fda1f",
+      "files": {
+        "README.md": "53c4243f98f79a6d4de000dd870bf5efac4a6993",
+        "docs/formal_dynamic_eval.md": "4feb7f5155850e1221e20c968974f845cad29d30",
+        "docs/reproducibility_notes.md": "daec93b026aab442dee26ed48cf25bd2106184b9",
+        "examples/evaluate_pi05_pytorch_async.py": "2ca74da9f5fbf10507eb9443a8cf787063b43a76",
+        "scripts/run_pi05_sync_eval.py": "4fe2611481ba1a54d0d1d60a40451a37c940a345",
+        "scripts/eval_dynamic_formal.py": "76fc3c485fdb62ee3b826922dfc47ac96e133dbf",
+        "scripts/run_pi05_async_eval.py": "ccdfd6620e83a4d19a804bfd8ab95632b3a14a6b",
+        "examples/_common.py": "66902337d99e3f3b23113dba9c8f24b9d8c3af9f",
+        "results/README.md": "cab10da651a939807a73304bf8e8b7c240768e67",
+        "results/cross_model_async.csv": "a6b918176f731494b9a07d2a669781738ee167b3",
+        "results/execution_strategy_best_points.csv": "d4bf6185f583b34a4389959412dae938e35fc5fe",
+        "results/dynamic_finetuning_ksweep.csv": "3cee2350c2fdfa3a49d7def1151470d8f1ffcb9b",
+        "results/real_robot_results_by_k.csv": "65086a79f7ab6d2a6e45f7d2830f4a367d2c2440"
+      },
+      "episode_population_per_configuration": 1800,
+      "dimensions": {
+        "tasks": 40,
+        "motion_families": 3,
+        "reviewed_trajectories_per_task_family": 5,
+        "speeds_meters_per_second": [
+          0.03,
+          0.06,
+          0.09
+        ]
+      },
+      "formal_action_clock_hz": 20,
+      "reproducibility_environment": {
+        "python": "3.10",
+        "robosuite": "1.4.0",
+        "mujoco": "2.3.7",
+        "pytorch": "2.13.0+cu130",
+        "cuda_user_space": "13.0.3",
+        "renderer": "EGL",
+        "publisher_validation_gpu": "NVIDIA RTX 5090",
+        "publisher_validation_driver": "580.126.18"
+      },
+      "separately_declared_formal_source": {
+        "repository": "https://github.com/renshaojie233/libero_dynamic_base.git",
+        "commit": "f1a86422d738b1f5759ad871f7e341d99c88f7c9",
+        "status": "DECLARED_IN_REPRO_NOTES_BUT_NOT_VERIFIED",
+        "reason": "GitHub source API returned 404 and repository search found no accessible public repository",
+        "blocks_formal_reproduction": true
+      },
+      "status": "paper_protocol_pinned;formal_source_unverified;assets_and_checkpoints_not_acquired",
+      "output_contract": {
+        "manifest_and_summary": "Per-item manifest plus summary.json",
+        "per_item_fields": [
+          "success",
+          "platform_path_error",
+          "object_follow_error",
+          "tilt",
+          "relative_drop",
+          "visibility",
+          "diagnostic_flags",
+          "queue_underflow",
+          "chunk_count",
+          "policy_requests",
+          "calibrated_simulation_latency",
+          "wall_clock_policy_latency",
+          "rtc_requested",
+          "rtc_supported",
+          "rtc_used",
+          "action_l2",
+          "action_delta_l2"
+        ],
+        "trace_fields": [
+          "per_control_step_values",
+          "chunk_boundaries",
+          "poses",
+          "contacts"
+        ],
+        "async_mode": {
+          "control_mode": "async_queue",
+          "prefetch_threshold": 2,
+          "chunk_size_threshold": 0.5,
+          "empty_action": "hold"
+        },
+        "sync_mode": {
+          "control_mode": "sync_hold",
+          "prefetch_threshold": 0,
+          "empty_action": "zero"
+        },
+        "formal_latency": "fixed calibrated latency; measured_wallclock is diagnostic-only"
+      },
+      "reported_cross_model_results": [
+        {
+          "model": "Pi0.5 JAX",
+          "k": 4,
+          "successes": 1041,
+          "episodes": 1800,
+          "success_rate_percent": 57.8333
+        },
+        {
+          "model": "FastWAM-Joint",
+          "k": 8,
+          "successes": 731,
+          "episodes": 1800,
+          "success_rate_percent": 40.6111
+        },
+        {
+          "model": "VLA-JEPA",
+          "k": 4,
+          "successes": 643,
+          "episodes": 1800,
+          "success_rate_percent": 35.7222
+        },
+        {
+          "model": "FastWAM",
+          "k": 8,
+          "successes": 577,
+          "episodes": 1800,
+          "success_rate_percent": 32.0556
+        },
+        {
+          "model": "Pi0 JAX",
+          "k": 8,
+          "successes": 567,
+          "episodes": 1800,
+          "success_rate_percent": 31.5
+        },
+        {
+          "model": "OpenVLA-OFT",
+          "k": 4,
+          "successes": 491,
+          "episodes": 1800,
+          "success_rate_percent": 27.2778
+        }
+      ],
+      "reported_execution_strategy_results": [
+        {
+          "strategy": "VLASH continuous-world",
+          "k": 4,
+          "latency_ms": 103.9873,
+          "successes": 998,
+          "episodes": 1800,
+          "success_rate_percent": 55.4444,
+          "label": "separately-trained system reference"
+        },
+        {
+          "strategy": "Sync zero latency",
+          "k": 8,
+          "latency_ms": 0,
+          "successes": 907,
+          "episodes": 1800,
+          "success_rate_percent": 50.3889,
+          "label": "optimistic diagnostic upper-control; not deployable"
+        },
+        {
+          "strategy": "Async Queue",
+          "k": 6,
+          "latency_ms": 147.199,
+          "successes": 871,
+          "episodes": 1800,
+          "success_rate_percent": 48.3889
+        },
+        {
+          "strategy": "Sync Hold",
+          "k": 10,
+          "latency_ms": 147.199,
+          "successes": 775,
+          "episodes": 1800,
+          "success_rate_percent": 43.0556
+        },
+        {
+          "strategy": "RTC fixed_10",
+          "k": 16,
+          "latency_ms": 169.8016,
+          "successes": 681,
+          "episodes": 1800,
+          "success_rate_percent": 37.8333
+        }
+      ]
+    }
+  ],
+  "claim_boundary": {
+    "installed": false,
+    "runtime_assets_downloaded": false,
+    "checkpoints_acquired": false,
+    "official_baselines_reproduced": false,
+    "symthaea_adapter_run": false,
+    "performance_claims": false
+  },
+  "related_research_programs": [
+    {
+      "id": "CMAQ-004",
+      "issue": 9010,
+      "purpose": "Matched direct-policy versus world-model net decision value",
+      "implementation_owners": [
+        "#9122",
+        "#9153"
+      ],
+      "use": "Do not implement a second paired advantage-of-prediction auditor."
+    },
+    {
+      "id": "CMAQ-011",
+      "issue": 9094,
+      "implementation_prs": [
+        "#9095",
+        "#9528"
+      ],
+      "purpose": "External benchmark bridge and per-environment protocol mapping",
+      "use": "This work package owns only RoboDyna/LIBERO-Dynamic adapters and reproduction."
+    },
+    {
+      "id": "CMAQ-017",
+      "issue": 9407,
+      "purpose": "Optimizer-induced distribution shift and multi-step model exploitability",
+      "use": "Use for long-horizon search-exploitation controls."
+    },
+    {
+      "id": "SAM-MODEL-RESIDUAL-001",
+      "issue": 10257,
+      "implementation_pr": 10276,
+      "purpose": "Horizon-conditioned model discrepancy and planner exploitation",
+      "use": "Use for residual-versus-rollout-horizon outputs; do not create a second residual evaluator."
+    },
+    {
+      "id": "CMAQ-018-HEADROOM-001",
+      "issue": 10625,
+      "implementation_pr": 10735,
+      "research_source": "https://arxiv.org/abs/2610.37196",
+      "purpose": "Denoised selectable headroom with repeated and held-out continuations",
+      "current_reference_fixture": {
+        "candidate_count": 64,
+        "selection_continuations": 17,
+        "heldout_continuations": 17,
+        "status": "finite reference oracle; not a learned D3 selector; no physical rollouts executed"
+      },
+      "use": "Feed benchmark-adapter outputs into the existing headroom reference; do not duplicate branch oracle or bootstrap."
+    },
+    {
+      "id": "DVPC-CAUSAL-PAIRING-001",
+      "issue": 13375,
+      "implementation_pr": 13377,
+      "purpose": "Action-coupled trajectory pairing, per-decision information filtration and scored-action binding",
+      "stochastic_draw_owners": {
+        "symtropy_correspondence_and_draw_bundle_pr": 3690,
+        "symtropy_semantic_bundle_verifier_pr": 3743,
+        "symtropy_semantic_bundle_verifier_issue": 3741,
+        "superseded_reference_pr": 3755,
+        "current_verifier_status": "DRAFT_PENDING_EXACT_HEAD_FOCUSED_VERIFICATION"
+      },
+      "use": "Bind exact draw-bundle and semantic-verification receipt digests per arm; do not implement a second PRNG or correspondence verifier."
+    },
+    {
+      "id": "BENCHMARK-RUN-MANIFEST-001",
+      "issue": 9735,
+      "purpose": "Canonical run provenance and measured resource boundaries",
+      "use": "Reuse the run manifest rather than introducing one."
+    }
+  ],
+  "plannable_range_experiment": {
+    "paper": {
+      "title": "The Planning Limits of Latent World Models",
+      "arxiv": "https://arxiv.org/abs/2609.39235",
+      "publication_date": "2026-09-30",
+      "status": "external prior-art protocol; reported values are not Symthaea results"
+    },
+    "independent_variables": {
+      "candidate_count_N": {
+        "values": [
+          1,
+          2,
+          4,
+          8,
+          16,
+          32,
+          64
+        ],
+        "unit": "candidate action sequences"
+      },
+      "imagined_rollout_horizon_K": {
+        "values": [
+          5,
+          10,
+          20,
+          30
+        ],
+        "unit": "control steps"
+      },
+      "target_lookahead_L": {
+        "values": [
+          1,
+          2,
+          3,
+          5,
+          10,
+          20,
+          "task_horizon"
+        ],
+        "unit": "control steps"
+      },
+      "recursive_training_horizon_H_train": {
+        "values": [
+          "checkpoint_defined"
+        ],
+        "unit": "recursive prediction steps"
+      },
+      "executed_action_chunk_A": {
+        "values": [
+          "official_policy_default",
+          "1",
+          "short_chunk",
+          "long_chunk"
+        ],
+        "unit": "actions committed before next decision"
+      },
+      "observation_refresh_interval_R": {
+        "values": [
+          "official_policy_default",
+          "per_action",
+          "chunk_boundary"
+        ],
+        "unit": "decision/observation refresh epochs"
+      },
+      "measured_compute_budget_C": {
+        "values": [
+          "matched_compute",
+          "best_attainable"
+        ],
+        "unit": "measured resource profile"
+      }
+    },
+    "invariants": [
+      "K is imagined rollout length; L is target/subgoal distance; H_train is model training horizon; A is executed action commitment; R is observation refresh interval; C is measured cost.",
+      "K and A are independent treatments and must not be equated.",
+      "Automotive prediction horizons in milliseconds remain separate from robotics control-step horizons.",
+      "No expert/demo-derived subgoal may be labelled deployable; it is evaluator-only oracle upper bound unless a learned/online generator supplies it."
+    ],
+    "primary_measurements": [
+      "expert/action-ranking percentile by K and L",
+      "empirical plannable range P*(K) with task-family uncertainty and exact denominators",
+      "predicted-versus-realized action regret and optimism gap",
+      "closed-loop success/progress and recovery cost",
+      "p50/p95/p99 latency, measured energy, memory, queue underflow and hard-budget misses"
+    ],
+    "recommended_controls": [
+      "direct reactive policy without world-model rollout",
+      "short-horizon MPC with real observation feedback",
+      "longer imagined rollout at matched and best-attainable compute",
+      "expert/demo subgoal upper bound (not deployable)",
+      "learned/online subgoal generation",
+      "VLA-proposed candidate bank ranked by world-model prediction",
+      "stale/optimistic model and shifted object/motion/contact negative controls"
+    ],
+    "owners": [
+      "#10257",
+      "#10252",
+      "#10256",
+      "#9122",
+      "#10625",
+      "#10735",
+      "#9735",
+      "#13375",
+      "#13377"
+    ]
+  },
+  "selectable_headroom_integration": {
+    "paper": "https://arxiv.org/abs/2610.37196",
+    "owner_issue": 10625,
+    "reference_pr": 10735,
+    "separate_axes": {
+      "candidate_count_N": "Number of alternative candidate action sequences.",
+      "selection_continuations_M_select": "Independent continuations used to estimate candidate value during selection.",
+      "heldout_continuations_M_eval": "Continuation IDs not used for selection or tuning; used only after candidate selection is fixed."
+    },
+    "requirements": [
+      "Do not use the same continuation outcomes for selection and held-out scoring.",
+      "Use common random numbers only under the event-scoped causal-coupling contract.",
+      "Retain negative CRN variance-reduction results when pairing increases variance.",
+      "Candidate and continuation costs must be measured separately; matrix-cell counts are not simulator rollout counts.",
+      "The #10735 finite reference selector is not a learned D3 result."
+    ]
+  }
+}
