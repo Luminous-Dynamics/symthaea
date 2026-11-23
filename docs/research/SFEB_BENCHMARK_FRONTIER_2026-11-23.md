@@ -160,6 +160,28 @@ Use task-block randomization, task-clustered bootstrap intervals, paired tests, 
 4. Finish #13228 signed execution statements and isolated Chromium, with #7435 enforced network egress as a prerequisite.
 5. Complete L2-005 on the same trust path, then run the 30-task pilot and matched study.
 
-## 6. Evidence boundary
+## 6. Monitoring and long-horizon agent research
+
+### SentinelBench — direct monitoring comparator
+
+SentinelBench provides 100 monitoring tasks across 10 synthetic web environments, including no-op tasks and passive/active, absolute/relative conditions. Its `wait_for` tool snapshots the page and checks for changes once per second; it is more efficient than repeated sleep-and-inspect loops but remains a polling baseline. Microsoft reports 69/100 tasks completed with `wait_for` versus 56/100 with `sleep`; for GPT-5.4 at the 10-minute horizon, median task cost was $0.23 versus $1.17. These are SentinelBench-specific figures, not SFEB scores. The opportunity is to compare a distinct event-wake + durable-cursor + source-of-record revalidation arm, while preserving the same model, task timeline, browser harness and cost accounting.
+
+Source: https://www.microsoft.com/en-us/research/articles/sentinelbench-a-benchmark-for-long-running-monitoring-agents/
+
+### Odysseys — efficiency under long horizons
+
+Odysseys contains 200 realistic multi-site web tasks, averaging 6.1 graded rubrics per task. Its paper reports a strongest success result of 44.5% and trajectory efficiency of 1.15% rubric score per step. This motivates partial-progress and trajectory-efficiency reporting rather than binary completion alone. It is an adjacent long-horizon comparator, not a dedicated monitoring score.
+
+Source: https://arxiv.org/abs/2604.24964
+
+### New paradigm: compile watches, not loops
+
+A long-running objective should compile to a durable watch contract containing predicate semantics (level vs edge), captured baseline, source-of-record identity, monotonic revision cursor, deadline/expiry, permissions, action target and idempotency key. A notification is only a wake hint. The agent resumes, fetches the latest source state, re-checks authorization, and then acts once or abstains. Waiting belongs to a scheduler, not repeated LLM/browser calls.
+
+SFEB-MON-001 now has a six-case synthetic fixture and eleven-rule policy. An independent in-memory V8 preflight passed 6/6 expected cases and 11/11 non-vacuous policy rules; it rejected forged-notification actions and action-target substitution, treated duplicate action replay idempotently, and reported one safe-but-late reconnect case separately as a liveness miss. The traces contain seven authoritative observations and zero explicit polls. This is not execution of the committed Node.js CLI, a browser runner, a production event bus, or a real scheduler; zero explicit polls in a virtual trace is not proof of zero CPU/network use.
+
+Further methodology and artifacts: `benchmarks/frontend/monitoring/README.md` and `docs/research/SFEB_MON001_EVENT_GATED_MONITORING_2026-11-23.md`.
+
+## 7. Evidence boundary
 
 The Nov 23 comparator refresh is a research snapshot. SFEB has not run the external benchmark suites, has no comparable SOTA score, and has not demonstrated superiority. INT-004's independent in-memory V8 reference check is not Rust execution, candidate-browser qualification or trusted verification. The branch still records `runnable_task_count=0`.
