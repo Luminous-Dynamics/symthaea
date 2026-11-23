@@ -116,6 +116,145 @@ fn digest_is_empty(digest: &[u8; 32]) -> bool {
     *digest == ZERO_DIGEST
 }
 
+const CLUSTER_ASSIGNMENT_MANIFEST_FORMAT: &str =
+    "VIS-DVPC-CLUSTER-ASSIGNMENTS-001-v1";
+
+fn digest_hex(bytes: &[u8; 32]) -> String {
+    let mut output = String::with_capacity(64);
+    for byte in bytes {
+        use std::fmt::Write as _;
+        let _ = write!(output, "{byte:02x}");
+    }
+    output
+}
+
+/// Canonical episode-to-cluster manifest bytes. Assignments are sorted by
+/// episode ID; field order, UTF-8 bytes, tabs and final newline are fixed.
+fn canonical_cluster_assignment_manifest(
+    assignments: &[ClusterAssignment],
+    metadata: &ClusterInferenceMetadata,
+) -> String {
+    let mut ordered = assignments.to_vec();
+    ordered.sort_by_key(|assignment| assignment.episode_id);
+
+    let mut output = String::new();
+    use std::fmt::Write as _;
+    writeln!(
+        output,
+        "MANIFEST\tformat\t{CLUSTER_ASSIGNMENT_MANIFEST_FORMAT}"
+    )
+    .expect("String writes are infallible");
+    writeln!(output, "META\texperiment_id\t{}", metadata.experiment_id)
+        .expect("String writes are infallible");
+    writeln!(output, "META\tdataset_id\t{}", metadata.dataset_id)
+        .expect("String writes are infallible");
+    writeln!(
+        output,
+        "META\tdataset_revision\t{}",
+        metadata.dataset_revision
+    )
+    .expect("String writes are infallible");
+    writeln!(output, "META\tsplit\t{}", metadata.split)
+        .expect("String writes are infallible");
+    writeln!(output, "META\tcluster_unit\t{}", metadata.cluster_unit)
+        .expect("String writes are infallible");
+    writeln!(
+        output,
+        "ASSIGNMENT_HEADER\tepisode_id\tcluster_id\tinitial_state_sha256"
+    )
+    .expect("String writes are infallible");
+    for assignment in ordered {
+        writeln!(
+            output,
+            "ASSIGNMENT\t{}\t{}\t{}",
+            assignment.episode_id,
+            assignment.cluster_id,
+            digest_hex(&assignment.initial_state_sha256)
+        )
+        .expect("String writes are infallible");
+    }
+    output
+}
+
+/// Dependency-free SHA-256 used only to verify the canonical assignment bytes.
+/// Standard test vectors below protect the implementation against drift.
+fn sha256_hex(input: &[u8]) -> String {
+    const K: [u32; 64] = [
+        0x428a_2f98, 0x7137_4491, 0xb5c0_fbcf, 0xe9b5_dba5, 0x3956_c25b, 0x59f1_11f1, 0x923f_82a4,
+        0xab1c_5ed5, 0xd807_aa98, 0x1283_5b01, 0x2431_85be, 0x550c_7dc3, 0x72be_5d74, 0x80de_b1fe,
+        0x9bdc_06a7, 0xc19b_f174, 0xe49b_69c1, 0xefbe_4786, 0x0fc1_9dc6, 0x240c_a1cc, 0x2de9_2c6f,
+        0x4a74_84aa, 0x5cb0_a9dc, 0x76f9_88da, 0x983e_5152, 0xa831_c66d, 0xb003_27c8, 0xbf59_7fc7,
+        0xc6e0_0bf3, 0xd5a7_9147, 0x06ca_6351, 0x1429_2967, 0x27b7_0a85, 0x2e1b_2138, 0x4d2c_6dfc,
+        0x5338_0d13, 0x650a_7354, 0x766a_0abb, 0x81c2_c92e, 0x9272_2c85, 0xa2bf_e8a1, 0xa81a_664b,
+        0xc24b_8b70, 0xc76c_51a3, 0xd192_e819, 0xd699_0624, 0xf40e_3585, 0x106a_a070, 0x19a4_c116,
+        0x1e37_6c08, 0x2748_774c, 0x34b0_bcb5, 0x391c_0cb3, 0x4ed8_aa4a, 0x5b9c_ca4f, 0x682e_6ff3,
+        0x748f_82ee, 0x78a5_636f, 0x84c8_7814, 0x8cc7_0208, 0x90be_fffa, 0xa450_6ceb, 0xbef9_a3f7,
+        0xc671_78f2,
+    ];
+    let mut state = [
+        0x6a09_e667_u32,
+        0xbb67_ae85,
+        0x3c6e_f372,
+        0xa54f_f53a,
+        0x510e_527f,
+        0x9b05_688c,
+        0x1f83_d9ab,
+        0x5be0_cd19,
+    ];
+    let bit_len = (input.len() as u64).wrapping_mul(8);
+    let mut message = input.to_vec();
+    message.push(0x80);
+    while message.len() % 64 != 56 {
+        message.push(0);
+    }
+    message.extend_from_slice(&bit_len.to_be_bytes());
+
+    for block in message.chunks_exact(64) {
+        let mut words = [0_u32; 64];
+        for (index, chunk) in block.chunks_exact(4).take(16).enumerate() {
+            words[index] = u32::from_be_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
+        }
+        for index in 16..64 {
+            let s0 = words[index - 15].rotate_right(7)
+                ^ words[index - 15].rotate_right(18)
+                ^ (words[index - 15] >> 3);
+            let s1 = words[index - 2].rotate_right(17)
+                ^ words[index - 2].rotate_right(19)
+                ^ (words[index - 2] >> 10);
+            words[index] = words[index - 16]
+                .wrapping_add(s0)
+                .wrapping_add(words[index - 7])
+                .wrapping_add(s1);
+        }
+
+        let [mut a, mut b, mut cc, mut d, mut e, mut f, mut g, mut h] = state;
+        for index in 0..64 {
+            let big1 = e.rotate_right(6) ^ e.rotate_right(11) ^ e.rotate_right(25);
+            let choose = (e & f) ^ ((!e) & g);
+            let temp1 = h
+                .wrapping_add(big1)
+                .wrapping_add(choose)
+                .wrapping_add(K[index])
+                .wrapping_add(words[index]);
+            let big0 = a.rotate_right(2) ^ a.rotate_right(13) ^ a.rotate_right(22);
+            let majority = (a & b) ^ (a & cc) ^ (b & cc);
+            let temp2 = big0.wrapping_add(majority);
+            h = g;
+            g = f;
+            f = e;
+            e = d.wrapping_add(temp1);
+            d = cc;
+            cc = b;
+            b = a;
+            a = temp1.wrapping_add(temp2);
+        }
+        for (slot, value) in state.iter_mut().zip([a, b, cc, d, e, f, g, h]) {
+            *slot = slot.wrapping_add(value);
+        }
+    }
+    state.iter().map(|word| format!("{word:08x}")).collect()
+}
+
 fn validate_metadata(
     metadata: &ClusterInferenceMetadata,
 ) -> Result<(String, String), ClusterAdapterError> {
@@ -343,6 +482,13 @@ pub fn export_cluster_deltas(
     }
     if assignment_by_episode.is_empty() {
         return Err(fail("frozen cluster-assignment manifest is empty"));
+    }
+    let canonical_manifest = canonical_cluster_assignment_manifest(assignments, metadata);
+    let computed_cluster_manifest = sha256_hex(canonical_manifest.as_bytes());
+    if computed_cluster_manifest != cluster_assignment_manifest {
+        return Err(fail(
+            "typed episode assignments do not match the frozen cluster-assignment manifest digest",
+        ));
     }
 
     let mut used_assignments = BTreeSet::new();
@@ -665,19 +811,43 @@ mod tests {
 
     fn metadata() -> ClusterInferenceMetadata {
         ClusterInferenceMetadata {
-            experiment_id: "compute-observation-v1".to_owned(),
-            dataset_id: "robo-dyna".to_owned(),
-            dataset_revision: "frozen-commit-a1b2c3d".to_owned(),
+            experiment_id: "compute-observation-cluster-adapter-v0.1".to_owned(),
+            dataset_id: "synthetic-paired-interaction-fixture".to_owned(),
+            dataset_revision: "synthetic-2026-11-23".to_owned(),
             split: "test".to_owned(),
             cluster_unit: "scene".to_owned(),
             primary_metric: "signed_decision_regret_effect_ppm".to_owned(),
             bundle_lock_sha256: "a".repeat(64),
             cluster_assignment_manifest_sha256:
-                "8257074ad9d509a144c807fe1eeca8c0f29fb9c5101589a3e220d207236d0aab".to_owned(),
+                "3446df932c4a91b37d3494a0912519e7df0922e949bd68289fd3ff7d359865d8".to_owned(),
             bootstrap_seed: 42,
             bootstrap_replicates: 10_000,
             familywise_confidence: 0.95,
         }
+    }
+
+    #[test]
+    fn sha256_matches_standard_empty_and_abc_vectors() {
+        assert_eq!(
+            sha256_hex(b""),
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
+        assert_eq!(
+            sha256_hex(b"abc"),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+    }
+
+    #[test]
+    fn typed_assignments_must_hash_to_the_frozen_manifest_digest() {
+        let mut altered = assignments();
+        altered[0].cluster_id = "scene-99".to_owned();
+        assert!(
+            export_cluster_deltas(&fixture(), &altered, &metadata())
+                .unwrap_err()
+                .to_string()
+                .contains("typed episode assignments do not match")
+        );
     }
 
     #[test]
