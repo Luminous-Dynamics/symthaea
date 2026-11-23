@@ -173,8 +173,22 @@ pub struct EvidenceLedger {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct EvidenceBound<T> {
-    pub value: T,
-    pub evidence_event_id: String,
+    value: T,
+    evidence_event_id: String,
+}
+
+impl<T> EvidenceBound<T> {
+    pub fn value(&self) -> &T {
+        &self.value
+    }
+
+    pub fn evidence_event_id(&self) -> &str {
+        &self.evidence_event_id
+    }
+
+    pub fn into_value(self) -> T {
+        self.value
+    }
 }
 
 impl EvidenceLedger {
@@ -317,6 +331,8 @@ impl EvidenceLedger {
                 || query.valid_at_millis < grant.valid_from_millis
                 || grant.valid_until_millis.is_some_and(|until| query.valid_at_millis >= until)
                 || !grant.rights.allowed_purposes.iter().any(|purpose| purpose == &query.purpose)
+                || grant.rights.retention_until_millis.is_some_and(|until| query.known_at_millis >= until)
+                || self.invalidating_event(grant, query).is_some()
             {
                 return reject(IneligibilityReason::ConsentOutOfScope, Some(grant_id));
             }
@@ -817,8 +833,8 @@ mod tests {
         let ledger = EvidenceLedger::new(vec![event]).unwrap();
         let query = query(20, 20);
         let bound = ledger.bind("deadline: Friday", "claim-1", &query).unwrap();
-        assert_eq!(bound.value, "deadline: Friday");
-        assert_eq!(bound.evidence_event_id, "claim-1");
+        assert_eq!(bound.value(), &"deadline: Friday");
+        assert_eq!(bound.evidence_event_id(), "claim-1");
 
         let mut wrong_purpose = query;
         wrong_purpose.purpose = "unrelated-purpose".to_string();
@@ -901,6 +917,36 @@ mod tests {
         assert_eq!(ledger.events(), before.as_slice());
         ledger.append(claim("claim-2", 2, 20, EvidenceEventKind::Assertion, Vec::new())).unwrap();
         assert_eq!(ledger.events().len(), 2);
+    }
+
+    #[test]
+    fn knowledge_time_must_not_move_backward_in_append_order() {
+        let first = claim("claim-1", 1, 20, EvidenceEventKind::Assertion, Vec::new());
+        let second = claim("claim-2", 2, 19, EvidenceEventKind::Assertion, Vec::new());
+        assert!(EvidenceLedger::new(vec![first, second]).is_err());
+    }
+
+    #[test]
+    fn erasing_a_consent_grant_invalidates_dependents() {
+        let grant = consent_grant();
+        let mut claim_event = claim("claim-1", 2, 20, EvidenceEventKind::Assertion, Vec::new());
+        claim_event.consent_id = Some("consent-alpha".to_string());
+        claim_event.rights.consent_required = true;
+        claim_event.rights.consent_grant_event_id = Some("consent-1".to_string());
+
+        let mut tombstone = claim("erase-consent", 3, 30, EvidenceEventKind::ErasureTombstone, vec!["consent-1"]);
+        tombstone.claim_key = None;
+        tombstone.source = None;
+        tombstone.payload_digest = None;
+        tombstone.observed_at_millis = None;
+        tombstone.consent_id = None;
+        tombstone.authority_scopes = vec!["memory-erasure".to_string()];
+
+        let ledger = EvidenceLedger::new(vec![grant, claim_event, tombstone]).unwrap();
+        assert_eq!(
+            ledger.evaluate("claim-1", &query(35, 30)).reason,
+            Some(IneligibilityReason::ConsentOutOfScope)
+        );
     }
 
     #[test]
