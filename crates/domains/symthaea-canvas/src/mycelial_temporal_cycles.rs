@@ -606,13 +606,13 @@ impl TemporalMycelialSequence {
                     snapshot.snapshot_id.clone(),
                 ));
             }
-            if let Some(end) = previous_end {
-                if snapshot.window_start_ns < end {
-                    return Err(MycelialTemporalCycleError::OverlappingWindows {
-                        previous: previous_snapshot.clone(),
-                        current: snapshot.snapshot_id.clone(),
-                    });
-                }
+            if let Some(end) = previous_end
+                && snapshot.window_start_ns < end
+            {
+                return Err(MycelialTemporalCycleError::OverlappingWindows {
+                    previous: previous_snapshot.clone(),
+                    current: snapshot.snapshot_id.clone(),
+                });
             }
             previous_end = Some(snapshot.window_end_ns);
             previous_snapshot.clone_from(&snapshot.snapshot_id);
