@@ -31,7 +31,13 @@ fn main() -> ExitCode {
         )).count()
     };
     println!("THEOREM_SANDWICH_RECEIPT_VALID task_id={}", receipt.candidate.task_id);
+    let control_passed = count_pass(&report.evaluator_control_obligations);
     println!("classification={}", report.classification.as_str());
+    println!(
+        "evaluator_controls_passed={} evaluator_controls_total={}",
+        control_passed,
+        report.evaluator_control_obligations.len()
+    );
     println!(
         "upper_passed={} upper_total={} lower_passed={} lower_total={}",
         count_pass(&report.upper_obligations),

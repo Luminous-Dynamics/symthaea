@@ -67,6 +67,8 @@ pub struct CorollaryObligationV1 {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ObligationDirection {
+    StrongerImpliesTarget,
+    TargetImpliesCorollary,
     StrongerImpliesCandidate,
     CandidateImpliesCorollary,
 }
@@ -97,6 +99,7 @@ pub enum SandwichClassification {
     CandidateMayBeTooWeak,
     IncomparableOrTranslationMismatch,
     Unknown,
+    InvalidEvaluatorControls,
 }
 
 impl SandwichClassification {
@@ -107,6 +110,7 @@ impl SandwichClassification {
             Self::CandidateMayBeTooWeak => "candidate_may_be_too_weak",
             Self::IncomparableOrTranslationMismatch => "incomparable_or_translation_mismatch",
             Self::Unknown => "unknown",
+            Self::InvalidEvaluatorControls => "invalid_evaluator_controls",
         }
     }
 }
@@ -114,6 +118,7 @@ impl SandwichClassification {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct TheoremSandwichReportV1 {
     pub task_id: String,
+    pub evaluator_control_obligations: Vec<ObligationResult>,
     pub upper_obligations: Vec<ObligationResult>,
     pub lower_obligations: Vec<ObligationResult>,
     pub classification: SandwichClassification,
@@ -300,6 +305,30 @@ pub fn evaluate_receipt(
         return Err(vec!["post-hoc theorem-sandwich evaluation requires evaluator_only data".to_owned()]);
     };
 
+    let mut evaluator_controls = Vec::new();
+    for item in &evaluator.stronger_obligations {
+        evaluator_controls.push(
+            evaluate_obligation(
+                &format!("CONTROL-{}", item.id),
+                ObligationDirection::StrongerImpliesTarget,
+                std::slice::from_ref(&item.stronger_formula),
+                &evaluator.target_statement_formula,
+            )
+            .map_err(|error| vec![format!("evaluator stronger control {}: {error}", item.id)])?,
+        );
+    }
+    for item in &evaluator.corollary_obligations {
+        evaluator_controls.push(
+            evaluate_obligation(
+                &format!("CONTROL-{}", item.id),
+                ObligationDirection::TargetImpliesCorollary,
+                std::slice::from_ref(&evaluator.target_statement_formula),
+                &item.corollary_formula,
+            )
+            .map_err(|error| vec![format!("evaluator corollary control {}: {error}", item.id)])?,
+        );
+    }
+
     let mut upper = Vec::new();
     for item in &evaluator.stronger_obligations {
         upper.push(evaluate_obligation(
@@ -320,7 +349,9 @@ pub fn evaluate_receipt(
         ).map_err(|error| vec![format!("lower obligation {}: {error}", item.id)])?);
     }
 
-    let classification = if any_unknown(&upper) || any_unknown(&lower) {
+    let classification = if any_fail(&evaluator_controls) {
+        SandwichClassification::InvalidEvaluatorControls
+    } else if any_unknown(&evaluator_controls) || any_unknown(&upper) || any_unknown(&lower) {
         SandwichClassification::Unknown
     } else {
         match (all_pass(&upper), all_pass(&lower), any_fail(&upper), any_fail(&lower)) {
@@ -333,6 +364,7 @@ pub fn evaluate_receipt(
 
     Ok(TheoremSandwichReportV1 {
         task_id: receipt.candidate.task_id.clone(),
+        evaluator_control_obligations: evaluator_controls,
         upper_obligations: upper,
         lower_obligations: lower,
         classification,
@@ -365,6 +397,43 @@ mod tests {
     }
     fn and(left: BooleanFormula, right: BooleanFormula) -> BooleanFormula {
         BooleanFormula::And { left: Box::new(left), right: Box::new(right) }
+    }
+
+
+    #[test]
+    fn hidden_stronger_control_must_imply_hidden_target() {
+        let mut receipt = fixture();
+        receipt.evaluator_only.as_mut().unwrap().stronger_obligations[0].stronger_formula =
+            atom("p");
+        let report = evaluate_receipt(&receipt).expect("syntactically valid receipt");
+        assert_eq!(
+            report.classification,
+            SandwichClassification::InvalidEvaluatorControls
+        );
+        assert!(any_fail(&report.evaluator_control_obligations));
+    }
+
+    #[test]
+    fn hidden_target_must_imply_each_selected_corollary() {
+        let mut receipt = fixture();
+        receipt.evaluator_only.as_mut().unwrap().corollary_obligations[0].corollary_formula =
+            atom("q");
+        let report = evaluate_receipt(&receipt).expect("syntactically valid receipt");
+        assert_eq!(
+            report.classification,
+            SandwichClassification::InvalidEvaluatorControls
+        );
+        assert!(any_fail(&report.evaluator_control_obligations));
+    }
+
+    #[test]
+    fn valid_hidden_controls_are_checked_before_candidate_classification() {
+        let report = evaluate_receipt(&fixture()).expect("valid synthetic receipt");
+        assert!(all_pass(&report.evaluator_control_obligations));
+        assert_eq!(
+            report.classification,
+            SandwichClassification::ConsistentWithSelectedControls
+        );
     }
 
     #[test]

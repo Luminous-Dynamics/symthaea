@@ -6,14 +6,15 @@
 
 The candidate partition contains source/task identity, model identity, visible assumptions, and the formal statement the candidate proposes. The evaluator-only partition contains a hidden target statement, stronger obligations and required corollaries. The evaluator-only partition is post-hoc only; the model receives candidate_view and never receives hidden gold or witnesses.
 
-For each stronger obligation S_i, the evaluator checks S_i implies candidate_statement. This is an upper-side guard against candidates that are stronger than the selected hidden controls support. For each corollary C_j, it checks candidate_statement implies C_j. This is a lower-side guard against candidates that are too weak to imply required consequences.
+Before classifying a candidate, the evaluator checks the integrity of its hidden controls: each stronger obligation S_i must imply the hidden target P, and P must imply each selected corollary C_j. A false hidden bracket is classified as invalid_evaluator_controls; an atom-budget overflow remains unknown. Only after these controls pass does the evaluator test S_i implies candidate_statement and candidate_statement implies C_j.
 
-Classification:
+Classification (after hidden-control validation):
 - consistent_with_selected_controls: every finite upper and lower obligation passes.
 - candidate_may_be_too_strong: an upper obligation fails while lower controls pass.
 - candidate_may_be_too_weak: upper controls pass while a lower corollary fails.
 - incomparable_or_translation_mismatch: both sides fail.
 - unknown: a finite truth-table atom budget is exceeded.
+- invalid_evaluator_controls: the hidden stronger/corollary obligations do not actually bracket their hidden target.
 
 These labels are diagnostic classes over selected obligations, not proof of complete equivalence. A candidate that passes is only consistent with this finite control set; expert semantic review and Lean kernel replay remain separate authorities.
 
