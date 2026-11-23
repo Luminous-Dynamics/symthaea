@@ -84,7 +84,7 @@ pub struct PitchTrackScoreConfigV1 {
 impl Default for PitchTrackScoreConfigV1 {
     fn default() -> Self {
         Self {
-            timestamp_tolerance_ns: 5_000_000,
+            timestamp_tolerance_ns: 2_500_000,
             gross_pitch_error_ratio: DEFAULT_GROSS_PITCH_ERROR_RATIO,
             octave_ratio_tolerance: DEFAULT_OCTAVE_RATIO_TOLERANCE,
         }
@@ -209,11 +209,7 @@ pub fn score_pitch_tracks(
 
     let mut ref_index = 0usize;
     let mut est_index = 0usize;
-    let mut squared_hz_error = 0.0_f64;
-    let mut signed_cents_error = Vec::new();
-    let mut absolute_cents_error = Vec::new();
-    let mut gross_pitch_errors = 0u64;
-    let mut octave_errors = 0u64;
+    let mut f0_errors = F0ErrorAccumulator::default();
 
     while ref_index < reference.frames.len() && est_index < estimated.frames.len() {
         let ref_frame = reference.frames[ref_index];
@@ -224,17 +220,7 @@ pub fn score_pitch_tracks(
 
         if timestamp_delta <= config.timestamp_tolerance_ns {
             metrics.aligned_frame_count += 1;
-            score_aligned_frame(
-                ref_frame,
-                est_frame,
-                config,
-                &mut metrics,
-                &mut squared_hz_error,
-                &mut signed_cents_error,
-                &mut absolute_cents_error,
-                &mut gross_pitch_errors,
-                &mut octave_errors,
-            );
+            score_aligned_frame(ref_frame, est_frame, config, &mut metrics, &mut f0_errors);
             ref_index += 1;
             est_index += 1;
         } else if est_frame.source_timestamp_ns < ref_frame.source_timestamp_ns {
@@ -292,15 +278,25 @@ pub fn score_pitch_tracks(
 
     if metrics.jointly_voiced_frame_count > 0 {
         let count = metrics.jointly_voiced_frame_count as f64;
-        metrics.f0_rmse_hz = Some((squared_hz_error / count).sqrt());
-        metrics.median_absolute_f0_error_cents = Some(median(&mut absolute_cents_error));
+        metrics.f0_rmse_hz = Some((f0_errors.squared_hz_error / count).sqrt());
+        metrics.median_absolute_f0_error_cents =
+            Some(median(&mut f0_errors.absolute_cents_error));
         metrics.mean_signed_f0_error_cents =
-            Some(signed_cents_error.iter().sum::<f64>() / count);
-        metrics.gross_pitch_error_rate = Some(gross_pitch_errors as f64 / count);
-        metrics.octave_error_rate = Some(octave_errors as f64 / count);
+            Some(f0_errors.signed_cents_error.iter().sum::<f64>() / count);
+        metrics.gross_pitch_error_rate = Some(f0_errors.gross_pitch_errors as f64 / count);
+        metrics.octave_error_rate = Some(f0_errors.octave_errors as f64 / count);
     }
 
     Ok(metrics)
+}
+
+#[derive(Default)]
+struct F0ErrorAccumulator {
+    squared_hz_error: f64,
+    signed_cents_error: Vec<f64>,
+    absolute_cents_error: Vec<f64>,
+    gross_pitch_errors: u64,
+    octave_errors: u64,
 }
 
 fn score_aligned_frame(
@@ -308,30 +304,27 @@ fn score_aligned_frame(
     estimated: PitchTrackFrameV1,
     config: PitchTrackScoreConfigV1,
     metrics: &mut PitchTrackMetricsV1,
-    squared_hz_error: &mut f64,
-    signed_cents_error: &mut Vec<f64>,
-    absolute_cents_error: &mut Vec<f64>,
-    gross_pitch_errors: &mut u64,
-    octave_errors: &mut u64,
+    errors: &mut F0ErrorAccumulator,
 ) {
     match (reference.f0_hz, estimated.f0_hz) {
         (Some(reference_f0), Some(estimated_f0)) => {
             metrics.voiced_true_positive += 1;
             metrics.jointly_voiced_frame_count += 1;
             let hz_error = estimated_f0 - reference_f0;
-            *squared_hz_error += hz_error * hz_error;
-            let cents_error = 1200.0 * (estimated_f0 / reference_f0).log2();
-            signed_cents_error.push(cents_error);
-            absolute_cents_error.push(cents_error.abs());
+            errors.squared_hz_error += hz_error * hz_error;
+            let cents_error =
+                1200.0 * (estimated_f0.ln() - reference_f0.ln()) / std::f64::consts::LN_2;
+            errors.signed_cents_error.push(cents_error);
+            errors.absolute_cents_error.push(cents_error.abs());
             let relative_error = (estimated_f0 / reference_f0 - 1.0).abs();
             if relative_error > config.gross_pitch_error_ratio {
-                *gross_pitch_errors += 1;
+                errors.gross_pitch_errors += 1;
             }
             let ratio = estimated_f0 / reference_f0;
             let octave_error = (ratio / 2.0 - 1.0).abs() <= config.octave_ratio_tolerance
                 || (ratio / 0.5 - 1.0).abs() <= config.octave_ratio_tolerance;
             if octave_error {
-                *octave_errors += 1;
+                errors.octave_errors += 1;
             }
         }
         (Some(_), None) => metrics.voiced_false_negative += 1,
