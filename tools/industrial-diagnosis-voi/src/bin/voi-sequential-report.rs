@@ -4,7 +4,7 @@
 use industrial_diagnosis_voi::evaluate_case;
 use industrial_diagnosis_voi::reference_case;
 use industrial_diagnosis_voi::reference_measurements;
-use industrial_diagnosis_voi::sequential::{evaluate_depth_two, MeasurementOutcome};
+use industrial_diagnosis_voi::sequential::{MeasurementOutcome, evaluate_depth_two};
 
 fn fmt(value: f64) -> String {
     format!("{value:.6}")
@@ -19,10 +19,12 @@ fn main() {
     let measurements = reference_measurements();
     let result = evaluate_depth_two(&case, &measurements, 4.0)
         .expect("frozen sequential diagnosis case must be valid");
-    let one_step = evaluate_case(&case, &measurements)
-        .expect("frozen one-step comparison must be valid");
+    let one_step =
+        evaluate_case(&case, &measurements).expect("frozen one-step comparison must be valid");
 
-    println!("record_type\tcase_id\tpolicy_or_first\tfirst_outcome\tsecond_measurement\tstop_decision\texpected_terminal_loss\tmeasurement_cost_or_expected_cost\texpected_total_loss_or_branch_total\tworst_case_leaf_total_loss\timprovement_vs_no_test\tworst_case_regret_vs_no_test\tsecond_positive_probability\tsecond_negative_probability\tsecond_positive_leaf_loss\tsecond_negative_leaf_loss\tfirst_outcome_probability");
+    println!(
+        "record_type\tcase_id\tpolicy_or_first\tfirst_outcome\tsecond_measurement\tstop_decision\texpected_terminal_loss\tmeasurement_cost_or_expected_cost\texpected_total_loss_or_branch_total\tworst_case_leaf_total_loss\timprovement_vs_no_test\tworst_case_regret_vs_no_test\tsecond_positive_probability\tsecond_negative_probability\tsecond_positive_leaf_loss\tsecond_negative_leaf_loss\tfirst_outcome_probability"
+    );
     println!(
         "BASELINE\t{}\tNO_TEST\t-\t-\t{}\t{}\t0.000000\t{}\t{}\t0.000000\t0.000000\t-\t-\t-\t-\t1.000000",
         case.case_id,
@@ -38,7 +40,9 @@ fn main() {
             .iter()
             .find(|item| item.measurement_id == measurement_id)
             .expect("selected greedy measurement must have an evaluation");
-        let cost = evaluation.measurement_cost.expect("eligible measurement has a cost");
+        let cost = evaluation
+            .measurement_cost
+            .expect("eligible measurement has a cost");
         let positive_leaf = evaluation
             .positive_decision
             .as_ref()
