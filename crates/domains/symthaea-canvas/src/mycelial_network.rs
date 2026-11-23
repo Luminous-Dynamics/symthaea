@@ -733,7 +733,7 @@ mod tests {
     use crate::mycelial_model::{
         MycelialFilament, OrbitalCell, PresenceMode, build_mycelial_model,
     };
-    use crate::{COGNITIVE_TOPOLOGY_SCHEMA_VERSION, CognitiveTopology};
+    use crate::CognitiveTopology;
 
     fn filament(
         id: u32,
