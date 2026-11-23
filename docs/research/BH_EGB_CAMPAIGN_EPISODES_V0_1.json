@@ -227,6 +227,16 @@
           "path": "docs/research/BH_EGB_COVARIANCE_REDUNDANCY_CONTROL_V0_1.json",
           "git_blob_sha1": "8f9ed0654b88376deeee2c7d466682dc37dbc8fd",
           "use": "exact synthetic covariance and redundant-observable regression fixture"
+        },
+        {
+          "path": "docs/research/verify_bh_egb_covariance_fixture.py",
+          "git_blob_sha1": "8e3fd3ced8efb605385e292cd0281f4e3c0a7255",
+          "use": "exact rational covariance, pseudoinverse, basis and unit metamorphic verifier"
+        },
+        {
+          "path": "docs/research/BH_EGB_COVARIANCE_VERIFICATION_RECEIPT_V0_1.json",
+          "git_blob_sha1": "d0f1a7e154cb927c15d0def3cf44f35dd161f970",
+          "use": "exact replay receipt for covariance and metamorphic controls"
         }
       ]
     },
@@ -249,6 +259,28 @@
           "path": "docs/research/BH_EGB_DECISION_VALUE_VERIFICATION_RECEIPT_V0_1.json",
           "git_blob_sha1": "23165b2f5093b9a0015f5f4f09541615b00b70b4",
           "use": "replay receipt for decision-value versus information-gain control"
+        }
+      ]
+    },
+    {
+      "role": "symthaea_open_world_model_adequacy_synthetic_control",
+      "repository": "Luminous-Dynamics/symthaea",
+      "ref": "research/bh-egb-symthaea-campaign-2026-11-23",
+      "files": [
+        {
+          "path": "docs/research/BH_EGB_OPEN_WORLD_MODEL_ADEQUACY_CONTROL_V0_1.json",
+          "git_blob_sha1": "a19cc81b48910fbb90ce3a766bd1b820786a5c47",
+          "use": "exact open-world model-adequacy known-answer fixture"
+        },
+        {
+          "path": "docs/research/verify_bh_egb_open_world_model_adequacy.py",
+          "git_blob_sha1": "23c43cf03903446d9721b5d6981fbcdf1df43956",
+          "use": "exact-rational held-out model-family adequacy verifier"
+        },
+        {
+          "path": "docs/research/BH_EGB_OPEN_WORLD_MODEL_ADEQUACY_RECEIPT_V0_1.json",
+          "git_blob_sha1": "cfaabadb6ac1a590770addcf6c7751cb1601351f",
+          "use": "replay receipt for open-world adequacy regression"
         }
       ]
     }
