@@ -600,17 +600,41 @@ fn run_stream() -> Result<(), String> {
         .map_err(|error| format!("flush stream readiness: {error}"))?;
 
     loop {
-        let mut line = Vec::new();
-        let read = reader
-            .read_until(b'\n', &mut line)
-            .map_err(|error| format!("read candidate request line: {error}"))?;
-        if read == 0 {
+        let mut line = Vec::with_capacity(4096);
+        let mut terminated = false;
+        let mut reached_eof = false;
+        loop {
+            let available = match reader
+                .fill_buf()
+                .map_err(|error| format!("read candidate request line: {error}"))?
+            {
+                [] => {
+                    reached_eof = true;
+                    break;
+                }
+                available => available,
+            };
+            let newline = available.iter().position(|byte| *byte == b'\n');
+            let take = newline.unwrap_or(available.len());
+            if line.len().saturating_add(take) > MAX_REQUEST_BYTES {
+                return Err(format!("request line exceeds {MAX_REQUEST_BYTES} bytes"));
+            }
+            line.extend_from_slice(&available[..take]);
+            let consumed = take + usize::from(newline.is_some());
+            reader.consume(consumed);
+            if newline.is_some() {
+                terminated = true;
+                break;
+            }
+        }
+
+        if line.is_empty() && reached_eof {
             break;
         }
-        if line.len() > MAX_REQUEST_BYTES + 1 {
-            return Err(format!("request line exceeds {MAX_REQUEST_BYTES} bytes"));
+        if !terminated {
+            return Err("candidate request ended without a newline delimiter".to_string());
         }
-        while line.last().is_some_and(|byte| *byte == b'\n' || *byte == b'\r') {
+        if line.last() == Some(&b'\r') {
             line.pop();
         }
         if line.is_empty() {
