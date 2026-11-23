@@ -718,8 +718,7 @@ mod tests {
 
     #[test]
     fn positivity_failure_blocks_an_otherwise_cheap_candidate() {
-        let mut candidate =
-            action(KineticAction::VelocityFourierSponge, 0.001, 0.001, 0.1, 10);
+        let mut candidate = action(KineticAction::VelocityFourierSponge, 0.001, 0.001, 0.1, 10);
         candidate.positivity_preserved = false;
         let decision = ActionDecision::select(&[candidate], constraints()).unwrap();
         assert_eq!(decision.recommended_index, None);
