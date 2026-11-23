@@ -43,7 +43,9 @@ jobs:
           components: rustfmt, clippy
 
       - name: Check formatting without workspace discovery
-        run: rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/lib.rs
+        run: |
+          rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/lib.rs
+          rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/bin/kird_point_audit.rs
 
       - name: Prepare isolated crate validation workspace
         shell: bash
