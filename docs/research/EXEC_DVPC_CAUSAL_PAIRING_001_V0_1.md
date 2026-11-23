@@ -128,6 +128,36 @@ Report separately:
 
 A passing Rust validator establishes only finite structural pairing and receipt consistency over supplied commitments. It does not validate the physics, prove that a stochastic schedule is complete, identify unsupported counterfactuals from logged data, demonstrate a better policy, establish physical safety, or show a SOTA improvement. Those require independently replayed driver traces and held-out benchmark results.
 
+## 8. Competitive baseline crosswalk and experiment order
+
+The closest public results measure different parts of the problem. They should be treated as distinct baselines, not collapsed into one leaderboard score.
+
+| Prior work / benchmark | What it already establishes | Symthaea comparison that remains open |
+|---|---|---|
+| DEEP, *The Decision Value of Perception Compute* (2026-09-28) | Perception escalation can worsen downstream decisions; perception-quality gains need not produce decision-value gains. | Reproduce the official perception-cost / downstream-loss comparison, then add paired observation-only, compute-only and joint arms with application-time regret. |
+| Online policy-wise state abstraction (IEEE TNNLS, 2026-09-30) | Online task-relevant abstraction with parallel learners and free-energy-guided selection is prior art. | Test temporal decision sufficiency of compressed recurrent state across future observations and regimes; measure actual memory traffic and future regret, not just abstraction quality. |
+| *How Can Driving World Models Do Counterfactual Prediction?* (2026-08-12) | Direct action-conditioned prediction can miss factual continuation evidence; the paper formalizes abduction–action–prediction in a short-horizon setup where other agents are not action-coupled. | Require arm-local action-coupled trajectories when the environment responds to actions, and separately audit factual evidence transfer and counterfactual replay. |
+| TempoWAM (2026-08-10) | Progress-monitored adaptive action-chunk execution is prior art; its paper reports 26.9% fewer WAM inferences on easy real-world tasks while maintaining success and a 13.3-point success increase on difficult real-world tasks. | Include fixed-horizon, progress-triggered and TempoWAM-style execution baselines. Symthaea must show added value from joint observation/compute/verification and temporal evidence, not merely replan timing. |
+| RoboDyna (NeurIPS 2026 Workshop; arXiv 2026-11-20) | 30 physically grounded dynamic tasks, synchronous/asynchronous paired execution, task success and progress. Official results report π0.5 18%, X-VLA 11%, and FastWAM 6% overall success; sync-to-async execution flips 5–12% of episode outcomes while average success changes by at most 3 percentage points. | Reproduce the exact checkpoints, seeds, task splits and sync/async protocol first. Then add Symthaea as a separately labelled decision layer and report per-seed flips, progress and application-time regret. |
+| RoboRecover (2026-09-24) | Initial-state policy performance does not determine recovery after execution-induced deviations; its dataset contains 2,000 scenarios across RoboTwin and LIBERO. | Add a recovery arm after controlled deviations. Measure recovery success, time-to-recovery, extra actions, damage/regret and tail failures at matched deviation states. |
+
+### Recommended campaign
+
+1. **Reproduction before augmentation.** Reproduce DEEP on its official KITTI, nuScenes and open-loop nuPlan settings; separately reproduce RoboDyna's π0.5, X-VLA and FastWAM results. Freeze checkpoints, versions, seeds, task splits, clock mode and resource ceilings.
+2. **Decision-layer isolation.** Keep each foundation policy frozen. Compare the base policy, fixed-budget escalation, random allocation, confidence/entropy routing, DEEP-style decision-value routing, TempoWAM-style progress routing, and Symthaea. This isolates the value of the decision layer from model-scale or task-specific fine-tuning effects.
+3. **Factorial attribution.** Use #13281 for compute×observation regret; use #13176 for its existing resource/exposure decomposition; use #8578 for independent-cluster uncertainty. Add memory and verification only through their existing owners after the four-arm campaign is stable.
+4. **Closed-loop branch correctness.** On action-coupled tasks, the four arms share the initial state and indexed exogenous forcing, not a forced common future state trajectory. Use arm-local execution, action-conditioned actor response and independent replay. Keep open-loop DEEP results separate from closed-loop RoboDyna/RoboRecover results.
+5. **Recovery and temporal integrity.** After baseline reproduction, inject controlled execution deviations and evaluate recovery. Separately compare full state, identity, PCA, random projection, quantization and decision-aware recurrent-state compression across future decision epochs.
+
+### Pre-registered success criteria
+
+- **Decision-value track:** retain the existing #8572 targets: at least 5% relative downstream-loss reduction with a 95% interval excluding zero, harmful-escalation upper confidence bound no greater than 5%, and zero hard budget violations. Treat the existing 20% lower measured resource-cost objective at a fixed non-inferior regret margin as a target, not an observed result.
+- **Embodied track:** first reproduce official baseline intervals. Then require a positive held-out decision-regret or progress improvement over the strongest matched baseline, with independent-cluster uncertainty excluding zero; also reduce sync-to-async success-to-failure flips without increasing hard safety/budget failures.
+- **Recovery track:** improve recovery completion and time-to-recovery over matched deviation-state baselines, and report the worst task families and tail outcomes rather than only the mean.
+- **Compression track:** zero false preservation certificates on exhaustive finite controls, one held-out workload with measured memory reduction and non-inferior future decision regret, and one negative control where lossy compression is rejected.
+
+Do not use a composite score to hide trade-offs. Report decision regret, success, progress, recovery, first-divergence time, p50/p95/p99 latency, measured energy, memory footprint, sensor cost, and hard-budget violations as separate dimensions. Five clusters are only the mechanics floor in the current analyzer; a real campaign needs a preregistered power/MDE analysis and enough independently sampled scenes or sessions.
+
 ## References
 
 - [Symthaea #13375](https://github.com/Luminous-Dynamics/symthaea/issues/13375)
@@ -137,3 +167,8 @@ A passing Rust validator establishes only finite structural pairing and receipt 
 - [Symthaea PR #13282](https://github.com/Luminous-Dynamics/symthaea/pull/13282)
 - [RoboDyna](https://robodyna.github.io/robodyna/)
 - [DEEP](https://arxiv.org/abs/2609.35910)
+- [How Can Driving World Models Do Counterfactual Prediction?](https://arxiv.org/abs/2608.11601)
+- [TempoWAM: Rethink Before You Execute](https://arxiv.org/abs/2608.09492)
+- [RoboRecover](https://arxiv.org/abs/2609.28952)
+- [RoboDyna paper](https://arxiv.org/abs/2611.26969)
+- [Online Policy-Wise State Abstraction for Reinforcement Learning Agents Leveraging Free Energy](https://pubmed.ncbi.nlm.nih.gov/?term=Online+Policy-Wise+State+Abstraction+for+Reinforcement+Learning+Agents+Leveraging+Free+Energy)
