@@ -3,6 +3,7 @@
 // Reads only frozen fixtures, never candidate UI claims.
 import fs from 'node:fs';
 import crypto from 'node:crypto';
+const MAX_SAFE_INTEGER=Number.MAX_SAFE_INTEGER,MAX_REORDER_WINDOW=1024,MAX_BUFFERED_EVENTS=1024;
 const fixturePath = process.argv[2] ?? 'benchmarks/frontend/long-horizon/event-reconciliation-v1.json';
 const fixtureBytes = fs.readFileSync(fixturePath);
 const fixture = JSON.parse(fixtureBytes.toString('utf8'));
@@ -40,9 +41,25 @@ function cloneState(s){
  return {jobs:new Map([...s.jobs].map(([k,v])=>[k,clone(v)])),permissions:new Map([...s.permissions].map(([k,v])=>[k,new Set(v)])),conflicts:new Map(s.conflicts),pending:new Map([...s.pending].map(([k,v])=>[k,clone(v)])),actionResults:new Map([...s.actionResults].map(([k,v])=>[k,clone(v)])),seenById:new Map([...s.seenById].map(([k,v])=>[k,clone(v)])),sequenceOwner:new Map(s.sequenceOwner),buffered:new Map([...s.buffered].map(([k,v])=>[k,clone(v)])),lastSequence:s.lastSequence,audit:[...s.audit],duplicateDeliveries:s.duplicateDeliveries};
 }
 function deliver(s,e){const draft=cloneState(s);deliverInto(draft,e);Object.assign(s,draft);}
+function validateEventShape(e){
+ const kind=e?.type;
+ const fields={job_transition:['type','event_id','sequence','job_id','expected_version','next_version','from_status','to_status','actor_id','capability','action_id'],owner_changed:['type','event_id','sequence','job_id','expected_version','next_version','from_owner','to_owner','actor_id','capability'],permission_revoked:['type','event_id','sequence','actor_id','capability'],clarification_required:['type','event_id','sequence','job_id','conflict_id'],clarification_resolved:['type','event_id','sequence','job_id','conflict_id','resolution']}[kind];
+ if(!fields)throw new Error(`unsupported event type: ${kind}`);
+ if(!e||typeof e!=='object'||Array.isArray(e))throw new Error('event must be a JSON object');
+ for(const key of Object.keys(e))if(!fields.includes(key))throw new Error(`unknown event field: ${key}`);
+ for(const key of fields)if(!Object.hasOwn(e,key))throw new Error(`missing event field: ${key}`);
+ if(typeof e.event_id!=='string'||!e.event_id||e.event_id.length>128||!/^[A-Za-z0-9._-]+$/.test(e.event_id))throw new Error('invalid event identity');
+ if(!Number.isSafeInteger(e.sequence)||e.sequence<=0)throw new Error('event sequence is outside the safe positive-integer range');
+ for(const key of ['expected_version','next_version'])if(Object.hasOwn(e,key)&&(!Number.isSafeInteger(e[key])||e[key]<=0))throw new Error(`${key} is outside the safe positive-integer range`);
+ for(const key of ['job_id','actor_id','capability','from_status','to_status','from_owner','to_owner','conflict_id','resolution'])if(Object.hasOwn(e,key)&&(typeof e[key]!=='string'||!e[key]||e[key].length>128))throw new Error(`invalid event string field: ${key}`);
+ if(Object.hasOwn(e,'action_id')&&e.action_id!==null&&(typeof e.action_id!=='string'||!e.action_id||e.action_id.length>128||!/^[A-Za-z0-9._-]+$/.test(e.action_id)))throw new Error('invalid action_id');
+}
 function deliverInto(s,e){
  const prior=s.seenById.get(e.event_id);if(prior){if(JSON.stringify(prior)!==JSON.stringify(e))throw new Error(`event identity reused with different payload: ${e.event_id}`);s.duplicateDeliveries++;return;}
- if(!Number.isSafeInteger(e.sequence)||e.sequence<=s.lastSequence)throw new Error(`invalid or replayed sequence ${e.sequence}`);
+ validateEventShape(e);
+ if(e.sequence<=s.lastSequence)throw new Error(`invalid or replayed sequence ${e.sequence}`);
+ if(e.sequence>s.lastSequence+MAX_REORDER_WINDOW)throw new Error(`event sequence exceeds bounded reorder window: ${e.sequence}`);
+ if(s.buffered.size>=MAX_BUFFERED_EVENTS)throw new Error('event reorder buffer is full');
  const owner=s.sequenceOwner.get(e.sequence);if(owner)throw new Error(`sequence ${e.sequence} already owned by ${owner}`);
  s.seenById.set(e.event_id,clone(e));s.sequenceOwner.set(e.sequence,e.event_id);s.buffered.set(e.sequence,e);
  while(s.buffered.has(s.lastSequence+1)){const next=s.buffered.get(s.lastSequence+1);applyEvent(s,next);s.buffered.delete(next.sequence);s.lastSequence=next.sequence;s.audit.push(next.event_id);}
@@ -65,5 +82,5 @@ function runCase(c){const s=newState(fixture.initial_state);for(const step of c.
 const results=new Map(fixture.cases.map(c=>[c.case_id,runCase(c)]));
 for(const r of fixture.metamorphic_pairs){if(!results.has(r.left_case)||!results.has(r.right_case))throw new Error(`${r.relation_id}: case missing`);if(JSON.stringify(results.get(r.left_case))!==JSON.stringify(results.get(r.right_case)))throw new Error(`${r.relation_id}: outputs differ`);}
 function mustReject(control,fn){try{fn();}catch(error){if(String(error.message).includes(control.expected_error_fragment))return;throw new Error(`${control.control_id}: unexpected rejection: ${error.message}`);}throw new Error(`${control.control_id}: adversarial mutation was accepted`);}
-for(const c of fixture.negative_controls){const s=newState(fixture.initial_state),e=eventById.get(c.event_id);if(!e)throw new Error(`${c.control_id}: event missing`);if(c.operation==='alter_duplicate_payload'){deliver(s,e);mustReject(c,()=>deliver(s,{...e,...c.patch}));}else if(c.operation==='reuse_sequence_with_new_id'){deliver(s,e);mustReject(c,()=>deliver(s,{...e,event_id:c.alternate_event_id}));}else if(c.operation==='replace_actor'){deliver(s,eventById.get('evt-001'));deliver(s,eventById.get('evt-002'));mustReject(c,()=>deliver(s,{...e,actor_id:c.actor_id}));}else if(c.operation==='invalid_event_is_rolled_back_atomically'){mustReject(c,()=>deliver(s,{...e,to_status:c.to_status}));deliver(s,e);if(s.lastSequence!==e.sequence||s.audit.at(-1)!==e.event_id)throw new Error(`${c.control_id}: valid retry did not apply after rejection`);}else throw new Error(`${c.control_id}: unsupported control`);}
+for(const c of fixture.negative_controls){const s=newState(fixture.initial_state),e=eventById.get(c.event_id);if(!e)throw new Error(`${c.control_id}: event missing`);if(c.operation==='alter_duplicate_payload'){deliver(s,e);mustReject(c,()=>deliver(s,{...e,...c.patch}));}else if(c.operation==='reuse_sequence_with_new_id'){deliver(s,e);mustReject(c,()=>deliver(s,{...e,event_id:c.alternate_event_id}));}else if(c.operation==='replace_actor'){deliver(s,eventById.get('evt-001'));deliver(s,eventById.get('evt-002'));mustReject(c,()=>deliver(s,{...e,actor_id:c.actor_id}));}else if(c.operation==='invalid_event_is_rolled_back_atomically'){mustReject(c,()=>deliver(s,{...e,to_status:c.to_status}));deliver(s,e);if(s.lastSequence!==e.sequence||s.audit.at(-1)!==e.event_id)throw new Error(`${c.control_id}: valid retry did not apply after rejection`);}else if(c.operation==='excessive_reorder_window'){mustReject(c,()=>deliver(s,{...e,sequence:c.sequence}));if(s.seenById.has(e.event_id)||s.sequenceOwner.size!==0||s.buffered.size!==0)throw new Error(`${c.control_id}: rejected event mutated stream state`);deliver(s,e);}else if(c.operation==='unknown_event_field'){mustReject(c,()=>deliver(s,{...e,[c.field]:c.value}));}else throw new Error(`${c.control_id}: unsupported control`);}
 console.log(JSON.stringify({schema:'sfeb-event-reconciliation-preflight-v1',fixture_id:fixture.fixture_id,fixture_sha256:crypto.createHash('sha256').update(fixtureBytes).digest('hex'),golden_cases:fixture.cases.length,golden_cases_passed:results.size,metamorphic_relations:fixture.metamorphic_pairs.length,metamorphic_relations_passed:fixture.metamorphic_pairs.length,negative_controls:fixture.negative_controls.length,negative_controls_rejected:fixture.negative_controls.length,total_event_deliveries:fixture.cases.reduce((n,c)=>n+c.steps.filter(s=>s.op==='deliver').length,0),status:'reference_model_passed',limitations:['JavaScript reference only; Rust compilation/execution pending.','No Leptos candidate, DOM/browser, keyboard journey, accessibility or isolated network result.','Deterministic schedule is a synthetic benchmark fixture, not a production event service.','Public pilot fixture; not a hidden holdout.']},null,2));
