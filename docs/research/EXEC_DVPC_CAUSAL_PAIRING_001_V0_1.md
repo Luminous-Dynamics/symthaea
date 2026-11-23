@@ -276,9 +276,53 @@ The closest public results measure different parts of the problem. They should b
 | Online policy-wise state abstraction (IEEE TNNLS, 2026-09-30) | Online task-relevant abstraction with parallel learners and free-energy-guided selection is prior art. | Test temporal decision sufficiency of compressed recurrent state across future observations and regimes; measure actual memory traffic and future regret, not just abstraction quality. |
 | *How Can Driving World Models Do Counterfactual Prediction?* (2026-08-12) | Direct action-conditioned prediction can miss factual continuation evidence; the paper formalizes abduction–action–prediction in a short-horizon setup where other agents are not action-coupled. | Require arm-local action-coupled trajectories when the environment responds to actions, and separately audit factual evidence transfer and counterfactual replay. |
 | TempoWAM (2026-08-10) | Progress-monitored adaptive action-chunk execution is prior art; its paper reports 26.9% fewer WAM inferences on easy real-world tasks while maintaining success and a 13.3-point success increase on difficult real-world tasks. | Include fixed-horizon, progress-triggered and TempoWAM-style execution baselines. Symthaea must show added value from joint observation/compute/verification and temporal evidence, not merely replan timing. |
+| The Planning Limits of Latent World Models (2026-09-30) | Defines a task- and rollout-specific plannable range. With five-step imagined rollouts, the paper finds reliable expert-action ranking at target lookaheads of about 5–10 steps; increasing predictor capacity 81× does not extend that range, while longer imagined rollouts do. Nearby expert subgoals and VLA-proposed candidate selection improve closed-loop control in its setup. | Symthaea must measure when its predictive model can rank actions reliably, distinguish rollout depth from target distance and action commitment, and decide when to use subgoals, feedback, observation refresh or a direct-policy fallback. |
 | RoboDyna (NeurIPS 2026 Workshop; arXiv 2026-11-20) | 30 physically grounded dynamic tasks, synchronous/asynchronous paired execution, task success and progress. Official results report π0.5 18%, X-VLA 11%, and FastWAM 6% overall success; sync-to-async execution flips 5–12% of episode outcomes while average success changes by at most 3 percentage points. | Reproduce the exact checkpoints, seeds, task splits and sync/async protocol first. Then add Symthaea as a separately labelled decision layer and report per-seed flips, progress and application-time regret. |
 | LIBERO-Dynamic (2026) | Latency-aware evaluation across all 40 LIBERO tasks, with contact-driven motion, calibrated inference delay and asynchronous queue execution. | Official fixed-1,800-episode async results range from π0.5 (JAX) 57.8% to OpenVLA-OFT 27.3%; the reported best measured Async Queue strategy is 48.4%, Sync Hold 43.1%, RTC 37.8%, and separately trained VLASH 55.4%. | Use as the controlled latency/motion counterpart to RoboDyna. Reproduce its checkpoints and queue semantics, then evaluate the Symthaea layer on the same episode population. Keep VLASH as a separately trained system reference. |
 | RoboRecover (2026-09-24) | Initial-state policy performance does not determine recovery after execution-induced deviations; its dataset contains 2,000 scenarios across RoboTwin and LIBERO. | Add a recovery arm after controlled deviations. Measure recovery success, time-to-recovery, extra actions, damage/regret and tail failures at matched deviation states. |
+
+### Plannable range: distinguish horizon, target distance and execution
+
+The September 30, 2026 paper *The Planning Limits of Latent World Models* (arXiv:2609.39235) introduces a useful quantity that should become part of this campaign: the **plannable range** (P^*). It is not the maximum prediction horizon or the action-chunk length. It is the largest target lookahead at which a planner's imagined outcomes still rank useful actions reliably.
+
+The paper's specific protocol:
+- (K): number of control steps imagined for each candidate action sequence;
+- (L): target lookahead in control steps;
+- with (K=5), compare the expert's next-five-step action sequence against 100 random alternatives, score each by closest imagined state to the target, and define (P^*) as the largest tested (L) whose task-averaged expert percentile is at most 10.
+- It tests lookaheads (L\in\{1,2,3,5,10,20\}), with (K=5) as the primary setting.
+- It separately varies (H_{train}), the recursive prediction-training horizon. Training horizon and imagined rollout horizon are different.
+
+Reported paper-specific observations:
+- With (K=5), five frozen visual encoders had plannable ranges of 5–10 steps while expert completions were 16–53 steps (typical about 33).
+- Increasing predictor capacity 81× improved prediction loss but did not extend the plannable range in the five-step planning setting.
+- Five-step recursive training extended V-JEPA 2.1's range from five to ten; training to twenty recursive steps did not extend it further in that comparison.
+- Increasing imagined rollout length (K) was the intervention that extended the range beyond ten; a (K=30) rollout remained useful against harder action alternatives.
+- A five-step planner aimed at a twenty-step target lost control success even with a perfect simulator predictor (92% at five-step target versus 41% at twenty-step target). This shows that the target-scoring geometry and reachability of the goal within the imagined path can fail independently of learned prediction error.
+- Closed-loop pure imagination succeeded in 23% at (K=5), and 36% at (K=30); MPC feedback at (K=5) achieved 30%, and at (K=30) 52%. A five-step MPC using nearby expert/demo subgoals achieved 76%, but those demonstration-derived subgoals are an oracle upper bound, not a deployable learned-subgoal result.
+- A VLA proposing eight action sequences and a world model selecting among them raised success from 65% to 77% in the paper's 16-task setup. The same method improved near variants (25% to 49%) but not new objects/motions, where performance stayed near zero.
+
+Do not transfer these percentages to RoboDyna or LIBERO-Dynamic; they are results from the paper's Meta-World/BridgeData setup. Use them to define a falsifiable comparator and experiment, not as Symthaea targets already achieved.
+
+For this benchmark adapter, maintain distinct variables:
+- (K): imagined model rollout horizon;
+- (L): target lookahead / subgoal distance;
+- (H_{train}): recursive predictor training horizon;
+- (A): action commitment/chunk length executed before the next policy decision;
+- (R): actual observation-refresh interval;
+- (C): measured total compute budget for proposing, imagining, ranking and verifying actions.
+
+In particular (K\neq A). Imagining thirty steps does not require executing thirty actions without feedback. A short action chunk with a long imagined horizon and a long action chunk with a short imagined horizon are different conditions.
+
+The required evaluation sequence is:
+1. **Ranking-range map:** measure expert/action ranking versus (L) for each (K), using the same frozen candidate set/proposer and model-visible history. Estimate (P^*(K)) with confidence/cluster intervals and show worst-family ranges, not only task averages.
+2. **Budget control:** compare fixed (K), longer (K), and matched-total-compute candidate-count adjustments. Longer rollouts naturally cost more; report both matched-compute and best-attainable-compute frontiers.
+3. **Closed-loop controller:** compare direct policy, short-horizon MPC with real feedback, longer-horizon MPC, expert-subgoal oracle, learned/online subgoal generation, and VLA-proposed candidates scored by the world model. Keep the oracle subgoal condition ineligible for deployment claims.
+4. **Range-aware controller:** use a validated (P^*(K)) only while the current context is within its calibration/support scope. When target distance exceeds the supported range, choose a nearer qualified subgoal, buy an observation/feedback step, increase (K) only when budget allows, or use a separately qualified direct/fallback policy. Otherwise abstain.
+5. **Shift/negative controls:** new objects, motions, contact patterns, latency, observation corruption and deliberately optimistic dynamics must reduce the supported range or force an indeterminate/fallback result; they must not be hidden by pooled mean performance.
+
+Owners remain distinct: #10257/#10276 own horizon-conditioned discrepancy/exploitation rows; #10252 owns cross-model ranking stability; #10256 owns prediction-set coverage; #9122/#9153 owns paired advantage-of-prediction outcome auditing; #9094/#9095/#9528 owns the cross-environment benchmark bridge; #9735 owns run-manifest provenance; #13375/#13377 owns causal trajectories and decision-time evidence. This adapter does not create another world-model range estimator, action-ranking auditor, bootstrap engine or run manifest.
+
+Reference: [The Planning Limits of Latent World Models](https://arxiv.org/abs/2609.39235).
 
 ### Recommended campaign
 
