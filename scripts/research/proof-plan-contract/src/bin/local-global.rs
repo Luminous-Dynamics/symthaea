@@ -48,6 +48,13 @@ fn main() -> ExitCode {
         pair.candidate.pair_id
     );
     println!("scope_match={}", pair.scope_matches());
+    match pair.candidate_view_sha256() {
+        Ok(digest) => println!("candidate_payload_sha256={digest}"),
+        Err(error) => {
+            eprintln!("candidate payload digest failed: {error}");
+            return ExitCode::from(1);
+        }
+    }
     if let (Some(evaluator), Some(sequent)) = (
         pair.evaluator_only.as_ref(),
         pair.candidate.local_stage.scope_binding.finite_boolean_sequent.as_ref(),

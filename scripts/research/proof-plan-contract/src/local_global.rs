@@ -453,6 +453,12 @@ impl LocalGlobalPairV1 {
         &self.candidate
     }
 
+    /// Domain-separated identity for the exact versioned candidate-visible
+    /// payload. Evaluator-only labels and witnesses are deliberately excluded.
+    pub fn candidate_view_sha256(&self) -> Result<String, String> {
+        domain_separated_sha256("candidate_payload", &(&self.schema_version, &self.candidate))
+    }
+
     pub fn scope_matches(&self) -> bool {
         self.candidate.local_stage.scope_binding == self.candidate.global_stage.scope_binding
     }
@@ -1294,6 +1300,40 @@ mod tests {
     }
 
 
+
+
+    #[test]
+    fn candidate_view_digest_is_stable_and_excludes_evaluator_only_data() {
+        let pair = fixture();
+        let original = pair.candidate_view_sha256().expect("candidate digest");
+        let mut evaluator_mutation = pair.clone();
+        let evaluator = evaluator_mutation.evaluator_only.as_mut().unwrap();
+        evaluator.global_disposition = GlobalDisposition::Omitted;
+        evaluator.adjudication_refs.push("additional-hidden-reference".to_owned());
+        evaluator
+            .finite_boolean_countermodel
+            .as_mut()
+            .unwrap()
+            .valuation[0]
+            .value = true;
+        assert_eq!(
+            original,
+            evaluator_mutation.candidate_view_sha256().expect("same candidate digest")
+        );
+    }
+
+    #[test]
+    fn candidate_view_digest_changes_when_candidate_payload_changes() {
+        let pair = fixture();
+        let original = pair.candidate_view_sha256().expect("candidate digest");
+        let mut candidate_mutation = pair.clone();
+        candidate_mutation.candidate.task_class =
+            "modified_candidate_task_class".to_owned();
+        assert_ne!(
+            original,
+            candidate_mutation.candidate_view_sha256().expect("mutated candidate digest")
+        );
+    }
 
     #[test]
     fn canonical_surface_renderer_is_unambiguous() {

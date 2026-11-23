@@ -296,3 +296,8 @@ The truth-table oracle now searches assignments by increasing support size (fewe
 For the finite propositional tier, ScopeBinding now renders each formula through a fully parenthesized canonical display (¬, ∧, ∨, →, ↔). The visible premise list, conclusion text and root-goal text must exactly match the typed candidate sequent. This prevents a hidden valuation from being correctly checked against one AST while the candidate reads a different plain-text inference.
 
 The display is deliberately a canonical controlled-language representation, not a general natural-language parser. Free-form mathematical prose, Lean dependent binders, implicit arguments, typeclass assumptions and notation/coercion elaboration still require the separate formal identity and translation-review gates.
+## 17. Candidate-visible payload identity
+
+The receipt exposes a domain-separated `candidate_view_sha256()` over the pair schema version and the serialized candidate partition only. Evaluator-only eligibility, validity labels, adjudication references and hidden valuations are excluded. Tests prove that changing hidden evaluator fields preserves the candidate digest, while changing candidate-visible fields changes it.
+
+This digest is an identity receipt, not an access-control mechanism or a signature. The experimental runner must still enforce that only `candidate_view()` is serialized into the model prompt, keep evaluator material in a separate storage/access boundary, and attest the actual prompt/input bytes independently.
