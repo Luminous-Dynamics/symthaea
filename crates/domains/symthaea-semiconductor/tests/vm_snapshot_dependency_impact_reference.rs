@@ -5,13 +5,13 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
 use symthaea_semiconductor::benchmark::{
-    VM_DEPENDENCY_EDGE_SCHEMA_V1, VM_DEPENDENCY_GRAPH_SCHEMA_V1,
-    VM_IMPACT_CLOSURE_INPUT_SCHEMA_V1, VmDependencyDimensionV1, VmImpactClosureInputV1,
-    VmImpactClosureStatusV1, VmModelDerivationKindV1, VmModelSnapshotNodeV1,
-    VmSnapshotCurrentDispositionV1, VmSnapshotDependencyEdgeV1, VmSnapshotDependencyGraphV1,
-    VmSnapshotImpactStateV1, VmSnapshotPurposeV1, VmSnapshotRequalificationReportV1,
-    VmSnapshotLabelCurrentStatusV1, compute_vm_snapshot_impact_closure_v1,
-    seal_vm_snapshot_dependency_edge_v1, seal_vm_snapshot_dependency_graph_v1,
+    VM_DEPENDENCY_EDGE_SCHEMA_V1, VM_DEPENDENCY_GRAPH_SCHEMA_V1, VM_IMPACT_CLOSURE_INPUT_SCHEMA_V1,
+    VmDependencyDimensionV1, VmImpactClosureInputV1, VmImpactClosureStatusV1,
+    VmModelDerivationKindV1, VmModelSnapshotNodeV1, VmSnapshotCurrentDispositionV1,
+    VmSnapshotDependencyEdgeV1, VmSnapshotDependencyGraphV1, VmSnapshotImpactStateV1,
+    VmSnapshotLabelCurrentStatusV1, VmSnapshotPurposeV1, VmSnapshotRequalificationReportV1,
+    compute_vm_snapshot_impact_closure_v1, seal_vm_snapshot_dependency_edge_v1,
+    seal_vm_snapshot_dependency_graph_v1,
 };
 
 fn digest(ch: char) -> String {
@@ -268,7 +268,10 @@ fn independent_risk_oracle(
     let mut inherited: BTreeMap<String, OracleRisk> = BTreeMap::new();
 
     for report in &input.snapshot_requalification_reports {
-        direct.insert(report.snapshot_id.clone(), direct_risk(report.current_disposition));
+        direct.insert(
+            report.snapshot_id.clone(),
+            direct_risk(report.current_disposition),
+        );
         inherited.insert(report.snapshot_id.clone(), OracleRisk::None);
     }
 
@@ -277,7 +280,10 @@ fn independent_risk_oracle(
     while changed {
         changed = false;
         iterations += 1;
-        assert!(iterations <= input.graph.nodes.len() + 1, "fixture graph must be acyclic");
+        assert!(
+            iterations <= input.graph.nodes.len() + 1,
+            "fixture graph must be acyclic"
+        );
 
         for edge in &input.graph.edges {
             let parent = direct[&edge.parent_snapshot_id].max(inherited[&edge.parent_snapshot_id]);
@@ -393,18 +399,28 @@ fn frozen_dag_matches_independent_fixed_point_impact_oracle() {
         .collect();
 
     assert_eq!(
-        report.direct_impact_snapshot_ids.iter().cloned().collect::<BTreeSet<_>>(),
+        report
+            .direct_impact_snapshot_ids
+            .iter()
+            .cloned()
+            .collect::<BTreeSet<_>>(),
         expected_direct
     );
     assert_eq!(
-        report.transitive_impact_snapshot_ids.iter().cloned().collect::<BTreeSet<_>>(),
+        report
+            .transitive_impact_snapshot_ids
+            .iter()
+            .cloned()
+            .collect::<BTreeSet<_>>(),
         expected_transitive
     );
 
     let expected_rebuild: BTreeSet<String> = expected
         .iter()
         .filter(|(id, (direct, inherited))| {
-            let purpose = input.graph.nodes
+            let purpose = input
+                .graph
+                .nodes
                 .iter()
                 .find(|node| node.snapshot_id == **id)
                 .unwrap()
@@ -415,7 +431,11 @@ fn frozen_dag_matches_independent_fixed_point_impact_oracle() {
         .map(|(id, _)| id.clone())
         .collect();
     assert_eq!(
-        report.rebuild_order_snapshot_ids.iter().cloned().collect::<BTreeSet<_>>(),
+        report
+            .rebuild_order_snapshot_ids
+            .iter()
+            .cloned()
+            .collect::<BTreeSet<_>>(),
         expected_rebuild
     );
 
