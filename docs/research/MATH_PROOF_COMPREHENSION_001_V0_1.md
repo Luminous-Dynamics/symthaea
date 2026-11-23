@@ -442,3 +442,4 @@ This is pinned to the published-source mirror commit `40e56bab026552e089d7afcfef
 The map also identifies source-level candidates for the Chowla–Selberg period, digit arithmetic, lattice-height and global local-comparison inputs. Their precise mathematical roles and full kernel dependency paths remain open. The exact Lean declaration(s) for all of hypothesis (B), the trace/rank/pairing bounds and the Galois-cohomology contribution are not yet mapped.
 
 Dedicated bounded work is now tracked in [#13296 — RH-M-COMPREHENSION-001](https://github.com/Luminous-Dynamics/symthaea/issues/13296). This does not reconstruct all of (M), independently verify RH, or turn the external kernel graph into a Symthaea proof.
+undefined
