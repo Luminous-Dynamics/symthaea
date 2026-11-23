@@ -585,6 +585,53 @@ fn execute_request(bytes: &[u8]) -> Result<CandidateReceiptV1, String> {
     })
 }
 
+fn read_bounded_request_line<R: BufRead>(
+    reader: &mut R,
+    max_bytes: usize,
+) -> Result<Option<Vec<u8>>, String> {
+    let mut line = Vec::with_capacity(4096);
+    let mut terminated = false;
+    let mut reached_eof = false;
+    loop {
+        let available = match reader
+            .fill_buf()
+            .map_err(|error| format!("read candidate request line: {error}"))?
+        {
+            [] => {
+                reached_eof = true;
+                break;
+            }
+            available => available,
+        };
+        let newline = available.iter().position(|byte| *byte == b'\n');
+        let take = newline.unwrap_or(available.len());
+        if line.len().saturating_add(take) > max_bytes {
+            return Err(format!("request line exceeds {max_bytes} bytes"));
+        }
+        line.extend_from_slice(&available[..take]);
+        let consumed = take + usize::from(newline.is_some());
+        reader.consume(consumed);
+        if newline.is_some() {
+            terminated = true;
+            break;
+        }
+    }
+
+    if line.is_empty() && reached_eof {
+        return Ok(None);
+    }
+    if !terminated {
+        return Err("candidate request ended without a newline delimiter".to_string());
+    }
+    if line.last() == Some(&b'\r') {
+        line.pop();
+    }
+    if line.is_empty() {
+        return Err("empty candidate request line".to_string());
+    }
+    Ok(Some(line))
+}
+
 fn run_stream() -> Result<(), String> {
     let stdin = io::stdin();
     let mut reader = BufReader::new(stdin.lock());
@@ -599,47 +646,7 @@ fn run_stream() -> Result<(), String> {
         .flush()
         .map_err(|error| format!("flush stream readiness: {error}"))?;
 
-    loop {
-        let mut line = Vec::with_capacity(4096);
-        let mut terminated = false;
-        let mut reached_eof = false;
-        loop {
-            let available = match reader
-                .fill_buf()
-                .map_err(|error| format!("read candidate request line: {error}"))?
-            {
-                [] => {
-                    reached_eof = true;
-                    break;
-                }
-                available => available,
-            };
-            let newline = available.iter().position(|byte| *byte == b'\n');
-            let take = newline.unwrap_or(available.len());
-            if line.len().saturating_add(take) > MAX_REQUEST_BYTES {
-                return Err(format!("request line exceeds {MAX_REQUEST_BYTES} bytes"));
-            }
-            line.extend_from_slice(&available[..take]);
-            let consumed = take + usize::from(newline.is_some());
-            reader.consume(consumed);
-            if newline.is_some() {
-                terminated = true;
-                break;
-            }
-        }
-
-        if line.is_empty() && reached_eof {
-            break;
-        }
-        if !terminated {
-            return Err("candidate request ended without a newline delimiter".to_string());
-        }
-        if line.last() == Some(&b'\r') {
-            line.pop();
-        }
-        if line.is_empty() {
-            return Err("empty candidate request line".to_string());
-        }
+    while let Some(line) = read_bounded_request_line(&mut reader, MAX_REQUEST_BYTES)? {
         let receipt = execute_request(&line)?;
         serde_json::to_writer(&mut writer, &receipt)
             .map_err(|error| format!("serialize candidate receipt: {error}"))?;
@@ -1000,6 +1007,37 @@ mod tests {
             candidate_input_digest(need, HASH_B)
         );
     }
+    #[test]
+    fn bounded_stream_reader_accepts_exact_size_and_clean_eof() {
+        let mut exact = std::io::Cursor::new(b"12345\n");
+        assert_eq!(
+            read_bounded_request_line(&mut exact, 5).unwrap(),
+            Some(b"12345".to_vec())
+        );
+        assert_eq!(read_bounded_request_line(&mut exact, 5).unwrap(), None);
+    }
+
+    #[test]
+    fn bounded_stream_reader_rejects_oversize_and_unterminated_frames() {
+        let mut oversize = std::io::Cursor::new(b"123456\n");
+        assert!(read_bounded_request_line(&mut oversize, 5)
+            .unwrap_err()
+            .contains("exceeds 5 bytes"));
+
+        let mut unterminated = std::io::Cursor::new(b"12345");
+        assert!(read_bounded_request_line(&mut unterminated, 5)
+            .unwrap_err()
+            .contains("without a newline delimiter"));
+    }
+
+    #[test]
+    fn bounded_stream_reader_rejects_empty_frames() {
+        let mut empty = std::io::Cursor::new(b"\n");
+        assert!(read_bounded_request_line(&mut empty, 5)
+            .unwrap_err()
+            .contains("empty candidate request line"));
+    }
+
     #[test]
     fn typed_hdc_empty_evidence_abstains_without_building_an_index() {
         let mut value = envelope_value();
