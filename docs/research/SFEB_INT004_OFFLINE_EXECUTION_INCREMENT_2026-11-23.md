@@ -26,15 +26,29 @@ The independent JavaScript model was executed against the fixture bytes:
 - Pointer/keyboard metamorphic relation: **1/1**
 - Adversarial negative controls rejected: **6/6**
 - Event deliveries represented in golden traces: **17**
-- Fixture SHA-256: `b3c09e0a7c343c058d271e97c24f576ad64e2b52a5f8d84c354b7d570e26a703`
+- Fixture SHA-256: `f9f642acd996300068f0b0dd9a8a428093bfec6fa1236d27d8ee774370e3669a`
 
 This is a reference-model result. It does not demonstrate that a browser candidate behaves correctly.
 
 ## Rust and browser qualification boundary
 
-A standalone Rust reference model and seven authored unit tests are included. The event contract rejects unknown fields and unsafe numeric values, and caps out-of-order buffering at a 1,024-sequence window / 1,024 pending events. Event delivery is transactional: a rejected event cannot reserve its identity or sequence, alter the buffer, or poison a later valid retry. They have **not** been compiled or executed in this authoring environment because `rustc`/`cargo` are unavailable. The task still requires a Leptos candidate, fixture-local streaming adapter, real pointer and keyboard browser journeys, full accessibility-tree checks, deterministic Chromium execution, egress isolation, and a verifier in a separate trust domain.
+A standalone Rust reference model, offline trace-to-oracle evaluator, pinned seven-rule policy and ten authored unit tests are included. The event contract rejects unknown fields and unsafe numeric values, and caps out-of-order buffering at a 1,024-sequence window / 1,024 pending events. Event delivery is transactional: a rejected event cannot reserve its identity or sequence, alter the buffer, or poison a later valid retry. The Rust source and ten tests have **not** been compiled or executed in this authoring environment because `rustc`/`cargo` are unavailable. The task still requires a Leptos candidate, fixture-local streaming adapter, real pointer and keyboard browser journeys, full accessibility-tree checks, deterministic Chromium execution, egress isolation, and a verifier in a separate trust domain.
 
 The task-family ledger records INT-004 as `fixture_ready`, `golden_cases_authored_rust_execution_pending`, and `browser_runner_pending`. The portfolio's `runnable_task_count` remains **0**. Public pilot cases are not hidden holdouts and are not used as comparative leaderboard evidence.
+
+
+
+## Independent event-oracle replay increment
+
+Added a frozen task policy, raw execution-trace schema/example, verifier report schema and a standalone Rust trace-to-oracle path:
+- `event-oracle-policy-v1.json` and schema: seven required rules, pinned by SHA-256 `dddaaa445881feabc3dc7d3599c8741004917190b2b2467db65cf1c42d7b6d5c` in the Rust verifier source.
+- `event-execution-trace-v1.schema.json` and `examples/late-event-rollback-trace.json`: raw action/event steps bind to the exact fixture SHA-256.
+- `event-oracle-verification-v1.schema.json`: structured event-semantics report, rule hashes and canonical evidence-event digests.
+- `--verify-event-trace`: checks the frozen controller step sequence, replays event payloads through the reducer, derives seven semantic outcomes, and ignores worker `disposition` / `observed_oracle_ids`.
+
+An independent in-memory V8 preflight against the exact repository fixture, policy and example trace passed **7/7 policy rules**. Mutating worker claims left all oracle outcomes unchanged; altering a frozen event payload was rejected. This is not execution of the committed Rust verifier. The verifier does not authenticate browser execution, produce a signed in-toto verifier statement or inspect browser screenshots/accessibility/network artifacts. It is an initial semantic replay component for #13247 only.
+
+Trace SHA-256: `a6db51ee92df248161b15975027e65c13a475b20ae67a5e2b16ccb4b566d7fc0`.
 
 ## Next implementation gates
 
