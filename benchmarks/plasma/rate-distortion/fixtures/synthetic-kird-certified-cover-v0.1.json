@@ -1,0 +1,121 @@
+{
+  "schema_version": "0.1",
+  "record_id": "KIRD-SYNTHETIC-CERTIFIED-COVER-001",
+  "record_status": "synthetic_fixture_only",
+  "cohort": {
+    "equation": "periodic_1d1v_collisionless_vlasov_poisson",
+    "dimensions": [
+      1,
+      1
+    ],
+    "normalization_id": "synthetic-wire-fixture-only",
+    "boundary_id": "periodic-unit-domain",
+    "initial_state_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "reference_solver_revision": "no-physical-reference-fixture"
+  },
+  "task_contract": {
+    "contract_id": "synthetic-certified-lipschitz-cover",
+    "intervention_family_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "qoi_registry_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "horizon": 1,
+    "time_unit": "synthetic_time",
+    "split_role": "development",
+    "acquisition_allowed": true
+  },
+  "candidate": {
+    "representation_family": "manufactured-scalar-response",
+    "representation_revision": "e(u)=0.5+2u over U=[0,0.1]",
+    "configuration_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "storage": {
+    "state_payload_bytes": 1024,
+    "basis_codec_metadata_bytes": 128,
+    "coordinate_normalization_bytes": 64,
+    "component_lineage_bytes": 0,
+    "residual_memory_bytes": 0,
+    "uncertainty_validity_bytes": 32,
+    "provenance_contract_bytes": 256,
+    "model_asset_bytes": 4096,
+    "decoder_asset_bytes": 512,
+    "amortization_rollouts": 100,
+    "peak_working_set_bytes": 16384
+  },
+  "cost": {
+    "encode_seconds": 0,
+    "decode_seconds": 0,
+    "advance_seconds": 0,
+    "observe_seconds": 0,
+    "transition_seconds": 0,
+    "fallback_seconds": 0,
+    "training_seconds": 0,
+    "measured_rollouts": 1
+  },
+  "distortion": {
+    "microscopic": {
+      "status": "UNSUPPORTED"
+    },
+    "weak_observable": {
+      "status": "UNKNOWN"
+    },
+    "macroscopic_qoi": {
+      "status": "UNKNOWN"
+    },
+    "intervention_response": {
+      "status": "PASS",
+      "worst_confirmed_normalized_error": 0.5,
+      "complex_amplitude_error": 0,
+      "wrapped_phase_error_rad": 0,
+      "waveform_error": 0,
+      "missing_branch_count": 0,
+      "misassociated_branch_count": 0,
+      "evidence_sha256": "60dd433647c2ca915dd743c203235e5f1c8484ee7d89c9f984f40022d4341a10"
+    },
+    "sensitivity": {
+      "status": "UNSUPPORTED"
+    }
+  },
+  "physical_gates": {
+    "status": "UNKNOWN",
+    "gate_results": []
+  },
+  "response_scope": {
+    "coverage_kind": "certified_global",
+    "registered_probe_count": 1,
+    "confirmed_probe_count": 1,
+    "globally_bounded": true,
+    "bound_method": "manufactured-exact-lipschitz-cover-v1",
+    "bound_evidence_sha256": "60dd433647c2ca915dd743c203235e5f1c8484ee7d89c9f984f40022d4341a10",
+    "coverage_metric_id": "absolute-coordinate-distance-on-U",
+    "covering_radius": 0.1,
+    "verified_lipschitz_constant": 2,
+    "reference_uncertainty": 0.01,
+    "candidate_uncertainty": 0.02,
+    "measurement_uncertainty": 0.02,
+    "maximum_sampled_normalized_error": 0.5,
+    "global_normalized_error_bound": 0.75,
+    "covering_set_sha256": "8ffd84cdced28800babde7c1b04085aade89153474ce3631c9f81cb52c698e6a",
+    "branch_association_stable": true,
+    "branch_stability_evidence_sha256": "503bf73da7a083387892abc8291457937430e6b0a43a54804f673555bcbb182b",
+    "independent_checker_revision": "symthaea-plasma-probes/kird-auditor-0.1"
+  },
+  "provenance": {
+    "candidate_output_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "run_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "analysis_revision": "synthetic-lipschitz-cover-known-answer",
+    "physical_execution_authorized": false,
+    "reference_bundle_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "synthetic_certificate_definition": {
+    "intervention_space": "U=[0,0.1] with metric d(u,v)=abs(u-v)",
+    "response_error_function": "e(u)=0.5+2u",
+    "registered_probe_set": [
+      0
+    ],
+    "covering_radius": 0.1,
+    "verified_lipschitz_constant": 2,
+    "exact_supremum": 0.7,
+    "uncertainty_budget": 0.05,
+    "certified_upper_bound": 0.75,
+    "proof_note": "For any u in [0,0.1], e(u)<=e(0)+2*0.1=0.7; adding 0.05 uncertainty gives 0.75."
+  }
+}
