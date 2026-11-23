@@ -13,7 +13,7 @@
   },
   "inputs": {
     "manifest_path": "docs/research/BH_EGB_CAMPAIGN_EPISODES_V0_1.json",
-    "manifest_git_blob_sha1": "0296ba4a424186a3061c33efb7d9811b4639cc21",
+    "manifest_git_blob_sha1": "06cf0394686533b320a72e49a96bfdd7208337d6",
     "schema_path": "docs/research/BH_EGB_CAMPAIGN_EPISODES_V0_1.schema.json",
     "schema_git_blob_sha1": "77dd2e9e33f94e33bbe2b930286580f4d43ebf6f",
     "covariance_redundancy_fixture": {
@@ -36,18 +36,19 @@
     "unique_episode_ids": true,
     "unique_action_ids": true,
     "all_episode_action_references_resolve": true,
-    "all_declared_source_git_blob_ids_match_live_fetch": "manually_replayed_28_of_28_exact_public_git_blob_ids",
+    "all_declared_source_git_blob_ids_match_live_fetch": "manually_replayed_33_of_33_exact_public_git_blob_ids",
     "policy_arm_count": 11,
     "episode_count": 8,
     "action_count": 10,
     "frozen_negative_control_count": 14,
-    "source_pin_count": 28,
-    "source_pin_matches": 28,
+    "source_pin_count": 33,
+    "source_pin_matches": 33,
     "source_pin_mismatches": 0,
     "acquisition_stage_count": 2,
     "covariance_redundancy_control_pinned": true,
     "confirmatory_preconditions_all_unset": true,
-    "decision_value_control_pinned": true
+    "decision_value_control_pinned": true,
+    "open_world_adequacy_control_pinned": true
   },
   "source_pin_replay": [
     {
@@ -245,6 +246,41 @@
       "path": "docs/research/BH_EGB_DECISION_VALUE_VERIFICATION_RECEIPT_V0_1.json",
       "git_blob_sha1": "23165b2f5093b9a0015f5f4f09541615b00b70b4",
       "role": "symthaea_decision_value_vs_information_gain_synthetic_control"
+    },
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "ref": "research/bh-egb-symthaea-campaign-2026-11-23",
+      "path": "docs/research/verify_bh_egb_covariance_fixture.py",
+      "git_blob_sha1": "8e3fd3ced8efb605385e292cd0281f4e3c0a7255",
+      "role": "symthaea_covariance_redundancy_synthetic_control"
+    },
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "ref": "research/bh-egb-symthaea-campaign-2026-11-23",
+      "path": "docs/research/BH_EGB_COVARIANCE_VERIFICATION_RECEIPT_V0_1.json",
+      "git_blob_sha1": "d0f1a7e154cb927c15d0def3cf44f35dd161f970",
+      "role": "symthaea_covariance_redundancy_synthetic_control"
+    },
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "ref": "research/bh-egb-symthaea-campaign-2026-11-23",
+      "path": "docs/research/BH_EGB_OPEN_WORLD_MODEL_ADEQUACY_CONTROL_V0_1.json",
+      "git_blob_sha1": "a19cc81b48910fbb90ce3a766bd1b820786a5c47",
+      "role": "symthaea_open_world_model_adequacy_synthetic_control"
+    },
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "ref": "research/bh-egb-symthaea-campaign-2026-11-23",
+      "path": "docs/research/verify_bh_egb_open_world_model_adequacy.py",
+      "git_blob_sha1": "23c43cf03903446d9721b5d6981fbcdf1df43956",
+      "role": "symthaea_open_world_model_adequacy_synthetic_control"
+    },
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "ref": "research/bh-egb-symthaea-campaign-2026-11-23",
+      "path": "docs/research/BH_EGB_OPEN_WORLD_MODEL_ADEQUACY_RECEIPT_V0_1.json",
+      "git_blob_sha1": "cfaabadb6ac1a590770addcf6c7751cb1601351f",
+      "role": "symthaea_open_world_model_adequacy_synthetic_control"
     }
   ],
   "exclusions": [
@@ -349,6 +385,18 @@
       "selected_action": "B_decision_relevant",
       "negative_controls_rejected": 4,
       "claim_ceiling": "Synthetic finite oracle only; not the live Symthaea VoC policy."
+    },
+    "open_world_model_adequacy_control": {
+      "status": "exact_synthetic_open_world_control_passed",
+      "fixture_git_blob_sha1": "a19cc81b48910fbb90ce3a766bd1b820786a5c47",
+      "verifier_git_blob_sha1": "23c43cf03903446d9721b5d6981fbcdf1df43956",
+      "pairwise_candidate_separation_squared": "2",
+      "each_initial_candidate_held_out_residual_squared": "1",
+      "maximum_admissible_squared_residual": "1/2",
+      "initial_family_disposition": "ABSTAIN_AND_EXPAND_MODEL_CLASS",
+      "outside_family_witness_residual_squared": "0",
+      "negative_controls_rejected": 4,
+      "claim_ceiling": "Synthetic deterministic control only; no calibrated statistics, real EGB adequacy, or policy-performance claim."
     }
   }
 }
