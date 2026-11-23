@@ -19,7 +19,8 @@
     "constant_info_dependency_closure",
     "unresolved_dependencies",
     "edges",
-    "helper_nodes"
+    "helper_nodes",
+    "trust_profile"
   ],
   "properties": {
     "schema_version": {
@@ -130,6 +131,9 @@
       "items": {
         "$ref": "#/$defs/helperNode"
       }
+    },
+    "trust_profile": {
+      "$ref": "#/$defs/trustProfile"
     }
   },
   "$defs": {
@@ -146,7 +150,8 @@
         "proof_value_dependencies",
         "constant_info_dependency_closure",
         "unresolved_dependencies",
-        "edges"
+        "edges",
+        "trust_profile"
       ],
       "properties": {
         "root_declaration": {
@@ -237,9 +242,71 @@
               }
             }
           }
+        },
+        "trust_profile": {
+          "$ref": "#/$defs/trustProfile"
+        }
+      }
+    },
+    "trustProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "closure_status",
+        "transitive_declaration_count",
+        "axiom_declarations",
+        "unsafe_declarations",
+        "partial_declarations",
+        "opaque_declarations",
+        "sorry_ax_present",
+        "unresolved_declarations"
+      ],
+      "properties": {
+        "closure_status": {
+          "enum": [
+            "complete",
+            "unresolved"
+          ]
+        },
+        "transitive_declaration_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "axiom_declarations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "unsafe_declarations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "partial_declarations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "opaque_declarations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "sorry_ax_present": {
+          "type": "boolean"
+        },
+        "unresolved_declarations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       }
     }
   },
-  "description": " Includes generated/private helper declarations referenced by the root theorem proof value."
+  "description": " Includes generated/private helper declarations referenced by the root theorem proof value. Includes recursive trust-boundary inventory for every theorem and generated helper."
 }
