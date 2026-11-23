@@ -161,8 +161,7 @@ impl EvidenceDecision {
 
 /// In-memory ledger implementation. Durable persistence, external witnessing
 /// and cryptographic issuer verification are deliberately separate services.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(deny_unknown_fields)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Default)]
 pub struct EvidenceLedger {
     events: Vec<EvidenceEvent>,
 }
@@ -170,8 +169,7 @@ pub struct EvidenceLedger {
 /// A memory value paired with the evidence event that qualifies its use.
 /// This wrapper lets existing semantic/episodic types adopt provenance
 /// without breaking their public struct-literal constructors.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct EvidenceBound<T> {
     value: T,
     evidence_event_id: String,
@@ -188,6 +186,23 @@ impl<T> EvidenceBound<T> {
 
     pub fn into_value(self) -> T {
         self.value
+    }
+}
+
+impl<'de> Deserialize<'de> for EvidenceLedger {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct WireLedger {
+            events: Vec<EvidenceEvent>,
+        }
+
+        let wire = WireLedger::deserialize(deserializer)?;
+        validate_events(&wire.events).map_err(serde::de::Error::custom)?;
+        Ok(Self { events: wire.events })
     }
 }
 
@@ -911,6 +926,11 @@ mod tests {
             Some(IneligibilityReason::Erased)
         );
     }
+
+    // EvidenceLedger deserialization is intentionally custom: every decoded
+    // snapshot passes the same cross-event validator as EvidenceLedger::new.
+    // EvidenceBound is intentionally not deserializable; it must be minted by
+    // EvidenceLedger::bind at the use boundary.
 
     #[test]
     fn append_is_monotonic_and_failed_append_is_atomic() {
