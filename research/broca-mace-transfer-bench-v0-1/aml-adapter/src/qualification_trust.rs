@@ -338,7 +338,7 @@ mod tests {
         let profile = profile_with_key(&signer, QualificationKeyStatusV1::Active, 10, 1_000);
         let pin = profile.profile_sha256().expect("profile digest");
         let verifier = PinnedEd25519QualificationVerifierV1::from_pinned_profile(
-            &profile, &pin,
+            &profile, &pin, profile.profile_version,
         ).expect("pinned trust");
         assert_eq!(
             verifier.verify_signature(
@@ -354,7 +354,7 @@ mod tests {
         let profile = profile_with_key(&signer, QualificationKeyStatusV1::Revoked, 10, 1_000);
         let pin = profile.profile_sha256().expect("profile digest");
         let verifier = PinnedEd25519QualificationVerifierV1::from_pinned_profile(
-            &profile, &pin,
+            &profile, &pin, profile.profile_version,
         ).expect("pinned trust");
         let payload = "a".repeat(64);
         let signature = signed_payload(&signer, &payload);
@@ -372,7 +372,7 @@ mod tests {
         let profile = profile_with_key(&signer, QualificationKeyStatusV1::Active, 200, 1_000);
         let pin = profile.profile_sha256().expect("profile digest");
         let verifier = PinnedEd25519QualificationVerifierV1::from_pinned_profile(
-            &profile, &pin,
+            &profile, &pin, profile.profile_version,
         ).expect("pinned trust");
         let payload = "a".repeat(64);
         let signature = signed_payload(&signer, &payload);
@@ -390,7 +390,7 @@ mod tests {
         let profile = profile_with_key(&signer, QualificationKeyStatusV1::Active, 10, 200);
         let pin = profile.profile_sha256().expect("profile digest");
         let verifier = PinnedEd25519QualificationVerifierV1::from_pinned_profile(
-            &profile, &pin,
+            &profile, &pin, profile.profile_version,
         ).expect("pinned trust");
         let payload = "a".repeat(64);
         let signature = signed_payload(&signer, &payload);
@@ -461,7 +461,7 @@ mod tests {
         let profile = profile_with_key(&signer, QualificationKeyStatusV1::Active, 10, 1_000);
         let pin = profile.profile_sha256().expect("profile digest");
         let verifier = PinnedEd25519QualificationVerifierV1::from_pinned_profile(
-            &profile, &pin,
+            &profile, &pin, profile.profile_version,
         ).expect("pinned trust");
         let payload = "a".repeat(64);
         let mut signature = signed_payload(&signer, &payload);
