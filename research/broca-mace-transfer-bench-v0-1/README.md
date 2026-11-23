@@ -663,9 +663,9 @@ cargo test --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml \
   -p broca-mace-candidate
 ```
 
-This is a separate package and protocol, **not yet a sandboxed or independently custodied evaluator**. The paired evaluator has not yet been rewired to launch the candidate process. Candidate evidence trust/retraction/reconciliation fields are inputs to the prototype and must be derived from independently verified ingress receipts in production. Public digests do not authenticate issuers. See [MACE Isolated Candidate Protocol v0.1](../../docs/research/MACE_ISOLATED_CANDIDATE_PROTOCOL_V0_1.md) and [MACE Evaluation Paradigm and Benchmark Frontier v0.1](../../docs/research/MACE_EVALUATION_PARADIGM_AND_BENCHMARK_FRONTIER_V0_1.md).
+This is a separate package and protocol, **not yet a sandboxed or independently custodied evaluator**. The paired evaluator is wired in source to launch the worker for exact-scope scan and typed-content HDC; the three other baseline arms remain explicitly in-process. Candidate evidence trust/retraction/reconciliation fields are inputs to the prototype and must be derived from independently verified ingress receipts in production. Public digests do not authenticate issuers. See [MACE Isolated Candidate Protocol v0.1](../../docs/research/MACE_ISOLATED_CANDIDATE_PROTOCOL_V0_1.md) and [MACE Evaluation Paradigm and Benchmark Frontier v0.1](../../docs/research/MACE_EVALUATION_PARADIGM_AND_BENCHMARK_FRONTIER_V0_1.md).
 
-**Validation boundary:** source/schema work and parser regression tests are authored; Rust compilation, test execution, child-process integration, sandbox negative controls and independent evaluation have not been completed in this environment.
+**Validation boundary:** source/schema work and parser regression tests are authored; the subprocess integration is source-complete but not runtime verified. Rust compilation, test execution, sandbox negative controls and independent evaluation have not been completed in this environment.
 
 
 ## Evaluator subprocess integration (v0.2 research)
