@@ -96,15 +96,26 @@ pub enum MycelialObservationCoverageError {
     InvalidSchemaVersion(u16),
     EmptyObservationInventory,
     TooManyRecords(usize),
-    TooManyCandidates { observation_id: String, count: usize },
+    TooManyCandidates {
+        observation_id: String,
+        count: usize,
+    },
     InvalidIdentifier(&'static str),
     InvalidDigest(&'static str),
     DuplicateObservationId(String),
     NonCanonicalObservationOrder,
     ObservationInventoryMismatch,
-    DuplicateCandidateId { observation_id: String, candidate_id: String },
-    NonCanonicalCandidateOrder { observation_id: String },
-    InvalidRecordState { observation_id: String, reason: &'static str },
+    DuplicateCandidateId {
+        observation_id: String,
+        candidate_id: String,
+    },
+    NonCanonicalCandidateOrder {
+        observation_id: String,
+    },
+    InvalidRecordState {
+        observation_id: String,
+        reason: &'static str,
+    },
     DigestResourceLimitExceeded,
 }
 
@@ -112,10 +123,16 @@ impl fmt::Display for MycelialObservationCoverageError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidSchemaVersion(version) => {
-                write!(f, "unsupported mycelial observation coverage schema version {version}")
+                write!(
+                    f,
+                    "unsupported mycelial observation coverage schema version {version}"
+                )
             }
             Self::EmptyObservationInventory => {
-                write!(f, "mycelial observation coverage inventory must not be empty")
+                write!(
+                    f,
+                    "mycelial observation coverage inventory must not be empty"
+                )
             }
             Self::TooManyRecords(count) => write!(
                 f,
@@ -129,7 +146,10 @@ impl fmt::Display for MycelialObservationCoverageError {
                 "observation {observation_id} has {count} candidates, exceeding {MAX_MYCELIAL_COVERAGE_CANDIDATES_PER_OBSERVATION}"
             ),
             Self::InvalidIdentifier(field) => {
-                write!(f, "invalid or unbounded mycelial observation coverage identifier: {field}")
+                write!(
+                    f,
+                    "invalid or unbounded mycelial observation coverage identifier: {field}"
+                )
             }
             Self::InvalidDigest(field) => {
                 write!(f, "invalid mycelial observation coverage digest: {field}")
@@ -138,10 +158,16 @@ impl fmt::Display for MycelialObservationCoverageError {
                 write!(f, "duplicate observation ID in coverage inventory: {id}")
             }
             Self::NonCanonicalObservationOrder => {
-                write!(f, "observation IDs and coverage records must be strictly sorted")
+                write!(
+                    f,
+                    "observation IDs and coverage records must be strictly sorted"
+                )
             }
             Self::ObservationInventoryMismatch => {
-                write!(f, "coverage records do not exactly match the declared observation inventory")
+                write!(
+                    f,
+                    "coverage records do not exactly match the declared observation inventory"
+                )
             }
             Self::DuplicateCandidateId {
                 observation_id,
@@ -162,7 +188,10 @@ impl fmt::Display for MycelialObservationCoverageError {
                 "invalid coverage disposition for observation {observation_id}: {reason}"
             ),
             Self::DigestResourceLimitExceeded => {
-                write!(f, "coverage ledger exceeds canonical digest resource limits")
+                write!(
+                    f,
+                    "coverage ledger exceeds canonical digest resource limits"
+                )
             }
         }
     }
