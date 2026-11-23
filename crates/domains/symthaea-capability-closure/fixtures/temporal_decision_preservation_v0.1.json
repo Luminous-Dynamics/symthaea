@@ -13,7 +13,7 @@
   "interaction_attribution_pr": 13176,
   "memory_consolidation_issue": 9139,
   "evaluator_isolation_issue": 9437,
-  "status": "rust_1_96_latest_exact_head_format_tests_clippy_passed_external_benchmark_pending",
+  "status": "rust_1_96_exact_head_temporal_module_exported_65_tests_passed",
   "temporal_contract": {
     "index_unit": "decision_epoch",
     "epoch_sequence": "contiguous_integer",
@@ -177,16 +177,19 @@
     "support completeness and calibration assumptions require independent qualification",
     "resource improvements require actual candidate execution and measured receipts"
   ],
-  "evaluator_suite_test_count": 54,
-  "evaluator_suite_passed": 54,
+  "evaluator_suite_test_count": 65,
+  "evaluator_suite_passed": 65,
   "evaluator_suite_failed": 0,
-  "evaluator_suite_sha256": "6931c3dcce7e18797ea130e1ae50cee67271f93e",
+  "evaluator_suite_sha256": "9185feae6fb775436449b8af2a64595b54bb96e1",
   "qualification": {
     "toolchain": "Rust 1.96.0",
     "changed_module_rustfmt": "passed",
     "full_evaluator_test_suite": "54_passed_0_failed",
     "strict_clippy": "passed",
-    "workflow_run_id": 45085114505,
-    "qualification_head_sha": "6931c3dcce7e18797ea130e1ae50cee67271f93e"
+    "workflow_run_id": 45085999687,
+    "qualification_head_sha": "9185feae6fb775436449b8af2a64595b54bb96e1",
+    "full_suite_tests": "65_passed_0_failed",
+    "temporal_module_exported": true,
+    "temporal_module_tests": "11_included_and_passed"
   }
 }
