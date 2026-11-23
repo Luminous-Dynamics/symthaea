@@ -226,7 +226,9 @@ struct GateResult {
 
 fn token(value: &str, field: &str) -> Result<String, String> {
     if value.is_empty() || value.chars().any(|c| c.is_control() || c.is_whitespace()) {
-        return Err(format!("{field} must be a non-empty token without whitespace"));
+        return Err(format!(
+            "{field} must be a non-empty token without whitespace"
+        ));
     }
     Ok(value.to_owned())
 }
@@ -273,40 +275,25 @@ fn parse_row(fields: &[&str]) -> Result<GateInput, String> {
     let utility_model_digest = token(fields[3], "utility_model_digest")?;
 
     let adequacy = AdequacyEvidence {
-        physics_adherence: EvidenceStatus::parse(
-            fields[7],
-            "physics_adherence_status",
-        )?,
+        physics_adherence: EvidenceStatus::parse(fields[7], "physics_adherence_status")?,
         action_fidelity: EvidenceStatus::parse(fields[8], "action_fidelity_status")?,
-        constraint_compliance: EvidenceStatus::parse(
-            fields[9],
-            "constraint_compliance_status",
-        )?,
+        constraint_compliance: EvidenceStatus::parse(fields[9], "constraint_compliance_status")?,
         counterfactual_grounding: EvidenceStatus::parse(
             fields[10],
             "counterfactual_grounding_status",
         )?,
-        failure_preservation: EvidenceStatus::parse(
-            fields[11],
-            "failure_preservation_status",
-        )?,
+        failure_preservation: EvidenceStatus::parse(fields[11], "failure_preservation_status")?,
         horizon_support: EvidenceStatus::parse(fields[12], "horizon_support_status")?,
         latent_rollout_fidelity: EvidenceStatus::parse(
             fields[13],
             "latent_rollout_fidelity_status",
         )?,
-        state_sufficiency: EvidenceStatus::parse(
-            fields[14],
-            "state_sufficiency_status",
-        )?,
+        state_sufficiency: EvidenceStatus::parse(fields[14], "state_sufficiency_status")?,
         selected_action_calibration: EvidenceStatus::parse(
             fields[15],
             "selected_action_calibration_status",
         )?,
-        trajectory_provenance: EvidenceStatus::parse(
-            fields[16],
-            "trajectory_provenance_status",
-        )?,
+        trajectory_provenance: EvidenceStatus::parse(fields[16], "trajectory_provenance_status")?,
     };
 
     Ok(GateInput {
@@ -325,7 +312,10 @@ fn parse_row(fields: &[&str]) -> Result<GateInput, String> {
 }
 
 fn parse_input(input: &str) -> Result<Vec<GateInput>, String> {
-    let mut lines = input.lines().enumerate().filter(|(_, line)| !line.trim().is_empty());
+    let mut lines = input
+        .lines()
+        .enumerate()
+        .filter(|(_, line)| !line.trim().is_empty());
     let (_, header) = lines.next().ok_or("empty decision-gate input")?;
     let observed_header = header.split('\t').collect::<Vec<_>>();
     if observed_header.as_slice() != INPUT_HEADER.as_slice() {
@@ -391,9 +381,7 @@ fn assess(input: &GateInput) -> GateResult {
     if !valid_sha256(&input.model_digest) {
         return direct_fallback_or_block(input, "invalid_model_digest");
     }
-    if !valid_sha256(&input.adequacy_model_digest)
-        || !valid_sha256(&input.utility_model_digest)
-    {
+    if !valid_sha256(&input.adequacy_model_digest) || !valid_sha256(&input.utility_model_digest) {
         return direct_fallback_or_block(input, "invalid_evidence_digest");
     }
     if input.model_digest != input.adequacy_model_digest {
@@ -641,21 +629,27 @@ mod tests {
         let header = INPUT_HEADER.join("\t");
         let good = valid_row();
         let duplicate = format!("{header}\n{good}\n{good}\n");
-        assert!(parse_input(&duplicate)
-            .unwrap_err()
-            .contains("duplicate case_id"));
-        assert!(parse_input(&format!("{header}\ncase_only\n"))
-            .unwrap_err()
-            .contains("row has"));
+        assert!(
+            parse_input(&duplicate)
+                .unwrap_err()
+                .contains("duplicate case_id")
+        );
+        assert!(
+            parse_input(&format!("{header}\ncase_only\n"))
+                .unwrap_err()
+                .contains("row has")
+        );
     }
 
     #[test]
     fn parser_rejects_unknown_evidence_labels() {
         let header = INPUT_HEADER.join("\t");
         let invalid = valid_row().replacen("\tPASS\t", "\tMAYBE\t", 1);
-        assert!(parse_input(&format!("{header}\n{invalid}\n"))
-            .unwrap_err()
-            .contains("exactly PASS, FAIL, or UNKNOWN"));
+        assert!(
+            parse_input(&format!("{header}\n{invalid}\n"))
+                .unwrap_err()
+                .contains("exactly PASS, FAIL, or UNKNOWN")
+        );
     }
 
     #[test]
@@ -665,13 +659,17 @@ mod tests {
             "episode_001\t{DIGEST}\t{DIGEST}\t{DIGEST}\t7\t7\tfalse\tPASS\tPASS\tPASS\tPASS\tPASS\tPASS\tPASS\tPASS\tPASS\tPASS"
         );
         let nonfinite = format!("{header}\n{prefix}\tNaN\ttrue\ttrue\n");
-        assert!(parse_input(&nonfinite)
-            .unwrap_err()
-            .contains("finite number"));
+        assert!(
+            parse_input(&nonfinite)
+                .unwrap_err()
+                .contains("finite number")
+        );
         let malformed_bool = format!("{header}\n{prefix}\t0.12\tyes\ttrue\n");
-        assert!(parse_input(&malformed_bool)
-            .unwrap_err()
-            .contains("exactly true or false"));
+        assert!(
+            parse_input(&malformed_bool)
+                .unwrap_err()
+                .contains("exactly true or false")
+        );
     }
 
     #[test]
