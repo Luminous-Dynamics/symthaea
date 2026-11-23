@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/MATHLIB_ELABORATED_DEPENDENCY_GRAPH_V1.schema.json",
+  "title": "Mathlib Elaborated Dependency Graph Extraction V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "source_repository",
+    "source_revision",
+    "lean_toolchain",
+    "lean_revision",
+    "declaration",
+    "declaration_kind",
+    "level_parameters",
+    "proof_value_available",
+    "type_dependencies",
+    "proof_value_dependencies",
+    "constant_info_dependency_closure",
+    "unresolved_dependencies",
+    "edges"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "source_repository": {
+      "const": "leanprover-community/mathlib4"
+    },
+    "source_revision": {
+      "const": "6ebcce37335bcb6bca64596e5d57bb3035648030"
+    },
+    "lean_toolchain": {
+      "const": "leanprover/lean4:v4.37.0-rc1"
+    },
+    "lean_revision": {
+      "const": "0b77e12952ad39077d80d8bd6b66d601f225c321"
+    },
+    "declaration": {
+      "type": "string",
+      "minLength": 1
+    },
+    "declaration_kind": {
+      "enum": [
+        "axiom",
+        "definition",
+        "theorem",
+        "opaque",
+        "quotient",
+        "inductive",
+        "constructor",
+        "recursor"
+      ]
+    },
+    "level_parameters": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "proof_value_available": {
+      "type": "boolean"
+    },
+    "type_dependencies": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "proof_value_dependencies": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "constant_info_dependency_closure": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "unresolved_dependencies": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "source",
+          "target",
+          "relation",
+          "origin"
+        ],
+        "properties": {
+          "source": {
+            "type": "string",
+            "minLength": 1
+          },
+          "target": {
+            "type": "string",
+            "minLength": 1
+          },
+          "relation": {
+            "enum": [
+              "type_dependency",
+              "proof_dependency",
+              "inductive_constructor",
+              "mutual_inductive_member",
+              "constructor_of",
+              "recursor_for_inductive",
+              "recursor_rule_constructor",
+              "recursor_reduction_dependency"
+            ]
+          },
+          "origin": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}
