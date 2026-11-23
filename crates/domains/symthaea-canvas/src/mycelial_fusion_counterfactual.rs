@@ -1348,7 +1348,9 @@ mod tests {
     };
 
     fn digest(ch: char) -> String {
-        std::iter::repeat_n(ch, 64).collect()
+        let nibble = ch.to_digit(16).unwrap_or((ch as u32) % 16);
+        let hex_char = char::from_digit(nibble, 16).expect("nibble is in radix 16");
+        std::iter::repeat_n(hex_char, 64).collect()
     }
 
     fn junction(id: &str, kind: AnnotatedJunctionKind, x: f64, y: f64) -> AnnotatedJunction {
