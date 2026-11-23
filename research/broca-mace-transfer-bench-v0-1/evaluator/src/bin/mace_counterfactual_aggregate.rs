@@ -661,6 +661,7 @@ fn paired_record(
 struct CandidateReceipt {
     run_id: String,
     method: String,
+    candidate_observation_sequence: u64,
     candidate_input_sha256: String,
     decision: String,
     retrieved_event_ids: Vec<u32>,
@@ -668,10 +669,17 @@ struct CandidateReceipt {
     retrieval_profile_sha256: Option<String>,
 }
 
-fn expected_candidate_observation_id(method: &str, candidate_input_sha256: &str) -> String {
-    let identity = format!("{method}:{candidate_input_sha256}");
-    let digest = hex_digest(Sha256::digest(identity.as_bytes()).as_slice());
-    format!("obs-{}", &digest[..16])
+fn expected_candidate_observation_id(
+    run_id: &str,
+    pair_block_id: &str,
+    observation_sequence: u64,
+    method: &str,
+    candidate_input_sha256: &str,
+) -> String {
+    let identity = format!(
+        "mace-candidate-observation-v1|run={run_id}|pair={pair_block_id}|sequence={observation_sequence}|method={method}|input={candidate_input_sha256}"
+    );
+    format!("obs-{}", hex_digest(Sha256::digest(identity.as_bytes()).as_slice()))
 }
 
 fn expected_candidate_input_sha256(
@@ -697,6 +705,8 @@ fn parse_candidate_receipt(record: &Value) -> Result<((String, String), Candidat
         .map_err(|error| format!("invalid candidate pair_block_id: {error}"))?;
     let candidate_observation_id =
         required_string(record, "candidate_observation_id")?.to_string();
+    let candidate_observation_sequence =
+        required_u64(record, "candidate_observation_sequence")?;
     let method = required_string(record, "method")?.to_string();
     let candidate_input_sha256 =
         required_string(record, "candidate_input_sha256")?.to_string();
@@ -719,8 +729,13 @@ fn parse_candidate_receipt(record: &Value) -> Result<((String, String), Candidat
     {
         return Err("candidate_input_sha256 does not bind DecisionNeed and evidence digests".to_string());
     }
-    if expected_candidate_observation_id(&method, &candidate_input_sha256)
-        != candidate_observation_id
+    if expected_candidate_observation_id(
+        &run_id,
+        &pair_block_id,
+        candidate_observation_sequence,
+        &method,
+        &candidate_input_sha256,
+    ) != candidate_observation_id
     {
         return Err("candidate_observation_id does not match method/input digest".to_string());
     }
@@ -747,6 +762,7 @@ fn parse_candidate_receipt(record: &Value) -> Result<((String, String), Candidat
         CandidateReceipt {
             run_id,
             method,
+            candidate_observation_sequence,
             candidate_input_sha256,
             decision,
             retrieved_event_ids,
@@ -766,6 +782,11 @@ fn validate_score_against_candidate(
     }
     if required_string(score, "method")? != candidate.method {
         return Err("evaluator score method differs from candidate receipt".to_string());
+    }
+    if required_u64(score, "candidate_observation_sequence")?
+        != candidate.candidate_observation_sequence
+    {
+        return Err("evaluator score candidate_observation_sequence differs from candidate receipt".to_string());
     }
     if required_string(score, "candidate_input_sha256")? != candidate.candidate_input_sha256 {
         return Err("evaluator score candidate_input_sha256 differs from candidate receipt".to_string());
@@ -1125,14 +1146,21 @@ mod tests {
         let candidate_evidence_sha256 = "b".repeat(64);
         let candidate_input_sha256 =
             expected_candidate_input_sha256(&decision_need_sha256, &candidate_evidence_sha256);
-        let candidate_observation_id =
-            expected_candidate_observation_id(method, &candidate_input_sha256);
+        let candidate_observation_sequence = 7_u64;
+        let candidate_observation_id = expected_candidate_observation_id(
+            run_id,
+            pair_block_id,
+            candidate_observation_sequence,
+            method,
+            &candidate_input_sha256,
+        );
         json!({
             "schema_version": INPUT_SCHEMA,
             "record_type": "candidate_decision",
             "run_id": run_id,
             "pair_block_id": pair_block_id,
             "candidate_observation_id": candidate_observation_id,
+            "candidate_observation_sequence": candidate_observation_sequence,
             "method": method,
             "candidate_input_sha256": candidate_input_sha256,
             "decision_need_sha256": decision_need_sha256,
@@ -1149,9 +1177,13 @@ mod tests {
             "run_id": candidate.run_id,
             "pair_block_id": pair_block_id,
             "candidate_observation_id": expected_candidate_observation_id(
+                &candidate.run_id,
+                pair_block_id,
+                candidate.candidate_observation_sequence,
                 &candidate.method,
                 &candidate.candidate_input_sha256
             ),
+            "candidate_observation_sequence": candidate.candidate_observation_sequence,
             "method": candidate.method,
             "candidate_input_sha256": candidate.candidate_input_sha256,
             "decision": candidate.decision,
