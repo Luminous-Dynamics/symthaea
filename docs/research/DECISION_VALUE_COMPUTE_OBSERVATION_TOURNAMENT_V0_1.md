@@ -304,7 +304,7 @@ The official project reports mean success (sync+async) of 0.18 for π0.5, 0.11 f
 
 ### 17.2 The critical paired-outcome result
 
-RoboDyna's paper shows why a mean async penalty is insufficient. Moving from synchronous to asynchronous evaluation changes average success by at most 0.03, but seed-by-seed analysis finds that roughly one-third to one-half of each policy's successful rollouts are protocol-contingent: latency changes which episodes succeed more than it changes the total mean. In its Sort Apples Belt FastWAM example, success is 0.65 synchronous versus 0.17 asynchronous. The world-owned clock is especially consequential in monotonic state-transition tasks.
+RoboDyna's official project summary reports that moving from synchronous to asynchronous evaluation flips 5–12% of episode outcomes while changing average success rates by at most 3 percentage points. These are two different statistics: the paired transition rate captures which particular episodes change outcome, while the mean captures only the aggregate shift. We should report both directly from the official same-seed outputs, without inferring a larger share of all successes or quoting per-task sync/async values unless those exact rows are reproduced from the released result files.
 
 The tournament must therefore report all of the following, not only mean_success_async minus mean_success_sync:
 
@@ -316,7 +316,7 @@ The tournament must therefore report all of the following, not only mean_success
 - latency distributions by decision stage and charged policy latency;
 - full failure denominators, including timeouts and non-applications.
 
-Never claim “latency has a 2% effect” from a two-point average shift if 30–50% of previously successful episodes changed identity. The paired outcome identity is the primary causal datum.
+Never summarize latency sensitivity with the mean shift alone: the official benchmark reports 5–12% paired outcome flips despite at most a 3-percentage-point average-success change. The transition matrix and average effect should be reported together.
 
 ### 17.3 Reproduce first; extend second
 
@@ -347,3 +347,43 @@ A credible first result is not “higher benchmark average” alone. It is a pai
 Also publish at least one regime where the direct policy or VLA baseline is better. RoboDyna's own findings show that predictive world models can be worse than reactive policies on independently moving or periodic scenes, while providing a different capability on static-to-dynamic tasks. A useful cognitive architecture must detect when prediction helps and when it is a liability.
 
 Do not conflate official RoboDyna outcomes with Symthaea extensions. No result from this protocol presently establishes a RoboDyna score or superiority over its policies.
+
+
+## 18. World-model evidence ladder: declare the highest level actually demonstrated
+
+The 2026 position paper **How Should World Models Be Evaluated? A Decision-Making-Centric Position** argues that world-model benchmarks mix artifact quality with decision utility and that those axes are not interchangeable. It proposes an L0–L7 evidence ladder. The ladder is descriptive, spans several partly independent axes, and must not be collapsed into one score:
+
+| Level | Evidence question | Typical evidence |
+|---|---|---|
+| L0 Visual plausibility | Do generated images/videos look realistic? | FID/FVD, human preference |
+| L1 Logged-future prediction | Does open-loop prediction match held-out observed futures? | MSE/PSNR/SSIM/LPIPS, latent/flow error |
+| L2 Semantic alignment | Does the rollout match task instruction and scene semantics? | CLIP/caption scores, grounded semantic judgments |
+| L3 Physical plausibility | Are geometry, contact, object permanence and intuitive physics coherent? | Physical probes, trajectory/contact/depth consistency |
+| L4 Action controllability / interventional fidelity | Does changing an action produce the correct task-relevant change? | Paired interventions, action-effect accuracy, round-trip/interventional OPE |
+| L5 Reward/value/outcome fidelity | Does the model predict success, progress, reward or constraints? | Calibration, reward F1, value error, Kendall tau |
+| L6 Policy evaluation and ranking | Does model-based evaluation rank fixed policies as the real environment does? | Pairwise ranking accuracy, Spearman/Pearson, MMRV |
+| L7 Policy optimization / planning utility | Does using the model actually improve real/simulator decisions under matched budgets? | Policy lift, optimization regret, planning success, exploitability gap |
+
+Prior paper: https://arxiv.org/abs/2606.15032
+
+For Symthaea, state-abstraction and recurrent representation tests (#13239/#13258) are cross-cutting diagnostics; they do not by themselves establish L4–L7. The compute×observation evaluator establishes a paired arithmetic reference, not a world-model level. The RoboDyna external execution can support L4/L5 only when the model predicts action-conditioned effects and outcomes on held-out same-seed episodes. Fixed-policy ranking is L6. A claim that Symthaea's world model improves decision-making requires an L7 experiment: compare a policy with and without the model under the same information, action authority, training data and full vector resource budget, and measure real/simulator policy lift, regret, failure and exploitability.
+
+This claim ladder is useful precisely because a system may have weak image reconstruction but strong decision utility, or excellent video fidelity but poor action controllability. Report the evidence level per claim, not as a global model badge.
+
+## 19. Resource-aware inference under changing GPU load: ATEST comparator
+
+**ATEST: Adaptive Resource-Aware Test-Time Scaling for LLM Inference** (arXiv:2610.25519, October 18, 2026) is an important comparator for the reasoning-only compute track. It observes that the energy cost of the same four-sample query can rise by as much as 4.1× under GPU contention. ATEST-Online estimates answer stability and step energy online; ATEST-Calibrated relies on offline accuracy/cost calibration. The paper reports that online adaptation stays within its energy budget on its four A100 reasoning datasets while trading higher tail latency and lower throughput on short tasks for greater robustness to changing load.
+
+- Paper: https://arxiv.org/abs/2610.25519
+
+Use ATEST's native reasoning benchmarks and accuracy/energy/latency protocol as a separate comparator. For Symthaea, the transferable research question is whether a cognitive resource controller uses measured current cost—not static FLOPs or an offline average—when deciding whether more computation is worth purchasing. The 13-field pairing contract in #13281 binds the hard resource/deadline envelope, but a future online policy must additionally consume source-bound live utilization/energy receipts from the existing resource owners. Do not turn a predicted or nominal GPU cost into measured energy.
+
+A dynamic-load tournament should block by measured contention level and report:
+- per-step energy and measured total energy at a declared hardware boundary;
+- p50/p95/p99 latency and throughput;
+- answer/action quality and decision regret;
+- deferral/non-application rate;
+- budget overshoots and fallback exposure;
+- the same policy under stable and variable load.
+
+A policy that achieves the same mean score by exceeding the energy/deadline budget is not a win. A policy that remains within budget but sacrifices all short-task throughput is also not a universal win; publish its Pareto frontier and operating regime.
