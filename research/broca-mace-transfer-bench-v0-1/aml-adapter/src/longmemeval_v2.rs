@@ -41,6 +41,7 @@ pub enum V2TrajectoryReject {
     ScreenshotMissing,
     ScreenshotOutsideDatasetRoot,
     ScreenshotNotRegularFile,
+    ScreenshotDigestMismatch,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -55,6 +56,8 @@ pub struct LongMemEvalV2StateV1 {
     pub accessibility_tree: String,
     /// Source path/reference only. Image pixels are not loaded by this module.
     pub screenshot_reference: String,
+    /// Optional digest supplied by the controlled image-ingress adapter.
+    pub screenshot_sha256: Option<String>,
     /// Canonical JSON serialization of the original state object, retaining unknown keys.
     pub raw_state_json: String,
     pub raw_state_sha256: String,
@@ -117,6 +120,18 @@ impl LongMemEvalV2TrajectoryV1 {
                 .ok_or(V2TrajectoryReject::InvalidState { index: ordinal, field: "accessibility_tree/text" })?
                 .to_owned();
             let screenshot_reference = required_state("screenshot")?;
+            let screenshot_sha256 = match state.get("mace_screenshot_sha256") {
+                None | Some(Value::Null) => None,
+                Some(Value::String(value))
+                    if value.len() == 64
+                        && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)) =>
+                {
+                    Some(value.clone())
+                }
+                _ => return Err(V2TrajectoryReject::InvalidState {
+                    index: ordinal, field: "mace_screenshot_sha256",
+                }),
+            };
             let action_on_arrival = optional_string(state.get("action"))
                 .map_err(|_| V2TrajectoryReject::InvalidState { index: ordinal, field: "action" })?;
             let thoughts = optional_string(state.get("thought").or_else(|| state.get("thoughts")))
@@ -138,7 +153,7 @@ impl LongMemEvalV2TrajectoryV1 {
             states.push(LongMemEvalV2StateV1 {
                 source_ordinal: ordinal, source_state_index, step, url,
                 action_on_arrival, thoughts, accessibility_tree,
-                screenshot_reference, raw_state_json, raw_state_sha256,
+                screenshot_reference, screenshot_sha256, raw_state_json, raw_state_sha256,
             });
         }
 
@@ -261,6 +276,7 @@ pub struct LongMemEvalV2HitV1 {
     pub rank: usize,
     pub evidence_text: String,
     pub screenshot_references: Vec<String>,
+    pub screenshot_sha256s: Vec<Option<String>>,
 }
 
 impl LongMemEvalV2HitV1 {
@@ -291,8 +307,22 @@ impl LongMemEvalV2HitV1 {
             kind: LongMemEvalV2ContextKind::Text,
             value: self.evidence_text.clone(),
         }];
-        for reference in &self.screenshot_references {
+        if self.screenshot_references.len() != self.screenshot_sha256s.len() {
+            return Err(V2TrajectoryReject::ChunkIntegrityMismatch);
+        }
+        for (reference, expected_digest) in self
+            .screenshot_references
+            .iter()
+            .zip(&self.screenshot_sha256s)
+        {
             let resolved = resolve_screenshot_reference(dataset_root, reference)?;
+            if let Some(expected) = expected_digest {
+                let image_bytes = fs::read(&resolved)
+                    .map_err(|_| V2TrajectoryReject::ScreenshotMissing)?;
+                if sha256_hex(&image_bytes) != *expected {
+                    return Err(V2TrajectoryReject::ScreenshotDigestMismatch);
+                }
+            }
             items.push(LongMemEvalV2ContextItemV1 {
                 kind: LongMemEvalV2ContextKind::Image,
                 value: resolved.to_string_lossy().into_owned(),
@@ -553,6 +583,8 @@ impl LongMemEvalV2Bm25IndexV1 {
                     score, rank: 0,
                     evidence_text: item.chunk.evidence_text.clone(),
                     screenshot_references: item.chunk.screenshot_references.clone(),
+                    screenshot_sha256s: item.chunk.state_window.iter()
+                        .map(|state| state.screenshot_sha256.clone()).collect(),
                 });
             }
         }
@@ -643,8 +675,18 @@ fn validate_state_projection(state: &LongMemEvalV2StateV1) -> Result<(), V2Traje
         None | Some(Value::Null) => None,
         Some(value) => Some(value.as_i64().ok_or(V2TrajectoryReject::ChunkIntegrityMismatch)?),
     };
+    let screenshot_sha256 = match object.get("mace_screenshot_sha256") {
+        None | Some(Value::Null) => None,
+        Some(Value::String(value)) if value.len() == 64
+            && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)) =>
+        {
+            Some(value.clone())
+        }
+        _ => return Err(V2TrajectoryReject::ChunkIntegrityMismatch),
+    };
     if action != state.action_on_arrival || thought != state.thoughts
         || source_index != state.source_state_index || step != state.step
+        || screenshot_sha256 != state.screenshot_sha256
     { return Err(V2TrajectoryReject::ChunkIntegrityMismatch); }
     Ok(())
 }
@@ -975,6 +1017,37 @@ mod tests {
                 && Path::new(&item.value).is_absolute()
                 && Path::new(&item.value).is_file()
         }));
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn resolved_context_items_verify_optional_screenshot_pixel_digest() {
+        let root = temporary_dataset_root("context-digest");
+        let image = root.join("screenshots/traj/000.png");
+        fs::create_dir_all(image.parent().expect("image parent")).expect("image directory");
+        let image_bytes = b"bound screenshot bytes";
+        fs::write(&image, image_bytes).expect("image fixture");
+
+        let mut value: Value = serde_json::from_str(&sample("t1", "web")).expect("sample JSON");
+        value["states"][0]["mace_screenshot_sha256"] =
+            serde_json::json!(sha256_hex(image_bytes));
+        let trajectory = LongMemEvalV2TrajectoryV1::parse_jsonl_record(
+            &value.to_string()
+        ).expect("trajectory with screenshot digest");
+        let index = LongMemEvalV2Bm25IndexV1::build("web", &[trajectory], 0, profile())
+            .expect("index");
+        let result = index.search("web", "Orders page New order button", 1, 0)
+            .expect("search");
+        assert_eq!(
+            result.hits[0].resolved_context_items(&root).map(|_| ()),
+            Ok(())
+        );
+
+        fs::write(&image, b"replaced screenshot bytes").expect("replace fixture");
+        assert_eq!(
+            result.hits[0].resolved_context_items(&root),
+            Err(V2TrajectoryReject::ScreenshotDigestMismatch)
+        );
         fs::remove_dir_all(root).expect("cleanup");
     }
 
