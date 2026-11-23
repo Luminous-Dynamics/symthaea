@@ -13,9 +13,10 @@
     "exact_factorial_interaction_pr": 13176,
     "deterministic_decision_regret_pr": 13152,
     "mixed_strategy_decision_regret_pr": 13165,
-    "evaluator_isolation_issue": 9437
+    "evaluator_isolation_issue": 9437,
+    "paired_decision_regret_interaction_issue": 13279
   },
-  "status": "protocol_and_fixture_authored_not_executed",
+  "status": "paired_interaction_and_cluster_adapter_rust_qualified_cluster_analyzer_separate",
   "factors": [
     {
       "id": "additional_compute",
@@ -268,8 +269,8 @@
     "held_out_negative_or_zero_interaction_workloads": "at_least_one",
     "lower_resource_cost_at_noninferior_regret": "20_percent_aspirational"
   },
-  "authored_tests": 0,
-  "executed_tests": 0,
+  "authored_tests": 30,
+  "executed_tests": 30,
   "benchmark_runs": 0,
   "hardware_energy_measurements": 0,
   "claims": {
@@ -277,6 +278,71 @@
     "benchmark_executed": false,
     "sota_improvement": false,
     "physical_energy_advantage": false,
-    "deployment_qualification": false
+    "deployment_qualification": false,
+    "signed_paired_decision_regret_reference_implemented": true,
+    "rust_reference_tested": true,
+    "cluster_adapter_implemented": true,
+    "cluster_statistics_executed": false
+  },
+  "rust_reference_path": "research/decision-value-interaction-001/",
+  "authored_rust_tests": 30,
+  "executed_rust_tests": 30,
+  "shared_pairing_identity_fields": [
+    "episode_id",
+    "hidden_world_id",
+    "hidden_world_digest",
+    "initial_state_digest",
+    "task_digest",
+    "loss_scale_digest",
+    "evaluator_profile_digest",
+    "execution_environment_digest",
+    "action_domain_digest",
+    "resource_budget_digest",
+    "model_configuration_digest",
+    "candidate_policy_digest",
+    "policy_seed"
+  ],
+  "outcome_contract": {
+    "applied": "evaluator_measured_action_regret_at_actual_application_time",
+    "not_applied": "explicit_terminal_reason_and_task_contract_no_output_regret_penalty",
+    "missing_action_as_zero": false,
+    "include_all_arms_in_denominator": true,
+    "preserve_application_or_terminal_timestamps": true
+  },
+  "rust_reference_test_evidence": {
+    "qualification_head_sha": "8f6d2e9b605e3ef07af5c593b1f209bc9a2c410e",
+    "workflow_run_id": 45133813434,
+    "toolchain": "Rust 1.96.0",
+    "format": "passed",
+    "tests": "30_passed_0_failed",
+    "strict_clippy": "passed"
+  },
+  "cluster_inference": {
+    "owner_issue": 8578,
+    "owner_pr": 8578,
+    "adapter_path": "research/decision-value-interaction-001/src/cluster_adapter.rs",
+    "output_format": "VIS-DVPC-CLUSTER-DELTAS-001-v1",
+    "comparison_family_size": 4,
+    "contrasts": [
+      "compute_benefit",
+      "observation_benefit",
+      "joint_benefit",
+      "compute_observation_interaction"
+    ],
+    "aggregation_order": [
+      "hidden_worlds_within_episode",
+      "episodes_within_independent_cluster",
+      "one_delta_per_cluster_and_contrast"
+    ],
+    "downstream_statistics_owner": "VIS-DVPC-014 #8578",
+    "minimum_clusters_mechanics_floor": 5,
+    "minimum_cluster_count_is_not_scientific_power_claim": true,
+    "cluster_analyzer_benchmark_executed": false,
+    "analyzer_exact_head_run_observable": false,
+    "cluster_inference_result_claimed": false,
+    "assignment_manifest_sha256": "8257074ad9d509a144c807fe1eeca8c0f29fb9c5101589a3e220d207236d0aab",
+    "adapter_hashes_canonical_typed_assignments": true,
+    "adapter_sha256_standard_vectors_tested": true,
+    "adapter_hash_mismatch_control": true
   }
 }

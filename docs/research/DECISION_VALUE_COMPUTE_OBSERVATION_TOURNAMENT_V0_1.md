@@ -277,6 +277,33 @@ NeuroBench 2.4.0 supplies algorithm workloads such as few-shot class-incremental
 - NeuroBench 2.4.0: https://neurobench.readthedocs.io/en/2.4.0/readme.html
 
 The defensible competitive claim is not that Symthaea is more efficient or more intelligent today. It is that this programme is setting up a reproducible comparison of decision quality, temporal application cost, observation-compute interaction and non-fungible resources, while retaining official benchmark metrics where applicable.
+## 16. Executable paired decision-regret reference
+
+The narrow signed paired 2×2 decision-regret contrast is implemented in the standalone crate:
+
+research/decision-value-interaction-001/
+
+Tracking issue: #13279. The crate requires exactly one baseline, compute-only, observation-only and joint result for the same frozen episode/hidden-world/action-loss scope. It binds the common task/loss, evaluator, model/configuration, policy and seed identities; preserves the distinct actual application timestamps; rejects missing/duplicate arms, identity mismatches, empty digests and out-of-range regret; and retains negative marginal benefits and negative interactions. The shared identity now explicitly binds execution environment, action domain and hard resource/deadline envelope.
+
+Fourteen Rust unit tests are authored for positive complementarity (+230,000 PPM), zero/additive interaction, negative antagonism (−170,000 PPM), harmful compute escalation, row-order independence, distinct application times, missing/duplicate arms and identity/range failures.
+
+This reference does not replace #13176. #13176 remains responsible for exposure and resource factorial attribution; the new crate supplies only the paired decision-regret contrast, which is not in the current #13176 outcome schema. Exact-head Rust 1.96 verification passed on 0e5f80ca51541711752869d8d6bfe0304df1496d: formatting passed, 14 tests passed, and strict Clippy passed (workflow run 45086902847). This is evaluator qualification, not a RoboDyna or external benchmark result.
+
+### 16.1 Independent-cluster inference handoff
+
+Per-world certificates are not independent statistical samples merely because they have different episode or hidden-world IDs. The Rust adapter `research/decision-value-interaction-001/src/cluster_adapter.rs` preserves the intended hierarchy and emits the input contract owned by [#8578 — VIS-DVPC-014](https://github.com/Luminous-Dynamics/symthaea/pull/8578):
+
+1. Recompute certificate effects from the four raw arm regrets.
+2. Average hidden-world counterfactual outcomes within each episode.
+3. Average episode means within a preregistered independent scene/sequence/session cluster.
+4. Emit one row per independent cluster and each of four predeclared contrasts: compute benefit, observation benefit, joint benefit and compute×observation interaction.
+
+It binds the complete thirteen-field paired identity on the evaluator certificate. It rejects duplicate cluster/episode/world records, episode reassignment across clusters, task/loss/evaluator/environment/action/resource/model/policy context changes, initial-state/seed drift within an episode and hidden-world cohort drift across episodes in a cluster.
+
+The adapter emits exactly the `VIS-DVPC-CLUSTER-DELTAS-001-v1` table. #8578 owns the downstream approximate percentile cluster bootstrap, sign-flip diagnostic and Bonferroni correction. It does not duplicate those statistics here. A minimum of five clusters is only an executable-mechanics floor; confirmatory studies still need a preregistered power/MDE analysis, substantially more independent clusters where feasible and a second held-out-domain replication.
+
+The adapter's sixteen cluster tests are included in the passing 30-test evaluator run at exact head `8f6d2e9b605e3ef07af5c593b1f209bc9a2c410e` (workflow run `45133813434`). Its SHA-256 implementation passes standard empty-string and `abc` test vectors; it recomputes the canonical assignment-manifest hash from typed assignments before emitting any delta rows. The analyzer itself is separately developed in #8578; its custom push workflow has been authored, but no exact-head analyzer result is claimed until a visible run receipt is available.
+
 ## 17. RoboDyna replication profile: paired episode identity, not just average async loss
 
 RoboDyna is the closest public embodied benchmark for this programme and should be promoted from a background citation to a first external execution target. Its NeurIPS 2026 workshop paper evaluates 20 conceptual dynamic-manipulation tasks across five capability categories plus 10 household tasks, with 3,500 expert demonstrations, held-out compositional difficulty, paired synchronous/asynchronous evaluation on identical seeds, progress score and human controls. The environment uses SAPIEN physics at 250 Hz and an action cadence of 15 simulation steps (60 ms). During asynchronous inference, measured forward-pass wall time is charged to simulated time while the scene continues evolving and the arm holds its last target. The reported mean inference charges are 109 ms for π0.5, 156 ms for X-VLA and 236 ms for FastWAM.
@@ -387,3 +414,51 @@ A dynamic-load tournament should block by measured contention level and report:
 - the same policy under stable and variable load.
 
 A policy that achieves the same mean score by exceeding the energy/deadline budget is not a win. A policy that remains within budget but sacrifices all short-task throughput is also not a universal win; publish its Pareto frontier and operating regime.
+
+
+## 20. Competitive update and the next research frontier (2026-11-23)
+
+This programme now has a narrower and more defensible competitive thesis: **qualify when an information/resource intervention changes a decision at the time that decision is consumed, and price the whole intervention rather than its model-side work alone.** It must not claim that VOI, adaptive stopping, anytime inference, or decision-aware perception are new in isolation.
+
+### Closest current comparators
+
+| Comparator | Published result / protocol | What Symthaea should reproduce or extend |
+|---|---|---|
+| DEEP — Decision Value of Perception Compute (Sep 28, 2026) | On KITTI/nuScenes and open-loop nuPlan experiments, 34–54% of escalations that change downstream loss make it worse. The paper reports that perception-gain routing can reduce realized test decision gain by 7.4% of all-cheap loss versus decision-value routing. Under a 20% latency budget, only lightweight routers at about 3.5% of a full detector pass still beat random after allocator cost. [Paper](https://arxiv.org/abs/2609.35910) | Reproduce compatible cheap/full perception arms and budget semantics. Extend the treatment design to **compute × observation**, preserve positive and negative interaction, and evaluate regret at actual application time. |
+| ATEST — Adaptive Resource-Aware Test-Time Scaling (Oct 18, 2026) | Reports up to 4.1× energy increase for the same four-sample query as GPU contention rises. On high-load GSM8K, ATEST-Online reports 60.0% accuracy with no deferrals versus 44.0% and 42.4% deferrals for ATEST-Calibrated; including offline profiling, it reports 42× less GPU time and 48× less energy on its evaluated workload. [Paper](https://arxiv.org/abs/2610.25519) | Reproduce the reasoning-only track with live load and measured energy. Extend from answer stability to **action regret, application deadline, fallback exposure and the current price of each additional compute block**. |
+| RoboDyna (NeurIPS 2026 workshop) | 30 dynamic tasks, 3,500 demonstrations and same-seed synchronous/asynchronous protocols. Published results report 5–12% paired episode-outcome flips despite at most 3 percentage points of mean success change; the evaluated policies remain below 20% overall success. [Project and results](https://robodyna.github.io/robodyna/) · [Code/data](https://github.com/RoboDyna/robodyna) | Make this the first embodied external reproduction. Report paired flips and transition matrices, not only average success. Keep official success/progress scores separate from Symthaea-specific decision regret, action-age and resource extensions. |
+| MLPerf Inference v6.1 (Sep 16, 2026) | Record 30 submitters and 120 systems, with End-to-End RAG and Edge Agentic Inference added to the official suite. [MLCommons results](https://mlcommons.org/2026/09/mlperf-inference-v6-1-results/) · [working-group analysis](https://mlcommons.org/2026/09/chairs-mlperf-inference-v6-1/) | Where interface and hardware match, reproduce official quality/latency/throughput/energy protocols. Treat decision-regret and observation-compute interaction as additional task-level metrics—not substitutes for tokens/s or official scores. |
+| NeuroBench 2.4.0 | Provides algorithm tracks such as few-shot class-incremental learning, event-camera object detection, NHP motor prediction and chaotic-function prediction, plus static and workload metrics. [Docs](https://neurobench.readthedocs.io/en/2.4.0/readme.html) | Use matched tracks to assess the HDC/LTC/neuromorphic hypothesis. Report native task metrics and measured system energy/latency separately from theoretical synaptic-operation counts. |
+| TIME (ICML 2026) | Covers 50 fresh datasets and 98 forecasting tasks with a zero-shot, leakage-controlled, task- and pattern-level evaluation protocol. [Paper/proceedings](https://proceedings.mlr.press/v306/qiao26g.html) | Use as a complementary irregular/time-series prediction benchmark, not as evidence of embodied decision utility. Add intervention and downstream action tests before claiming world-model capability. |
+
+### Paradigm shift: from adaptive inference to adaptive *decision support*
+
+The resource allocator should reason over a vector of possible interventions, not just “more tokens” or “more compute”:
+
+- acquire an observation;
+- run another compute block;
+- retain, compress or refresh recurrent state;
+- verify a belief/action;
+- query an independent evaluator or sensor;
+- stop, apply, fall back or abstain.
+
+The state-compression evaluator in #13239 makes memory representation a candidate treatment only after its decision-regret loss is bounded. The #9666/#9882 owners continue to own joint resource feasibility and non-fungible accounting. The #13176 owner continues to own exact factorial attribution for its declared exposure/resource outputs. This tournament adds only the paired compute×observation decision-regret contrast and its cluster-level statistical handoff.
+
+The long-term research object is a **decision-sufficiency frontier**: the Pareto set of interventions that trade application-time regret, deadline/fallback exposure, measured energy, compute work, persistent bytes, retained byte-time, sensing and verification cost. A single weighted score must not hide a safety regression or hard resource overrun.
+
+### Benchmark gates and prospective targets
+
+The following are proposed acceptance criteria, not achieved results:
+
+1. **Mechanics:** 100% agreement on finite four-arm golden cases; exact manifest and source-lock binding; deterministic replay; zero missing/duplicate arm or cluster rows.
+2. **Leakage and authority:** zero future-information leakage, zero candidate-visible evaluator labels, zero stale/expired action applications and zero hard resource-budget overruns in adversarial controls.
+3. **Decision quality:** publish paired cluster means/medians, intervals, per-cluster signs, worst-family regret and the compute×observation interaction. Include at least one held-out positive-interaction case and one null/negative-interaction case.
+4. **Efficiency:** target at least 20% lower measured compute or energy at a preregistered non-inferior application-time-regret margin. This remains aspirational until a matched hardware experiment demonstrates it.
+5. **Generalization:** preregister power/minimum-detectable-effect analysis, use substantially more independent clusters than the five-cluster mechanics floor, and replicate on a second held-out domain.
+6. **External comparability:** reproduce official baseline protocols first; compare only identical input information, policy authority, action domain, hardware, timing and budget envelopes. Mark unmatched baselines NOT_COMPARABLE.
+
+### What would constitute a real SOTA-level result?
+
+A defensible claim needs all of the following: exact upstream dataset/benchmark revision and license; frozen group/cluster split and assignment manifest; source/evaluator/model/configuration hashes; matched current best public baselines; allocator overhead charged; measured wall latency and electrical energy; full failure denominators; cluster-level intervals under declared assumptions; independent reproduction; and a second-domain confirmation.
+
+The programme's differentiator is not that its evaluator computes a new arithmetic formula. It is the compositional evidence chain from counterfactual treatment, through application-time outcome, to a frozen independent-cluster inference receipt. The current PRs qualify that chain on synthetic fixtures only. No RoboDyna, MLPerf, NeuroBench, external SOTA or physical-energy advantage is claimed by these tests.
