@@ -578,12 +578,14 @@ mod tests {
     }
 
     #[test]
-    fn total_effect_weights_profile_clusters_not_turn_counts() {
+    fn reports_profile_clusters_separately_from_episode_rows() {
         let assignments = make_assignments();
         let outcomes = make_outcomes(&assignments);
         let report = estimate_total_effect(&assignments, &expected_tasks(), &outcomes).unwrap();
         assert_eq!(report.utility_effect.control_profiles, 4);
         assert_eq!(report.utility_effect.treatment_profiles, 4);
+        assert_eq!(report.control.episodes, 8);
+        assert_eq!(report.treatment.episodes, 8);
         assert!((report.control.mean_utility - 0.35).abs() < 1e-12);
         assert!((report.treatment.mean_utility - 0.9).abs() < 1e-12);
         assert!((report.utility_effect.treatment_minus_control - 0.55).abs() < 1e-12);
