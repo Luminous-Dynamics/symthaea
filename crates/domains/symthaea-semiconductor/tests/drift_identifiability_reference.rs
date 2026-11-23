@@ -21,7 +21,7 @@ struct CorpusV1 {
     cases: Vec<FixtureCaseV1>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct FixtureCaseV1 {
     id: String,
     actions: Vec<DriftObservationActionV1>,
@@ -244,16 +244,16 @@ fn assert_report_matches_independent_oracle(
         assert_eq!(
             actual.identifiable_from_observed,
             oracle_estimable(&observed_rows, actual.target),
-            "{} observed {}",
+            "{} observed target {:?}",
             case.id,
-            actual.target as u8
+            actual.target
         );
         assert_eq!(
             actual.identifiable_after_plan,
             oracle_estimable(&oracle.final_rows, actual.target),
-            "{} after {}",
+            "{} target after plan {:?}",
             case.id,
-            actual.target as u8
+            actual.target
         );
         assert_eq!(
             actual.identifiable_from_observed,
