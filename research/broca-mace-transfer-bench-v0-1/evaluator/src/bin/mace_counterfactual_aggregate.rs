@@ -1114,6 +1114,38 @@ mod tests {
     }
 
     #[test]
+    fn manifest_receipt_binds_pair_block_identity() {
+        let mut record = manifest_record("run-1", &"a".repeat(64));
+        record["pair_block_id"] = json!("world-2:task-relabeled");
+        let error = parse_manifest(&record).unwrap_err();
+        assert!(error.contains("receipt digest does not match"));
+    }
+
+    #[test]
+    fn manifest_receipt_binds_run_identity() {
+        let mut record = manifest_record("run-1", &"a".repeat(64));
+        record["run_id"] = json!("run-2");
+        let error = parse_manifest(&record).unwrap_err();
+        assert!(error.contains("receipt digest does not match"));
+    }
+
+    #[test]
+    fn manifest_receipt_binds_source_provenance() {
+        let mut record = manifest_record("run-1", &"a".repeat(64));
+        record["source_code_sha256"] = json!("b".repeat(64));
+        let error = parse_manifest(&record).unwrap_err();
+        assert!(error.contains("receipt digest does not match"));
+    }
+
+    #[test]
+    fn manifest_payload_digest_is_separate_from_receipt_digest() {
+        let mut record = manifest_record("run-1", &"a".repeat(64));
+        record["manifest_payload_sha256"] = json!("f".repeat(64));
+        let error = parse_manifest(&record).unwrap_err();
+        assert!(error.contains("payload digest does not match"));
+    }
+
+    #[test]
     fn manifest_rejects_intervention_mutation_with_stale_digest() {
         let mut record = manifest_record("run-1", &"a".repeat(64));
         record["intervention_count"] = json!(1);
