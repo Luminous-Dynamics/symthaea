@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/sfeb/two-sided-task-validity-v1.schema.json",
+  "title": "SFEB two-sided task validity policy v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "status",
+    "as_of",
+    "principle",
+    "task_modes",
+    "common_gates",
+    "reporting",
+    "limitations"
+  ],
+  "properties": {
+    "schema": {
+      "const": "sfeb-two-sided-task-validity-v1"
+    },
+    "status": {
+      "enum": [
+        "protocol_defined_not_executed",
+        "reviewed_not_executed",
+        "partially_executed",
+        "executed"
+      ]
+    },
+    "as_of": {
+      "type": "string",
+      "format": "date"
+    },
+    "principle": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_modes": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "mode",
+          "negative_control",
+          "negative_expected",
+          "positive_witness",
+          "positive_expected",
+          "preservation"
+        ],
+        "properties": {
+          "mode": {
+            "enum": [
+              "feature_implementation",
+              "seeded_defect_repair",
+              "maintenance_change"
+            ]
+          },
+          "negative_control": {
+            "type": "string",
+            "minLength": 1
+          },
+          "negative_expected": {
+            "type": "string",
+            "minLength": 1
+          },
+          "positive_witness": {
+            "type": "string",
+            "minLength": 1
+          },
+          "positive_expected": {
+            "type": "string",
+            "minLength": 1
+          },
+          "preservation": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "common_gates": {
+      "type": "array",
+      "minItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "requirement",
+          "required_evidence",
+          "failure"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Z0-9_]+$"
+          },
+          "requirement": {
+            "type": "string",
+            "minLength": 1
+          },
+          "required_evidence": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "failure": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "reporting": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required_fields",
+        "statuses",
+        "rules"
+      ],
+      "properties": {
+        "required_fields": {
+          "type": "array",
+          "minItems": 5,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "statuses": {
+          "type": "array",
+          "minItems": 4,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "rules": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

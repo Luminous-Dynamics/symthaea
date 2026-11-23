@@ -1,11 +1,12 @@
 {
   "schema": "sfeb-external-comparator-ledger-v1",
-  "as_of": "2026-11-22",
+  "as_of": "2026-11-23",
   "comparison_policy": [
     "Never pool raw scores across benchmarks with different task sets, models, harnesses, judges, metrics or execution environments.",
     "Store the observation date, model/harness context, task denominator, uncertainty interval and live-versus-historical page state for every result.",
     "Treat browser-tool benchmarks as tool-operation evidence, not frontend code-generation evidence.",
-    "Reproduce native task splits and scorers before making superiority claims; preserve failed, blocked and unparseable runs in denominators."
+    "Reproduce native task splits and scorers before making superiority claims; preserve failed, blocked and unparseable runs in denominators.",
+    "Qualify each benchmark task with a two-sided witness-patch/no-op gate, prompt-to-test traceability and clean-room regrading where the task format permits."
   ],
   "comparators": [
     {
@@ -514,6 +515,118 @@
       ],
       "sources": [
         "https://arena.ai/leaderboard/code/webdev"
+      ]
+    },
+    {
+      "id": "swe-bench-pro-v2",
+      "name": "SWE-Bench Pro V2",
+      "scope": "Long-horizon repository software-engineering task benchmark; an adjacent precedent for task validity, environment isolation and clean-room patch regrading, not a frontend-specific score comparator.",
+      "task_count": 642,
+      "snapshot_status": "historical_published_snapshot",
+      "observations": [
+        {
+          "kind": "release_snapshot",
+          "observed_date": "2026-09-22",
+          "public_tasks": 642,
+          "source_repositories": 11,
+          "removed_invalid_or_unrepairable_from_v1": 89,
+          "prior_v1_public_tasks": 731
+        },
+        {
+          "kind": "task_prompt_audit",
+          "problem_statements_rewritten": 529,
+          "rule": "Every graded assertion must trace to a sentence in the task statement; corrected instructions were independently implemented blind."
+        },
+        {
+          "kind": "two_sided_release_gate",
+          "reference_patch_resolves": 642,
+          "empty_patch_resolves": 0,
+          "interpretation": "Every task must pass under the reviewed reference patch and fail under the empty patch."
+        },
+        {
+          "kind": "agent_and_regrade_policy",
+          "agent_network_access": "limited to model endpoint",
+          "candidate_diff_regraded_on": "pristine image"
+        }
+      ],
+      "limitations": [
+        "This is a repository issue/patch benchmark, not a browser frontend-generation benchmark.",
+        "The two-sided gate establishes task/test sensitivity for the declared task, not complete semantic correctness or absence of all hidden-test defects.",
+        "Its task set, repository languages, verifier, agent budget and score must not be pooled with SFEB or Vision2Web."
+      ],
+      "sources": [
+        "https://labs.scale.com/blog/swe-bench-pro-v2",
+        "https://github.com/scaleapi/SWE-bench_Pro-os/blob/main/v2/README.md",
+        "https://huggingface.co/datasets/ScaleAI/SWE-bench_Pro"
+      ]
+    },
+    {
+      "id": "frontiercode-2",
+      "name": "FrontierCode 2.0",
+      "scope": "Maintainer-oriented repository software engineering and patch mergeability, including correctness, scope discipline, design, test quality and codebase conventions; adjacent comparator for SFEB's full-stack/maintenance lane.",
+      "task_count": 132,
+      "snapshot_status": "methodology_only",
+      "observations": [
+        {
+          "kind": "benchmark_scope",
+          "tasks": 132,
+          "task_authors": "20+ experienced open-source maintainers/developers",
+          "task_effort": "more than 40 hours per task",
+          "grading": "unit tests, repository-specific rubrics and additional verifiers; blocking criteria can zero a task"
+        },
+        {
+          "kind": "task_scale_change",
+          "reference_solution_file_changes_increase_percent": 67,
+          "reference_solution_line_changes_increase_percent": 89,
+          "codebase_size_increase_percent": 25,
+          "relative_to": "FrontierCode 1.1"
+        },
+        {
+          "kind": "release_date",
+          "observed_date": "2026-10-27"
+        }
+      ],
+      "limitations": [
+        "This evaluates mergeability of repository patches, not visual reconstruction or end-to-end browser journey quality.",
+        "The grading rubric includes subjective maintainer criteria; reproduce its native protocol before making numeric comparisons.",
+        "A benchmark score must be associated with its exact model, reasoning effort, agent harness and scoring revision."
+      ],
+      "sources": [
+        "https://cognition.com/blog/frontier-code-2.0",
+        "https://cognition.com/frontiercode"
+      ]
+    },
+    {
+      "id": "osworld-2",
+      "name": "OSWorld 2.0",
+      "scope": "Long-horizon computer-use workflows over desktop environments and self-hosted websites; adjacent stress benchmark for interaction, hidden-state inference and stateful UI operation, not frontend code generation.",
+      "task_count": 108,
+      "snapshot_status": "historical_published_snapshot",
+      "observations": [
+        {
+          "kind": "benchmark_scale",
+          "tasks": 108,
+          "self_hosted_websites": 31,
+          "tasks_over_one_hour_percent": 69.6,
+          "average_agent_steps_over": 250,
+          "average_scoring_checkpoints": 27.25
+        },
+        {
+          "kind": "leaderboard_snapshot",
+          "observed_date": "2026-11-14",
+          "top_reported_binary_completion_percent": 44.33,
+          "top_reported_model": "Claude Opus 5",
+          "note": "Version/step-budget-specific leaderboard row; do not treat as a universal computer-use success rate."
+        }
+      ],
+      "limitations": [
+        "Measures completion of long-horizon computer-use workflows, not application source-code generation or mergeability.",
+        "Its tasks, step budgets, partial-score metric and environment differ from SFEB and Online-Mind2Web.",
+        "Use it to inform state tracking and interaction stress tests, not to claim direct numeric superiority."
+      ],
+      "sources": [
+        "https://osworld-v2.xlang.ai/",
+        "https://arxiv.org/abs/2606.29537"
       ]
     }
   ]

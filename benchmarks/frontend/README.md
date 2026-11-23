@@ -4,8 +4,9 @@ This directory contains the **Symthaea Frontend Engineering Benchmark (SFEB)**.
 
 ## Current status
 
-- `sfeb-v0.json` contains 11 staged task specifications; the end-to-end SFEB benchmark remains `specification_only`.
-- One local service-dashboard reference fixture and its task contract are checked in as a **public pilot**. This is not a hidden holdout.
+- `sfeb-v0.json` contains 12 staged task specifications; the end-to-end SFEB benchmark remains `specification_only`.
+- Two original local reference-fixture bundles are checked in as **public-pilot** material: the service dashboard (SFEB-L1-004) and the search/filter explorer (SFEB-L2-005). The latter also has a synthetic dataset, deterministic Rust reference model, independent JavaScript model and authored Leptos candidate source. Public-pilot assets are not hidden holdouts.
+- SFEB-L2-005 is the one fixture-ready task in the 30-task family plan; it is **not runnable**. Rust compilation/tests, WASM build, candidate-browser journeys and independent browser-oracle execution remain pending. The plan's runnable task count remains zero.
 - `contract-check/` validates interface/task schemas, source anchors, fixture digests, provenance and retrieval-query references. Its Rust source and tests are authored but have not been compiled or executed here.
 - `retrieval-eval/` contains keyword, BM25, TF-IDF, deterministic bipolar-HDC and hybrid-RRF retrieval methods. It has not been compiled or run; no retrieval score exists yet.
 - `symthaea-browser` contains the CDP evidence-capture primitive, but the isolated full browser runner and task-level independent oracles remain pending.
@@ -89,7 +90,7 @@ implementation constraints, pinned environment requirements, reference-fixture
 digest, semantic regions, viewports, journeys, machine-readable assertions,
 hard gates, evidence obligations and a bounded task budget.
 
-The first original task is:
+The first checked-in task bundle is:
 
 - `tasks/sfeb-l1-service-dashboard-v1.json`
 - Reference assets: `fixtures/service-dashboard/reference.html` and
@@ -101,6 +102,13 @@ The first original task is:
 - The task remains `specification_only` in the SFEB index because Chromium
   screenshots, independent browser oracles and a baseline agent run are not
   available yet. The source fixture assets themselves are checked in.
+
+
+- SFEB-L2-005: tasks/sfeb-l2-search-filter-v1.json; fixture assets and synthetic dataset under fixtures/search-filter-explorer/.
+- Thirteen synthetic assets, eleven golden cases, four journeys and twelve task assertions.
+- A pure Rust search/filter/sort/pagination reference model and Leptos 0.8.20 CSR candidate share the intended behavior; the candidate package has no remote runtime dependencies.
+- The dependency-free JavaScript oracle locally reported 11/11 golden outcomes, 5,000 generated states, 9/9 simulated semantic faults and 8/8 URL-field omissions. These are independent-model results, not Rust execution or a compiled candidate-browser pass.
+- The task is fixture_ready, not runnable. Its candidate has not been compiled, tested, formatted, linted, built to WASM or qualified in Chromium. The overall task-family plan remains at zero runnable tasks.
 
 ### Standalone Rust validator
 
@@ -129,6 +137,21 @@ cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --ret
 The commands are authored but have not been executed in this environment
 because the Rust toolchain is unavailable. JSON documents were parsed and the
 fixture digest was independently confirmed with `sha256sum`.
+
+
+## Two-sided task-validity gate
+
+Every task must pass a two-sided validity check before it can be used to rank agents:
+
+- A reviewed reference/witness patch must satisfy the task's full acceptance contract when applied to the exact pristine base.
+- An empty/no-op patch (or the declared seeded-defect baseline for repair tasks) must fail the targeted requirements for the right reason.
+- Every scored assertion must trace to an explicit task requirement, and every testable requirement must have an oracle.
+- A second engineer must be able to solve the brief without seeing hidden tests, gold patches or verifier internals.
+- Agent changes are re-graded in a fresh evaluator-owned image; test, harness, verifier and policy modifications are excluded from candidate credit.
+- Network access is constrained to the explicitly permitted model endpoint or fixture-local services; solution-bearing code-host access is denied.
+- In repair tasks, a placebo intervention must not receive repair credit, and unrelated invariants must remain preserved.
+
+The machine-readable policy and schema are task-qualification/two-sided-task-validity-v1.json and task-qualification/two-sided-task-validity-v1.schema.json. This policy is designed but has not yet been executed against the task corpus. It is inspired by the two-sided reference-patch/empty-patch release gate and clean-image regrading used in SWE-Bench Pro V2; SFEB adapts it to frontend journeys, browser evidence and preservation invariants.
 
 ## Leptos knowledge corpus
 
