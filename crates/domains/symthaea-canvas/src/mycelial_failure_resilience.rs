@@ -3322,7 +3322,11 @@ mod tests {
         );
         let original_digest = first.canonical_digest_hex().unwrap();
         let mut tampered = first.clone();
-        tampered.trials[0].realized_failed_segment_ids.clear();
+        let original_reachability = tampered.trials[0].weighted_reachability;
+        tampered.trials[0].weighted_reachability = Some(original_reachability.map_or(
+            0.25,
+            |value| if value == 0.25 { 0.5 } else { 0.25 },
+        ));
         assert_ne!(tampered.canonical_digest_hex().unwrap(), original_digest);
         assert!(
             tampered
