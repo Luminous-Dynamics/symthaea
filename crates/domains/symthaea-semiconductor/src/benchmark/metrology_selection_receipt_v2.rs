@@ -13,8 +13,7 @@ use crate::benchmark::metrology_audit::{
 };
 use crate::benchmark::metrology_semantics::validate_binary_measurand_semantics_v1;
 
-pub const SELECTION_RECEIPT_V2_SCHEMA: &str =
-    "luminous.semi-bench.metrology-selection-receipt.v2";
+pub const SELECTION_RECEIPT_V2_SCHEMA: &str = "luminous.semi-bench.metrology-selection-receipt.v2";
 pub const SELECTION_POLICY_CONFIG_V2_SCHEMA: &str =
     "luminous.semi-bench.metrology-selection-policy-config.v2";
 pub const SELECTOR_ALGORITHM_ID_V1: &str = "luminous.semi-bench.exploit-srswor-selector";
@@ -129,13 +128,22 @@ fn validate_configuration(
         ("producer_ref", config.producer_ref.as_str()),
         ("run_id", config.run_id.as_str()),
         ("policy_id", config.policy_id.as_str()),
-        ("selector_algorithm_id", config.selector_algorithm_id.as_str()),
+        (
+            "selector_algorithm_id",
+            config.selector_algorithm_id.as_str(),
+        ),
         (
             "selector_algorithm_version",
             config.selector_algorithm_version.as_str(),
         ),
-        ("canonicalization_version", config.canonicalization_version.as_str()),
-        ("seed_derivation_version", config.seed_derivation_version.as_str()),
+        (
+            "canonicalization_version",
+            config.canonicalization_version.as_str(),
+        ),
+        (
+            "seed_derivation_version",
+            config.seed_derivation_version.as_str(),
+        ),
         (
             "risk_score_semantics_id",
             config.score_provenance.risk_score_semantics_id.as_str(),
@@ -147,9 +155,7 @@ fn validate_configuration(
             )));
         }
     }
-    if !valid_sha256(&config.model_sha256)
-        || !valid_sha256(&config.prediction_packet_sha256)
-    {
+    if !valid_sha256(&config.model_sha256) || !valid_sha256(&config.prediction_packet_sha256) {
         return Err(SelectionReceiptV2Error(
             "configuration requires lowercase model and prediction SHA-256 digests".into(),
         ));
@@ -189,7 +195,12 @@ fn validate_configuration(
             "configuration cost budgets are inconsistent".into(),
         ));
     }
-    if config.risk_weight > 0.0 && config.score_provenance.risk_score_semantics_id.trim().is_empty()
+    if config.risk_weight > 0.0
+        && config
+            .score_provenance
+            .risk_score_semantics_id
+            .trim()
+            .is_empty()
     {
         return Err(SelectionReceiptV2Error(
             "risk score semantics are required for nonzero risk weight".into(),
@@ -209,7 +220,11 @@ fn validate_configuration(
     }
     if config.evsi_weight > 0.0
         && (config.score_provenance.evsi_score_kind == EvsiScoreKindV2::NotUsed
-            || config.score_provenance.evsi_score_semantics_id.trim().is_empty())
+            || config
+                .score_provenance
+                .evsi_score_semantics_id
+                .trim()
+                .is_empty())
     {
         return Err(SelectionReceiptV2Error(
             "EVSI provenance is required for nonzero EVSI weight".into(),
@@ -236,8 +251,7 @@ fn canonicalize_candidates(
         if candidate.candidate_id.trim().is_empty()
             || candidate.subject_id.trim().is_empty()
             || candidate.stratum_id.trim().is_empty()
-            || candidate.target_measurand_id
-                != candidates[0].target_measurand_id
+            || candidate.target_measurand_id != candidates[0].target_measurand_id
             || !identities.insert(candidate.candidate_id.as_str())
         {
             return Err(SelectionReceiptV2Error(format!(
@@ -329,7 +343,9 @@ pub fn verify_selection_receipt_v2(
     receipt: &MetrologySelectionReceiptV2,
 ) -> Result<(), SelectionReceiptV2Error> {
     if receipt.schema != SELECTION_RECEIPT_V2_SCHEMA {
-        return Err(SelectionReceiptV2Error("receipt.schema: unsupported".into()));
+        return Err(SelectionReceiptV2Error(
+            "receipt.schema: unsupported".into(),
+        ));
     }
     validate_configuration(&receipt.configuration)?;
     if receipt.attestation_status != SelectionReceiptAttestationV2::Unattested {
@@ -354,7 +370,8 @@ pub fn verify_selection_receipt_v2(
         ));
     }
     for (index, candidate) in canonical_candidates.iter().enumerate() {
-        if candidate.target_measurand_id != receipt.configuration.binary_semantics.target_measurand_id
+        if candidate.target_measurand_id
+            != receipt.configuration.binary_semantics.target_measurand_id
         {
             return Err(SelectionReceiptV2Error(format!(
                 "candidate_scores[{index}].target_measurand_id differs from frozen semantics"
@@ -370,8 +387,7 @@ pub fn verify_selection_receipt_v2(
         .map_err(|error| SelectionReceiptV2Error(format!("selector replay rejected: {error}")))?;
     if replayed_selection != receipt.selection_report {
         return Err(SelectionReceiptV2Error(
-            "embedded selection report differs from independently replayed selector output"
-                .into(),
+            "embedded selection report differs from independently replayed selector output".into(),
         ));
     }
     if receipt_digest(receipt)? != receipt.receipt_sha256 {
@@ -424,9 +440,7 @@ mod tests {
             .collect()
     }
 
-    fn configuration(
-        candidates: &[MetrologyAuditCandidateV1],
-    ) -> MetrologySelectionPolicyConfigV2 {
+    fn configuration(candidates: &[MetrologyAuditCandidateV1]) -> MetrologySelectionPolicyConfigV2 {
         let mut quotas = BTreeMap::new();
         quotas.insert("tool-00".into(), 4);
         quotas.insert("tool-01".into(), 4);
@@ -517,12 +531,10 @@ mod tests {
         receipt.selection_report.rows[not_selected].selected = true;
         receipt.selection_report.rows[not_selected].method =
             crate::benchmark::metrology_audit::MetrologySelectionMethodV1::RandomizedAudit;
-        receipt.selection_report.selection_sha256 =
-            String::new();
+        receipt.selection_report.selection_sha256 = String::new();
         let mut selection_material = receipt.selection_report.clone();
         selection_material.selection_sha256.clear();
-        receipt.selection_report.selection_sha256 =
-            json_sha256(&selection_material).unwrap();
+        receipt.selection_report.selection_sha256 = json_sha256(&selection_material).unwrap();
         receipt.receipt_sha256.clear();
         receipt.receipt_sha256 = receipt_digest(&receipt).unwrap();
         assert!(verify_selection_receipt_v2(&receipt).is_err());
@@ -571,10 +583,12 @@ mod tests {
         let config = configuration(&candidate_scores);
         candidate_scores.reverse();
         let receipt = build_selection_receipt_v2(&config, &candidate_scores).unwrap();
-        assert!(receipt
-            .candidate_scores
-            .windows(2)
-            .all(|rows| rows[0].candidate_id < rows[1].candidate_id));
+        assert!(
+            receipt
+                .candidate_scores
+                .windows(2)
+                .all(|rows| rows[0].candidate_id < rows[1].candidate_id)
+        );
         verify_selection_receipt_v2(&receipt).unwrap();
     }
 }
