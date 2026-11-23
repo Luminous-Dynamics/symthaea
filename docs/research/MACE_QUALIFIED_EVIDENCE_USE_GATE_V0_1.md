@@ -19,6 +19,8 @@ It is deliberately separate from retrieval-policy memory. A search strategy can 
 
 The module defines:
 
+- Strict `from_json_value` / `to_json_value` codec for the versioned receipt wire representation; the parser rejects unknown fields and malformed nested entries.
+
 - `EvidenceQualificationReceiptV1`: verifier result bound to one query invocation and decision need.
 - `EvidenceQualificationEntryV1`: explicit per-candidate disposition and basis receipt digest.
 - `EvidenceQualificationBindingV1`: consumer-supplied expected context, not copied from the receipt.
@@ -30,6 +32,8 @@ The consumer binding includes:
 - an effective subject/tenant authorization-scope commitment (a digest of a canonical scope manifest, not a raw user or tenant identifier);
 
 The consuming runtime must supply a trusted current time; callers cannot treat the token as perpetual after verification.
+
+The JSON wire contract is defined in `data/schemas/mace_evidence_qualification_receipt_v1.schema.json`. JSON Schema checks shape only; the Rust strict decoder validates the typed protocol shape, and `verify_and_bind` remains the signature/trust/binding boundary.
 
 - run ID, opaque query invocation ID and domain;
 - environment revision and tool-profile digests;
@@ -89,7 +93,7 @@ No signature algorithm, key custody, issuer registry, remote source-observation 
 
 ## 6. Test inventory
 
-Thirteen Rust unit tests are authored in the module:
+Fourteen Rust unit tests are authored in the module:
 
 1. Only independently admissible evidence IDs cross the gate.
 2. DecisionNeed binding cannot be changed.
@@ -104,6 +108,7 @@ Thirteen Rust unit tests are authored in the module:
 11. A verified qualification token cannot be used after expiry.
 12. Consumer/tenant scope cannot be rebound.
 13. Three candidate-producing traces may promote an advisory search strategy, while the independent evidence gate still rejects the poisoned candidate and yields no admissible evidence.
+14. The versioned JSON receipt codec round-trips typed values and rejects unknown fields.
 
 The module's test verifier is intentionally a deterministic test double; it is not a production signature scheme.
 
@@ -169,6 +174,26 @@ These are distinct tasks and scoring protocols. Do not pool their scores with AM
 7. Add external witness custody for T9/T10; do not count local filesystem persistence as rollback protection.
 8. Run the adversarial decision episodes in #13397 and matched baselines in #13261 under independently isolated evaluator custody in #13287.
 
-## 10. Claim boundary
+
+## 11. References
+
+- Agent Memory Leaderboard Cycle 2 official results: https://agentmemoryleaderboard.ai/results/cycle-2/
+- LongMemEval-V2 official benchmark and leaderboard: https://xiaowu0162.github.io/longmemeval-v2/
+- AgentRunbook-C V2 Online method report: https://xiaowu0162.github.io/longmemeval-v2/agentrunbook-c-v2/
+- MemSecBench, *Tracking Agent Memory Poisoning from Persistence to Consequence and Repair*: https://arxiv.org/abs/2607.27080
+- MemoryDojo, *Benchmarking Poisoning Through LLM Agent Memory*: https://arxiv.org/abs/2611.09721
+- MemPoison, *Uncovering Persistent Memory Threats and Structural Blind Spots in LLM Agents*: https://arxiv.org/abs/2607.14651
+- MPBench, *From Untrusted Input to Trusted Memory*: https://arxiv.org/abs/2606.04329
+- Agent Memory Integrity at Rest Internet-Draft (work in progress): https://datatracker.ietf.org/doc/html/draft-khandelwal-bpm-agent-memory-integrity
+- MemoryArena, ICML/PMLR 2026: https://proceedings.mlr.press/v306/he26am.html
+- AMA-Bench, ICML/PMLR 2026: https://proceedings.mlr.press/v306/zhao26bs.html
+- WorldMemArena: https://arxiv.org/abs/2605.29341
+- StateMemBench: https://arxiv.org/abs/2608.19652
+- Memora / FAMA, Findings of ACL 2026: https://aclanthology.org/2026.findings-acl.1337/
+- TimlMemBench, Findings of EMNLP 2026: https://aclanthology.org/2026.findings-emnlp.507/
+
+These references describe different evaluation protocols. Published scores, sample counts and operating points must be reported under their original benchmark definitions and must not be pooled into one MACE score.
+
+## 12. Claim boundary
 
 This PR adds a Rust interface prototype and authored unit tests only. It does not qualify any actual source, authenticate an issuer, authorize a tool call, secure a benchmark sandbox, prevent whole-store rollback, prove erasure, change the LongMemEval-V2 result, or establish any SOTA advantage. The next proof must include a real external verifier, executed tests, an exact-head integration run and independent counterfactual evaluation.
