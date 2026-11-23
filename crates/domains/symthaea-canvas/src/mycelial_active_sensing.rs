@@ -248,7 +248,9 @@ fn hypothesis_inventory_digest(posterior: &MycelialGraphHypothesisPosterior) -> 
                 hasher.update(&[1]);
                 hasher.update(&value.to_bits().to_le_bytes());
             }
-            None => hasher.update(&[0]),
+            None => {
+                hasher.update(&[0]);
+            }
         }
     }
     hex_digest(hasher.finalize().as_bytes())
@@ -371,7 +373,7 @@ fn validate_actions(
         ));
     }
     let mut action_ids = BTreeSet::new();
-    let mut total_evaluations = decisions_evaluations(actions, posterior.hypotheses.len(), decision_count);
+    let total_evaluations = decisions_evaluations(actions, posterior.hypotheses.len(), decision_count);
     if total_evaluations > MAX_MYCELIAL_ACTIVE_SENSING_EVALUATIONS {
         return Err(MycelialActiveSensingError::ResourceBudgetExceeded(
             total_evaluations,
@@ -432,12 +434,6 @@ fn validate_actions(
                 action.action_id.clone(),
             ));
         }
-    }
-    total_evaluations = decisions_evaluations(actions, posterior.hypotheses.len(), decision_count);
-    if total_evaluations > MAX_MYCELIAL_ACTIVE_SENSING_EVALUATIONS {
-        return Err(MycelialActiveSensingError::ResourceBudgetExceeded(
-            total_evaluations,
-        ));
     }
     Ok(())
 }
@@ -1134,6 +1130,29 @@ mod tests {
         assert_eq!(
             report
                 .validate_against(&source, &candidates, &posterior, &decisions, &actions)
+                .unwrap_err(),
+            MycelialActiveSensingError::ReportMismatch
+        );
+
+        let mut altered_actions = actions.clone();
+        altered_actions[0].acquisition_model_digest = digest('9');
+        let unmodified = evaluate_mycelial_active_sensing(
+            &source,
+            &candidates,
+            &posterior,
+            &decisions,
+            &actions,
+        )
+        .unwrap();
+        assert_eq!(
+            unmodified
+                .validate_against(
+                    &source,
+                    &candidates,
+                    &posterior,
+                    &decisions,
+                    &altered_actions,
+                )
                 .unwrap_err(),
             MycelialActiveSensingError::ReportMismatch
         );
