@@ -1579,6 +1579,12 @@ mod tests {
         );
         assert_eq!(report.metrology_sensitivity, 0.0);
         assert_eq!(report.metrology_specificity, 0.0);
+        assert_eq!(report.metrology_true_negative_count, 0);
+        assert_eq!(report.metrology_observed_positive_count, report.selected_count);
+        assert_eq!(report.metrology_empirical_sensitivity, Some(0.0));
+        assert_eq!(report.metrology_empirical_specificity, Some(0.0));
+        assert_eq!(report.metrology_positive_predictive_value, Some(0.0));
+        assert!(report.metrology_negative_predictive_value.is_none());
         assert_eq!(report.detection_capture_fraction, Some(0.0));
         assert!(report.assay_estimator_qualified);
         assert!(report.assay_adjusted_ht_prevalence.is_some());
