@@ -180,7 +180,7 @@ A long-running objective should compile to a durable watch contract containing p
 
 SFEB-MON-001 now has a six-case synthetic fixture and eleven-rule policy. An independent in-memory V8 preflight passed 6/6 expected cases and 11/11 non-vacuous policy rules; it rejected forged-notification actions and action-target substitution, treated duplicate action replay idempotently, and reported one safe-but-late reconnect case separately as a liveness miss. The traces contain seven authoritative observations and zero explicit polls. This is not execution of the committed Node.js CLI, a browser runner, a production event bus, or a real scheduler; zero explicit polls in a virtual trace is not proof of zero CPU/network use.
 
-Further methodology and artifacts: `benchmarks/frontend/monitoring/README.md` and `docs/research/SFEB_MON001_EVENT_GATED_MONITORING_2026-11-23.md`.
+Further methodology and artifacts: `benchmarks/frontend/monitoring/README.md` and `docs/research/SFEB_MON001_EVENT_GATED_MONITORING_2026-11-23.md`. A separate MON-002 track now tests **edge-triggered durable receipts** so ephemeral opportunities can survive reconnect only with a valid source-of-record event receipt, non-expired/non-revoked scope and current permission. It has a five-case fixture, eleven-rule policy and strict verifier source; independent in-memory V8 preflight passed 5/5 cases, 11/11 rules and 9/9 adversarial rejections. The committed Node CLI and production receipt service remain unexecuted. See `benchmarks/frontend/monitoring/edge-monitoring-README.md`, `docs/research/SFEB_EDGE001_DURABLE_EVENT_RECEIPTS_2026-11-23.md`, [issue #13393](https://github.com/Luminous-Dynamics/symthaea/issues/13393).
 
 ## 7. Evidence boundary
 
