@@ -163,11 +163,12 @@ fn set_diff(baseline: &BTreeSet<String>, candidate: &BTreeSet<String>) -> SetDif
     }
 }
 
-fn effective_value_dependencies<'a>(
-    value_dependencies: &'a [String],
-    legacy_proof_dependencies: &'a [String],
+fn effective_value_dependencies(
+    value_kind: &str,
+    value_dependencies: &[String],
+    legacy_proof_dependencies: &[String],
 ) -> BTreeSet<String> {
-    if value_dependencies.is_empty() && !legacy_proof_dependencies.is_empty() {
+    if value_kind.is_empty() {
         string_set(legacy_proof_dependencies)
     } else {
         string_set(value_dependencies)
@@ -184,6 +185,7 @@ fn normalized_value_kind(value_kind: &str) -> String {
 
 fn snapshot_value_dependencies(snapshot: &Snapshot) -> BTreeSet<String> {
     effective_value_dependencies(
+        &snapshot.value_kind,
         &snapshot.value_dependencies,
         &snapshot.proof_value_dependencies,
     )
@@ -191,6 +193,7 @@ fn snapshot_value_dependencies(snapshot: &Snapshot) -> BTreeSet<String> {
 
 fn helper_value_dependencies(helper: &HelperNode) -> BTreeSet<String> {
     effective_value_dependencies(
+        &helper.value_kind,
         &helper.value_dependencies,
         &helper.proof_value_dependencies,
     )
@@ -680,9 +683,25 @@ mod tests {
         let mut legacy = snapshot("T", &["Nat"], &["Nat.add"]);
         legacy.value_kind.clear();
         legacy.value_dependencies.clear();
-        assert_eq!(snapshot_value_dependencies(&legacy), string_set(&legacy.proof_value_dependencies));
-        assert_eq!(normalized_value_kind(&legacy.value_kind), "legacy_unclassified");
+        assert_eq!(
+            snapshot_value_dependencies(&legacy),
+            string_set(&legacy.proof_value_dependencies)
+        );
+        assert_eq!(
+            normalized_value_kind(&legacy.value_kind),
+            "legacy_unclassified"
+        );
         assert!(closure_reconciles(&legacy));
+    }
+
+    #[test]
+    fn explicit_new_schema_empty_value_set_does_not_use_legacy_fallback() {
+        let mut malformed = snapshot("T", &["Nat"], &["Nat.add"]);
+        malformed.value_kind = "theorem_proof".to_owned();
+        malformed.value_dependencies.clear();
+
+        assert!(snapshot_value_dependencies(&malformed).is_empty());
+        assert!(!closure_reconciles(&malformed));
     }
 
     #[test]

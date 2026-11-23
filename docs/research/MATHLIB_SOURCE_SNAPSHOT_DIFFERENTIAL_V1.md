@@ -77,8 +77,8 @@ For Nat.choose_pos, the v4.29 direct proof-value set has 33 names and v4.37 has 
 The comparator now emits helper_expansion_explains_direct_drift. It is true only when:
 
 1. The type dependency set is exactly stable.
-2. Direct proof-value dependencies have changed and their Jaccard is below 0.5.
-3. The union of root and generated-helper proof dependencies has Jaccard at least 0.9.
+2. Direct generic value dependencies have changed and their Jaccard is below 0.5.
+3. The union of root and generated-helper value dependencies has Jaccard at least 0.9.
 
 This is a diagnostic for dependency representation/repackaging, not proof equivalence, proof-plan fidelity or mathematical essentiality. It does not suppress or replace raw direct-edge differences. On this four-theorem cohort it should trigger for Nat.choose_pos and not for Set.countable_union.
 
@@ -91,3 +91,6 @@ The extractor now classifies an available value by declaration kind: theorem_pro
 The differential comparator reconciles closure as type_dependencies union value_dependencies, keeps the theorem-proof metric separate, and includes definition helper bodies in helper expansion. Legacy snapshots without value_dependencies remain loadable, but are explicitly marked legacy_unclassified and use their old value array only for backward-compatible closure reconciliation.
 
 This aligns the extraction representation more closely with LeanGraph-style typed edge classes such as sig, proof, and def. It does not establish exact equivalence with the external LeanGraph raw export; that still requires a pinned, same-revision edge-by-edge differential.
+### Legacy artifact behavior
+
+An old artifact is recognized only when its value_kind field is absent/empty. Such snapshots are labelled legacy_unclassified and use their former proof_value_dependencies array as the compatibility source for generic value closure. A new-schema artifact with value_kind present uses value_dependencies exactly—even when empty. If its type/value union no longer reconciles with Lean's closure, the comparator rejects it rather than silently substituting the legacy proof-only array.
