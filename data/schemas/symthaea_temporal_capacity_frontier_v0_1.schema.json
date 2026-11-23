@@ -1,0 +1,384 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/symthaea_temporal_capacity_frontier_v0_1.schema.json",
+  "title": "Symthaea temporal-capacity frontier JSONL record",
+  "description": "Output records from temporal_capacity_frontier. Statistical unit is the independent corpus/model seed; the K95/T90 qualification uses one-sided exact Clopper-Pearson bounds.",
+  "oneOf": [
+    {
+      "title": "Cohort reliability",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record_type",
+        "schema_version",
+        "source_revision",
+        "dimension",
+        "memory_fan_in",
+        "condition",
+        "gap_profile",
+        "horizon_seconds",
+        "event_count",
+        "cohort_ids",
+        "independent_seed_count",
+        "min_seed_count_gate",
+        "mean_seed_accuracy",
+        "min_seed_accuracy",
+        "max_seed_accuracy",
+        "seeds_meeting_95_percent_accuracy",
+        "seed_reliability_lower_95_for_95_percent_accuracy",
+        "seeds_meeting_90_percent_accuracy",
+        "seed_reliability_lower_95_for_90_percent_accuracy",
+        "chance_accuracy",
+        "confirmatory_sample_gate_met"
+      ],
+      "properties": {
+        "record_type": {
+          "const": "cohort_reliability"
+        },
+        "schema_version": {
+          "const": "symthaea.temporal-capacity-frontier/0.1"
+        },
+        "source_revision": {
+          "type": "string",
+          "pattern": "^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$",
+          "description": "Pinned Git commit SHA; the aggregator refuses unpinned source summaries."
+        },
+        "dimension": {
+          "type": "integer",
+          "minimum": 8
+        },
+        "memory_fan_in": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "condition": {
+          "enum": [
+            "static_hdc_bundle",
+            "static_mismatched_pairing_control",
+            "static_random_query_control",
+            "hdc_ltc_zero_input",
+            "hdc_ltc_distractor"
+          ]
+        },
+        "gap_profile": {
+          "enum": [
+            "not_applicable",
+            "regular",
+            "irregular"
+          ]
+        },
+        "horizon_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "event_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cohort_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "independent_seed_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "min_seed_count_gate": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "mean_seed_accuracy": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "min_seed_accuracy": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "max_seed_accuracy": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "seeds_meeting_95_percent_accuracy": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "seed_reliability_lower_95_for_95_percent_accuracy": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Pointwise one-sided exact 95% Clopper-Pearson lower bound; not multiplicity-adjusted across cohort families."
+        },
+        "seeds_meeting_90_percent_accuracy": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "seed_reliability_lower_95_for_90_percent_accuracy": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Pointwise one-sided exact 95% Clopper-Pearson lower bound; not multiplicity-adjusted across cohort families."
+        },
+        "chance_accuracy": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "confirmatory_sample_gate_met": {
+          "type": "boolean"
+        }
+      }
+    },
+    {
+      "title": "K95 frontier",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record_type",
+        "schema_version",
+        "source_revision",
+        "dimension",
+        "condition",
+        "gap_profile",
+        "horizon_seconds",
+        "event_count",
+        "target_per_seed_accuracy",
+        "target_seed_reliability",
+        "familywise_confidence_level",
+        "per_level_alpha",
+        "tested_level_count",
+        "multiplicity_correction",
+        "minimum_seeds_if_all_pass",
+        "tested_fan_in_levels",
+        "common_seed_count",
+        "paired_seed_sets",
+        "confirmatory_sample_gate_met",
+        "qualified_k95",
+        "interpretation"
+      ],
+      "properties": {
+        "record_type": {
+          "const": "k95"
+        },
+        "schema_version": {
+          "const": "symthaea.temporal-capacity-frontier/0.1"
+        },
+        "source_revision": {
+          "type": "string",
+          "pattern": "^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$",
+          "description": "Pinned Git commit SHA; the aggregator refuses unpinned source summaries."
+        },
+        "dimension": {
+          "type": "integer",
+          "minimum": 8
+        },
+        "condition": {
+          "enum": [
+            "static_hdc_bundle",
+            "static_mismatched_pairing_control",
+            "static_random_query_control",
+            "hdc_ltc_zero_input",
+            "hdc_ltc_distractor"
+          ]
+        },
+        "gap_profile": {
+          "enum": [
+            "not_applicable",
+            "regular",
+            "irregular"
+          ]
+        },
+        "horizon_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "event_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "target_per_seed_accuracy": {
+          "const": 0.95
+        },
+        "target_seed_reliability": {
+          "const": 0.95
+        },
+        "tested_fan_in_levels": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "integer",
+            "minimum": 2
+          }
+        },
+        "common_seed_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "paired_seed_sets": {
+          "type": "boolean"
+        },
+        "confirmatory_sample_gate_met": {
+          "type": "boolean"
+        },
+        "qualified_k95": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 2
+        },
+        "interpretation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "familywise_confidence_level": {
+          "type": "number",
+          "const": 0.95
+        },
+        "per_level_alpha": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 0.05
+        },
+        "tested_level_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "multiplicity_correction": {
+          "type": "string",
+          "const": "Bonferroni within the fixed D/condition/gap/horizon/event family"
+        },
+        "minimum_seeds_if_all_pass": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    {
+      "title": "T90 frontier",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record_type",
+        "schema_version",
+        "source_revision",
+        "dimension",
+        "condition",
+        "gap_profile",
+        "memory_fan_in",
+        "event_count",
+        "target_per_seed_accuracy",
+        "target_seed_reliability",
+        "familywise_confidence_level",
+        "per_level_alpha",
+        "tested_level_count",
+        "multiplicity_correction",
+        "minimum_seeds_if_all_pass",
+        "tested_horizon_seconds",
+        "common_seed_count",
+        "paired_seed_sets",
+        "confirmatory_sample_gate_met",
+        "qualified_t90_seconds",
+        "interpretation"
+      ],
+      "properties": {
+        "record_type": {
+          "const": "t90"
+        },
+        "schema_version": {
+          "const": "symthaea.temporal-capacity-frontier/0.1"
+        },
+        "source_revision": {
+          "type": "string",
+          "pattern": "^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$",
+          "description": "Pinned Git commit SHA; the aggregator refuses unpinned source summaries."
+        },
+        "dimension": {
+          "type": "integer",
+          "minimum": 8
+        },
+        "condition": {
+          "enum": [
+            "hdc_ltc_zero_input",
+            "hdc_ltc_distractor"
+          ]
+        },
+        "gap_profile": {
+          "enum": [
+            "regular",
+            "irregular"
+          ]
+        },
+        "memory_fan_in": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "event_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "target_per_seed_accuracy": {
+          "const": 0.9
+        },
+        "target_seed_reliability": {
+          "const": 0.95
+        },
+        "tested_horizon_seconds": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        },
+        "common_seed_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "paired_seed_sets": {
+          "type": "boolean"
+        },
+        "confirmatory_sample_gate_met": {
+          "type": "boolean"
+        },
+        "qualified_t90_seconds": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "interpretation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "familywise_confidence_level": {
+          "type": "number",
+          "const": 0.95
+        },
+        "per_level_alpha": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 0.05
+        },
+        "tested_level_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "multiplicity_correction": {
+          "type": "string",
+          "const": "Bonferroni within the fixed D/condition/gap/fan-in/event family"
+        },
+        "minimum_seeds_if_all_pass": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  ]
+}

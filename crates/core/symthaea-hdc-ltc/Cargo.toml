@@ -36,3 +36,15 @@ path = "examples/language.rs"
 [[example]]
 name = "irregular_timestep_replay"
 path = "examples/irregular_timestep_replay.rs"
+
+
+[[example]]
+name = "temporal_associative_capacity"
+path = "examples/temporal_associative_capacity.rs"
+test = true
+
+
+[[example]]
+name = "temporal_capacity_frontier"
+path = "examples/temporal_capacity_frontier.rs"
+test = true

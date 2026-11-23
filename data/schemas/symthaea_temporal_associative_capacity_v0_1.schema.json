@@ -1,0 +1,370 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/symthaea_temporal_associative_capacity_v0_1.schema.json",
+  "title": "Symthaea temporal associative-retrieval capacity JSONL record",
+  "description": "One JSON object per line emitted by temporal_associative_capacity.rs. Fano values are descriptive finite-sample plug-in diagnostics, not confidence-certified bounds.",
+  "oneOf": [
+    {
+      "title": "Query record",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record_type",
+        "schema_version",
+        "source_revision",
+        "cohort_id",
+        "seed",
+        "dimension",
+        "memory_fan_in",
+        "condition",
+        "gap_profile",
+        "horizon_seconds",
+        "event_count",
+        "query_index",
+        "predicted_index",
+        "correct",
+        "tie",
+        "valid",
+        "target_similarity",
+        "best_distractor_similarity",
+        "target_margin",
+        "chance_accuracy"
+      ],
+      "properties": {
+        "record_type": {
+          "const": "query"
+        },
+        "schema_version": {
+          "const": "symthaea.temporal-associative-capacity/0.1"
+        },
+        "cohort_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "dimension": {
+          "type": "integer",
+          "minimum": 8,
+          "maximum": 262144
+        },
+        "memory_fan_in": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 512
+        },
+        "condition": {
+          "enum": [
+            "static_hdc_bundle",
+            "static_mismatched_pairing_control",
+            "static_random_query_control",
+            "hdc_ltc_zero_input",
+            "hdc_ltc_distractor"
+          ]
+        },
+        "gap_profile": {
+          "enum": [
+            "not_applicable",
+            "regular",
+            "irregular"
+          ]
+        },
+        "horizon_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "event_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4096
+        },
+        "query_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "predicted_index": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "correct": {
+          "type": "boolean"
+        },
+        "tie": {
+          "type": "boolean"
+        },
+        "valid": {
+          "type": "boolean"
+        },
+        "target_similarity": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": -1,
+          "maximum": 1
+        },
+        "best_distractor_similarity": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": -1,
+          "maximum": 1
+        },
+        "target_margin": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": -2,
+          "maximum": 2
+        },
+        "chance_accuracy": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 0.5
+        },
+        "source_revision": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$",
+          "description": "Git commit SHA used to build/run the experiment; null means not source-pinned."
+        }
+      }
+    },
+    {
+      "title": "Summary record",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_revision",
+        "record_type",
+        "schema_version",
+        "cohort_id",
+        "seed",
+        "dimension",
+        "memory_fan_in",
+        "condition",
+        "gap_profile",
+        "horizon_seconds",
+        "event_count",
+        "input_seeds",
+        "gap_coefficient_of_variation",
+        "gap_schedule_seconds",
+        "query_count",
+        "valid_query_count",
+        "correct_count",
+        "tie_count",
+        "invalid_count",
+        "accuracy",
+        "chance_accuracy",
+        "mean_target_similarity",
+        "mean_best_distractor_similarity",
+        "mean_target_margin",
+        "plug_in_fano_information_lower_bound_bits",
+        "initial_state_norm",
+        "final_state_norm",
+        "api_update_count",
+        "reported_logical_seconds",
+        "logical_horizon_error_seconds",
+        "memory_preparation_wall_ns",
+        "model_setup_wall_ns",
+        "input_preparation_wall_ns",
+        "evolution_wall_ns",
+        "decode_wall_ns",
+        "interpretation"
+      ],
+      "properties": {
+        "record_type": {
+          "const": "summary"
+        },
+        "schema_version": {
+          "const": "symthaea.temporal-associative-capacity/0.1"
+        },
+        "cohort_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "dimension": {
+          "type": "integer",
+          "minimum": 8,
+          "maximum": 262144
+        },
+        "memory_fan_in": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 512
+        },
+        "condition": {
+          "enum": [
+            "static_hdc_bundle",
+            "static_mismatched_pairing_control",
+            "static_random_query_control",
+            "hdc_ltc_zero_input",
+            "hdc_ltc_distractor"
+          ]
+        },
+        "gap_profile": {
+          "enum": [
+            "not_applicable",
+            "regular",
+            "irregular"
+          ]
+        },
+        "horizon_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "event_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4096
+        },
+        "query_count": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "valid_query_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "correct_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "tie_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "invalid_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "accuracy": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "chance_accuracy": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 0.5
+        },
+        "mean_target_similarity": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": -1,
+          "maximum": 1
+        },
+        "mean_best_distractor_similarity": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": -1,
+          "maximum": 1
+        },
+        "mean_target_margin": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": -2,
+          "maximum": 2
+        },
+        "plug_in_fano_information_lower_bound_bits": {
+          "type": "number",
+          "minimum": 0
+        },
+        "initial_state_norm": {
+          "type": "number",
+          "minimum": 0
+        },
+        "final_state_norm": {
+          "type": "number",
+          "minimum": 0
+        },
+        "api_update_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reported_logical_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "model_setup_wall_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "input_preparation_wall_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "evolution_wall_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "decode_wall_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "interpretation": {
+          "const": "finite-sample plug-in Fano diagnostic; not a confidence-certified information bound"
+        },
+        "gap_schedule_seconds": {
+          "type": "array",
+          "maxItems": 4096,
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        },
+        "gap_coefficient_of_variation": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "input_seeds": {
+          "type": "array",
+          "maxItems": 4096,
+          "description": "Lowercase 16-digit hexadecimal u64 seeds, preserving all bits across JSON consumers.",
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{16}$"
+          }
+        },
+        "memory_preparation_wall_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "logical_horizon_error_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "source_revision": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$",
+          "description": "Git commit SHA used to build/run the experiment; null means not source-pinned."
+        }
+      }
+    }
+  ]
+}
