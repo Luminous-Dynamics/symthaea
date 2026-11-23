@@ -35,6 +35,19 @@ The Rust reference parser:
 
 Scores are backend-native diagnostics. Scores from different channels are not comparable and must not be combined by this module. Fusion must be an explicit, pinned retrieval profile with its own identity.
 
+## Producer-side encoding
+
+Retrieval backends can construct typed `CandidateEvidenceV1` records and call:
+
+```rust
+let batch = encode_candidate_evidence_jsonl(&records)?;
+let canonical_jsonl = batch.to_jsonl()?;
+```
+
+The encoder applies the same strict parser/validation path as JSONL ingestion, enforces record and batch limits, rejects non-finite scores before JSON serialization, normalizes parent IDs and record order, and computes the candidate-set digest. `CandidateEvidenceBatchV1::to_jsonl()` revalidates the public batch fields and refuses stale or mutated batch metadata.
+
+This is a serialization/interchange facility only. It does not create backend source receipts, verify payload references, or grant qualification.
+
 ## Critical trust boundary
 
 A valid candidate envelope is **not qualified evidence**.
