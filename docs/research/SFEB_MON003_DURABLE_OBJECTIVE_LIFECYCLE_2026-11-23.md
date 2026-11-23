@@ -395,7 +395,7 @@ A monitoring guarantee is not an agent property alone. It is constrained by the 
 | C0 | Poll-only; no durable event stream | Level checks between polls; no transient-edge recall guarantee |
 | C1 | Best-effort push/notifications; no durable replay cursor | Wake hints only; delivery loss can create an unrecoverable edge gap |
 | C2 | Durable event log with stable source identity, per-partition sequence, high-watermark and replay-from-cursor | Bounded edge recovery within source retention, subject to cursor correctness |
-| C3 | C2 plus authenticated issuer, tenant/scope binding and key revocation checks | Authenticated event provenance under the source trust profile |
+| C3 | C2 plus a verified signature, authenticated issuer, tenant/scope binding and key revocation checks | Authenticated event provenance under the source trust profile |
 | C4 | C3 plus action-sink current policy revision, fencing and durable idempotency | Bounded event recovery with live authority and controlled external mutation, subject to sink transaction guarantees |
 
 A higher tier is not inferred from marketing or transport choice. An adapter supplies a versioned capability profile; SFEB validates the profile's shape and executes conformance probes. The claim is bounded by the weakest capability in the end-to-end path.
@@ -420,7 +420,7 @@ The compiler must fail closed on missing or contradictory fields. A high-waterma
 Companion source: benchmarks/frontend/monitoring/mon003-source-capability-v1.mjs  
 Machine-readable report: benchmarks/frontend/monitoring/mon003-source-capability-report-v1.json
 
-Executed using Node.js v22.16.0: **12/12 deterministic cases passed**. The suite tests poll-only, best-effort push, durable replay, retention shorter than the disconnect horizon, missing partition cursors/high-watermarks, untrusted signature profiles, absent sink-side permission recheck and invalid/missing source capabilities.
+Executed using Node.js v22.16.0: **15/15 deterministic cases passed**. The suite tests poll-only, best-effort push, durable replay, retention shorter than the disconnect horizon, missing partition cursors/high-watermarks, signatures without verification, missing issuer-scope/key-revocation controls, absent sink-side permission recheck, polling-field misuse and invalid/missing source capabilities.
 
 Exact source Git blob SHA: 9e4ac2f9c0933db13ce09a865ed09c9139f604df.  
 Exact source SHA-256: 2112746978e4759292f49900d6c7692c430fac17606451211c9804cefa21574e.
