@@ -679,6 +679,43 @@ mod tests {
         .unwrap();
         assert_ne!(original_report.label_sha256, changed_report.label_sha256);
         assert_ne!(original_report.report_sha256, changed_report.report_sha256);
+
+        let mut uncertainty_changed = label();
+        uncertainty_changed.standard_uncertainty = Some(0.10);
+        let uncertainty_report = assess_label_consumption_eligibility_v1(
+            &uncertainty_changed,
+            &input,
+            LabelEvidenceFrontierV1::CurrentAtK1,
+        )
+        .unwrap();
+        assert_ne!(original_report.label_sha256, uncertainty_report.label_sha256);
+        assert_ne!(original_report.report_sha256, uncertainty_report.report_sha256);
+    }
+
+    #[test]
+    fn non_finite_label_numeric_metadata_is_rejected_before_receipt() {
+        let input = input();
+        let mut value = label();
+        value.value = Some(f64::NAN);
+        assert!(
+            assess_label_consumption_eligibility_v1(
+                &value,
+                &input,
+                LabelEvidenceFrontierV1::CurrentAtK1
+            )
+            .is_err()
+        );
+
+        let mut uncertainty = label();
+        uncertainty.standard_uncertainty = Some(f64::INFINITY);
+        assert!(
+            assess_label_consumption_eligibility_v1(
+                &uncertainty,
+                &input,
+                LabelEvidenceFrontierV1::CurrentAtK1
+            )
+            .is_err()
+        );
     }
 
     #[test]
