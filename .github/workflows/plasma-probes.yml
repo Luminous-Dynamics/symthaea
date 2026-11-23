@@ -9,6 +9,7 @@ on:
       - "crates/domains/symthaea-plasma-probes/**"
       - "benchmarks/plasma/adversarial-probes/**"
       - "benchmarks/plasma/rate-distortion/**"
+      - "benchmarks/plasma/topology-lifting/**"
       - ".github/workflows/plasma-probes.yml"
   pull_request:
     branches: [main]
@@ -18,6 +19,7 @@ on:
       - "crates/domains/symthaea-plasma-probes/**"
       - "benchmarks/plasma/adversarial-probes/**"
       - "benchmarks/plasma/rate-distortion/**"
+      - "benchmarks/plasma/topology-lifting/**"
       - ".github/workflows/plasma-probes.yml"
   workflow_dispatch:
 
@@ -56,6 +58,7 @@ jobs:
           mkdir -p "${crate_dir}/src/bin"
           mkdir -p "${tmp_root}/benchmarks/plasma/adversarial-probes/fixtures"
           mkdir -p "${tmp_root}/benchmarks/plasma/rate-distortion/fixtures"
+          mkdir -p "${tmp_root}/benchmarks/plasma/topology-lifting/fixtures"
           cp crates/domains/symthaea-plasma-probes/src/lib.rs "${crate_dir}/src/lib.rs"
           cp crates/domains/symthaea-plasma-probes/src/bin/kird_point_audit.rs "${crate_dir}/src/bin/kird_point_audit.rs"
           cp benchmarks/plasma/adversarial-probes/fixtures/synthetic-pulse-family-v0.1.json \
@@ -64,6 +67,10 @@ jobs:
             "${tmp_root}/benchmarks/plasma/rate-distortion/"
           cp benchmarks/plasma/rate-distortion/fixtures/synthetic-kird-point-v0.1.json \
             "${tmp_root}/benchmarks/plasma/rate-distortion/fixtures/"
+          cp benchmarks/plasma/topology-lifting/boundary-lift-contract-v0.1.schema.json \
+            "${tmp_root}/benchmarks/plasma/topology-lifting/"
+          cp benchmarks/plasma/topology-lifting/fixtures/topology-lift-known-answer-v0.1.json \
+            "${tmp_root}/benchmarks/plasma/topology-lifting/fixtures/"
           cat > "${crate_dir}/Cargo.toml" <<'EOF'
           [package]
           name = "symthaea-plasma-probes"
@@ -101,6 +108,27 @@ jobs:
           assert fixture["record_status"] == "synthetic_fixture_only"
           assert fixture["provenance"]["physical_execution_authorized"] is False
           print("kird_schema_validation=PASS")
+          PY
+
+      - name: Validate topology-aware lifting Draft 2020-12 schema and fixture
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path("${{ runner.temp }}/plasma-probe-validation/benchmarks/plasma/topology-lifting")
+          schema = json.loads((root / "boundary-lift-contract-v0.1.schema.json").read_text())
+          fixture = json.loads((root / "fixtures/topology-lift-known-answer-v0.1.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(fixture)
+          periodic, opened = fixture["cases"]
+          assert periodic["boundary"]["kind"] == "periodic"
+          assert periodic["lift"]["raw_coordinate_included"] is False
+          assert opened["boundary"]["kind"] == "open"
+          assert opened["lift"]["boundary_distances_included"] is True
+          assert fixture["claim_boundary"]["no_physical_plasma_run"] is True
+          print("topology_lift_schema_validation=PASS")
           PY
 
       - name: Run KIRD semantic audit fixture
