@@ -518,8 +518,10 @@ fn validate_selection_design(
     for (index, row) in selection.rows.iter().enumerate() {
         let is_exploit = expected_exploit[index];
         if is_exploit {
-            if !matches!(&row.method, MetrologySelectionMethodV1::DeterministicExploit)
-                || !row.selected
+            if !matches!(
+                &row.method,
+                MetrologySelectionMethodV1::DeterministicExploit
+            ) || !row.selected
                 || row.inclusion_probability != 1.0
             {
                 return Err(SyntheticFabReplayError(format!(
@@ -594,7 +596,10 @@ fn validate_selection_design(
     if residual_population_by_stratum
         .keys()
         .collect::<BTreeSet<_>>()
-        != selection.audit_quota_by_stratum.keys().collect::<BTreeSet<_>>()
+        != selection
+            .audit_quota_by_stratum
+            .keys()
+            .collect::<BTreeSet<_>>()
     {
         return Err(SyntheticFabReplayError(
             "audit quotas do not exactly cover residual strata".into(),
@@ -635,8 +640,7 @@ fn validate_selection_design(
         let mut expected_draw = residual_by_stratum[stratum].clone();
         let mut rng = SplitMix64::new(stratum_seed(selection.seed, stratum));
         shuffle_indices(&mut expected_draw, &mut rng);
-        let expected_audit: BTreeSet<usize> =
-            expected_draw.into_iter().take(quota).collect();
+        let expected_audit: BTreeSet<usize> = expected_draw.into_iter().take(quota).collect();
         for index in &residual_by_stratum[stratum] {
             let should_be_selected = expected_audit.contains(index);
             let row = &selection.rows[*index];
