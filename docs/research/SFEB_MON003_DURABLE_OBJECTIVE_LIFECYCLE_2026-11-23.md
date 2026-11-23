@@ -382,3 +382,60 @@ Exact source SHA-256: `77919e99612be1253f9524b160cf9c43796f2c8d57c7b53ab8cfee59d
 A source high-watermark cannot regress behind either the committed cursor or a previously trusted high-watermark. Only the contiguous committed prefix is eligible as source-event evidence; a notification or high-watermark alone cannot create an eligible event.
 
 This is a single-threaded in-memory cursor/replay model. It does not qualify a real broker, database cursor, retention/outbox transaction, concurrent cursor CAS, authenticated source identity or signed event provenance.
+
+
+## 18. Capability-aware source contracts (2026-11-23)
+
+A monitoring guarantee is not an agent property alone. It is constrained by the source integration. SFEB must classify a source before promising edge recall, reconnect recovery, event dormancy or authenticated provenance.
+
+### 18.1 Source capability ladder
+
+| Tier | Source capability | What SFEB may claim |
+|---|---|---|
+| C0 | Poll-only; no durable event stream | Level checks between polls; no transient-edge recall guarantee |
+| C1 | Best-effort push/notifications; no durable replay cursor | Wake hints only; delivery loss can create an unrecoverable edge gap |
+| C2 | Durable event log with stable source identity, per-partition sequence, high-watermark and replay-from-cursor | Bounded edge recovery within source retention, subject to cursor correctness |
+| C3 | C2 plus authenticated issuer, tenant/scope binding and key revocation checks | Authenticated event provenance under the source trust profile |
+| C4 | C3 plus action-sink current policy revision, fencing and durable idempotency | Bounded event recovery with live authority and controlled external mutation, subject to sink transaction guarantees |
+
+A higher tier is not inferred from marketing or transport choice. An adapter supplies a versioned capability profile; SFEB validates the profile's shape and executes conformance probes. The claim is bounded by the weakest capability in the end-to-end path.
+
+### 18.2 Retention horizon is part of the guarantee
+
+Let D be the maximum supported disconnection duration and R the source's replay retention. Edge recovery is only supported when R is at least D, with allowance for replay lag, source maintenance and clock uncertainty. Otherwise the correct result after reconnect is inconclusive or a declared liveness miss—not a fabricated claim that no event occurred.
+
+The source capability profile records:
+- delivery mode: polling, best-effort push or durable push;
+- source identity and event identity semantics;
+- per-partition sequence and high-watermark semantics;
+- replay-from-cursor support and retention horizon;
+- signed event envelope, issuer scope and key-revocation status;
+- current permission revision enforced at the action sink;
+- expected disconnection horizon and polling interval, where applicable.
+
+The compiler must fail closed on missing or contradictory fields. A high-watermark without stable event identity and replayable sequence is not sufficient evidence. A signed event without issuer-scope and key-revocation validation is not trusted provenance. A valid event receipt without current sink authority is not an executable opportunity.
+
+### 18.3 Capability-classifier preflight
+
+Companion source: benchmarks/frontend/monitoring/mon003-source-capability-v1.mjs  
+Machine-readable report: benchmarks/frontend/monitoring/mon003-source-capability-report-v1.json
+
+Executed using Node.js v22.16.0: **12/12 deterministic cases passed**. The suite tests poll-only, best-effort push, durable replay, retention shorter than the disconnect horizon, missing partition cursors/high-watermarks, untrusted signature profiles, absent sink-side permission recheck and invalid/missing source capabilities.
+
+Exact source Git blob SHA: 9e4ac2f9c0933db13ce09a865ed09c9139f604df.  
+Exact source SHA-256: 2112746978e4759292f49900d6c7692c430fac17606451211c9804cefa21574e.
+
+This is a pure in-memory profile classifier. It does not probe or authenticate a live source, prove the source's declared retention, or show that a production integration continues to meet its declared profile. Production adapters need periodic conformance probes and signed capability/version receipts.
+
+## 19. Industry building blocks and what SFEB should not reinvent
+
+The research position is an **assurance layer over existing durable execution and event infrastructure**, not a replacement for their storage, timers, event buses or orchestration semantics.
+
+- **Temporal** persists workflow event history and replays workflow code after worker failure. Activities may be retried and should be idempotent. This is the native workflow/retry baseline; SFEB adds source evidence, authority, fencing and independent outcome proof. [Temporal Durable Execution](https://docs.temporal.io/durable-execution) · [Temporal Activities](https://docs.temporal.io/activities)
+- **DBOS** checkpoints workflow progress in Postgres. It can couple database mutations and checkpoints transactionally, but external service effects still require idempotency keys. [DBOS Architecture](https://docs.dbos.dev/architecture) · [DBOS Durable Execution](https://www.dbos.dev/durable-execution)
+- **Azure Durable Functions / Durable Task** use event-sourced orchestration histories, deterministic replay, durable timers and external events. This is another useful workflow-engine comparator; it does not itself establish the truth or authority of an external source event. [Azure durable orchestrations](https://learn.microsoft.com/en-us/azure/durable-task/common/durable-task-orchestrations) · [Durable Task programming model](https://learn.microsoft.com/en-us/azure/azure-functions/durable-functions-types-features-overview)
+- **Apache Kafka** supports exactly-once transactional consume-transform-produce behavior when consumed offsets and produced Kafka records are part of the transaction. That boundary does not automatically extend to arbitrary third-party HTTP side effects. [Kafka design and transactions](https://kafka.apache.org/design/)
+- **Amazon EventBridge** supports archiving and replaying retained events for a selected time window back to the source event bus. Replay is useful source infrastructure, but consumers still need identity, cursor, idempotency and policy checks. [EventBridge archive and replay](https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-archive.html)
+- **Microsoft SentinelBench** provides the closest direct monitoring-agent comparison: 100 tasks across 10 synthetic web environments; its wait_for method polls the page every second and is more cost-efficient than repeated sleep-and-inspect. The authors explicitly leave ephemeral, must-act-now opportunities as an open benchmark gap. [SentinelBench](https://www.microsoft.com/en-us/research/articles/sentinelbench-a-benchmark-for-long-running-monitoring-agents/)
+
+These are complementary building blocks. SFEB should integrate with their durable history/replay primitives while testing whether an additional assurance contract improves eligible-event recovery, authorization correctness, stale-worker rejection, evidence quality and cost per independently verified action.
