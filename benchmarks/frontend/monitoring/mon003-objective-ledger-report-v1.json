@@ -1,0 +1,30 @@
+{
+  "schema": "sfeb-mon003-objective-ledger-report-v1",
+  "status": "passed",
+  "runtime": {
+    "node_version": "v22.16.0",
+    "source_path": "benchmarks/frontend/monitoring/mon003-objective-ledger-v1.mjs",
+    "source_git_blob_sha": "1407b6c5240ca98071e062513588da5e17166ef5",
+    "source_sha256": "f42218fee255b7b5e78c5b7bf0c9fd05e46aa998c63addbcf721bf7d2d090a59"
+  },
+  "deterministic_cases": 3,
+  "cases": [
+    {
+      "name": "stale objective writer rejected by compare-and-swap version",
+      "result": "pass"
+    },
+    {
+      "name": "illegal jump and success without independent proof are rejected",
+      "result": "pass"
+    },
+    {
+      "name": "unknown outcome can only be completed against original operation identity and proof",
+      "result": "pass"
+    }
+  ],
+  "limitations": [
+    "Pure in-memory state-machine reference; it does not persist to a database or distributed log.",
+    "The state version is a model of compare-and-swap, not proof of a production transaction.",
+    "Postcondition proof is a non-empty fixture token; independent cryptographic verification remains unimplemented."
+  ]
+}
