@@ -57,3 +57,16 @@ It does **not** yet reproduce Redis Remis + Instruct, Agent Zero Memory, AML Cyc
 ## Tests
 
 Fourteen deterministic tests are authored for raw text fidelity, strict schema/unknown-field handling, duplicate IDs, session/user isolation, stable chunking, source mutation identity, chunk-metadata tamper detection, BM25 matching, neighbor isolation, lower-bound resource receipts, measured latency fields, unsupported tokenizer-version rejection, invalid input and RRF. They have not been executed here.
+
+
+## LongMemEval-V2 trajectory adapter
+
+The sibling `longmemeval_v2` module parses the official V2 trajectory JSONL record shape and builds a text-only state-window BM25 reference index. It preserves the full original trajectory JSON, state JSON, source state indices/steps, actions, thoughts, accessibility-tree text and screenshot references. Each candidate chunk is a centered state window; neighbor expansion remains within the same trajectory.
+
+The dataset attaches actions to destination states. The adapter keeps the action on its original destination state and describes it as the transition from the prior state; it does not shift the action backward. Web and enterprise trajectories cannot share one index.
+
+Screenshots are kept as evidence references, not opened or embedded. This is a text-only comparator, not multimodal V2 support, and it is not yet an implementation of the official Python `Memory.insert/query` plugin interface. The adapter emits a typed text/image-reference context projection, but screenshot references are not opened, validated against a dataset root, or converted to image payloads. A future protocol bridge must preserve image items and the official reader/context budget.
+
+Resource receipts report local measured index-build and query latency, source/state/accessibility/evidence-text bytes, screenshot-reference bytes, and lexical payload lower bounds. They exclude image pixels, allocator/container overhead, embeddings, LLM/reader cost, verification and persistent storage infrastructure. Eleven deterministic unit tests are authored for source/metadata preservation, state-window boundaries, destination-attached action semantics, domain isolation, same-trajectory neighbor expansion, BM25 retrieval, context-item projection, source mutation, invalid input and chunk tamper detection. They have not been executed.
+
+No V2 run or score is claimed.

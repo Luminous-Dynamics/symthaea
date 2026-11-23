@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/longmemeval_v2_trajectory_adapter_v0_1.schema.json",
+  "title": "LongMemEval-V2 trajectory adapter input v0.1",
+  "type": "object",
+  "required": ["id", "domain", "goal", "start_url", "states"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "domain": { "type": "string", "minLength": 1 },
+    "goal": { "type": "string", "minLength": 1 },
+    "start_url": { "type": "string", "minLength": 1 },
+    "outcome": { "type": ["string", "null"] },
+    "states": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["url", "screenshot"],
+        "properties": {
+          "url": { "type": "string", "minLength": 1 },
+          "action": { "type": ["string", "null"] },
+          "thought": { "type": ["string", "null"] },
+          "thoughts": { "type": ["string", "null"] },
+          "accessibility_tree": { "type": "string" },
+          "text": { "type": "string" },
+          "screenshot": { "type": "string", "minLength": 1 },
+          "state_index": { "type": "integer" },
+          "step": { "type": "integer" }
+        },
+        "anyOf": [
+          { "required": ["accessibility_tree"] },
+          { "required": ["text"] }
+        ],
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}
