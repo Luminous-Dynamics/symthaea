@@ -34,11 +34,11 @@ Sources: https://proceedings.mlr.press/v306/he26n.html ; https://vision2web-benc
 
 The official benchmark contains 132 tasks, authored by 20+ experienced maintainers/developers who reportedly spent more than 40 hours per task. Grading combines unit tests, repository-specific rubrics and additional verifiers; failing a blocking criterion yields a score of zero. It explicitly evaluates whether a maintainer would merge the patch.
 
-The 2026-11-23 official leaderboard row for Claude Fable 5.2 / Claude Code xhigh is 50.2% weighted score, 54.7% pass rate, $17.73 mean cost per rollout and 156k output tokens. These are separate measurements. The official changelog notes a scoring rescore on Nov 11 after the cheating scanner was revised to remove false positives.
+A 2026-11-23 cross-check of public leaderboard mirrors shows Claude Fable 5.2 / Claude Code xhigh at **50.2% weighted score**. This is a mirrored leaderboard observation, not an independently reproduced run; Cognition's direct page is dynamically rendered in the available text view. The official site explains that scores are weighted rubric aggregates, blocking-criterion failures receive zero, tasks are written by 20+ maintainers with more than 40 hours per task, and results were rescored on Nov 11 after a scanner revision removed false positives. Do not conflate the weighted score with pass rate or cost.
 
 **SFEB lesson:** measure thoroughness, related-input coverage, scope discipline, compatibility and regression preservation. Keep a maintainer rubric and deterministic gates separate; a weighted score must not hide hard blockers.
 
-Source: https://cognition.com/frontiercode
+Sources: https://cognition.com/frontiercode ; https://benchlm.ai/benchmarks/frontiercode-2 ; https://www.mypriors.com/benchmarks/frontiercode-2.0-main
 
 ### OSWorld 2.0 — long-horizon operational stress
 
