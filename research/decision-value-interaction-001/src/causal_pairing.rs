@@ -800,10 +800,12 @@ mod tests {
             false,
         );
         let certificate = validate_causal_pairing(&runs).expect("valid null causal case");
-        assert!(certificate
-            .terminal_state_sha256
-            .iter()
-            .all(|state| *state == digest(40)));
+        assert!(
+            certificate
+                .terminal_state_sha256
+                .iter()
+                .all(|state| *state == digest(40))
+        );
     }
 
     #[test]
