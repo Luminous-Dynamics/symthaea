@@ -1,8 +1,9 @@
 {
   "schema": "sfeb-event-execution-trace-v1",
-  "trace_id": "SFEB-INT004-TRACE-DEMO-001",
-  "case_id": "late-event-rolls-back-optimistic-action",
+  "trace_id": "SFEB-INT004-COMPOSITE-ALL-RULES-001",
+  "case_id": "composite-independent-oracle-all-families",
   "fixture_id": "SFEB-INT-004-EVENTS-001",
+  "fixture_sha256": "ac98b22042929f4ddc546df0b0b83b693a3422f66c6e3eb173c223c5c10ad6fa",
   "steps": [
     {
       "op": "submit",
@@ -18,6 +19,19 @@
       }
     },
     {
+      "op": "submit",
+      "action": {
+        "action_id": "act-revoked",
+        "job_id": "JOB-B",
+        "actor_id": "alice",
+        "capability": "job.transition",
+        "expected_version": 1,
+        "from_status": "open",
+        "to_status": "in_progress",
+        "input_mode": "keyboard"
+      }
+    },
+    {
       "op": "deliver",
       "event": {
         "type": "job_transition",
@@ -48,15 +62,119 @@
         "capability": "job.transition",
         "action_id": null
       }
+    },
+    {
+      "op": "deliver",
+      "event": {
+        "type": "permission_revoked",
+        "event_id": "evt-002",
+        "sequence": 2,
+        "actor_id": "alice",
+        "capability": "job.transition"
+      }
+    },
+    {
+      "op": "deliver",
+      "event": {
+        "type": "owner_changed",
+        "event_id": "evt-003",
+        "sequence": 3,
+        "job_id": "JOB-A",
+        "expected_version": 2,
+        "next_version": 3,
+        "from_owner": "alice",
+        "to_owner": "bob",
+        "actor_id": "admin",
+        "capability": "job.assign"
+      }
+    },
+    {
+      "op": "deliver",
+      "event": {
+        "type": "job_transition",
+        "event_id": "evt-004",
+        "sequence": 4,
+        "job_id": "JOB-A",
+        "expected_version": 3,
+        "next_version": 4,
+        "from_status": "blocked",
+        "to_status": "in_progress",
+        "actor_id": "bob",
+        "capability": "job.transition",
+        "action_id": null
+      }
+    },
+    {
+      "op": "deliver",
+      "event": {
+        "type": "clarification_required",
+        "event_id": "evt-005",
+        "sequence": 5,
+        "job_id": "JOB-B",
+        "conflict_id": "CONFLICT-77"
+      }
+    },
+    {
+      "op": "submit",
+      "action": {
+        "action_id": "act-ambiguous",
+        "job_id": "JOB-B",
+        "actor_id": "bob",
+        "capability": "job.transition",
+        "expected_version": 1,
+        "from_status": "open",
+        "to_status": "in_progress",
+        "input_mode": "keyboard"
+      }
+    },
+    {
+      "op": "deliver",
+      "event": {
+        "type": "clarification_resolved",
+        "event_id": "evt-006",
+        "sequence": 6,
+        "job_id": "JOB-B",
+        "conflict_id": "CONFLICT-77",
+        "resolution": "defer-until-inspection"
+      }
+    },
+    {
+      "op": "submit",
+      "action": {
+        "action_id": "act-clear",
+        "job_id": "JOB-B",
+        "actor_id": "bob",
+        "capability": "job.transition",
+        "expected_version": 1,
+        "from_status": "open",
+        "to_status": "in_progress",
+        "input_mode": "keyboard"
+      }
+    },
+    {
+      "op": "deliver",
+      "event": {
+        "type": "job_transition",
+        "event_id": "evt-007",
+        "sequence": 7,
+        "job_id": "JOB-B",
+        "expected_version": 1,
+        "next_version": 2,
+        "from_status": "open",
+        "to_status": "in_progress",
+        "actor_id": "bob",
+        "capability": "job.transition",
+        "action_id": "act-clear"
+      }
     }
   ],
   "worker_claims": {
-    "disposition": "accepted",
+    "disposition": "rejected",
     "observed_oracle_ids": [
-      "worker.claimed.pass",
-      "worker.claimed.security"
+      "fake.failure",
+      "fake.permission",
+      "fake.clarification"
     ],
-    "note": "Deliberately false claims; the verifier must ignore them."
-  },
-  "fixture_sha256": "743457004e5b88ff37134c4ac2c74b9e5f5c4f9b48619267cada2cab36b8e101"
+    "note": "Deliberately false; verifier must ignore these claims."
+  }
 }
