@@ -363,32 +363,27 @@ impl AudioPerception {
     /// whose validity can be stated without confusing fallback values with
     /// observed spectral peaks.
     fn extract_prosody(&self, samples: &[f32], sample_rate: u32) -> ProsodyFeatures {
-        use symthaea_vocal_tract::formant_extraction::{
-            ExtractionConfig, extract_formant_frames,
-        };
+        use symthaea_vocal_tract::formant_extraction::{ExtractionConfig, extract_formant_frames};
 
         const EXTRACTOR_ID: &str = "symthaea-vocal-tract.lpc-autocorrelation.v1";
         let extraction_config = ExtractionConfig::default();
         let extracted = extract_formant_frames(samples, sample_rate, &extraction_config);
-        let window_samples =
-            (extraction_config.window_secs * sample_rate as f32).round() as u64;
+        let window_samples = (extraction_config.window_secs * sample_rate as f32).round() as u64;
 
         let frames: Vec<AcousticProsodyFrameV1> = extracted
             .iter()
             .enumerate()
             .map(|(index, frame)| {
-                let source_start_sample =
-                    (frame.time.max(0.0) * sample_rate as f32).round() as u64;
+                let source_start_sample = (frame.time.max(0.0) * sample_rate as f32).round() as u64;
                 let source_end_sample = source_start_sample
                     .saturating_add(window_samples)
                     .min(samples.len() as u64);
-                let f0_hz = if frame.f0 > 0.0
-                    && frame.voicing >= extraction_config.voicing_threshold
-                {
-                    Some(frame.f0)
-                } else {
-                    None
-                };
+                let f0_hz =
+                    if frame.f0 > 0.0 && frame.voicing >= extraction_config.voicing_threshold {
+                        Some(frame.f0)
+                    } else {
+                        None
+                    };
 
                 AcousticProsodyFrameV1 {
                     frame_index: index as u64,
@@ -631,9 +626,15 @@ mod tests {
         let prosody = perception.extract_prosody(&samples, 16_000);
 
         assert_eq!(prosody.schema_version, ACOUSTIC_PROSODY_SCHEMA_VERSION);
-        assert_eq!(prosody.extractor_id, "symthaea-vocal-tract.lpc-autocorrelation.v1");
+        assert_eq!(
+            prosody.extractor_id,
+            "symthaea-vocal-tract.lpc-autocorrelation.v1"
+        );
         assert_eq!(prosody.source_sample_rate, 16_000);
-        assert_eq!(prosody.energy_normalization, ProsodyEnergyNormalization::UtterancePeak);
+        assert_eq!(
+            prosody.energy_normalization,
+            ProsodyEnergyNormalization::UtterancePeak
+        );
         assert!(prosody.frames.len() > 250);
         let mean_f0 = prosody.avg_pitch_hz.expect("voiced tone should yield F0");
         assert!(
@@ -676,7 +677,11 @@ mod tests {
     #[test]
     fn rate_aware_pcm_entry_point_rejects_unresampled_audio() {
         let mut perception = AudioPerception::new(AudioPerceptionConfig::default()).unwrap();
-        assert!(perception.process_samples_at_rate(&[0.0; 160], 48_000).is_err());
+        assert!(
+            perception
+                .process_samples_at_rate(&[0.0; 160], 48_000)
+                .is_err()
+        );
     }
 
     #[test]
