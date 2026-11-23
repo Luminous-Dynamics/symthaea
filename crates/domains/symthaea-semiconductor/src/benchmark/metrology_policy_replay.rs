@@ -1316,13 +1316,8 @@ mod tests {
         let semantics = synthetic_defect_semantics_v1(0.62).unwrap();
         let policy = policy_config(first.policy_view(), "mismatched-packet", 0, 32, 8, 9);
         assert!(
-            run_synthetic_metrology_policy_v1(
-                &first,
-                second.policy_view(),
-                &semantics,
-                &policy
-            )
-            .is_err()
+            run_synthetic_metrology_policy_v1(&first, second.policy_view(), &semantics, &policy)
+                .is_err()
         );
     }
 
