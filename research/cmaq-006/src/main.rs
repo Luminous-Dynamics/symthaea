@@ -72,6 +72,7 @@ struct AdequacyEvidence {
 }
 
 impl AdequacyEvidence {
+    #[cfg(test)]
     fn all_pass() -> Self {
         Self {
             physics_adherence: EvidenceStatus::Pass,
@@ -166,6 +167,7 @@ impl AdequacyEvidence {
         ]
     }
 
+    #[cfg(test)]
     fn set(&mut self, index: usize, status: EvidenceStatus) {
         match index {
             0 => self.physics_adherence = status,
