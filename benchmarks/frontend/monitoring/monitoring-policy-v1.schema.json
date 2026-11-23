@@ -17,10 +17,12 @@
       "const": "sfeb-monitoring-policy-v1"
     },
     "policy_id": {
-      "type": "string"
+      "type": "string",
+      "pattern": "^[A-Z0-9._-]+$"
     },
     "version": {
-      "type": "string"
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
     },
     "task_id": {
       "const": "SFEB-MON-001"
@@ -30,12 +32,16 @@
       "minItems": 1,
       "uniqueItems": true,
       "items": {
-        "type": "string"
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128
       }
     },
     "rules": {
       "type": "array",
       "minItems": 11,
+      "maxItems": 11,
+      "uniqueItems": true,
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -48,7 +54,8 @@
         ],
         "properties": {
           "id": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^[a-z0-9._-]+$"
           },
           "severity": {
             "enum": [
@@ -62,10 +69,12 @@
             "const": true
           },
           "evaluator": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
           "description": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           }
         }
       }
