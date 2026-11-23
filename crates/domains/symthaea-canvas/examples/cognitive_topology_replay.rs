@@ -12,10 +12,7 @@ use std::fs;
 use std::hint::black_box;
 use std::time::Instant;
 
-use symthaea_canvas::{
-    CognitiveLayoutConfig, CognitiveSvgOptions, CognitiveTopology, layout_cognitive_topology,
-    render_cognitive_projection_svg,
-};
+use symthaea_canvas::{CognitiveLayoutConfig, CognitiveTopology, layout_cognitive_topology};
 
 const DEFAULT_FIXTURE: &str =
     "crates/domains/symthaea-canvas/tests/fixtures/cognitive_topology_v1.json";
