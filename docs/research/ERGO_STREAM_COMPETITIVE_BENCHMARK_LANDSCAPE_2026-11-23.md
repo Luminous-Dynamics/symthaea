@@ -14,6 +14,7 @@ Existing suites measure complementary capabilities. They should be used as adapt
 | Track | External benchmark / system | What it tests | Fit to ErgoStream | Limitation / correct use |
 |---|---|---|---|---|
 | Ansatz-free scientific discovery | [Unsatz](https://arxiv.org/abs/2611.03713) | Learner proposes variables, hidden state, interactions and measurement/model form, buys experiments and predicts held-out interventions/conditions/horizons | **Closest direct comparator** for structural/model-form discovery | Agent starts with a scientific task and a model-program language; it is not a generic pre-task acquisition benchmark. Reproduce its exact task protocol before comparing |
+| Interactive scientific research agents | [SciAgentArena](https://sciagentarena.github.io/) | ~200 stepwise-verified tasks across five scientific domains, four task categories and 18 evaluated agents; reports reliability, stability and cost as well as task outcomes | External reality check for whether acquired structural knowledge improves actual scientific workflows | Tasks are user/task exposed and span data-analysis workflows; it does not isolate pre-task structural acquisition or frozen cross-domain transfer |
 | Interactive exploration | [ARC-AGI-3](https://arcprize.org/arc-agi/3) | Explore unfamiliar interactive environments, infer goals/rules, build adaptive world models and learn from actions without natural-language instructions | Strong external probe for acquired structures supporting exploration and transfer | It is task/game-centric and does not independently measure a pre-task structural library. The ARC Prize site currently lists GPT-6.2 (Astra/Sol) at 100.00% on its ARC-AGI-3 model-performance table (entry dated 2026-11-17), while the 2026 competition prize results are still scheduled for 2026-12-04. Keep these two reporting surfaces distinct and verify the exact evaluation protocol before using a leaderboard number as a matched result |
 | Visual causal reasoning | [CLEVRER](https://clevrer.csail.mit.edu/) | Descriptive, explanatory, predictive and counterfactual questions over object-interaction videos | Good post-acquisition probe for temporal/event relations and causal predictions | Synthetic, short, object-collision videos; task labels/questions are exposed at evaluation, so this is not task-agnostic acquisition by itself |
 | Interactive physical reasoning | [PHYRE](https://phyre.ai/) | Sample-efficient solving and generalization across 2D physical puzzles | Useful for testing whether discovered dynamics/relations support action selection | Puzzle goals are provided; not a test of open-ended or goal-free acquisition |
@@ -34,6 +35,14 @@ Existing suites measure complementary capabilities. They should be used as adapt
 Unsatz (Ji, Wang and Sun, 2026-10-31) evaluates scientific discovery without a supplied ansatz over 80 simulated systems and 20 domains. The authors report that nine LLMs solve between 21% and 60% of systems. It exposes a key failure mode: agents may identify which variables exist but not how they act, and may prefer a lower training error over better held-out prediction. These are reported paper results, not a reproduced Symthaea comparison.
 
 **Response:** use Unsatz as the direct ansatz-free scientific-discovery comparator within the #11042 lane. ErgoStream adds a separate pre-task acquisition phase and a library snapshot that is tested on later undisclosed probes. Do not reimplement the Unsatz task DSL or claim superiority from a different synthetic task.
+
+### Scientific research agents need real workflow evaluation too
+
+SciAgentArena (2026) supplies approximately 200 stepwise-verified tasks across five scientific domains and evaluates 18 agents. Its published results show no single agent dominates; systems are useful on well-specified analysis workflows but struggle with sustained self-directed exploration, genuinely novel insights, stability and validity checking. It reports task-specific best-agent examples rather than one universal research-agent score.
+
+**Response:** use SciAgentArena as an external workflow track after the finite structural-transfer contract is stable. Measure whether a frozen acquired library improves task execution, verification, method selection, reliability and cost. Keep this distinct from the pre-task acquisition claim: SciAgentArena presents a task and scores its execution; ErgoStream must additionally show that the library was built before the downstream task was disclosed.
+
+Source: https://sciagentarena.github.io/ · Paper: https://arxiv.org/abs/2606.12736
 
 ### Compositional category discovery is an adjacent frontier
 
@@ -119,6 +128,14 @@ Nastl and Hardt's NeurIPS 2024 study evaluates 16 tabular prediction tasks with 
 
 Paper: https://proceedings.neurips.cc/paper_files/paper/2024/hash/3792ddbf94b68ff4369f510f7a3e1777-Abstract-Conference.html
 
+### Physical-AI SOTA claims require more than a simulation leaderboard
+
+The September 2026 survey on world models for Physical AI recommends matched deterministic, stochastic and model-free baselines under the same data, observation/action, planning-horizon and compute budgets. It also recommends reporting mean and variance across at least five random seeds, computational cost and failure rates. For deployment-level claims, it calls for hardware-in-the-loop or physical-system transfer plus predefined stress tests for sensor dropout/noise, dynamics mismatch, actuation delay and external disturbance.
+
+**Response:** adopt these as minimum reporting rules for any eventual physical-AI comparison. A simulation-only improvement should be described as a benchmark result, not a deployment-level SOTA claim. Include contact, friction, stale observations, actuator limits and out-of-distribution stress cases.
+
+Survey: https://link.springer.com/article/10.1007/s44163-026-02122-1
+
 ### Dynamic robotics is a harder test than frozen-video prediction
 
 RoboDyna reports 20 conceptual dynamic manipulation tasks across five categories plus 10 household tasks, 3,500 expert demonstrations and synchronous/asynchronous evaluation. Its authors report sub-20% success across evaluated policies, and that inference latency can flip individual episode outcomes. LIBERO-Dynamic similarly makes target motion and policy inference latency explicit across dynamic variants of the LIBERO tasks.
@@ -141,7 +158,8 @@ All arms should receive the same stream, split, modality availability, observati
 4. **Analogy and compositional transfer controls:** CARV for compositional visual analogy; CGGC for unseen relation combinations; CoGe-GCD for discovery of primitives and new category compositions; GOOD for graph OOD shifts; Heidelberg Graph Matching Benchmark, Neuen-Schweitzer and labeled graph-edit datasets for algorithmic matching quality/scaling. Distinguish task-exposed analogy tests from pre-task acquisition; none substitutes for intervention-divergent false-analogy worlds.
 5. **World-model and action-policy controls:** object/event-centric recurrent and transformer models; the strongest compatible action-conditioned world model; a direct reactive/VLA policy with no explicit world model; a no-transfer/fresh-learning control. Report same-budget and best-available tracks separately. The primary question is incremental decision utility from acquired structure, not video fidelity alone.
 6. **Scientific-discovery and causal controls:** Unsatz-compatible agent/program interface; ACDB-compatible PC + greedy active orientation, density-aware random-DAG and other admitted causal baselines; PySR or another pinned symbolic-regression baseline when the candidate grammar and task class match; SINDy only when its sparse-regression assumptions are satisfied; exact tiny-world enumeration as evaluator diagnostic only.
-7. **Human reference:** where the task supports meaningful human interaction, include a human sample-efficiency / action-efficiency reference. It is not a substitute for a matched machine baseline.
+7. **Interactive scientific workflow control:** SciAgentArena-compatible task subsets for stepwise validity, method choice, reliability and cost. Treat this as a downstream workflow evaluation; it does not substitute for hidden paired-world and pre-task acquisition experiments.
+8. **Human reference:** where the task supports meaningful human interaction, include a human sample-efficiency / action-efficiency reference. It is not a substitute for a matched machine baseline.
 
 No name-only reproduction. Record exact code commit, weights, model/API revision, prompt, tool access, preprocessing, operator set, task subset, compute, retries, failed runs and licensing/data exclusions. For proprietary APIs, report black-box evaluation conditions and do not imply implementation-level parity.
 
@@ -225,3 +243,5 @@ These are prospective engineering targets, not external standards or achieved re
 - Do causal predictors generalize better to new domains? (NeurIPS 2024): https://proceedings.neurips.cc/paper_files/paper/2024/hash/3792ddbf94b68ff4369f510f7a3e1777-Abstract-Conference.html
 - CoGe-GCD (ICML 2026): https://proceedings.mlr.press/v306/tang26ai.html
 - Heidelberg Graph Matching Benchmark (11 datasets / 451 instances): https://hci.iwr.uni-heidelberg.de/content/graph-matching-benchmark
+- SciAgentArena: https://sciagentarena.github.io/ · https://arxiv.org/abs/2606.12736
+- Physical-AI world-model survey (2026): https://link.springer.com/article/10.1007/s44163-026-02122-1
