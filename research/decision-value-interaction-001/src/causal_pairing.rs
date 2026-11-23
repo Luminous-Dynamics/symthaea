@@ -168,6 +168,7 @@ pub enum CausalPairingError {
     },
     RandomnessDomainsNotSeparated,
     InitialStateMismatch { arm: TreatmentArm },
+    StateChainMismatch { arm: TreatmentArm, world_tick: u64 },
     TickOverflow { arm: TreatmentArm },
     NonContiguousTick {
         arm: TreatmentArm,
@@ -233,6 +234,10 @@ impl fmt::Display for CausalPairingError {
             Self::InitialStateMismatch { arm } => write!(
                 formatter,
                 "first transition in arm {arm:?} does not start at the paired initial state"
+            ),
+            Self::StateChainMismatch { arm, world_tick } => write!(
+                formatter,
+                "arm {arm:?} has a discontinuous world-state chain at tick {world_tick}"
             ),
             Self::TickOverflow { arm } => {
                 write!(formatter, "world-tick arithmetic overflowed for arm {arm:?}")
@@ -377,6 +382,14 @@ fn validate_steps(receipt: &CausalTrajectoryReceipt) -> Result<(), CausalPairing
         }
         if index == 0 && step.pre_state_sha256 != receipt.identity.paired.initial_state_sha256 {
             return Err(CausalPairingError::InitialStateMismatch { arm: receipt.arm });
+        }
+        if index > 0
+            && step.pre_state_sha256 != receipt.steps[index - 1].post_state_sha256
+        {
+            return Err(CausalPairingError::StateChainMismatch {
+                arm: receipt.arm,
+                world_tick: step.world_tick,
+            });
         }
         if index + 1 < receipt.steps.len() {
             expected_tick = expected_tick
@@ -875,6 +888,40 @@ mod tests {
         assert!(matches!(
             validate_causal_pairing(&runs),
             Err(CausalPairingError::ConflictingDeterministicTransition { world_tick: 100 })
+        ));
+    }
+
+
+    #[test]
+    fn closed_loop_checks_exogenous_overlap_even_beyond_baseline_termination() {
+        let mut runs = receipts(
+            CausalReplayRegime::ClosedLoopActionCoupled,
+            TrajectoryOrigin::ArmLocalDriverExecution,
+            true,
+        );
+        runs[0].steps.truncate(1);
+        runs[2].steps[1].exogenous_input_sha256 = digest(222);
+        runs[3].steps[1].exogenous_input_sha256 = digest(222);
+        assert!(matches!(
+            validate_causal_pairing(&runs),
+            Err(CausalPairingError::ExogenousInputMismatch { world_tick: 101 })
+        ));
+    }
+
+    #[test]
+    fn discontinuous_state_chain_is_rejected() {
+        let mut runs = receipts(
+            CausalReplayRegime::ClosedLoopActionCoupled,
+            TrajectoryOrigin::ArmLocalDriverExecution,
+            true,
+        );
+        runs[2].steps[1].pre_state_sha256 = digest(233);
+        assert!(matches!(
+            validate_causal_pairing(&runs),
+            Err(CausalPairingError::StateChainMismatch {
+                arm: TreatmentArm::ObservationOnly,
+                world_tick: 101
+            })
         ));
     }
 
