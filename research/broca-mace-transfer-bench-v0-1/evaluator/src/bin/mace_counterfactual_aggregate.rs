@@ -661,6 +661,11 @@ fn paired_record(
 struct CandidateReceipt {
     run_id: String,
     method: String,
+    intervention_id: String,
+    intervention_kind: String,
+    target_key: String,
+    removed_event_ids: Vec<u32>,
+    matched_to: Option<String>,
     candidate_input_sha256: String,
     decision: String,
     retrieved_event_ids: Vec<u32>,
@@ -700,6 +705,18 @@ fn parse_candidate_receipt(record: &Value) -> Result<((String, String), Candidat
     let method = required_string(record, "method")?.to_string();
     let candidate_input_sha256 =
         required_string(record, "candidate_input_sha256")?.to_string();
+    let intervention_id = required_string(record, "intervention_id")?.to_string();
+    let intervention_kind = required_string(record, "intervention_kind")?.to_string();
+    let target_key = required_string(record, "target_key")?.to_string();
+    let removed_event_ids = required_event_ids(record, "removed_event_ids")?;
+    let matched_to_value = record
+        .get("matched_to")
+        .ok_or_else(|| "candidate receipt is missing matched_to field".to_string())?;
+    let matched_to = match matched_to_value {
+        Value::Null => None,
+        Value::String(value) if !value.is_empty() => Some(value.clone()),
+        _ => return Err("candidate receipt matched_to must be null or a non-empty string".to_string()),
+    };
     let decision_need_sha256 =
         required_string(record, "decision_need_sha256")?.to_string();
     let candidate_evidence_sha256 =
@@ -747,6 +764,11 @@ fn parse_candidate_receipt(record: &Value) -> Result<((String, String), Candidat
         CandidateReceipt {
             run_id,
             method,
+            intervention_id,
+            intervention_kind,
+            target_key,
+            removed_event_ids,
+            matched_to,
             candidate_input_sha256,
             decision,
             retrieved_event_ids,
@@ -766,6 +788,32 @@ fn validate_score_against_candidate(
     }
     if required_string(score, "method")? != candidate.method {
         return Err("evaluator score method differs from candidate receipt".to_string());
+    }
+    if required_string(score, "intervention_id")? != candidate.intervention_id {
+        return Err("evaluator score intervention_id differs from candidate receipt".to_string());
+    }
+    if required_string(score, "intervention_kind")? != candidate.intervention_kind {
+        return Err("evaluator score intervention_kind differs from candidate receipt".to_string());
+    }
+    if required_string(score, "target_key")? != candidate.target_key {
+        return Err("evaluator score target_key differs from candidate receipt".to_string());
+    }
+    if required_event_ids(score, "removed_event_ids")? != candidate.removed_event_ids {
+        return Err("evaluator score removed_event_ids differ from candidate receipt".to_string());
+    }
+    if required_u64(score, "removed_event_count")?
+        != u64::try_from(candidate.removed_event_ids.len()).unwrap_or(u64::MAX)
+    {
+        return Err("evaluator score removed_event_count differs from candidate receipt".to_string());
+    }
+    let score_matched_to = score.get("matched_to").cloned().unwrap_or(Value::Null);
+    let candidate_matched_to = candidate
+        .matched_to
+        .as_ref()
+        .map(|value| json!(value))
+        .unwrap_or(Value::Null);
+    if score_matched_to != candidate_matched_to {
+        return Err("evaluator score matched_to differs from candidate receipt".to_string());
     }
     if required_string(score, "candidate_input_sha256")? != candidate.candidate_input_sha256 {
         return Err("evaluator score candidate_input_sha256 differs from candidate receipt".to_string());
@@ -1134,6 +1182,11 @@ mod tests {
             "pair_block_id": pair_block_id,
             "candidate_observation_id": candidate_observation_id,
             "method": method,
+            "intervention_id": format!("full_evidence_{method}"),
+            "intervention_kind": "reference",
+            "target_key": method,
+            "removed_event_ids": [],
+            "matched_to": null,
             "candidate_input_sha256": candidate_input_sha256,
             "decision_need_sha256": decision_need_sha256,
             "candidate_evidence_sha256": candidate_evidence_sha256,
@@ -1153,6 +1206,12 @@ mod tests {
                 &candidate.candidate_input_sha256
             ),
             "method": candidate.method,
+            "intervention_id": candidate.intervention_id,
+            "intervention_kind": candidate.intervention_kind,
+            "target_key": candidate.target_key,
+            "removed_event_ids": candidate.removed_event_ids,
+            "removed_event_count": candidate.removed_event_ids.len(),
+            "matched_to": candidate.matched_to,
             "candidate_input_sha256": candidate.candidate_input_sha256,
             "decision": candidate.decision,
             "retrieved_event_ids": candidate.retrieved_event_ids,
