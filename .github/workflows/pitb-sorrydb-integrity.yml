@@ -2,6 +2,7 @@ name: PITB SorryDB Snapshot Integrity
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "tools/pitb-sorrydb-integrity/**"
       - ".github/workflows/pitb-sorrydb-integrity.yml"
@@ -13,6 +14,7 @@ permissions:
 
 jobs:
   sorrydb-snapshot-contract:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
