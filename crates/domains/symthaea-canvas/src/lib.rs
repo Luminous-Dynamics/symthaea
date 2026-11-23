@@ -31,6 +31,7 @@ pub mod mycelial_annotation_triage;
 pub mod mycelial_contact_persistence;
 pub mod mycelial_failure_resilience;
 pub mod mycelial_fusion_counterfactual;
+pub mod mycelial_graph_sidecar;
 pub mod mycelial_junction_graph;
 pub mod mycelial_mesh;
 pub mod mycelial_model;
@@ -134,6 +135,14 @@ pub use mycelial_fusion_counterfactual::{
     evaluate_mycelial_fusion_counterfactuals,
 };
 
+pub use mycelial_graph_sidecar::{
+    MAX_MYCELIAL_GRAPH_EXTERNAL_MAPPINGS, MAX_MYCELIAL_GRAPH_SIDECAR_ID_BYTES,
+    MAX_MYCELIAL_GRAPH_SIDECAR_URI_BYTES, MYCELIAL_GRAPH_SIDECAR_SCHEMA_VERSION,
+    MycelialExternalObjectMapping, MycelialGraphImageContainerFormat, MycelialGraphImageReference,
+    MycelialGraphInteroperabilityAssessment, MycelialGraphObjectKind, MycelialGraphSidecar,
+    MycelialGraphSidecarError, MycelialGraphSidecarProducer, MycelialGraphSidecarRoundTripReport,
+    assess_mycelial_graph_interoperability, evaluate_mycelial_graph_sidecar_round_trip,
+};
 pub use mycelial_junction_graph::{
     GeometricEfficiencyReport, JunctionKind, JunctionLengthUnit, MAX_JUNCTION_GRAPH_JUNCTIONS,
     MAX_JUNCTION_GRAPH_SEGMENTS, MYCELIAL_JUNCTION_GRAPH_SCHEMA_VERSION, MycelialHyphaSegment,
