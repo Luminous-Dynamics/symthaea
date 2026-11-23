@@ -347,7 +347,54 @@
         },
         "bound_evidence_sha256": {
           "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
+          "pattern": "^(?!0{64}$)[0-9a-f]{64}$"
+        },
+        "coverage_metric_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "covering_radius": {
+          "type": "number",
+          "minimum": 0
+        },
+        "verified_lipschitz_constant": {
+          "type": "number",
+          "minimum": 0
+        },
+        "reference_uncertainty": {
+          "type": "number",
+          "minimum": 0
+        },
+        "candidate_uncertainty": {
+          "type": "number",
+          "minimum": 0
+        },
+        "measurement_uncertainty": {
+          "type": "number",
+          "minimum": 0
+        },
+        "maximum_sampled_normalized_error": {
+          "type": "number",
+          "minimum": 0
+        },
+        "global_normalized_error_bound": {
+          "type": "number",
+          "minimum": 0
+        },
+        "covering_set_sha256": {
+          "type": "string",
+          "pattern": "^(?!0{64}$)[0-9a-f]{64}$"
+        },
+        "branch_association_stable": {
+          "type": "boolean"
+        },
+        "branch_stability_evidence_sha256": {
+          "type": "string",
+          "pattern": "^(?!0{64}$)[0-9a-f]{64}$"
+        },
+        "independent_checker_revision": {
+          "type": "string",
+          "minLength": 1
         }
       }
     },
@@ -524,6 +571,86 @@
               "reference_bundle_sha256": {
                 "type": "string",
                 "pattern": "^(?!0{64}$)[0-9a-f]{64}$"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "response_scope": {
+            "properties": {
+              "coverage_kind": {
+                "const": "certified_global"
+              }
+            },
+            "required": [
+              "coverage_kind"
+            ]
+          }
+        },
+        "required": [
+          "response_scope"
+        ]
+      },
+      "then": {
+        "properties": {
+          "response_scope": {
+            "required": [
+              "globally_bounded",
+              "bound_method",
+              "bound_evidence_sha256",
+              "coverage_metric_id",
+              "covering_radius",
+              "verified_lipschitz_constant",
+              "reference_uncertainty",
+              "candidate_uncertainty",
+              "measurement_uncertainty",
+              "maximum_sampled_normalized_error",
+              "global_normalized_error_bound",
+              "covering_set_sha256",
+              "branch_association_stable",
+              "branch_stability_evidence_sha256",
+              "independent_checker_revision"
+            ],
+            "properties": {
+              "globally_bounded": {
+                "const": true
+              },
+              "branch_association_stable": {
+                "const": true
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "response_scope": {
+            "properties": {
+              "coverage_kind": {
+                "const": "finite_empirical"
+              }
+            },
+            "required": [
+              "coverage_kind"
+            ]
+          }
+        },
+        "required": [
+          "response_scope"
+        ]
+      },
+      "then": {
+        "properties": {
+          "response_scope": {
+            "properties": {
+              "globally_bounded": {
+                "const": false
               }
             }
           }
