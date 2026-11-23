@@ -2056,7 +2056,13 @@ mod tests {
             vec![
                 node("pA", AnnotatedJunctionKind::Branch, 0.01, 0.0, 0.0),
                 node("pB", AnnotatedJunctionKind::Tip, 1.01, 0.0, 0.0),
-                node("pC", AnnotatedJunctionKind::ProjectedCrossing, 0.0, 1.01, 0.0),
+                node(
+                    "pC",
+                    AnnotatedJunctionKind::ProjectedCrossing,
+                    0.0,
+                    1.01,
+                    0.0,
+                ),
             ],
             vec![edge("s1", "pA", "pB", 1.0), edge("s2", "pA", "pC", 1.0)],
         );
