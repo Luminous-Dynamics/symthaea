@@ -19,7 +19,9 @@
     ],
     "formula": "z(x) = -pi + 2*pi*(x-min(X))/(max(X)-min(X))",
     "normalization_is_position_only": true,
-    "particle_weights_affect_extrema": false
+    "particle_weights_affect_extrema": false,
+    "source_faithful_to_neopic": false,
+    "output_interval_role": "illustrative_synthetic_interval_only"
   },
   "base_cloud": {
     "positions": [
@@ -106,6 +108,6 @@
     "empirical_measure_change": "At most the mass assigned to the added outlier (1e-12) before renormalization.",
     "normalization_change": "The min/max support changes from [0.1,0.9] to [0,0.9], remapping every inlier position except the upper endpoint.",
     "expected_disposition": "Detect and report normalization-induced global coordinate drift separately from sampling / learned-operator error.",
-    "scope_limit": "This is an analytic synthetic normalization witness, not a NEOPIC model-output error, kinetic simulation, or claim that all physical particle clouds contain such outliers."
+    "scope_limit": "This is an analytic synthetic normalization witness using an illustrative [-pi, pi] interval, not a paper-faithful reproduction of NEOPIC's exact source normalization scale or a learned-field output error, kinetic simulation, or claim that all physical particle clouds contain such outliers. Pin the paper-tag source and exact transform in issue #12952 before a faithful comparator run."
   }
 }
