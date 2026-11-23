@@ -38,9 +38,9 @@ pub mod encoder;
 pub mod fep;
 pub mod formant_extraction;
 pub mod metrics;
-pub mod pitch_track_eval;
 pub mod phonetics;
 pub mod pipeline;
+pub mod pitch_track_eval;
 pub mod speech;
 pub mod types;
 
