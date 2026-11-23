@@ -231,6 +231,95 @@ class MaceLongMemEvalV2IngressTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "until reload/reconciliation"):
             memory._rpc({"op": "query", "query": "must not execute"})
 
+    def test_candidate_evidence_receipt_is_bound_to_run_invocation_query_and_binary(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            memory = self.make_memory(root)
+            memory.run_id = "run-2026-11-23"
+            memory.sidecar_binary_sha256 = "a" * 64
+            memory.candidate_evidence_dir = root / "workspace" / "candidate_evidence"
+            query = "query"
+            query_digest = hashlib.sha256(query.encode("utf-8")).hexdigest()
+            candidate = {
+                "schema_version": "mace_candidate_evidence_v0_1",
+                "record_type": "candidate_evidence",
+                "run_id": memory.run_id,
+                "candidate_id": "opaque-invocation-1",
+                "backend_id": "mace_lmev2_bm25_text",
+                "backend_revision_sha256": memory.sidecar_binary_sha256,
+                "query_scope": "longmemeval-v2:domain:web",
+                "query_purpose": "benchmark:memory-context",
+                "query_sha256": query_digest,
+                "evidence_id": "lmev2:text:t1:chunk1",
+                "source_id": "t1",
+                "source_sha256": "b" * 64,
+                "payload_sha256": "c" * 64,
+                "payload_ref": "lmev2://web/trajectories/t1/chunks/chunk1",
+                "modality": "text",
+                "retrieval_channel": "trajectory_bm25_text",
+                "retrieval_rank": 1,
+                "retrieval_score": 0.5,
+                "parent_evidence_ids": [],
+                "derivation_receipt_sha256": None,
+            }
+            candidate_jsonl = json.dumps(candidate, sort_keys=True, separators=(",", ":"))
+            response = {
+                "candidate_evidence_jsonl": candidate_jsonl,
+                "candidate_record_count": 1,
+                "candidate_set_sha256": "d" * 64,
+            }
+
+            memory._persist_candidate_envelope("opaque-invocation-1", query, response)
+            files = list(memory.candidate_evidence_dir.iterdir())
+            self.assertEqual(len(files), 2)
+            receipt_file = next(path for path in files if path.name.endswith(".receipt.json"))
+            receipt = json.loads(receipt_file.read_text(encoding="utf-8"))
+            self.assertEqual(receipt["run_id"], memory.run_id)
+            self.assertEqual(receipt["candidate_id"], "opaque-invocation-1")
+            self.assertEqual(receipt["candidate_set_sha256"], "d" * 64)
+            self.assertEqual(
+                receipt["candidate_jsonl_sha256"],
+                hashlib.sha256(candidate_jsonl.encode("utf-8")).hexdigest(),
+            )
+
+            changed = dict(candidate)
+            changed["payload_sha256"] = "e" * 64
+            changed_jsonl = json.dumps(changed, sort_keys=True, separators=(",", ":"))
+            changed_response = dict(response, candidate_evidence_jsonl=changed_jsonl)
+            with self.assertRaisesRegex(RuntimeError, "different evidence"):
+                memory._persist_candidate_envelope(
+                    "opaque-invocation-1", query, changed_response
+                )
+
+    def test_zero_candidate_query_still_persists_an_empty_result_receipt(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            memory = self.make_memory(root)
+            memory.run_id = "run-empty"
+            memory.sidecar_binary_sha256 = "a" * 64
+            memory.candidate_evidence_dir = root / "workspace" / "candidate_evidence"
+            memory._persist_candidate_envelope(
+                "opaque-empty-invocation",
+                "no match",
+                {
+                    "candidate_evidence_jsonl": "",
+                    "candidate_record_count": 0,
+                    "candidate_set_sha256": None,
+                },
+            )
+            files = list(memory.candidate_evidence_dir.iterdir())
+            self.assertEqual(len(files), 2)
+            self.assertEqual(
+                len([path for path in files if path.suffix == ".jsonl"]),
+                1,
+            )
+            receipt = json.loads(
+                next(path for path in files if path.name.endswith(".receipt.json"))
+                .read_text(encoding="utf-8")
+            )
+            self.assertEqual(receipt["candidate_record_count"], 0)
+            self.assertIsNone(receipt["candidate_set_sha256"])
+
     def test_domain_mismatch_is_rejected_before_asset_creation(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
