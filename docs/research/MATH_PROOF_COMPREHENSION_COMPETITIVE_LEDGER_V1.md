@@ -396,3 +396,23 @@ These are prospective targets, not current achievements. Benchmark comparisons m
 5. Preregister and conduct a human comprehension / delayed-transfer study only after ethics and power-analysis prerequisites are met.
 
 The purpose is not to beat all theorem provers at their own task. It is to establish whether evidence-bound proof reconstruction and counterfactual consistency deliver measurable capabilities that existing retrieval, formal proving, proof grading and proof compression benchmarks do not yet directly measure.
+
+## 14. Statement semantics and elaborated proof structure — new comparison axis
+
+Two recent benchmarks show that proof generation and statement fidelity are separate engineering problems:
+
+- **LPBench** publishes 118 Lean 4 research-level problems: 32 open conjectures, 65 literature problems and 21 calibration tasks. Its theorem-sandwich evaluation asks a candidate formalization to support a stronger statement or lemma family and to imply selected corollaries, reducing reliance on a single reference proof. Use it to calibrate statement fidelity and research-level proving, while keeping hidden sandwich evidence evaluator-only. <https://github.com/lp-bench/lp-bench>
+- **T² (ACL Industry 2026)** uses dependent successor theorems as downstream semantic tests. Its dataset covers 2,206 tasks across five Lean 4 repositories with about 41 successor theorems per task on average; the paper reports 38.9% testing accuracy for its best model in the stated setting. Compilation alone is not a complete semantic equivalence test. <https://aclanthology.org/2026.acl-industry.150/>
+
+The current Mathlib extractor pilot supplies an executable lower-level data source for this programme: 4 pinned theorem declarations, 24 type references, 60 proof-value references, 64 unique merged closure references, 84 role-labelled edges and zero unresolved names. For each theorem, the union of type and proof-value references reconciles exactly with Lean's ConstantInfo closure. This is a small extraction result, not expert proof-plan agreement or external graph SOTA.
+
+**New research hypothesis:** theorem comprehension should be evaluated across three independent identities: (1) formal statement and hypotheses, (2) elaborated proof-plan/dependency roles, and (3) downstream semantic behavior. A candidate passes only the layers it actually satisfies. Theorem sandwiches test selected implication directions; successor-theorem regression tests downstream compatibility; proof-plan reconstruction tests whether the model recovered the reasoning structure. None alone proves complete informal/formal equivalence.
+
+Prospective semantic gate targets:
+- 100% exact source/declaration/assumption identity.
+- Zero acceptance of vacuous, admitted or deliberately unsound negative controls.
+- ≥95% precision and ≥90% recall for seeded statement-defect detection.
+- ≥90% classification accuracy for entailment direction and route-only versus theorem-truth mutations.
+- Report theorem-sandwich obligations and successor-test behavior separately, with false alarms and task-family confidence intervals.
+
+These targets remain prospective. LPBench and T² must be run in their own harnesses and source pins; cross-paper headline scores are not directly comparable.
