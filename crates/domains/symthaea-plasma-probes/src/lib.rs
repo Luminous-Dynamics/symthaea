@@ -2159,10 +2159,10 @@ fn kird_join_field(parent: &'static str, child: &'static str) -> &'static str {
     }
 }
 
-fn kird_value(
-    root: &serde_json::Value,
+fn kird_value<'a>(
+    root: &'a serde_json::Value,
     field: &'static str,
-) -> Result<&serde_json::Value, ContractError> {
+) -> Result<&'a serde_json::Value, ContractError> {
     let mut current = root;
     for segment in field.split('.') {
         current = current
@@ -2172,7 +2172,10 @@ fn kird_value(
     Ok(current)
 }
 
-fn kird_string(root: &serde_json::Value, field: &'static str) -> Result<&str, ContractError> {
+fn kird_string<'a>(
+    root: &'a serde_json::Value,
+    field: &'static str,
+) -> Result<&'a str, ContractError> {
     kird_value(root, field)?
         .as_str()
         .ok_or_else(|| kird_error(field, "must be a string"))
@@ -2220,10 +2223,10 @@ fn kird_optional_number(
     Ok(Some(number))
 }
 
-fn kird_array(
-    root: &serde_json::Value,
+fn kird_array<'a>(
+    root: &'a serde_json::Value,
     field: &'static str,
-) -> Result<&[serde_json::Value], ContractError> {
+) -> Result<&'a [serde_json::Value], ContractError> {
     kird_value(root, field)?
         .as_array()
         .map(Vec::as_slice)
