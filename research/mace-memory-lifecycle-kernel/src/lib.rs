@@ -447,6 +447,7 @@ pub fn erase_record(snapshot: &mut MemorySnapshot, witness: &mut dyn MonotonicWi
 /// erasure without a real external witness implementation.
 pub fn reconcile_snapshot(mut snapshot: MemorySnapshot, witness: &dyn MonotonicWitnessStore) -> Result<(MemorySnapshot, RecoveryReport), LifecycleError> {
     let state = witness.latest_checkpoint()?;
+    if !state.verify_digest() { return Err(LifecycleError::WitnessCheckpointInvalid); }
     if snapshot.generation > state.generation { return Err(LifecycleError::SnapshotAheadOfWitness); }
     let removed_resurrected_ids: Vec<String> = state.erased_ids.iter().filter(|id| snapshot.records.contains_key(*id)).cloned().collect();
     for id in &state.erased_ids { snapshot.records.remove(id); }
@@ -576,6 +577,7 @@ fn ensure_generation_available(snapshot: &MemorySnapshot) -> Result<(), Lifecycl
 
 fn advance_head(snapshot: &mut MemorySnapshot, witness: &mut dyn MonotonicWitnessStore, revoked_ids: BTreeSet<String>, erased_ids: BTreeSet<String>) -> Result<(), LifecycleError> {
     let current = witness.latest_checkpoint()?;
+    if !current.verify_digest() { return Err(LifecycleError::WitnessCheckpointInvalid); }
     ensure_generation_available(snapshot)?;
     if snapshot.generation != current.generation { return Err(LifecycleError::StoreHeadMismatch); }
     let generation = current.generation + 1;
@@ -624,6 +626,24 @@ mod tests {
         }
     }
 
+    struct RejectingWitness {
+        inner: TrustedWitness,
+    }
+
+    impl MonotonicWitnessStore for RejectingWitness {
+        fn latest_checkpoint(&self) -> Result<WitnessCheckpoint, LifecycleError> {
+            self.inner.latest_checkpoint()
+        }
+
+        fn append_checkpoint(
+            &mut self,
+            _expected_checkpoint_sha256: &str,
+            _next: WitnessCheckpoint,
+        ) -> Result<(), LifecycleError> {
+            Err(LifecycleError::WitnessUnavailable)
+        }
+    }
+
     fn full_profile() -> AuthorityProfile {
         AuthorityProfile {
             allowed_scopes: BTreeSet::from(["project-x".to_owned()]),
@@ -659,6 +679,55 @@ mod tests {
 
     fn need() -> DecisionNeed {
         DecisionNeed::new("project-x", "planning")
+    }
+
+    #[test]
+    fn witness_checkpoint_binds_tombstones_and_chain_parent() {
+        let revoked = BTreeSet::from(["e1".to_owned()]);
+        let first = WitnessCheckpoint::new(
+            1, "store-head", revoked, BTreeSet::new(), Some("parent-a".to_owned()),
+        );
+        let changed_tombstones = WitnessCheckpoint::new(
+            1, "store-head", BTreeSet::new(), BTreeSet::new(), Some("parent-a".to_owned()),
+        );
+        let changed_parent = WitnessCheckpoint::new(
+            1, "store-head", BTreeSet::from(["e1".to_owned()]), BTreeSet::new(),
+            Some("parent-b".to_owned()),
+        );
+        assert!(first.verify_digest());
+        assert_ne!(first.checkpoint_sha256, changed_tombstones.checkpoint_sha256);
+        assert_ne!(first.checkpoint_sha256, changed_parent.checkpoint_sha256);
+        let mut tampered = first.clone();
+        tampered.erased_ids.insert("e2".to_owned());
+        assert!(!tampered.verify_digest());
+    }
+
+    #[test]
+    fn witness_compare_and_append_rejects_stale_expected_head() {
+        let mut witness = TrustedWitness::default();
+        let current = witness.latest_checkpoint().expect("genesis");
+        let next = WitnessCheckpoint::new(
+            1, "next-head", current.revoked_ids.clone(), current.erased_ids.clone(),
+            Some(current.checkpoint_sha256.clone()),
+        );
+        assert_eq!(
+            witness.append_checkpoint("stale-checkpoint", next),
+            Err(LifecycleError::WitnessConflict)
+        );
+        assert_eq!(witness.generation(), 0);
+    }
+
+    #[test]
+    fn failed_external_witness_commit_rolls_back_the_working_snapshot() {
+        let (mut snapshot, inner, authority) = setup();
+        let mut witness = RejectingWitness { inner };
+        let before = snapshot.clone();
+        let result = commit_record(
+            &mut snapshot, &mut witness, record("e1", "source-a", &[]), &authority,
+        );
+        assert_eq!(result, Err(LifecycleError::WitnessUnavailable));
+        assert_eq!(snapshot, before);
+        assert_eq!(witness.latest_checkpoint().expect("checkpoint").generation, 0);
     }
 
     #[test]
