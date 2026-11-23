@@ -299,7 +299,7 @@ The schemas define wire shape, not authenticity or authorization. The runtime mu
 - Obtain independent reproduction of the policy assignment, score and result receipts.
 - Only then publish confirmatory claims.
 
-## 11. Related MACE programmes
+## 12. Related MACE programmes
 
 - [#13388 — on-policy memory control under endogenous disclosure and feedback](https://github.com/Luminous-Dynamics/symthaea/issues/13388)
 - [#13261 — competitive hybrid, causal-graph and state-first baselines](https://github.com/Luminous-Dynamics/symthaea/issues/13261)
@@ -309,7 +309,7 @@ The schemas define wire shape, not authenticity or authorization. The runtime mu
 - [#13319 — adversarial lifecycle, poisoning, repair and erasure](https://github.com/Luminous-Dynamics/symthaea/issues/13319)
 - [#13287 — independent candidate/evaluator custody](https://github.com/Luminous-Dynamics/symthaea/issues/13287)
 
-## 12. Claim boundary
+## 13. Claim boundary
 
 - Static replay accuracy is not closed-loop policy value.
 - More user disclosure is not inherently better.
