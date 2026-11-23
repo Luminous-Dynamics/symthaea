@@ -1,0 +1,53 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_set_id": "PROOFPLAN-MUTATIONS-AND-COMM-V1",
+  "status": "authored_expected_diagnostics_not_executed",
+  "base_plan_id": "PROOFPLAN-AND-COMM-001",
+  "cases": [
+    {
+      "id": "MUT-DROP-REVERSE",
+      "mutation_kind": "remove_plan_action",
+      "description": "Remove the reverse-direction action and its discharge edge while retaining the iff root goal.",
+      "expected_diagnostic": "uncovered_goal",
+      "mathematical_disposition": "unknown",
+      "claim_ceiling": "The plan is incomplete. This does not refute the original iff theorem.",
+      "oracle_status": "not_run"
+    },
+    {
+      "id": "MUT-AND-LEFT",
+      "mutation_kind": "replace_justification",
+      "description": "Replace the conjunction-symmetry warrant with And.left for the forward goal.",
+      "expected_diagnostic": "warrant_or_type_mismatch",
+      "mathematical_disposition": "unknown",
+      "claim_ceiling": "The proposed warrant does not establish the stated output goal; a failed elaboration is not a theorem counterexample.",
+      "oracle_status": "not_run"
+    },
+    {
+      "id": "MUT-STATEMENT-DRIFT",
+      "mutation_kind": "change_root_statement",
+      "description": "Change the root theorem from an iff to only the forward implication while retaining the two-direction plan and original declaration identity.",
+      "expected_diagnostic": "theorem_identity_mismatch",
+      "mathematical_disposition": "unknown",
+      "claim_ceiling": "The artifact no longer describes the pinned And.comm statement.",
+      "oracle_status": "not_run"
+    },
+    {
+      "id": "MUT-MISSING-EVIDENCE",
+      "mutation_kind": "remove_evidence_reference",
+      "description": "Remove E_SOURCE from the A_FORWARD formal/interpretation claim and its action evidence.",
+      "expected_diagnostic": "missing_evidence",
+      "mathematical_disposition": "unknown",
+      "claim_ceiling": "The plan claim is unsupported; no theorem truth disposition follows.",
+      "oracle_status": "not_run"
+    },
+    {
+      "id": "MUT-ROUTE-ONLY",
+      "mutation_kind": "replace_proof_route",
+      "description": "Replace the And.symm applications with explicit construction that swaps the two conjunction components in each direction, leaving the theorem statement unchanged.",
+      "expected_diagnostic": "proof_route_changed",
+      "mathematical_disposition": "not_refuted",
+      "claim_ceiling": "This is an alternative proof plan for the same proposition; no claim of Lean kernel acceptance is made until it is checked.",
+      "oracle_status": "not_run"
+    }
+  ]
+}
