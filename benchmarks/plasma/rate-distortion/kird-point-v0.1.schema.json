@@ -501,5 +501,34 @@
         }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "record_status": {
+            "const": "physical_measurement"
+          }
+        },
+        "required": [
+          "record_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "provenance": {
+            "required": [
+              "reference_bundle_sha256"
+            ],
+            "properties": {
+              "reference_bundle_sha256": {
+                "type": "string",
+                "pattern": "^(?!0{64}$)[0-9a-f]{64}$"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }
