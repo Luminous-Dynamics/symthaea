@@ -3,7 +3,7 @@
 **Date:** 23 November 2026  
 **Status:** Research specification; not yet implemented or experimentally qualified  
 **Scope:** Periodic 1D1V collisionless Vlasov–Poisson as the first common cohort  
-**Owners / related work:** [#13104](https://github.com/Luminous-Dynamics/symthaea/issues/13104), [#13156](https://github.com/Luminous-Dynamics/symthaea/issues/13156), [#13132](https://github.com/Luminous-Dynamics/symthaea/issues/13132), [#13138](https://github.com/Luminous-Dynamics/symthaea/issues/13138), [#13169](https://github.com/Luminous-Dynamics/symthaea/issues/13169), [#13177](https://github.com/Luminous-Dynamics/symthaea/issues/13177)
+**Owners / related work:** [#12907](https://github.com/Luminous-Dynamics/symthaea/issues/12907), [#12910](https://github.com/Luminous-Dynamics/symthaea/issues/12910), [#12914](https://github.com/Luminous-Dynamics/symthaea/issues/12914), [#12921](https://github.com/Luminous-Dynamics/symthaea/issues/12921), [#12942](https://github.com/Luminous-Dynamics/symthaea/issues/12942), [#12976](https://github.com/Luminous-Dynamics/symthaea/issues/12976), [#12979](https://github.com/Luminous-Dynamics/symthaea/issues/12979), [#13104](https://github.com/Luminous-Dynamics/symthaea/issues/13104), [#13132](https://github.com/Luminous-Dynamics/symthaea/issues/13132), [#13138](https://github.com/Luminous-Dynamics/symthaea/issues/13138), [#13156](https://github.com/Luminous-Dynamics/symthaea/issues/13156), [#13169](https://github.com/Luminous-Dynamics/symthaea/issues/13169), [#13177](https://github.com/Luminous-Dynamics/symthaea/issues/13177)
 
 ## Executive thesis
 
@@ -404,19 +404,40 @@ The capsule is not assumed sufficient. Its value must be measured by the interve
 9. Report p50/p95, host/device memory, energy and all conversion/diagnostic/IO work.
 10. Publish the exact source revision, environment, configuration, seeds, input digests, output digests and analysis code.
 
-## 9. Runner-independent work sequence
+## 9. Work ownership and programme composition
+
+This specification is a shared metric/contract layer. It does not replace the existing source-reproduction, memory, closure-reliability, echo, representation or evidence issues.
+
+| Existing owner | Work retained there |
+|---|---|
+| [#12907](https://github.com/Luminous-Dynamics/symthaea/issues/12907) | Source/artifact admission and faithful reproduction of the 2025 offline FNO, 2026 online FNO, analytic Hammett–Perkins and eligible sparse-discovery baselines |
+| [#12910](https://github.com/Luminous-Dynamics/symthaea/issues/12910) | Runge–Kutta substage semantics, accepted-state versus provisional-stage memory and solver/time-step transfer |
+| [#12914](https://github.com/Luminous-Dynamics/symthaea/issues/12914) | Closure accuracy, physical-admissibility, epistemic/OOD and portability envelopes |
+| [#12921](https://github.com/Luminous-Dynamics/symthaea/issues/12921) | Explicit history versus prognostic hidden state versus continuous-time latent-memory tournament, including ADEPT-style and CfC/LTC candidates |
+| [#12942](https://github.com/Luminous-Dynamics/symthaea/issues/12942) | Portfolio-level registry and separation of physical task lanes |
+| [#12976](https://github.com/Luminous-Dynamics/symthaea/issues/12976) | Matched-budget full-workflow tournament and execution evidence receipts |
+| [#12979](https://github.com/Luminous-Dynamics/symthaea/issues/12979) | Fail-closed physical cohort comparability key and diagnostic-profile completeness |
+| [#13104](https://github.com/Luminous-Dynamics/symthaea/issues/13104) | Dense / TT / Hermite / particle / learned-operator representation competition |
+| [#13156](https://github.com/Luminous-Dynamics/symthaea/issues/13156) | Calibration of representation-native indicators against independently measured future-response loss |
+| [#13132](https://github.com/Luminous-Dynamics/symthaea/issues/13132) | Goal-oriented QoI and sensitivity allocation |
+| [#13138](https://github.com/Luminous-Dynamics/symthaea/issues/13138) and [#13169](https://github.com/Luminous-Dynamics/symthaea/issues/13169) | Two-pulse physical echo anchor and finite multi-pulse response graph |
+| [#13177](https://github.com/Luminous-Dynamics/symthaea/issues/13177) | Multi-component representation, conservative overlap, split/merge and lineage |
+
+The ICF nonlocal electron heat-flux programme in [#12938](https://github.com/Luminous-Dynamics/symthaea/issues/12938) remains a separate physical task. It can reuse the contract vocabulary, but its equations, reference data, observables and scorecard must not be pooled with periodic electrostatic Landau damping.
+
+## 10. Runner-independent work sequence
 
 The following work can proceed without waiting for long echo/recurrence workflows:
 
 1. **Close the measurement contract around #13378.** Add signed physical runs, zero-pulse baselines, complex response matrix, phase controls, amplitude sweeps and convergence analysis. The current PR adds the parity primitive; it does not yet supply those experiment results.
-2. **Reproduce the FNO comparator.** Use the public [Zenodo code and training data](https://doi.org/10.5281/zenodo.22800112). Reproduce the published single-amplitude and amplitude-scan settings before adding held-out wavenumber, temperature, longer horizon and intervention cohorts.
+2. **Reproduce the FNO comparator in the existing owner lanes.** [#12907](https://github.com/Luminous-Dynamics/symthaea/issues/12907) owns source/artifact admission and exact 2025/2026 reproductions; [#12910](https://github.com/Luminous-Dynamics/symthaea/issues/12910) owns RK-substage memory semantics; [#12914](https://github.com/Luminous-Dynamics/symthaea/issues/12914) owns accuracy/admissibility/OOD/portability envelopes; [#12921](https://github.com/Luminous-Dynamics/symthaea/issues/12921) owns the explicit-window versus latent-memory tournament. Use the public [Zenodo code and training data](https://doi.org/10.5281/zenodo.22800112), verify the record-level file manifest and licence, reproduce the published profiles first, then add response and longer-horizon cohorts.
 3. **Resolve and execute VlasovTT.** Keep source-default and paper-faithful profiles separate; execute upstream tests, dense path and compressed path before any modified settings.
 4. **Calibrate native memory indicators (#13156).** Fit each representation's own indicators to independently measured response loss; test held-out complete trajectories and representations.
 5. **Connect to goal-oriented adaptation (#13132).** Protect declared QoIs and gradients, while retaining mandatory physical-state gates.
 6. **Run representation ablations (#13104 / #13177).** Static dense, static TT, static Hermite, closure-only, micro-error-only adaptation, QoI-only adaptation and response-aware adaptation.
 7. **Publish matched Pareto results.** A method wins only on the subset where it passes the same declared contract.
 
-## 10. First falsifiable research claims
+## 11. First falsifiable research claims
 
 The initial paper-quality claims should be modest and independently testable:
 
@@ -428,7 +449,7 @@ The initial paper-quality claims should be modest and independently testable:
 
 Failure of any claim is useful: it narrows the conditions under which response-aware compression is justified.
 
-## 11. Claim ceiling
+## 12. Claim ceiling
 
 This specification does not claim:
 - a universal scalar measure of kinetic information;
@@ -447,7 +468,7 @@ The immediate deliverable is a fair, falsifiable contract. Implementation and co
 2. Åsgrim, E. M., Pennati, L., Pasquale, M. & Markidis, S. (2026). *Tensor Network Compression for Fully Spectral Vlasov–Poisson Simulation*. Journal of Computational Physics. https://doi.org/10.1016/j.jcp.2026.115330
 3. Shao, S., Wang, Y. & Wu, J. (2026). *Solving Vlasov–Poisson system with an adaptive Hermite spectral method*. arXiv:2605.17820. https://arxiv.org/abs/2605.17820
 4. Muralikrishnan, S. et al. (2026). *NEOPIC: A Neural Operator Framework for Particle-based Kinetic Plasma Simulations*. arXiv:2610.40528. https://arxiv.org/abs/2610.40528
-5. Joglekar, A. S. & Thomas, A. G. R. (2023). *Machine learning of hidden variables in multiscale fluid simulation*. Machine Learning: Science and Technology. https://doi.org/10.1088/2632-2153/acfa47
+5. Joglekar, A. S. & Thomas, A. G. R. (2023). *Machine learning of hidden variables in multiscale fluid simulation*. Machine Learning: Science and Technology 4, 035049. https://doi.org/10.1088/2632-2153/acf81a
 6. Burles, S. & Camporeale, E. (2026). *The machine learning approach to moment closure relations for plasma: a review*. Journal of Plasma Physics 92, E100. https://doi.org/10.1017/S0022377826102013
 7. Smilei 5.1 documentation. https://smileipic.github.io/Smilei/
 8. WarpX 26.11 documentation. https://warpx.readthedocs.io/en/26.11/
