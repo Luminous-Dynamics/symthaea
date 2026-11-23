@@ -90,7 +90,13 @@ The existing lexical resource receipt counts source JSON/text and screenshot ref
 
 ## Validation boundary
 
-Six Python ingress/protocol tests are provided in `tests/test_mace_lmev2_memory.py` for byte-preserving image copy/digest binding, canonical original-trajectory preservation, absolute/traversal/symlink escape rejection, screenshot size limits domain isolation, and fail-closed behavior after a sidecar response is lost. An ambiguous RPC outcome poisons the sidecar process; the plugin refuses further operations until the memory is reloaded/reconciled instead of silently restarting an empty sidecar. Copy this test file into the official repository's `tests/` directory after installing the plugin. The prescribed command is:
+The sidecar crate's focused test command is:
+
+```sh
+cargo test --manifest-path research/broca-mace-transfer-bench-v0-1/aml-adapter/Cargo.toml --bin mace_lmev2_stdio
+```
+
+Six Python ingress/protocol tests are provided in `tests/test_mace_lmev2_memory.py` for byte-preserving image copy/digest binding, canonical original-trajectory preservation, absolute/traversal/symlink escape rejection, screenshot size limits domain isolation, and fail-closed behavior after a sidecar response is lost. An ambiguous RPC outcome poisons the sidecar process; the plugin refuses further operations until the memory is reloaded/reconciled instead of silently restarting an empty sidecar. The Rust sidecar also has three unit tests for official context-item output, duplicate inserts and screenshot-byte substitution. Copy this test file into the official repository's `tests/` directory after installing the plugin. The prescribed command is:
 
 ```sh
 python -m unittest tests.test_mace_lmev2_memory
