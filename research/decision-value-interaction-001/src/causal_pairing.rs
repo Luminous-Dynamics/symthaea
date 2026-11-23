@@ -714,9 +714,9 @@ fn validate_steps(
         CausalDigestField::StochasticDrawBundleVerificationReceipt,
     )?;
     if !receipt.stochastic_draw_bundle_semantically_verified {
-        return Err(CausalPairingError::StochasticDrawBundleNotSemanticallyVerified {
-            arm: receipt.arm,
-        });
+        return Err(
+            CausalPairingError::StochasticDrawBundleNotSemanticallyVerified { arm: receipt.arm },
+        );
     }
 
     let mut expected_tick = receipt.identity.initial_world_tick;
@@ -1657,9 +1657,11 @@ mod tests {
         runs[3].stochastic_draw_bundle_semantically_verified = false;
         assert!(matches!(
             validate_causal_pairing(&runs),
-            Err(CausalPairingError::StochasticDrawBundleNotSemanticallyVerified {
-                arm: TreatmentArm::Joint
-            })
+            Err(
+                CausalPairingError::StochasticDrawBundleNotSemanticallyVerified {
+                    arm: TreatmentArm::Joint
+                }
+            )
         ));
     }
 
