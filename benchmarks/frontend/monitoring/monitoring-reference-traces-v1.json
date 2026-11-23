@@ -54,11 +54,22 @@
           "time": 27,
           "revision": 3,
           "action_id": "act-absolute-001",
-          "idempotency_key": "reserve:slot-absolute-001"
+          "idempotency_key": "reserve:slot-absolute-001",
+          "action_type": "reserve",
+          "resource_id": "slot-absolute-001"
+        },
+        {
+          "op": "act",
+          "time": 28,
+          "revision": 3,
+          "action_id": "act-absolute-001-replay",
+          "idempotency_key": "reserve:slot-absolute-001",
+          "action_type": "reserve",
+          "resource_id": "slot-absolute-001"
         },
         {
           "op": "finish",
-          "time": 27,
+          "time": 28,
           "claimed_outcome": "triggered"
         }
       ],
@@ -262,7 +273,9 @@
           "time": 31,
           "revision": 3,
           "action_id": "act-relative-001",
-          "idempotency_key": "reserve:slot-relative-001"
+          "idempotency_key": "reserve:slot-relative-001",
+          "action_type": "reserve",
+          "resource_id": "slot-relative-001"
         },
         {
           "op": "finish",
