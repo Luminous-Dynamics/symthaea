@@ -172,14 +172,14 @@ fn evaluate_first_branch(
             let second_negative_probability = evaluation
                 .probability_positive
                 .map(|probability| (1.0 - probability).max(0.0));
-            let second_positive_leaf_total_loss = evaluation
-                .positive_decision
-                .as_ref()
-                .map(|decision| first_measurement.cost_units + second_cost + decision.expected_loss);
-            let second_negative_leaf_total_loss = evaluation
-                .negative_decision
-                .as_ref()
-                .map(|decision| first_measurement.cost_units + second_cost + decision.expected_loss);
+            let second_positive_leaf_total_loss =
+                evaluation.positive_decision.as_ref().map(|decision| {
+                    first_measurement.cost_units + second_cost + decision.expected_loss
+                });
+            let second_negative_leaf_total_loss =
+                evaluation.negative_decision.as_ref().map(|decision| {
+                    first_measurement.cost_units + second_cost + decision.expected_loss
+                });
             let worst_case_leaf_total_loss = [
                 second_positive_leaf_total_loss,
                 second_negative_leaf_total_loss,
@@ -203,7 +203,9 @@ fn evaluate_first_branch(
                     .map(|decision| decision.decision_id),
                 terminal_expected_decision_loss: terminal_loss,
                 second_measurement_cost: second_cost,
-                branch_expected_total_loss: first_measurement.cost_units + terminal_loss + second_cost,
+                branch_expected_total_loss: first_measurement.cost_units
+                    + terminal_loss
+                    + second_cost,
                 second_positive_probability,
                 second_negative_probability,
                 second_positive_leaf_total_loss,
@@ -220,12 +222,14 @@ fn evaluate_first_branch(
             second_negative_decision_id: None,
             terminal_expected_decision_loss: current_decision.expected_loss,
             second_measurement_cost: 0.0,
-            branch_expected_total_loss: first_measurement.cost_units + current_decision.expected_loss,
+            branch_expected_total_loss: first_measurement.cost_units
+                + current_decision.expected_loss,
             second_positive_probability: None,
             second_negative_probability: None,
             second_positive_leaf_total_loss: None,
             second_negative_leaf_total_loss: None,
-            worst_case_leaf_total_loss: first_measurement.cost_units + current_decision.expected_loss,
+            worst_case_leaf_total_loss: first_measurement.cost_units
+                + current_decision.expected_loss,
         },
     };
 
@@ -302,11 +306,13 @@ pub fn evaluate_depth_two(
     let mut second_measurements_evaluated = 0usize;
     let mut nonzero_branches = 0usize;
     let mut first_measurements_enumerated = 0usize;
-    let prior: Vec<f64> = case.hypotheses.iter().map(|hypothesis| hypothesis.prior).collect();
+    let prior: Vec<f64> = case
+        .hypotheses
+        .iter()
+        .map(|hypothesis| hypothesis.prior)
+        .collect();
 
-    for (first_measurement, first_evaluation) in
-        measurements.iter().zip(&baseline.measurements)
-    {
+    for (first_measurement, first_evaluation) in measurements.iter().zip(&baseline.measurements) {
         if first_evaluation.disposition != MeasurementDisposition::Eligible {
             continue;
         }
@@ -324,10 +330,8 @@ pub fn evaluate_depth_two(
             .probability_positive
             .expect("eligible measurement has an outcome probability");
         let probability_negative = (1.0 - probability_positive).max(0.0);
-        let positive_posterior =
-            posterior(&prior, likelihoods, true, probability_positive);
-        let negative_posterior =
-            posterior(&prior, likelihoods, false, probability_negative);
+        let positive_posterior = posterior(&prior, likelihoods, true, probability_positive);
+        let negative_posterior = posterior(&prior, likelihoods, false, probability_negative);
 
         let mut branches = Vec::with_capacity(2);
         let mut expected_terminal_loss = 0.0;
@@ -346,8 +350,7 @@ pub fn evaluate_depth_two(
                     &mut second_measurements_evaluated,
                 );
                 nonzero_branches += 1;
-                expected_terminal_loss +=
-                    probability_positive * choice.terminal_loss;
+                expected_terminal_loss += probability_positive * choice.terminal_loss;
                 expected_measurement_cost += choice.expected_second_cost;
                 branches.push(choice.branch);
             }
@@ -366,8 +369,7 @@ pub fn evaluate_depth_two(
                     &mut second_measurements_evaluated,
                 );
                 nonzero_branches += 1;
-                expected_terminal_loss +=
-                    probability_negative * choice.terminal_loss;
+                expected_terminal_loss += probability_negative * choice.terminal_loss;
                 expected_measurement_cost += choice.expected_second_cost;
                 branches.push(choice.branch);
             }
@@ -399,8 +401,7 @@ pub fn evaluate_depth_two(
         let replace = match &best_policy {
             None => true,
             Some(incumbent) => {
-                candidate.expected_total_loss
-                    < incumbent.expected_total_loss - LOSS_TOLERANCE
+                candidate.expected_total_loss < incumbent.expected_total_loss - LOSS_TOLERANCE
                     || ((candidate.expected_total_loss - incumbent.expected_total_loss).abs()
                         <= LOSS_TOLERANCE
                         && lexically_better_id(
@@ -446,16 +447,25 @@ mod tests {
             Some("INDEPENDENT_PROCESS_SAFETY_TEST")
         );
         let policy = result.adaptive_depth_two.unwrap();
-        assert_eq!(policy.first_measurement_id, "CALIBRATION_REFERENCE_ARTIFACT");
+        assert_eq!(
+            policy.first_measurement_id,
+            "CALIBRATION_REFERENCE_ARTIFACT"
+        );
         close(policy.expected_total_loss, 6.598);
         assert_eq!(policy.branches.len(), 2);
-        assert_eq!(policy.branches[0].first_outcome, MeasurementOutcome::Positive);
+        assert_eq!(
+            policy.branches[0].first_outcome,
+            MeasurementOutcome::Positive
+        );
         assert_eq!(policy.branches[0].second_measurement_id, None);
         assert_eq!(
             policy.branches[0].stop_decision_id,
             Some("RECALIBRATE_AND_RETEST")
         );
-        assert_eq!(policy.branches[1].first_outcome, MeasurementOutcome::Negative);
+        assert_eq!(
+            policy.branches[1].first_outcome,
+            MeasurementOutcome::Negative
+        );
         assert_eq!(
             policy.branches[1].second_measurement_id,
             Some("INDEPENDENT_PROCESS_SAFETY_TEST")
@@ -497,7 +507,10 @@ mod tests {
         close(negative.second_positive_probability.unwrap(), 0.2077777778);
         close(negative.second_negative_probability.unwrap(), 0.7922222222);
         close(negative.second_positive_leaf_total_loss.unwrap(), 15.0);
-        close(negative.second_negative_leaf_total_loss.unwrap(), 5.159887798);
+        close(
+            negative.second_negative_leaf_total_loss.unwrap(),
+            5.159887798,
+        );
         close(negative.worst_case_leaf_total_loss, 15.0);
     }
 
@@ -519,7 +532,12 @@ mod tests {
         measurements.truncate(2);
         let result = evaluate_depth_two(&case, &measurements, 4.0).unwrap();
         let policy = result.adaptive_depth_two.unwrap();
-        assert!(policy.branches.iter().all(|branch| branch.second_measurement_id.is_none()));
+        assert!(
+            policy
+                .branches
+                .iter()
+                .all(|branch| branch.second_measurement_id.is_none())
+        );
     }
 
     #[test]
@@ -541,12 +559,16 @@ mod tests {
 
     #[test]
     fn adaptive_policy_respects_budget_below_two_test_combination_cost() {
-        let result = evaluate_depth_two(&reference_case(), &reference_measurements(), 1.49).unwrap();
+        let result =
+            evaluate_depth_two(&reference_case(), &reference_measurements(), 1.49).unwrap();
         let policy = result.adaptive_depth_two.unwrap();
         assert!(policy.expected_measurement_cost <= 1.49 + LOSS_TOLERANCE);
-        assert!(policy.branches.iter().all(|branch| {
-            branch.second_measurement_id.is_none()
-        }));
+        assert!(
+            policy
+                .branches
+                .iter()
+                .all(|branch| { branch.second_measurement_id.is_none() })
+        );
     }
 
     #[test]
