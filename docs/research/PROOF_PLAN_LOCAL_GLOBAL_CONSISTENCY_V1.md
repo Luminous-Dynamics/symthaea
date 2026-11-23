@@ -204,3 +204,50 @@ First freeze the corpus and measure baselines; do not tune on the confirmatory h
 - A proof plan is not a kernel-checked proof.
 
 The intended claim, if supported by independent results, is narrow: a structured evidence envelope can reduce context-induced reuse of previously rejected invalid warrants in proof-plan reconstruction, while preserving correct acceptance of valid warrants.
+
+## 13. Executable LocalGlobalPairV1 receipt and CIRR semantics
+
+The first executable receipt contract is specified by:
+
+- docs/research/LOCAL_GLOBAL_PAIR_V1.schema.json
+- docs/research/LOCAL_GLOBAL_PAIR_SYNTHETIC_V1.json
+- scripts/research/proof-plan-contract/src/local_global.rs
+- scripts/research/proof-plan-contract/src/bin/local-global.rs
+
+### Candidate/evaluator separation
+
+LocalGlobalPairV1 has two top-level partitions:
+
+1. candidate: source/theorem/warrant scope bindings, model and decoding identity, local verdict, global plan digest, candidate-side warrant mentions, prompt/input/output digests, artifact references and resource budgets.
+2. evaluator_only: eligibility, independent warrant validity, local-verdict correctness, adjudicated global disposition, adjudication authority and supporting references.
+
+Only the serialized candidate projection is suitable for a model prompt or candidate handoff. The Rust candidate_view() method returns that projection without evaluator-only fields. The combined receipt is a post-hoc record; never provide its evaluator_only partition to the candidate.
+
+### Scope equality is a hard primary-denominator gate
+
+Both stages independently repeat the full scope binding: source repository/revision/path/declaration, theorem ID, root-goal digest, hypothesis-set digest, premise-set digest, conclusion digest, warrant ID and warrant digest. The primary CIRR denominator excludes any pair whose local and global bindings differ. An evaluator receipt that labels a scope-mismatched pair eligible is rejected.
+
+Changes to wording, ordering, distractors, narrative framing and plan length may be allowed by a task protocol, but any change to source, proposition, assumptions, premises, conclusion or focal warrant must create a separate control stratum rather than silently remain in the primary denominator.
+
+### Three-state global adjudication; no silent imputation
+
+CIRR continues to mean:
+
+CIRR = definite material reuse of a locally rejected, independently invalid warrant / eligible locally rejected, independently invalid warrants.
+
+Global adjudication has five outcomes: used_directly, used_implicitly, cited_rejected, omitted, and unknown. Only direct and implicit use count in the numerator. Citing a rejected warrant as rejected, or omitting it, is not material reuse.
+
+An unknown global outcome remains in the denominator but is also reported separately. The tool returns a lower bound (unknown treated as no reuse), an upper bound (unknown treated as reuse), and a point estimate only when there are no unresolved outcomes. A zero denominator produces an undefined point estimate, never zero.
+
+### Executable checks and claim ceiling
+
+The Rust validator rejects unknown fields, malformed SHA-256 digests, execution budget overruns, duplicate warrant-mention IDs, unsupported eligible labels, and eligible scope mismatches. Unit tests cover candidate/evaluator separation, scope mutations, denominator-zero behavior, unknown-outcome bounds, direct reuse, cited-rejected non-reuse and budget violations.
+
+The synthetic p entails q fixture is a stipulated control record, not an evaluation of an LLM. Its countermodel p=true, q=false illustrates why the inference is invalid; the paired candidate outputs are synthetic data designed to exercise the receipt contract. It must not be reported as an observed CIRR score.
+
+Run locally:
+
+    cargo test --locked --manifest-path scripts/research/proof-plan-contract/Cargo.toml
+    cargo run --locked --manifest-path scripts/research/proof-plan-contract/Cargo.toml --bin local-global -- docs/research/LOCAL_GLOBAL_PAIR_SYNTHETIC_V1.json
+
+A successful run means structural receipt checks and deterministic metric arithmetic passed. It does not mean Lean replay, expert adjudication, model testing or a human study has occurred.

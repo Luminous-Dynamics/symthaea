@@ -1,0 +1,89 @@
+{
+  "schema_version": "1.0.0",
+  "candidate": {
+    "pair_id": "PAIR-SYNTHETIC-P-TO-Q-001",
+    "task_class": "synthetic_control_not_model_evaluation",
+    "model_identity": {
+      "provider": "synthetic_fixture",
+      "model": "deterministic_stipulated_output",
+      "version": "1",
+      "decoding_config_sha256": "807969c24abf78b50e72a98e5bd719347724162aebf1db7048405d333fb3182c"
+    },
+    "local_stage": {
+      "scope_binding": {
+        "source_repository": "symthaea.synthetic",
+        "source_revision": "fixture-v1",
+        "source_path": "truth_tables/p_implies_q.json",
+        "declaration": "synthetic.non_entailment.p_to_q",
+        "theorem_id": "SYNTHETIC-NON-ENTAILMENT-P-TO-Q",
+        "root_goal_sha256": "70b699aae93e6baaa306d1aa15830d0486192bb01cf9dbcf8d33933ec311f403",
+        "hypothesis_set_sha256": "3bd27c10fecad3737dbe1760580f4a8b4011e1fb9c545e9946906a1a0e593a3b",
+        "premise_set_sha256": "148de9c5a7a44d19e56cd9ae1a554bf67847afb0c58f6e12fa29ac7ddfca9940",
+        "conclusion_sha256": "8e35c2cd3bf6641bdb0e2050b76932cbb2e6034a0ddacc1d9bea82a6ba57f7cf",
+        "warrant_id": "W-P-TO-Q",
+        "warrant_sha256": "48197de801edc9eb5da3b2c79fafcc7b2c682cfc34f7d295491a0e285c58757d"
+      },
+      "execution": {
+        "prompt_sha256": "19ecd8ae491541d1451cd6bdf9fc9a173b3a55b834f0987d0df62d72ce7ba4fe",
+        "input_sha256": "b944c0910411ae8e28286bfc0ca7f69614ea97a308f22cfb658b48819233928d",
+        "output_sha256": "15efb6637688bc76f9609a7543abc6ad0e02a8b2c98400360f5ebaa5bd540a2a",
+        "output_artifact_ref": "synthetic://candidate/local-stage-output",
+        "token_budget": 500,
+        "tokens_used": 35,
+        "tool_call_budget": 0,
+        "tool_calls_used": 0,
+        "wall_clock_budget_ms": 2000,
+        "wall_clock_used_ms": 20
+      },
+      "verdict": "reject"
+    },
+    "global_stage": {
+      "scope_binding": {
+        "source_repository": "symthaea.synthetic",
+        "source_revision": "fixture-v1",
+        "source_path": "truth_tables/p_implies_q.json",
+        "declaration": "synthetic.non_entailment.p_to_q",
+        "theorem_id": "SYNTHETIC-NON-ENTAILMENT-P-TO-Q",
+        "root_goal_sha256": "70b699aae93e6baaa306d1aa15830d0486192bb01cf9dbcf8d33933ec311f403",
+        "hypothesis_set_sha256": "3bd27c10fecad3737dbe1760580f4a8b4011e1fb9c545e9946906a1a0e593a3b",
+        "premise_set_sha256": "148de9c5a7a44d19e56cd9ae1a554bf67847afb0c58f6e12fa29ac7ddfca9940",
+        "conclusion_sha256": "8e35c2cd3bf6641bdb0e2050b76932cbb2e6034a0ddacc1d9bea82a6ba57f7cf",
+        "warrant_id": "W-P-TO-Q",
+        "warrant_sha256": "48197de801edc9eb5da3b2c79fafcc7b2c682cfc34f7d295491a0e285c58757d"
+      },
+      "execution": {
+        "prompt_sha256": "bbdf550fd6093eb04217ece68774b259e5bde9a92071bcb6ff9be5bec7c18c1f",
+        "input_sha256": "7824f1c72a12ba7bfdca33d4ed9e923d200e5ef75811b703f1ae8442ada86fbf",
+        "output_sha256": "48441a06a011f465ff4a6005d65e8b686f1c0743bd14780c6ca5d0e15214d5ba",
+        "output_artifact_ref": "synthetic://candidate/global-stage-output",
+        "token_budget": 1000,
+        "tokens_used": 120,
+        "tool_call_budget": 0,
+        "tool_calls_used": 0,
+        "wall_clock_budget_ms": 4000,
+        "wall_clock_used_ms": 40
+      },
+      "proof_plan_sha256": "e0331b52d0b36a3244e42edf190b4b073bb084c1dd915a7f87c17b55b109fb74",
+      "warrant_mentions": [
+        {
+          "mention_id": "MENTION-W-P-TO-Q-001",
+          "warrant_id": "W-P-TO-Q",
+          "plan_node_id": "N1",
+          "relation": "uses_as_rule"
+        }
+      ]
+    }
+  },
+  "evaluator_only": {
+    "eligibility": "eligible",
+    "exclusion_reason": null,
+    "independently_assessed_warrant": "invalid",
+    "local_verdict_correct": true,
+    "global_disposition": "used_directly",
+    "adjudication_authority": "finite_countermodel_fixture",
+    "adjudication_refs": [
+      "COUNTERMODEL:p=true,q=false",
+      "RULE:p-entails-q-is-invalid"
+    ]
+  }
+}

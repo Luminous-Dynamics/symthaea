@@ -346,3 +346,53 @@ The paired protocol binds both stages to the same theorem identity, exact hypoth
 The key intervention compares a structured immutable local verdict/evidence envelope supplied to the global planner against ordinary natural-language self-critique or no local-verdict handoff. This tests whether evidence-carrying reasoning state resists contextual regression better than conversational memory.
 
 The full protocol is [PROOF_PLAN_LOCAL_GLOBAL_CONSISTENCY_V1.md](PROOF_PLAN_LOCAL_GLOBAL_CONSISTENCY_V1.md), tracked under [#13326](https://github.com/Luminous-Dynamics/symthaea/issues/13326). No CIRR measurement has been executed; the metric and prospective thresholds are research targets only.
+
+## 13. Updated benchmark frontier — evidence and comprehension (2026-11-23)
+
+The 2026-11-23 literature check adds several baselines that materially sharpen the competitive strategy. The values below are external published/project figures and are not Symthaea results.
+
+| Work | Published scope / result | What it establishes | Symthaea response |
+|---|---|---|---|
+| [LeanGraphSearch](https://arxiv.org/abs/2610.22339) | MathlibQR: Recall@100 94.7% vs LeanSearch v2 82.7% on the paper's 810-query fair subset; MathlibMPR route coverage 44.2% vs 41.3% at @50 | A strong semantic-seed + dependency-PPR + reranking retrieval baseline | Treat it as a mandatory retrieval comparator; novelty must be evidence-backed role reconstruction and transfer, not graph expansion |
+| [TheoremGraph](https://arxiv.org/abs/2606.25363) | 11.7M informal statement nodes, 18.3M candidate informal dependency edges, 388,105 Lean declarations and 11.3M typed formal edges | Large-scale formal/informal graph infrastructure already exists | Interoperate; distinguish direct kernel dependencies, filtered/expanded graph views, relation types and candidate cross-formality links |
+| [FormalMATH](https://aclanthology.org/2026.findings-emnlp.579/) | 5,560 semantically validated Lean 4 statements; strongest reported model 28.31% Pass@32 | Formal proof generation remains difficult and domain-imbalanced; solution prose can hurt proving | Separate reader-facing explanation from prover-facing plan context and measure both |
+| [ProofBench / ProofGrader](https://proceedings.iclr.cc/paper_files/paper/2026/hash/764d4fc73ab69289b1e10f15089274f3-Abstract-Conference.html) | 145 competition problems, 435 model-generated solutions, expert scores; evaluator MAE 0.926 | Fine-grained natural-language proof-quality evaluation is measurable | Use expert ratings as one outcome, but add assumption comprehension, plan reconstruction and delayed transfer |
+| [LeanLean](https://www.sri.inf.ethz.ch/publications/rognvaldsson2026leanlean) | 64 real-world Lean repositories, up to 174k LOC; best reported average compression 48.3% under a 12-hour limit | Repository-scale proof restructuring/compression is a mature comparison axis | Compare minimum-sufficient explanations at matched human comprehension; do not equate shorter source with understanding |
+| [TheoremBench](https://arxiv.org/abs/2606.09450) | Nearly 100 classical theorems, plain/premised versions and supporting subtheorem families | Whole-theorem coverage and token efficiency reveal progress hidden by single pass/fail | Add subgoal coverage, proof-plan fidelity and token/compute cost |
+| [Formal benchmark audit](https://proceedings.mlr.press/v306/ammanamanchi26a.html) | Audit of five Lean benchmark families; 4,833 findings including 398 mechanically certified defects | Kernel checking alone does not guarantee task/specification fidelity or robust evaluation | Make source identity, semantic task audit, hidden controls and false-acceptance tests first-class release gates |
+| [ProofGrid](https://arxiv.org/abs/2605.12524) | 15 proof writing/checking/masking/gap-filling tasks with instrumented first-invalid-step feedback | Fine-grained proof competence and failure localization | Reuse its task dimensions and keep its Epistemic Stability Index distinct from CIRR |
+
+### Paradigm shifts that can create a genuine contribution
+
+1. **From proof answers to evidence-carrying proof state.** Every claim, assumption, warrant, action and plan node is identity-bound to a source, proposition, proof environment and artifact. Model confidence is not authority.
+2. **From static explanation to intervention-based understanding.** Ask what changes when a premise, binder, lemma direction or reduction guarantee is altered. Distinguish a failed proof route from a false proposition, and require a counterexample when a claim is false.
+3. **From local accuracy to cross-context consistency.** Pair isolated inference judgments with later global proof planning under the same immutable scope. Measure whether rejected invalid warrants reappear as global support.
+4. **From one verifier to partitioned authority.** Candidate generation, structural validation, formal kernel replay, independent mathematical adjudication and human-learning outcomes are separate authorities. No stage inherits authority from another.
+5. **From one score to a reliability/utility frontier.** Report theorem identity, false acceptance, proof-route fidelity, explanation support, reader transfer, abstention, latency, tokens and review burden separately. Use hard gates for soundness-sensitive outcomes.
+6. **From fixed explanations to minimum-sufficient explanations.** Optimize explanation length only subject to non-inferiority in comprehension and transfer. A shorter explanation that drops a hypothesis or weakens transfer is a failure.
+
+### Revised prospective targets and comparison protocol
+
+| Dimension | Prospective target | Guardrail / interpretation |
+|---|---:|---|
+| Source + theorem + assumption identity | 100% exact match | Hard gate; any mismatch is a separate task/control |
+| False formal-proof acceptance | 0 | Hard gate on all negative controls; report confidence bounds |
+| Material dependency precision / recall | ≥95% / ≥90% | Expert-labelled held-out theorem families; stratify edge class |
+| Proof-plan expert acceptance | ≥80% | Two independent expert reviewers; retain disagreement |
+| Side-condition and subgoal coverage | ≥90% | Missing a required condition is a critical miss |
+| Counterfactual disposition accuracy | ≥90% | Include theorem-false and route-only mutations |
+| CIRR | ≤5% | Only with a nonzero eligible denominator; publish numerator/denominator and unresolved bounds |
+| Delayed / cross-family human transfer | +10 percentage points | Strongest matched control, preregistered primary outcome |
+| Minimum-sufficient explanation | ≥25% fewer tokens | Matched comprehension within a 5-point non-inferiority margin |
+
+These are prospective targets, not current achievements. Benchmark comparisons must pin model version, decoding configuration, context, tool access, proof environment, token/latency budget and contamination window. Report per-task and per-family rows, paired confidence intervals, abstentions, invalid-task exclusions and all negative-control results. A claimed SOTA win requires a matched rerun or a clearly labelled non-comparable published reference—not a cross-paper score collage.
+
+### Research execution order
+
+1. Finish and exact-head validate LocalGlobalPairV1 and CIRR arithmetic; first fixture is synthetic and is not a model score.
+2. Add Lean-native elaborated type/value extraction and compare its edge set against pinned LeanGraph / TheoremGraph outputs.
+3. Obtain expert-reviewed gold plan annotations on a small theorem-family holdout before scaling the corpus.
+4. Run matched retrieval/explanation ablations: BM25, dense, LeanSearch v2, LeanGraphSearch/PPR, symbolic/type-directed, HDC, and HDC+CfC.
+5. Preregister and conduct a human comprehension / delayed-transfer study only after ethics and power-analysis prerequisites are met.
+
+The purpose is not to beat all theorem provers at their own task. It is to establish whether evidence-bound proof reconstruction and counterfactual consistency deliver measurable capabilities that existing retrieval, formal proving, proof grading and proof compression benchmarks do not yet directly measure.

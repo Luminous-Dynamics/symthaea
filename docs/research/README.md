@@ -354,3 +354,5 @@ The proof-to-concept reconstruction and human-transfer research programme is tra
 - [ETH reduction pilot fixture](ETH_REDUCTION_COMPREHENSION_TOY_V1.json) — machine-readable truth-table and guarantee receipt.
 
 The initial seed is source-pinned to Lean 4 core and is explicitly not expert-reviewed gold data or a Lean extraction result. The next stage is elaborated-environment extraction, independent annotation, and a Mathlib-scale dependency-rich pilot.
+
+- [Executable local/global receipt and CIRR contract](LOCAL_GLOBAL_PAIR_V1.schema.json) with a synthetic post-hoc fixture and Rust validator; see [protocol details](PROOF_PLAN_LOCAL_GLOBAL_CONSISTENCY_V1.md).
