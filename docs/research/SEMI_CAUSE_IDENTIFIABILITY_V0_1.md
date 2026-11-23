@@ -69,7 +69,7 @@ The planner uses action sensitivity rows supplied by the declared design. It doe
 
 ## Authored tests
 
-The initial module contains nine Rust tests for:
+The initial module contains ten Rust tests for:
 
 1. process/gauge confounding from a single production measurement;
 2. process identifiability after a reference crossover while gauge/common-mode remain confounded;
