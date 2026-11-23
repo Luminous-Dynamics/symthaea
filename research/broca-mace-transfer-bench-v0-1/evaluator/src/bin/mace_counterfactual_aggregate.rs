@@ -981,11 +981,17 @@ fn parse_candidate_receipt(record: &Value) -> Result<((String, String), Candidat
         "detached_subprocess_stream"
             if candidate_artifact_sha256.is_some()
                 && candidate_process_startup_ns.is_some()
-                && candidate_process_wall_ns.is_some() => {}
+                && candidate_process_wall_ns.is_some()
+                && candidate_request_build_ns.is_some()
+                && candidate_receipt_validation_ns.is_some()
+                && candidate_end_to_end_ns.is_some() => {}
         "legacy_in_process"
             if candidate_artifact_sha256.is_none()
                 && candidate_process_startup_ns.is_none()
-                && candidate_process_wall_ns.is_none() => {}
+                && candidate_process_wall_ns.is_none()
+                && candidate_request_build_ns.is_none()
+                && candidate_receipt_validation_ns.is_none()
+                && candidate_end_to_end_ns.is_none() => {}
         _ => return Err("candidate execution boundary metadata is inconsistent".to_string()),
     }
 
