@@ -2340,6 +2340,7 @@ mod tests {
         JunctionKind, MYCELIAL_JUNCTION_GRAPH_SCHEMA_VERSION, MycelialHyphaSegment,
         MycelialJunction, MycelialJunctionHyphaGraph, PARAMETER_SCALE,
     };
+    use std::collections::BTreeMap;
 
     fn triangle_graph() -> MycelialJunctionHyphaGraph {
         let mut a = MycelialJunction {
