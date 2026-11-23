@@ -267,9 +267,15 @@ pub fn encode_longmemeval_v2_search_candidate_evidence_v1(
         {
             return Err(LongMemEvalV2CandidateReject::InvalidHit);
         }
+        if chunk.screenshot_references.len() != chunk.state_window.len() {
+            return Err(LongMemEvalV2CandidateReject::ScreenshotProjectionMismatch);
+        }
 
         let mut parents = Vec::with_capacity(chunk.state_window.len());
-        for state in &chunk.state_window {
+        for (state_index, state) in chunk.state_window.iter().enumerate() {
+            if chunk.screenshot_references[state_index] != state.screenshot_reference {
+                return Err(LongMemEvalV2CandidateReject::ScreenshotProjectionMismatch);
+            }
             if !valid_sha256(&state.raw_state_sha256) {
                 return Err(LongMemEvalV2CandidateReject::InvalidSourceDigest);
             }
