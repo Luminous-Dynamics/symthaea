@@ -123,7 +123,9 @@ The module contains tests for:
 13. refusing to bind an ineligible value;
 14. future-valid correction not erasing present truth;
 15. non-decreasing knowledge time;
-16. erasure of a consent grant invalidating dependent claims.
+16. erasure of a consent grant invalidating dependent claims;
+17. rejection of source observations after the system's knowledge time;
+18. rejection of retractions carrying an invalid consent identifier.
 
 These tests are authored but have not been compiled or executed in this environment.
 
