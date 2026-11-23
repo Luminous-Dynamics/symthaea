@@ -1,0 +1,146 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/mycelial-benchmarks/registry.schema.json",
+  "title": "Mycelial benchmark dataset registry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "registry_date",
+    "records"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "registry_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "records": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "dataset_id",
+          "title",
+          "publication_doi",
+          "artifact_urls",
+          "access_status",
+          "data_rights",
+          "ingestion_status",
+          "benchmark_tasks",
+          "independent_unit",
+          "split_requirements",
+          "known_limitations"
+        ],
+        "properties": {
+          "dataset_id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "publication_doi": {
+            "type": "string",
+            "pattern": "^https://doi\\.org/10\\."
+          },
+          "artifact_urls": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          "code_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "software_license": {
+            "type": "string"
+          },
+          "access_status": {
+            "enum": [
+              "public_repository",
+              "public_source_data",
+              "request_only",
+              "public_package"
+            ]
+          },
+          "data_rights": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "status",
+              "notes"
+            ],
+            "properties": {
+              "status": {
+                "enum": [
+                  "verified",
+                  "per_artifact_review_required",
+                  "author_permission_required",
+                  "unknown"
+                ]
+              },
+              "license_label": {
+                "type": "string"
+              },
+              "notes": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "ingestion_status": {
+            "enum": [
+              "metadata_only_not_ingested",
+              "rights_review_pending",
+              "eligible_for_local_adapter",
+              "ingested_and_receipted"
+            ]
+          },
+          "published_sample_summary": {
+            "type": "string"
+          },
+          "benchmark_tasks": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          },
+          "independent_unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "split_requirements": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          },
+          "known_limitations": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          },
+          "source_manifest_requirements": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  }
+}
