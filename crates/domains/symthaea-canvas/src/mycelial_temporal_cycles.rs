@@ -193,11 +193,10 @@ pub fn temporal_snapshot_from_annotated_skeleton(
             .ok_or_else(|| {
                 MycelialTemporalCycleError::EdgeEvidenceInventoryMismatch(segment.id.clone())
             })?;
-        let endpoints_match =
-            (record.source_node_id == segment.start_junction_id
-                && record.target_node_id == segment.end_junction_id)
-                || (record.source_node_id == segment.end_junction_id
-                    && record.target_node_id == segment.start_junction_id);
+        let endpoints_match = (record.source_node_id == segment.start_junction_id
+            && record.target_node_id == segment.end_junction_id)
+            || (record.source_node_id == segment.end_junction_id
+                && record.target_node_id == segment.start_junction_id);
         if !endpoints_match {
             return Err(MycelialTemporalCycleError::EdgeEvidenceEndpointMismatch(
                 segment.id.clone(),
