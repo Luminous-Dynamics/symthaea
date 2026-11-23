@@ -158,6 +158,15 @@ pub struct CausalTrajectoryReceipt {
     /// Symtropy correspondence-receipt verifier; this module does not resolve
     /// PRNG outputs or infer event correspondence.
     pub stochastic_draw_bundle_sha256: [u8; 32],
+    /// Exact verifier implementation/profile identity used by Symtropy #3755.
+    pub stochastic_draw_bundle_verifier_sha256: [u8; 32],
+    /// Digest of the external semantic-verification receipt for this exact
+    /// bundle and verifier profile. This module binds the reference only.
+    pub stochastic_draw_bundle_verification_receipt_sha256: [u8; 32],
+    /// The producer's declared #3755 semantic-verification disposition.
+    /// True is eligible only with the non-empty verifier and receipt digests;
+    /// the external receipt must still be independently retrieved/verified.
+    pub stochastic_draw_bundle_semantically_verified: bool,
     /// True only when the driver reports that the complete declared episode
     /// (including a terminal disposition and complete draw correspondence set)
     /// is represented by this receipt.
@@ -169,6 +178,10 @@ pub struct CausalTrajectoryReceipt {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CausalPairingCertificate {
     pub regime: CausalReplayRegime,
+    /// Complete draw-bundle references in baseline, compute, observation, joint order.
+    pub stochastic_draw_bundle_sha256: [[u8; 32]; 4],
+    /// Independently verified #3755 receipt references in the same arm order.
+    pub stochastic_draw_bundle_verification_receipt_sha256: [[u8; 32]; 4],
     /// The full 13-field pairing root used by all four arms.
     pub paired_run_identity: PairedRunIdentity,
     /// Scored outcome bindings in baseline, compute, observation, joint order.
@@ -208,6 +221,8 @@ pub enum CausalDigestField {
     ObservationDelivery,
     EvidenceEventIdentity,
     StochasticDrawBundle,
+    StochasticDrawBundleVerifier,
+    StochasticDrawBundleVerificationReceipt,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -267,6 +282,9 @@ pub enum CausalPairingError {
         arm: TreatmentArm,
         terminal_at_us: u64,
         last_decision_at_us: u64,
+    },
+    StochasticDrawBundleNotSemanticallyVerified {
+        arm: TreatmentArm,
     },
     ScoredOutcomeDispositionMismatch {
         arm: TreatmentArm,
@@ -427,6 +445,10 @@ impl fmt::Display for CausalPairingError {
             } => write!(
                 formatter,
                 "terminal disposition for arm {arm:?} at {terminal_at_us} precedes final decision at {last_decision_at_us}"
+            ),
+            Self::StochasticDrawBundleNotSemanticallyVerified { arm } => write!(
+                formatter,
+                "stochastic draw bundle for arm {arm:?} lacks an affirmative external semantic-verification disposition"
             ),
             Self::ScoredOutcomeDispositionMismatch { arm } => write!(
                 formatter,
@@ -681,6 +703,21 @@ fn validate_steps(
         Some(receipt.arm),
         CausalDigestField::StochasticDrawBundle,
     )?;
+    require_digest(
+        &receipt.stochastic_draw_bundle_verifier_sha256,
+        Some(receipt.arm),
+        CausalDigestField::StochasticDrawBundleVerifier,
+    )?;
+    require_digest(
+        &receipt.stochastic_draw_bundle_verification_receipt_sha256,
+        Some(receipt.arm),
+        CausalDigestField::StochasticDrawBundleVerificationReceipt,
+    )?;
+    if !receipt.stochastic_draw_bundle_semantically_verified {
+        return Err(CausalPairingError::StochasticDrawBundleNotSemanticallyVerified {
+            arm: receipt.arm,
+        });
+    }
 
     let mut expected_tick = receipt.identity.initial_world_tick;
     let mut previous_decision_at_us = None;
@@ -982,9 +1019,23 @@ pub fn validate_causal_pairing(
         ordered[2].scored_outcome,
         ordered[3].scored_outcome,
     ];
+    let stochastic_draw_bundle_sha256 = [
+        ordered[0].stochastic_draw_bundle_sha256,
+        ordered[1].stochastic_draw_bundle_sha256,
+        ordered[2].stochastic_draw_bundle_sha256,
+        ordered[3].stochastic_draw_bundle_sha256,
+    ];
+    let stochastic_draw_bundle_verification_receipt_sha256 = [
+        ordered[0].stochastic_draw_bundle_verification_receipt_sha256,
+        ordered[1].stochastic_draw_bundle_verification_receipt_sha256,
+        ordered[2].stochastic_draw_bundle_verification_receipt_sha256,
+        ordered[3].stochastic_draw_bundle_verification_receipt_sha256,
+    ];
 
     Ok(CausalPairingCertificate {
         regime,
+        stochastic_draw_bundle_sha256,
+        stochastic_draw_bundle_verification_receipt_sha256,
         paired_run_identity: baseline.identity.paired.clone(),
         scored_outcome_bindings,
         validated_decision_count,
@@ -1194,6 +1245,9 @@ mod tests {
                     driver_execution_receipt_sha256: digest(90 + index as u8),
                     independent_replay_audit_sha256: digest(100 + index as u8),
                     stochastic_draw_bundle_sha256: digest(120 + index as u8),
+                    stochastic_draw_bundle_verifier_sha256: digest(130 + index as u8),
+                    stochastic_draw_bundle_verification_receipt_sha256: digest(140 + index as u8),
+                    stochastic_draw_bundle_semantically_verified: true,
                     independent_replay_audit_passed: true,
                     complete: true,
                 }
@@ -1572,6 +1626,39 @@ mod tests {
             Err(CausalPairingError::EmptyDigest {
                 arm: Some(TreatmentArm::ComputeOnly),
                 field: CausalDigestField::StochasticDrawBundle
+            })
+        ));
+    }
+
+    #[test]
+    fn draw_bundle_requires_a_verification_receipt_digest() {
+        let mut runs = receipts(
+            CausalReplayRegime::ClosedLoopActionCoupled,
+            TrajectoryOrigin::ArmLocalDriverExecution,
+            true,
+        );
+        runs[1].stochastic_draw_bundle_verification_receipt_sha256 = digest(0);
+        assert!(matches!(
+            validate_causal_pairing(&runs),
+            Err(CausalPairingError::EmptyDigest {
+                arm: Some(TreatmentArm::ComputeOnly),
+                field: CausalDigestField::StochasticDrawBundleVerificationReceipt
+            })
+        ));
+    }
+
+    #[test]
+    fn unverified_draw_bundle_is_not_accepted_as_complete() {
+        let mut runs = receipts(
+            CausalReplayRegime::ClosedLoopActionCoupled,
+            TrajectoryOrigin::ArmLocalDriverExecution,
+            true,
+        );
+        runs[3].stochastic_draw_bundle_semantically_verified = false;
+        assert!(matches!(
+            validate_causal_pairing(&runs),
+            Err(CausalPairingError::StochasticDrawBundleNotSemanticallyVerified {
+                arm: TreatmentArm::Joint
             })
         ));
     }
