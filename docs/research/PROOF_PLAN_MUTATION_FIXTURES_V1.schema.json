@@ -61,7 +61,8 @@
               "remove_side_condition",
               "drop_subgoal",
               "change_quantifier",
-              "change_domain"
+              "change_domain",
+              "contextual_reuse"
             ]
           },
           "description": {
@@ -78,7 +79,8 @@
               "missing_side_condition",
               "missing_subgoal",
               "statement_semantics_changed",
-              "unknown"
+              "unknown",
+              "local_global_inconsistency"
             ]
           },
           "mathematical_disposition": {
