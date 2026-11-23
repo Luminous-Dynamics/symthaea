@@ -86,15 +86,10 @@
           }
         },
         "action_alternatives": {
-          "type": "array",
-          "items": {
-            "enum": [
-              "a",
-              "b"
-            ]
-          },
-          "minItems": 2,
-          "maxItems": 2
+          "const": [
+            "a",
+            "b"
+          ]
         },
         "semantic_estimand": {
           "type": "object",
