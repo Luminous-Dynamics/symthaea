@@ -316,31 +316,31 @@ fn expected_state(direct: OracleRisk, inherited: OracleRisk) -> VmSnapshotImpact
 
 /// Independent DFS parent-before-child ordering check. We check edge constraints
 /// rather than matching the implementation's exact tie-break order.
-fn visit(
+fn visit_parents(
     id: &str,
-    outgoing: &BTreeMap<String, Vec<String>>,
+    parents: &BTreeMap<String, Vec<String>>,
     seen: &mut BTreeSet<String>,
     output: &mut Vec<String>,
 ) {
     if !seen.insert(id.to_string()) {
         return;
     }
-    output.push(id.to_string());
-    for child in outgoing.get(id).into_iter().flatten() {
-        visit(child, outgoing, seen, output);
+    for parent in parents.get(id).into_iter().flatten() {
+        visit_parents(parent, parents, seen, output);
     }
+    output.push(id.to_string());
 }
 
 fn independent_topological_order(input: &VmImpactClosureInputV1) -> Vec<String> {
-    let mut outgoing: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    let mut parents: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for edge in &input.graph.edges {
-        outgoing
-            .entry(edge.parent_snapshot_id.clone())
+        parents
+            .entry(edge.child_snapshot_id.clone())
             .or_default()
-            .push(edge.child_snapshot_id.clone());
+            .push(edge.parent_snapshot_id.clone());
     }
-    for children in outgoing.values_mut() {
-        children.sort();
+    for parent_ids in parents.values_mut() {
+        parent_ids.sort();
     }
     let mut ids: Vec<String> = input
         .graph
@@ -353,7 +353,7 @@ fn independent_topological_order(input: &VmImpactClosureInputV1) -> Vec<String> 
     let mut seen = BTreeSet::new();
     let mut output = Vec::new();
     for id in &ids {
-        visit(id, &outgoing, &mut seen, &mut output);
+        visit_parents(id, &parents, &mut seen, &mut output);
     }
     output
 }
