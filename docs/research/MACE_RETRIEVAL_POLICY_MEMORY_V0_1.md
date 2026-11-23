@@ -141,7 +141,7 @@ This is **single-operation trace capture**, not multi-step strategy learning. Th
 
 ## 9. Durable receipt storage
 
-The Rust reference file store is in `research/broca-mace-transfer-bench-v0-1/aml-adapter/src/retrieval_policy_store.rs`. It strictly decodes canonical trace JSON, binds filenames to the opaque invocation ID, enforces file/count bounds, rejects symlinks/non-regular entries and replays receipts into the policy store. Four tests cover restart replay, create-once idempotency/conflict, tamper rejection and interrupted pending files. The store is a local conformance adapter, not an external witness service.
+The Rust reference file store is in `research/broca-mace-transfer-bench-v0-1/aml-adapter/src/retrieval_policy_store.rs`. It strictly decodes canonical trace JSON, binds filenames to the opaque invocation ID, enforces file/count bounds, rejects symlinks/non-regular entries and replays receipts into the policy store. Five tests cover restart replay, create-once idempotency/conflict, ambiguous post-publication in-memory binding recovery, tamper rejection and interrupted pending files. The store is a local conformance adapter, not an external witness service.
 
 ## 10. Rust API
 
