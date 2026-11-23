@@ -681,14 +681,14 @@ fn split_target_segment(
         ));
     }
     view.segments.push(ViewSegment {
-        id: format!("{}::split:{}:left", original.id, candidate.candidate_id),
+        id: format!("{}::split:{}:left", original.id, split_identity),
         original_segment_id: Some(original.id.clone()),
         start_junction_id: original.start_junction_id,
         end_junction_id: split_junction_id.clone(),
         length: left_length,
     });
     view.segments.push(ViewSegment {
-        id: format!("{}::split:{}:right", original.id, candidate.candidate_id),
+        id: format!("{}::split:{}:right", original.id, split_identity),
         original_segment_id: Some(original.id),
         start_junction_id: split_junction_id.clone(),
         end_junction_id: original.end_junction_id,
