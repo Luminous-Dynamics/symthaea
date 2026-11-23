@@ -277,12 +277,12 @@ fn validate_scope(
     require_text(&scope.unit, "scope.unit")?;
     require_text(&scope.method_revision, "scope.method_revision")?;
 
-    if let CalibrationOperatingRangeV1::ClosedInterval { lower, upper } = scope.operating_range {
-        if !lower.is_finite() || !upper.is_finite() || lower > upper {
-            return Err(CalibrationRequalificationErrorV1(
-                "scope.operating_range: invalid finite closed interval".into(),
-            ));
-        }
+    if let CalibrationOperatingRangeV1::ClosedInterval { lower, upper } = scope.operating_range
+        && (!lower.is_finite() || !upper.is_finite() || lower > upper)
+    {
+        return Err(CalibrationRequalificationErrorV1(
+            "scope.operating_range: invalid finite closed interval".into(),
+        ));
     }
     Ok(())
 }
