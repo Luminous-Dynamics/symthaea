@@ -643,15 +643,12 @@
         {
           "kind": "current_leaderboard_snapshot",
           "observed_date": "2026-11-23",
-          "source": "official_frontiercode_leaderboard",
+          "source": "two_third_party_leaderboard_snapshots; official_Cognition_page_dynamic_chart",
           "model": "Claude Fable 5.2",
           "harness": "Claude Code",
           "reasoning_effort": "xhigh",
           "weighted_score_percent": 50.2,
-          "pass_rate_percent": 54.7,
-          "mean_usd_per_rollout": 17.73,
-          "output_tokens_per_rollout": 156000,
-          "interpretation": "Current leaderboard row at observation time. Weighted rubric score and pass rate are separate. Any failed blocking criterion scores zero."
+          "interpretation": "Cross-checked 2026-11-23 leaderboard mirrors show the public FrontierCode 2.0 weighted-score row at 50.2% for Claude Fable 5.2. Cognition's rendered page exposes weighted-score semantics and scoring revisions but not the individual numeric row in text; treat 50.2 as a mirrored leaderboard snapshot, not a locally reproduced score."
         }
       ],
       "limitations": [
@@ -659,12 +656,13 @@
         "The grading rubric includes subjective maintainer criteria; reproduce its native protocol before making numeric comparisons.",
         "A benchmark score must be associated with its exact model, reasoning effort, agent harness and scoring revision.",
         "The 47.3% Opus 5.5 score is the official October 27 launch snapshot; later leaderboard entries may differ and must be timestamped separately.",
-        "The current 2026-11-23 row for Claude Fable 5.2 (50.2 weighted score, 54.7% pass rate) supersedes the October launch snapshot as the current leaderboard observation; retain both snapshots with their dates and do not conflate weighted score with pass rate.",
-        "The official site notes 20+ maintainer-authors spent more than 40 hours per task, uses unit tests, rubrics and verifiers, and zeroes runs that use solution-bearing sources; SFEB should match the rigor and independently qualify its own tasks."
+        "The official site notes 20+ maintainer-authors spent more than 40 hours per task, uses unit tests, rubrics and verifiers, and zeroes runs that use solution-bearing sources; SFEB should match the rigor and independently qualify its own tasks.",
+        "The 50.2% Claude Fable 5.2 current row is corroborated by third-party leaderboard mirrors; Cognition's direct page is dynamically rendered and its text view states scoring semantics but does not expose the numeric row. Treat the numeric observation as a timestamped external mirror, not a locally reproduced benchmark run."
       ],
       "sources": [
-        "https://cognition.com/blog/frontier-code-2.0",
-        "https://cognition.com/frontiercode"
+        "https://cognition.com/frontiercode",
+        "https://benchlm.ai/benchmarks/frontiercode-2",
+        "https://www.mypriors.com/benchmarks/frontiercode-2.0-main"
       ]
     },
     {
