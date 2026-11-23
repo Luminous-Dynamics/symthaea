@@ -59,8 +59,21 @@ jobs:
           /tmp/vis-dvpc-014 fixtures/vis-dvpc-compute-observation-cluster-deltas-v0.1.tsv aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa > /tmp/vis-dvpc-014-receipt.tsv
           grep -F $'ANALYSIS\tstatus\tCLUSTER_LEVEL_INFERENCE_ONLY' /tmp/vis-dvpc-014-receipt.tsv
           grep -F $'ANALYSIS\tperformance_claim\tNONE' /tmp/vis-dvpc-014-receipt.tsv
-          test "$(grep -c '^RESULT\t' /tmp/vis-dvpc-014-receipt.tsv)" -eq 4
-          test "$(grep -F 'ANALYSIS\tindependent_clusters\t6' /tmp/vis-dvpc-014-receipt.tsv | wc -l)" -eq 1
+          test "$(grep -c '^RESULT' /tmp/vis-dvpc-014-receipt.tsv)" -eq 4
+          test "$(grep -F  | wc -l)" -eq 1
+
+      - name: Verify deterministic replay
+        run: |
+          /tmp/vis-dvpc-014 fixtures/vis-dvpc-compute-observation-cluster-deltas-v0.1.tsv aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa > /tmp/vis-dvpc-014-receipt-repeat.tsv
+          cmp /tmp/vis-dvpc-014-receipt.tsv /tmp/vis-dvpc-014-receipt-repeat.tsv
+
+      - name: Verify external lock mismatch is rejected
+        run: |
+          if /tmp/vis-dvpc-014 fixtures/vis-dvpc-compute-observation-cluster-deltas-v0.1.tsv bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb > /tmp/vis-dvpc-014-invalid.tsv 2>&1; then
+            echo "analyzer accepted a mismatched external bundle lock" >&2
+            exit 1
+          fi
+ANALYSIS\tindependent_clusters\t6' /tmp/vis-dvpc-014-receipt.tsv | wc -l)" -eq 1
 
       - name: Verify deterministic replay
         run: |
