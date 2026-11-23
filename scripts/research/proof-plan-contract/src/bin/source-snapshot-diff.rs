@@ -15,7 +15,15 @@ struct Snapshot {
     declaration: String,
     declaration_kind: String,
     type_dependencies: Vec<String>,
+    #[serde(default)]
+    value_kind: String,
+    #[serde(default)]
+    value_dependencies: Vec<String>,
     proof_value_dependencies: Vec<String>,
+    #[serde(default)]
+    definition_value_dependencies: Vec<String>,
+    #[serde(default)]
+    opaque_value_dependencies: Vec<String>,
     constant_info_dependency_closure: Vec<String>,
     unresolved_dependencies: Vec<String>,
     edges: Vec<Edge>,
@@ -44,7 +52,15 @@ struct HelperNode {
     declaration_kind: String,
     proof_value_available: bool,
     type_dependencies: Vec<String>,
+    #[serde(default)]
+    value_kind: String,
+    #[serde(default)]
+    value_dependencies: Vec<String>,
     proof_value_dependencies: Vec<String>,
+    #[serde(default)]
+    definition_value_dependencies: Vec<String>,
+    #[serde(default)]
+    opaque_value_dependencies: Vec<String>,
     constant_info_dependency_closure: Vec<String>,
     unresolved_dependencies: Vec<String>,
     edges: Vec<Edge>,
@@ -79,9 +95,14 @@ struct DeclarationDiff {
     declaration: String,
     baseline_declaration_kind: String,
     candidate_declaration_kind: String,
+    baseline_value_kind: String,
+    candidate_value_kind: String,
     classification: String,
     type_dependencies: SetDiff,
+    value_dependencies: SetDiff,
     proof_value_dependencies: SetDiff,
+    definition_value_dependencies: SetDiff,
+    opaque_value_dependencies: SetDiff,
     dependency_closure: SetDiff,
     baseline_closure_reconciles: bool,
     candidate_closure_reconciles: bool,
@@ -93,7 +114,7 @@ struct DeclarationDiff {
     edge_relation_counts_candidate: BTreeMap<String, usize>,
     helper_nodes_baseline: Vec<String>,
     helper_nodes_candidate: Vec<String>,
-    helper_expanded_proof_dependencies: SetDiff,
+    helper_expanded_value_dependencies: SetDiff,
     helper_expansion_explains_direct_drift: bool,
     axiom_declarations: SetDiff,
     unsafe_declarations: SetDiff,
@@ -142,17 +163,50 @@ fn set_diff(baseline: &BTreeSet<String>, candidate: &BTreeSet<String>) -> SetDif
     }
 }
 
-fn closure_reconciles(snapshot: &Snapshot) -> bool {
-    let type_refs = string_set(&snapshot.type_dependencies);
-    let proof_refs = string_set(&snapshot.proof_value_dependencies);
-    let closure = string_set(&snapshot.constant_info_dependency_closure);
-    union_set(&type_refs, &proof_refs) == closure
+fn effective_value_dependencies<'a>(
+    value_dependencies: &'a [String],
+    legacy_proof_dependencies: &'a [String],
+) -> BTreeSet<String> {
+    if value_dependencies.is_empty() && !legacy_proof_dependencies.is_empty() {
+        string_set(legacy_proof_dependencies)
+    } else {
+        string_set(value_dependencies)
+    }
 }
 
-fn helper_expanded_proof_dependencies(snapshot: &Snapshot) -> BTreeSet<String> {
-    let mut dependencies = string_set(&snapshot.proof_value_dependencies);
+fn normalized_value_kind(value_kind: &str) -> String {
+    if value_kind.is_empty() {
+        "legacy_unclassified".to_owned()
+    } else {
+        value_kind.to_owned()
+    }
+}
+
+fn snapshot_value_dependencies(snapshot: &Snapshot) -> BTreeSet<String> {
+    effective_value_dependencies(
+        &snapshot.value_dependencies,
+        &snapshot.proof_value_dependencies,
+    )
+}
+
+fn helper_value_dependencies(helper: &HelperNode) -> BTreeSet<String> {
+    effective_value_dependencies(
+        &helper.value_dependencies,
+        &helper.proof_value_dependencies,
+    )
+}
+
+fn closure_reconciles(snapshot: &Snapshot) -> bool {
+    let type_refs = string_set(&snapshot.type_dependencies);
+    let value_refs = snapshot_value_dependencies(snapshot);
+    let closure = string_set(&snapshot.constant_info_dependency_closure);
+    union_set(&type_refs, &value_refs) == closure
+}
+
+fn helper_expanded_value_dependencies(snapshot: &Snapshot) -> BTreeSet<String> {
+    let mut dependencies = snapshot_value_dependencies(snapshot);
     for helper in &snapshot.helper_nodes {
-        dependencies.extend(helper.proof_value_dependencies.iter().cloned());
+        dependencies.extend(helper_value_dependencies(helper));
     }
     dependencies
 }
@@ -167,23 +221,23 @@ fn helper_names(snapshot: &Snapshot) -> Vec<String> {
 
 fn helper_closure_reconciles(helper: &HelperNode) -> bool {
     let type_refs = string_set(&helper.type_dependencies);
-    let proof_refs = string_set(&helper.proof_value_dependencies);
+    let value_refs = helper_value_dependencies(helper);
     let closure = string_set(&helper.constant_info_dependency_closure);
-    union_set(&type_refs, &proof_refs) == closure
+    union_set(&type_refs, &value_refs) == closure
 }
 
 fn helper_expansion_explains_direct_drift(
     type_diff: &SetDiff,
-    direct_proof_diff: &SetDiff,
+    direct_value_diff: &SetDiff,
     helper_expanded_diff: &SetDiff,
 ) -> bool {
     let type_interface_stable =
         type_diff.baseline_only.is_empty() && type_diff.candidate_only.is_empty();
-    let direct_proof_set_shifted =
-        !direct_proof_diff.baseline_only.is_empty() || !direct_proof_diff.candidate_only.is_empty();
+    let direct_value_set_shifted =
+        !direct_value_diff.baseline_only.is_empty() || !direct_value_diff.candidate_only.is_empty();
     type_interface_stable
-        && direct_proof_set_shifted
-        && direct_proof_diff.jaccard < 0.5
+        && direct_value_set_shifted
+        && direct_value_diff.jaccard < 0.5
         && helper_expanded_diff.jaccard >= 0.9
 }
 
@@ -195,16 +249,16 @@ fn relation_counts(snapshot: &Snapshot) -> BTreeMap<String, usize> {
     counts
 }
 
-fn classify(type_diff: &SetDiff, proof_diff: &SetDiff, closure_diff: &SetDiff) -> &'static str {
+fn classify(type_diff: &SetDiff, value_diff: &SetDiff, closure_diff: &SetDiff) -> &'static str {
     let type_stable = type_diff.baseline_only.is_empty() && type_diff.candidate_only.is_empty();
-    let proof_stable = proof_diff.baseline_only.is_empty() && proof_diff.candidate_only.is_empty();
+    let value_stable = value_diff.baseline_only.is_empty() && value_diff.candidate_only.is_empty();
     let closure_stable =
         closure_diff.baseline_only.is_empty() && closure_diff.candidate_only.is_empty();
 
-    match (type_stable, proof_stable, closure_stable) {
-        (true, true, true) => "identical_type_proof_and_closure_sets",
-        (true, false, false) => "stable_type_interface_proof_value_drift",
-        (false, true, false) => "type_interface_drift_stable_proof_values",
+    match (type_stable, value_stable, closure_stable) {
+        (true, true, true) => "identical_type_value_and_closure_sets",
+        (true, false, false) => "stable_type_interface_value_drift",
+        (false, true, false) => "type_interface_drift_stable_values",
         _ => "type_and_or_closure_dependency_drift",
     }
 }
@@ -331,23 +385,32 @@ fn compare(
 
         let left_type = string_set(&left.type_dependencies);
         let right_type = string_set(&right.type_dependencies);
+        let left_value = snapshot_value_dependencies(left);
+        let right_value = snapshot_value_dependencies(right);
         let left_proof = string_set(&left.proof_value_dependencies);
         let right_proof = string_set(&right.proof_value_dependencies);
+        let left_definition = string_set(&left.definition_value_dependencies);
+        let right_definition = string_set(&right.definition_value_dependencies);
+        let left_opaque = string_set(&left.opaque_value_dependencies);
+        let right_opaque = string_set(&right.opaque_value_dependencies);
         let left_closure = string_set(&left.constant_info_dependency_closure);
         let right_closure = string_set(&right.constant_info_dependency_closure);
 
         let type_dependencies = set_diff(&left_type, &right_type);
+        let value_dependencies = set_diff(&left_value, &right_value);
         let proof_value_dependencies = set_diff(&left_proof, &right_proof);
+        let definition_value_dependencies = set_diff(&left_definition, &right_definition);
+        let opaque_value_dependencies = set_diff(&left_opaque, &right_opaque);
         let dependency_closure = set_diff(&left_closure, &right_closure);
         let classification = classify(
             &type_dependencies,
-            &proof_value_dependencies,
+            &value_dependencies,
             &dependency_closure,
         )
         .to_owned();
         let helper_expanded_diff = set_diff(
-            &helper_expanded_proof_dependencies(left),
-            &helper_expanded_proof_dependencies(right),
+            &helper_expanded_value_dependencies(left),
+            &helper_expanded_value_dependencies(right),
         );
         let helper_expansion_explains_direct_drift = helper_expansion_explains_direct_drift(
             &type_dependencies,
@@ -359,9 +422,14 @@ fn compare(
             declaration: name,
             baseline_declaration_kind: left.declaration_kind.clone(),
             candidate_declaration_kind: right.declaration_kind.clone(),
+            baseline_value_kind: normalized_value_kind(&left.value_kind),
+            candidate_value_kind: normalized_value_kind(&right.value_kind),
             classification,
             type_dependencies,
+            value_dependencies,
             proof_value_dependencies,
+            definition_value_dependencies,
+            opaque_value_dependencies,
             dependency_closure,
             baseline_closure_reconciles: closure_reconciles(left),
             candidate_closure_reconciles: closure_reconciles(right),
@@ -373,7 +441,7 @@ fn compare(
             edge_relation_counts_candidate: relation_counts(right),
             helper_nodes_baseline: helper_names(left),
             helper_nodes_candidate: helper_names(right),
-            helper_expanded_proof_dependencies: helper_expanded_diff,
+            helper_expanded_value_dependencies: helper_expanded_diff,
             helper_expansion_explains_direct_drift,
             axiom_declarations: set_diff(
                 &string_set(&left.trust_profile.axiom_declarations),
@@ -476,8 +544,12 @@ mod tests {
             lean_revision: "fixture".to_owned(),
             declaration: declaration.to_owned(),
             declaration_kind: "theorem".to_owned(),
+            value_kind: "theorem_proof".to_owned(),
             type_dependencies: type_dependencies.iter().map(|v| (*v).to_owned()).collect(),
+            value_dependencies: proof_dependencies.iter().map(|v| (*v).to_owned()).collect(),
             proof_value_dependencies: proof_dependencies.iter().map(|v| (*v).to_owned()).collect(),
+            definition_value_dependencies: Vec::new(),
+            opaque_value_dependencies: Vec::new(),
             constant_info_dependency_closure: closure,
             unresolved_dependencies: Vec::new(),
             edges: Vec::new(),
@@ -508,7 +580,7 @@ mod tests {
         .expect("identical declaration inventory");
         assert_eq!(
             report.declarations[0].classification,
-            "identical_type_proof_and_closure_sets"
+            "identical_type_value_and_closure_sets"
         );
         assert_eq!(report.declarations[0].proof_value_dependencies.jaccard, 1.0);
     }
@@ -526,7 +598,7 @@ mod tests {
         .expect("valid declaration inventories");
         assert_eq!(
             report.declarations[0].classification,
-            "stable_type_interface_proof_value_drift"
+            "stable_type_interface_value_drift"
         );
         assert_eq!(
             report.declarations[0]
@@ -572,8 +644,12 @@ mod tests {
             declaration: "Nat.choose_pos._f".to_owned(),
             declaration_kind: "definition".to_owned(),
             proof_value_available: true,
+            value_kind: "definition_body".to_owned(),
             type_dependencies: vec!["Nat".to_owned()],
-            proof_value_dependencies: vec!["A".to_owned(), "B".to_owned()],
+            value_dependencies: vec!["A".to_owned(), "B".to_owned()],
+            proof_value_dependencies: Vec::new(),
+            definition_value_dependencies: vec!["A".to_owned(), "B".to_owned()],
+            opaque_value_dependencies: Vec::new(),
             constant_info_dependency_closure: vec![
                 "A".to_owned(),
                 "B".to_owned(),
@@ -599,8 +675,12 @@ mod tests {
             declaration: "_private.Nat.choose_pos.match_1_1".to_owned(),
             declaration_kind: "definition".to_owned(),
             proof_value_available: true,
+            value_kind: "definition_body".to_owned(),
             type_dependencies: vec!["Nat".to_owned()],
-            proof_value_dependencies: vec!["A".to_owned(), "B".to_owned()],
+            value_dependencies: vec!["A".to_owned(), "B".to_owned()],
+            proof_value_dependencies: Vec::new(),
+            definition_value_dependencies: vec!["A".to_owned(), "B".to_owned()],
+            opaque_value_dependencies: Vec::new(),
             constant_info_dependency_closure: vec![
                 "A".to_owned(),
                 "B".to_owned(),
@@ -630,7 +710,7 @@ mod tests {
         assert_eq!(report.declarations[0].helper_nodes_candidate.len(), 1);
         assert_eq!(
             report.declarations[0]
-                .helper_expanded_proof_dependencies
+                .helper_expanded_value_dependencies
                 .jaccard,
             1.0
         );
