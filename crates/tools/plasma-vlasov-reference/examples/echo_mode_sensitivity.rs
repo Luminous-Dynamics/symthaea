@@ -83,7 +83,10 @@ fn density_preserving_mode_perturbation(
     if !epsilon.is_finite() || epsilon.abs() >= 0.5 {
         return Err("relative perturbation amplitude must be finite with magnitude < 0.5".into());
     }
-    let expected_len = config.nx.checked_mul(config.nv).ok_or("grid size overflow")?;
+    let expected_len = config
+        .nx
+        .checked_mul(config.nv)
+        .ok_or("grid size overflow")?;
     if distribution.len() != expected_len {
         return Err("distribution length does not match the configured grid".into());
     }
@@ -111,18 +114,13 @@ fn density_preserving_mode_perturbation(
 
         for (iv, value) in row.iter().copied().enumerate() {
             let phase = x_phase_scale * config.x(ix) + velocity_phase_scale * iv as f64;
-            result[row_start + iv] =
-                value * (1.0 + epsilon * (phase.cos() - weighted_cosine_mean));
+            result[row_start + iv] = value * (1.0 + epsilon * (phase.cos() - weighted_cosine_mean));
         }
     }
     Ok(result)
 }
 
-fn density_change_max(
-    before: &[f64],
-    after: &[f64],
-    config: VlasovPoissonConfig,
-) -> f64 {
+fn density_change_max(before: &[f64], after: &[f64], config: VlasovPoissonConfig) -> f64 {
     let mut maximum = 0.0_f64;
     for ix in 0..config.nx {
         let start = ix * config.nv;
@@ -133,11 +131,7 @@ fn density_change_max(
     maximum
 }
 
-fn mass_change_relative(
-    before: &[f64],
-    after: &[f64],
-    config: VlasovPoissonConfig,
-) -> f64 {
+fn mass_change_relative(before: &[f64], after: &[f64], config: VlasovPoissonConfig) -> f64 {
     let measure = config.dx() * config.dv();
     let before_mass = before.iter().sum::<f64>() * measure;
     let after_mass = after.iter().sum::<f64>() * measure;
@@ -181,8 +175,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         return Err("pulse and observation times must lie on the declared timestep grid".into());
     }
 
-    let initial =
-        maxwellian_perturbation(config, INITIAL_AMPLITUDE, FIRST_MODE, 1.0)?;
+    let initial = maxwellian_perturbation(config, INITIAL_AMPLITUDE, FIRST_MODE, 1.0)?;
     let mut pre_pulse_solver = VlasovPoisson1d1v::new(config, initial)?;
     for _ in 0..pulse_step {
         pre_pulse_solver.step(DT)?;
@@ -196,12 +189,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         })
         .collect();
 
-    let baseline_response = response_for_initial_state(
-        config,
-        &pre_pulse_distribution,
-        &kick,
-        post_pulse_steps,
-    )?;
+    let baseline_response =
+        response_for_initial_state(config, &pre_pulse_distribution, &kick, post_pulse_steps)?;
     let baseline_amplitude = baseline_response.amplitude();
     if !baseline_amplitude.is_finite() || baseline_amplitude <= f64::MIN_POSITIVE {
         return Err("baseline complex echo response is not finite and nonzero".into());
@@ -225,18 +214,10 @@ fn main() -> Result<(), Box<dyn Error>> {
             -PERTURBATION_AMPLITUDE,
         )?;
 
-        let positive_response = response_for_initial_state(
-            config,
-            &positive_distribution,
-            &kick,
-            post_pulse_steps,
-        )?;
-        let negative_response = response_for_initial_state(
-            config,
-            &negative_distribution,
-            &kick,
-            post_pulse_steps,
-        )?;
+        let positive_response =
+            response_for_initial_state(config, &positive_distribution, &kick, post_pulse_steps)?;
+        let negative_response =
+            response_for_initial_state(config, &negative_distribution, &kick, post_pulse_steps)?;
 
         let derivative = positive_response
             .difference(negative_response)
@@ -245,8 +226,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         let even_order_residual =
             midpoint.difference(baseline_response).amplitude() / baseline_amplitude;
         let relative_sensitivity = derivative.amplitude() / baseline_amplitude;
-        let epsilon_scaled_response_effect =
-            PERTURBATION_AMPLITUDE * relative_sensitivity;
+        let epsilon_scaled_response_effect = PERTURBATION_AMPLITUDE * relative_sensitivity;
 
         println!(
             "{signed_mode},{FIRST_MODE},{OBSERVATION_TIME:.8},{PERTURBATION_AMPLITUDE:.8},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.8},{:.12e},{:.12e},{:.12e}",
@@ -276,8 +256,7 @@ mod tests {
     fn signed_mode_perturbations_preserve_each_discrete_spatial_density() {
         let config = config();
         let initial = maxwellian_perturbation(config, 1.0e-3, FIRST_MODE, 1.0).unwrap();
-        let perturbed =
-            density_preserving_mode_perturbation(&initial, config, 24, 1.0e-3).unwrap();
+        let perturbed = density_preserving_mode_perturbation(&initial, config, 24, 1.0e-3).unwrap();
         assert!(
             density_change_max(&initial, &perturbed, config) < 1.0e-12,
             "row-wise density changed under the projected phase-space perturbation"
@@ -290,12 +269,8 @@ mod tests {
     fn signed_mode_perturbations_reject_invalid_amplitudes_and_shapes() {
         let config = config();
         let initial = maxwellian_perturbation(config, 1.0e-3, FIRST_MODE, 1.0).unwrap();
-        assert!(
-            density_preserving_mode_perturbation(&initial, config, 4, f64::NAN).is_err()
-        );
-        assert!(
-            density_preserving_mode_perturbation(&initial, config, 4, 0.5).is_err()
-        );
+        assert!(density_preserving_mode_perturbation(&initial, config, 4, f64::NAN).is_err());
+        assert!(density_preserving_mode_perturbation(&initial, config, 4, 0.5).is_err());
         assert!(
             density_preserving_mode_perturbation(&initial[..initial.len() - 1], config, 4, 1.0e-3)
                 .is_err()
