@@ -27,8 +27,8 @@ use crate::mycelial_reconstruction_metrics::AnnotatedMycelialSkeleton;
 
 pub const MYCELIAL_GRAPH_HYPOTHESIS_POSTERIOR_SCHEMA_VERSION: u16 = 1;
 /// Exact enumeration is bounded at 2^16 = 65,536 graph hypotheses.
-pub const MAX_MYCELELIAL_POSTERIOR_CANDIDATES: usize = 16;
-pub const MAX_MYCELELIAL_POSTERIOR_HYPOTHESES: usize = 1 << MAX_MYCELELIAL_POSTERIOR_CANDIDATES;
+pub const MAX_MYCELIAL_POSTERIOR_CANDIDATES: usize = 16;
+pub const MAX_MYCELIAL_POSTERIOR_HYPOTHESES: usize = 1 << MAX_MYCELIAL_POSTERIOR_CANDIDATES;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -81,7 +81,7 @@ pub struct MycelialGraphHypothesisPosterior {
     pub log_feasible_prior_mass: f64,
     pub posterior_entropy_nats: f64,
     pub candidate_marginals: Vec<MycelialFusionCandidateMarginal>,
-    /// Sorted lexicographically by the accepted candidate-ID vector.
+    /// Deterministically ordered by ascending bit mask over sorted candidate IDs.
     pub hypotheses: Vec<MycelialGraphHypothesis>,
 }
 
@@ -98,7 +98,7 @@ impl fmt::Display for MycelialGraphHypothesisPosteriorError {
         match self {
             Self::TooManyCandidates(count) => write!(
                 f,
-                "exact graph-hypothesis candidate count {count} exceeds {MAX_MYCELELIAL_POSTERIOR_CANDIDATES}"
+                "exact graph-hypothesis candidate count {count} exceeds {MAX_MYCELIAL_POSTERIOR_CANDIDATES}"
             ),
             Self::InvalidFusionCandidates(reason) => {
                 write!(f, "invalid fusion candidates for graph posterior: {reason}")
@@ -178,7 +178,7 @@ pub fn evaluate_mycelial_graph_hypothesis_posterior(
     MycelialGraphHypothesisPosterior,
     MycelialGraphHypothesisPosteriorError,
 > {
-    if candidates.len() > MAX_MYCELELIAL_POSTERIOR_CANDIDATES {
+    if candidates.len() > MAX_MYCELIAL_POSTERIOR_CANDIDATES {
         return Err(MycelialGraphHypothesisPosteriorError::TooManyCandidates(
             candidates.len(),
         ));
@@ -276,8 +276,8 @@ pub fn evaluate_mycelial_graph_hypothesis_posterior(
         if log_prior.is_finite() {
             let probability = (*log_prior - log_feasible_prior_mass).exp();
             hypothesis.posterior_probability = probability;
+            nonzero_prior_feasible_hypothesis_count += 1;
             if probability > 0.0 {
-                nonzero_prior_feasible_hypothesis_count += 1;
                 posterior_entropy_nats -= probability * probability.ln();
             }
             for (index, marginal_mass) in candidate_marginal_mass.iter_mut().enumerate() {
@@ -382,6 +382,26 @@ mod tests {
                     kind: AnnotatedJunctionKind::Tip,
                     position: ReconstructionPoint3 { x: 11.0, y: 0.0, z: 0.0 },
                 },
+                AnnotatedJunction {
+                    id: "E".to_string(),
+                    kind: AnnotatedJunctionKind::Origin,
+                    position: ReconstructionPoint3 { x: 20.0, y: 0.0, z: 0.0 },
+                },
+                AnnotatedJunction {
+                    id: "F".to_string(),
+                    kind: AnnotatedJunctionKind::Tip,
+                    position: ReconstructionPoint3 { x: 21.0, y: 0.0, z: 0.0 },
+                },
+                AnnotatedJunction {
+                    id: "G".to_string(),
+                    kind: AnnotatedJunctionKind::Origin,
+                    position: ReconstructionPoint3 { x: 30.0, y: 0.0, z: 0.0 },
+                },
+                AnnotatedJunction {
+                    id: "H".to_string(),
+                    kind: AnnotatedJunctionKind::Tip,
+                    position: ReconstructionPoint3 { x: 31.0, y: 0.0, z: 0.0 },
+                },
             ],
             segments: vec![
                 AnnotatedHyphaSegment {
@@ -394,6 +414,18 @@ mod tests {
                     id: "cd".to_string(),
                     start_junction_id: "C".to_string(),
                     end_junction_id: "D".to_string(),
+                    length: 1.0,
+                },
+                AnnotatedHyphaSegment {
+                    id: "ef".to_string(),
+                    start_junction_id: "E".to_string(),
+                    end_junction_id: "F".to_string(),
+                    length: 1.0,
+                },
+                AnnotatedHyphaSegment {
+                    id: "gh".to_string(),
+                    start_junction_id: "G".to_string(),
+                    end_junction_id: "H".to_string(),
                     length: 1.0,
                 },
             ],
@@ -427,7 +459,7 @@ mod tests {
         let source = skeleton();
         let candidates = vec![
             candidate("one", "B", "D", 0.2, None),
-            candidate("two", "D", "B", 0.7, None),
+            candidate("two", "F", "H", 0.7, None),
         ];
         let report =
             evaluate_mycelial_graph_hypothesis_posterior(&source, &candidates).unwrap();
