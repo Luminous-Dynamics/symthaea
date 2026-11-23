@@ -118,12 +118,15 @@ pub enum MentionRelation {
     Alternative,
 }
 
-
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(tag = "op", rename_all = "snake_case", deny_unknown_fields)]
 pub enum BooleanFormula {
-    Atom { name: String },
-    Not { arg: Box<BooleanFormula> },
+    Atom {
+        name: String,
+    },
+    Not {
+        arg: Box<BooleanFormula>,
+    },
     And {
         left: Box<BooleanFormula>,
         right: Box<BooleanFormula>,
@@ -178,7 +181,10 @@ impl BooleanFormula {
         Ok(())
     }
 
-    fn evaluate(&self, valuation: &std::collections::HashMap<String, bool>) -> Result<bool, String> {
+    fn evaluate(
+        &self,
+        valuation: &std::collections::HashMap<String, bool>,
+    ) -> Result<bool, String> {
         match self {
             Self::Atom { name } => valuation
                 .get(name)
@@ -188,9 +194,7 @@ impl BooleanFormula {
             Self::And { left, right } => {
                 Ok(left.evaluate(valuation)? && right.evaluate(valuation)?)
             }
-            Self::Or { left, right } => {
-                Ok(left.evaluate(valuation)? || right.evaluate(valuation)?)
-            }
+            Self::Or { left, right } => Ok(left.evaluate(valuation)? || right.evaluate(valuation)?),
             Self::Implies { left, right } => {
                 Ok(!left.evaluate(valuation)? || right.evaluate(valuation)?)
             }
@@ -215,7 +219,10 @@ impl BooleanCountermodel {
             if !non_empty(&assignment.atom) {
                 return Err("countermodel valuation atom must be non-empty".to_owned());
             }
-            if values.insert(assignment.atom.clone(), assignment.value).is_some() {
+            if values
+                .insert(assignment.atom.clone(), assignment.value)
+                .is_some()
+            {
                 return Err(format!(
                     "countermodel contains duplicate valuation for atom {}",
                     assignment.atom
@@ -236,9 +243,7 @@ impl BooleanCountermodel {
 
         for (index, premise) in self.premises.iter().enumerate() {
             if !premise.evaluate(&values)? {
-                return Err(format!(
-                    "countermodel premise[{index}] evaluates to false"
-                ));
+                return Err(format!("countermodel premise[{index}] evaluates to false"));
             }
         }
         if self.conclusion.evaluate(&values)? {
@@ -477,7 +482,9 @@ pub fn validate_pair(pair: &LocalGlobalPairV1) -> Vec<String> {
 
         if let Some(countermodel) = &evaluator.finite_boolean_countermodel {
             if let Err(reason) = countermodel.validate() {
-                errors.push(format!("evaluator_only.finite_boolean_countermodel: {reason}"));
+                errors.push(format!(
+                    "evaluator_only.finite_boolean_countermodel: {reason}"
+                ));
             }
             if evaluator.independently_assessed_warrant != WarrantValidity::Invalid {
                 errors.push(
@@ -489,7 +496,8 @@ pub fn validate_pair(pair: &LocalGlobalPairV1) -> Vec<String> {
             && evaluator.finite_boolean_countermodel.is_none()
         {
             errors.push(
-                "finite_boolean_countermodel authority requires a finite Boolean witness".to_owned(),
+                "finite_boolean_countermodel authority requires a finite Boolean witness"
+                    .to_owned(),
             );
         }
 
