@@ -321,7 +321,7 @@ function selfTest() {
   const forgedTrace=clone(input.trace);forgedTrace.worker_claims={disposition:'rejected',observed_oracle_ids:['fake.failure','fake.security']};
   const forgedReport=verifyTrace({...input,trace:forgedTrace,traceBytes:Buffer.from(JSON.stringify(forgedTrace))});
   if(JSON.stringify(baseline.oracle_results)!==JSON.stringify(forgedReport.oracle_results)) fail('worker claims influenced oracle outcomes');
-  const alteredTrace=clone(input.trace);alteredTrace.steps[1].event.to_status='done';
+  const alteredTrace=clone(input.trace);alteredTrace.steps[2].event.to_status='done';
   let mutationRejected=false;
   try { verifyTrace({...input,trace:alteredTrace,traceBytes:Buffer.from(JSON.stringify(alteredTrace))}); } catch { mutationRejected=true; }
   if(!mutationRejected) fail('altered authoritative event was accepted');
