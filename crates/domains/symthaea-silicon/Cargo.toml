@@ -13,6 +13,7 @@ symthaea-engineering = { path = "../symthaea-engineering" }
 symthaea-formal-safety = { path = "../symthaea-formal-safety" }
 symthaea-sim-bridge = { path = "../../bridges/symthaea-sim-bridge" }
 serde = { workspace = true }
+sha2 = { workspace = true }
 serde_json = { workspace = true }
 tracing = { workspace = true }
 uuid = { workspace = true }
