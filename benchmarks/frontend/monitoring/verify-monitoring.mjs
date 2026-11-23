@@ -48,7 +48,7 @@ function evaluateCase(fixtureCase,trace){
  function currentCondition(){return predicateSatisfied({...contract,baseline_capacity:baselineCapacity},state);}
  function advance(time){
   if(!Number.isSafeInteger(time)||time<now||time>deadline)fail(fixtureCase.case_id+': non-monotonic or out-of-deadline time');
-  if(time===now)return;
+  // Also process source events at the current timestamp (including time zero).
   // Mutations sharing a virtual timestamp are applied as one atomic source-of-record batch.
   while(eventIndex<events.length&&events[eventIndex].at<=time){
    const eventTime=events[eventIndex].at;
@@ -99,7 +99,7 @@ function evaluateCase(fixtureCase,trace){
     deliveryIndexes.set(step.message_id,used+1);
     if(wakeIds.has(step.message_id)){duplicateWakeCount++;break;}
     wakeIds.add(step.message_id);uniqueWakeCount++;dirty=true;
-    if(notification.claimed_revision>state.revision)staleHintCount++;
+    if(notification.claimed_revision<state.revision)staleHintCount++;
     // Crucial: a wake never mutates authoritative state or grants permission.
     break;
    }
@@ -171,7 +171,10 @@ function verifyAll({fixtureBytes,traceBytes,policyBytes,fixture,traces,policy}){
  if(fixture.schema!=='sfeb-monitoring-fixture-v1'||policy.schema!=='sfeb-monitoring-policy-v1'||traces.schema!=='sfeb-monitoring-reference-traces-v1')fail('unsupported monitoring fixture/policy/trace schema');
  if(policy.task_id!=='SFEB-MON-001'||traces.fixture_id!==fixture.fixture_id)fail('monitoring task/fixture identity mismatch');
  if(traces.fixture_sha256!==sha256(fixtureBytes))fail('monitoring traces do not bind exact fixture bytes');
+ const expectedRuleIds=['watch.register.once','wake.hint_not_authority','observation.latest_revision','action.predicate_guard','action.permission_guard','action.idempotency','no_op.abstention','reconnect.stale_revalidation','wait.monotonic_bounded','relative.baseline','resource.polling_budget'];
+ if(!Array.isArray(policy.rules)||policy.rules.map(rule=>rule.id).join('|')!==expectedRuleIds.join('|'))fail('monitoring policy rule set/order mismatch');
  const cases=new Map(fixture.cases.map(c=>[c.case_id,c]));
+ if(JSON.stringify([...policy.case_ids].sort())!==JSON.stringify([...cases.keys()].sort()))fail('monitoring policy case coverage mismatch');
  const traceMap=new Map(traces.traces.map(t=>[t.case_id,t]));
  if(cases.size!==fixture.cases.length||traceMap.size!==traces.traces.length)fail('duplicate case or trace identity');
  if(cases.size!==traceMap.size||[...cases.keys()].some(id=>!traceMap.has(id)))fail('fixture/trace case coverage mismatch');
