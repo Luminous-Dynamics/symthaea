@@ -1268,7 +1268,7 @@ fn hex_digest(bytes: &[u8; 32]) -> String {
 mod tests {
     use super::*;
     use crate::mycelial_model::PresenceMode;
-    use crate::mycelial_network::AnastomosisKind;
+    use crate::mycelial_network::{AnastomosisKind, MycelialAnastomosis};
 
     fn filament(
         id: u32,
