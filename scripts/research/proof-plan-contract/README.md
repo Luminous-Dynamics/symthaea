@@ -7,8 +7,8 @@ This crate validates the **structure and references** of ProofPlanV1 documents. 
 From the repository root:
 
 ```bash
-cargo test --manifest-path scripts/research/proof-plan-contract/Cargo.toml --offline
-cargo run --manifest-path scripts/research/proof-plan-contract/Cargo.toml --offline -- docs/research/PROOF_PLAN_AND_COMM_V1.json
+cargo test --locked --manifest-path scripts/research/proof-plan-contract/Cargo.toml
+cargo run --locked --manifest-path scripts/research/proof-plan-contract/Cargo.toml -- docs/research/PROOF_PLAN_AND_COMM_V1.json
 ```
 
 The crate has its own workspace boundary. It does not add the large Symthaea workspace to the test graph.
@@ -44,3 +44,6 @@ A proposed metric is:
 `Context-Induced Reuse Rate = locally rejected invalid warrants reused in global plans / locally rejected invalid-warrant cases`
 
 Report the numerator, denominator, clustered confidence interval, and subgroup by mutation/context family. If the denominator is zero, report the metric as undefined, not zero. Keep this separate from theorem truth, kernel acceptance and plan validity.
+
+
+The standalone crate's `Cargo.lock` is committed. Use `--locked` for reproducible dependency resolution; do not regenerate or update the lockfile during validation.
