@@ -27,6 +27,7 @@ pub mod color;
 pub mod embodiment;
 pub mod embodiment_trace;
 pub mod geometry;
+pub mod mycelial_acquisition_domain;
 pub mod mycelial_annotation_triage;
 pub mod mycelial_contact_persistence;
 pub mod mycelial_failure_resilience;
@@ -91,6 +92,16 @@ pub use embodiment_trace::{
     MAX_EMBODIMENT_TRACE_EVENTS, OpenActivityInterval, OpenPlaybackInterval,
 };
 pub use geometry::build_scene;
+pub use mycelial_acquisition_domain::{
+    MAX_MYCELIAL_ACQUISITION_DOMAIN_UNITS, MYCELIAL_ACQUISITION_DOMAIN_SCHEMA_VERSION,
+    MYCELIAL_EXTRACTION_RECEIPT_SCHEMA_VERSION, MycelialAcquisitionAxis,
+    MycelialAcquisitionAxisName, MycelialAcquisitionDomainError,
+    MycelialAcquisitionDomainManifest, MycelialAcquisitionDomainSpec,
+    MycelialAcquisitionScopeExclusion, MycelialAcquisitionUnitKey,
+    MycelialExtractionCoverageReceipt, MycelialExtractionCoverageStatus,
+    MycelialExtractionCoverageSummary, MycelialExtractionUnitOutcome,
+    MycelialExtractionUnitState,
+};
 pub use mycelial_annotation_triage::{
     MAX_MYCELIAL_ANNOTATION_TRIAGE_ITEMS, MYCELIAL_ANNOTATION_TRIAGE_SCHEMA_VERSION,
     MycelialAnnotationTriageConfig, MycelialAnnotationTriageError, MycelialAnnotationTriageReport,
