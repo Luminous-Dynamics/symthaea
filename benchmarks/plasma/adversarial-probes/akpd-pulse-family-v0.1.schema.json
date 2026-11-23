@@ -1,0 +1,439 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/plasma/adversarial-probes/akpd-pulse-family-v0.1.schema.json",
+  "title": "Adversarial Kinetic Probe Design pulse-family contract v0.1",
+  "description": "Versioned admissible intervention-family declaration for empirical adversarial probe search in periodic 1D1V collisionless Vlasov-Poisson. JSON Schema validates shape; cross-field ordering, physical admissibility, energy impact and numerical convergence require independent semantic/runtime checks.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "contract_id",
+    "contract_status",
+    "physics_cohort",
+    "intervention_operator",
+    "admissible_controls",
+    "search_budget",
+    "evaluation_policy",
+    "split_role",
+    "acquisition_allowed",
+    "provenance"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "contract_id": {
+      "type": "string",
+      "pattern": "^AKPD-[A-Z0-9][A-Z0-9._-]{2,63}$"
+    },
+    "contract_status": {
+      "enum": [
+        "synthetic_fixture_only",
+        "development_contract",
+        "physical_candidate"
+      ]
+    },
+    "physics_cohort": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "equation",
+        "normalization_id",
+        "spatial_domain",
+        "velocity_domain",
+        "time_unit"
+      ],
+      "properties": {
+        "equation": {
+          "const": "periodic_1d1v_collisionless_vlasov_poisson"
+        },
+        "normalization_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "spatial_domain": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "minimum",
+            "maximum",
+            "periodic"
+          ],
+          "properties": {
+            "minimum": {
+              "type": "number"
+            },
+            "maximum": {
+              "type": "number"
+            },
+            "periodic": {
+              "const": true
+            }
+          }
+        },
+        "velocity_domain": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "minimum",
+            "maximum",
+            "velocity_unit"
+          ],
+          "properties": {
+            "minimum": {
+              "type": "number"
+            },
+            "maximum": {
+              "type": "number"
+            },
+            "velocity_unit": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "time_unit": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "intervention_operator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operator_id",
+        "definition",
+        "amplitude_semantics"
+      ],
+      "properties": {
+        "operator_id": {
+          "const": "sinusoidal_velocity_kick_v1"
+        },
+        "definition": {
+          "const": "v_after(x) = v_before(x) + A*sin(2*pi*m*(x-x_min)/L + phase)"
+        },
+        "amplitude_semantics": {
+          "const": "maximum_absolute_delta_v"
+        },
+        "application_semantics": {
+          "const": "instantaneous_canonical_velocity_kick"
+        }
+      }
+    },
+    "admissible_controls": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "spatial_mode",
+        "phase_rad",
+        "kick_amplitude",
+        "application_time"
+      ],
+      "properties": {
+        "spatial_mode": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "minimum",
+            "maximum"
+          ],
+          "properties": {
+            "minimum": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "maximum": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "phase_rad": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "minimum",
+            "maximum"
+          ],
+          "properties": {
+            "minimum": {
+              "type": "number",
+              "minimum": -3.141592653589793,
+              "maximum": 3.141592653589793
+            },
+            "maximum": {
+              "type": "number",
+              "minimum": -3.141592653589793,
+              "maximum": 3.141592653589793
+            }
+          }
+        },
+        "kick_amplitude": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "minimum",
+            "maximum",
+            "unit"
+          ],
+          "properties": {
+            "minimum": {
+              "type": "number",
+              "minimum": 0
+            },
+            "maximum": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "unit": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "application_time": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "minimum",
+            "maximum",
+            "unit"
+          ],
+          "properties": {
+            "minimum": {
+              "type": "number",
+              "minimum": 0
+            },
+            "maximum": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "unit": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "search_budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "maximum_proposals",
+        "maximum_high_fidelity_confirmations",
+        "maximum_reference_steps",
+        "maximum_wall_time_seconds"
+      ],
+      "properties": {
+        "maximum_proposals": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maximum_high_fidelity_confirmations": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maximum_reference_steps": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maximum_wall_time_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "evaluation_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "independent_confirmation_required",
+        "minimum_spatial_refinement_levels",
+        "minimum_time_refinement_levels",
+        "required_controls",
+        "response_metrics"
+      ],
+      "properties": {
+        "independent_confirmation_required": {
+          "const": true
+        },
+        "minimum_spatial_refinement_levels": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "minimum_time_refinement_levels": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "required_controls": {
+          "type": "array",
+          "minItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "no_pulse",
+              "sign_reversed",
+              "phase_mismatch",
+              "off_mode_sham",
+              "pulse_removed",
+              "injected_high_frequency_noise",
+              "duplicate_replay"
+            ]
+          }
+        },
+        "response_metrics": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "complex_amplitude",
+              "wrapped_phase",
+              "waveform_error",
+              "peak_time",
+              "peak_width",
+              "branch_association",
+              "macro_qoi_error",
+              "invariant_delta"
+            ]
+          }
+        },
+        "confirmation_reference_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "split_role": {
+      "enum": [
+        "discovery",
+        "development",
+        "confirmation",
+        "sealed_test"
+      ]
+    },
+    "acquisition_allowed": {
+      "type": "boolean"
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fixture_class",
+        "initial_state_sha256",
+        "reference_solver_revision",
+        "candidate_representation_revision",
+        "generator_seed",
+        "physical_execution_authorized"
+      ],
+      "properties": {
+        "fixture_class": {
+          "enum": [
+            "synthetic_schema_test_only",
+            "physical_candidate"
+          ]
+        },
+        "initial_state_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "reference_solver_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "candidate_representation_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "generator_seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "physical_execution_authorized": {
+          "type": "boolean"
+        },
+        "source_record_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uri"
+          },
+          "uniqueItems": true
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "split_role": {
+            "const": "sealed_test"
+          }
+        },
+        "required": [
+          "split_role"
+        ]
+      },
+      "then": {
+        "properties": {
+          "acquisition_allowed": {
+            "const": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "contract_status": {
+            "const": "synthetic_fixture_only"
+          }
+        },
+        "required": [
+          "contract_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "provenance": {
+            "properties": {
+              "fixture_class": {
+                "const": "synthetic_schema_test_only"
+              },
+              "physical_execution_authorized": {
+                "const": false
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "contract_status": {
+            "const": "physical_candidate"
+          }
+        },
+        "required": [
+          "contract_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "provenance": {
+            "properties": {
+              "fixture_class": {
+                "const": "physical_candidate"
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$comment": "JSON Schema does not prove min<=max, consistent units, physical realism, a valid initial-state digest, admissible energy exchange, solver convergence or independence of the confirmation path. A fail-closed semantic validator must check these before a candidate is executed or described as confirmed. A finite search does not certify a continuous worst-case response bound."
+}
