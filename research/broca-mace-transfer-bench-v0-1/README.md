@@ -651,7 +651,7 @@ The current implementation is a synthetic pairwise diagnostic, not the productio
 
 A new workspace member, `candidate/` (`broca-mace-candidate`), provides a separate candidate process with one bounded JSON envelope on stdin and one candidate receipt on stdout. It initially supports exact-scope scan and typed-content HDC; both retain the unchanged `Policy::CausalQualified` decision gate.
 
-The candidate package depends on the policy and HDC retrieval packages, serialization and hashing. It does not depend on the evaluator or generated stress fixtures. The input and output contracts are in [mace_candidate_envelope_v1.schema.json](../../../data/schemas/mace_candidate_envelope_v1.schema.json) and [mace_candidate_receipt_v1.schema.json](../../../data/schemas/mace_candidate_receipt_v1.schema.json). Nested unknown fields are rejected; the envelope is bounded to 32 MiB / 20,000 evidence records and does not define evaluator truth, utility labels, optimal actions, intervention labels or scoring instructions.
+The candidate package depends on the policy and HDC retrieval packages, serialization and hashing. It does not depend on the evaluator or generated stress fixtures. The input and output contracts are in [mace_candidate_envelope_v1.schema.json](../../data/schemas/mace_candidate_envelope_v1.schema.json) and [mace_candidate_receipt_v1.schema.json](../../data/schemas/mace_candidate_receipt_v1.schema.json). Nested unknown fields are rejected; the envelope is bounded to 32 MiB / 20,000 evidence records and does not define evaluator truth, utility labels, optimal actions, intervention labels or scoring instructions.
 
 Run independently:
 
