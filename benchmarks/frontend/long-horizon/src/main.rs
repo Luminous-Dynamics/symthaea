@@ -854,11 +854,51 @@ mod tests {
         serde_json::from_str(include_str!("../event-reconciliation-v1.json")).expect("fixture JSON")
     }
 
+    fn append_permutations(values: &mut [usize], start: usize, output: &mut Vec<Vec<usize>>) {
+        if start == values.len() {
+            output.push(values.to_vec());
+            return;
+        }
+        for index in start..values.len() {
+            values.swap(start, index);
+            append_permutations(values, start + 1, output);
+            values.swap(start, index);
+        }
+    }
+
     #[test]
     fn all_golden_cases_metamorphic_pairs_and_negative_controls_match() {
         let (id, cases, relations, negatives) = run_fixture(&fixture()).expect("event fixture should pass");
         assert_eq!(id, "SFEB-INT-004-EVENTS-001");
         assert_eq!((cases, relations, negatives), (6, 1, 6));
+    }
+
+    #[test]
+    fn every_event_delivery_order_converges_and_replay_is_idempotent() {
+        let f = fixture();
+        let events = f["events"].as_array().unwrap();
+        let mut canonical = State::new(&f["initial_state"]).unwrap();
+        for event in events {
+            canonical.deliver(event).unwrap();
+        }
+        let mut expected = canonical.snapshot();
+        expected["duplicate_deliveries"] = json!(events.len());
+
+        let mut indexes: Vec<usize> = (0..events.len()).collect();
+        let mut permutations = Vec::new();
+        append_permutations(&mut indexes, 0, &mut permutations);
+        assert_eq!(permutations.len(), 5_040);
+
+        for order in &permutations {
+            let mut state = State::new(&f["initial_state"]).unwrap();
+            for index in order {
+                state.deliver(&events[*index]).unwrap();
+            }
+            for index in order.iter().rev() {
+                state.deliver(&events[*index]).unwrap();
+            }
+            assert_eq!(state.snapshot(), expected, "delivery order did not converge: {order:?}");
+        }
     }
 
     #[test]
