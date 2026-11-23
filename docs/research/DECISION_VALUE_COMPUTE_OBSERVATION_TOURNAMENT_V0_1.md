@@ -302,7 +302,7 @@ It binds the complete thirteen-field paired identity on the evaluator certificat
 
 The adapter emits exactly the `VIS-DVPC-CLUSTER-DELTAS-001-v1` table. #8578 owns the downstream approximate percentile cluster bootstrap, sign-flip diagnostic and Bonferroni correction. It does not duplicate those statistics here. A minimum of five clusters is only an executable-mechanics floor; confirmatory studies still need a preregistered power/MDE analysis, substantially more independent clusters where feasible and a second held-out-domain replication.
 
-The adapter's ten tests are included in the passing 24-test evaluator run. The analyzer itself is separately developed in #8578; its custom push workflow has been authored, but no exact-head analyzer result is claimed until a visible run receipt is available.
+The adapter's sixteen cluster tests are included in the passing 30-test evaluator run at exact head `8f6d2e9b605e3ef07af5c593b1f209bc9a2c410e` (workflow run `45133813434`). Its SHA-256 implementation passes standard empty-string and `abc` test vectors; it recomputes the canonical assignment-manifest hash from typed assignments before emitting any delta rows. The analyzer itself is separately developed in #8578; its custom push workflow has been authored, but no exact-head analyzer result is claimed until a visible run receipt is available.
 
 ## 17. RoboDyna replication profile: paired episode identity, not just average async loss
 
