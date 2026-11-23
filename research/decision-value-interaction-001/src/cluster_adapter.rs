@@ -136,12 +136,9 @@ fn validate_metadata(metadata: &ClusterInferenceMetadata) -> Result<String, Clus
     if !metadata.familywise_confidence.is_finite()
         || !(0.5..1.0).contains(&metadata.familywise_confidence)
     {
-        return Err(fail(
-            "familywise_confidence must be finite and in [0.5, 1)",
-        ));
+        return Err(fail("familywise_confidence must be finite and in [0.5, 1)"));
     }
-    let per_tail = (1.0 - metadata.familywise_confidence)
-        / (2.0 * COMPARISON_FAMILY_SIZE as f64);
+    let per_tail = (1.0 - metadata.familywise_confidence) / (2.0 * COMPARISON_FAMILY_SIZE as f64);
     if metadata.bootstrap_replicates as f64 * per_tail < 20.0 {
         return Err(fail(
             "bootstrap_replicates provides fewer than 20 draws in a Bonferroni-adjusted tail",
@@ -156,7 +153,10 @@ fn validate_identity(identity: &PairedRunIdentity) -> Result<(), ClusterAdapterE
         ("initial_state_sha256", &identity.initial_state_sha256),
         ("task_sha256", &identity.task_sha256),
         ("loss_scale_sha256", &identity.loss_scale_sha256),
-        ("evaluator_profile_sha256", &identity.evaluator_profile_sha256),
+        (
+            "evaluator_profile_sha256",
+            &identity.evaluator_profile_sha256,
+        ),
         (
             "execution_environment_sha256",
             &identity.execution_environment_sha256,
@@ -167,10 +167,7 @@ fn validate_identity(identity: &PairedRunIdentity) -> Result<(), ClusterAdapterE
             "model_configuration_sha256",
             &identity.model_configuration_sha256,
         ),
-        (
-            "candidate_policy_sha256",
-            &identity.candidate_policy_sha256,
-        ),
+        ("candidate_policy_sha256", &identity.candidate_policy_sha256),
     ];
     for (field, digest) in digests {
         if digest_is_empty(digest) {
@@ -289,7 +286,9 @@ pub fn export_cluster_deltas(
 ) -> Result<ClusterDeltaExport, ClusterAdapterError> {
     let bundle_lock = validate_metadata(metadata)?;
     if outcomes.is_empty() {
-        return Err(fail("at least one paired interaction certificate is required"));
+        return Err(fail(
+            "at least one paired interaction certificate is required",
+        ));
     }
 
     let mut experiment_context: Option<PairedRunIdentity> = None;
@@ -523,7 +522,11 @@ mod tests {
         }
     }
 
-    fn certificate(episode_id: u64, world_id: u64, regrets: [u32; 4]) -> DecisionValueInteractionCertificate {
+    fn certificate(
+        episode_id: u64,
+        world_id: u64,
+        regrets: [u32; 4],
+    ) -> DecisionValueInteractionCertificate {
         let arms = [
             TreatmentArm::Baseline,
             TreatmentArm::ComputeOnly,
@@ -553,19 +556,11 @@ mod tests {
                 let episode_id = cluster * 10 + episode_offset + 1;
                 rows.push(ClusteredInteractionOutcome {
                     cluster_id: format!("scene-{cluster:02}"),
-                    certificate: certificate(
-                        episode_id,
-                        1,
-                        [400_000, 350_000, 380_000, 100_000],
-                    ),
+                    certificate: certificate(episode_id, 1, [400_000, 350_000, 380_000, 100_000]),
                 });
                 rows.push(ClusteredInteractionOutcome {
                     cluster_id: format!("scene-{cluster:02}"),
-                    certificate: certificate(
-                        episode_id,
-                        2,
-                        [400_000, 300_000, 250_000, 150_000],
-                    ),
+                    certificate: certificate(episode_id, 2, [400_000, 300_000, 250_000, 150_000]),
                 });
             }
         }
@@ -595,7 +590,11 @@ mod tests {
         assert_eq!(result.hidden_world_observation_count, 24);
         assert_eq!(result.comparison_count, 4);
         assert_eq!(
-            result.tsv.lines().filter(|line| line.starts_with("DELTA\t")).count(),
+            result
+                .tsv
+                .lines()
+                .filter(|line| line.starts_with("DELTA\t"))
+                .count(),
             24
         );
         assert!(result.tsv.contains("META\tcomparison_family_size\t4"));
@@ -617,10 +616,12 @@ mod tests {
     fn duplicate_cluster_episode_world_pair_is_rejected() {
         let mut rows = fixture();
         rows.push(rows[0].clone());
-        assert!(export_cluster_deltas(&rows, &metadata())
-            .unwrap_err()
-            .to_string()
-            .contains("duplicate (cluster, episode, hidden-world)"));
+        assert!(
+            export_cluster_deltas(&rows, &metadata())
+                .unwrap_err()
+                .to_string()
+                .contains("duplicate (cluster, episode, hidden-world)")
+        );
     }
 
     #[test]
@@ -629,30 +630,36 @@ mod tests {
         let mut duplicate = rows[0].clone();
         duplicate.cluster_id = "different-scene".to_owned();
         rows.push(duplicate);
-        assert!(export_cluster_deltas(&rows, &metadata())
-            .unwrap_err()
-            .to_string()
-            .contains("more than one independent cluster"));
+        assert!(
+            export_cluster_deltas(&rows, &metadata())
+                .unwrap_err()
+                .to_string()
+                .contains("more than one independent cluster")
+        );
     }
 
     #[test]
     fn hidden_world_cohort_must_be_identical_across_episodes_in_cluster() {
         let mut rows = fixture();
         rows.retain(|row| row.certificate.episode_id != 2 || row.certificate.hidden_world_id != 2);
-        assert!(export_cluster_deltas(&rows, &metadata())
-            .unwrap_err()
-            .to_string()
-            .contains("hidden-world cohort or digest changed"));
+        assert!(
+            export_cluster_deltas(&rows, &metadata())
+                .unwrap_err()
+                .to_string()
+                .contains("hidden-world cohort or digest changed")
+        );
     }
 
     #[test]
     fn execution_resource_and_task_context_must_remain_fixed() {
         let mut rows = fixture();
         rows[0].certificate.pairing_identity.resource_budget_sha256 = digest(99);
-        assert!(export_cluster_deltas(&rows, &metadata())
-            .unwrap_err()
-            .to_string()
-            .contains("context changed"));
+        assert!(
+            export_cluster_deltas(&rows, &metadata())
+                .unwrap_err()
+                .to_string()
+                .contains("context changed")
+        );
     }
 
     #[test]
@@ -661,45 +668,55 @@ mod tests {
             .into_iter()
             .filter(|row| row.cluster_id <= "scene-02")
             .collect();
-        assert!(export_cluster_deltas(&rows, &metadata())
-            .unwrap_err()
-            .to_string()
-            .contains("at least 5 independent clusters"));
+        assert!(
+            export_cluster_deltas(&rows, &metadata())
+                .unwrap_err()
+                .to_string()
+                .contains("at least 5 independent clusters")
+        );
     }
 
     #[test]
     fn pseudoreplicated_cluster_unit_is_rejected() {
         let mut config = metadata();
         config.cluster_unit = "frame".to_owned();
-        assert!(export_cluster_deltas(&fixture(), &config)
-            .unwrap_err()
-            .to_string()
-            .contains("too granular"));
+        assert!(
+            export_cluster_deltas(&fixture(), &config)
+                .unwrap_err()
+                .to_string()
+                .contains("too granular")
+        );
     }
 
     #[test]
     fn mismatched_certificate_identity_and_effects_are_rejected() {
         let mut rows = fixture();
         rows[0].certificate.interaction_ppm += 1;
-        assert!(export_cluster_deltas(&rows, &metadata())
-            .unwrap_err()
-            .to_string()
-            .contains("signed effects do not recompute"));
+        assert!(
+            export_cluster_deltas(&rows, &metadata())
+                .unwrap_err()
+                .to_string()
+                .contains("signed effects do not recompute")
+        );
     }
 
     #[test]
     fn invalid_bundle_lock_and_underpowered_bootstrap_config_are_rejected() {
         let mut config = metadata();
         config.bundle_lock_sha256 = "not-a-digest".to_owned();
-        assert!(export_cluster_deltas(&fixture(), &config)
-            .unwrap_err()
-            .to_string()
-            .contains("64-character"));
+        assert!(
+            export_cluster_deltas(&fixture(), &config)
+                .unwrap_err()
+                .to_string()
+                .contains("64-character")
+        );
         let mut config = metadata();
         config.bootstrap_replicates = 1_000;
-        assert!(export_cluster_deltas(&fixture(), &config)
-            .unwrap_err()
-            .to_string()
-            .contains("fewer than 20 draws"));
+        assert!(
+            export_cluster_deltas(&fixture(), &config)
+                .unwrap_err()
+                .to_string()
+                .contains("fewer than 20 draws")
+        );
     }
 }
