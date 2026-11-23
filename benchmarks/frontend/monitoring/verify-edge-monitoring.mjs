@@ -41,7 +41,7 @@ function validateInputs(fixture,traces,policy){
   if(typeof c.case_id!=='string'||!c.case_id||caseIds.has(c.case_id))fail('invalid/duplicate edge case ID');caseIds.add(c.case_id);
   const w=c.watch_contract;
   assertKeys(w,['watch_id','idempotency_key','deadline','mode','event_type','permission_scope','action'],['watch_id','idempotency_key','deadline','mode','event_type','permission_scope','action'],'edge watch contract');
-  if(w.mode!=='edge'||typeof w.watch_id!=='string'||!w.watch_id||typeof w.idempotency_key!=='string'||!w.idempotency_key||!Number.isSafeInteger(w.deadline)||w.deadline<1||typeof w.event_type!=='string'||!w.event_type||typeof w.permission_scope!=='string'||!w.permission_scope)fail(c.case_id+': invalid watch contract');
+  if(w.mode!=='edge'||w.event_type!=='capacity_threshold_crossed'||typeof w.watch_id!=='string'||!w.watch_id||typeof w.idempotency_key!=='string'||!w.idempotency_key||!Number.isSafeInteger(w.deadline)||w.deadline<1||typeof w.event_type!=='string'||!w.event_type||typeof w.permission_scope!=='string'||!w.permission_scope)fail(c.case_id+': invalid watch contract');
   assertKeys(w.action,['type','resource_id'],['type','resource_id'],'edge action contract');
   if(typeof w.action.type!=='string'||!w.action.type||typeof w.action.resource_id!=='string'||!w.action.resource_id)fail(c.case_id+': invalid action target');
   assertKeys(c.initial_state,['revision','provider_status','capacity','permission_granted','trigger_receipts','reserved'],['revision','provider_status','capacity','permission_granted','trigger_receipts','reserved'],'edge initial state');
@@ -52,7 +52,7 @@ function validateInputs(fixture,traces,policy){
   let revision=c.initial_state.revision,prevAt=-1,prevSequence=0;
   for(const e of sorted){
    assertKeys(e,['at','sequence','event_id','revision','patch'],['at','sequence','event_id','revision','patch'],'edge source event');
-   if(!Number.isSafeInteger(e.at)||e.at<0||e.at>w.deadline||!Number.isSafeInteger(e.sequence)||e.sequence<1||!Number.isSafeInteger(e.revision)||e.revision!==revision+1||e.at<prevAt||(e.at===prevAt&&e.sequence<=prevSequence))fail(c.case_id+': invalid source event order/revision');
+   if(!Number.isSafeInteger(e.at)||e.at<0||e.at>w.deadline||!Number.isSafeInteger(e.sequence)||e.sequence<1||!Number.isSafeInteger(e.revision)||e.revision!==revision+1||e.at<prevAt||e.sequence<=prevSequence)fail(c.case_id+': invalid source event order/revision');
    if(typeof e.event_id!=='string'||!e.event_id||eventIds.has(e.event_id))fail(c.case_id+': duplicate/invalid source event ID');
    assertKeys(e.patch,['provider_status','capacity','permission_granted','trigger_receipts','reserved'],Object.keys(e.patch||{}),'edge source patch');
    if(!e.patch||Object.keys(e.patch).length===0)fail(c.case_id+': empty source patch');
@@ -63,14 +63,24 @@ function validateInputs(fixture,traces,policy){
    eventIds.add(e.event_id);eventMap.set(e.event_id,e);revision=e.revision;prevAt=e.at;prevSequence=e.sequence;
   }
   const qualifyingEdgeEvents=deriveQualifyingEdgeEvents(c);
+  const receiptHistory=new Map();
   for(const e of sorted){
    if(!Object.hasOwn(e.patch,'trigger_receipts'))continue;
+   const snapshotIds=new Set();
    for(const r of e.patch.trigger_receipts){
     assertKeys(r,['receipt_id','event_type','source_event_id','source_revision','occurred_at','valid_until','status','action_type','resource_id','permission_scope'],['receipt_id','event_type','source_event_id','source_revision','occurred_at','valid_until','status','action_type','resource_id','permission_scope'],'edge receipt');
     const source=eventMap.get(r.source_event_id);
-    if(typeof r.receipt_id!=='string'||!r.receipt_id||!source||source.revision!==r.source_revision||r.source_revision>e.revision||r.occurred_at!==source.at||r.valid_until<=r.occurred_at||!['active','revoked'].includes(r.status))fail(c.case_id+': malformed or unbound durable receipt');
+    if(typeof r.receipt_id!=='string'||!r.receipt_id||snapshotIds.has(r.receipt_id)||!source||source.revision!==r.source_revision||r.source_revision>e.revision||r.occurred_at!==source.at||r.valid_until<=r.occurred_at||!['active','revoked'].includes(r.status))fail(c.case_id+': malformed or unbound durable receipt');
     if(typeof r.event_type!=='string'||typeof r.action_type!=='string'||typeof r.resource_id!=='string'||typeof r.permission_scope!=='string')fail(c.case_id+': invalid receipt binding');
     if(r.event_type==='capacity_threshold_crossed'&&!qualifyingEdgeEvents.has(r.source_event_id))fail(c.case_id+': receipt source event did not prove the watched threshold edge');
+    const previous=receiptHistory.get(r.receipt_id);
+    if(previous){
+     for(const key of ['event_type','source_event_id','source_revision','occurred_at','valid_until','action_type','resource_id','permission_scope']){
+      if(previous[key]!==r[key])fail(c.case_id+': durable receipt identity reused with altered binding');
+     }
+     if(previous.status==='revoked'&&r.status!=='revoked')fail(c.case_id+': revoked durable receipt cannot become active again');
+    }
+    receiptHistory.set(r.receipt_id,r);snapshotIds.add(r.receipt_id);
    }
   }
   const noticeIds=new Set();
@@ -212,15 +222,15 @@ function verifyAll({fixtureBytes,traceBytes,policyBytes,fixture,traces,policy}){
  const rules=[
   {oracle_id:'edge.watch.register_once',result:results.length===cases.size?'pass':'fail',non_vacuous:results.length>0},
   {oracle_id:'edge.wake.not_authority',result:forged.metrics.action_count===0?'pass':'fail',non_vacuous:forged.metrics.unique_wake_count>0},
-  {oracle_id:'edge.receipt.source_of_record',result:durable.metrics.receipt_status==='active'?'pass':'fail',non_vacuous:true},
-  {oracle_id:'edge.receipt.source_binding',result:durable.metrics.action_count===1?'pass':'fail',non_vacuous:true},
-  {oracle_id:'edge.receipt.action_window',result:expired.metrics.action_count===0&&expired.metrics.receipt_status==='expired'?'pass':'fail',non_vacuous:true},
-  {oracle_id:'edge.receipt.revocation',result:revoked.metrics.action_count===0&&revoked.metrics.receipt_status==='revoked'?'pass':'fail',non_vacuous:true},
-  {oracle_id:'edge.permission.current',result:permission.metrics.action_count===0&&!permission.metrics.final_permission_granted?'pass':'fail',non_vacuous:true},
-  {oracle_id:'edge.action.target_scope',result:durable.metrics.action_count===1?'pass':'fail',non_vacuous:true},
-  {oracle_id:'edge.action.idempotency',result:durable.metrics.action_count===1&&durable.metrics.duplicate_action_attempts===1?'pass':'fail',non_vacuous:true},
-  {oracle_id:'edge.reconnect.latest_revision',result:durable.metrics.final_revision===3&&durable.metrics.current_level_predicate===false?'pass':'fail',non_vacuous:true},
-  {oracle_id:'edge.no_receipt.abstention',result:forged.metrics.receipt_status==='missing'&&forged.metrics.action_count===0?'pass':'fail',non_vacuous:true}
+  {oracle_id:'edge.receipt.source_of_record',result:durable.metrics.receipt_status==='active'?'pass':'fail',non_vacuous:durable.metrics.receipt_status==='active'},
+  {oracle_id:'edge.receipt.source_binding',result:durable.metrics.action_count===1?'pass':'fail',non_vacuous:durable.metrics.action_count>0},
+  {oracle_id:'edge.receipt.action_window',result:expired.metrics.action_count===0&&expired.metrics.receipt_status==='expired'?'pass':'fail',non_vacuous:expired.metrics.receipt_status==='expired'},
+  {oracle_id:'edge.receipt.revocation',result:revoked.metrics.action_count===0&&revoked.metrics.receipt_status==='revoked'?'pass':'fail',non_vacuous:revoked.metrics.receipt_status==='revoked'},
+  {oracle_id:'edge.permission.current',result:permission.metrics.action_count===0&&!permission.metrics.final_permission_granted?'pass':'fail',non_vacuous:permission.metrics.final_permission_granted===false},
+  {oracle_id:'edge.action.target_scope',result:durable.metrics.action_count===1?'pass':'fail',non_vacuous:durable.metrics.action_count>0},
+  {oracle_id:'edge.action.idempotency',result:durable.metrics.action_count===1&&durable.metrics.duplicate_action_attempts===1?'pass':'fail',non_vacuous:durable.metrics.duplicate_action_attempts>0},
+  {oracle_id:'edge.reconnect.latest_revision',result:durable.metrics.final_revision===3&&durable.metrics.current_level_predicate===false?'pass':'fail',non_vacuous:durable.metrics.final_revision>2&&durable.metrics.current_level_predicate===false},
+  {oracle_id:'edge.no_receipt.abstention',result:forged.metrics.receipt_status==='missing'&&forged.metrics.action_count===0?'pass':'fail',non_vacuous:forged.metrics.receipt_status==='missing'&&forged.metrics.unique_wake_count>0}
  ];
  return {
   schema:'sfeb-edge-monitoring-verification-v1',task_id:policy.task_id,
@@ -260,7 +270,22 @@ function selfTest(paths){
  t.steps.splice(4,0,{op:'act',time:5,revision:1,receipt_id:'receipt-forged',action_id:'fake-edge-act',idempotency_key:'edge-reserve:forged-edge',action_type:'reserve',resource_id:'slot-edge-001'});
  let rejected=false;try{verifyAll({...input,traces:forged,traceBytes:Buffer.from(JSON.stringify(forged))});}catch{rejected=true;}
  if(!rejected)fail('claimed edge receipt without a source record authorized an action');
- console.log(JSON.stringify({status:'edge_monitoring_source_ready',cases:baseline.case_results.length,rules:baseline.oracle_results.length,rules_passed:baseline.oracle_results.filter(r=>r.result==='pass').length,worker_claim_mutation:'invariant',forged_receipt_action:'rejected',non_edge_receipt:'rejected',expired_receipt_action:'rejected',limitations:['This source-authored Node CLI must be executed on Node.js.','No production event log, browser or signer is qualified.']},null,2));
+ const revoked=clone(input.traces),revokedTrace=revoked.traces.find(t=>t.case_id==='edge-receipt-revoked-before-reconnect');
+ revokedTrace.steps.splice(4,0,{op:'act',time:16,revision:4,receipt_id:'receipt-edge-001',action_id:'revoked-act',idempotency_key:'edge-reserve:edge-receipt-revoked-before-reconnect',action_type:'reserve',resource_id:'slot-edge-001'});
+ let revokedReceiptRejected=false;
+ try{verifyAll({...input,traces:revoked,traceBytes:Buffer.from(JSON.stringify(revoked))});}catch{revokedReceiptRejected=true;}
+ if(!revokedReceiptRejected)fail('revoked durable receipt authorized an action');
+ const permission=clone(input.traces),permissionTrace=permission.traces.find(t=>t.case_id==='edge-permission-revoked-before-reconnect');
+ permissionTrace.steps.splice(4,0,{op:'act',time:16,revision:4,receipt_id:'receipt-edge-001',action_id:'permission-act',idempotency_key:'edge-reserve:edge-permission-revoked-before-reconnect',action_type:'reserve',resource_id:'slot-edge-001'});
+ let revokedPermissionRejected=false;
+ try{verifyAll({...input,traces:permission,traceBytes:Buffer.from(JSON.stringify(permission))});}catch{revokedPermissionRejected=true;}
+ if(!revokedPermissionRejected)fail('revoked permission authorized an edge action');
+ const wrongTarget=clone(input.traces),validTrace=wrongTarget.traces.find(t=>t.case_id==='durable-edge-receipt-survives-reconnect');
+ validTrace.steps.find(step=>step.op==='act').resource_id='attacker-controlled-resource';
+ let wrongTargetRejected=false;
+ try{verifyAll({...input,traces:wrongTarget,traceBytes:Buffer.from(JSON.stringify(wrongTarget))});}catch{wrongTargetRejected=true;}
+ if(!wrongTargetRejected)fail('action target outside durable receipt scope was accepted');
+ console.log(JSON.stringify({status:'edge_monitoring_source_ready',cases:baseline.case_results.length,rules:baseline.oracle_results.length,rules_passed:baseline.oracle_results.filter(r=>r.result==='pass').length,worker_claim_mutation:'invariant',forged_receipt_action:'rejected',non_edge_receipt:'rejected',expired_receipt_action:'rejected',revoked_receipt_action:'rejected',revoked_permission_action:'rejected',wrong_target:'rejected',limitations:['This source-authored Node CLI must be executed on Node.js.','No production event log, browser or signer is qualified.']},null,2));
 }
 function main(){
  const args=process.argv.slice(2);
