@@ -273,7 +273,7 @@ node --check benchmarks/frontend/monitoring/mon003-objective-kernel-v1.mjs
 node benchmarks/frontend/monitoring/mon003-objective-kernel-v1.mjs
 ```
 
-Runtime: Node.js v22.16.0. Source SHA-256: `e34246012cf360f37fa3d014b3c2515d150e1b9c8a6ec4c483c256d53452071f`.
+Runtime: Node.js v22.16.0. Source SHA-256: `5ff04d8c395aad6fa7d3e756dbceac4fca510e4c2e92aad0d41b29386150088b`.
 
 **Executed result: 9/9 deterministic cases passed.** Coverage: durable edge receipt after current level fell false; stale worker A rejected after worker B obtained the higher fence; permission revocation after grant issuance; expired receipt; revoked receipt; sink commit with response lost followed by reconciliation using the same key; same idempotency key with a different request digest; wrong-target grant substitution; fabricated receipt lookup rejected by the source/authority path; request-digest substitution during an idempotent replay rejected.
 
