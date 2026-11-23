@@ -442,6 +442,7 @@ fn run_fixture(fixture: &Value) -> Result<(String, usize, usize, usize), String>
 }
 
 
+const EXPECTED_EVENT_POLICY_SHA256: &str = "dddaaa445881feabc3dc7d3599c8741004917190b2b2467db65cf1c42d7b6d5c";
 const DEFAULT_POLICY: &str = "benchmarks/frontend/long-horizon/event-oracle-policy-v1.json";
 const DEFAULT_TRACE: &str = "benchmarks/frontend/long-horizon/examples/late-event-rollback-trace.json";
 const DEFAULT_POLICY_SCHEMA: &str = "benchmarks/frontend/long-horizon/event-oracle-policy-v1.schema.json";
@@ -526,6 +527,9 @@ fn verify_event_trace_values(
     trace: &Value,
     trace_bytes: &[u8],
 ) -> Result<Value, String> {
+    if digest_hex(policy_bytes) != EXPECTED_EVENT_POLICY_SHA256 {
+        return Err("event oracle policy digest does not match the verifier's frozen allowlisted policy".to_string());
+    }
     verify_policy(policy)?;
     verify_trace_shape(trace)?;
     let fixture_id = field_str(fixture, "fixture_id")?;
@@ -836,6 +840,21 @@ mod tests {
         let second = verify_event_trace_values(&fixture,fixture_bytes,&policy,policy_bytes,&trace,&forged_worker_bytes).unwrap();
         assert_eq!(first["oracle_results"], second["oracle_results"]);
         assert_eq!(second["semantic_decision"], "accepted");
+    }
+
+    #[test]
+    fn independent_event_verifier_rejects_mutated_frozen_policy() {
+        let fixture_bytes = include_bytes!("../event-reconciliation-v1.json");
+        let policy_bytes = include_bytes!("../event-oracle-policy-v1.json");
+        let trace_bytes = include_bytes!("../examples/late-event-rollback-trace.json");
+        let fixture: Value = serde_json::from_slice(fixture_bytes).unwrap();
+        let mut policy: Value = serde_json::from_slice(policy_bytes).unwrap();
+        let trace: Value = serde_json::from_slice(trace_bytes).unwrap();
+        policy["rules"][0]["required"] = json!(false);
+        let altered_policy_bytes = serde_json::to_vec(&policy).unwrap();
+        let error = verify_event_trace_values(&fixture,fixture_bytes,&policy,&altered_policy_bytes,&trace,trace_bytes)
+            .expect_err("modified policy must not be accepted");
+        assert!(error.contains("policy digest"));
     }
 
     #[test]
