@@ -7,6 +7,7 @@ on:
       - "scripts/research/proof_comprehension_oracle.rs"
       - "scripts/research/proof-plan-contract/**"
       - "scripts/research/lean-proof-extractor/**"
+      - "docs/research/MATHLIB_ELABORATED_DEPENDENCY_GRAPH_V1.schema.json"
       - "docs/research/PROOF_PLAN_*.json"
       - "docs/research/LOCAL_GLOBAL_PAIR_*"
       - "docs/research/PROOF_PLAN_*.md"
@@ -75,6 +76,7 @@ jobs:
             docs/research/MATH_PROOF_COMPREHENSION_RECEIPT_V1.schema.json
             docs/research/MATHLIB_PROOF_COMPREHENSION_PILOT_V1.json
             docs/research/MATHLIB_PROOF_COMPREHENSION_PILOT_V1.schema.json
+            docs/research/MATHLIB_ELABORATED_DEPENDENCY_GRAPH_V1.schema.json
             docs/research/ETH_REDUCTION_COMPREHENSION_TOY_V1.json
             docs/research/RH_PROOF_GRAPH_BASELINE_V1.json
             docs/research/RH_MAIN_INEQUALITY_M_MAP_V1.json
@@ -155,7 +157,10 @@ jobs:
             and .candidate.global_stage.scope_binding == .candidate.local_stage.scope_binding
             and .evaluator_only.eligibility == "eligible"
             and .evaluator_only.independently_assessed_warrant == "invalid"
-            and .evaluator_only.global_disposition == "used_directly"' \
+            and .evaluator_only.global_disposition == "used_directly"
+            and .evaluator_only.finite_boolean_countermodel.premises[0].op == "implies"
+            and .evaluator_only.finite_boolean_countermodel.conclusion.op == "implies"
+            and .evaluator_only.finite_boolean_countermodel.valuation == [{ "atom": "p", "value": false }, { "atom": "q", "value": true }]' \
             docs/research/LOCAL_GLOBAL_PAIR_SYNTHETIC_V1.json >/dev/null
 
           echo "LOCAL_GLOBAL_PAIR_FIXTURE_PASS"
@@ -185,7 +190,7 @@ jobs:
       - name: Check out exact PR head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: \${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
 
       - name: Check out pinned Mathlib snapshot
@@ -225,7 +230,7 @@ jobs:
           cp "$GITHUB_WORKSPACE/scripts/research/lean-proof-extractor/ProofComprehensionExtract.lean" .
           lake env lean ProofComprehensionExtract.lean
           for declaration in Nat.choose_pos Set.countable_union Multiset.map_id Finset.card_map; do
-            file="proof-comprehension-extract-\${declaration}.json"
+            file="proof-comprehension-extract-${declaration}.json"
             test -s "$file"
             jq -e --arg declaration "$declaration" '.schema_version == "1.0.0"
               and .source_revision == "6ebcce37335bcb6bca64596e5d57bb3035648030"
