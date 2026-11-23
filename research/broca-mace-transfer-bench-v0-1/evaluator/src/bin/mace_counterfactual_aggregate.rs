@@ -947,7 +947,7 @@ mod tests {
     fn score_row_must_match_the_digest_verified_manifest_intervention() {
         let mut manifest = manifest_record("run-1", &"a".repeat(64));
         append_intervention(&mut manifest, json!({
-            "intervention_id": "event:1:1",
+            "intervention_id": "event:event:1:1",
             "kind": "event",
             "target_key": "event:1",
             "removed_event_ids": [1],
@@ -955,7 +955,7 @@ mod tests {
         }));
         parse_manifest(&manifest).unwrap();
 
-        let score = linked_score("event:1:1", "event", "event:1", json!([1]));
+        let score = linked_score("event:event:1:1", "event", "event:1", json!([1]));
         assert!(validate_score_against_manifest(&score, &manifest).is_ok());
     }
 
@@ -971,13 +971,13 @@ mod tests {
     fn score_row_rejects_mutated_removed_event_set() {
         let mut manifest = manifest_record("run-1", &"a".repeat(64));
         append_intervention(&mut manifest, json!({
-            "intervention_id": "event:1:1",
+            "intervention_id": "event:event:1:1",
             "kind": "event",
             "target_key": "event:1",
             "removed_event_ids": [1],
             "matched_to": null
         }));
-        let score = linked_score("event:1:1", "event", "event:1", json!([2]));
+        let score = linked_score("event:event:1:1", "event", "event:1", json!([2]));
         let error = validate_score_against_manifest(&score, &manifest).unwrap_err();
         assert!(error.contains("removed_event_ids differ"));
     }
@@ -986,15 +986,15 @@ mod tests {
     fn score_row_rejects_kind_and_target_mismatch() {
         let mut manifest = manifest_record("run-1", &"a".repeat(64));
         append_intervention(&mut manifest, json!({
-            "intervention_id": "event:1:1",
+            "intervention_id": "event:event:1:1",
             "kind": "event",
             "target_key": "event:1",
             "removed_event_ids": [1],
             "matched_to": null
         }));
-        let wrong_kind = linked_score("event:1:1", "source_root", "event:1", json!([1]));
+        let wrong_kind = linked_score("event:event:1:1", "source_root", "event:1", json!([1]));
         assert!(validate_score_against_manifest(&wrong_kind, &manifest).unwrap_err().contains("intervention_kind"));
-        let wrong_target = linked_score("event:1:1", "event", "event:2", json!([1]));
+        let wrong_target = linked_score("event:event:1:1", "event", "event:2", json!([1]));
         assert!(validate_score_against_manifest(&wrong_target, &manifest).unwrap_err().contains("target_key"));
     }
 
