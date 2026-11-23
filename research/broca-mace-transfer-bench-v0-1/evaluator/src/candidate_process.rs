@@ -79,7 +79,7 @@ struct CandidateReceiptWire {
 
 pub struct CandidateProcessSession {
     child: Child,
-    stdin: ChildStdin,
+    requests: mpsc::SyncSender<Vec<u8>>,
     responses: mpsc::Receiver<Result<String, String>>,
     stderr: Arc<Mutex<Vec<u8>>>,
     binary_sha256: String,
@@ -137,6 +137,23 @@ impl CandidateProcessSession {
             .stdin
             .take()
             .ok_or_else(|| "candidate worker stdin pipe unavailable".to_string())?;
+        let (request_sender, request_receiver) = mpsc::sync_channel::<Vec<u8>>(1);
+        thread::Builder::new()
+            .name("mace-candidate-stdin".into())
+            .spawn(move || {
+                let mut writer = stdin;
+                while let Ok(bytes) = request_receiver.recv() {
+                    if writer
+                        .write_all(&bytes)
+                        .and_then(|_| writer.write_all(b"\\n"))
+                        .and_then(|_| writer.flush())
+                        .is_err()
+                    {
+                        break;
+                    }
+                }
+            })
+            .map_err(|error| format!("start candidate stdin writer: {error}"))?;
         let stdout = child
             .stdout
             .take()
@@ -262,7 +279,7 @@ impl CandidateProcessSession {
 
         Ok(Self {
             child,
-            stdin,
+            requests: request_sender,
             responses,
             stderr: stderr_capture,
             binary_sha256: actual_sha256,
@@ -350,13 +367,11 @@ impl CandidateProcessSession {
         let request_build_ns =
             u64::try_from(request_build_started.elapsed().as_nanos()).unwrap_or(u64::MAX);
 
+        // Enqueueing is bounded; the dedicated writer can block on a child
+        // that does not read, while the evaluator's response deadline continues.
         let ipc_started = Instant::now();
-        if let Err(error) = self.stdin
-            .write_all(&request_bytes)
-            .and_then(|_| self.stdin.write_all(b"\n"))
-            .and_then(|_| self.stdin.flush())
-        {
-            let reason = format!("send candidate request: {error}");
+        if self.requests.send(request_bytes).is_err() {
+            let reason = "candidate stdin writer has stopped".to_string();
             let _ = self.child.kill();
             let _ = self.child.wait();
             return Err(self.worker_error(reason));
