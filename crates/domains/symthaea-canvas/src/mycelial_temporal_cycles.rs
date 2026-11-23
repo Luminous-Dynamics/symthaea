@@ -28,6 +28,9 @@ pub const MAX_TEMPORAL_MYCELIAL_WINDOWS: usize = 4_096;
 pub const MAX_TEMPORAL_MYCELIAL_NODES: usize = 128;
 pub const MAX_TEMPORAL_MYCELIAL_EDGES: usize = 512;
 pub const MAX_TEMPORAL_CYCLES_PER_WINDOW: usize = 2_048;
+pub const MAX_TEMPORAL_CYCLE_RECORDS: usize = 16_384;
+pub const MAX_TEMPORAL_CYCLE_WINDOW_OBSERVATIONS: usize = 1_000_000;
+pub const MAX_TEMPORAL_EDGE_WINDOW_OBSERVATIONS: usize = 1_000_000;
 /// Upper bound on adjacency-edge visits during exact simple-cycle enumeration per window.
 pub const MAX_TEMPORAL_CYCLE_SEARCH_STEPS: usize = 1_000_000;
 const MAX_TEMPORAL_NODE_ID_BYTES: usize = 128;
@@ -569,6 +572,12 @@ impl TemporalMycelialSequence {
         let mut observation_scope_id: Option<&str> = None;
         for snapshot in &self.snapshots {
             validate_snapshot(snapshot)?;
+            if snapshot.observation_scope_id != self.observation_scope_id {
+                return Err(MycelialTemporalCycleError::ObservationScopeMismatch {
+                    previous: self.observation_scope_id.clone(),
+                    current: snapshot.observation_scope_id.clone(),
+                });
+            }
             if observation_scope_id
                 .is_some_and(|previous| previous != snapshot.observation_scope_id.as_str())
             {
