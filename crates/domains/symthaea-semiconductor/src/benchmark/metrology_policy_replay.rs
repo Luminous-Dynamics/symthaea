@@ -1371,24 +1371,10 @@ mod tests {
         ];
 
         for (policy_id, risk, uncertainty, evsi) in policy_specs {
-            let policy = policy_config_with_weights(
-                view,
-                policy_id,
-                16,
-                16,
-                4,
-                53,
-                risk,
-                uncertainty,
-                evsi,
-            );
-            let run = run_synthetic_metrology_policy_v1(
-                &episode,
-                view,
-                &semantics,
-                &policy,
-            )
-            .unwrap();
+            let policy =
+                policy_config_with_weights(view, policy_id, 16, 16, 4, 53, risk, uncertainty, evsi);
+            let run =
+                run_synthetic_metrology_policy_v1(&episode, view, &semantics, &policy).unwrap();
             assert_eq!(run.selection.total_selected_cost, 32);
             assert_eq!(run.selection.exploit_count, 16);
             assert_eq!(run.selection.randomized_audit_count, 16);
