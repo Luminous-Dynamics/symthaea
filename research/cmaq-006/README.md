@@ -62,7 +62,7 @@ The published dataset card exposes the 1,207 image–instruction records and com
 
 ## CLI
 
-This is a dependency-free Rust crate pinned to Rust 1.96.0.
+This is a dependency-free Rust crate pinned to Rust 1.96.0. Its focused workflow checks `cargo fmt --check`, unit tests, strict Clippy with warnings denied, and the 19-case known-answer ledger.
 
 Run from the repository root:
 
