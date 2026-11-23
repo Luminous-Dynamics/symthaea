@@ -507,6 +507,32 @@ mod tests {
     }
 
     #[test]
+    fn purpose_is_part_of_the_binding() {
+        let receipt = signed_receipt();
+        let ids = candidate_ids();
+        let changed_purpose = digest('5');
+        let mut binding = binding(&receipt, &ids, 150);
+        binding.purpose_sha256 = &changed_purpose;
+        assert_eq!(
+            VerifiedEvidenceQualificationV1::verify_and_bind(&receipt, &binding, &TestSignatureVerifier),
+            Err(EvidenceQualificationRejectV1::BindingMismatch)
+        );
+    }
+
+    #[test]
+    fn candidate_id_set_commitment_must_match_exact_sorted_ids() {
+        let mut receipt = signed_receipt();
+        receipt.candidate_evidence_ids_sha256 = digest('5');
+        receipt.signature = receipt.signing_payload_sha256().into_bytes();
+        let ids = candidate_ids();
+        let binding = binding(&receipt, &ids, 150);
+        assert_eq!(
+            VerifiedEvidenceQualificationV1::verify_and_bind(&receipt, &binding, &TestSignatureVerifier),
+            Err(EvidenceQualificationRejectV1::BindingMismatch)
+        );
+    }
+
+    #[test]
     fn expired_receipt_is_rejected_at_consumption_time() {
         let receipt = signed_receipt();
         let ids = candidate_ids();
