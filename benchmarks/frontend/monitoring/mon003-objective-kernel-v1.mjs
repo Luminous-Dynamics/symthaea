@@ -156,18 +156,18 @@ class DurableMockSink {
   }
 
   execute({ objective, lease, grant, source, receiptId, action, actionKey, requestDigest, policy, now }) {
-    const prior = this.results.get(actionKey);
-    if (prior) {
-      if (prior.requestDigest !== requestDigest) fail('IDEMPOTENCY_CONFLICT', 'same idempotency key used with a different request digest');
-      return { ...clone(prior), replayed: true };
-    }
-
     const receipt = source.get(receiptId);
     if (!receipt) fail('UNKNOWN_SOURCE_RECEIPT', 'sink could not resolve an authoritative source receipt');
     const expectedActionKey = deriveActionKey({ objective, receipt, action });
     const expectedRequestDigest = deriveRequestDigest({ objective, receipt, action });
-    if (actionKey !== expectedActionKey) fail('ACTION_KEY_MISMATCH', 'idempotency key is not derived from the objective, event and action');
     if (requestDigest !== expectedRequestDigest) fail('REQUEST_DIGEST_MISMATCH', 'request digest does not match the canonical action envelope');
+
+    const prior = this.results.get(actionKey);
+    if (prior) {
+      if (prior.requestDigest !== expectedRequestDigest) fail('IDEMPOTENCY_CONFLICT', 'same idempotency key used with a different request digest');
+      return { ...clone(prior), replayed: true };
+    }
+    if (actionKey !== expectedActionKey) fail('ACTION_KEY_MISMATCH', 'idempotency key is not derived from the objective, event and action');
 
     const maxEpoch = this.maxEpoch.get(objective.id) ?? 0;
     if (lease.objectiveId !== objective.id || lease.epoch !== maxEpoch || lease.expiresAt <= now) {
@@ -255,7 +255,6 @@ function expectCode(code, fn) {
   assert.throws(fn, error => error && error.code === code, 'expected ' + code);
 }
 
-// 1. A durable edge remains available after current level state has fallen false.
 test('edge receipt survives level falling false but remains event evidence', () => {
   const world = makeWorld();
   assert.equal(world.source.capacity, 1);
@@ -263,7 +262,6 @@ test('edge receipt survives level falling false but remains event evidence', () 
   assert.equal(world.source.get(world.receipt.receiptId).expiresAt, 30);
 });
 
-// 2. A replaced worker cannot mutate using an earlier fencing epoch.
 test('stale worker A is fenced after worker B acquires a higher epoch', () => {
   const world = makeWorld();
   const leaseA = world.leases.acquire('worker-A', { now: 1, ttl: 5 });
@@ -279,7 +277,6 @@ test('stale worker A is fenced after worker B acquires a higher epoch', () => {
   assert.equal(world.sink.sideEffects.length, 0);
 });
 
-// 3. A grant issued before revocation is invalid at commit time.
 test('permission revocation between grant issuance and sink commit blocks the action', () => {
   const world = makeWorld();
   const lease = world.leases.acquire('worker-B', { now: 13, ttl: 10 });
@@ -293,7 +290,6 @@ test('permission revocation between grant issuance and sink commit blocks the ac
   assert.equal(world.sink.sideEffects.length, 0);
 });
 
-// 4. Expired and revoked source receipts are rejected even if the worker holds a lease.
 test('expired and revoked event receipts cannot authorize a side effect', () => {
   const expired = makeWorld();
   const lease1 = expired.leases.acquire('worker-X', { now: 13, ttl: 20 });
@@ -316,7 +312,6 @@ test('expired and revoked event receipts cannot authorize a side effect', () => 
   assert.equal(revoked.sink.sideEffects.length, 0);
 });
 
-// 5. Lost response: the operation committed, and retry/reconciliation uses the same key.
 test('lost sink response reconciles to one durable execution receipt', () => {
   const world = makeWorld();
   const lease = world.leases.acquire('worker-recovery', { now: 13, ttl: 20 });
@@ -338,7 +333,6 @@ test('lost sink response reconciles to one durable execution receipt', () => {
   assert.equal(world.sink.sideEffects.length, 1);
 });
 
-// 6. Key reuse with a different payload is a conflict, not a second operation.
 test('same idempotency key with a different request digest is rejected', () => {
   const world = makeWorld();
   const lease = world.leases.acquire('worker-idem', { now: 13, ttl: 20 });
@@ -354,7 +348,21 @@ test('same idempotency key with a different request digest is rejected', () => {
   assert.equal(world.sink.sideEffects.length, 1);
 });
 
-// 7. Wrong-target grant substitution fails at the sink.
+test('worker cannot falsify the request digest during an idempotent replay', () => {
+  const world = makeWorld();
+  const lease = world.leases.acquire('worker-digest', { now: 13, ttl: 20 });
+  const grant = world.policy.issueGrant({ lease, objective: world.objective, source: world.source, receiptId: world.receipt.receiptId, action: world.action, now: 14, ttl: 10 });
+  const actionKey = deriveActionKey({ objective: world.objective, receipt: world.receipt, action: world.action });
+  const originalDigest = deriveRequestDigest({ objective: world.objective, receipt: world.receipt, action: world.action });
+  world.sink.execute({ objective: world.objective, lease, grant, source: world.source, receiptId: world.receipt.receiptId,
+    action: world.action, actionKey, requestDigest: originalDigest, policy: world.policy, now: 15 });
+  expectCode('REQUEST_DIGEST_MISMATCH', () => world.sink.execute({
+    objective: world.objective, lease, grant, source: world.source, receiptId: world.receipt.receiptId,
+    action: { ...world.action, amount: 99 }, actionKey, requestDigest: originalDigest, policy: world.policy, now: 16,
+  }));
+  assert.equal(world.sink.sideEffects.length, 1);
+});
+
 test('authorization grant cannot be rebound to another target', () => {
   const world = makeWorld();
   const lease = world.leases.acquire('worker-scope', { now: 13, ttl: 20 });
