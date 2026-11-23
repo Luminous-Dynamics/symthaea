@@ -19,6 +19,7 @@ pub enum VelocityFourierSpongeError {
     InvalidMaximumDamping,
     InvalidExponent,
     NonFiniteTransform,
+    ImaginaryResidualTooLarge { residual: f64, tolerance: f64 },
     Solver(SolverError),
 }
 
@@ -46,6 +47,10 @@ impl fmt::Display for VelocityFourierSpongeError {
                     "velocity-Fourier sponge produced a non-finite transform"
                 )
             }
+            Self::ImaginaryResidualTooLarge { residual, tolerance } => write!(
+                formatter,
+                "inverse transform imaginary residual {residual:e} exceeds tolerance {tolerance:e}"
+            ),
             Self::Solver(error) => write!(formatter, "solver failure during sponge: {error}"),
         }
     }
@@ -243,7 +248,10 @@ impl VlasovPoisson1d1v {
         if max_imaginary_residual > imaginary_tolerance {
             self.distribution = previous_distribution;
             self.electric_field = previous_field;
-            return Err(VelocityFourierSpongeError::NonFiniteTransform);
+            return Err(VelocityFourierSpongeError::ImaginaryResidualTooLarge {
+                residual: max_imaginary_residual,
+                tolerance: imaginary_tolerance,
+            });
         }
 
         let after = match self.quadratic_casimir_budget() {
