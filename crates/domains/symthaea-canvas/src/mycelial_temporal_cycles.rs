@@ -165,7 +165,7 @@ pub fn temporal_snapshot_from_annotated_skeleton(
     for record in edge_evidence {
         if !valid_id(&record.edge_id)
             || evidence_by_id
-                .insert(record.edge_id.as_str(), record.evidence)
+                .insert(record.edge_id.as_str(), record)
                 .is_some()
         {
             return Err(MycelialTemporalCycleError::EdgeEvidenceInventoryMismatch(
@@ -187,17 +187,27 @@ pub fn temporal_snapshot_from_annotated_skeleton(
     node_ids.sort_unstable();
     let mut edges = Vec::with_capacity(skeleton.segments.len());
     for segment in &skeleton.segments {
-        let evidence = evidence_by_id
+        let record = evidence_by_id
             .get(segment.id.as_str())
             .copied()
             .ok_or_else(|| {
                 MycelialTemporalCycleError::EdgeEvidenceInventoryMismatch(segment.id.clone())
             })?;
+        let endpoints_match =
+            (record.source_node_id == segment.start_junction_id
+                && record.target_node_id == segment.end_junction_id)
+                || (record.source_node_id == segment.end_junction_id
+                    && record.target_node_id == segment.start_junction_id);
+        if !endpoints_match {
+            return Err(MycelialTemporalCycleError::EdgeEvidenceEndpointMismatch(
+                segment.id.clone(),
+            ));
+        }
         edges.push(TemporalMycelialEdge {
             id: segment.id.clone(),
             source_node_id: segment.start_junction_id.clone(),
             target_node_id: segment.end_junction_id.clone(),
-            evidence,
+            evidence: record.evidence,
         });
     }
     edges.sort_by(|left, right| left.id.cmp(&right.id));
@@ -358,6 +368,7 @@ pub enum MycelialTemporalCycleError {
     InvalidConfig,
     InvalidAnnotatedSkeleton(String),
     EdgeEvidenceInventoryMismatch(String),
+    EdgeEvidenceEndpointMismatch(String),
     TooManyWindows(usize),
     TooManyNodes {
         snapshot_id: String,
@@ -420,6 +431,10 @@ impl fmt::Display for MycelialTemporalCycleError {
                     "temporal edge evidence does not map exactly to annotated segment {id}"
                 )
             }
+            Self::EdgeEvidenceEndpointMismatch(id) => write!(
+                f,
+                "temporal edge evidence endpoints do not match annotated segment {id}"
+            ),
             Self::TooManyWindows(count) => {
                 write!(
                     f,
@@ -1868,6 +1883,67 @@ mod tests {
             ),
             Err(MycelialTemporalCycleError::EdgeEvidenceInventoryMismatch(_))
         ));
+    }
+
+    #[test]
+    fn annotated_skeleton_adapter_rejects_endpoint_mismatch_even_when_edge_id_matches() {
+        let annotation = annotated_fixture();
+        let evidence = vec![
+            TemporalMycelialEdgeEvidenceRecord {
+                edge_id: "segment-ab".to_string(),
+                source_node_id: "A".to_string(),
+                target_node_id: "C".to_string(),
+                evidence: TemporalEdgeEvidence::DirectlyObservedHypha,
+            },
+            TemporalMycelialEdgeEvidenceRecord {
+                edge_id: "segment-ac".to_string(),
+                source_node_id: "A".to_string(),
+                target_node_id: "C".to_string(),
+                evidence: TemporalEdgeEvidence::DirectlyObservedHypha,
+            },
+        ];
+        assert!(matches!(
+            temporal_snapshot_from_annotated_skeleton(
+                &annotation,
+                0,
+                10,
+                "roi:whole-domain-v1",
+                TemporalWindowCoverage::CompleteWithinDeclaredScope,
+                &evidence,
+            ),
+            Err(MycelialTemporalCycleError::EdgeEvidenceEndpointMismatch(id))
+                if id == "segment-ab"
+        ));
+    }
+
+    #[test]
+    fn annotated_skeleton_adapter_accepts_reversed_endpoints_for_undirected_segments() {
+        let annotation = annotated_fixture();
+        let evidence = vec![
+            TemporalMycelialEdgeEvidenceRecord {
+                edge_id: "segment-ab".to_string(),
+                source_node_id: "B".to_string(),
+                target_node_id: "A".to_string(),
+                evidence: TemporalEdgeEvidence::DirectlyObservedHypha,
+            },
+            TemporalMycelialEdgeEvidenceRecord {
+                edge_id: "segment-ac".to_string(),
+                source_node_id: "C".to_string(),
+                target_node_id: "A".to_string(),
+                evidence: TemporalEdgeEvidence::DirectlyObservedHypha,
+            },
+        ];
+        let snapshot = temporal_snapshot_from_annotated_skeleton(
+            &annotation,
+            0,
+            10,
+            "roi:whole-domain-v1",
+            TemporalWindowCoverage::CompleteWithinDeclaredScope,
+            &evidence,
+        )
+        .unwrap();
+        assert_eq!(snapshot.edges[0].source_node_id, "A");
+        assert_eq!(snapshot.edges[0].target_node_id, "B");
     }
 
     #[test]
