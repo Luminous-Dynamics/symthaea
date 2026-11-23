@@ -1114,6 +1114,7 @@ fn run() -> Result<(), String> {
                 "target_key": baseline.mode.name(),
                 "retrieved_event_ids": baseline.retrieved_event_ids,
                 "decision_support_event_ids": baseline.decision.evidence_ids,
+                "candidate_visible_event_count": baseline.candidate_visible_event_count,
                 "index_bytes": baseline.index_bytes,
                 "removed_event_ids": [],
                 "removed_event_count": 0,
