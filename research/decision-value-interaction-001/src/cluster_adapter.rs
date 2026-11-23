@@ -880,9 +880,8 @@ mod tests {
 
     fn metadata_for_assignments(assignments: &[ClusterAssignment]) -> ClusterInferenceMetadata {
         let mut frozen = metadata();
-        frozen.cluster_assignment_manifest_sha256 = sha256_hex(
-            canonical_cluster_assignment_manifest(assignments, &frozen).as_bytes(),
-        );
+        frozen.cluster_assignment_manifest_sha256 =
+            sha256_hex(canonical_cluster_assignment_manifest(assignments, &frozen).as_bytes());
         frozen
     }
 
