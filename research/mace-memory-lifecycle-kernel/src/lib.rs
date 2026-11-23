@@ -156,48 +156,141 @@ impl MemorySnapshot {
     }
 }
 
-/// Externally persisted monotonic witness.
+/// Canonical checkpoint for an independently persisted monotonic witness.
 ///
-/// This value must live outside restorable memory snapshots. The crate models
-/// the API contract only; it does not protect this object from rollback,
-/// impersonation, deletion, or storage corruption.
+/// This digest binds the store head, generation, revocation tombstones, erasure
+/// tombstones and previous checkpoint. It is a commitment, not a signature.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct WitnessCheckpoint {
+    pub generation: u64,
+    pub store_head_sha256: String,
+    pub revoked_ids: BTreeSet<String>,
+    pub erased_ids: BTreeSet<String>,
+    pub previous_checkpoint_sha256: Option<String>,
+    pub checkpoint_sha256: String,
+}
+
+impl WitnessCheckpoint {
+    pub fn new(
+        generation: u64,
+        store_head_sha256: impl Into<String>,
+        revoked_ids: BTreeSet<String>,
+        erased_ids: BTreeSet<String>,
+        previous_checkpoint_sha256: Option<String>,
+    ) -> Self {
+        let mut value = Self {
+            generation,
+            store_head_sha256: store_head_sha256.into(),
+            revoked_ids,
+            erased_ids,
+            previous_checkpoint_sha256,
+            checkpoint_sha256: String::new(),
+        };
+        value.checkpoint_sha256 = value.calculate_digest();
+        value
+    }
+
+    pub fn verify_digest(&self) -> bool {
+        self.checkpoint_sha256 == self.calculate_digest()
+    }
+
+    fn calculate_digest(&self) -> String {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(&self.generation.to_be_bytes());
+        append_field(&mut bytes, &self.store_head_sha256);
+        for id in &self.revoked_ids { append_field(&mut bytes, id); }
+        bytes.push(0xff);
+        for id in &self.erased_ids { append_field(&mut bytes, id); }
+        bytes.push(0xfe);
+        match &self.previous_checkpoint_sha256 {
+            Some(previous) => { bytes.push(1); append_field(&mut bytes, previous); }
+            None => bytes.push(0),
+        }
+        sha256_hex(&bytes)
+    }
+}
+
+/// Pluggable witness persistence contract.
+///
+/// Implementations must enforce atomic compare-and-append, monotonic generation,
+/// chain continuity and durable storage outside the memory snapshot's rollback
+/// domain. On error, the old checkpoint must remain authoritative. The
+/// in-memory implementation below is only a reference/test adapter.
+pub trait MonotonicWitnessStore {
+    fn latest_checkpoint(&self) -> Result<WitnessCheckpoint, LifecycleError>;
+    fn append_checkpoint(
+        &mut self,
+        expected_checkpoint_sha256: &str,
+        next: WitnessCheckpoint,
+    ) -> Result<(), LifecycleError>;
+}
+
+/// In-memory reference witness. It is not independently durable or rollback-safe.
 #[derive(Debug)]
 pub struct TrustedWitness {
-    generation: u64,
-    store_head_sha256: String,
-    revoked_ids: BTreeSet<String>,
-    erased_ids: BTreeSet<String>,
+    checkpoints: Vec<WitnessCheckpoint>,
 }
 
 impl Default for TrustedWitness {
     fn default() -> Self {
         let empty = MemorySnapshot::default();
         Self {
-            generation: 0,
-            store_head_sha256: empty.head_sha256(),
-            revoked_ids: BTreeSet::new(),
-            erased_ids: BTreeSet::new(),
+            checkpoints: vec![WitnessCheckpoint::new(
+                0, empty.head_sha256(), BTreeSet::new(), BTreeSet::new(), None,
+            )],
         }
     }
 }
 
 impl TrustedWitness {
     pub fn generation(&self) -> u64 {
-        self.generation
+        self.checkpoints.last().map(|v| v.generation).unwrap_or(0)
     }
-
-    /// Current committed store head, to be persisted with this witness outside
-    /// the rollback domain of the memory snapshot.
     pub fn store_head_sha256(&self) -> &str {
-        &self.store_head_sha256
+        &self.checkpoints.last().expect("genesis checkpoint exists").store_head_sha256
     }
-
     pub fn revoked_ids(&self) -> &BTreeSet<String> {
-        &self.revoked_ids
+        &self.checkpoints.last().expect("genesis checkpoint exists").revoked_ids
+    }
+    pub fn erased_ids(&self) -> &BTreeSet<String> {
+        &self.checkpoints.last().expect("genesis checkpoint exists").erased_ids
+    }
+    pub fn checkpoint_history(&self) -> &[WitnessCheckpoint] {
+        &self.checkpoints
+    }
+}
+
+impl MonotonicWitnessStore for TrustedWitness {
+    fn latest_checkpoint(&self) -> Result<WitnessCheckpoint, LifecycleError> {
+        let checkpoint = self.checkpoints.last().cloned().ok_or(LifecycleError::WitnessUnavailable)?;
+        if !checkpoint.verify_digest() {
+            return Err(LifecycleError::WitnessCheckpointInvalid);
+        }
+        Ok(checkpoint)
     }
 
-    pub fn erased_ids(&self) -> &BTreeSet<String> {
-        &self.erased_ids
+    fn append_checkpoint(
+        &mut self,
+        expected_checkpoint_sha256: &str,
+        next: WitnessCheckpoint,
+    ) -> Result<(), LifecycleError> {
+        let current = self.latest_checkpoint()?;
+        if current.checkpoint_sha256 != expected_checkpoint_sha256
+            || next.previous_checkpoint_sha256.as_deref() != Some(expected_checkpoint_sha256)
+        {
+            return Err(LifecycleError::WitnessConflict);
+        }
+        let expected_generation = current.generation.checked_add(1)
+            .ok_or(LifecycleError::GenerationOverflow)?;
+        if next.generation != expected_generation
+            || !next.revoked_ids.is_superset(&current.revoked_ids)
+            || !next.erased_ids.is_superset(&current.erased_ids)
+            || !next.verify_digest()
+        {
+            return Err(LifecycleError::WitnessHistoryRegression);
+        }
+        self.checkpoints.push(next);
+        Ok(())
     }
 }
 
@@ -224,6 +317,10 @@ pub enum LifecycleError {
     SnapshotAheadOfWitness,
     RollbackOrTamperDetected,
     GenerationOverflow,
+    WitnessUnavailable,
+    WitnessCheckpointInvalid,
+    WitnessConflict,
+    WitnessHistoryRegression,
 }
 
 impl fmt::Display for LifecycleError {
@@ -253,72 +350,40 @@ pub struct RecoveryReport {
 /// Parent evidence must already exist and be eligible for the same scope and
 /// purpose. This prevents a derived record from laundering an inadmissible
 /// parent into a newly trusted representation.
-pub fn commit_record(
-    snapshot: &mut MemorySnapshot,
-    witness: &mut TrustedWitness,
-    record: MemoryRecord,
-    authority: &dyn IdentityAuthority,
-) -> Result<(), LifecycleError> {
+pub fn commit_record(snapshot: &mut MemorySnapshot, witness: &mut dyn MonotonicWitnessStore, record: MemoryRecord, authority: &dyn IdentityAuthority) -> Result<(), LifecycleError> {
     verify_store_head(snapshot, witness)?;
-    if record.id.is_empty() || record.issuer_id.is_empty() {
-        return Err(LifecycleError::EmptyIdentity);
-    }
-    if snapshot.records.contains_key(&record.id) {
-        return Err(LifecycleError::DuplicateRecord);
-    }
-    if witness.erased_ids.contains(&record.id) {
-        return Err(LifecycleError::AlreadyInvalidated);
-    }
-    if witness.revoked_ids.contains(&record.id) {
-        return Err(LifecycleError::AlreadyInvalidated);
-    }
+    if record.id.is_empty() || record.issuer_id.is_empty() { return Err(LifecycleError::EmptyIdentity); }
+    if snapshot.records.contains_key(&record.id) { return Err(LifecycleError::DuplicateRecord); }
+    let state = witness.latest_checkpoint()?;
+    if state.erased_ids.contains(&record.id) || state.revoked_ids.contains(&record.id) { return Err(LifecycleError::AlreadyInvalidated); }
     validate_record_shape(&record)?;
     let need = DecisionNeed::new(record.scope.clone(), record.purpose.clone());
-    let profile = authority
-        .profile_for(&record.issuer_id)
-        .ok_or(LifecycleError::UnknownIssuer)?;
+    let profile = authority.profile_for(&record.issuer_id).ok_or(LifecycleError::UnknownIssuer)?;
     validate_profile(&profile, &need)?;
     if record.parents.is_empty() {
-        if !profile.may_assert {
-            return Err(LifecycleError::IssuerCannotAssert);
-        }
+        if !profile.may_assert { return Err(LifecycleError::IssuerCannotAssert); }
     } else {
-        if !profile.may_derive {
-            return Err(LifecycleError::IssuerCannotDerive);
-        }
+        if !profile.may_derive { return Err(LifecycleError::IssuerCannotDerive); }
         let mut visiting = BTreeSet::new();
         for parent_id in &record.parents {
-            let parent = snapshot
-                .records
-                .get(parent_id)
-                .ok_or(LifecycleError::MissingParent)?;
-            if parent.scope != record.scope || parent.purpose != record.purpose {
-                return Err(LifecycleError::ParentUseMismatch);
-            }
-            verify_record_inner(
-                snapshot,
-                witness,
-                authority,
-                &need,
-                parent_id,
-                &mut visiting,
-            )?;
+            let parent = snapshot.records.get(parent_id).ok_or(LifecycleError::MissingParent)?;
+            if parent.scope != record.scope || parent.purpose != record.purpose { return Err(LifecycleError::ParentUseMismatch); }
+            verify_record_inner(snapshot, witness, authority, &need, parent_id, &mut visiting)?;
         }
     }
     ensure_generation_available(snapshot)?;
+    let before = snapshot.clone();
     snapshot.records.insert(record.id.clone(), record);
-    advance_head(snapshot, witness)
+    if let Err(error) = advance_head(snapshot, witness, state.revoked_ids, state.erased_ids) {
+        *snapshot = before;
+        return Err(error);
+    }
+    Ok(())
 }
 
 /// Verify that a record is usable for the exact requested need and current
 /// externally witnessed store state.
-pub fn verify_for_use(
-    snapshot: &MemorySnapshot,
-    witness: &TrustedWitness,
-    authority: &dyn IdentityAuthority,
-    need: &DecisionNeed,
-    record_id: &str,
-) -> Result<(), LifecycleError> {
+pub fn verify_for_use(snapshot: &MemorySnapshot, witness: &dyn MonotonicWitnessStore, authority: &dyn IdentityAuthority, need: &DecisionNeed, record_id: &str) -> Result<(), LifecycleError> {
     verify_store_head(snapshot, witness)?;
     let mut visiting = BTreeSet::new();
     verify_record_inner(snapshot, witness, authority, need, record_id, &mut visiting)
@@ -326,83 +391,51 @@ pub fn verify_for_use(
 
 /// Revoke one record. Descendants remain in the store for auditability but fail
 /// current-at-use recursively whenever they depend on the revoked parent.
-pub fn revoke_record(
-    snapshot: &mut MemorySnapshot,
-    witness: &mut TrustedWitness,
-    authority: &dyn IdentityAuthority,
-    revoker_id: &str,
-    record_id: &str,
-) -> Result<InvalidationReport, LifecycleError> {
+pub fn revoke_record(snapshot: &mut MemorySnapshot, witness: &mut dyn MonotonicWitnessStore, authority: &dyn IdentityAuthority, revoker_id: &str, record_id: &str) -> Result<InvalidationReport, LifecycleError> {
     verify_store_head(snapshot, witness)?;
-    let record = snapshot
-        .records
-        .get(record_id)
-        .ok_or(LifecycleError::MissingRecord)?;
-    let profile = authority
-        .profile_for(revoker_id)
-        .ok_or(LifecycleError::UnknownIssuer)?;
+    let record = snapshot.records.get(record_id).ok_or(LifecycleError::MissingRecord)?;
+    let profile = authority.profile_for(revoker_id).ok_or(LifecycleError::UnknownIssuer)?;
     let need = DecisionNeed::new(record.scope.clone(), record.purpose.clone());
     validate_profile(&profile, &need)?;
-    if !profile.may_revoke {
-        return Err(LifecycleError::RevokerNotAuthorized);
-    }
-    if witness.revoked_ids.contains(record_id) {
-        return Ok(InvalidationReport {
-            invalidated_ids: vec![record_id.to_owned()],
-            generation: witness.generation,
-        });
+    if !profile.may_revoke { return Err(LifecycleError::RevokerNotAuthorized); }
+    let mut state = witness.latest_checkpoint()?;
+    if state.revoked_ids.contains(record_id) {
+        return Ok(InvalidationReport { invalidated_ids: vec![record_id.to_owned()], generation: state.generation });
     }
     ensure_generation_available(snapshot)?;
-    witness.revoked_ids.insert(record_id.to_owned());
+    let before = snapshot.clone();
+    state.revoked_ids.insert(record_id.to_owned());
     let descendants = descendant_closure(snapshot, record_id);
-    advance_head(snapshot, witness)?;
-    Ok(InvalidationReport {
-        invalidated_ids: descendants.into_iter().collect(),
-        generation: witness.generation,
-    })
+    if let Err(error) = advance_head(snapshot, witness, state.revoked_ids, state.erased_ids) {
+        *snapshot = before;
+        return Err(error);
+    }
+    Ok(InvalidationReport { invalidated_ids: descendants.into_iter().collect(), generation: snapshot.generation })
 }
 
 /// Erase a record and its complete derived-descendant closure. Tombstones are
 /// written to the separate witness before the working snapshot is advanced.
-pub fn erase_record(
-    snapshot: &mut MemorySnapshot,
-    witness: &mut TrustedWitness,
-    authority: &dyn IdentityAuthority,
-    eraser_id: &str,
-    record_id: &str,
-) -> Result<InvalidationReport, LifecycleError> {
+pub fn erase_record(snapshot: &mut MemorySnapshot, witness: &mut dyn MonotonicWitnessStore, authority: &dyn IdentityAuthority, eraser_id: &str, record_id: &str) -> Result<InvalidationReport, LifecycleError> {
     verify_store_head(snapshot, witness)?;
-    if witness.erased_ids.contains(record_id) {
-        return Ok(InvalidationReport {
-            invalidated_ids: vec![record_id.to_owned()],
-            generation: witness.generation,
-        });
+    let mut state = witness.latest_checkpoint()?;
+    if state.erased_ids.contains(record_id) {
+        return Ok(InvalidationReport { invalidated_ids: vec![record_id.to_owned()], generation: state.generation });
     }
-    let record = snapshot
-        .records
-        .get(record_id)
-        .ok_or(LifecycleError::MissingRecord)?;
-    let profile = authority
-        .profile_for(eraser_id)
-        .ok_or(LifecycleError::UnknownIssuer)?;
+    let record = snapshot.records.get(record_id).ok_or(LifecycleError::MissingRecord)?;
+    let profile = authority.profile_for(eraser_id).ok_or(LifecycleError::UnknownIssuer)?;
     let need = DecisionNeed::new(record.scope.clone(), record.purpose.clone());
     validate_profile(&profile, &need)?;
-    if !profile.may_erase {
-        return Err(LifecycleError::EraserNotAuthorized);
-    }
+    if !profile.may_erase { return Err(LifecycleError::EraserNotAuthorized); }
     ensure_generation_available(snapshot)?;
+    let before = snapshot.clone();
     let closure = descendant_closure(snapshot, record_id);
-    for id in &closure {
-        witness.erased_ids.insert(id.clone());
+    for id in &closure { state.erased_ids.insert(id.clone()); }
+    for id in &closure { snapshot.records.remove(id); }
+    if let Err(error) = advance_head(snapshot, witness, state.revoked_ids, state.erased_ids) {
+        *snapshot = before;
+        return Err(error);
     }
-    for id in &closure {
-        snapshot.records.remove(id);
-    }
-    advance_head(snapshot, witness)?;
-    Ok(InvalidationReport {
-        invalidated_ids: closure.into_iter().collect(),
-        generation: witness.generation,
-    })
+    Ok(InvalidationReport { invalidated_ids: closure.into_iter().collect(), generation: snapshot.generation })
 }
 
 /// Reconcile a stale backup against an independently held witness.
@@ -412,60 +445,23 @@ pub fn erase_record(
 /// Missing newer writes, arbitrary byte changes, or unknown orphaning fail
 /// closed. This models the T10 erasure-resurrection case; it is not durable
 /// erasure without a real external witness implementation.
-pub fn reconcile_snapshot(
-    mut snapshot: MemorySnapshot,
-    witness: &TrustedWitness,
-) -> Result<(MemorySnapshot, RecoveryReport), LifecycleError> {
-    if snapshot.generation > witness.generation {
-        return Err(LifecycleError::SnapshotAheadOfWitness);
-    }
-
-    let removed_resurrected_ids: Vec<String> = witness
-        .erased_ids
-        .iter()
-        .filter(|id| snapshot.records.contains_key(*id))
-        .cloned()
-        .collect();
-
-    for id in &witness.erased_ids {
-        snapshot.records.remove(id);
-    }
-
+pub fn reconcile_snapshot(mut snapshot: MemorySnapshot, witness: &dyn MonotonicWitnessStore) -> Result<(MemorySnapshot, RecoveryReport), LifecycleError> {
+    let state = witness.latest_checkpoint()?;
+    if snapshot.generation > state.generation { return Err(LifecycleError::SnapshotAheadOfWitness); }
+    let removed_resurrected_ids: Vec<String> = state.erased_ids.iter().filter(|id| snapshot.records.contains_key(*id)).cloned().collect();
+    for id in &state.erased_ids { snapshot.records.remove(id); }
     let mut removed_orphaned_ids = Vec::new();
     loop {
-        let orphaned: Vec<String> = snapshot
-            .records
-            .iter()
-            .filter_map(|(id, record)| {
-                record
-                    .parents
-                    .iter()
-                    .any(|parent| !snapshot.records.contains_key(parent))
-                    .then(|| id.clone())
-            })
-            .collect();
-        if orphaned.is_empty() {
-            break;
-        }
-        for id in orphaned {
-            snapshot.records.remove(&id);
-            removed_orphaned_ids.push(id);
-        }
+        let orphaned: Vec<String> = snapshot.records.iter().filter_map(|(id, record)| {
+            record.parents.iter().any(|parent| !snapshot.records.contains_key(parent)).then(|| id.clone())
+        }).collect();
+        if orphaned.is_empty() { break; }
+        for id in orphaned { snapshot.records.remove(&id); removed_orphaned_ids.push(id); }
     }
-
-    snapshot.generation = witness.generation;
+    snapshot.generation = state.generation;
     let recovered_head_sha256 = snapshot.head_sha256();
-    if recovered_head_sha256 != witness.store_head_sha256 {
-        return Err(LifecycleError::RollbackOrTamperDetected);
-    }
-
-    let report = RecoveryReport {
-        removed_resurrected_ids,
-        removed_orphaned_ids,
-        generation: witness.generation,
-        recovered_head_sha256,
-    };
-    Ok((snapshot, report))
+    if recovered_head_sha256 != state.store_head_sha256 { return Err(LifecycleError::RollbackOrTamperDetected); }
+    Ok((snapshot, RecoveryReport { removed_resurrected_ids, removed_orphaned_ids, generation: state.generation, recovered_head_sha256 }))
 }
 
 fn validate_record_shape(record: &MemoryRecord) -> Result<(), LifecycleError> {
@@ -499,16 +495,14 @@ fn validate_profile(
 
 fn verify_record_inner(
     snapshot: &MemorySnapshot,
-    witness: &TrustedWitness,
+    witness: &dyn MonotonicWitnessStore,
     authority: &dyn IdentityAuthority,
     need: &DecisionNeed,
     record_id: &str,
     visiting: &mut BTreeSet<String>,
 ) -> Result<(), LifecycleError> {
-    if witness.erased_ids.contains(record_id) {
-        return Err(LifecycleError::AlreadyInvalidated);
-    }
-    if witness.revoked_ids.contains(record_id) {
+    let state = witness.latest_checkpoint()?;
+    if state.erased_ids.contains(record_id) || state.revoked_ids.contains(record_id) {
         return Err(LifecycleError::AlreadyInvalidated);
     }
     if !visiting.insert(record_id.to_owned()) {
@@ -565,15 +559,10 @@ fn descendant_closure(snapshot: &MemorySnapshot, root_id: &str) -> BTreeSet<Stri
     }
 }
 
-fn verify_store_head(
-    snapshot: &MemorySnapshot,
-    witness: &TrustedWitness,
-) -> Result<(), LifecycleError> {
-    if snapshot.generation != witness.generation
-        || snapshot.head_sha256() != witness.store_head_sha256
-    {
-        return Err(LifecycleError::StoreHeadMismatch);
-    }
+fn verify_store_head(snapshot: &MemorySnapshot, witness: &dyn MonotonicWitnessStore) -> Result<(), LifecycleError> {
+    let state = witness.latest_checkpoint()?;
+    if !state.verify_digest() { return Err(LifecycleError::WitnessCheckpointInvalid); }
+    if snapshot.generation != state.generation || snapshot.head_sha256() != state.store_head_sha256 { return Err(LifecycleError::StoreHeadMismatch); }
     Ok(())
 }
 
@@ -585,15 +574,17 @@ fn ensure_generation_available(snapshot: &MemorySnapshot) -> Result<(), Lifecycl
         .ok_or(LifecycleError::GenerationOverflow)
 }
 
-fn advance_head(
-    snapshot: &mut MemorySnapshot,
-    witness: &mut TrustedWitness,
-) -> Result<(), LifecycleError> {
+fn advance_head(snapshot: &mut MemorySnapshot, witness: &mut dyn MonotonicWitnessStore, revoked_ids: BTreeSet<String>, erased_ids: BTreeSet<String>) -> Result<(), LifecycleError> {
+    let current = witness.latest_checkpoint()?;
     ensure_generation_available(snapshot)?;
-    let generation = snapshot.generation + 1;
+    if snapshot.generation != current.generation { return Err(LifecycleError::StoreHeadMismatch); }
+    let generation = current.generation + 1;
     snapshot.generation = generation;
-    witness.generation = generation;
-    witness.store_head_sha256 = snapshot.head_sha256();
+    let next = WitnessCheckpoint::new(generation, snapshot.head_sha256(), revoked_ids, erased_ids, Some(current.checkpoint_sha256.clone()));
+    if let Err(error) = witness.append_checkpoint(&current.checkpoint_sha256, next) {
+        snapshot.generation = current.generation;
+        return Err(error);
+    }
     Ok(())
 }
 
