@@ -62,7 +62,7 @@ The receipt binds:
 - decision and support/retrieval event IDs;
 - retrieval-profile digest, index payload bytes and candidate-process latency.
 
-The receipt also records the candidate-visible event count separately from the full available-event count in the parent-authored candidate/evaluator rows. This makes the scope projection auditable. The observation identity follows the same canonical formula as the paired evaluator receipt contract in PR #13331. A digest establishes byte identity, not who supplied the bytes.
+The receipt also records the candidate-visible event count separately from the full available-event count in the parent-authored candidate/evaluator rows. This makes the scope projection auditable. The run's source-bundle digest binds the evaluator runner and reducer, process client, candidate source, direct policy/HDC sources, package/workspace manifests, Rust toolchain file and Nix lock. A separate schema-bundle digest binds the three JSON schemas. The observation identity follows the same canonical formula as the paired evaluator receipt contract in PR #13331. A digest establishes byte identity, not who supplied the bytes.
 
 ## Invocation
 
@@ -163,7 +163,7 @@ cargo run --release \
   -- 1 /tmp/mace-candidate.jsonl /tmp/mace-evaluator.jsonl
 ```
 
-The evaluator requires both `MACE_CANDIDATE_BIN` and `MACE_CANDIDATE_BIN_SHA256`; missing or mismatched values fail closed. The child process runs with a cleared environment and working directory `/`, but remains under the parent user's OS identity. The digest pins the candidate executable file bytes only; it does not pin dynamic shared libraries, the host kernel, CPU microcode, runtime image or sandbox configuration. Those must be included in a later container/attestation manifest.
+The evaluator requires both `MACE_CANDIDATE_BIN` and `MACE_CANDIDATE_BIN_SHA256`; missing or mismatched values fail closed. The child process runs with a cleared environment and working directory `/`, but remains under the parent user's OS identity. The digest pins the candidate executable file bytes only; it does not pin dynamic shared libraries, the host kernel, CPU microcode, runtime image or sandbox configuration. Those must be included in a later container/attestation manifest. The nested MACE workspace still lacks its own Cargo.lock; dependency-lock reproducibility is tracked in [#13364](https://github.com/Luminous-Dynamics/symthaea/issues/13364).
 
 ### Timing contract
 
