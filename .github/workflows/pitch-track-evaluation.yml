@@ -8,6 +8,7 @@ on:
       - "crates/domains/symthaea-vocal-tract/src/pitch_track_eval.rs"
       - "crates/domains/symthaea-vocal-tract/src/lib.rs"
       - "schemas/pitch-track-evaluation-v1.schema.json"
+      - "schemas/pitch-track-metrics-v1.schema.json"
       - "docs/research/pitch-track-evaluation-v1/**"
       - ".github/workflows/pitch-track-evaluation.yml"
       - "Cargo.toml"
@@ -44,6 +45,9 @@ jobs:
 
       - name: Validate schema syntax
         run: python3 -m json.tool schemas/pitch-track-evaluation-v1.schema.json > /dev/null
+
+      - name: Validate metrics schema syntax
+        run: python3 -m json.tool schemas/pitch-track-metrics-v1.schema.json > /dev/null
 
       - name: Check formatting
         run: cargo fmt --manifest-path Cargo.toml -p symthaea-vocal-tract -- --check
