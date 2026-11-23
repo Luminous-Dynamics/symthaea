@@ -244,9 +244,7 @@ fn matrix_rank(rows: &[[f64; DRIFT_IDENTIFIABILITY_DIMENSIONS_V1]]) -> usize {
             if factor.abs() <= RANK_TOLERANCE_V1 {
                 continue;
             }
-            for (value, pivot_value) in matrix[row][column..]
-                .iter_mut()
-                .zip(&normalized_pivot_tail)
+            for (value, pivot_value) in matrix[row][column..].iter_mut().zip(&normalized_pivot_tail)
             {
                 *value -= factor * pivot_value;
             }
