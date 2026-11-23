@@ -9,20 +9,19 @@
 //! collaboration. Those require separate candidate adapters and studies.
 
 use crate::rmi_benchmark::{
-    evaluate_rmi_pair, evaluate_rmi_reciprocal_pair, FixedPartnerResponsePolicyV1,
-    FixedResponsePolicyV1, ImitationOnlyPolicyV1, OneWayPromptPolicyV1,
-    RmiAgentActionV1, RmiEvaluationEnvelopeV1, RmiHistoryActorV1, RmiHistoryEventV1,
-    YokedReplayPolicyV1,
-    RmiInterventionPairV1, RmiMusicalFeaturesV1, RmiPartnerObservationV1,
+    FixedPartnerResponsePolicyV1, FixedResponsePolicyV1, ImitationOnlyPolicyV1,
+    OneWayPromptPolicyV1, RmiAgentActionV1, RmiEvaluationEnvelopeV1, RmiHistoryActorV1,
+    RmiHistoryEventV1, RmiInterventionPairV1, RmiMusicalFeaturesV1, RmiPartnerObservationV1,
     RmiPartnerResponseV1, RmiPolicyV1, RmiReciprocalEvaluationEnvelopeV1, RmiRoleV1,
-    RmiTargetFeatureV1,
-    SyntheticContingentPolicyV1, SyntheticResponsivePartnerPolicyV1,
+    RmiTargetFeatureV1, SyntheticContingentPolicyV1, SyntheticResponsivePartnerPolicyV1,
+    YokedReplayPolicyV1, evaluate_rmi_pair, evaluate_rmi_reciprocal_pair,
+    synthetic_rule_identity_v1,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::fmt::Write as FmtWrite;
 
-pub const RMI_TRACK_A_RUNNER_VERSION_V1: &str = "rmi-track-a-offline-runner-v1";
+pub const RMI_TRACK_A_RUNNER_VERSION_V2: &str = "rmi-track-a-offline-runner-v2";
 pub const RMI_TRACK_A_MAX_TRIALS_PER_TARGET_V1: usize = 1_024;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -152,7 +151,11 @@ fn mutate_target_v1(
             features.rhythm_onsets[step] = !features.rhythm_onsets[step];
         }
         RmiTargetFeatureV1::Tempo => {
-            let delta = if trial_index.is_multiple_of(2) { 1_500 } else { -1_500 };
+            let delta = if trial_index.is_multiple_of(2) {
+                1_500
+            } else {
+                -1_500
+            };
             features.tempo_milli_bpm = (features.tempo_milli_bpm as i64 + delta) as u32;
         }
         RmiTargetFeatureV1::Role => {
@@ -192,7 +195,11 @@ pub fn make_rmi_track_a_fixture_v1(
         motif_intervals: [2, -1, 3, 0],
         rhythm_onsets: [true, false, true, false, true, false, false, true],
         tempo_milli_bpm: 120_000,
-        role: if trial_index.is_multiple_of(2) { RmiRoleV1::Lead } else { RmiRoleV1::Bass },
+        role: if trial_index.is_multiple_of(2) {
+            RmiRoleV1::Lead
+        } else {
+            RmiRoleV1::Bass
+        },
     };
     // Vary the frozen context without changing the intervention definition.
     control.motif_intervals[0] += (trial_index % 4) as i16;
@@ -201,11 +208,7 @@ pub fn make_rmi_track_a_fixture_v1(
     let mut treatment = control.clone();
     mutate_target_v1(&mut treatment, target, trial_index);
 
-    let trial_id = format!(
-        "rmi-track-a-{}-{:06}",
-        target_name_v1(target),
-        trial_index
-    );
+    let trial_id = format!("rmi-track-a-{}-{:06}", target_name_v1(target), trial_index);
     let history = vec![
         RmiHistoryEventV1 {
             event_id: format!("{trial_id}-history-partner"),
@@ -333,6 +336,17 @@ impl RmiPolicyV1 for UnrelatedFeatureAgentV1 {
         &self.version
     }
 
+    fn immutable_identity(
+        &self,
+    ) -> Result<crate::rmi_benchmark::RmiImmutablePolicyIdentityV1, String> {
+        synthetic_rule_identity_v1(
+            &self.id,
+            &self.version,
+            "unrelated-feature-agent-v1",
+            &(&self.frozen_features, self.transform),
+        )
+    }
+
     fn respond(
         &mut self,
         _history: &[RmiHistoryEventV1],
@@ -348,9 +362,7 @@ impl RmiPolicyV1 for UnrelatedFeatureAgentV1 {
     }
 }
 
-fn unrelated_feature_agent_v1(
-    pair: &RmiInterventionPairV1,
-) -> UnrelatedFeatureAgentV1 {
+fn unrelated_feature_agent_v1(pair: &RmiInterventionPairV1) -> UnrelatedFeatureAgentV1 {
     UnrelatedFeatureAgentV1 {
         id: "unrelated-feature-agent-v1".into(),
         version: "1".into(),
@@ -409,8 +421,8 @@ pub fn run_rmi_track_a_suite_v1(
 
     let targets = targets_v1();
     let manifest = RmiTrackAManifestV1 {
-        schema_version: 1,
-        runner_version: RMI_TRACK_A_RUNNER_VERSION_V1.into(),
+        schema_version: 2,
+        runner_version: RMI_TRACK_A_RUNNER_VERSION_V2.into(),
         suite_id: "rmi-track-a-synthetic-v1".into(),
         crate_version: env!("CARGO_PKG_VERSION").to_owned(),
         source_revision: option_env!("SYMTHAEA_MUSE_GIT_REV").map(str::to_owned),
@@ -458,12 +470,9 @@ pub fn run_rmi_track_a_suite_v1(
                 capture(evaluate_rmi_pair(&one_way_prompt_agent_v1(), &pair));
             let (yoked_policy, yoked_donor_trial_id, yoked_donor_fixture_sha256) =
                 yoked_replay_agent_v1(target, trial_index, seed_root)?;
-            let yoked_replay_agent =
-                capture(evaluate_rmi_pair(&yoked_policy, &pair));
-            let unrelated_feature_agent = capture(evaluate_rmi_pair(
-                &unrelated_feature_agent_v1(&pair),
-                &pair,
-            ));
+            let yoked_replay_agent = capture(evaluate_rmi_pair(&yoked_policy, &pair));
+            let unrelated_feature_agent =
+                capture(evaluate_rmi_pair(&unrelated_feature_agent_v1(&pair), &pair));
             let imitation_agent = capture(evaluate_rmi_pair(&imitation_agent_v1(), &pair));
             let synthetic_contingent_agent =
                 capture(evaluate_rmi_pair(&contingent_agent_v1(target), &pair));
@@ -525,34 +534,40 @@ pub fn run_rmi_track_a_suite_v1(
         if let Ok(result) = &trial.fixed_agent {
             summary.fixed_agent_zero_sensitivity +=
                 usize::from(!result.payload.targeted_input_sensitivity);
-            summary.agent_order_swap_verified += usize::from(result.payload.arm_order_swap_verified);
+            summary.agent_order_swap_verified +=
+                usize::from(result.payload.arm_order_swap_verified);
         }
         if let Ok(result) = &trial.one_way_prompt_agent {
             summary.one_way_prompt_zero_sensitivity +=
                 usize::from(!result.payload.targeted_input_sensitivity);
-            summary.agent_order_swap_verified += usize::from(result.payload.arm_order_swap_verified);
+            summary.agent_order_swap_verified +=
+                usize::from(result.payload.arm_order_swap_verified);
         }
         if let Ok(result) = &trial.yoked_replay_agent {
             summary.yoked_replay_zero_sensitivity +=
                 usize::from(!result.payload.targeted_input_sensitivity);
-            summary.agent_order_swap_verified += usize::from(result.payload.arm_order_swap_verified);
+            summary.agent_order_swap_verified +=
+                usize::from(result.payload.arm_order_swap_verified);
         }
         if let Ok(result) = &trial.unrelated_feature_agent {
             summary.unrelated_feature_zero_target_sensitivity +=
                 usize::from(!result.payload.targeted_input_sensitivity);
-            summary.agent_order_swap_verified += usize::from(result.payload.arm_order_swap_verified);
+            summary.agent_order_swap_verified +=
+                usize::from(result.payload.arm_order_swap_verified);
         }
         if let Ok(result) = &trial.imitation_agent {
             summary.imitation_agent_target_sensitive +=
                 usize::from(result.payload.targeted_input_sensitivity);
-            summary.agent_order_swap_verified += usize::from(result.payload.arm_order_swap_verified);
+            summary.agent_order_swap_verified +=
+                usize::from(result.payload.arm_order_swap_verified);
         }
         if let Ok(result) = &trial.synthetic_contingent_agent {
             summary.positive_agent_target_sensitive +=
                 usize::from(result.payload.targeted_input_sensitivity);
             summary.positive_agent_zero_collateral +=
                 usize::from(result.payload.collateral_changed_feature_count == 0);
-            summary.agent_order_swap_verified += usize::from(result.payload.arm_order_swap_verified);
+            summary.agent_order_swap_verified +=
+                usize::from(result.payload.arm_order_swap_verified);
         }
         if let Ok(result) = &trial.fixed_agent_with_responsive_partner {
             summary.fixed_agent_did_not_influence_partner +=
@@ -573,8 +588,7 @@ pub fn run_rmi_track_a_suite_v1(
                 && result.payload.targeted_partner_sensitivity;
             summary.reciprocal_positive_control_both_directions += usize::from(both);
             summary.reciprocal_positive_control_zero_collateral += usize::from(
-                both
-                    && result.payload.partner_collateral_changed_feature_count == 0
+                both && result.payload.partner_collateral_changed_feature_count == 0
                     && result.payload.partner_arm_order_swap_verified,
             );
         }
@@ -634,23 +648,28 @@ mod tests {
         for target in targets_v1() {
             for trial_index in 0..32 {
                 let fixture = make_rmi_track_a_fixture_v1(target, trial_index, 7).unwrap();
-                assert!(seeds.insert(fixture.seed), "duplicate seed {}", fixture.seed);
+                assert!(
+                    seeds.insert(fixture.seed),
+                    "duplicate seed {}",
+                    fixture.seed
+                );
             }
         }
-        assert!(make_rmi_track_a_fixture_v1(
-            RmiTargetFeatureV1::Motif,
-            RMI_TRACK_A_MAX_TRIALS_PER_TARGET_V1,
-            7
-        )
-        .is_err());
+        assert!(
+            make_rmi_track_a_fixture_v1(
+                RmiTargetFeatureV1::Motif,
+                RMI_TRACK_A_MAX_TRIALS_PER_TARGET_V1,
+                7
+            )
+            .is_err()
+        );
     }
 
     #[test]
     fn wrong_feature_agent_is_not_counted_as_target_sensitive() {
         for target in targets_v1() {
             let pair = make_rmi_track_a_fixture_v1(target, 3, 42).unwrap();
-            let result =
-                evaluate_rmi_pair(&unrelated_feature_agent_v1(&pair), &pair).unwrap();
+            let result = evaluate_rmi_pair(&unrelated_feature_agent_v1(&pair), &pair).unwrap();
             assert!(!result.payload.targeted_input_sensitivity);
         }
     }
@@ -672,16 +691,61 @@ mod tests {
         let first = run_rmi_track_a_suite_v1(2, 42).unwrap();
         let second = run_rmi_track_a_suite_v1(2, 42).unwrap();
         assert_eq!(first, second);
-        assert!(first.payload.summary.synthetic_fixture_expectations_satisfied);
+        assert!(
+            first
+                .payload
+                .summary
+                .synthetic_fixture_expectations_satisfied
+        );
         assert_eq!(first.payload.summary.trials, 8);
         assert_eq!(first.payload.summary.evaluator_errors, 0);
         assert_eq!(first.payload.summary.fixed_agent_zero_sensitivity, 8);
         assert_eq!(first.payload.summary.one_way_prompt_zero_sensitivity, 8);
         assert_eq!(first.payload.summary.yoked_replay_zero_sensitivity, 8);
-        assert_eq!(first.payload.summary.unrelated_feature_zero_target_sensitivity, 8);
+        assert_eq!(
+            first
+                .payload
+                .summary
+                .unrelated_feature_zero_target_sensitivity,
+            8
+        );
         assert_eq!(first.payload.summary.imitation_agent_target_sensitive, 8);
         assert_eq!(first.payload.summary.positive_agent_target_sensitive, 8);
         assert_eq!(first.payload.summary.positive_agent_zero_collateral, 8);
-        assert_eq!(first.payload.summary.reciprocal_positive_control_both_directions, 8);
+        assert_eq!(
+            first
+                .payload
+                .summary
+                .reciprocal_positive_control_both_directions,
+            8
+        );
+        assert_eq!(first.payload.manifest.schema_version, 2);
+        assert_eq!(
+            first.payload.manifest.runner_version,
+            RMI_TRACK_A_RUNNER_VERSION_V2
+        );
+        let first_trial = &first.payload.trials[0];
+        let agent_identity = &first_trial
+            .synthetic_contingent_agent
+            .as_ref()
+            .unwrap()
+            .payload
+            .policy_immutable_identity;
+        agent_identity
+            .validate_for("synthetic-contingent-agent-motif", "1")
+            .unwrap();
+        let reciprocal = &first_trial
+            .synthetic_agent_with_responsive_partner
+            .as_ref()
+            .unwrap()
+            .payload;
+        assert_eq!(
+            reciprocal.agent_policy_immutable_identity_sha256,
+            agent_identity.payload_sha256
+        );
+        reciprocal
+            .partner_policy_immutable_identity
+            .validate_for("synthetic-responsive-partner-motif", "1")
+            .unwrap();
     }
 }
