@@ -13,7 +13,8 @@
     "exact_factorial_interaction_pr": 13176,
     "deterministic_decision_regret_pr": 13152,
     "mixed_strategy_decision_regret_pr": 13165,
-    "evaluator_isolation_issue": 9437
+    "evaluator_isolation_issue": 9437,
+    "paired_decision_regret_interaction_issue": 13279
   },
   "status": "protocol_and_fixture_authored_not_executed",
   "factors": [
@@ -277,6 +278,41 @@
     "benchmark_executed": false,
     "sota_improvement": false,
     "physical_energy_advantage": false,
-    "deployment_qualification": false
+    "deployment_qualification": false,
+    "signed_paired_decision_regret_reference_implemented": true,
+    "rust_reference_tested": true
+  },
+  "rust_reference_path": "research/decision-value-interaction-001/",
+  "authored_rust_tests": 14,
+  "executed_rust_tests": 14,
+  "shared_pairing_identity_fields": [
+    "episode_id",
+    "hidden_world_id",
+    "hidden_world_digest",
+    "initial_state_digest",
+    "task_digest",
+    "loss_scale_digest",
+    "evaluator_profile_digest",
+    "execution_environment_digest",
+    "action_domain_digest",
+    "resource_budget_digest",
+    "model_configuration_digest",
+    "candidate_policy_digest",
+    "policy_seed"
+  ],
+  "outcome_contract": {
+    "applied": "evaluator_measured_action_regret_at_actual_application_time",
+    "not_applied": "explicit_terminal_reason_and_task_contract_no_output_regret_penalty",
+    "missing_action_as_zero": false,
+    "include_all_arms_in_denominator": true,
+    "preserve_application_or_terminal_timestamps": true
+  },
+  "rust_reference_test_evidence": {
+    "qualification_head_sha": "14d92e51787b8836c8e9ac2e5d9e6f9c2029ae57",
+    "workflow_run_id": 45086268384,
+    "toolchain": "Rust 1.96.0",
+    "format": "passed",
+    "tests": "14_passed_0_failed",
+    "strict_clippy": "passed"
   }
 }
