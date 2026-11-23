@@ -435,8 +435,11 @@ pub fn validate_events(events: &[EvidenceEvent]) -> Result<(), String> {
         match event.kind {
             EvidenceEventKind::Assertion | EvidenceEventKind::Correction => {
                 require_claim_fields(event)?;
-                if event.observed_at_millis.is_none() {
-                    return Err(format!("claim event missing observed_at_millis: {}", event.event_id));
+                let observed_at = event
+                    .observed_at_millis
+                    .ok_or_else(|| format!("claim event missing observed_at_millis: {}", event.event_id))?;
+                if observed_at > event.known_at_millis {
+                    return Err(format!("claim observed_at_millis is later than known_at_millis: {}", event.event_id));
                 }
                 if event.consent_id.is_some() && event.rights.consent_grant_event_id.is_none() {
                     return Err(format!("claim consent_id lacks grant reference: {}", event.event_id));
@@ -478,6 +481,9 @@ pub fn validate_events(events: &[EvidenceEvent]) -> Result<(), String> {
             EvidenceEventKind::Retraction => {
                 require_control_fields(event)?;
                 require_claim_key(event)?;
+                if event.consent_id.is_some() {
+                    return Err(format!("retraction cannot carry consent_id: {}", event.event_id));
+                }
                 if event.targets.is_empty() {
                     return Err(format!("retraction must target at least one claim: {}", event.event_id));
                 }
@@ -957,6 +963,24 @@ mod tests {
         event.payload_digest = Some(format!("sha256:{}", "c".repeat(64)));
         event.rights.allowed_purposes.clear();
         assert!(EvidenceLedger::new(vec![event]).is_err());
+    }
+
+    #[test]
+    fn rejects_source_observation_after_knowledge_time() {
+        let mut event = claim("claim-1", 1, 10, EvidenceEventKind::Assertion, Vec::new());
+        event.observed_at_millis = Some(11);
+        assert!(EvidenceLedger::new(vec![event]).is_err());
+    }
+
+    #[test]
+    fn retraction_cannot_smuggle_a_consent_identifier() {
+        let prior = claim("claim-1", 1, 10, EvidenceEventKind::Assertion, Vec::new());
+        let mut retraction = claim("retract-1", 2, 20, EvidenceEventKind::Retraction, vec!["claim-1"]);
+        retraction.source = None;
+        retraction.payload_digest = None;
+        retraction.observed_at_millis = None;
+        retraction.consent_id = Some("unexpected".to_string());
+        assert!(EvidenceLedger::new(vec![prior, retraction]).is_err());
     }
 
     #[test]
