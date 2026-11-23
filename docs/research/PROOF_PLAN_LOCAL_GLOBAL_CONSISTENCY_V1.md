@@ -241,9 +241,9 @@ An unknown global outcome remains in the denominator but is also reported separa
 
 ### Executable checks and claim ceiling
 
-The Rust validator rejects unknown fields, malformed SHA-256 digests, execution budget overruns, duplicate warrant-mention IDs, unsupported eligible labels, and eligible scope mismatches. Unit tests cover candidate/evaluator separation, scope mutations, denominator-zero behavior, unknown-outcome bounds, direct reuse, cited-rejected non-reuse and budget violations.
+The Rust validator rejects unknown fields, malformed SHA-256 digests, execution budget overruns, duplicate warrant-mention IDs, unsupported eligible labels, and eligible scope mismatches. Unit tests cover candidate/evaluator separation, finite Boolean countermodel evaluation and corruption controls, scope mutations, denominator-zero behavior, unknown-outcome bounds, direct reuse, cited-rejected non-reuse and budget violations.
 
-The synthetic p entails q fixture is a stipulated control record, not an evaluation of an LLM. Its countermodel p=true, q=false illustrates why the inference is invalid; the paired candidate outputs are synthetic data designed to exercise the receipt contract. It must not be reported as an observed CIRR score.
+The synthetic fixture now carries a recursively typed propositional formula and a finite Boolean valuation. It checks the converse failure: from the premise `p → q`, the conclusion `q → p` does not follow; the valuation `p=false, q=true` makes the premise true and the conclusion false. The Rust validator evaluates every premise and the conclusion, rejects duplicate or missing atom assignments, and does not trust a witness string. This is a finite semantic check for propositional formulas only, not Lean-kernel verification or a general mathematical proof. The paired candidate outputs and resulting 1/1 CIRR arithmetic remain synthetic contract fixtures, not an LLM evaluation or observed benchmark result.
 
 Run locally:
 

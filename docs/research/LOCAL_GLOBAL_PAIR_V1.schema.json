@@ -5,120 +5,276 @@
   "description": "Paired, scope-bound local/global proof-consistency receipt. Candidate-visible payload and evaluator-only adjudication are explicitly separated. Structural validity does not certify a theorem or Lean proof.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "candidate", "evaluator_only"],
+  "required": [
+    "schema_version",
+    "candidate",
+    "evaluator_only"
+  ],
   "properties": {
-    "schema_version": { "const": "1.0.0" },
-    "candidate": { "$ref": "#/$defs/candidate" },
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "candidate": {
+      "$ref": "#/$defs/candidate"
+    },
     "evaluator_only": {
       "oneOf": [
-        { "type": "null" },
-        { "$ref": "#/$defs/evaluator" }
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/evaluator"
+        }
       ]
     }
   },
   "$defs": {
-    "nonEmpty": { "type": "string", "minLength": 1 },
-    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "nonEmpty": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
     "candidate": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["pair_id", "task_class", "model_identity", "local_stage", "global_stage"],
+      "required": [
+        "pair_id",
+        "task_class",
+        "model_identity",
+        "local_stage",
+        "global_stage"
+      ],
       "properties": {
-        "pair_id": { "$ref": "#/$defs/nonEmpty" },
-        "task_class": { "$ref": "#/$defs/nonEmpty" },
-        "model_identity": { "$ref": "#/$defs/modelIdentity" },
-        "local_stage": { "$ref": "#/$defs/localStage" },
-        "global_stage": { "$ref": "#/$defs/globalStage" }
+        "pair_id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "task_class": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "model_identity": {
+          "$ref": "#/$defs/modelIdentity"
+        },
+        "local_stage": {
+          "$ref": "#/$defs/localStage"
+        },
+        "global_stage": {
+          "$ref": "#/$defs/globalStage"
+        }
       }
     },
     "modelIdentity": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["provider", "model", "version", "decoding_config_sha256"],
+      "required": [
+        "provider",
+        "model",
+        "version",
+        "decoding_config_sha256"
+      ],
       "properties": {
-        "provider": { "$ref": "#/$defs/nonEmpty" },
-        "model": { "$ref": "#/$defs/nonEmpty" },
-        "version": { "$ref": "#/$defs/nonEmpty" },
-        "decoding_config_sha256": { "$ref": "#/$defs/sha256" }
+        "provider": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "model": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "version": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "decoding_config_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
       }
     },
     "scopeBinding": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "source_repository", "source_revision", "source_path", "declaration",
-        "theorem_id", "root_goal_sha256", "hypothesis_set_sha256",
-        "premise_set_sha256", "conclusion_sha256", "warrant_id", "warrant_sha256"
+        "source_repository",
+        "source_revision",
+        "source_path",
+        "declaration",
+        "theorem_id",
+        "root_goal_sha256",
+        "hypothesis_set_sha256",
+        "premise_set_sha256",
+        "conclusion_sha256",
+        "warrant_id",
+        "warrant_sha256"
       ],
       "properties": {
-        "source_repository": { "$ref": "#/$defs/nonEmpty" },
-        "source_revision": { "$ref": "#/$defs/nonEmpty" },
-        "source_path": { "$ref": "#/$defs/nonEmpty" },
-        "declaration": { "$ref": "#/$defs/nonEmpty" },
-        "theorem_id": { "$ref": "#/$defs/nonEmpty" },
-        "root_goal_sha256": { "$ref": "#/$defs/sha256" },
-        "hypothesis_set_sha256": { "$ref": "#/$defs/sha256" },
-        "premise_set_sha256": { "$ref": "#/$defs/sha256" },
-        "conclusion_sha256": { "$ref": "#/$defs/sha256" },
-        "warrant_id": { "$ref": "#/$defs/nonEmpty" },
-        "warrant_sha256": { "$ref": "#/$defs/sha256" }
+        "source_repository": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "source_revision": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "source_path": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "declaration": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "theorem_id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "root_goal_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "hypothesis_set_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "premise_set_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "conclusion_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "warrant_id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "warrant_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
       }
     },
     "execution": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "prompt_sha256", "input_sha256", "output_sha256", "output_artifact_ref",
-        "token_budget", "tokens_used", "tool_call_budget", "tool_calls_used",
-        "wall_clock_budget_ms", "wall_clock_used_ms"
+        "prompt_sha256",
+        "input_sha256",
+        "output_sha256",
+        "output_artifact_ref",
+        "token_budget",
+        "tokens_used",
+        "tool_call_budget",
+        "tool_calls_used",
+        "wall_clock_budget_ms",
+        "wall_clock_used_ms"
       ],
       "properties": {
-        "prompt_sha256": { "$ref": "#/$defs/sha256" },
-        "input_sha256": { "$ref": "#/$defs/sha256" },
-        "output_sha256": { "$ref": "#/$defs/sha256" },
-        "output_artifact_ref": { "$ref": "#/$defs/nonEmpty" },
-        "token_budget": { "type": "integer", "minimum": 0 },
-        "tokens_used": { "type": "integer", "minimum": 0 },
-        "tool_call_budget": { "type": "integer", "minimum": 0 },
-        "tool_calls_used": { "type": "integer", "minimum": 0 },
-        "wall_clock_budget_ms": { "type": "integer", "minimum": 0 },
-        "wall_clock_used_ms": { "type": "integer", "minimum": 0 }
+        "prompt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "input_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "output_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "output_artifact_ref": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "token_budget": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "tokens_used": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "tool_call_budget": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "tool_calls_used": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "wall_clock_budget_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "wall_clock_used_ms": {
+          "type": "integer",
+          "minimum": 0
+        }
       }
     },
     "localStage": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["scope_binding", "execution", "verdict"],
+      "required": [
+        "scope_binding",
+        "execution",
+        "verdict"
+      ],
       "properties": {
-        "scope_binding": { "$ref": "#/$defs/scopeBinding" },
-        "execution": { "$ref": "#/$defs/execution" },
-        "verdict": { "enum": ["accept", "reject", "unknown", "ill_formed"] }
+        "scope_binding": {
+          "$ref": "#/$defs/scopeBinding"
+        },
+        "execution": {
+          "$ref": "#/$defs/execution"
+        },
+        "verdict": {
+          "enum": [
+            "accept",
+            "reject",
+            "unknown",
+            "ill_formed"
+          ]
+        }
       }
     },
     "warrantMention": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["mention_id", "warrant_id", "plan_node_id", "relation"],
+      "required": [
+        "mention_id",
+        "warrant_id",
+        "plan_node_id",
+        "relation"
+      ],
       "properties": {
-        "mention_id": { "$ref": "#/$defs/nonEmpty" },
-        "warrant_id": { "$ref": "#/$defs/nonEmpty" },
-        "plan_node_id": { "$ref": "#/$defs/nonEmpty" },
+        "mention_id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "warrant_id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "plan_node_id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
         "relation": {
-          "enum": ["uses_as_rule", "supports_inference", "cites", "rebuts", "context_only", "alternative"]
+          "enum": [
+            "uses_as_rule",
+            "supports_inference",
+            "cites",
+            "rebuts",
+            "context_only",
+            "alternative"
+          ]
         }
       }
     },
     "globalStage": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["scope_binding", "execution", "proof_plan_sha256", "warrant_mentions"],
+      "required": [
+        "scope_binding",
+        "execution",
+        "proof_plan_sha256",
+        "warrant_mentions"
+      ],
       "properties": {
-        "scope_binding": { "$ref": "#/$defs/scopeBinding" },
-        "execution": { "$ref": "#/$defs/execution" },
-        "proof_plan_sha256": { "$ref": "#/$defs/sha256" },
+        "scope_binding": {
+          "$ref": "#/$defs/scopeBinding"
+        },
+        "execution": {
+          "$ref": "#/$defs/execution"
+        },
+        "proof_plan_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
         "warrant_mentions": {
           "type": "array",
-          "items": { "$ref": "#/$defs/warrantMention" }
+          "items": {
+            "$ref": "#/$defs/warrantMention"
+          }
         }
       }
     },
@@ -126,24 +282,230 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "eligibility", "exclusion_reason", "independently_assessed_warrant",
-        "local_verdict_correct", "global_disposition", "adjudication_authority",
-        "adjudication_refs"
+        "eligibility",
+        "exclusion_reason",
+        "independently_assessed_warrant",
+        "local_verdict_correct",
+        "global_disposition",
+        "adjudication_authority",
+        "adjudication_refs",
+        "finite_boolean_countermodel"
       ],
       "properties": {
-        "eligibility": { "enum": ["eligible", "excluded"] },
-        "exclusion_reason": { "type": ["string", "null"] },
-        "independently_assessed_warrant": { "enum": ["valid", "invalid", "unknown"] },
-        "local_verdict_correct": { "type": ["boolean", "null"] },
-        "global_disposition": {
-          "enum": ["used_directly", "used_implicitly", "cited_rejected", "omitted", "unknown"]
+        "eligibility": {
+          "enum": [
+            "eligible",
+            "excluded"
+          ]
         },
-        "adjudication_authority": { "$ref": "#/$defs/nonEmpty" },
+        "exclusion_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "independently_assessed_warrant": {
+          "enum": [
+            "valid",
+            "invalid",
+            "unknown"
+          ]
+        },
+        "local_verdict_correct": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "global_disposition": {
+          "enum": [
+            "used_directly",
+            "used_implicitly",
+            "cited_rejected",
+            "omitted",
+            "unknown"
+          ]
+        },
+        "adjudication_authority": {
+          "$ref": "#/$defs/nonEmpty"
+        },
         "adjudication_refs": {
           "type": "array",
           "minItems": 1,
           "uniqueItems": true,
-          "items": { "$ref": "#/$defs/nonEmpty" }
+          "items": {
+            "$ref": "#/$defs/nonEmpty"
+          }
+        },
+        "finite_boolean_countermodel": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/booleanCountermodel"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "booleanAssignment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atom",
+        "value"
+      ],
+      "properties": {
+        "atom": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "value": {
+          "type": "boolean"
+        }
+      }
+    },
+    "booleanFormula": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "name"
+          ],
+          "properties": {
+            "op": {
+              "const": "atom"
+            },
+            "name": {
+              "$ref": "#/$defs/nonEmpty"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "arg"
+          ],
+          "properties": {
+            "op": {
+              "const": "not"
+            },
+            "arg": {
+              "$ref": "#/$defs/booleanFormula"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "left",
+            "right"
+          ],
+          "properties": {
+            "op": {
+              "const": "and"
+            },
+            "left": {
+              "$ref": "#/$defs/booleanFormula"
+            },
+            "right": {
+              "$ref": "#/$defs/booleanFormula"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "left",
+            "right"
+          ],
+          "properties": {
+            "op": {
+              "const": "or"
+            },
+            "left": {
+              "$ref": "#/$defs/booleanFormula"
+            },
+            "right": {
+              "$ref": "#/$defs/booleanFormula"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "left",
+            "right"
+          ],
+          "properties": {
+            "op": {
+              "const": "implies"
+            },
+            "left": {
+              "$ref": "#/$defs/booleanFormula"
+            },
+            "right": {
+              "$ref": "#/$defs/booleanFormula"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "left",
+            "right"
+          ],
+          "properties": {
+            "op": {
+              "const": "iff"
+            },
+            "left": {
+              "$ref": "#/$defs/booleanFormula"
+            },
+            "right": {
+              "$ref": "#/$defs/booleanFormula"
+            }
+          }
+        }
+      ]
+    },
+    "booleanCountermodel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "premises",
+        "conclusion",
+        "valuation"
+      ],
+      "properties": {
+        "premises": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/booleanFormula"
+          }
+        },
+        "conclusion": {
+          "$ref": "#/$defs/booleanFormula"
+        },
+        "valuation": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/booleanAssignment"
+          }
         }
       }
     }

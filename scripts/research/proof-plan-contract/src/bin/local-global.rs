@@ -45,6 +45,14 @@ fn main() -> ExitCode {
         pair.candidate.pair_id
     );
     println!("scope_match={}", pair.scope_matches());
+    if let Some(evaluator) = &pair.evaluator_only {
+        if let Some(countermodel) = &evaluator.finite_boolean_countermodel {
+            println!(
+                "finite_boolean_countermodel=verified premises={} conclusion=false",
+                countermodel.premises.len()
+            );
+        }
+    }
     println!(
         "cirr_numerator={} cirr_denominator={} unresolved={}",
         summary.numerator_definite_reuse,

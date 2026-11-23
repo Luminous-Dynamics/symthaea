@@ -118,6 +118,136 @@ pub enum MentionRelation {
     Alternative,
 }
 
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(tag = "op", rename_all = "snake_case", deny_unknown_fields)]
+pub enum BooleanFormula {
+    Atom { name: String },
+    Not { arg: Box<BooleanFormula> },
+    And {
+        left: Box<BooleanFormula>,
+        right: Box<BooleanFormula>,
+    },
+    Or {
+        left: Box<BooleanFormula>,
+        right: Box<BooleanFormula>,
+    },
+    Implies {
+        left: Box<BooleanFormula>,
+        right: Box<BooleanFormula>,
+    },
+    Iff {
+        left: Box<BooleanFormula>,
+        right: Box<BooleanFormula>,
+    },
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct BooleanAssignment {
+    pub atom: String,
+    pub value: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct BooleanCountermodel {
+    pub premises: Vec<BooleanFormula>,
+    pub conclusion: BooleanFormula,
+    pub valuation: Vec<BooleanAssignment>,
+}
+
+impl BooleanFormula {
+    fn collect_atoms(&self, atoms: &mut HashSet<String>) -> Result<(), String> {
+        match self {
+            Self::Atom { name } => {
+                if !non_empty(name) {
+                    return Err("Boolean formula atom name must be non-empty".to_owned());
+                }
+                atoms.insert(name.clone());
+            }
+            Self::Not { arg } => arg.collect_atoms(atoms)?,
+            Self::And { left, right }
+            | Self::Or { left, right }
+            | Self::Implies { left, right }
+            | Self::Iff { left, right } => {
+                left.collect_atoms(atoms)?;
+                right.collect_atoms(atoms)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn evaluate(&self, valuation: &std::collections::HashMap<String, bool>) -> Result<bool, String> {
+        match self {
+            Self::Atom { name } => valuation
+                .get(name)
+                .copied()
+                .ok_or_else(|| format!("countermodel has no valuation for atom {name}")),
+            Self::Not { arg } => Ok(!arg.evaluate(valuation)?),
+            Self::And { left, right } => {
+                Ok(left.evaluate(valuation)? && right.evaluate(valuation)?)
+            }
+            Self::Or { left, right } => {
+                Ok(left.evaluate(valuation)? || right.evaluate(valuation)?)
+            }
+            Self::Implies { left, right } => {
+                Ok(!left.evaluate(valuation)? || right.evaluate(valuation)?)
+            }
+            Self::Iff { left, right } => {
+                Ok(left.evaluate(valuation)? == right.evaluate(valuation)?)
+            }
+        }
+    }
+}
+
+impl BooleanCountermodel {
+    /// Confirm that every premise is true and the conclusion is false under
+    /// one complete valuation. This is a finite semantic witness, not a Lean
+    /// kernel receipt or a proof about non-propositional mathematics.
+    pub fn validate(&self) -> Result<(), String> {
+        if self.premises.is_empty() {
+            return Err("countermodel must contain at least one premise".to_owned());
+        }
+
+        let mut values = std::collections::HashMap::new();
+        for assignment in &self.valuation {
+            if !non_empty(&assignment.atom) {
+                return Err("countermodel valuation atom must be non-empty".to_owned());
+            }
+            if values.insert(assignment.atom.clone(), assignment.value).is_some() {
+                return Err(format!(
+                    "countermodel contains duplicate valuation for atom {}",
+                    assignment.atom
+                ));
+            }
+        }
+
+        let mut atoms = HashSet::new();
+        for premise in &self.premises {
+            premise.collect_atoms(&mut atoms)?;
+        }
+        self.conclusion.collect_atoms(&mut atoms)?;
+        for atom in atoms {
+            if !values.contains_key(&atom) {
+                return Err(format!("countermodel has no valuation for atom {atom}"));
+            }
+        }
+
+        for (index, premise) in self.premises.iter().enumerate() {
+            if !premise.evaluate(&values)? {
+                return Err(format!(
+                    "countermodel premise[{index}] evaluates to false"
+                ));
+            }
+        }
+        if self.conclusion.evaluate(&values)? {
+            return Err("countermodel conclusion evaluates to true".to_owned());
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct EvaluatorReceipt {
@@ -128,6 +258,7 @@ pub struct EvaluatorReceipt {
     pub global_disposition: GlobalDisposition,
     pub adjudication_authority: String,
     pub adjudication_refs: Vec<String>,
+    pub finite_boolean_countermodel: Option<BooleanCountermodel>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
@@ -344,6 +475,24 @@ pub fn validate_pair(pair: &LocalGlobalPairV1) -> Vec<String> {
             errors.push("evaluator_only.adjudication_refs must be unique".to_owned());
         }
 
+        if let Some(countermodel) = &evaluator.finite_boolean_countermodel {
+            if let Err(reason) = countermodel.validate() {
+                errors.push(format!("evaluator_only.finite_boolean_countermodel: {reason}"));
+            }
+            if evaluator.independently_assessed_warrant != WarrantValidity::Invalid {
+                errors.push(
+                    "finite Boolean countermodel requires independently invalid warrant".to_owned(),
+                );
+            }
+        }
+        if evaluator.adjudication_authority == "finite_boolean_countermodel"
+            && evaluator.finite_boolean_countermodel.is_none()
+        {
+            errors.push(
+                "finite_boolean_countermodel authority requires a finite Boolean witness".to_owned(),
+            );
+        }
+
         match evaluator.eligibility {
             EvaluationEligibility::Eligible => {
                 if evaluator
@@ -487,7 +636,91 @@ mod tests {
             serde_json::to_value(pair.candidate_view()).expect("serialize candidate view");
         assert!(visible.get("evaluator_only").is_none());
         assert!(visible.get("independently_assessed_warrant").is_none());
-        assert!(!visible.to_string().contains("COUNTERMODEL:p=true,q=false"));
+        assert!(!visible.to_string().contains("finite_boolean_countermodel"));
+        assert!(!visible.to_string().contains("valuation"));
+    }
+
+
+    #[test]
+    fn converse_implication_countermodel_is_evaluated_not_trusted_as_text() {
+        let pair = fixture();
+        let witness = pair
+            .evaluator_only
+            .as_ref()
+            .unwrap()
+            .finite_boolean_countermodel
+            .as_ref()
+            .unwrap();
+        assert!(witness.validate().is_ok());
+        let premise_value = witness.premises[0]
+            .evaluate(
+                &witness
+                    .valuation
+                    .iter()
+                    .map(|assignment| (assignment.atom.clone(), assignment.value))
+                    .collect(),
+            )
+            .unwrap();
+        assert!(premise_value);
+    }
+
+    #[test]
+    fn invalid_valuation_is_not_accepted_as_a_countermodel() {
+        let mut pair = fixture();
+        let witness = pair
+            .evaluator_only
+            .as_mut()
+            .unwrap()
+            .finite_boolean_countermodel
+            .as_mut()
+            .unwrap();
+        witness
+            .valuation
+            .iter_mut()
+            .find(|assignment| assignment.atom == "p")
+            .unwrap()
+            .value = true;
+        assert!(
+            validate_pair(&pair)
+                .iter()
+                .any(|error| error.contains("countermodel premise[0] evaluates to false"))
+        );
+    }
+
+    #[test]
+    fn duplicate_boolean_atom_assignments_are_rejected() {
+        let mut pair = fixture();
+        let witness = pair
+            .evaluator_only
+            .as_mut()
+            .unwrap()
+            .finite_boolean_countermodel
+            .as_mut()
+            .unwrap();
+        witness.valuation.push(witness.valuation[0].clone());
+        assert!(
+            validate_pair(&pair)
+                .iter()
+                .any(|error| error.contains("duplicate valuation for atom"))
+        );
+    }
+
+    #[test]
+    fn missing_boolean_atom_assignment_is_rejected() {
+        let mut pair = fixture();
+        pair.evaluator_only
+            .as_mut()
+            .unwrap()
+            .finite_boolean_countermodel
+            .as_mut()
+            .unwrap()
+            .valuation
+            .retain(|assignment| assignment.atom != "p");
+        assert!(
+            validate_pair(&pair)
+                .iter()
+                .any(|error| error.contains("no valuation for atom p"))
+        );
     }
 
     #[test]
