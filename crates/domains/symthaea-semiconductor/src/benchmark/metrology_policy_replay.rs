@@ -287,6 +287,236 @@ fn seal_selection_for_test(selection: &mut MetrologyAuditSelectionReportV1) {
 }
 
 pub const SYNTHETIC_HEURISTIC_MODEL_V1: &str = "semi.synthetic.sensor-rule-heuristic.v1";
+pub const REPLAY_TOURNAMENT_SCHEMA_V1: &str =
+    "luminous.semi-bench.synthetic-metrology-policy-tournament.v1";
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct SyntheticMetrologyPolicyTournamentRunV1 {
+    pub scenario_id: String,
+    pub scenario_seed: u64,
+    pub policy_id: String,
+    pub selection_sha256: String,
+    pub evaluation: SyntheticFabPolicyEvaluationV1,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct SyntheticMetrologyPolicyTournamentSummaryV1 {
+    pub policy_id: String,
+    pub run_count: usize,
+    pub measurement_reduction_mean: f64,
+    pub measurement_reduction_sample_stddev: f64,
+    pub detection_capture_support: usize,
+    pub detection_capture_mean: Option<f64>,
+    pub detection_capture_sample_stddev: Option<f64>,
+    pub undetected_defect_fraction_support: usize,
+    pub undetected_defect_fraction_mean: Option<f64>,
+    pub undetected_defect_fraction_sample_stddev: Option<f64>,
+    pub assay_adjusted_prevalence_error_support: usize,
+    pub assay_adjusted_prevalence_absolute_error_mean: Option<f64>,
+    pub assay_adjusted_prevalence_absolute_error_sample_stddev: Option<f64>,
+    pub cost_per_detected_defect_support: usize,
+    pub cost_per_detected_defect_mean: Option<f64>,
+    pub cost_per_detected_defect_sample_stddev: Option<f64>,
+    pub evaluation_sha256s: Vec<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct SyntheticMetrologyPolicyTournamentV1 {
+    pub schema: String,
+    pub tournament_id: String,
+    pub scenario_manifest_sha256: String,
+    pub policy_manifest_sha256: String,
+    pub total_cost_budget: u64,
+    pub paired_scenario_count: usize,
+    pub policy_count: usize,
+    pub runs: Vec<SyntheticMetrologyPolicyTournamentRunV1>,
+    pub summaries: Vec<SyntheticMetrologyPolicyTournamentSummaryV1>,
+    pub tournament_sha256: String,
+}
+
+/// Sample mean and sample standard deviation. A one-observation standard
+/// deviation is reported as zero and must be interpreted with its support count.
+fn mean_sample_stddev(values: &[f64]) -> Option<(f64, f64)> {
+    if values.is_empty() {
+        return None;
+    }
+    let mean = values.iter().sum::<f64>() / values.len() as f64;
+    if values.len() == 1 {
+        return Some((mean, 0.0));
+    }
+    let variance = values
+        .iter()
+        .map(|value| (value - mean).powi(2))
+        .sum::<f64>()
+        / (values.len() - 1) as f64;
+    Some((mean, variance.sqrt()))
+}
+
+/// Executes every policy template on every scenario seed. Policies are paired
+/// by receiving the same generated episode; the per-policy selection seed is
+/// deterministically derived from the template seed and scenario seed.
+/// All policies must use the same total cost budget.
+pub fn run_synthetic_metrology_policy_tournament_v1(
+    tournament_id: &str,
+    scenarios: &[SyntheticFabScenarioConfigV1],
+    policy_templates: &[SyntheticMetrologyPolicyConfigV1],
+) -> Result<SyntheticMetrologyPolicyTournamentV1, SyntheticFabReplayError> {
+    if tournament_id.trim().is_empty() || scenarios.is_empty() || policy_templates.is_empty() {
+        return Err(SyntheticFabReplayError(
+            "tournament requires an ID, scenarios and policy templates".into(),
+        ));
+    }
+    let common_cost_budget = policy_templates[0].total_cost_budget;
+    if common_cost_budget == 0
+        || policy_templates
+            .iter()
+            .any(|policy| policy.total_cost_budget != common_cost_budget)
+    {
+        return Err(SyntheticFabReplayError(
+            "all tournament policies must share one positive total cost budget".into(),
+        ));
+    }
+
+    let mut scenario_keys = BTreeSet::new();
+    let mut policy_ids = BTreeSet::new();
+    let first = &scenarios[0];
+    for (index, scenario) in scenarios.iter().enumerate() {
+        validate_config(scenario)?;
+        if !scenario_keys.insert((scenario.scenario_id.as_str(), scenario.seed)) {
+            return Err(SyntheticFabReplayError(format!(
+                "scenarios[{index}]: duplicate scenario ID and seed"
+            )));
+        }
+        if scenario.wafer_count != first.wafer_count
+            || scenario.tool_count != first.tool_count
+            || scenario.chamber_count != first.chamber_count
+        {
+            return Err(SyntheticFabReplayError(
+                "paired scenarios must share wafer, tool and chamber populations".into(),
+            ));
+        }
+    }
+    for (index, policy) in policy_templates.iter().enumerate() {
+        if policy.policy_id.trim().is_empty() || !policy_ids.insert(policy.policy_id.as_str()) {
+            return Err(SyntheticFabReplayError(format!(
+                "policy_templates[{index}]: empty or duplicate policy ID"
+            )));
+        }
+        if policy.total_cost_budget != common_cost_budget {
+            return Err(SyntheticFabReplayError(
+                "tournament cost budgets must be matched".into(),
+            ));
+        }
+    }
+
+    let scenario_manifest_sha256 = json_sha256(scenarios)?;
+    let policy_manifest_sha256 = json_sha256(policy_templates)?;
+    let mut runs = Vec::with_capacity(scenarios.len() * policy_templates.len());
+
+    for scenario in scenarios {
+        let episode = generate_synthetic_fab_episode_v1(scenario)?;
+        let semantics = synthetic_defect_semantics_v1(scenario.defect_threshold)?;
+        for template in policy_templates {
+            let mut policy = template.clone();
+            policy.seed = stratum_seed(
+                template.seed ^ scenario.seed,
+                &scenario.scenario_id,
+            );
+            let run = run_synthetic_metrology_policy_v1(
+                &episode,
+                episode.policy_view(),
+                &semantics,
+                &policy,
+            )?;
+            runs.push(SyntheticMetrologyPolicyTournamentRunV1 {
+                scenario_id: scenario.scenario_id.clone(),
+                scenario_seed: scenario.seed,
+                policy_id: template.policy_id.clone(),
+                selection_sha256: run.selection.selection_sha256,
+                evaluation: run.evaluation,
+            });
+        }
+    }
+
+    let mut summaries = Vec::with_capacity(policy_templates.len());
+    for template in policy_templates {
+        let policy_runs: Vec<_> = runs
+            .iter()
+            .filter(|run| run.policy_id == template.policy_id)
+            .collect();
+        let measurement_reductions: Vec<f64> = policy_runs
+            .iter()
+            .map(|run| run.evaluation.measurement_reduction_fraction)
+            .collect();
+        let detection_capture: Vec<f64> = policy_runs
+            .iter()
+            .filter_map(|run| run.evaluation.detection_capture_fraction)
+            .collect();
+        let undetected_fraction: Vec<f64> = policy_runs
+            .iter()
+            .filter_map(|run| run.evaluation.total_undetected_defect_fraction)
+            .collect();
+        let assay_adjusted_error: Vec<f64> = policy_runs
+            .iter()
+            .filter_map(|run| run.evaluation.assay_adjusted_ht_absolute_error)
+            .collect();
+        let cost_per_detected: Vec<f64> = policy_runs
+            .iter()
+            .filter_map(|run| run.evaluation.cost_per_defect_captured)
+            .collect();
+
+        let (measurement_reduction_mean, measurement_reduction_sample_stddev) =
+            mean_sample_stddev(&measurement_reductions).ok_or_else(|| {
+                SyntheticFabReplayError("policy tournament has no measurement results".into())
+            })?;
+        let detection_capture_stats = mean_sample_stddev(&detection_capture);
+        let undetected_fraction_stats = mean_sample_stddev(&undetected_fraction);
+        let assay_error_stats = mean_sample_stddev(&assay_adjusted_error);
+        let cost_per_detected_stats = mean_sample_stddev(&cost_per_detected);
+
+        summaries.push(SyntheticMetrologyPolicyTournamentSummaryV1 {
+            policy_id: template.policy_id.clone(),
+            run_count: policy_runs.len(),
+            measurement_reduction_mean,
+            measurement_reduction_sample_stddev,
+            detection_capture_support: detection_capture.len(),
+            detection_capture_mean: detection_capture_stats.map(|stats| stats.0),
+            detection_capture_sample_stddev: detection_capture_stats.map(|stats| stats.1),
+            undetected_defect_fraction_support: undetected_fraction.len(),
+            undetected_defect_fraction_mean: undetected_fraction_stats.map(|stats| stats.0),
+            undetected_defect_fraction_sample_stddev: undetected_fraction_stats
+                .map(|stats| stats.1),
+            assay_adjusted_prevalence_error_support: assay_adjusted_error.len(),
+            assay_adjusted_prevalence_absolute_error_mean: assay_error_stats.map(|stats| stats.0),
+            assay_adjusted_prevalence_absolute_error_sample_stddev: assay_error_stats
+                .map(|stats| stats.1),
+            cost_per_detected_defect_support: cost_per_detected.len(),
+            cost_per_detected_defect_mean: cost_per_detected_stats.map(|stats| stats.0),
+            cost_per_detected_defect_sample_stddev: cost_per_detected_stats.map(|stats| stats.1),
+            evaluation_sha256s: policy_runs
+                .iter()
+                .map(|run| run.evaluation.evaluation_sha256.clone())
+                .collect(),
+        });
+    }
+
+    let mut tournament = SyntheticMetrologyPolicyTournamentV1 {
+        schema: REPLAY_TOURNAMENT_SCHEMA_V1.into(),
+        tournament_id: tournament_id.into(),
+        scenario_manifest_sha256,
+        policy_manifest_sha256,
+        total_cost_budget: common_cost_budget,
+        paired_scenario_count: scenarios.len(),
+        policy_count: policy_templates.len(),
+        runs,
+        summaries,
+        tournament_sha256: String::new(),
+    };
+    tournament.tournament_sha256 = json_sha256(&tournament)?;
+    Ok(tournament)
+}
+
+
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SyntheticMetrologyPolicyConfigV1 {
