@@ -138,6 +138,97 @@
           "use": "pinned external research-agent and black-hole numerical-physics benchmark comparison"
         }
       ]
+    },
+    {
+      "role": "symthaea_simple_variance_experiment_selector",
+      "repository": "Luminous-Dynamics/symthaea",
+      "ref": "main",
+      "files": [
+        {
+          "path": "crates/core/symthaea-core/src/hdc/conjecture_engine/experiment_selection.rs",
+          "git_blob_sha1": "06a033939ba922f1933680d8bd15ab4d9222d296",
+          "use": "prediction-variance disagreement baseline; not EIG or posterior"
+        },
+        {
+          "path": "crates/core/symthaea-core/src/hdc/conjecture_engine/cfc_smoothing.rs",
+          "git_blob_sha1": "70424f79db300cf97a40271d128326aabc5cb017",
+          "use": "dt-aware observation smoother; optional and not a BVP solver or campaign authority"
+        }
+      ]
+    },
+    {
+      "role": "symthaea_robust_maximin_selector_candidate",
+      "repository": "Luminous-Dynamics/symthaea",
+      "ref": "feat/physics-experiment-design-v0-1-2026-10-18",
+      "pr": "https://github.com/Luminous-Dynamics/symthaea/pull/8034",
+      "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/8034",
+      "workflow_state": "draft; dedicated workflow fails before package checks on root Cargo workspace discovery",
+      "qualification_status": "not_qualified",
+      "files": [
+        {
+          "path": "crates/domains/symthaea-experiment-design/src/lib.rs",
+          "git_blob_sha1": "f5ea0c9d226948344b8eba497aeca2300056e9aa",
+          "use": "prior-free maximin standardized separation; assumes conditionally independent observables"
+        },
+        {
+          "path": "crates/domains/symthaea-experiment-design/Cargo.toml",
+          "git_blob_sha1": "b22aaec604c9d9a72b69cdaf8aa23935e08007f1",
+          "use": "standalone design package manifest"
+        },
+        {
+          "path": "crates/domains/symthaea-experiment-design/src/main.rs",
+          "git_blob_sha1": "accede6ad3bb715825b54d7db15ef72a34db6769",
+          "use": "JSON CLI"
+        },
+        {
+          "path": "crates/domains/symthaea-experiment-design/fixtures/galileo-discrimination-v0.1.json",
+          "git_blob_sha1": "0548cf58562517e69c93e5f810bfee822acee1a2",
+          "use": "synthetic Galileo design fixture; not historical experimental reconstruction"
+        },
+        {
+          "path": ".github/workflows/physics-experiment-design.yml",
+          "git_blob_sha1": "72550e109662ef3c83578e5fb79345b8b45a941a",
+          "use": "focused formatting/tests/Clippy/demo/JSON workflow"
+        }
+      ]
+    },
+    {
+      "role": "symthaea_workspace_glob_repair_candidate",
+      "repository": "Luminous-Dynamics/symthaea",
+      "ref": "fix/workspace-exclude-empty-core-symthaea-2026-11-21",
+      "pr": "https://github.com/Luminous-Dynamics/symthaea/pull/13080",
+      "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13080",
+      "workflow_state": "draft; dedicated Workspace manifest smoke passed at exact head 6a0f432c8b647704c8a6101e78bd661722ad105c; separate Beverage workflow failed",
+      "qualification_status": "workspace_smoke_pass_only",
+      "files": [
+        {
+          "path": "Cargo.toml",
+          "git_blob_sha1": "6b0b90b7b02912d392cd15ba658828ad09687bf6",
+          "use": "excludes unmanifested workspace glob directories"
+        },
+        {
+          "path": "scripts/check-workspace-targets.sh",
+          "git_blob_sha1": "63264e93c7f9dea6252f288af45565e34f17f972",
+          "use": "fails closed on unexcluded source-only workspace glob directories"
+        },
+        {
+          "path": ".github/workflows/workspace-manifest-smoke.yml",
+          "git_blob_sha1": "2aa01568f62f3cd081bd58214b7dc70464dd09fb",
+          "use": "focused workspace integrity and Cargo metadata workflow"
+        }
+      ]
+    },
+    {
+      "role": "symthaea_covariance_redundancy_synthetic_control",
+      "repository": "Luminous-Dynamics/symthaea",
+      "ref": "research/bh-egb-symthaea-campaign-2026-11-23",
+      "files": [
+        {
+          "path": "docs/research/BH_EGB_COVARIANCE_REDUNDANCY_CONTROL_V0_1.json",
+          "git_blob_sha1": "cf737cf3632464bdc7d816f941027b7eefd796ea",
+          "use": "exact synthetic covariance and redundant-observable regression fixture"
+        }
+      ]
     }
   ],
   "authority_boundaries": {
@@ -429,11 +520,11 @@
     },
     {
       "id": "P04",
-      "name": "active_selector",
+      "name": "robust_maximin_independent_observable_selector",
       "features": [
-        "existing_experiment_selector"
+        "symthaea_experiment_design_prior_free_maximin"
       ],
-      "eligibility": "only_after_exact_implementation_qualification"
+      "eligibility": "draft PR #8034 only; not eligible until focused exact-head package workflow passes after workspace repair; conditional-independence assumption limits EGB use"
     },
     {
       "id": "P05",
@@ -474,6 +565,15 @@
         "enumerated_outcome_oracle"
       ],
       "eligibility": "upper-bound diagnostic only"
+    },
+    {
+      "id": "P10",
+      "name": "simple_prediction_variance_selector",
+      "features": [
+        "select_most_informative_experiment",
+        "population_prediction_variance"
+      ],
+      "eligibility": "baseline only; not EIG, posterior, calibrated uncertainty, or resource-aware VoC"
     }
   ],
   "confirmatory_preconditions": {
@@ -554,5 +654,36 @@
       "reported_result": "neural discovery plus pseudo-spectral refinement for higher-curvature rotating black-hole families",
       "use": "matched 5D Einstein-limit and later same-model numerical comparator"
     }
-  ]
+  ],
+  "acquisition_policy": {
+    "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13418",
+    "stages": [
+      {
+        "id": "A",
+        "name": "research_action_allocation",
+        "owner_issues": [
+          "https://github.com/Luminous-Dynamics/symthaea/issues/8721",
+          "https://github.com/Luminous-Dynamics/symthaea/issues/11171"
+        ],
+        "objective": "prospective value-of-computation for choosing among legal source, derivation, mutation, BVP, precision, endpoint, interval and proof actions",
+        "baseline_arms": [
+          "fixed_schedule",
+          "random_matched_cost",
+          "static_threshold",
+          "no_optional_tool"
+        ],
+        "authority": "policy forecast is prospective advice; execution and result qualification are external"
+      },
+      {
+        "id": "B",
+        "name": "numerical_experiment_design",
+        "owner_pr": "https://github.com/Luminous-Dynamics/symthaea/pull/8034",
+        "objective": "choose design settings/observables that discriminate declared competing physical or numerical hypotheses",
+        "current_candidate_status": "draft_unqualified; independent-observable maximin only",
+        "required_extension": "covariance-aware, metric-aware, redundancy-invariant score with uncertainty calibration and explicit interval disposition",
+        "synthetic_control": "docs/research/BH_EGB_COVARIANCE_REDUNDANCY_CONTROL_V0_1.json"
+      }
+    ],
+    "anti_conflation": "Stage A computation allocation and Stage B numerical experiment selection have different outcome spaces, costs and validation requirements; do not combine raw variance, VoC and EIG into one scalar."
+  }
 }
