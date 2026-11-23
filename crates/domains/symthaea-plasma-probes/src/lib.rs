@@ -11,7 +11,7 @@
 
 use std::collections::BTreeSet;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 const CONTRACT_VERSION: &str = "0.1";
@@ -96,6 +96,8 @@ pub enum ContractError {
     InvalidNormalizationOutputInterval,
     #[error("normalization coordinate is non-finite")]
     NonFiniteNormalizationCoordinate,
+    #[error("invalid KIRD record field {field}: {reason}")]
+    InvalidKirdField { field: &'static str, reason: &'static str },
 }
 
 /// A parsed and semantically checked v0.1 pulse-family contract.
@@ -1461,6 +1463,459 @@ fn linspace(minimum: f64, maximum: f64, steps: usize) -> Result<Vec<f64>, Contra
     Ok(values)
 }
 
+/// Summary of a semantically checked KIRD checkpoint record.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct KirdRecordSummary {
+    pub record_id: String,
+    pub record_status: String,
+    pub checkpoint_bytes: u64,
+    pub model_asset_bytes: u64,
+    pub decoder_asset_bytes: u64,
+    pub amortization_rollouts: u64,
+    pub amortized_asset_bytes_per_rollout: f64,
+    pub amortized_persistent_bytes_per_rollout: f64,
+    pub peak_working_set_bytes: u64,
+    pub registered_probe_count: u64,
+    pub confirmed_probe_count: u64,
+    pub response_coverage_kind: String,
+    pub globally_bounded: bool,
+    pub physical_gate_status: String,
+}
+
+/// Validate KIRD cross-field semantics after JSON Schema validation.
+///
+/// This deliberately does not claim to verify external SHA-256 artifacts or
+/// physical convergence. It checks digest syntax / non-placeholder identity,
+/// accounting arithmetic, split policy, response-coverage consistency and
+/// metric/status consistency. The caller must separately run the JSON Schema
+/// validator and resolve each digest against immutable evidence.
+pub fn validate_kird_record_json(input: &str) -> Result<KirdRecordSummary, ContractError> {
+    let value: serde_json::Value =
+        serde_json::from_str(input).map_err(|error| ContractError::JsonParse(error.to_string()))?;
+    validate_kird_record_value(&value)
+}
+
+/// Validate an already-parsed KIRD JSON value.
+pub fn validate_kird_record_value(
+    value: &serde_json::Value,
+) -> Result<KirdRecordSummary, ContractError> {
+    use serde_json::Value;
+
+    let record_id = kird_string(value, "record_id")?;
+    if !record_id.starts_with("KIRD-") {
+        return Err(kird_error("record_id", "must use the KIRD- prefix"));
+    }
+    let record_status = kird_string(value, "record_status")?;
+    if !matches!(record_status, "synthetic_fixture_only" | "physical_measurement") {
+        return Err(kird_error("record_status", "unsupported record status"));
+    }
+
+    let split_role = kird_string(value, "task_contract.split_role")?;
+    let acquisition_allowed = kird_bool(value, "task_contract.acquisition_allowed")?;
+    if split_role == "sealed_test" && acquisition_allowed {
+        return Err(kird_error(
+            "task_contract.acquisition_allowed",
+            "sealed-test records must prohibit new acquisition",
+        ));
+    }
+
+    let physical_authorized = kird_bool(value, "provenance.physical_execution_authorized")?;
+    let is_physical = record_status == "physical_measurement";
+    if physical_authorized != is_physical {
+        return Err(kird_error(
+            "provenance.physical_execution_authorized",
+            "must agree with record_status",
+        ));
+    }
+
+    let digest_paths = [
+        "cohort.initial_state_sha256",
+        "task_contract.intervention_family_sha256",
+        "task_contract.qoi_registry_sha256",
+        "candidate.configuration_sha256",
+        "provenance.candidate_output_sha256",
+        "provenance.run_receipt_sha256",
+    ];
+    for digest_path in digest_paths {
+        let digest = kird_string(value, digest_path)?;
+        if !is_sha256_hex(digest) {
+            return Err(kird_error(digest_path, "must be a lowercase SHA-256 hex digest"));
+        }
+        if is_physical && digest.bytes().all(|byte| byte == b'0') {
+            return Err(kird_error(
+                digest_path,
+                "physical measurements cannot use the all-zero placeholder digest",
+            ));
+        }
+    }
+
+    let byte_fields = [
+        "storage.state_payload_bytes",
+        "storage.basis_codec_metadata_bytes",
+        "storage.coordinate_normalization_bytes",
+        "storage.component_lineage_bytes",
+        "storage.residual_memory_bytes",
+        "storage.uncertainty_validity_bytes",
+        "storage.provenance_contract_bytes",
+    ];
+    let mut checkpoint_bytes = 0_u64;
+    for field in byte_fields {
+        checkpoint_bytes = checkpoint_bytes
+            .checked_add(kird_u64(value, field)?)
+            .ok_or(ContractError::StorageByteCountOverflow)?;
+    }
+    let model_asset_bytes = kird_u64(value, "storage.model_asset_bytes")?;
+    let decoder_asset_bytes = kird_u64(value, "storage.decoder_asset_bytes")?;
+    let persistent_assets = model_asset_bytes
+        .checked_add(decoder_asset_bytes)
+        .ok_or(ContractError::StorageByteCountOverflow)?;
+    let amortization_rollouts = kird_u64(value, "storage.amortization_rollouts")?;
+    if amortization_rollouts == 0 {
+        return Err(ContractError::ZeroAmortizationRollouts);
+    }
+    let measured_rollouts = kird_u64(value, "cost.measured_rollouts")?;
+    if measured_rollouts == 0 {
+        return Err(kird_error("cost.measured_rollouts", "must be positive"));
+    }
+    let _peak_working_set_bytes = kird_u64(value, "storage.peak_working_set_bytes")?;
+
+    for field in [
+        "cost.encode_seconds",
+        "cost.decode_seconds",
+        "cost.advance_seconds",
+        "cost.observe_seconds",
+        "cost.transition_seconds",
+        "cost.fallback_seconds",
+        "cost.training_seconds",
+        "cost.energy_joules",
+    ] {
+        if kird_optional_number(value, field)?.is_some_and(|number| number < 0.0) {
+            return Err(kird_error(field, "must be non-negative"));
+        }
+    }
+
+    let registered_probe_count = kird_u64(value, "response_scope.registered_probe_count")?;
+    let confirmed_probe_count = kird_u64(value, "response_scope.confirmed_probe_count")?;
+    if confirmed_probe_count > registered_probe_count {
+        return Err(kird_error(
+            "response_scope.confirmed_probe_count",
+            "cannot exceed registered probe count",
+        ));
+    }
+    let response_coverage_kind = kird_string(value, "response_scope.coverage_kind")?;
+    let globally_bounded = kird_bool(value, "response_scope.globally_bounded")?;
+    match response_coverage_kind {
+        "none" => {
+            if registered_probe_count != 0 || confirmed_probe_count != 0 || globally_bounded {
+                return Err(kird_error(
+                    "response_scope",
+                    "none coverage requires zero probes and no global-bound claim",
+                ));
+            }
+        }
+        "finite_empirical" => {
+            if registered_probe_count == 0 || confirmed_probe_count == 0 || globally_bounded {
+                return Err(kird_error(
+                    "response_scope",
+                    "finite empirical coverage requires confirmed probes and cannot claim a global bound",
+                ));
+            }
+        }
+        "certified_global" => {
+            if !globally_bounded {
+                return Err(kird_error(
+                    "response_scope.globally_bounded",
+                    "certified_global coverage requires a true global-bound flag",
+                ));
+            }
+            let method = kird_string(value, "response_scope.bound_method")?;
+            if method.trim().is_empty() {
+                return Err(kird_error("response_scope.bound_method", "must be non-empty"));
+            }
+            let evidence = kird_string(value, "response_scope.bound_evidence_sha256")?;
+            if !is_sha256_hex(evidence) || evidence.bytes().all(|byte| byte == b'0') {
+                return Err(kird_error(
+                    "response_scope.bound_evidence_sha256",
+                    "requires a non-placeholder SHA-256 evidence digest",
+                ));
+            }
+        }
+        _ => {
+            return Err(kird_error(
+                "response_scope.coverage_kind",
+                "unsupported response coverage kind",
+            ));
+        }
+    }
+    if globally_bounded && response_coverage_kind != "certified_global" {
+        return Err(kird_error(
+            "response_scope.coverage_kind",
+            "a global bound cannot be inferred from finite empirical coverage",
+        ));
+    }
+
+    for tier in [
+        "distortion.microscopic",
+        "distortion.weak_observable",
+        "distortion.macroscopic_qoi",
+        "distortion.sensitivity",
+    ] {
+        validate_kird_distortion_tier(value, tier)?;
+    }
+    validate_kird_response_tier(value)?;
+
+    let physical_gate_status = kird_string(value, "physical_gates.status")?;
+    let gate_results = kird_array(value, "physical_gates.gate_results")?;
+    let gate_statuses = gate_results
+        .iter()
+        .map(|gate| kird_string(gate, "status"))
+        .collect::<Result<Vec<_>, _>>()?;
+    match physical_gate_status {
+        "PASS" => {
+            if gate_statuses.is_empty() || gate_statuses.iter().any(|status| *status != "PASS") {
+                return Err(kird_error(
+                    "physical_gates.status",
+                    "PASS requires at least one gate and every gate must PASS",
+                ));
+            }
+        }
+        "FAIL" => {
+            if !gate_statuses.iter().any(|status| *status == "FAIL") {
+                return Err(kird_error(
+                    "physical_gates.status",
+                    "FAIL requires at least one failing physical gate",
+                ));
+            }
+        }
+        "UNKNOWN" | "UNSUPPORTED" => {}
+        _ => return Err(kird_error("physical_gates.status", "unsupported gate disposition")),
+    }
+    if record_status == "synthetic_fixture_only" && physical_gate_status == "PASS" {
+        return Err(kird_error(
+            "physical_gates.status",
+            "synthetic fixtures cannot pass physical qualification",
+        ));
+    }
+
+    let checkpoint_and_assets = checkpoint_bytes
+        .checked_add(persistent_assets)
+        .ok_or(ContractError::StorageByteCountOverflow)?;
+    let amortized_asset_bytes_per_rollout =
+        persistent_assets as f64 / amortization_rollouts as f64;
+    let amortized_persistent_bytes_per_rollout =
+        checkpoint_bytes as f64 + amortized_asset_bytes_per_rollout;
+    if !amortized_asset_bytes_per_rollout.is_finite()
+        || !amortized_persistent_bytes_per_rollout.is_finite()
+        || checkpoint_and_assets < checkpoint_bytes
+    {
+        return Err(ContractError::StorageByteCountOverflow);
+    }
+
+    Ok(KirdRecordSummary {
+        record_id: record_id.to_owned(),
+        record_status: record_status.to_owned(),
+        checkpoint_bytes,
+        model_asset_bytes,
+        decoder_asset_bytes,
+        amortization_rollouts,
+        amortized_asset_bytes_per_rollout,
+        amortized_persistent_bytes_per_rollout,
+        peak_working_set_bytes: _peak_working_set_bytes,
+        registered_probe_count,
+        confirmed_probe_count,
+        response_coverage_kind: response_coverage_kind.to_owned(),
+        globally_bounded,
+        physical_gate_status: physical_gate_status.to_owned(),
+    })
+}
+
+fn validate_kird_distortion_tier(
+    root: &serde_json::Value,
+    field: &'static str,
+) -> Result<(), ContractError> {
+    let status = kird_string(root, field)?;
+    if !matches!(status, "PASS" | "FAIL" | "UNKNOWN" | "UNSUPPORTED") {
+        return Err(kird_error(field, "unsupported distortion status"));
+    }
+    if status == "PASS" || status == "FAIL" {
+        let metric_id = kird_string(root, kird_join_field(field, "metric_id"))?;
+        if metric_id.trim().is_empty() {
+            return Err(kird_error(field, "measured distortion requires metric_id"));
+        }
+        let observed = kird_number(root, kird_join_field(field, "observed_error"))?;
+        let tolerance = kird_number(root, kird_join_field(field, "tolerance"))?;
+        let normalized = kird_number(root, kird_join_field(field, "normalized_error"))?;
+        if observed < 0.0 || tolerance <= 0.0 || normalized < 0.0 {
+            return Err(kird_error(field, "invalid error or tolerance range"));
+        }
+        let expected = observed / tolerance;
+        let allowance = 1.0e-9_f64.max(expected.abs() * 1.0e-8);
+        if (normalized - expected).abs() > allowance {
+            return Err(kird_error(
+                field,
+                "normalized_error must equal observed_error / tolerance",
+            ));
+        }
+        if status == "PASS" && normalized > 1.0 {
+            return Err(kird_error(field, "PASS requires normalized_error <= 1"));
+        }
+        let digest_path = kird_join_field(field, "evidence_sha256");
+        let digest = kird_string(root, digest_path)?;
+        if !is_sha256_hex(digest) {
+            return Err(kird_error(digest_path, "requires a lowercase SHA-256 digest"));
+        }
+    }
+    Ok(())
+}
+
+fn validate_kird_response_tier(root: &serde_json::Value) -> Result<(), ContractError> {
+    let status = kird_string(root, "distortion.intervention_response.status")?;
+    if !matches!(status, "PASS" | "FAIL" | "UNKNOWN" | "UNSUPPORTED") {
+        return Err(kird_error(
+            "distortion.intervention_response.status",
+            "unsupported response status",
+        ));
+    }
+    let missing = kird_u64(root, "distortion.intervention_response.missing_branch_count")?;
+    let misassociated =
+        kird_u64(root, "distortion.intervention_response.misassociated_branch_count")?;
+    if status == "PASS" {
+        let normalized = kird_number(
+            root,
+            "distortion.intervention_response.worst_confirmed_normalized_error",
+        )?;
+        let evidence = kird_string(root, "distortion.intervention_response.evidence_sha256")?;
+        if normalized > 1.0 || missing != 0 || misassociated != 0 || !is_sha256_hex(evidence) {
+            return Err(kird_error(
+                "distortion.intervention_response",
+                "PASS requires error <= 1, zero missing/misassociated branches and evidence digest",
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn kird_error(field: &'static str, reason: &'static str) -> ContractError {
+    ContractError::InvalidKirdField { field, reason }
+}
+
+fn kird_join_field(parent: &'static str, child: &'static str) -> &'static str {
+    match (parent, child) {
+        ("distortion.microscopic", "metric_id") => "distortion.microscopic.metric_id",
+        ("distortion.microscopic", "observed_error") => "distortion.microscopic.observed_error",
+        ("distortion.microscopic", "tolerance") => "distortion.microscopic.tolerance",
+        ("distortion.microscopic", "normalized_error") => "distortion.microscopic.normalized_error",
+        ("distortion.microscopic", "evidence_sha256") => "distortion.microscopic.evidence_sha256",
+        ("distortion.weak_observable", "metric_id") => "distortion.weak_observable.metric_id",
+        ("distortion.weak_observable", "observed_error") => "distortion.weak_observable.observed_error",
+        ("distortion.weak_observable", "tolerance") => "distortion.weak_observable.tolerance",
+        ("distortion.weak_observable", "normalized_error") => "distortion.weak_observable.normalized_error",
+        ("distortion.weak_observable", "evidence_sha256") => "distortion.weak_observable.evidence_sha256",
+        ("distortion.macroscopic_qoi", "metric_id") => "distortion.macroscopic_qoi.metric_id",
+        ("distortion.macroscopic_qoi", "observed_error") => "distortion.macroscopic_qoi.observed_error",
+        ("distortion.macroscopic_qoi", "tolerance") => "distortion.macroscopic_qoi.tolerance",
+        ("distortion.macroscopic_qoi", "normalized_error") => "distortion.macroscopic_qoi.normalized_error",
+        ("distortion.macroscopic_qoi", "evidence_sha256") => "distortion.macroscopic_qoi.evidence_sha256",
+        ("distortion.sensitivity", "metric_id") => "distortion.sensitivity.metric_id",
+        ("distortion.sensitivity", "observed_error") => "distortion.sensitivity.observed_error",
+        ("distortion.sensitivity", "tolerance") => "distortion.sensitivity.tolerance",
+        ("distortion.sensitivity", "normalized_error") => "distortion.sensitivity.normalized_error",
+        ("distortion.sensitivity", "evidence_sha256") => "distortion.sensitivity.evidence_sha256",
+        _ => "distortion",
+    }
+}
+
+fn kird_value<'a>(
+    root: &'a serde_json::Value,
+    field: &'static str,
+) -> Result<&'a serde_json::Value, ContractError> {
+    let mut current = root;
+    for segment in field.split('.') {
+        current = current
+            .get(segment)
+            .ok_or_else(|| kird_error(field, "required field is missing"))?;
+    }
+    Ok(current)
+}
+
+fn kird_string<'a>(
+    root: &'a serde_json::Value,
+    field: &'static str,
+) -> Result<&'a str, ContractError> {
+    kird_value(root, field)?
+        .as_str()
+        .ok_or_else(|| kird_error(field, "must be a string"))
+}
+
+fn kird_bool(root: &serde_json::Value, field: &'static str) -> Result<bool, ContractError> {
+    kird_value(root, field)?
+        .as_bool()
+        .ok_or_else(|| kird_error(field, "must be a boolean"))
+}
+
+fn kird_u64(root: &serde_json::Value, field: &'static str) -> Result<u64, ContractError> {
+    kird_value(root, field)?
+        .as_u64()
+        .ok_or_else(|| kird_error(field, "must be a non-negative integer"))
+}
+
+fn kird_number(root: &serde_json::Value, field: &'static str) -> Result<f64, ContractError> {
+    let number = kird_value(root, field)?
+        .as_f64()
+        .ok_or_else(|| kird_error(field, "must be a finite number"))?;
+    if !number.is_finite() {
+        return Err(kird_error(field, "must be finite"));
+    }
+    Ok(number)
+}
+
+fn kird_optional_number(
+    root: &serde_json::Value,
+    field: &'static str,
+) -> Result<Option<f64>, ContractError> {
+    let mut current = root;
+    for segment in field.split('.') {
+        match current.get(segment) {
+            Some(value) => current = value,
+            None => return Ok(None),
+        }
+    }
+    let number = current
+        .as_f64()
+        .ok_or_else(|| kird_error(field, "must be a finite number"))?;
+    if !number.is_finite() {
+        return Err(kird_error(field, "must be finite"));
+    }
+    Ok(Some(number))
+}
+
+fn kird_array<'a>(
+    root: &'a serde_json::Value,
+    field: &'static str,
+) -> Result<&'a [serde_json::Value], ContractError> {
+    kird_value(root, field)?
+        .as_array()
+        .map(Vec::as_slice)
+        .ok_or_else(|| kird_error(field, "must be an array"))
+}
+
+fn is_sha256_hex(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+/// Checked-in synthetic KIRD fixture used by the semantic auditor tests.
+pub const KIRD_SYNTHETIC_FIXTURE: &str = include_str!(
+    "../../../../benchmarks/plasma/rate-distortion/fixtures/synthetic-kird-point-v0.1.json"
+);
+
+/// Checked-in KIRD JSON Schema. Consumers should still run a Draft 2020-12
+/// validator; this constant makes the exact source available to integration tests.
+pub const KIRD_POINT_SCHEMA: &str =
+    include_str!("../../../../benchmarks/plasma/rate-distortion/kird-point-v0.1.schema.json");
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1882,6 +2337,149 @@ mod tests {
             map.apply(f64::INFINITY),
             Err(ContractError::NonFiniteNormalizationCoordinate)
         );
+    }
+
+    #[test]
+    fn kird_synthetic_fixture_passes_semantic_audit_and_reports_all_bytes() {
+        let report = validate_kird_record_json(KIRD_SYNTHETIC_FIXTURE).unwrap();
+        assert_eq!(report.record_id, "KIRD-SYNTHETIC-WIRE-FIXTURE-001");
+        assert_eq!(report.checkpoint_bytes, 1_504);
+        assert_eq!(report.model_asset_bytes, 4_096);
+        assert_eq!(report.decoder_asset_bytes, 512);
+        assert_eq!(report.amortization_rollouts, 100);
+        assert_eq!(report.amortized_asset_bytes_per_rollout, 46.08);
+        assert_eq!(report.amortized_persistent_bytes_per_rollout, 1_550.08);
+        assert_eq!(report.peak_working_set_bytes, 16_384);
+        assert_eq!(report.response_coverage_kind, "none");
+        assert!(!report.globally_bounded);
+        assert_eq!(report.physical_gate_status, "UNKNOWN");
+    }
+
+    #[test]
+    fn kird_schema_and_fixture_are_valid_json_documents() {
+        let schema: serde_json::Value = serde_json::from_str(KIRD_POINT_SCHEMA).unwrap();
+        let fixture: serde_json::Value =
+            serde_json::from_str(KIRD_SYNTHETIC_FIXTURE).unwrap();
+        assert_eq!(schema["$schema"], "https://json-schema.org/draft/2020-12/schema");
+        assert_eq!(fixture["record_status"], "synthetic_fixture_only");
+    }
+
+    #[test]
+    fn kird_audit_rejects_sealed_test_acquisition() {
+        let mut value: serde_json::Value = serde_json::from_str(KIRD_SYNTHETIC_FIXTURE).unwrap();
+        value["task_contract"]["split_role"] = serde_json::json!("sealed_test");
+        value["task_contract"]["acquisition_allowed"] = serde_json::json!(true);
+        assert!(matches!(
+            validate_kird_record_value(&value),
+            Err(ContractError::InvalidKirdField {
+                field: "task_contract.acquisition_allowed",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn kird_audit_rejects_synthetic_physical_authorization() {
+        let mut value: serde_json::Value = serde_json::from_str(KIRD_SYNTHETIC_FIXTURE).unwrap();
+        value["provenance"]["physical_execution_authorized"] = serde_json::json!(true);
+        assert!(matches!(
+            validate_kird_record_value(&value),
+            Err(ContractError::InvalidKirdField {
+                field: "provenance.physical_execution_authorized",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn kird_audit_rejects_checkpoint_byte_overflow() {
+        let mut value: serde_json::Value = serde_json::from_str(KIRD_SYNTHETIC_FIXTURE).unwrap();
+        value["storage"]["state_payload_bytes"] = serde_json::json!(u64::MAX);
+        value["storage"]["basis_codec_metadata_bytes"] = serde_json::json!(1);
+        assert_eq!(
+            validate_kird_record_value(&value),
+            Err(ContractError::StorageByteCountOverflow)
+        );
+    }
+
+    #[test]
+    fn kird_audit_rejects_finite_probe_set_claimed_as_global_bound() {
+        let mut value: serde_json::Value = serde_json::from_str(KIRD_SYNTHETIC_FIXTURE).unwrap();
+        value["response_scope"]["coverage_kind"] = serde_json::json!("finite_empirical");
+        value["response_scope"]["registered_probe_count"] = serde_json::json!(20);
+        value["response_scope"]["confirmed_probe_count"] = serde_json::json!(20);
+        value["response_scope"]["globally_bounded"] = serde_json::json!(true);
+        assert!(matches!(
+            validate_kird_record_value(&value),
+            Err(ContractError::InvalidKirdField {
+                field: "response_scope",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn kird_audit_rejects_inconsistent_probe_counts() {
+        let mut value: serde_json::Value = serde_json::from_str(KIRD_SYNTHETIC_FIXTURE).unwrap();
+        value["response_scope"]["registered_probe_count"] = serde_json::json!(2);
+        value["response_scope"]["confirmed_probe_count"] = serde_json::json!(3);
+        assert!(matches!(
+            validate_kird_record_value(&value),
+            Err(ContractError::InvalidKirdField {
+                field: "response_scope.confirmed_probe_count",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn kird_audit_rejects_false_distortion_pass() {
+        let mut value: serde_json::Value = serde_json::from_str(KIRD_SYNTHETIC_FIXTURE).unwrap();
+        value["distortion"]["macroscopic_qoi"] = serde_json::json!({
+            "status":"PASS",
+            "metric_id":"qoi-relative-l2",
+            "observed_error":0.2,
+            "tolerance":0.1,
+            "normalized_error":2.0,
+            "evidence_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        });
+        assert!(matches!(
+            validate_kird_record_value(&value),
+            Err(ContractError::InvalidKirdField {
+                field: "distortion.macroscopic_qoi",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn kird_audit_rejects_synthetic_physical_gate_pass() {
+        let mut value: serde_json::Value = serde_json::from_str(KIRD_SYNTHETIC_FIXTURE).unwrap();
+        value["physical_gates"] = serde_json::json!({
+            "status":"PASS",
+            "gate_results":[{"gate_id":"energy","status":"PASS"}]
+        });
+        assert!(matches!(
+            validate_kird_record_value(&value),
+            Err(ContractError::InvalidKirdField {
+                field: "physical_gates.status",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn kird_audit_rejects_placeholder_digest_for_physical_record() {
+        let mut value: serde_json::Value = serde_json::from_str(KIRD_SYNTHETIC_FIXTURE).unwrap();
+        value["record_status"] = serde_json::json!("physical_measurement");
+        value["provenance"]["physical_execution_authorized"] = serde_json::json!(true);
+        assert!(matches!(
+            validate_kird_record_value(&value),
+            Err(ContractError::InvalidKirdField {
+                field: "cohort.initial_state_sha256",
+                ..
+            })
+        ));
     }
 
     #[test]
