@@ -448,6 +448,96 @@ pub fn evaluate_robust_probe(
     })
 }
 
+/// Provenance for a prior-free Stage-B hypothesis-discrimination result.
+///
+/// The score is retained as a research diagnostic only. It is never converted
+/// into a probability, support relation, likelihood, or decision value.
+#[derive(Clone, Debug, PartialEq)]
+pub struct StageBDiscriminationEvidence {
+    pub experiment_id: String,
+    pub method_id: String,
+    pub worst_case_separation_squared: f64,
+    pub covariance_matrix_digest_sha256: [u8; 32],
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum StageBAdapterError {
+    EmptyExperimentId,
+    EmptyMethodId,
+    InvalidSeparationScore(f64),
+    MissingCovarianceDigest,
+    DecisionValue(RobustEvaluationError),
+}
+
+impl Display for StageBAdapterError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::EmptyExperimentId => write!(formatter, "Stage-B experiment ID must be non-empty"),
+            Self::EmptyMethodId => write!(formatter, "Stage-B method ID must be non-empty"),
+            Self::InvalidSeparationScore(value) => write!(formatter, "Stage-B separation score must be finite and non-negative, got {value}"),
+            Self::MissingCovarianceDigest => write!(formatter, "Stage-B covariance matrix digest must be non-zero SHA-256"),
+            Self::DecisionValue(error) => write!(formatter, "Stage-A robust decision evaluation failed: {error}"),
+        }
+    }
+}
+
+impl Error for StageBAdapterError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::DecisionValue(error) => Some(error),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct CovarianceGuidedRobustProbeValue {
+    pub stage_b_evidence: StageBDiscriminationEvidence,
+    pub stage_a_decision_value: RobustProbeValue,
+}
+
+/// Connect a v0.2 covariance-discrimination candidate to prior-free Stage-A
+/// decision evaluation.
+///
+/// The Stage-B score and covariance digest are preserved as provenance. The
+/// score is intentionally not used by the robust minimax computation: only the
+/// explicit outcome-support sets, frozen loss table, permissions, cost budget
+/// and deadline determine Stage-A value. A caller must not derive likelihoods
+/// or state supports from the scalar separation score.
+pub fn evaluate_covariance_guided_robust_probe(
+    stage_b: StageBDiscriminationEvidence,
+    problem: &RobustDecisionProblem,
+    probe: &RobustProbe,
+    context: &RobustProbeContext,
+) -> Result<CovarianceGuidedRobustProbeValue, StageBAdapterError> {
+    if stage_b.experiment_id.trim().is_empty() {
+        return Err(StageBAdapterError::EmptyExperimentId);
+    }
+    if stage_b.method_id.trim().is_empty() {
+        return Err(StageBAdapterError::EmptyMethodId);
+    }
+    if !stage_b.worst_case_separation_squared.is_finite()
+        || stage_b.worst_case_separation_squared < 0.0
+    {
+        return Err(StageBAdapterError::InvalidSeparationScore(
+            stage_b.worst_case_separation_squared,
+        ));
+    }
+    if !stage_b
+        .covariance_matrix_digest_sha256
+        .iter()
+        .any(|byte| *byte != 0)
+    {
+        return Err(StageBAdapterError::MissingCovarianceDigest);
+    }
+    let stage_a_decision_value = evaluate_robust_probe(problem, probe, context)
+        .map_err(StageBAdapterError::DecisionValue)?;
+    Ok(CovarianceGuidedRobustProbeValue {
+        stage_b_evidence: stage_b,
+        stage_a_decision_value,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -626,6 +716,101 @@ mod tests {
         assert!(matches!(
             evaluate_robust_probe(&problem, &probe, &context()),
             Err(RobustEvaluationError::UncoveredState(_))
+        ));
+    }
+}
+
+
+#[cfg(test)]
+mod stage_b_adapter_tests {
+    use super::*;
+
+    fn robust_problem() -> RobustDecisionProblem {
+        RobustDecisionProblem {
+            state_ids: vec!["H_A".into(), "H_B".into()],
+            decision_ids: vec!["choose_A".into(), "choose_B".into(), "abstain".into()],
+            decision_loss: BTreeMap::from([
+                ("choose_A".into(), BTreeMap::from([("H_A".into(), 0.0), ("H_B".into(), 1.0)])),
+                ("choose_B".into(), BTreeMap::from([("H_A".into(), 1.0), ("H_B".into(), 0.0)])),
+                ("abstain".into(), BTreeMap::from([("H_A".into(), 0.4), ("H_B".into(), 0.4)])),
+            ]),
+            maximum_worst_case_loss: 0.4,
+        }
+    }
+
+    fn robust_probe() -> RobustProbe {
+        RobustProbe {
+            probe_id: "reference".into(),
+            acquisition_cost_units: 0.1,
+            result_delay_steps: 1,
+            outcomes: vec![
+                RobustProbeOutcome {
+                    outcome_id: "A".into(),
+                    possible_state_ids: vec!["H_A".into()],
+                },
+                RobustProbeOutcome {
+                    outcome_id: "B".into(),
+                    possible_state_ids: vec!["H_B".into()],
+                },
+            ],
+        }
+    }
+
+    fn context() -> RobustProbeContext {
+        RobustProbeContext {
+            permitted_probe_ids: vec!["reference".into()],
+            remaining_cost_budget_units: 1.0,
+            current_step: 0,
+            decision_deadline_step: 5,
+        }
+    }
+
+    fn stage_b() -> StageBDiscriminationEvidence {
+        StageBDiscriminationEvidence {
+            experiment_id: "candidate-experiment".into(),
+            method_id: "joint-covariance-maximin-v0.2".into(),
+            worst_case_separation_squared: 4.0,
+            covariance_matrix_digest_sha256: [0x5a; 32],
+        }
+    }
+
+    #[test]
+    fn covariance_separation_is_preserved_but_not_converted_into_decision_value() {
+        let result = evaluate_covariance_guided_robust_probe(
+            stage_b(),
+            &robust_problem(),
+            &robust_probe(),
+            &context(),
+        )
+        .unwrap();
+
+        assert_eq!(result.stage_b_evidence.worst_case_separation_squared, 4.0);
+        assert_eq!(result.stage_b_evidence.method_id, "joint-covariance-maximin-v0.2");
+        assert!((result.stage_a_decision_value.guaranteed_worst_case_loss_reduction - 0.4).abs() < TOLERANCE);
+        assert_eq!(result.stage_a_decision_value.admission, RobustProbeAdmission::Eligible);
+    }
+
+    #[test]
+    fn covariance_score_cannot_replace_explicit_outcome_support_or_digest() {
+        let mut missing_digest = stage_b();
+        missing_digest.covariance_matrix_digest_sha256 = [0; 32];
+        assert!(matches!(
+            evaluate_covariance_guided_robust_probe(missing_digest, &robust_problem(), &robust_probe(), &context()),
+            Err(StageBAdapterError::MissingCovarianceDigest)
+        ));
+
+        let mut invalid_score = stage_b();
+        invalid_score.worst_case_separation_squared = f64::NAN;
+        assert!(matches!(
+            evaluate_covariance_guided_robust_probe(invalid_score, &robust_problem(), &robust_probe(), &context()),
+            Err(StageBAdapterError::InvalidSeparationScore(_))
+        ));
+
+        let mut incomplete_probe = robust_probe();
+        incomplete_probe.outcomes.pop();
+        assert!(matches!(
+            evaluate_covariance_guided_robust_probe(stage_b(), &robust_problem(), &incomplete_probe, &context()),
+            Err(StageBAdapterError::DecisionValue(RobustEvaluationError::UncoveredState(_)))
         ));
     }
 }
