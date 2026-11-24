@@ -24,7 +24,9 @@
   "controller": {
     "execution_latency_seconds": 0.005,
     "minimum_bandwidth_multiple": 2,
-    "maximum_loop_latency_efold_fraction": 0.1
+    "maximum_loop_latency_efold_fraction": 0.1,
+    "minimum_observability_fisher_information": 1000,
+    "minimum_controllability_gramian": 1
   },
   "known_answers": {
     "observation_sample_count": 5,
@@ -37,7 +39,9 @@
     "actuator_bandwidth_multiple": 4,
     "conservative_loop_latency_seconds": 0.065,
     "loop_latency_efold_fraction": 0.0325,
-    "mode_interface_qualified": true
+    "mode_interface_qualified": true,
+    "minimum_required_observability_fisher_information": 1000,
+    "minimum_required_controllability_gramian": 1
   },
   "claim_boundary": {
     "status": "synthetic_analytic_reference_only",
