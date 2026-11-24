@@ -72,3 +72,12 @@ This is still not a complete official Python `Memory.insert/query` plugin. The B
 Resource receipts report local measured index-build and query latency, source/state/accessibility/evidence-text bytes, screenshot-reference bytes, and lexical payload lower bounds. They exclude image pixels, allocator/container overhead, embeddings, LLM/reader cost, verification and persistent storage infrastructure. Sixteen deterministic LongMemEval-V2 adapter tests are authored across source preservation, state/action semantics, BM25 retrieval, path resolution, missing images, traversal, symlink escape, context projection and tamper detection. The tests have not been executed.
 
 No V2 run or score is claimed.
+
+
+## Independent qualification exchange
+
+The `independent_qualification_exchange` module provides a transport-neutral consumer boundary: it sends the exact canonical candidate JSONL and use binding to an injected issuer, verifies the returned receipt against the consumer's pinned Ed25519 profile, and returns only the dependency-closed qualified projection or an explicit abstention. Issuer failure or any verification/projection error returns an error; the original candidate batch is never a fallback.
+
+This module is **not** an independent qualifier implementation or production transport. The issuer adapter must contact a separately governed authority that independently resolves source payloads, recomputes candidate and provenance commitments, checks rights/scope/lifecycle, and signs a complete three-valued receipt. Process/credential/trust-root/rollback separation and current-at-use checks remain deployment requirements.
+
+Protocol: [MACE independent qualification exchange v1](../../../../docs/research/MACE_INDEPENDENT_QUALIFICATION_EXCHANGE_V1.md). Request schema: `data/schemas/mace_evidence_qualification_request_v1.schema.json`.
