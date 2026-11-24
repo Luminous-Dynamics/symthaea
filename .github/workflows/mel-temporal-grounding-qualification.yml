@@ -71,6 +71,31 @@ jobs:
       - name: Warnings-denied Clippy on exact production source
         run: cargo +1.96.0 clippy --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --all-targets -- -D warnings
 
+      - name: Replay multi-annotator temporal-grounding panel when module is present
+        if: hashFiles('tools/mel-temporal-grounding-qualifier/src/temporal_consensus.rs') != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-multi-annotator-grounding-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-multi-annotator-temporal.synthetic.json > "$RUNNER_TEMP/multi-annotator-report.json"
+          jq -e '
+            .schema == "mel-multi-annotator-grounding-report-v1"
+            and .summary.panel_size == 6
+            and .summary.scored_annotators == 4
+            and .summary.present_annotators == 3
+            and .summary.absent_annotators == 1
+            and .summary.ambiguous_exclusions == 1
+            and .summary.not_estimable_exclusions == 1
+            and .summary.present_exact_count_accuracy > 0.66
+            and .summary.present_exact_count_accuracy < 0.67
+            and .summary.annotated_occurrence_count_min == 0
+            and .summary.annotated_occurrence_count_max == 2
+            and .summary.unanimous_correct_across_scored_annotators == false
+            and (.annotator_results | length) == 6
+            and .pairwise_inter_annotator_agreement_computed == false
+            and .synthetic_consensus_ground_truth_created == false
+            and .population_confidence_interval_computed == false
+          ' "$RUNNER_TEMP/multi-annotator-report.json" > /dev/null
+
       - name: Replay paired temporal revision when module is present
         if: hashFiles('tools/mel-temporal-grounding-qualifier/src/temporal_revision.rs') != ''
         shell: bash
