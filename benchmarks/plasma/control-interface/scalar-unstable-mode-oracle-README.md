@@ -33,8 +33,11 @@ The finite-horizon controllability Gramian sums those terms for commands applied
 - Effective diagnostic bandwidth 25 Hz, effective actuator bandwidth 20 Hz.
 - Conservative loop latency 65 ms = 0.0325 e-folds at gamma = 0.5 s^-1.
 
-The scalar mode is qualified against the declared 2x bandwidth and 0.1 e-fold latency margins. The Rust function `evaluate_scalar_unstable_mode_interface` computes these results and rejects non-finite growth, excessive horizons and invalid noise / schedules.
+The scalar mode is qualified against the declared 2x bandwidth and 0.1 e-fold latency margins, **and** minimum observability Fisher information 1000 and minimum controllability Gramian 1.0. The Rust function `evaluate_scalar_unstable_mode_interface` computes these results and rejects non-finite growth, excessive horizons, invalid noise/schedules, insufficient observation information and insufficient actuator authority. A merely positive Gramian does not automatically qualify the mode.
 
 ## Scope
 
 This is an analytic scalar-mode oracle only. It does not prove stabilizability, controllability of a multi-mode kinetic system, closed-loop stability, nonlinear Vlasov response, or any hardware capability. The scalar Gramians are a manufactured first step for #13484 and must be extended to multi-mode, non-normal and partially observed linearizations before physical controller claims.
+
+
+The minimum information/authority thresholds are task-specific contract values, not universal constants. They must be calibrated to the noise model, physical units, normalized state and required control performance for a real cohort; the fixture values 1000 and 1 are illustrative synthetic thresholds.
