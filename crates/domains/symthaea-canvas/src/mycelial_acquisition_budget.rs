@@ -36,6 +36,8 @@ pub struct MycelialPhotonDoseLimit {
     pub channel_id: String,
     pub minimum_wavelength_nm: u16,
     pub maximum_wavelength_nm: u16,
+    /// Digest of the channel-specific calibration used to convert instrument settings to dose.
+    pub calibration_digest: String,
     /// Maximum cumulative incident photon dose per spatial cell, in photons/µm².
     /// This is an assay-specific exposure bound, not a universal phototoxicity threshold.
     pub maximum_cumulative_photons_per_um2: f64,
@@ -48,6 +50,8 @@ pub struct MycelialSampleHealthBudget {
     pub policy_id: String,
     pub policy_version: String,
     pub coordinate_frame_id: String,
+    /// Calibration/model bundle used to establish this specimen-health policy.
+    pub health_model_digest: String,
     pub maximum_session_duration_ns: u64,
     pub maximum_actions_per_session: u32,
     pub maximum_roi_area_um2: f64,
@@ -102,6 +106,9 @@ pub struct MycelialCumulativePhotonExposure {
     pub wavelength_nm: u16,
     pub photons_per_um2: f64,
     pub source_session_id: String,
+    /// Evidence receipt and calibration that support this historical exposure.
+    pub evidence_receipt_digest: String,
+    pub calibration_digest: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -299,6 +306,7 @@ fn validate_budget(
     validate_identifier(&budget.policy_id, "policy_id")?;
     validate_identifier(&budget.policy_version, "policy_version")?;
     validate_identifier(&budget.coordinate_frame_id, "coordinate_frame_id")?;
+    validate_digest(&budget.health_model_digest, "health_model_digest")?;
     if budget.maximum_session_duration_ns == 0
         || budget.maximum_actions_per_session == 0
         || !budget.maximum_roi_area_um2.is_finite()
@@ -312,6 +320,7 @@ fn validate_budget(
     let mut channels = BTreeSet::new();
     for limit in &budget.photon_dose_limits {
         validate_identifier(&limit.channel_id, "photon_dose_limit.channel_id")?;
+        validate_digest(&limit.calibration_digest, "photon_dose_limit.calibration_digest")?;
         if !channels.insert(limit.channel_id.as_str()) {
             return Err(MycelialSampleHealthBudgetError::DuplicateId(
                 "photon_dose_limit.channel_id",
@@ -364,6 +373,8 @@ fn validate_state(
         validate_identifier(&exposure.spatial_cell_id, "exposure.spatial_cell_id")?;
         validate_identifier(&exposure.channel_id, "exposure.channel_id")?;
         validate_identifier(&exposure.source_session_id, "exposure.source_session_id")?;
+        validate_digest(&exposure.evidence_receipt_digest, "exposure.evidence_receipt_digest")?;
+        validate_digest(&exposure.calibration_digest, "exposure.calibration_digest")?;
         if exposure.sample_id != state.sample_id
             || exposure.wavelength_nm == 0
             || !exposure.photons_per_um2.is_finite()
@@ -383,6 +394,11 @@ fn validate_state(
         {
             return Err(MycelialSampleHealthBudgetError::InvalidState(
                 "prior exposure wavelength is outside the policy's calibrated band",
+            ));
+        }
+        if exposure.calibration_digest != limit.calibration_digest {
+            return Err(MycelialSampleHealthBudgetError::InvalidState(
+                "prior exposure calibration differs from the current channel policy",
             ));
         }
     }
@@ -549,6 +565,7 @@ fn validate_proposal(
     }
     if proposal.acquisition_model_digest != action_model_digest
         || proposal.cost_evidence_digest != cost_evidence_digest
+        || proposal.health_model_digest != budget.health_model_digest
     {
         return Err(MycelialSampleHealthBudgetError::InvalidProposal(
             "acquisition model or cost evidence differs from active-sensing action",
@@ -635,6 +652,7 @@ fn policy_digest(budget: &MycelialSampleHealthBudget) -> String {
     hash_string(&mut hasher, &budget.policy_id);
     hash_string(&mut hasher, &budget.policy_version);
     hash_string(&mut hasher, &budget.coordinate_frame_id);
+    hash_string(&mut hasher, &budget.health_model_digest);
     hasher.update(&budget.maximum_session_duration_ns.to_le_bytes());
     hasher.update(&budget.maximum_actions_per_session.to_le_bytes());
     hash_f64(&mut hasher, budget.maximum_roi_area_um2);
@@ -646,6 +664,7 @@ fn policy_digest(budget: &MycelialSampleHealthBudget) -> String {
         hash_string(&mut hasher, &limit.channel_id);
         hasher.update(&limit.minimum_wavelength_nm.to_le_bytes());
         hasher.update(&limit.maximum_wavelength_nm.to_le_bytes());
+        hash_string(&mut hasher, &limit.calibration_digest);
         hash_f64(&mut hasher, limit.maximum_cumulative_photons_per_um2);
     }
     finish_digest(hasher)
@@ -685,6 +704,8 @@ fn state_digest(state: &MycelialSampleHealthState) -> String {
         hasher.update(&exposure.wavelength_nm.to_le_bytes());
         hash_f64(&mut hasher, exposure.photons_per_um2);
         hash_string(&mut hasher, &exposure.source_session_id);
+        hash_string(&mut hasher, &exposure.evidence_receipt_digest);
+        hash_string(&mut hasher, &exposure.calibration_digest);
     }
     finish_digest(hasher)
 }
@@ -930,6 +951,13 @@ fn evaluate_proposal(
                 add_reason(
                     &mut reasons,
                     MycelialSampleHealthRejectionReason::WavelengthOutsideCalibratedBand,
+                );
+                continue;
+            }
+            if dose.calibration_digest != limit.calibration_digest {
+                add_reason(
+                    &mut reasons,
+                    MycelialSampleHealthRejectionReason::MissingOpticalDoseEstimate,
                 );
                 continue;
             }
@@ -1181,6 +1209,7 @@ mod tests {
             policy_id: "assay-policy-001".to_string(),
             policy_version: "1.0.0".to_string(),
             coordinate_frame_id: "specimen-frame-v1".to_string(),
+            health_model_digest: digest('e'),
             maximum_session_duration_ns: 100,
             maximum_actions_per_session: 4,
             maximum_roi_area_um2: 50.0,
@@ -1189,6 +1218,7 @@ mod tests {
                 channel_id: "gfp".to_string(),
                 minimum_wavelength_nm: 480,
                 maximum_wavelength_nm: 510,
+                calibration_digest: digest('f'),
                 maximum_cumulative_photons_per_um2: 10.0,
             }],
         }
@@ -1208,6 +1238,8 @@ mod tests {
                 wavelength_nm: 488,
                 photons_per_um2: 7.0,
                 source_session_id: "session-000".to_string(),
+                evidence_receipt_digest: digest('g'),
+                calibration_digest: digest('f'),
             }],
         }
     }
@@ -1281,7 +1313,7 @@ mod tests {
             local_temperature_rise_upper_millikelvin: 100,
             acquisition_model_digest: digest('a'),
             cost_evidence_digest: digest('b'),
-            health_model_digest: digest('c'),
+            health_model_digest: digest('e'),
             photon_dose_estimates: if kind == MycelialAcquisitionActionKind::HumanAnnotation {
                 Vec::new()
             } else {
@@ -1289,7 +1321,7 @@ mod tests {
                     channel_id: "gfp".to_string(),
                     wavelength_nm: 488,
                     photons_per_um2_upper: dose,
-                    calibration_digest: digest('d'),
+                    calibration_digest: digest('f'),
                 }]
             },
         }
@@ -1338,6 +1370,8 @@ mod tests {
             wavelength_nm: 488,
             photons_per_um2: 1.5,
             source_session_id: "session-previous-other".to_string(),
+            evidence_receipt_digest: digest('h'),
+            calibration_digest: digest('f'),
         });
         let result =
             evaluate_mycelial_sample_health_budget(&report, &budget(), &current, &proposals)
