@@ -539,3 +539,22 @@ Sources:
 - Goedel-Prover-V2 project README: https://github.com/Goedel-LM/Goedel-Prover-V2
 - Legendre live leaderboard: https://www.legendre-leaderboard.com/
 - DAP hard-mode paper: https://aclanthology.org/2026.acl-long.3/
+
+
+## 19. Cross-benchmark research check (2026-11-24)
+
+A fresh source check reinforces the programme's benchmark segmentation. These results measure different capabilities and must not be collapsed into a single ranking.
+
+- **FormalMATH (EMNLP 2026 Findings):** 5,560 semantically validated Lean 4 statements; the paper reports DeepSeek-Prover-V2 at 28.31% Pass@32. It also reports that natural-language solution references can degrade formal proof generation in some conditions. This supports keeping human-facing explanation and prover-facing context as separate experimental arms. https://aclanthology.org/2026.findings-emnlp.579/
+- **LeanGraphSearch:** on the 810-query shared MathlibQR subset, Recall@100 is 94.7%; on MathlibMPR, complete-route Covered@20 is 42.8%. These are mandatory retrieval baselines, not proof-comprehension scores. https://pluslabnlp.github.io/LeanGraphSearch/
+- **MathAdv:** a 13-domain diagnostic benchmark with expert-crafted equivalent transformations; its analysis finds that mathematically equivalent reformulations reveal robustness limits, and that language guidance can help general-purpose LLMs while hindering proof-specialized models. This closely motivates paired invariance/sensitivity testing. https://arxiv.org/abs/2608.25449
+- **ProofGrid:** 15 proof writing/checking/masking/gap-filling tasks with first-substantive-failure localization and a separate Epistemic Stability Index. CIRR must remain distinct: it tests paired reuse of a locally rejected warrant in a later global plan. https://arxiv.org/abs/2605.12524
+- **QEDBench (ICML 2026):** 7 judges × 5 solvers, over 1,000 hours of human evaluation, and up to +0.28 positive scoring bias for some judge configurations. This makes independent gold, formal receipts and calibration essential; LLM judge agreement is not proof authority. https://proceedings.mlr.press/v306/gonzalez26a.html
+- **TheoremGraph / LeanGraph:** 11.7M informal theorem-like statements, 18.3M candidate informal dependencies, 388,105 Lean declarations and 11.3M typed formal edges across 25 Lean projects. Symthaea should interoperate and add reviewed proof-plan roles, local warrant evidence, intervention receipts and transfer—not attempt to recreate the graph. https://arxiv.org/abs/2606.25363
+- **ProofRank (NeurIPS 2026):** 382 base competition problems and 445 adaptivity pairs, with proxies for conciseness, computational ease, cognitive simplicity, diversity and requested-method adaptivity. MSE should complement these proof-quality dimensions with hard plan/assumption fidelity and learner transfer. https://www.sri.inf.ethz.ch/publications/petrov2026proofrank
+- **Gao & Evans (published 2026-11-06):** a study of 143 undergraduates found proof-presentation performance only moderately associated with later near-transfer proof construction (from sqrt(6) irrationality to sqrt(10)). This argues against using explanation fluency as a proxy for learning and supports delayed transfer as a primary human endpoint. https://link.springer.com/article/10.1007/s40753-026-00319-4
+- **PutnamBench live leaderboard:** the featured Lean ranking and separate no-answer ranking show 672/672 solved. This is a saturation signal for this competition suite, not a claim that research mathematics is solved. Keep answer-provided and no-answer results separate and use PutnamBench as an integration smoke test rather than the primary discriminative benchmark. https://trishullab.github.io/PutnamBench/leaderboard
+
+### Strategic decision
+
+The defensible competitive position is a reliability-and-comprehension layer composed with existing proof engines and retrieval graphs. The flagship result must show, on a hidden theorem-family holdout, exact statement/context binding, faithful proof-plan reconstruction, checked local warrant evidence, correct response to semantic interventions, low local-to-global reuse of invalid warrants, calibrated abstention, and improved delayed human transfer. No single aggregate can compensate for false acceptance or false context equivalence.
