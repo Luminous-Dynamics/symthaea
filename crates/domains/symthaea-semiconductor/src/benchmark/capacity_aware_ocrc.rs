@@ -687,6 +687,7 @@ pub fn advance_ca_ocrc_round_v1(
             )?);
             continue;
         }
+
         let round = next.round_ledger.get(&feedback.originating_round);
         let Some(round) = round else {
             feedback_receipts.push(make_feedback_receipt(
@@ -701,51 +702,11 @@ pub fn advance_ca_ocrc_round_v1(
                 threshold_before,
                 threshold_before,
             )?);
+            next.seen_feedback_idempotency_keys.insert(idempotency);
             continue;
         };
         let actual_delay = input.round_index.saturating_sub(feedback.originating_round);
-        if tracked.is_none() {
-            let (disposition, reason) = if feedback.eligibility_report.eligibility
-                == LabelConsumptionEligibilityV1::Unknown
-            {
-                (
-                    CaoOcrcFeedbackDispositionV1::HeldUnknown,
-                    CaoOcrcFeedbackReasonV1::LabelNotEligible,
-                )
-            } else if feedback.eligibility_report.eligibility
-                == LabelConsumptionEligibilityV1::Blocked
-            {
-                (
-                    CaoOcrcFeedbackDispositionV1::Blocked,
-                    CaoOcrcFeedbackReasonV1::LabelNotEligible,
-                )
-            } else if next.lost_feedback_round_ids.contains(&feedback.originating_round) {
-                (
-                    CaoOcrcFeedbackDispositionV1::AlreadyExpired,
-                    CaoOcrcFeedbackReasonV1::PredictionReceiptMismatch,
-                )
-            } else {
-                (
-                    CaoOcrcFeedbackDispositionV1::NotTracked,
-                    CaoOcrcFeedbackReasonV1::PredictionReceiptMismatch,
-                )
-            };
-            feedback_receipts.push(make_feedback_receipt(
-                feedback,
-                disposition,
-                Some(reason),
-                Some(actual_delay),
-                None,
-                None,
-                None,
-                Some(round.prediction_receipt_sha256.clone()),
-                threshold_before,
-                threshold_before,
-            )?);
-            next.seen_feedback_idempotency_keys.insert(idempotency);
-            continue;
-        }
-        if let Some(reason) = validate_feedback(feedback, round, &next, actual_delay, tracked.as_ref())? {
+        if let Some(reason) = validate_feedback(feedback, round, &next, actual_delay)? {
             let disposition = match feedback.eligibility_report.eligibility {
                 LabelConsumptionEligibilityV1::Unknown => CaoOcrcFeedbackDispositionV1::HeldUnknown,
                 LabelConsumptionEligibilityV1::Blocked => CaoOcrcFeedbackDispositionV1::Blocked,
@@ -756,7 +717,7 @@ pub fn advance_ca_ocrc_round_v1(
                 disposition,
                 Some(reason),
                 Some(actual_delay),
-                tracked.as_ref().map(|item| item.proxy_delay_rounds),
+                Some(tracked_round.proxy_delay_rounds),
                 None,
                 None,
                 Some(round.prediction_receipt_sha256.clone()),
@@ -766,7 +727,7 @@ pub fn advance_ca_ocrc_round_v1(
             continue;
         }
 
-        let Some(tracked) = tracked else {
+        let Some(tracked_round) = tracked else {
             let disposition = if next.lost_feedback_round_ids.contains(&feedback.originating_round) {
                 CaoOcrcFeedbackDispositionV1::AlreadyExpired
             } else {
@@ -784,8 +745,26 @@ pub fn advance_ca_ocrc_round_v1(
                 threshold_before,
                 threshold_before,
             )?);
+            next.seen_feedback_idempotency_keys.insert(idempotency);
             continue;
         };
+        if round.prediction_receipt_sha256 != tracked_round.prediction_receipt_sha256
+            || round.round_record_sha256 != tracked_round.round_record_sha256
+        {
+            feedback_receipts.push(make_feedback_receipt(
+                feedback,
+                CaoOcrcFeedbackDispositionV1::Rejected,
+                Some(CaoOcrcFeedbackReasonV1::PredictionReceiptMismatch),
+                Some(actual_delay),
+                Some(tracked_round.proxy_delay_rounds),
+                None,
+                None,
+                Some(round.prediction_receipt_sha256.clone()),
+                threshold_before,
+                threshold_before,
+            )?);
+            continue;
+        }
 
         let value = feedback.corrected_measurement_value;
         let loss = if value < round.interval_lower.unwrap_or(f64::NEG_INFINITY)
@@ -802,7 +781,7 @@ pub fn advance_ca_ocrc_round_v1(
                 CaoOcrcFeedbackDispositionV1::Rejected,
                 Some(CaoOcrcFeedbackReasonV1::ProxySurvivalZero),
                 Some(actual_delay),
-                Some(tracked.proxy_delay_rounds),
+                Some(tracked_round.proxy_delay_rounds),
                 None,
                 Some(loss),
                 Some(round.prediction_receipt_sha256.clone()),
@@ -822,7 +801,7 @@ pub fn advance_ca_ocrc_round_v1(
             CaoOcrcFeedbackDispositionV1::ReceivedAndApplied,
             None,
             Some(actual_delay),
-            Some(tracked.proxy_delay_rounds),
+            Some(tracked_round.proxy_delay_rounds),
             Some(inverse_weight),
             Some(loss),
             Some(round.prediction_receipt_sha256.clone()),
@@ -878,7 +857,6 @@ fn validate_feedback(
     round: &CaoOcrcRoundRecordV1,
     engine: &CaoOcrcEngineV1,
     actual_delay: u64,
-    tracked: Option<&CaoOcrcTrackedRoundV1>,
 ) -> Result<Option<CaoOcrcFeedbackReasonV1>, CaoOcrcErrorV1> {
     let report = &feedback.eligibility_report;
     if feedback.delivery_round < feedback.originating_round
@@ -956,13 +934,6 @@ fn validate_feedback(
     if feedback.delivered_at_unix_seconds < feedback.eligibility_report_available_at_unix_seconds
     {
         return Ok(Some(CaoOcrcFeedbackReasonV1::ReportUnavailableAtDelivery));
-    }
-    if let Some(tracked) = tracked {
-        if round.prediction_receipt_sha256 != tracked.prediction_receipt_sha256
-            || round.round_record_sha256 != tracked.round_record_sha256
-        {
-            return Ok(Some(CaoOcrcFeedbackReasonV1::PredictionReceiptMismatch));
-        }
     }
     Ok(None)
 }
