@@ -1,0 +1,10 @@
+[package]
+name = "mel-veto-race-reducer"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Dependency-free deterministic reducer for Melothaea veto/pending-output race traces"
+
+[lib]
+path = "src/lib.rs"
