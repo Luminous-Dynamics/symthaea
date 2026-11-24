@@ -6404,6 +6404,10 @@ mod tests {
         );
     }
 
+    const COUPLED_TWO_MODE_AUTHORITY_FIXTURE: &str = include_str!(
+        "../../../../benchmarks/plasma/control-interface/fixtures/coupled-unstable-mode-authority-known-answer-v0.1.json"
+    );
+
     fn coupled_two_mode_contract(
         transition_matrix: [f64; 4],
         diagnostic_gain: [[f64; 2]; 2],
@@ -6425,7 +6429,84 @@ mod tests {
     }
 
     #[test]
-    fn coupled_two_mode_authority_accepts_distinct_unstable_modes_with_shared_scalar_channels() {
+    fn coupled_two_mode_fixture_matches_all_three_known_answers() {
+        let fixture: serde_json::Value =
+            serde_json::from_str(COUPLED_TWO_MODE_AUTHORITY_FIXTURE).unwrap();
+        for case in fixture["cases"].as_array().unwrap() {
+            let matrix = case["transition_matrix"].as_array().unwrap();
+            let diagnostics = case["diagnostic_gain"].as_array().unwrap();
+            let contract = CoupledTwoModeAuthorityContract {
+                transition_matrix: [
+                    matrix[0].as_f64().unwrap(),
+                    matrix[1].as_f64().unwrap(),
+                    matrix[2].as_f64().unwrap(),
+                    matrix[3].as_f64().unwrap(),
+                ],
+                horizon_steps: case["horizon_steps"].as_u64().unwrap() as u32,
+                diagnostic_gain: [
+                    [
+                        diagnostics[0][0].as_f64().unwrap(),
+                        diagnostics[0][1].as_f64().unwrap(),
+                    ],
+                    [
+                        diagnostics[1][0].as_f64().unwrap(),
+                        diagnostics[1][1].as_f64().unwrap(),
+                    ],
+                ],
+                diagnostic_noise_variance: [
+                    case["diagnostic_noise_variance"][0].as_f64().unwrap(),
+                    case["diagnostic_noise_variance"][1].as_f64().unwrap(),
+                ],
+                diagnostic_sampling_stride_steps: case["diagnostic_sampling_stride_steps"]
+                    .as_u64()
+                    .unwrap() as u32,
+                diagnostic_delivery_delay_steps: case["diagnostic_delivery_delay_steps"]
+                    .as_u64()
+                    .unwrap() as u32,
+                actuator_gain: [
+                    case["actuator_gain"][0].as_f64().unwrap(),
+                    case["actuator_gain"][1].as_f64().unwrap(),
+                ],
+                actuator_update_stride_steps: case["actuator_update_stride_steps"]
+                    .as_u64()
+                    .unwrap() as u32,
+                actuator_delivery_delay_steps: case["actuator_delivery_delay_steps"]
+                    .as_u64()
+                    .unwrap() as u32,
+                minimum_observability_eigenvalue: case["minimum_observability_eigenvalue"]
+                    .as_f64()
+                    .unwrap(),
+                minimum_controllability_eigenvalue: case["minimum_controllability_eigenvalue"]
+                    .as_f64()
+                    .unwrap(),
+            };
+            let report = evaluate_coupled_two_mode_authority(contract).unwrap();
+            let expected = &case["expected"];
+            assert_eq!(
+                report.observation_sample_count,
+                expected["observation_sample_count"].as_u64().unwrap() as u32
+            );
+            assert_eq!(
+                report.actuator_command_count,
+                expected["actuator_command_count"].as_u64().unwrap() as u32
+            );
+            assert_eq!(
+                report.observable,
+                expected["observable"].as_bool().unwrap()
+            );
+            assert_eq!(
+                report.controllable,
+                expected["controllable"].as_bool().unwrap()
+            );
+            assert_eq!(
+                report.authority_qualified,
+                expected["authority_qualified"].as_bool().unwrap()
+            );
+        }
+    }
+
+    #[test]
+    fn coupled_two_mode_authority_accepts_distinct_unstable_modes_with_independent_sensors() {
         let report = evaluate_coupled_two_mode_authority(coupled_two_mode_contract(
             [1.2, 0.0, 0.0, 1.1],
             [[1.0, 0.0], [0.0, 1.0]],
@@ -6510,14 +6591,17 @@ mod tests {
 
     #[test]
     fn coupled_two_mode_authority_rejects_invalid_and_non_unstable_contracts() {
-        let mut contract =
-            coupled_two_mode_contract([1.2, 0.0, 0.0, 1.1], [1.0, 1.0], [1.0, 1.0]);
-        contract.diagnostic_noise_variance = 0.0;
+        let mut contract = coupled_two_mode_contract(
+            [1.2, 0.0, 0.0, 1.1],
+            [[1.0, 0.0], [0.0, 1.0]],
+            [1.0, 1.0],
+        );
+        contract.diagnostic_noise_variance = [0.0, 1.0];
         assert!(matches!(
             evaluate_coupled_two_mode_authority(contract),
             Err(ContractError::InvalidCoupledModeAuthority(_))
         ));
-        contract.diagnostic_noise_variance = 1.0;
+        contract.diagnostic_noise_variance = [1.0, 1.0];
         contract.transition_matrix = [1.2, 0.0, 0.0, 0.95];
         assert!(matches!(
             evaluate_coupled_two_mode_authority(contract),
