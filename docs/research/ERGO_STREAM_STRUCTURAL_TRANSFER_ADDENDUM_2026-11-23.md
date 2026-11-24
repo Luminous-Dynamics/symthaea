@@ -310,20 +310,22 @@ The current #7173 Rust witnesses now cover the following finite contracts:
 
 The sidecar schemas bind candidate transfer artifacts to the original AgentSubmission digest, source/target episode IDs and evidence-prefix hashes without mutating the strict AgentEpisode v0 wire protocol. The quotient validator is a one-system abstraction witness; it does not yet validate target-side quotient transfer or preserve task-specific observables/rewards. Simulation and bisimulation are scope-limited finite LTS witnesses; probabilistic, weak, approximate and continuous-time variants remain future work under Symtropy #7230 and the continuous-dynamics protocol.
 
-The latest follow-on adds `calibration.rs` for proper scoring (Brier/log loss/ECE) and selective risk–coverage under explicit assert/reject/abstain decisions. This extends the claim boundary from “is the proposed finite map valid?” to “how well calibrated is the system's probability that this exact scoped claim will qualify?” The new source and schema additions are pending exact-head Rust checks; the earlier 86-test pass does not cover them.
+The latest follow-on adds `calibration.rs` for proper scoring (Brier/log loss/ECE) and selective risk–coverage under explicit assert/reject/abstain decisions. It also reports by evaluator-owned shift/claim strata after validating the complete cohort, so a good pooled score cannot conceal a domain-specific false-transfer failure. Outcome stratum labels, calibration bins and decision thresholds are owner-side, not candidate-authored.
+
+The exact combined Symtropy #7173 code head `e9a5fbf30b69931f54f387329df31af210ee717e` passed focused Rust 1.96 formatting, **96 unit tests plus doctests**, and strict Clippy in workflow [#45357214975](https://github.com/Luminous-Dynamics/symtropy/actions/runs/45357214975). This qualifies the focused finite microcosm and empirical calibration metrics only. It does not establish a conformal coverage guarantee, sequential validity under temporal dependence, production #11171 integration, physical qualification or external benchmark performance.
 
 The exact combined Symtropy #7173 code head `9735f9f7ddaabce19b75a96a0e97783d3cc04a9d` passed focused Rust 1.96 formatting, 86 unit tests plus doctests, and strict Clippy in workflow [#45296666519](https://github.com/Luminous-Dynamics/symtropy/actions/runs/45296666519). This qualifies the finite microcosm crate only. It does not implement CfC/LTC dynamics, continuous ODE/DAE/PDE execution, contact simulation, production #11171 integration, or a continuous-time equivalence proof. The next meaningful implementation is the learned-policy/owner-side adapter from existing AV-STREAM and finite scientific episodes—not a duplicate simulator.
 
 ## 8. Execution order
 
 **P0 — close the transfer contract**
-- Land or revise the Symtropy #7173 witness validator after exact-head format/test/Clippy.
+- Keep Symtropy #7173 as the finite, Rust-qualified conformance and calibration kernel; next reviewer milestone is integration review with #11171, not more isolated validators.
 - Use the v0.2 scoped witness for induced/subgraph embeddings; keep v0.1 full isomorphism strict. Finite quotient, simulation and bisimulation witnesses now exist; #7230 continues with homomorphism, quotient-to-target transfer, weak/probabilistic/approximate behaviour and stronger independent oracles.
 - Add paired-world generation with one invariant, one equivariant and one false-analogy pair.
 
 **P0 — baseline before complexity**
 - Retain the fixed segmentation/passive and unique-incidence baselines already added; next add strong VF2-style/graph-edit solvers and integrate the optional evidence-bound structural/behavioural transfer bundle into the #11171 research-policy adapter.
-- Freeze structural snapshots before the evaluator releases hidden intervention outcomes.
+- Freeze structural snapshots and claim forecasts before the evaluator releases hidden outcomes; calibrate only on development worlds and score per shift/claim stratum on the sealed cohort.
 - Add leakage negatives and non-identifiability controls.
 
 **P1 — connect Symthaea**
