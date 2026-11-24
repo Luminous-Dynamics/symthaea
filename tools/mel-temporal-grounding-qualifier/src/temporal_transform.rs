@@ -12,7 +12,6 @@ use crate::temporal_grounding::{
     validate_temporal_grounding_prediction, AudioArtifactClockV1, FrameIntervalV1,
     GroundingPredictionStateV1, TemporalGroundTruthV1, TemporalGroundingPlanV1,
     TemporalGroundingPredictionV1, TemporalGroundingScoreV1,
-    TEMPORAL_GROUNDING_SCHEMA_V1,
 };
 
 const TRANSFORM_MAP_SCHEMA_V1: &str = "mel-temporal-view-map-v1";
@@ -308,7 +307,7 @@ fn map_interval_list(
         {
             return Err(format!("prediction interval {interval_index} is outside the view clock"));
         }
-        let mut pieces = Vec::new();
+        let mut pieces: Vec<FrameIntervalV1> = Vec::new();
         for segment in &view_map.segments {
             let view_start = interval.start_frame.max(segment.view_start_frame);
             let view_end = interval.end_frame.min(segment.view_end_frame);
@@ -468,6 +467,7 @@ mod tests {
     use crate::temporal_grounding::{
         GroundTruthStateV1, GroundingPredictionStateV1, TemporalGroundingPredictionV1,
         TemporalGroundTruthV1, TEMPORAL_GROUNDING_EVALUATOR_V1,
+        TEMPORAL_GROUNDING_SCHEMA_V1,
     };
 
     const SOURCE_DIGEST: &str =
