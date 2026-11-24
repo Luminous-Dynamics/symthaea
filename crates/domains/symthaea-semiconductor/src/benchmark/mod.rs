@@ -18,6 +18,7 @@ pub mod secom_missingness;
 pub mod secom_observation_drift;
 pub mod secom_raw;
 pub mod secom_tabular_baselines;
+pub mod robust_decision_loss_evsi;
 pub mod split_manifest;
 pub mod stratified_repeat;
 pub mod vm_snapshot_dependency_impact;
@@ -162,4 +163,14 @@ pub use decision_loss_metrology_policy::{
     MetrologyPortfolioReportV1, MetrologyPortfolioStatusV1, MetrologyReadinessEvidenceV1,
     MetrologyReadinessStatusV1, compute_expected_value_of_sample_information_v1,
     optimize_metrology_decision_loss_portfolio_v1,
+};
+
+pub use robust_decision_loss_evsi::{
+    ROBUST_EVSI_CANDIDATE_REPORT_SCHEMA_V1, ROBUST_EVSI_CANDIDATE_SCHEMA_V1,
+    ROBUST_EVSI_INPUT_SCHEMA_V1, ROBUST_EVSI_PORTFOLIO_REPORT_SCHEMA_V1,
+    ROBUST_EVSI_SCENARIO_SCHEMA_V1, RobustEvsiCandidateReportV1,
+    RobustEvsiCandidateStatusV1, RobustEvsiCandidateV1, RobustEvsiErrorV1,
+    RobustEvsiInputV1, RobustEvsiPortfolioReportV1, RobustEvsiPortfolioStatusV1,
+    RobustEvsiScenarioResultV1, RobustEvsiScenarioV1, optimize_robust_metrology_evsi_portfolio_v1,
+    seal_robust_evsi_candidate_v1, seal_robust_evsi_scenario_v1,
 };
