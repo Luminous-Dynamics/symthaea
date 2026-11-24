@@ -1331,6 +1331,8 @@ mod tests {
         assert_eq!(aggregate.one_to_many_queries, 1);
         assert_eq!(aggregate.one_to_many_exact_count, 1);
         assert_eq!(aggregate.one_to_many_count_accuracy, Some(1.0));
+        assert_eq!(aggregate.one_to_many_macro_temporal_f1, Some(1.0));
+        assert_eq!(aggregate.one_to_many_count_gated_f1, Some(1.0));
         assert_eq!(aggregate.negative_absence_accuracy, Some(1.0));
         assert_eq!(aggregate.negative_absence_coverage, Some(1.0));
         assert_eq!(aggregate.start_boundary_mae_ms, Some(1.0));
