@@ -1,0 +1,139 @@
+{
+  "schema": "muse-acoustic-observation-v1",
+  "observer": {
+    "observer_id": "muse-windowed-rms-gain-observer",
+    "version": "0.1.0",
+    "measurement": "windowed_rms_dbfs_gain_delta"
+  },
+  "scope": {
+    "kind": "isolated_stem",
+    "scope_id": "stem-melody-001"
+  },
+  "artifacts": {
+    "contract_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "source_audio_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "candidate_audio_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+  },
+  "audio": {
+    "sample_rate_hz": 48000,
+    "channels": 2,
+    "frame_count": 960000,
+    "source_sample_format": "pcm_integer",
+    "source_bits_per_sample": 24,
+    "candidate_sample_format": "pcm_integer",
+    "candidate_bits_per_sample": 24,
+    "source_clipped_sample_fraction": 0,
+    "candidate_clipped_sample_fraction": 0.00001
+  },
+  "target": {
+    "status": "pass",
+    "windows": [
+      {
+        "start_frame": 240000,
+        "end_frame": 360000,
+        "source_rms_dbfs": [
+          -12,
+          -13
+        ],
+        "candidate_rms_dbfs": [
+          -18,
+          -19
+        ],
+        "expected_gain_db": -6,
+        "observed_gain_db": [
+          -6,
+          -6
+        ],
+        "absolute_error_db": [
+          0,
+          0
+        ],
+        "passed": true,
+        "abstention_reason": null
+      },
+      {
+        "start_frame": 360000,
+        "end_frame": 480000,
+        "source_rms_dbfs": [
+          -14,
+          -15
+        ],
+        "candidate_rms_dbfs": [
+          -17,
+          -18
+        ],
+        "expected_gain_db": -3,
+        "observed_gain_db": [
+          -3,
+          -3
+        ],
+        "absolute_error_db": [
+          0,
+          0
+        ],
+        "passed": true,
+        "abstention_reason": null
+      }
+    ]
+  },
+  "preservation": {
+    "status": "pass",
+    "windows": [
+      {
+        "start_frame": 0,
+        "end_frame": 240000,
+        "source_rms_dbfs": [
+          -15,
+          -16
+        ],
+        "candidate_rms_dbfs": [
+          -15,
+          -16
+        ],
+        "expected_gain_db": 0,
+        "observed_gain_db": [
+          0,
+          0
+        ],
+        "absolute_error_db": [
+          0,
+          0
+        ],
+        "passed": true,
+        "abstention_reason": null
+      },
+      {
+        "start_frame": 480000,
+        "end_frame": 960000,
+        "source_rms_dbfs": [
+          -18,
+          -17
+        ],
+        "candidate_rms_dbfs": [
+          -18,
+          -17
+        ],
+        "expected_gain_db": 0,
+        "observed_gain_db": [
+          0,
+          0
+        ],
+        "absolute_error_db": [
+          0,
+          0
+        ],
+        "passed": true,
+        "abstention_reason": null
+      }
+    ]
+  },
+  "clipping": {
+    "maximum_candidate_clipped_sample_fraction": 0.001,
+    "passed": true
+  },
+  "outcome": {
+    "acoustic_observation_status": "pass",
+    "abstention_reasons": []
+  },
+  "receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+}
