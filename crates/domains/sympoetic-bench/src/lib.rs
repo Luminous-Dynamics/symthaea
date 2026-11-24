@@ -5,6 +5,7 @@
 //! computes only metrics whose inputs and assumptions are explicit.
 
 pub mod agent_protocol;
+pub mod challenge_response;
 pub mod metrics;
 pub mod model;
 pub mod reliability;
