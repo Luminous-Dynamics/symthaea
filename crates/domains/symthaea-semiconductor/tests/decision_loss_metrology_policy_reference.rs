@@ -25,17 +25,11 @@ fn fixture() -> MetrologyDecisionLossModelV1 {
         actions: vec![
             MetrologyDecisionActionV1 {
                 action_id: "accept".into(),
-                loss_by_state: BTreeMap::from([
-                    ("good".into(), 0.0),
-                    ("defective".into(), 100.0),
-                ]),
+                loss_by_state: BTreeMap::from([("good".into(), 0.0), ("defective".into(), 100.0)]),
             },
             MetrologyDecisionActionV1 {
                 action_id: "hold".into(),
-                loss_by_state: BTreeMap::from([
-                    ("good".into(), 5.0),
-                    ("defective".into(), 0.0),
-                ]),
+                loss_by_state: BTreeMap::from([("good".into(), 5.0), ("defective".into(), 0.0)]),
             },
         ],
         assay: MetrologyAssayModelV1 {
@@ -65,18 +59,23 @@ fn fixture() -> MetrologyDecisionLossModelV1 {
 /// A separately written posterior-risk enumeration. It deliberately does not
 /// call the production expected-optimal-loss helper.
 fn reference_evsi(model: &MetrologyDecisionLossModelV1) -> (f64, f64) {
-    let prior: BTreeMap<String, f64> = model.states
+    let prior: BTreeMap<String, f64> = model
+        .states
         .iter()
         .map(|state| (state.state_id.clone(), state.prior_probability))
         .collect();
 
     let expected_loss = |probabilities: &BTreeMap<String, f64>| {
-        model.actions
+        model
+            .actions
             .iter()
             .map(|action| {
-                model.states
+                model
+                    .states
                     .iter()
-                    .map(|state| probabilities[&state.state_id] * action.loss_by_state[&state.state_id])
+                    .map(|state| {
+                        probabilities[&state.state_id] * action.loss_by_state[&state.state_id]
+                    })
                     .sum::<f64>()
             })
             .fold(f64::INFINITY, f64::min)
@@ -85,23 +84,21 @@ fn reference_evsi(model: &MetrologyDecisionLossModelV1) -> (f64, f64) {
     let risk_before = expected_loss(&prior);
     let mut risk_after = 0.0;
     for outcome in &model.assay.outcomes {
-        let probability = model.states
+        let probability = model
+            .states
             .iter()
-            .map(|state| {
-                state.prior_probability
-                    * outcome.likelihood_by_state[&state.state_id]
-            })
+            .map(|state| state.prior_probability * outcome.likelihood_by_state[&state.state_id])
             .sum::<f64>();
         if probability == 0.0 {
             continue;
         }
-        let posterior = model.states
+        let posterior = model
+            .states
             .iter()
             .map(|state| {
                 (
                     state.state_id.clone(),
-                    state.prior_probability
-                        * outcome.likelihood_by_state[&state.state_id]
+                    state.prior_probability * outcome.likelihood_by_state[&state.state_id]
                         / probability,
                 )
             })
