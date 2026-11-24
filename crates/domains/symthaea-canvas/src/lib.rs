@@ -27,6 +27,7 @@ pub mod color;
 pub mod embodiment;
 pub mod embodiment_trace;
 pub mod geometry;
+pub mod mycelial_acquisition_budget;
 pub mod mycelial_active_sensing;
 pub mod mycelial_annotation_triage;
 pub mod mycelial_contact_persistence;
@@ -91,6 +92,18 @@ pub use embodiment_trace::{
     MAX_EMBODIMENT_TRACE_EVENTS, OpenActivityInterval, OpenPlaybackInterval,
 };
 pub use geometry::build_scene;
+pub use mycelial_acquisition_budget::{
+    MAX_MYCELIAL_HEALTH_BUDGET_ACTIONS, MAX_MYCELIAL_HEALTH_BUDGET_CELLS_PER_ACTION,
+    MAX_MYCELIAL_HEALTH_BUDGET_CHANNELS, MAX_MYCELIAL_HEALTH_BUDGET_EVALUATIONS,
+    MAX_MYCELIAL_HEALTH_EXPOSURE_RECORDS, MYCELIAL_SAMPLE_HEALTH_BUDGET_SCHEMA_VERSION,
+    MycelialAcquisitionBudgetProposal, MycelialCumulativePhotonExposure,
+    MycelialPhotonDoseEstimate, MycelialPhotonDoseLimit, MycelialProjectedChannelDose,
+    MycelialSampleHealthActiveSensingEvidence, MycelialSampleHealthBudget,
+    MycelialSampleHealthBudgetError, MycelialSampleHealthBudgetReport,
+    MycelialSampleHealthEligibleAction, MycelialSampleHealthRejection,
+    MycelialSampleHealthRejectionReason, MycelialSampleHealthState,
+    evaluate_mycelial_sample_health_budget, mycelial_sample_health_budget_report_digest,
+};
 pub use mycelial_active_sensing::{
     MAX_MYCELIAL_ACQUISITION_ACTIONS, MAX_MYCELIAL_ACQUISITION_DECISIONS,
     MAX_MYCELIAL_ACQUISITION_OUTCOMES_PER_ACTION, MAX_MYCELIAL_ACTIVE_SENSING_EVALUATIONS,
