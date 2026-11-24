@@ -195,6 +195,21 @@ Keep official benchmark results separate:
 
 The official LongMemEval-V2 LAFS definition integrates the best reachable accuracy over log-scaled latency budgets from 1 to 200 seconds. Preserve the official reference frontier and benchmark protocol; do not compare a locally modified frontier to an official score.
 
+### Competitive targets — Agent Memory Leaderboard Cycle 2
+
+The following are project targets derived from the published Cycle 2 reference scores, not measured MACE results. Keep each track and division separate.
+
+| Track | Open-method reference | Commercial reference | Phase I target (+5 vs open) | Phase II stretch (+2 vs commercial) |
+|---|---:|---:|---:|---:|
+| Textual | 61.22 | 69.26 | 66.22 | 71.26 |
+| Multimodal | 43.26 | 53.68 | 48.26 | 55.68 |
+| Coding | 63.33% | 68.00% | 68.33% | 70.00% |
+
+Phase I establishes a strong open-method outperformance target; it does not imply commercial parity on every track. Phase II is deliberately an aspiration above the commercial reference. Before claiming either result, reproduce the matching track's actual Add/Search protocol, division, corpus, reader, model settings and resource budget. Publish exact run manifests, paired confidence intervals and failure counts. A result from one track cannot be used to imply a win on another.
+
+For AMA-Bench, after reproducing a strongest matched-backbone baseline, a proposed initial gate is at least +3 absolute accuracy points with a positive preregistered 95% confidence interval, without a task-family regression beyond 2 points. For MemoryArena, target at least +5 points in held-out multi-session task completion at matched tool/model budgets, with per-family transfer and worst-family results reported. These are proposed experimental gates, not official leaderboard targets.
+
+
 Project ambition targets already proposed for LongMemEval-V2 are ΔLAFS ≥ +3.2 initially and ≥ +4.0 as a stretch. These remain targets, not achieved results. For AMA-Bench and MemoryArena, first reproduce exact matched settings; then preregister uplift targets against the strongest reproduced control rather than comparing unrelated paper numbers.
 
 ### Assurance metrics (separate from leaderboard utility)
