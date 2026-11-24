@@ -9,7 +9,7 @@ A retrieval backend emits a structurally validated but untrusted candidate batch
 The exchange order is:
 
 1. Consumer reconstructs canonical candidate JSONL and verifies the candidate batch commitment.
-2. Consumer binds the complete candidate ID set to run, query invocation, domain, effective subject scope, environment, tool profile, DecisionNeed, purpose, qualification policy, lifecycle snapshot, pinned verifier profile, and trusted time.
+2. Consumer binds the complete candidate ID set to run, query invocation, domain, effective subject scope, environment, tool profile, DecisionNeed, purpose, qualification policy, lifecycle snapshot, pinned verifier profile. No client-supplied time is part of the request.
 3. An injected transport sends the request to a separately governed issuer.
 4. The issuer independently parses the candidate batch, recomputes all canonical digests, resolves source payloads and provenance, evaluates rights/authority/purpose/scope and currentness, and returns a signed qualification receipt.
 5. The consumer checks the receipt against the exact request and independently pinned Ed25519 trust profile.
@@ -35,9 +35,8 @@ The `request_sha256` field is SHA-256 over the following exact sequence:
 4. Length-prefixed UTF-8 values, in order: `run_id`, `query_invocation_id`, `domain_id`, `subject_scope_sha256`, `environment_revision_sha256`, `tool_profile_sha256`, `query_sha256`, `candidate_set_sha256`.
 5. A u64 big-endian candidate-ID count, then each sorted candidate ID as a length-prefixed UTF-8 value.
 6. Length-prefixed `decision_need_sha256`, `purpose_sha256`, `qualification_policy_sha256`, `lifecycle_snapshot_sha256`, `verifier_profile_sha256`.
-7. `now_unix` as u64 big-endian.
 
-The request digest is an idempotency/canonicalization aid only. It is not signed, does not authenticate the caller, and does not replace issuer-side parsing, candidate/source digest recomputation, or signature verification. The Rust test suite includes a fixed digest vector for cross-implementation parity.
+The request digest is an idempotency/canonicalization aid only. It is not signed, does not authenticate the caller, and does not replace issuer-side parsing, candidate/source digest recomputation, or signature verification. The Rust test suite includes a fixed digest vector for cross-implementation parity. The request contains no caller-controlled timestamp: the issuer must use its own authoritative clock for issuance and expiry; the consumer samples an injected trusted clock after receiving the signed response.
 
 ## Independence requirements not supplied by this module
 
@@ -52,7 +51,7 @@ The interface alone does not establish process, credential, storage, trust-root 
 - sign the typed receipt with a key represented in a trust profile provisioned outside the candidate backend and protected by a monotonic profile-version floor;
 - expose authenticated, bounded request/response transport with replay protection, timeout handling and auditable service health.
 
-The verifier profile in the consumer must be pinned out of band; copying the profile digest from the same request or candidate database is not trust bootstrap. A local subprocess under the same user account is not, by itself, sufficient separation for a hostile-host threat model.
+The verifier profile in the consumer must be pinned out of band; copying the profile digest from the same request or candidate database is not trust bootstrap. The consumer clock passed to the exchange must be protected and monotonic; the exchange samples it after the issuer responds, so a stale or caller-backdated timestamp cannot make an expired key or receipt appear valid. A local subprocess under the same user account is not, by itself, sufficient separation for a hostile-host threat model.
 
 ## Fail-closed semantics
 
@@ -60,7 +59,7 @@ The verifier profile in the consumer must be pinned out of band; copying the pro
 - Issuer unavailable, timeout, malformed response, signature failure, or any binding mismatch: return an error and expose no candidate payload.
 - Signed receipt with no admissible candidates: return explicit abstention.
 - Admissible derived record whose required parent is rejected, indeterminate, absent, or cyclic: remove the dependent record; if no evidence remains, abstain.
-- Qualification receipt expiry or use-context change: reject at use.
+- Qualification receipt expiry or use-context change: reject at use. Before each later consequential read, the consumer must sample its trusted clock again and put that value into the use-time binding; it must not reuse the exchange timestamp.
 - A qualified projection is not an action authorization. Live authorization and lifecycle currentness must be rechecked at consequential use. Decision sufficiency, decision, action authorization, consume-once state and outcome receipts remain separate objects.
 
 ## Claim boundary
