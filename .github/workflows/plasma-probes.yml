@@ -224,7 +224,9 @@ jobs:
           fixture = json.loads((root / "fixtures/synthetic-refinement-cases-v0.1.json").read_text())
           Draft202012Validator.check_schema(schema)
           Draft202012Validator(schema).validate(fixture)
-          assert len(fixture["cases"]) == 6
+          assert len(fixture["cases"]) == 10
+          assert any(case["case_id"] == "late-response-arrives-after-refinement-deadline" and case["expected_qualification"] == "UnknownResponse" for case in fixture["cases"])
+          assert any(case["case_id"] == "unstable-response-branch-is-unknown" and case["expected_qualification"] == "UnknownResponse" for case in fixture["cases"])
           paired = [case for case in fixture["cases"] if case.get("matched_pair_id") == "same-tail-different-response-risk"]
           assert len(paired) == 2
           assert paired[0]["spectral_tail_measure"] == paired[1]["spectral_tail_measure"]
