@@ -76,6 +76,8 @@ Symtropy's role is process scenarios, deterministic replay, process-twin integra
 
 The paper's alignment degree is calculated from the remanent-polarization ratio between hard and easy directions using the stated Fernengel-derived relationship. Preserve the original definition when reproducing; do not silently substitute a different texture statistic.
 
+**Source transcription discrepancy:** Table 2 reports HD + desorbed powder D90 = 276 μm, while the later discussion text states D90 = 279 μm. The machine-readable case records both and treats the value as unresolved. Use a full source PSD or explicit uncertainty for particle-resolved modelling; do not silently choose a single exact D90.
+
 ### Reported LPBF setup
 
 | Parameter | Source value |
