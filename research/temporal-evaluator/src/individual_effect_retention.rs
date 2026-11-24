@@ -132,6 +132,12 @@ impl EffectSign {
 pub struct IndividualEffectComparison {
     pub pair_id: u64,
     pub individual_id_sha256: [u8; 32],
+    pub baseline_applied_at_us: u64,
+    pub alternative_applied_at_us: u64,
+    /// Alternative application time minus baseline application time.
+    /// Positive means the alternative was applied later; this is a treatment
+    /// outcome, not a pairing-identity mismatch.
+    pub application_time_delta_us: i128,
     pub realized_effect_units: i128,
     pub latent_predicted_effect_units: i128,
     pub rollout_predicted_effect_units: i128,
@@ -288,7 +294,7 @@ fn validate_branch(
     context: &IndividualEffectContext,
     branch: &IndividualEffectBranch,
     expected_action_id: &str,
-) -> Result<i64, IndividualEffectError> {
+) -> Result<(i64, u64), IndividualEffectError> {
     if branch.run_id == 0 {
         return Err(IndividualEffectError::ZeroRunId);
     }
@@ -533,6 +539,9 @@ pub fn evaluate_individual_effect_retention(
         individual_effects.push(IndividualEffectComparison {
             pair_id: context.pair_id,
             individual_id_sha256: context.individual_id_sha256,
+            baseline_applied_at_us,
+            alternative_applied_at_us,
+            application_time_delta_us,
             realized_effect_units: realized_effect,
             latent_predicted_effect_units: latent_effect,
             rollout_predicted_effect_units: rollout_effect,
@@ -883,6 +892,17 @@ mod tests {
                 ..
             })
         ));
+    }
+
+
+    #[test]
+    fn branch_application_times_are_preserved_as_treatment_outcomes() {
+        let pairs = vec![pair(1, 1, (0, 2), (0, 2), (0, 2))];
+        let result = evaluate_individual_effect_retention(&pairs).unwrap();
+        let comparison = &result.comparisons[0];
+        assert_eq!(comparison.baseline_applied_at_us, 20);
+        assert_eq!(comparison.alternative_applied_at_us, 30);
+        assert_eq!(comparison.application_time_delta_us, 10);
     }
 
     #[test]
