@@ -214,6 +214,7 @@ pub struct CaOcrcRoundReceiptV1 {
 pub struct CaOcrcTrackedPredictionV1 {
     pub prediction: CaOcrcPredictionReceiptV1,
     pub proxy_delay: u64,
+    pub saw_unknown_feedback: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -287,6 +288,7 @@ fn state_digest(engine: &CaOcrcEngineV1) -> Result<String, CaOcrcErrorV1> {
         evicted_feedback_count: u64,
         untracked_feedback_count: u64,
         guarantee_state: CaOcrcGuaranteeStateV1,
+        prng_state: u64,
     }
     json_sha256(&State {
         threshold: engine.threshold,
@@ -298,6 +300,7 @@ fn state_digest(engine: &CaOcrcEngineV1) -> Result<String, CaOcrcErrorV1> {
         evicted_feedback_count: engine.evicted_feedback_count,
         untracked_feedback_count: engine.untracked_feedback_count,
         guarantee_state: engine.guarantee_state,
+        prng_state: engine.prng_state,
     })
 }
 
@@ -773,7 +776,12 @@ fn process_round_inner(
         })
         .collect();
     for issue_round in &expired {
-        engine.tracking_set.remove(issue_round);
+        if let Some(evicted) = engine.tracking_set.remove(issue_round)
+            && evicted.saw_unknown_feedback
+        {
+            engine.guarantee_state =
+                CaOcrcGuaranteeStateV1::UncertifiedInvalidOrOutOfModelFeedback;
+        }
         engine.evicted_feedback_count = engine.evicted_feedback_count.saturating_add(1);
     }
 
@@ -801,6 +809,7 @@ fn process_round_inner(
             CaOcrcTrackedPredictionV1 {
                 prediction: prediction.clone(),
                 proxy_delay: proxy_delay as u64,
+                saw_unknown_feedback: false,
             },
         );
         CaOcrcAdmissionV1::Admitted
@@ -870,6 +879,9 @@ fn process_round_inner(
             let only_blocked = status == LabelConsumptionEligibilityV1::Blocked
                 && reasons.iter().all(is_eligibility_only);
             let disposition = if only_unknown {
+                if let Some(pending) = engine.tracking_set.get_mut(&issue_round) {
+                    pending.saw_unknown_feedback = true;
+                }
                 CaOcrcFeedbackDispositionV1::HeldUnknown
             } else if only_blocked {
                 engine.guarantee_state =
