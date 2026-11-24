@@ -168,7 +168,7 @@ Every output carries a generic value_dependencies array for reconciling the comp
 
 The v4.37 and v4.29 focused workflow jobs assert that the four root pilot declarations are theorem-proof values and generated Nat.choose_pos helper nodes are definition bodies with no theorem-proof references. The source-snapshot comparator tests generic-value closure, theorem-only proof edges and definition-body helper expansion independently.
 
-## 10. Structural relation calibration
+## 11. Structural relation calibration
 
 The extractor's special relation emitters must be exercised independently of ordinary theorem type/value references. Both pinned Mathlib cohorts now include four structural calibration declarations:
 

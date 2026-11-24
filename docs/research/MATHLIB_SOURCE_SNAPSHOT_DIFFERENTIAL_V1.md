@@ -2,7 +2,7 @@
 
 **Status:** two independent Lean-native extraction jobs passed on PR head `cecdce02555c7cbe70385ddc8aabf2092466483d`; a local artifact comparison has been performed. The machine comparator and exact-head comparison workflow are being added.
 
-## Cohorts
+## 1. Cohorts
 
 | Cohort | Mathlib source | Lean toolchain | Extractor output |
 |---|---|---|---|
@@ -11,7 +11,7 @@
 
 These are two source/toolchain cohorts, not a controlled Lean-compiler-only ablation. Mathlib source revisions differ too. The four target declarations were manually inspected at both commits; their theorem statements and visible proof expressions are unchanged, but their surrounding elaboration environments differ.
 
-## Exact per-declaration dependency-set comparison
+## 2. Exact per-declaration dependency-set comparison
 
 A direct comparison of the actual artifact JSON files gives:
 
@@ -39,29 +39,29 @@ All four declarations have zero unresolved dependency names in both cohorts. In 
 3. **Elaborated notation/interface drift:** `Set.countable_union` preserves the same source theorem and visible `simp [union_eq_iUnion, and_comm]` expression. The v4.29 type edges include `Set.instUnion` and `Union.union`; the v4.37 type edges include `Set.instMax` and `Max.max`. This reflects a changed elaboration of the set-operation interface in the two environments. The proof-value dependency set also changes (22 to 32); only 20 names are shared.
 4. **Why counts alone mislead:** `Nat.choose_pos` has fewer direct references in the newer cohort, whereas `Set.countable_union` has more. Neither count alone says the proof is simpler, more correct, or better understood.
 
-## Research consequence
+## 3. Research consequence
 
 The dependency graph must carry a source/toolchain cohort identity and declaration-level dependency provenance. A graph cache keyed only by declaration name is unsafe across Mathlib/Lean snapshots. Persist exact Mathlib commit, Lean toolchain/revision, declaration type identity and dependency provenance with every graph. The benchmark should distinguish proposition/type-interface stability; proof-value dependency stability; elaborated notation and instance resolution; generated/private helper references; filtered/expanded external graph edges; and axiom/opaque-value availability.
 
 This justifies a three-way comparison: Symthaea direct elaborated extraction, LeanGraph raw direct edges at its pinned v4.29 source, and TheoremGraph's historical filtered/expanded dataset. Do not compare the current v4.37 output as though it were the same environment.
 
-## Claim boundary
+## 4. Claim boundary
 
 This is a four-declaration source-snapshot differential. It is not a corpus-level estimate, expert assessment of which dependency is mathematically essential, a controlled compiler-only ablation, or a direct LeanGraph raw-export differential. The v4.29 job uses the same Lean toolchain vintage as the pinned LeanGraph dataset and runs Symthaea's direct extractor; it is a comparability cohort, not LeanGraph execution itself.
 
-## Generated-helper boundary analysis
+## 5. Generated-helper boundary analysis
 
 Both pinned Lean extractors now emit nested helper_nodes records for direct proof-value dependencies whose fully qualified Name contains the root theorem's component sequence and has additional suffix components. This preserves exact private/generated helper identity, declaration kind, type and proof-value dependencies, ConstantInfo closure, unresolved names and edge provenance. The helper remains a separate node; its references are not silently flattened into the theorem's direct edge set.
 
 The differential CLI now validates the complete generated-helper worklist per root declaration and reports helper names plus the union of root and recursively discovered helper proof-value dependencies. The extraction uses fully qualified Lean Name components, a visited set and explicit helper-to-helper references; it does not flatten helper edges into the root's direct edge set. This captures generated-helper boundary depth while retaining a typed node graph. Non-generated dependencies remain direct targets; their own general recursive trust dependencies are reported separately in the trust profile.
 
-## Trust-profile interpretation and comparison
+## 6. Trust-profile interpretation and comparison
 
 Trust profiles are recursively derived from the loaded Lean environment, walking each reachable ConstantInfo type/value/structural dependency. They distinguish kernel axiom dependencies, unsafe declarations, partial definitions, opaque declarations, explicit sorryAx reachability and unresolved names. A complete trust closure means every reachable name resolved under the pinned environment; it does not mean zero axioms. Legitimate Lean axioms such as extensionality or classical choice are disclosed and interpreted as part of the declared foundation, not automatically counted as defects. A reachable sorryAx, unsafe declaration or partial definition is a separate high-salience boundary for expert review.
 
 The comparison report includes set differences for each trust class and exact sorryAx booleans. No claim of proof soundness follows from the trust profile alone; kernel acceptance and theorem-statement fidelity remain separate.
 
-## 10. Source-grounded explanation of the first two drift cases
+## 7. Source-grounded explanation of the first two drift cases
 
 The dependency differential was traced to exact source declarations in the two pinned Mathlib cohorts:
 
@@ -72,7 +72,7 @@ The source theorem Set.countable_union retains the same visible simp [union_eq_i
 
 For Nat.choose_pos, the v4.29 direct proof-value set has 33 names and v4.37 has 10. The newer root proof value exposes Nat.choose_pos._f as a generated helper. The nested helper worklist recovers most of the old references: direct proof-value Jaccard is 0.265, while helper-expanded proof-value Jaccard is approximately 0.946. This motivates the report field helper_expansion_explains_direct_drift.
 
-### Helper-expanded stability signal
+### 7.1 Helper-expanded stability signal
 
 The comparator now emits helper_expansion_explains_direct_drift. It is true only when:
 
@@ -82,7 +82,7 @@ The comparator now emits helper_expansion_explains_direct_drift. It is true only
 
 This is a diagnostic for dependency representation/repackaging, not proof equivalence, proof-plan fidelity or mathematical essentiality. It does not suppress or replace raw direct-edge differences. On this four-theorem cohort it should trigger for Nat.choose_pos and not for Set.countable_union.
 
-## 5. Typed value-edge semantics correction
+## 8. Typed value-edge semantics correction
 
 The initial four-theorem extraction compared type references with all ConstantInfo.value? references but labelled every value edge proof_dependency. That was accurate for the four root theorem declarations, but not for generated helpers: Nat.choose_pos._f is a definition, so its body references are definition dependencies, not theorem proof dependencies.
 
@@ -91,6 +91,6 @@ The extractor now classifies an available value by declaration kind: theorem_pro
 The differential comparator reconciles closure as type_dependencies union value_dependencies, keeps the theorem-proof metric separate, and includes definition helper bodies in helper expansion. Legacy snapshots without value_dependencies remain loadable, but are explicitly marked legacy_unclassified and use their old value array only for backward-compatible closure reconciliation.
 
 This aligns the extraction representation more closely with LeanGraph-style typed edge classes such as sig, proof, and def. It does not establish exact equivalence with the external LeanGraph raw export; that still requires a pinned, same-revision edge-by-edge differential.
-### Legacy artifact behavior
+### 8.1 Legacy artifact behavior
 
 An old artifact is recognized only when its value_kind field is absent/empty. Such snapshots are labelled legacy_unclassified and use their former proof_value_dependencies array as the compatibility source for generic value closure. A new-schema artifact with value_kind present uses value_dependencies exactly—even when empty. If its type/value union no longer reconciles with Lean's closure, the comparator rejects it rather than silently substituting the legacy proof-only array.
