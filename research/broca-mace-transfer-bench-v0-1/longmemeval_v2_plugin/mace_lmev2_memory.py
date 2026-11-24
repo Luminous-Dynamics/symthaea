@@ -662,7 +662,7 @@ class MaceLongMemEvalV2Memory(Memory):
         retrieval_mode = response.get("retrieval_mode")
         require(
             retrieval_mode == self.retrieval_mode_label,
-            "sidecar retrieval mode does not match the pinned hybrid backend profile",
+            "sidecar retrieval mode does not match the pinned retrieval backend profile",
         )
         candidate_jsonl = response.get("candidate_evidence_jsonl")
         record_count = response.get("candidate_record_count")
