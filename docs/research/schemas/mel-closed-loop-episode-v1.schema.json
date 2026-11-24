@@ -413,6 +413,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
+        "source_kind",
         "capture_id",
         "payload_sha256",
         "recorder_identity",
@@ -420,6 +421,7 @@
         "reported_closure",
         "sequence_accounting",
         "frame_accounting",
+        "heartbeat_accounting",
         "terminal_watermark",
         "receipt"
       ],
@@ -509,6 +511,40 @@
         },
         "receipt": {
           "$ref": "#/$defs/receipt_ref"
+        },
+        "source_kind": {
+          "enum": [
+            "rendered_audio_loopback",
+            "midi_output_monitor"
+          ]
+        },
+        "heartbeat_accounting": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "expected",
+            "observed",
+            "missing",
+            "duplicate"
+          ],
+          "properties": {
+            "expected": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "observed": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "missing": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "duplicate": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
         }
       }
     },
