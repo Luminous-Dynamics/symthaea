@@ -1221,7 +1221,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(next.phase, 0);
-        assert_eq!(next.alpha_at_issue, -0.08);
+        assert!(close(next.alpha_at_issue, -0.08));
     }
 
     #[test]
