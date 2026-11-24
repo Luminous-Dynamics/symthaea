@@ -1303,6 +1303,9 @@ mod tests {
         assert_eq!(first_run.experiment_units, 2);
         assert_eq!(first_run.source_work_clusters, 2);
         assert_eq!(first_run.one_to_many_source_work_clusters, 2);
+        assert_eq!(first_run.recommended_confirmatory_cluster_floor, 30);
+        assert!(!first_run.confirmatory_source_cluster_floor_met);
+        assert!(!first_run.confirmatory_one_to_many_cluster_floor_met);
         assert_eq!(
             first_run.local_minus_no_evidence_f1.estimate,
             0.5
