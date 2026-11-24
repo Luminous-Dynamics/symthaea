@@ -780,6 +780,56 @@ mod tests {
     }
 
     #[test]
+    fn rational_frame_mapping_never_shrinks_intervals_over_small_exhaustive_domain() {
+        for view_len in 1_u64..=16 {
+            for canonical_len in 1_u64..=16 {
+                let view_map = map(
+                    canonical_len,
+                    view_len,
+                    vec![TemporalTransformSegmentV1 {
+                        view_start_frame: 0,
+                        view_end_frame: view_len,
+                        canonical_start_frame: 0,
+                        canonical_end_frame: canonical_len,
+                    }],
+                );
+                for start in 0..view_len {
+                    for end in (start + 1)..=view_len {
+                        let mapped = map_prediction_to_canonical(
+                            &prediction(
+                                view_map.view_artifact.clone(),
+                                vec![FrameIntervalV1 {
+                                    start_frame: start,
+                                    end_frame: end,
+                                }],
+                            ),
+                            &view_map,
+                        )
+                        .unwrap();
+                        let GroundingPredictionStateV1::Occurrences { intervals } = mapped.state
+                        else {
+                            panic!("occurrence prediction changed disposition");
+                        };
+                        assert_eq!(intervals.len(), 1);
+                        let projected = &intervals[0];
+                        assert!(projected.start_frame < projected.end_frame);
+                        assert!(
+                            (projected.start_frame as u128) * (view_len as u128)
+                                <= (start as u128) * (canonical_len as u128),
+                            "mapped start shrank for view={view_len}, canonical={canonical_len}, interval=[{start},{end})"
+                        );
+                        assert!(
+                            (projected.end_frame as u128) * (view_len as u128)
+                                >= (end as u128) * (canonical_len as u128),
+                            "mapped end shrank for view={view_len}, canonical={canonical_len}, interval=[{start},{end})"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
     fn same_audio_digest_cannot_claim_a_different_frame_clock() {
         let mut invalid = map(
             1_000,
