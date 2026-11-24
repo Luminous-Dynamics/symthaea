@@ -624,6 +624,13 @@ The checked-in synthetic fixture has five available measurement samples and five
 
 These are exact scalar linear reference values, not a multi-mode Vlasov result or closed-loop stability proof. They make the next benchmark step measurable: replace the scalar mode with a coupled non-normal linearized kinetic mode block, compute its exact finite-horizon observability/controllability Gramians, and compare sparse sensor/actuator subsets on the same registered unstable/QoI subspace.
 
+The key separation is:
+- **timescale feasibility:** can diagnostics and actuators respond on the target mode's frequency/e-fold timescale?
+- **mode observability/authority:** do the actual sampled and delayed channels have non-zero, sufficiently strong information and actuation Gramian on that mode?
+- **closed-loop stability:** does a specified estimator/controller under those real channel schedules stabilize the dynamics under uncertainty?
+
+The first two are now independently measurable on the scalar synthetic fixture. Neither implies the third. The immediate next reference should be a coupled non-normal linear system with exact matrix-exponential / discrete finite-horizon Gramians, mode coupling and sensor/actuator subspace comparisons before a nonlinear kinetic controller is attempted.
+
 
 ## PPMD source-reproduction boundary
 
