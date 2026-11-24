@@ -26,6 +26,7 @@ const MAX_PERIODIC_LIFT_HARMONICS: usize = 4_096;
 const MAX_MEASURE_PARTICLES: usize = 1_000_000;
 const MAX_FOURIER_MEASURE_WORK: usize = 16_777_216;
 const MAX_SCALAR_MODE_HORIZON_STEPS: u32 = 1_000_000;
+const MAX_DELAY_CANCELLATION_SAMPLES: usize = 1_000_000;
 const DIGEST_DOMAIN: &[u8] = b"symthaea.akpd.pulse-candidate.v0.1\0";
 
 /// Errors returned while parsing, validating or enumerating probe contracts.
@@ -2685,6 +2686,128 @@ pub fn evaluate_scalar_unstable_mode_interface(
             .minimum_observability_fisher_information,
         minimum_required_controllability_gramian: contract.minimum_controllability_gramian,
         mode_interface_qualified,
+    })
+}
+
+/// Delayed field and interval-mean current/gradient observations for the
+/// one-dimensional transverse Maxwell subsystem.
+///
+/// Every vector must have the same non-zero spatial length. The current and
+/// gradient vectors are interval means over the exact preceding delay window,
+/// not arbitrary point samples.
+#[derive(Clone, Debug, PartialEq)]
+pub struct MaxwellDelayCancellationObservation {
+    pub delayed_electric_longitudinal: Vec<f64>,
+    pub delayed_electric_transverse: Vec<f64>,
+    pub delayed_magnetic_transverse: Vec<f64>,
+    pub interval_mean_current_longitudinal: Vec<f64>,
+    pub interval_mean_current_transverse: Vec<f64>,
+    pub interval_mean_gradient_electric_transverse: Vec<f64>,
+    pub interval_mean_gradient_magnetic_transverse: Vec<f64>,
+}
+
+/// Deterministic cancellation commands predicted from the Maxwell delay identities.
+///
+/// The fields are the baseline command only. Any learned or optimized residual
+/// must be added as a separate, independently bounded component.
+#[derive(Clone, Debug, PartialEq)]
+pub struct MaxwellDelayCancellationCommand {
+    pub external_electric_longitudinal: Vec<f64>,
+    pub external_electric_transverse: Vec<f64>,
+    pub external_magnetic_transverse: Vec<f64>,
+}
+
+/// First-order / interval-mean delay compensation for the 1D2V Maxwell field
+/// equations. With exact interval means, these are the exact delayed-to-current
+/// field-cancellation identities:
+///
+/// - H1 = -E1(t-tau) + tau * mean(J1)
+/// - H2 = -E2(t-tau) + tau * mean(J2 + d_x B3)
+/// - Bext = -B3(t-tau) + tau * mean(d_x E2)
+///
+/// The deterministic predictor is deliberately independent of any learned
+/// residual operator. It does not validate sensor noise, derivative bias,
+/// actuation feasibility, or the kinetic model that supplied the observations.
+pub fn predict_maxwell_delay_cancellation(
+    observation: &MaxwellDelayCancellationObservation,
+    delay_seconds: f64,
+) -> Result<MaxwellDelayCancellationCommand, ContractError> {
+    if !delay_seconds.is_finite() || delay_seconds < 0.0 {
+        return Err(control_timing_error(
+            "delay_seconds",
+            "must be finite and non-negative",
+        ));
+    }
+
+    let lengths = [
+        observation.delayed_electric_longitudinal.len(),
+        observation.delayed_electric_transverse.len(),
+        observation.delayed_magnetic_transverse.len(),
+        observation.interval_mean_current_longitudinal.len(),
+        observation.interval_mean_current_transverse.len(),
+        observation.interval_mean_gradient_electric_transverse.len(),
+        observation.interval_mean_gradient_magnetic_transverse.len(),
+    ];
+    let sample_count = lengths[0];
+    if sample_count == 0 || lengths.iter().any(|length| *length != sample_count) {
+        return Err(control_timing_error(
+            "field_observations",
+            "all seven spatial arrays must have equal, non-zero lengths",
+        ));
+    }
+    if sample_count > MAX_DELAY_CANCELLATION_SAMPLES {
+        return Err(control_timing_error(
+            "field_observations",
+            "spatial sample count exceeds the bounded work budget",
+        ));
+    }
+
+    let all_values = observation
+        .delayed_electric_longitudinal
+        .iter()
+        .chain(observation.delayed_electric_transverse.iter())
+        .chain(observation.delayed_magnetic_transverse.iter())
+        .chain(observation.interval_mean_current_longitudinal.iter())
+        .chain(observation.interval_mean_current_transverse.iter())
+        .chain(observation.interval_mean_gradient_electric_transverse.iter())
+        .chain(observation.interval_mean_gradient_magnetic_transverse.iter());
+    if all_values.clone().any(|value| !value.is_finite()) {
+        return Err(control_timing_error(
+            "field_observations",
+            "all field, current and gradient observations must be finite",
+        ));
+    }
+
+    let mut external_electric_longitudinal = Vec::with_capacity(sample_count);
+    let mut external_electric_transverse = Vec::with_capacity(sample_count);
+    let mut external_magnetic_transverse = Vec::with_capacity(sample_count);
+
+    for index in 0..sample_count {
+        let h1 = -observation.delayed_electric_longitudinal[index]
+            + delay_seconds * observation.interval_mean_current_longitudinal[index];
+        let h2 = -observation.delayed_electric_transverse[index]
+            + delay_seconds
+                * (observation.interval_mean_current_transverse[index]
+                    + observation.interval_mean_gradient_magnetic_transverse[index]);
+        let b_ext = -observation.delayed_magnetic_transverse[index]
+            + delay_seconds
+                * observation.interval_mean_gradient_electric_transverse[index];
+
+        if !h1.is_finite() || !h2.is_finite() || !b_ext.is_finite() {
+            return Err(control_timing_error(
+                "delay_compensation",
+                "delay-integral arithmetic produced a non-finite command",
+            ));
+        }
+        external_electric_longitudinal.push(h1);
+        external_electric_transverse.push(h2);
+        external_magnetic_transverse.push(b_ext);
+    }
+
+    Ok(MaxwellDelayCancellationCommand {
+        external_electric_longitudinal,
+        external_electric_transverse,
+        external_magnetic_transverse,
     })
 }
 
@@ -6447,6 +6570,126 @@ mod tests {
             minimum_observability_eigenvalue: 1.0e-6,
             minimum_controllability_eigenvalue: 1.0e-6,
         }
+    }
+
+    fn maxwell_delay_observation_fixture() -> MaxwellDelayCancellationObservation {
+        MaxwellDelayCancellationObservation {
+            delayed_electric_longitudinal: vec![0.6, -0.2],
+            delayed_electric_transverse: vec![1.2, 0.4],
+            delayed_magnetic_transverse: vec![-0.4, 0.8],
+            interval_mean_current_longitudinal: vec![0.8, -0.4],
+            interval_mean_current_transverse: vec![-0.2, 0.6],
+            interval_mean_gradient_electric_transverse: vec![-1.0, 0.2],
+            interval_mean_gradient_magnetic_transverse: vec![0.6, -0.8],
+        }
+    }
+
+    #[test]
+    fn maxwell_delay_predictor_matches_manufactured_interval_integral_identity() {
+        let command =
+            predict_maxwell_delay_cancellation(&maxwell_delay_observation_fixture(), 0.5)
+                .unwrap();
+        assert!((command.external_electric_longitudinal[0] - -0.2).abs() < 1.0e-12);
+        assert!((command.external_electric_transverse[0] - -1.0).abs() < 1.0e-12);
+        assert!((command.external_magnetic_transverse[0] - -0.1).abs() < 1.0e-12);
+        assert!((command.external_electric_longitudinal[1] - 0.0).abs() < 1.0e-12);
+        assert!((command.external_electric_transverse[1] - -0.3).abs() < 1.0e-12);
+        assert!((command.external_magnetic_transverse[1] - -0.7).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn maxwell_delay_predictor_reduces_to_instantaneous_field_cancellation_at_zero_delay() {
+        let observation = maxwell_delay_observation_fixture();
+        let command = predict_maxwell_delay_cancellation(&observation, 0.0).unwrap();
+        assert_eq!(
+            command.external_electric_longitudinal,
+            observation
+                .delayed_electric_longitudinal
+                .iter()
+                .map(|value| -*value)
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(
+            command.external_electric_transverse,
+            observation
+                .delayed_electric_transverse
+                .iter()
+                .map(|value| -*value)
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(
+            command.external_magnetic_transverse,
+            observation
+                .delayed_magnetic_transverse
+                .iter()
+                .map(|value| -*value)
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn maxwell_delay_predictor_rejects_invalid_delay_and_spatial_shapes() {
+        let observation = maxwell_delay_observation_fixture();
+        assert!(matches!(
+            predict_maxwell_delay_cancellation(&observation, f64::NAN),
+            Err(ContractError::InvalidControlTimingField {
+                field: "delay_seconds",
+                ..
+            })
+        ));
+        assert!(matches!(
+            predict_maxwell_delay_cancellation(&observation, -0.1),
+            Err(ContractError::InvalidControlTimingField {
+                field: "delay_seconds",
+                ..
+            })
+        ));
+        let mut mismatched = observation.clone();
+        mismatched.delayed_electric_transverse.pop();
+        assert!(matches!(
+            predict_maxwell_delay_cancellation(&mismatched, 0.5),
+            Err(ContractError::InvalidControlTimingField {
+                field: "field_observations",
+                ..
+            })
+        ));
+        let mut empty = observation;
+        empty.delayed_electric_longitudinal.clear();
+        empty.delayed_electric_transverse.clear();
+        empty.delayed_magnetic_transverse.clear();
+        empty.interval_mean_current_longitudinal.clear();
+        empty.interval_mean_current_transverse.clear();
+        empty.interval_mean_gradient_electric_transverse.clear();
+        empty.interval_mean_gradient_magnetic_transverse.clear();
+        assert!(matches!(
+            predict_maxwell_delay_cancellation(&empty, 0.5),
+            Err(ContractError::InvalidControlTimingField {
+                field: "field_observations",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn maxwell_delay_predictor_rejects_non_finite_measurements_and_overflow() {
+        let mut observation = maxwell_delay_observation_fixture();
+        observation.interval_mean_current_longitudinal[0] = f64::INFINITY;
+        assert!(matches!(
+            predict_maxwell_delay_cancellation(&observation, 0.5),
+            Err(ContractError::InvalidControlTimingField {
+                field: "field_observations",
+                ..
+            })
+        ));
+        let mut observation = maxwell_delay_observation_fixture();
+        observation.interval_mean_current_longitudinal[0] = f64::MAX;
+        assert!(matches!(
+            predict_maxwell_delay_cancellation(&observation, f64::MAX),
+            Err(ContractError::InvalidControlTimingField {
+                field: "delay_compensation",
+                ..
+            })
+        ));
     }
 
     #[test]
