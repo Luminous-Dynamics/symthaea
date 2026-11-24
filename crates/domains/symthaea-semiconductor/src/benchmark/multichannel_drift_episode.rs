@@ -682,14 +682,14 @@ pub fn observe_drift_channel_v1(
             engine,
             input,
             DriftObservationOutcomeV1 {
-                disposition: disposition,
+                disposition,
                 reason: Some(reason),
                 alarm_state: DriftAlarmStateV1::InsufficientEvidence,
                 observations: existing.map_or(0, |state| state.observations),
                 missing: existing.map_or(0, |state| state.missing_observations),
                 statistic: 0.0,
                 before_sha256: before.clone(),
-                after_sha256: &before.into(),
+                after_sha256: before.clone(),
             },
         );
     }
@@ -836,10 +836,10 @@ pub fn observe_drift_channel_v1(
         DriftObservationOutcomeV1 {
             disposition: DriftObservationDispositionV1::Updated,
             reason: None,
-            alarm_state: alarm_state,
+            alarm_state,
             observations: next.observations,
             missing: next.missing_observations,
-            statistic: statistic,
+            statistic,
             before_sha256: before.clone(),
             after_sha256: after.clone(),
         },
@@ -1469,7 +1469,7 @@ mod tests {
     fn episode_digest_is_insertion_order_invariant_and_never_claims_cause() {
         let mut engine = engine();
         let mut receipts = Vec::new();
-        for (id, channel, plane, kind, qualification, signal, evidence) in [
+        for (id, channel, plane, _kind, _qualification, signal, evidence) in [
             (
                 "x1",
                 "feature",
