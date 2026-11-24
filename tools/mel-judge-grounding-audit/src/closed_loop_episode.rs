@@ -302,6 +302,9 @@ fn reduce_episode(episode: &Episode) -> Result<EpisodeReport, String> {
         return Err("turn-taking decision does not bind the exact forecast ID and revision".into());
     }
 
+    if episode.decision.sequence > episode.forecast.expires_at_sequence {
+        return Err("turn-taking decision occurred after forecast expiry".into());
+    }
     let action_disposition = validate_action_semantics(episode)?;
     let effect_stage_reported = episode.effect.as_ref().map(|effect| effect.reported_stage.clone());
 
@@ -433,15 +436,6 @@ fn reduce_episode(episode: &Episode) -> Result<EpisodeReport, String> {
         && observation_outcome == ObservationOutcome::Unobserved
     {
         findings.push("detector present/absent claim was downgraded to unobserved because eligibility did not close".into());
-    }
-
-    if episode.forecast.expires_at_sequence < episode.decision.sequence
-        && episode.disposition.action == "accept"
-    {
-        findings.push("forecast expired before the decision; action is not admissible".into());
-        if is_output_stage(effect_stage_reported.as_deref().unwrap_or("not_requested")) {
-            return Err("output effect is bound to an expired forecast".into());
-        }
     }
 
     Ok(EpisodeReport {
@@ -664,7 +658,8 @@ mod tests {
     #[test]
     fn recorder_and_event_observer_must_be_distinct() {
         let mut value: serde_json::Value = serde_json::from_str(PRESENT).expect("fixture JSON");
-        value["observation"]["observer_identity"] = value["capture"]["recorder_identity"].clone();
+        let recorder_identity = value["capture"]["recorder_identity"].clone();
+        value["observation"]["observer_identity"] = recorder_identity;
         let raw = serde_json::to_string(&value).expect("serialize fixture");
         let report = parse_and_reduce(&raw).expect("mismatch should downgrade to unobserved");
         assert_eq!(report.observation_outcome, ObservationOutcome::Unobserved);
