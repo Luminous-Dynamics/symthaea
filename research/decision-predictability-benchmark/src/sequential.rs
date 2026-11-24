@@ -110,6 +110,7 @@ pub enum SequentialOracleError {
     TooManyActions(usize),
     TooManyProtocolStates(usize),
     TooManyOutcomes(usize),
+    TooManyResourceDimensions(usize),
     TooManyHorizonActions(u8),
     EmptyIdentifier(&'static str),
     DuplicateIdentifier {
@@ -198,11 +199,9 @@ fn validate(problem: &SequentialRobustProblem) -> Result<(), SequentialOracleErr
         return Err(SequentialOracleError::EmptyResourceBudget);
     }
     if problem.resource_budget.len() > MAX_RESOURCE_DIMENSIONS {
-        return Err(SequentialOracleError::ResourceDimensionMismatch {
-            action_id: "<resource-budget>".to_owned(),
-            expected: Vec::new(),
-            actual: problem.resource_budget.keys().cloned().collect(),
-        });
+        return Err(SequentialOracleError::TooManyResourceDimensions(
+            problem.resource_budget.len(),
+        ));
     }
     if problem
         .resource_budget
@@ -404,7 +403,8 @@ fn terminal_minimax(
             None => true,
             Some((best_loss, best_decision)) => {
                 worst_loss < *best_loss
-                    || (worst_loss == *best_loss && decision_id < *best_decision)
+                    || (worst_loss == *best_loss
+                        && decision_id.as_str() < best_decision.as_str())
             }
         };
         if replace {
