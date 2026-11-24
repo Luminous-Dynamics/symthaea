@@ -238,13 +238,17 @@ jobs:
             and .root_declaration.certificate_declaration == "ProofPlanActionCertificatePilot.and_comm_plan_replay"
             and (.claim_ceiling | length) >= 5
             and .negative_control.expected_result == "lean_type_error"
-            and .negative_control.sha256 == "87f2c53a03395b5a614883e111a4ab8c7f734eb8d6823638ce832b3eb75d269e"' \
+            and .negative_control.sha256 == "87f2c53a03395b5a614883e111a4ab8c7f734eb8d6823638ce832b3eb75d269e"
+            and .axiom_negative_control.expected_result == "axiom_dependency_reported"
+            and .axiom_negative_control.sha256 == "8e4a30f02043eaecfda1642eca155963f92283f6d7606af008699bb5ec7acf47"
+            and .axiom_negative_control.expected_observed_axiom == "ProofActionCertificateAxiomControl.injected_premise"' \
             docs/research/PROOF_ACTION_CERTIFICATE_AND_COMM_V1.json >/dev/null
           jq -e '."$schema" == "https://json-schema.org/draft/2020-12/schema"
             and .properties.status.const == "kernel_replay_pending"
             and .properties.proof_source.properties.sha256.pattern == "^[a-f0-9]{64}$"
             and .properties.actions.minItems == 3
-            and .properties.actions.maxItems == 3' \
+            and .properties.actions.maxItems == 3
+            and .properties.axiom_negative_control.properties.expected_result.const == "axiom_dependency_reported"' \
             docs/research/PROOF_ACTION_CERTIFICATE_AND_COMM_V1.schema.json >/dev/null
           echo "PROOF_ACTION_CERTIFICATE_MANIFEST_PASS"
 
@@ -488,9 +492,11 @@ jobs:
           set -euo pipefail
           proof_source="$GITHUB_WORKSPACE/scripts/research/lean-proof-extractor/ProofActionCertificateAndComm.lean"
           negative_source="$GITHUB_WORKSPACE/scripts/research/lean-proof-extractor/ProofActionCertificateAndCommNegative.lean"
+          axiom_negative_source="$GITHUB_WORKSPACE/scripts/research/lean-proof-extractor/ProofActionCertificateAndCommAxiomNegative.lean"
           manifest="$GITHUB_WORKSPACE/docs/research/PROOF_ACTION_CERTIFICATE_AND_COMM_V1.json"
           cp "$proof_source" ProofActionCertificateAndComm.lean
           cp "$negative_source" ProofActionCertificateAndCommNegative.lean
+          cp "$axiom_negative_source" ProofActionCertificateAndCommAxiomNegative.lean
           test "$(git rev-parse HEAD)" = "6ebcce37335bcb6bca64596e5d57bb3035648030"
           test "$(cat lean-toolchain)" = "leanprover/lean4:v4.37.0-rc1"
 
@@ -500,6 +506,9 @@ jobs:
           actual_negative_source_sha256="$(sha256sum ProofActionCertificateAndCommNegative.lean | cut -d' ' -f1)"
           expected_negative_source_sha256="$(jq -r '.negative_control.sha256' "$manifest")"
           test "$actual_negative_source_sha256" = "$expected_negative_source_sha256"
+          actual_axiom_negative_sha256="$(sha256sum ProofActionCertificateAndCommAxiomNegative.lean | cut -d' ' -f1)"
+          expected_axiom_negative_sha256="$(jq -r '.axiom_negative_control.sha256' "$manifest")"
+          test "$actual_axiom_negative_sha256" = "$expected_axiom_negative_sha256"
           test "$(jq -r '.environment.mathlib_revision' "$manifest")" = "$(git rev-parse HEAD)"
 
           lake env lean ProofActionCertificateAndComm.lean 2>&1 | tee proof-action-certificate-and-comm.log
@@ -521,9 +530,15 @@ jobs:
           grep -Eiq "type mismatch|application type mismatch" proof-action-certificate-negative.log
           echo "PROOF_ACTION_CERTIFICATE_WRONG_PROPOSITION_REJECTED"
 
+          lake env lean ProofActionCertificateAndCommAxiomNegative.lean > proof-action-certificate-axiom-negative.log 2>&1
+          expected_injected_axiom="$(jq -r '.axiom_negative_control.expected_observed_axiom' "$manifest")"
+          grep -Fq "$expected_injected_axiom" proof-action-certificate-axiom-negative.log
+          echo "PROOF_ACTION_CERTIFICATE_INJECTED_AXIOM_DETECTED"
+
           manifest_sha256="$(sha256sum "$manifest" | cut -d' ' -f1)"
           axiom_log_sha256="$(sha256sum proof-action-certificate-and-comm.log | cut -d' ' -f1)"
           negative_log_sha256="$(sha256sum proof-action-certificate-negative.log | cut -d' ' -f1)"
+          axiom_negative_log_sha256="$(sha256sum proof-action-certificate-axiom-negative.log | cut -d' ' -f1)"
           lake_manifest_sha256="$(sha256sum lake-manifest.json | cut -d' ' -f1)"
           lean_version="$(lean --version)"
           mathlib_revision="$(git rev-parse HEAD)"
@@ -536,6 +551,9 @@ jobs:
             --arg source_sha256 "$actual_source_sha256" \
             --arg negative_source_sha256 "$actual_negative_source_sha256" \
             --arg negative_log_sha256 "$negative_log_sha256" \
+            --arg axiom_negative_source_sha256 "$actual_axiom_negative_sha256" \
+            --arg axiom_negative_log_sha256 "$axiom_negative_log_sha256" \
+            --arg expected_injected_axiom "$expected_injected_axiom" \
             --arg manifest_sha256 "$manifest_sha256" \
             --arg lean_version "$lean_version" \
             --arg mathlib_revision "$mathlib_revision" \
@@ -565,6 +583,13 @@ jobs:
                 source_sha256: $negative_source_sha256,
                 log_sha256: $negative_log_sha256
               },
+              axiom_negative_control: {
+                expected_result: "axiom_dependency_reported",
+                observed_as_expected: true,
+                source_sha256: $axiom_negative_source_sha256,
+                expected_axiom: $expected_injected_axiom,
+                log_sha256: $axiom_negative_log_sha256
+              },
               claim_ceiling: [
                 "Lean accepted the declared action propositions and composed root theorem in this exact run environment.",
                 "The raw #print axioms output is retained as a log hash but its dependency closure is not yet parsed into structured evidence.",
@@ -572,7 +597,7 @@ jobs:
                 "The action-to-plan mapping remains provisional and has not received independent expert review."
               ]
             }' > "$receipt"
-          jq -e '.status == "accepted" and (.action_certificates | length) == 3 and .root_declaration == "ProofPlanActionCertificatePilot.and_comm_plan_replay" and .axiom_report.captured == true and .axiom_report.parsed == false and .negative_control.expected_result == "lean_type_error" and .negative_control.rejected_as_expected == true and (.negative_control.source_sha256 | test("^[a-f0-9]{64}$")) and (.negative_control.log_sha256 | test("^[a-f0-9]{64}$"))' "$receipt" >/dev/null
+          jq -e '.status == "accepted" and (.action_certificates | length) == 3 and .root_declaration == "ProofPlanActionCertificatePilot.and_comm_plan_replay" and .axiom_report.captured == true and .axiom_report.parsed == false and .negative_control.expected_result == "lean_type_error" and .negative_control.rejected_as_expected == true and (.negative_control.source_sha256 | test("^[a-f0-9]{64}$")) and (.negative_control.log_sha256 | test("^[a-f0-9]{64}$")) and .axiom_negative_control.expected_result == "axiom_dependency_reported" and .axiom_negative_control.observed_as_expected == true and .axiom_negative_control.expected_axiom == "ProofActionCertificateAxiomControl.injected_premise" and (.axiom_negative_control.source_sha256 | test("^[a-f0-9]{64}$")) and (.axiom_negative_control.log_sha256 | test("^[a-f0-9]{64}$"))' "$receipt" >/dev/null
           cat "$receipt" >> "$GITHUB_STEP_SUMMARY"
           echo "PROOF_ACTION_CERTIFICATE_AND_COMM_LEAN_REPLAY_PASS"
 
@@ -586,6 +611,8 @@ jobs:
             mathlib4/proof-action-certificate-and-comm.log
             mathlib4/ProofActionCertificateAndCommNegative.lean
             mathlib4/proof-action-certificate-negative.log
+            mathlib4/ProofActionCertificateAndCommAxiomNegative.lean
+            mathlib4/proof-action-certificate-axiom-negative.log
           if-no-files-found: error
 
       - name: Replay Tier-2 Lean context and warrant transport
