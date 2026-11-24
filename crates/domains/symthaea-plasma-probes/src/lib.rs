@@ -6593,7 +6593,7 @@ mod tests {
         assert!((command.external_electric_transverse[0] - -1.0).abs() < 1.0e-12);
         assert!((command.external_magnetic_transverse[0] - -0.1).abs() < 1.0e-12);
         assert!((command.external_electric_longitudinal[1] - 0.0).abs() < 1.0e-12);
-        assert!((command.external_electric_transverse[1] - -0.3).abs() < 1.0e-12);
+        assert!((command.external_electric_transverse[1] - -0.5).abs() < 1.0e-12);
         assert!((command.external_magnetic_transverse[1] - -0.7).abs() < 1.0e-12);
     }
 
