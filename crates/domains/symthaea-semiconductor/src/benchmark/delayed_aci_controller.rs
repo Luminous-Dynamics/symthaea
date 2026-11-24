@@ -192,7 +192,9 @@ fn valid_sha256(value: &str) -> bool {
 
 fn require_text(value: &str, field: &str) -> Result<(), DelayedAciErrorV1> {
     if value.trim().is_empty() {
-        return Err(DelayedAciErrorV1(format!("{field}: expected non-empty text")));
+        return Err(DelayedAciErrorV1(format!(
+            "{field}: expected non-empty text"
+        )));
     }
     Ok(())
 }
@@ -219,9 +221,7 @@ fn eligibility_digest(
     json_sha256(&canonical)
 }
 
-fn prediction_digest(
-    receipt: &DelayedAciPredictionReceiptV1,
-) -> Result<String, DelayedAciErrorV1> {
+fn prediction_digest(receipt: &DelayedAciPredictionReceiptV1) -> Result<String, DelayedAciErrorV1> {
     let mut canonical = receipt.clone();
     canonical.receipt_sha256.clear();
     json_sha256(&canonical)
@@ -235,7 +235,9 @@ fn update_digest(receipt: &DelayedAciUpdateReceiptV1) -> Result<String, DelayedA
 
 fn validate_policy(policy: &DelayedAciPolicyV1) -> Result<(), DelayedAciErrorV1> {
     if policy.schema != DELAYED_ACI_POLICY_SCHEMA_V1 {
-        return Err(DelayedAciErrorV1("delayed ACI policy schema is unsupported".into()));
+        return Err(DelayedAciErrorV1(
+            "delayed ACI policy schema is unsupported".into(),
+        ));
     }
     require_text(&policy.policy_id, "policy.policy_id")?;
     if policy.revision == 0
@@ -251,14 +253,18 @@ fn validate_policy(policy: &DelayedAciPolicyV1) -> Result<(), DelayedAciErrorV1>
         || policy.target_miscoverage < policy.minimum_miscoverage
         || policy.target_miscoverage > policy.maximum_miscoverage
     {
-        return Err(DelayedAciErrorV1("delayed ACI policy parameters are invalid".into()));
+        return Err(DelayedAciErrorV1(
+            "delayed ACI policy parameters are invalid".into(),
+        ));
     }
     Ok(())
 }
 
 fn validate_engine(engine: &DelayedAciEngineV1) -> Result<(), DelayedAciErrorV1> {
     if engine.schema != DELAYED_ACI_ENGINE_SCHEMA_V1 {
-        return Err(DelayedAciErrorV1("delayed ACI engine schema is unsupported".into()));
+        return Err(DelayedAciErrorV1(
+            "delayed ACI engine schema is unsupported".into(),
+        ));
     }
     require_text(&engine.engine_id, "engine.engine_id")?;
     require_text(&engine.clock_domain_id, "engine.clock_domain_id")?;
@@ -266,7 +272,9 @@ fn validate_engine(engine: &DelayedAciEngineV1) -> Result<(), DelayedAciErrorV1>
         || !valid_sha256(&engine.policy_sha256)
         || policy_digest(&engine.policy)? != engine.policy_sha256
     {
-        return Err(DelayedAciErrorV1("interval or policy digest is invalid".into()));
+        return Err(DelayedAciErrorV1(
+            "interval or policy digest is invalid".into(),
+        ));
     }
     validate_policy(&engine.policy)?;
     let delay = usize::try_from(engine.policy.feedback_delay_steps)
@@ -279,7 +287,9 @@ fn validate_engine(engine: &DelayedAciEngineV1) -> Result<(), DelayedAciErrorV1>
                 || *alpha > engine.policy.maximum_miscoverage
         })
     {
-        return Err(DelayedAciErrorV1("delayed ACI lane state is invalid".into()));
+        return Err(DelayedAciErrorV1(
+            "delayed ACI lane state is invalid".into(),
+        ));
     }
     for (sample_id, receipt) in &engine.pending_predictions {
         if sample_id != &receipt.sample_id
@@ -310,7 +320,9 @@ pub fn create_delayed_aci_engine_v1(
     require_text(engine_id, "engine_id")?;
     require_text(clock_domain_id, "clock_domain_id")?;
     if !valid_sha256(interval_method_sha256) {
-        return Err(DelayedAciErrorV1("interval method digest is malformed".into()));
+        return Err(DelayedAciErrorV1(
+            "interval method digest is malformed".into(),
+        ));
     }
     validate_policy(&policy)?;
     let delay = usize::try_from(policy.feedback_delay_steps)
@@ -346,12 +358,17 @@ pub fn issue_delayed_aci_prediction_v1(
         return Err(DelayedAciErrorV1("prediction schema is unsupported".into()));
     }
     require_text(&input.sample_id, "prediction.sample_id")?;
-    require_text(&input.measurement_event_id, "prediction.measurement_event_id")?;
+    require_text(
+        &input.measurement_event_id,
+        "prediction.measurement_event_id",
+    )?;
     require_text(&input.clock_domain_id, "prediction.clock_domain_id")?;
     if input.clock_domain_id != engine.clock_domain_id
         || input.interval_method_sha256 != engine.interval_method_sha256
     {
-        return Err(DelayedAciErrorV1("clock domain or interval method mismatch".into()));
+        return Err(DelayedAciErrorV1(
+            "clock domain or interval method mismatch".into(),
+        ));
     }
     if input.event_time_unix_seconds > input.prediction_at_unix_seconds
         || !input.constructed_for_alpha.is_finite()
@@ -359,16 +376,22 @@ pub fn issue_delayed_aci_prediction_v1(
         || !input.upper_bound.is_finite()
         || input.lower_bound > input.upper_bound
     {
-        return Err(DelayedAciErrorV1("prediction interval or chronology is invalid".into()));
+        return Err(DelayedAciErrorV1(
+            "prediction interval or chronology is invalid".into(),
+        ));
     }
     if engine.pending_predictions.contains_key(&input.sample_id) {
-        return Err(DelayedAciErrorV1("sample already has a pending interval".into()));
+        return Err(DelayedAciErrorV1(
+            "sample already has a pending interval".into(),
+        ));
     }
     let step = engine.next_prediction_step;
     let delay = engine.policy.feedback_delay_steps;
-    if engine.pending_predictions.values().any(|pending| {
-        pending.prediction_step.saturating_add(delay) <= step
-    }) {
+    if engine
+        .pending_predictions
+        .values()
+        .any(|pending| pending.prediction_step.saturating_add(delay) <= step)
+    {
         engine.state.fixed_delay_assumptions_intact = false;
     }
     let lane = step % delay;
@@ -453,18 +476,25 @@ pub fn deliver_delayed_aci_feedback_v1(
 ) -> Result<DelayedAciUpdateReceiptV1, DelayedAciErrorV1> {
     validate_engine(engine)?;
     if delivery.schema != DELAYED_ACI_DELIVERY_SCHEMA_V1 {
-        return Err(DelayedAciErrorV1("label delivery schema is unsupported".into()));
+        return Err(DelayedAciErrorV1(
+            "label delivery schema is unsupported".into(),
+        ));
     }
     require_text(&delivery.sample_id, "delivery.sample_id")?;
     require_text(&delivery.label_id, "delivery.label_id")?;
-    require_text(&delivery.measurement_event_id, "delivery.measurement_event_id")?;
+    require_text(
+        &delivery.measurement_event_id,
+        "delivery.measurement_event_id",
+    )?;
     require_text(&delivery.clock_domain_id, "delivery.clock_domain_id")?;
     require_text(&delivery.idempotency_key, "delivery.idempotency_key")?;
     if delivery.label_revision == 0
         || !valid_sha256(&delivery.label_payload_sha256)
         || !delivery.label_value.is_finite()
     {
-        return Err(DelayedAciErrorV1("delivery revision, digest or numeric value is invalid".into()));
+        return Err(DelayedAciErrorV1(
+            "delivery revision, digest or numeric value is invalid".into(),
+        ));
     }
 
     let prediction = engine.pending_predictions.get(&delivery.sample_id).cloned();
@@ -534,9 +564,7 @@ pub fn deliver_delayed_aci_feedback_v1(
     {
         reasons.push(DelayedAciReasonV1::EligibilityReportBeforeLabel);
     }
-    if delivery.delivered_at_unix_seconds
-        < delivery.eligibility_report_available_at_unix_seconds
-    {
+    if delivery.delivered_at_unix_seconds < delivery.eligibility_report_available_at_unix_seconds {
         reasons.push(DelayedAciReasonV1::EligibilityReportUnavailableAtDelivery);
     }
     if prediction.measurement_event_id != delivery.measurement_event_id
@@ -550,9 +578,7 @@ pub fn deliver_delayed_aci_feedback_v1(
     if report.label_revision != delivery.label_revision {
         reasons.push(DelayedAciReasonV1::LabelRevisionMismatch);
     }
-    if report.label_sha256 != delivery.label_payload_sha256
-        || !valid_sha256(&report.label_sha256)
-    {
+    if report.label_sha256 != delivery.label_payload_sha256 || !valid_sha256(&report.label_sha256) {
         reasons.push(DelayedAciReasonV1::LabelPayloadDigestMismatch);
     }
     if eligibility_digest(report)? != report.report_sha256 {
@@ -571,9 +597,7 @@ pub fn deliver_delayed_aci_feedback_v1(
     {
         reasons.push(DelayedAciReasonV1::InvalidNumericInput);
     }
-    if delivery.idempotency_key
-        != format!("{}:{}", delivery.label_id, delivery.label_revision)
-    {
+    if delivery.idempotency_key != format!("{}:{}", delivery.label_id, delivery.label_revision) {
         reasons.push(DelayedAciReasonV1::LabelIdentityMismatch);
     }
     match report.eligibility {
@@ -594,16 +618,14 @@ pub fn deliver_delayed_aci_feedback_v1(
     reasons.dedup();
     if !reasons.is_empty() {
         engine.state.fixed_delay_assumptions_intact = false;
-        let only_eligibility_unknown =
-            report.eligibility == LabelConsumptionEligibilityV1::Unknown
-                && reasons
-                    .iter()
-                    .all(|reason| *reason == DelayedAciReasonV1::LabelNotEligible);
-        let only_eligibility_blocked =
-            report.eligibility == LabelConsumptionEligibilityV1::Blocked
-                && reasons
-                    .iter()
-                    .all(|reason| *reason == DelayedAciReasonV1::LabelNotEligible);
+        let only_eligibility_unknown = report.eligibility == LabelConsumptionEligibilityV1::Unknown
+            && reasons
+                .iter()
+                .all(|reason| *reason == DelayedAciReasonV1::LabelNotEligible);
+        let only_eligibility_blocked = report.eligibility == LabelConsumptionEligibilityV1::Blocked
+            && reasons
+                .iter()
+                .all(|reason| *reason == DelayedAciReasonV1::LabelNotEligible);
         let disposition = if only_eligibility_unknown {
             DelayedAciDispositionV1::HeldUnknown
         } else if only_eligibility_blocked {
@@ -670,10 +692,9 @@ pub fn deliver_delayed_aci_feedback_v1(
 
     engine.state = candidate_state;
     engine.pending_predictions.remove(&delivery.sample_id);
-    engine.accepted_label_revisions.insert(format!(
-        "{}:{}",
-        delivery.label_id, delivery.label_revision
-    ));
+    engine
+        .accepted_label_revisions
+        .insert(format!("{}:{}", delivery.label_id, delivery.label_revision));
     Ok(receipt)
 }
 
@@ -699,13 +720,8 @@ mod tests {
     }
 
     fn engine(delay: u64) -> DelayedAciEngineV1 {
-        create_delayed_aci_engine_v1(
-            "aci-engine-001",
-            "fab-clock",
-            &digest('a'),
-            policy(delay),
-        )
-        .unwrap()
+        create_delayed_aci_engine_v1("aci-engine-001", "fab-clock", &digest('a'), policy(delay))
+            .unwrap()
     }
 
     fn prediction(sample: &str, event: &str, alpha: f64) -> DelayedAciPredictionInputV1 {
@@ -738,8 +754,8 @@ mod tests {
             calibration_certificate_id: "cert-1".into(),
             frontier: LabelEvidenceFrontierV1::CurrentAtK1,
             eligibility: status,
-            downstream_consumption_allowed:
-                status == LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            downstream_consumption_allowed: status
+                == LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
             reasons: Vec::new(),
             label_sha256: payload.into(),
             measurement_sha256: digest('b'),
@@ -809,8 +825,17 @@ mod tests {
 
         let first_update = deliver_delayed_aci_feedback_v1(
             &mut engine,
-            &delivery("s0", "e0", "l0", 1, 0.5, 2, LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy),
-        ).unwrap();
+            &delivery(
+                "s0",
+                "e0",
+                "l0",
+                1,
+                0.5,
+                2,
+                LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            ),
+        )
+        .unwrap();
         assert_eq!(first_update.disposition, DelayedAciDispositionV1::Updated);
         assert_eq!(first_update.missed_interval, Some(false));
         assert!((engine.state.alpha_lanes[0] - 0.11).abs() < 1e-12);
@@ -828,8 +853,17 @@ mod tests {
         assert_eq!(receipt.alpha_used, 0.10);
         let update = deliver_delayed_aci_feedback_v1(
             &mut engine,
-            &delivery("s0", "e0", "l0", 1, 1.5, 1, LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy),
-        ).unwrap();
+            &delivery(
+                "s0",
+                "e0",
+                "l0",
+                1,
+                1.5,
+                1,
+                LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            ),
+        )
+        .unwrap();
         assert_eq!(update.missed_interval, Some(true));
         assert!((engine.state.alpha_lanes[0] - 0.01).abs() < 1e-12);
     }
@@ -838,7 +872,15 @@ mod tests {
     fn exact_label_revision_and_payload_are_required() {
         let mut engine = engine(1);
         issue(&mut engine, "s0", "e0");
-        let mut candidate = delivery("s0", "e0", "l0", 2, 0.5, 1, LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy);
+        let mut candidate = delivery(
+            "s0",
+            "e0",
+            "l0",
+            2,
+            0.5,
+            1,
+            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+        );
         candidate.eligibility_report.label_revision = 1;
         let mut canonical = candidate.eligibility_report.clone();
         canonical.report_sha256.clear();
@@ -855,8 +897,17 @@ mod tests {
         let before = engine.state.alpha_lanes.clone();
         let update = deliver_delayed_aci_feedback_v1(
             &mut engine,
-            &delivery("s0", "e0", "l0", 1, 0.5, 1, LabelConsumptionEligibilityV1::Unknown),
-        ).unwrap();
+            &delivery(
+                "s0",
+                "e0",
+                "l0",
+                1,
+                0.5,
+                1,
+                LabelConsumptionEligibilityV1::Unknown,
+            ),
+        )
+        .unwrap();
         assert_eq!(update.disposition, DelayedAciDispositionV1::HeldUnknown);
         assert_eq!(engine.state.alpha_lanes, before);
         assert!(!engine.state.fixed_delay_assumptions_intact);
@@ -869,8 +920,17 @@ mod tests {
         let before = engine.state.alpha_lanes.clone();
         let update = deliver_delayed_aci_feedback_v1(
             &mut engine,
-            &delivery("s0", "e0", "l0", 1, 0.5, 1, LabelConsumptionEligibilityV1::Blocked),
-        ).unwrap();
+            &delivery(
+                "s0",
+                "e0",
+                "l0",
+                1,
+                0.5,
+                1,
+                LabelConsumptionEligibilityV1::Blocked,
+            ),
+        )
+        .unwrap();
         assert_eq!(update.disposition, DelayedAciDispositionV1::Blocked);
         assert_eq!(engine.state.alpha_lanes, before);
         assert!(!engine.state.fixed_delay_assumptions_intact);
@@ -884,8 +944,17 @@ mod tests {
         let before = engine.state.alpha_lanes.clone();
         let update = deliver_delayed_aci_feedback_v1(
             &mut engine,
-            &delivery("s0", "e0", "l0", 1, 0.5, 3, LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy),
-        ).unwrap();
+            &delivery(
+                "s0",
+                "e0",
+                "l0",
+                1,
+                0.5,
+                3,
+                LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            ),
+        )
+        .unwrap();
         assert_eq!(update.disposition, DelayedAciDispositionV1::Rejected);
         assert_eq!(engine.state.alpha_lanes, before);
         assert!(!engine.state.fixed_delay_assumptions_intact);
@@ -908,7 +977,11 @@ mod tests {
         let before = engine.state.alpha_lanes.clone();
         let update = deliver_delayed_aci_feedback_v1(&mut engine, &candidate).unwrap();
         assert_eq!(update.disposition, DelayedAciDispositionV1::Rejected);
-        assert!(update.reasons.contains(&DelayedAciReasonV1::EligibilityReportBeforeLabel));
+        assert!(
+            update
+                .reasons
+                .contains(&DelayedAciReasonV1::EligibilityReportBeforeLabel)
+        );
         assert_eq!(engine.state.alpha_lanes, before);
         assert!(!engine.state.fixed_delay_assumptions_intact);
     }
@@ -917,7 +990,11 @@ mod tests {
     fn tampered_pending_prediction_receipt_is_rejected() {
         let mut engine = engine(1);
         issue(&mut engine, "s0", "e0");
-        engine.pending_predictions.get_mut("s0").unwrap().upper_bound = 3.0;
+        engine
+            .pending_predictions
+            .get_mut("s0")
+            .unwrap()
+            .upper_bound = 3.0;
         assert!(validate_engine(&engine).is_err());
     }
 
@@ -950,7 +1027,11 @@ mod tests {
         candidate.eligibility_report_available_at_unix_seconds = 1_011;
         let update = deliver_delayed_aci_feedback_v1(&mut engine, &candidate).unwrap();
         assert_eq!(update.disposition, DelayedAciDispositionV1::Rejected);
-        assert!(update.reasons.contains(&DelayedAciReasonV1::LabelAvailableBeforeMeasurement));
+        assert!(
+            update
+                .reasons
+                .contains(&DelayedAciReasonV1::LabelAvailableBeforeMeasurement)
+        );
         assert!(!update.alpha_state_mutated);
     }
 
@@ -1006,13 +1087,34 @@ mod tests {
             issue(&mut engine, "s1", "e1");
             deliver_delayed_aci_feedback_v1(
                 &mut engine,
-                &delivery("s0", "e0", "l0", 1, 1.5, 2, LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy),
-            ).unwrap();
+                &delivery(
+                    "s0",
+                    "e0",
+                    "l0",
+                    1,
+                    1.5,
+                    2,
+                    LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+                ),
+            )
+            .unwrap();
             deliver_delayed_aci_feedback_v1(
                 &mut engine,
-                &delivery("s1", "e1", "l1", 1, 0.5, 3, LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy),
-            ).unwrap();
-            (json_sha256(&engine.state).unwrap(), policy_digest(&engine.policy).unwrap())
+                &delivery(
+                    "s1",
+                    "e1",
+                    "l1",
+                    1,
+                    0.5,
+                    3,
+                    LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+                ),
+            )
+            .unwrap();
+            (
+                json_sha256(&engine.state).unwrap(),
+                policy_digest(&engine.policy).unwrap(),
+            )
         }
         assert_eq!(run(), run());
     }
@@ -1021,9 +1123,19 @@ mod tests {
     fn accepted_revision_is_idempotent() {
         let mut engine = engine(1);
         issue(&mut engine, "s0", "e0");
-        let accepted = delivery("s0", "e0", "l0", 1, 0.5, 1, LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy);
+        let accepted = delivery(
+            "s0",
+            "e0",
+            "l0",
+            1,
+            0.5,
+            1,
+            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+        );
         assert_eq!(
-            deliver_delayed_aci_feedback_v1(&mut engine, &accepted).unwrap().disposition,
+            deliver_delayed_aci_feedback_v1(&mut engine, &accepted)
+                .unwrap()
+                .disposition,
             DelayedAciDispositionV1::Updated
         );
         let before = engine.state.alpha_lanes.clone();
