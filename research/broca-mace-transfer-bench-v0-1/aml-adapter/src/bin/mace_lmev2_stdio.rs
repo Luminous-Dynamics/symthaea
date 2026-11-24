@@ -605,6 +605,8 @@ fn handle_request(
             let trace_elapsed_ns = operations.iter()
                 .fold(0_u64, |total, operation| total.saturating_add(operation.elapsed_ns));
             let created_at_unix = unix_now_seconds()?;
+            let tool_calls_used = u32::try_from(operations.len())
+                .map_err(|_| "retrieval action count exceeds u32".to_owned())?;
             let trace = RetrievalTraceReceiptV1 {
                 run_id: config.run_id.clone(),
                 query_invocation_id: candidate_id.to_owned(),
@@ -615,10 +617,8 @@ fn handle_request(
                 candidate_set_sha256: candidate_set_sha256.clone(),
                 operations,
                 stop_reason,
-                tool_call_budget: u32::try_from(operations.len())
-                    .map_err(|_| "retrieval action count exceeds u32".to_owned())?,
-                tool_calls_used: u32::try_from(operations.len())
-                    .map_err(|_| "retrieval action count exceeds u32".to_owned())?,
+                tool_call_budget: tool_calls_used,
+                tool_calls_used,
                 elapsed_ns: trace_elapsed_ns,
                 inspected_bytes: 0,
                 inspected_bytes_complete: false,
