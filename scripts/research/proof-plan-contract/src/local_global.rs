@@ -362,7 +362,10 @@ impl BooleanCountermodel {
     /// Both contextual hypotheses and inference premises must evaluate to true.
     pub fn validate(&self, sequent: &BooleanSequent) -> Result<(), String> {
         if sequent.premises.is_empty() {
-            return Err("candidate finite Boolean sequent must contain at least one inference premise".to_owned());
+            return Err(
+                "candidate finite Boolean sequent must contain at least one inference premise"
+                    .to_owned(),
+            );
         }
 
         let mut values = std::collections::HashMap::new();
@@ -402,7 +405,9 @@ impl BooleanCountermodel {
 
         for (index, hypothesis) in sequent.hypotheses.iter().enumerate() {
             if !hypothesis.evaluate(&values)? {
-                return Err(format!("countermodel hypothesis[{index}] evaluates to false"));
+                return Err(format!(
+                    "countermodel hypothesis[{index}] evaluates to false"
+                ));
             }
         }
         for (index, premise) in sequent.premises.iter().enumerate() {
@@ -483,7 +488,10 @@ impl LocalGlobalPairV1 {
     /// Domain-separated identity for the exact versioned candidate-visible
     /// payload. Evaluator-only labels and witnesses are deliberately excluded.
     pub fn candidate_view_sha256(&self) -> Result<String, String> {
-        domain_separated_sha256("candidate_payload", &(&self.schema_version, &self.candidate))
+        domain_separated_sha256(
+            "candidate_payload",
+            &(&self.schema_version, &self.candidate),
+        )
     }
 
     pub fn scope_matches(&self) -> bool {
@@ -1204,11 +1212,9 @@ mod tests {
 
         pair.candidate.global_stage.scope_binding = candidate_scope.clone();
 
-        assert!(
-            validate_pair(&pair).iter().any(|error| {
-                error.contains("hypotheses[0] does not match the canonical typed sequent display")
-            })
-        );
+        assert!(validate_pair(&pair).iter().any(|error| {
+            error.contains("hypotheses[0] does not match the canonical typed sequent display")
+        }));
     }
 
     #[test]
@@ -1249,7 +1255,6 @@ mod tests {
             ]
         );
     }
-
 
     #[test]
     fn truth_table_prefers_minimum_support_countermodel() {
@@ -1333,12 +1338,8 @@ mod tests {
             }),
         };
         let right = BooleanFormula::Or {
-            left: Box::new(BooleanFormula::Not {
-                arg: Box::new(p),
-            }),
-            right: Box::new(BooleanFormula::Not {
-                arg: Box::new(q),
-            }),
+            left: Box::new(BooleanFormula::Not { arg: Box::new(p) }),
+            right: Box::new(BooleanFormula::Not { arg: Box::new(q) }),
         };
         let de_morgan = BooleanFormula::Iff {
             left: Box::new(left),
@@ -1346,12 +1347,8 @@ mod tests {
         };
 
         assert_eq!(
-            check_finite_propositional_entailment(
-                &[],
-                &de_morgan,
-                MAX_FINITE_BOOLEAN_ATOMS
-            )
-            .unwrap(),
+            check_finite_propositional_entailment(&[], &de_morgan, MAX_FINITE_BOOLEAN_ATOMS)
+                .unwrap(),
             FiniteTruthTableResult::NoCountermodelFound {
                 assignments_checked: 4,
             }
@@ -1474,9 +1471,6 @@ mod tests {
         assert!(premise_value);
     }
 
-
-
-
     #[test]
     fn candidate_view_digest_is_stable_and_excludes_evaluator_only_data() {
         let pair = fixture();
@@ -1484,7 +1478,9 @@ mod tests {
         let mut evaluator_mutation = pair.clone();
         let evaluator = evaluator_mutation.evaluator_only.as_mut().unwrap();
         evaluator.global_disposition = GlobalDisposition::Omitted;
-        evaluator.adjudication_refs.push("additional-hidden-reference".to_owned());
+        evaluator
+            .adjudication_refs
+            .push("additional-hidden-reference".to_owned());
         evaluator
             .finite_boolean_countermodel
             .as_mut()
@@ -1493,7 +1489,9 @@ mod tests {
             .value = true;
         assert_eq!(
             original,
-            evaluator_mutation.candidate_view_sha256().expect("same candidate digest")
+            evaluator_mutation
+                .candidate_view_sha256()
+                .expect("same candidate digest")
         );
     }
 
@@ -1502,23 +1500,27 @@ mod tests {
         let pair = fixture();
         let original = pair.candidate_view_sha256().expect("candidate digest");
         let mut candidate_mutation = pair.clone();
-        candidate_mutation.candidate.task_class =
-            "modified_candidate_task_class".to_owned();
+        candidate_mutation.candidate.task_class = "modified_candidate_task_class".to_owned();
         assert_ne!(
             original,
-            candidate_mutation.candidate_view_sha256().expect("mutated candidate digest")
+            candidate_mutation
+                .candidate_view_sha256()
+                .expect("mutated candidate digest")
         );
     }
 
     #[test]
     fn canonical_surface_renderer_is_unambiguous() {
         let formula = BooleanFormula::Implies {
-            left: Box::new(BooleanFormula::Atom { name: "p".to_owned() }),
-            right: Box::new(BooleanFormula::Atom { name: "q".to_owned() }),
+            left: Box::new(BooleanFormula::Atom {
+                name: "p".to_owned(),
+            }),
+            right: Box::new(BooleanFormula::Atom {
+                name: "q".to_owned(),
+            }),
         };
         assert_eq!(formula.canonical_surface_text(), "(p → q)");
     }
-
 
     #[test]
     fn candidate_warrant_text_must_match_typed_sequent_even_after_valid_rehash() {
@@ -1526,16 +1528,13 @@ mod tests {
         {
             let scope = &mut pair.candidate.local_stage.scope_binding;
             scope.warrant_text = "From (q → p) infer (p → q).".to_owned();
-            scope.warrant_sha256 =
-                domain_separated_sha256("warrant", &scope.warrant_text).unwrap();
+            scope.warrant_sha256 = domain_separated_sha256("warrant", &scope.warrant_text).unwrap();
         }
         pair.candidate.global_stage.scope_binding =
             pair.candidate.local_stage.scope_binding.clone();
-        assert!(
-            validate_pair(&pair)
-                .iter()
-                .any(|error| error.contains("warrant_text does not match the canonical typed sequent warrant"))
-        );
+        assert!(validate_pair(&pair).iter().any(|error| {
+            error.contains("warrant_text does not match the canonical typed sequent warrant")
+        }));
     }
 
     #[test]
@@ -1545,8 +1544,7 @@ mod tests {
             let scope = &mut pair.candidate.local_stage.scope_binding;
             scope.premises[0] = "(p ↔ q)".to_owned();
             let canonical = canonical_string_set(&scope.premises, "premises").unwrap();
-            scope.premise_set_sha256 =
-                domain_separated_sha256("premises", &canonical).unwrap();
+            scope.premise_set_sha256 = domain_separated_sha256("premises", &canonical).unwrap();
         }
         pair.candidate.global_stage.scope_binding =
             pair.candidate.local_stage.scope_binding.clone();
@@ -1571,8 +1569,14 @@ mod tests {
             .unwrap();
         assert!(witness.validate(sequent).is_ok());
         assert_eq!(
-            pair.candidate.local_stage.scope_binding.finite_boolean_sequent,
-            pair.candidate.global_stage.scope_binding.finite_boolean_sequent
+            pair.candidate
+                .local_stage
+                .scope_binding
+                .finite_boolean_sequent,
+            pair.candidate
+                .global_stage
+                .scope_binding
+                .finite_boolean_sequent
         );
     }
 
@@ -1604,14 +1608,11 @@ mod tests {
         pair.candidate
             .local_stage
             .scope_binding
-            .finite_boolean_sequent_sha256 = Some(
-            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_owned(),
-        );
-        assert!(
-            validate_pair(&pair)
-                .iter()
-                .any(|error| error.contains("finite_boolean_sequent_sha256 does not match its canonical preimage"))
-        );
+            .finite_boolean_sequent_sha256 =
+            Some("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_owned());
+        assert!(validate_pair(&pair).iter().any(|error| {
+            error.contains("finite_boolean_sequent_sha256 does not match its canonical preimage")
+        }));
     }
 
     #[test]

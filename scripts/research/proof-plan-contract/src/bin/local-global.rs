@@ -3,8 +3,8 @@ use std::fs;
 use std::process::ExitCode;
 
 use proof_plan_contract::local_global::{
-    FiniteTruthTableResult, MAX_FINITE_BOOLEAN_ATOMS, check_finite_boolean_sequent,
-    compute_cirr, validate_pair_json,
+    FiniteTruthTableResult, MAX_FINITE_BOOLEAN_ATOMS, check_finite_boolean_sequent, compute_cirr,
+    validate_pair_json,
 };
 
 fn main() -> ExitCode {
@@ -57,7 +57,11 @@ fn main() -> ExitCode {
     }
     if let (Some(evaluator), Some(sequent)) = (
         pair.evaluator_only.as_ref(),
-        pair.candidate.local_stage.scope_binding.finite_boolean_sequent.as_ref(),
+        pair.candidate
+            .local_stage
+            .scope_binding
+            .finite_boolean_sequent
+            .as_ref(),
     ) {
         if let Some(countermodel) = &evaluator.finite_boolean_countermodel {
             println!(

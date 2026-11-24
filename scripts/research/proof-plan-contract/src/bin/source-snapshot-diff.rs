@@ -405,12 +405,8 @@ fn compare(
         let definition_value_dependencies = set_diff(&left_definition, &right_definition);
         let opaque_value_dependencies = set_diff(&left_opaque, &right_opaque);
         let dependency_closure = set_diff(&left_closure, &right_closure);
-        let classification = classify(
-            &type_dependencies,
-            &value_dependencies,
-            &dependency_closure,
-        )
-        .to_owned();
+        let classification =
+            classify(&type_dependencies, &value_dependencies, &dependency_closure).to_owned();
         let helper_expanded_diff = set_diff(
             &helper_expanded_value_dependencies(left),
             &helper_expanded_value_dependencies(right),
@@ -646,14 +642,12 @@ mod tests {
         baseline.value_dependencies = vec!["Nat.add".to_owned()];
         baseline.definition_value_dependencies = vec!["Nat.add".to_owned()];
         baseline.proof_value_dependencies.clear();
-        baseline.constant_info_dependency_closure =
-            vec!["Nat".to_owned(), "Nat.add".to_owned()];
+        baseline.constant_info_dependency_closure = vec!["Nat".to_owned(), "Nat.add".to_owned()];
 
         let mut candidate = baseline.clone();
         candidate.value_dependencies = vec!["Nat.mul".to_owned()];
         candidate.definition_value_dependencies = vec!["Nat.mul".to_owned()];
-        candidate.constant_info_dependency_closure =
-            vec!["Nat".to_owned(), "Nat.mul".to_owned()];
+        candidate.constant_info_dependency_closure = vec!["Nat".to_owned(), "Nat.mul".to_owned()];
 
         assert!(closure_reconciles(&baseline));
         assert!(closure_reconciles(&candidate));
@@ -672,10 +666,7 @@ mod tests {
         assert_eq!(diff.proof_value_dependencies.jaccard, 1.0);
         assert_eq!(diff.definition_value_dependencies.intersection_count, 0);
         assert_eq!(diff.value_dependencies.intersection_count, 0);
-        assert_eq!(
-            diff.classification,
-            "stable_type_interface_value_drift"
-        );
+        assert_eq!(diff.classification, "stable_type_interface_value_drift");
     }
 
     #[test]
