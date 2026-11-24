@@ -4704,6 +4704,27 @@ mod tests {
         serde_json::from_str(SENSOR_ACTUATOR_FIXTURE).unwrap()
     }
 
+    fn scalar_unstable_mode_contract() -> ScalarUnstableModeContract {
+        ScalarUnstableModeContract {
+            growth_rate_per_second: 0.5,
+            oscillation_frequency_hz: 5.0,
+            time_step_seconds: 0.01,
+            horizon_steps: 10,
+            diagnostic_gain: 2.0,
+            diagnostic_noise_std: 0.1,
+            diagnostic_bandwidth_hz: 80.0,
+            diagnostic_sampling_stride_steps: 2,
+            diagnostic_delivery_delay_steps: 1,
+            actuator_gain: 0.5,
+            actuator_bandwidth_hz: 20.0,
+            actuator_update_stride_steps: 2,
+            actuator_delivery_delay_steps: 1,
+            controller_execution_latency_seconds: 0.005,
+            minimum_bandwidth_multiple: 2.0,
+            maximum_loop_latency_efold_fraction: 0.1,
+        }
+    }
+
     const REFINEMENT_POLICY_FIXTURE: &str = include_str!(
         "../../../../benchmarks/plasma/adaptive-refinement/fixtures/synthetic-refinement-cases-v0.1.json"
     );
@@ -4926,6 +4947,102 @@ mod tests {
             decide_spectral_refinement(invalid_budget),
             Err(ContractError::InvalidRefinementMemoryBudget)
         );
+    }
+
+    #[test]
+    fn scalar_unstable_mode_oracle_matches_exact_observability_and_controllability_sums() {
+        let report = evaluate_scalar_unstable_mode_interface(scalar_unstable_mode_contract()).unwrap();
+        assert!((report.discrete_growth_factor_per_step - 1.005012520859401).abs() < 1.0e-13);
+        assert_eq!(report.observation_sample_count, 5);
+        assert_eq!(report.actuator_command_count, 5);
+        assert!(
+            (report.observability_fisher_information - 2082.4542913757846).abs() < 1.0e-9
+        );
+        assert!((report.controllability_gramian - 1.3015339321098656).abs() < 1.0e-12);
+        assert!((report.effective_diagnostic_bandwidth_hz - 25.0).abs() < 1.0e-12);
+        assert!((report.effective_actuator_bandwidth_hz - 20.0).abs() < 1.0e-12);
+        assert!((report.diagnostic_bandwidth_multiple - 5.0).abs() < 1.0e-12);
+        assert!((report.actuator_bandwidth_multiple - 4.0).abs() < 1.0e-12);
+        assert!((report.conservative_loop_latency_seconds - 0.065).abs() < 1.0e-12);
+        assert!((report.loop_latency_efold_fraction - 0.0325).abs() < 1.0e-12);
+        assert!((report.diagnostic_delay_efold_fraction - 0.005).abs() < 1.0e-12);
+        assert!((report.actuator_delay_efold_fraction - 0.005).abs() < 1.0e-12);
+        assert!(report.mode_interface_qualified);
+    }
+
+    #[test]
+    fn scalar_unstable_mode_oracle_marks_bandwidth_limited_observation_unqualified() {
+        let mut contract = scalar_unstable_mode_contract();
+        contract.diagnostic_sampling_stride_steps = 10;
+        let report = evaluate_scalar_unstable_mode_interface(contract).unwrap();
+        assert!(report.diagnostic_bandwidth_multiple < report.minimum_required_bandwidth_multiple);
+        assert!(!report.mode_interface_qualified);
+    }
+
+    #[test]
+    fn scalar_unstable_mode_oracle_marks_no_delivered_actuation_unqualified() {
+        let mut contract = scalar_unstable_mode_contract();
+        contract.actuator_delivery_delay_steps = contract.horizon_steps;
+        let report = evaluate_scalar_unstable_mode_interface(contract).unwrap();
+        assert_eq!(report.actuator_command_count, 0);
+        assert_eq!(report.controllability_gramian, 0.0);
+        assert!(!report.mode_interface_qualified);
+    }
+
+    #[test]
+    fn scalar_unstable_mode_oracle_rejects_invalid_noise_gain_and_schedule() {
+        let mut zero_noise = scalar_unstable_mode_contract();
+        zero_noise.diagnostic_noise_std = 0.0;
+        assert!(matches!(
+            evaluate_scalar_unstable_mode_interface(zero_noise),
+            Err(ContractError::InvalidControlTimingField {
+                field: "scalar_mode",
+                ..
+            })
+        ));
+
+        let mut invalid_gain = scalar_unstable_mode_contract();
+        invalid_gain.actuator_gain = f64::NAN;
+        assert!(matches!(
+            evaluate_scalar_unstable_mode_interface(invalid_gain),
+            Err(ContractError::InvalidControlTimingField {
+                field: "scalar_mode",
+                ..
+            })
+        ));
+
+        let mut invalid_stride = scalar_unstable_mode_contract();
+        invalid_stride.diagnostic_sampling_stride_steps = 0;
+        assert!(matches!(
+            evaluate_scalar_unstable_mode_interface(invalid_stride),
+            Err(ContractError::InvalidControlTimingField {
+                field: "scalar_mode",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn scalar_unstable_mode_oracle_fails_closed_on_growth_overflow_and_excessive_horizon() {
+        let mut overflow = scalar_unstable_mode_contract();
+        overflow.growth_rate_per_second = 1_000.0;
+        assert!(matches!(
+            evaluate_scalar_unstable_mode_interface(overflow),
+            Err(ContractError::InvalidControlTimingField {
+                field: "scalar_mode.growth_rate_per_second",
+                ..
+            })
+        ));
+
+        let mut excessive = scalar_unstable_mode_contract();
+        excessive.horizon_steps = MAX_SCALAR_MODE_HORIZON_STEPS + 1;
+        assert!(matches!(
+            evaluate_scalar_unstable_mode_interface(excessive),
+            Err(ContractError::InvalidControlTimingField {
+                field: "scalar_mode.horizon_steps",
+                ..
+            })
+        ));
     }
 
     #[test]
