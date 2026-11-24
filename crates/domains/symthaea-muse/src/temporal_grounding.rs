@@ -379,12 +379,8 @@ pub fn score_temporal_grounding(
 
     let prediction_kind = prediction_kind(&prediction.state);
     let (outcome, scored) = match truth.state {
-        GroundTruthStateV1::Present => {
-            (TemporalGroundingOutcomeV1::ScoredPresentQuery, true)
-        }
-        GroundTruthStateV1::Absent => {
-            (TemporalGroundingOutcomeV1::ScoredAbsentQuery, true)
-        }
+        GroundTruthStateV1::Present => (TemporalGroundingOutcomeV1::ScoredPresentQuery, true),
+        GroundTruthStateV1::Absent => (TemporalGroundingOutcomeV1::ScoredAbsentQuery, true),
         GroundTruthStateV1::Ambiguous => (
             TemporalGroundingOutcomeV1::ExcludedAmbiguousGroundTruth,
             false,
@@ -424,7 +420,10 @@ pub fn score_temporal_grounding(
             prediction_kind,
             scored: false,
             abstained,
-            parse_failure: matches!(&prediction.state, GroundingPredictionStateV1::Unparseable { .. }),
+            parse_failure: matches!(
+                &prediction.state,
+                GroundingPredictionStateV1::Unparseable { .. }
+            ),
             ground_truth_occurrences: 0,
             predicted_occurrences,
             ambiguous_candidate_count,
@@ -461,7 +460,10 @@ pub fn score_temporal_grounding(
             prediction_kind,
             scored: true,
             abstained,
-            parse_failure: matches!(&prediction.state, GroundingPredictionStateV1::Unparseable { .. }),
+            parse_failure: matches!(
+                &prediction.state,
+                GroundingPredictionStateV1::Unparseable { .. }
+            ),
             ground_truth_occurrences: 0,
             predicted_occurrences,
             ambiguous_candidate_count,
@@ -517,7 +519,10 @@ pub fn score_temporal_grounding(
         prediction_kind,
         scored: true,
         abstained,
-        parse_failure: matches!(&prediction.state, GroundingPredictionStateV1::Unparseable { .. }),
+        parse_failure: matches!(
+            &prediction.state,
+            GroundingPredictionStateV1::Unparseable { .. }
+        ),
         ground_truth_occurrences: truth.intervals.len(),
         predicted_occurrences,
         ambiguous_candidate_count,
@@ -548,25 +553,16 @@ pub fn temporal_grounding_input_commitment_sha256(
 
 fn prediction_kind(state: &GroundingPredictionStateV1) -> GroundingPredictionKindV1 {
     match state {
-        GroundingPredictionStateV1::Occurrences { .. } => {
-            GroundingPredictionKindV1::Occurrences
-        }
+        GroundingPredictionStateV1::Occurrences { .. } => GroundingPredictionKindV1::Occurrences,
         GroundingPredictionStateV1::QueryAbsent => GroundingPredictionKindV1::QueryAbsent,
         GroundingPredictionStateV1::NotDetected => GroundingPredictionKindV1::NotDetected,
         GroundingPredictionStateV1::Ambiguous { .. } => GroundingPredictionKindV1::Ambiguous,
-        GroundingPredictionStateV1::NotEstimable { .. } => {
-            GroundingPredictionKindV1::NotEstimable
-        }
-        GroundingPredictionStateV1::Unparseable { .. } => {
-            GroundingPredictionKindV1::Unparseable
-        }
+        GroundingPredictionStateV1::NotEstimable { .. } => GroundingPredictionKindV1::NotEstimable,
+        GroundingPredictionStateV1::Unparseable { .. } => GroundingPredictionKindV1::Unparseable,
     }
 }
 
-fn validate_artifact(
-    artifact: &AudioArtifactClockV1,
-    issues: &mut Vec<TemporalGroundingIssue>,
-) {
+fn validate_artifact(artifact: &AudioArtifactClockV1, issues: &mut Vec<TemporalGroundingIssue>) {
     if !is_lower_hex_digest(&artifact.audio_sha256) {
         issues.push(TemporalGroundingIssue::InvalidAudioDigest);
     }
@@ -638,9 +634,7 @@ fn maximum_cardinality_matches(
     }
 
     let mut matches = Vec::new();
-    for (annotation_index, prediction_index) in
-        annotation_to_prediction.into_iter().enumerate()
-    {
+    for (annotation_index, prediction_index) in annotation_to_prediction.into_iter().enumerate() {
         if let Some(prediction_index) = prediction_index {
             matches.push(TemporalIntervalMatchV1 {
                 prediction_index,
@@ -668,8 +662,7 @@ fn maximum_cardinality_matches(
     let mean_iou = if matches.is_empty() {
         0.0
     } else {
-        matches.iter().map(|item| item.interval_iou).sum::<f64>()
-            / matches.len() as f64
+        matches.iter().map(|item| item.interval_iou).sum::<f64>() / matches.len() as f64
     };
     (matches, mean_iou)
 }
@@ -729,7 +722,6 @@ fn augment_match(
     }
     false
 }
-
 
 /// Dataset-level metrics derived from per-query score records.
 ///
@@ -878,10 +870,7 @@ pub fn aggregate_temporal_grounding_scores(
     let mean_matched_iou = if all_matches.is_empty() {
         None
     } else {
-        Some(
-            all_matches.iter().map(|item| item.0).sum::<f64>()
-                / all_matches.len() as f64,
-        )
+        Some(all_matches.iter().map(|item| item.0).sum::<f64>() / all_matches.len() as f64)
     };
     let start_errors: Vec<_> = all_matches.iter().map(|item| item.1).collect();
     let end_errors: Vec<_> = all_matches.iter().map(|item| item.2).collect();
@@ -1140,7 +1129,10 @@ mod tests {
 
     #[test]
     fn explicit_ambiguous_and_unestimable_truth_is_excluded_not_relabelled_absent() {
-        for state in [GroundTruthStateV1::Ambiguous, GroundTruthStateV1::NotEstimable] {
+        for state in [
+            GroundTruthStateV1::Ambiguous,
+            GroundTruthStateV1::NotEstimable,
+        ] {
             let truth = truth(state, Vec::new());
             let prediction = prediction(GroundingPredictionStateV1::QueryAbsent);
             let score = score_temporal_grounding(&truth, &prediction, &plan()).unwrap();
@@ -1182,9 +1174,7 @@ mod tests {
             }],
         );
         let issues = validate_temporal_ground_truth(&truth);
-        assert!(issues.contains(&TemporalGroundingIssue::IntervalBeyondArtifact {
-            index: 0
-        }));
+        assert!(issues.contains(&TemporalGroundingIssue::IntervalBeyondArtifact { index: 0 }));
     }
 
     #[test]
@@ -1201,9 +1191,7 @@ mod tests {
         assert!(issues.contains(&TemporalGroundingIssue::InvalidAudioClock {
             field: "sample_rate_hz".into()
         }));
-        assert!(issues.contains(&TemporalGroundingIssue::InvalidInterval {
-            index: 0
-        }));
+        assert!(issues.contains(&TemporalGroundingIssue::InvalidInterval { index: 0 }));
     }
 
     #[test]
@@ -1221,8 +1209,10 @@ mod tests {
                 },
             ],
         );
-        assert!(validate_temporal_ground_truth(&base)
-            .contains(&TemporalGroundingIssue::UnsortedIntervals { index: 1 }));
+        assert!(
+            validate_temporal_ground_truth(&base)
+                .contains(&TemporalGroundingIssue::UnsortedIntervals { index: 1 })
+        );
 
         let duplicate = truth(
             GroundTruthStateV1::Present,
@@ -1237,8 +1227,10 @@ mod tests {
                 },
             ],
         );
-        assert!(validate_temporal_ground_truth(&duplicate)
-            .contains(&TemporalGroundingIssue::DuplicateInterval { index: 1 }));
+        assert!(
+            validate_temporal_ground_truth(&duplicate)
+                .contains(&TemporalGroundingIssue::DuplicateInterval { index: 1 })
+        );
     }
 
     #[test]
@@ -1264,7 +1256,6 @@ mod tests {
         assert_eq!(score.false_negatives, 1);
     }
 
-
     #[test]
     fn unparseable_output_is_a_failure_not_an_abstention() {
         let truth = truth(
@@ -1282,7 +1273,10 @@ mod tests {
         assert!(score.parse_failure);
         assert!(!score.abstained);
         assert_eq!(score.false_negatives, 1);
-        assert_eq!(score.prediction_kind, GroundingPredictionKindV1::Unparseable);
+        assert_eq!(
+            score.prediction_kind,
+            GroundingPredictionKindV1::Unparseable
+        );
     }
 
     #[test]
@@ -1505,8 +1499,7 @@ mod tests {
         let score = score_temporal_grounding(&truth, &prediction, &plan()).unwrap();
         let mut second = score.clone();
         second.evaluator_version = "different-evaluator".into();
-        let issues =
-            aggregate_temporal_grounding_scores(&[score.clone(), second]).unwrap_err();
+        let issues = aggregate_temporal_grounding_scores(&[score.clone(), second]).unwrap_err();
         assert!(issues.iter().any(|issue| matches!(
             issue,
             TemporalGroundingAggregateIssue::MixedEvaluatorVersions { .. }
@@ -1534,20 +1527,12 @@ mod tests {
                 end_frame: 200,
             }],
         });
-        let original = temporal_grounding_input_commitment_sha256(
-            &truth,
-            &prediction,
-            &plan(),
-        )
-        .unwrap();
+        let original =
+            temporal_grounding_input_commitment_sha256(&truth, &prediction, &plan()).unwrap();
         let mut changed_plan = plan();
         changed_plan.minimum_interval_iou = 0.7;
-        let changed = temporal_grounding_input_commitment_sha256(
-            &truth,
-            &prediction,
-            &changed_plan,
-        )
-        .unwrap();
+        let changed =
+            temporal_grounding_input_commitment_sha256(&truth, &prediction, &changed_plan).unwrap();
         assert_ne!(original, changed);
     }
 }
