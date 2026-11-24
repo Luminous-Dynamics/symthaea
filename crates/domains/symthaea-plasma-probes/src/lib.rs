@@ -25,6 +25,7 @@ const PI: f64 = std::f64::consts::PI;
 const MAX_PERIODIC_LIFT_HARMONICS: usize = 4_096;
 const MAX_MEASURE_PARTICLES: usize = 1_000_000;
 const MAX_FOURIER_MEASURE_WORK: usize = 16_777_216;
+const MAX_SCALAR_MODE_HORIZON_STEPS: u32 = 1_000_000;
 const DIGEST_DOMAIN: &[u8] = b"symthaea.akpd.pulse-candidate.v0.1\0";
 
 /// Errors returned while parsing, validating or enumerating probe contracts.
@@ -2419,6 +2420,255 @@ fn timing_array<'a>(
         .as_array()
         .map(Vec::as_slice)
         .ok_or_else(|| control_timing_error(field, "must be an array"))
+}
+
+/// One unstable scalar mode with asynchronous measurements and delayed actuation.
+///
+/// The reference discrete dynamics are
+/// \`x[k+1] = exp(gamma*dt) * x[k] + b*u[k]\`.
+/// Diagnostic sample j observes \`c*x[k_j] + noise\` and becomes available
+/// after the declared integer-step delay. Actuator commands are applied on
+/// their declared update schedule after their integer-step delivery delay.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ScalarUnstableModeContract {
+    pub growth_rate_per_second: f64,
+    pub oscillation_frequency_hz: f64,
+    pub time_step_seconds: f64,
+    pub horizon_steps: u32,
+    pub diagnostic_gain: f64,
+    pub diagnostic_noise_std: f64,
+    pub diagnostic_bandwidth_hz: f64,
+    pub diagnostic_sampling_stride_steps: u32,
+    pub diagnostic_delivery_delay_steps: u32,
+    pub actuator_gain: f64,
+    pub actuator_bandwidth_hz: f64,
+    pub actuator_update_stride_steps: u32,
+    pub actuator_delivery_delay_steps: u32,
+    pub controller_execution_latency_seconds: f64,
+    pub minimum_bandwidth_multiple: f64,
+    pub maximum_loop_latency_efold_fraction: f64,
+}
+
+/// Exact scalar-mode observability / controllability and timing summary.
+///
+/// The observability value is the noise-whitened Fisher information for the
+/// initial scalar state across samples that arrive within the horizon.
+/// The controllability value is the finite-horizon discrete controllability
+/// Gramian for unit-energy actuator impulses on the declared update schedule.
+/// Neither scalar quantity is a stability proof for a coupled kinetic system.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+pub struct ScalarUnstableModeReport {
+    pub discrete_growth_factor_per_step: f64,
+    pub observation_sample_count: u32,
+    pub actuator_command_count: u32,
+    pub observability_fisher_information: f64,
+    pub controllability_gramian: f64,
+    pub effective_diagnostic_bandwidth_hz: f64,
+    pub effective_actuator_bandwidth_hz: f64,
+    pub diagnostic_bandwidth_multiple: f64,
+    pub actuator_bandwidth_multiple: f64,
+    pub conservative_loop_latency_seconds: f64,
+    pub loop_latency_efold_fraction: f64,
+    pub diagnostic_delay_efold_fraction: f64,
+    pub actuator_delay_efold_fraction: f64,
+    pub minimum_required_bandwidth_multiple: f64,
+    pub maximum_allowed_loop_latency_efold_fraction: f64,
+    pub mode_interface_qualified: bool,
+}
+
+/// Compute the exact finite-horizon scalar observability and controllability
+/// Gramians for the declared asynchronous sensor and delayed actuator schedule.
+///
+/// This is a manufactured linear-mode oracle. It makes no claim about nonlinear
+/// Vlasov-Poisson stabilizability or about a multi-mode controller.
+pub fn evaluate_scalar_unstable_mode_interface(
+    contract: ScalarUnstableModeContract,
+) -> Result<ScalarUnstableModeReport, ContractError> {
+    let positive_finite = [
+        contract.growth_rate_per_second,
+        contract.oscillation_frequency_hz,
+        contract.time_step_seconds,
+        contract.diagnostic_noise_std,
+        contract.diagnostic_bandwidth_hz,
+        contract.actuator_bandwidth_hz,
+        contract.minimum_bandwidth_multiple,
+        contract.maximum_loop_latency_efold_fraction,
+    ];
+    if positive_finite.iter().any(|value| !value.is_finite() || *value <= 0.0)
+        || !contract.diagnostic_gain.is_finite()
+        || contract.diagnostic_gain < 0.0
+        || !contract.actuator_gain.is_finite()
+        || contract.actuator_gain < 0.0
+        || !contract.controller_execution_latency_seconds.is_finite()
+        || contract.controller_execution_latency_seconds < 0.0
+        || contract.diagnostic_sampling_stride_steps == 0
+        || contract.actuator_update_stride_steps == 0
+        || contract.horizon_steps == 0
+    {
+        return Err(control_timing_error(
+            "scalar_mode",
+            "growth, frequency, time step, noise, bandwidths and margins must be positive; gains/latency non-negative; strides and horizon positive",
+        ));
+    }
+    if contract.horizon_steps > MAX_SCALAR_MODE_HORIZON_STEPS {
+        return Err(control_timing_error(
+            "scalar_mode.horizon_steps",
+            "horizon exceeds bounded scalar-mode work budget",
+        ));
+    }
+
+    let growth_exponent = contract.growth_rate_per_second * contract.time_step_seconds;
+    if !growth_exponent.is_finite() {
+        return Err(control_timing_error(
+            "scalar_mode.growth_rate_per_second",
+            "growth exponent must be finite",
+        ));
+    }
+    let growth_factor = growth_exponent.exp();
+    if !growth_factor.is_finite() || growth_factor <= 0.0 {
+        return Err(control_timing_error(
+            "scalar_mode.growth_rate_per_second",
+            "discrete growth factor must be finite and positive",
+        ));
+    }
+
+    let gain_to_noise = contract.diagnostic_gain / contract.diagnostic_noise_std;
+    let information_scale = gain_to_noise * gain_to_noise;
+    let actuator_scale = contract.actuator_gain * contract.actuator_gain;
+    if !information_scale.is_finite() || !actuator_scale.is_finite() {
+        return Err(control_timing_error(
+            "scalar_mode",
+            "squared gain/noise scales must be finite",
+        ));
+    }
+
+    let mut observation_sample_count = 0_u32;
+    let mut observability_fisher_information = 0.0_f64;
+    let mut observation_compensation = 0.0_f64;
+    let last_sample_step = contract
+        .horizon_steps
+        .saturating_sub(contract.diagnostic_delivery_delay_steps);
+    let mut sample_step = 0_u32;
+    while sample_step <= last_sample_step {
+        let exponent = 2.0 * growth_exponent * sample_step as f64;
+        let contribution = information_scale * exponent.exp();
+        if !contribution.is_finite() {
+            return Err(control_timing_error(
+                "scalar_mode.observability_fisher_information",
+                "finite-horizon observation information overflowed",
+            ));
+        }
+        kahan_add(
+            contribution,
+            &mut observability_fisher_information,
+            &mut observation_compensation,
+        );
+        observation_sample_count += 1;
+        match sample_step.checked_add(contract.diagnostic_sampling_stride_steps) {
+            Some(next) => sample_step = next,
+            None => break,
+        }
+    }
+
+    let mut actuator_command_count = 0_u32;
+    let mut controllability_gramian = 0.0_f64;
+    let mut actuator_compensation = 0.0_f64;
+    let mut command_step = 0_u32;
+    while let Some(applied_step) = command_step.checked_add(contract.actuator_delivery_delay_steps) {
+        if applied_step >= contract.horizon_steps {
+            break;
+        }
+        let remaining_steps = contract.horizon_steps - 1 - applied_step;
+        let exponent = 2.0 * growth_exponent * remaining_steps as f64;
+        let contribution = actuator_scale * exponent.exp();
+        if !contribution.is_finite() {
+            return Err(control_timing_error(
+                "scalar_mode.controllability_gramian",
+                "finite-horizon actuator Gramian overflowed",
+            ));
+        }
+        kahan_add(contribution, &mut controllability_gramian, &mut actuator_compensation);
+        actuator_command_count += 1;
+        match command_step.checked_add(contract.actuator_update_stride_steps) {
+            Some(next) => command_step = next,
+            None => break,
+        }
+    }
+
+    let diagnostic_interval_seconds =
+        contract.diagnostic_sampling_stride_steps as f64 * contract.time_step_seconds;
+    let actuator_interval_seconds =
+        contract.actuator_update_stride_steps as f64 * contract.time_step_seconds;
+    let effective_diagnostic_bandwidth_hz = contract
+        .diagnostic_bandwidth_hz
+        .min(0.5 / diagnostic_interval_seconds);
+    let effective_actuator_bandwidth_hz = contract
+        .actuator_bandwidth_hz
+        .min(0.5 / actuator_interval_seconds);
+    let diagnostic_bandwidth_multiple =
+        effective_diagnostic_bandwidth_hz / contract.oscillation_frequency_hz;
+    let actuator_bandwidth_multiple =
+        effective_actuator_bandwidth_hz / contract.oscillation_frequency_hz;
+    let diagnostic_delay_seconds =
+        contract.diagnostic_delivery_delay_steps as f64 * contract.time_step_seconds;
+    let actuator_delay_seconds =
+        contract.actuator_delivery_delay_steps as f64 * contract.time_step_seconds;
+    let conservative_loop_latency_seconds = diagnostic_interval_seconds
+        + diagnostic_delay_seconds
+        + contract.controller_execution_latency_seconds
+        + actuator_interval_seconds
+        + actuator_delay_seconds;
+    let loop_latency_efold_fraction =
+        conservative_loop_latency_seconds * contract.growth_rate_per_second;
+    let diagnostic_delay_efold_fraction =
+        diagnostic_delay_seconds * contract.growth_rate_per_second;
+    let actuator_delay_efold_fraction =
+        actuator_delay_seconds * contract.growth_rate_per_second;
+    let derived = [
+        effective_diagnostic_bandwidth_hz,
+        effective_actuator_bandwidth_hz,
+        diagnostic_bandwidth_multiple,
+        actuator_bandwidth_multiple,
+        conservative_loop_latency_seconds,
+        loop_latency_efold_fraction,
+        diagnostic_delay_efold_fraction,
+        actuator_delay_efold_fraction,
+        observability_fisher_information,
+        controllability_gramian,
+    ];
+    if derived.iter().any(|value| !value.is_finite()) {
+        return Err(control_timing_error(
+            "scalar_mode",
+            "derived Gramian and timing metrics must be finite",
+        ));
+    }
+
+    let mode_interface_qualified = observation_sample_count > 0
+        && actuator_command_count > 0
+        && observability_fisher_information > 0.0
+        && controllability_gramian > 0.0
+        && diagnostic_bandwidth_multiple >= contract.minimum_bandwidth_multiple
+        && actuator_bandwidth_multiple >= contract.minimum_bandwidth_multiple
+        && loop_latency_efold_fraction <= contract.maximum_loop_latency_efold_fraction;
+
+    Ok(ScalarUnstableModeReport {
+        discrete_growth_factor_per_step: growth_factor,
+        observation_sample_count,
+        actuator_command_count,
+        observability_fisher_information,
+        controllability_gramian,
+        effective_diagnostic_bandwidth_hz,
+        effective_actuator_bandwidth_hz,
+        diagnostic_bandwidth_multiple,
+        actuator_bandwidth_multiple,
+        conservative_loop_latency_seconds,
+        loop_latency_efold_fraction,
+        diagnostic_delay_efold_fraction,
+        actuator_delay_efold_fraction,
+        minimum_required_bandwidth_multiple: contract.minimum_bandwidth_multiple,
+        maximum_allowed_loop_latency_efold_fraction: contract.maximum_loop_latency_efold_fraction,
+        mode_interface_qualified,
+    })
 }
 
 /// Result of projecting a kinetic fluctuation into a weighted discrete micro-space.
