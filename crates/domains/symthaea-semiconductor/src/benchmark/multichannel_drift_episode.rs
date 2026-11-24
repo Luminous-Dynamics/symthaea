@@ -11,6 +11,11 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
 
+use super::label_consumption_guard::{
+    LABEL_CONSUMPTION_REPORT_SCHEMA_V1, LabelConsumptionEligibilityReportV1,
+    LabelConsumptionEligibilityV1, LabelEvidenceFrontierV1,
+};
+
 pub const DRIFT_MONITOR_SCHEMA_V1: &str = "luminous.semi-bench.drift-monitor.v1";
 pub const DRIFT_POLICY_SCHEMA_V1: &str = "luminous.semi-bench.drift-policy.v1";
 pub const DRIFT_OBSERVATION_SCHEMA_V1: &str = "luminous.semi-bench.drift-observation.v1";
@@ -168,6 +173,8 @@ pub struct DriftObservationInputV1 {
     pub evidence_kind: DriftEvidenceKindV1,
     pub qualification: DriftQualificationV1,
     pub evidence_receipt_sha256: String,
+    pub qualification_report: Option<LabelConsumptionEligibilityReportV1>,
+    pub prediction_receipt_sha256: Option<String>,
     pub source_label_ids: Vec<String>,
     /// Standardized scalar for EWMA/CUSUM; missingness is represented separately.
     pub standardized_signal: Option<f64>,
@@ -193,6 +200,8 @@ pub struct DriftObservationReceiptV1 {
     pub observed_at_unix_seconds: i64,
     pub knowledge_frontier_unix_seconds: i64,
     pub evidence_receipt_sha256: String,
+    pub qualification_report_sha256: Option<String>,
+    pub prediction_receipt_sha256: Option<String>,
     pub source_label_ids: Vec<String>,
     pub policy_sha256: String,
     pub channel_state_before_sha256: String,
@@ -320,6 +329,25 @@ fn validate_policy(policy: &DriftMonitorPolicyV1) -> Result<(), DriftMonitorErro
     Ok(())
 }
 
+fn qualification_report_digest(
+    report: &LabelConsumptionEligibilityReportV1,
+) -> Result<String, DriftMonitorErrorV1> {
+    let mut canonical = report.clone();
+    canonical.report_sha256.clear();
+    json_sha256(&canonical)
+}
+
+fn validate_engine(engine: &DriftMonitorEngineV1) -> Result<(), DriftMonitorErrorV1> {
+    if engine.schema != DRIFT_MONITOR_SCHEMA_V1 {
+        return Err(DriftMonitorErrorV1("drift monitor engine schema is unsupported".into()));
+    }
+    validate_policy(&engine.policy)?;
+    if policy_digest(&engine.policy)? != engine.policy_sha256 {
+        return Err(DriftMonitorErrorV1("drift policy digest does not match its content".into()));
+    }
+    Ok(())
+}
+
 fn evidence_kind_matches(input: &DriftObservationInputV1) -> bool {
     matches!(
         (input.plane, input.evidence_kind, input.qualification),
@@ -395,6 +423,11 @@ fn make_receipt(
         observed_at_unix_seconds: input.observed_at_unix_seconds,
         knowledge_frontier_unix_seconds: input.knowledge_frontier_unix_seconds,
         evidence_receipt_sha256: input.evidence_receipt_sha256.clone(),
+        qualification_report_sha256: input
+            .qualification_report
+            .as_ref()
+            .map(|report| report.report_sha256.clone()),
+        prediction_receipt_sha256: input.prediction_receipt_sha256.clone(),
         source_label_ids: label_ids,
         policy_sha256: engine.policy_sha256.clone(),
         channel_state_before_sha256: before.into(),
@@ -456,6 +489,37 @@ fn validate_input(
     if !evidence_kind_matches(input) {
         return Err(denied_reason(input));
     }
+    if input.plane == DriftEvidencePlaneV1::QualifiedResidual {
+        let Some(report) = input.qualification_report.as_ref() else {
+            return Err(DriftObservationReasonV1::QualificationNotCurrentK1);
+        };
+        if report.schema != LABEL_CONSUMPTION_REPORT_SCHEMA_V1
+            || report.frontier != LabelEvidenceFrontierV1::CurrentAtK1
+        {
+            return Err(DriftObservationReasonV1::QualificationNotCurrentK1);
+        }
+        match report.eligibility {
+            LabelConsumptionEligibilityV1::Unknown => {
+                return Err(DriftObservationReasonV1::QualificationUnknown);
+            }
+            LabelConsumptionEligibilityV1::Blocked => {
+                return Err(DriftObservationReasonV1::QualificationBlocked);
+            }
+            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy => {}
+        }
+        if !report.downstream_consumption_allowed
+            || qualification_report_digest(report).ok().as_deref()
+                != Some(report.report_sha256.as_str())
+            || report.report_sha256 != input.evidence_receipt_sha256
+            || !valid_sha256(&report.label_sha256)
+            || input.source_label_ids.as_slice() != [report.label_id.as_str()]
+            || input.prediction_receipt_sha256.as_deref().is_none_or(|value| !valid_sha256(value))
+        {
+            return Err(DriftObservationReasonV1::MissingEvidenceDigest);
+        }
+    } else if input.qualification_report.is_some() || input.prediction_receipt_sha256.is_some() {
+        return Err(DriftObservationReasonV1::EvidenceKindPlaneMismatch);
+    }
     if input.source_label_ids.iter().any(|label| label.trim().is_empty()) {
         return Err(DriftObservationReasonV1::MissingEvidenceDigest);
     }
@@ -490,6 +554,7 @@ pub fn observe_drift_channel_v1(
     engine: &mut DriftMonitorEngineV1,
     input: &DriftObservationInputV1,
 ) -> Result<DriftObservationReceiptV1, DriftMonitorErrorV1> {
+    validate_engine(engine)?;
     require_text(&input.observation_id, "input.observation_id")?;
     require_text(&input.channel_id, "input.channel_id")?;
     require_text(&input.scope_id, "input.scope_id")?;
@@ -860,6 +925,35 @@ mod tests {
         create_drift_monitor_engine_v1("drift-001", "fab-clock", policy()).unwrap()
     }
 
+    fn eligible_label_report(label_id: &str, evidence: char) -> LabelConsumptionEligibilityReportV1 {
+        let mut report = LabelConsumptionEligibilityReportV1 {
+            schema: LABEL_CONSUMPTION_REPORT_SCHEMA_V1.into(),
+            label_id: label_id.into(),
+            label_revision: 1,
+            measurement_event_id: format!("event-{label_id}"),
+            calibration_certificate_id: "calibration-1".into(),
+            frontier: LabelEvidenceFrontierV1::CurrentAtK1,
+            eligibility: LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            downstream_consumption_allowed: true,
+            reasons: Vec::new(),
+            label_sha256: digest(evidence),
+            measurement_sha256: digest('d'),
+            qualified_corrected_value: 1.0,
+            qualified_standard_uncertainty_upper_bound: Some(0.1),
+            qualification_report_sha256: digest('e'),
+            requalification_report_sha256: digest('f'),
+            requalification_frontier_sha256: digest('a'),
+            source_authenticity_proven: false,
+            training_snapshot_mutated: false,
+            equipment_control_authority: false,
+            report_sha256: String::new(),
+        };
+        let mut canonical = report.clone();
+        canonical.report_sha256.clear();
+        report.report_sha256 = json_sha256(&canonical).unwrap();
+        report
+    }
+
     fn input(
         id: &str,
         channel: &str,
@@ -887,6 +981,17 @@ mod tests {
             evidence_kind,
             qualification,
             evidence_receipt_sha256: digest(receipt),
+            evidence_receipt_sha256: digest(receipt),
+            qualification_report: if plane == DriftEvidencePlaneV1::QualifiedResidual {
+                Some(eligible_label_report(&format!("label-{id}"), receipt))
+            } else {
+                None
+            },
+            prediction_receipt_sha256: if plane == DriftEvidencePlaneV1::QualifiedResidual {
+                Some(digest('p'))
+            } else {
+                None
+            },
             source_label_ids: if plane == DriftEvidencePlaneV1::QualifiedResidual {
                 vec![format!("label-{id}")]
             } else {
@@ -929,7 +1034,7 @@ mod tests {
     #[test]
     fn unknown_and_blocked_residuals_do_not_mutate_detector_state() {
         let mut engine = engine();
-        let clean = input(
+        let mut clean = input(
             "r1",
             "residual-tool-1",
             DriftEvidencePlaneV1::QualifiedResidual,
@@ -940,6 +1045,7 @@ mod tests {
             100,
             'c',
         );
+        clean.evidence_receipt_sha256 = clean.qualification_report.as_ref().unwrap().report_sha256.clone();
         observe_drift_channel_v1(&mut engine, &clean).unwrap();
         let before = channel_state_digest(engine.channels.get("residual-tool-1")).unwrap();
         let mut unknown = clean.clone();
