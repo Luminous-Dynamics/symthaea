@@ -506,6 +506,40 @@ class MaceLongMemEvalV2IngressTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "receipt digest mismatch"):
                 memory._verify_persisted_retrieval_traces()
 
+    def test_candidates_returned_trace_digest_matches_rust_reference_vector(self) -> None:
+        trace = {
+            "run_id": "run-candidate-test",
+            "query_invocation_id": "invocation-candidate-test",
+            "domain_id": "web",
+            "environment_revision_sha256": "e" * 64,
+            "tool_profile_sha256": "b" * 64,
+            "query_sha256": hashlib.sha256(b"find Ada order").hexdigest(),
+            "candidate_set_sha256": "d" * 64,
+            "operations": [
+                {
+                    "tool_id": "trajectory.bm25.search",
+                    "tool_revision_sha256": "b" * 64,
+                    "action_template_sha256": "c" * 64,
+                    "observed_evidence_ids": ["evidence:1"],
+                    "outcome": "evidence_observed",
+                    "elapsed_ns": 17,
+                    "inspected_bytes": 128,
+                    "inspected_bytes_measured": True,
+                }
+            ],
+            "stop_reason": "candidates_returned",
+            "tool_call_budget": 1,
+            "tool_calls_used": 1,
+            "elapsed_ns": 17,
+            "inspected_bytes": 128,
+            "inspected_bytes_complete": True,
+            "created_at_unix": 100,
+        }
+        self.assertEqual(
+            MaceLongMemEvalV2Memory._retrieval_trace_digest_from_json(trace),
+            "c925ead961171cd7a01381c4ca0dc4d518e26442a34388d9cec3d364b15a2c0e",
+        )
+
     def test_ambiguous_durable_trace_publication_poisons_sidecar(self) -> None:
         class FakePipe:
             def __init__(self, response: str = "") -> None:
