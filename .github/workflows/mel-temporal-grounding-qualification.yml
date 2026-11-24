@@ -71,6 +71,25 @@ jobs:
       - name: Warnings-denied Clippy on exact production source
         run: cargo +1.96.0 clippy --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --all-targets -- -D warnings
 
+      - name: Replay paired temporal revision when module is present
+        if: hashFiles('tools/mel-temporal-grounding-qualifier/src/temporal_revision.rs') != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-temporal-revision-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-temporal-revision-triplet.synthetic.json > "$RUNNER_TEMP/temporal-revision-report.json"
+          jq -e '
+            .schema == "mel-temporal-revision-batch-report-v1"
+            and .cases == 3
+            and (.matched_evidence_contrasts | length) == 1
+            and .matched_evidence_contrasts[0].local_minus_no_evidence_f1 == 0.5
+            and .matched_evidence_contrasts[0].local_minus_yoked_f1 == 0.5
+            and .matched_evidence_contrasts[0].local_beats_yoked == true
+            and .matched_evidence_contrasts[0].local_output_tokens == 128
+            and .reports[0].source_lineage_id == "synthetic-lineage-001"
+            and .reports[0].runtime_identity_sha256 != null
+            and .reports[0].actual_output_tokens == 128
+          ' "$RUNNER_TEMP/temporal-revision-report.json" > /dev/null
+
       - name: Replay transformed-view equivariance when module is present
         if: hashFiles('tools/mel-temporal-grounding-qualifier/src/temporal_transform.rs') != ''
         shell: bash
@@ -105,6 +124,12 @@ jobs:
           cp crates/domains/symthaea-muse/src/temporal_grounding.rs "$evidence/"
           cp crates/domains/symthaea-muse/src/evidence_digest.rs "$evidence/"
           cp docs/research/MEL-GROUND-001-TEMPORAL-GROUNDING-SCORER-V1.md "$evidence/"
+          if [[ -f tools/mel-temporal-grounding-qualifier/src/temporal_revision.rs ]]; then
+            cp tools/mel-temporal-grounding-qualifier/src/temporal_revision.rs "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/src/bin/mel-temporal-revision-audit.rs "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/fixtures/mel-temporal-revision-triplet.synthetic.json "$evidence/"
+            cp "$RUNNER_TEMP/temporal-revision-report.json" "$evidence/"
+          fi
           if [[ -f tools/mel-temporal-grounding-qualifier/src/temporal_transform.rs ]]; then
             cp tools/mel-temporal-grounding-qualifier/src/temporal_transform.rs "$evidence/"
             cp tools/mel-temporal-grounding-qualifier/src/bin/mel-temporal-transform-audit.rs "$evidence/"
