@@ -479,6 +479,7 @@ pub struct GlobalUseAdjudicationV1 {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct GlobalUseNodeEvidenceV1 {
+    pub mention_id: String,
     pub plan_node_id: String,
     pub warrant_id: String,
     pub relation: MentionRelation,
@@ -853,11 +854,22 @@ fn validate_global_use_adjudication(
         errors.push("global_use_adjudication.evidence_refs must be unique".to_owned());
     }
     let mut node_ids = HashSet::new();
+    let mut evidence_mention_ids = HashSet::new();
     for node in &adjudication.node_evidence {
-        if !non_empty(&node.plan_node_id) || !non_empty(&node.warrant_id) {
+        if !non_empty(&node.mention_id)
+            || !non_empty(&node.plan_node_id)
+            || !non_empty(&node.warrant_id)
+        {
             errors.push(
-                "global-use plan-node evidence requires non-empty node and warrant IDs".to_owned(),
+                "global-use plan-node evidence requires non-empty mention, node and warrant IDs"
+                    .to_owned(),
             );
+        }
+        if !evidence_mention_ids.insert(&node.mention_id) {
+            errors.push(format!(
+                "duplicate global-use mention evidence: {}",
+                node.mention_id
+            ));
         }
         if !node_ids.insert(&node.plan_node_id) {
             errors.push(format!(
@@ -877,20 +889,58 @@ fn validate_global_use_adjudication(
                 node.plan_node_id
             ));
         }
+        match node.relation {
+            MentionRelation::UsesAsRule | MentionRelation::SupportsInference => {
+                if !node.material_use {
+                    errors.push(format!(
+                        "global-use node {} marks a material warrant relation as non-material",
+                        node.plan_node_id
+                    ));
+                }
+            }
+            MentionRelation::Cites
+            | MentionRelation::Rebuts
+            | MentionRelation::ContextOnly
+            | MentionRelation::Alternative => {
+                if node.material_use {
+                    errors.push(format!(
+                        "global-use node {} marks a non-warrant relation as material use",
+                        node.plan_node_id
+                    ));
+                }
+            }
+        }
         let matching_candidate_mention = candidate
             .global_stage
             .warrant_mentions
             .iter()
             .any(|mention| {
-                mention.plan_node_id == node.plan_node_id
+                mention.mention_id == node.mention_id
+                    && mention.plan_node_id == node.plan_node_id
                     && mention.warrant_id == node.warrant_id
                     && mention.relation == node.relation
             });
         if !matching_candidate_mention {
             errors.push(format!(
-                "global-use node {} must match a candidate-visible warrant mention",
+                "global-use node {} must match a candidate-visible warrant mention by exact mention ID",
                 node.plan_node_id
             ));
+        }
+    }
+
+    if adjudication.reviewed_entire_plan && adjudication.disposition != GlobalDisposition::Unknown {
+        for mention in candidate
+            .global_stage
+            .warrant_mentions
+            .iter()
+            .filter(|mention| mention.warrant_id == adjudication.target_warrant_id)
+        {
+            if !evidence_mention_ids.contains(&mention.mention_id) {
+                errors.push(format!(
+                    "complete global-use adjudication omits candidate warrant mention {}",
+                    mention.mention_id
+                ));
+            }
         }
     }
 
