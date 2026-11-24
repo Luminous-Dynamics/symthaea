@@ -444,7 +444,10 @@ class MaceLongMemEvalV2IngressTests(unittest.TestCase):
         acquisition_digest = MaceLongMemEvalV2Memory._retrieval_trace_digest_from_json(trace)
         legacy_trace = dict(trace, stop_reason="evidence_sufficient")
         legacy_digest = MaceLongMemEvalV2Memory._retrieval_trace_digest_from_json(legacy_trace)
-        self.assertEqual(len(acquisition_digest), 64)
+        self.assertEqual(
+            acquisition_digest,
+            "3c3431c6f31419de7a270ca49c04a93bd94f573fedd949993fa21d17a3b4c723",
+        )
         self.assertEqual(len(legacy_digest), 64)
         self.assertNotEqual(acquisition_digest, legacy_digest)
 
