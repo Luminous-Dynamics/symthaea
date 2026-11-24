@@ -374,8 +374,8 @@ fn handle_request(
                 .and_then(Value::as_str)
                 .filter(|value| !value.trim().is_empty())
                 .ok_or_else(|| "query request requires opaque candidate_id".to_string())?;
-            // Accepted for API compatibility. The lexical baseline does not
-            // inspect or rank the question image; this is not multimodal search.
+            // Accepted for official API compatibility. No current retrieval arm
+            // consumes question-image pixels; this is not multimodal image search.
             let _query_image = request.get("query_image").and_then(Value::as_str);
             let query_started = Instant::now();
 
@@ -852,7 +852,9 @@ mod tests {
                 .as_array().expect("single retrieval action receipt");
             assert_eq!(operations.len(), 1);
             assert_eq!(operations[0]["tool_id"], expected_tool);
-            assert_eq!(response["candidate_evidence_jsonl"].as_str().unwrap().contains(expected_backend), true);
+            assert!(
+                response["candidate_evidence_jsonl"].as_str().unwrap().contains(expected_backend)
+            );
             assert_eq!(
                 response["candidate_evidence_jsonl"].as_str().unwrap()
                     .contains(expected_channel),
