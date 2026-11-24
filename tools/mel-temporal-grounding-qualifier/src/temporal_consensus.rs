@@ -79,6 +79,9 @@ pub struct MultiAnnotatorGroundingSummaryV1 {
     pub present_count_error_min: Option<usize>,
     pub present_count_error_median: Option<f64>,
     pub present_count_error_max: Option<usize>,
+    pub annotated_occurrence_count_min: Option<usize>,
+    pub annotated_occurrence_count_median: Option<f64>,
+    pub annotated_occurrence_count_max: Option<usize>,
     pub absent_correct_claims: usize,
     pub absent_claim_accuracy: Option<f64>,
     pub start_boundary_mae_frames: Option<f64>,
@@ -322,6 +325,9 @@ fn summarize_results(
         present_count_error_min: count_errors.iter().copied().min(),
         present_count_error_median: median_u64(&count_errors),
         present_count_error_max: count_errors.iter().copied().max(),
+        annotated_occurrence_count_min: truth_counts.iter().copied().min(),
+        annotated_occurrence_count_median: median_u64(&truth_counts),
+        annotated_occurrence_count_max: truth_counts.iter().copied().max(),
         absent_correct_claims,
         absent_claim_accuracy: rate(absent_correct_claims, absent.len()),
         start_boundary_mae_frames: mean(&start_errors),
@@ -538,13 +544,17 @@ mod tests {
         );
         let report = audit_multi_annotator_case(&input).unwrap();
         assert_eq!(report.annotator_results.len(), 2);
-        assert_ne!(
+        assert_eq!(
             report.annotator_results[0].score.f1,
             report.annotator_results[1].score.f1
         );
+        assert_ne!(
+            report.annotator_results[0].score.matched_interval_iou_mean,
+            report.annotator_results[1].score.matched_interval_iou_mean
+        );
         assert_eq!(report.summary.present_min_f1, report.annotator_results.iter().map(|item| item.score.f1.unwrap()).reduce(f64::min));
         assert_eq!(report.summary.present_max_f1, report.annotator_results.iter().map(|item| item.score.f1.unwrap()).reduce(f64::max));
-        assert!(report.summary.start_boundary_mae_frames.is_some());
+        assert!(report.summary.start_boundary_mae_frames.unwrap() > 0.0);
     }
 
     #[test]
@@ -599,6 +609,8 @@ mod tests {
         let report = audit_multi_annotator_case(&input).unwrap();
         assert_eq!(report.summary.present_count_error_min, Some(0));
         assert_eq!(report.summary.present_count_error_max, Some(1));
+        assert_eq!(report.summary.annotated_occurrence_count_min, Some(1));
+        assert_eq!(report.summary.annotated_occurrence_count_max, Some(2));
         assert_eq!(report.summary.present_exact_count_accuracy, Some(0.5));
     }
 
