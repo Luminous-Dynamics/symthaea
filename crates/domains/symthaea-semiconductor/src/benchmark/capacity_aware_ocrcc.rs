@@ -283,6 +283,8 @@ fn state_digest(engine: &CaOcrcEngineV1) -> Result<String, CaOcrcErrorV1> {
         current_round: Option<u64>,
         tracking_set: &'a BTreeMap<u64, CaOcrcTrackedPredictionV1>,
         accepted_label_revisions: &'a BTreeSet<String>,
+        seen_sample_ids: &'a BTreeSet<String>,
+        seen_measurement_event_ids: &'a BTreeSet<String>,
         accepted_feedback_count: u64,
         rejected_feedback_count: u64,
         evicted_feedback_count: u64,
@@ -295,6 +297,8 @@ fn state_digest(engine: &CaOcrcEngineV1) -> Result<String, CaOcrcErrorV1> {
         current_round: engine.current_round,
         tracking_set: &engine.tracking_set,
         accepted_label_revisions: &engine.accepted_label_revisions,
+        seen_sample_ids: &engine.seen_sample_ids,
+        seen_measurement_event_ids: &engine.seen_measurement_event_ids,
         accepted_feedback_count: engine.accepted_feedback_count,
         rejected_feedback_count: engine.rejected_feedback_count,
         evicted_feedback_count: engine.evicted_feedback_count,
@@ -510,6 +514,8 @@ pub fn create_ca_ocrc_engine_v1(
         current_round: None,
         tracking_set: BTreeMap::new(),
         accepted_label_revisions: BTreeSet::new(),
+        seen_sample_ids: BTreeSet::new(),
+        seen_measurement_event_ids: BTreeSet::new(),
         accepted_feedback_count: 0,
         rejected_feedback_count: 0,
         evicted_feedback_count: 0,
@@ -624,7 +630,7 @@ fn validate_delivery(
     if delivery.delivered_at_unix_seconds < delivery.label_available_at_unix_seconds {
         reasons.push(CaOcrcFeedbackReasonV1::LabelNotAvailableByDelivery);
     }
-    if delivery.eligibility_report_available_at_unix_seconds
+    if delivery.label_available_at_unix_seconds
         < tracked.prediction.event_time_unix_seconds
     {
         reasons.push(CaOcrcFeedbackReasonV1::LabelAvailableBeforeMeasurement);
@@ -757,8 +763,8 @@ fn process_round_inner(
             input.round
         )));
     }
-    if engine.tracking_set.values().any(|tracked| tracked.prediction.sample_id == input.sample_id)
-        || engine.tracking_set.values().any(|tracked| tracked.prediction.measurement_event_id == input.measurement_event_id)
+    if engine.seen_sample_ids.contains(&input.sample_id)
+        || engine.seen_measurement_event_ids.contains(&input.measurement_event_id)
     {
         return Err(CaOcrcErrorV1("duplicate prediction sample/event identity".into()));
     }
@@ -975,6 +981,10 @@ fn process_round_inner(
     }
     engine.threshold = threshold_after;
     engine.current_round = Some(input.round);
+    engine.seen_sample_ids.insert(input.sample_id.clone());
+    engine
+        .seen_measurement_event_ids
+        .insert(input.measurement_event_id.clone());
 
     let tracking_digest = tracking_set_digest(&engine.tracking_set)?;
     let state_after = state_digest(engine)?;
