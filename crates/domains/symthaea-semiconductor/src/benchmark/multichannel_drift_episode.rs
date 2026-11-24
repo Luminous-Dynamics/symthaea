@@ -12,8 +12,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
 
 use super::calibration_requalification::{
-    CALIBRATION_REQUALIFICATION_REPORT_SCHEMA_V1,
-    CalibrationRequalificationFrontierReportV1, CalibrationRequalificationReportV1,
+    CALIBRATION_REQUALIFICATION_REPORT_SCHEMA_V1, CalibrationRequalificationFrontierReportV1,
+    CalibrationRequalificationReportV1,
 };
 use super::label_consumption_guard::{
     LABEL_CONSUMPTION_REPORT_SCHEMA_V1, LabelConsumptionEligibilityReportV1,
@@ -27,8 +27,7 @@ pub const DRIFT_OBSERVATION_SCHEMA_V1: &str = "luminous.semi-bench.drift-observa
 pub const DRIFT_OBSERVATION_RECEIPT_SCHEMA_V1: &str =
     "luminous.semi-bench.drift-observation-receipt.v1";
 pub const DRIFT_EPISODE_SCHEMA_V1: &str = "luminous.semi-bench.drift-episode.v1";
-pub const SHARED_RESOURCE_GRAPH_SCHEMA_V1: &str =
-    "luminous.semi-bench.shared-resource-graph.v1";
+pub const SHARED_RESOURCE_GRAPH_SCHEMA_V1: &str = "luminous.semi-bench.shared-resource-graph.v1";
 pub const COMMON_CAUSE_ASSESSMENT_SCHEMA_V1: &str =
     "luminous.semi-bench.common-cause-assessment.v1";
 
@@ -309,7 +308,9 @@ fn policy_digest(policy: &DriftMonitorPolicyV1) -> Result<String, DriftMonitorEr
     json_sha256(policy)
 }
 
-fn channel_state_digest(state: Option<&DriftChannelStateV1>) -> Result<String, DriftMonitorErrorV1> {
+fn channel_state_digest(
+    state: Option<&DriftChannelStateV1>,
+) -> Result<String, DriftMonitorErrorV1> {
     json_sha256(&state)
 }
 
@@ -323,7 +324,9 @@ fn observation_receipt_digest(
 
 fn validate_policy(policy: &DriftMonitorPolicyV1) -> Result<(), DriftMonitorErrorV1> {
     if policy.schema != DRIFT_POLICY_SCHEMA_V1 {
-        return Err(DriftMonitorErrorV1("drift policy schema is unsupported".into()));
+        return Err(DriftMonitorErrorV1(
+            "drift policy schema is unsupported".into(),
+        ));
     }
     require_text(&policy.policy_id, "policy.policy_id")?;
     if !policy.ewma_lambda.is_finite()
@@ -337,7 +340,9 @@ fn validate_policy(policy: &DriftMonitorPolicyV1) -> Result<(), DriftMonitorErro
         || policy.maximum_abs_standardized_signal <= 0.0
         || policy.maximum_observation_delay_seconds < 0
     {
-        return Err(DriftMonitorErrorV1("drift policy contains invalid parameters".into()));
+        return Err(DriftMonitorErrorV1(
+            "drift policy contains invalid parameters".into(),
+        ));
     }
     Ok(())
 }
@@ -352,11 +357,15 @@ fn qualification_report_digest(
 
 fn validate_engine(engine: &DriftMonitorEngineV1) -> Result<(), DriftMonitorErrorV1> {
     if engine.schema != DRIFT_MONITOR_SCHEMA_V1 {
-        return Err(DriftMonitorErrorV1("drift monitor engine schema is unsupported".into()));
+        return Err(DriftMonitorErrorV1(
+            "drift monitor engine schema is unsupported".into(),
+        ));
     }
     validate_policy(&engine.policy)?;
     if policy_digest(&engine.policy)? != engine.policy_sha256 {
-        return Err(DriftMonitorErrorV1("drift policy digest does not match its content".into()));
+        return Err(DriftMonitorErrorV1(
+            "drift policy digest does not match its content".into(),
+        ));
     }
     Ok(())
 }
@@ -507,9 +516,7 @@ fn validate_input(
     {
         return Err(DriftObservationReasonV1::ObservationDelayExceeded);
     }
-    if !valid_sha256(&input.feature_schema_sha256)
-        || !valid_sha256(&input.baseline_sha256)
-    {
+    if !valid_sha256(&input.feature_schema_sha256) || !valid_sha256(&input.baseline_sha256) {
         return Err(DriftObservationReasonV1::FeatureSchemaMismatch);
     }
     if !valid_sha256(&input.evidence_receipt_sha256) {
@@ -544,7 +551,10 @@ fn validate_input(
             || input.source_label_ids.len() != 1
             || input.source_label_ids.first() != Some(&report.label_id)
             || input.measurement_event_id.as_deref() != Some(report.measurement_event_id.as_str())
-            || input.prediction_receipt_sha256.as_deref().is_none_or(|value| !valid_sha256(value))
+            || input
+                .prediction_receipt_sha256
+                .as_deref()
+                .is_none_or(|value| !valid_sha256(value))
         {
             return Err(DriftObservationReasonV1::MissingEvidenceDigest);
         }
@@ -569,7 +579,9 @@ fn validate_input(
         }
         match report.current_at_k1.status {
             MeasurementQualificationStatusV1::Qualified
-                if report.current_at_k1.downstream_consumption_allowed_at_frontier => {}
+                if report
+                    .current_at_k1
+                    .downstream_consumption_allowed_at_frontier => {}
             MeasurementQualificationStatusV1::Unknown => {
                 return Err(DriftObservationReasonV1::QualificationUnknown);
             }
@@ -589,12 +601,15 @@ fn validate_input(
     {
         return Err(DriftObservationReasonV1::EvidenceKindPlaneMismatch);
     }
-    if input.plane != DriftEvidencePlaneV1::MeasurementSystem
-        && input.calibration_report.is_some()
+    if input.plane != DriftEvidencePlaneV1::MeasurementSystem && input.calibration_report.is_some()
     {
         return Err(DriftObservationReasonV1::EvidenceKindPlaneMismatch);
     }
-    if input.source_label_ids.iter().any(|label| label.trim().is_empty()) {
+    if input
+        .source_label_ids
+        .iter()
+        .any(|label| label.trim().is_empty())
+    {
         return Err(DriftObservationReasonV1::MissingEvidenceDigest);
     }
     if input.plane != DriftEvidencePlaneV1::QualifiedResidual
@@ -746,7 +761,11 @@ pub fn observe_drift_channel_v1(
 
     let signal = match input.detector {
         DriftDetectorKindV1::MissingnessRate => {
-            if input.is_missing { 1.0 } else { 0.0 }
+            if input.is_missing {
+                1.0
+            } else {
+                0.0
+            }
         }
         DriftDetectorKindV1::EventChange => input.standardized_signal.unwrap_or(0.0),
         DriftDetectorKindV1::Ewma | DriftDetectorKindV1::TwoSidedCusum => {
@@ -777,8 +796,8 @@ pub fn observe_drift_channel_v1(
         }
         DriftDetectorKindV1::MissingnessRate => {
             let rate = next.missing_observations as f64 / next.observations as f64;
-            next.ewma = engine.policy.ewma_lambda * rate
-                + (1.0 - engine.policy.ewma_lambda) * next.ewma;
+            next.ewma =
+                engine.policy.ewma_lambda * rate + (1.0 - engine.policy.ewma_lambda) * next.ewma;
             next.ewma
         }
         DriftDetectorKindV1::EventChange => signal.abs(),
@@ -855,7 +874,9 @@ pub fn seal_drift_episode_v1(
             )));
         }
         if !receipt_ids.insert(receipt.receipt_sha256.as_str()) {
-            return Err(DriftMonitorErrorV1("duplicate observation receipt in episode".into()));
+            return Err(DriftMonitorErrorV1(
+                "duplicate observation receipt in episode".into(),
+            ));
         }
         accepted.push(receipt.receipt_sha256.clone());
         if receipt.disposition == DriftObservationDispositionV1::Updated {
@@ -892,8 +913,11 @@ fn shared_resource_graph_digest(
     let mut canonical = graph.clone();
     canonical.graph_sha256.clear();
     canonical.bindings.sort_by(|a, b| {
-        (&a.context_id, &a.resource_kind, &a.resource_id)
-            .cmp(&(&b.context_id, &b.resource_kind, &b.resource_id))
+        (&a.context_id, &a.resource_kind, &a.resource_id).cmp(&(
+            &b.context_id,
+            &b.resource_kind,
+            &b.resource_id,
+        ))
     });
     json_sha256(&canonical)
 }
@@ -914,7 +938,9 @@ pub fn assess_declared_common_resource_association_v1(
         || !valid_sha256(&graph.graph_sha256)
         || shared_resource_graph_digest(graph)? != graph.graph_sha256
     {
-        return Err(DriftMonitorErrorV1("shared-resource graph digest or schema invalid".into()));
+        return Err(DriftMonitorErrorV1(
+            "shared-resource graph digest or schema invalid".into(),
+        ));
     }
     require_text(&graph.graph_id, "graph.graph_id")?;
     let mut alert_ids = BTreeSet::new();
@@ -923,7 +949,9 @@ pub fn assess_declared_common_resource_association_v1(
         require_text(&alert.alert_id, "alert.alert_id")?;
         require_text(&alert.context_id, "alert.context_id")?;
         if !valid_sha256(&alert.observation_receipt_sha256) {
-            return Err(DriftMonitorErrorV1("alert observation receipt digest invalid".into()));
+            return Err(DriftMonitorErrorV1(
+                "alert observation receipt digest invalid".into(),
+            ));
         }
         if !alert_ids.insert(alert.alert_id.as_str()) {
             return Err(DriftMonitorErrorV1("duplicate alert ID".into()));
@@ -942,7 +970,9 @@ pub fn assess_declared_common_resource_association_v1(
             binding.resource_id.as_str(),
             binding.resource_kind.as_str(),
         )) {
-            return Err(DriftMonitorErrorV1("duplicate shared-resource binding".into()));
+            return Err(DriftMonitorErrorV1(
+                "duplicate shared-resource binding".into(),
+            ));
         }
         bindings
             .entry(binding.context_id.as_str())
@@ -1028,7 +1058,10 @@ mod tests {
         create_drift_monitor_engine_v1("drift-001", "fab-clock", policy()).unwrap()
     }
 
-    fn eligible_calibration_report(event_id: &str, evidence: char) -> CalibrationRequalificationReportV1 {
+    fn eligible_calibration_report(
+        event_id: &str,
+        evidence: char,
+    ) -> CalibrationRequalificationReportV1 {
         let frontier = CalibrationRequalificationFrontierReportV1 {
             frontier_input_sha256: digest(evidence),
             status: MeasurementQualificationStatusV1::Qualified,
@@ -1059,7 +1092,10 @@ mod tests {
         report
     }
 
-    fn eligible_label_report(label_id: &str, evidence: char) -> LabelConsumptionEligibilityReportV1 {
+    fn eligible_label_report(
+        label_id: &str,
+        evidence: char,
+    ) -> LabelConsumptionEligibilityReportV1 {
         let mut report = LabelConsumptionEligibilityReportV1 {
             schema: LABEL_CONSUMPTION_REPORT_SCHEMA_V1.into(),
             label_id: label_id.into(),
@@ -1112,12 +1148,20 @@ mod tests {
         let evidence_receipt_sha256 = qualification_report
             .as_ref()
             .map(|report| report.report_sha256.clone())
-            .or_else(|| calibration_report.as_ref().map(|report| report.report_sha256.clone()))
+            .or_else(|| {
+                calibration_report
+                    .as_ref()
+                    .map(|report| report.report_sha256.clone())
+            })
             .unwrap_or_else(|| digest(receipt));
         let measurement_event_id = qualification_report
             .as_ref()
             .map(|report| report.measurement_event_id.clone())
-            .or_else(|| calibration_report.as_ref().map(|report| report.measurement_event_id.clone()));
+            .or_else(|| {
+                calibration_report
+                    .as_ref()
+                    .map(|report| report.measurement_event_id.clone())
+            });
         DriftObservationInputV1 {
             schema: DRIFT_OBSERVATION_SCHEMA_V1.into(),
             observation_id: id.into(),
@@ -1195,7 +1239,12 @@ mod tests {
             100,
             'c',
         );
-        clean.evidence_receipt_sha256 = clean.qualification_report.as_ref().unwrap().report_sha256.clone();
+        clean.evidence_receipt_sha256 = clean
+            .qualification_report
+            .as_ref()
+            .unwrap()
+            .report_sha256
+            .clone();
         observe_drift_channel_v1(&mut engine, &clean).unwrap();
         let before = channel_state_digest(engine.channels.get("residual-tool-1")).unwrap();
         let mut unknown = clean.clone();
@@ -1203,8 +1252,14 @@ mod tests {
         unknown.qualification = DriftQualificationV1::Unknown;
         unknown.evidence_receipt_sha256 = digest('d');
         let receipt = observe_drift_channel_v1(&mut engine, &unknown).unwrap();
-        assert_eq!(receipt.disposition, DriftObservationDispositionV1::HeldUnknown);
-        assert_eq!(channel_state_digest(engine.channels.get("residual-tool-1")).unwrap(), before);
+        assert_eq!(
+            receipt.disposition,
+            DriftObservationDispositionV1::HeldUnknown
+        );
+        assert_eq!(
+            channel_state_digest(engine.channels.get("residual-tool-1")).unwrap(),
+            before
+        );
 
         let mut blocked = clean;
         blocked.observation_id = "r3".into();
@@ -1212,7 +1267,10 @@ mod tests {
         blocked.evidence_receipt_sha256 = digest('e');
         let receipt = observe_drift_channel_v1(&mut engine, &blocked).unwrap();
         assert_eq!(receipt.disposition, DriftObservationDispositionV1::Blocked);
-        assert_eq!(channel_state_digest(engine.channels.get("residual-tool-1")).unwrap(), before);
+        assert_eq!(
+            channel_state_digest(engine.channels.get("residual-tool-1")).unwrap(),
+            before
+        );
     }
 
     #[test]
@@ -1276,8 +1334,14 @@ mod tests {
         let mut duplicate = first;
         duplicate.observation_id = "x2".into();
         let receipt = observe_drift_channel_v1(&mut engine, &duplicate).unwrap();
-        assert_eq!(receipt.disposition, DriftObservationDispositionV1::Duplicate);
-        assert_eq!(channel_state_digest(engine.channels.get("feature")).unwrap(), before);
+        assert_eq!(
+            receipt.disposition,
+            DriftObservationDispositionV1::Duplicate
+        );
+        assert_eq!(
+            channel_state_digest(engine.channels.get("feature")).unwrap(),
+            before
+        );
     }
 
     #[test]
@@ -1304,7 +1368,10 @@ mod tests {
         out_of_order.evidence_receipt_sha256 = digest('d');
         let receipt = observe_drift_channel_v1(&mut engine, &out_of_order).unwrap();
         assert_eq!(receipt.disposition, DriftObservationDispositionV1::Rejected);
-        assert_eq!(channel_state_digest(engine.channels.get("feature")).unwrap(), before);
+        assert_eq!(
+            channel_state_digest(engine.channels.get("feature")).unwrap(),
+            before
+        );
     }
 
     #[test]
@@ -1328,7 +1395,10 @@ mod tests {
         changed.baseline_sha256 = digest('f');
         let receipt = observe_drift_channel_v1(&mut engine, &changed).unwrap();
         assert_eq!(receipt.disposition, DriftObservationDispositionV1::Rejected);
-        assert_eq!(receipt.reason, Some(DriftObservationReasonV1::ChannelIdentityChanged));
+        assert_eq!(
+            receipt.reason,
+            Some(DriftObservationReasonV1::ChannelIdentityChanged)
+        );
     }
 
     #[test]
@@ -1389,8 +1459,24 @@ mod tests {
         let mut engine = engine();
         let mut receipts = Vec::new();
         for (id, channel, plane, kind, qualification, signal, evidence) in [
-            ("x1", "feature", DriftEvidencePlaneV1::InputFeature, DriftEvidenceKindV1::FeatureWindow, DriftQualificationV1::NotApplicable, 0.5, 'c'),
-            ("r1", "residual", DriftEvidencePlaneV1::QualifiedResidual, DriftEvidenceKindV1::QualifiedMetrologyLabel, DriftQualificationV1::CurrentK1Eligible, 0.7, 'd'),
+            (
+                "x1",
+                "feature",
+                DriftEvidencePlaneV1::InputFeature,
+                DriftEvidenceKindV1::FeatureWindow,
+                DriftQualificationV1::NotApplicable,
+                0.5,
+                'c',
+            ),
+            (
+                "r1",
+                "residual",
+                DriftEvidencePlaneV1::QualifiedResidual,
+                DriftEvidenceKindV1::QualifiedMetrologyLabel,
+                DriftQualificationV1::CurrentK1Eligible,
+                0.7,
+                'd',
+            ),
         ] {
             let detector = DriftDetectorKindV1::Ewma;
             let observation = input(
@@ -1410,7 +1496,10 @@ mod tests {
         receipts.reverse();
         let second = seal_drift_episode_v1("episode-1", 100, 102, &receipts).unwrap();
         assert_eq!(first.episode_sha256, second.episode_sha256);
-        assert_eq!(first.causal_attribution, CausalAttributionStateV1::NotEstablished);
+        assert_eq!(
+            first.causal_attribution,
+            CausalAttributionStateV1::NotEstablished
+        );
         assert_eq!(first.active_planes.len(), 2);
     }
 
@@ -1452,7 +1541,10 @@ mod tests {
             report.state,
             CommonCauseAssessmentStateV1::NoDeclaredSharedResource
         );
-        assert_eq!(report.causal_attribution, CausalAttributionStateV1::NotEstablished);
+        assert_eq!(
+            report.causal_attribution,
+            CausalAttributionStateV1::NotEstablished
+        );
     }
 
     #[test]
@@ -1510,7 +1602,10 @@ mod tests {
             .report_sha256
             .clone();
         let receipt = observe_drift_channel_v1(&mut engine, &observation).unwrap();
-        assert_eq!(receipt.disposition, DriftObservationDispositionV1::HeldUnknown);
+        assert_eq!(
+            receipt.disposition,
+            DriftObservationDispositionV1::HeldUnknown
+        );
         assert!(engine.channels.is_empty());
     }
 
@@ -1584,7 +1679,10 @@ mod tests {
             CommonCauseAssessmentStateV1::SharedResourceAssociationCandidate
         );
         assert_eq!(report.shared_resource_ids, vec!["cal-ref-1"]);
-        assert_eq!(report.causal_attribution, CausalAttributionStateV1::NotEstablished);
+        assert_eq!(
+            report.causal_attribution,
+            CausalAttributionStateV1::NotEstablished
+        );
     }
 
     #[test]
