@@ -5070,6 +5070,58 @@ mod tests {
         }
     }
 
+    const OSCILLATORY_UNSTABLE_MODE_FIXTURE: &str = include_str!(
+        "../../../../benchmarks/plasma/control-interface/fixtures/oscillatory-unstable-mode-known-answer-v0.1.json"
+    );
+
+    fn oscillatory_unstable_mode_contract() -> OscillatoryUnstableModeContract {
+        let value: serde_json::Value =
+            serde_json::from_str(OSCILLATORY_UNSTABLE_MODE_FIXTURE).unwrap();
+        let model = &value["model"];
+        let diagnostic = &value["diagnostic"];
+        let actuator = &value["actuator"];
+        let controller = &value["controller"];
+        OscillatoryUnstableModeContract {
+            growth_rate_per_second: model["growth_rate_per_second"].as_f64().unwrap(),
+            oscillation_frequency_hz: model["oscillation_frequency_hz"].as_f64().unwrap(),
+            time_step_seconds: model["time_step_seconds"].as_f64().unwrap(),
+            horizon_steps: model["horizon_steps"].as_u64().unwrap() as u32,
+            diagnostic_gain: [
+                diagnostic["gain_real"].as_f64().unwrap(),
+                diagnostic["gain_imag"].as_f64().unwrap(),
+            ],
+            diagnostic_noise_std: diagnostic["noise_std"].as_f64().unwrap(),
+            diagnostic_bandwidth_hz: diagnostic["bandwidth_hz"].as_f64().unwrap(),
+            diagnostic_sampling_stride_steps: diagnostic["sampling_stride_steps"].as_u64().unwrap()
+                as u32,
+            diagnostic_delivery_delay_steps: diagnostic["delivery_delay_steps"].as_u64().unwrap()
+                as u32,
+            actuator_gain: [
+                actuator["gain_real"].as_f64().unwrap(),
+                actuator["gain_imag"].as_f64().unwrap(),
+            ],
+            actuator_bandwidth_hz: actuator["bandwidth_hz"].as_f64().unwrap(),
+            actuator_update_stride_steps: actuator["update_stride_steps"].as_u64().unwrap() as u32,
+            actuator_delivery_delay_steps: actuator["delivery_delay_steps"].as_u64().unwrap()
+                as u32,
+            controller_execution_latency_seconds: controller["execution_latency_seconds"]
+                .as_f64()
+                .unwrap(),
+            minimum_bandwidth_multiple: controller["minimum_bandwidth_multiple"].as_f64().unwrap(),
+            maximum_loop_latency_efold_fraction: controller["maximum_loop_latency_efold_fraction"]
+                .as_f64()
+                .unwrap(),
+            minimum_observability_min_eigenvalue: controller
+                ["minimum_observability_min_eigenvalue"]
+                .as_f64()
+                .unwrap(),
+            minimum_controllability_min_eigenvalue: controller
+                ["minimum_controllability_min_eigenvalue"]
+                .as_f64()
+                .unwrap(),
+        }
+    }
+
     const REFINEMENT_POLICY_FIXTURE: &str = include_str!(
         "../../../../benchmarks/plasma/adaptive-refinement/fixtures/synthetic-refinement-cases-v0.1.json"
     );
@@ -5415,6 +5467,118 @@ mod tests {
             evaluate_scalar_unstable_mode_interface(excessive),
             Err(ContractError::InvalidControlTimingField {
                 field: "scalar_mode.horizon_steps",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn oscillatory_unstable_mode_oracle_matches_two_by_two_gramian_known_answer() {
+        let report =
+            evaluate_oscillatory_unstable_mode_interface(oscillatory_unstable_mode_contract())
+                .unwrap();
+        let expected = serde_json::from_str::<serde_json::Value>(
+            OSCILLATORY_UNSTABLE_MODE_FIXTURE,
+        )
+        .unwrap();
+        let known = &expected["known_answers"];
+        assert_eq!(report.observation_sample_count, 5);
+        assert_eq!(report.actuator_command_count, 5);
+        for (actual, expected) in report
+            .observability_gramian
+            .iter()
+            .zip(known["observability_gramian"].as_array().unwrap())
+        {
+            assert!((actual - expected.as_f64().unwrap()).abs() < 1.0e-9);
+        }
+        for (actual, expected) in report
+            .controllability_gramian
+            .iter()
+            .zip(known["controllability_gramian"].as_array().unwrap())
+        {
+            assert!((actual - expected.as_f64().unwrap()).abs() < 1.0e-12);
+        }
+        assert!(
+            (report.observability_min_eigenvalue
+                - known["observability_min_eigenvalue"].as_f64().unwrap())
+                .abs()
+                < 1.0e-8
+        );
+        assert!(
+            (report.controllability_min_eigenvalue
+                - known["controllability_min_eigenvalue"].as_f64().unwrap())
+                .abs()
+                < 1.0e-12
+        );
+        assert!((report.diagnostic_bandwidth_multiple - 5.0).abs() < 1.0e-12);
+        assert!((report.actuator_bandwidth_multiple - 4.0).abs() < 1.0e-12);
+        assert!((report.conservative_loop_latency_seconds - 0.065).abs() < 1.0e-12);
+        assert!((report.loop_latency_efold_fraction - 0.013).abs() < 1.0e-12);
+        assert!(report.mode_interface_qualified);
+    }
+
+    #[test]
+    fn oscillatory_unstable_mode_oracle_detects_sampling_and_actuator_phase_aliasing() {
+        let mut contract = oscillatory_unstable_mode_contract();
+        contract.oscillation_frequency_hz = 50.0;
+        let report = evaluate_oscillatory_unstable_mode_interface(contract).unwrap();
+        assert_eq!(report.observation_sample_count, 5);
+        assert_eq!(report.actuator_command_count, 5);
+        assert!(report.observability_min_eigenvalue < 1.0e-7);
+        assert!(report.controllability_min_eigenvalue < 1.0e-10);
+        assert!(!report.mode_interface_qualified);
+    }
+
+    #[test]
+    fn oscillatory_unstable_mode_oracle_rejects_insufficient_quadrature_information_and_authority() {
+        let mut poor_sensor = oscillatory_unstable_mode_contract();
+        poor_sensor.diagnostic_noise_std = 10.0;
+        let sensor_report = evaluate_oscillatory_unstable_mode_interface(poor_sensor).unwrap();
+        assert!(
+            sensor_report.observability_min_eigenvalue
+                < sensor_report.minimum_required_observability_min_eigenvalue
+        );
+        assert!(!sensor_report.mode_interface_qualified);
+
+        let mut weak_actuator = oscillatory_unstable_mode_contract();
+        weak_actuator.actuator_gain = [0.005, 0.002];
+        let actuator_report = evaluate_oscillatory_unstable_mode_interface(weak_actuator).unwrap();
+        assert!(
+            actuator_report.controllability_min_eigenvalue
+                < actuator_report.minimum_required_controllability_min_eigenvalue
+        );
+        assert!(!actuator_report.mode_interface_qualified);
+    }
+
+    #[test]
+    fn oscillatory_unstable_mode_oracle_rejects_invalid_noise_schedules_and_growth() {
+        let mut zero_noise = oscillatory_unstable_mode_contract();
+        zero_noise.diagnostic_noise_std = 0.0;
+        assert!(matches!(
+            evaluate_oscillatory_unstable_mode_interface(zero_noise),
+            Err(ContractError::InvalidControlTimingField {
+                field: "oscillatory_mode",
+                ..
+            })
+        ));
+
+        let mut invalid_stride = oscillatory_unstable_mode_contract();
+        invalid_stride.diagnostic_sampling_stride_steps = 0;
+        assert!(matches!(
+            evaluate_oscillatory_unstable_mode_interface(invalid_stride),
+            Err(ContractError::InvalidControlTimingField {
+                field: "oscillatory_mode",
+                ..
+            })
+        ));
+
+        let mut overflow = oscillatory_unstable_mode_contract();
+        overflow.growth_rate_per_second = 1_000.0;
+        overflow.time_step_seconds = 1.0;
+        assert!(matches!(
+            evaluate_oscillatory_unstable_mode_interface(overflow),
+            Err(ContractError::InvalidControlTimingField {
+                field: "oscillatory_mode.growth_rate_per_second",
                 ..
             })
         ));
