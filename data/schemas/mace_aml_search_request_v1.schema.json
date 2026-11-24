@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mace_aml_search_request_v1.schema.json",
+  "title": "MACE AML Search request v1",
+  "description": "Strict snapshot of the public AML Search request. The query preserves the original question and ordered multimodal parts.",
+  "type": "object",
+  "properties": {
+    "query": {
+      "oneOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "mace_aml_add_request_v1.schema.json#/$defs/contentPart"
+          }
+        }
+      ]
+    },
+    "options": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "user_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096
+    },
+    "top_k": {
+      "type": "integer",
+      "minimum": 1
+    }
+  },
+  "required": [
+    "query",
+    "user_id",
+    "top_k"
+  ],
+  "additionalProperties": false
+}
