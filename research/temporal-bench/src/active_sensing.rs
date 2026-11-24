@@ -746,7 +746,7 @@ mod tests {
         );
         let mut invalid_context = context();
         invalid_context.calibration_receipt_sha256 = [0; 32];
-        assert!(plan_active_sensing_actions(invalid_context, &[useful.clone()]).is_err());
+        assert!(plan_active_sensing_actions(invalid_context, std::slice::from_ref(&useful)).is_err());
 
         let valid = plan_active_sensing_actions(context(), &[useful]).unwrap();
         let mut forged = valid.clone();
