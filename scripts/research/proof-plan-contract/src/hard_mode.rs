@@ -718,14 +718,18 @@ mod tests {
         assert_eq!(report.answer_correct, None);
     }
 
-
     #[test]
     fn answer_text_mutation_is_rejected_without_digest_update() {
         let mut receipt = fixture();
-        receipt.candidate.answer_text.push_str(" This is a mutation.");
-        assert!(validate_receipt(&receipt)
-            .iter()
-            .any(|error| error.contains("answer_sha256 does not match its canonical preimage")));
+        receipt
+            .candidate
+            .answer_text
+            .push_str(" This is a mutation.");
+        assert!(
+            validate_receipt(&receipt)
+                .iter()
+                .any(|error| error.contains("answer_sha256 does not match its canonical preimage"))
+        );
     }
 
     #[test]
