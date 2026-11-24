@@ -119,6 +119,10 @@
               "UnknownResponse",
               "UnknownBlockedByMemory"
             ]
+          },
+          "matched_pair_id": {
+            "type": "string",
+            "minLength": 1
           }
         }
       }
