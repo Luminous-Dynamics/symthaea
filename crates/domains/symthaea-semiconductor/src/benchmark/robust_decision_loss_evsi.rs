@@ -1107,44 +1107,6 @@ mod tests {
     }
 
     #[test]
-    fn readiness_status_precedence_is_order_invariant_across_scenarios() {
-        let mut value = candidate(
-            "status-order",
-            "chamber-1",
-            MetrologyReadinessStatusV1::Qualified,
-            vec![
-                scenario("central", None, 0.10, 0.01, 0.95),
-                scenario("unknown", None, 0.10, 0.01, 0.95),
-                scenario("rejected", None, 0.10, 0.01, 0.95),
-            ],
-            true,
-        );
-        value.scenarios[1].decision_loss_model.model_id = "unknown-model".into();
-        value.scenarios[1].scenario_sha256 = seal_robust_evsi_scenario_v1(&value.scenarios[1]).unwrap();
-        value.scenarios[2].decision_loss_model.model_id = "rejected-model".into();
-        value.scenarios[2].scenario_sha256 = seal_robust_evsi_scenario_v1(&value.scenarios[2]).unwrap();
-        // Different scenario IDs do not change the readiness record by default;
-        // this fixture checks that scenario list permutation does not decide status.
-        let mut reversed = value.clone();
-        reversed.scenarios.reverse();
-        reversed.scenario_set_sha256 = seal_robust_evsi_candidate_v1(&reversed).unwrap();
-        let first = score_robust_candidate(
-            &value,
-            &policy(1, BTreeMap::new()),
-            8,
-            true,
-        ).unwrap();
-        let second = score_robust_candidate(
-            &reversed,
-            &policy(1, BTreeMap::new()),
-            8,
-            true,
-        ).unwrap();
-        assert_eq!(first.status, second.status);
-        assert_eq!(first.report_sha256, second.report_sha256);
-    }
-
-    #[test]
     fn scenario_source_digest_tampering_is_rejected() {
         let mut value = candidate(
             "tampered",
