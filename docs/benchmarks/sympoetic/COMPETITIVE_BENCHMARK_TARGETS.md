@@ -34,7 +34,7 @@ We should publish a vector of outcomes and evidence, not a single unqualified sc
 | CMU Human-AI Complementarity programme (2026) | Individual persistence and unaided skill after AI withdrawal; team AI × transactive-memory interaction | Programme reports randomized individual trials (N=1,222) and a 159-team 2×2 study | Replicate with matched AI × TMS cells, immediate/delayed/transfer outcomes and AI-off isolation |
 | HiddenBench (ICML 2026) | Reasoning when relevant facts are distributed across participants/agents | 65 tasks; 15 frontier models; 30.1% multi-agent accuracy under distributed information vs 80.7% for a single model with the complete profile | Report information-access conditions explicitly; add solicitation, unique-fact coverage, attribution and full-information diagnostic reference |
 | GroupMemBench (2026) | Multi-party conversation memory, knowledge updates, ambiguity, temporal reasoning and abstention | 715 adversarial questions; strongest tested system 46.0% average; BM25 competitive with or above many agent-memory systems | Require BM25, exact-provenance retrieval, update/ambiguity and abstention baselines before claiming semantic-memory superiority |
-| Agent Sovereignty Benchmark (public preview, v1.1) | Portability, transparency, auditability, verifiability, modifiability and controllability | Public-preview framework with 26 evidence-scored tests; not a regulatory standard | Use as an adjacent evidence crosswalk; report pass/partial/fail/unverified per control, not a single sovereignty score |
+| Agent Sovereignty Benchmark (public preview, v1.1) | Portability, transparency, auditability, verifiability, modifiability and controllability | 49 agents, 26 tests, criteria v1.1 (10 Nov 2026); public results are desk review, not a regulatory standard. Highest listed score 66.7, with 13 pass / 10 partial / 3 fail tests | Use as an adjacent evidence crosswalk; report pass/partial/fail/unverified per control, not a single sovereignty score |
 
 External source links:
 - AOBench benchmark card: https://mskazemi.com/aobench/latest/about/benchmark-card/
@@ -48,6 +48,7 @@ External source links:
 - HiddenBench (ICML 2026): https://proceedings.mlr.press/v306/li26ej.html
 - GroupMemBench: https://www.microsoft.com/en-us/research/publication/groupmembench-benchmarking-llm-agent-memory-in-multi-party-conversations/
 - Agent Sovereignty Benchmark (public preview): https://agentsofhumanity.ai/
+- Agent Sovereignty Benchmark results (49-agent desk review, v1.1): https://agentsofhumanity.ai/agents
 
 Scores are not directly comparable across these programmes. Different task sets, tools, environments, agents, populations, and scoring methods change the estimand. Reproduce external baselines under their own documented contracts before claiming a comparative result.
 
