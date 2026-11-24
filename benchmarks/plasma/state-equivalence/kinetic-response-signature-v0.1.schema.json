@@ -119,6 +119,7 @@
         "structure_class_id",
         "intervention_ids",
         "qoi_ids",
+        "qoi_scales",
         "time_samples",
         "responses",
         "branch_ids"
@@ -184,6 +185,14 @@
                 "type": "null"
               }
             ]
+          }
+        },
+        "qoi_scales": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
           }
         }
       }
