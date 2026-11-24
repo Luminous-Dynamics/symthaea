@@ -367,7 +367,9 @@ fn summarize_distribution(
     samples: &[PosteriorEffectSampleComparison],
     use_latent: bool,
 ) -> Result<PosteriorEffectDistribution, PosteriorCohortError> {
-    let _first = samples.first().ok_or(PosteriorCohortError::EmptyDrawSet)?;
+    if samples.is_empty() {
+        return Err(PosteriorCohortError::EmptyDrawSet);
+    }
     let mut min_effect = i128::MAX;
     let mut max_effect = i128::MIN;
     let mut weighted_sum = 0_i128;
@@ -680,9 +682,7 @@ mod tests {
         paired_seed: u64,
         context: &IndividualEffectContext,
         applied_at_us: u64,
-        realized_utility_units: i64,
-        latent_utility_units: i64,
-        rollout_utility_units: i64,
+        utilities: (i64, i64, i64),
     ) -> IndividualEffectBranch {
         IndividualEffectBranch {
             run_id,
@@ -696,10 +696,10 @@ mod tests {
             latent_state_sha256: context.latent_state_sha256,
             disposition: BranchDisposition::Applied {
                 applied_at_us,
-                realized_utility_units,
+                realized_utility_units: utilities.0,
             },
-            latent_predicted_utility_units: latent_utility_units,
-            rollout_predicted_utility_units: rollout_utility_units,
+            latent_predicted_utility_units: utilities.1,
+            rollout_predicted_utility_units: utilities.2,
         }
     }
 
@@ -709,9 +709,7 @@ mod tests {
         draw_id: u64,
         draw_seed: u8,
         weight_ppm: u32,
-        realized_effect: i64,
-        latent_effect: i64,
-        rollout_effect: i64,
+        effects: (i64, i64, i64),
     ) -> PosteriorDrawPair {
         let individual_digest = digest(individual_seed);
         let context = IndividualEffectContext {
@@ -743,9 +741,7 @@ mod tests {
             context.paired_seed,
             &context,
             10_000,
-            100,
-            1_000,
-            2_000,
+            (100, 1_000, 2_000),
         );
         let alternative = make_branch(
             5_002,
@@ -753,9 +749,11 @@ mod tests {
             context.paired_seed,
             &context,
             10_100,
-            100_i64 + realized_effect,
-            1_000_i64 + latent_effect,
-            2_000_i64 + rollout_effect,
+            (
+                100_i64 + effects.0,
+                1_000_i64 + effects.1,
+                2_000_i64 + effects.2,
+            ),
         );
         let draw_digest = digest(draw_seed.wrapping_add(70));
 
@@ -784,8 +782,8 @@ mod tests {
     #[test]
     fn shared_draw_preserves_bimodal_effect_distribution() {
         let input = cohort(vec![
-            make_draw(1, 101, 1, 51, 500_000, 0, -10, -10),
-            make_draw(1, 101, 2, 52, 500_000, 0, 10, 10),
+            make_draw(1, 101, 1, 51, 500_000, (0, -10, -10)),
+            make_draw(1, 101, 2, 52, 500_000, (0, 10, 10)),
         ]);
         let result = evaluate_posterior_individual_cohort(&input).unwrap();
 
@@ -804,7 +802,7 @@ mod tests {
 
     #[test]
     fn posterior_draw_id_mismatch_on_one_sibling_rejects() {
-        let mut draw = make_draw(1, 101, 1, 51, 1_000_000, 2, 1, 1);
+        let mut draw = make_draw(1, 101, 1, 51, 1_000_000, (2, 1, 1));
         draw.alternative.posterior_draw_id = 2;
         let error = evaluate_posterior_individual_cohort(&cohort(vec![draw])).unwrap_err();
         assert_eq!(
@@ -818,7 +816,7 @@ mod tests {
 
     #[test]
     fn posterior_draw_digest_mismatch_on_one_sibling_rejects() {
-        let mut draw = make_draw(1, 101, 1, 51, 1_000_000, 2, 1, 1);
+        let mut draw = make_draw(1, 101, 1, 51, 1_000_000, (2, 1, 1));
         draw.alternative.posterior_draw_sha256 = digest(99);
         let error = evaluate_posterior_individual_cohort(&cohort(vec![draw])).unwrap_err();
         assert_eq!(
@@ -833,8 +831,8 @@ mod tests {
     #[test]
     fn same_realized_branch_outcomes_are_reused_for_each_draw() {
         let input = cohort(vec![
-            make_draw(1, 101, 1, 51, 500_000, 2, 1, 1),
-            make_draw(1, 101, 2, 52, 500_000, 2, 4, 5),
+            make_draw(1, 101, 1, 51, 500_000, (2, 1, 1)),
+            make_draw(1, 101, 2, 52, 500_000, (2, 4, 5)),
         ]);
         let result = evaluate_posterior_individual_cohort(&input).unwrap();
         assert_eq!(result.realized_effect_units, 2);
@@ -848,8 +846,8 @@ mod tests {
     #[test]
     fn realized_outcome_drift_across_posterior_draws_rejects() {
         let input = cohort(vec![
-            make_draw(1, 101, 1, 51, 500_000, 2, 1, 1),
-            make_draw(1, 101, 2, 52, 500_000, 3, 1, 1),
+            make_draw(1, 101, 1, 51, 500_000, (2, 1, 1)),
+            make_draw(1, 101, 2, 52, 500_000, (3, 1, 1)),
         ]);
         let error = evaluate_posterior_individual_cohort(&input).unwrap_err();
         assert_eq!(
@@ -865,7 +863,7 @@ mod tests {
         let mut second = make_draw(1, 101, 2, 52, 500_000, 2, 1, 1);
         second.baseline.branch.run_id = 5_111;
         let input = cohort(vec![
-            make_draw(1, 101, 1, 51, 500_000, 2, 1, 1),
+            make_draw(1, 101, 1, 51, 500_000, (2, 1, 1)),
             second,
         ]);
         let error = evaluate_posterior_individual_cohort(&input).unwrap_err();
@@ -894,7 +892,7 @@ mod tests {
     #[test]
     fn duplicate_posterior_draw_id_rejects() {
         let input = cohort(vec![
-            make_draw(1, 101, 1, 51, 500_000, 2, 1, 1),
+            make_draw(1, 101, 1, 51, 500_000, (2, 1, 1)),
             make_draw(1, 101, 1, 52, 500_000, 2, 3, 3),
         ]);
         let error = evaluate_posterior_individual_cohort(&input).unwrap_err();
@@ -907,11 +905,11 @@ mod tests {
     #[test]
     fn duplicate_posterior_draw_digest_rejects() {
         let duplicate_digest = digest(121);
-        let mut first = make_draw(1, 101, 1, 51, 500_000, 2, 1, 1);
+        let mut first = make_draw(1, 101, 1, 51, 500_000, (2, 1, 1));
         first.posterior_draw_sha256 = duplicate_digest;
         first.baseline.posterior_draw_sha256 = duplicate_digest;
         first.alternative.posterior_draw_sha256 = duplicate_digest;
-        let mut second = make_draw(1, 101, 2, 52, 500_000, 2, 3, 3);
+        let mut second = make_draw(1, 101, 2, 52, 500_000, (2, 3, 3));
         second.posterior_draw_sha256 = duplicate_digest;
         second.baseline.posterior_draw_sha256 = duplicate_digest;
         second.alternative.posterior_draw_sha256 = duplicate_digest;
@@ -922,11 +920,11 @@ mod tests {
     #[test]
     fn posterior_draws_do_not_inflate_individual_count() {
         let first = cohort(vec![
-            make_draw(1, 101, 1, 51, 500_000, 2, 1, 1),
-            make_draw(1, 101, 2, 52, 500_000, 2, 3, 3),
+            make_draw(1, 101, 1, 51, 500_000, (2, 1, 1)),
+            make_draw(1, 101, 2, 52, 500_000, (2, 3, 3)),
         ]);
         let second = cohort(vec![
-            make_draw(2, 102, 1, 61, 1_000_000, -1, -1, -1),
+            make_draw(2, 102, 1, 61, 1_000_000, (-1, -1, -1)),
         ]);
         let result = evaluate_posterior_effect_cohort(&[first, second]).unwrap();
 
@@ -942,9 +940,9 @@ mod tests {
     #[test]
     fn cohort_profile_drift_rejects() {
         let first = cohort(vec![
-            make_draw(1, 101, 1, 51, 1_000_000, 2, 1, 1),
+            make_draw(1, 101, 1, 51, 1_000_000, (2, 1, 1)),
         ]);
-        let mut second_draw = make_draw(2, 102, 1, 61, 1_000_000, 2, 1, 1);
+        let mut second_draw = make_draw(2, 102, 1, 61, 1_000_000, (2, 1, 1));
         second_draw.context.model_configuration_sha256 = digest(88);
         second_draw.baseline.branch.model_configuration_sha256 = digest(88);
         second_draw.alternative.branch.model_configuration_sha256 = digest(88);
@@ -960,7 +958,7 @@ mod tests {
 
     #[test]
     fn missing_or_not_applied_branch_is_not_silently_dropped() {
-        let mut draw = make_draw(1, 101, 1, 51, 1_000_000, 2, 1, 1);
+        let mut draw = make_draw(1, 101, 1, 51, 1_000_000, (2, 1, 1));
         draw.alternative.branch.disposition = BranchDisposition::NotApplied {
             terminal_at_us: 10_500,
             reason: NonApplicationReason::DeadlineMiss,
@@ -975,8 +973,8 @@ mod tests {
     #[test]
     fn latent_and_rollout_distributions_remain_separate() {
         let input = cohort(vec![
-            make_draw(1, 101, 1, 51, 500_000, 2, 1, -5),
-            make_draw(1, 101, 2, 52, 500_000, 2, 3, 7),
+            make_draw(1, 101, 1, 51, 500_000, (2, 1, -5)),
+            make_draw(1, 101, 2, 52, 500_000, (2, 3, 7)),
         ]);
         let result = evaluate_posterior_individual_cohort(&input).unwrap();
         assert_eq!(result.latent_effects.min_effect_units, 1);
@@ -988,8 +986,8 @@ mod tests {
     #[test]
     fn weighted_mean_and_error_numerators_are_exact() {
         let input = cohort(vec![
-            make_draw(1, 101, 1, 51, 250_000, 2, 0, 0),
-            make_draw(1, 101, 2, 52, 750_000, 2, 4, 6),
+            make_draw(1, 101, 1, 51, 250_000, (2, 0, 0)),
+            make_draw(1, 101, 2, 52, 750_000, (2, 4, 6)),
         ]);
         let result = evaluate_posterior_individual_cohort(&input).unwrap();
         assert_eq!(result.latent_effects.weighted_effect_sum_units_ppm, 3_000_000);
