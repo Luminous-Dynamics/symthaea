@@ -745,10 +745,8 @@ pub fn deliver_qualified_stream_label_v1(
             None,
             StreamingUpdateDispositionV1::PendingPredictionMissing,
             sorted,
-            &before,
-            &before,
+            (&before, &before),
             None,
-            false,
         );
     };
 
@@ -774,10 +772,8 @@ pub fn deliver_qualified_stream_label_v1(
             Some(&prediction_receipt),
             disposition,
             reasons,
-            &before,
-            &before,
+            (&before, &before),
             None,
-            false,
         );
     }
 
@@ -792,10 +788,8 @@ pub fn deliver_qualified_stream_label_v1(
             Some(&prediction_receipt),
             StreamingUpdateDispositionV1::Rejected,
             vec![StreamingUpdateReasonV1::InvalidStreamingNumericInput],
-            &before,
-            &before,
+            (&before, &before),
             None,
-            false,
         );
     }
 
