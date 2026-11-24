@@ -1,0 +1,281 @@
+{
+  "schema_version": "bh-egb-stage-a-action-allocation-v0.1",
+  "fixture_kind": "synthetic_exact_finite_world",
+  "title": "Decision value versus information gain for Stage-A research-action allocation",
+  "claim_boundary": "Synthetic known-answer policy control only; not an EGB prior, physical prediction, calibrated Symthaea forecast, or real research-cost estimate.",
+  "utility_scale": "unitless decision utility in [0,1]",
+  "cost_scale": "synthetic research-cost units",
+  "scenarios": [
+    {
+      "scenario_id": "decision_sensitive_two_state",
+      "description": "Two equally likely rival explanations require opposite downstream decisions.",
+      "state_ids": [
+        "H_A",
+        "H_B"
+      ],
+      "prior_probabilities": {
+        "H_A": 0.5,
+        "H_B": 0.5
+      },
+      "decisions": [
+        {
+          "decision_id": "choose_A",
+          "utility_by_state": {
+            "H_A": 1,
+            "H_B": 0
+          }
+        },
+        {
+          "decision_id": "choose_B",
+          "utility_by_state": {
+            "H_A": 0,
+            "H_B": 1
+          }
+        }
+      ],
+      "baseline_best_decision": "choose_A",
+      "baseline_best_expected_utility": 0.5,
+      "risk_policy": {
+        "max_worst_case_loss": 0.4,
+        "loss_scale": "same unitless utility scale"
+      },
+      "actions": [
+        {
+          "action_id": "cheap_symbolic_derivation",
+          "kind": "symbolic_derivation",
+          "cost_units": 0.1,
+          "outcome_likelihoods": [
+            {
+              "outcome_id": "derives_A",
+              "likelihood_by_state": {
+                "H_A": 1,
+                "H_B": 0
+              }
+            },
+            {
+              "outcome_id": "derives_B",
+              "likelihood_by_state": {
+                "H_A": 0,
+                "H_B": 1
+              }
+            }
+          ],
+          "expected_post_action_best_utility": 1,
+          "gross_evsi": 0.5,
+          "net_decision_value": 0.4,
+          "worst_case_loss": 0.1,
+          "risk_gate": {
+            "eligible": true,
+            "reason": "worst-case loss is within the frozen 0.4 limit"
+          },
+          "expected_information_gain_bits": 1,
+          "expected_best_decision_after_action": "choose_A or choose_B according to the observed derivation"
+        },
+        {
+          "action_id": "degenerate_parameter_bvp",
+          "kind": "numerical_bvp",
+          "cost_units": 0.15,
+          "outcome_likelihoods": [
+            {
+              "outcome_id": "same_endpoint_response",
+              "likelihood_by_state": {
+                "H_A": 1,
+                "H_B": 1
+              }
+            }
+          ],
+          "expected_post_action_best_utility": 0.5,
+          "gross_evsi": 0,
+          "net_decision_value": -0.15,
+          "worst_case_loss": 0.05,
+          "risk_gate": {
+            "eligible": true,
+            "reason": "within risk limit but outcome does not distinguish the hypotheses"
+          },
+          "expected_information_gain_bits": 0,
+          "expected_best_decision_after_action": "choose_A"
+        },
+        {
+          "action_id": "precision_refinement",
+          "kind": "numerical_precision_increase",
+          "cost_units": 0.02,
+          "outcome_likelihoods": [
+            {
+              "outcome_id": "unchanged_shared_signature",
+              "likelihood_by_state": {
+                "H_A": 1,
+                "H_B": 1
+              }
+            }
+          ],
+          "expected_post_action_best_utility": 0.5,
+          "gross_evsi": 0,
+          "net_decision_value": -0.02,
+          "worst_case_loss": 0,
+          "risk_gate": {
+            "eligible": true,
+            "reason": "within risk limit but no decision-relevant discrimination"
+          },
+          "expected_information_gain_bits": 0,
+          "expected_best_decision_after_action": "choose_A"
+        },
+        {
+          "action_id": "expensive_discriminating_bvp",
+          "kind": "independent_numerical_bvp",
+          "cost_units": 0.7,
+          "outcome_likelihoods": [
+            {
+              "outcome_id": "supports_A",
+              "likelihood_by_state": {
+                "H_A": 1,
+                "H_B": 0
+              }
+            },
+            {
+              "outcome_id": "supports_B",
+              "likelihood_by_state": {
+                "H_A": 0,
+                "H_B": 1
+              }
+            }
+          ],
+          "expected_post_action_best_utility": 1,
+          "gross_evsi": 0.5,
+          "net_decision_value": -0.2,
+          "worst_case_loss": 0.1,
+          "risk_gate": {
+            "eligible": true,
+            "reason": "within risk limit but net decision value is negative"
+          },
+          "expected_information_gain_bits": 1,
+          "expected_best_decision_after_action": "choose_A or choose_B according to the observed result"
+        },
+        {
+          "action_id": "risky_discriminating_probe",
+          "kind": "high_downside_experiment",
+          "cost_units": 0.05,
+          "outcome_likelihoods": [
+            {
+              "outcome_id": "supports_A",
+              "likelihood_by_state": {
+                "H_A": 1,
+                "H_B": 0
+              }
+            },
+            {
+              "outcome_id": "supports_B",
+              "likelihood_by_state": {
+                "H_A": 0,
+                "H_B": 1
+              }
+            }
+          ],
+          "expected_post_action_best_utility": 1,
+          "gross_evsi": 0.5,
+          "net_decision_value": 0.45,
+          "worst_case_loss": 0.8,
+          "risk_gate": {
+            "eligible": false,
+            "reason": "worst-case loss 0.8 exceeds frozen limit 0.4"
+          },
+          "expected_information_gain_bits": 1,
+          "expected_best_decision_after_action": "must not be purchased while the risk gate fails"
+        }
+      ],
+      "known_answer": {
+        "selected_action": "cheap_symbolic_derivation",
+        "rationale": "It has the greatest eligible net decision value (+0.40); the cheaper precision check and degenerate BVP do not change the decision; the more expensive perfectly discriminating BVP has negative net value; the risky probe is vetoed despite positive net value.",
+        "required_invariants": [
+          "The Stage-A objective selects by prospective downstream decision value net of direct cost.",
+          "Information gain alone does not justify purchasing an action.",
+          "A failed downside-risk gate cannot be overridden by positive gross or net value.",
+          "The selected action is frozen before any outcome is observed."
+        ]
+      }
+    },
+    {
+      "scenario_id": "information_without_decision_value",
+      "description": "A diagnostic perfectly identifies the hidden state but the same downstream decision is optimal in every state.",
+      "state_ids": [
+        "H_A",
+        "H_B"
+      ],
+      "prior_probabilities": {
+        "H_A": 0.5,
+        "H_B": 0.5
+      },
+      "decisions": [
+        {
+          "decision_id": "continue_common_plan",
+          "utility_by_state": {
+            "H_A": 1,
+            "H_B": 1
+          }
+        },
+        {
+          "decision_id": "stop",
+          "utility_by_state": {
+            "H_A": 0,
+            "H_B": 0
+          }
+        }
+      ],
+      "baseline_best_decision": "continue_common_plan",
+      "baseline_best_expected_utility": 1,
+      "risk_policy": {
+        "max_worst_case_loss": 0.4,
+        "loss_scale": "same unitless utility scale"
+      },
+      "actions": [
+        {
+          "action_id": "perfect_mechanism_diagnostic",
+          "kind": "mechanism_diagnostic",
+          "cost_units": 0.04,
+          "outcome_likelihoods": [
+            {
+              "outcome_id": "identifies_A",
+              "likelihood_by_state": {
+                "H_A": 1,
+                "H_B": 0
+              }
+            },
+            {
+              "outcome_id": "identifies_B",
+              "likelihood_by_state": {
+                "H_A": 0,
+                "H_B": 1
+              }
+            }
+          ],
+          "expected_post_action_best_utility": 1,
+          "gross_evsi": 0,
+          "net_decision_value": -0.04,
+          "worst_case_loss": 0,
+          "risk_gate": {
+            "eligible": true,
+            "reason": "within risk limit"
+          },
+          "expected_information_gain_bits": 1,
+          "expected_best_decision_after_action": "continue_common_plan in either outcome"
+        }
+      ],
+      "known_answer": {
+        "selected_action": "none",
+        "rationale": "The diagnostic removes one bit of state uncertainty, but it cannot change the optimal decision. Decision EVSI is zero and net value is negative.",
+        "required_invariants": [
+          "Positive information gain is not interchangeable with positive decision value.",
+          "A diagnostic that cannot change any qualified downstream decision should not be purchased solely because it resolves uncertainty."
+        ]
+      }
+    }
+  ],
+  "computation_contract": {
+    "outcome_probability": "P(o) = sum_s prior(s) * P(o | s)",
+    "posterior": "P(s | o) = prior(s) * P(o | s) / P(o), for P(o) > 0",
+    "state_value": "V(posterior) = max_d sum_s posterior(s) * utility(d,s)",
+    "gross_evsi": "sum_o P(o) * V(posterior_after_o) - V(prior)",
+    "net_decision_value": "gross_evsi - direct_cost_units - declared_opportunity_cost_units",
+    "purchase_rule": "action must have positive net decision value and pass every predeclared risk/legality/budget gate",
+    "unknown_policy": "If outcome probabilities, likelihoods, costs, or utilities are not calibrated/declared for the episode, do not invent them; emit bounded/ranked qualitative forecast or UNRESOLVED."
+  }
+}
