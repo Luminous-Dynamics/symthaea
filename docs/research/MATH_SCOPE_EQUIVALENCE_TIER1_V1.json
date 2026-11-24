@@ -1,0 +1,308 @@
+{
+  "schema_version": "1.0.0",
+  "pairs": [
+    {
+      "candidate": {
+        "pair_id": "SCOPE-T1-EXACT-IDENTITY-001",
+        "source": {
+          "repository": "Luminous-Dynamics/symthaea",
+          "revision": "synthetic-v1",
+          "declaration": "SCOPE-T1-EXACT-IDENTITY-001",
+          "task_family": "tier1_boolean_scope_controls"
+        },
+        "base": {
+          "hypotheses": [
+            {
+              "op": "atom",
+              "name": "P"
+            }
+          ],
+          "premises": [
+            {
+              "op": "atom",
+              "name": "R"
+            }
+          ],
+          "conclusion": {
+            "op": "atom",
+            "name": "S"
+          }
+        },
+        "variant": {
+          "hypotheses": [
+            {
+              "op": "atom",
+              "name": "P"
+            }
+          ],
+          "premises": [
+            {
+              "op": "atom",
+              "name": "R"
+            }
+          ],
+          "conclusion": {
+            "op": "atom",
+            "name": "S"
+          }
+        }
+      },
+      "evaluator_only": {
+        "normalizer_version": "scope-tier1-unordered-hypotheses-v1",
+        "expected_relation": "exact_identity",
+        "adjudication_authority": "frozen_fixture_oracle",
+        "evidence_refs": [
+          "synthetic-control:SCOPE-T1-EXACT-IDENTITY-001"
+        ]
+      }
+    },
+    {
+      "candidate": {
+        "pair_id": "SCOPE-T1-HYPOTHESIS-PERMUTATION-001",
+        "source": {
+          "repository": "Luminous-Dynamics/symthaea",
+          "revision": "synthetic-v1",
+          "declaration": "SCOPE-T1-HYPOTHESIS-PERMUTATION-001",
+          "task_family": "tier1_boolean_scope_controls"
+        },
+        "base": {
+          "hypotheses": [
+            {
+              "op": "atom",
+              "name": "P"
+            },
+            {
+              "op": "atom",
+              "name": "Q"
+            }
+          ],
+          "premises": [
+            {
+              "op": "atom",
+              "name": "R"
+            }
+          ],
+          "conclusion": {
+            "op": "atom",
+            "name": "S"
+          }
+        },
+        "variant": {
+          "hypotheses": [
+            {
+              "op": "atom",
+              "name": "Q"
+            },
+            {
+              "op": "atom",
+              "name": "P"
+            }
+          ],
+          "premises": [
+            {
+              "op": "atom",
+              "name": "R"
+            }
+          ],
+          "conclusion": {
+            "op": "atom",
+            "name": "S"
+          }
+        }
+      },
+      "evaluator_only": {
+        "normalizer_version": "scope-tier1-unordered-hypotheses-v1",
+        "expected_relation": "tier1_hypothesis_permutation_equivalent",
+        "adjudication_authority": "frozen_fixture_oracle",
+        "evidence_refs": [
+          "synthetic-control:SCOPE-T1-HYPOTHESIS-PERMUTATION-001"
+        ]
+      }
+    },
+    {
+      "candidate": {
+        "pair_id": "SCOPE-T1-PREMISE-ORDER-001",
+        "source": {
+          "repository": "Luminous-Dynamics/symthaea",
+          "revision": "synthetic-v1",
+          "declaration": "SCOPE-T1-PREMISE-ORDER-001",
+          "task_family": "tier1_boolean_scope_controls"
+        },
+        "base": {
+          "hypotheses": [
+            {
+              "op": "atom",
+              "name": "P"
+            }
+          ],
+          "premises": [
+            {
+              "op": "atom",
+              "name": "R"
+            },
+            {
+              "op": "atom",
+              "name": "S"
+            }
+          ],
+          "conclusion": {
+            "op": "atom",
+            "name": "T"
+          }
+        },
+        "variant": {
+          "hypotheses": [
+            {
+              "op": "atom",
+              "name": "P"
+            }
+          ],
+          "premises": [
+            {
+              "op": "atom",
+              "name": "S"
+            },
+            {
+              "op": "atom",
+              "name": "R"
+            }
+          ],
+          "conclusion": {
+            "op": "atom",
+            "name": "T"
+          }
+        }
+      },
+      "evaluator_only": {
+        "normalizer_version": "scope-tier1-unordered-hypotheses-v1",
+        "expected_relation": "not_tier1_equivalent",
+        "adjudication_authority": "frozen_fixture_oracle",
+        "evidence_refs": [
+          "synthetic-control:SCOPE-T1-PREMISE-ORDER-001"
+        ]
+      }
+    },
+    {
+      "candidate": {
+        "pair_id": "SCOPE-T1-HYPOTHESIS-MULTIPLICITY-001",
+        "source": {
+          "repository": "Luminous-Dynamics/symthaea",
+          "revision": "synthetic-v1",
+          "declaration": "SCOPE-T1-HYPOTHESIS-MULTIPLICITY-001",
+          "task_family": "tier1_boolean_scope_controls"
+        },
+        "base": {
+          "hypotheses": [
+            {
+              "op": "atom",
+              "name": "P"
+            },
+            {
+              "op": "atom",
+              "name": "P"
+            }
+          ],
+          "premises": [
+            {
+              "op": "atom",
+              "name": "R"
+            }
+          ],
+          "conclusion": {
+            "op": "atom",
+            "name": "S"
+          }
+        },
+        "variant": {
+          "hypotheses": [
+            {
+              "op": "atom",
+              "name": "P"
+            }
+          ],
+          "premises": [
+            {
+              "op": "atom",
+              "name": "R"
+            }
+          ],
+          "conclusion": {
+            "op": "atom",
+            "name": "S"
+          }
+        }
+      },
+      "evaluator_only": {
+        "normalizer_version": "scope-tier1-unordered-hypotheses-v1",
+        "expected_relation": "not_tier1_equivalent",
+        "adjudication_authority": "frozen_fixture_oracle",
+        "evidence_refs": [
+          "synthetic-control:SCOPE-T1-HYPOTHESIS-MULTIPLICITY-001"
+        ]
+      }
+    },
+    {
+      "candidate": {
+        "pair_id": "SCOPE-T1-CONCLUSION-CHANGE-001",
+        "source": {
+          "repository": "Luminous-Dynamics/symthaea",
+          "revision": "synthetic-v1",
+          "declaration": "SCOPE-T1-CONCLUSION-CHANGE-001",
+          "task_family": "tier1_boolean_scope_controls"
+        },
+        "base": {
+          "hypotheses": [
+            {
+              "op": "atom",
+              "name": "P"
+            },
+            {
+              "op": "atom",
+              "name": "Q"
+            }
+          ],
+          "premises": [
+            {
+              "op": "atom",
+              "name": "R"
+            }
+          ],
+          "conclusion": {
+            "op": "atom",
+            "name": "S"
+          }
+        },
+        "variant": {
+          "hypotheses": [
+            {
+              "op": "atom",
+              "name": "P"
+            },
+            {
+              "op": "atom",
+              "name": "Q"
+            }
+          ],
+          "premises": [
+            {
+              "op": "atom",
+              "name": "R"
+            }
+          ],
+          "conclusion": {
+            "op": "atom",
+            "name": "T"
+          }
+        }
+      },
+      "evaluator_only": {
+        "normalizer_version": "scope-tier1-unordered-hypotheses-v1",
+        "expected_relation": "not_tier1_equivalent",
+        "adjudication_authority": "frozen_fixture_oracle",
+        "evidence_refs": [
+          "synthetic-control:SCOPE-T1-CONCLUSION-CHANGE-001"
+        ]
+      }
+    }
+  ]
+}
