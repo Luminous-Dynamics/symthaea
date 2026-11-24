@@ -976,6 +976,7 @@ pub struct CaoOcrcBernoulliOptimizerResultV1 {
     pub expected_tracking_load: f64,
     pub risk_bound: f64,
     pub optimizer_iterations: u32,
+    pub corollary_one_regime_applicable: bool,
 }
 
 pub fn full_tracking_proxy_survival_v1(
@@ -990,6 +991,124 @@ pub fn optimized_bernoulli_proxy_survival_v1(
     vec![result.optimal_track_probability; result.maximum_delay_rounds as usize + 1]
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CaoOcrcBoundRegimeV1 {
+    CapacityConstrainedTheoremOne,
+    UnlimitedTrackingOcrcLemmaTwo,
+    NoFeedbackCapacityZero,
+    ImmediateFeedbackSpecialCase,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct CaoOcrcRiskBoundV1 {
+    pub regime: CaoOcrcBoundRegimeV1,
+    pub horizon_rounds: u64,
+    pub score_upper_bound: f64,
+    pub learning_rate: f64,
+    pub tracking_capacity: usize,
+    pub maximum_delay_rounds: u64,
+    pub tracking_load: Option<f64>,
+    pub minimum_proxy_survival: Option<f64>,
+    pub bound: Option<f64>,
+    pub corollary_one_regime_applicable: bool,
+}
+
+/// Computes the exact displayed risk bound for the regime covered by
+/// Theorem 1 (capacity-constrained) or Lemma 2 (unlimited tracking).
+/// It refuses to silently apply either expression outside its assumptions.
+pub fn compute_ca_ocrc_risk_bound_v1(
+    policy: &CaoOcrcPolicyV1,
+    horizon_rounds: u64,
+) -> Result<CaoOcrcRiskBoundV1, CaoOcrcErrorV1> {
+    validate_policy(policy)?;
+    if horizon_rounds == 0 {
+        return Err(CaoOcrcErrorV1("risk-bound horizon must be positive".into()));
+    }
+    let d_max = policy.maximum_feedback_delay_rounds;
+    let k = policy.tracking_capacity;
+    let common = policy.score_upper_bound / (policy.learning_rate * horizon_rounds as f64);
+
+    if k == 0 {
+        return Ok(CaoOcrcRiskBoundV1 {
+            regime: CaoOcrcBoundRegimeV1::NoFeedbackCapacityZero,
+            horizon_rounds,
+            score_upper_bound: policy.score_upper_bound,
+            learning_rate: policy.learning_rate,
+            tracking_capacity: k,
+            maximum_delay_rounds: d_max,
+            tracking_load: None,
+            minimum_proxy_survival: None,
+            bound: None,
+            corollary_one_regime_applicable: false,
+        });
+    }
+    if d_max == 0 {
+        return Ok(CaoOcrcRiskBoundV1 {
+            regime: CaoOcrcBoundRegimeV1::ImmediateFeedbackSpecialCase,
+            horizon_rounds,
+            score_upper_bound: policy.score_upper_bound,
+            learning_rate: policy.learning_rate,
+            tracking_capacity: k,
+            maximum_delay_rounds: d_max,
+            tracking_load: Some(0.0),
+            minimum_proxy_survival: Some(policy.proxy_survival[0]),
+            bound: if policy.proxy_survival[0] == 1.0 { Some(common) } else { None },
+            corollary_one_regime_applicable: false,
+        });
+    }
+    let tracking_load: f64 = policy.proxy_survival.iter().skip(1).sum();
+    if tracking_load > k as f64 + 1.0e-12 {
+        return Err(CaoOcrcErrorV1(
+            "CA-OCRC Theorem 1 requires proxy tracking load <= capacity".into(),
+        ));
+    }
+    let minimum_survival = *policy.proxy_survival.last().unwrap();
+    if k as u64 >= d_max + 1 {
+        let bound = common + (d_max + 1) as f64 / horizon_rounds as f64;
+        return Ok(CaoOcrcRiskBoundV1 {
+            regime: CaoOcrcBoundRegimeV1::UnlimitedTrackingOcrcLemmaTwo,
+            horizon_rounds,
+            score_upper_bound: policy.score_upper_bound,
+            learning_rate: policy.learning_rate,
+            tracking_capacity: k,
+            maximum_delay_rounds: d_max,
+            tracking_load: Some(tracking_load),
+            minimum_proxy_survival: Some(minimum_survival),
+            bound: Some(bound),
+            corollary_one_regime_applicable: false,
+        });
+    }
+    if k as u64 > d_max {
+        return Err(CaoOcrcErrorV1(
+            "capacity regime is inconsistent with maximum-delay boundary".into(),
+        ));
+    }
+    if minimum_survival <= 0.0 || tracking_load <= 0.0 {
+        return Err(CaoOcrcErrorV1(
+            "Theorem 1 needs positive F(d_max) and positive tracking load".into(),
+        ));
+    }
+    let x = tracking_load / k as f64;
+    let h = x - 1.0 - x.ln();
+    let bound = common
+        + (k as f64 + 1.0) / (minimum_survival * horizon_rounds as f64)
+        + (-k as f64 * h).exp();
+    Ok(CaoOcrcRiskBoundV1 {
+        regime: CaoOcrcBoundRegimeV1::CapacityConstrainedTheoremOne,
+        horizon_rounds,
+        score_upper_bound: policy.score_upper_bound,
+        learning_rate: policy.learning_rate,
+        tracking_capacity: k,
+        maximum_delay_rounds: d_max,
+        tracking_load: Some(tracking_load),
+        minimum_proxy_survival: Some(minimum_survival),
+        bound: Some(bound),
+        corollary_one_regime_applicable: (1..=d_max).contains(&(k as u64))
+            && d_max <= horizon_rounds,
+    })
+}
+
 pub fn optimize_ca_ocrc_bernoulli_proxy_v1(
     capacity: usize,
     maximum_delay_rounds: u64,
@@ -999,7 +1118,6 @@ pub fn optimize_ca_ocrc_bernoulli_proxy_v1(
 ) -> Result<CaoOcrcBernoulliOptimizerResultV1, CaoOcrcErrorV1> {
     if capacity == 0
         || maximum_delay_rounds == 0
-        || maximum_delay_rounds >= horizon_rounds
         || horizon_rounds == 0
         || !score_upper_bound.is_finite()
         || score_upper_bound <= 0.0
@@ -1058,6 +1176,7 @@ pub fn optimize_ca_ocrc_bernoulli_proxy_v1(
         expected_tracking_load: maximum_delay_rounds as f64 * p,
         risk_bound,
         optimizer_iterations: iterations,
+        corollary_one_regime_applicable: maximum_delay_rounds <= horizon_rounds,
     })
 }
 
