@@ -4,12 +4,10 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 
 use symthaea_semiconductor::benchmark::{
-    DELAYED_ACI_DELIVERY_SCHEMA_V1, DELAYED_ACI_PREDICTION_SCHEMA_V1,
-    DELAYED_ACI_POLICY_SCHEMA_V1, DelayedAciLabelDeliveryV1, DelayedAciPolicyV1,
-    DelayedAciPredictionInputV1, LabelConsumptionEligibilityReportV1,
-    LabelConsumptionEligibilityV1, LabelEvidenceFrontierV1,
-    create_delayed_aci_engine_v1, deliver_delayed_aci_feedback_v1,
-    issue_delayed_aci_prediction_v1,
+    DELAYED_ACI_DELIVERY_SCHEMA_V1, DELAYED_ACI_POLICY_SCHEMA_V1, DELAYED_ACI_PREDICTION_SCHEMA_V1,
+    DelayedAciLabelDeliveryV1, DelayedAciPolicyV1, DelayedAciPredictionInputV1,
+    LabelConsumptionEligibilityReportV1, LabelConsumptionEligibilityV1, LabelEvidenceFrontierV1,
+    create_delayed_aci_engine_v1, deliver_delayed_aci_feedback_v1, issue_delayed_aci_prediction_v1,
 };
 
 fn digest(ch: char) -> String {
@@ -20,7 +18,12 @@ fn hash_json<T: Serialize>(value: &T) -> String {
     format!("{:x}", Sha256::digest(serde_json::to_vec(value).unwrap()))
 }
 
-fn eligible_report(label_id: &str, event_id: &str, value: f64, payload: &str) -> LabelConsumptionEligibilityReportV1 {
+fn eligible_report(
+    label_id: &str,
+    event_id: &str,
+    value: f64,
+    payload: &str,
+) -> LabelConsumptionEligibilityReportV1 {
     let mut report = LabelConsumptionEligibilityReportV1 {
         schema: "luminous.semi-bench.label-consumption-report.v1".into(),
         label_id: label_id.into(),
@@ -49,7 +52,13 @@ fn eligible_report(label_id: &str, event_id: &str, value: f64, payload: &str) ->
     report
 }
 
-fn label_delivery(step: u64, sample: &str, event: &str, label: &str, value: f64) -> DelayedAciLabelDeliveryV1 {
+fn label_delivery(
+    step: u64,
+    sample: &str,
+    event: &str,
+    label: &str,
+    value: f64,
+) -> DelayedAciLabelDeliveryV1 {
     let payload = digest('f');
     DelayedAciLabelDeliveryV1 {
         schema: DELAYED_ACI_DELIVERY_SCHEMA_V1.into(),
@@ -72,7 +81,7 @@ fn label_delivery(step: u64, sample: &str, event: &str, label: &str, value: f64)
 #[test]
 fn interleaved_controller_matches_independent_long_stream_recursion() {
     let delay = 3_u64;
-    let sample_count =  ninety_six();
+    let sample_count = ninety_six();
     let target = 0.20;
     let gamma = 0.10;
     let policy = DelayedAciPolicyV1 {
@@ -90,7 +99,8 @@ fn interleaved_controller_matches_independent_long_stream_recursion() {
         "aci-clock",
         &digest('a'),
         policy.clone(),
-    ).unwrap();
+    )
+    .unwrap();
 
     let mut oracle_lanes = vec![target; delay as usize];
     let mut issued = Vec::new();
@@ -113,7 +123,8 @@ fn interleaved_controller_matches_independent_long_stream_recursion() {
                     &format!("label-{prediction_index}"),
                     value,
                 ),
-            ).unwrap();
+            )
+            .unwrap();
             assert_eq!(update.disposition, DelayedAciDispositionV1::Updated);
 
             let lane = prediction.lane as usize;
@@ -168,12 +179,8 @@ fn k0_feedback_does_not_change_alpha_or_claim_intact_fixed_delay_assumptions() {
         maximum_miscoverage: 0.40,
         feedback_delay_steps: 1,
     };
-    let mut engine = create_delayed_aci_engine_v1(
-        "aci-k0-control",
-        "aci-clock",
-        &digest('a'),
-        policy,
-    ).unwrap();
+    let mut engine =
+        create_delayed_aci_engine_v1("aci-k0-control", "aci-clock", &digest('a'), policy).unwrap();
     let input = DelayedAciPredictionInputV1 {
         schema: DELAYED_ACI_PREDICTION_SCHEMA_V1.into(),
         sample_id: "s0".into(),
@@ -217,7 +224,9 @@ fn k0_feedback_does_not_change_alpha_or_claim_intact_fixed_delay_assumptions() {
     assert!(!engine.state.fixed_delay_assumptions_intact);
 }
 
-fn ninety_six() -> usize { 96 }
+fn ninety_six() -> usize {
+    96
+}
 
 fn outcome(index: usize) -> f64 {
     const VALUES: [f64; 8] = [0.1, 0.2, 1.5, -1.6, 0.4, 1.1, -0.3, 0.8];
