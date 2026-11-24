@@ -1,0 +1,477 @@
+{
+  "schema_version": "decision_equivalent_imagination.fixture.v0.1",
+  "status": "research_contract_fixture_not_benchmark_result",
+  "utility_direction": "higher_is_better",
+  "epsilon": 0,
+  "fixtures": [
+    {
+      "id": "F1_DECISION_INVARIANT_UNCERTAINTY",
+      "kind": "exact_finite_decision",
+      "worlds": [
+        {
+          "world_id": "W0",
+          "action_utilities": {
+            "A": 100,
+            "B": 70
+          }
+        },
+        {
+          "world_id": "W1",
+          "action_utilities": {
+            "A": 80,
+            "B": 60
+          }
+        }
+      ],
+      "candidate_profiles": [
+        {
+          "profile_id": "low_budget",
+          "worlds_distinguished": false,
+          "chosen_action": "A",
+          "illustrative_cost_units": 10
+        },
+        {
+          "profile_id": "full_budget",
+          "worlds_distinguished": true,
+          "chosen_action_by_world": {
+            "W0": "A",
+            "W1": "A"
+          },
+          "illustrative_cost_units": 25
+        },
+        {
+          "profile_id": "excess_budget",
+          "worlds_distinguished": true,
+          "chosen_action_by_world": {
+            "W0": "A",
+            "W1": "A"
+          },
+          "illustrative_cost_units": 80
+        }
+      ],
+      "expected": {
+        "low_budget_regret_by_world": {
+          "W0": 0,
+          "W1": 0
+        },
+        "low_budget_mean_regret": 0,
+        "full_budget_mean_regret": 0,
+        "additional_decision_value_of_full_budget": 0,
+        "excess_budget_dominated_by": "full_budget",
+        "note": "All costs are abstract fixture units, not measured time or energy."
+      }
+    },
+    {
+      "id": "F2_DECISION_BOUNDARY_AMBIGUITY",
+      "kind": "exact_finite_decision",
+      "world_probability": {
+        "W0": 0.5,
+        "W1": 0.5
+      },
+      "worlds": [
+        {
+          "world_id": "W0",
+          "action_utilities": {
+            "A": 100,
+            "B": 70
+          }
+        },
+        {
+          "world_id": "W1",
+          "action_utilities": {
+            "A": 20,
+            "B": 85
+          }
+        }
+      ],
+      "candidate_profiles": [
+        {
+          "profile_id": "low_budget",
+          "worlds_distinguished": false,
+          "chosen_action": "A",
+          "illustrative_cost_units": 10
+        },
+        {
+          "profile_id": "resolved_budget",
+          "worlds_distinguished": true,
+          "chosen_action_by_world": {
+            "W0": "A",
+            "W1": "B"
+          },
+          "illustrative_cost_units": 25
+        }
+      ],
+      "expected": {
+        "low_budget_regret_by_world": {
+          "W0": 0,
+          "W1": 65
+        },
+        "low_budget_mean_regret": 32.5,
+        "resolved_budget_regret_by_world": {
+          "W0": 0,
+          "W1": 0
+        },
+        "resolved_budget_mean_regret": 0,
+        "decision_value_before_cost": 32.5,
+        "note": "Probability weights are evaluator-side fixture values and are not candidate-visible."
+      }
+    },
+    {
+      "id": "F3_HARD_CONSTRAINT_OVERRIDE",
+      "kind": "authority_and_feasibility",
+      "candidate_action": "A",
+      "predicted_utility": 1000000,
+      "independent_admissibility": false,
+      "fallback_authorized": true,
+      "expected": {
+        "disposition": "DIRECT_FALLBACK",
+        "candidate_action_executed": false
+      },
+      "negative_control": {
+        "fallback_authorized": false,
+        "expected_disposition": "BLOCK"
+      }
+    },
+    {
+      "id": "F4_UNSUPPORTED_TARGET_RANGE",
+      "kind": "horizon_scope",
+      "supported_prediction_range_steps": 10,
+      "requested_target_lookahead_steps": 20,
+      "planner_lookahead_steps": 30,
+      "expected": {
+        "model_supports_target": false,
+        "allowed_dispositions": [
+          "QUALIFIED_NEARER_SUBGOAL",
+          "REQUEST_FRESH_EVIDENCE",
+          "DIRECT_FALLBACK",
+          "UNKNOWN_DEFER"
+        ],
+        "forbidden_inference": "planner_lookahead_expands_supported_prediction_range"
+      }
+    },
+    {
+      "id": "F5_OPTIMIZER_EXPLOITABILITY",
+      "kind": "adversarial_search",
+      "setup": {
+        "behaviour_distribution_average_error": "matched_between_models",
+        "model_a": "no_localized_optimism_pocket",
+        "model_b": "narrow_optimism_pocket_discoverable_by_adaptive_search"
+      },
+      "expected": {
+        "report_selected_action_error_separately": true,
+        "report_realized_selected_action_regret": true,
+        "report_search_induced_exploitability": true,
+        "expanded_search_inherits_prior_qualification": false
+      }
+    },
+    {
+      "id": "F6_FUTURE_DECISION_REPRESENTATION_COLLISION",
+      "kind": "temporal_representation",
+      "setup": {
+        "full_states": [
+          "S0",
+          "S1"
+        ],
+        "compressed_representation": "Z",
+        "current_action": "A",
+        "later_observation": "O",
+        "later_best_action": {
+          "S0": "B",
+          "S1": "C"
+        }
+      },
+      "expected": {
+        "current_decision_may_be_sufficient": true,
+        "future_decision_is_sufficient": false,
+        "single_snapshot_pass_authorizes_future_horizon": false
+      }
+    },
+    {
+      "id": "F7_LOCAL_GAIN_CLOSED_LOOP_HARM",
+      "kind": "fixed_context_vs_branch_evolving_decision_value",
+      "setup": {
+        "utility_direction": "higher_is_better",
+        "same_initial_world": true,
+        "same_exogenous_forcing_commitment": true,
+        "branch_specific_state_evolution_after_action_divergence": true,
+        "shared_prerecorded_future_state_trajectory_after_divergence": false,
+        "low_budget": {
+          "chosen_action": "A",
+          "step_zero_utility": 0,
+          "future_utility_after_own_action_branch": 10,
+          "illustrative_compute_cost_units": 10
+        },
+        "higher_budget": {
+          "chosen_action": "B",
+          "step_zero_utility": 2,
+          "future_utility_after_own_action_branch": -20,
+          "illustrative_compute_cost_units": 20
+        }
+      },
+      "expected": {
+        "fixed_context_local_value_of_higher_budget": 2,
+        "low_budget_episode_utility_before_cost": 10,
+        "higher_budget_episode_utility_before_cost": -18,
+        "closed_loop_value_of_higher_budget": -28,
+        "local_value_sign": "positive",
+        "closed_loop_value_sign": "negative",
+        "sign_reversal": true,
+        "candidate_visible_future_trajectory": false,
+        "interpretation": "A higher-budget profile improves the immediate fixed-context decision but its selected action enters a worse future branch. Local escalation value is not closed-loop episode value.",
+        "note": "All utilities and compute costs are illustrative finite-fixture values, not measured robot outcomes or a claim about DEEP's results."
+      }
+    },
+    {
+      "id": "F8_INDIVIDUAL_EFFECT_MEAN_CANCELLATION",
+      "kind": "history_abduction_and_individual_counterfactual_effect",
+      "setup": {
+        "utility_direction": "higher_is_better",
+        "branch_point_observation_id": "O_SHARED",
+        "same_branch_point_observation_for_all_individuals": true,
+        "full_factual_history_distinguishes_individuals": true,
+        "same_exogenous_conditions_within_each_individual_intervention_pair": true,
+        "different_individuals_have_distinct_exogenous_state": true,
+        "intervention_pair": [
+          "BASELINE",
+          "ALTERNATIVE"
+        ],
+        "individuals": [
+          {
+            "individual_id": "U0",
+            "factual_history_id": "H0",
+            "exogenous_state_id": "E0",
+            "utility": {
+              "BASELINE": 0,
+              "ALTERNATIVE": 10
+            },
+            "true_individual_effect": 10,
+            "latent_readout_effect": 10,
+            "rollout_effect_prediction": 0
+          },
+          {
+            "individual_id": "U1",
+            "factual_history_id": "H1",
+            "exogenous_state_id": "E1",
+            "utility": {
+              "BASELINE": 0,
+              "ALTERNATIVE": -10
+            },
+            "true_individual_effect": -10,
+            "latent_readout_effect": -10,
+            "rollout_effect_prediction": 0
+          }
+        ],
+        "effect_convention": "utility(ALTERNATIVE) - utility(BASELINE)"
+      },
+      "expected": {
+        "population_mean_true_effect": 0,
+        "population_mean_rollout_effect": 0,
+        "population_mean_effect_error": 0,
+        "mean_absolute_individual_effect": 10,
+        "latent_individual_effect_mae": 0,
+        "rollout_individual_effect_mae": 10,
+        "branch_point_only_predictor_individual_mae": 10,
+        "latent_retains_history_specific_effect": true,
+        "rollout_preserves_history_specific_effect": false,
+        "average_effect_accuracy_is_not_individual_counterfactual_accuracy": true,
+        "interpretation": "The average intervention effect is exactly predicted because opposite individual effects cancel. The branch-point observation alone cannot distinguish the individuals. A history-conditioned latent readout recovers both signs, but the rollout collapses them to the mean. This localizes loss to the latent-to-imagined-effect path rather than the stored representation.",
+        "note": "All values are exact illustrative fixture units, not an empirical estimate of an abducible share or a measured Symthaea result."
+      }
+    },
+    {
+      "id": "F9_COUNTERFACTUAL_FORMULATION_GATE",
+      "kind": "third_rung_environment_and_measurement_prerequisites",
+      "setup": {
+        "source": "Okita, Where Individual-Effect Information Survives: A Diagnostic Ladder for World Models (2026-11-04), DOI 10.3390/make8110363",
+        "conditions": {
+          "C1_action_efficacy": "The outcome must depend on the intervention.",
+          "C2_branchability": "Multiple interventions must be executable from the same exogenous condition / restored branch point.",
+          "C3_individual_dependence": "The individual treatment effect must vary across individuals.",
+          "C4_measurability": "The abducible-share estimate must clear its preregistered estimation floor.",
+          "C5_convergence": "The estimate must stabilize as independent individuals are added."
+        },
+        "paper_specific_floor_rule": {
+          "ratio_threshold": 3,
+          "expression": "A >= 3 * phi",
+          "status": "source-specific proposed criterion; not a universal law or default Symthaea threshold"
+        }
+      },
+      "cases": [
+        {
+          "case_id": "NO_ACTION_EFFICACY",
+          "conditions": {
+            "C1": false,
+            "C2": true,
+            "C3": true,
+            "C4": true,
+            "C5": true
+          },
+          "expected": "NO_INDIVIDUAL_EFFECT_TARGET"
+        },
+        {
+          "case_id": "NO_BRANCHABILITY",
+          "conditions": {
+            "C1": true,
+            "C2": false,
+            "C3": true,
+            "C4": true,
+            "C5": true
+          },
+          "expected": "NO_PAIRED_COUNTERFACTUAL_REFERENCE"
+        },
+        {
+          "case_id": "NO_INDIVIDUAL_DEPENDENCE",
+          "conditions": {
+            "C1": true,
+            "C2": true,
+            "C3": false,
+            "C4": true,
+            "C5": true
+          },
+          "expected": "SECOND_RUNG_ONLY_NO_INDIVIDUAL_EFFECT"
+        },
+        {
+          "case_id": "ESTIMATION_FLOOR_DOMINATES",
+          "conditions": {
+            "C1": true,
+            "C2": true,
+            "C3": true,
+            "C4": false,
+            "C5": true
+          },
+          "example": {
+            "abducible_share": 0.12,
+            "estimation_floor": 0.05,
+            "share_to_floor_ratio": 2.4
+          },
+          "expected": "QUESTION_EXISTS_BUT_MAGNITUDE_UNREADABLE"
+        },
+        {
+          "case_id": "NOT_CONVERGED",
+          "conditions": {
+            "C1": true,
+            "C2": true,
+            "C3": true,
+            "C4": true,
+            "C5": false
+          },
+          "expected": "NO_ENVIRONMENT_LEVEL_CERTIFICATE"
+        },
+        {
+          "case_id": "ALL_PREREQUISITES_MET",
+          "conditions": {
+            "C1": true,
+            "C2": true,
+            "C3": true,
+            "C4": true,
+            "C5": true
+          },
+          "expected": "ELIGIBLE_FOR_INDIVIDUAL_EFFECT_RETENTION_DIAGNOSTIC"
+        }
+      ],
+      "expected": {
+        "no_case_alone_authorizes_physical_action": true,
+        "failed_prerequisites_suppress_third_rung_claim": true,
+        "missing_condition_is_not_pass": true,
+        "source_specific_threshold_must_be_preregistered_and_sensitivity_tested": true,
+        "note": "Passing C1-C5 only makes the declared measurement eligible for interpretation under its assumptions; it does not establish universal validity or deployment safety."
+      }
+    },
+    {
+      "id": "F10_CAUSAL_ERROR_DECISION_SUFFICIENT",
+      "kind": "individual_effect_fidelity_vs_epsilon_decision_sufficiency",
+      "setup": {
+        "utility_direction": "higher_is_better",
+        "actions": [
+          "A_BASELINE",
+          "B_ALTERNATIVE"
+        ],
+        "epsilon": 10,
+        "individuals": [
+          {
+            "individual_id": "U0",
+            "utility": {
+              "A_BASELINE": 100,
+              "B_ALTERNATIVE": 110
+            },
+            "true_effect_B_minus_A": 10
+          },
+          {
+            "individual_id": "U1",
+            "utility": {
+              "A_BASELINE": 100,
+              "B_ALTERNATIVE": 90
+            },
+            "true_effect_B_minus_A": -10
+          }
+        ],
+        "collapsed_rollout_effect_prediction_by_individual": {
+          "U0": 0,
+          "U1": 0
+        },
+        "candidate_selected_action": "A_BASELINE"
+      },
+      "expected": {
+        "population_mean_true_effect": 0,
+        "population_mean_predicted_effect": 0,
+        "individual_effect_mae": 10,
+        "common_epsilon_good_action_set": [
+          "A_BASELINE",
+          "B_ALTERNATIVE"
+        ],
+        "worst_case_candidate_regret": 10,
+        "decision_sufficient": true,
+        "individual_counterfactual_fidelity": false,
+        "interpretation": "The rollout is individually wrong by 10 for both individuals, but both actions remain epsilon-good at epsilon=10. The representation may compress this distinction for this declared decision task, while the causal-fidelity failure must remain visible."
+      },
+      "note": "Exact finite illustrative utilities; epsilon shares the same declared utility units. This is not a physical-safety or causal-identification certificate."
+    },
+    {
+      "id": "F11_CAUSAL_ERROR_DECISION_CRITICAL",
+      "kind": "individual_effect_fidelity_vs_epsilon_decision_sufficiency",
+      "setup": {
+        "utility_direction": "higher_is_better",
+        "actions": [
+          "A_BASELINE",
+          "B_ALTERNATIVE"
+        ],
+        "epsilon": 0,
+        "individuals": [
+          {
+            "individual_id": "U0",
+            "utility": {
+              "A_BASELINE": 100,
+              "B_ALTERNATIVE": 110
+            },
+            "true_effect_B_minus_A": 10
+          },
+          {
+            "individual_id": "U1",
+            "utility": {
+              "A_BASELINE": 100,
+              "B_ALTERNATIVE": 90
+            },
+            "true_effect_B_minus_A": -10
+          }
+        ],
+        "collapsed_rollout_effect_prediction_by_individual": {
+          "U0": 0,
+          "U1": 0
+        },
+        "candidate_selected_action": "A_BASELINE"
+      },
+      "expected": {
+        "population_mean_true_effect": 0,
+        "population_mean_predicted_effect": 0,
+        "individual_effect_mae": 10,
+        "common_epsilon_good_action_set": [],
+        "worst_case_candidate_regret": 10,
+        "decision_sufficient": false,
+        "individual_counterfactual_fidelity": false,
+        "required_disposition": "REFINE_REPRESENTATION_OR_ACQUIRE_EVIDENCE_OR_DEFER",
+        "interpretation": "The same individual-effect error now crosses the exact decision boundary. No single action is optimal in both individuals, so collapsing their history is no longer decision-sufficient."
+      },
+      "note": "Same worlds and predictions as F10; only epsilon changes. This isolates task tolerance as the reason representation detail becomes decision-relevant."
+    }
+  ]
+}
