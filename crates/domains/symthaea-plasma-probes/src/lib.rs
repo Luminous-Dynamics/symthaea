@@ -105,6 +105,11 @@ pub enum ContractError {
     NonFiniteSymplecticBasis,
     #[error("canonical symplectic pair defect exceeds the declared tolerance")]
     InvalidSymplecticBasis,
+    #[error("invalid sensor/actuator timing field {field}: {reason}")]
+    InvalidControlTimingField {
+        field: &'static str,
+        reason: &'static str,
+    },
     #[error("invalid KIRD record field {field}: {reason}")]
     InvalidKirdField {
         field: &'static str,
@@ -1565,6 +1570,252 @@ impl OpenBoundaryCoordinateLift {
             distance_to_upper_boundary: 1.0 - xi,
         })
     }
+}
+
+/// Audited timing envelope for a sparse, asynchronous kinetic-control interface.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SensorActuatorTimingSummary {
+    pub contract_id: String,
+    pub diagnostic_channel_count: usize,
+    pub actuator_channel_count: usize,
+    pub maximum_observation_age_seconds: f64,
+    pub maximum_actuator_delivery_delay_seconds: f64,
+    pub controller_update_period_seconds: f64,
+    pub controller_deadline_seconds: f64,
+    pub controller_worst_case_execution_seconds: f64,
+}
+
+/// Parse and semantically audit a sensor/actuator timing contract.
+pub fn validate_sensor_actuator_timing_contract_json(
+    input: &str,
+) -> Result<SensorActuatorTimingSummary, ContractError> {
+    let value: serde_json::Value =
+        serde_json::from_str(input).map_err(|error| ContractError::JsonParse(error.to_string()))?;
+    validate_sensor_actuator_timing_contract_value(&value)
+}
+
+/// Audit timing consistency after the caller has validated the JSON Schema.
+///
+/// This checks that the declared observation age covers the sample period,
+/// transport latency, jitter and clock skew; that every channel fits within the
+/// controller's maximum observation age; that WCET fits the deadline and update
+/// period; and that hidden full-state access is prohibited.
+pub fn validate_sensor_actuator_timing_contract_value(
+    value: &serde_json::Value,
+) -> Result<SensorActuatorTimingSummary, ContractError> {
+    if timing_string(value, "schema_version")? != "0.1" {
+        return Err(control_timing_error(
+            "schema_version",
+            "unsupported timing contract version",
+        ));
+    }
+    let contract_id = timing_string(value, "contract_id")?.to_owned();
+    if contract_id.trim().is_empty() {
+        return Err(control_timing_error(
+            "contract_id",
+            "contract identity must be non-empty",
+        ));
+    }
+
+    let clock_skew =
+        timing_number(value, "clock.maximum_clock_skew_seconds")?;
+    if clock_skew < 0.0 {
+        return Err(control_timing_error(
+            "clock.maximum_clock_skew_seconds",
+            "clock skew must be non-negative",
+        ));
+    }
+
+    let diagnostics = timing_array(value, "diagnostics")?;
+    let actuators = timing_array(value, "actuators")?;
+    if diagnostics.is_empty() || actuators.is_empty() {
+        return Err(control_timing_error(
+            "diagnostics",
+            "at least one diagnostic and actuator channel are required",
+        ));
+    }
+
+    let mut diagnostic_ids = BTreeSet::new();
+    let mut maximum_observation_age_seconds = 0.0_f64;
+    for diagnostic in diagnostics {
+        let channel_id = timing_string(diagnostic, "channel_id")?;
+        if !diagnostic_ids.insert(channel_id.to_owned()) {
+            return Err(control_timing_error(
+                "diagnostics.channel_id",
+                "diagnostic channel IDs must be unique",
+            ));
+        }
+        let sampling_period =
+            timing_number(diagnostic, "sampling_period_seconds")?;
+        let transport_latency =
+            timing_number(diagnostic, "transport_latency_seconds")?;
+        let timestamp_age_bound =
+            timing_number(diagnostic, "timestamp_age_bound_seconds")?;
+        let jitter = timing_number(diagnostic, "jitter_bound_seconds")?;
+        let noise_std = timing_number(diagnostic, "noise_std")?;
+        if sampling_period <= 0.0
+            || transport_latency < 0.0
+            || timestamp_age_bound < 0.0
+            || jitter < 0.0
+            || noise_std < 0.0
+        {
+            return Err(control_timing_error(
+                "diagnostics",
+                "sampling period must be positive and latency/age/jitter/noise non-negative",
+            ));
+        }
+        let minimum_age_bound = sampling_period + transport_latency + jitter + clock_skew;
+        let allowance = 1.0e-12_f64.max(minimum_age_bound.abs() * 1.0e-10);
+        if !minimum_age_bound.is_finite()
+            || timestamp_age_bound + allowance < minimum_age_bound
+        {
+            return Err(control_timing_error(
+                "diagnostics.timestamp_age_bound_seconds",
+                "age bound must cover sampling period + transport latency + jitter + clock skew",
+            ));
+        }
+        maximum_observation_age_seconds =
+            maximum_observation_age_seconds.max(timestamp_age_bound);
+    }
+
+    let mut actuator_ids = BTreeSet::new();
+    let mut maximum_actuator_delivery_delay_seconds = 0.0_f64;
+    for actuator in actuators {
+        let channel_id = timing_string(actuator, "channel_id")?;
+        if !actuator_ids.insert(channel_id.to_owned()) {
+            return Err(control_timing_error(
+                "actuators.channel_id",
+                "actuator channel IDs must be unique",
+            ));
+        }
+        let update_period = timing_number(actuator, "update_period_seconds")?;
+        let delivery_delay = timing_number(actuator, "delivery_delay_seconds")?;
+        let bandwidth = timing_number(actuator, "bandwidth_hz")?;
+        let amplitude = timing_number(actuator, "maximum_amplitude")?;
+        let slew = timing_number(actuator, "maximum_slew_per_second")?;
+        if update_period <= 0.0
+            || delivery_delay < 0.0
+            || bandwidth <= 0.0
+            || amplitude <= 0.0
+            || slew <= 0.0
+        {
+            return Err(control_timing_error(
+                "actuators",
+                "actuator update period/bandwidth/amplitude/slew must be positive and delay non-negative",
+            ));
+        }
+        maximum_actuator_delivery_delay_seconds =
+            maximum_actuator_delivery_delay_seconds.max(delivery_delay);
+    }
+
+    let controller_update_period =
+        timing_number(value, "controller.update_period_seconds")?;
+    let controller_wcet =
+        timing_number(value, "controller.worst_case_execution_seconds")?;
+    let controller_deadline = timing_number(value, "controller.deadline_seconds")?;
+    let maximum_allowed_observation_age =
+        timing_number(value, "controller.maximum_observation_age_seconds")?;
+    if controller_update_period <= 0.0
+        || controller_wcet < 0.0
+        || controller_deadline <= 0.0
+        || maximum_allowed_observation_age <= 0.0
+    {
+        return Err(control_timing_error(
+            "controller",
+            "controller update/deadline/age must be positive and WCET non-negative",
+        ));
+    }
+    if controller_wcet + clock_skew > controller_deadline
+        || controller_deadline > controller_update_period
+    {
+        return Err(control_timing_error(
+            "controller.deadline_seconds",
+            "WCET plus clock skew must fit the deadline, which must fit the update period",
+        ));
+    }
+    if maximum_observation_age_seconds > maximum_allowed_observation_age {
+        return Err(control_timing_error(
+            "controller.maximum_observation_age_seconds",
+            "controller age allowance is smaller than a diagnostic channel's declared age bound",
+        ));
+    }
+    if timing_bool(value, "controller.full_state_access")? {
+        return Err(control_timing_error(
+            "controller.full_state_access",
+            "deployment interface cannot expose hidden full state",
+        ));
+    }
+    if timing_bool(value, "claim_boundary.closed_loop_experiment_performed")?
+        || timing_bool(value, "claim_boundary.stability_claimed")?
+    {
+        return Err(control_timing_error(
+            "claim_boundary",
+            "synthetic timing fixtures cannot claim closed-loop or stability results",
+        ));
+    }
+
+    Ok(SensorActuatorTimingSummary {
+        contract_id,
+        diagnostic_channel_count: diagnostics.len(),
+        actuator_channel_count: actuators.len(),
+        maximum_observation_age_seconds,
+        maximum_actuator_delivery_delay_seconds,
+        controller_update_period_seconds: controller_update_period,
+        controller_deadline_seconds: controller_deadline,
+        controller_worst_case_execution_seconds: controller_wcet,
+    })
+}
+
+fn control_timing_error(field: &'static str, reason: &'static str) -> ContractError {
+    ContractError::InvalidControlTimingField { field, reason }
+}
+
+fn timing_value<'a>(
+    root: &'a serde_json::Value,
+    field: &'static str,
+) -> Result<&'a serde_json::Value, ContractError> {
+    let mut current = root;
+    for segment in field.split('.') {
+        current = current
+            .get(segment)
+            .ok_or_else(|| control_timing_error(field, "required field is missing"))?;
+    }
+    Ok(current)
+}
+
+fn timing_string<'a>(
+    root: &'a serde_json::Value,
+    field: &'static str,
+) -> Result<&'a str, ContractError> {
+    timing_value(root, field)?
+        .as_str()
+        .ok_or_else(|| control_timing_error(field, "must be a string"))
+}
+
+fn timing_bool(root: &serde_json::Value, field: &'static str) -> Result<bool, ContractError> {
+    timing_value(root, field)?
+        .as_bool()
+        .ok_or_else(|| control_timing_error(field, "must be a boolean"))
+}
+
+fn timing_number(root: &serde_json::Value, field: &'static str) -> Result<f64, ContractError> {
+    let number = timing_value(root, field)?
+        .as_f64()
+        .ok_or_else(|| control_timing_error(field, "must be a finite number"))?;
+    if !number.is_finite() {
+        return Err(control_timing_error(field, "must be finite"));
+    }
+    Ok(number)
+}
+
+fn timing_array<'a>(
+    root: &'a serde_json::Value,
+    field: &'static str,
+) -> Result<&'a [serde_json::Value], ContractError> {
+    timing_value(root, field)?
+        .as_array()
+        .map(Vec::as_slice)
+        .ok_or_else(|| control_timing_error(field, "must be an array"))
 }
 
 /// Result of projecting a kinetic fluctuation into a weighted discrete micro-space.
@@ -3346,6 +3597,78 @@ mod tests {
         let report = validate_kird_record_value(&value).unwrap();
         assert_eq!(report.record_status, "physical_measurement");
         assert_eq!(report.physical_gate_status, "UNKNOWN");
+    }
+
+    const SENSOR_ACTUATOR_FIXTURE: &str = include_str!(
+        "../../../../benchmarks/plasma/control-interface/fixtures/synthetic-multirate-interface-v0.1.json"
+    );
+
+    fn sensor_actuator_fixture_value() -> serde_json::Value {
+        serde_json::from_str(SENSOR_ACTUATOR_FIXTURE).unwrap()
+    }
+
+    #[test]
+    fn sensor_actuator_timing_auditor_accepts_consistent_asynchronous_fixture() {
+        let report =
+            validate_sensor_actuator_timing_contract_json(SENSOR_ACTUATOR_FIXTURE).unwrap();
+        assert_eq!(report.contract_id, "KINETIC-MULTIRATE-INTERFACE-SYNTHETIC-001");
+        assert_eq!(report.diagnostic_channel_count, 2);
+        assert_eq!(report.actuator_channel_count, 1);
+        assert_eq!(report.maximum_observation_age_seconds, 0.04);
+        assert_eq!(report.maximum_actuator_delivery_delay_seconds, 0.006);
+        assert_eq!(report.controller_update_period_seconds, 0.02);
+    }
+
+    #[test]
+    fn sensor_actuator_timing_auditor_rejects_understated_timestamp_age() {
+        let mut value = sensor_actuator_fixture_value();
+        value["diagnostics"][0]["timestamp_age_bound_seconds"] = serde_json::json!(0.01);
+        assert!(matches!(
+            validate_sensor_actuator_timing_contract_value(&value),
+            Err(ContractError::InvalidControlTimingField {
+                field: "diagnostics.timestamp_age_bound_seconds",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn sensor_actuator_timing_auditor_rejects_missed_controller_deadline() {
+        let mut value = sensor_actuator_fixture_value();
+        value["controller"]["deadline_seconds"] = serde_json::json!(0.001);
+        assert!(matches!(
+            validate_sensor_actuator_timing_contract_value(&value),
+            Err(ContractError::InvalidControlTimingField {
+                field: "controller.deadline_seconds",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn sensor_actuator_timing_auditor_rejects_hidden_full_state_access() {
+        let mut value = sensor_actuator_fixture_value();
+        value["controller"]["full_state_access"] = serde_json::json!(true);
+        assert!(matches!(
+            validate_sensor_actuator_timing_contract_value(&value),
+            Err(ContractError::InvalidControlTimingField {
+                field: "controller.full_state_access",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn sensor_actuator_timing_auditor_rejects_duplicate_channel_ids() {
+        let mut value = sensor_actuator_fixture_value();
+        value["diagnostics"][1]["channel_id"] = value["diagnostics"][0]["channel_id"].clone();
+        assert!(matches!(
+            validate_sensor_actuator_timing_contract_value(&value),
+            Err(ContractError::InvalidControlTimingField {
+                field: "diagnostics.channel_id",
+                ..
+            })
+        ));
     }
 
     #[test]
