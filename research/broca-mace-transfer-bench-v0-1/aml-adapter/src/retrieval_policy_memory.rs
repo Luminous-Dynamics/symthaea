@@ -723,6 +723,7 @@ impl RetrievalPolicyMemoryV1 {
             if stored.receipt.created_at_unix > promoted_at_unix {
                 return Err(RetrievalPolicyRejectV1::InvalidPromotionTime);
             }
+        }
         let has_acquisition_only_status = selected.iter().any(|stored| {
             matches!(
                 stored.receipt.stop_reason,
