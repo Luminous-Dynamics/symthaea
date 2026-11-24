@@ -62,7 +62,7 @@ The controller is an online state mechanism, not a substitute for an immutable c
 
 ## Test coverage
 
-The initial tests include:
+The initial 15 unit tests and 2 independent integration-oracle tests include:
 1. fixed-delay interleaved lanes;
 2. an in-interval result increases alpha toward narrower future intervals;
 3. a miss decreases alpha to widen future intervals;
@@ -74,7 +74,12 @@ The initial tests include:
 9. deterministic replay of a frozen event schedule;
 10. accepted revision is idempotent;
 11. label/report availability chronology;
-12. tampered pending prediction receipt rejection.
+12. tampered pending prediction receipt rejection;
+13. missed feedback deadline invalidates assumptions before the next prediction;
+14. label availability cannot predate the measurement event;
+15. historical interval receipt remains unchanged after feedback.
+
+The two independent integration tests compare a 96-step, three-lane interleaved recurrence against a separate scalar reference implementation and verify a K0 negative control.
 
 Additional testing is required for the alpha bounds under long adversarial streams, missing-feedback expiry, common-cause shifts, and numerical edge cases before considering the module complete.
 
