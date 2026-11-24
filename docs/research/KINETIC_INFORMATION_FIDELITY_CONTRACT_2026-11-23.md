@@ -941,3 +941,28 @@ The immediate deliverable is a fair, falsifiable contract. Implementation and co
 6. Burles, S. & Camporeale, E. (2026). *The machine learning approach to moment closure relations for plasma: a review*. Journal of Plasma Physics 92, E100. https://doi.org/10.1017/S0022377826102013
 7. Smilei 5.1 documentation. https://smileipic.github.io/Smilei/
 8. WarpX 26.11 documentation. https://warpx.readthedocs.io/en/26.11/
+
+
+## Coupled unstable-subspace authority (CUSA)
+
+New companion programme: [#13564 — qualify coupled unstable-mode observability and controllability](https://github.com/Luminous-Dynamics/symthaea/issues/13564).
+
+The scalar and single-complex-mode timing oracles are necessary but not sufficient for multi-mode kinetic control. A controller can have nonzero gain on every coordinate and still fail to observe or actuate the complete unstable invariant subspace. A set of measurements can also be individually informative while remaining linearly dependent.
+
+The first executable increment is in [PR #13405](https://github.com/Luminous-Dynamics/symthaea/pull/13405): a manufactured two-state discrete system
+
+\[
+x_{k+1}=Ax_k+Bu_k,\qquad y_{j,k}=C_jx_k+v_{j,k}
+\]
+
+with two diagnostic channels (independent noise variances), one actuator direction, sample/update strides and sensor/actuator delivery delays. It computes the finite-horizon noise-whitened observability Gramian and the controllability Gramian using only measurements/commands admitted by their actual arrival time. Both eigenvalues of the declared two-state subsystem must be unstable for this first oracle.
+
+Three schema-checked known-answer cases distinguish:
+1. distinct unstable growth factors, independent sensing and one actuator direction: observable and controllable;
+2. collinear diagnostic rows with a delay leaving only one admitted sample: controllable but unobservable;
+3. repeated unstable eigenspace, full sensing and a rank-one actuator direction: observable but uncontrollable.
+
+The report includes minimum/maximum Gramian eigenvalues, finite condition numbers where defined, sample/command counts, and separate observable / controllable / authority-qualified decisions. Non-finite Gramian/eigenvalue arithmetic is rejected.
+
+**Claim ceiling:** this is a manufactured finite-dimensional linear interface oracle. It does not establish observability or stabilizability of nonlinear Vlasov–Poisson, and its A/B/C matrices must eventually come from an independently qualified kinetic linearization or dispersion analysis. Closed-loop nonlinear replay remains a separate mandatory gate. A timing-contract pass cannot substitute for unstable-subspace authority; a linear authority pass cannot substitute for actuator physics or full-order stability.
+
