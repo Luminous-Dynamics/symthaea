@@ -2,7 +2,7 @@
 //! temporal-grounding scorer. It reuses the canonical one-to-one interval
 //! matcher and never computes a second temporal alignment.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
@@ -44,6 +44,8 @@ pub enum RevisionActionV1 {
 pub struct RevisionCaseV2 {
     pub schema: String,
     pub case_id: String,
+    /// Shared stable identifier for the same query/model trial across evidence arms.
+    pub experiment_unit_id: String,
     pub model_identity_sha256: String,
     pub prompt_sha256: String,
     pub adapter_sha256: String,
@@ -98,6 +100,7 @@ pub struct RevisionScoreSnapshotV1 {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct RevisionReportV1 {
     pub case_id: String,
+    pub experiment_unit_id: String,
     pub evaluator_version: String,
     pub query_id: String,
     pub audio_sha256: String,
@@ -113,6 +116,22 @@ pub struct RevisionReportV1 {
     pub preservation_violation: bool,
     pub absence_improved: Option<bool>,
     pub absence_regressed: Option<bool>,
+}
+
+/// Paired evidence-ablation result for one frozen query/model unit.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct MatchedEvidenceContrastV1 {
+    pub experiment_unit_id: String,
+    pub no_evidence_case_id: String,
+    pub local_evidence_case_id: String,
+    pub yoked_evidence_case_id: String,
+    pub local_minus_no_evidence_f1: Option<f64>,
+    pub local_minus_yoked_f1: Option<f64>,
+    pub local_minus_no_evidence_count_gated_f1: Option<f64>,
+    pub local_minus_yoked_count_gated_f1: Option<f64>,
+    pub local_revision_gain: Option<f64>,
+    pub yoked_revision_gain: Option<f64>,
+    pub local_beats_yoked: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -138,6 +157,119 @@ pub struct RevisionAggregateV1 {
     pub correct_absence_after: usize,
     pub absence_improvements: usize,
     pub absence_regressions: usize,
+}
+
+/// Compare one no-evidence, one local-evidence and one yoked-evidence
+/// case per experiment unit. The three cases must share the same raw draft,
+/// frozen truth, scoring plan, model, prompt and adapter. This is the key
+/// control for attributing incremental value to retrieval rather than to a
+/// changed draft or a different inference configuration.
+pub fn compare_matched_evidence_arms(
+    cases: &[RevisionCaseV2],
+) -> Result<Vec<MatchedEvidenceContrastV1>, String> {
+    let mut grouped: BTreeMap<&str, Vec<&RevisionCaseV2>> = BTreeMap::new();
+    for case in cases {
+        require_text(&case.experiment_unit_id, "experiment_unit_id")?;
+        grouped
+            .entry(case.experiment_unit_id.as_str())
+            .or_default()
+            .push(case);
+    }
+
+    let mut results = Vec::with_capacity(grouped.len());
+    for (unit_id, group) in grouped {
+        if group.len() != 3 {
+            return Err(format!(
+                "experiment unit {unit_id} must have exactly three evidence arms"
+            ));
+        }
+        let mut by_condition = BTreeMap::new();
+        let mut case_ids = BTreeSet::new();
+        for case in &group {
+            if !case_ids.insert(case.case_id.as_str()) {
+                return Err(format!("experiment unit {unit_id} repeats a case_id"));
+            }
+            if by_condition.insert(case.evidence_condition, *case).is_some() {
+                return Err(format!("experiment unit {unit_id} repeats an evidence condition"));
+            }
+        }
+        let no_evidence = by_condition
+            .get(&EvidenceConditionV1::NoEvidence)
+            .copied()
+            .ok_or_else(|| format!("experiment unit {unit_id} lacks the no-evidence arm"))?;
+        let local = by_condition
+            .get(&EvidenceConditionV1::LocalRetrieved)
+            .copied()
+            .ok_or_else(|| format!("experiment unit {unit_id} lacks the local-evidence arm"))?;
+        let yoked = by_condition
+            .get(&EvidenceConditionV1::YokedRetrieved)
+            .copied()
+            .ok_or_else(|| format!("experiment unit {unit_id} lacks the yoked-evidence arm"))?;
+
+        for arm in [local, yoked] {
+            if arm.experiment_unit_id != no_evidence.experiment_unit_id
+                || arm.truth != no_evidence.truth
+                || arm.plan != no_evidence.plan
+                || arm.draft_prediction != no_evidence.draft_prediction
+                || arm.model_identity_sha256 != no_evidence.model_identity_sha256
+                || arm.prompt_sha256 != no_evidence.prompt_sha256
+                || arm.adapter_sha256 != no_evidence.adapter_sha256
+            {
+                return Err(format!(
+                    "experiment unit {unit_id} is not a matched evidence-ablation triplet"
+                ));
+            }
+        }
+
+        let no_report = audit_revision_v2(no_evidence)?;
+        let local_report = audit_revision_v2(local)?;
+        let yoked_report = audit_revision_v2(yoked)?;
+        let local_minus_no_evidence_f1 = paired_delta(
+            local_report.final_score.f1,
+            no_report.final_score.f1,
+        );
+        let local_minus_yoked_f1 =
+            paired_delta(local_report.final_score.f1, yoked_report.final_score.f1);
+        let local_minus_no_evidence_count_gated_f1 = paired_delta(
+            local_report.final_score.count_gated_f1,
+            no_report.final_score.count_gated_f1,
+        );
+        let local_minus_yoked_count_gated_f1 = paired_delta(
+            local_report.final_score.count_gated_f1,
+            yoked_report.final_score.count_gated_f1,
+        );
+        let local_revision_gain = local_report.f1_delta;
+        let yoked_revision_gain = yoked_report.f1_delta;
+        let local_beats_yoked = match (
+            local_revision_gain,
+            yoked_revision_gain,
+            local_minus_yoked_f1,
+        ) {
+            (Some(local_gain), Some(yoked_gain), Some(final_delta)) => {
+                Some(local_gain > yoked_gain + EPSILON && final_delta > EPSILON)
+            }
+            _ => None,
+        };
+
+        results.push(MatchedEvidenceContrastV1 {
+            experiment_unit_id: unit_id.to_owned(),
+            no_evidence_case_id: no_evidence.case_id.clone(),
+            local_evidence_case_id: local.case_id.clone(),
+            yoked_evidence_case_id: yoked.case_id.clone(),
+            local_minus_no_evidence_f1,
+            local_minus_yoked_f1,
+            local_minus_no_evidence_count_gated_f1,
+            local_minus_yoked_count_gated_f1,
+            local_revision_gain,
+            yoked_revision_gain,
+            local_beats_yoked,
+        });
+    }
+    Ok(results)
+}
+
+fn paired_delta(left: Option<f64>, right: Option<f64>) -> Option<f64> {
+    left.zip(right).map(|(left, right)| left - right)
 }
 
 /// Parse and score a self-contained revision case using the exact
@@ -195,6 +327,7 @@ pub fn audit_revision_v2(case: &RevisionCaseV2) -> Result<RevisionReportV1, Stri
     let legacy_case = RevisionCaseV1 {
         schema: REVISION_SCHEMA.into(),
         case_id: case.case_id.clone(),
+        experiment_unit_id: case.experiment_unit_id.clone(),
         model_identity_sha256: case.model_identity_sha256.clone(),
         prompt_sha256: case.prompt_sha256.clone(),
         adapter_sha256: case.adapter_sha256.clone(),
@@ -302,6 +435,7 @@ pub fn audit_revision(case: &RevisionCaseV1) -> Result<RevisionReportV1, String>
 
     Ok(RevisionReportV1 {
         case_id: case.case_id.clone(),
+        experiment_unit_id: case.experiment_unit_id.clone(),
         evaluator_version: case.draft.evaluator_version.clone(),
         query_id: case.draft.query_id.clone(),
         audio_sha256: case.draft.audio_sha256.clone(),
