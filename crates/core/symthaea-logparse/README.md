@@ -1,53 +1,74 @@
 # symthaea-logparse
 
-**Status:** Phase 1 spike scaffold (Apr 13, 2026). Not production.
+**Status:** Research prototype. Not production; not a qualified threat-detection product.
 
-Part of the MSP / IT-ops wedge. See `memory/project_msp_wedge.md` for the full
-three-product ladder, kill criteria, and strategic context.
+This crate explores whether structured Windows Event Log and syslog records can be normalized and analysed using Symthaea's hyperdimensional computing (HDC) representations. It is part of the MSP / IT-operations research programme.
 
-## What this crate is
+> [!CAUTION]
+> ## Generalization is currently poor
+>
+> The historical supervised probe achieved **0.817 ± 0.018 event-level 5-fold CV on the same sbousseaden corpus**, but only **0.168 accuracy on OTRF Security-Datasets**, against **0.143 chance across seven labels**. Several classes were near zero. The existing report concludes that the model learned corpus/collection fingerprints rather than robust attack-tactic semantics.
+>
+> The 0.815/0.817 results are in-distribution only. They are **not** enterprise detection performance, production readiness or SOTA evidence. See [PHASE1_RESULTS.md](PHASE1_RESULTS.md) for the full record and caveats.
 
-A Phase 1 spike to answer one question:
+## Current evidence
 
-> Can Symthaea's HDC encoder cluster real IT-ops logs (Windows Event Log +
-> syslog) into useful semantic categories?
+| Experiment | Result | Interpretation |
+|---|---:|---|
+| EVTX corpus parsed | 261 files, 35,807 events | Research corpus |
+| Phase 1 labeled sample | 1,000 events, 8 tactic labels | Stratified event sample |
+| Nearest-centroid purity | 0.451 | Below original 0.50 criterion |
+| HDBSCAN purity | 0.565 at min cluster 10 | Passes that corpus-specific clustering criterion only |
+| Linear probe, single event split | 0.815 | In-distribution only |
+| Linear probe, 5-fold event CV | 0.817 ± 0.018 | Same-corpus in-distribution |
+| Cross-corpus OOD | 0.168, chance 0.143 | Severe generalization failure |
 
-If the answer is yes (cluster purity ≥ 0.50 on a labeled Evtx corpus), the
-"autonomous Tier-2 engineer" thesis survives and Phase 2 (fleshing out
-`symthaea-support` + wiring `reasoning_engine` to a typed `SystemStateGraph`)
-is justified.
+These numbers come from different experiment designs and should not be combined into a single performance claim.
 
-If the answer is no, the thesis dies cheaply here instead of after months of
-product work.
+## Implementation status and limitations
 
-## What this crate is NOT
+- **Ingestion:** offline EVTX parsing and RFC5424/RFC3164 syslog parsing exist.
+- **Normalization:** `LogEvent` captures source, severity, provider, event ID, component, fields, host and optional research label.
+- **Encoding:** current `encoder.rs` uses a local, deterministic 16,384-dimensional bipolar MAP-I reference implementation. The `hdc-encoder` feature is still a placeholder; actual integration with `symthaea-core` is not established.
+- **Clustering:** nearest-centroid and HDBSCAN evaluation code exist.
+- **Supervised probe:** a pure-Rust logistic probe exists. The updated `supervised_probe` runner carries source EVTX filename as split-only provenance and supports grouped file-disjoint 80/20 holdout and five-fold CV. The grouping information is not encoded as a model feature.
+- **Not implemented:** production Windows ETW collector, production SIEM/EDR pipeline, live endpoint response, independently qualified detection logic, enterprise benign baseline, or SOC workflow.
 
-- Not a production log collector. Evtx parsing runs offline on staged corpora.
-- Not wired to `symthaea-core`'s real HDC encoder yet — uses a local reference
-  implementation with matching dimensionality (16,384) and binding operators.
-  The `hdc-encoder` feature is a placeholder for the swap.
-- Not a clustering library. The benchmark example uses a nearest-centroid
-  baseline. Real HDBSCAN integration is a TODO.
+A file-disjoint split reduces one source of leakage. It does not establish host-, incident-, campaign-, time- or cross-corpus generalization. The known OOD failure remains until independently reproduced and repaired.
 
-## Layout
+## Running the experiments
 
-| File | Purpose |
-|---|---|
-| `src/event.rs` | Normalized `LogEvent` all sources flatten into |
-| `src/evtx_source.rs` | Windows Event Log parsing (via `evtx` crate) |
-| `src/syslog_source.rs` | RFC5424/RFC3164 syslog parsing (via `syslog-loose`) |
-| `src/encoder.rs` | HDC encoder (6 role-filler bindings → 16,384D bipolar HV) |
-| `src/cluster.rs` | Cluster purity metric + nearest-centroid baseline |
-| `examples/cluster_evtx.rs` | Phase 1 benchmark runner |
-
-## Running the spike
+Run from the Symthaea workspace in its pinned Nix development environment.
 
 ```bash
-# Stage a labeled corpus at /tmp/evtx-corpus with labels.csv
-cargo run -p symthaea-logparse --example cluster_evtx -- /tmp/evtx-corpus/
+# Pipeline sanity only; synthetic data is not a benchmark result.
+cargo run -p symthaea-logparse --example cluster_evtx --release -- --synthetic
+
+# Historical corpus clustering study.
+cargo run -p symthaea-logparse --example cluster_evtx --release -- /path/to/evtx-corpus
+
+# File-disjoint supervised holdout and grouped five-fold CV.
+# labels.csv maps each filename to one class; each class needs at least five
+# independent source EVTX files for five-fold grouping.
+cargo run -p symthaea-logparse --example supervised_probe --release -- /path/to/evtx-corpus
+
+# Historical scale-up, event-level CV and cross-corpus OOD experiment.
+# Treat the event-level CV as in-distribution only.
+cargo run -p symthaea-logparse --example phase2_experiments --release -- \
+  /path/to/evtx-staged /path/to/otrf-staged
 ```
 
-Expected `labels.csv` format:
+Expected corpus layout:
+
+```text
+evtx-corpus/
+  labels.csv
+  incident_a.evtx
+  incident_b.evtx
+  ...
+```
+
+`labels.csv` format:
 
 ```csv
 filename,label
@@ -56,15 +77,21 @@ ransomware_03.evtx,ransomware
 benign_baseline.evtx,benign
 ```
 
-## Kill criterion
+The file-disjoint runner refuses to score if any label has fewer than five independent file groups or a provenance group appears under multiple labels. This is intentional: do not silently fall back to event-level splits.
 
-Purity < 0.50 on a corpus of ≥5 distinct incident classes → thesis fails,
-stop work on the MSP wedge.
+## Next research priorities
 
-## Next session TODO
+1. Reproduce the 0.168 cross-corpus result from frozen source corpora, parser versions and split manifests.
+2. Add a third independently collected corpus and benign enterprise-like background telemetry; measure false alerts per endpoint-day.
+3. Add incident/campaign-, host- and temporal-disjoint split manifests, retaining source lineage without exposing it as a model feature.
+4. Normalize provider names, EventIDs and source-specific field layouts; explicitly measure collection-methodology leakage.
+5. Compare rules, TF-IDF/linear models, conventional ML, nearest-centroid, the local HDC reference encoder and the real Symthaea core encoder on identical held-out splits.
+6. Integrate and reproduce the actual Symthaea HDC encoder; remove the placeholder only when the adapter is working and tested.
+7. Report per-class precision/recall/F1, macro-F1, PR-AUC, calibration, uncertainty and false-positive rates—not accuracy alone.
+8. Evaluate incident triage and analyst usefulness only after event-level generalization is demonstrated.
 
-1. Stage the DFIR.training Evtx corpus (free, public, labeled)
-2. Swap nearest-centroid for real HDBSCAN
-3. Per-provider purity breakdown (which event classes separate cleanly)
-4. Wire real `symthaea-core` HDC encoder behind the `hdc-encoder` feature
-5. If green: open Phase 2 tracking issue for `symthaea-support` fleshing
+## Claim discipline
+
+A synthetic fixture validates wiring, not the thesis. Same-corpus CV does not establish cross-corpus robustness. Clustering purity does not establish attack detection. A detection score does not establish safe containment or verified recovery.
+
+The current honest product description is: **an experimental log-normalization and HDC research pipeline with a documented cross-corpus generalization failure and new file-disjoint evaluation support.**
