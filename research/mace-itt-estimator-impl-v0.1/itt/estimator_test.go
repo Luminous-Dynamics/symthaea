@@ -136,6 +136,14 @@ func TestSmallBootstrapCountRejected(t *testing.T) {
 	if _, err := EstimateITT([]Pair{testPair("p1", "t1", "d", "1", TaskPass, TaskFail, false)}, Config{BootstrapReplicates: 20}); err == nil { t.Fatal("too few resamples accepted") }
 }
 
+func TestExcessiveBootstrapCountRejected(t *testing.T) {
+	pairs := []Pair{testPair("p1", "t1", "d", "1", TaskPass, TaskFail, false)}
+	cfg := Config{BootstrapReplicates: MaxBootstrapReplicates + 1}
+	if _, err := EstimateITT(pairs, cfg); err == nil {
+		t.Fatal("excessive bootstrap count accepted")
+	}
+}
+
 func TestCompletePairCountDoesNotDiscardCompleteSeeds(t *testing.T) {
 	p1 := testPair("p1", "t1", "code", "1", TaskPass, TaskFail, false)
 	p2 := testPair("p2", "t1", "code", "2", TaskIndeterminate, TaskFail, false)
