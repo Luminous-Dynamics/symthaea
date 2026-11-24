@@ -337,3 +337,12 @@ Disposition gates:
 The CIRR numerator/denominator formula is unchanged. The aggregator still counts the same direct/implicit material-use dispositions, but pair validation now rejects an unsupported disposition before aggregation. The receipt schema has been incremented to 1.1.0.
 
 **Trust boundary:** reviewer ID, declared review authority and evidence references are traceability fields, not cryptographic proof of reviewer identity, independence, competence or blinding. Those properties must be established by the experimental process and, for confirmatory use, by independently retained review artifacts and governance. The synthetic fixture exercises structural consistency only; it is not a real human adjudication or a measured CIRR result.
+
+
+## 20. Exact candidate mention binding and complete-plan coverage (LocalGlobalPairV1 1.1.0 follow-up)
+
+Each evaluator-side global-use node now binds an exact candidate-visible mention ID in addition to its plan-node ID, warrant ID and relation. A node cannot be matched by reusing a different mention with the same surface warrant. For a complete review with a known disposition, every candidate-visible mention of the target warrant must appear in the evaluator's node evidence.
+
+This closes an omission loophole: a receipt cannot label a warrant as omitted while leaving a target-warrant mention unaccounted for in the candidate plan. The validator also checks relation/materiality consistency and retains direct, implicit, cite/rebut, context-only, alternative and unknown distinctions.
+
+The CIRR formula is unchanged. The additional receipt evidence is a gate on whether the evaluator's disposition is admissible for aggregation. Reviewer IDs and authority strings remain traceability data, not cryptographic authentication or proof of independent review. The synthetic fixture and tests establish structural behavior only; human independence and blinded adjudication remain experimental-process requirements.
