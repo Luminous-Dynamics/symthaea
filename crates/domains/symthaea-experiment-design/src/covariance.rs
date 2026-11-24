@@ -744,6 +744,46 @@ pub fn covariance_redundancy_fixture() -> CovarianceAwareDesignInput {
 mod tests {
     use super::*;
 
+    fn rehash_joint(experiment: &mut CovarianceAwareCandidateExperiment) {
+        let joint = &mut experiment.joint_output_covariance;
+        joint.covariance_matrix_digest_sha256 = matrix_digest_sha256(&joint.covariance);
+    }
+
+    fn scalar_three_hypothesis_fixture(joint: Vec<Vec<f64>>) -> CovarianceAwareDesignInput {
+        let mut input = covariance_redundancy_fixture();
+        input.hypothesis_ids = vec!["H0".to_owned(), "H1".to_owned(), "H2".to_owned()];
+        input.experiments.truncate(1);
+        let experiment = &mut input.experiments[0];
+        experiment.experiment_id = "three_scalar_hypotheses".to_owned();
+        experiment.observables = vec![CovarianceObservable {
+            observable_id: "scalar".to_owned(),
+            unit: "u".to_owned(),
+        }];
+        experiment.predictions = [("H0", 0.0), ("H1", 0.1), ("H2", 2.0)]
+            .iter()
+            .map(|(id, mean)| {
+                let descriptor = format!("synthetic-control:model:{id}:v1");
+                VectorHypothesisPrediction {
+                    hypothesis_id: (*id).to_owned(),
+                    model_digest_sha256: format!("{:x}", Sha256::digest(descriptor.as_bytes())),
+                    model_descriptor: descriptor,
+                    means: vec![*mean],
+                }
+            })
+            .collect();
+
+        let descriptor = "synthetic-joint-output-covariance:three-hypotheses:v1".to_owned();
+        experiment.joint_output_covariance = JointOutputCovariance {
+            hypothesis_order: vec!["H0".to_owned(), "H1".to_owned(), "H2".to_owned()],
+            observable_order: vec!["scalar".to_owned()],
+            covariance_matrix_digest_sha256: matrix_digest_sha256(&joint),
+            covariance_descriptor_digest_sha256: format!("{:x}", Sha256::digest(descriptor.as_bytes())),
+            covariance_descriptor: descriptor,
+            covariance: joint,
+        };
+        input
+    }
+
     #[test]
     fn covariance_aware_score_is_four_before_and_after_redundancy() {
         let report = rank_covariance_aware_experiments(&covariance_redundancy_fixture()).unwrap();
@@ -758,160 +798,87 @@ mod tests {
     #[test]
     fn duplicated_observable_does_not_increase_the_score() {
         let report = rank_covariance_aware_experiments(&covariance_redundancy_fixture()).unwrap();
-        let base = report
-            .ranked_experiments
-            .iter()
-            .find(|x| x.experiment_id == "base_two_observables")
-            .unwrap();
-        let redundant = report
-            .ranked_experiments
-            .iter()
-            .find(|x| x.experiment_id == "with_exact_redundant_sum")
-            .unwrap();
-        assert!(
-            (base.worst_case_separation_squared - redundant.worst_case_separation_squared).abs()
-                < 1.0e-10
-        );
+        let base = report.ranked_experiments.iter()
+            .find(|x| x.experiment_id == "base_two_observables").unwrap();
+        let redundant = report.ranked_experiments.iter()
+            .find(|x| x.experiment_id == "with_exact_redundant_sum").unwrap();
+        assert!((base.worst_case_separation_squared - redundant.worst_case_separation_squared).abs() < 1.0e-10);
         assert_eq!(1.0_f64.powi(2) / 1.0 + 2.0_f64.powi(2) / 1.0, 5.0);
+        assert_eq!(1.0_f64.powi(2) / 1.0 + 2.0_f64.powi(2) / 1.0 + 3.0_f64.powi(2) / 3.0, 8.0);
+    }
+
+    #[test]
+    fn three_hypotheses_derive_all_difference_covariances_from_one_joint_model() {
+        // Y0=0, Y1=Z, Y2=2Z for Var(Z)=1 gives
+        // Var(Y0-Y1)=1, Var(Y0-Y2)=4 and Var(Y1-Y2)=1.
+        let joint = vec![
+            vec![0.0, 0.0, 0.0],
+            vec![0.0, 1.0, 2.0],
+            vec![0.0, 2.0, 4.0],
+        ];
+        let input = scalar_three_hypothesis_fixture(joint);
+        let report = rank_covariance_aware_experiments(&input).unwrap();
+        let candidate = &report.ranked_experiments[0];
+        assert!((candidate.worst_case_separation_squared - 0.01).abs() < 1.0e-10);
         assert_eq!(
-            1.0_f64.powi(2) / 1.0 + 2.0_f64.powi(2) / 1.0 + 3.0_f64.powi(2) / 3.0,
-            8.0
+            candidate.closest_hypothesis_pair,
+            ["H0".to_owned(), "H1".to_owned()]
         );
     }
 
     #[test]
-    fn three_hypotheses_use_the_worst_pair_and_require_every_pair_covariance() {
-        let mut input = covariance_redundancy_fixture();
-        input.hypothesis_ids.push("H2".to_owned());
-
-        for experiment in &mut input.experiments {
-            let means = if experiment.experiment_id == "base_two_observables" {
-                // H2 is deliberately closer to H0 than to H1, avoiding a
-                // floating-point near-tie in the closest-pair assertion.
-                vec![1.0, 0.0]
-            } else {
-                vec![1.0, 0.0, 1.0]
-            };
-            experiment.predictions.push(VectorHypothesisPrediction {
-                hypothesis_id: "H2".to_owned(),
-                model_descriptor: "synthetic-control:model:H2:v1".to_owned(),
-                model_digest_sha256: format!(
-                    "{:x}",
-                    Sha256::digest("synthetic-control:model:H2:v1".as_bytes())
-                ),
-                means,
-            });
-
-            let mut pair_02 = experiment.pairwise_difference_covariances[0].clone();
-            pair_02.first_hypothesis_id = "H0".to_owned();
-            pair_02.second_hypothesis_id = "H2".to_owned();
-            experiment
-                .pairwise_difference_covariances
-                .push(pair_02.clone());
-
-            let mut pair_12 = pair_02;
-            pair_12.first_hypothesis_id = "H1".to_owned();
-            pair_12.second_hypothesis_id = "H2".to_owned();
-            experiment.pairwise_difference_covariances.push(pair_12);
-        }
-
-        let report = rank_covariance_aware_experiments(&input).unwrap();
-        for candidate in &report.ranked_experiments {
-            assert!((candidate.worst_case_separation_squared - (4.0 / 3.0)).abs() < 1.0e-10);
-            assert_eq!(
-                candidate.closest_hypothesis_pair,
-                ["H0".to_owned(), "H2".to_owned()]
-            );
-        }
-
-        let mut missing = input;
-        missing.experiments[0].pairwise_difference_covariances.pop();
+    fn invalid_joint_covariance_is_rejected_even_when_each_derived_pair_variance_is_positive() {
+        // All derived pairwise scalar difference variances are positive:
+        // 0.2, 0.2, 3.8. But this proposed joint covariance has eigenvalue -0.8.
+        // A pairwise-only contract could miss this; the joint matrix cannot.
+        let joint = vec![
+            vec![1.0, 0.9, 0.9],
+            vec![0.9, 1.0, -0.9],
+            vec![0.9, -0.9, 1.0],
+        ];
+        let input = scalar_three_hypothesis_fixture(joint);
         assert!(matches!(
-            rank_covariance_aware_experiments(&missing),
-            Err(CovarianceDesignError::InvalidInput(_))
+            rank_covariance_aware_experiments(&input),
+            Err(CovarianceDesignError::NonPsdCovariance(_))
         ));
     }
 
     #[test]
     fn diagonal_unit_rescaling_preserves_the_score() {
         let mut input = covariance_redundancy_fixture();
-        let experiment = input
-            .experiments
-            .iter_mut()
-            .find(|x| x.experiment_id == "base_two_observables")
-            .unwrap();
+        let experiment = input.experiments.iter_mut()
+            .find(|x| x.experiment_id == "base_two_observables").unwrap();
         experiment.observables[0].unit = "millibase-unit".to_owned();
         for prediction in &mut experiment.predictions {
             prediction.means[0] *= 1000.0;
         }
-        for pair in &mut experiment.pairwise_difference_covariances {
-            for row in &mut pair.covariance {
-                row[0] *= 1000.0;
-            }
-            for value in &mut pair.covariance[0] {
-                *value *= 1000.0;
-            }
-            pair.covariance_matrix_digest_sha256 = matrix_digest_sha256(&pair.covariance);
+        let h = experiment.joint_output_covariance.hypothesis_order.len();
+        let p = experiment.joint_output_covariance.observable_order.len();
+        let mut transform = vec![1.0; h*p];
+        for hypothesis in 0..h {
+            transform[hypothesis*p] = 1000.0;
         }
+        for i in 0..h*p {
+            for j in 0..h*p {
+                experiment.joint_output_covariance.covariance[i][j] *= transform[i] * transform[j];
+            }
+        }
+        rehash_joint(experiment);
         let report = rank_covariance_aware_experiments(&input).unwrap();
-        let score = report
-            .ranked_experiments
-            .iter()
-            .find(|x| x.experiment_id == "base_two_observables")
-            .unwrap()
+        let score = report.ranked_experiments.iter()
+            .find(|x| x.experiment_id == "base_two_observables").unwrap()
             .worst_case_separation_squared;
         assert!((score - 4.0).abs() < 1.0e-10);
     }
 
-    fn scalar_three_hypothesis_fixture(pair_variances: [f64; 3]) -> CovarianceAwareDesignInput {
-        let mut input = covariance_redundancy_fixture();
-        input.hypothesis_ids = vec!["H0".to_owned(), "H1".to_owned(), "H2".to_owned()];
-        input.experiments.truncate(1);
-        let experiment = &mut input.experiments[0];
-        experiment.observables = vec![CovarianceObservable {
-            observable_id: "scalar".to_owned(),
-            unit: "u".to_owned(),
-        }];
-        experiment.predictions = ["H0", "H1", "H2"]
-            .iter()
-            .zip([0.0, 1.0, 2.0])
-            .map(|(id, mean)| {
-                let descriptor = format!("synthetic-control:model:{id}:v1");
-                VectorHypothesisPrediction {
-                    hypothesis_id: (*id).to_owned(),
-                    model_digest_sha256: format!("{:x}", Sha256::digest(descriptor.as_bytes())),
-                    model_descriptor: descriptor,
-                    means: vec![mean],
-                }
-            })
-            .collect();
-
-        let pairs = [("H0", "H1"), ("H0", "H2"), ("H1", "H2")];
-        experiment.pairwise_difference_covariances = pairs
-            .iter()
-            .zip(pair_variances)
-            .map(|((first, second), variance)| {
-                let descriptor = format!("synthetic-difference-covariance:{first}:{second}:v1");
-                let covariance = vec![vec![variance]];
-                PairwiseDifferenceCovariance {
-                    first_hypothesis_id: (*first).to_owned(),
-                    second_hypothesis_id: (*second).to_owned(),
-                    covariance_matrix_digest_sha256: matrix_digest_sha256(&covariance),
-                    covariance_descriptor_digest_sha256: format!(
-                        "{:x}",
-                        Sha256::digest(descriptor.as_bytes())
-                    ),
-                    covariance_descriptor: descriptor,
-                    covariance,
-                }
-            })
-            .collect();
-        input
-    }
-
     #[test]
-    fn joint_covariance_consistency_is_invariant_to_unit_rescaling() {
-        let mut input = scalar_three_hypothesis_fixture([1.0, 4.0, 1.0]);
+    fn joint_covariance_unit_rescaling_is_invariant_for_three_hypotheses() {
+        let joint = vec![
+            vec![0.0, 0.0, 0.0],
+            vec![0.0, 1.0, 2.0],
+            vec![0.0, 2.0, 4.0],
+        ];
+        let mut input = scalar_three_hypothesis_fixture(joint);
         let baseline = rank_covariance_aware_experiments(&input).unwrap();
         let baseline_score = baseline.ranked_experiments[0].worst_case_separation_squared;
         let experiment = &mut input.experiments[0];
@@ -919,153 +886,150 @@ mod tests {
         for prediction in &mut experiment.predictions {
             prediction.means[0] *= 1000.0;
         }
-        for pair in &mut experiment.pairwise_difference_covariances {
-            pair.covariance[0][0] *= 1_000_000.0;
-            pair.covariance_matrix_digest_sha256 = matrix_digest_sha256(&pair.covariance);
+        for row in &mut experiment.joint_output_covariance.covariance {
+            for value in row {
+                *value *= 1_000_000.0;
+            }
         }
+        rehash_joint(experiment);
         let rescaled = rank_covariance_aware_experiments(&input).unwrap();
         let rescaled_score = rescaled.ranked_experiments[0].worst_case_separation_squared;
         assert!((rescaled_score - baseline_score).abs() < 1.0e-10);
     }
 
     #[test]
-    fn individually_psd_pairwise_covariances_must_be_jointly_realizable() {
-        // Each scalar pairwise covariance is positive. Together they are
-        // impossible: Var(Y0-Y1)=1, Var(Y0-Y2)=1, Var(Y1-Y2)=9 would imply
-        // Cov(Y1-Y0, Y2-Y0)=-3.5 despite both marginal variances being 1.
-        let inconsistent = scalar_three_hypothesis_fixture([1.0, 1.0, 9.0]);
-        assert!(matches!(
-            rank_covariance_aware_experiments(&inconsistent),
-            Err(CovarianceDesignError::InconsistentPairwiseCovariances(_))
-        ));
-
-        // A coherent boundary case: the three difference variances are 1, 4, 1.
-        let coherent = scalar_three_hypothesis_fixture([1.0, 4.0, 1.0]);
-        assert!(rank_covariance_aware_experiments(&coherent).is_ok());
-    }
-
-    #[test]
     fn invertible_observable_basis_change_preserves_the_score() {
         let mut input = covariance_redundancy_fixture();
-        let experiment = input
-            .experiments
-            .iter_mut()
-            .find(|x| x.experiment_id == "base_two_observables")
-            .unwrap();
-
-        // A = [[2, 1], [-1, 1]], det(A) = 3, so this is invertible.
-        // Transport every hypothesis mean by A and the covariance by A S A^T.
+        let experiment = input.experiments.iter_mut()
+            .find(|x| x.experiment_id == "base_two_observables").unwrap();
+        // A = [[2, 1], [-1, 1]], det(A) = 3.
+        let a = [[2.0, 1.0], [-1.0, 1.0]];
         for prediction in &mut experiment.predictions {
             let x = prediction.means[0];
             let y = prediction.means[1];
-            prediction.means = vec![2.0 * x + y, -x + y];
+            prediction.means = vec![a[0][0]*x + a[0][1]*y, a[1][0]*x + a[1][1]*y];
         }
         experiment.observables[0].unit = "basis-row-1".to_owned();
         experiment.observables[1].unit = "basis-row-2".to_owned();
 
-        let pair = &mut experiment.pairwise_difference_covariances[0];
-        pair.covariance = vec![vec![7.0, -0.5], vec![-0.5, 1.0]];
-        pair.covariance_matrix_digest_sha256 = matrix_digest_sha256(&pair.covariance);
+        let h = experiment.joint_output_covariance.hypothesis_order.len();
+        let mut transform = vec![vec![0.0; 2*h]; 2*h];
+        for hypothesis in 0..h {
+            for row in 0..2 {
+                for column in 0..2 {
+                    transform[hypothesis*2+row][hypothesis*2+column] = a[row][column];
+                }
+            }
+        }
+        let gamma = experiment.joint_output_covariance.covariance.clone();
+        let mut transformed = vec![vec![0.0; 2*h]; 2*h];
+        for i in 0..2*h {
+            for j in 0..2*h {
+                for k in 0..2*h {
+                    for l in 0..2*h {
+                        transformed[i][j] += transform[i][k] * gamma[k][l] * transform[j][l];
+                    }
+                }
+            }
+        }
+        experiment.joint_output_covariance.covariance = transformed;
+        rehash_joint(experiment);
 
         let report = rank_covariance_aware_experiments(&input).unwrap();
-        let score = report
-            .ranked_experiments
-            .iter()
-            .find(|x| x.experiment_id == "base_two_observables")
-            .unwrap()
+        let score = report.ranked_experiments.iter()
+            .find(|x| x.experiment_id == "base_two_observables").unwrap()
             .worst_case_separation_squared;
         assert!((score - 4.0).abs() < 1.0e-10);
     }
 
     #[test]
-    fn singular_covariance_outside_support_is_quarantined() {
+    fn singular_joint_covariance_outside_difference_support_is_quarantined() {
         let mut input = covariance_redundancy_fixture();
         let experiment = &mut input.experiments[0];
-        experiment
-            .predictions
-            .iter_mut()
-            .find(|p| p.hypothesis_id == "H1")
-            .unwrap()
+        experiment.predictions.iter_mut()
+            .find(|prediction| prediction.hypothesis_id == "H1").unwrap()
             .means = vec![1.0, 0.0];
-        let pair = &mut experiment.pairwise_difference_covariances[0];
-        pair.covariance = vec![vec![1.0, 1.0], vec![1.0, 1.0]];
-        pair.covariance_matrix_digest_sha256 = matrix_digest_sha256(&pair.covariance);
+        experiment.joint_output_covariance.covariance = vec![
+            vec![0.0, 0.0, 0.0, 0.0],
+            vec![0.0, 0.0, 0.0, 0.0],
+            vec![0.0, 0.0, 1.0, 1.0],
+            vec![0.0, 0.0, 1.0, 1.0],
+        ];
+        rehash_joint(experiment);
         let target = experiment.experiment_id.clone();
         let report = rank_covariance_aware_experiments(&input).unwrap();
-        assert!(
-            report
-                .ranked_experiments
-                .iter()
-                .all(|x| x.experiment_id != target)
-        );
-        assert!(
-            report
-                .support_review_required
-                .iter()
-                .any(|x| x.experiment_id == target)
-        );
+        assert!(report.ranked_experiments.iter().all(|x| x.experiment_id != target));
+        assert!(report.support_review_required.iter().any(|x| x.experiment_id == target));
     }
 
     #[test]
-    fn singular_covariance_inside_support_is_scored() {
+    fn singular_joint_covariance_inside_difference_support_is_scored() {
         let mut input = covariance_redundancy_fixture();
         let experiment = &mut input.experiments[0];
-        experiment
-            .predictions
-            .iter_mut()
-            .find(|p| p.hypothesis_id == "H1")
-            .unwrap()
+        experiment.predictions.iter_mut()
+            .find(|prediction| prediction.hypothesis_id == "H1").unwrap()
             .means = vec![1.0, 1.0];
-        let pair = &mut experiment.pairwise_difference_covariances[0];
-        pair.covariance = vec![vec![1.0, 1.0], vec![1.0, 1.0]];
-        pair.covariance_matrix_digest_sha256 = matrix_digest_sha256(&pair.covariance);
+        experiment.joint_output_covariance.covariance = vec![
+            vec![0.0, 0.0, 0.0, 0.0],
+            vec![0.0, 0.0, 0.0, 0.0],
+            vec![0.0, 0.0, 1.0, 1.0],
+            vec![0.0, 0.0, 1.0, 1.0],
+        ];
+        rehash_joint(experiment);
         let target = experiment.experiment_id.clone();
         let report = rank_covariance_aware_experiments(&input).unwrap();
-        let score = report
-            .ranked_experiments
-            .iter()
-            .find(|x| x.experiment_id == target)
-            .unwrap()
+        let score = report.ranked_experiments.iter()
+            .find(|x| x.experiment_id == target).unwrap()
             .worst_case_separation_squared;
         assert!((score - 1.0).abs() < 1.0e-10);
     }
 
     #[test]
-    fn indefinite_covariance_and_tampered_matrix_are_rejected() {
+    fn indefinite_joint_covariance_and_tampered_matrix_are_rejected() {
         let mut input = covariance_redundancy_fixture();
-        let pair = &mut input.experiments[0].pairwise_difference_covariances[0];
-        pair.covariance = vec![vec![1.0, 2.0], vec![2.0, 1.0]];
-        pair.covariance_matrix_digest_sha256 = matrix_digest_sha256(&pair.covariance);
+        let experiment = &mut input.experiments[0];
+        experiment.joint_output_covariance.covariance = vec![
+            vec![0.0, 0.0, 0.0, 0.0],
+            vec![0.0, 0.0, 0.0, 0.0],
+            vec![0.0, 0.0, 1.0, 2.0],
+            vec![0.0, 0.0, 2.0, 1.0],
+        ];
+        rehash_joint(experiment);
         assert!(matches!(
             rank_covariance_aware_experiments(&input),
             Err(CovarianceDesignError::NonPsdCovariance(_))
         ));
 
-        let mut input = covariance_redundancy_fixture();
-        input.experiments[0].pairwise_difference_covariances[0].covariance[0][0] = 1.25;
+        let mut tampered = covariance_redundancy_fixture();
+        tampered.experiments[0].joint_output_covariance.covariance[2][2] = 1.25;
         assert!(matches!(
-            rank_covariance_aware_experiments(&input),
+            rank_covariance_aware_experiments(&tampered),
             Err(CovarianceDesignError::DigestMismatch(_))
         ));
     }
 
     #[test]
-    fn missing_covariance_pair_and_non_finite_values_are_rejected() {
-        let mut input = covariance_redundancy_fixture();
-        input.experiments[0].pairwise_difference_covariances.clear();
+    fn joint_covariance_order_dimensions_and_finiteness_are_validated() {
+        let mut wrong_order = covariance_redundancy_fixture();
+        wrong_order.experiments[0].joint_output_covariance.hypothesis_order.reverse();
         assert!(matches!(
-            rank_covariance_aware_experiments(&input),
+            rank_covariance_aware_experiments(&wrong_order),
             Err(CovarianceDesignError::InvalidInput(_))
         ));
 
-        let mut input = covariance_redundancy_fixture();
-        input.experiments[0].pairwise_difference_covariances[0].covariance[0][0] = f64::NAN;
-        input.experiments[0].pairwise_difference_covariances[0].covariance_matrix_digest_sha256 =
-            matrix_digest_sha256(
-                &input.experiments[0].pairwise_difference_covariances[0].covariance,
-            );
+        let mut wrong_shape = covariance_redundancy_fixture();
+        wrong_shape.experiments[0].joint_output_covariance.covariance.pop();
+        rehash_joint(&mut wrong_shape.experiments[0]);
         assert!(matches!(
-            rank_covariance_aware_experiments(&input),
+            rank_covariance_aware_experiments(&wrong_shape),
+            Err(CovarianceDesignError::InvalidCovariance(_))
+        ));
+
+        let mut non_finite = covariance_redundancy_fixture();
+        non_finite.experiments[0].joint_output_covariance.covariance[0][0] = f64::NAN;
+        rehash_joint(&mut non_finite.experiments[0]);
+        assert!(matches!(
+            rank_covariance_aware_experiments(&non_finite),
             Err(CovarianceDesignError::InvalidCovariance(_))
         ));
     }
