@@ -1,0 +1,154 @@
+name: MEL temporal-grounding count-gated qualification
+
+on:
+  push:
+    branches:
+      - research/mel-temporal-grounding-count-gated-f1-v1-20261124
+      - research/mel-temporal-revision-audit-v1-20261124
+    paths:
+      - "crates/domains/symthaea-muse/src/temporal_grounding.rs"
+      - "crates/domains/symthaea-muse/src/evidence_digest.rs"
+      - "tools/mel-temporal-grounding-qualifier/**"
+      - "docs/research/MEL-GROUND-001-TEMPORAL-GROUNDING-SCORER-V1.md"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/mel-temporal-grounding-qualification.yml"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches:
+      - research/mel-ground-temporal-evaluator-v1-20261103
+      - research/mel-temporal-grounding-count-gated-f1-v1-20261124
+    paths:
+      - "crates/domains/symthaea-muse/src/temporal_grounding.rs"
+      - "crates/domains/symthaea-muse/src/evidence_digest.rs"
+      - "tools/mel-temporal-grounding-qualifier/**"
+      - "docs/research/MEL-GROUND-001-TEMPORAL-GROUNDING-SCORER-V1.md"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/mel-temporal-grounding-qualification.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Exact-head count-gated temporal grounding
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact PR head or pushed commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact tested source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+          printf 'tested_head=%s\n' "$actual"
+
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Check exact-source harness formatting
+        run: cargo +1.96.0 fmt --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --check
+
+      - name: Verify committed lock and workspace resolution
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 metadata --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --no-deps --format-version 1 > "$RUNNER_TEMP/metadata.json"
+
+      - name: Run locked exact-source temporal-grounding tests
+        run: cargo +1.96.0 test --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml
+
+      - name: Warnings-denied Clippy on exact production source
+        run: cargo +1.96.0 clippy --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --all-targets -- -D warnings
+
+      - name: Replay paired temporal revision when module is present
+        if: hashFiles('tools/mel-temporal-grounding-qualifier/src/temporal_revision.rs') != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-temporal-revision-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-temporal-revision-triplet.synthetic.json > "$RUNNER_TEMP/temporal-revision-report.json"
+          jq -e '
+            .schema == "mel-temporal-revision-batch-report-v1"
+            and .cases == 6
+            and (.matched_evidence_contrasts | length) == 2
+            and .matched_evidence_contrasts[0].local_minus_no_evidence_f1 == 0.5
+            and .matched_evidence_contrasts[0].local_minus_yoked_f1 == 0.5
+            and .matched_evidence_contrasts[0].local_beats_yoked == true
+            and .matched_evidence_contrasts[0].local_output_tokens == 128
+            and .reports[0].source_lineage_id == "synthetic-lineage-001"
+            and .reports[0].runtime_identity_sha256 != null
+            and .reports[0].actual_output_tokens == 128
+            and .source_work_bootstrap.source_work_clusters == 2
+            and .source_work_bootstrap.one_to_many_source_work_clusters == 2
+            and .source_work_bootstrap.recommended_confirmatory_cluster_floor == 30
+            and .source_work_bootstrap.confirmatory_source_cluster_floor_met == false
+            and .source_work_bootstrap.local_minus_no_evidence_f1.estimate == 0.5
+            and .source_work_bootstrap.local_minus_no_evidence_count_gated_f1.estimate == 0.5
+          ' "$RUNNER_TEMP/temporal-revision-report.json" > /dev/null
+
+      - name: Replay transformed-view equivariance when module is present
+        if: hashFiles('tools/mel-temporal-grounding-qualifier/src/temporal_transform.rs') != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-temporal-transform-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-temporal-equivariance-2x.synthetic.json > "$RUNNER_TEMP/temporal-equivariance-report.json"
+          jq -e '
+            .schema == "mel-temporal-equivariance-report-v1"
+            and .baseline.f1 == 1.0
+            and .transformed_mapped_to_canonical.f1 == 1.0
+            and .exact_count_preserved == true
+            and .f1_delta_after_canonical_mapping == 0.0
+            and .count_gated_f1_delta_after_canonical_mapping == 0.0
+            and .upstream_qualification_receipt_authenticated == false
+            and .qualified_equivariance_claim_permitted == false
+            and .transform_bytes_recomputed == false
+          ' "$RUNNER_TEMP/temporal-equivariance-report.json" > /dev/null
+
+      - name: Assemble exact-head evidence
+        if: always()
+        shell: bash
+        run: |
+          set -uo pipefail
+          evidence="$RUNNER_TEMP/mel-temporal-grounding-evidence"
+          mkdir -p "$evidence"
+          printf 'tested_head=%s\n' "$(git rev-parse HEAD)" > "$evidence/source-identity.txt"
+          rustc +1.96.0 --version > "$evidence/rustc-version.txt" 2>&1 || true
+          cargo +1.96.0 --version > "$evidence/cargo-version.txt" 2>&1 || true
+          cp tools/mel-temporal-grounding-qualifier/Cargo.toml "$evidence/harness-Cargo.toml"
+          cp tools/mel-temporal-grounding-qualifier/Cargo.lock "$evidence/harness-Cargo.lock"
+          cp tools/mel-temporal-grounding-qualifier/src/lib.rs "$evidence/harness-lib.rs"
+          cp crates/domains/symthaea-muse/src/temporal_grounding.rs "$evidence/"
+          cp crates/domains/symthaea-muse/src/evidence_digest.rs "$evidence/"
+          cp docs/research/MEL-GROUND-001-TEMPORAL-GROUNDING-SCORER-V1.md "$evidence/"
+          if [[ -f tools/mel-temporal-grounding-qualifier/src/temporal_revision.rs ]]; then
+            cp tools/mel-temporal-grounding-qualifier/src/temporal_revision.rs "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/src/bin/mel-temporal-revision-audit.rs "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/fixtures/mel-temporal-revision-triplet.synthetic.json "$evidence/"
+            cp "$RUNNER_TEMP/temporal-revision-report.json" "$evidence/"
+          fi
+          if [[ -f tools/mel-temporal-grounding-qualifier/src/temporal_transform.rs ]]; then
+            cp tools/mel-temporal-grounding-qualifier/src/temporal_transform.rs "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/src/bin/mel-temporal-transform-audit.rs "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/fixtures/mel-temporal-equivariance-2x.synthetic.json "$evidence/"
+            cp "$RUNNER_TEMP/temporal-equivariance-report.json" "$evidence/"
+          fi
+          (cd "$evidence" && find . -maxdepth 1 -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)
+
+      - name: Upload exact-head evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mel-temporal-grounding-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/mel-temporal-grounding-evidence/
+          if-no-files-found: error
+          retention-days: 90
