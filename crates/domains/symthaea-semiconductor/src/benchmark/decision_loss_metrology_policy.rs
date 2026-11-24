@@ -513,7 +513,9 @@ fn score_candidate(
         .checked_add(candidate.turnaround_seconds as i64)
         .ok_or_else(|| MetrologyDecisionLossErrorV1("measurement completion time overflow".into()))?;
     if measurement_complete_at > candidate.decision_deadline_unix_seconds {
-        status = MetrologyCandidateStatusV1::DecisionDeadlineMissed;
+        if status == MetrologyCandidateStatusV1::Eligible {
+            status = MetrologyCandidateStatusV1::DecisionDeadlineMissed;
+        }
         reasons.push("measurement_cannot_return_before_decision_deadline".into());
     }
 
