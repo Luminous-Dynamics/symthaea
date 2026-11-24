@@ -3,7 +3,11 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Privacy — Sharing tier management and data filtering
 
-/// Privacy manager for controlling what data can be shared.
+/// Coarse user-configured sharing preference.
+///
+/// This is not proof that content is anonymous, scrubbed, consented, or safe
+/// to disclose. A separate data-classification and privacy-validation step
+/// must run before any customer data leaves its tenant boundary.
 #[derive(Debug)]
 pub struct PrivacyManager {
     sharing_tier: SharingTier,
@@ -11,8 +15,13 @@ pub struct PrivacyManager {
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum SharingTier {
+    /// No cross-tenant sharing. This is the default.
     LocalOnly,
+    /// Sharing may be considered only after an independent anonymization and
+    /// disclosure review; this label alone does not establish anonymity.
     Anonymized,
+    /// Explicit full-sharing preference. Still subject to tenant consent,
+    /// contract, data classification, and destination authorization.
     Full,
 }
 
@@ -29,12 +38,16 @@ impl PrivacyManager {
         self.sharing_tier = tier;
     }
 
-    /// Check if data can be shared at the current tier.
+    /// Check whether the configured preference permits considering sharing.
+    ///
+    /// A true result is not a privacy guarantee or an authorization token.
     pub fn can_share(&self) -> bool {
         !matches!(self.sharing_tier, SharingTier::LocalOnly)
     }
 
-    /// Check if cognitive updates can be shared.
+    /// Check whether the configured preference permits considering cognitive
+    /// sharing. Callers must independently scrub, classify, and authorize the
+    /// exact payload before transmission.
     pub fn can_share_cognitive(&self) -> bool {
         matches!(
             self.sharing_tier,
@@ -45,7 +58,7 @@ impl PrivacyManager {
 
 impl Default for PrivacyManager {
     fn default() -> Self {
-        Self::new(SharingTier::Anonymized)
+        Self::new(SharingTier::LocalOnly)
     }
 }
 
@@ -83,9 +96,11 @@ mod tests {
     }
 
     #[test]
-    fn default_is_anonymized() {
+    fn default_is_local_only() {
         let pm = PrivacyManager::default();
-        assert_eq!(*pm.sharing_tier(), SharingTier::Anonymized);
+        assert_eq!(*pm.sharing_tier(), SharingTier::LocalOnly);
+        assert!(!pm.can_share());
+        assert!(!pm.can_share_cognitive());
     }
 
     #[test]
