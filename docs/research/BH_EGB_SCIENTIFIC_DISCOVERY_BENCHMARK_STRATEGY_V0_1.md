@@ -160,17 +160,20 @@ Primary metrics: cost to first independently qualified result; decision regret; 
 On identical fixed hypothesis/design sets, compare:
 
 1. fixed and random designs;
-2. scalar variance/disagreement selector;
-3. the original #8034 conditional-independence score after its own qualification;
-4. covariance-aware maximin Mahalanobis screen;
-5. robust worst-case design over a predeclared covariance uncertainty set (future work);
-6. Gaussian Monte Carlo EIG / expected log Bayes factor only where predictive distributions and priors have been independently justified;
-7. interval/set-based discrimination where probability distributions are not defensible;
-8. exact tiny-world optimal design oracle.
+2. the existing scalar variance/disagreement selector (population variance across available hypothesis predictions);
+3. a coverage-aware variant of that baseline with a frozen minimum valid-prediction fraction and explicit UNRESOLVED disposition;
+4. the original #8034 conditional-independence score after its own qualification;
+5. covariance-aware maximin Mahalanobis screen;
+6. robust worst-case design over a predeclared covariance uncertainty set (future work);
+7. Gaussian Monte Carlo EIG / expected log Bayes factor only where predictive distributions and priors have been independently justified;
+8. interval/set-based discrimination where probability distributions are not defensible;
+9. exact tiny-world optimal design oracle.
 
-Controls: exact duplicate observables; determinant/condition number derived from the same matrix; common-mode error; invalid/indefinite covariance; singular support mismatch and in-support mean; unit rescaling; invertible basis transformation; source/model digest change; covariance miscalibration; nuisance-parameter shifts; observational noise; irrelevant observables; and a design that cannot change the downstream decision.
+**Baseline interpretation:** the current `select_most_informative_experiment` implementation in `symthaea-core/src/hdc/conjecture_engine/experiment_selection.rs` computes population variance across predictions and omits hypotheses whose prediction closure returns `None`. This is a useful low-cost disagreement baseline. It is not EIG, has no explicit experiment cost or joint covariance, and its score can be confounded by changing prediction coverage. Keep the legacy implementation intact as a comparator; any coverage-aware arm must publish its frozen eligibility threshold and missing-prediction disposition.
 
-Metrics: pairwise discrimination, ranking regret, redundancy/unit/basis invariance, covariance coverage, calibration, failure/abstention counts, and cost to the next qualified decision.
+Controls: exact duplicate observables; determinant/condition number derived from the same matrix; common-mode error; invalid/indefinite covariance; individually PSD but jointly impossible pairwise covariances; singular support mismatch and in-support mean; unit rescaling; invertible basis transformation; source/model digest change; covariance miscalibration; nuisance-parameter shifts; observational noise; irrelevant observables; a hypothesis prediction returning None; a candidate supported by only a small subset of hypotheses; a design that cannot change the downstream decision.
+
+Metrics: pairwise discrimination, ranking regret, prediction-coverage fraction, excluded-hypothesis reasons, redundancy/unit/basis invariance, joint covariance consistency, covariance coverage, calibration, failure/abstention counts, and cost to the next qualified decision.
 
 ### Track C — integrated research workflow
 
