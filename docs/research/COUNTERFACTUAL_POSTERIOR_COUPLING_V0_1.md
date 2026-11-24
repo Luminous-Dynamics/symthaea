@@ -183,7 +183,7 @@ Run the machine-readable fixtures in the companion JSON file. These validate pai
 
 Keep #13530 Track A separate: reproduce the paper's DMC environment-eligibility and masking diagnostic only after recovering its exact supplementary configuration and estimator.
 
-Track B adds posterior coupling as a new Symthaea experiment on the recovered DMC individual parameterization. Compare A0–A8 on held-out individuals, held-out intervention pairs, and the joint holdout. The paper did not report a trained DMC world-model checkpoint; no Track B result can be called a DMC model replication.
+Track B adds posterior coupling as a new Symthaea experiment on the recovered DMC individual parameterization. Compare A0–A9 on held-out individuals, held-out intervention pairs, and the joint holdout. A9, the shared-branch-point RSSM latent, is mandatory. The paper did not report a trained DMC world-model checkpoint; no Track B result can be called a DMC model replication.
 
 ### Stage 2 — second simulator family
 
@@ -191,11 +191,38 @@ Only after the DMC mechanism is qualified, select a second branchable task with 
 
 ### Stage 3 — closed-loop embodied value
 
-Use matched implementations and task protocols for World-In-World, RoboDyna/LIBERO-Dynamic and/or WorldArena 2.0 where the official assets and execution path can be recovered. Compare direct policy, full-state reference, point-estimate world model, posterior-coupled model and compute-matched strong baselines. Include MRS.Q-style search-overestimation controls. Rollback is prior art for rewind/branch/action-chunk search; it is a comparator, not a novelty claim.
+Use matched implementations and task protocols for:
+- **World-In-World** for its closed-loop online planning/action API and four embodied task environments. Task success is the primary endpoint; visual fidelity is diagnostic, not a substitute.
+- **WorldArena 2.0** for visuo-tactile modelling, world models as online RL environments, and simulated/real robot platform transfer (RoboTwin 2.0, LIBERO and AgileX split-type ALOHA paths where reproducible).
+- **Rollback** as the direct prior-art comparator for rewind, branching, action-chunk search and counterfactual action-level supervision.
+- **Causal-JEPA** as a visual/object-centric representation comparator when the chosen task includes object-level visual observations and a faithful implementation is available. Its counterfactual VQA and latent-token results are not numerically comparable to DMC's scalar individual-effect estimand.
+- **MRS.Q-style value-ensemble minimum** as a planner-overestimation control. Keep value uncertainty/ensemble aggregation separate from the dynamics model's posterior over individual traits.
+
+The minimum matched policy arms are: direct policy with no model rollouts; compute-matched direct/value controller; standard RSSM/Dreamer-style planner; RSSM plus search/value-min control; posterior-coupled HDC/CfC/LTC planner; and the Rollback-style branch/backtracking comparator where its execution protocol can be reproduced. Add the full-state/known-parameter simulator as evaluator-only oracle. Freeze candidate action sets and planner budgets before reference outcomes are revealed.
+
+Do not pool benchmark success rates, visual scores, DMC A/phi values or counterfactual VQA scores into one leaderboard. Report task-specific effect fidelity and closed-loop outcomes separately.
 
 ### Stage 4 — hardware-in-loop
 
 Require measured restoration residuals, independently checked reset evidence, actuator application timestamps and a declared physical tolerance. A single physical unit cannot reveal both exact individual potential outcomes without a valid intervention/restoration design. Where exact unit-level counterfactual restoration is impossible, use randomized matched units and report population/subgroup effects instead of asserting exact per-unit ground truth.
+
+### Stage 5 — pre-registered qualification targets (prospective, not achieved)
+
+The targets below are research objectives. They do not imply that current code, fixtures or a paper-reported result satisfies them.
+
+| Property | Qualification target | Falsification / refusal condition |
+|---|---|---|
+| Environment eligibility | Reproduce DMC A, phi, C1–C5 and mask sensitivity on the pinned formulation; evaluate A >= 3 phi and 2x/3x/4x floor sensitivity | Estimation floor exceeds the signal, sample-size curve does not converge, or unresolved formulation choices change the result |
+| Individual-effect retention | Once A_lat is measurable above its floor, target A_pred/A_lat >= 0.90 on held-out individuals and intervention pairs | Latent readout retains the effect but imagination loses it; or the latent readout itself is below the floor |
+| Effect prediction | Beat zero-effect, branch-point-only and point-estimate RSSM controls on individual-centred MAE; calibrate slope toward 1 and report sign accuracy, worst-stratum bias and uncertainty separately | Apparent gains disappear after within-pair centering, or pooled rows hide failure in individual strata |
+| Posterior uncertainty | Nominal 90% and 95% intervals achieve empirical coverage compatible with their nominal rates on held-out individual clusters, with interval width and calibration reported | Coverage is achieved only by uninformative intervals, coverage fails after planner selection, or calibration labels reuse test outcomes |
+| Action decision | Positive paired held-out reduction in regret with a 95% interval excluding zero, at equal declared compute; no hard-constraint regression | Model use does not beat direct control, MRS.Q-style search control, or strong RSSM comparator after costs |
+| Robustness | Effect sign, ranking and calibrated intervals reported under held-out physical-parameter strata, observation masks, history lengths and regime shifts | OOD or masked conditions yield confident but wrong sign / optimistic planner decisions |
+| Cost | Pareto improvement across compute, inference latency, model memory and measured energy; report p50/p95/p99 and full resource accounting | Improvement requires a larger unreported search budget or omits posterior-sampling / replay cost |
+
+Use the individual as the resampling unit. With 15 correlated intervention pairs per DMC individual, pairs are not 15 independent observations. Keep all branches, posterior draws and repeated histories for an individual in the same split. Use nested sample-size curves rather than treating the paper's 150 individuals as automatically sufficient.
+
+At least one result must be an end-to-end *decision* result: model-driven policy compared with direct-policy and RSSM/search controls on a frozen task, action budget and cost budget. A more accurate predicted trajectory without lower realized regret is not a world-model decision improvement. A lower regret under an unqualified simulator is not a physical safety claim.
 
 ## 9. Statistical and calibration ownership
 
