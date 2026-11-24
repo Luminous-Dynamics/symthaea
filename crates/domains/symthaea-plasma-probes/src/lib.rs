@@ -140,6 +140,8 @@ pub enum ContractError {
     NonFiniteSymplecticBasis,
     #[error("canonical symplectic pair defect exceeds the declared tolerance")]
     InvalidSymplecticBasis,
+    #[error("invalid coupled-mode authority contract: {0}")]
+    InvalidCoupledModeAuthority(&'static str),
     #[error("invalid sensor/actuator timing field {field}: {reason}")]
     InvalidControlTimingField {
         field: &'static str,
@@ -2684,6 +2686,283 @@ pub fn evaluate_scalar_unstable_mode_interface(
         minimum_required_controllability_gramian: contract.minimum_controllability_gramian,
         mode_interface_qualified,
     })
+}
+
+/// Two-real-mode authority contract with one sampled scalar diagnostic and actuator.
+///
+/// The full two-state space is treated as the declared unstable subspace. Both
+/// eigenvalues of the discrete transition matrix must lie outside the unit
+/// circle. This is an analytic interface oracle, not a kinetic linearization.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CoupledTwoModeAuthorityContract {
+    /// Row-major discrete transition matrix [a00, a01, a10, a11].
+    pub transition_matrix: [f64; 4],
+    pub horizon_steps: u32,
+    pub diagnostic_gain: [f64; 2],
+    pub diagnostic_noise_variance: f64,
+    pub diagnostic_sampling_stride_steps: u32,
+    pub diagnostic_delivery_delay_steps: u32,
+    pub actuator_gain: [f64; 2],
+    pub actuator_update_stride_steps: u32,
+    pub actuator_delivery_delay_steps: u32,
+    pub minimum_observability_eigenvalue: f64,
+    pub minimum_controllability_eigenvalue: f64,
+}
+
+/// Finite-horizon authority report on the complete two-dimensional unstable subspace.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+pub struct CoupledTwoModeAuthorityReport {
+    pub minimum_unstable_eigenvalue_modulus: f64,
+    pub spectral_radius: f64,
+    pub observation_sample_count: u32,
+    pub actuator_command_count: u32,
+    /// Symmetric 2x2 matrices stored as [m00, m01, m11].
+    pub observability_gramian: [f64; 3],
+    pub observability_min_eigenvalue: f64,
+    pub observability_max_eigenvalue: f64,
+    pub observability_condition_number: Option<f64>,
+    pub controllability_gramian: [f64; 3],
+    pub controllability_min_eigenvalue: f64,
+    pub controllability_max_eigenvalue: f64,
+    pub controllability_condition_number: Option<f64>,
+    pub observable: bool,
+    pub controllable: bool,
+    pub authority_qualified: bool,
+}
+
+/// Compute exact finite-horizon two-state observability and controllability
+/// Gramians under the declared asynchronous sample / command schedules.
+///
+/// Samples are admitted only if their delivery completes within the horizon.
+/// Commands contribute only after their delivery time and are propagated to
+/// the terminal step. Noise variance whitens the scalar observation Gramian.
+/// The report is restricted to the full two-state unstable subspace; no stable
+/// directions can inflate its authority score.
+pub fn evaluate_coupled_two_mode_authority(
+    contract: CoupledTwoModeAuthorityContract,
+) -> Result<CoupledTwoModeAuthorityReport, ContractError> {
+    let a = contract.transition_matrix;
+    if a.iter().any(|value| !value.is_finite())
+        || contract
+            .diagnostic_gain
+            .iter()
+            .chain(contract.actuator_gain.iter())
+            .any(|value| !value.is_finite())
+        || !contract.diagnostic_noise_variance.is_finite()
+        || contract.diagnostic_noise_variance <= 0.0
+        || !contract.minimum_observability_eigenvalue.is_finite()
+        || contract.minimum_observability_eigenvalue <= 0.0
+        || !contract.minimum_controllability_eigenvalue.is_finite()
+        || contract.minimum_controllability_eigenvalue <= 0.0
+        || contract.horizon_steps < 2
+        || contract.horizon_steps > MAX_SCALAR_MODE_HORIZON_STEPS
+        || contract.diagnostic_sampling_stride_steps == 0
+        || contract.actuator_update_stride_steps == 0
+    {
+        return Err(ContractError::InvalidCoupledModeAuthority(
+            "finite matrices, positive noise / margins, bounded horizon and positive strides are required",
+        ));
+    }
+
+    let trace = a[0] + a[3];
+    let determinant = a[0].mul_add(a[3], -(a[1] * a[2]));
+    let discriminant = trace.mul_add(trace, -4.0 * determinant);
+    if !trace.is_finite() || !determinant.is_finite() || !discriminant.is_finite() {
+        return Err(ContractError::InvalidCoupledModeAuthority(
+            "transition eigenvalue arithmetic is non-finite",
+        ));
+    }
+    let (minimum_modulus, spectral_radius) = if discriminant >= 0.0 {
+        let root = discriminant.sqrt();
+        let lambda_a = 0.5 * (trace + root);
+        let lambda_b = 0.5 * (trace - root);
+        (lambda_a.abs().min(lambda_b.abs()), lambda_a.abs().max(lambda_b.abs()))
+    } else {
+        let modulus = determinant.sqrt();
+        (modulus, modulus)
+    };
+    if !minimum_modulus.is_finite()
+        || !spectral_radius.is_finite()
+        || minimum_modulus <= 1.0
+    {
+        return Err(ContractError::InvalidCoupledModeAuthority(
+            "both declared modes must be unstable (eigenvalue modulus > 1)",
+        ));
+    }
+
+    let mut observability = [0.0_f64; 3];
+    let mut observability_compensation = [0.0_f64; 3];
+    let mut observation_sample_count = 0_u32;
+    let mut power = [1.0, 0.0, 0.0, 1.0];
+    let mut sample_step = 0_u32;
+    loop {
+        let delivered_step = sample_step
+            .checked_add(contract.diagnostic_delivery_delay_steps)
+            .ok_or(ContractError::InvalidCoupledModeAuthority(
+                "diagnostic delivery step overflowed",
+            ))?;
+        if delivered_step >= contract.horizon_steps {
+            break;
+        }
+        let c0 = contract.diagnostic_gain[0] * power[0]
+            + contract.diagnostic_gain[1] * power[2];
+        let c1 = contract.diagnostic_gain[0] * power[1]
+            + contract.diagnostic_gain[1] * power[3];
+        let inverse_variance = 1.0 / contract.diagnostic_noise_variance;
+        let contribution = [
+            c0 * c0 * inverse_variance,
+            c0 * c1 * inverse_variance,
+            c1 * c1 * inverse_variance,
+        ];
+        if contribution.iter().any(|value| !value.is_finite()) {
+            return Err(ContractError::InvalidCoupledModeAuthority(
+                "observability Gramian overflowed",
+            ));
+        }
+        for index in 0..3 {
+            kahan_add(
+                contribution[index],
+                &mut observability[index],
+                &mut observability_compensation[index],
+            );
+        }
+        observation_sample_count = observation_sample_count.saturating_add(1);
+        sample_step = match sample_step.checked_add(contract.diagnostic_sampling_stride_steps) {
+            Some(next) => next,
+            None => break,
+        };
+        power = multiply_mat2(power, a)?;
+    }
+
+    let mut controllability = [0.0_f64; 3];
+    let mut controllability_compensation = [0.0_f64; 3];
+    let mut actuator_command_count = 0_u32;
+    let mut command_step = 0_u32;
+    while command_step < contract.horizon_steps {
+        let applied_step = command_step
+            .checked_add(contract.actuator_delivery_delay_steps)
+            .ok_or(ContractError::InvalidCoupledModeAuthority(
+                "actuator delivery step overflowed",
+            ))?;
+        if applied_step >= contract.horizon_steps {
+            break;
+        }
+        let remaining_steps = contract.horizon_steps - 1 - applied_step;
+        let propagation = matrix_power_2x2(a, remaining_steps)?;
+        let propagated_b = multiply_mat2_vec(propagation, contract.actuator_gain);
+        let contribution = [
+            propagated_b[0] * propagated_b[0],
+            propagated_b[0] * propagated_b[1],
+            propagated_b[1] * propagated_b[1],
+        ];
+        if contribution.iter().any(|value| !value.is_finite()) {
+            return Err(ContractError::InvalidCoupledModeAuthority(
+                "controllability Gramian overflowed",
+            ));
+        }
+        for index in 0..3 {
+            kahan_add(
+                contribution[index],
+                &mut controllability[index],
+                &mut controllability_compensation[index],
+            );
+        }
+        actuator_command_count = actuator_command_count.saturating_add(1);
+        command_step = match command_step.checked_add(contract.actuator_update_stride_steps) {
+            Some(next) => next,
+            None => break,
+        };
+    }
+
+    if observation_sample_count == 0 || actuator_command_count == 0 {
+        return Err(ContractError::InvalidCoupledModeAuthority(
+            "no diagnostic sample or actuator command arrives within the horizon",
+        ));
+    }
+
+    let (observability_min, observability_max, observability_condition) =
+        symmetric_2x2_spectrum(observability)?;
+    let (controllability_min, controllability_max, controllability_condition) =
+        symmetric_2x2_spectrum(controllability)?;
+    let observable = observability_min >= contract.minimum_observability_eigenvalue;
+    let controllable = controllability_min >= contract.minimum_controllability_eigenvalue;
+
+    Ok(CoupledTwoModeAuthorityReport {
+        minimum_unstable_eigenvalue_modulus: minimum_modulus,
+        spectral_radius,
+        observation_sample_count,
+        actuator_command_count,
+        observability_gramian: observability,
+        observability_min_eigenvalue: observability_min,
+        observability_max_eigenvalue: observability_max,
+        observability_condition_number: observability_condition,
+        controllability_gramian: controllability,
+        controllability_min_eigenvalue: controllability_min,
+        controllability_max_eigenvalue: controllability_max,
+        controllability_condition_number: controllability_condition,
+        observable,
+        controllable,
+        authority_qualified: observable && controllable,
+    })
+}
+
+fn multiply_mat2(left: [f64; 4], right: [f64; 4]) -> Result<[f64; 4], ContractError> {
+    let product = [
+        left[0].mul_add(right[0], left[1] * right[2]),
+        left[0].mul_add(right[1], left[1] * right[3]),
+        left[2].mul_add(right[0], left[3] * right[2]),
+        left[2].mul_add(right[1], left[3] * right[3]),
+    ];
+    if product.iter().any(|value| !value.is_finite()) {
+        return Err(ContractError::InvalidCoupledModeAuthority(
+            "matrix power overflowed",
+        ));
+    }
+    Ok(product)
+}
+
+fn multiply_mat2_vec(matrix: [f64; 4], vector: [f64; 2]) -> [f64; 2] {
+    [
+        matrix[0].mul_add(vector[0], matrix[1] * vector[1]),
+        matrix[2].mul_add(vector[0], matrix[3] * vector[1]),
+    ]
+}
+
+fn matrix_power_2x2(matrix: [f64; 4], exponent: u32) -> Result<[f64; 4], ContractError> {
+    let mut result = [1.0, 0.0, 0.0, 1.0];
+    let mut factor = matrix;
+    let mut power = exponent;
+    while power > 0 {
+        if power & 1 == 1 {
+            result = multiply_mat2(result, factor)?;
+        }
+        power >>= 1;
+        if power > 0 {
+            factor = multiply_mat2(factor, factor)?;
+        }
+    }
+    Ok(result)
+}
+
+fn symmetric_2x2_spectrum(
+    matrix: [f64; 3],
+) -> Result<(f64, f64, Option<f64>), ContractError> {
+    let [a, b, d] = matrix;
+    if matrix.iter().any(|value| !value.is_finite()) {
+        return Err(ContractError::InvalidCoupledModeAuthority(
+            "Gramian matrix is non-finite",
+        ));
+    }
+    let discriminant = (a - d).mul_add(a - d, 4.0 * b * b);
+    let root = discriminant.sqrt();
+    let minimum = (0.5 * (a + d - root)).max(0.0);
+    let maximum = (0.5 * (a + d + root)).max(0.0);
+    let condition = if minimum > 0.0 {
+        Some(maximum / minimum)
+    } else {
+        None
+    };
+    Ok((minimum, maximum, condition))
 }
 
 /// Two-quadrature real representation of one complex growing kinetic mode.
@@ -6117,6 +6396,121 @@ mod tests {
             invalid_scale.unwrap_err(),
             ContractError::InvalidResponseSignatureScale
         );
+    }
+
+    fn coupled_two_mode_contract(
+        transition_matrix: [f64; 4],
+        diagnostic_gain: [f64; 2],
+        actuator_gain: [f64; 2],
+    ) -> CoupledTwoModeAuthorityContract {
+        CoupledTwoModeAuthorityContract {
+            transition_matrix,
+            horizon_steps: 12,
+            diagnostic_gain,
+            diagnostic_noise_variance: 1.0,
+            diagnostic_sampling_stride_steps: 1,
+            diagnostic_delivery_delay_steps: 0,
+            actuator_gain,
+            actuator_update_stride_steps: 1,
+            actuator_delivery_delay_steps: 0,
+            minimum_observability_eigenvalue: 1.0e-6,
+            minimum_controllability_eigenvalue: 1.0e-6,
+        }
+    }
+
+    #[test]
+    fn coupled_two_mode_authority_accepts_distinct_unstable_modes_with_shared_scalar_channels() {
+        let report = evaluate_coupled_two_mode_authority(coupled_two_mode_contract(
+            [1.2, 0.0, 0.0, 1.1],
+            [1.0, 1.0],
+            [1.0, 1.0],
+        ))
+        .unwrap();
+        assert_eq!(report.minimum_unstable_eigenvalue_modulus, 1.1);
+        assert_eq!(report.spectral_radius, 1.2);
+        assert_eq!(report.observation_sample_count, 12);
+        assert_eq!(report.actuator_command_count, 12);
+        assert!(report.observable);
+        assert!(report.controllable);
+        assert!(report.authority_qualified);
+        assert!(report.observability_min_eigenvalue > 1.0e-6);
+        assert!(report.controllability_min_eigenvalue > 1.0e-6);
+        assert!(report.observability_condition_number.is_some());
+        assert!(report.controllability_condition_number.is_some());
+    }
+
+    #[test]
+    fn coupled_two_mode_authority_rejects_shared_sensor_on_repeated_unstable_eigenspace() {
+        let report = evaluate_coupled_two_mode_authority(coupled_two_mode_contract(
+            [1.2, 0.0, 0.0, 1.2],
+            [1.0, 1.0],
+            [1.0, 0.0],
+        ))
+        .unwrap();
+        assert!(!report.observable);
+        assert!(!report.authority_qualified);
+        assert_eq!(report.observability_min_eigenvalue, 0.0);
+        assert_eq!(report.observability_condition_number, None);
+    }
+
+    #[test]
+    fn coupled_two_mode_authority_rejects_rank_one_actuator_on_repeated_unstable_eigenspace() {
+        let report = evaluate_coupled_two_mode_authority(coupled_two_mode_contract(
+            [1.2, 0.0, 0.0, 1.2],
+            [1.0, 0.0],
+            [1.0, 1.0],
+        ))
+        .unwrap();
+        assert!(report.observable);
+        assert!(!report.controllable);
+        assert!(!report.authority_qualified);
+        assert_eq!(report.controllability_min_eigenvalue, 0.0);
+        assert_eq!(report.controllability_condition_number, None);
+    }
+
+    #[test]
+    fn coupled_two_mode_authority_applies_sensor_and_actuator_delivery_delays() {
+        let mut contract =
+            coupled_two_mode_contract([1.2, 0.0, 0.0, 1.1], [1.0, 1.0], [1.0, 1.0]);
+        contract.diagnostic_delivery_delay_steps = 4;
+        contract.actuator_delivery_delay_steps = 5;
+        let report = evaluate_coupled_two_mode_authority(contract).unwrap();
+        assert_eq!(report.observation_sample_count, 8);
+        assert_eq!(report.actuator_command_count, 7);
+    }
+
+    #[test]
+    fn coupled_two_mode_authority_rejects_late_or_absent_channel_updates() {
+        let mut contract =
+            coupled_two_mode_contract([1.2, 0.0, 0.0, 1.1], [1.0, 1.0], [1.0, 1.0]);
+        contract.diagnostic_delivery_delay_steps = contract.horizon_steps;
+        assert!(matches!(
+            evaluate_coupled_two_mode_authority(contract),
+            Err(ContractError::InvalidCoupledModeAuthority(_))
+        ));
+        contract.diagnostic_delivery_delay_steps = 0;
+        contract.actuator_delivery_delay_steps = contract.horizon_steps;
+        assert!(matches!(
+            evaluate_coupled_two_mode_authority(contract),
+            Err(ContractError::InvalidCoupledModeAuthority(_))
+        ));
+    }
+
+    #[test]
+    fn coupled_two_mode_authority_rejects_invalid_and_non_unstable_contracts() {
+        let mut contract =
+            coupled_two_mode_contract([1.2, 0.0, 0.0, 1.1], [1.0, 1.0], [1.0, 1.0]);
+        contract.diagnostic_noise_variance = 0.0;
+        assert!(matches!(
+            evaluate_coupled_two_mode_authority(contract),
+            Err(ContractError::InvalidCoupledModeAuthority(_))
+        ));
+        contract.diagnostic_noise_variance = 1.0;
+        contract.transition_matrix = [1.2, 0.0, 0.0, 0.95];
+        assert!(matches!(
+            evaluate_coupled_two_mode_authority(contract),
+            Err(ContractError::InvalidCoupledModeAuthority(_))
+        ));
     }
 
     #[test]
