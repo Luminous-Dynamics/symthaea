@@ -23,12 +23,12 @@ cargo run -p sympoetic-bench -- validate-trace --input path/to/trace.json
 cargo run -p sympoetic-bench -- validate-scorecard --input path/to/scorecard.json
 
 # Validate the checked-in evidence-bearing example
-cargo run -p sympoetic-bench -- validate-scorecard \\
+cargo run -p sympoetic-bench -- validate-scorecard \
   --input docs/benchmarks/sympoetic/fixtures/scorecard-with-evidence.example.json
 
 # Summarize capability gains and negative-gain rates by baseline stratum
-cargo run -p sympoetic-bench -- summarize-capability-strata \\
-  --input docs/benchmarks/sympoetic/fixtures/distributional-capability.example.json \\
+cargo run -p sympoetic-bench -- summarize-capability-strata \
+  --input docs/benchmarks/sympoetic/fixtures/distributional-capability.example.json \
   --draws 2000 --seed 42
 
 # Digest a file without modifying it
@@ -98,8 +98,8 @@ The team-level evaluator for Mycelix [DELIB-TEAM-RETENTION-001 #6597](https://gi
 Run the checked-in synthetic known-answer fixture:
 
 ```bash
-cargo run -p sympoetic-bench -- summarize-team-retention \\
-  --input docs/benchmarks/sympoetic/fixtures/team-retention-synthetic-v0.1.tsv \\
+cargo run -p sympoetic-bench -- summarize-team-retention \
+  --input docs/benchmarks/sympoetic/fixtures/team-retention-synthetic-v0.1.tsv \
   --draws 2000 --seed 42
 ```
 
