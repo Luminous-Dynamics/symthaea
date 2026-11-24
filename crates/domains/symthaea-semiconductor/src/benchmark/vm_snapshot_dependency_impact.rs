@@ -11,6 +11,7 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
 
+use super::label_consumption_guard::LabelConsumptionEligibilityV1;
 use super::vm_snapshot_evidence::{
     VmSnapshotCurrentDispositionV1, VmSnapshotPurposeV1, VmSnapshotRequalificationReportV1,
 };
@@ -108,6 +109,8 @@ pub struct VmSnapshotImpactEntryV1 {
     pub directly_impacted: bool,
     pub direct_label_status: Option<VmSnapshotCurrentDispositionV1>,
     pub inherited_from_snapshot_ids: Vec<String>,
+    pub direct_affected_label_ids: Vec<String>,
+    pub inherited_affected_label_ids: Vec<String>,
     pub rebuild_candidate: bool,
 }
 
@@ -624,6 +627,8 @@ pub fn compute_vm_snapshot_impact_closure_v1(
     let mut direct_risks: BTreeMap<String, ImpactRiskV1> = BTreeMap::new();
     let mut inherited_risks: BTreeMap<String, ImpactRiskV1> = BTreeMap::new();
     let mut direct_statuses: BTreeMap<String, VmSnapshotCurrentDispositionV1> = BTreeMap::new();
+    let mut direct_label_ids: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    let mut inherited_label_ids: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     let mut inherited_from: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
 
     for snapshot_id in &topological {
@@ -633,6 +638,16 @@ pub fn compute_vm_snapshot_impact_closure_v1(
         direct_risks.insert(snapshot_id.clone(), direct_risk(report.current_disposition));
         inherited_risks.insert(snapshot_id.clone(), ImpactRiskV1::None);
         direct_statuses.insert(snapshot_id.clone(), report.current_disposition);
+        let affected_labels: BTreeSet<String> = report
+            .label_statuses
+            .iter()
+            .filter(|label| {
+                label.k1_eligibility != LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy
+            })
+            .map(|label| label.label_id.clone())
+            .collect();
+        direct_label_ids.insert(snapshot_id.clone(), affected_labels);
+        inherited_label_ids.insert(snapshot_id.clone(), BTreeSet::new());
     }
 
     for parent_id in &topological {
@@ -658,6 +673,12 @@ pub fn compute_vm_snapshot_impact_closure_v1(
                 .entry(edge.child_snapshot_id.clone())
                 .or_default()
                 .insert(parent_id.clone());
+            let mut propagated_label_ids = direct_label_ids[parent_id].clone();
+            propagated_label_ids.extend(inherited_label_ids[parent_id].iter().cloned());
+            inherited_label_ids
+                .entry(edge.child_snapshot_id.clone())
+                .or_default()
+                .extend(propagated_label_ids);
         }
     }
 
@@ -691,6 +712,14 @@ pub fn compute_vm_snapshot_impact_closure_v1(
         if rebuild_candidate {
             rebuild_candidates.insert(snapshot_id.clone());
         }
+        let direct_affected_label_ids: Vec<String> = direct_label_ids[snapshot_id]
+            .iter()
+            .cloned()
+            .collect();
+        let inherited_affected_label_ids: Vec<String> = inherited_label_ids[snapshot_id]
+            .iter()
+            .cloned()
+            .collect();
         entries.push(VmSnapshotImpactEntryV1 {
             snapshot_id: snapshot_id.clone(),
             state,
@@ -701,6 +730,8 @@ pub fn compute_vm_snapshot_impact_closure_v1(
                 None
             },
             inherited_from_snapshot_ids: inherited,
+            direct_affected_label_ids,
+            inherited_affected_label_ids,
             rebuild_candidate,
         });
     }
@@ -956,6 +987,64 @@ mod tests {
                 "grandchild".to_string()
             ]
         );
+    }
+
+    #[test]
+    fn impacted_descendants_retain_exact_source_label_ids() {
+        let root = node(
+            "root",
+            VmModelDerivationKindV1::IndependentRetrain,
+            VmSnapshotPurposeV1::Training,
+            'a',
+            'b',
+        );
+        let child = node(
+            "child",
+            VmModelDerivationKindV1::FineTuneFromParent,
+            VmSnapshotPurposeV1::Training,
+            'c',
+            'd',
+        );
+        let g = graph(
+            vec![root.clone(), child.clone()],
+            vec![edge(
+                "inherits-root",
+                &root,
+                &child,
+                vec![VmDependencyDimensionV1::ModelWeights],
+            )],
+            true,
+            true,
+        );
+        let report = compute_vm_snapshot_impact_closure_v1(&input(
+            g,
+            vec![
+                requal(
+                    "root",
+                    &root.manifest_sha256,
+                    VmSnapshotCurrentDispositionV1::RebuildRequired,
+                ),
+                requal(
+                    "child",
+                    &child.manifest_sha256,
+                    VmSnapshotCurrentDispositionV1::CurrentEligible,
+                ),
+            ],
+        ))
+        .unwrap();
+        let root_entry = report
+            .entries
+            .iter()
+            .find(|entry| entry.snapshot_id == "root")
+            .unwrap();
+        let child_entry = report
+            .entries
+            .iter()
+            .find(|entry| entry.snapshot_id == "child")
+            .unwrap();
+        assert_eq!(root_entry.direct_affected_label_ids, vec!["label-root"]);
+        assert_eq!(child_entry.inherited_affected_label_ids, vec!["label-root"]);
+        assert!(child_entry.direct_affected_label_ids.is_empty());
     }
 
     #[test]
