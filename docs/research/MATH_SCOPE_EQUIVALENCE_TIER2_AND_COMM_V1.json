@@ -24,7 +24,7 @@
   "proof_source": {
     "repository": "Luminous-Dynamics/symthaea",
     "path": "scripts/research/lean-proof-extractor/ScopeEquivalenceTier2AndComm.lean",
-    "sha256": "720875c1096f615d966bb45f194a4e99ec910f1bfe1423fae4cc9390b3b19d79"
+    "sha256": "9702bb4139fe9aa51c2f708d95857aead3018856dbc935585842a9b5151a7395"
   },
   "certificates": [
     {
