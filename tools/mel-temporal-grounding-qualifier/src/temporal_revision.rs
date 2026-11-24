@@ -671,6 +671,68 @@ mod tests {
     const EVIDENCE: &str = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
     const RETRIEVAL: &str = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
 
+    fn interval(start_frame: u64, end_frame: u64) -> FrameIntervalV1 {
+        FrameIntervalV1 {
+            start_frame,
+            end_frame,
+        }
+    }
+
+    fn raw_prediction(
+        audio: &AudioArtifactClockV1,
+        query_id: &str,
+        intervals: Vec<FrameIntervalV1>,
+    ) -> TemporalGroundingPredictionV1 {
+        TemporalGroundingPredictionV1 {
+            schema_version: TEMPORAL_GROUNDING_SCHEMA_V1.into(),
+            query_id: query_id.into(),
+            artifact: audio.clone(),
+            state: GroundingPredictionStateV1::Occurrences { intervals },
+        }
+    }
+
+    fn revision_case_v2(
+        truth_intervals: Vec<FrameIntervalV1>,
+        draft_intervals: Vec<FrameIntervalV1>,
+        final_intervals: Vec<FrameIntervalV1>,
+    ) -> RevisionCaseV2 {
+        let audio = AudioArtifactClockV1 {
+            audio_sha256: AUDIO.into(),
+            sample_rate_hz: 48_000,
+            channels: 2,
+            total_frames: 48_000 * 60,
+        };
+        let query_id = "query-v2";
+        RevisionCaseV2 {
+            schema: "mel-temporal-revision-case-v2".into(),
+            case_id: "case-v2".into(),
+            model_identity_sha256: MODEL.into(),
+            prompt_sha256: PROMPT.into(),
+            adapter_sha256: ADAPTER.into(),
+            evidence_condition: EvidenceConditionV1::NoEvidence,
+            evidence: None,
+            actions: vec![RevisionActionV1::Other],
+            truth: TemporalGroundTruthV1 {
+                schema_version: TEMPORAL_GROUNDING_SCHEMA_V1.into(),
+                query_id: query_id.into(),
+                query_text: "Every piano entrance".into(),
+                artifact: audio.clone(),
+                annotation_policy_version: "annot-v1".into(),
+                annotation_set_sha256: EVIDENCE.into(),
+                annotator_count: 2,
+                state: GroundTruthStateV1::Present,
+                intervals: truth_intervals,
+                status_reason: None,
+            },
+            plan: TemporalGroundingPlanV1 {
+                evaluator_version: "mel-temporal-grounding-evaluator-v1".into(),
+                minimum_interval_iou: 0.5,
+            },
+            draft_prediction: raw_prediction(&audio, query_id, draft_intervals),
+            final_prediction: raw_prediction(&audio, query_id, final_intervals),
+        }
+    }
+
     fn positive_score(
         f1: f64,
         tp: usize,
@@ -729,6 +791,78 @@ mod tests {
             draft,
             final_score,
         }
+    }
+
+    #[test]
+    fn v2_computes_draft_and_final_scores_from_raw_predictions() {
+        let case = revision_case_v2(
+            vec![interval(100, 200), interval(500, 600)],
+            vec![interval(100, 200), interval(800, 900)],
+            vec![interval(100, 200), interval(500, 600)],
+        );
+        let report = audit_revision_v2(&case).unwrap();
+        assert_eq!(report.draft.f1, Some(0.5));
+        assert_eq!(report.final_score.f1, Some(1.0));
+        assert_eq!(report.draft.count_gated_f1, Some(0.0));
+        assert_eq!(report.final_score.count_gated_f1, Some(1.0));
+        assert_eq!(report.count_gated_f1_delta, Some(1.0));
+        assert_eq!(report.helpful_revision, Some(true));
+    }
+
+    #[test]
+    fn v2_rejects_no_change_when_raw_predictions_differ_even_if_scores_could_match() {
+        let mut case = revision_case_v2(
+            vec![interval(100, 200), interval(500, 600)],
+            vec![interval(100, 200), interval(800, 900)],
+            vec![interval(100, 200), interval(700, 800)],
+        );
+        case.actions = vec![RevisionActionV1::NoChange];
+        assert!(audit_revision_v2(&case).is_err());
+    }
+
+    #[test]
+    fn v2_rejects_predictions_from_a_different_audio_artifact() {
+        let mut case = revision_case_v2(
+            vec![interval(100, 200), interval(500, 600)],
+            vec![interval(100, 200), interval(800, 900)],
+            vec![interval(100, 200), interval(500, 600)],
+        );
+        case.final_prediction.artifact.audio_sha256 =
+            "1212121212121212121212121212121212121212121212121212121212121212".into();
+        assert!(audit_revision_v2(&case).is_err());
+    }
+
+    #[test]
+    fn v2_local_evidence_must_stay_inside_the_scored_recording() {
+        let mut case = revision_case_v2(
+            vec![interval(100, 200), interval(500, 600)],
+            vec![interval(100, 200), interval(800, 900)],
+            vec![interval(100, 200), interval(500, 600)],
+        );
+        case.evidence_condition = EvidenceConditionV1::LocalRetrieved;
+        case.evidence = Some(RevisionEvidenceV1 {
+            source_audio_sha256: AUDIO.into(),
+            source_sample_rate_hz: 48_000,
+            evidence_payload_sha256: EVIDENCE.into(),
+            retrieval_config_sha256: RETRIEVAL.into(),
+            start_frame: 47_000,
+            end_frame: 49_000,
+        });
+        assert!(audit_revision_v2(&case).is_err());
+        case.evidence.as_mut().unwrap().end_frame = 48_000;
+        assert!(audit_revision_v2(&case).is_ok());
+    }
+
+    #[test]
+    fn v2_json_parser_uses_raw_scorer_inputs_not_injected_scores() {
+        let case = revision_case_v2(
+            vec![interval(100, 200), interval(500, 600)],
+            vec![interval(100, 200), interval(800, 900)],
+            vec![interval(100, 200), interval(500, 600)],
+        );
+        let encoded = serde_json::to_string(&case).unwrap();
+        let report = audit_revision_case_v2(&encoded).unwrap();
+        assert_eq!(report.final_score.f1, Some(1.0));
     }
 
     #[test]
