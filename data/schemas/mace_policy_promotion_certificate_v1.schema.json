@@ -1,0 +1,183 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mace_policy_promotion_certificate_v1.schema.json",
+  "title": "MACE Policy Promotion Certificate V1",
+  "description": "Sealed evaluator attestation that a retrieval strategy passed preregistered paired, held-out decision-utility and safety guardrails. It is not a runtime authorization token.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "strategy_signature_sha256",
+    "policy_note_sha256",
+    "evaluation_manifest_sha256",
+    "candidate_profile_sha256",
+    "baseline_profile_sha256",
+    "task_distribution_sha256",
+    "outcome_receipt_set_sha256",
+    "promotion_status",
+    "paired_block_count",
+    "independent_cluster_count",
+    "effect_estimate_micros",
+    "effect_lcb_micros",
+    "confidence_level_ppm",
+    "max_task_family_regression_micros",
+    "resource_budget_matched",
+    "security_controls_passed",
+    "selection_bias_controls_passed",
+    "distribution_shift_controls_passed",
+    "issuer_profile_sha256",
+    "key_id",
+    "issued_at_unix",
+    "expires_at_unix",
+    "signature"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mace_policy_promotion_certificate_v1"
+    },
+    "strategy_signature_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "policy_note_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "evaluation_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "candidate_profile_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "baseline_profile_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "task_distribution_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "outcome_receipt_set_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "promotion_status": {
+      "enum": [
+        "eligible",
+        "rejected",
+        "non_estimable"
+      ]
+    },
+    "paired_block_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "independent_cluster_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "effect_estimate_micros": {
+      "type": "integer",
+      "minimum": -1000000000000,
+      "maximum": 1000000000000
+    },
+    "effect_lcb_micros": {
+      "type": "integer",
+      "minimum": -1000000000000,
+      "maximum": 1000000000000
+    },
+    "confidence_level_ppm": {
+      "type": "integer",
+      "minimum": 500000,
+      "maximum": 999999
+    },
+    "max_task_family_regression_micros": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000000000
+    },
+    "resource_budget_matched": {
+      "type": "boolean"
+    },
+    "security_controls_passed": {
+      "type": "boolean"
+    },
+    "selection_bias_controls_passed": {
+      "type": "boolean"
+    },
+    "distribution_shift_controls_passed": {
+      "type": "boolean"
+    },
+    "issuer_profile_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "key_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "issued_at_unix": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "expires_at_unix": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "signature": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4096,
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "promotion_status": {
+            "const": "eligible"
+          }
+        },
+        "required": [
+          "promotion_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "paired_block_count": {
+            "minimum": 30
+          },
+          "independent_cluster_count": {
+            "minimum": 10
+          },
+          "effect_lcb_micros": {
+            "minimum": 1
+          },
+          "max_task_family_regression_micros": {
+            "maximum": 20000
+          },
+          "resource_budget_matched": {
+            "const": true
+          },
+          "security_controls_passed": {
+            "const": true
+          },
+          "selection_bias_controls_passed": {
+            "const": true
+          },
+          "distribution_shift_controls_passed": {
+            "const": true
+          }
+        }
+      }
+    }
+  ]
+}
