@@ -270,6 +270,17 @@ fn validate_arm(pair_id: &str, label: &str, arm: &EpisodeArmV1) -> Result<(), St
     if arm.utility_milli > 1_000 || arm.harm_milli > 1_000 {
         return Err(format!("pair {pair_id} {label} utility_milli and harm_milli must be in 0..=1000"));
     }
+    if [
+        arm.input_tokens,
+        arm.output_tokens,
+        arm.latency_ms,
+        arm.total_cost_microusd,
+    ]
+    .iter()
+    .any(|value| *value > i64::MAX as u64)
+    {
+        return Err(format!("pair {pair_id} {label} counters exceed the supported signed-delta range"));
+    }
     match (arm.memory_condition, arm.memory_snapshot_sha256.as_deref()) {
         (MemoryConditionV1::None, None) => {}
         (MemoryConditionV1::None, Some(_)) => {
@@ -354,12 +365,12 @@ fn build_report(dataset: &DatasetV1, source: &[u8]) -> Result<AuditReportV1, Str
         .pairs
         .iter()
         .map(|pair| pair.treatment.unauthorized_exposure_count as u64)
-        .sum();
+        .fold(0_u64, u64::saturating_add);
     let action_count = dataset
         .pairs
         .iter()
         .map(|pair| pair.treatment.unauthorized_action_count as u64)
-        .sum();
+        .fold(0_u64, u64::saturating_add);
 
     let mut pair_deltas = Vec::with_capacity(dataset.pairs.len());
     let mut metric_clusters: BTreeMap<String, BTreeMap<String, Vec<f64>>> = BTreeMap::new();
@@ -475,7 +486,7 @@ fn cluster_bootstrap_interval(
     for _ in 0..resamples {
         let mut sample_sum = 0.0;
         for _ in 0..values.len() {
-            let index = (rng.next() as usize) % values.len();
+            let index = (rng.next() % values.len() as u64) as usize;
             sample_sum += values[index];
         }
         estimates.push(sample_sum / values.len() as f64);
