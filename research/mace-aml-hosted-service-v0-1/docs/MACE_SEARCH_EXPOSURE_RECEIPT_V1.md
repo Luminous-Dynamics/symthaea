@@ -10,7 +10,7 @@ The hosted service therefore creates a Search exposure receipt inside the same S
 
 ## Receipt fields
 
-The strict JSON payload is defined by `data/schemas/mace_search_trace_receipt_v1.schema.json`.
+The strict JSON payload is defined by `data/schemas/mace_search_trace_receipt_v1.schema.json`, with a non-production example at `data/fixtures/mace_search_trace_receipt_v1.example.json`. The Rust payload type also uses strict unknown-field rejection.
 
 - `search_id`: unique identity for this retrieval invocation.
 - `principal_id` and `tenant_id`: authenticated service boundary.
