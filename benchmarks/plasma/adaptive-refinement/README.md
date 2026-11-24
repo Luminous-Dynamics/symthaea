@@ -12,7 +12,7 @@ A missing response estimate is not treated as zero risk: it triggers a conservat
 
 Before refinement, compare the projected peak memory (including padded arrays, FFT workspaces, split stages and temporary allocations) with the budget after reserved headroom. If the required allocation does not fit, return `BlockedByMemory` and `UnknownBlockedByMemory`. The policy must not call this a qualified stable state.
 
-The Rust primitive is `decide_spectral_refinement`; its inputs include the spectral-tail measure, normalized future-response upper bound, projected peak memory, budget and reserve. The checked-in fixture exercises six deterministic manufactured cases.
+The Rust primitive is `decide_spectral_refinement`; its inputs include the spectral-tail measure, normalized future-response upper bound, projected peak memory, budget and reserve. The checked-in fixture exercises six deterministic manufactured cases. Its first two cases form a matched witness pair: identical spectral-tail measure and projected memory, but low versus high future-response risk. The first holds resolution; the second refines. This isolates the incremental value of the response signal from the energy-tail signal.
 
 ## Relationship to the adaptive Fourier baseline
 
