@@ -810,8 +810,7 @@ fn validate_global_use_adjudication(
     }
     if !valid_sha256(&adjudication.reviewed_plan_sha256) {
         errors.push(
-            "global_use_adjudication.reviewed_plan_sha256 must be lowercase SHA-256 hex"
-                .to_owned(),
+            "global_use_adjudication.reviewed_plan_sha256 must be lowercase SHA-256 hex".to_owned(),
         );
     } else if adjudication.reviewed_plan_sha256 != candidate.global_stage.proof_plan_sha256 {
         errors.push(
@@ -821,8 +820,7 @@ fn validate_global_use_adjudication(
     }
     let expected_warrant = &candidate.global_stage.scope_binding.warrant_id;
     if &adjudication.target_warrant_id != expected_warrant
-        || adjudication.target_warrant_id
-            != candidate.local_stage.scope_binding.warrant_id
+        || adjudication.target_warrant_id != candidate.local_stage.scope_binding.warrant_id
     {
         errors.push(
             "global_use_adjudication.target_warrant_id must match the exact paired warrant identity"
@@ -857,7 +855,9 @@ fn validate_global_use_adjudication(
     let mut node_ids = HashSet::new();
     for node in &adjudication.node_evidence {
         if !non_empty(&node.plan_node_id) || !non_empty(&node.warrant_id) {
-            errors.push("global-use plan-node evidence requires non-empty node and warrant IDs".to_owned());
+            errors.push(
+                "global-use plan-node evidence requires non-empty node and warrant IDs".to_owned(),
+            );
         }
         if !node_ids.insert(&node.plan_node_id) {
             errors.push(format!(
@@ -877,11 +877,15 @@ fn validate_global_use_adjudication(
                 node.plan_node_id
             ));
         }
-        let matching_candidate_mention = candidate.global_stage.warrant_mentions.iter().any(|mention| {
-            mention.plan_node_id == node.plan_node_id
-                && mention.warrant_id == node.warrant_id
-                && mention.relation == node.relation
-        });
+        let matching_candidate_mention = candidate
+            .global_stage
+            .warrant_mentions
+            .iter()
+            .any(|mention| {
+                mention.plan_node_id == node.plan_node_id
+                    && mention.warrant_id == node.warrant_id
+                    && mention.relation == node.relation
+            });
         if !matching_candidate_mention {
             errors.push(format!(
                 "global-use node {} must match a candidate-visible warrant mention",
@@ -893,9 +897,10 @@ fn validate_global_use_adjudication(
     match adjudication.disposition {
         GlobalDisposition::UsedDirectly => {
             if !adjudication.reviewed_entire_plan
-                || !adjudication.node_evidence.iter().any(|node| {
-                    node.material_use && node.relation == MentionRelation::UsesAsRule
-                })
+                || !adjudication
+                    .node_evidence
+                    .iter()
+                    .any(|node| node.material_use && node.relation == MentionRelation::UsesAsRule)
             {
                 errors.push(
                     "used_directly requires a complete plan review and a material uses_as_rule node"
@@ -908,9 +913,10 @@ fn validate_global_use_adjudication(
                 || !adjudication.node_evidence.iter().any(|node| {
                     node.material_use && node.relation == MentionRelation::SupportsInference
                 })
-                || adjudication.node_evidence.iter().any(|node| {
-                    node.material_use && node.relation == MentionRelation::UsesAsRule
-                })
+                || adjudication
+                    .node_evidence
+                    .iter()
+                    .any(|node| node.material_use && node.relation == MentionRelation::UsesAsRule)
             {
                 errors.push(
                     "used_implicitly requires a complete plan review, a material supports_inference node, and no direct uses_as_rule node"
@@ -927,7 +933,10 @@ fn validate_global_use_adjudication(
                             MentionRelation::Cites | MentionRelation::Rebuts
                         )
                 })
-                || adjudication.node_evidence.iter().any(|node| node.material_use)
+                || adjudication
+                    .node_evidence
+                    .iter()
+                    .any(|node| node.material_use)
             {
                 errors.push(
                     "cited_rejected requires a complete plan review and non-material cite/rebut evidence only"
@@ -939,7 +948,10 @@ fn validate_global_use_adjudication(
             if !adjudication.reviewed_entire_plan
                 || adjudication.node_evidence.iter().any(|node| {
                     node.material_use
-                        || matches!(node.relation, MentionRelation::Cites | MentionRelation::Rebuts)
+                        || matches!(
+                            node.relation,
+                            MentionRelation::Cites | MentionRelation::Rebuts
+                        )
                 })
             {
                 errors.push(
@@ -1923,10 +1935,15 @@ mod tests {
     #[test]
     fn eligible_cirr_requires_independent_global_use_adjudication() {
         let mut pair = fixture();
-        pair.evaluator_only.as_mut().unwrap().global_use_adjudication = None;
-        assert!(validate_pair(&pair)
-            .iter()
-            .any(|error| error.contains("requires a global_use_adjudication receipt")));
+        pair.evaluator_only
+            .as_mut()
+            .unwrap()
+            .global_use_adjudication = None;
+        assert!(
+            validate_pair(&pair)
+                .iter()
+                .any(|error| error.contains("requires a global_use_adjudication receipt"))
+        );
     }
 
     #[test]
@@ -1939,10 +1956,13 @@ mod tests {
             .global_use_adjudication
             .as_mut()
             .unwrap()
-            .reviewed_plan_sha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_owned();
-        assert!(validate_pair(&plan_mutation)
-            .iter()
-            .any(|error| error.contains("must match candidate.global_stage.proof_plan_sha256")));
+            .reviewed_plan_sha256 =
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_owned();
+        assert!(
+            validate_pair(&plan_mutation)
+                .iter()
+                .any(|error| error.contains("must match candidate.global_stage.proof_plan_sha256"))
+        );
 
         let mut warrant_mutation = fixture();
         warrant_mutation
@@ -1953,9 +1973,11 @@ mod tests {
             .as_mut()
             .unwrap()
             .target_warrant_id = "W-DIFFERENT-THEOREM".to_owned();
-        assert!(validate_pair(&warrant_mutation)
-            .iter()
-            .any(|error| error.contains("must match the exact paired warrant identity")));
+        assert!(
+            validate_pair(&warrant_mutation)
+                .iter()
+                .any(|error| error.contains("must match the exact paired warrant identity"))
+        );
     }
 
     #[test]
@@ -1969,9 +1991,11 @@ mod tests {
             .unwrap()
             .node_evidence[0]
             .material_use = false;
-        assert!(validate_pair(&pair)
-            .iter()
-            .any(|error| error.contains("used_directly requires a complete plan review")));
+        assert!(
+            validate_pair(&pair)
+                .iter()
+                .any(|error| error.contains("used_directly requires a complete plan review"))
+        );
     }
 
     #[test]
@@ -1994,9 +2018,11 @@ mod tests {
             .unwrap()
             .node_evidence[0]
             .rationale_ref = "MISSING-REVIEW-EVIDENCE".to_owned();
-        assert!(validate_pair(&pair)
-            .iter()
-            .any(|error| error.contains("rationale_ref must resolve")));
+        assert!(
+            validate_pair(&pair)
+                .iter()
+                .any(|error| error.contains("rationale_ref must resolve"))
+        );
     }
 
     #[test]
