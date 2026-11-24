@@ -731,7 +731,7 @@ pub fn observe_drift_channel_v1(
                     missing: state.missing_observations,
                     statistic: 0.0,
                     before_sha256: before.clone(),
-                    after_sha256: &before.into(),
+                    after_sha256: before.to_string(),
                 },
             );
         }
@@ -1049,6 +1049,7 @@ pub fn assess_declared_common_resource_association_v1(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::calibration_requalification::CalibrationRequalificationFrontierReportV1;
 
     fn digest(ch: char) -> String {
         std::iter::repeat_n(ch, 64).collect()
