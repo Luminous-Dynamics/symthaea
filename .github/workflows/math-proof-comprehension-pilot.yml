@@ -296,6 +296,10 @@ jobs:
                   and .action_spec.output_subgoal_ids == $action.output_goal_ids
                 )
               )
+              and ([$certificate.actions[] | .output_goal_ids[]] | sort)
+                  == ([$certificate.actions[] | select(.plan_node_id != "A_SPLIT_IFF") | .input_goal_ids[]] | sort)
+              and ([$certificate.actions[] | .output_goal_ids[]] | length) == 2
+              and ([$certificate.actions[] | .output_goal_ids[]] | unique | length) == 2
               and (($certificate.actions[] | select(.plan_node_id == "A_FORWARD").expected_statement)
                    == ($plan.nodes[] | select(.id == "G_FORWARD").statement))
               and (($certificate.actions[] | select(.plan_node_id == "A_REVERSE").expected_statement)
@@ -314,6 +318,17 @@ jobs:
           fi
           echo "PROOF_ACTION_PLAN_BINDING_PASS"
           echo "PROOF_ACTION_PLAN_BINDING_MUTATION_REJECTED"
+
+          jq '.actions |= map(if .plan_node_id == "A_SPLIT_IFF"
+            then .output_goal_ids = ["G_FORWARD"] else . end)' \
+            docs/research/PROOF_ACTION_CERTIFICATE_AND_COMM_V1.json \
+            > "$RUNNER_TEMP/proof-action-certificate-omitted-subgoal.json"
+          if validate_mapping "$RUNNER_TEMP/proof-action-certificate-omitted-subgoal.json"; then
+            echo "ERROR: validator accepted an omitted action subgoal"
+            exit 1
+          fi
+          echo "PROOF_ACTION_SUBGOAL_ACCOUNTING_PASS"
+          echo "PROOF_ACTION_OMITTED_SUBGOAL_MUTATION_REJECTED"
 
           jq -e '."$schema" == "https://json-schema.org/draft/2020-12/schema"
             and (getpath(["$defs","evaluator","required"]) | index("global_use_adjudication") != null)
