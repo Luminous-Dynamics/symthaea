@@ -161,9 +161,9 @@ fn parse_tsv(input: &str) -> Result<Vec<TeamObservation>, String> {
     for (line_index, line) in lines.enumerate() {
         let line_number = line_index + 2;
         let fields: Vec<&str> = line.trim_end_matches('\r').split('\t').collect();
-        if fields.len() != 14 {
+        if fields.len() != 15 {
             return Err(format!(
-                "line {line_number}: expected 14 tab-separated fields, got {}",
+                "line {line_number}: expected 15 tab-separated fields, got {}",
                 fields.len()
             ));
         }
@@ -732,6 +732,12 @@ mod tests {
             input.push_str(&line);
         }
         assert!(parse_tsv(&input).is_ok());
+        let missing_tms_column = input.replacen("\tNA\thuman_only\t", "\thuman_only\t", 1);
+        assert!(
+            parse_tsv(&missing_tms_column)
+                .unwrap_err()
+                .contains("expected 15 tab-separated fields")
+        );
 
         let missing_ai_assisted_score =
             input.replace("\thuman_ai\t0.5\t0.8\t0.5", "\thuman_ai\t0.5\tNA\t0.5");
