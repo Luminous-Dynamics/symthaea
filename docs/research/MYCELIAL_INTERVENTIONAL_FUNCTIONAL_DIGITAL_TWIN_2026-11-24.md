@@ -196,7 +196,7 @@ These results motivate a strict distinction:
 
 An exposure can preserve viability while changing developmental behaviour; opposite endpoints can move in different directions. An imaging condition must therefore be treated as a possible biological treatment until its effect is shown negligible for the endpoint being predicted.
 
-Issue #13488 specifies a separate, source-bound photobiological exposure ledger and response model. It records species, strain, stage, cultivation unit, substrate/hydration, spectrum, specimen-plane irradiance, fluence, duty cycle, dwell, schedule, spatial footprint, acquisition plan and device identities. It keeps growth, viability, sporulation, ROS and metabolite outcomes separate. Unknown species/strain/stage or out-of-domain exposure schedules must produce an explicit unqualified response state; no wavelength-only correction factor is permitted.
+Issue #13488 specifies a separate, source-bound photobiological exposure ledger and response model. Draft PR #13492 implements the first typed Rust record: species, strain, stage, cultivation unit, substrate/hydration, spectrum, specimen-plane irradiance, fluence, duty cycle, longest continuous dwell, exact pulse-schedule digest, ambient photoperiod phase, spatial footprint, acquisition plan and device identities. It adds separate response-observation types for extension, branching, cord area, conidiation, viability, ROS, analyte-specific metabolites and fruiting latency. It validates exact exposure binding and pre/during/post/recovery observation windows. This is an evidence schema, not a fitted light-response model. Unknown species/strain/stage or out-of-domain exposure schedules must produce an explicit unqualified response state in the future response-model layer; no wavelength-only correction factor is permitted.
 
 The first controlled fungal study should include dark/ambient and low-exposure imaging controls, species-appropriate spectral bands, calibrated irradiance levels, continuous versus fractionated schedules at equal integrated fluence, temperature/handling shams, randomized independent cultivation units and post-exposure recovery observations. Such work requires qualified mycologists and approved protocols. PhotoFiTT and the cited fungal studies provide research design precedents, not universal Mycelial safe-dose thresholds.
 
@@ -323,6 +323,7 @@ This protocol connects rather than duplicates the current portfolio:
 - PR #13369 — feasible graph-hypothesis posterior.
 - PR #13379 — decision-value active acquisition.
 - Issue #13486 / draft PR #13487 — hard cumulative specimen-health admissibility after VOI ranking.
+- Issue #13488 / draft PR #13492 — photobiological exposure and response observations, distinct from phototoxicity.
 - Issue #13419 — posterior adequacy, candidate-generation coverage and common-cause residuals.
 - Issue #13352 — independent functional observations and transport benchmarks.
 - Issue #13423 — multiplex transport and causal perturbation programme.
