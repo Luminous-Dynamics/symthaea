@@ -1,9 +1,8 @@
 name: DMC Complete Restore Contract
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    branches: ["research/dmc-individual-effect-pilot-v0-1-20261124"]
+  push:
+    branches: ["research/dmc-restore-contract-v0-1-20261124"]
     paths:
       - "research/temporal-evaluator/**"
       - "docs/research/DMC_COMPLETE_RESTORE_AND_PREFIX_V0_1.md"
