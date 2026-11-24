@@ -1,16 +1,20 @@
-# SFEB MON-006 — SCITT-compatible action evidence v1
+# SFEB MON-006 — SCITT-compatible action evidence v1 (corrected CBOR ordering)
 
 ## Local execution
 
 Node.js v22.16.0; built-in modules only.
 
-- **28/28 deterministic tests passed** in four fresh raw-source invocations and one compressed-stdin invocation.
-- Raw and compressed runs emit byte-identical Signed Statement, Receipt A, Receipt B and Transparent Statement wire fixtures. Whole-run JSON differs because benchmark timings vary naturally.
-- Tenant-bound action encoded as CBOR tag 18 COSE_Sign1 using EdDSA (-8), protected kid, content_type and CWT iss/sub.
-- Two differently keyed mock Transparency Service identities register the exact same Signed Statement and issue separate RFC 9942-shaped inclusion receipts.
-- Receipts attach via unprotected header label 394; original issuer signature remains verifiable.
-- Negative controls cover tampered payload/header/signature, tenant/resource substitution, unknown issuer/kid, non-deterministic CBOR, non-empty pre-registration unprotected header, TS key/identity mismatch, proof tampering, VDS substitution, duplicate TS identity and insufficient receipts.
-- A signed fabricated sink/readback claim is deliberately accepted by the mock TS. This demonstrates that transparency proves provenance and registration, not real-world truth.
+- **29/29 deterministic tests passed** in four fresh raw-source invocations and one compressed-stdin invocation.
+- Exact CBOR wire fixtures (Signed Statement, Receipt A/B, Transparent Statement) are byte-identical across all five runs. Whole-run JSON differs because it includes variable timings.
+- The issuer statement is tagged CBOR tag 18 COSE_Sign1 using EdDSA (-8), protected content_type, kid and CWT iss/sub.
+- The tenant-bound action payload commits to resource, stable operation identity, request/source digests, authority revision, objective fence, execution/sink/readback digests and aggregate sequence.
+- Two differently keyed mock Transparency Services register the exact same Signed Statement and issue separate RFC 9942-shaped RFC 9162 inclusion receipts. The receipts attach under COSE label 394.
+- Negative controls cover tampering, tenant/resource substitution, issuer/TS identity, proof tampering, VDS substitution, duplicate TS identity, insufficient receipts and registration-header constraints.
+- A fabricated sink/readback claim signed by the issuer is deliberately accepted by the mock TS: transparency establishes provenance and registration, not factual truth.
+
+## CBOR standards-audit correction
+
+The initial comparator used legacy length-first ordering. It is corrected to RFC 8949 core deterministic bytewise lexicographic order of encoded map keys. A mixed-length regression vector explicitly distinguishes core ordering from length-first ordering. Supported integer/length arguments use shortest encodings and indefinite lengths are rejected. This remains a narrow supported CBOR subset, not a general RFC 8949 library.
 
 ## Run
 
@@ -19,17 +23,13 @@ gzip -dc benchmarks/frontend/monitoring/mon006-scitt-action-evidence-v1.mjs.gz |
 gzip -dc benchmarks/frontend/monitoring/mon006-scitt-action-evidence-v1.mjs.gz | node --input-type=module
 ```
 
-## Four-run same-process microbenchmark
+## Local four-run microbenchmark
 
-Each invocation created and verified 600 signed action statements and verified 600 detached inclusion receipts.
+- Signed action create+verify: median **3,272.5 ops/s**, range **3,020–3,537**.
+- Detached inclusion-receipt verification: median **6,559.5 ops/s**, range **5,335–6,604**.
 
-- Signed action create+verify: median **2,790 ops/s**, range **2,476–2,922**.
-- Detached inclusion-receipt verification: median **5,712.5 ops/s**, range **4,856–5,982**.
+Same-process CBOR/Ed25519/Merkle CPU only. No network, persistence, live registration, key discovery, real sink or readback. Not an industry or SOTA comparison.
 
-CPU/CBOR/Ed25519/Merkle only. No network, persistence, live registration, key discovery, external sink or independent readback. Not comparable to DBOS, Temporal or provider throughput figures.
+## Limits
 
-## Wire and scope
-
-mon006-scitt-wire-examples-v1.json contains exact deterministic CBOR hex for the issuer Signed Statement, two receipts and assembled Transparent Statement. These are test fixtures, not live TS receipts.
-
-Limits: no live SCITT TS, no general CBOR library, no independent COSE/SCITT implementation differential test, deterministic test keys, no production key rotation, no independent TS operators, no source/auth/sink/readback integration. The application media type is a prototype requiring a complete interoperable SFEB profile.
+No live SCITT TS, independent TS operators, production keys, key rotation/revocation, full RFC 8949 implementation, independent COSE differential test, KMS/HSM, source/authority services, mutation sink or independent postcondition reader. The action media type is a prototype and needs a complete interoperable SFEB profile.
