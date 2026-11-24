@@ -511,6 +511,61 @@ The local-to-closed-loop sign-reversal rate is a diagnostic of how often a local
 
 This addendum extends the existing #13445 experiment contract; it is not a new standalone score or execution authority.
 
+## Experience backtracking is prior art — Rollback (2026-11-24)
+
+Do not claim that rewinding a world model to earlier decision points, branching alternative action chunks, selecting informative branch points, or distilling sibling outcomes into action-level supervision is itself a new Symthaea contribution.
+
+Luo et al., *Rollback: Experience Backtracking in World Models for Policy Improvement* (arXiv:2610.36068, 26 October 2026), already proposes:
+- experience-backtracking tree search from saved world-model states;
+- MCTS allocation toward decision points whose alternatives diverge;
+- sibling-branch outcome contrasts as action-level supervision without a separately learned value model;
+- world-model/policy co-evolution using new real-robot transitions.
+
+The public project page reports the same starting pi0.5 policy and success results on its three distinct physical tasks: Jenga 69.33% vs RISE-with-GE-Sim2 58.67%; ball tossing 40.00% vs 28.89%; tabletop curling 64.44% vs 52.59%. These are task-specific robot results and must not be compared numerically with RoboDyna, LIBERO-Dynamic, standard LIBERO or World-In-World. Project page: https://rollback-wm.github.io/ . Paper: https://arxiv.org/abs/2610.36068 .
+
+### Competitive implication
+
+The flagship distinction must not be "we can rewind and branch." It should be:
+
+**we qualify whether a selected counterfactual branch is trustworthy for this individual, whether the branch contrast survives the model rollout and selection process, and whether the resulting policy change improves the complete closed-loop outcome after real resource and recovery costs.**
+
+Rollback is a high-priority methodological comparator for branch selection and counterfactual action supervision. A faithful reproduction requires its exact policy/world-model checkpoints, robot/task protocol, branch-search settings, training schedule and real-interaction budget. The public project page inspected in this audit did not expose a complete runnable source/artifact package; until those are independently pinned, a Symthaea implementation can be labelled Rollback-inspired, not a Rollback reproduction.
+
+### Symthaea differentiating experiment
+
+On a branchable development environment, compare:
+1. Forward-only fixed-budget model-based policy improvement.
+2. Uniform backtracking over eligible decision points.
+3. Divergence/impact-prioritized backtracking (Rollback-style).
+4. Decision-sensitive backtracking using the existing #10320 measurement owner and #13445 budget protocol.
+5. An evaluator-only branch-selection oracle, not a deployable baseline.
+
+Keep total branch evaluations, wall-clock deadline, energy, policy/environment interactions and number of real transitions matched. Reuse #9396 to test whether branch search discovers localized optimistic regions; #9127 for selected-action calibration; #13375/#13377 for exact common-history, exogenous-draw and action-application pairing; #13281 for compute/observation interaction where applicable; #9437 for evaluator custody.
+
+Measure branch-selection regret, individual-effect MAE/sign/ranking, latent-to-rollout effect retention, local-to-closed-loop sign reversal, task success, recovery and the full resource vector separately. Do not add another score aggregator.
+
+## HDC/CfC-LTC: preserve individual causes, not only average dynamics — 2026-11-24
+
+The individual-effect study motivates a more specific representation hypothesis. Factor the recurrent state conceptually into:
+- a history-inferred, instance-specific component that should remain invariant across counterfactual sibling branches for the same individual;
+- an endogenous dynamical component that changes in response to the branch's actions and observations;
+- explicit uncertainty, timing and provenance.
+
+HDC can be tested as a compositional carrier for typed entity/history/constraint/provenance relations and a persistent instance-specific latent signature. CfC/LTC can be tested as the action-conditioned continuous-time evolution of endogenous state while the inferred instance-specific component is retained across branches. This is a testable factorization hypothesis, not a claim that the network has recovered true structural causal variables.
+
+The critical new training ablation is **contrast preservation**, not merely another reconstruction/model-selection setting:
+- reconstruction-only;
+- reconstruction plus action-conditioned prediction;
+- reconstruction plus individual-contrast loss on branchable training pairs;
+- HDC latent contrast readout;
+- CfC/LTC imagined individual-contrast output;
+- HDC+CfC/LTC joint representation/rollout;
+- the strongest simple latent and value-aligned baselines.
+
+A candidate contrast loss may supervise the difference between paired action-conditioned outcomes, not only each absolute next state. Its scale, gradient contribution and intervention coverage must be reported; do not let a tiny effect term disappear beneath a much larger reconstruction objective. Evaluate multiple checkpoints along training because the external study reports that a reconstruction-selected later checkpoint can retain/improve latent identity information while degrading the effect expressed by the rollout. That result is a reason to test checkpoint selection, not an assumed Symthaea outcome.
+
+For each variant, probe the frozen latent and evaluate the actual imagined output on the same held-out individual/intervention pairs. A probe that consumes evaluator labels is diagnostic only. A model is not credited with counterfactual capability merely because a post-hoc readout can recover information the deployed rollout does not use.
+
 ## Numeric-control baseline parity: MRS.Q and WIMLE — 2026-11-24
 
 The first external numerical-control experiment should reuse the already pinned CMAQ-011 protocol rather than introduce a new benchmark adapter.
