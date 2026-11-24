@@ -21,7 +21,9 @@ use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use symthaea_logparse::encoder::{Hdv, encode};
 use symthaea_logparse::fixtures::generate_synthetic_corpus;
-use symthaea_logparse::probe::{LogisticProbe, TrainConfig, group_stratified_split};
+use symthaea_logparse::probe::{
+    LogisticProbe, TrainConfig, group_kfold_splits, group_stratified_split,
+};
 use symthaea_logparse::{LogEvent, evtx_source};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -103,6 +105,48 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n=== Supervised probe result ({mode_label}) ===");
     println!("train accuracy:    {train_acc:.3}");
     println!("test accuracy:     {test_acc:.3}");
+
+    // Group-disjoint K-fold evaluation is the main uncertainty check. Each
+    // source EVTX file appears in exactly one held-out fold, never in that
+    // fold's training set. If the corpus has too few independent files per
+    // label, fail explicitly rather than silently reverting to event splits.
+    let grouped_folds = group_kfold_splits(&hvs, &labels, &group_ids, 5, 0x5EED)?;
+    let mut grouped_fold_accuracies = Vec::with_capacity(grouped_folds.len());
+    println!("\\n=== Source-file-disjoint 5-fold CV ===");
+    for (fold_index, fold) in grouped_folds.iter().enumerate() {
+        let train_groups: HashSet<&str> =
+            fold.train_group_ids.iter().map(String::as_str).collect();
+        let test_groups: HashSet<&str> =
+            fold.test_group_ids.iter().map(String::as_str).collect();
+        if !train_groups.is_disjoint(&test_groups) {
+            return Err(format!("source-file leakage in grouped fold {}", fold_index + 1).into());
+        }
+        let fold_probe = LogisticProbe::train(&fold.train_hvs, &fold.train_labels, cfg);
+        let fold_accuracy = fold_probe.accuracy(&fold.test_hvs, &fold.test_labels);
+        println!(
+            "  fold {}: train={} events/{} files, test={} events/{} files, accuracy={:.3}",
+            fold_index + 1,
+            fold.train_hvs.len(),
+            train_groups.len(),
+            fold.test_hvs.len(),
+            test_groups.len(),
+            fold_accuracy
+        );
+        grouped_fold_accuracies.push(fold_accuracy);
+    }
+    let grouped_mean = grouped_fold_accuracies.iter().sum::<f32>()
+        / grouped_fold_accuracies.len() as f32;
+    let grouped_variance = grouped_fold_accuracies
+        .iter()
+        .map(|value| (value - grouped_mean).powi(2))
+        .sum::<f32>()
+        / grouped_fold_accuracies.len() as f32;
+    println!(
+        "  file-disjoint mean ± population SD: {:.3} ± {:.3}",
+        grouped_mean,
+        grouped_variance.sqrt()
+    );
+
     println!("chance level:      {:.3}", 1.0 / dist.len() as f32);
     println!("historical NC event-level reference: 0.451 (not directly comparable)");
     println!("historical HDBSCAN event-level reference: 0.565 (not directly comparable)");
