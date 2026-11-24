@@ -29,7 +29,7 @@ A retrieval trace receipt may contain only:
 
 It has no field for a question ID, task category, gold answer, evaluator judgment, hidden attack assignment, correctness label, target action or benchmark score. A retrieval strategy signature excludes query content and retrieved evidence IDs. The promoted note stores supporting trace receipt digests, not the trace's facts or payloads.
 
-The candidate process can report only what it actually executed and observed. It must not receive the evaluator's view of whether its final answer was correct. “Evidence sufficient” means the candidate-side retrieval process declared that it had a non-empty candidate evidence set; it does **not** mean the answer was correct.
+The candidate process can report only what it actually executed and observed. It must not receive the evaluator's view of whether its final answer was correct. The old V1 `evidence_sufficient` label was overloaded: it meant only that the candidate-side retrieval process had a non-empty candidate evidence set. It never established independent admissibility, decision sufficiency or correctness. New sidecar observations use `candidates_returned`; the legacy label is accepted only when replaying older durable V1 receipts.
 
 ## 3. Trace validation
 
@@ -40,25 +40,27 @@ RetrievalPolicyMemoryV1::record_trace checks:
 - bounded, non-empty operation sequences and exact operation/tool-call count agreement (256 tool calls maximum, 10,000 evidence IDs maximum per trace, 256-byte run/invocation/tool identifiers, 512-byte domain IDs and 1,024-byte evidence IDs);
 - operation evidence IDs consistent with the declared outcome;
 - aggregate elapsed nanoseconds and inspected bytes exactly equal the sum of operation measurements;
-- stop-reason constraints: sufficient evidence requires a candidate-set digest and observed evidence; no-candidate-evidence cannot carry either; budget exhaustion requires the full declared budget; tool-error termination requires the final operation to have failed.
+- acquisition-status constraints: `candidates_returned` requires a candidate-set digest and observed evidence; `no_candidate_evidence` cannot carry either; budget exhaustion requires the full declared budget; tool-error termination requires the final operation to have failed. Legacy `evidence_sufficient` receipts retain their original digest and decoding semantics but are never treated as decision evidence.
 
 The trace receipt is a deterministic, version-domain-separated SHA-256 commitment. Replaying the same (run, opaque invocation ID) with the same receipt is idempotent. Rebinding that invocation ID to a different trace is rejected.
 
-## 4. Deterministic strategy promotion
+## 4. Promotion requires independent decision outcomes
 
-A strategy may be promoted only when all of these hold:
+Raw retrieval traces are acquisition observations only. A non-empty candidate set, repeated successful tool call, or repeated query pattern is not evidence that candidates were admissible, useful to a declared `DecisionNeed`, sufficient for the downstream reader, or causally responsible for a better decision.
 
-1. At least three and at most 128 unique trace references are supplied.
-2. Every reference resolves to a recorded trace with “evidence sufficient”.
-3. Every trace has a distinct exact-query SHA-256 and distinct opaque invocation reference.
-4. Domain, environment revision and tool-profile digests are identical across all supporting traces.
-5. The ordered (tool_id, tool_revision_sha256, action_template_sha256) sequence is identical.
-6. The consolidation algorithm is pinned by SHA-256.
-7. Promotion and expiry times are valid; a strategy cannot live for more than 30 days in this prototype.
+Accordingly, `RetrievalPolicyMemoryV1::promote_strategy` now fails closed for candidate-return observations with `DecisionOutcomeReceiptRequired`. Legacy V1 `evidence_sufficient` receipts remain decodable for restart/replay compatibility but are subject to the same rejection. Empty-result, tool-error, budget-exhausted and abstained traces remain non-promotable as well.
 
-This is intentionally conservative. A single lucky retrieval, repeated retries of the same query, or a trace from a different site/tool/schema version cannot promote a reusable policy.
+The required future promotion chain is separate and invocation-bound:
 
-The strategy signature captures the ordered tool/action template sequence, not the source evidence, query or answer. The note carries sorted parent trace receipt digests so an evaluator can reproduce which executions supported it.
+1. A decision-scoped qualification receipt admits/rejects/marks-indeterminate each candidate under an explicit scope, purpose, authority, lifecycle snapshot and verifier profile.
+2. A decision-sufficiency receipt binds the exact qualified-evidence digest and declared `DecisionNeed`.
+3. A separately governed outcome receipt binds the decision and observed result without exposing evaluator truth to retrieval-policy memory.
+4. A pre-registered paired held-out evaluation demonstrates positive decision utility at matched resource budgets, with task-family regression and security guardrails.
+5. Only then may an exploratory strategy note become policy-eligible through a distinct promotion path.
+
+Three retrieval observations may support a future exploratory hypothesis; they are not a policy-eligibility threshold and do not establish causal utility. This patch deliberately disables the previous trace-only promotion route rather than silently substituting a weaker proxy.
+
+The strategy signature continues to identify an ordered tool/action template sequence, not source evidence, query text or answer content. A strategy note must carry the exact receipt digests and applicability envelope used by the independent promotion service.
 
 ## 5. Negative transfer and expiry
 
@@ -131,7 +133,7 @@ The companion V2 sidecar now emits one policy trace for each official query invo
 - tool revision: deterministic backend execution-profile digest;
 - action template: SHA-256 of the BM25 search operation and its pinned domain/top-k/window/neighbor/k1/b/tokenizer parameters;
 - observed evidence IDs: the candidate-evidence graph records produced for that query;
-- stop reason: candidate-side evidence sufficient or no candidate evidence;
+- stop reason: candidates returned or no candidate evidence (legacy V1 field only; not independent qualification or decision sufficiency);
 - latency: measured end-to-end sidecar query work;
 - inspected bytes: explicitly incomplete because the current BM25 index does not expose posting/index bytes read.
 
@@ -150,10 +152,10 @@ The reference API is in:
 research/broca-mace-transfer-bench-v0-1/aml-adapter/src/retrieval_policy_memory.rs
 
 - record_trace(trace) validates and records a trace; returns its receipt digest.
-- promote_strategy(refs, algorithm_revision, promoted_at, expires_at) deterministically creates a note from supporting traces.
+- promote_strategy(refs, algorithm_revision, promoted_at, expires_at) is retained as a legacy API but now fails closed for raw acquisition traces until separately qualified decision/outcome receipts and held-out counterfactual qualification are available.
 - applicable_notes(domain, environment_revision, tool_profile, now) returns only currently valid notes matching every scope/version constraint.
 
-The eleven Rust unit tests cover invocation idempotency/rebinding, minimum support, duplicate query exclusion, domain/environment/tool-profile/strategy isolation, expiry, resource accounting, invalid success claims, insufficient search budgets, input-size limits, explicit byte-accounting completeness and a cross-language retrieval-trace receipt hash vector.
+The Rust unit tests cover invocation idempotency/rebinding, candidate-return status validation, legacy V1 replay, refusal to promote acquisition-only traces, duplicate query exclusion, domain/environment/tool-profile/strategy isolation, promotion-time bounds, resource accounting, invalid acquisition claims, insufficient search budgets, input-size limits, explicit byte-accounting completeness and a cross-language retrieval-trace receipt hash vector. These tests are authored; they remain unexecuted until a pinned Rust toolchain is available.
 
 ## 11. Next implementation stages
 

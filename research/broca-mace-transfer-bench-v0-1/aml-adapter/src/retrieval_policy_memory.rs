@@ -56,7 +56,11 @@ impl RetrievalOperationOutcomeV1 {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RetrievalStopReasonV1 {
+    /// Legacy V1 label retained only so durable receipts can be decoded.
+    /// It never represented independent qualification or decision sufficiency.
     EvidenceSufficient,
+    /// The retrieval adapter returned at least one candidate reference.
+    CandidatesReturned,
     BudgetExhausted,
     NoCandidateEvidence,
     ToolError,
@@ -71,6 +75,7 @@ impl RetrievalStopReasonV1 {
             Self::NoCandidateEvidence => 3,
             Self::ToolError => 4,
             Self::Abstained => 5,
+            Self::CandidatesReturned => 6,
         }
     }
 
@@ -81,6 +86,7 @@ impl RetrievalStopReasonV1 {
             Self::NoCandidateEvidence => "no_candidate_evidence",
             Self::ToolError => "tool_error",
             Self::Abstained => "abstained",
+            Self::CandidatesReturned => "candidates_returned",
         }
     }
 }
@@ -174,6 +180,7 @@ impl RetrievalTraceReceiptV1 {
         };
         let stop_reason = match required_string("stop_reason")?.as_str() {
             "evidence_sufficient" => RetrievalStopReasonV1::EvidenceSufficient,
+            "candidates_returned" => RetrievalStopReasonV1::CandidatesReturned,
             "budget_exhausted" => RetrievalStopReasonV1::BudgetExhausted,
             "no_candidate_evidence" => RetrievalStopReasonV1::NoCandidateEvidence,
             "tool_error" => RetrievalStopReasonV1::ToolError,
@@ -355,6 +362,8 @@ pub enum RetrievalPolicyRejectV1 {
     MixedToolProfile,
     MixedStrategy,
     UnsupportedTraceOutcome,
+    /// Raw acquisition observations cannot establish downstream decision value.
+    DecisionOutcomeReceiptRequired,
     EmptyStrategy,
     InvalidPromotionTime,
     StrategyExpired,
@@ -464,45 +473,6 @@ fn strategy_signature(trace: &RetrievalTraceReceiptV1) -> String {
     hex_digest(&hasher.finalize())
 }
 
-fn strategy_steps(trace: &RetrievalTraceReceiptV1) -> Vec<RetrievalStrategyStepV1> {
-    trace
-        .operations
-        .iter()
-        .map(|operation| RetrievalStrategyStepV1 {
-            tool_id: operation.tool_id.clone(),
-            tool_revision_sha256: operation.tool_revision_sha256.clone(),
-            action_template_sha256: operation.action_template_sha256.clone(),
-        })
-        .collect()
-}
-
-fn note_digest(note: &RetrievalStrategyNoteV1) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(b"luminous:mace:retrieval-strategy-note:v1\0");
-    for value in [
-        note.domain_id.as_str(),
-        note.environment_revision_sha256.as_str(),
-        note.tool_profile_sha256.as_str(),
-        note.strategy_signature_sha256.as_str(),
-        note.consolidation_algorithm_sha256.as_str(),
-    ] {
-        hash_field(&mut hasher, value);
-    }
-    hasher.update(note.promoted_at_unix.to_be_bytes());
-    hasher.update(note.expires_at_unix.to_be_bytes());
-    hasher.update((note.steps.len() as u64).to_be_bytes());
-    for step in &note.steps {
-        hash_field(&mut hasher, &step.tool_id);
-        hash_field(&mut hasher, &step.tool_revision_sha256);
-        hash_field(&mut hasher, &step.action_template_sha256);
-    }
-    hasher.update((note.supporting_trace_receipt_sha256.len() as u64).to_be_bytes());
-    for receipt in &note.supporting_trace_receipt_sha256 {
-        hash_field(&mut hasher, receipt);
-    }
-    hex_digest(&hasher.finalize())
-}
-
 fn validate_trace(trace: &RetrievalTraceReceiptV1) -> Result<(), RetrievalPolicyRejectV1> {
     if !valid_atom_with_limit(&trace.run_id, MAX_IDENTIFIER_BYTES_V1)
         || !valid_atom_with_limit(&trace.query_invocation_id, MAX_IDENTIFIER_BYTES_V1)
@@ -597,7 +567,8 @@ fn validate_trace(trace: &RetrievalTraceReceiptV1) -> Result<(), RetrievalPolicy
     }
 
     match trace.stop_reason {
-        RetrievalStopReasonV1::EvidenceSufficient => {
+        RetrievalStopReasonV1::EvidenceSufficient
+        | RetrievalStopReasonV1::CandidatesReturned => {
             if !observed_any
                 || !trace
                     .candidate_set_sha256
@@ -681,9 +652,9 @@ impl RetrievalPolicyMemoryV1 {
             .map(|stored| stored.receipt_sha256.as_str())
     }
 
-    /// Promote a search strategy only after at least three distinct successful
-    /// query invocations share exactly the same domain, environment, tool
-    /// profile and ordered tool/action template sequence.
+    /// Legacy API retained while callers migrate. Acquisition traces alone
+    /// cannot promote a reusable policy: a separate qualified decision/outcome
+    /// receipt and held-out counterfactual qualification are required.
     pub fn promote_strategy(
         &mut self,
         references: &[RetrievalTraceRefV1],
@@ -727,9 +698,6 @@ impl RetrievalPolicyMemoryV1 {
                 .traces
                 .get(&key)
                 .ok_or(RetrievalPolicyRejectV1::UnknownTrace)?;
-            if stored.receipt.stop_reason != RetrievalStopReasonV1::EvidenceSufficient {
-                return Err(RetrievalPolicyRejectV1::UnsupportedTraceOutcome);
-            }
             if !seen_queries.insert(stored.receipt.query_sha256.clone()) {
                 return Err(RetrievalPolicyRejectV1::DuplicateSupportingQuery);
             }
@@ -737,7 +705,6 @@ impl RetrievalPolicyMemoryV1 {
         }
 
         let first = selected[0];
-        let mut supporting_trace_receipt_sha256 = Vec::with_capacity(selected.len());
         for stored in &selected {
             if stored.receipt.domain_id != first.receipt.domain_id {
                 return Err(RetrievalPolicyRejectV1::MixedDomain);
@@ -756,30 +723,18 @@ impl RetrievalPolicyMemoryV1 {
             if stored.receipt.created_at_unix > promoted_at_unix {
                 return Err(RetrievalPolicyRejectV1::InvalidPromotionTime);
             }
-            supporting_trace_receipt_sha256.push(stored.receipt_sha256.clone());
         }
-        supporting_trace_receipt_sha256.sort();
-
-        let mut note = RetrievalStrategyNoteV1 {
-            note_sha256: String::new(),
-            domain_id: first.receipt.domain_id.clone(),
-            environment_revision_sha256: first.receipt.environment_revision_sha256.clone(),
-            tool_profile_sha256: first.receipt.tool_profile_sha256.clone(),
-            strategy_signature_sha256: first.strategy_signature_sha256.clone(),
-            steps: strategy_steps(&first.receipt),
-            supporting_trace_receipt_sha256,
-            consolidation_algorithm_sha256: consolidation_algorithm_sha256.to_owned(),
-            promoted_at_unix,
-            expires_at_unix,
-        };
-        if note.steps.is_empty() {
-            return Err(RetrievalPolicyRejectV1::EmptyStrategy);
+        let has_acquisition_only_status = selected.iter().any(|stored| {
+            matches!(
+                stored.receipt.stop_reason,
+                RetrievalStopReasonV1::EvidenceSufficient
+                    | RetrievalStopReasonV1::CandidatesReturned
+            )
+        });
+        if has_acquisition_only_status {
+            return Err(RetrievalPolicyRejectV1::DecisionOutcomeReceiptRequired);
         }
-        note.note_sha256 = note_digest(&note);
-        self.notes
-            .entry(note.note_sha256.clone())
-            .or_insert_with(|| note.clone());
-        Ok(note)
+        Err(RetrievalPolicyRejectV1::UnsupportedTraceOutcome)
     }
 
     /// Return only notes whose domain, environment revision, tool profile and
@@ -871,7 +826,7 @@ mod tests {
             query_sha256: query_digest.to_owned(),
             candidate_set_sha256: Some(CANDIDATE_SET.to_owned()),
             operations,
-            stop_reason: RetrievalStopReasonV1::EvidenceSufficient,
+            stop_reason: RetrievalStopReasonV1::CandidatesReturned,
             tool_call_budget: 8,
             tool_calls_used: 2,
             elapsed_ns: 20,
@@ -891,7 +846,7 @@ mod tests {
             .collect()
     }
 
-    fn three_successful_traces(memory: &mut RetrievalPolicyMemoryV1) -> Vec<RetrievalTraceRefV1> {
+    fn three_candidate_return_traces(memory: &mut RetrievalPolicyMemoryV1) -> Vec<RetrievalTraceRefV1> {
         let samples = [
             ("query-a", "1010101010101010101010101010101010101010101010101010101010101010"),
             ("query-b", "2020202020202020202020202020202020202020202020202020202020202020"),
@@ -942,20 +897,18 @@ mod tests {
     }
 
     #[test]
-    fn promotion_requires_three_distinct_successful_query_invocations() {
+    fn repeated_candidate_returns_cannot_promote_without_decision_outcomes() {
         let mut memory = RetrievalPolicyMemoryV1::default();
-        let references = three_successful_traces(&mut memory);
-        let note = memory
-            .promote_strategy(&references[..2], ALGORITHM, 200, 300)
-            .expect_err("two traces do not meet support threshold");
-        assert_eq!(note, RetrievalPolicyRejectV1::TooFewSupportingTraces);
-
-        let note = memory
-            .promote_strategy(&references, ALGORITHM, 200, 300)
-            .expect("three traces promote");
-        assert_eq!(note.supporting_trace_receipt_sha256.len(), 3);
-        assert_eq!(note.steps.len(), 2);
-        assert_eq!(memory.note_count(), 1);
+        let references = three_candidate_return_traces(&mut memory);
+        assert_eq!(
+            memory.promote_strategy(&references[..2], ALGORITHM, 200, 300),
+            Err(RetrievalPolicyRejectV1::TooFewSupportingTraces)
+        );
+        assert_eq!(
+            memory.promote_strategy(&references, ALGORITHM, 200, 300),
+            Err(RetrievalPolicyRejectV1::DecisionOutcomeReceiptRequired)
+        );
+        assert_eq!(memory.note_count(), 0);
     }
 
     #[test]
@@ -1020,38 +973,21 @@ mod tests {
     }
 
     #[test]
-    fn policy_note_is_not_applicable_outside_its_exact_domain_and_versions() {
+    fn acquisition_only_traces_never_create_applicable_strategy_notes() {
         let mut memory = RetrievalPolicyMemoryV1::default();
-        let supporting = three_successful_traces(&mut memory);
-        let note = memory.promote_strategy(&supporting, ALGORITHM, 200, 300).unwrap();
-
+        let supporting = three_candidate_return_traces(&mut memory);
         assert_eq!(
-            memory.applicable_notes("web-shop-a", ENV_A, TOOL_PROFILE_A, 250),
-            vec![&note]
+            memory.promote_strategy(&supporting, ALGORITHM, 200, 300),
+            Err(RetrievalPolicyRejectV1::DecisionOutcomeReceiptRequired)
         );
-        assert!(memory.applicable_notes("web-shop-b", ENV_A, TOOL_PROFILE_A, 250).is_empty());
-        assert!(memory.applicable_notes(
-            "web-shop-a",
-            "9999999999999999999999999999999999999999999999999999999999999999",
-            TOOL_PROFILE_A,
-            250
-        ).is_empty());
-        assert!(memory.applicable_notes(
-            "web-shop-a",
-            ENV_A,
-            "8888888888888888888888888888888888888888888888888888888888888888",
-            250
-        ).is_empty());
+        assert_eq!(memory.note_count(), 0);
+        assert!(memory.applicable_notes("web-shop-a", ENV_A, TOOL_PROFILE_A, 250).is_empty());
     }
 
     #[test]
-    fn expired_and_not_yet_promoted_notes_are_never_returned() {
+    fn raw_retrieval_traces_cannot_create_notes_regardless_of_ttl() {
         let mut memory = RetrievalPolicyMemoryV1::default();
-        let supporting = three_successful_traces(&mut memory);
-        memory.promote_strategy(&supporting, ALGORITHM, 200, 300).unwrap();
-
-        assert!(memory.applicable_notes("web-shop-a", ENV_A, TOOL_PROFILE_A, 199).is_empty());
-        assert!(memory.applicable_notes("web-shop-a", ENV_A, TOOL_PROFILE_A, 300).is_empty());
+        let supporting = three_candidate_return_traces(&mut memory);
         assert_eq!(
             memory.promote_strategy(&supporting, ALGORITHM, 200, 200),
             Err(RetrievalPolicyRejectV1::InvalidPromotionTime)
@@ -1060,6 +996,11 @@ mod tests {
             memory.promote_strategy(&supporting, ALGORITHM, 200, 200 + MAX_STRATEGY_TTL_SECONDS_V1 + 1),
             Err(RetrievalPolicyRejectV1::InvalidTtl)
         );
+        assert_eq!(
+            memory.promote_strategy(&supporting, ALGORITHM, 200, 300),
+            Err(RetrievalPolicyRejectV1::DecisionOutcomeReceiptRequired)
+        );
+        assert_eq!(memory.note_count(), 0);
     }
 
     #[test]
@@ -1116,6 +1057,37 @@ mod tests {
     }
 
     #[test]
+    fn legacy_v1_evidence_sufficient_receipts_decode_but_cannot_promote() {
+        let mut memory = RetrievalPolicyMemoryV1::default();
+        let samples = [
+            ("legacy-a", "abababababababababababababababababababababababababababababababab"),
+            ("legacy-b", "acacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacac"),
+            ("legacy-c", "adadadadadadadadadadadadadadadadadadadadadadadadadadadadadadadad"),
+        ];
+        for (invocation, query_digest) in samples {
+            let mut legacy = trace(
+                invocation,
+                query_digest,
+                "web-shop-a",
+                ENV_A,
+                TOOL_PROFILE_A,
+                ACTION_SEARCH,
+            );
+            legacy.stop_reason = RetrievalStopReasonV1::EvidenceSufficient;
+            let value = legacy.to_json_value();
+            assert_eq!(value["stop_reason"], "evidence_sufficient");
+            assert_eq!(RetrievalTraceReceiptV1::from_json_value(&value), Ok(legacy.clone()));
+            memory.record_trace(legacy).expect("legacy observation remains replayable");
+        }
+
+        assert_eq!(
+            memory.promote_strategy(&refs(&["legacy-a", "legacy-b", "legacy-c"]), ALGORITHM, 200, 300),
+            Err(RetrievalPolicyRejectV1::DecisionOutcomeReceiptRequired)
+        );
+        assert_eq!(memory.note_count(), 0);
+    }
+
+    #[test]
     fn retrieval_trace_receipt_matches_cross_language_reference_vector() {
         let receipt = RetrievalTraceReceiptV1 {
             run_id: "run-trace-test".to_owned(),
@@ -1146,6 +1118,38 @@ mod tests {
         assert_eq!(
             receipt.receipt_sha256(),
             "e818d458148b2edd093a95d45afffb3d86b65291ee1b399149abf4ca4d18edb6"
+        );
+
+        // Cross-language golden vector for the new acquisition-only status.
+        let candidates_returned = RetrievalTraceReceiptV1 {
+            run_id: "run-acquisition".to_owned(),
+            query_invocation_id: "opaque-acquisition-1".to_owned(),
+            domain_id: "web".to_owned(),
+            environment_revision_sha256: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_owned(),
+            tool_profile_sha256: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_owned(),
+            query_sha256: "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff".to_owned(),
+            candidate_set_sha256: Some("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_owned()),
+            operations: vec![RetrievalOperationV1 {
+                tool_id: "trajectory.bm25.search".to_owned(),
+                tool_revision_sha256: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_owned(),
+                action_template_sha256: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc".to_owned(),
+                observed_evidence_ids: vec!["source:evidence-1".to_owned()],
+                outcome: RetrievalOperationOutcomeV1::EvidenceObserved,
+                elapsed_ns: 17,
+                inspected_bytes: 0,
+                inspected_bytes_measured: false,
+            }],
+            stop_reason: RetrievalStopReasonV1::CandidatesReturned,
+            tool_call_budget: 1,
+            tool_calls_used: 1,
+            elapsed_ns: 17,
+            inspected_bytes: 0,
+            inspected_bytes_complete: false,
+            created_at_unix: 100,
+        };
+        assert_eq!(
+            candidates_returned.receipt_sha256(),
+            "3c3431c6f31419de7a270ca49c04a93bd94f573fedd949993fa21d17a3b4c723"
         );
     }
 

@@ -593,7 +593,7 @@ fn handle_request(
             let stop_reason = if observed_evidence_ids.is_empty() {
                 RetrievalStopReasonV1::NoCandidateEvidence
             } else {
-                RetrievalStopReasonV1::EvidenceSufficient
+                RetrievalStopReasonV1::CandidatesReturned
             };
             let query_elapsed_ns = u64::try_from(query_started.elapsed().as_nanos())
                 .unwrap_or(u64::MAX);
@@ -918,6 +918,7 @@ mod tests {
         assert_eq!(response["run_id"], "fixture-run");
         assert_eq!(response["candidate_id"], "query-invocation-1");
         assert_eq!(response["candidate_record_count"], 3);
+        assert_eq!(response["retrieval_trace"]["stop_reason"], "candidates_returned");
         assert!(response["candidate_set_sha256"].as_str().is_some());
         assert!(response["candidate_evidence_jsonl"].as_str().unwrap().contains("lmev2:text:"));
         assert_eq!(response["retrieval_trace"]["run_id"], "fixture-run");
