@@ -24,7 +24,7 @@ type input struct {
 }
 
 func main() {
-	bootstrap := flag.Int("bootstrap", 2000, "task-cluster bootstrap replicates (>=200)")
+	bootstrap := flag.Int("bootstrap", 2000, "task-cluster bootstrap replicates (200..100000)")
 	seed := flag.Int64("seed", 1, "deterministic bootstrap RNG seed")
 	rosterPath := flag.String("roster", "", "JSON assignment roster; required for completeness checking")
 	flag.Parse()
