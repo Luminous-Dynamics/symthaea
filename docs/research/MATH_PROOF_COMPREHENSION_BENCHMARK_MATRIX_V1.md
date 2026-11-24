@@ -323,3 +323,41 @@ The harder research frontier for this programme should be:
 7. confidence calibration and review burden at a fixed risk ceiling.
 
 For any future Putnam comparison, publish separate answer-provided and no-answer rows, exact task revision, run timestamp, model/prompt/toolchain revision, candidate count, total inference budget, per-problem cost/time distribution, and failed/unresolved tasks. A 672/672 ceiling means the primary scientific comparison should move to those undermeasured reliability and comprehension axes.
+
+
+## 9. Paired mathematical invariance and intervention sensitivity (2026-11-24)
+
+A proof-comprehension result should not depend on harmless presentation details, and it should not ignore a change that alters the mathematical problem. This is a paired evaluation axis, not a weighted aggregate score.
+
+The dedicated protocol is [MATH_METAMORPHIC_V1.md](MATH_METAMORPHIC_V1.md), tracked by [#13547](https://github.com/Luminous-Dynamics/symthaea/issues/13547). It composes three existing research contracts without replacing them:
+- [#13309 — counterfactual proof-mechanism understanding](https://github.com/Luminous-Dynamics/symthaea/issues/13309) owns theorem mutation and proof-route-vs-truth semantics.
+- [#13537 — proof-scope equivalence](https://github.com/Luminous-Dynamics/symthaea/issues/13537) owns proof-carrying comparability for representationally different contexts.
+- [#13345 — local/global consistency](https://github.com/Luminous-Dynamics/symthaea/issues/13345) owns exact-scope paired CIRR.
+
+The new paired benchmark measures four primary rates independently:
+- Semantics-Preserving Invariance Accuracy (SPIA).
+- Semantics-Changing Sensitivity Accuracy (SCSA).
+- False Stability Rate (FSR).
+- False Sensitivity Rate (FSeR).
+
+It also records proof-route confusion, scope identity, first-invalid-step localization, evidence fidelity, abstention and cost. A proof-route-only mutation must not be misclassified as theorem falsity. A semantics-preserving rewrite must not be counted as a theorem change. A changed assumption must not be normalized away.
+
+### Research motivation and external baselines
+
+- [MathAdv (2026)](https://arxiv.org/abs/2608.25449) has 13 mathematical domains and expert-crafted equivalent reformulations; it is the nearest benchmark for presentation robustness.
+- [ProofGrid (2026)](https://arxiv.org/abs/2605.12524) provides 15 proof writing/checking/masking/gap-filling tasks and first-substantive-failure diagnostics.
+- [FormalMATH (EMNLP 2026 Findings)](https://aclanthology.org/2026.findings-emnlp.579/) has 5,560 semantically validated Lean statements and a reported 28.31% DeepSeek-Prover-V2 Pass@32 result.
+- [QEDBench (ICML 2026)](https://proceedings.mlr.press/v306/gonzalez26a.html) shows why proof graders require independent calibration rather than LLM agreement.
+- [Gao & Evans (2026)](https://link.springer.com/article/10.1007/s40753-026-00319-4) reports a 143-student delayed near-transfer study in which proof-presentation performance was only moderately associated with later proof construction. This supports measuring actual transfer separately from explanation quality.
+
+### Prospective metamorphic targets
+
+| Metric | Proposed target |
+|---|---:|
+| SPIA on automatable frozen equivalence controls | ≥99% |
+| SCSA on independently adjudicated held-out mutations | ≥95% |
+| FSR on high-risk frozen negative controls | 0 observed |
+| FSeR on exact metamorphic controls | ≤1% |
+| Proof-route-to-theorem-refutation errors | 0 observed |
+
+These are target thresholds, not Symthaea results. Publish per-family counts, confidence intervals, exclusions, reviewer cost and exact budgets.
