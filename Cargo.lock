@@ -18789,8 +18789,8 @@ dependencies = [
 name = "symthaea-experiment-design"
 version = "0.1.0"
 dependencies = [
- "serde",
  "nalgebra 0.34.2",
+ "serde",
  "serde_json",
  "sha2 0.10.9",
 ]
