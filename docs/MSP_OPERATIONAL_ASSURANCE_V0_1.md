@@ -162,7 +162,7 @@ NIST CSF 2.0 and CIS Controls v8.1 should be mapped to actual evidence-producing
 
 ## 8. Cyber and log-analysis qualification
 
-The current `symthaea-logparse` Phase 1 report records a 0.815 held-out event accuracy on a 1,000-event, eight-label subset. Do not use this as an enterprise detection claim.
+The current `symthaea-logparse` Phase 1 report records 0.815 on a single event-level split and 0.817 ± 0.018 on same-corpus event-level cross-validation, but only 0.168 on a separate OTRF corpus (chance 0.143, seven labels). The report itself concludes that the probe learned corpus/collection fingerprints rather than robust tactic semantics. Treat 0.815/0.817 as in-distribution only; the 0.168 OOD result is the material external-validity finding. Do not claim enterprise threat-detection capability or SOTA superiority.
 
 Before drawing conclusions, revalidate:
 
