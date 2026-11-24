@@ -220,6 +220,162 @@
         "interpretation": "A higher-budget profile improves the immediate fixed-context decision but its selected action enters a worse future branch. Local escalation value is not closed-loop episode value.",
         "note": "All utilities and compute costs are illustrative finite-fixture values, not measured robot outcomes or a claim about DEEP's results."
       }
+    },
+    {
+      "id": "F8_INDIVIDUAL_EFFECT_MEAN_CANCELLATION",
+      "kind": "history_abduction_and_individual_counterfactual_effect",
+      "setup": {
+        "utility_direction": "higher_is_better",
+        "branch_point_observation_id": "O_SHARED",
+        "same_branch_point_observation_for_all_individuals": true,
+        "full_factual_history_distinguishes_individuals": true,
+        "same_exogenous_conditions_within_each_individual_intervention_pair": true,
+        "different_individuals_have_distinct_exogenous_state": true,
+        "intervention_pair": [
+          "BASELINE",
+          "ALTERNATIVE"
+        ],
+        "individuals": [
+          {
+            "individual_id": "U0",
+            "factual_history_id": "H0",
+            "exogenous_state_id": "E0",
+            "utility": {
+              "BASELINE": 0,
+              "ALTERNATIVE": 10
+            },
+            "true_individual_effect": 10,
+            "latent_readout_effect": 10,
+            "rollout_effect_prediction": 0
+          },
+          {
+            "individual_id": "U1",
+            "factual_history_id": "H1",
+            "exogenous_state_id": "E1",
+            "utility": {
+              "BASELINE": 0,
+              "ALTERNATIVE": -10
+            },
+            "true_individual_effect": -10,
+            "latent_readout_effect": -10,
+            "rollout_effect_prediction": 0
+          }
+        ],
+        "effect_convention": "utility(ALTERNATIVE) - utility(BASELINE)"
+      },
+      "expected": {
+        "population_mean_true_effect": 0,
+        "population_mean_rollout_effect": 0,
+        "population_mean_effect_error": 0,
+        "mean_absolute_individual_effect": 10,
+        "latent_individual_effect_mae": 0,
+        "rollout_individual_effect_mae": 10,
+        "branch_point_only_predictor_individual_mae": 10,
+        "latent_retains_history_specific_effect": true,
+        "rollout_preserves_history_specific_effect": false,
+        "average_effect_accuracy_is_not_individual_counterfactual_accuracy": true,
+        "interpretation": "The average intervention effect is exactly predicted because opposite individual effects cancel. The branch-point observation alone cannot distinguish the individuals. A history-conditioned latent readout recovers both signs, but the rollout collapses them to the mean. This localizes loss to the latent-to-imagined-effect path rather than the stored representation.",
+        "note": "All values are exact illustrative fixture units, not an empirical estimate of an abducible share or a measured Symthaea result."
+      }
+    },
+    {
+      "id": "F9_COUNTERFACTUAL_FORMULATION_GATE",
+      "kind": "third_rung_environment_and_measurement_prerequisites",
+      "setup": {
+        "source": "Okita, Where Individual-Effect Information Survives: A Diagnostic Ladder for World Models (2026-11-04), DOI 10.3390/make8110363",
+        "conditions": {
+          "C1_action_efficacy": "The outcome must depend on the intervention.",
+          "C2_branchability": "Multiple interventions must be executable from the same exogenous condition / restored branch point.",
+          "C3_individual_dependence": "The individual treatment effect must vary across individuals.",
+          "C4_measurability": "The abducible-share estimate must clear its preregistered estimation floor.",
+          "C5_convergence": "The estimate must stabilize as independent individuals are added."
+        },
+        "paper_specific_floor_rule": {
+          "ratio_threshold": 3,
+          "expression": "A >= 3 * phi",
+          "status": "source-specific proposed criterion; not a universal law or default Symthaea threshold"
+        }
+      },
+      "cases": [
+        {
+          "case_id": "NO_ACTION_EFFICACY",
+          "conditions": {
+            "C1": false,
+            "C2": true,
+            "C3": true,
+            "C4": true,
+            "C5": true
+          },
+          "expected": "NO_INDIVIDUAL_EFFECT_TARGET"
+        },
+        {
+          "case_id": "NO_BRANCHABILITY",
+          "conditions": {
+            "C1": true,
+            "C2": false,
+            "C3": true,
+            "C4": true,
+            "C5": true
+          },
+          "expected": "NO_PAIRED_COUNTERFACTUAL_REFERENCE"
+        },
+        {
+          "case_id": "NO_INDIVIDUAL_DEPENDENCE",
+          "conditions": {
+            "C1": true,
+            "C2": true,
+            "C3": false,
+            "C4": true,
+            "C5": true
+          },
+          "expected": "SECOND_RUNG_ONLY_NO_INDIVIDUAL_EFFECT"
+        },
+        {
+          "case_id": "ESTIMATION_FLOOR_DOMINATES",
+          "conditions": {
+            "C1": true,
+            "C2": true,
+            "C3": true,
+            "C4": false,
+            "C5": true
+          },
+          "example": {
+            "abducible_share": 0.12,
+            "estimation_floor": 0.05,
+            "share_to_floor_ratio": 2.4
+          },
+          "expected": "QUESTION_EXISTS_BUT_MAGNITUDE_UNREADABLE"
+        },
+        {
+          "case_id": "NOT_CONVERGED",
+          "conditions": {
+            "C1": true,
+            "C2": true,
+            "C3": true,
+            "C4": true,
+            "C5": false
+          },
+          "expected": "NO_ENVIRONMENT_LEVEL_CERTIFICATE"
+        },
+        {
+          "case_id": "ALL_PREREQUISITES_MET",
+          "conditions": {
+            "C1": true,
+            "C2": true,
+            "C3": true,
+            "C4": true,
+            "C5": true
+          },
+          "expected": "ELIGIBLE_FOR_INDIVIDUAL_EFFECT_RETENTION_DIAGNOSTIC"
+        }
+      ],
+      "expected": {
+        "no_case_alone_authorizes_physical_action": true,
+        "failed_prerequisites_suppress_third_rung_claim": true,
+        "missing_condition_is_not_pass": true,
+        "source_specific_threshold_must_be_preregistered_and_sensitivity_tested": true,
+        "note": "Passing C1-C5 only makes the declared measurement eligible for interpretation under its assumptions; it does not establish universal validity or deployment safety."
+      }
     }
   ]
 }
