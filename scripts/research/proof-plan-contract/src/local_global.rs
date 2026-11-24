@@ -1332,6 +1332,7 @@ mod tests {
         adjudication.node_evidence = relation
             .map(|relation| {
                 vec![GlobalUseNodeEvidenceV1 {
+                    mention_id: "MENTION-TEST-001".to_owned(),
                     plan_node_id: "N-TEST-001".to_owned(),
                     warrant_id,
                     relation,
@@ -2028,6 +2029,19 @@ mod tests {
                 .iter()
                 .any(|error| error.contains("must match the exact paired warrant identity"))
         );
+    }
+
+    #[test]
+    fn complete_review_must_account_for_every_target_warrant_mention() {
+        let mut pair = fixture();
+        let extra = pair.candidate.global_stage.warrant_mentions[0].clone();
+        pair.candidate.global_stage.warrant_mentions.push(WarrantMention {
+            mention_id: "MENTION-UNREVIEWED-002".to_owned(),
+            ..extra
+        });
+        assert!(validate_pair(&pair)
+            .iter()
+            .any(|error| error.contains("omits candidate warrant mention MENTION-UNREVIEWED-002")));
     }
 
     #[test]
