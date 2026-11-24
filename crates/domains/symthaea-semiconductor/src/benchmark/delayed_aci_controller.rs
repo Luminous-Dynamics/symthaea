@@ -431,36 +431,40 @@ pub fn issue_delayed_aci_prediction_v1(
     Ok(receipt)
 }
 
-fn make_update_receipt(
-    engine: &DelayedAciEngineV1,
-    delivery: &DelayedAciLabelDeliveryV1,
-    prediction: Option<&DelayedAciPredictionReceiptV1>,
+struct DelayedAciReceiptContext<'a> {
+    engine: &'a DelayedAciEngineV1,
+    delivery: &'a DelayedAciLabelDeliveryV1,
+    prediction: Option<&'a DelayedAciPredictionReceiptV1>,
     disposition: DelayedAciDispositionV1,
     reasons: Vec<DelayedAciReasonV1>,
     alpha_before: Option<f64>,
     alpha_after: Option<f64>,
     missed_interval: Option<bool>,
     mutated: bool,
+}
+
+fn make_update_receipt(
+    context: DelayedAciReceiptContext<'_>,
 ) -> Result<DelayedAciUpdateReceiptV1, DelayedAciErrorV1> {
     let mut receipt = DelayedAciUpdateReceiptV1 {
         schema: DELAYED_ACI_UPDATE_RECEIPT_SCHEMA_V1.into(),
-        engine_id: engine.engine_id.clone(),
-        sample_id: delivery.sample_id.clone(),
-        label_id: delivery.label_id.clone(),
-        label_revision: delivery.label_revision,
-        measurement_event_id: delivery.measurement_event_id.clone(),
-        disposition,
-        reasons,
-        prediction_receipt_sha256: prediction.map(|value| value.receipt_sha256.clone()),
-        eligibility_report_sha256: Some(delivery.eligibility_report.report_sha256.clone()),
-        label_payload_sha256: delivery.label_payload_sha256.clone(),
-        lane: prediction.map(|value| value.lane),
-        alpha_before,
-        alpha_after,
-        missed_interval,
-        feedback_step: delivery.feedback_step,
-        fixed_delay_assumptions_intact: engine.state.fixed_delay_assumptions_intact,
-        alpha_state_mutated: mutated,
+        engine_id: context.engine.engine_id.clone(),
+        sample_id: context.delivery.sample_id.clone(),
+        label_id: context.delivery.label_id.clone(),
+        label_revision: context.delivery.label_revision,
+        measurement_event_id: context.delivery.measurement_event_id.clone(),
+        disposition: context.disposition,
+        reasons: context.reasons,
+        prediction_receipt_sha256: context.prediction.map(|value| value.receipt_sha256.clone()),
+        eligibility_report_sha256: Some(context.delivery.eligibility_report.report_sha256.clone()),
+        label_payload_sha256: context.delivery.label_payload_sha256.clone(),
+        lane: context.prediction.map(|value| value.lane),
+        alpha_before: context.alpha_before,
+        alpha_after: context.alpha_after,
+        missed_interval: context.missed_interval,
+        feedback_step: context.delivery.feedback_step,
+        fixed_delay_assumptions_intact: context.engine.state.fixed_delay_assumptions_intact,
+        alpha_state_mutated: context.mutated,
         receipt_sha256: String::new(),
     };
     receipt.receipt_sha256 = update_digest(&receipt)?;
@@ -506,33 +510,33 @@ pub fn deliver_delayed_aci_feedback_v1(
         delivery.label_id, delivery.label_revision
     )) {
         reasons.push(DelayedAciReasonV1::DuplicateAcceptedRevision);
-        return make_update_receipt(
+        return make_update_receipt(DelayedAciReceiptContext {
             engine,
             delivery,
-            prediction.as_ref(),
-            DelayedAciDispositionV1::Duplicate,
+            prediction: prediction.as_ref(),
+            disposition: DelayedAciDispositionV1::Duplicate,
             reasons,
-            None,
-            None,
-            None,
-            false,
-        );
+            alpha_before: None,
+            alpha_after: None,
+            missed_interval: None,
+            mutated: false,
+        });
     }
 
     let Some(prediction) = prediction else {
         engine.state.fixed_delay_assumptions_intact = false;
         reasons.push(DelayedAciReasonV1::PendingPredictionMissing);
-        return make_update_receipt(
+        return make_update_receipt(DelayedAciReceiptContext {
             engine,
             delivery,
-            None,
-            DelayedAciDispositionV1::PendingPredictionMissing,
+            prediction: None,
+            disposition: DelayedAciDispositionV1::PendingPredictionMissing,
             reasons,
-            None,
-            None,
-            None,
-            false,
-        );
+            alpha_before: None,
+            alpha_after: None,
+            missed_interval: None,
+            mutated: false,
+        });
     };
 
     let expected_step = prediction
@@ -633,17 +637,17 @@ pub fn deliver_delayed_aci_feedback_v1(
         } else {
             DelayedAciDispositionV1::Rejected
         };
-        return make_update_receipt(
+        return make_update_receipt(DelayedAciReceiptContext {
             engine,
             delivery,
-            Some(&prediction),
+            prediction: Some(&prediction),
             disposition,
             reasons,
-            Some(prediction.alpha_used),
-            Some(engine.state.alpha_lanes[prediction.lane as usize]),
-            None,
-            false,
-        );
+            alpha_before: Some(prediction.alpha_used),
+            alpha_after: Some(engine.state.alpha_lanes[prediction.lane as usize]),
+            missed_interval: None,
+            mutated: false,
+        });
     }
 
     let lane = prediction.lane as usize;
@@ -678,17 +682,17 @@ pub fn deliver_delayed_aci_feedback_v1(
 
     let mut candidate_engine = engine.clone();
     candidate_engine.state = candidate_state.clone();
-    let receipt = make_update_receipt(
-        &candidate_engine,
+    let receipt = make_update_receipt(DelayedAciReceiptContext {
+        engine: &candidate_engine,
         delivery,
-        Some(&prediction),
-        DelayedAciDispositionV1::Updated,
-        Vec::new(),
-        Some(alpha_before),
-        Some(alpha_after),
-        Some(missed),
-        true,
-    )?;
+        prediction: Some(&prediction),
+        disposition: DelayedAciDispositionV1::Updated,
+        reasons: Vec::new(),
+        alpha_before: Some(alpha_before),
+        alpha_after: Some(alpha_after),
+        missed_interval: Some(missed),
+        mutated: true,
+    })?;
 
     engine.state = candidate_state;
     engine.pending_predictions.remove(&delivery.sample_id);
