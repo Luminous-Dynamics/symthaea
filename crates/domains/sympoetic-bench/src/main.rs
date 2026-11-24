@@ -9,6 +9,7 @@ use sympoetic_bench::{
         StratifiedCapabilityObservation, summarize_capability_amplification_by_stratum,
     },
     trajectory::{TeamTrajectory, validate_trajectory},
+    team_retention::summarize_tsv,
     validate::{sha256_hex, validate_corpus, validate_scorecard, validate_trace},
 };
 
@@ -46,6 +47,15 @@ enum Command {
     },
     /// Summarize independent learning gain and negative-gain rates by baseline stratum.
     SummarizeCapabilityStrata {
+        #[arg(long)]
+        input: PathBuf,
+        #[arg(long, default_value_t = 2_000)]
+        draws: usize,
+        #[arg(long, default_value_t = 42)]
+        seed: u64,
+    },
+    /// Summarize collective capability after AI withdrawal in a 2x2 design.
+    SummarizeTeamRetention {
         #[arg(long)]
         input: PathBuf,
         #[arg(long, default_value_t = 2_000)]
@@ -138,6 +148,13 @@ fn main() -> Result<()> {
                 seed,
             )?;
             println!("{}", serde_json::to_string_pretty(&summary)?);
+        }
+        Command::SummarizeTeamRetention { input, draws, seed } => {
+            let contents = fs::read_to_string(&input)
+                .with_context(|| format!("could not read {}", input.display()))?;
+            let report = summarize_tsv(&contents, draws, seed)
+                .map_err(anyhow::Error::msg)?;
+            println!("{report}");
         }
         Command::Digest { input } => {
             let bytes = fs::read(&input)
