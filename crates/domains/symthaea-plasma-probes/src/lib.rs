@@ -2781,15 +2781,15 @@ pub fn evaluate_coupled_two_mode_authority(
         let root = discriminant.sqrt();
         let lambda_a = 0.5 * (trace + root);
         let lambda_b = 0.5 * (trace - root);
-        (lambda_a.abs().min(lambda_b.abs()), lambda_a.abs().max(lambda_b.abs()))
+        (
+            lambda_a.abs().min(lambda_b.abs()),
+            lambda_a.abs().max(lambda_b.abs()),
+        )
     } else {
         let modulus = determinant.sqrt();
         (modulus, modulus)
     };
-    if !minimum_modulus.is_finite()
-        || !spectral_radius.is_finite()
-        || minimum_modulus <= 1.0
-    {
+    if !minimum_modulus.is_finite() || !spectral_radius.is_finite() || minimum_modulus <= 1.0 {
         return Err(ContractError::InvalidCoupledModeAuthority(
             "both declared modes must be unstable (eigenvalue modulus > 1)",
         ));
@@ -2960,9 +2960,7 @@ fn matrix_power_2x2(matrix: [f64; 4], exponent: u32) -> Result<[f64; 4], Contrac
     Ok(result)
 }
 
-fn symmetric_2x2_spectrum(
-    matrix: [f64; 3],
-) -> Result<(f64, f64, Option<f64>), ContractError> {
+fn symmetric_2x2_spectrum(matrix: [f64; 3]) -> Result<(f64, f64, Option<f64>), ContractError> {
     let [a, b, d] = matrix;
     if matrix.iter().any(|value| !value.is_finite()) {
         return Err(ContractError::InvalidCoupledModeAuthority(
@@ -6488,9 +6486,8 @@ mod tests {
                     case["actuator_gain"][0].as_f64().unwrap(),
                     case["actuator_gain"][1].as_f64().unwrap(),
                 ],
-                actuator_update_stride_steps: case["actuator_update_stride_steps"]
-                    .as_u64()
-                    .unwrap() as u32,
+                actuator_update_stride_steps: case["actuator_update_stride_steps"].as_u64().unwrap()
+                    as u32,
                 actuator_delivery_delay_steps: case["actuator_delivery_delay_steps"]
                     .as_u64()
                     .unwrap() as u32,
@@ -6511,18 +6508,9 @@ mod tests {
                 report.actuator_command_count,
                 expected["actuator_command_count"].as_u64().unwrap() as u32
             );
-            assert_eq!(
-                report.observable,
-                expected["observable"].as_bool().unwrap()
-            );
-            assert_eq!(
-                report.controllable,
-                expected["controllable"].as_bool().unwrap()
-            );
-            assert_eq!(
-                report.authority_qualified,
-                expected["authority_qualified"].as_bool().unwrap()
-            );
+            assert_eq!(report.observable, expected["observable"].as_bool().unwrap());
+            assert_eq!(report.controllable, expected["controllable"].as_bool().unwrap());
+            assert_eq!(report.authority_qualified, expected["authority_qualified"].as_bool().unwrap());
         }
     }
 
@@ -6578,11 +6566,8 @@ mod tests {
 
     #[test]
     fn coupled_two_mode_authority_applies_sensor_and_actuator_delivery_delays() {
-        let mut contract = coupled_two_mode_contract(
-            [1.2, 0.0, 0.0, 1.1],
-            [[1.0, 0.0], [0.0, 1.0]],
-            [1.0, 1.0],
-        );
+        let mut contract =
+            coupled_two_mode_contract([1.2, 0.0, 0.0, 1.1], [[1.0, 0.0], [0.0, 1.0]], [1.0, 1.0]);
         contract.diagnostic_delivery_delay_steps = 4;
         contract.actuator_delivery_delay_steps = 5;
         let report = evaluate_coupled_two_mode_authority(contract).unwrap();
@@ -6592,11 +6577,8 @@ mod tests {
 
     #[test]
     fn coupled_two_mode_authority_rejects_late_or_absent_channel_updates() {
-        let mut contract = coupled_two_mode_contract(
-            [1.2, 0.0, 0.0, 1.1],
-            [[1.0, 0.0], [0.0, 1.0]],
-            [1.0, 1.0],
-        );
+        let mut contract =
+            coupled_two_mode_contract([1.2, 0.0, 0.0, 1.1], [[1.0, 0.0], [0.0, 1.0]], [1.0, 1.0]);
         contract.diagnostic_delivery_delay_steps = contract.horizon_steps;
         assert!(matches!(
             evaluate_coupled_two_mode_authority(contract),
