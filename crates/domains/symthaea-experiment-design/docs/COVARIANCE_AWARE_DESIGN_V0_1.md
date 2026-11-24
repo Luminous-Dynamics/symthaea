@@ -48,6 +48,8 @@ This is a prior-free covariance-geometry screen. It is **not** Bayesian expected
 ## Numerical treatment and limitations
 
 - Covariance matrices are checked for dimensions, finiteness, symmetry, non-negative diagonal entries, positive semidefiniteness, and exact pair coverage.
+- The complete family of pairwise difference covariance matrices is also checked for **joint realizability**. Individually PSD matrices can still be mutually impossible. Their block variogram must be conditionally negative semidefinite; equivalently, its double-centred Gram/covariance matrix must be PSD. The implementation rejects incoherent pairwise sets instead of ranking them.
+- Resource guards cap the request at 8 hypotheses, 8 observables per candidate, 16 joint hypothesis-observable dimensions, 256 candidate experiments, and 8 MiB of CLI JSON input. These are explicit v0.1 safety bounds, not claims about the maximum scale of future algorithms.
 - A descriptor SHA-256 binds the supplied provenance text. A separate canonical matrix digest binds the numeric matrix dimensions and row-major IEEE-754 values. Neither digest proves that an executable generated the data.
 - Covariance eigendecomposition is applied to a diagonal-standardized correlation matrix. This makes numerical rank/support cutoffs invariant to positive diagonal unit changes (for example, metres to millimetres). The algorithm and tolerances are versioned in the output.
 - No diagonal jitter, automatic shrinkage, or undocumented regularization is applied.
@@ -97,6 +99,16 @@ A=\begin{pmatrix}1&0\\0&1\\1&1\end{pmatrix}.
 The augmented covariance has rank two. Its covariance-aware pseudoinverse score remains D²=4. The diagonal-only independence calculation instead changes from 5 to 8, falsely rewarding the duplicate.
 
 A second hostile test uses S=[[1,1],[1,1]] and Δμ=(1,0)^T. Because the mean difference has a component outside range(S), the candidate must be quarantined rather than assigned the finite value returned by the pseudoinverse quadratic form alone.
+
+A third hostile control demonstrates **pairwise covariance incoherence**. For three scalar hypotheses, each of these pairwise difference variances is individually valid and non-negative:
+
+[
+operatorname{Var}(Y_0-Y_1)=1,quad
+operatorname{Var}(Y_0-Y_2)=1,quad
+operatorname{Var}(Y_1-Y_2)=9.
+]
+
+Together they are impossible: setting X=Y_1-Y_0 and Z=Y_2-Y_0 would require Var(X)=Var(Z)=1 and Cov(X,Z)=-3.5, violating Cauchy–Schwarz. The selector must reject this family. The coherent control (1,4,1) is accepted. The implementation checks the matrix-valued variogram through its double-centred PSD condition.
 
 A further metamorphic control applies the invertible transformation A=[[2,1],[-1,1]] (determinant 3) to both the mean vector and covariance, producing S'=[[7,-1/2],[-1/2,1]]. The quadratic form remains D²=4. A three-hypothesis test also confirms that the selector ranks by the least-separated pair and rejects a missing pairwise covariance.
 
