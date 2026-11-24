@@ -1,6 +1,6 @@
-# Joint-covariance experiment design v0.2
+# Joint-covariance experiment design v0.2 — proposal
 
-**Status:** additive Stage-B screening implementation. The current exact-head focused workflow is the qualification authority. This module is not connected to the live Symtropy response atlas, calibrated on physical data, or validated as expected information gain.
+**Status:** design specification associated with [draft PR #13453](https://github.com/Luminous-Dynamics/symthaea/pull/13453). The v0.2 joint-covariance refactor is not yet merged or Rust/CI-qualified. The code currently on the PR branch is the implementation candidate; this document on main is only the proposed contract. It is not connected to the live Symtropy response atlas, calibrated on physical data, or validated as expected information gain.
 
 Synthetic fixture: [covariance-redundancy-v0.1.json](../fixtures/covariance-redundancy-v0.1.json). Machine-readable contract: [covariance-design.schema.json](../fixtures/covariance-design.schema.json).
 
