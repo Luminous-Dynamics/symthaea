@@ -1,0 +1,167 @@
+{
+  "schema_version": "1.0.0",
+  "pairs": [
+    {
+      "candidate": {
+        "pair_id": "MMP-EQUIVALENT-IMPLICATION-001",
+        "source": {
+          "repository": "symthaea.synthetic",
+          "revision": "fixture-v1",
+          "declaration": "synthetic.implication_equivalence",
+          "task_family": "propositional_logic"
+        },
+        "base": {
+          "sequent": {
+            "hypotheses": [],
+            "premises": [
+              {
+                "op": "implies",
+                "left": {"op": "atom", "name": "p"},
+                "right": {"op": "atom", "name": "q"}
+              }
+            ],
+            "conclusion": {
+              "op": "implies",
+              "left": {"op": "atom", "name": "q"},
+              "right": {"op": "atom", "name": "p"}
+            }
+          },
+          "sequent_sha256": "71b6eb9e5be1d1355948f1d68ed93d5c97c2529a877b63567f44ec326f2d9531",
+          "proof_route_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "variant": {
+          "sequent": {
+            "hypotheses": [],
+            "premises": [
+              {
+                "op": "or",
+                "left": {
+                  "op": "not",
+                  "arg": {"op": "atom", "name": "p"}
+                },
+                "right": {"op": "atom", "name": "q"}
+              }
+            ],
+            "conclusion": {
+              "op": "implies",
+              "left": {"op": "atom", "name": "q"},
+              "right": {"op": "atom", "name": "p"}
+            }
+          },
+          "sequent_sha256": "34f7f1562434a25f05eaba5e3e1be8736ba62ed04fb84d34567d0fe8b463dd5d",
+          "proof_route_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      },
+      "evaluator_only": {
+        "transformation_class": "semantics_preserving",
+        "oracle_relation": "equivalent",
+        "adjudication_authority": "finite_boolean_truth_table",
+        "evidence_refs": ["FINITE-AST:IMPLIES-EQUIV-NOT-OR", "FIXTURE:PAIR-001"]
+      }
+    },
+    {
+      "candidate": {
+        "pair_id": "MMP-REMOVED-HYPOTHESIS-001",
+        "source": {
+          "repository": "symthaea.synthetic",
+          "revision": "fixture-v1",
+          "declaration": "synthetic.modus_ponens_scope",
+          "task_family": "propositional_logic"
+        },
+        "base": {
+          "sequent": {
+            "hypotheses": [
+              {"op": "atom", "name": "p"}
+            ],
+            "premises": [
+              {
+                "op": "implies",
+                "left": {"op": "atom", "name": "p"},
+                "right": {"op": "atom", "name": "q"}
+              }
+            ],
+            "conclusion": {"op": "atom", "name": "q"}
+          },
+          "sequent_sha256": "ea62e684dce94c0070aa12919bb8bb7ffc6a1e5453fcfcc597f5bfa7acbb5276",
+          "proof_route_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        "variant": {
+          "sequent": {
+            "hypotheses": [],
+            "premises": [
+              {
+                "op": "implies",
+                "left": {"op": "atom", "name": "p"},
+                "right": {"op": "atom", "name": "q"}
+              }
+            ],
+            "conclusion": {"op": "atom", "name": "q"}
+          },
+          "sequent_sha256": "8686bbbf36d3c42b25438a42a4453f88bda6a6a13f9296ec51e59f2e7a0ffca1",
+          "proof_route_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        }
+      },
+      "evaluator_only": {
+        "transformation_class": "semantics_changing",
+        "oracle_relation": "variant_entails_base",
+        "adjudication_authority": "finite_boolean_truth_table",
+        "evidence_refs": ["FINITE-AST:REMOVED-HYPOTHESIS", "FIXTURE:PAIR-002"]
+      }
+    },
+    {
+      "candidate": {
+        "pair_id": "MMP-PROOF-ROUTE-ONLY-001",
+        "source": {
+          "repository": "symthaea.synthetic",
+          "revision": "fixture-v1",
+          "declaration": "synthetic.same_sequent_alternate_route",
+          "task_family": "propositional_logic"
+        },
+        "base": {
+          "sequent": {
+            "hypotheses": [],
+            "premises": [
+              {
+                "op": "implies",
+                "left": {"op": "atom", "name": "p"},
+                "right": {"op": "atom", "name": "q"}
+              }
+            ],
+            "conclusion": {
+              "op": "implies",
+              "left": {"op": "atom", "name": "q"},
+              "right": {"op": "atom", "name": "p"}
+            }
+          },
+          "sequent_sha256": "71b6eb9e5be1d1355948f1d68ed93d5c97c2529a877b63567f44ec326f2d9531",
+          "proof_route_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "variant": {
+          "sequent": {
+            "hypotheses": [],
+            "premises": [
+              {
+                "op": "implies",
+                "left": {"op": "atom", "name": "p"},
+                "right": {"op": "atom", "name": "q"}
+              }
+            ],
+            "conclusion": {
+              "op": "implies",
+              "left": {"op": "atom", "name": "q"},
+              "right": {"op": "atom", "name": "p"}
+            }
+          },
+          "sequent_sha256": "71b6eb9e5be1d1355948f1d68ed93d5c97c2529a877b63567f44ec326f2d9531",
+          "proof_route_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        }
+      },
+      "evaluator_only": {
+        "transformation_class": "proof_route_only",
+        "oracle_relation": "equivalent",
+        "adjudication_authority": "finite_boolean_truth_table",
+        "evidence_refs": ["FINITE-AST:ROUTE-ONLY-SAME-SEQUENT", "FIXTURE:PAIR-003"]
+      }
+    }
+  ]
+}
