@@ -38,17 +38,49 @@ _ALLOWED_PARAMS = {
     "neighbor_radius",
     "bm25_k1",
     "bm25_b",
+    "retrieval_mode",
 }
 _ALLOWED_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif"}
 MAX_SCREENSHOT_BYTES = 32 * 1024 * 1024
 MAX_TRAJECTORY_SCREENSHOT_BYTES = 512 * 1024 * 1024
+
+_RETRIEVAL_MODE_PROFILES: dict[str, dict[str, Any]] = {
+    "bm25_only": {
+        "backend_id": "mace_lmev2_bm25_only",
+        "retrieval_mode_label": "bm25_only_with_original_image_evidence",
+        "evidence_channel": "trajectory_bm25_text",
+        "retrieval_channels": ["trajectory_bm25_search_v1"],
+        "fusion_profile": {"algorithm": "none"},
+    },
+    "entity_literal_only": {
+        "backend_id": "mace_lmev2_entity_literal_only",
+        "retrieval_mode_label": "entity_literal_only_with_original_image_evidence",
+        "evidence_channel": "trajectory_entity_literal",
+        "retrieval_channels": ["trajectory_entity_literal_search_v1"],
+        "fusion_profile": {"algorithm": "none"},
+    },
+    "hybrid_rrf": {
+        "backend_id": "mace_lmev2_hybrid_rrf_bm25_entity",
+        "retrieval_mode_label": "hybrid_bm25_entity_literal_with_original_image_evidence",
+        "evidence_channel": "hybrid_rrf_bm25_entity",
+        "retrieval_channels": [
+            "trajectory_bm25_search_v1",
+            "trajectory_entity_literal_search_v1",
+        ],
+        "fusion_profile": {
+            "algorithm": "reciprocal_rank_fusion_v1",
+            "k": 60,
+            "channel_weights": {"bm25": 1.0, "entity_literal": 1.0},
+        },
+    },
+}
 
 
 @register_memory
 class MaceLongMemEvalV2Memory(Memory):
     """Official LongMemEval-V2 plugin backed by a persistent Rust sidecar."""
 
-    memory_type = "mace_lmev2_hybrid_bm25_entity_literal"
+    memory_type = "mace_lmev2_retrieval_ablation_v1"
 
     def __init__(self, memory_params: dict[str, object]) -> None:
         require(isinstance(memory_params, dict), "MACE memory_params must be an object")
@@ -61,6 +93,11 @@ class MaceLongMemEvalV2Memory(Memory):
         domain = memory_params.get("domain", "web")
         run_id = memory_params.get("run_id")
         environment_revision_sha256 = memory_params.get("environment_revision_sha256")
+        retrieval_mode = memory_params.get("retrieval_mode", "hybrid_rrf")
+        require(
+            isinstance(retrieval_mode, str) and retrieval_mode in _RETRIEVAL_MODE_PROFILES,
+            "retrieval_mode must be bm25_only, entity_literal_only, or hybrid_rrf",
+        )
         require(isinstance(sidecar_value, str) and sidecar_value, "sidecar_binary is required")
         require(isinstance(source_root_value, str) and source_root_value, "source_screenshot_root is required")
         require(isinstance(workspace_value, str) and workspace_value, "workspace_dir is required")
@@ -112,6 +149,10 @@ class MaceLongMemEvalV2Memory(Memory):
         self.domain = str(domain)
         self.run_id = run_id
         self.environment_revision_sha256 = environment_revision_sha256
+        self.retrieval_mode = retrieval_mode
+        self.retrieval_profile = dict(_RETRIEVAL_MODE_PROFILES[retrieval_mode])
+        self.backend_id = str(self.retrieval_profile["backend_id"])
+        self.retrieval_mode_label = str(self.retrieval_profile["retrieval_mode_label"])
         self.top_k = self._bounded_int(memory_params.get("top_k", 8), "top_k", 1, 100)
         self.slice_radius = self._bounded_int(memory_params.get("slice_radius", 1), "slice_radius", 0, 32)
         self.neighbor_radius = self._bounded_int(
