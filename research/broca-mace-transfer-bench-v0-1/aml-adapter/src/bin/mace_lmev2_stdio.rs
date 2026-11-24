@@ -593,7 +593,9 @@ fn handle_request(
             let stop_reason = if observed_evidence_ids.is_empty() {
                 RetrievalStopReasonV1::NoCandidateEvidence
             } else {
-                RetrievalStopReasonV1::EvidenceSufficient
+                // Retrieval completion means candidates were returned, not
+                // that they were qualified or sufficient for the decision.
+                RetrievalStopReasonV1::CandidatesReturned
             };
             let query_elapsed_ns = u64::try_from(query_started.elapsed().as_nanos())
                 .unwrap_or(u64::MAX);
@@ -922,6 +924,7 @@ mod tests {
         assert!(response["candidate_evidence_jsonl"].as_str().unwrap().contains("lmev2:text:"));
         assert_eq!(response["retrieval_trace"]["run_id"], "fixture-run");
         assert_eq!(response["retrieval_trace"]["query_invocation_id"], "query-invocation-1");
+        assert_eq!(response["retrieval_trace"]["stop_reason"], "candidates_returned");
         assert_eq!(response["retrieval_trace"]["inspected_bytes_complete"], false);
         assert!(response["retrieval_trace_sha256"].as_str().is_some());
         assert_eq!(response["policy_trace_count"], 1);

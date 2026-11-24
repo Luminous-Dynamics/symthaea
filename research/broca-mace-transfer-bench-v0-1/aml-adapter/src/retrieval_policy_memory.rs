@@ -3,12 +3,14 @@
 
 //! Label-blind retrieval-policy memory, kept separate from world/evidence memory.
 //!
-//! This module learns only reusable tool/action templates and their operating
-//! envelope. It does not store query text, question IDs, gold answers, evaluator
-//! judgments, hidden task families, attack assignments, retrieved facts or
-//! source payloads. A strategy note may recommend where/how to search; it is
-//! never evidence that a world-state claim is true or that a source is
-//! authorized for a purpose.
+//! This module records label-blind retrieval observations and exploratory
+//! tool/action templates. It does not store query text, question IDs, gold
+//! answers, evaluator judgments, hidden task families, attack assignments,
+//! retrieved facts or source payloads. Candidate-return observations can
+//! create exploratory notes only; they cannot make a strategy policy-eligible.
+//! A separate held-out counterfactual qualification is required before a note
+//! may influence retrieval policy. A strategy note is never evidence that a
+//! world-state claim is true or that a source is authorized for a purpose.
 //!
 //! The in-memory implementation is a deterministic reference prototype. A
 //! hosted service must persist trace receipts and promoted notes durably and
@@ -56,7 +58,12 @@ impl RetrievalOperationOutcomeV1 {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RetrievalStopReasonV1 {
+    /// Legacy v1 wire label. It is retained for receipt replay only and is
+    /// never interpreted as a decision-sufficiency assessment.
     EvidenceSufficient,
+    /// A retrieval adapter returned one or more candidate evidence records.
+    /// This says nothing about qualification, reader use, or decision utility.
+    CandidatesReturned,
     BudgetExhausted,
     NoCandidateEvidence,
     ToolError,
@@ -66,7 +73,8 @@ pub enum RetrievalStopReasonV1 {
 impl RetrievalStopReasonV1 {
     fn tag(self) -> u8 {
         match self {
-            Self::EvidenceSufficient => 1,
+            // Preserve the v1 receipt commitment for the legacy label.
+            Self::EvidenceSufficient | Self::CandidatesReturned => 1,
             Self::BudgetExhausted => 2,
             Self::NoCandidateEvidence => 3,
             Self::ToolError => 4,
@@ -77,6 +85,7 @@ impl RetrievalStopReasonV1 {
     fn as_str(self) -> &'static str {
         match self {
             Self::EvidenceSufficient => "evidence_sufficient",
+            Self::CandidatesReturned => "candidates_returned",
             Self::BudgetExhausted => "budget_exhausted",
             Self::NoCandidateEvidence => "no_candidate_evidence",
             Self::ToolError => "tool_error",
@@ -174,6 +183,7 @@ impl RetrievalTraceReceiptV1 {
         };
         let stop_reason = match required_string("stop_reason")?.as_str() {
             "evidence_sufficient" => RetrievalStopReasonV1::EvidenceSufficient,
+            "candidates_returned" => RetrievalStopReasonV1::CandidatesReturned,
             "budget_exhausted" => RetrievalStopReasonV1::BudgetExhausted,
             "no_candidate_evidence" => RetrievalStopReasonV1::NoCandidateEvidence,
             "tool_error" => RetrievalStopReasonV1::ToolError,
@@ -312,8 +322,27 @@ pub struct RetrievalStrategyStepV1 {
     pub action_template_sha256: String,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RetrievalStrategyStatusV1 {
+    /// Observed retrieval patterns; diagnostic only and never auto-applied.
+    Exploratory,
+    /// Reserved for a separately verified held-out counterfactual qualification.
+    PolicyEligible,
+}
+
+impl RetrievalStrategyStatusV1 {
+    fn tag(self) -> u8 {
+        match self {
+            Self::Exploratory => 1,
+            Self::PolicyEligible => 2,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RetrievalStrategyNoteV1 {
+    /// Whether the note is diagnostic-only or independently policy-qualified.
+    pub status: RetrievalStrategyStatusV1,
     /// The digest is also the immutable note ID.
     pub note_sha256: String,
     pub domain_id: String,
@@ -478,7 +507,8 @@ fn strategy_steps(trace: &RetrievalTraceReceiptV1) -> Vec<RetrievalStrategyStepV
 
 fn note_digest(note: &RetrievalStrategyNoteV1) -> String {
     let mut hasher = Sha256::new();
-    hasher.update(b"luminous:mace:retrieval-strategy-note:v1\0");
+    hasher.update(b"luminous:mace:retrieval-strategy-note:v2\0");
+    hasher.update(note.status.tag().to_be_bytes());
     for value in [
         note.domain_id.as_str(),
         note.environment_revision_sha256.as_str(),
@@ -597,7 +627,8 @@ fn validate_trace(trace: &RetrievalTraceReceiptV1) -> Result<(), RetrievalPolicy
     }
 
     match trace.stop_reason {
-        RetrievalStopReasonV1::EvidenceSufficient => {
+        RetrievalStopReasonV1::EvidenceSufficient
+        | RetrievalStopReasonV1::CandidatesReturned => {
             if !observed_any
                 || !trace
                     .candidate_set_sha256
@@ -681,9 +712,9 @@ impl RetrievalPolicyMemoryV1 {
             .map(|stored| stored.receipt_sha256.as_str())
     }
 
-    /// Promote a search strategy only after at least three distinct successful
-    /// query invocations share exactly the same domain, environment, tool
-    /// profile and ordered tool/action template sequence.
+    /// Consolidate repeated candidate-return observations into an exploratory
+    /// note. This is deliberately not policy promotion: no receipt in this
+    /// module proves qualification, decision sufficiency, or held-out uplift.
     pub fn promote_strategy(
         &mut self,
         references: &[RetrievalTraceRefV1],
@@ -727,7 +758,11 @@ impl RetrievalPolicyMemoryV1 {
                 .traces
                 .get(&key)
                 .ok_or(RetrievalPolicyRejectV1::UnknownTrace)?;
-            if stored.receipt.stop_reason != RetrievalStopReasonV1::EvidenceSufficient {
+            if !matches!(
+                stored.receipt.stop_reason,
+                RetrievalStopReasonV1::EvidenceSufficient
+                    | RetrievalStopReasonV1::CandidatesReturned
+            ) {
                 return Err(RetrievalPolicyRejectV1::UnsupportedTraceOutcome);
             }
             if !seen_queries.insert(stored.receipt.query_sha256.clone()) {
@@ -761,6 +796,7 @@ impl RetrievalPolicyMemoryV1 {
         supporting_trace_receipt_sha256.sort();
 
         let mut note = RetrievalStrategyNoteV1 {
+            status: RetrievalStrategyStatusV1::Exploratory,
             note_sha256: String::new(),
             domain_id: first.receipt.domain_id.clone(),
             environment_revision_sha256: first.receipt.environment_revision_sha256.clone(),
@@ -782,9 +818,10 @@ impl RetrievalPolicyMemoryV1 {
         Ok(note)
     }
 
-    /// Return only notes whose domain, environment revision, tool profile and
-    /// validity interval match exactly. A changed environment is negative
-    /// transfer, not an invitation to silently reuse a stale strategy.
+    /// Return only notes with an independently qualified policy-eligible
+    /// status and an exact domain/environment/tool/time match. This prototype
+    /// never creates that status, so the method safely returns no notes until
+    /// a held-out counterfactual qualification API is added.
     pub fn applicable_notes(
         &self,
         domain_id: &str,
@@ -795,7 +832,30 @@ impl RetrievalPolicyMemoryV1 {
         self.notes
             .values()
             .filter(|note| {
-                note.domain_id == domain_id
+                note.status == RetrievalStrategyStatusV1::PolicyEligible
+                    && note.domain_id == domain_id
+                    && note.environment_revision_sha256 == environment_revision_sha256
+                    && note.tool_profile_sha256 == tool_profile_sha256
+                    && note.promoted_at_unix <= now_unix
+                    && now_unix < note.expires_at_unix
+            })
+            .collect()
+    }
+
+    /// Return diagnostic-only strategy observations. These must not be
+    /// supplied to a retrieval policy as eligible actions.
+    pub fn exploratory_notes(
+        &self,
+        domain_id: &str,
+        environment_revision_sha256: &str,
+        tool_profile_sha256: &str,
+        now_unix: u64,
+    ) -> Vec<&RetrievalStrategyNoteV1> {
+        self.notes
+            .values()
+            .filter(|note| {
+                note.status == RetrievalStrategyStatusV1::Exploratory
+                    && note.domain_id == domain_id
                     && note.environment_revision_sha256 == environment_revision_sha256
                     && note.tool_profile_sha256 == tool_profile_sha256
                     && note.promoted_at_unix <= now_unix
@@ -871,7 +931,7 @@ mod tests {
             query_sha256: query_digest.to_owned(),
             candidate_set_sha256: Some(CANDIDATE_SET.to_owned()),
             operations,
-            stop_reason: RetrievalStopReasonV1::EvidenceSufficient,
+            stop_reason: RetrievalStopReasonV1::CandidatesReturned,
             tool_call_budget: 8,
             tool_calls_used: 2,
             elapsed_ns: 20,
@@ -955,6 +1015,12 @@ mod tests {
             .expect("three traces promote");
         assert_eq!(note.supporting_trace_receipt_sha256.len(), 3);
         assert_eq!(note.steps.len(), 2);
+        assert_eq!(note.status, RetrievalStrategyStatusV1::Exploratory);
+        assert!(memory.applicable_notes("web-shop-a", ENV_A, TOOL_PROFILE_A, 250).is_empty());
+        assert_eq!(
+            memory.exploratory_notes("web-shop-a", ENV_A, TOOL_PROFILE_A, 250),
+            vec![&note]
+        );
         assert_eq!(memory.note_count(), 1);
     }
 
@@ -1025,8 +1091,9 @@ mod tests {
         let supporting = three_successful_traces(&mut memory);
         let note = memory.promote_strategy(&supporting, ALGORITHM, 200, 300).unwrap();
 
+        assert!(memory.applicable_notes("web-shop-a", ENV_A, TOOL_PROFILE_A, 250).is_empty());
         assert_eq!(
-            memory.applicable_notes("web-shop-a", ENV_A, TOOL_PROFILE_A, 250),
+            memory.exploratory_notes("web-shop-a", ENV_A, TOOL_PROFILE_A, 250),
             vec![&note]
         );
         assert!(memory.applicable_notes("web-shop-b", ENV_A, TOOL_PROFILE_A, 250).is_empty());
@@ -1051,7 +1118,9 @@ mod tests {
         memory.promote_strategy(&supporting, ALGORITHM, 200, 300).unwrap();
 
         assert!(memory.applicable_notes("web-shop-a", ENV_A, TOOL_PROFILE_A, 199).is_empty());
-        assert!(memory.applicable_notes("web-shop-a", ENV_A, TOOL_PROFILE_A, 300).is_empty());
+        assert!(memory.applicable_notes("web-shop-a", ENV_A, TOOL_PROFILE_A, 250).is_empty());
+        assert!(memory.exploratory_notes("web-shop-a", ENV_A, TOOL_PROFILE_A, 199).is_empty());
+        assert!(memory.exploratory_notes("web-shop-a", ENV_A, TOOL_PROFILE_A, 300).is_empty());
         assert_eq!(
             memory.promote_strategy(&supporting, ALGORITHM, 200, 200),
             Err(RetrievalPolicyRejectV1::InvalidPromotionTime)
@@ -1112,6 +1181,75 @@ mod tests {
         assert_eq!(
             memory.record_trace(early_stop),
             Err(RetrievalPolicyRejectV1::InvalidStopReason)
+        );
+    }
+
+    #[test]
+    fn legacy_evidence_sufficient_label_remains_readable_but_only_exploratory() {
+        let mut memory = RetrievalPolicyMemoryV1::default();
+        for (invocation, query) in [
+            ("legacy-a", "a141414141414141414141414141414141414141414141414141414141414141"),
+            ("legacy-b", "a242424242424242424242424242424242424242424242424242424242424242"),
+            ("legacy-c", "a343434343434343434343434343434343434343434343434343434343434343"),
+        ] {
+            let original = trace(
+                invocation, query, "web-shop-a", ENV_A, TOOL_PROFILE_A, ACTION_SEARCH,
+            );
+            let mut value = original.to_json_value();
+            value["stop_reason"] = Value::String("evidence_sufficient".to_owned());
+            // Legacy label and candidate-returned label share the old v1 tag,
+            // preserving digest verification without preserving its unsafe meaning.
+            value["receipt_sha256"] = Value::String(original.receipt_sha256());
+            let decoded = RetrievalTraceReceiptV1::from_json_value(&value)
+                .expect("legacy v1 receipt remains readable");
+            assert_eq!(decoded.stop_reason, RetrievalStopReasonV1::EvidenceSufficient);
+            memory.record_trace(decoded).expect("legacy observation accepted");
+        }
+
+        let note = memory
+            .promote_strategy(&refs(&["legacy-a", "legacy-b", "legacy-c"]), ALGORITHM, 200, 300)
+            .expect("legacy observations may be consolidated for diagnostics");
+        assert_eq!(note.status, RetrievalStrategyStatusV1::Exploratory);
+        assert!(memory.applicable_notes("web-shop-a", ENV_A, TOOL_PROFILE_A, 250).is_empty());
+    }
+
+    #[test]
+    fn candidates_returned_receipt_matches_cross_language_reference_vector() {
+        let receipt = RetrievalTraceReceiptV1 {
+            run_id: "run-candidate-test".to_owned(),
+            query_invocation_id: "invocation-candidate-test".to_owned(),
+            domain_id: "web".to_owned(),
+            environment_revision_sha256: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_owned(),
+            tool_profile_sha256: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_owned(),
+            query_sha256: "fcef6f729579a929adf41fb9249bf3c2fa8fb4de403fe1019163ba6729646fb1".to_owned(),
+            candidate_set_sha256: Some("dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd".to_owned()),
+            operations: vec![RetrievalOperationV1 {
+                tool_id: "trajectory.bm25.search".to_owned(),
+                tool_revision_sha256: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_owned(),
+                action_template_sha256: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc".to_owned(),
+                observed_evidence_ids: vec!["evidence:1".to_owned()],
+                outcome: RetrievalOperationOutcomeV1::EvidenceObserved,
+                elapsed_ns: 17,
+                inspected_bytes: 128,
+                inspected_bytes_measured: true,
+            }],
+            stop_reason: RetrievalStopReasonV1::CandidatesReturned,
+            tool_call_budget: 1,
+            tool_calls_used: 1,
+            elapsed_ns: 17,
+            inspected_bytes: 128,
+            inspected_bytes_complete: true,
+            created_at_unix: 100,
+        };
+        assert_eq!(
+            receipt.receipt_sha256(),
+            "c925ead961171cd7a01381c4ca0dc4d518e26442a34388d9cec3d364b15a2c0e"
+        );
+        let value = receipt.to_json_value();
+        assert_eq!(value["stop_reason"], "candidates_returned");
+        assert_eq!(
+            RetrievalTraceReceiptV1::from_json_value(&value).unwrap(),
+            receipt
         );
     }
 

@@ -449,7 +449,9 @@ class MaceLongMemEvalV2Memory(Memory):
             hash_field(candidate_set)
 
         stop_tags = {
+            # Legacy v1 spelling retained for digest-compatible replay.
             "evidence_sufficient": 1,
+            "candidates_returned": 1,
             "budget_exhausted": 2,
             "no_candidate_evidence": 3,
             "tool_error": 4,
@@ -530,9 +532,9 @@ class MaceLongMemEvalV2Memory(Memory):
         require(elapsed_sum == trace["elapsed_ns"], "retrieval trace elapsed accounting mismatch")
         require(bytes_sum == trace["inspected_bytes"], "retrieval trace byte accounting mismatch")
         require(all_bytes_measured == complete, "retrieval trace byte completeness mismatch")
-        if stop_reason == "evidence_sufficient":
+        if stop_reason in {"evidence_sufficient", "candidates_returned"}:
             require(candidate_set is not None and observed_any,
-                    "evidence_sufficient trace must bind a non-empty candidate set")
+                    "candidate-returned trace must bind a non-empty candidate set")
         elif stop_reason == "no_candidate_evidence":
             require(candidate_set is None and not observed_any,
                     "no_candidate_evidence trace cannot contain candidates")
