@@ -88,14 +88,15 @@ It also requires one prediction per population candidate and exactly one result 
 
 ## Authored tests
 
-Seven unit tests cover:
+Eight unit tests cover:
 1. a two-stratum known-answer HT and model-assisted estimate;
 2. full census equals exact population MAE with zero variance;
 3. selected-but-not-returned outcome returns UNKNOWN without denominator shrinkage;
 4. blocked K1 label is nonresponse, not a zero error;
 5. incomplete frame and invalid audit propensity fail closed;
 6. unit mismatch and label-payload tampering reject;
-7. deterministic replay returns the same receipt and estimates.
+7. deterministic replay returns the same receipt and estimates;
+8. exhaustive enumeration of all 3×3 SRSWOR audit draws confirms both HT and model-assisted design-unbiasedness and the finite-population variance estimator.
 
 Exact-head rustfmt, strict Clippy, crate tests and SEMI-BENCH-001 reference workflow are required before a pass can be claimed.
 
