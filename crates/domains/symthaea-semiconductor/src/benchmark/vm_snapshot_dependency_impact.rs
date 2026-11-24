@@ -488,9 +488,7 @@ fn validate_requalification_report(
             LabelConsumptionEligibilityV1::Unknown => unknown += 1,
             LabelConsumptionEligibilityV1::Blocked => blocked += 1,
         }
-        if !valid_sha256(&label.k0_projection_sha256)
-            || !valid_sha256(&label.k1_report_sha256)
-        {
+        if !valid_sha256(&label.k0_projection_sha256) || !valid_sha256(&label.k1_report_sha256) {
             return Err(VmImpactClosureErrorV1(format!(
                 "snapshot {} has malformed per-label K0/K1 receipt digest",
                 report.snapshot_id
@@ -783,14 +781,10 @@ pub fn compute_vm_snapshot_impact_closure_v1(
         if rebuild_candidate {
             rebuild_candidates.insert(snapshot_id.clone());
         }
-        let direct_affected_label_ids: Vec<String> = direct_label_ids[snapshot_id]
-            .iter()
-            .cloned()
-            .collect();
-        let inherited_affected_label_ids: Vec<String> = inherited_label_ids[snapshot_id]
-            .iter()
-            .cloned()
-            .collect();
+        let direct_affected_label_ids: Vec<String> =
+            direct_label_ids[snapshot_id].iter().cloned().collect();
+        let inherited_affected_label_ids: Vec<String> =
+            inherited_label_ids[snapshot_id].iter().cloned().collect();
         entries.push(VmSnapshotImpactEntryV1 {
             snapshot_id: snapshot_id.clone(),
             state,
