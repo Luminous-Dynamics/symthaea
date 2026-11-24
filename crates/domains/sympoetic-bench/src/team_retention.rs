@@ -215,7 +215,6 @@ fn parse_tsv(input: &str) -> Result<Vec<TeamObservation>, String> {
             ));
         }
 
-
         let tms_digest = if fields[3] == "NA" {
             None
         } else {
@@ -224,9 +223,7 @@ fn parse_tsv(input: &str) -> Result<Vec<TeamObservation>, String> {
         };
         if arm.has_tms() {
             let digest = tms_digest.as_ref().ok_or_else(|| {
-                format!(
-                    "line {line_number}: TMS arms require a pinned TMS configuration digest"
-                )
+                format!("line {line_number}: TMS arms require a pinned TMS configuration digest")
             })?;
             match &tms_configuration_digest {
                 Some(expected) if expected != digest => {
@@ -244,7 +241,7 @@ fn parse_tsv(input: &str) -> Result<Vec<TeamObservation>, String> {
         }
 
         let baseline_accuracy = parse_score(fields[5], "baseline_accuracy", line_number)?;
-        let assisted_accuracy = if fields[5] == "NA" {
+        let assisted_accuracy = if fields[6] == "NA" {
             None
         } else {
             Some(parse_score(fields[6], "assisted_accuracy", line_number)?)
@@ -377,8 +374,12 @@ fn analyze(observations: &[TeamObservation], draws: usize, seed: u64) -> Result<
         endpoints,
         assisted_ai_arm_mean,
         task_bundle_sha256: observations[0].task_bundle_sha256.clone(),
-        ai_configuration_sha256: observations.iter().find_map(|row| row.ai_configuration_sha256.clone()),
-        tms_configuration_sha256: observations.iter().find_map(|row| row.tms_configuration_sha256.clone()),
+        ai_configuration_sha256: observations
+            .iter()
+            .find_map(|row| row.ai_configuration_sha256.clone()),
+        tms_configuration_sha256: observations
+            .iter()
+            .find_map(|row| row.tms_configuration_sha256.clone()),
         draws,
         seed,
     })
