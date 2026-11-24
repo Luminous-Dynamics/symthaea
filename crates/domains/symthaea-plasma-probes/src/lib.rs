@@ -5015,6 +5015,71 @@ mod tests {
     }
 
     #[test]
+    fn kinetic_response_signature_rejects_mismatched_qoi_scales() {
+        let left = KineticResponseSignature::new(
+            "contract".to_owned(),
+            "class".to_owned(),
+            vec!["pulse".to_owned()],
+            vec!["electric-field".to_owned()],
+            vec![1.0],
+            vec![0.0],
+            vec![Some(ComplexResponse::new(1.0, 0.0).unwrap())],
+            vec![Some("branch".to_owned())],
+        )
+        .unwrap();
+        let right = KineticResponseSignature::new(
+            "contract".to_owned(),
+            "class".to_owned(),
+            vec!["pulse".to_owned()],
+            vec!["electric-field".to_owned()],
+            vec![2.0],
+            vec![0.0],
+            vec![Some(ComplexResponse::new(1.0, 0.0).unwrap())],
+            vec![Some("branch".to_owned())],
+        )
+        .unwrap();
+        assert_eq!(
+            left.compare(&right),
+            Err(ContractError::ResponseSignatureScaleMismatch)
+        );
+    }
+
+    #[test]
+    fn kinetic_response_signature_uses_each_qoi_scale_before_rms() {
+        let left = KineticResponseSignature::new(
+            "contract".to_owned(),
+            "class".to_owned(),
+            vec!["pulse".to_owned()],
+            vec!["electric-field".to_owned(), "energy".to_owned()],
+            vec![1.0, 10.0],
+            vec![0.0],
+            vec![
+                Some(ComplexResponse::new(1.0, 0.0).unwrap()),
+                Some(ComplexResponse::new(1.0, 0.0).unwrap()),
+            ],
+            vec![Some("branch".to_owned()), Some("branch".to_owned())],
+        )
+        .unwrap();
+        let right = KineticResponseSignature::new(
+            "contract".to_owned(),
+            "class".to_owned(),
+            vec!["pulse".to_owned()],
+            vec!["electric-field".to_owned(), "energy".to_owned()],
+            vec![1.0, 10.0],
+            vec![0.0],
+            vec![
+                Some(ComplexResponse::new(0.0, 0.0).unwrap()),
+                Some(ComplexResponse::new(0.0, 0.0).unwrap()),
+            ],
+            vec![Some("branch".to_owned()), Some("branch".to_owned())],
+        )
+        .unwrap();
+        let compared = left.compare(&right).unwrap();
+        let expected = ((1.0_f64.powi(2) + 0.1_f64.powi(2)) / 2.0).sqrt();
+        assert!((compared.normalized_response_distance.unwrap() - expected).abs() < 1.0e-12);
+    }
+
+    #[test]
     fn kinetic_response_signature_requires_valid_axes_times_and_scale() {
         assert_eq!(
             KineticResponseSignature::new(
@@ -5033,10 +5098,19 @@ mod tests {
             .unwrap_err(),
             ContractError::InvalidResponseSignatureTimes
         );
-        let signature = make_kinetic_response_signature(1.0, "contract", "class", Some("branch"));
+        let invalid_scale = KineticResponseSignature::new(
+            "contract".to_owned(),
+            "class".to_owned(),
+            vec!["pulse".to_owned()],
+            vec!["qoi".to_owned()],
+            vec![0.0],
+            vec![0.0],
+            vec![Some(ComplexResponse::new(1.0, 0.0).unwrap())],
+            vec![Some("branch".to_owned())],
+        );
         assert_eq!(
-            signature.compare(&signature),
-            Err(ContractError::InvalidResponseSignatureScale)
+            invalid_scale.unwrap_err(),
+            ContractError::InvalidResponseSignatureScale
         );
     }
 
