@@ -437,3 +437,9 @@ The proof-action workstream now has a bounded `And.comm` Lean source pilot. The 
 **Status:** source, manifest, schema and workflow are committed; the new exact-head Lean replay has not yet been observed. The manifest remains `kernel_replay_pending` until a successful run emits an accepted receipt. This is an initial source-level kernel pilot, not a general ProofActionCertificateV1 implementation.
 
 **Not yet covered:** elaborated goal-state extraction, binder/hypothesis identity, local-instance context digests, generated subgoal-state receipts, machine-parsed axiom/admission closure, and automatic plan-graph composition validation. The proof-plan action mapping is still provisional; no expert-role review or human-transfer measurement has been collected.
+
+## 16. Wrong-proposition negative control for local action proofs (2026-11-24)
+
+A second pinned Lean source now deliberately applies `And.symm` to the wrong proposition (`a ∧ b → a ∧ b`). The manifest pins its digest and states that the expected result is a Lean type error. The focused workflow accepts this control only when the negative compile is rejected with a type/application-type mismatch, and fails if Lean accepts it. The machine-readable replay receipt records the negative source and log digests separately from the positive certificate proof.
+
+**Status:** negative source, manifest binding and focused workflow check are committed. Its exact-head execution remains pending; the expected rejection is not yet a measured pass. This is one mutation control, not comprehensive adversarial coverage.
