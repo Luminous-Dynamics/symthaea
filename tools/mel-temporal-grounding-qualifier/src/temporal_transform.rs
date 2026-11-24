@@ -213,6 +213,10 @@ pub fn map_prediction_to_canonical(
     view_map: &TemporalViewMapV1,
 ) -> Result<TemporalGroundingPredictionV1, String> {
     validate_map(view_map)?;
+    let prediction_issues = validate_temporal_grounding_prediction(prediction);
+    if !prediction_issues.is_empty() {
+        return Err(format!("invalid transformed-view prediction: {prediction_issues:?}"));
+    }
     if prediction.artifact != view_map.view_artifact {
         return Err("prediction artifact does not match transformed view".into());
     }
