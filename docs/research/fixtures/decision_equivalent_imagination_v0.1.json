@@ -376,6 +376,102 @@
         "source_specific_threshold_must_be_preregistered_and_sensitivity_tested": true,
         "note": "Passing C1-C5 only makes the declared measurement eligible for interpretation under its assumptions; it does not establish universal validity or deployment safety."
       }
+    },
+    {
+      "id": "F10_CAUSAL_ERROR_DECISION_SUFFICIENT",
+      "kind": "individual_effect_fidelity_vs_epsilon_decision_sufficiency",
+      "setup": {
+        "utility_direction": "higher_is_better",
+        "actions": [
+          "A_BASELINE",
+          "B_ALTERNATIVE"
+        ],
+        "epsilon": 10,
+        "individuals": [
+          {
+            "individual_id": "U0",
+            "utility": {
+              "A_BASELINE": 100,
+              "B_ALTERNATIVE": 110
+            },
+            "true_effect_B_minus_A": 10
+          },
+          {
+            "individual_id": "U1",
+            "utility": {
+              "A_BASELINE": 100,
+              "B_ALTERNATIVE": 90
+            },
+            "true_effect_B_minus_A": -10
+          }
+        ],
+        "collapsed_rollout_effect_prediction_by_individual": {
+          "U0": 0,
+          "U1": 0
+        },
+        "candidate_selected_action": "A_BASELINE"
+      },
+      "expected": {
+        "population_mean_true_effect": 0,
+        "population_mean_predicted_effect": 0,
+        "individual_effect_mae": 10,
+        "common_epsilon_good_action_set": [
+          "A_BASELINE",
+          "B_ALTERNATIVE"
+        ],
+        "worst_case_candidate_regret": 10,
+        "decision_sufficient": true,
+        "individual_counterfactual_fidelity": false,
+        "interpretation": "The rollout is individually wrong by 10 for both individuals, but both actions remain epsilon-good at epsilon=10. The representation may compress this distinction for this declared decision task, while the causal-fidelity failure must remain visible."
+      },
+      "note": "Exact finite illustrative utilities; epsilon shares the same declared utility units. This is not a physical-safety or causal-identification certificate."
+    },
+    {
+      "id": "F11_CAUSAL_ERROR_DECISION_CRITICAL",
+      "kind": "individual_effect_fidelity_vs_epsilon_decision_sufficiency",
+      "setup": {
+        "utility_direction": "higher_is_better",
+        "actions": [
+          "A_BASELINE",
+          "B_ALTERNATIVE"
+        ],
+        "epsilon": 0,
+        "individuals": [
+          {
+            "individual_id": "U0",
+            "utility": {
+              "A_BASELINE": 100,
+              "B_ALTERNATIVE": 110
+            },
+            "true_effect_B_minus_A": 10
+          },
+          {
+            "individual_id": "U1",
+            "utility": {
+              "A_BASELINE": 100,
+              "B_ALTERNATIVE": 90
+            },
+            "true_effect_B_minus_A": -10
+          }
+        ],
+        "collapsed_rollout_effect_prediction_by_individual": {
+          "U0": 0,
+          "U1": 0
+        },
+        "candidate_selected_action": "A_BASELINE"
+      },
+      "expected": {
+        "population_mean_true_effect": 0,
+        "population_mean_predicted_effect": 0,
+        "individual_effect_mae": 10,
+        "common_epsilon_good_action_set": [],
+        "worst_case_candidate_regret": 10,
+        "decision_sufficient": false,
+        "individual_counterfactual_fidelity": false,
+        "required_disposition": "REFINE_REPRESENTATION_OR_ACQUIRE_EVIDENCE_OR_DEFER",
+        "interpretation": "The same individual-effect error now crosses the exact decision boundary. No single action is optimal in both individuals, so collapsing their history is no longer decision-sufficient."
+      },
+      "note": "Same worlds and predictions as F10; only epsilon changes. This isolates task tolerance as the reason representation detail becomes decision-relevant."
     }
   ]
 }
