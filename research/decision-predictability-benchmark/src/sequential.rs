@@ -420,7 +420,7 @@ fn active_branches(
     possible_states: &[String],
 ) -> Result<Vec<(String, Vec<String>, String)>, SequentialOracleError> {
     let current: BTreeSet<&str> = possible_states.iter().map(String::as_str).collect();
-    let mut covered = BTreeSet::new();
+    let mut covered: BTreeSet<String> = BTreeSet::new();
     let mut branches = Vec::new();
 
     for outcome in &action.outcomes {
@@ -435,7 +435,7 @@ fn active_branches(
             continue;
         }
         for state_id in &support {
-            covered.insert(state_id.as_str());
+            covered.insert(state_id.clone());
         }
         branches.push((
             outcome.outcome_id.clone(),
@@ -445,7 +445,7 @@ fn active_branches(
     }
 
     for state_id in possible_states {
-        if !covered.contains(state_id.as_str()) {
+        if !covered.contains(state_id) {
             return Err(SequentialOracleError::UncoveredState {
                 action_id: action.action_id.clone(),
                 state_id: state_id.clone(),
@@ -778,7 +778,7 @@ mod tests {
     fn support(states: &[String], predicate: impl Fn(&str) -> bool) -> Vec<String> {
         states
             .iter()
-            .filter(|state_id| predicate(state_id))
+            .filter(|state_id| predicate(state_id.as_str()))
             .cloned()
             .collect()
     }
@@ -817,22 +817,23 @@ mod tests {
             })
             .collect();
 
-        let action_c = |z: u8| SequentialAction {
-            action_id: format!("C{z}"),
-            resource_costs: cost(1),
-            result_delay_steps: 1,
-            outcomes: (0..=1)
-                .map(|x| SequentialOutcome {
-                    outcome_id: format!("x{x}"),
-                    possible_state_ids: support(&state_ids, |id| {
-                        id.starts_with(format!("x{x}_z{z}_").as_str())
-                    }),
-                    next_protocol_state_id: format!("terminal_x{x}"),
-                })
-                .collect(),
+        let (action_c0, action_c1) = {
+            let action_c = |z: u8| SequentialAction {
+                action_id: format!("C{z}"),
+                resource_costs: cost(1),
+                result_delay_steps: 1,
+                outcomes: (0..=1)
+                    .map(|x| SequentialOutcome {
+                        outcome_id: format!("x{x}"),
+                        possible_state_ids: support(&state_ids, |id| {
+                            id.starts_with(format!("x{x}_z{z}_").as_str())
+                        }),
+                        next_protocol_state_id: format!("terminal_x{x}"),
+                    })
+                    .collect(),
+            };
+            (action_c(0), action_c(1))
         };
-        let action_c0 = action_c(0);
-        let action_c1 = action_c(1);
 
         SequentialRobustProblem {
             state_ids,
@@ -932,7 +933,7 @@ mod tests {
     }
 
     #[test]
-    fn high_information_nuisance_action_is_not_purchased_for_zero_decision_value() {
+    fn dead_end_nuisance_action_is_not_purchased_without_decision_value() {
         let problem = branch_unlock_world();
         let value = evaluate_sequential_robust(&problem).unwrap();
         // A is considered, but the exact policy selects B because only B
