@@ -229,6 +229,8 @@ pub struct CaoOcrcEngineV1 {
     pub round_ledger: BTreeMap<u64, CaoOcrcRoundRecordV1>,
     pub accepted_label_revisions: BTreeSet<String>,
     pub seen_feedback_idempotency_keys: BTreeSet<String>,
+    pub seen_sample_ids: BTreeSet<String>,
+    pub seen_measurement_event_ids: BTreeSet<String>,
     pub lost_feedback_round_ids: BTreeSet<u64>,
 }
 
@@ -262,9 +264,7 @@ fn json_sha256<T: Serialize + ?Sized>(value: &T) -> Result<String, CaoOcrcErrorV
 }
 
 fn policy_digest(policy: &CaoOcrcPolicyV1) -> Result<String, CaoOcrcErrorV1> {
-    let mut canonical = policy.clone();
-    canonical.proxy_survival.shrink_to_fit();
-    json_sha256(&canonical)
+    json_sha256(policy)
 }
 
 fn engine_tracking_digest(
@@ -403,6 +403,8 @@ pub fn create_ca_ocrc_engine_v1(
         round_ledger: BTreeMap::new(),
         accepted_label_revisions: BTreeSet::new(),
         seen_feedback_idempotency_keys: BTreeSet::new(),
+        seen_sample_ids: BTreeSet::new(),
+        seen_measurement_event_ids: BTreeSet::new(),
         lost_feedback_round_ids: BTreeSet::new(),
     })
 }
@@ -508,6 +510,13 @@ pub fn advance_ca_ocrc_round_v1(
             }
         }
     }
+    if engine.seen_sample_ids.contains(&input.sample_id)
+        || engine.seen_measurement_event_ids.contains(&input.measurement_event_id)
+    {
+        return Err(CaoOcrcErrorV1(
+            "duplicate sample or measurement event in CA-OCRC stream".into(),
+        ));
+    }
     let mut next = engine.clone();
     let tracking_before = engine_tracking_digest(&engine.tracked_rounds, engine.threshold)?;
     let threshold_before = next.threshold;
@@ -545,23 +554,21 @@ pub fn advance_ca_ocrc_round_v1(
                 .round_index
                 .checked_add(proxy_delay_u64)
                 .ok_or_else(|| CaoOcrcErrorV1("proxy expiry round overflow".into()))?;
+            next.tracked_rounds.insert(
+                input.round_index,
+                CaoOcrcTrackedRoundV1 {
+                    round_index: input.round_index,
+                    proxy_delay_rounds: proxy_delay_u64,
+                    proxy_expiry_round: expiry,
+                    proxy_uniform_draw: draw,
+                    prediction_receipt_sha256: input.upstream_prediction_receipt_sha256.clone(),
+                },
+            );
             (None, proxy_delay, Some(draw), CaoOcrcAdmissionV1::CapacityAdmitted)
-                .tap(|_| {
-                    next.tracked_rounds.insert(
-                        input.round_index,
-                        CaoOcrcTrackedRoundV1 {
-                            round_index: input.round_index,
-                            proxy_delay_rounds: proxy_delay_u64,
-                            proxy_expiry_round: expiry,
-                            proxy_uniform_draw: draw,
-                            prediction_receipt_sha256: input.upstream_prediction_receipt_sha256.clone(),
-                        },
-                    );
-                })
         }
     };
 
-    let mut round_record = CaoOcrcRoundRecordV1 {
+    let round_record = CaoOcrcRoundRecordV1 {
         round_index: input.round_index,
         sample_id: input.sample_id.clone(),
         measurement_event_id: input.measurement_event_id.clone(),
@@ -576,10 +583,13 @@ pub fn advance_ca_ocrc_round_v1(
         interval_upper: input.interval_upper,
         prediction_receipt_sha256: input.upstream_prediction_receipt_sha256.clone(),
     };
-    let _ = &mut round_record;
     if next.round_ledger.insert(input.round_index, round_record).is_some() {
         return Err(CaoOcrcErrorV1("duplicate CA-OCRC round ledger entry".into()));
     }
+    next.seen_sample_ids.insert(input.sample_id.clone());
+    next.seen_measurement_event_ids
+        .insert(input.measurement_event_id.clone());
+    let tracking_count_after_admission = next.tracked_rounds.len();
 
     // 3. Receive all now-available feedback; process in a stable order.
     let mut feedback_sorted = feedback_events.to_vec();
@@ -617,6 +627,22 @@ pub fn advance_ca_ocrc_round_v1(
         }
 
         let tracked = next.tracked_rounds.get(&feedback.originating_round).cloned();
+        let revision_key = format!("{}:{}", feedback.label_id, feedback.label_revision);
+        if next.accepted_label_revisions.contains(&revision_key) {
+            feedback_receipts.push(make_feedback_receipt(
+                feedback,
+                CaoOcrcFeedbackDispositionV1::Duplicate,
+                Some(CaoOcrcFeedbackReasonV1::DuplicateFeedback),
+                None,
+                None,
+                None,
+                None,
+                None,
+                threshold_before,
+                threshold_before,
+            )?);
+            continue;
+        }
         let round = next.round_ledger.get(&feedback.originating_round);
         let Some(round) = round else {
             feedback_receipts.push(make_feedback_receipt(
@@ -634,6 +660,47 @@ pub fn advance_ca_ocrc_round_v1(
             continue;
         };
         let actual_delay = input.round_index.saturating_sub(feedback.originating_round);
+        if tracked.is_none() {
+            let (disposition, reason) = if feedback.eligibility_report.eligibility
+                == LabelConsumptionEligibilityV1::Unknown
+            {
+                (
+                    CaoOcrcFeedbackDispositionV1::HeldUnknown,
+                    CaoOcrcFeedbackReasonV1::LabelNotEligible,
+                )
+            } else if feedback.eligibility_report.eligibility
+                == LabelConsumptionEligibilityV1::Blocked
+            {
+                (
+                    CaoOcrcFeedbackDispositionV1::Blocked,
+                    CaoOcrcFeedbackReasonV1::LabelNotEligible,
+                )
+            } else if next.lost_feedback_round_ids.contains(&feedback.originating_round) {
+                (
+                    CaoOcrcFeedbackDispositionV1::AlreadyExpired,
+                    CaoOcrcFeedbackReasonV1::PredictionReceiptMismatch,
+                )
+            } else {
+                (
+                    CaoOcrcFeedbackDispositionV1::NotTracked,
+                    CaoOcrcFeedbackReasonV1::PredictionReceiptMismatch,
+                )
+            };
+            feedback_receipts.push(make_feedback_receipt(
+                feedback,
+                disposition,
+                Some(reason),
+                Some(actual_delay),
+                None,
+                None,
+                None,
+                Some(round.prediction_receipt_sha256.clone()),
+                threshold_before,
+                threshold_before,
+            )?);
+            next.seen_feedback_idempotency_keys.insert(idempotency);
+            continue;
+        }
         if let Some(reason) = validate_feedback(feedback, round, &next, actual_delay, tracked.as_ref())? {
             let disposition = match feedback.eligibility_report.eligibility {
                 LabelConsumptionEligibilityV1::Unknown => CaoOcrcFeedbackDispositionV1::HeldUnknown,
@@ -748,7 +815,7 @@ pub fn advance_ca_ocrc_round_v1(
         proxy_uniform_draw: proxy_draw,
         selected_proxy_delay_rounds: selected_proxy,
         admission,
-        tracking_count_after_admission: next.tracked_rounds.len(),
+        tracking_count_after_admission,
         evicted_round_ids: expired.clone(),
         expired_feedback_round_ids: expired,
         received_feedback_receipts: feedback_receipts,
@@ -774,9 +841,6 @@ fn validate_feedback(
         || actual_delay > engine.policy.maximum_feedback_delay_rounds
     {
         return Ok(Some(CaoOcrcFeedbackReasonV1::FeedbackDelayOutOfPolicy));
-    }
-    if tracked.is_none() {
-        return Ok(Some(CaoOcrcFeedbackReasonV1::PredictionReceiptMismatch));
     }
     if report.schema != LABEL_CONSUMPTION_REPORT_SCHEMA_V1
         || eligibility_report_digest(report)? != report.report_sha256
