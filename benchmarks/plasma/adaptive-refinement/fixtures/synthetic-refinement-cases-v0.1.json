@@ -12,22 +12,24 @@
   },
   "cases": [
     {
-      "case_id": "quiet-tail-low-response-hold",
-      "spectral_tail_measure": 5,
+      "case_id": "matched-pair-low-future-response",
+      "spectral_tail_measure": 2,
       "response_risk_upper_bound": 0.5,
       "projected_peak_bytes": 700,
       "expected_decision": "Hold",
       "expected_reason": "NoTrigger",
-      "expected_qualification": "NoTrigger"
+      "expected_qualification": "NoTrigger",
+      "matched_pair_id": "same-tail-different-response-risk"
     },
     {
-      "case_id": "weak-tail-high-future-response",
+      "case_id": "matched-pair-high-future-response",
       "spectral_tail_measure": 2,
       "response_risk_upper_bound": 1.2,
       "projected_peak_bytes": 700,
       "expected_decision": "Refine",
       "expected_reason": "FutureResponse",
-      "expected_qualification": "Triggered"
+      "expected_qualification": "Triggered",
+      "matched_pair_id": "same-tail-different-response-risk"
     },
     {
       "case_id": "spectral-tail-exceeded",
