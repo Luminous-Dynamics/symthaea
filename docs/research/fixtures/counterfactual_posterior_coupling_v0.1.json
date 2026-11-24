@@ -16,7 +16,9 @@
     "Branch-local endogenous states may diverge after action application.",
     "Exogenous events are coupled only when the task-specific correspondence contract admits them.",
     "Missing or mismatched sibling branches produce UNKNOWN or REJECTED, never zero effect.",
-    "All branches and posterior draws for one individual remain in one split and one statistical cluster."
+    "All branches and posterior draws for one individual remain in one split and one statistical cluster.",
+    "Stable individual traits and the time-indexed exogenous disturbance realization are components of the full exogenous draw and remain coupled across sibling actions.",
+    "A stochastic task without verified shared exogenous-source/event correspondence cannot claim the same-u individual-effect estimand; it must return UNKNOWN or use a separately labelled distributional estimand."
   ],
   "fixtures": [
     {
@@ -256,6 +258,52 @@
       },
       "expected": "STRUCTURAL_AMBIGUITY_REMAINS",
       "reason": "Two models fit the factual evidence but imply opposite intervention effects; do not average them into a false point certainty."
+    },
+    {
+      "id": "PCIR-F13-FULL-EXOGENOUS-DRAW-COUPLED",
+      "purpose": "Accept different branch-local endogenous trajectories while preserving the same complete SCM exogenous draw.",
+      "input": {
+        "individual_id": "unit-004",
+        "posterior_draw_id": "draw-0013",
+        "full_exogenous_draw_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "stochastic_task": true,
+        "event_correspondence_receipt": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "branches": [
+          {
+            "action_id": "a0",
+            "full_exogenous_draw_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "branch_state_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+          },
+          {
+            "action_id": "a1",
+            "full_exogenous_draw_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "branch_state_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+          }
+        ]
+      },
+      "expected": "ACCEPT",
+      "reason": "The full exogenous realization is shared, while action-dependent endogenous states may differ."
+    },
+    {
+      "id": "PCIR-F14-UNCOUPLED-STOCHASTIC-POTENTIAL-OUTCOMES",
+      "purpose": "Refuse an exact same-individual counterfactual claim when stochastic branches use unrelated exogenous realizations.",
+      "input": {
+        "individual_id": "unit-005",
+        "stochastic_task": true,
+        "branches": [
+          {
+            "action_id": "a0",
+            "full_exogenous_draw_digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+          },
+          {
+            "action_id": "a1",
+            "full_exogenous_draw_digest": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+          }
+        ],
+        "event_correspondence_receipt": null
+      },
+      "expected": "UNKNOWN_SAME_U_ESTIMAND",
+      "reason": "Independent branch disturbances no longer represent two interventions under the same exogenous realization; only a separately defined distributional estimand remains available."
     }
   ],
   "reported_metrics": [
@@ -274,7 +322,9 @@
     "measured_memory_and_energy",
     "within_model_posterior_effect_variance",
     "between_model_effect_disagreement",
-    "counterfactual_identified_set_width"
+    "counterfactual_identified_set_width",
+    "full_exogenous_draw_coupling_rate",
+    "unpaired_stochastic_branch_rate"
   ],
   "comparators": [
     "zero_effect",
@@ -307,7 +357,8 @@
     "No physical experiment or simulator result generated.",
     "No SOTA or resource advantage demonstrated.",
     "Semantic fixtures test the protocol only and are not hidden empirical qualification.",
-    "No outer posterior or complete admissible set over structural causal mechanisms is implemented; the mechanism-ambiguity fixture is a reserved future-boundary control."
+    "No outer posterior or complete admissible set over structural causal mechanisms is implemented; the mechanism-ambiguity fixture is a reserved future-boundary control.",
+    "A seed match alone does not authenticate same-u stochastic correspondence; stochastic pairing requires source/event mapping and replay evidence."
   ],
   "prior_art_boundary": {
     "same_exogenous_u": "Okita formalizes counterfactual pairs by holding the same individual-specific exogenous u and factual history fixed across interventions (Eq. 10). This is established semantics, not a PCIR novelty claim.",
