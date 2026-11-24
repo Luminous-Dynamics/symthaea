@@ -776,8 +776,13 @@ fn scorecard_receipts_require_sources_and_complete_uncertainty_intervals() {
     assert!(validate_scorecard(&scorecard).is_err());
 
     let mut scorecard = base_scorecard();
-    scorecard.metric_evidence[0].ci_lower = Some(0.7);
-    scorecard.metric_evidence[0].ci_upper = Some(0.9);
+    let task_quality_receipt = scorecard
+        .metric_evidence
+        .iter_mut()
+        .find(|receipt| receipt.metric_name == "task_quality")
+        .unwrap();
+    task_quality_receipt.ci_lower = Some(0.7);
+    task_quality_receipt.ci_upper = Some(0.9);
     validate_scorecard(&scorecard).unwrap();
 }
 
