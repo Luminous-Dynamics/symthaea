@@ -166,3 +166,8 @@ The Python recomputation is an independent implementation of the candidate-set a
 - The official V2 repository specifies Python 3.11, Qwen3.5-9B as the paper reader, Qwen3-Embedding-8B for embedding baselines, and gpt-5.2/medium as the default judge; these pins must be held constant for matched comparisons.
 - No dataset download, official run, answer-accuracy result, LAFS value or SOTA comparison is claimed.
 - Before qualification, run the official unit tests and privacy tests, add MACE-specific integration tests, and execute the official small split with the pinned reader, judge, prompts and resource limits.
+
+
+## Retrieval receipt semantics
+
+A non-empty result is recorded as `candidates_returned`; it is not evidence-qualified or decision-sufficient. The legacy `evidence_sufficient` spelling remains readable for replay but is interpreted only as a historical candidate-return observation. Repeated retrieval observations create `Exploratory` strategy notes, which are not returned by the policy-eligible `applicable_notes()` API. See [MACE retrieval observation semantics](docs/MACE_RETRIEVAL_OBSERVATION_SEMANTICS_V1.md) for the boundary and remaining qualification requirements.
