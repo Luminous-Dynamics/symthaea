@@ -26,6 +26,7 @@ pub const MAX_MYCELIAL_HEALTH_BUDGET_ACTIONS: usize = 64;
 pub const MAX_MYCELIAL_HEALTH_BUDGET_CELLS_PER_ACTION: usize = 16_384;
 pub const MAX_MYCELIAL_HEALTH_BUDGET_CHANNELS: usize = 64;
 pub const MAX_MYCELIAL_HEALTH_EXPOSURE_RECORDS: usize = 1_000_000;
+pub const MAX_MYCELIAL_HEALTH_BUDGET_EVALUATIONS: usize = 1_000_000;
 pub const MAX_MYCELIAL_HEALTH_ID_BYTES: usize = 128;
 const DIGEST_HEX_BYTES: usize = 64;
 
@@ -353,6 +354,11 @@ fn validate_state(
             "cumulative photon exposure records",
         ));
     }
+    let limits_by_channel = budget
+        .photon_dose_limits
+        .iter()
+        .map(|limit| (limit.channel_id.as_str(), limit))
+        .collect::<BTreeMap<_, _>>();
     for exposure in &state.cumulative_photon_exposures {
         validate_identifier(&exposure.sample_id, "exposure.sample_id")?;
         validate_identifier(&exposure.spatial_cell_id, "exposure.spatial_cell_id")?;
@@ -367,11 +373,7 @@ fn validate_state(
                 "exposure identity, wavelength or dose is invalid",
             ));
         }
-        let Some(limit) = budget
-            .photon_dose_limits
-            .iter()
-            .find(|limit| limit.channel_id == exposure.channel_id)
-        else {
+        let Some(limit) = limits_by_channel.get(exposure.channel_id.as_str()) else {
             return Err(MycelialSampleHealthBudgetError::InvalidState(
                 "prior exposure references an unknown illumination channel",
             ));
@@ -385,6 +387,25 @@ fn validate_state(
         }
     }
     Ok(())
+}
+
+fn prior_exposure_by_cell_channel(
+    state: &MycelialSampleHealthState,
+) -> Result<BTreeMap<(String, String), f64>, MycelialSampleHealthBudgetError> {
+    let mut totals = BTreeMap::new();
+    for exposure in &state.cumulative_photon_exposures {
+        let total = totals
+            .entry((
+                exposure.spatial_cell_id.clone(),
+                exposure.channel_id.clone(),
+            ))
+            .or_insert(0.0_f64);
+        *total += exposure.photons_per_um2;
+        if !total.is_finite() {
+            return Err(MycelialSampleHealthBudgetError::ExposureArithmeticOverflow);
+        }
+    }
+    Ok(totals)
 }
 
 fn validate_active_sensing_report(
@@ -427,6 +448,11 @@ fn validate_active_sensing_report(
     }
     if report.actions.len() > MAX_MYCELIAL_HEALTH_BUDGET_ACTIONS
         || report.actions.is_empty()
+        || report.posterior_hypothesis_count == 0
+        || !report.posterior_entropy_nats.is_finite()
+        || report.posterior_entropy_nats < 0.0
+        || !valid_id(&report.loss_scale_id)
+        || !valid_id(&report.baseline_best_decision_id)
         || !report.baseline_bayes_risk.is_finite()
         || report.baseline_bayes_risk < 0.0
     {
@@ -456,6 +482,9 @@ fn validate_active_sensing_report(
             || !action.net_value_of_information.is_finite()
             || !action.gross_value_of_information.is_finite()
             || !action.cost_in_loss_units.is_finite()
+            || action.cost_in_loss_units < 0.0
+            || !action.expected_posterior_bayes_risk.is_finite()
+            || action.expected_posterior_bayes_risk < 0.0
         {
             return Err(
                 MycelialSampleHealthBudgetError::InvalidActiveSensingReport(
@@ -785,7 +814,7 @@ fn evaluate_proposal(
     net_voi: f64,
     proposal: &MycelialAcquisitionBudgetProposal,
     budget: &MycelialSampleHealthBudget,
-    state: &MycelialSampleHealthState,
+    prior_dose_by_cell_channel: &BTreeMap<(String, String), f64>,
 ) -> Result<
     Result<MycelialSampleHealthEligibleAction, MycelialSampleHealthRejection>,
     MycelialSampleHealthBudgetError,
@@ -904,18 +933,10 @@ fn evaluate_proposal(
             if let Some(increment) = increment_by_channel.get(&limit.channel_id) {
                 let mut maximum_projected = 0.0_f64;
                 for cell_id in &proposal.spatial_footprint_cell_ids {
-                    let prior = state
-                        .cumulative_photon_exposures
-                        .iter()
-                        .filter(|exposure| {
-                            exposure.sample_id == proposal.sample_id
-                                && exposure.spatial_cell_id == *cell_id
-                                && exposure.channel_id == limit.channel_id
-                                && exposure.wavelength_nm >= limit.minimum_wavelength_nm
-                                && exposure.wavelength_nm <= limit.maximum_wavelength_nm
-                        })
-                        .map(|exposure| exposure.photons_per_um2)
-                        .sum::<f64>();
+                    let prior = prior_dose_by_cell_channel
+                        .get(&(cell_id.clone(), limit.channel_id.clone()))
+                        .copied()
+                        .unwrap_or(0.0);
                     let projected = prior + increment;
                     if !projected.is_finite() {
                         return Err(MycelialSampleHealthBudgetError::ExposureArithmeticOverflow);
@@ -1000,6 +1021,20 @@ pub fn evaluate_mycelial_sample_health_budget(
         return Err(MycelialSampleHealthBudgetError::InventoryMismatch);
     }
 
+    let evaluations = proposals.iter().try_fold(0usize, |total, proposal| {
+        total.checked_add(
+            proposal
+                .spatial_footprint_cell_ids
+                .len()
+                .saturating_mul(budget.photon_dose_limits.len().max(1)),
+        )
+    });
+    if evaluations.is_none_or(|count| count > MAX_MYCELIAL_HEALTH_BUDGET_EVALUATIONS) {
+        return Err(MycelialSampleHealthBudgetError::ResourceLimitExceeded(
+            "sample-health action × footprint × channel evaluation budget",
+        ));
+    }
+
     for action in &active_sensing_report.actions {
         let proposal = proposal_by_id
             .get(action.action_id.as_str())
@@ -1014,6 +1049,7 @@ pub fn evaluate_mycelial_sample_health_budget(
         )?;
     }
 
+    let prior_dose_by_cell_channel = prior_exposure_by_cell_channel(state)?;
     let mut eligible_actions = Vec::new();
     let mut rejected_actions = Vec::new();
     for action in &active_sensing_report.actions {
@@ -1026,7 +1062,7 @@ pub fn evaluate_mycelial_sample_health_budget(
             action.net_value_of_information,
             proposal,
             budget,
-            state,
+            &prior_dose_by_cell_channel,
         )? {
             Ok(eligible) => eligible_actions.push(eligible),
             Err(rejected) => rejected_actions.push(rejected),
@@ -1441,6 +1477,30 @@ mod tests {
         assert!(result.rejected_actions[0].reasons.contains(
             &MycelialSampleHealthRejectionReason::WavelengthOutsideCalibratedBand
         ));
+    }
+
+    #[test]
+    fn every_required_illumination_channel_needs_a_dose_estimate() {
+        let report = active_report(vec![action(
+            "missing-one-channel",
+            MycelialAcquisitionActionKind::AlternateIllumination,
+            8.0,
+        )]);
+        let mut proposal = proposal(
+            "missing-one-channel",
+            &["cell-b"],
+            1.0,
+            MycelialAcquisitionActionKind::AlternateIllumination,
+        );
+        proposal.required_illumination_channel_ids =
+            vec!["gfp".to_string(), "red".to_string()];
+        let result =
+            evaluate_mycelial_sample_health_budget(&report, &budget(), &state(), &[proposal])
+                .unwrap();
+        assert!(result.rejected_actions[0].reasons.contains(
+            &MycelialSampleHealthRejectionReason::MissingOpticalDoseEstimate
+        ));
+        assert_eq!(result.recommended_action_id, None);
     }
 
     #[test]
