@@ -42,7 +42,7 @@ For its fixed-delay assumptions, the paper gives the finite-horizon long-run emp
 +\frac{\tau}{T}.
 ]
 
-The implementation does not re-prove this theorem. It encodes the declared fixed-delay phase schedule so that an external evaluator can check the recursion and its assumptions.
+The implementation does not re-prove this theorem. It exposes the paper's finite-horizon bound calculation and encodes the declared fixed-delay phase schedule so an external evaluator can check the recursion and assumptions. Missing or invalid physical feedback degrades guarantee status rather than being imputed.
 
 Primary source: https://arxiv.org/abs/2609.07251
 
@@ -57,6 +57,8 @@ Primary source: https://arxiv.org/abs/2609.07251
 - The prediction receipt records sample/event identity, issue round, due round, phase, alpha, interval, model-artifact SHA, policy SHA, point forecast, timestamps and state digest.
 - The prediction interval and alpha never change after the outcome arrives.
 
+For alpha <= 0, the interval is the full real line and the miss bit is deterministically false. For alpha > 1, the interval is empty and the miss bit is deterministically true. The new explicit degenerate-resolution receipt handles these cases at the due round without physical metrology; bounded intervals still require a qualified K1 label. This is a known-by-construction outcome, not an observed wafer result.
+
 ### Qualified delayed outcome
 
 A label can update the relevant phase only when:
@@ -65,6 +67,7 @@ A label can update the relevant phase only when:
 - the report is K1 / CurrentAtK1 and EligibleUnderDeclaredPolicy;
 - downstream consumption is permitted;
 - label ID, report-attested revision, event ID, full payload SHA and corrected numeric value match;
+- if the interval is full or empty, use the separate degenerate-resolution receipt and do not consume a physical label for an outcome already known from set construction;
 - the report digest independently replays;
 - uncertainty is present, finite and non-negative;
 - the label revision has not already been accepted.
