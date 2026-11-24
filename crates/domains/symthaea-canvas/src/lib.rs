@@ -237,6 +237,7 @@ pub use mycelial_photobiological_exposure::{
     MYCELIAL_PHOTOBIOLOGICAL_EXPOSURE_SCHEMA_VERSION,
     MYCELIAL_PHOTOBIOLOGICAL_RESPONSE_SCHEMA_VERSION, MycelialIlluminationInterval,
     MycelialIlluminationPurpose, MycelialIlluminationScheduleKind,
+    MycelialAmbientLightObservation, MycelialAmbientLightState,
     MycelialPhotobiologicalChannelExposure, MycelialPhotobiologicalExposureError,
     MycelialPhotobiologicalExposureRecord, MycelialPhotobiologicalMeasurement,
     MycelialPhotobiologicalMissingStatus, MycelialPhotobiologicalObservationWindow,
