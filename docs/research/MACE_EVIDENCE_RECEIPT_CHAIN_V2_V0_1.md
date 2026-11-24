@@ -127,7 +127,7 @@ Legacy `mace_retrieval_trace_receipt_v1` records remain immutable historical inp
 - Apply strict JSON Schema validation with `additionalProperties: false` at every typed object boundary.
 - Define one canonical typed encoding per schema version; do not assume arbitrary JSON serializers produce canonical bytes.
 - Use domain-separated SHA-256 over the versioned canonical payload.
-- Keep signature envelopes separate from content digests. Prefer DSSE/in-toto or a separately versioned COSE profile for interoperable signed statements; do not silently mix `COSE_Sign` and `COSE_Sign1` or reinterpret a raw signature byte array as a standard envelope.
+- The V0.1 schemas carry detached Ed25519 signature bytes in the same explicit byte-array shape as the existing qualification receipt; these arrays are **not** DSSE or COSE envelopes. For cross-system publication, add a separately versioned DSSE/in-toto or COSE envelope and schema. Do not silently mix `COSE_Sign` and `COSE_Sign1` or reinterpret raw signature bytes as a standard envelope.
 - Provision trusted verifier/evaluator keys out-of-band. Verify issuer identity, key status, profile version, purpose, scope, validity and revocation at consumption.
 - Make create-once publication idempotent. An ambiguous write/acknowledgement outcome is `unknown` and blocks further mutation until independent reconciliation.
 - A local hash chain or same-workspace signature file is not rollback resistance. Qualification, outcome custody and promotion authority need a separate administrative and backup/restore failure domain.
