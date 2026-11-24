@@ -1,0 +1,313 @@
+# MACE v0.1 — Decision-Value Retrieval Controller and Counterfactual Evaluation
+
+**Status:** research / implementation contract. This document specifies the next controller increment; it is not evidence that the controller, adapters, or benchmark runs are implemented.  
+**Related:** [#13477](https://github.com/Luminous-Dynamics/symthaea/issues/13477), [#13455](https://github.com/Luminous-Dynamics/symthaea/issues/13455), [#13261](https://github.com/Luminous-Dynamics/symthaea/issues/13261), [#13284](https://github.com/Luminous-Dynamics/symthaea/issues/13284), [#13517](https://github.com/Luminous-Dynamics/symthaea/issues/13517) — sealed official LongMemEval-V2 paired evaluator, [PR #13436](https://github.com/Luminous-Dynamics/symthaea/pull/13436), [PR #13491](https://github.com/Luminous-Dynamics/symthaea/pull/13491) — deterministic risk-adjusted retrieval selection kernel, [PR #13512](https://github.com/Luminous-Dynamics/symthaea/pull/13512) — BM25 + entity-literal hybrid RRF retrieval.
+
+## 1. Problem statement
+
+MACE already has retrieval trace and strategy-memory types, but the LongMemEval-V2 sidecar does not yet operationally promote and consume advisory strategy notes. Its current retrieval path is BM25-only. Repeated successful traces are useful support evidence, but they do not establish that a learned strategy improves held-out decisions.
+
+The engineering objective is to turn retrieval from a single ranked lookup into a **budgeted sequential evidence-acquisition policy**. The policy may choose among typed retrieval operations, inspect the result, update its estimate of what remains useful, and either continue, stop, or abstain.
+
+Three boundaries are non-negotiable:
+
+1. Strategy memory proposes *where and how to search*. It does not qualify evidence.
+2. The independent qualifier determines which source observations may enter a qualified evidence set. The retrieval backend cannot qualify its own output.
+3. A decision receipt, action authorization, consume-once state, and outcome receipt remain distinct downstream objects. Evidence qualification is not permission to act.
+
+## 2. Formal decision-value objective
+
+Let:
+
+- $s_t$ be the current decision state, containing the DecisionNeed, the evidence already qualified for this invocation, unresolved contradictions, source/channel coverage, the remaining resource budget, and current lifecycle context;
+- $a$ be a typed retrieval action;
+- $o_a$ be the observation returned by that action;
+- $E_t$ be the currently qualified evidence set;
+- $R(E)$ be downstream decision regret under a frozen, independently controlled evaluator;
+- $C(a)$ be the all-in incremental cost of action (a);
+- $H(a,s_t)$ be a risk estimate for privacy exposure, scope violation, stale state, poisoning, or an inadmissible source.
+
+The ideal value of sample information is:
+
+$$
+\operatorname{EVSI}(a\mid s_t)
+= \mathbb{E}[R(E_t)-R(E_t\cup Q(o_a))\mid s_t] - \lambda_C C(a) - \lambda_H H(a,s_t),
+$$
+
+where $Q(o_a)$ is the output after independent evidence qualification. An unqualified observation is not inserted into $E_t$.
+
+The live controller cannot inspect hidden gold answers or evaluator labels. It therefore uses a calibrated *prediction* of action value, not the evaluator's realized regret:
+
+$$
+a_t = \arg\max_{a\in A_{\mathrm{safe}}(s_t)}
+\operatorname{LCB}_{\alpha}[\widehat{\Delta R}(a\mid s_t)]
+-\lambda_C C(a)-\lambda_H H(a,s_t).
+$$
+
+The lower confidence bound makes uncertainty explicit. The controller stops when no safe action has positive risk-adjusted lower-bound value, when its budget is exhausted, or when the evidence-sufficiency rule is met. It abstains when the qualified evidence does not support a decision.
+
+**Important distinction:** the estimator's prediction is not a benchmark result. Only a separate evaluator with sealed outcomes can measure whether a policy actually reduced regret.
+
+## 3. Typed action space
+
+The first real multi-action increment should add at least one genuinely different retrieval mechanism to BM25. The target portfolio is:
+
+| Action family | Purpose | Required output discipline |
+|---|---|---|
+| BM25 / lexical | Exact terms and rare identifiers | Preserve source spans and offsets |
+| Dense retrieval | Semantic paraphrase and related concepts | Pin embedding model and revision |
+| Hybrid rank fusion | Combine independent lexical, structured-literal and/or dense candidate rankings | Preserve per-channel ranks and provenance; use RRF initially, calibrated score fusion only after calibration tests |
+| Entity / literal | Names, IDs, values, versions and exact strings | Preserve normalized and original forms |
+| Temporal / state | Dates, event order, supersession and current state | Bind valid-time and observation/transaction-time |
+| Causal / lineage graph | Parent dependencies, interventions and consequences | Return traversable, digest-bound edges |
+| HDC / typed association | Structured relational and compositional recall | Report separately from conventional embedding retrieval |
+| Stop / abstain | Avoid low-value or unsupported acquisition | Produce an explicit reason and budget snapshot |
+
+The adapter contract must expose action identity, version, query-parameter digest, backend revision, candidate-set digest, source references, latency, resource accounting, and an outcome status. A strategy note must never contain arbitrary executable code or an unconstrained shell/network operation. It may select only from an allowlisted action vocabulary and validated parameters.
+
+Channel scores are not naturally comparable. Begin with per-channel ranks and an explicit fusion rule (for example, reciprocal-rank fusion); introduce calibrated score fusion only after measuring calibration on a separate training split. Log channel-level candidates so that a fused result remains auditable.
+
+## 4. Strategy-note contract
+
+A strategy note is an advisory policy proposal, not an instruction with authority. It should contain only:
+
+- stable note ID and immutable content digest;
+- typed action sequence or conditional action template;
+- DecisionNeed/task-family applicability scope;
+- environment, corpus, backend, embedding and tool-profile digests;
+- support-trace receipt digests (not raw labels, answer keys, or retrieved source payloads);
+- estimated utility distribution and uncertainty, with estimator version;
+- observed cost envelope (p50/p95/p99 and resource accounting);
+- known failure and negative-transfer envelope;
+- creation time, expiry, revocation/lifecycle state and parent policy digest.
+
+At use, revalidate scope, tool and backend revisions, environment, policy version, expiry, revocation state and lifecycle snapshot. A mismatch means **do not suggest the note**. Do not silently fall back to a stale note.
+
+The existing three-independent-successful-query promotion threshold may remain as a *minimum support threshold for an exploratory proposal*. It must not be treated as proof of positive causal utility or production eligibility.
+
+Use three explicit statuses:
+
+1. **Exploratory:** supported by trace observations; never allowed to outrank the safe default without an explicit experiment.
+2. **Evaluation-eligible:** frozen and admitted to a preregistered, held-out counterfactual trial.
+3. **Policy-eligible:** passes the held-out utility, cost, transfer and safety gates below. Still advisory and still subject to use-time applicability checks.
+
+## 5. Label separation and counterfactual evaluation
+
+The policy process must not read benchmark answer keys, gold answers, evaluator labels, hidden question IDs, or evaluator signing credentials. It may observe its own retrieval actions, source/tool outcomes, qualification dispositions, elapsed time, measured resource use and explicitly permitted operational feedback.
+
+The independent evaluator may use sealed labels to calculate decision utility. It writes immutable evaluation receipts and aggregate metrics only after the candidate policy and run manifest are frozen. Do not feed per-question answer correctness back into the policy-memory process during the same evaluation.
+
+The existing `evaluator/src/bin/mace_paired_intervention.rs` is a public, co-located synthetic diagnostic: its own manifest describes the evaluator as public/non-secret. It is useful for internal falsification but is not an independent official LongMemEval-V2 evaluator or a leaderboard score. Issue #13517 specifies the separate official-harness paired evaluator, sealed task outcomes, and evaluator-owned receipts required for external benchmark claims.
+
+
+### Paired experiment protocol
+
+For each benchmark family:
+
+1. Freeze the corpus, trajectories, query set, reader/model, prompt, tools, embedding and reranker revisions, environment, timeouts, seeds and total budget.
+2. Split by session / trajectory / project / domain as appropriate. Do not split near-duplicate turns from one trajectory across support and held-out evaluation.
+3. Run paired conditions on identical held-out tasks: no-retrieval/reader-only control, BM25-only, entity-literal-only, fixed BM25+entity-literal RRF, random safe action over the same allowlist, strategy-note controller, and (where implemented) EVSI-guided controller. Add a dense channel only as a separately pinned arm after its embedder/revision and calibration are frozen.
+4. Keep model, reasoning tier, reader, evaluator and total resource budget identical. Randomize policy assignment/order where possible and pin deterministic replay inputs.
+5. Include an abstain/no-additional-evidence arm. A controller must not receive credit for retrieving more material if decision regret increases.
+6. Record action sequences, returned evidence digests, qualification dispositions, provenance closures, candidate coverage, latency, context tokens, storage, embedding/reranking cost, CPU/GPU time, network bytes and consolidation cost.
+7. Evaluate per task family and operating point. Report paired absolute differences, confidence intervals, sample counts, missing runs and all exclusions. Use a preregistered paired bootstrap or randomization test; correct for multiple comparisons when promoting among many candidate policies.
+8. Publish exact manifests and raw result receipts. A score without a reproducible source/data/model/evaluator/budget manifest is not a reproduced baseline.
+
+For policy $\pi$ and held-out task $q$, define realized uplift:
+
+$$
+\Delta_q = R_q(\pi_{\mathrm{baseline}})-R_q(\pi).
+$$
+
+Report the mean paired uplift and its confidence interval, but also report accuracy, abstention, evidence sufficiency, per-family regret, p50/p95/p99 latency and all-in cost. Do not collapse independent benchmarks into a composite score.
+
+### Counterfactual controls
+
+Include at least:
+
+- a no-note controller and a fixed-policy controller;
+- a random policy over the same safe action set;
+- query-shuffled and task-family-shuffled strategy notes;
+- note removal and stale-profile controls;
+- poisoned trace and repeated-query controls;
+- a strategy that increases evidence volume but increases regret;
+- a strategy that only helps one task family and harms another;
+- a policy trained on support traces but evaluated on unseen sessions/domains;
+- a baseline with the same total token, compute and latency budget.
+
+For evidence-level attribution, use randomized channel / evidence suppression and rerun the frozen decision pipeline. Report this as an intervention on the evaluated pipeline, not as proof that a retrieved source is universally causal.
+
+## 6. Promotion and stopping rules
+
+A strategy becomes policy-eligible only when all of the following hold:
+
+- positive paired held-out uplift against no-note, fixed-policy and random controls, with a preregistered confidence criterion;
+- no pre-registered task family regresses beyond the allowed margin;
+- matched-budget utility is maintained or improved;
+- all-in cost and latency are within their declared operating envelope;
+- the note survives domain, environment and tool-profile negative-transfer tests;
+- all strategy use is traceable to a validated note digest and allowlisted action;
+- no evidence qualification, provenance, privacy, lifecycle or authorization invariant is weakened.
+
+Initial project targets (not measured results):
+
+| Measure | Initial target |
+|---|---:|
+| Paired held-out accuracy uplift at matched budget | ≥2 percentage points, or a preregistered alternative utility improvement |
+| Alternative efficiency gate | ≥20% lower p95 query latency with ≤1 pp accuracy loss |
+| All-in cost reduction at matched utility | ≥25% |
+| Worst task-family regression | ≤2 pp |
+| Invalid / expired / mismatched strategy note used | 0 |
+| Strategy action outside allowlist | 0 |
+| Unqualified evidence surfaced as qualified | 0 |
+
+A policy that fails the utility gate remains exploratory or is rejected. A policy that fails a safety gate is rejected regardless of retrieval accuracy.
+
+## 7. Integration boundary with independent qualification
+
+The intended path is:
+
+```
+LMEV2 sidecar
+  -> typed action planner (advisory)
+  -> allowlisted retrieval adapter(s)
+  -> untrusted candidate batch
+  -> independent qualifier (#13455)
+  -> standard signed qualification receipt
+  -> exact-batch projection (#13436)
+  -> current-at-use binding / lifecycle validation
+  -> decision-sufficiency controller
+  -> separate decision and authorization protocols
+```
+
+The controller must not skip the qualifier to save latency. If the qualifier is unavailable, receipt validation fails, a candidate is Indeterminate, or dependency closure is incomplete, the system returns an auditable abstention or a separately tracked retry. It must never expose the raw candidate batch as if it were qualified.
+
+Prefer a DSSE envelope carrying a versioned in-toto Statement predicate for the first interoperable receipt prototype. Fix the payload type, statement predicate type, canonical payload schema, signer identity and verification policy. Publish positive, negative, malformed, duplicate-field, unknown-key, revoked-key, multi-signature and replay vectors. If COSE is evaluated, explicitly choose the structure required by the signer model: COSE_Sign supports one or more signatures; COSE_Sign1 is single-signer and is not wire-compatible with COSE_Sign. The receipt attests scoped evidence qualification; it is not an action approval.
+
+## 8. Benchmark portfolio
+
+Keep official benchmark results separate:
+
+| Benchmark | What it establishes | MACE evaluation requirement |
+|---|---|---|
+| Agent Memory Leaderboard | Track-specific textual, multimodal and coding memory utility | Implement the actual Add/Search protocol; compare only within matching track and division |
+| LongMemEval-V2 | Experience acquisition and memory-query accuracy/latency frontier | Report official ΔLAFS against the frozen reference frontier and every operating point |
+| AMA-Bench | Long-horizon agentic memory, causal inference and tool-augmented retrieval | Reproduce the strongest matched-backbone baseline; report each task family |
+| MemoryArena | Interdependent multi-session Memory-Agent-Environment task performance | Measure downstream task completion and transfer across sessions, not dialogue recall alone |
+| MACE decision-sufficiency lane | Whether qualified evidence changes decisions safely and economically | Independent evaluator, causal interventions, lifecycle/rights attacks and regret-cost frontier |
+
+The official LongMemEval-V2 LAFS definition integrates the best reachable accuracy over log-scaled latency budgets from 1 to 200 seconds. Preserve the official reference frontier and benchmark protocol; do not compare a locally modified frontier to an official score.
+
+### Competitive targets — Agent Memory Leaderboard Cycle 2
+
+The following are project targets derived from the published Cycle 2 reference scores, not measured MACE results. Keep each track and division separate.
+
+| Track | Open-method reference | Commercial reference | Phase I target (+5 vs open) | Phase II stretch (+2 vs commercial) |
+|---|---:|---:|---:|---:|
+| Textual | 61.22 | 69.26 | 66.22 | 71.26 |
+| Multimodal | 43.26 | 53.68 | 48.26 | 55.68 |
+| Coding | 63.33% | 68.00% | 68.33% | 70.00% |
+
+Phase I establishes a strong open-method outperformance target; it does not imply commercial parity on every track. Phase II is deliberately an aspiration above the commercial reference. Before claiming either result, reproduce the matching track's actual Add/Search protocol, division, corpus, reader, model settings and resource budget. Publish exact run manifests, paired confidence intervals and failure counts. A result from one track cannot be used to imply a win on another.
+
+#### Textual capability targets
+
+Cycle 2 publishes separate scores for explicit fact recall (A), relational/multi-hop reasoning (B), temporal/event sequencing (C), memory governance (D), personalization/care (E), workflow execution (G), epistemic safety/privacy (H), and streaming (S). The following MACE targets use the Resurface open-method leader for Phase I (+5) and set Phase II to the greater of Phase I or MemoraX commercial leader (+2), so the stretch target never falls below Phase I.
+
+| Capability | Resurface open | MemoraX commercial | Phase I | Phase II floor |
+|---|---:|---:|---:|---:|
+| A — Explicit fact recall | 62.98 | 70.85 | 67.98 | 72.85 |
+| B — Relational/multi-hop | 58.94 | 64.40 | 63.94 | 66.40 |
+| C — Temporal/event sequence | 57.76 | 67.05 | 62.76 | 69.05 |
+| D — Memory governance | 76.55 | 78.10 | 81.55 | 81.55 |
+| E — Personalization/care | 38.82 | 54.70 | 43.82 | 56.70 |
+| G — Workflow/rule execution | 59.67 | 61.20 | 64.67 | 64.67 |
+| H — Epistemic safety/privacy | 68.59 | 81.98 | 73.59 | 83.98 |
+| S — Streaming | 49.65 | 63.11 | 54.65 | 65.11 |
+
+This table suggests two high-leverage research fronts. First, preserve and improve governance/epistemic safety without assuming that security mechanisms automatically translate to benchmark points. Second, close the open-to-commercial gaps in personalization and streaming; the latter especially requires an actual streaming protocol, not just fast batch retrieval. Do not optimize the subscore in isolation: report the official overall score, all capability scores, failure rates and resource tiers.
+
+#### Multimodal and coding target decomposition
+
+| Multimodal capability | Khipu open | MemoraX commercial | Phase I (+5) | Phase II (+2 commercial) |
+|---|---:|---:|---:|---:|
+| Retrieval | 50.28 | 66.73 | 55.28 | 68.73 |
+| Relational reasoning | 45.82 | 53.87 | 50.82 | 55.87 |
+| Temporal reasoning | 34.23 | 40.12 | 39.23 | 42.12 |
+| Continual learning | 38.45 | 48.40 | 43.45 | 50.40 |
+| Personalization | 11.04 | 12.21 | 16.04 | 16.04 |
+| Evidence governance | 31.29 | 33.59 | 36.29 | 36.29 |
+
+| Coding measure | InsightMem open | MemoraX commercial | Phase I (+5) | Phase II (+2 commercial) |
+|---|---:|---:|---:|---:|
+| Overall resolved | 63.33% | 68.00% | 68.33% | 70.00% |
+| Relevant — new feature | 74.51% | 70.59% | 79.51% | 79.51% |
+| Relevant — bug fix | 57.58% | 65.66% | 62.58% | 67.66% |
+| Noisy — new feature | 74.51% | 74.51% | 79.51% | 79.51% |
+| Noisy — bug fix | 57.58% | 65.66% | 62.58% | 67.66% |
+
+For each capability, freeze Phase II as max(Phase I, commercial reference +2); this keeps the stretch threshold monotonic even where the commercial subscore plus two is below the open-method plus five target.
+
+Reference: [Agent Memory Leaderboard Cycle 2 official results, November 19, 2026](https://agentmemoryleaderboard.ai/results/cycle-2/). Scores and divisions are track-specific; do not combine textual, multimodal and coding points into a synthetic project score.
+
+AMA-Bench baseline reconciliation: the PMLR paper abstract reports AMA-Agent at 57.22% and +11.16 points over its strongest baseline, while the live AMA-Bench site currently surfaces 56.33% (+10.99%) in its main-results panel and separately describes the 57.22% paper result. Do not select one value opportunistically. Freeze a specific official artifact, dataset split, base model, QA subset, judge and evaluation script; report the paper reproduction and live leaderboard submission as separate rows until their manifests demonstrate they are the same protocol. The benchmark describes 207 samples, 2,482 QA pairs, six domains and four capabilities; report those task-family breakdowns and matched Qwen3-32B settings with any comparison. References: [PMLR paper](https://proceedings.mlr.press/v306/zhao26bs.html) and [AMA-Bench results/methods](https://ama-bench.github.io/).
+
+For AMA-Bench, after reproducing a strongest matched-backbone baseline, a proposed initial gate is at least +3 absolute accuracy points with a positive preregistered 95% confidence interval, without a task-family regression beyond 2 points. For MemoryArena, target at least +5 points in held-out multi-session task completion at matched tool/model budgets, with per-family transfer and worst-family results reported. These are proposed experimental gates, not official leaderboard targets.
+
+
+Project ambition targets already proposed for LongMemEval-V2 are ΔLAFS ≥ +3.2 initially and ≥ +4.0 as a stretch. These remain targets, not achieved results. For AMA-Bench and MemoryArena, first reproduce exact matched settings; then preregister uplift targets against the strongest reproduced control rather than comparing unrelated paper numbers.
+
+### Assurance metrics (separate from leaderboard utility)
+
+- unauthorized / cross-scope evidence accepted: 0;
+- invalid, replayed, expired, revoked or rebound qualification accepted: 0;
+- cyclic, dangling or incomplete lineage accepted: 0;
+- stale lifecycle evidence used at consequential time: 0;
+- unsupported cases produce explicit abstention;
+- harmful-memory influence removal ≥90%;
+- benign-memory utility retention ≥95%;
+- report selective-risk versus coverage, calibration, abstention utility and subgroup/task-family performance;
+- report p50/p95/p99 latency and all-in CPU, memory, storage, network and verification cost.
+
+A reject-everything controller fails the utility-retention and decision-quality gates. Security metrics cannot be traded against answer accuracy.
+
+### Current implementation checkpoint — three identity-bound retrieval ablation arms
+
+[PR #13512](https://github.com/Luminous-Dynamics/symthaea/pull/13512) now exposes three benchmark modes through the official LongMemEval-V2 bridge:
+
+- `bm25_only`: build and execute only the prose BM25 index;
+- `entity_literal_only`: build and execute only exact structured-literal retrieval over trajectory IDs, URLs, numeric state/step values, goals and structured action fields;
+- `hybrid_rrf`: build both indexes and fuse immutable chunk IDs with reciprocal-rank fusion (k=60, equal channel weights).
+
+Every mode has a distinct backend ID, evidence-channel identity, execution-profile digest and retrieval-mode receipt. The sidecar records exactly the action(s) it actually executed. Single-channel modes do not build the inactive index, avoiding hidden index-build cost in the ablations. Generic prose remains BM25's responsibility; the exact-literal channel deliberately does not duplicate it.
+
+These are fixed benchmark arms, not learned action selection. The new capability creates a direct, reproducible comparison of BM25, literal retrieval and hybrid RRF under the same trajectory corpus and reader. It is not evidence that hybrid retrieval improves accuracy, latency or total cost; those claims require paired runs with frozen corpus, reader, context budget, environment and per-mode execution manifests. The optional query-image argument remains unused, so this is not a multimodal image-query result.
+
+
+## 9. Implementation sequence — runner-independent work first
+
+1. **Source audit:** locate the exact sidecar, trace store, strategy promotion and applicability functions; map the current public API before modifying it.
+2. **Pure controller contract:** define typed action, observation, plan, policy note and use-receipt structures. Keep planning deterministic for fixed state and seed.
+3. **Additional independent actions:** BM25 and exact entity/literal are now available as distinct arms in PR #13512. Next add a pinned dense retriever or a genuinely useful temporal/graph action as a separately versioned arm; do not treat neighbor expansion as a second retriever.
+4. **Advisory integration:** call applicability and promotion in the sidecar; record plan digest, action receipt and policy-use decision. Keep BM25-only fallback explicit and versioned.
+5. **Deterministic fake adapters:** test action ordering, budget stop, abstention, duplicate support traces, task-family overfitting, note expiry, backend/environment mismatch, poisoned proposals and restart/replay.
+6. **Paired evaluation harness:** freeze manifests and implement paired runs, confidence intervals, task-family guardrails, cost accounting and sealed evaluator custody.
+7. **Qualification composition:** integrate the independent qualifier and exact-batch projection; test timeouts, ambiguous outcomes, replays, corrections and current-at-use lifecycle checks.
+8. **External reproductions:** implement raw-trajectory adapters and pinned reproductions for Resurface, Khipu and InsightMem. Keep AML official protocol runs separate from local causal-intervention experiments.
+
+Because the authoring environment previously lacked the Rust toolchain, source authoring and static review can proceed independently, but compilation, formatting, Clippy, tests and integration are not claimed until executed on a pinned toolchain or exact-head CI. A skipped workflow is not a pass.
+
+## 10. Decision record
+
+The design deliberately rejects four shortcuts:
+
+- **No promotion by repetition alone:** three successful traces support a hypothesis; held-out counterfactual uplift supports a policy.
+- **No self-qualification:** retrieval policy cannot issue evidence authority.
+- **No uncalibrated score soup:** different retrieval channels require rank fusion or calibrated combination.
+- **No one-score benchmark story:** utility, latency, all-in cost, evidence integrity and lifecycle resilience remain independently reported.
+
+The research claim MACE should attempt to establish is:
+
+> Under matched task, reader, evaluator and all-in resource budgets, decision-value-guided retrieval improves held-out decision utility or the accuracy–latency frontier, while independently qualified evidence, explicit abstention and lifecycle controls preserve evidence integrity.
+
+This claim is falsifiable. It is not established by the existence of the architecture or by authored tests.
