@@ -294,3 +294,21 @@ The programme now has separate scoreboards for:
 6. materials-ML and active-selection methodological baselines.
 
 A route only wins within a matched application and evidence boundary. No cross-route ranking may conflate mass-specific and volume-specific magnetization, alignment degree definitions, external-field surface readings, magnetizing field, remanence, coercivity or energy product.
+
+
+### Direct commercial bonded-magnet reference: anisotropic injection-moulded NdFeB
+
+Manufacturer grade tables provide a more relevant first industry comparator than a generic sintered-NdFeB headline value:
+
+| Manufacturer / grade | Process and orientation | Br | Hcj | (BH)max | Data status |
+|---|---|---:|---:|---:|---|
+| thyssenkrupp NdFeB 87/100p | anisotropic injection moulded | 0.700 T minimum | 1,000 kA/m minimum | 87 kJ/m³ minimum | Manufacturer grade table; referenced to EN 60404-8-1:2015 |
+| thyssenkrupp NdFeB 120/100p | anisotropic injection moulded | 0.840 T minimum | 1,000 kA/m minimum | 120 kJ/m³ minimum | Manufacturer grade table; referenced to EN 60404-8-1:2015 |
+| Mainrich MN-12120 | anisotropic, oriented in mould; PA12 | 0.786 T typical | 860 kA/m typical | 12.7 MGOe typical | Manufacturer typical values; acceptance limits are agreed at drawing review |
+| Mainrich MN-12140 | anisotropic, oriented in mould; PA12 | 0.821 T typical | 1,003 kA/m typical | 14.2 MGOe typical | Manufacturer typical values; operating temperature and circuit applicability confirmed per grade |
+
+Sources: [thyssenkrupp plastic-bonded NdFeB factsheet](https://ucpcdn.thyssenkrupp.com/_binary/UCPthyssenkruppBAMXSchulteMicrositeMagnettechnik/en/downloads/link-thyssenkruppMagnettechnik-Factsheet-plastic-bonded-neodym-magnets.pdf) and [Mainrich injection-moulded NdFeB grade table](https://mainrichmagnets.com/injection-molded-ndfeb-magnets). The thyssenkrupp file is an older grade table; Mainrich labels its figures typical rather than acceptance limits. Treat these as manufacturer-published reference grades, not a representative market survey or a matched comparison to the LPBF paper.
+
+The LPBF HD result (0.34 T) is approximately 40–49% of the 0.70–0.84 T manufacturer Br band. Closing half of that nominal absolute Br gap would correspond to 0.52–0.59 T, depending on the selected comparator. This is a **prospective stretch range**, not a performance prediction. It is valid only after matching geometry, specimen direction, temperature, magnetization, demagnetization correction, measurement method and material form. The Br target alone is insufficient: compare Hcj, (BH)max, density, mechanical strength, temperature stability, process yield and accepted-part cost alongside it.
+
+The commercial grades are injection moulded and anisotropically oriented in the mould; the source LPBF material is PA12-bonded recycled powder printed into geometry. They are close enough to define a commercially meaningful reference, but not close enough to claim direct superiority from the published headline numbers.
