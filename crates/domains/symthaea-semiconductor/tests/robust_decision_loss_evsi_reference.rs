@@ -297,7 +297,10 @@ fn independent_portfolio(
             best_value = value;
         }
     }
-    assert!(found, "reference fixture should have a feasible robust portfolio");
+    assert!(
+        found,
+        "reference fixture should have a feasible robust portfolio"
+    );
     (best_ids, best_value)
 }
 
