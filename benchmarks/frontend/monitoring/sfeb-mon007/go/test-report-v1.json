@@ -1,0 +1,36 @@
+{
+  "schema": "sfeb-mon007-go-core-preflight-report-v1",
+  "date": "2026-11-25",
+  "implementation": "Go standard library only",
+  "go_version": "go1.23.2",
+  "go_mod_version": "1.23",
+  "platform": "linux/amd64",
+  "tests": {
+    "cases": 17,
+    "fresh_suite_repetitions": 5,
+    "race_suite_repetitions": 2,
+    "go_test": "passed",
+    "go_test_race": "passed",
+    "go_vet": "passed",
+    "statement_coverage_percent": 72.6
+  },
+  "files": {
+    "go.mod": {"sha256": "404469a25027b324c4728c03c17d27917f5214c3fda0781f29fd48fb2f8bba44"},
+    "model.go": {"sha256": "b3c12fa581937f2356623011818337349a26af746bea417ecef42e92f9a40f23"},
+    "model_test.go": {"sha256": "b074919e631a02644dc25802d1b4b7a8eeffef20044e9e081b14133a599b76c7"},
+    "model.go.gz": {"sha256": "ed62d3c69405ada8a6eb7af73fb06849b84e2825888ece4f2925569345fbf570"},
+    "model_test.go.gz": {"sha256": "abc81c2754ed5c134ff063d58f33c8e491ebf194b83b2c21cfc7a52ed1986882"}
+  },
+  "scope": "External-effect semantic core only: source identity/digest, authority, fence, stable operation identity, sink receipt, readback, causal linkage, and verified-fields snapshot consistency.",
+  "excluded": [
+    "COSE and CBOR parsing/verification",
+    "Ed25519 signature verification and key lifecycle",
+    "RFC 9942 receipt and RFC 9162 proof verification",
+    "SCITT registration and historical policy validation",
+    "distributed witness services and host/process fault testing",
+    "live source and mutation sink adapters",
+    "independent external readback execution",
+    "JS-Go differential conformance vectors"
+  ],
+  "qualification": "Local Go tests passed. This is not a production verifier, cryptographic qualification, cross-language conformance result, or industry/SOTA benchmark."
+}
