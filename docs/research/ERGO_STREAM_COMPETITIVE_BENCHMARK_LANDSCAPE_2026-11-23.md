@@ -348,7 +348,22 @@ Important assumptions:
 - arbitrary concept/mechanism shift: no general distribution-free coverage claim without further assumptions or target labels.
 
 
-## 7. References
+### Adaptive and sequential conformal prediction are separate SOTA tracks
+
+The current ErgoStream baseline is an offline split-conformal predictor conditioned on an owner-approved, receipt-bound stratum. The next comparisons should separate these 2026 methods:
+
+- **Adaptive Coverage Policies (AISTATS 2026)** optimize example-dependent coverage levels using e-values and leave-one-out calibration. This targets efficiency under heterogeneous examples; it is not by itself a guarantee under arbitrary shift. https://proceedings.mlr.press/v300/gauthier26a.html
+- **Delayed-feedback ACI (2026)** studies finite-sample long-run coverage when outcomes arrive after a delay. Its delay-to-memory ratio helps organize behavior for some residual processes, but is less predictive for other dynamics such as GARCH or Markov switching. https://arxiv.org/abs/2609.07251
+- **Dependence-aware time-series conformal inference (2026)** derives coverage-error bounds under a functional-dependence measure and block-based uncertainty estimates for realized coverage, including long-memory settings. https://arxiv.org/abs/2609.33868
+- **Online drift-detection conformal (2026)** studies training-conditional cumulative regret for abrupt and smooth shift on independent generated streams, under explicit assumptions. https://arxiv.org/abs/2602.16537
+
+**Benchmark response:** split the ErgoStream tournament into static exchangeability, independent campaign blocks, adaptive sampling/optional stopping, delayed/censored labels, and drift adaptation. Measure coverage and set size alongside miss-run length, local coverage debt, adaptation lag, cumulative regret and label cost. Use #6887 for anytime-valid adaptive observations, #6943/#5285 for dependence/block methods and #13280 for delayed-feedback updates. Do not treat unique episode IDs as evidence of independence or mature labels as available before their validated arrival.
+
+
+- Optimal Training-Conditional Regret for Online Conformal Prediction (2026): https://arxiv.org/abs/2602.16537
+- Conformal Coverage of Time Series (2026): https://arxiv.org/abs/2609.33868
+- Adaptive Conformal Inference Under Delayed Feedback (2026): https://arxiv.org/abs/2609.07251
+- Adaptive Coverage Policies (AISTATS 2026): https://proceedings.mlr.press/v300/gauthier26a.html## 7. References
 - Weighted Conformal Prediction under Covariate Shift: https://arxiv.org/abs/1904.06019
 - Conformal Prediction with Conditional Guarantees (JRSSB 2025): https://academic.oup.com/jrsssb/article/87/4/1100/8058684
 - Online Martingale PAC-Bayes Certificates for Time Series Calibration (UAI 2026): https://proceedings.mlr.press/v337/huang26b.html
