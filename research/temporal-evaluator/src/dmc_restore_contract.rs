@@ -22,6 +22,9 @@ pub const PINNED_MUJOCO_VERSION: &str = "4.0.1";
 /// Errors are reported in integer nanounits to avoid floating tolerance drift.
 /// A value of 1 is the paper's 1e-9 prefix-match threshold in source units.
 pub const PREFIX_MATCH_MAX_ERROR_NANO: u64 = 1;
+/// MuJoCo 4.0.1 mjSTATE_INTEGRATION = FULLPHYSICS | USER | WARMSTART
+/// = (1 << 0) | ... | (1 << 14).
+pub const PINNED_MJ_STATE_INTEGRATION_MASK: u32 = 0x7fff;
 pub const MAX_DMC_BRANCHES: usize = 16;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -68,7 +71,8 @@ pub struct DmcSnapshotManifest {
     pub environment_step_count: u64,
     pub reset_next_step: bool,
     pub n_sub_steps: u32,
-    pub step_limit: Option<u64>,
+    /// Raw IEEE-754 bits of dm_env Environment._step_limit (positive finite or +infinity).
+    pub step_limit_f64_bits: u64,
     pub legacy_step: bool,
     pub control_timestep_ns: u64,
 
@@ -127,6 +131,13 @@ pub struct DmcRestoreCohort {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DmcAdmittedBranch {
+    pub action_id: String,
+    pub run_id: u64,
+    pub post_intervention_trajectory_sha256: [u8; 32],
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DmcRestoreCertificate {
     pub dm_control_commit: String,
     pub model_mjcf_sha256: [u8; 32],
@@ -134,9 +145,8 @@ pub struct DmcRestoreCertificate {
     pub exogenous_schedule_sha256: [u8; 32],
     pub branch_point_step: u64,
     pub prefix_trace_sha256: [u8; 32],
-    pub admitted_action_ids: Vec<String>,
-    pub admitted_run_ids: Vec<u64>,
-    pub post_intervention_trajectory_sha256: Vec<[u8; 32]>,
+    /// Action/run/trajectory lineage remains bound as one canonical tuple.
+    pub admitted_branches: Vec<DmcAdmittedBranch>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -159,6 +169,7 @@ pub enum DmcRestoreError {
     ZeroControlTimestep,
     BranchPointStepMismatch,
     StepLimitAlreadyReached,
+    InvalidStepLimit,
     RestOperationNotInFactualPrefix,
     EmptyActionSet,
     TooManyBranches { requested: usize, maximum: usize },
@@ -212,6 +223,7 @@ impl fmt::Display for DmcRestoreError {
             Self::ZeroControlTimestep => write!(formatter, "control timestep must be nonzero"),
             Self::BranchPointStepMismatch => write!(formatter, "wrapper step count must equal the declared branch-point control step"),
             Self::StepLimitAlreadyReached => write!(formatter, "branch point is at or beyond the declared environment step limit"),
+            Self::InvalidStepLimit => write!(formatter, "environment step limit must be a positive finite value or positive infinity"),
             Self::RestOperationNotInFactualPrefix => write!(formatter, "auxiliary rest/settling operation is not part of the common factual prefix"),
             Self::EmptyActionSet => write!(formatter, "DMC restore cohort requires at least two expected action IDs"),
             Self::TooManyBranches { requested, maximum } => write!(formatter, "DMC restore cohort has {requested} branches; maximum is {maximum}"),
@@ -297,7 +309,9 @@ fn validate_snapshot(snapshot: &DmcSnapshotManifest) -> Result<(), DmcRestoreErr
             state_size,
             state_sha256,
         } => {
-            if signature_name != "mjSTATE_INTEGRATION" || *signature_value == 0 {
+            if signature_name != "mjSTATE_INTEGRATION"
+                || *signature_value != PINNED_MJ_STATE_INTEGRATION_MASK
+            {
                 return Err(DmcRestoreError::WrongIntegrationSignature);
             }
             if *state_size == 0 || digest_is_empty(state_sha256) {
@@ -330,6 +344,13 @@ fn validate_snapshot(snapshot: &DmcSnapshotManifest) -> Result<(), DmcRestoreErr
     }
     if snapshot.reset_next_step {
         return Err(DmcRestoreError::WrapperResetPending);
+    }
+    let step_limit = f64::from_bits(snapshot.step_limit_f64_bits);
+    if step_limit.is_nan() || step_limit <= 0.0 {
+        return Err(DmcRestoreError::InvalidStepLimit);
+    }
+    if step_limit.is_finite() && snapshot.environment_step_count as f64 >= step_limit {
+        return Err(DmcRestoreError::StepLimitAlreadyReached);
     }
     if snapshot.n_sub_steps == 0 {
         return Err(DmcRestoreError::ZeroActionRepeat);
@@ -492,16 +513,16 @@ pub fn validate_dmc_restore_cohort(
         }
     }
 
-    let mut admitted_action_ids: Vec<String> = expected.into_iter().collect();
-    admitted_action_ids.sort();
-    let mut admitted_run_ids: Vec<u64> = run_ids.into_iter().collect();
-    admitted_run_ids.sort_unstable();
-    let mut post_intervention_trajectory_sha256: Vec<[u8; 32]> = cohort
+    let mut admitted_branches: Vec<DmcAdmittedBranch> = cohort
         .branches
         .iter()
-        .map(|branch| branch.post_intervention_trajectory_sha256)
+        .map(|branch| DmcAdmittedBranch {
+            action_id: branch.action_id.clone(),
+            run_id: branch.run_id,
+            post_intervention_trajectory_sha256: branch.post_intervention_trajectory_sha256,
+        })
         .collect();
-    post_intervention_trajectory_sha256.sort_unstable();
+    admitted_branches.sort_unstable_by(|left, right| left.action_id.cmp(&right.action_id));
 
     Ok(DmcRestoreCertificate {
         dm_control_commit: cohort.snapshot.dm_control_commit.clone(),
@@ -510,9 +531,7 @@ pub fn validate_dmc_restore_cohort(
         exogenous_schedule_sha256: cohort.snapshot.exogenous_schedule_sha256,
         branch_point_step: cohort.snapshot.branch_point_step,
         prefix_trace_sha256: cohort.snapshot.prefix_trace_sha256,
-        admitted_action_ids,
-        admitted_run_ids,
-        post_intervention_trajectory_sha256,
+        admitted_branches,
     })
 }
 
@@ -534,7 +553,7 @@ mod tests {
             model_mjcf_sha256: digest(1),
             physics_snapshot: PhysicsSnapshotKind::IntegrationState {
                 signature_name: "mjSTATE_INTEGRATION".to_owned(),
-                signature_value: 0x1fff,
+                signature_value: PINNED_MJ_STATE_INTEGRATION_MASK,
                 state_size: 42,
                 state_sha256: digest(2),
             },
@@ -547,7 +566,7 @@ mod tests {
             environment_step_count: 12,
             reset_next_step: false,
             n_sub_steps: 1,
-            step_limit: Some(1000),
+            step_limit_f64_bits: 1000.0_f64.to_bits(),
             legacy_step: true,
             control_timestep_ns: 10_000_000,
             model_plugin_count: 0,
@@ -597,8 +616,11 @@ mod tests {
     fn complete_integration_state_and_fresh_prefix_admit() {
         let result = validate_dmc_restore_cohort(&cohort()).unwrap();
         assert_eq!(result.branch_point_step, 12);
-        assert_eq!(result.admitted_action_ids, vec!["a0", "a1"]);
-        assert_eq!(result.admitted_run_ids, vec![100, 101]);
+        assert_eq!(result.admitted_branches.len(), 2);
+        assert_eq!(result.admitted_branches[0].action_id, "a0");
+        assert_eq!(result.admitted_branches[0].run_id, 100);
+        assert_eq!(result.admitted_branches[1].action_id, "a1");
+        assert_eq!(result.admitted_branches[1].run_id, 101);
     }
 
     #[test]
@@ -632,11 +654,44 @@ mod tests {
     }
 
     #[test]
+    fn wrong_integration_signature_value_rejects() {
+        let mut input = cohort();
+        if let PhysicsSnapshotKind::IntegrationState {
+            signature_value,
+            ..
+        } = &mut input.snapshot.physics_snapshot
+        {
+            *signature_value = PINNED_MJ_STATE_INTEGRATION_MASK - 1;
+        }
+        assert_eq!(
+            validate_dmc_restore_cohort(&input).unwrap_err(),
+            DmcRestoreError::WrongIntegrationSignature
+        );
+    }
+
+    #[test]
+    fn invalid_step_limit_rejects_nan() {
+        let mut input = cohort();
+        input.snapshot.step_limit_f64_bits = f64::NAN.to_bits();
+        assert_eq!(
+            validate_dmc_restore_cohort(&input).unwrap_err(),
+            DmcRestoreError::InvalidStepLimit
+        );
+    }
+
+    #[test]
+    fn positive_infinite_step_limit_is_admissible() {
+        let mut input = cohort();
+        input.snapshot.step_limit_f64_bits = f64::INFINITY.to_bits();
+        assert!(validate_dmc_restore_cohort(&input).is_ok());
+    }
+
+    #[test]
     fn invalid_integration_signature_rejects() {
         let mut input = cohort();
         input.snapshot.physics_snapshot = PhysicsSnapshotKind::IntegrationState {
             signature_name: "mjSTATE_FULLPHYSICS".to_owned(),
-            signature_value: 0x0fff,
+            signature_value: PINNED_MJ_STATE_INTEGRATION_MASK,
             state_size: 42,
             state_sha256: digest(2),
         };
@@ -818,7 +873,7 @@ mod tests {
         let mut input = cohort();
         input.snapshot.physics_snapshot = PhysicsSnapshotKind::IntegrationState {
             signature_name: "mjSTATE_INTEGRATION".to_owned(),
-            signature_value: 0x1fff,
+            signature_value: PINNED_MJ_STATE_INTEGRATION_MASK,
             state_size: 42,
             state_sha256: [0; 32],
         };
