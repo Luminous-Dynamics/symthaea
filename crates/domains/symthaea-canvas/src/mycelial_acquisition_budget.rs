@@ -482,6 +482,9 @@ fn validate_budget(
             || limit.minimum_wavelength_nm > limit.maximum_wavelength_nm
             || !limit.maximum_cumulative_photons_per_um2.is_finite()
             || limit.maximum_cumulative_photons_per_um2 <= 0.0
+            || !limit.maximum_irradiance_watts_per_cm2.is_finite()
+            || limit.maximum_irradiance_watts_per_cm2 <= 0.0
+            || limit.maximum_continuous_illumination_duration_ns == 0
         {
             return Err(MycelialSampleHealthBudgetError::InvalidBudget(
                 "invalid wavelength band or cumulative photon-dose limit",
@@ -507,6 +510,10 @@ fn validate_state(
             "coordinate frame differs from policy",
         ));
     }
+    validate_digest(
+        &state.exposure_history_evidence_digest,
+        "state.exposure_history_evidence_digest",
+    )?;
     if state.elapsed_session_duration_ns > budget.maximum_session_duration_ns
         || state.completed_actions_in_session > budget.maximum_actions_per_session
     {
@@ -780,6 +787,7 @@ fn validate_proposal(
     if !proposal.roi_area_um2.is_finite()
         || proposal.roi_area_um2 <= 0.0
         || proposal.duration_ns == 0
+        || proposal.planned_start_offset_ns < state.elapsed_session_duration_ns
     {
         return Err(MycelialSampleHealthBudgetError::InvalidProposal(
             "positive finite ROI area and acquisition duration are required",
@@ -801,9 +809,13 @@ fn validate_proposal(
         if dose.wavelength_nm == 0
             || !dose.photons_per_um2_upper.is_finite()
             || dose.photons_per_um2_upper < 0.0
+            || !dose.irradiance_watts_per_cm2_upper.is_finite()
+            || dose.irradiance_watts_per_cm2_upper < 0.0
+            || dose.illumination_duration_ns == 0
+            || dose.illumination_duration_ns > proposal.duration_ns
         {
             return Err(MycelialSampleHealthBudgetError::InvalidProposal(
-                "invalid conservative photon-dose estimate",
+                "invalid photon-dose, irradiance or illumination-duration estimate",
             ));
         }
         if previous_dose_channel.is_some_and(|prior| prior >= dose.channel_id.as_str()) {
@@ -836,6 +848,9 @@ fn policy_digest(budget: &MycelialSampleHealthBudget) -> String {
         hasher.update(&limit.minimum_wavelength_nm.to_le_bytes());
         hasher.update(&limit.maximum_wavelength_nm.to_le_bytes());
         hash_string(&mut hasher, &limit.calibration_digest);
+        hash_f64(&mut hasher, limit.maximum_irradiance_watts_per_cm2);
+        hasher.update(&limit.maximum_continuous_illumination_duration_ns.to_le_bytes());
+        hasher.update(&limit.minimum_recovery_interval_ns.to_le_bytes());
         hash_f64(&mut hasher, limit.maximum_cumulative_photons_per_um2);
     }
     finish_digest(hasher)
@@ -850,6 +865,15 @@ fn state_digest(state: &MycelialSampleHealthState) -> String {
     hash_string(&mut hasher, &state.coordinate_frame_id);
     hasher.update(&state.elapsed_session_duration_ns.to_le_bytes());
     hasher.update(&state.completed_actions_in_session.to_le_bytes());
+    hasher.update(&[u8::from(state.exposure_history_complete)]);
+    hash_string(&mut hasher, &state.exposure_history_evidence_digest);
+    match state.elapsed_since_last_optical_exposure_ns {
+        Some(elapsed) => {
+            hasher.update(&[1]);
+            hasher.update(&elapsed.to_le_bytes());
+        }
+        None => hasher.update(&[0]),
+    }
     let mut exposures: Vec<_> = state.cumulative_photon_exposures.iter().collect();
     exposures.sort_by(|left, right| {
         (
@@ -897,6 +921,7 @@ fn proposal_inventory_digest(proposals: &[MycelialAcquisitionBudgetProposal]) ->
         hash_string(&mut hasher, &proposal.acquisition_plan_digest);
         hash_string(&mut hasher, &proposal.device_capability_manifest_digest);
         hash_string(&mut hasher, &proposal.coordinate_frame_id);
+        hasher.update(&proposal.planned_start_offset_ns.to_le_bytes());
         hash_string(&mut hasher, &proposal.spatial_footprint_digest);
         hasher.update(&(proposal.required_illumination_channel_ids.len() as u64).to_le_bytes());
         for channel_id in &proposal.required_illumination_channel_ids {
@@ -917,6 +942,8 @@ fn proposal_inventory_digest(proposals: &[MycelialAcquisitionBudgetProposal]) ->
             hash_string(&mut hasher, &dose.channel_id);
             hasher.update(&dose.wavelength_nm.to_le_bytes());
             hash_f64(&mut hasher, dose.photons_per_um2_upper);
+            hash_f64(&mut hasher, dose.irradiance_watts_per_cm2_upper);
+            hasher.update(&dose.illumination_duration_ns.to_le_bytes());
             hash_string(&mut hasher, &dose.calibration_digest);
         }
         hasher.update(&(proposal.spatial_footprint_cell_ids.len() as u64).to_le_bytes());
@@ -1412,6 +1439,9 @@ mod tests {
                 minimum_wavelength_nm: 480,
                 maximum_wavelength_nm: 510,
                 calibration_digest: digest('f'),
+                maximum_irradiance_watts_per_cm2: 0.01,
+                maximum_continuous_illumination_duration_ns: 20,
+                minimum_recovery_interval_ns: 5,
                 maximum_cumulative_photons_per_um2: 10.0,
             }],
         }
@@ -1425,6 +1455,9 @@ mod tests {
             coordinate_frame_id: "specimen-frame-v1".to_string(),
             elapsed_session_duration_ns: 20,
             completed_actions_in_session: 1,
+            exposure_history_complete: true,
+            exposure_history_evidence_digest: digest('l'),
+            elapsed_since_last_optical_exposure_ns: Some(10),
             cumulative_photon_exposures: vec![MycelialCumulativePhotonExposure {
                 sample_id: "sample-001".to_string(),
                 spatial_cell_id: "cell-a".to_string(),
@@ -1664,6 +1697,7 @@ mod tests {
                 vec!["gfp".to_string()]
             },
             roi_area_um2: 20.0,
+            planned_start_offset_ns: 20,
             duration_ns: 10,
             local_temperature_rise_upper_millikelvin: 100,
             acquisition_model_digest: digest('a'),
@@ -1676,6 +1710,8 @@ mod tests {
                     channel_id: "gfp".to_string(),
                     wavelength_nm: 488,
                     photons_per_um2_upper: dose,
+                    irradiance_watts_per_cm2_upper: 0.001,
+                    illumination_duration_ns: 5,
                     calibration_digest: digest('f'),
                 }]
             },
@@ -1948,6 +1984,9 @@ mod tests {
             minimum_wavelength_nm: 600,
             maximum_wavelength_nm: 650,
             calibration_digest: digest('i'),
+            maximum_irradiance_watts_per_cm2: 0.01,
+            maximum_continuous_illumination_duration_ns: 20,
+            minimum_recovery_interval_ns: 5,
             maximum_cumulative_photons_per_um2: 10.0,
         });
         let result =
