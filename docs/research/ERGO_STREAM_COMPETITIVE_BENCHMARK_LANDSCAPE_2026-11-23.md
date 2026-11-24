@@ -14,6 +14,7 @@ Existing suites measure complementary capabilities. They should be used as adapt
 | Track | External benchmark / system | What it tests | Fit to ErgoStream | Limitation / correct use |
 |---|---|---|---|---|
 | Ansatz-free scientific discovery | [Unsatz](https://arxiv.org/abs/2611.03713) | Learner proposes variables, hidden state, interactions and measurement/model form, buys experiments and predicts held-out interventions/conditions/horizons | **Closest direct comparator** for structural/model-form discovery | Agent starts with a scientific task and a model-program language; it is not a generic pre-task acquisition benchmark. Reproduce its exact task protocol before comparing |
+| Industry scientific-agent harness | [OpenScience](https://www.openscience.sh/benchmark) | Reports 371 skills, 42 data connectors, seven specialist workers; public-terminal and internal end-to-end research benchmarks | Systems/harness comparator for workflow orchestration, domain procedures, evidence checks, tool connectivity and verification | The publisher disclosed evaluation-comparability issues and a planned rerun; internal benchmark and trial counts differ from public leaderboards. Do not treat its headline percentages as a common cross-benchmark SOTA score |
 | Scientific rediscovery | [FIRE-Bench](https://proceedings.mlr.press/v306/wang26d.html) | Agents rediscover established, documented findings from recent high-impact ML papers through independent experiment design, execution and evidence-backed conclusions | Direct comparator for scientific reproducibility and evidence validation after transfer | Rediscovery tasks are benchmark-specified; they do not establish novel discovery or pre-task structural acquisition |
 | Interactive scientific research agents | [SciAgentArena](https://sciagentarena.github.io/) | ~200 stepwise-verified tasks across five scientific domains, four task categories and 18 evaluated agents; reports reliability, stability and cost as well as task outcomes | External reality check for whether acquired structural knowledge improves actual scientific workflows | Tasks are user/task exposed and span data-analysis workflows; it does not isolate pre-task structural acquisition or frozen cross-domain transfer |
 | Graph foundation model transfer | [GFMBenchmark](https://github.com/smufang/GFMBenchmark) | Eight graph foundation models over 33 datasets, seven topic domains and six graph-format domains; separates semantic/topic shifts from representation-format shifts | Direct graph transfer baseline and two-axis OOD test | Pretraining/adaptation benchmark, not task-agnostic relational acquisition or intervention validation |
@@ -59,6 +60,14 @@ The current leaderboard also makes cost/latency trade-offs visible: GPT-6 Astra 
 **Response:** make ASB the primary external laboratory-loop benchmark after the #11060/#11171 adapter exists. Match the full model/agent/tool/harness configuration, report task-level and cost-frontier outcomes, and do not compare only leaderboard percentages. Its planned backends are especially useful: replay oracle (v0), digital twin (v1), live lab (v2). This aligns with Luminous' evidence-execution architecture and offers a staged route from replay to physical qualification.
 
 Source: https://asb.open-ssi.org/about
+
+### OpenScience is an industry-scale harness comparator (with a disclosed caveat)
+
+OpenScience reports 371 reusable scientific skills across 18 categories, 42 scientific-data connectors across six domains, and a lead agent that can delegate to seven bounded specialist workers. Its September 2026 benchmark page reports 75.7% on 70 Terminal-Bench Science tasks, 82.2 on 50 BiomniBench-DA tasks, and 47.3% pass@3 on its own OpenScience Bench. The same page explicitly says its evaluation setup contained issues and some comparisons were not perfect; it says the harness would be improved and results rerun. It also states that OpenScience counted one trial per task for Terminal-Bench Science while public leaderboard entries averaged three, and that OpenScience Bench is internal.
+
+**Response:** treat OpenScience as a systems/harness baseline and source of useful workflow practices, not as a clean universal SOTA percentage. Reproduce the public task suites with identical graders and matched backbones/harness conditions where feasible. Compare skill retrieval, provenance checking, independent worker verification, tool/connectivity, cost/time, and reliability. ErgoStream's differentiation must be demonstrated in pre-task structural acquisition, explicit transfer scope, calibrated abstention, and fewer false mechanism transfers—not in the number of skills or connectors.
+
+Source: https://www.openscience.sh/benchmark
 
 ### FIRE-Bench tests rediscovery of verifiable scientific findings
 
@@ -279,6 +288,7 @@ These are prospective engineering targets, not external standards or achieved re
 - Autonomous Science Bench 0.1: https://asb.open-ssi.org/about## 7. References
 - GFMBenchmark: https://github.com/smufang/GFMBenchmark
 - FIRE-Bench (ICML 2026): https://proceedings.mlr.press/v306/wang26d.html
+- OpenScience benchmark and disclosed 1 October 2026 evaluation update: https://www.openscience.sh/benchmark
 - Autonomous Science Bench leaderboard and protocol: https://asb.open-ssi.org/leaderboard · https://asb.open-ssi.org/about
 - CARV compositional visual analogy: https://arxiv.org/abs/2603.27958
 - ERD / latent displacement analogical reasoning: https://proceedings.mlr.press/v326/dats26a.html
