@@ -31,6 +31,28 @@ The 2025 study *A travelling-wave strategy for plant–fungal trade* reports lar
 
 Reference: https://doi.org/10.1038/s41586-025-08614-x
 
+#### 2.1.1 Reproducible AMF travelling-wave benchmark
+
+This is a high-value retrospective benchmark because the paper and its frozen analysis repository provide source data and code rather than only a descriptive result. The paper studied three AMF strains (*Rhizophagus irregularis* A5 and C2, and *R. aggregatum*), with split-Petri-plate geometry constraining the extraradical network to a 2D imaging plane. A typical longitudinal experiment used roughly 150 stitched-field images per replicate at 2-hour intervals. The paper reports more than 500,000 tracked nodes across the study, approximately 40,000 nodes per plate, and around 100,000 cytoplasmic-flow trajectories registered to network coordinates. The flow lane used more than 1,600 high-magnification videos from 28 biological samples/plates, typically 20–25 frames per second for 20–60 seconds and approximately 20–100 sampled positions per plate. Kymograph trajectory extraction used a ten-consecutive-frame minimum, with manual review of kymographs. These details define a much more rigorous benchmark than treating every track as an independent sample.
+
+The published source data for the main analyses/figures are available through Figshare, and the MIT-licensed code repository states that the archive includes the figure-source data plus a subsample of raw data to demonstrate the pipeline; it does not promise that every original acquisition video is present. The analysis repository is a frozen publication-reproducibility snapshot and documents external setup requirements. Before claiming full raw-data reproduction, inspect the Figshare manifest, per-file licensing, exact plate/strain/replicate joins and which raw microscopy/video files are actually included.
+
+Benchmark lanes must remain separate:
+- longitudinal 2D network reconstruction, node/edge identity tracking, fusion and growth-front events;
+- travelling-wave speed and spatiotemporal density-profile prediction;
+- exact registration of high-magnification flow videos to the low-magnification graph;
+- bidirectional and simultaneous antiparallel flow tracking, velocity distributions and direction-switch events;
+- coupling between local flow statistics, graph topology, root distance and developmental age;
+- global/root geometric efficiency and construction-cost comparisons against the paper's minimum-spanning-tree and Delaunay-triangulation limits.
+
+Treat the biological network/plate as the independent grouping unit. The more than 100,000 flow trajectories, image frames, nodes and sampled positions are nested observations. Hold out entire networks/plates for within-strain generalization, and report leave-one-strain-out transfer separately across the three strains. The two-dimensional plate results are not 3D soil ground truth; bright-field particle trajectories are not direct isotope delivery or a complete mass-flux measurement. The short-track detection threshold creates a measurable selection window that should be explicitly re-evaluated.
+
+Use the frozen AMFTrack/AMFTravellingWave publication pipeline as the reproduction baseline, then compare persistence, morphology-only, local geometry/distance-to-root, topology-only and BARE travelling-wave model baselines. Add shuffled trajectory-to-edge registration and reversed-time controls to detect spurious alignment or temporal leakage.
+
+Data and code:
+- Figshare source data: https://doi.org/10.6084/m9.figshare.27889143
+- Frozen analysis repository (MIT): https://github.com/Cocopyth/AMFTravellingWave
+
 ### 2.2 Demand-responsive cordogenesis
 
 The 2026 *Agaricus bisporus* cordogenesis study describes changes in cord formation and widening during new-substrate colonization and fruiting development. It also reports substantial cultivation-cycle variation and no significant general correlation between cord abundance and total mushroom yield.
@@ -299,7 +321,7 @@ Create separate, rights-qualified lanes:
 2. Sten 3D z-stack reconstruction and printed-prototype geometry, scored separately from biological images.
 3. Fungal Network Analysis (FNA) images and reference processing.
 4. SkelPy's published *Botrytis cinerea* 2D time series, with separate manual-trace, workflow-derived node, spatial-cell and trait-agreement tasks; the full raw series must be sourced separately, and its published preprocessing parameters must not leak from the 180-image tuning cohort into a test set.
-5. 2025 AM-fungal travelling-wave growth and flow trajectories.
+5. 2025 AM-fungal travelling-wave growth and flow trajectories: separate network/plate-disjoint reconstruction, node/edge tracking, growth-front, trajectory-to-graph registration, bidirectional/antiparallel flow and topology/transport coupling lanes; report leave-one-strain-out transfer separately and do not count tracks or nodes as independent replicates.
 6. 2026 *Agaricus* cordogenesis/fructification.
 7. 2026 *Agaricus* stable-isotope source-region attribution.
 8. Hyphal Highways Device microbial-dispersal measurements.
