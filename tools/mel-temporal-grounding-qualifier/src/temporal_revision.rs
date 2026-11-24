@@ -933,6 +933,85 @@ mod tests {
         }
     }
 
+    fn matched_evidence_triplet() -> [RevisionCaseV2; 3] {
+        let truth = vec![interval(100, 200), interval(500, 600)];
+        let draft = vec![interval(100, 200), interval(800, 900)];
+        let mut no_evidence = revision_case_v2(
+            truth.clone(),
+            draft.clone(),
+            draft.clone(),
+        );
+        no_evidence.case_id = "unit-v2-no-evidence".into();
+
+        let mut local = no_evidence.clone();
+        local.case_id = "unit-v2-local".into();
+        local.evidence_condition = EvidenceConditionV1::LocalRetrieved;
+        local.evidence = Some(RevisionEvidenceV1 {
+            source_audio_sha256: AUDIO.into(),
+            source_sample_rate_hz: 48_000,
+            evidence_payload_sha256: EVIDENCE.into(),
+            retrieval_config_sha256: RETRIEVAL.into(),
+            start_frame: 0,
+            end_frame: 48_000,
+        });
+        local.final_prediction =
+            raw_prediction(&local.truth.artifact, "query-v2", truth.clone());
+
+        let mut yoked = no_evidence.clone();
+        yoked.case_id = "unit-v2-yoked".into();
+        yoked.evidence_condition = EvidenceConditionV1::YokedRetrieved;
+        yoked.evidence = Some(RevisionEvidenceV1 {
+            source_audio_sha256:
+                "1212121212121212121212121212121212121212121212121212121212121212".into(),
+            source_sample_rate_hz: 48_000,
+            evidence_payload_sha256: RETRIEVAL.into(),
+            retrieval_config_sha256: EVIDENCE.into(),
+            start_frame: 0,
+            end_frame: 48_000,
+        });
+        [no_evidence, local, yoked]
+    }
+
+    #[test]
+    fn matched_evidence_triplet_isolates_local_retrieval_gain() {
+        let cases = matched_evidence_triplet();
+        let result = compare_matched_evidence_arms(&cases).unwrap();
+        assert_eq!(result.len(), 1);
+        let contrast = &result[0];
+        assert_eq!(contrast.experiment_unit_id, "unit-v2");
+        assert_eq!(contrast.local_minus_no_evidence_f1, Some(0.5));
+        assert_eq!(contrast.local_minus_yoked_f1, Some(0.5));
+        assert_eq!(
+            contrast.local_minus_no_evidence_count_gated_f1,
+            Some(1.0)
+        );
+        assert_eq!(
+            contrast.local_minus_yoked_count_gated_f1,
+            Some(1.0)
+        );
+        assert_eq!(contrast.local_beats_yoked, Some(true));
+    }
+
+    #[test]
+    fn matched_evidence_triplet_rejects_changed_initial_draft() {
+        let mut cases = matched_evidence_triplet();
+        cases[2].draft_prediction = raw_prediction(
+            &cases[2].truth.artifact,
+            "query-v2",
+            vec![interval(100, 200), interval(700, 800)],
+        );
+        assert!(compare_matched_evidence_arms(&cases).is_err());
+    }
+
+    #[test]
+    fn matched_evidence_triplet_requires_each_arm_exactly_once() {
+        let cases = matched_evidence_triplet();
+        assert!(compare_matched_evidence_arms(&cases[..2]).is_err());
+        let mut duplicate = cases;
+        duplicate[2].evidence_condition = EvidenceConditionV1::LocalRetrieved;
+        assert!(compare_matched_evidence_arms(&duplicate).is_err());
+    }
+
     #[test]
     fn v2_computes_draft_and_final_scores_from_raw_predictions() {
         let case = revision_case_v2(
