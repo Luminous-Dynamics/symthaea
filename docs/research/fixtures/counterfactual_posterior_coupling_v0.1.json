@@ -233,7 +233,7 @@
     },
     {
       "id": "PCIR-F12-OUTER-CAUSAL-MECHANISM-AMBIGUITY",
-      "purpose": "Keep uncertainty over the causal mechanism separate from within-model uncertainty over stable individual traits.",
+      "purpose": "Boundary control: when factual-compatible model profiles imply opposite individual effects, preserve structural ambiguity for the existing #10372 support/identification contract.",
       "input": {
         "factual_history_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "candidate_models": [
@@ -257,7 +257,7 @@
         "posterior_weights": null
       },
       "expected": "STRUCTURAL_AMBIGUITY_REMAINS",
-      "reason": "Two models fit the factual evidence but imply opposite intervention effects; do not average them into a false point certainty."
+      "reason": "PCIR must not average model disagreement into a point estimate or duplicate the #10372 identified-set disposition logic."
     },
     {
       "id": "PCIR-F13-FULL-EXOGENOUS-DRAW-COUPLED",
@@ -354,7 +354,12 @@
     "cluster_inference": "Symthaea #8578",
     "model_use_gate": "Symthaea #9029/#13413",
     "branch_and_stochastic_evidence": "Symthaea #13375/#13377 and Symtropy #3741/#3743",
-    "evaluator_isolation": "Symthaea #9437"
+    "evaluator_isolation": "Symthaea #9437",
+    "structural_support_and_cross_world_identification": "Symthaea #10372 (SAM-CF-SUPPORT-001); PCIR is an individual-conditioned evidence producer and must not duplicate this evaluator.",
+    "episode_specific_abduction_action_prediction": "Symthaea #10356 in its autonomous-driving scope.",
+    "matched_model_assisted_decision_value": "Symthaea #9010 in its CMAQ scope.",
+    "vehicle_cross_model_ranking_sensitivity": "Symthaea #10252 in its vehicle scope.",
+    "posterior_ambiguity_sets": "Symthaea #9781/#9788 (TV/OT posterior ambiguity; do not conflate with causal identified sets)."
   },
   "explicit_non_claims": [
     "No posterior inference or HDC Bayesian encoder implemented.",
@@ -364,14 +369,16 @@
     "No SOTA or resource advantage demonstrated.",
     "Semantic fixtures test the protocol only and are not hidden empirical qualification.",
     "No outer posterior or complete admissible set over structural causal mechanisms is implemented; the mechanism-ambiguity fixture is a reserved future-boundary control.",
-    "A seed match alone does not authenticate same-u stochastic correspondence; stochastic pairing requires source/event mapping and replay evidence."
+    "A seed match alone does not authenticate same-u stochastic correspondence; stochastic pairing requires source/event mapping and replay evidence.",
+    "No separate structural support, cross-world assumption or set-identification evaluator is implemented; PCIR composes with existing SAM #10372/#10377."
   ],
   "prior_art_boundary": {
     "same_exogenous_u": "Okita formalizes counterfactual pairs by holding the same individual-specific exogenous u and factual history fixed across interventions (Eq. 10). This is established semantics, not a PCIR novelty claim.",
     "abduction_posterior": "Okita defines abduction as P(U | factual observations) and maps the RSSM posterior q_phi(z_t | h_t, o_t) to this role structurally; numerical correspondence between learned z and physical U is an empirical question.",
     "pcir_scope": "An auditable Symthaea implementation/ablation protocol for explicit stable-trait posterior/sample identity versus a standard RSSM-style branch-point latent copied across sibling action branches.",
     "required_control": "A9 standard RSSM-style posterior latent with identical branch-point deterministic/stochastic state cloned across sibling action branches.",
-    "dynamic_mechanism_bounds": "Haugh & Singal (ICML 2023) already optimize over possibly infinitely many mechanisms for upper/lower dynamic counterfactual bounds. A finite candidate model range is only empirical unless completeness is certified; PCIR Section 13 is an integration proposal, not a novel bounds algorithm."
+    "dynamic_mechanism_bounds": "Haugh & Singal (ICML 2023) already optimize over possibly infinitely many mechanisms for upper/lower dynamic counterfactual bounds. A finite candidate model range is only empirical unless completeness is certified; PCIR Section 13 is an integration proposal, not a novel bounds algorithm.",
+    "dynamic_mechanism_set_owner": "Use existing SAM #10372/#10377 for support, coupling assumptions and set-identification dispositions; PCIR must not create a parallel mechanism-ambiguity evaluator."
   },
   "prospective_qualification_targets": {
     "status": "targets_not_achieved_results",
