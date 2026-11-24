@@ -168,6 +168,8 @@ The proposed Rust implementation is split into two layers:
 
 Hard constraints require exact calibration binding:
 - the health-model digest in every acquisition proposal must match the versioned sample-health policy;
+- the exact compiled acquisition-plan digest and device-capability-manifest digest are bound to the active recorded session;
+- the spatial-footprint digest commits to coordinate frame, compiled plan, device capability and canonical source-region cell IDs;
 - each illuminated channel has a policy-bound wavelength band and calibration digest;
 - each optical action supplies a conservative dose estimate for every required illumination channel;
 - each historical exposure records its source receipt and calibration digest; an unqualified or incompatible historical exposure blocks further optical acquisition until reconciled;
