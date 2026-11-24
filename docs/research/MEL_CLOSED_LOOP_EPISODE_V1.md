@@ -53,7 +53,7 @@ A veto is an action-authority fact, not an acoustic observation. Already-admitte
 
 ### Late-veto receipt composition
 
-The episode reducer now accepts an optional, strict `effect.veto_race` projection when the disposition is a veto but an output-stage receipt already exists. It records the authorization identity, the admission stage and event sequence, veto sequence, exact old/new output epochs, reported-stage sequence, callback disposition, callback epoch, admitted/stale-discarded frame counts, queue invalidation counts, discarded-note count and an owning receipt reference.
+The episode reducer now accepts an optional, strict `effect.veto_race` projection when the disposition is a veto but an output-stage receipt already exists. It binds the exact session/turn, disposition receipt digest, decision receipt digest, effect receipt digest and output artifact digest. It then records the authorization identity, admission stage and event sequence, veto sequence, exact old/new output epochs, reported-stage sequence, callback disposition, callback epoch, admitted/stale-discarded frame counts, queue invalidation counts, discarded-note count and an owning receipt reference.
 
 The projection distinguishes three materially different cases:
 - **Callback admitted before veto:** callback event sequence precedes the veto under the prior epoch. Subsequent CPAL prediction or independent loopback observation may arrive after the veto; this is pre-veto-admitted residual output, not a new post-veto admission.
