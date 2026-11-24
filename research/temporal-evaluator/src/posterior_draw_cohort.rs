@@ -18,7 +18,7 @@
 //! sets, or evidence that the supplied posterior is well specified.
 
 use super::individual_effect_retention::{
-    BranchDisposition, IndividualEffectBranch, IndividualEffectComparison, IndividualEffectContext,
+    IndividualEffectBranch, IndividualEffectComparison, IndividualEffectContext,
     IndividualEffectError, IndividualEffectPair, evaluate_individual_effect_retention,
 };
 use std::collections::BTreeSet;
@@ -790,7 +790,7 @@ pub fn evaluate_posterior_effect_cohort(
 
 #[cfg(test)]
 mod tests {
-    use super::super::individual_effect_retention::NonApplicationReason;
+    use super::super::individual_effect_retention::{BranchDisposition, NonApplicationReason};
     use super::*;
 
     fn digest(seed: u8) -> [u8; 32] {
