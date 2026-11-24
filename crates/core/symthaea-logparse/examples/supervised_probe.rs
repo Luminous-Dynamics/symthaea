@@ -112,7 +112,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // label, fail explicitly rather than silently reverting to event splits.
     let grouped_folds = group_kfold_splits(&hvs, &labels, &group_ids, 5, 0x5EED)?;
     let mut grouped_fold_accuracies = Vec::with_capacity(grouped_folds.len());
-    println!("\\n=== Source-file-disjoint 5-fold CV ===");
+    println!("\n=== Source-file-disjoint 5-fold CV ===");
     for (fold_index, fold) in grouped_folds.iter().enumerate() {
         let train_groups: HashSet<&str> =
             fold.train_group_ids.iter().map(String::as_str).collect();
