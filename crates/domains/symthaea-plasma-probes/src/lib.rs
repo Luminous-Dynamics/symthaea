@@ -28,6 +28,8 @@ const MAX_FOURIER_MEASURE_WORK: usize = 16_777_216;
 const MAX_SCALAR_MODE_HORIZON_STEPS: u32 = 1_000_000;
 const MAX_DELAY_CANCELLATION_SAMPLES: usize = 1_000_000;
 const MAX_DELAY_HISTORY_WORK: usize = 4_194_304;
+const MAX_PERIODIC_DERIVATIVE_SAMPLES: usize = 65_536;
+const MAX_PERIODIC_DERIVATIVE_WORK: usize = 8_388_608;
 const DIGEST_DOMAIN: &[u8] = b"symthaea.akpd.pulse-candidate.v0.1\0";
 
 /// Errors returned while parsing, validating or enumerating probe contracts.
@@ -144,6 +146,10 @@ pub enum ContractError {
     InvalidSymplecticBasis,
     #[error("invalid coupled-mode authority contract: {0}")]
     InvalidCoupledModeAuthority(&'static str),
+    #[error("invalid periodic derivative configuration: {0}")]
+    InvalidPeriodicDerivativeConfig(&'static str),
+    #[error("periodic derivative work exceeds its bounded budget")]
+    PeriodicDerivativeWorkBudgetExceeded,
     #[error("invalid sensor/actuator timing field {field}: {reason}")]
     InvalidControlTimingField {
         field: &'static str,
@@ -2719,6 +2725,182 @@ pub struct MaxwellDelayCancellationObservation {
     pub interval_mean_current_transverse: Vec<f64>,
     pub interval_mean_gradient_electric_transverse: Vec<f64>,
     pub interval_mean_gradient_magnetic_transverse: Vec<f64>,
+}
+
+/// Configuration for a periodic, uniform-grid Fourier derivative estimator.
+///
+/// The regularizer is W_k = 1 / (1 + lambda * k^4), where k is the integer
+/// Fourier mode. measurement_noise_variance is an explicit white, independent
+/// sample-noise model; it is used only to predict the linear estimator output
+/// variance and is not inferred from the field samples.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PeriodicDerivativeConfig {
+    pub domain_length: f64,
+    pub maximum_harmonic: usize,
+    pub tikhonov_strength: f64,
+    pub measurement_noise_variance: f64,
+}
+
+/// Periodic spectral derivative and its linear white-noise amplification report.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct PeriodicDerivativeEstimate {
+    pub derivative: Vec<f64>,
+    pub filter_weights: Vec<f64>,
+    /// Variance gain G such that white sample noise variance sigma^2 maps to
+    /// predicted derivative variance sigma^2 * G under the documented DFT convention.
+    pub white_noise_variance_gain: f64,
+    pub predicted_white_noise_variance: f64,
+    pub sample_count: usize,
+    pub maximum_harmonic: usize,
+}
+
+/// Estimate a periodic spatial derivative from uniformly sampled real data.
+///
+/// The input grid is x_j = j*L/N on a declared periodic interval of length L.
+/// The mean/DC component is omitted from differentiation. A truncated real
+/// Fourier series is reconstructed and differentiated analytically. The
+/// regularizer W_k = 1/(1+lambda*k^4) is applied symmetrically to positive and
+/// negative modes. The Nyquist mode is excluded because its real collocation
+/// derivative is not represented by a unique sine/cosine pair.
+///
+/// For independent, zero-mean white sample noise with variance sigma^2, this
+/// estimator has output variance sigma^2 * (2/N) * sum_k (2*pi*k/L)^2 W_k^2.
+/// Correlated noise, nonuniform grids, open boundaries and unresolved physical
+/// bandwidth are outside this contract.
+pub fn estimate_periodic_derivative(
+    samples: &[f64],
+    config: PeriodicDerivativeConfig,
+) -> Result<PeriodicDerivativeEstimate, ContractError> {
+    let sample_count = samples.len();
+    if !(3..=MAX_PERIODIC_DERIVATIVE_SAMPLES).contains(&sample_count) {
+        return Err(ContractError::InvalidPeriodicDerivativeConfig(
+            "sample count must be between 3 and the bounded maximum",
+        ));
+    }
+    if samples.iter().any(|value| !value.is_finite()) {
+        return Err(ContractError::InvalidPeriodicDerivativeConfig(
+            "all periodic field samples must be finite",
+        ));
+    }
+    if !config.domain_length.is_finite() || config.domain_length <= 0.0 {
+        return Err(ContractError::InvalidPeriodicDerivativeConfig(
+            "domain length must be finite and positive",
+        ));
+    }
+    if config.maximum_harmonic == 0 || config.maximum_harmonic > (sample_count - 1) / 2 {
+        return Err(ContractError::InvalidPeriodicDerivativeConfig(
+            "maximum harmonic must be positive and strictly below the Nyquist mode",
+        ));
+    }
+    if !config.tikhonov_strength.is_finite() || config.tikhonov_strength < 0.0 {
+        return Err(ContractError::InvalidPeriodicDerivativeConfig(
+            "Tikhonov strength must be finite and non-negative",
+        ));
+    }
+    if !config.measurement_noise_variance.is_finite()
+        || config.measurement_noise_variance < 0.0
+    {
+        return Err(ContractError::InvalidPeriodicDerivativeConfig(
+            "white measurement-noise variance must be finite and non-negative",
+        ));
+    }
+    let transform_work = sample_count
+        .checked_mul(config.maximum_harmonic)
+        .and_then(|work| work.checked_mul(2))
+        .ok_or(ContractError::PeriodicDerivativeWorkBudgetExceeded)?;
+    if transform_work > MAX_PERIODIC_DERIVATIVE_WORK {
+        return Err(ContractError::PeriodicDerivativeWorkBudgetExceeded);
+    }
+
+    let mut cosine_coefficients = Vec::with_capacity(config.maximum_harmonic);
+    let mut sine_coefficients = Vec::with_capacity(config.maximum_harmonic);
+    let mut filter_weights = Vec::with_capacity(config.maximum_harmonic);
+    let mut white_noise_variance_gain = 0.0_f64;
+    let mut gain_compensation = 0.0_f64;
+
+    for harmonic in 1..=config.maximum_harmonic {
+        let k_squared = (harmonic as f64) * (harmonic as f64);
+        let penalty = config.tikhonov_strength * k_squared * k_squared;
+        let denominator = 1.0 + penalty;
+        if !denominator.is_finite() || denominator <= 0.0 {
+            return Err(ContractError::InvalidPeriodicDerivativeConfig(
+                "regularization filter arithmetic overflowed",
+            ));
+        }
+        let weight = 1.0 / denominator;
+        let mut cosine_sum = 0.0_f64;
+        let mut cosine_compensation = 0.0_f64;
+        let mut sine_sum = 0.0_f64;
+        let mut sine_compensation = 0.0_f64;
+
+        for (sample_index, sample) in samples.iter().enumerate() {
+            let phase = TAU * harmonic as f64 * sample_index as f64 / sample_count as f64;
+            kahan_add(*sample * phase.cos(), &mut cosine_sum, &mut cosine_compensation);
+            kahan_add(*sample * phase.sin(), &mut sine_sum, &mut sine_compensation);
+        }
+
+        let cosine_coefficient = (2.0 / sample_count as f64) * cosine_sum * weight;
+        let sine_coefficient = (2.0 / sample_count as f64) * sine_sum * weight;
+        if !cosine_coefficient.is_finite() || !sine_coefficient.is_finite() {
+            return Err(ContractError::InvalidPeriodicDerivativeConfig(
+                "Fourier coefficient arithmetic produced a non-finite value",
+            ));
+        }
+        cosine_coefficients.push(cosine_coefficient);
+        sine_coefficients.push(sine_coefficient);
+        filter_weights.push(weight);
+
+        let angular_frequency = TAU * harmonic as f64 / config.domain_length;
+        let gain_term = (2.0 / sample_count as f64)
+            * angular_frequency
+            * angular_frequency
+            * weight
+            * weight;
+        if !gain_term.is_finite() {
+            return Err(ContractError::InvalidPeriodicDerivativeConfig(
+                "white-noise gain arithmetic produced a non-finite value",
+            ));
+        }
+        kahan_add(gain_term, &mut white_noise_variance_gain, &mut gain_compensation);
+    }
+
+    let mut derivative = Vec::with_capacity(sample_count);
+    for sample_index in 0..sample_count {
+        let mut value = 0.0_f64;
+        let mut compensation = 0.0_f64;
+        for harmonic_index in 0..config.maximum_harmonic {
+            let harmonic = (harmonic_index + 1) as f64;
+            let phase = TAU * harmonic * sample_index as f64 / sample_count as f64;
+            let angular_frequency = TAU * harmonic / config.domain_length;
+            let mode_derivative = angular_frequency
+                * (-cosine_coefficients[harmonic_index] * phase.sin()
+                    + sine_coefficients[harmonic_index] * phase.cos());
+            kahan_add(mode_derivative, &mut value, &mut compensation);
+        }
+        if !value.is_finite() {
+            return Err(ContractError::InvalidPeriodicDerivativeConfig(
+                "reconstructed derivative is non-finite",
+            ));
+        }
+        derivative.push(value);
+    }
+
+    let predicted_white_noise_variance =
+        config.measurement_noise_variance * white_noise_variance_gain;
+    if !white_noise_variance_gain.is_finite() || !predicted_white_noise_variance.is_finite() {
+        return Err(ContractError::InvalidPeriodicDerivativeConfig(
+            "predicted white-noise variance is non-finite",
+        ));
+    }
+
+    Ok(PeriodicDerivativeEstimate {
+        derivative,
+        filter_weights,
+        white_noise_variance_gain,
+        predicted_white_noise_variance,
+        sample_count,
+        maximum_harmonic: config.maximum_harmonic,
+    })
 }
 
 /// Time-stamped current and transverse field-gradient history over a delay window.
@@ -6817,6 +6999,187 @@ mod tests {
             gradient_electric_transverse: vec![vec![2.0, -2.0], vec![1.5, -1.5], vec![0.0, 0.0]],
             gradient_magnetic_transverse: vec![vec![0.0, 1.0], vec![0.5, 1.25], vec![2.0, 2.0]],
         }
+    }
+
+    fn periodic_derivative_config(
+        sample_count: usize,
+        maximum_harmonic: usize,
+        tikhonov_strength: f64,
+        measurement_noise_variance: f64,
+    ) -> PeriodicDerivativeConfig {
+        assert!(sample_count >= 3);
+        PeriodicDerivativeConfig {
+            domain_length: 2.5,
+            maximum_harmonic,
+            tikhonov_strength,
+            measurement_noise_variance,
+        }
+    }
+
+    #[test]
+    fn periodic_derivative_recovers_manufactured_fourier_modes() {
+        let sample_count = 33;
+        let length = 2.5;
+        let samples = (0..sample_count)
+            .map(|index| {
+                let phase = TAU * index as f64 / sample_count as f64;
+                1.7 * (2.0 * phase).cos() - 0.35 * (3.0 * phase).sin() + 4.2
+            })
+            .collect::<Vec<_>>();
+        let estimate = estimate_periodic_derivative(
+            &samples,
+            periodic_derivative_config(sample_count, 4, 0.0, 0.0),
+        )
+        .unwrap();
+        for (index, derivative) in estimate.derivative.iter().enumerate() {
+            let phase = TAU * index as f64 / sample_count as f64;
+            let expected = -1.7 * (2.0 * TAU / length) * (2.0 * phase).sin()
+                - 0.35 * (3.0 * TAU / length) * (3.0 * phase).cos();
+            assert!((derivative - expected).abs() < 1.0e-11);
+        }
+        assert!(estimate.white_noise_variance_gain.is_finite());
+        assert_eq!(estimate.filter_weights, vec![1.0; 4]);
+    }
+
+    #[test]
+    fn periodic_derivative_reports_the_analytic_white_noise_gain() {
+        let sample_count = 9;
+        let config = periodic_derivative_config(sample_count, 3, 0.25, 0.04);
+        let samples = vec![0.0; sample_count];
+        let estimate = estimate_periodic_derivative(&samples, config).unwrap();
+        let expected_gain = (1..=3)
+            .map(|harmonic| {
+                let k = harmonic as f64;
+                let weight = 1.0 / (1.0 + 0.25 * k.powi(4));
+                (2.0 / sample_count as f64)
+                    * (TAU * k / config.domain_length).powi(2)
+                    * weight.powi(2)
+            })
+            .sum::<f64>();
+        assert!((estimate.white_noise_variance_gain - expected_gain).abs() < 1.0e-12);
+        assert!(
+            (estimate.predicted_white_noise_variance
+                - config.measurement_noise_variance * expected_gain)
+                .abs()
+                < 1.0e-12
+        );
+        assert!(estimate.derivative.iter().all(|value| value.abs() < 1.0e-12));
+    }
+
+    #[test]
+    fn periodic_derivative_regularization_reduces_white_noise_gain() {
+        let samples = (0..33)
+            .map(|index| {
+                let phase = TAU * index as f64 / 33.0;
+                (9.0 * phase).sin() + 0.1 * (2.0 * phase).cos()
+            })
+            .collect::<Vec<_>>();
+        let raw = estimate_periodic_derivative(
+            &samples,
+            periodic_derivative_config(33, 12, 0.0, 0.2),
+        )
+        .unwrap();
+        let regularized = estimate_periodic_derivative(
+            &samples,
+            periodic_derivative_config(33, 12, 0.5, 0.2),
+        )
+        .unwrap();
+        assert!(regularized.white_noise_variance_gain < raw.white_noise_variance_gain);
+        assert!(regularized.predicted_white_noise_variance < raw.predicted_white_noise_variance);
+        assert!(regularized
+            .filter_weights
+            .iter()
+            .zip(&raw.filter_weights)
+            .all(|(filtered, unfiltered)| filtered <= unfiltered));
+    }
+
+    #[test]
+    fn periodic_derivative_is_equivariant_to_cyclic_grid_translations() {
+        let sample_count = 31;
+        let samples = (0..sample_count)
+            .map(|index| {
+                let phase = TAU * index as f64 / sample_count as f64;
+                0.8 * phase.cos() + 0.4 * (3.0 * phase).sin()
+            })
+            .collect::<Vec<_>>();
+        let shifted = samples
+            .iter()
+            .cycle()
+            .skip(7)
+            .take(sample_count)
+            .copied()
+            .collect::<Vec<_>>();
+        let config = periodic_derivative_config(sample_count, 8, 0.03, 0.1);
+        let base = estimate_periodic_derivative(&samples, config).unwrap();
+        let translated = estimate_periodic_derivative(&shifted, config).unwrap();
+        for index in 0..sample_count {
+            let translated_index = (index + sample_count - 7) % sample_count;
+            assert!(
+                (base.derivative[index] - translated.derivative[translated_index]).abs()
+                    < 1.0e-10
+            );
+        }
+    }
+
+    #[test]
+    fn periodic_derivative_rejects_invalid_grid_noise_and_work_budgets() {
+        let samples = vec![0.0; 8];
+        assert!(matches!(
+            estimate_periodic_derivative(
+                &samples,
+                PeriodicDerivativeConfig {
+                    domain_length: 0.0,
+                    maximum_harmonic: 1,
+                    tikhonov_strength: 0.0,
+                    measurement_noise_variance: 0.0,
+                }
+            ),
+            Err(ContractError::InvalidPeriodicDerivativeConfig(_))
+        ));
+        assert!(matches!(
+            estimate_periodic_derivative(
+                &samples,
+                periodic_derivative_config(8, 4, 0.0, 0.0)
+            ),
+            Err(ContractError::InvalidPeriodicDerivativeConfig(_))
+        ));
+        assert!(matches!(
+            estimate_periodic_derivative(
+                &samples,
+                periodic_derivative_config(8, 1, -0.1, 0.0)
+            ),
+            Err(ContractError::InvalidPeriodicDerivativeConfig(_))
+        ));
+        assert!(matches!(
+            estimate_periodic_derivative(
+                &samples,
+                periodic_derivative_config(8, 1, 0.0, f64::NAN)
+            ),
+            Err(ContractError::InvalidPeriodicDerivativeConfig(_))
+        ));
+        let mut non_finite = samples.clone();
+        non_finite[2] = f64::INFINITY;
+        assert!(matches!(
+            estimate_periodic_derivative(
+                &non_finite,
+                periodic_derivative_config(8, 1, 0.0, 0.0)
+            ),
+            Err(ContractError::InvalidPeriodicDerivativeConfig(_))
+        ));
+        let maximum_samples = MAX_PERIODIC_DERIVATIVE_SAMPLES;
+        let excessive = vec![0.0; maximum_samples];
+        assert_eq!(
+            estimate_periodic_derivative(
+                &excessive,
+                periodic_derivative_config(
+                    maximum_samples,
+                    (maximum_samples - 1) / 2,
+                    0.0,
+                    0.0
+                )
+            ),
+            Err(ContractError::PeriodicDerivativeWorkBudgetExceeded)
+        );
     }
 
     #[test]
