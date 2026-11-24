@@ -318,7 +318,8 @@ fn derive_difference_covariance(
             let second_a = second_hypothesis * observable_count + a;
             let second_b = second_hypothesis * observable_count + b;
             *value = joint[first_a][first_b] + joint[second_a][second_b]
-                - joint[first_a][second_b] - joint[second_a][first_b];
+                - joint[first_a][second_b]
+                - joint[second_a][first_b];
         }
     }
     difference
@@ -529,7 +530,10 @@ fn validate_input(input: &CovarianceAwareDesignInput) -> Result<(), CovarianceDe
             )));
         }
         if experiment.observables.len() > MAX_OBSERVABLES
-            || experiment.observables.len().saturating_mul(input.hypothesis_ids.len())
+            || experiment
+                .observables
+                .len()
+                .saturating_mul(input.hypothesis_ids.len())
                 > MAX_JOINT_COVARIANCE_DIMENSION
         {
             return Err(CovarianceDesignError::InvalidInput(format!(
@@ -623,7 +627,12 @@ fn validate_input(input: &CovarianceAwareDesignInput) -> Result<(), CovarianceDe
                 "joint covariance must be {dimension}×{dimension} in {eid}"
             )));
         }
-        if covariance.covariance.iter().flatten().any(|value| !value.is_finite()) {
+        if covariance
+            .covariance
+            .iter()
+            .flatten()
+            .any(|value| !value.is_finite())
+        {
             return Err(CovarianceDesignError::InvalidCovariance(format!(
                 "joint covariance contains a non-finite entry in {eid}"
             )));
@@ -777,7 +786,10 @@ mod tests {
             hypothesis_order: vec!["H0".to_owned(), "H1".to_owned(), "H2".to_owned()],
             observable_order: vec!["scalar".to_owned()],
             covariance_matrix_digest_sha256: matrix_digest_sha256(&joint),
-            covariance_descriptor_digest_sha256: format!("{:x}", Sha256::digest(descriptor.as_bytes())),
+            covariance_descriptor_digest_sha256: format!(
+                "{:x}",
+                Sha256::digest(descriptor.as_bytes())
+            ),
             covariance_descriptor: descriptor,
             covariance: joint,
         };
@@ -798,13 +810,25 @@ mod tests {
     #[test]
     fn duplicated_observable_does_not_increase_the_score() {
         let report = rank_covariance_aware_experiments(&covariance_redundancy_fixture()).unwrap();
-        let base = report.ranked_experiments.iter()
-            .find(|x| x.experiment_id == "base_two_observables").unwrap();
-        let redundant = report.ranked_experiments.iter()
-            .find(|x| x.experiment_id == "with_exact_redundant_sum").unwrap();
-        assert!((base.worst_case_separation_squared - redundant.worst_case_separation_squared).abs() < 1.0e-10);
+        let base = report
+            .ranked_experiments
+            .iter()
+            .find(|x| x.experiment_id == "base_two_observables")
+            .unwrap();
+        let redundant = report
+            .ranked_experiments
+            .iter()
+            .find(|x| x.experiment_id == "with_exact_redundant_sum")
+            .unwrap();
+        assert!(
+            (base.worst_case_separation_squared - redundant.worst_case_separation_squared).abs()
+                < 1.0e-10
+        );
         assert_eq!(1.0_f64.powi(2) / 1.0 + 2.0_f64.powi(2) / 1.0, 5.0);
-        assert_eq!(1.0_f64.powi(2) / 1.0 + 2.0_f64.powi(2) / 1.0 + 3.0_f64.powi(2) / 3.0, 8.0);
+        assert_eq!(
+            1.0_f64.powi(2) / 1.0 + 2.0_f64.powi(2) / 1.0 + 3.0_f64.powi(2) / 3.0,
+            8.0
+        );
     }
 
     #[test]
@@ -846,27 +870,33 @@ mod tests {
     #[test]
     fn diagonal_unit_rescaling_preserves_the_score() {
         let mut input = covariance_redundancy_fixture();
-        let experiment = input.experiments.iter_mut()
-            .find(|x| x.experiment_id == "base_two_observables").unwrap();
+        let experiment = input
+            .experiments
+            .iter_mut()
+            .find(|x| x.experiment_id == "base_two_observables")
+            .unwrap();
         experiment.observables[0].unit = "millibase-unit".to_owned();
         for prediction in &mut experiment.predictions {
             prediction.means[0] *= 1000.0;
         }
         let h = experiment.joint_output_covariance.hypothesis_order.len();
         let p = experiment.joint_output_covariance.observable_order.len();
-        let mut transform = vec![1.0; h*p];
+        let mut transform = vec![1.0; h * p];
         for hypothesis in 0..h {
-            transform[hypothesis*p] = 1000.0;
+            transform[hypothesis * p] = 1000.0;
         }
-        for i in 0..h*p {
-            for j in 0..h*p {
+        for i in 0..h * p {
+            for j in 0..h * p {
                 experiment.joint_output_covariance.covariance[i][j] *= transform[i] * transform[j];
             }
         }
         rehash_joint(experiment);
         let report = rank_covariance_aware_experiments(&input).unwrap();
-        let score = report.ranked_experiments.iter()
-            .find(|x| x.experiment_id == "base_two_observables").unwrap()
+        let score = report
+            .ranked_experiments
+            .iter()
+            .find(|x| x.experiment_id == "base_two_observables")
+            .unwrap()
             .worst_case_separation_squared;
         assert!((score - 4.0).abs() < 1.0e-10);
     }
@@ -900,33 +930,36 @@ mod tests {
     #[test]
     fn invertible_observable_basis_change_preserves_the_score() {
         let mut input = covariance_redundancy_fixture();
-        let experiment = input.experiments.iter_mut()
-            .find(|x| x.experiment_id == "base_two_observables").unwrap();
+        let experiment = input
+            .experiments
+            .iter_mut()
+            .find(|x| x.experiment_id == "base_two_observables")
+            .unwrap();
         // A = [[2, 1], [-1, 1]], det(A) = 3.
         let a = [[2.0, 1.0], [-1.0, 1.0]];
         for prediction in &mut experiment.predictions {
             let x = prediction.means[0];
             let y = prediction.means[1];
-            prediction.means = vec![a[0][0]*x + a[0][1]*y, a[1][0]*x + a[1][1]*y];
+            prediction.means = vec![a[0][0] * x + a[0][1] * y, a[1][0] * x + a[1][1] * y];
         }
         experiment.observables[0].unit = "basis-row-1".to_owned();
         experiment.observables[1].unit = "basis-row-2".to_owned();
 
         let h = experiment.joint_output_covariance.hypothesis_order.len();
-        let mut transform = vec![vec![0.0; 2*h]; 2*h];
+        let mut transform = vec![vec![0.0; 2 * h]; 2 * h];
         for hypothesis in 0..h {
             for row in 0..2 {
                 for column in 0..2 {
-                    transform[hypothesis*2+row][hypothesis*2+column] = a[row][column];
+                    transform[hypothesis * 2 + row][hypothesis * 2 + column] = a[row][column];
                 }
             }
         }
         let gamma = experiment.joint_output_covariance.covariance.clone();
-        let mut transformed = vec![vec![0.0; 2*h]; 2*h];
-        for i in 0..2*h {
-            for j in 0..2*h {
-                for k in 0..2*h {
-                    for l in 0..2*h {
+        let mut transformed = vec![vec![0.0; 2 * h]; 2 * h];
+        for i in 0..2 * h {
+            for j in 0..2 * h {
+                for k in 0..2 * h {
+                    for l in 0..2 * h {
                         transformed[i][j] += transform[i][k] * gamma[k][l] * transform[j][l];
                     }
                 }
@@ -936,8 +969,11 @@ mod tests {
         rehash_joint(experiment);
 
         let report = rank_covariance_aware_experiments(&input).unwrap();
-        let score = report.ranked_experiments.iter()
-            .find(|x| x.experiment_id == "base_two_observables").unwrap()
+        let score = report
+            .ranked_experiments
+            .iter()
+            .find(|x| x.experiment_id == "base_two_observables")
+            .unwrap()
             .worst_case_separation_squared;
         assert!((score - 4.0).abs() < 1.0e-10);
     }
@@ -946,8 +982,11 @@ mod tests {
     fn singular_joint_covariance_outside_difference_support_is_quarantined() {
         let mut input = covariance_redundancy_fixture();
         let experiment = &mut input.experiments[0];
-        experiment.predictions.iter_mut()
-            .find(|prediction| prediction.hypothesis_id == "H1").unwrap()
+        experiment
+            .predictions
+            .iter_mut()
+            .find(|prediction| prediction.hypothesis_id == "H1")
+            .unwrap()
             .means = vec![1.0, 0.0];
         experiment.joint_output_covariance.covariance = vec![
             vec![0.0, 0.0, 0.0, 0.0],
@@ -958,16 +997,29 @@ mod tests {
         rehash_joint(experiment);
         let target = experiment.experiment_id.clone();
         let report = rank_covariance_aware_experiments(&input).unwrap();
-        assert!(report.ranked_experiments.iter().all(|x| x.experiment_id != target));
-        assert!(report.support_review_required.iter().any(|x| x.experiment_id == target));
+        assert!(
+            report
+                .ranked_experiments
+                .iter()
+                .all(|x| x.experiment_id != target)
+        );
+        assert!(
+            report
+                .support_review_required
+                .iter()
+                .any(|x| x.experiment_id == target)
+        );
     }
 
     #[test]
     fn singular_joint_covariance_inside_difference_support_is_scored() {
         let mut input = covariance_redundancy_fixture();
         let experiment = &mut input.experiments[0];
-        experiment.predictions.iter_mut()
-            .find(|prediction| prediction.hypothesis_id == "H1").unwrap()
+        experiment
+            .predictions
+            .iter_mut()
+            .find(|prediction| prediction.hypothesis_id == "H1")
+            .unwrap()
             .means = vec![1.0, 1.0];
         experiment.joint_output_covariance.covariance = vec![
             vec![0.0, 0.0, 0.0, 0.0],
@@ -978,8 +1030,11 @@ mod tests {
         rehash_joint(experiment);
         let target = experiment.experiment_id.clone();
         let report = rank_covariance_aware_experiments(&input).unwrap();
-        let score = report.ranked_experiments.iter()
-            .find(|x| x.experiment_id == target).unwrap()
+        let score = report
+            .ranked_experiments
+            .iter()
+            .find(|x| x.experiment_id == target)
+            .unwrap()
             .worst_case_separation_squared;
         assert!((score - 1.0).abs() < 1.0e-10);
     }
@@ -1011,14 +1066,20 @@ mod tests {
     #[test]
     fn joint_covariance_order_dimensions_and_finiteness_are_validated() {
         let mut wrong_order = covariance_redundancy_fixture();
-        wrong_order.experiments[0].joint_output_covariance.hypothesis_order.reverse();
+        wrong_order.experiments[0]
+            .joint_output_covariance
+            .hypothesis_order
+            .reverse();
         assert!(matches!(
             rank_covariance_aware_experiments(&wrong_order),
             Err(CovarianceDesignError::InvalidInput(_))
         ));
 
         let mut wrong_shape = covariance_redundancy_fixture();
-        wrong_shape.experiments[0].joint_output_covariance.covariance.pop();
+        wrong_shape.experiments[0]
+            .joint_output_covariance
+            .covariance
+            .pop();
         rehash_joint(&mut wrong_shape.experiments[0]);
         assert!(matches!(
             rank_covariance_aware_experiments(&wrong_shape),
