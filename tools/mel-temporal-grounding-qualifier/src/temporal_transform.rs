@@ -280,12 +280,12 @@ pub fn validate_map(view_map: &TemporalViewMapV1) -> Result<(), String> {
         if segment.canonical_end_frame > view_map.source_artifact.total_frames {
             return Err(format!("view map segment {index} exceeds canonical source duration"));
         }
-        if let Some(previous_end) = previous_canonical_end {
-            if segment.canonical_start_frame != previous_end {
-                return Err(format!(
-                    "view map segment {index} is not contiguous and monotonic in canonical time"
-                ));
-            }
+        if let Some(previous_end) = previous_canonical_end
+            && segment.canonical_start_frame != previous_end
+        {
+            return Err(format!(
+                "view map segment {index} is not contiguous and monotonic in canonical time"
+            ));
         }
         expected_view_start = segment.view_end_frame;
         previous_canonical_end = Some(segment.canonical_end_frame);
@@ -335,11 +335,11 @@ fn map_interval_list(
                 start_frame: canonical_start,
                 end_frame: canonical_end,
             };
-            if let Some(previous) = pieces.last_mut() {
-                if previous.end_frame >= piece.start_frame {
-                    previous.end_frame = previous.end_frame.max(piece.end_frame);
-                    continue;
-                }
+            if let Some(previous) = pieces.last_mut()
+                && previous.end_frame >= piece.start_frame
+            {
+                previous.end_frame = previous.end_frame.max(piece.end_frame);
+                continue;
             }
             pieces.push(piece);
         }
