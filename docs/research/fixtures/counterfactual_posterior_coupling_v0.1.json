@@ -1,0 +1,434 @@
+{
+  "schema_version": "pcir-fixtures-v0.1",
+  "protocol": "Posterior-Coupled Individual Rollouts",
+  "status": "semantic_fixtures_only",
+  "purpose": "Exercise the stable-individual posterior coupling contract independently of model implementation.",
+  "definitions": {
+    "stable_individual_draw": "One posterior hypothesis about one fixed individual, sampled from q(u_i | factual_history).",
+    "sibling_action_bundle": "All required intervention branches for one individual and one stable_individual_draw_id.",
+    "paired_effect": "Utility(action_a, same_draw) minus Utility(action_b, same_draw).",
+    "epistemic_uncertainty": "Posterior uncertainty over the same individual's stable characteristics.",
+    "aleatoric_uncertainty": "Time-varying process/environment disturbances; shared only under explicit event correspondence."
+  },
+  "admission_invariants": [
+    "For each individual and posterior_draw_id, every required sibling action uses the same posterior_draw_digest.",
+    "Factual history, restored branch point, task, model, utility scale, seed scope and evaluation split are frozen across sibling actions.",
+    "Branch-local endogenous states may diverge after action application.",
+    "Exogenous events are coupled only when the task-specific correspondence contract admits them.",
+    "Missing or mismatched sibling branches produce UNKNOWN or REJECTED, never zero effect.",
+    "All branches and posterior draws for one individual remain in one split and one statistical cluster.",
+    "Stable individual traits and the time-indexed exogenous disturbance realization are components of the full exogenous draw and remain coupled across sibling actions.",
+    "A stochastic task without verified shared exogenous-source/event correspondence cannot claim the same-u individual-effect estimand; it must return UNKNOWN or use a separately labelled distributional estimand."
+  ],
+  "fixtures": [
+    {
+      "id": "PCIR-F1-SHARED-STABLE-DRAW",
+      "purpose": "Accept valid sibling branches with one shared stable-parameter draw.",
+      "input": {
+        "individual_id": "unit-001",
+        "posterior_draw_id": "draw-0007",
+        "posterior_draw_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+        "branches": [
+          {
+            "action_id": "a0",
+            "posterior_draw_id": "draw-0007",
+            "posterior_draw_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+            "branch_state_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "action_id": "a1",
+            "posterior_draw_id": "draw-0007",
+            "posterior_draw_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+            "branch_state_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        ]
+      },
+      "expected": "ACCEPT",
+      "reason": "The same individual hypothesis is used by both actions; branch-local post-action state is allowed to differ."
+    },
+    {
+      "id": "PCIR-F2-CROSS-BRANCH-DRAW-MISMATCH",
+      "purpose": "Reject independently sampled stable parameters for a paired individual-effect estimate.",
+      "input": {
+        "individual_id": "unit-001",
+        "branches": [
+          {
+            "action_id": "a0",
+            "posterior_draw_id": "draw-0007",
+            "posterior_draw_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777"
+          },
+          {
+            "action_id": "a1",
+            "posterior_draw_id": "draw-0008",
+            "posterior_draw_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+          }
+        ]
+      },
+      "expected": "REJECT",
+      "reason": "The branches no longer represent alternative actions for the same posterior hypothesis."
+    },
+    {
+      "id": "PCIR-F3-BRANCH-DIVERGENCE-ALLOWED",
+      "purpose": "Ensure the validator does not force identical post-action endogenous trajectories.",
+      "input": {
+        "individual_id": "unit-001",
+        "posterior_draw_id": "draw-0007",
+        "posterior_draw_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+        "branches": [
+          {
+            "action_id": "a0",
+            "posterior_draw_id": "draw-0007",
+            "posterior_draw_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+            "branch_state_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          },
+          {
+            "action_id": "a1",
+            "posterior_draw_id": "draw-0007",
+            "posterior_draw_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+            "branch_state_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          }
+        ]
+      },
+      "expected": "ACCEPT",
+      "reason": "Stable individual parameters are shared; action-driven dynamics are distinct."
+    },
+    {
+      "id": "PCIR-F4-MULTIMODAL-EFFECT",
+      "purpose": "Prevent a symmetric posterior effect distribution from being reported only as a zero mean.",
+      "input": {
+        "individual_id": "unit-002",
+        "posterior_effect_samples": [
+          -10,
+          10
+        ],
+        "sample_weights": [
+          0.5,
+          0.5
+        ],
+        "posterior_mean": 0,
+        "posterior_support": [
+          -10,
+          10
+        ],
+        "mass_below_zero": 0.5,
+        "mass_above_zero": 0.5
+      },
+      "expected": "RETAIN_DISTRIBUTION",
+      "reason": "A zero posterior mean hides sign ambiguity and nontrivial individual-effect magnitude."
+    },
+    {
+      "id": "PCIR-F5-ALEATORIC-CORRESPONDENCE-SEPARATE",
+      "purpose": "Do not treat stable posterior coupling as proof that stochastic events correspond.",
+      "input": {
+        "stable_parameter_draw_shared": true,
+        "task_is_stochastic": true,
+        "event_correspondence_receipt": null
+      },
+      "expected": "UNKNOWN_EVENT_PAIRING",
+      "reason": "The same hidden individual draw does not authenticate shared random events."
+    },
+    {
+      "id": "PCIR-F6-DETERMINISTIC-TASK-NO-STOCHASTIC-RECEIPT",
+      "purpose": "Avoid inventing stochastic verifier requirements for deterministic tasks.",
+      "input": {
+        "stable_parameter_draw_shared": true,
+        "task_is_stochastic": false,
+        "event_correspondence_receipt": null
+      },
+      "expected": "ACCEPT_STABLE_DRAW_SCOPE",
+      "reason": "No stochastic correspondence proof is required where the declared task has no stochastic draw domain."
+    },
+    {
+      "id": "PCIR-F7-MISSING-POSTERIOR-SUPPORT",
+      "purpose": "Refuse a precise point estimate when the target lies outside posterior support or the support is unavailable.",
+      "input": {
+        "posterior_support_available": false,
+        "posterior_draw_count": 0,
+        "requested_action_pair": [
+          "a0",
+          "a1"
+        ]
+      },
+      "expected": "UNKNOWN_INSUFFICIENT_SUPPORT",
+      "reason": "No posterior support cannot be converted into zero uncertainty."
+    },
+    {
+      "id": "PCIR-F8-DUPLICATE-OR-INCOMPLETE-BRANCH",
+      "purpose": "Reject duplicate and incomplete sibling action coverage.",
+      "input": {
+        "required_actions": [
+          "a0",
+          "a1",
+          "a2"
+        ],
+        "observed_actions": [
+          "a0",
+          "a1",
+          "a1"
+        ],
+        "posterior_draw_id": "draw-0009"
+      },
+      "expected": "REJECT",
+      "reason": "The bundle contains a duplicate action and omits a required branch."
+    },
+    {
+      "id": "PCIR-F9-SPLIT-LEAKAGE",
+      "purpose": "Reject posterior draws or sibling branches split across data partitions.",
+      "input": {
+        "individual_id": "unit-003",
+        "branch_splits": [
+          "train",
+          "test"
+        ],
+        "posterior_draw_splits": [
+          "train",
+          "test"
+        ]
+      },
+      "expected": "REJECT_SPLIT_LEAKAGE",
+      "reason": "The evaluation unit is the individual with its complete branch family, not a single pair row."
+    },
+    {
+      "id": "PCIR-F10-POSTERIOR-UPDATE-CHANGES-INDIVIDUAL",
+      "purpose": "Prevent branch-specific filtering from silently substituting another stable individual draw.",
+      "input": {
+        "initial_posterior_draw_id": "draw-0010",
+        "branch_a_stable_draw_id": "draw-0010",
+        "branch_b_stable_draw_id": "draw-0011"
+      },
+      "expected": "REJECT",
+      "reason": "Branch-local beliefs may update, but the paired sample's underlying stable-individual hypothesis remains fixed."
+    },
+    {
+      "id": "PCIR-F11-PAIRED-VARIANCE-KNOWN-ANSWER",
+      "purpose": "Show the exact variance inflation caused by independently sampling stable individual parameters across sibling interventions.",
+      "input": {
+        "posterior_support": [
+          -1,
+          1
+        ],
+        "sample_weights": [
+          0.5,
+          0.5
+        ],
+        "outcome_equations": {
+          "action_a0": "Y=5u",
+          "action_a1": "Y=7u"
+        },
+        "matched_same_u_effect_samples": [
+          -2,
+          2
+        ],
+        "independently_sampled_cross_branch_effect_samples": [
+          -12,
+          -2,
+          2,
+          12
+        ],
+        "matched_same_u_effect_population_variance": 4,
+        "independently_sampled_cross_branch_effect_population_variance": 74
+      },
+      "expected": "PRESERVE_PAIRED_VARIANCE",
+      "reason": "Population variance is calculated under the equally weighted posterior support, not as an unbiased sample variance. Independent branch draws mix variation in stable individual identity into the treatment contrast."
+    },
+    {
+      "id": "PCIR-F12-OUTER-CAUSAL-MECHANISM-AMBIGUITY",
+      "purpose": "Boundary control: when factual-compatible model profiles imply opposite individual effects, preserve structural ambiguity for the existing #10372 support/identification contract.",
+      "input": {
+        "factual_history_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "candidate_models": [
+          {
+            "model_id": "M1",
+            "factual_adequacy": "PASS",
+            "individual_effect_support": [
+              4,
+              4
+            ]
+          },
+          {
+            "model_id": "M2",
+            "factual_adequacy": "PASS",
+            "individual_effect_support": [
+              -4,
+              -4
+            ]
+          }
+        ],
+        "posterior_weights": null
+      },
+      "expected": "STRUCTURAL_AMBIGUITY_REMAINS",
+      "reason": "PCIR must not average model disagreement into a point estimate or duplicate the #10372 identified-set disposition logic."
+    },
+    {
+      "id": "PCIR-F13-FULL-EXOGENOUS-DRAW-COUPLED",
+      "purpose": "Accept different branch-local endogenous trajectories while preserving the same complete SCM exogenous draw.",
+      "input": {
+        "individual_id": "unit-004",
+        "posterior_draw_id": "draw-0013",
+        "full_exogenous_draw_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "stochastic_task": true,
+        "event_correspondence_receipt": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "branches": [
+          {
+            "action_id": "a0",
+            "full_exogenous_draw_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "branch_state_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+          },
+          {
+            "action_id": "a1",
+            "full_exogenous_draw_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "branch_state_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+          }
+        ]
+      },
+      "expected": "ACCEPT",
+      "reason": "The full exogenous realization is shared, while action-dependent endogenous states may differ."
+    },
+    {
+      "id": "PCIR-F14-UNCOUPLED-STOCHASTIC-POTENTIAL-OUTCOMES",
+      "purpose": "Refuse an exact same-individual counterfactual claim when stochastic branches use unrelated exogenous realizations.",
+      "input": {
+        "individual_id": "unit-005",
+        "stochastic_task": true,
+        "branches": [
+          {
+            "action_id": "a0",
+            "full_exogenous_draw_digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+          },
+          {
+            "action_id": "a1",
+            "full_exogenous_draw_digest": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+          }
+        ],
+        "event_correspondence_receipt": null
+      },
+      "expected": "UNKNOWN_SAME_U_ESTIMAND",
+      "reason": "Independent branch disturbances no longer represent two interventions under the same exogenous realization; only a separately defined distributional estimand remains available."
+    }
+  ],
+  "reported_metrics": [
+    "individual_effect_centred_mae_vs_zero",
+    "individual_effect_sign_accuracy",
+    "posterior_effect_interval_coverage",
+    "posterior_effect_interval_width",
+    "posterior_mass_below_zero",
+    "posterior_mass_above_zero",
+    "latent_abducible_share",
+    "rollout_abducible_share",
+    "decision_regret",
+    "common_epsilon_good_action_set",
+    "closed_loop_success_and_recovery",
+    "inference_latency_p50_p95_p99",
+    "measured_memory_and_energy",
+    "within_model_posterior_effect_variance",
+    "between_model_effect_disagreement",
+    "counterfactual_identified_set_width",
+    "full_exogenous_draw_coupling_rate",
+    "unpaired_stochastic_branch_rate"
+  ],
+  "comparators": [
+    "zero_effect",
+    "branch_point_only",
+    "point_estimate_stable_latent",
+    "independent_per_action_posterior_sampling_negative_control",
+    "hidden_parameter_oracle_simulator_reference",
+    "HDC_only",
+    "CfC_LTC_only",
+    "HDC_plus_CfC_LTC",
+    "matched_GRU_or_RSSM_when_reproducible",
+    "standard_RSSM_with_shared_branch_point_latent",
+    "direct_policy_without_world_model_rollouts",
+    "MRSQ_style_minimum_value_ensemble_search_control",
+    "Rollback_branch_and_backtracking_comparator",
+    "Causal_JEPA_object_masking_visual_comparator_where_applicable",
+    "World_In_World_closed_loop_benchmark",
+    "WorldArena_2_0_visuotactile_online_RL_and_real_robot_tracks"
+  ],
+  "ownership": {
+    "effect_arithmetic": "Symthaea #13520",
+    "DMC_environment_and_replication_boundary": "Symthaea #13530",
+    "temporal_representation": "Symthaea #13255/#13258",
+    "decision_sufficiency": "Symthaea #13239/#13152",
+    "episode_interval_calibration": "Symthaea #11655/#11659",
+    "robust_observation_support": "Symthaea #13202",
+    "cluster_inference": "Symthaea #8578",
+    "model_use_gate": "Symthaea #9029/#13413",
+    "branch_and_stochastic_evidence": "Symthaea #13375/#13377 and Symtropy #3741/#3743",
+    "evaluator_isolation": "Symthaea #9437",
+    "structural_support_and_cross_world_identification": "Symthaea #10372 (SAM-CF-SUPPORT-001); PCIR is an individual-conditioned evidence producer and must not duplicate this evaluator.",
+    "episode_specific_abduction_action_prediction": "Symthaea #10356 in its autonomous-driving scope.",
+    "matched_model_assisted_decision_value": "Symthaea #9010 in its CMAQ scope.",
+    "vehicle_cross_model_ranking_sensitivity": "Symthaea #10252 in its vehicle scope.",
+    "posterior_ambiguity_sets": "Symthaea #9781/#9788 (TV/OT posterior ambiguity; do not conflate with causal identified sets)."
+  },
+  "explicit_non_claims": [
+    "No posterior inference or HDC Bayesian encoder implemented.",
+    "No paired rollout trainer implemented.",
+    "No DMC replication or model benchmark executed.",
+    "No physical experiment or simulator result generated.",
+    "No SOTA or resource advantage demonstrated.",
+    "Semantic fixtures test the protocol only and are not hidden empirical qualification.",
+    "No outer posterior or complete admissible set over structural causal mechanisms is implemented; the mechanism-ambiguity fixture is a reserved future-boundary control.",
+    "A seed match alone does not authenticate same-u stochastic correspondence; stochastic pairing requires source/event mapping and replay evidence.",
+    "No separate structural support, cross-world assumption or set-identification evaluator is implemented; PCIR composes with existing SAM #10372/#10377."
+  ],
+  "prior_art_boundary": {
+    "same_exogenous_u": "Okita formalizes counterfactual pairs by holding the same individual-specific exogenous u and factual history fixed across interventions (Eq. 10). This is established semantics, not a PCIR novelty claim.",
+    "abduction_posterior": "Okita defines abduction as P(U | factual observations) and maps the RSSM posterior q_phi(z_t | h_t, o_t) to this role structurally; numerical correspondence between learned z and physical U is an empirical question.",
+    "pcir_scope": "An auditable Symthaea implementation/ablation protocol for explicit stable-trait posterior/sample identity versus a standard RSSM-style branch-point latent copied across sibling action branches.",
+    "required_control": "A9 standard RSSM-style posterior latent with identical branch-point deterministic/stochastic state cloned across sibling action branches.",
+    "dynamic_mechanism_bounds": "Haugh & Singal (ICML 2023) already optimize over possibly infinitely many mechanisms for upper/lower dynamic counterfactual bounds. A finite candidate model range is only empirical unless completeness is certified; PCIR Section 13 is an integration proposal, not a novel bounds algorithm.",
+    "dynamic_mechanism_set_owner": "Use existing SAM #10372/#10377 for support, coupling assumptions and set-identification dispositions; PCIR must not create a parallel mechanism-ambiguity evaluator."
+  },
+  "prospective_qualification_targets": {
+    "status": "targets_not_achieved_results",
+    "environment_eligibility": {
+      "diagnostic": "reproduce DMC abducible share A and estimation floor phi on exact source formulation",
+      "certificate_convention": "A >= 3*phi",
+      "sensitivity_multipliers": [
+        2,
+        3,
+        4
+      ]
+    },
+    "rollout_retention": {
+      "metric": "A_pred / A_lat",
+      "target_minimum": 0.9,
+      "precondition": "A_lat is reliably measurable above its estimator floor"
+    },
+    "interval_calibration": {
+      "nominal_coverage": [
+        0.9,
+        0.95
+      ],
+      "report": [
+        "empirical cluster coverage",
+        "interval width",
+        "individual-stratum coverage",
+        "planner-selected coverage"
+      ]
+    },
+    "decision_value": {
+      "metric": "baseline regret minus PCIR regret",
+      "target": "positive paired held-out improvement with 95% individual-cluster interval excluding zero",
+      "matched_cost": true,
+      "hard_constraint_regressions_allowed": false
+    },
+    "resource_efficiency": {
+      "target": "Pareto improvement or explicitly reported tradeoff",
+      "metrics": [
+        "inference latency p50/p95/p99",
+        "model memory",
+        "posterior sampling cost",
+        "simulator calls",
+        "measured energy"
+      ]
+    }
+  },
+  "benchmark_reporting_policy": {
+    "no_cross_benchmark_score_pooling": true,
+    "report_per_benchmark_metrics_separately": true,
+    "mandatory_individual_cluster_resampling": true,
+    "all_interventions_histories_draws_of_an_individual_stay_in_one_split": true
+  }
+}
