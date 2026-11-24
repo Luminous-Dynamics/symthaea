@@ -1074,7 +1074,9 @@ mod tests {
         )
     }
 
-    fn input_from_selection(selection: MetrologyAuditSelectionReportV1) -> ContinuousMetrologyAuditInputV1 {
+    fn input_from_selection(
+        selection: MetrologyAuditSelectionReportV1,
+    ) -> ContinuousMetrologyAuditInputV1 {
         let predictions = predictions();
         let frame_id = "film-thickness-frame-2026w47".to_string();
         let frame_sha256 = compute_continuous_audit_frame_sha256_v1(
