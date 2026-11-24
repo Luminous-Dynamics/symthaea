@@ -1,5 +1,5 @@
 //! Finite metamorphic-pair validator for mathematical invariance/sensitivity.
- //!
+//!
  //! The finite oracle classifies equivalence relations only for the declared
  //! Boolean AST. It is not a Lean proof, theorem prover, or authority for
  //! arbitrary mathematical propositions.
@@ -12,8 +12,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 #[cfg(test)]
-const FIXTURE: &str =
-    include_str!("../../../../docs/research/MATH_METAMORPHIC_PAIR_V1.json");
+const FIXTURE: &str = include_str!("../../../../docs/research/MATH_METAMORPHIC_PAIR_V1.json");
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -123,10 +122,12 @@ fn as_implication(sequent: &BooleanSequent) -> BooleanFormula {
         .chain(sequent.premises.iter())
         .cloned()
         .collect::<Vec<_>>();
-    match antecedents.into_iter().reduce(|left, right| BooleanFormula::And {
-        left: Box::new(left),
-        right: Box::new(right),
-    }) {
+    match antecedents
+        .into_iter()
+        .reduce(|left, right| BooleanFormula::And {
+            left: Box::new(left),
+            right: Box::new(right),
+        }) {
         Some(antecedent) => BooleanFormula::Implies {
             left: Box::new(antecedent),
             right: Box::new(sequent.conclusion.clone()),
@@ -177,7 +178,9 @@ fn valid_sha256(value: &str) -> bool {
 
 fn validate_binding(binding: &StatementBindingV1, label: &str, errors: &mut Vec<String>) {
     if !valid_sha256(&binding.sequent_sha256) {
-        errors.push(format!("{label}.sequent_sha256 must be lowercase SHA-256 hex"));
+        errors.push(format!(
+            "{label}.sequent_sha256 must be lowercase SHA-256 hex"
+        ));
     } else {
         match sequent_sha256(&binding.sequent) {
             Ok(expected) if expected == binding.sequent_sha256 => {}
@@ -189,7 +192,9 @@ fn validate_binding(binding: &StatementBindingV1, label: &str, errors: &mut Vec<
     }
     if let Some(route) = &binding.proof_route_sha256 {
         if !valid_sha256(route) {
-            errors.push(format!("{label}.proof_route_sha256 must be lowercase SHA-256 hex"));
+            errors.push(format!(
+                "{label}.proof_route_sha256 must be lowercase SHA-256 hex"
+            ));
         }
     }
 }
@@ -215,19 +220,17 @@ pub fn validate_pair(pair: &MathMetamorphicPairV1) -> Vec<String> {
 
     if let Some(evaluator) = &pair.evaluator_only {
         if evaluator.adjudication_authority != "finite_boolean_truth_table" {
-            errors.push(
-                "finite-only v1 requires finite_boolean_truth_table authority".to_owned(),
-            );
+            errors.push("finite-only v1 requires finite_boolean_truth_table authority".to_owned());
         }
         if evaluator.evidence_refs.is_empty()
-            || evaluator.evidence_refs.iter().any(|value| value.trim().is_empty())
+            || evaluator
+                .evidence_refs
+                .iter()
+                .any(|value| value.trim().is_empty())
         {
             errors.push("evaluator_only.evidence_refs must be non-empty".to_owned());
         }
-        let derived = match derive_relation(
-            &candidate.base.sequent,
-            &candidate.variant.sequent,
-        ) {
+        let derived = match derive_relation(&candidate.base.sequent, &candidate.variant.sequent) {
             Ok(relation) => relation,
             Err(error) => {
                 errors.push(format!("finite semantic check failed: {error}"));
@@ -288,10 +291,7 @@ pub fn validate_dataset(dataset: &MathMetamorphicDatasetV1) -> Vec<String> {
     let mut ids = std::collections::HashSet::new();
     for (index, pair) in dataset.pairs.iter().enumerate() {
         if !ids.insert(&pair.candidate.pair_id) {
-            errors.push(format!(
-                "duplicate pair_id: {}",
-                pair.candidate.pair_id
-            ));
+            errors.push(format!("duplicate pair_id: {}", pair.candidate.pair_id));
         }
         errors.extend(
             validate_pair(pair)
@@ -303,8 +303,8 @@ pub fn validate_dataset(dataset: &MathMetamorphicDatasetV1) -> Vec<String> {
 }
 
 pub fn parse_dataset(input: &str) -> Result<MathMetamorphicDatasetV1, String> {
-    let dataset: MathMetamorphicDatasetV1 =
-        serde_json::from_str(input).map_err(|error| format!("invalid MathMetamorphicDatasetV1 JSON: {error}"))?;
+    let dataset: MathMetamorphicDatasetV1 = serde_json::from_str(input)
+        .map_err(|error| format!("invalid MathMetamorphicDatasetV1 JSON: {error}"))?;
     let errors = validate_dataset(&dataset);
     if errors.is_empty() {
         Ok(dataset)
@@ -394,8 +394,7 @@ mod tests {
     fn route_only_change_requires_same_statement_and_distinct_route_receipts() {
         let mut dataset = fixture();
         let pair = &mut dataset.pairs[2];
-        pair.candidate.variant.proof_route_sha256 =
-            pair.candidate.base.proof_route_sha256.clone();
+        pair.candidate.variant.proof_route_sha256 = pair.candidate.base.proof_route_sha256.clone();
         assert!(
             validate_dataset(&dataset)
                 .iter()
@@ -409,7 +408,11 @@ mod tests {
         let candidate_json = serde_json::to_value(&dataset.pairs[0].candidate)
             .expect("candidate-only serialization");
         assert!(!candidate_json.to_string().contains("oracle_relation"));
-        assert!(!candidate_json.to_string().contains("adjudication_authority"));
+        assert!(
+            !candidate_json
+                .to_string()
+                .contains("adjudication_authority")
+        );
     }
 
     #[test]
