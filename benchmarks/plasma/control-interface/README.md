@@ -21,4 +21,11 @@ The Rust crate exposes `validate_sensor_actuator_timing_contract_json` and the `
 - hidden full-state access is rejected;
 - synthetic fixtures cannot claim closed-loop execution or stability.
 
+The timing summary also reports:
+- worst-case actuator command latency = update-period wait + delivery delay + clock skew;
+- the minimum effective bandwidth across actuator channels, limited by both physical actuator bandwidth and each channel's digital command Nyquist rate;
+- a conservative observation-to-actuation latency estimate = maximum diagnostic age + controller WCET + maximum actuator command latency.
+
+For the synthetic fixture these are 26.5 ms actuator command latency, 20 Hz minimum effective actuator bandwidth, and 71.5 ms conservative loop latency. These are derived from the synthetic contract only, not measurements of real hardware.
+
 The tests include an asynchronous two-diagnostic / one-actuator fixture and negative controls for stale timestamps, missed execution deadlines, hidden state and duplicate channel identity. These are timing-contract checks, not a proof of closed-loop stability or sufficient controllability.
