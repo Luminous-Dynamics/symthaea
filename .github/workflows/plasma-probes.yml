@@ -237,6 +237,7 @@ jobs:
           assert comparisons[("B", "C")]["pairwise_compatible"] is True
           assert comparisons[("A", "C")]["normalized_rms_distance"] == 1.5
           assert comparisons[("A", "C")]["pairwise_compatible"] is False
+          assert all(len(state["signature"]["qoi_scales"]) == len(state["signature"]["qoi_ids"]) for state in fixture["states"])
           assert fixture["claim_boundary"]["approximate_pairwise_compatibility_is_not_transitive"] is True
           print("intervention_equivalent_state_schema_validation=PASS")
           PY
