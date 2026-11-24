@@ -1,6 +1,6 @@
 # MEL-CLOSED-LOOP-001 — Forecast-to-observed-effect episode v1
 
-**Status:** composition-envelope draft. The JSON Schema and three synthetic examples are authored and locally schema-validated. No Rust reducer, live adapter, hardware test, detector study or musician study is claimed by this first increment.
+**Status:** v1 schema and four synthetic examples are committed; the structural Rust reducer and exact-head qualification workflow are implemented in [PR #13496](https://github.com/Luminous-Dynamics/symthaea/pull/13496). This is still an offline composition/replay layer: no live adapter, physical hardware test, detector accuracy study or musician study is claimed.
 
 **Parent / integration:** [#13480](https://github.com/Luminous-Dynamics/symthaea/issues/13480). This work is stacked on [PR #13348](https://github.com/Luminous-Dynamics/symthaea/pull/13348) and composes [#13349](https://github.com/Luminous-Dynamics/symthaea/issues/13349), [#10382](https://github.com/Luminous-Dynamics/symthaea/issues/10382), [#13313](https://github.com/Luminous-Dynamics/symthaea/issues/13313), [#10190](https://github.com/Luminous-Dynamics/symthaea/issues/10190), [#10265](https://github.com/Luminous-Dynamics/symthaea/issues/10265), [#13254](https://github.com/Luminous-Dynamics/symthaea/issues/13254) and [#10206](https://github.com/Luminous-Dynamics/symthaea/issues/10206).
 
@@ -16,6 +16,7 @@ This v1 document is a **join envelope**, not a second implementation of any upst
 - `fixtures/mel-closed-loop-episode-present.synthetic.json` — complete capture with a detector-reported event.
 - `fixtures/mel-closed-loop-episode-absent.synthetic.json` — complete empty window after WAIT/ignore; no producer realization record is required (`effect: null`).
 - `fixtures/mel-closed-loop-episode-unobserved.synthetic.json` — sequence gap, dropped frames and XRUN; observation is explicitly unobserved.
+- `fixtures/mel-closed-loop-episode-midi-absent.synthetic.json` — complete-empty independent MIDI monitor with fully reconciled heartbeat/sequence accounting and no audio sample-frame requirement.
 
 All hashes, clocks, identities, event records and receipt references in these fixtures are synthetic sentinels. They are not real artifacts, signatures or qualifications.
 
@@ -33,7 +34,9 @@ Required joins:
 7. Producer, capture-recorder and event-observer principal/role separation.
 8. Clock-domain identity and time-window coverage, retaining mapping uncertainty and expiry from owner receipts.
 
-The top-level reported closure and detector result are **untrusted summaries**. The reducer must replay upstream closure and observer receipts and derive its own outcome.
+The top-level reported closure and detector result are **untrusted summaries**. The structural reducer checks the modality-specific arithmetic and joins, but reports upstream receipt authentication and verifier replay as false. The owning closure and detector verifiers must still be replayed independently before the observation can be admitted as verified evidence.
+
+Capture modality is explicit: `rendered_audio_loopback` requires nonzero, fully reconciled sample frames with no drops/XRUNs and zero MIDI-heartbeat accounting; `midi_output_monitor` requires nonzero, fully reconciled heartbeat and sequence accounting, and zero audio-frame accounting. Neither path can substitute its counters for the other. The synthetic MIDI case proves only the reducer's structural branch, not a live MIDI device monitor.
 
 ## Outcome semantics
 
@@ -48,15 +51,26 @@ The top-level reported closure and detector result are **untrusted summaries**. 
 
 A veto is an action-authority fact, not an acoustic observation. Already-admitted callback frames or device buffers cannot be claimed physically recalled. Queue invalidation is not a claim that hardware was silenced.
 
-## Reducer requirements (next increment)
+### Late-veto receipt composition
 
-The Rust reducer should fail closed on ID/revision/sequence mismatches; stale, expired or superseded forecasts; RESPOND/CONTINUE without valid authorization; effects scheduled after a veto boundary; producer/capture/observer identity collapse; receipt or payload substitution; mismatched capture/window/clock identities; incomplete frame/sequence accounting, missing watermarks, gaps, drops, XRUNs, restarts, ring overflow or unknown clock mapping; present/absent without eligible closure and detector qualification; `absent` represented as ground truth; unknown execution treated as retry permission; and model/adapter/config/runtime drift across paired counterfactual arms.
+The episode reducer now accepts an optional, strict `effect.veto_race` projection when the disposition is a veto but an output-stage receipt already exists. It binds the exact session/turn, disposition receipt digest, decision receipt digest, effect receipt digest and output artifact digest. It then records the authorization identity, admission stage and event sequence, veto sequence, exact old/new output epochs, reported-stage sequence, callback disposition, callback epoch, admitted/stale-discarded frame counts, queue invalidation counts, discarded-note count and an owning receipt reference.
+
+The projection distinguishes three materially different cases:
+- **Callback admitted before veto:** callback event sequence precedes the veto under the prior epoch. Subsequent CPAL prediction or independent loopback observation may arrive after the veto; this is pre-veto-admitted residual output, not a new post-veto admission.
+- **Stale callback discarded after veto:** the callback observes the new epoch after the veto and discards old-epoch enqueued frames. This is not callback admission or audible output.
+- **No callback observation yet:** queue/application admission remains the highest reported successful stage. It is not safe to infer either playback or silence.
+
+The reducer rejects post-veto new admissions, event-sequence inversions, an epoch transition other than exactly +1, a callback marked admitted under the wrong epoch, or a stale discard reported as successful callback output. The action/effect domain remains owned by [#10659](https://github.com/Luminous-Dynamics/symthaea/pull/10659); the separate race oracle is [#10800](https://github.com/Luminous-Dynamics/symthaea/pull/10800). This episode-layer projection checks supplied structure only. It does not replay or authenticate either owner’s receipt, prove a physical device transition, or demonstrate that output was acoustically absent after queue invalidation.
+
+## Remaining integration requirements
+
+The remaining integration must replay and authenticate each owning receipt; resolve real receipt bytes; bind event IDs/order and exact stage receipts to the supplied projection; use qualified clock-fit uncertainty rather than domain-string equality alone; detect device restart, ring overflow, stream drain and unknown capture intervals; and preserve the current fail-closed behavior on ID/revision/sequence mismatches, stale/expired forecasts, invalid authority, unreceipted or post-veto new admissions, identity collapse, payload substitution, incomplete frame/sequence accounting, missing watermarks, gaps, drops, XRUNs and model/runtime drift. The current episode reducer structurally handles a selected late-veto subset; it does not yet prove every possible scheduling/enqueue/callback race on real hardware.
 
 The reducer must preserve failed, pending and unobserved attempts. A steer or branch cannot rewrite an earlier forecast.
 
 ## Adversarial controls
 
-The fixtures provide the positive/negative shapes. The reducer suite must add digest substitution, one-frame truncation, undrained final buffer, sequence gap, ring overflow, XRUN, restart, stale clock, revoked detector qualification, deliberate detector miss, late veto at every output stage, stale forecast, branch cross-binding and same-label/different-model-identity controls.
+The current suite includes synthetic late-veto controls for pre-veto callback admission followed by post-veto loopback, missing race evidence, callback-order inversion, incorrect epoch advancement, post-veto admission and old-epoch callback stale discard. The remaining matrix must add digest substitution, one-frame truncation, undrained final buffer, sequence gap, ring overflow, XRUN, restart, stale clock, revoked detector qualification, deliberate detector miss, veto before scheduling/after enqueue/after predicted playback, stale forecast, branch cross-binding and same-label/different-model-identity controls.
 
 The key detector negative control is **complete capture + deliberately injected event + detector-reported absent**. It exposes false-negative behavior; capture completeness cannot certify detector correctness.
 

@@ -1,0 +1,255 @@
+# MEL Closed-Loop Music Collaboration Benchmark v1
+
+**Status:** research protocol and target proposal. No new benchmark run, external baseline reproduction, loopback measurement, listener study or SOTA result is claimed by this document.
+
+**Integration owner:** [#13480 — forecast-to-intervention-to-observed-effect lineage](https://github.com/Luminous-Dynamics/symthaea/issues/13480).  
+**Implementation:** [#13481 — episode manifest](https://github.com/Luminous-Dynamics/symthaea/pull/13481) and the stacked Rust reducer PR.  
+**Existing benchmark owners:** #10190 predictive transparency; #10088 reciprocal musical interaction; #13313 scoped musical agency; #10265 grounded musical event perception; #10417 external benchmark registry; #12949 paired edit evidence; #9184 human-grounded edit evaluation.
+
+## 1. Research thesis
+
+The benchmark unit is not a generated clip or a single response. It is a **closed-loop interaction episode**:
+
+\`input \u2192 forecast \u2192 musician disposition \u2192 authorized effect \u2192 independent capture \u2192 qualified event observation \u2192 replayable outcome\`
+
+The programme asks five distinct questions:
+
+1. **Musical competence:** did the system understand and produce the intended musical material?
+2. **Causal responsiveness:** did the musician's actual intervention change the next action in the intended dimension, beyond sham and yoked replay?
+3. **Agency preservation:** could the musician steer, veto, branch, ignore and recover without silent override or preference assimilation?
+4. **Physical execution:** what did the output path actually emit, enqueue, admit, predict and independently capture?
+5. **Epistemic validity:** is the observation complete, is the detector qualified, and what remains unknown?
+
+No overall collaboration score may let musical quality compensate for unauthorized output, poor veto compliance, incomplete capture or unqualified negative evidence.
+
+## 2. Paradigm shifts worth testing
+
+### 2.1 Forecasts become negotiated, expiring commitments
+
+A forecast is a pre-output commitment with a version, input watermark, time window, uncertainty, immutable model/runtime identity and expiry. It is not a post-hoc explanation and not an instruction to the performer.
+
+A musician can accept, steer, veto, branch, ignore, clarify or abstain. Each disposition attaches to the exact forecast revision shown. A successor forecast does not rewrite the one previously displayed.
+
+### 2.2 Silence and withholding become measured musical actions
+
+WAIT, YIELD, intentional rests and non-response are first-class actions. Missing output is not retrospectively reclassified as WAIT. Silence is useful only when the system's decision and the independently observed output are both accounted for.
+
+### 2.3 Editing becomes an evidence transaction
+
+The same control philosophy extends to composition editing: an exact source, target change set, protected musical invariants, candidate, independent verification, bounded repair budget and explicit commit decision. A no-op that preserves everything but fails to edit must not pass. A beautiful regeneration that damages protected content must not pass either.
+
+### 2.4 The evaluator is itself a system under test
+
+Use no-op similarity traps, wrong-direction edits, yoked forecasts, output substitutions, detector-miss injections, answer-order swaps and best-of-N selection pressure. Qualify judges and selectors against adversarial candidate distributions, not only random examples.
+
+### 2.5 Personalization is scoped adaptation, not assimilation
+
+Keep present instructions, contextual preferences, agent proposals and persistent identity updates distinct. A current hard instruction outranks stale soft preference. A local session preference does not silently become a global taste model. A participant may disagree with the agent and retain a separate branch.
+
+### 2.6 Evidence is a musical capability
+
+A musician should be able to inspect what was proposed, what was authorized, where execution reached, what an independent observer captured, and why the outcome is present, absent, ambiguous or unobserved.
+
+## 3. Benchmark tracks
+
+### Track A — Causal reciprocal improvisation
+
+Tasks: motif response/transformation; phrase completion after unexpected continuation; tempo drift and rubato; gap/entry negotiation; role exchange; preserve-motif/change-texture; deliberate rest; interruption; recovery after mismatch.
+
+Conditions, counterbalanced within musician where feasible:
+
+1. no preview;
+2. post-hoc explanation (anticipation negative control);
+3. yoked preview from an unrelated matched session (contingency negative control);
+4. one precommitted forecast;
+5. uncertainty-aware alternative forecasts;
+6. steerable forecast with accept/steer/veto/branch/ignore/abstain.
+
+Baselines: fixed/scripted accompaniment; reactive-rule accompaniment; imitation-only; one-way prompt-response; yoked replay; current Melothaea without relationship memory; Melothaea with authorized contextual memory; human-human reference on a matched subset. JAM_BOT is a compatible MIDI/live comparator only when instrument, tempo, clock and output measurement can be matched. Audio-stream systems belong in a separate controls-only adapter track.
+
+### Track B — Human agency and intervention
+
+Use registered races and musician sessions for:
+- veto before scheduling, after enqueue, after callback admission and after predicted playback;
+- steer before versus after forecast expiry;
+- ignore/non-response;
+- branch/merge disagreement;
+- deliberate musician departure from the preview;
+- preference reversal and collaborator swap;
+- revocation between retrieval and commit.
+
+Measure veto propagation at each actual boundary. Do not claim already-admitted callback frames or device buffers were physically recalled. A human deviation from a prediction is agency, not a forecast violation.
+
+### Track B1 — Control restoration cost and anti-anchoring
+
+A collaborator can obey a veto in a synthetic state machine while still making a musician work too hard to regain control. Measure the *cost of intervention* explicitly:
+
+- **Veto admission boundary:** time/sequence from the externally received veto to the last newly admitted note/PCM item; target zero new admissions after the veto boundary.
+- **Residual output after veto:** already-admitted queue/callback/device material reported separately by admission epoch and actual observed end. It is not an unauthorized new admission when the admission receipt proves it preceded the veto; it is still relevant to the musician's experience.
+- **Time to control restoration:** time until the musician can safely issue a new intention without stale work continuing.
+- **Steering efficiency:** intervention count, elapsed time and wrong-scope/collateral changes until the system satisfies the revised intention.
+- **Branch/undo cost:** time and operations required to return to the previous exact score/audio state, plus any non-bit-exact restoration.
+- **Ignore/non-response semantics:** verify that not answering a preview never becomes consent.
+
+Test **preview anchoring** as well as preview utility. Randomize visible precommitted forecast, hidden forecast, uncertainty-aware alternatives and post-hoc explanation. Compare musician anticipation/entry timing against (a) the diversity of musician-originated deviations, (b) novelty and structure of the resulting joint passage, (c) ownership/autonomy ratings, and (d) willingness to continue. A preview that improves synchronization but suppresses valid creative alternatives is a trade-off, not an unqualified win.
+
+Include a *human-led reflective* interface arm (questions or optional alternatives; musician chooses the next edit) and a *model-led proactive* arm (system proposes/re-writes a candidate), with matched task/compute budgets. A 2026 CHI randomized study (N=486) compares these interaction modes in non-musical ideation; it motivates the ablation but is not evidence that the same effect holds in music. [CHI 2026 study](https://doi.org/10.1145/3772318.3791185). A 2026 qualitative study of 30 independent musicians also reports that creative agency and authorship are negotiated through selection, editing and recombination rather than being inferred from technical output quality; use it as a hypothesis and instrument-design reference, not as a benchmark score. [Study](https://so02.tci-thaijo.org/index.php/jam/article/view/288549).
+
+**Do not create one agency scalar.** Publish veto correctness, time-to-control-restoration, steering effort, branch survival, creative diversity, ownership, workload and musical quality separately.
+
+**Reducer boundary:** the episode reducer now accepts a stage-aware `veto_race` projection for the late-veto path. It binds the projection to exact session/turn, disposition/decision/effect receipt digests and output artifact digest. It distinguishes pre-veto callback admission followed by post-veto CPAL/loopback observation from old-epoch application output discarded at a callback after the epoch fence, and it rejects any reported new admission after veto. The authoritative action/effect receipt owner is [#10659](https://github.com/Luminous-Dynamics/symthaea/pull/10659); [#10800](https://github.com/Luminous-Dynamics/symthaea/pull/10800) is a separate frame-range race oracle. This composition validates the shape, chronology and epoch semantics of supplied projections only: it does not authenticate or replay upstream receipts, connect the production callback, or prove physical silence. Pre-veto callback admissions remain potentially in flight and must be reported as residual output, not retroactively cancelled.
+
+### Track C — Independent output and event observation
+
+The capture adapters are modality-specific and must not borrow one another's completeness counters:
+
+- **Rendered audio loopback:** reconcile sample-frame ranges, callback/stream sequences, drops, XRUNs, terminal drain/watermark and calibrated capture clock.
+- **MIDI output monitor:** reconcile MIDI event sequence and independent monitor heartbeat coverage. There is no audio sample-frame count to invent or fill with a zero-frame success.
+- **Cross-modal comparison:** retain MIDI emission and audible loopback as distinct measurements. A MIDI event can be observed even when no matching acoustic onset is detected; conversely, audio can contain events not present in the MIDI tap.
+
+The current v1 reducer has a synthetic structural fixture for a complete-empty MIDI monitor. It does not connect to a physical MIDI tap or authenticate the monitor's heartbeat source. The existing #13349 live adapter remains the integration owner.
+
+Report separately:
+- MIDI message emitted;
+- note-queue operation applied;
+- application output enqueued;
+- callback admission observed;
+- backend/CPAL playback prediction;
+- independently loopback-observed audible onset.
+
+The negative-evidence rule is absolute: a complete capture may support a detector-reported absence; an incomplete or unqualified capture is unobserved. Complete capture is not detector correctness. Detector correctness is not physical capture completeness.
+
+### Track D — Musical editing and preservation
+
+Reproduce the compatible native operations from SMEBench and the score-native editing suite. Keep score-native edits, real multitrack edits and arbitrary mixture editing as separate strata. Preserve native task definitions, splits, metrics and denominators.
+
+### Track E — Evaluator and selector robustness
+
+Compare human judgments and independent observers against automatic judges, then measure how candidate selection pressure changes the chosen output. Use candidate-set sizes 1/2/4/8/16/32/64/128 and matched render budgets. Retain every failed, unparseable, timed-out and unselected candidate in the attempt denominator.
+
+## 4. External benchmark alignment
+
+External systems measure different things. Reproduce compatible protocols rather than combine scores.
+
+| External reference | Published scope | How Melothaea should use it |
+|---|---|---|
+| SMEBench | 12 paired edit operations; balanced 3,600-example test set; separate 416-pair real-audio complement | Reproduce operation-specific target/preservation/text metrics and disclose metric-ranking reversals |
+| ICASSP 2027 Audio Editing Challenge / MMAE | 2,000 public examples with 17,741 atomic rubrics; separate 500-example hidden sets for Single Model and Agent tracks | Reproduce official IFR, CR and conjunctive EMR where eligible; add score/lineage/agency diagnostics separately |
+| HEARTBEAT 2027 | 132,571 training/development samples across online/offline speech/audio-agent tracks; online protocol logs silent chunks and causal response times | Reuse causal streaming and silence-accounting ideas; do not label it a music benchmark |
+| JAM_BOT (NIME 2026) | Live symbolic call-and-response, variable tempo, expressive velocity and MIDI latency compensation; paper reports median beat-alignment F1 0.7834 with per-note/per-velocity compensation in its player-piano experiment | Matched live MIDI timing comparator, not universal improvisation SOTA |
+| Daydream research | Vendor reports parameter-to-changed-sound 81 ms, chord-root accuracy 69%, melody pitch-class accuracy 53%, groove accent F1 80%, accompaniment onset match 33% | Task-specific real-time audio-control comparator; preserve vendor protocol and hardware caveats |
+| Agents in Concert (IUI 2026) | Two-month musician co-design and public co-improvised performance with 97 audience members | Human-centred and longitudinal study design reference, not a numerical leaderboard |
+| MIREX 2026 CMI-RewardBench | Best core pairwise human-preference agreement 73.9%; vocal extension 60.9%; instrumental extension 72.6% | Matched human-judge calibration target; not an edit-success or agency metric |
+
+Primary references:
+- SMEBench: https://arxiv.org/abs/2610.36715
+- Audio Editing Challenge: https://audio-editing-challenge.github.io/
+- HEARTBEAT: https://heartbeat-challenge.github.io/
+- JAM_BOT: https://nime.org/proc/nime2026_73/index.html
+- Daydream: https://daydream.live/research
+- Agents in Concert: https://www.media.mit.edu/publications/agents-in-concert/
+- MIREX: https://music-ir.org/mirex/wiki/2026%3AMusic_Evaluation_via_CMI-RewardBench_Results
+
+### Important competition timing
+
+The Audio Editing Challenge organizers announced on 23 November 2026 that final submission and leaderboard freeze moved to **28 November 2026, 11:59 PM U.S. Pacific Time**. Registration closed 8 October; the Agent Track public model/weights cutoff remains 1 November. The public MMAE development set remains useful for local reproduction even when competition registration or release-date eligibility is unavailable. Do not imply Luminous Dynamics is registered or eligible without organizer confirmation.
+
+## 5. Scorecards and prospective targets
+
+All thresholds below are proposed gates, not results. Each must be reported by task family, instrument, source type, performer, renderer/device and musical-density stratum where applicable.
+
+| Dimension | Initial target | Stretch target / hard rule |
+|---|---:|---:|
+| Unauthorized effect after valid pre-admission veto | 0 | 0 |
+| Stale/expired/superseded forecast executed | 0 | 0 |
+| False absence from incomplete/unqualified capture | 0 | 0 |
+| Exact forecast/disposition/decision/effect/capture join coverage on scored episodes | 100% | 100% |
+| Synthetic sequence/frame reconciliation | 100% | 100% |
+| Qualified live window yield | \u226599% | \u226599.9%, per device/backend |
+| Detector sensitivity lower 95% confidence bound on declared held-out scope | \u22650.98 | \u22650.995 |
+| Detector false-positive upper 95% confidence bound | \u22640.02 | \u22640.005 |
+| Musician steer/veto/branch disposition honoured | \u226599% | 100% on deterministic controls |
+| Partner-to-agent intervention effect beyond sham/yoked controls | Positive, pre-registered CI | Replicate across held-out performers/tasks |
+| Preference judge agreement on matched MIREX-compatible protocol | \u226578% | \u226582%, report vocal/instrumental separately |
+| Deterministic edit target adherence | \u226599.5% | 100% on registered exact controls |
+| Deterministic protected-event preservation | \u226599.9% | 100% on registered exact controls |
+
+Do not set an arbitrary universal latency threshold. First measure musician-input-to-independent-loopback p50/p95/p99 with calibrated clock uncertainty, under matched hardware, buffer, sample rate, route and task. Then derive task- and musician-specific timing tolerances in a pilot and preregister them before confirmation.
+
+### Independent dimensions to publish
+
+- Forecast presence calibration (Brier/log loss only where probabilities are meaningful), onset uncertainty calibration, revision rate and expired/stale forecast rate.
+- Anticipation accuracy, useful lead time and entry/turn repair.
+- Partner-to-agent causal effect and agent-to-partner causal effect, separately.
+- Intent execution, protected-content preservation and correspondence coverage.
+- Veto/stop correctness, unauthorized mutation, steering success, branch retention and rollback.
+- Capture closure yield and reason-coded missingness.
+- Detector sensitivity/specificity, calibration, risk/coverage and event-scope support.
+- p50/p95/p99 latency for each distinct execution stage.
+- Listener-rated audibility, musical validity, preference, ownership, autonomy, workload and willingness to continue.
+- Candidate/render/repair budgets, cost per qualified episode and human correction time.
+
+## 6. Statistical protocol
+
+- Split by source work/composition lineage, not excerpt; hold out performers, motifs, instruments and at least one renderer/backend family.
+- Randomize and counterbalance condition order within musician where feasible.
+- Use matched model version, input history, response deadline, output budget and compute budget in counterfactual arms.
+- Include no-op, sham, unrelated-feature, yoked and hidden-preview negative controls.
+- Pilot variance and within-musician correlation first; preregister the powered sample size for primary outcomes.
+- Use mixed-effects or hierarchical models with musician, session, task and source-work effects. Bootstrap by source-work and listener, not by individual audio frames or repeated turns.
+- Report missing sessions, dropped windows, detector abstentions, timeouts, unsupported operations and failed runs; never remove them silently.
+- Evaluate preference with A/B order swaps, randomized display order, explicit ties and unsure responses. Report position bias and swap consistency.
+- Freeze human rubrics and automatic evaluator identities before held-out scoring. Keep adjudication disagreement and plural valid targets visible.
+
+## 7. Route to surpassing the field
+
+1. Reproduce a compatible published baseline faithfully before optimizing.
+2. Improve one registered task family at a time; do not tune a global composite.
+3. Use paired counterfactual interventions and source-lineage-disjoint held-out data.
+4. Require improvement over the strongest reproduced baseline with source-clustered 95% intervals and no material regression on primary subgroups.
+5. Qualify automatic judges against humans and test the selector under increasing best-of-N pressure.
+6. Demonstrate live control on matched hardware and independently observed audio, not only a fast generation API.
+7. Run longitudinal musician sessions to test whether transparency improves coordination without anchoring, fatigue or reducing creative diversity.
+8. Publish nulls, negative controls, uncertainty and claim ceilings alongside wins.
+
+A proposed superiority claim requires at least a five-percentage-point absolute improvement on a preregistered primary matched metric, a confidence interval excluding zero, replication on held-out source/performance strata and no unacceptable hard-gate regression. This threshold is a study design target, not a promise of attainable improvement.
+
+## 8. Immediate no-runner execution
+
+The current implementation increment has added strict late-veto composition to the episode reducer without introducing a competing turn/effect state machine:
+- the effect carries a typed `veto_race` projection with admission/veto/report sequences, old/new epoch, callback disposition, exact callback/stale-discard counts and an owner receipt reference;
+- a callback admitted under the old epoch before veto can be followed by a later CPAL prediction or loopback observation, and is reported as residual output;
+- a callback observing the new epoch after veto is represented as a stale discard, never as successful playback;
+- post-veto admissions, sequence inversion and incorrect epoch advancement fail closed;
+- the upstream action/effect and race reducers remain independently owned; the episode reducer does not claim to authenticate or replay their receipts.
+
+The previous exact head passed the dedicated Rust 1.96 workflow (98 tests, schema/fixture validation, Clippy and four synthetic CLI replays). This new change requires its own exact-head run; do not carry the previous pass forward to the new commit.
+
+Continue in parallel without waiting for that run:
+- implement receipt-byte resolution and owner-verifier replay using #10659/#13348/#10265/#13254 outputs; never accept a self-reported `verified=true`;
+- consume the #10391 runner→CPAL→predicted-playback mappings with explicit uncertainty/validity status, not assumed shared origins;
+- prioritize a Linux PipeWire explicit-sink smoke capture under #13349, then native WASAPI/CoreAudio adapters; use the platform-specific capture owner rather than a synthetic substitute;
+- prepare public MMAE/SMEBench evaluation materialization with source-license and rights review before acquiring audio;
+- start symbolic Track A counterfactual experiments with public-domain, owned or synthetic material while real loopback/human access is arranged.
+
+## 9. Claim boundary
+
+A schema or reducer pass proves only its specified structural rules. Synthetic fixtures do not prove musical quality, detector sensitivity, acoustic latency, human agency, reciprocal causal gain or SOTA superiority. An authenticated receipt proves who asserted/bound an observation, not that the physical observation was correct. Each of those claims needs its own evidence and independent validation.
+
+
+### Commercial creator/workstation frontier — verified 24 November 2026
+
+The public product surface has advanced beyond prompt-to-song generation; Melothaea must benchmark against actual editing workflows rather than claim that score control or local regeneration is unoccupied.
+
+- **Suno Studio 2.0** publicly documents audio/MIDI tracks, import/record/edit MIDI on a timeline, a wavetable synth, automation/effects, take lanes, and chat-directed generation of MIDI clips and audio. Its September 17, 2026 release notes describe improved MIDI-to-audio accuracy/context and generation of audio stems from MIDI clips; October 8 notes describe beat-one detection, clip stretching and fade curves. [Studio 2.0](https://help.suno.com/en/articles/13670529) · [MIDI in Studio](https://help.suno.com/en/articles/13670593) · [September MIDI update](https://suno.com/release-notes/studio-improved-midi) · [October Studio update](https://suno.com/release-notes)
+- **Eleven Music v2.5** publicly documents section-by-section composition and inpainting. Its composition plan can mix generation chunks with audio-reference chunks that are inserted unchanged; a generation chunk can be conditioned on a slice of stored audio with a declared context-adherence/conditioning strength. The docs describe up to 30 chunks and 3–120 second generation chunks. Audio Reference is style/sound guidance, not a remix guarantee. [Music API overview](https://elevenlabs.io/docs/overview/capabilities/music) · [Inpainting guide](https://elevenlabs.io/docs/eleven-api/guides/how-to/music/inpainting)
+- **Lyria 3.5** is now visible in Google's official Gemini API pricing as a full-song model, while legacy Lyria 3 clip/full-song endpoints are separately listed. Do not conflate these with the earlier Lyria RealTime streaming-control track; they are different product tasks and interfaces. [Official model/pricing table](https://ai.google.dev/gemini-api/docs/pricing)
+
+**Competitive implication:** do not claim "local editing", MIDI prompting, or unchanged-section regeneration as unique features. The stronger differentiated claim is a verifiable edit contract across symbolic material/PartId lineage, explicit protected musical constraints, candidate-specific execution and observation evidence, reversible transactions, and musician-controlled authorization. The comparison should include:
+1. Suno Studio 2.0 native MIDI + chat-to-audio-stem workflow;
+2. Eleven Music v2.5 generation/reference-chunk inpainting workflow;
+3. deterministic direct symbolic/DSP edit;
+4. expert musician/orchestrator edit;
+5. Melothaea typed edit plan plus qualified realizer and independent preservation evidence.
+
+Match source material, instruction, permitted scope, duration, candidate count, render/compute budget and output modality. Report native edit-task metrics and human correction time separately. Product documentation is evidence of advertised surface capability, not an internal architecture audit; do not infer undocumented competitor limitations.
