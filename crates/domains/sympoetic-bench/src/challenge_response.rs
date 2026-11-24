@@ -43,18 +43,17 @@ pub struct ChallengeResponseSummary {
 
 impl ObservedRate {
     fn from_values(values: impl Iterator<Item = Option<bool>>) -> Self {
-        let (observed_count, positive_count) =
-            values.fold((0usize, 0usize), |(observed, positive), value| {
-                match value {
-                    Some(value) => (observed + 1, positive + usize::from(value)),
-                    None => (observed, positive),
-                }
-            });
+        let (observed_count, positive_count) = values.fold(
+            (0usize, 0usize),
+            |(observed, positive), value| match value {
+                Some(value) => (observed + 1, positive + usize::from(value)),
+                None => (observed, positive),
+            },
+        );
         Self {
             observed_count,
             positive_count,
-            rate: (observed_count > 0)
-                .then_some(positive_count as f64 / observed_count as f64),
+            rate: (observed_count > 0).then_some(positive_count as f64 / observed_count as f64),
         }
     }
 }
@@ -73,9 +72,8 @@ pub fn summarize_challenge_response(
         }
     }
 
-    let flags = |select: fn(&ChallengeEpisodeObservation) -> Option<bool>| {
-        observations.iter().map(select)
-    };
+    let flags =
+        |select: fn(&ChallengeEpisodeObservation) -> Option<bool>| observations.iter().map(select);
 
     Ok(ChallengeResponseSummary {
         opportunity_count: observations.len(),
@@ -118,9 +116,30 @@ mod tests {
     #[test]
     fn known_answer_fixture_uses_event_specific_denominators() {
         let observations = [
-            episode(Some(true), Some(true), Some(true), Some(false), Some(false), Some(false)),
-            episode(Some(false), Some(true), Some(false), Some(true), Some(false), Some(false)),
-            episode(Some(true), Some(false), None, Some(false), Some(true), Some(false)),
+            episode(
+                Some(true),
+                Some(true),
+                Some(true),
+                Some(false),
+                Some(false),
+                Some(false),
+            ),
+            episode(
+                Some(false),
+                Some(true),
+                Some(false),
+                Some(true),
+                Some(false),
+                Some(false),
+            ),
+            episode(
+                Some(true),
+                Some(false),
+                None,
+                Some(false),
+                Some(true),
+                Some(false),
+            ),
             episode(Some(true), None, None, None, None, Some(true)),
         ];
         let summary = summarize_challenge_response(&observations).unwrap();
@@ -158,9 +177,14 @@ mod tests {
 
     #[test]
     fn reattempt_without_observed_setback_is_rejected() {
-        let observations = [
-            episode(Some(true), Some(false), Some(true), Some(false), Some(false), Some(false)),
-        ];
+        let observations = [episode(
+            Some(true),
+            Some(false),
+            Some(true),
+            Some(false),
+            Some(false),
+            Some(false),
+        )];
         let error = summarize_challenge_response(&observations).unwrap_err();
         assert!(error.to_string().contains("requires an observed setback"));
     }
@@ -168,8 +192,22 @@ mod tests {
     #[test]
     fn voluntary_stop_is_preserved_as_its_own_outcome() {
         let observations = [
-            episode(Some(true), Some(true), Some(false), Some(true), Some(false), Some(true)),
-            episode(Some(true), Some(false), None, Some(false), Some(false), Some(false)),
+            episode(
+                Some(true),
+                Some(true),
+                Some(false),
+                Some(true),
+                Some(false),
+                Some(true),
+            ),
+            episode(
+                Some(true),
+                Some(false),
+                None,
+                Some(false),
+                Some(false),
+                Some(false),
+            ),
         ];
         let summary = summarize_challenge_response(&observations).unwrap();
 
