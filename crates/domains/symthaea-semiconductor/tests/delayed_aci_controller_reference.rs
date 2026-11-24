@@ -8,7 +8,8 @@ use symthaea_semiconductor::benchmark::{
     DelayedAciDispositionV1, DelayedAciLabelDeliveryV1, DelayedAciPolicyV1,
     DelayedAciPredictionInputV1, DelayedAciPredictionReceiptV1,
     LabelConsumptionEligibilityReportV1, LabelConsumptionEligibilityV1, LabelEvidenceFrontierV1,
-    create_delayed_aci_engine_v1, deliver_delayed_aci_feedback_v1, issue_delayed_aci_prediction_v1,
+    close_delayed_aci_prediction_stream_v1, create_delayed_aci_engine_v1,
+    deliver_delayed_aci_feedback_v1, issue_delayed_aci_prediction_v1,
 };
 
 fn digest(ch: char) -> String {
@@ -108,6 +109,9 @@ fn interleaved_controller_matches_independent_long_stream_recursion() {
     let mut accepted = 0_u64;
 
     for stream_step in 0..(sample_count as u64 + delay) {
+        if stream_step == sample_count as u64 {
+            close_delayed_aci_prediction_stream_v1(&mut engine).unwrap();
+        }
         // Fixed-delay feedback is delivered before the prediction at the same
         // stream step, so the corresponding residue-class lane has the correct
         // updated alpha for its next prediction.
