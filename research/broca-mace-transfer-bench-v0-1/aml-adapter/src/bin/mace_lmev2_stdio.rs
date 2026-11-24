@@ -798,6 +798,71 @@ mod tests {
     }
 
     #[test]
+    fn retrieval_ablation_modes_execute_only_the_selected_channel() {
+        for (label, mode, query, expected_tool, expected_mode, expected_backend, expected_channel) in [
+            (
+                "bm25-only",
+                RetrievalModeV1::Bm25Only,
+                "customer Ada pending order",
+                "trajectory.bm25.search",
+                "bm25_only_with_original_image_evidence",
+                "mace_lmev2_bm25_only",
+                "trajectory_bm25_text",
+            ),
+            (
+                "entity-only",
+                RetrievalModeV1::EntityLiteralOnly,
+                "state 42",
+                "trajectory.entity_literal.search",
+                "entity_literal_only_with_original_image_evidence",
+                "mace_lmev2_entity_literal_only",
+                "trajectory_entity_literal",
+            ),
+        ] {
+            let root = fixture_root(label);
+            let trajectory = fixture_trajectory(&root, b"ablation fixture image");
+            let mut config = fixture_config(root.clone());
+            config.retrieval_mode = mode;
+            let store = RetrievalPolicyTraceFileStoreV1::open(&config.policy_trace_dir)
+                .expect("open policy trace store");
+            let mut trajectories = Vec::new();
+            let mut index = None;
+            let mut policy_memory = RetrievalPolicyMemoryV1::default();
+
+            handle_request(
+                json!({"op":"insert", "trajectory":trajectory}),
+                &config,
+                &mut trajectories,
+                &mut index,
+                &mut policy_memory,
+                &store,
+            ).expect("insert trajectory");
+
+            let response = handle_request(
+                json!({"op":"query", "query":query, "candidate_id":"ablation-invocation"}),
+                &config,
+                &mut trajectories,
+                &mut index,
+                &mut policy_memory,
+                &store,
+            ).expect("execute selected retrieval arm");
+            assert_eq!(response["retrieval_mode"], expected_mode);
+            assert_eq!(response["retrieval_fusion"], "none");
+            let operations = response["retrieval_trace"]["operations"]
+                .as_array().expect("single retrieval action receipt");
+            assert_eq!(operations.len(), 1);
+            assert_eq!(operations[0]["tool_id"], expected_tool);
+            assert_eq!(response["candidate_evidence_jsonl"].as_str().unwrap().contains(expected_backend), true);
+            assert_eq!(
+                response["candidate_evidence_jsonl"].as_str().unwrap()
+                    .contains(expected_channel),
+                true
+            );
+            fs::remove_dir_all(root).expect("cleanup");
+        }
+    }
+
+    #[test]
     fn official_memory_api_request_returns_text_and_verified_image_context_items() {
         let root = fixture_root("context");
         let image_bytes = b"verified screenshot bytes";
