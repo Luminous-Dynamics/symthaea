@@ -1430,20 +1430,6 @@ mod tests {
         let candidates = vec![test_candidate()];
         let posterior =
             evaluate_mycelial_graph_hypothesis_posterior(&skeleton, &candidates).unwrap();
-        let no_fusion = posterior
-            .hypotheses
-            .iter()
-            .find(|hypothesis| hypothesis.accepted_candidate_ids.is_empty())
-            .expect("no-fusion hypothesis")
-            .accepted_candidate_ids
-            .clone();
-        let fusion = posterior
-            .hypotheses
-            .iter()
-            .find(|hypothesis| hypothesis.accepted_candidate_ids == vec!["bridge".to_string()])
-            .expect("fusion hypothesis")
-            .accepted_candidate_ids
-            .clone();
         let decisions = vec![
             MycelialAcquisitionDecision {
                 decision_id: "accept-fusion".to_string(),
