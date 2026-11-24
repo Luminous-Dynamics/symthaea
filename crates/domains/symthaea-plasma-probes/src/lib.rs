@@ -1862,7 +1862,7 @@ pub fn decide_spectral_refinement(
 }
 
 /// Audited timing envelope for a sparse, asynchronous kinetic-control interface.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct SensorActuatorTimingSummary {
     pub contract_id: String,
     pub diagnostic_channel_count: usize,
