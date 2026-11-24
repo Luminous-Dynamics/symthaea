@@ -985,12 +985,14 @@ mod tests {
         label_id: &str,
         event_id: &str,
         payload_digest: &str,
+        label_revision: u64,
         eligibility: LabelConsumptionEligibilityV1,
         frontier: LabelEvidenceFrontierV1,
     ) -> LabelConsumptionEligibilityReportV1 {
         let mut report = LabelConsumptionEligibilityReportV1 {
             schema: "luminous.semi-bench.label-consumption-report.v1".into(),
             label_id: label_id.into(),
+            label_revision,
             measurement_event_id: event_id.into(),
             calibration_certificate_id: "cal-cert-001".into(),
             frontier,
