@@ -397,7 +397,11 @@ mod tests {
             .find(|pair| pair.candidate.pair_id == "MMP-INCOMPARABLE-CONCLUSIONS-001")
             .expect("incomparable pair");
         assert_eq!(
-            derive_relation(&pair.candidate.base.sequent, &pair.candidate.variant.sequent).unwrap(),
+            derive_relation(
+                &pair.candidate.base.sequent,
+                &pair.candidate.variant.sequent
+            )
+            .unwrap(),
             OracleRelationV1::Incomparable
         );
     }
