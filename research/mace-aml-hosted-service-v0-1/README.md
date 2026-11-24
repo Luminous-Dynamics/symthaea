@@ -9,13 +9,13 @@ This crate implements the missing HTTP/storage boundary behind the frozen Add/Se
 - Axum `GET /health`, `POST /add`, and `POST /search` endpoints.
 - Strict Serde request structs reject unknown fields.
 - Required API-key authentication through `Authorization: Bearer`, `Authorization: Token`, or `X-Api-Key`; the key is configured outside source and logs.
-- One configured service principal and tenant per process; Search filters by principal, tenant, and the exact AML `user_id`.
+- One configured service principal and tenant per process; Search filters by principal, tenant, and the exact AML `user_id`; `/health` checks the database connection.
 - SQLite WAL mode with `synchronous=FULL`, an immediate transaction, immutable request-ID/payload binding, and source rows plus searchable text projection committed together.
-- Same request ID plus same normalized request payload returns the original Add response without another write; same request ID plus changed payload returns HTTP 409 and never overwrites the first write.
+- Same request ID plus same normalized request payload returns the original Add response without another write; same request ID plus changed payload returns HTTP 422 and never overwrites the first write.
 - Search reads the same committed rows and therefore provides read-after-write visibility for acknowledged Add requests.
 - Deterministic lexical BM25 ranking with a stable memory-ID tie-break; Search returns source memory records only, not a generated answer.
 - Original ordered multimodal content parts and their Base64 data URIs are stored unchanged. JPEG/PNG/WebP signatures and decoded per-image / aggregate payload limits are checked at ingress.
-- A 32 MiB HTTP body bound, top-k bound of 100, and non-negative timestamp validation.
+- A 48 MiB HTTP body bound, top-k bound of 100, and non-negative timestamp validation.
 - Six focused Rust unit tests authored for read-after-write, duplicate retry, changed-payload conflict, user isolation, top-k rejection, and media-signature validation.
 
 ## Run locally
