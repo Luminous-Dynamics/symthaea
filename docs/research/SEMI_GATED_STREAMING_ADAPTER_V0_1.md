@@ -6,6 +6,8 @@
 
 ## Research anchor: GRAPE
 
+The pinned upstream snapshot and dataset file identities are recorded in [GRAPE_UPSTREAM_SOURCE_MANIFEST_V1.md](GRAPE_UPSTREAM_SOURCE_MANIFEST_V1.md).
+
 The public author repository is `https://github.com/cheonwoolee/GRAPE` (Apache-2.0). It contains anonymized derived feature/label bundles for two semiconductor datasets, EQP/chamber context IDs, a PyTorch global predictor and two interpretable online adapters.
 
 The upstream runner's prequential path predicts a sample and immediately updates from that same sample's true label, while carrying mutable model state through validation, test and unseen streams. This is a zero-delay label assumption. Its unseen branch also selects the first `nf` columns rather than the training-derived ranked indices used by train/validation/test.
@@ -94,7 +96,9 @@ The module currently includes tests for:
 13. fixed arrival schedule replays deterministically;
 14. unavailable K1 eligibility report cannot be used before report availability;
 15. prediction sequence overflow does not partially register a sample;
-16. context-support overflow leaves the entire update transaction unchanged.
+16. context-support overflow leaves the entire update transaction unchanged;
+17. K1 report cannot predate label availability;
+18. delivery revision must match the revision attested by the K1 report.
 
 These tests are authored, not yet reported as passing. Exact-head rustfmt, strict Clippy, crate tests and SEMI-BENCH-001 reference runs are required.
 
