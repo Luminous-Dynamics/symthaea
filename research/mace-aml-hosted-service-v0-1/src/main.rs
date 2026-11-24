@@ -31,7 +31,7 @@ use subtle::ConstantTimeEq;
 use tokio::net::TcpListener;
 use uuid::Uuid;
 
-const MAX_BODY_BYTES: usize = 32 * 1024 * 1024;
+const MAX_BODY_BYTES: usize = 48 * 1024 * 1024;
 const MAX_MESSAGES: usize = 20;
 const MAX_IMAGE_BYTES: usize = 10 * 1024 * 1024;
 const MAX_REQUEST_IMAGE_BYTES: usize = 30 * 1024 * 1024;
@@ -137,7 +137,7 @@ impl IntoResponse for ApiError {
         let (status, message) = match self {
             Self::BadRequest(m) => (StatusCode::UNPROCESSABLE_ENTITY, m),
             Self::Unauthorized => (StatusCode::UNAUTHORIZED, "authentication required"),
-            Self::Conflict => (StatusCode::CONFLICT, "request id is already bound to different content"),
+            Self::Conflict => (StatusCode::UNPROCESSABLE_ENTITY, "request id is already bound to different content"),
             Self::Unavailable => (StatusCode::SERVICE_UNAVAILABLE, "storage outcome unavailable; retry with the same request id"),
             Self::Internal => (StatusCode::INTERNAL_SERVER_ERROR, "internal error"),
         };
@@ -435,8 +435,15 @@ fn authenticate(headers: &HeaderMap, state: &AppState) -> Result<(), ApiError> {
     Ok(())
 }
 
-async fn health() -> impl IntoResponse {
-    (StatusCode::OK, Json(json!({"status":"ready","service":"mace-aml-hosted-service-v0.1"})))
+async fn health(State(state): State<Arc<AppState>>) -> Result<impl IntoResponse, ApiError> {
+    let ready = tokio::task::spawn_blocking(move || {
+        let connection = state.db.lock().map_err(|_| ApiError::Unavailable)?;
+        let value: i64 = connection.query_row("SELECT 1", [], |row| row.get(0))
+            .map_err(|_| ApiError::Unavailable)?;
+        Ok::<bool, ApiError>(value == 1)
+    }).await.map_err(|_| ApiError::Internal)??;
+    if !ready { return Err(ApiError::Unavailable); }
+    Ok((StatusCode::OK, Json(json!({"status":"ready","service":"mace-aml-hosted-service-v0.1"}))))
 }
 
 async fn add(State(state): State<Arc<AppState>>, headers: HeaderMap, Json(request): Json<AddRequest>)
@@ -563,6 +570,12 @@ mod tests {
         let state = test_state();
         let request = SearchRequest { query: Content::Text("anything".into()), options: None, user_id: "user-1".into(), top_k: 0 };
         assert!(matches!(search_query(&state, request), Err(ApiError::BadRequest(_))));
+    }
+
+    #[test]
+    fn payload_conflict_uses_permanent_422_response() {
+        let response = ApiError::Conflict.into_response();
+        assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
     }
 
     #[test]
