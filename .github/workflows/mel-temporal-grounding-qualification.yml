@@ -14,6 +14,7 @@ on:
       - "Cargo.lock"
       - ".github/workflows/mel-temporal-grounding-qualification.yml"
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     branches:
       - research/mel-ground-temporal-evaluator-v1-20261103
       - research/mel-temporal-grounding-count-gated-f1-v1-20261124
