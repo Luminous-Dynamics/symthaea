@@ -42,6 +42,21 @@ The current known-answer tests include:
 
 The evaluator is deterministic and does not simulate probe execution. It computes the value of a requested probe from the evaluator's declared likelihood model. The posterior and risk reports are evaluator outputs and must not be returned to the candidate during a confirmatory episode.
 
+## Experimental sequential robust policy oracle
+
+The new `src/sequential.rs` module adds a finite-horizon, prior-free policy-tree reference with:
+
+- Set-valued observation supports, including overlapping outcomes.
+- Branch-specific continuations driven by public protocol state.
+- Component-wise integer resource budgets and explicit result deadlines.
+- A bounded backward dynamic programme and a separately written exhaustive policy-tree enumerator.
+- Explicit terminal decisions and a root risk-gate status; no implicit abstain action or execution authorization.
+- A 16-state non-myopic branch-unlock fixture in the linked research PR.
+
+**Qualification status: uncompiled / untested.** Six Rust test functions have been authored, including dynamic-programme versus exhaustive-enumerator comparison, nuisance dead-end handling, overlapping supports, deadline rejection and component-wise budget enforcement. No Rust formatter, compiler, test runner or strict Clippy result has yet been obtained for this module. Do not use it as a qualified evaluator until exact-head Rust 1.96 formatting, compilation, tests and strict Clippy pass.
+
+This module is a tiny-world reference oracle, not the production research policy, a general scheduler, a Bayesian EVSI implementation, or an experiment execution authority. It shares only the declared model semantics; the exhaustive enumerator separately constructs the full contingent policy-tree choice set rather than calling the dynamic-programming recurrence.
+
 ## Run
 
 ~~~bash
