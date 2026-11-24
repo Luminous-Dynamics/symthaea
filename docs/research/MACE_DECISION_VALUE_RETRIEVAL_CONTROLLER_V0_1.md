@@ -19,30 +19,30 @@ Three boundaries are non-negotiable:
 
 Let:
 
-- (s_t) be the current decision state, containing the DecisionNeed, the evidence already qualified for this invocation, unresolved contradictions, source/channel coverage, the remaining resource budget, and current lifecycle context;
-- (a) be a typed retrieval action;
-- (o_a) be the observation returned by that action;
-- (E_t) be the currently qualified evidence set;
-- (R(E)) be downstream decision regret under a frozen, independently controlled evaluator;
-- (C(a)) be the all-in incremental cost of action (a);
-- (H(a,s_t)) be a risk estimate for privacy exposure, scope violation, stale state, poisoning, or an inadmissible source.
+- $s_t$ be the current decision state, containing the DecisionNeed, the evidence already qualified for this invocation, unresolved contradictions, source/channel coverage, the remaining resource budget, and current lifecycle context;
+- $a$ be a typed retrieval action;
+- $o_a$ be the observation returned by that action;
+- $E_t$ be the currently qualified evidence set;
+- $R(E)$ be downstream decision regret under a frozen, independently controlled evaluator;
+- $C(a)$ be the all-in incremental cost of action (a);
+- $H(a,s_t)$ be a risk estimate for privacy exposure, scope violation, stale state, poisoning, or an inadmissible source.
 
 The ideal value of sample information is:
 
-[
+$$
 \operatorname{EVSI}(a\mid s_t)
 = \mathbb{E}[R(E_t)-R(E_t\cup Q(o_a))\mid s_t] - \lambda_C C(a) - \lambda_H H(a,s_t),
-]
+$$
 
-where (Q(o_a)) is the output after independent evidence qualification. An unqualified observation is not inserted into (E_t).
+where $Q(o_a)$ is the output after independent evidence qualification. An unqualified observation is not inserted into $E_t$.
 
 The live controller cannot inspect hidden gold answers or evaluator labels. It therefore uses a calibrated *prediction* of action value, not the evaluator's realized regret:
 
-[
+$$
 a_t = \arg\max_{a\in A_{\mathrm{safe}}(s_t)}
 \operatorname{LCB}_{\alpha}[\widehat{\Delta R}(a\mid s_t)]
 -\lambda_C C(a)-\lambda_H H(a,s_t).
-]
+$$
 
 The lower confidence bound makes uncertainty explicit. The controller stops when no safe action has positive risk-adjusted lower-bound value, when its budget is exhausted, or when the evidence-sufficiency rule is met. It abstains when the qualified evidence does not support a decision.
 
@@ -112,9 +112,9 @@ For each benchmark family:
 
 For policy $\pi$ and held-out task $q$, define realized uplift:
 
-[
+$$
 \Delta_q = R_q(\pi_{\mathrm{baseline}})-R_q(\pi).
-]
+$$
 
 Report the mean paired uplift and its confidence interval, but also report accuracy, abstention, evidence sufficiency, per-family regret, p50/p95/p99 latency and all-in cost. Do not collapse independent benchmarks into a composite score.
 
