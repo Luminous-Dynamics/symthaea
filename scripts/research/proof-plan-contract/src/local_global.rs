@@ -908,9 +908,12 @@ fn validate_global_use_adjudication(
                 || !adjudication.node_evidence.iter().any(|node| {
                     node.material_use && node.relation == MentionRelation::SupportsInference
                 })
+                || adjudication.node_evidence.iter().any(|node| {
+                    node.material_use && node.relation == MentionRelation::UsesAsRule
+                })
             {
                 errors.push(
-                    "used_implicitly requires a complete plan review and a material supports_inference node"
+                    "used_implicitly requires a complete plan review, a material supports_inference node, and no direct uses_as_rule node"
                         .to_owned(),
                 );
             }
@@ -924,22 +927,24 @@ fn validate_global_use_adjudication(
                             MentionRelation::Cites | MentionRelation::Rebuts
                         )
                 })
+                || adjudication.node_evidence.iter().any(|node| node.material_use)
             {
                 errors.push(
-                    "cited_rejected requires a complete plan review and a non-material cite/rebut node"
+                    "cited_rejected requires a complete plan review and non-material cite/rebut evidence only"
                         .to_owned(),
                 );
-            }
-            if adjudication.node_evidence.iter().any(|node| node.material_use) {
-                errors.push("cited_rejected cannot contain material-use nodes".to_owned());
             }
         }
         GlobalDisposition::Omitted => {
             if !adjudication.reviewed_entire_plan
-                || adjudication.node_evidence.iter().any(|node| node.material_use)
+                || adjudication.node_evidence.iter().any(|node| {
+                    node.material_use
+                        || matches!(node.relation, MentionRelation::Cites | MentionRelation::Rebuts)
+                })
             {
                 errors.push(
-                    "omitted requires a complete plan review with no material-use nodes".to_owned(),
+                    "omitted requires a complete plan review with no material use or cite/rebut nodes"
+                        .to_owned(),
                 );
             }
         }
