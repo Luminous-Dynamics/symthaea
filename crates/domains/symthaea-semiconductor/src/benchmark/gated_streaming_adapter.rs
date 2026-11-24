@@ -1028,14 +1028,7 @@ mod tests {
             delivered_at_unix_seconds: delivered_at,
             clock_domain_id: "fab-clock".into(),
             idempotency_key: format!("{label_id}:{revision}"),
-            eligibility_report: eligibility_report(
-                label_id,
-                event_id,
-                &payload,
-                revision,
-                status,
-                frontier,
-            ),
+            eligibility_report: eligibility_report(label_id, event_id, &payload, revision, status, frontier),
         }
     }
 
