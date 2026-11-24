@@ -12,6 +12,7 @@ pub mod decision_observability;
 pub mod decision_regret_voi;
 pub mod decision_sufficient_representation;
 pub mod individual_effect_retention;
+pub mod posterior_draw_cohort;
 pub mod sensing;
 pub mod temporal_representation_preservation;
 
