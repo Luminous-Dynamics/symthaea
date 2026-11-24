@@ -23,7 +23,7 @@ A covariance separation score is not EVSI. Mutual information is not decision va
 | Symthaea PR #13453 — joint-covariance experiment design v0.2 | Focused workflow passed at source 735b8cc936cc42372de4c9fc8ee8ee8aff0b2dd0: 29 tests, rustfmt, strict Clippy, demos, JSON contracts and committed lockfile gate | Package-level mathematical/contract qualification; not whole-repo CI, physical covariance calibration or EGB validation |
 | Symthaea PR #9821 — decision-focused active sensing | Focused workflow passed at source f203c5e4fd62c985c32414e8c038929f031f2d67: 9 tests, rustfmt, strict Clippy and isolated lockfile artifact | Planner and receipt correctness on synthetic tests; no calibrated prospective forecasts or physical energy result |
 | Symthaea PR #10947 — AS-Bench compatibility adapter | Focused workflow passed at source f23caa7b8a177f002ee25eaec34404d4e675946f: 38 tests, rustfmt, strict Clippy, pinned manifest and Lab API fixtures | Offline compatibility/request-response contract only; no live API call, campaign execution, verifier access or official submission |
-| Symthaea #12546 — finite-world decision evaluator | Focused workflow passed at source ee1bd6d62140f028b3f4909bfe9c056b6ba0b076: 14 tests, rustfmt and strict Clippy. Includes Bayesian and prior-free robust decision-value modes. | Executable finite-world evaluator primitives; full chaotic-systems generators, sealed evaluator process, external predictor tournament and physical sensing remain future work |
+| Symthaea #12546 — finite-world decision evaluator | Focused workflow passed at source d66d216d77d7b9d70cbbd7e66fa75a4bda3f6738: 16 tests, rustfmt and strict Clippy. Includes Bayesian and prior-free robust decision-value modes plus a typed covariance-to-robust adapter. | Executable finite-world evaluator primitives; full chaotic-systems generators, sealed evaluator process, external predictor tournament and physical sensing remain future work |
 
 The focused work is deliberately split across existing owners. #9817/#9821 own active sensing; #12546 owns the paired-world decision evaluator; #12407 owns observation time/mask/modality semantics; #12502/#12505/#12506/#12624 own dynamical reference and predictor baselines; #5476/#5477/#5478 own prospective value-of-computation calibration and causal metareasoning ablations.
 
@@ -47,6 +47,8 @@ The new research/decision-predictability-benchmark/src/robust.rs module implemen
 ### 3. From pairwise variance fragments to one coherent joint model
 
 The v0.2 covariance planner accepts one PSD covariance over the stacked hypothesis-output vector, then derives all pairwise difference covariances from that common matrix. This is stronger than letting callers supply mutually inconsistent pairwise covariances. The next step is to bind covariance outputs to observation semantics and observable lineage, not to assume the covariance itself reveals a measurement likelihood.
+
+The new typed adapter in the finite-world evaluator preserves Stage-B experiment identity, method identity, D² and covariance digest next to Stage-A robust decision value. It does not use D² in the Stage-A calculation. This creates a reproducible integration seam without conflating estimands.
 
 ### 4. From experiment selection to active scientific work allocation
 
