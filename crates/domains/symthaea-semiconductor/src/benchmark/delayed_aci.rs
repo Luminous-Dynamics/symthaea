@@ -1086,7 +1086,11 @@ mod tests {
     fn delayed_miss_updates_only_its_phase_then_affects_next_same_phase_prediction() {
         let mut engine = engine(3);
         for round in 0..3 {
-            begin_and_issue(&mut engine, round, AciPredictionIntervalV1::bounded(9.0, 11.0));
+            begin_and_issue(
+                &mut engine,
+                round,
+                AciPredictionIntervalV1::bounded(9.0, 11.0),
+            );
         }
         begin_delayed_aci_round_v1(&mut engine, 3).unwrap();
         let receipt = deliver_delayed_aci_label_v1(
