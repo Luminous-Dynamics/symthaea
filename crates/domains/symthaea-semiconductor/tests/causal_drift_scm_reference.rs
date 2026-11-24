@@ -96,10 +96,7 @@ fn sensor_only_drift_changes_telemetry_not_physical_quality_or_metrology() {
     let shifted = observe(sensor_drift, wafer(0.0), true);
 
     assert!(close(shifted.sensor.unwrap() - base.sensor.unwrap(), 4.0));
-    assert!(close(
-        shifted.reported_metrology,
-        base.reported_metrology
-    ));
+    assert!(close(shifted.reported_metrology, base.reported_metrology));
     assert_eq!(shifted.independent_reference, base.independent_reference);
 }
 
@@ -131,10 +128,10 @@ fn common_cause_process_shift_has_same_sign_across_tools() {
     let baseline_a = observe(baseline_world(), wafer(0.0), true);
     let baseline_b = observe(baseline_world(), wafer(0.8), true);
 
-    let change_a = tool_a.independent_reference.unwrap()
-        - baseline_a.independent_reference.unwrap();
-    let change_b = tool_b.independent_reference.unwrap()
-        - baseline_b.independent_reference.unwrap();
+    let change_a =
+        tool_a.independent_reference.unwrap() - baseline_a.independent_reference.unwrap();
+    let change_b =
+        tool_b.independent_reference.unwrap() - baseline_b.independent_reference.unwrap();
     assert!(close(change_a, 2.0));
     assert!(close(change_b, 2.0));
 }
@@ -216,10 +213,30 @@ fn independent_reference_assay_breaks_process_vs_calibration_equivalence() {
 fn product_mix_can_move_pooled_mean_without_within_family_process_drift() {
     let world = baseline_world();
     let family_a: Vec<f64> = (0..100)
-        .map(|_| observe(world, Wafer { product_effect: 0.0, ..wafer(0.0) }, false).reported_metrology)
+        .map(|_| {
+            observe(
+                world,
+                Wafer {
+                    product_effect: 0.0,
+                    ..wafer(0.0)
+                },
+                false,
+            )
+            .reported_metrology
+        })
         .collect();
     let family_b: Vec<f64> = (0..100)
-        .map(|_| observe(world, Wafer { product_effect: 5.0, ..wafer(0.0) }, false).reported_metrology)
+        .map(|_| {
+            observe(
+                world,
+                Wafer {
+                    product_effect: 5.0,
+                    ..wafer(0.0)
+                },
+                false,
+            )
+            .reported_metrology
+        })
         .collect();
 
     let mean_a = family_a.iter().sum::<f64>() / family_a.len() as f64;
@@ -231,11 +248,27 @@ fn product_mix_can_move_pooled_mean_without_within_family_process_drift() {
     assert!(close(mean_b, 10.5));
     assert!(mixed_after > mixed_before);
     assert!(close(
-        observe(world, Wafer { product_effect: 0.0, ..wafer(0.0) }, false).reported_metrology,
+        observe(
+            world,
+            Wafer {
+                product_effect: 0.0,
+                ..wafer(0.0)
+            },
+            false
+        )
+        .reported_metrology,
         mean_a
     ));
     assert!(close(
-        observe(world, Wafer { product_effect: 5.0, ..wafer(0.0) }, false).reported_metrology,
+        observe(
+            world,
+            Wafer {
+                product_effect: 5.0,
+                ..wafer(0.0)
+            },
+            false
+        )
+        .reported_metrology,
         mean_b
     ));
 }
@@ -256,7 +289,11 @@ fn missing_sensor_is_missing_not_a_numeric_zero() {
 fn selected_metrology_subset_is_not_population_prevalence() {
     let population: Vec<f64> = (0..100).map(f64::from).collect();
     let true_mean = population.iter().sum::<f64>() / population.len() as f64;
-    let selected: Vec<f64> = population.iter().copied().filter(|value| *value >= 75.0).collect();
+    let selected: Vec<f64> = population
+        .iter()
+        .copied()
+        .filter(|value| *value >= 75.0)
+        .collect();
     let selected_mean = selected.iter().sum::<f64>() / selected.len() as f64;
 
     assert!(close(true_mean, 49.5));
