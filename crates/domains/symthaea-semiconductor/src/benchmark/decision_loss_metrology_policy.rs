@@ -16,14 +16,10 @@ pub const METROLOGY_DECISION_LOSS_POLICY_SCHEMA_V1: &str =
     "luminous.semi-bench.metrology-decision-loss-policy.v1";
 pub const METROLOGY_DECISION_LOSS_INPUT_SCHEMA_V1: &str =
     "luminous.semi-bench.metrology-decision-loss-input.v1";
-pub const METROLOGY_ASSAY_MODEL_SCHEMA_V1: &str =
-    "luminous.semi-bench.metrology-assay-model.v1";
-pub const METROLOGY_READINESS_SCHEMA_V1: &str =
-    "luminous.semi-bench.metrology-readiness.v1";
-pub const METROLOGY_CANDIDATE_SCHEMA_V1: &str =
-    "luminous.semi-bench.metrology-candidate.v1";
-pub const METROLOGY_EVSI_REPORT_SCHEMA_V1: &str =
-    "luminous.semi-bench.metrology-evsi-report.v1";
+pub const METROLOGY_ASSAY_MODEL_SCHEMA_V1: &str = "luminous.semi-bench.metrology-assay-model.v1";
+pub const METROLOGY_READINESS_SCHEMA_V1: &str = "luminous.semi-bench.metrology-readiness.v1";
+pub const METROLOGY_CANDIDATE_SCHEMA_V1: &str = "luminous.semi-bench.metrology-candidate.v1";
+pub const METROLOGY_EVSI_REPORT_SCHEMA_V1: &str = "luminous.semi-bench.metrology-evsi-report.v1";
 pub const METROLOGY_PORTFOLIO_REPORT_SCHEMA_V1: &str =
     "luminous.semi-bench.metrology-portfolio-report.v1";
 
@@ -208,9 +204,7 @@ fn sha256_hex(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
 
-fn json_sha256<T: Serialize + ?Sized>(
-    value: &T,
-) -> Result<String, MetrologyDecisionLossErrorV1> {
+fn json_sha256<T: Serialize + ?Sized>(value: &T) -> Result<String, MetrologyDecisionLossErrorV1> {
     let bytes = serde_json::to_vec(value).map_err(|error| {
         MetrologyDecisionLossErrorV1(format!("canonical JSON serialization failed: {error}"))
     })?;
@@ -241,7 +235,9 @@ fn portfolio_report_digest(
     json_sha256(&canonical)
 }
 
-fn validate_policy(policy: &MetrologyDecisionLossPolicyV1) -> Result<(), MetrologyDecisionLossErrorV1> {
+fn validate_policy(
+    policy: &MetrologyDecisionLossPolicyV1,
+) -> Result<(), MetrologyDecisionLossErrorV1> {
     if policy.schema != METROLOGY_DECISION_LOSS_POLICY_SCHEMA_V1 {
         return Err(MetrologyDecisionLossErrorV1(
             "decision-loss policy schema is unsupported".into(),
@@ -253,7 +249,10 @@ fn validate_policy(policy: &MetrologyDecisionLossPolicyV1) -> Result<(), Metrolo
         || policy.delay_cost_per_second < 0.0
         || policy.maximum_exact_candidates == 0
         || policy.maximum_exact_candidates > 20
-        || policy.minimum_group_coverage.keys().any(|key| key.trim().is_empty())
+        || policy
+            .minimum_group_coverage
+            .keys()
+            .any(|key| key.trim().is_empty())
     {
         return Err(MetrologyDecisionLossErrorV1(
             "decision-loss policy contains invalid parameters".into(),
@@ -307,9 +306,10 @@ fn validate_decision_model(
         if !action_ids.insert(action.action_id.as_str())
             || action.loss_by_state.len() != state_ids.len()
             || model.states.iter().any(|state| {
-                action.loss_by_state.get(&state.state_id).is_none_or(|loss| {
-                    !loss.is_finite() || *loss < 0.0
-                })
+                action
+                    .loss_by_state
+                    .get(&state.state_id)
+                    .is_none_or(|loss| !loss.is_finite() || *loss < 0.0)
             })
         {
             return Err(MetrologyDecisionLossErrorV1(
@@ -319,8 +319,11 @@ fn validate_decision_model(
     }
 
     let mut outcome_ids = BTreeSet::new();
-    let mut outcome_sum_by_state: BTreeMap<&str, f64> =
-        model.states.iter().map(|state| (state.state_id.as_str(), 0.0)).collect();
+    let mut outcome_sum_by_state: BTreeMap<&str, f64> = model
+        .states
+        .iter()
+        .map(|state| (state.state_id.as_str(), 0.0))
+        .collect();
     for outcome in &model.assay.outcomes {
         require_text(&outcome.outcome_id, "assay.outcome_id")?;
         if !outcome_ids.insert(outcome.outcome_id.as_str())
@@ -341,10 +344,15 @@ fn validate_decision_model(
                     "assay likelihood must be finite and in [0,1]".into(),
                 ));
             }
-            *outcome_sum_by_state.get_mut(state.state_id.as_str()).unwrap() += probability;
+            *outcome_sum_by_state
+                .get_mut(state.state_id.as_str())
+                .unwrap() += probability;
         }
     }
-    if outcome_sum_by_state.values().any(|sum| (sum - 1.0).abs() > 1.0e-9) {
+    if outcome_sum_by_state
+        .values()
+        .any(|sum| (sum - 1.0).abs() > 1.0e-9)
+    {
         return Err(MetrologyDecisionLossErrorV1(
             "assay outcome likelihoods must sum to one for every state".into(),
         ));
@@ -394,9 +402,7 @@ pub fn compute_expected_value_of_sample_information_v1(
         let outcome_probability: f64 = model
             .states
             .iter()
-            .map(|state| {
-                state.prior_probability * outcome.likelihood_by_state[&state.state_id]
-            })
+            .map(|state| state.prior_probability * outcome.likelihood_by_state[&state.state_id])
             .sum();
         if outcome_probability <= 0.0 {
             continue;
@@ -407,8 +413,7 @@ pub fn compute_expected_value_of_sample_information_v1(
             .map(|state| {
                 (
                     state.state_id.clone(),
-                    state.prior_probability
-                        * outcome.likelihood_by_state[&state.state_id]
+                    state.prior_probability * outcome.likelihood_by_state[&state.state_id]
                         / outcome_probability,
                 )
             })
@@ -434,13 +439,22 @@ fn score_candidate(
         ));
     }
     require_text(&candidate.candidate_id, "candidate.candidate_id")?;
-    require_text(&candidate.measurement_event_id, "candidate.measurement_event_id")?;
+    require_text(
+        &candidate.measurement_event_id,
+        "candidate.measurement_event_id",
+    )?;
     require_text(&candidate.group_key, "candidate.group_key")?;
     require_text(&candidate.instrument_id, "candidate.instrument_id")?;
     require_text(&candidate.measurand_id, "candidate.measurand_id")?;
     require_text(&candidate.unit, "candidate.unit")?;
-    require_text(&candidate.readiness.certificate_id, "readiness.certificate_id")?;
-    require_text(&candidate.readiness.instrument_id, "readiness.instrument_id")?;
+    require_text(
+        &candidate.readiness.certificate_id,
+        "readiness.certificate_id",
+    )?;
+    require_text(
+        &candidate.readiness.instrument_id,
+        "readiness.instrument_id",
+    )?;
     require_text(&candidate.readiness.measurand_id, "readiness.measurand_id")?;
     require_text(&candidate.readiness.unit, "readiness.unit")?;
     if !candidate.measurement_cost.is_finite()
@@ -453,7 +467,8 @@ fn score_candidate(
         ));
     }
     if candidate.readiness.schema != METROLOGY_READINESS_SCHEMA_V1
-        || candidate.readiness.valid_from_unix_seconds >= candidate.readiness.valid_until_unix_seconds
+        || candidate.readiness.valid_from_unix_seconds
+            >= candidate.readiness.valid_until_unix_seconds
         || !valid_sha256(&candidate.readiness.report_sha256)
         || readiness_digest(&candidate.readiness)? != candidate.readiness.report_sha256
     {
@@ -490,13 +505,15 @@ fn score_candidate(
             .readiness
             .expected_standard_uncertainty_upper_bound
             .is_finite()
-        || candidate.readiness.expected_standard_uncertainty_upper_bound <= 0.0
+        || candidate
+            .readiness
+            .expected_standard_uncertainty_upper_bound
+            <= 0.0
     {
         status = MetrologyCandidateStatusV1::ReadinessUnknown;
         reasons.push("measurement_system_uncertainty_or_identity_incomplete".into());
     }
-    if candidate.readiness.valid_from_unix_seconds
-        > candidate.planned_measurement_at_unix_seconds
+    if candidate.readiness.valid_from_unix_seconds > candidate.planned_measurement_at_unix_seconds
         || candidate.readiness.valid_until_unix_seconds
             < candidate.planned_measurement_at_unix_seconds
         || candidate
@@ -511,7 +528,9 @@ fn score_candidate(
     let measurement_complete_at = candidate
         .planned_measurement_at_unix_seconds
         .checked_add(candidate.turnaround_seconds as i64)
-        .ok_or_else(|| MetrologyDecisionLossErrorV1("measurement completion time overflow".into()))?;
+        .ok_or_else(|| {
+            MetrologyDecisionLossErrorV1("measurement completion time overflow".into())
+        })?;
     if measurement_complete_at > candidate.decision_deadline_unix_seconds {
         if status == MetrologyCandidateStatusV1::Eligible {
             status = MetrologyCandidateStatusV1::DecisionDeadlineMissed;
@@ -578,7 +597,9 @@ pub fn optimize_metrology_decision_loss_portfolio_v1(
     input: &MetrologyDecisionLossInputV1,
 ) -> Result<MetrologyPortfolioReportV1, MetrologyDecisionLossErrorV1> {
     if input.schema != METROLOGY_DECISION_LOSS_INPUT_SCHEMA_V1 {
-        return Err(MetrologyDecisionLossErrorV1("decision-loss input schema is unsupported".into()));
+        return Err(MetrologyDecisionLossErrorV1(
+            "decision-loss input schema is unsupported".into(),
+        ));
     }
     require_text(&input.input_id, "input.input_id")?;
     validate_policy(&input.policy)?;
@@ -649,9 +670,12 @@ pub fn optimize_metrology_decision_loss_portfolio_v1(
         if !feasible {
             continue;
         }
-        if input.policy.minimum_group_coverage.iter().any(|(group, minimum)| {
-            group_counts.get(group).copied().unwrap_or(0) < *minimum
-        }) {
+        if input
+            .policy
+            .minimum_group_coverage
+            .iter()
+            .any(|(group, minimum)| group_counts.get(group).copied().unwrap_or(0) < *minimum)
+        {
             continue;
         }
 
@@ -811,12 +835,7 @@ mod tests {
             turnaround_seconds: turnaround,
             measurement_cost,
             measurement_cost_units: cost_units,
-            readiness: readiness(
-                readiness_status,
-                "tool-A",
-                "film-thickness",
-                "nm",
-            ),
+            readiness: readiness(readiness_status, "tool-A", "film-thickness", "nm"),
             decision_loss_model: decision_model(evidence_quality),
         }
     }
@@ -833,7 +852,10 @@ mod tests {
         }
     }
 
-    fn input(candidates: Vec<MetrologyCandidateV1>, policy: MetrologyDecisionLossPolicyV1) -> MetrologyDecisionLossInputV1 {
+    fn input(
+        candidates: Vec<MetrologyCandidateV1>,
+        policy: MetrologyDecisionLossPolicyV1,
+    ) -> MetrologyDecisionLossInputV1 {
         MetrologyDecisionLossInputV1 {
             schema: METROLOGY_DECISION_LOSS_INPUT_SCHEMA_V1.into(),
             input_id: "decision-loss-fixture-001".into(),
@@ -858,8 +880,26 @@ mod tests {
     fn readiness_unknown_or_rejected_candidate_never_selected() {
         let input = input(
             vec![
-                candidate("unknown", "chamber-1", 1, 0.1, MetrologyReadinessStatusV1::Unknown, 10, 1_000, 0.95),
-                candidate("rejected", "chamber-1", 1, 0.1, MetrologyReadinessStatusV1::Rejected, 10, 1_000, 0.95),
+                candidate(
+                    "unknown",
+                    "chamber-1",
+                    1,
+                    0.1,
+                    MetrologyReadinessStatusV1::Unknown,
+                    10,
+                    1_000,
+                    0.95,
+                ),
+                candidate(
+                    "rejected",
+                    "chamber-1",
+                    1,
+                    0.1,
+                    MetrologyReadinessStatusV1::Rejected,
+                    10,
+                    1_000,
+                    0.95,
+                ),
             ],
             policy(2),
         );
@@ -871,9 +911,36 @@ mod tests {
     fn exact_portfolio_uses_budget_and_highest_net_decision_value() {
         let input = input(
             vec![
-                candidate("low", "chamber-1", 1, 0.5, MetrologyReadinessStatusV1::Qualified, 10, 1_000, 0.20),
-                candidate("high", "chamber-1", 1, 0.1, MetrologyReadinessStatusV1::Qualified, 10, 1_000, 0.95),
-                candidate("mid", "chamber-2", 1, 0.3, MetrologyReadinessStatusV1::Qualified, 10, 1_000, 0.65),
+                candidate(
+                    "low",
+                    "chamber-1",
+                    1,
+                    0.5,
+                    MetrologyReadinessStatusV1::Qualified,
+                    10,
+                    1_000,
+                    0.20,
+                ),
+                candidate(
+                    "high",
+                    "chamber-1",
+                    1,
+                    0.1,
+                    MetrologyReadinessStatusV1::Qualified,
+                    10,
+                    1_000,
+                    0.95,
+                ),
+                candidate(
+                    "mid",
+                    "chamber-2",
+                    1,
+                    0.3,
+                    MetrologyReadinessStatusV1::Qualified,
+                    10,
+                    1_000,
+                    0.65,
+                ),
             ],
             policy(1),
         );
@@ -886,56 +953,111 @@ mod tests {
     #[test]
     fn group_minimums_are_hard_constraints_not_soft_bonuses() {
         let mut p = policy(2);
-        p.minimum_group_coverage = BTreeMap::from([
-            ("chamber-1".into(), 1),
-            ("chamber-2".into(), 1),
-        ]);
+        p.minimum_group_coverage =
+            BTreeMap::from([("chamber-1".into(), 1), ("chamber-2".into(), 1)]);
         let input = input(
             vec![
-                candidate("a", "chamber-1", 1, 0.1, MetrologyReadinessStatusV1::Qualified, 10, 1_000, 0.9),
-                candidate("b", "chamber-2", 1, 0.1, MetrologyReadinessStatusV1::Qualified, 10, 1_000, 0.9),
+                candidate(
+                    "a",
+                    "chamber-1",
+                    1,
+                    0.1,
+                    MetrologyReadinessStatusV1::Qualified,
+                    10,
+                    1_000,
+                    0.9,
+                ),
+                candidate(
+                    "b",
+                    "chamber-2",
+                    1,
+                    0.1,
+                    MetrologyReadinessStatusV1::Qualified,
+                    10,
+                    1_000,
+                    0.9,
+                ),
             ],
             p,
         );
         let report = optimize_metrology_decision_loss_portfolio_v1(&input).unwrap();
-        assert_eq!(report.selected_candidate_ids, vec!["a".to_string(), "b".to_string()]);
+        assert_eq!(
+            report.selected_candidate_ids,
+            vec!["a".to_string(), "b".to_string()]
+        );
     }
 
     #[test]
     fn infeasible_group_coverage_returns_explicit_infeasible_status() {
         let mut p = policy(1);
-        p.minimum_group_coverage = BTreeMap::from([
-            ("chamber-1".into(), 1),
-            ("chamber-2".into(), 1),
-        ]);
+        p.minimum_group_coverage =
+            BTreeMap::from([("chamber-1".into(), 1), ("chamber-2".into(), 1)]);
         let input = input(
-            vec![candidate("a", "chamber-1", 1, 0.1, MetrologyReadinessStatusV1::Qualified, 10, 1_000, 0.9)],
+            vec![candidate(
+                "a",
+                "chamber-1",
+                1,
+                0.1,
+                MetrologyReadinessStatusV1::Qualified,
+                10,
+                1_000,
+                0.9,
+            )],
             p,
         );
         let report = optimize_metrology_decision_loss_portfolio_v1(&input).unwrap();
-        assert_eq!(report.status, MetrologyPortfolioStatusV1::InfeasibleCoverage);
+        assert_eq!(
+            report.status,
+            MetrologyPortfolioStatusV1::InfeasibleCoverage
+        );
         assert!(report.selected_candidate_ids.is_empty());
     }
 
     #[test]
     fn measurements_that_return_after_the_decision_deadline_are_excluded() {
         let input = input(
-            vec![candidate("late", "chamber-1", 1, 0.1, MetrologyReadinessStatusV1::Qualified, 100, 150, 0.95)],
+            vec![candidate(
+                "late",
+                "chamber-1",
+                1,
+                0.1,
+                MetrologyReadinessStatusV1::Qualified,
+                100,
+                150,
+                0.95,
+            )],
             policy(1),
         );
         let report = optimize_metrology_decision_loss_portfolio_v1(&input).unwrap();
         assert_eq!(report.selected_candidate_ids, Vec::<String>::new());
-        assert_eq!(report.candidate_reports[0].status, MetrologyCandidateStatusV1::DecisionDeadlineMissed);
+        assert_eq!(
+            report.candidate_reports[0].status,
+            MetrologyCandidateStatusV1::DecisionDeadlineMissed
+        );
     }
 
     #[test]
     fn calibration_revoked_before_planned_measurement_excludes_candidate() {
-        let mut candidate = candidate("revoked", "chamber-1", 1, 0.1, MetrologyReadinessStatusV1::Qualified, 10, 1_000, 0.95);
+        let mut candidate = candidate(
+            "revoked",
+            "chamber-1",
+            1,
+            0.1,
+            MetrologyReadinessStatusV1::Qualified,
+            10,
+            1_000,
+            0.95,
+        );
         candidate.readiness.revoked_at_unix_seconds = Some(99);
         candidate.readiness.report_sha256 = readiness_digest(&candidate.readiness).unwrap();
-        let report = optimize_metrology_decision_loss_portfolio_v1(&input(vec![candidate], policy(1))).unwrap();
+        let report =
+            optimize_metrology_decision_loss_portfolio_v1(&input(vec![candidate], policy(1)))
+                .unwrap();
         assert!(report.selected_candidate_ids.is_empty());
-        assert_eq!(report.candidate_reports[0].status, MetrologyCandidateStatusV1::ReadinessRejected);
+        assert_eq!(
+            report.candidate_reports[0].status,
+            MetrologyCandidateStatusV1::ReadinessRejected
+        );
     }
 
     #[test]
@@ -982,16 +1104,18 @@ mod tests {
         let mut p = policy(30);
         p.maximum_exact_candidates = 2;
         let candidates = (0..3)
-            .map(|i| candidate(
-                &format!("c{i}"),
-                "chamber-1",
-                1,
-                0.1,
-                MetrologyReadinessStatusV1::Qualified,
-                10,
-                1_000,
-                0.95,
-            ))
+            .map(|i| {
+                candidate(
+                    &format!("c{i}"),
+                    "chamber-1",
+                    1,
+                    0.1,
+                    MetrologyReadinessStatusV1::Qualified,
+                    10,
+                    1_000,
+                    0.95,
+                )
+            })
             .collect();
         assert!(optimize_metrology_decision_loss_portfolio_v1(&input(candidates, p)).is_err());
     }
@@ -1017,8 +1141,13 @@ mod tests {
             1_000,
             0.95,
         );
-        candidate.readiness.expected_standard_uncertainty_upper_bound = 0.50;
-        assert!(optimize_metrology_decision_loss_portfolio_v1(&input(vec![candidate], policy(1))).is_err());
+        candidate
+            .readiness
+            .expected_standard_uncertainty_upper_bound = 0.50;
+        assert!(
+            optimize_metrology_decision_loss_portfolio_v1(&input(vec![candidate], policy(1)))
+                .is_err()
+        );
     }
 
     #[test]
@@ -1043,8 +1172,13 @@ mod tests {
             1_000,
             0.90,
         );
-        let first = optimize_metrology_decision_loss_portfolio_v1(&input(vec![a.clone(), b.clone()], policy(1))).unwrap();
-        let second = optimize_metrology_decision_loss_portfolio_v1(&input(vec![b, a], policy(1))).unwrap();
+        let first = optimize_metrology_decision_loss_portfolio_v1(&input(
+            vec![a.clone(), b.clone()],
+            policy(1),
+        ))
+        .unwrap();
+        let second =
+            optimize_metrology_decision_loss_portfolio_v1(&input(vec![b, a], policy(1))).unwrap();
         assert_eq!(first.report_sha256, second.report_sha256);
     }
 
@@ -1052,8 +1186,26 @@ mod tests {
     fn decision_loss_portfolio_receipt_replays_deterministically() {
         let input = input(
             vec![
-                candidate("a", "chamber-1", 1, 0.1, MetrologyReadinessStatusV1::Qualified, 10, 1_000, 0.90),
-                candidate("b", "chamber-2", 1, 0.1, MetrologyReadinessStatusV1::Qualified, 10, 1_000, 0.90),
+                candidate(
+                    "a",
+                    "chamber-1",
+                    1,
+                    0.1,
+                    MetrologyReadinessStatusV1::Qualified,
+                    10,
+                    1_000,
+                    0.90,
+                ),
+                candidate(
+                    "b",
+                    "chamber-2",
+                    1,
+                    0.1,
+                    MetrologyReadinessStatusV1::Qualified,
+                    10,
+                    1_000,
+                    0.90,
+                ),
             ],
             policy(1),
         );
