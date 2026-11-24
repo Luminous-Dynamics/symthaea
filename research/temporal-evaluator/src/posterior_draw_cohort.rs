@@ -18,9 +18,8 @@
 //! sets, or evidence that the supplied posterior is well specified.
 
 use super::individual_effect_retention::{
-    evaluate_individual_effect_retention, BranchDisposition, IndividualEffectBranch,
-    IndividualEffectComparison, IndividualEffectContext, IndividualEffectError,
-    IndividualEffectPair,
+    BranchDisposition, IndividualEffectBranch, IndividualEffectComparison, IndividualEffectContext,
+    IndividualEffectError, IndividualEffectPair, evaluate_individual_effect_retention,
 };
 use std::collections::BTreeSet;
 use std::fmt;
@@ -139,22 +138,51 @@ pub struct PosteriorEffectCohortCertificate {
 pub enum PosteriorCohortError {
     EmptyIndividualCohort,
     EmptyDrawSet,
-    TooManyDraws { requested: usize, maximum: usize },
-    TooManyIndividuals { requested: usize, maximum: usize },
-    TooManyTotalDraws { requested: usize, maximum: usize },
+    TooManyDraws {
+        requested: usize,
+        maximum: usize,
+    },
+    TooManyIndividuals {
+        requested: usize,
+        maximum: usize,
+    },
+    TooManyTotalDraws {
+        requested: usize,
+        maximum: usize,
+    },
     ZeroPosteriorDrawId,
     MissingPosteriorDrawDigest,
-    DuplicatePosteriorDrawId { draw_id: u64 },
+    DuplicatePosteriorDrawId {
+        draw_id: u64,
+    },
     DuplicatePosteriorDrawDigest,
-    PosteriorDrawBindingMismatch { branch: &'static str, field: &'static str },
-    ZeroPosteriorWeight { draw_id: u64 },
-    PosteriorWeightSumMismatch { actual_ppm: u64 },
-    PairIdentityMismatch { field: &'static str },
-    BranchEvidenceMismatch { branch: &'static str, field: &'static str },
-    RealizedOutcomeMismatch { field: &'static str },
+    PosteriorDrawBindingMismatch {
+        branch: &'static str,
+        field: &'static str,
+    },
+    ZeroPosteriorWeight {
+        draw_id: u64,
+    },
+    PosteriorWeightSumMismatch {
+        actual_ppm: u64,
+    },
+    PairIdentityMismatch {
+        field: &'static str,
+    },
+    BranchEvidenceMismatch {
+        branch: &'static str,
+        field: &'static str,
+    },
+    RealizedOutcomeMismatch {
+        field: &'static str,
+    },
     DuplicateIndividualId,
-    DuplicatePairId { pair_id: u64 },
-    InconsistentCohortProfile { field: &'static str },
+    DuplicatePairId {
+        pair_id: u64,
+    },
+    InconsistentCohortProfile {
+        field: &'static str,
+    },
     ArithmeticOverflow,
     BaseEvaluator(IndividualEffectError),
 }
@@ -162,26 +190,78 @@ pub enum PosteriorCohortError {
 impl fmt::Display for PosteriorCohortError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::EmptyIndividualCohort => write!(formatter, "posterior-effect cohort requires at least one individual"),
-            Self::EmptyDrawSet => write!(formatter, "each individual requires at least one posterior draw"),
-            Self::TooManyDraws { requested, maximum } => write!(formatter, "posterior draw count {requested} exceeds the bounded maximum {maximum}"),
-            Self::TooManyIndividuals { requested, maximum } => write!(formatter, "individual count {requested} exceeds the bounded maximum {maximum}"),
-            Self::TooManyTotalDraws { requested, maximum } => write!(formatter, "total posterior draw count {requested} exceeds the bounded maximum {maximum}"),
+            Self::EmptyIndividualCohort => write!(
+                formatter,
+                "posterior-effect cohort requires at least one individual"
+            ),
+            Self::EmptyDrawSet => write!(
+                formatter,
+                "each individual requires at least one posterior draw"
+            ),
+            Self::TooManyDraws { requested, maximum } => write!(
+                formatter,
+                "posterior draw count {requested} exceeds the bounded maximum {maximum}"
+            ),
+            Self::TooManyIndividuals { requested, maximum } => write!(
+                formatter,
+                "individual count {requested} exceeds the bounded maximum {maximum}"
+            ),
+            Self::TooManyTotalDraws { requested, maximum } => write!(
+                formatter,
+                "total posterior draw count {requested} exceeds the bounded maximum {maximum}"
+            ),
             Self::ZeroPosteriorDrawId => write!(formatter, "posterior draw ID must be nonzero"),
-            Self::MissingPosteriorDrawDigest => write!(formatter, "posterior draw digest must be nonzero"),
-            Self::DuplicatePosteriorDrawId { draw_id } => write!(formatter, "duplicate posterior draw ID {draw_id}"),
-            Self::DuplicatePosteriorDrawDigest => write!(formatter, "duplicate posterior draw digest"),
-            Self::PosteriorDrawBindingMismatch { branch, field } => write!(formatter, "{branch} branch does not bind the same posterior draw {field}"),
-            Self::ZeroPosteriorWeight { draw_id } => write!(formatter, "posterior draw {draw_id} has zero weight"),
-            Self::PosteriorWeightSumMismatch { actual_ppm } => write!(formatter, "posterior PPM weights sum to {actual_ppm}, expected {POSTERIOR_WEIGHT_TOTAL_PPM}"),
-            Self::PairIdentityMismatch { field } => write!(formatter, "posterior draws do not share frozen pair identity field {field}"),
-            Self::BranchEvidenceMismatch { branch, field } => write!(formatter, "{branch} branch's realized evidence identity changed across posterior draws: {field}"),
-            Self::RealizedOutcomeMismatch { field } => write!(formatter, "independently measured realized branch outcome changed across posterior draws: {field}"),
-            Self::DuplicateIndividualId => write!(formatter, "an individual appears more than once in one posterior-effect cohort"),
-            Self::DuplicatePairId { pair_id } => write!(formatter, "duplicate posterior-effect pair ID {pair_id}"),
-            Self::InconsistentCohortProfile { field } => write!(formatter, "posterior-effect cohort mixes incompatible {field} profiles"),
-            Self::ArithmeticOverflow => write!(formatter, "posterior-effect weighted integer arithmetic overflowed"),
-            Self::BaseEvaluator(error) => write!(formatter, "base individual-effect evaluator rejected posterior draw: {error}"),
+            Self::MissingPosteriorDrawDigest => {
+                write!(formatter, "posterior draw digest must be nonzero")
+            }
+            Self::DuplicatePosteriorDrawId { draw_id } => {
+                write!(formatter, "duplicate posterior draw ID {draw_id}")
+            }
+            Self::DuplicatePosteriorDrawDigest => {
+                write!(formatter, "duplicate posterior draw digest")
+            }
+            Self::PosteriorDrawBindingMismatch { branch, field } => write!(
+                formatter,
+                "{branch} branch does not bind the same posterior draw {field}"
+            ),
+            Self::ZeroPosteriorWeight { draw_id } => {
+                write!(formatter, "posterior draw {draw_id} has zero weight")
+            }
+            Self::PosteriorWeightSumMismatch { actual_ppm } => write!(
+                formatter,
+                "posterior PPM weights sum to {actual_ppm}, expected {POSTERIOR_WEIGHT_TOTAL_PPM}"
+            ),
+            Self::PairIdentityMismatch { field } => write!(
+                formatter,
+                "posterior draws do not share frozen pair identity field {field}"
+            ),
+            Self::BranchEvidenceMismatch { branch, field } => write!(
+                formatter,
+                "{branch} branch's realized evidence identity changed across posterior draws: {field}"
+            ),
+            Self::RealizedOutcomeMismatch { field } => write!(
+                formatter,
+                "independently measured realized branch outcome changed across posterior draws: {field}"
+            ),
+            Self::DuplicateIndividualId => write!(
+                formatter,
+                "an individual appears more than once in one posterior-effect cohort"
+            ),
+            Self::DuplicatePairId { pair_id } => {
+                write!(formatter, "duplicate posterior-effect pair ID {pair_id}")
+            }
+            Self::InconsistentCohortProfile { field } => write!(
+                formatter,
+                "posterior-effect cohort mixes incompatible {field} profiles"
+            ),
+            Self::ArithmeticOverflow => write!(
+                formatter,
+                "posterior-effect weighted integer arithmetic overflowed"
+            ),
+            Self::BaseEvaluator(error) => write!(
+                formatter,
+                "base individual-effect evaluator rejected posterior draw: {error}"
+            ),
         }
     }
 }
@@ -416,15 +496,21 @@ fn summarize_distribution(
             .ok_or(PosteriorCohortError::ArithmeticOverflow)?;
 
         match sign_of(effect) {
-            -1 => negative_weight = negative_weight
-                .checked_add(u64::from(sample.weight_ppm))
-                .ok_or(PosteriorCohortError::ArithmeticOverflow)?,
-            0 => zero_weight = zero_weight
-                .checked_add(u64::from(sample.weight_ppm))
-                .ok_or(PosteriorCohortError::ArithmeticOverflow)?,
-            _ => positive_weight = positive_weight
-                .checked_add(u64::from(sample.weight_ppm))
-                .ok_or(PosteriorCohortError::ArithmeticOverflow)?,
+            -1 => {
+                negative_weight = negative_weight
+                    .checked_add(u64::from(sample.weight_ppm))
+                    .ok_or(PosteriorCohortError::ArithmeticOverflow)?
+            }
+            0 => {
+                zero_weight = zero_weight
+                    .checked_add(u64::from(sample.weight_ppm))
+                    .ok_or(PosteriorCohortError::ArithmeticOverflow)?
+            }
+            _ => {
+                positive_weight = positive_weight
+                    .checked_add(u64::from(sample.weight_ppm))
+                    .ok_or(PosteriorCohortError::ArithmeticOverflow)?
+            }
         }
         if sign_matches {
             sign_match_weight = sign_match_weight
@@ -624,7 +710,10 @@ pub fn evaluate_posterior_effect_cohort(
     let mut total_draws = 0_usize;
 
     for cohort in cohorts {
-        let first = cohort.draws.first().ok_or(PosteriorCohortError::EmptyDrawSet)?;
+        let first = cohort
+            .draws
+            .first()
+            .ok_or(PosteriorCohortError::EmptyDrawSet)?;
         same_cohort_profile(first_context, &first.context)?;
 
         if !individual_ids.insert(first.context.individual_id_sha256) {
@@ -667,8 +756,8 @@ pub fn evaluate_posterior_effect_cohort(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::individual_effect_retention::NonApplicationReason;
+    use super::*;
 
     fn digest(seed: u8) -> [u8; 32] {
         let mut value = [seed; 32];
@@ -866,10 +955,7 @@ mod tests {
             applied_at_us: 10_001,
             realized_utility_units: 100,
         };
-        let input = cohort(vec![
-            make_draw(1, 101, 1, 51, 500_000, (2, 1, 1)),
-            second,
-        ]);
+        let input = cohort(vec![make_draw(1, 101, 1, 51, 500_000, (2, 1, 1)), second]);
         let error = evaluate_posterior_individual_cohort(&input).unwrap_err();
         assert_eq!(
             error,
@@ -906,7 +992,9 @@ mod tests {
         let error = evaluate_posterior_individual_cohort(&input).unwrap_err();
         assert_eq!(
             error,
-            PosteriorCohortError::PosteriorWeightSumMismatch { actual_ppm: 800_000 }
+            PosteriorCohortError::PosteriorWeightSumMismatch {
+                actual_ppm: 800_000
+            }
         );
     }
 
@@ -944,9 +1032,7 @@ mod tests {
             make_draw(1, 101, 1, 51, 500_000, (2, 1, 1)),
             make_draw(1, 101, 2, 52, 500_000, (2, 3, 3)),
         ]);
-        let second = cohort(vec![
-            make_draw(2, 102, 1, 61, 1_000_000, (-1, -1, -1)),
-        ]);
+        let second = cohort(vec![make_draw(2, 102, 1, 61, 1_000_000, (-1, -1, -1))]);
         let result = evaluate_posterior_effect_cohort(&[first, second]).unwrap();
 
         assert_eq!(result.individual_count, 2);
@@ -975,9 +1061,7 @@ mod tests {
 
     #[test]
     fn cohort_profile_drift_rejects() {
-        let first = cohort(vec![
-            make_draw(1, 101, 1, 51, 1_000_000, (2, 1, 1)),
-        ]);
+        let first = cohort(vec![make_draw(1, 101, 1, 51, 1_000_000, (2, 1, 1))]);
         let mut second_draw = make_draw(2, 102, 1, 61, 1_000_000, (2, 1, 1));
         second_draw.context.model_configuration_sha256 = digest(88);
         second_draw.baseline.branch.model_configuration_sha256 = digest(88);
@@ -1026,10 +1110,22 @@ mod tests {
             make_draw(1, 101, 2, 52, 750_000, (2, 4, 6)),
         ]);
         let result = evaluate_posterior_individual_cohort(&input).unwrap();
-        assert_eq!(result.latent_effects.weighted_effect_sum_units_ppm, 3_000_000);
-        assert_eq!(result.rollout_effects.weighted_effect_sum_units_ppm, 4_500_000);
-        assert_eq!(result.latent_effects.weighted_absolute_error_sum_units_ppm, 2_000_000);
-        assert_eq!(result.rollout_effects.weighted_absolute_error_sum_units_ppm, 3_500_000);
+        assert_eq!(
+            result.latent_effects.weighted_effect_sum_units_ppm,
+            3_000_000
+        );
+        assert_eq!(
+            result.rollout_effects.weighted_effect_sum_units_ppm,
+            4_500_000
+        );
+        assert_eq!(
+            result.latent_effects.weighted_absolute_error_sum_units_ppm,
+            2_000_000
+        );
+        assert_eq!(
+            result.rollout_effects.weighted_absolute_error_sum_units_ppm,
+            3_500_000
+        );
     }
 
     #[test]
