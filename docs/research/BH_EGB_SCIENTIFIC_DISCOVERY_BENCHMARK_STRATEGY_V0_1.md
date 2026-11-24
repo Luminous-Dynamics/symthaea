@@ -96,13 +96,25 @@ An ablation must show that each cognitive component changes prospective action s
 
 ### End-to-end scientific workflow
 
+- **Autonomous Science Bench (AS-Bench) 0.1:** the closest direct match to our experiment-design objective. It evaluates closed-loop, budgeted campaigns grounded in published lab experiments. A campaign succeeds only when both the *discovery gate* (quality of designs actually measured) and *learning gate* (ranking of designs never measured) pass. The official 0.1 dataset currently lists six campaigns: Nuclease replay, Biosensor replay, Propylene digital twin, Suzuki replay, OER replay, and Coercivity replay. Its current public leaderboard reports a 72.2% resolution rate for GPT-6 Astra/Codex and 66.7% for Opus 5.5/Claude Code; these are benchmark-specific pilot aggregates, not universal science scores or a matched comparison with unrelated leaderboards. Five tasks use replay and one uses a digital twin; the live-lab API tier is defined but no v0.1 campaign uses it. Use existing Symthaea #10921 for the adapter. Its two-task Nuclease/Propylene slice is a pilot, not a complete AS-Bench v0.1 reproduction. Do not silently add tasks that appear in the upstream repository but are outside the official six-task dataset without a pinned scope/evaluator decision.
+  https://asb.open-ssi.org/about
+  https://asb.open-ssi.org/run
+  https://github.com/Open-SSI/autonomous-science-bench
+  https://arxiv.org/abs/2610.18449
+- **SciWorkBench (17 Nov 2026 preprint):** real science tasks across biology, chemistry, materials science, and physics, with a best reported model–harness mean of 57.38. Its failure analysis highlights task-specific procedure translation, multimodal evidence integration, and scientific self-correction. Treat its score as a model-plus-harness result, not a base-model capability constant.
+  https://arxiv.org/abs/2611.22490
+- **FIRE-Bench (ICML 2026):** verified rediscovery tasks requiring agents to design experiments, execute them, and produce evidence-backed conclusions. The reported best tested system scores 46.7 F1, with substantial run-to-run variance and recurring planning errors.
+  https://firebench.github.io/
+  https://proceedings.mlr.press/v306/wang26d.html
+
 - **SciWorkBench (17 Nov 2026 preprint):** real science tasks across biology, chemistry, materials science, and physics, with a best reported model–harness mean of 57.38. Its failure analysis highlights task-specific procedure translation, multimodal evidence integration, and scientific self-correction. Treat its score as a model-plus-harness result, not a base-model capability constant.
   https://arxiv.org/abs/2611.22490
 - **FIRE-Bench (ICML 2026):** verified rediscovery tasks requiring agents to design experiments, execute them, and produce evidence-backed conclusions. The reported best tested system scores 46.7 F1, with substantial run-to-run variance and recurring failures in design, execution, and evidence-based reasoning.
   https://proceedings.mlr.press/v306/wang26d.html
-- **AstaBench (Ai2):** thousands of tasks across literature, scientific coding/execution, data analysis, and end-to-end discovery. Ai2's Spring 2026 update reported roughly 53% overall for its Asta v0 system but only 3% perfect end-to-end completion on the then-reported E2E-Bench-Hard slice, despite many runs completing 60–70% of component steps. Later scoring/leaderboard snapshots should be compared only within the exact same benchmark version and rubric.
+- **AstaBench (Ai2):** broad tasks across literature, scientific coding/execution, data analysis, and end-to-end discovery. E2E-Bench and E2E-Bench-Hard test the full pipeline from a research task through experiment design/execution, analysis and final research deliverable. Keep its *partial-completion rubric score* separate from exact all-requirements completion. The Spring 2026 Asta v0 report's 3% perfect E2E-Bench-Hard figure is a historical result under that earlier evaluation; a 22 Nov 2026 third-party leaderboard snapshot reports a 0.7 partial-completion score for Opus 4.7, which is not a 70% perfect-completion rate and should not be directly compared to the older 3%. Reproduce the official benchmark version and grader before making a current SOTA comparison.
   https://allenai.org/asta/bench
   https://allenai.org/blog/astabench-update-spring-2026
+  https://atlas.village.dev/benchmarks/astabench-2026-e2e-hard
 
 ### Interactive law and experiment discovery
 
@@ -203,12 +215,13 @@ These are goals, not achieved results.
 
 ### Stretch external targets
 
-After first reproducing the published baselines with the exact model/harness and benchmark revisions, target:
-- SciWorkBench mean above 65 (against the reported 57.38 best configuration);
-- FIRE-Bench F1 above 60 (against the reported 46.7 best tested configuration);
-- at least 10% exact perfect completion on the corresponding E2E-Bench-Hard rubric/snapshot (against Ai2's earlier 3% report).
+After reproducing the official baselines with the exact model/harness, benchmark revision and grader, target:
+- **AS-Bench 0.1 resolution rate above 80%**, against the public 72.2% leader, while reporting discovery and learning gates separately and retaining every failed/incomplete trial;
+- **SciWorkBench mean above 65**, against the reported 57.38 best configuration;
+- **FIRE-Bench F1 above 60**, against the reported 46.7 best tested configuration;
+- **AstaBench E2E-Bench-Hard partial-completion score above 0.80** on the same 2026 scoring/judge snapshot, with exact perfect-completion reported as a separate metric. The historical 3% figure is not the denominator or comparator for the newer partial score.
 
-These are deliberately ambitious, provisional stretch goals. They cannot be called SOTA unless the benchmark version, task set, model, harness, budget, grader, and statistical protocol are matched. Later AstaBench rubric/leaderboard updates must not be conflated with the earlier perfect-completion statistic.
+These are provisional stretch goals, not results. Small leaderboard gaps must not be described as significant without matched trials and uncertainty intervals. No combined score across these benchmarks is valid: the task units, harnesses, budgets, graders and outcome semantics differ.
 
 ### Qualified Knowledge Yield
 
