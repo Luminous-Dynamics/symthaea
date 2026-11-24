@@ -114,6 +114,8 @@ type Report struct {
 	MissingnessPolicy string `json:"missingness_policy"`
 	EndpointDirections map[string]string `json:"endpoint_directions"`
 }
+const MaxBootstrapReplicates = 100_000
+
 type Config struct {
 	BootstrapReplicates int
 	BootstrapSeed int64
@@ -143,8 +145,11 @@ type taskEffect struct { taskID, domain string; effects [endpointCount]pairEffec
 // repeated seeds are averaged within task. Unknown outcomes remain [0,1].
 func EstimateITT(pairs []Pair, cfg Config) (Report, error) {
 	if len(pairs) == 0 { return Report{}, ErrEmptyInput }
-	if cfg.BootstrapReplicates <= 0 { cfg.BootstrapReplicates = 2000 }
+	if cfg.BootstrapReplicates == 0 { cfg.BootstrapReplicates = 2000 }
 	if cfg.BootstrapReplicates < 200 { return Report{}, fmt.Errorf("%w: at least 200 bootstrap replicates required", ErrInvalidInput) }
+	if cfg.BootstrapReplicates > MaxBootstrapReplicates {
+		return Report{}, fmt.Errorf("%w: at most %d bootstrap replicates allowed", ErrInvalidInput, MaxBootstrapReplicates)
+	}
 	if cfg.RequireAssignmentRoster && len(cfg.ExpectedPairIDs) == 0 { return Report{}, fmt.Errorf("%w: assignment roster is required", ErrInvalidInput) }
 
 	seenPair, seenRun, seenCell := map[string]bool{}, map[string]bool{}, map[string]bool{}
