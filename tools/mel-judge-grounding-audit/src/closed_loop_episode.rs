@@ -829,9 +829,8 @@ fn validate_veto_race(
             "veto_race admission_stage must be queue_applied or application_enqueued".into(),
         );
     }
-    let reported_stage_rank = effect_stage_rank(&effect.reported_stage).ok_or_else(|| {
-        "veto_race reported stage is not a successful output stage".to_string()
-    })?;
+    let reported_stage_rank = effect_stage_rank(&effect.reported_stage)
+        .ok_or_else(|| "veto_race reported stage is not a successful output stage".to_string())?;
     let admission_stage_rank = effect_stage_rank(&race.admission_stage)
         .ok_or_else(|| "veto_race admission stage is not a successful output stage".to_string())?;
     if reported_stage_rank < admission_stage_rank {
@@ -853,7 +852,10 @@ fn validate_veto_race(
         || (reported_stage_rank > admission_stage_rank
             && race.reported_stage_event_sequence == race.admission_event_sequence)
     {
-        return Err("veto_race reported-stage sequence does not follow its exact output-stage transition".into());
+        return Err(
+            "veto_race reported-stage sequence does not follow its exact output-stage transition"
+                .into(),
+        );
     }
     if race.veto_output_epoch
         != race
@@ -1385,26 +1387,34 @@ mod tests {
         let mutations = [
             (
                 "decision_receipt_sha256",
-                serde_json::json!("2525252525252525252525252525252525252525252525252525252525252525"),
+                serde_json::json!(
+                    "2525252525252525252525252525252525252525252525252525252525252525"
+                ),
             ),
             (
                 "disposition_receipt_sha256",
-                serde_json::json!("2727272727272727272727272727272727272727272727272727272727272727"),
+                serde_json::json!(
+                    "2727272727272727272727272727272727272727272727272727272727272727"
+                ),
             ),
             (
                 "effect_receipt_sha256",
-                serde_json::json!("2828282828282828282828282828282828282828282828282828282828282828"),
+                serde_json::json!(
+                    "2828282828282828282828282828282828282828282828282828282828282828"
+                ),
             ),
             ("session_id", serde_json::json!("other-session")),
             ("turn_id", serde_json::json!("other-turn")),
         ];
         for (field, replacement) in mutations {
-            let mut value: serde_json::Value =
-                serde_json::from_str(PRESENT).expect("fixture JSON");
+            let mut value: serde_json::Value = serde_json::from_str(PRESENT).expect("fixture JSON");
             attach_valid_pre_veto_loopback_race(&mut value);
             value["effect"]["veto_race"][field] = replacement;
             let raw = serde_json::to_string(&value).expect("serialize fixture");
-            assert!(parse_and_reduce(&raw).is_err(), "accepted mismatched {field}");
+            assert!(
+                parse_and_reduce(&raw).is_err(),
+                "accepted mismatched {field}"
+            );
         }
     }
 
