@@ -16,8 +16,8 @@ use std::fmt;
 use serde::{Deserialize, Serialize};
 
 use crate::mycelial_photobiological_exposure::{
-    MycelialAmbientLightState, MycelialIlluminationPurpose,
-    MycelialIlluminationScheduleKind, MycelialPhotobiologicalExposureRecord, MycelialPhotobiologicalMeasurement,
+    MycelialAmbientLightState, MycelialIlluminationPurpose, MycelialIlluminationScheduleKind,
+    MycelialPhotobiologicalExposureRecord, MycelialPhotobiologicalMeasurement,
     MycelialPhotobiologicalObservationWindow, MycelialPhotobiologicalResponseObservation,
 };
 
@@ -1315,7 +1315,8 @@ mod tests {
                 arm_id: "dark".to_string(),
                 arm_kind: MycelialObserverEffectArmKind::DarkControl,
                 is_reference_comparator: true,
-                description: "Ambient sensor verified dark within preregistered threshold".to_string(),
+                description: "Ambient sensor verified dark within preregistered threshold"
+                    .to_string(),
             },
             MycelialObserverEffectArm {
                 arm_id: "low-imaging".to_string(),
@@ -1608,13 +1609,16 @@ mod tests {
     fn unknown_ambient_light_cannot_qualify_as_dark_control() {
         let (trial, mut exposures, observations) = evidence();
         exposures[0].ambient_light.state = MycelialAmbientLightState::Unknown;
-        exposures[0].ambient_light.specimen_plane_irradiance_watts_per_cm2_upper = None;
+        exposures[0]
+            .ambient_light
+            .specimen_plane_irradiance_watts_per_cm2_upper = None;
         exposures[0].ambient_light.spectral_distribution_digest = None;
         exposures[0].ambient_light.calibration_digest = None;
-        exposures[0].ambient_light.dark_classification_threshold_watts_per_cm2 = None;
+        exposures[0]
+            .ambient_light
+            .dark_classification_threshold_watts_per_cm2 = None;
         exposures[0].ambient_light.classification_policy_digest = None;
-        exposures[0].ambient_light.unknown_reason =
-            Some("ambient sensor unavailable".to_string());
+        exposures[0].ambient_light.unknown_reason = Some("ambient sensor unavailable".to_string());
         assert!(matches!(
             trial.validate_against_evidence(&exposures, &observations),
             Err(MycelialObserverEffectTrialError::AssignmentExposureMismatch(_))
@@ -1625,8 +1629,9 @@ mod tests {
     fn measured_ambient_exposure_cannot_be_assigned_to_dark_control() {
         let (trial, mut exposures, observations) = evidence();
         exposures[0].ambient_light.state = MycelialAmbientLightState::AmbientMeasured;
-        exposures[0].ambient_light.specimen_plane_irradiance_watts_per_cm2_upper =
-            Some(0.000_01);
+        exposures[0]
+            .ambient_light
+            .specimen_plane_irradiance_watts_per_cm2_upper = Some(0.000_01);
         assert!(matches!(
             trial.validate_against_evidence(&exposures, &observations),
             Err(MycelialObserverEffectTrialError::AssignmentExposureMismatch(_))
