@@ -1002,7 +1002,7 @@ pub struct KineticResponseSignature {
 /// Pairwise discrepancy and admissibility diagnostics for two response signatures.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ResponseSignatureComparison {
-    /// Euclidean/Frobenius discrepancy normalized by a task-fixed scale.
+    /// RMS complex-response discrepancy normalized by a task-fixed scale.
     pub normalized_response_distance: Option<f64>,
     pub absolute_frobenius_error: f64,
     pub measured_entry_count: usize,
@@ -1049,14 +1049,19 @@ impl KineticResponseSignature {
         if responses.len() != expected_entries || branch_ids.len() != expected_entries {
             return Err(ContractError::ResponseSignatureShapeMismatch);
         }
-        if responses.iter().flatten().any(|response| {
-            !response.real.is_finite() || !response.imag.is_finite()
-        }) || branch_ids
+        if responses
+            .iter()
+            .flatten()
+            .any(|response| !response.real.is_finite() || !response.imag.is_finite())
+        {
+            return Err(ContractError::NonFiniteResponseValue);
+        }
+        if branch_ids
             .iter()
             .flatten()
             .any(|branch| branch.trim().is_empty())
         {
-            return Err(ContractError::NonFiniteResponseValue);
+            return Err(ContractError::InvalidResponseSignatureIdentity);
         }
         Ok(Self {
             contract_id,
@@ -1069,12 +1074,12 @@ impl KineticResponseSignature {
         })
     }
 
-    /// Compare two signatures on exactly the same frozen intervention/QoI/time axes.
+    /// Compare two signatures on identical frozen axes using a task-fixed RMS scale.
     ///
     /// normalization_scale is fixed by the task contract and must be identical
-    /// for all pairwise comparisons in a cohort. Using a shared scale makes the
-    /// distance symmetric and supports honest non-transitivity tests for
-    /// approximate pairwise compatibility.
+    /// for all pairwise comparisons in a cohort. The per-entry RMS distance is
+    /// symmetric on the fixed signature grid and supports honest non-transitivity
+    /// tests for approximate pairwise compatibility.
     pub fn compare(
         &self,
         other: &Self,
@@ -1099,8 +1104,14 @@ impl KineticResponseSignature {
         let mut branch_mismatch_count = 0_usize;
         let mut unresolved_branch_count = 0_usize;
 
-        for index in 0..self.responses.len() {
-            match (self.responses[index], other.responses[index]) {
+        for (((left_response, right_response), left_branch), right_branch) in self
+            .responses
+            .iter()
+            .zip(&other.responses)
+            .zip(&self.branch_ids)
+            .zip(&other.branch_ids)
+        {
+            match (left_response, right_response) {
                 (Some(left), Some(right)) => {
                     let real_delta = left.real - right.real;
                     let imag_delta = left.imag - right.imag;
@@ -1109,7 +1120,7 @@ impl KineticResponseSignature {
                 }
                 _ => missing_response_count += 1,
             }
-            match (&self.branch_ids[index], &other.branch_ids[index]) {
+            match (left_branch, right_branch) {
                 (Some(left), Some(right)) if left != right => branch_mismatch_count += 1,
                 (Some(_), Some(_)) => {}
                 _ => unresolved_branch_count += 1,
@@ -1119,8 +1130,13 @@ impl KineticResponseSignature {
             return Err(ContractError::InvalidGramianArithmetic);
         }
         let absolute_frobenius_error = squared_error.sqrt();
+        let rms_response_error = if measured_entry_count > 0 {
+            absolute_frobenius_error / (measured_entry_count as f64).sqrt()
+        } else {
+            0.0
+        };
         let normalized_response_distance = (measured_entry_count > 0)
-            .then_some(absolute_frobenius_error / normalization_scale);
+            .then_some(rms_response_error / normalization_scale);
         if normalized_response_distance.is_some_and(|distance| !distance.is_finite()) {
             return Err(ContractError::InvalidGramianArithmetic);
         }
@@ -4863,8 +4879,8 @@ mod tests {
     fn kinetic_response_signature_comparison_is_symmetric_with_fixed_contract_scale() {
         let left = make_kinetic_response_signature(1.0, "contract-a", "hamiltonian-class-a", Some("echo"));
         let right = make_kinetic_response_signature(1.5, "contract-a", "hamiltonian-class-a", Some("echo"));
-        let forward = left.compare(&right, 2.0).unwrap();
-        let reverse = right.compare(&left, 2.0).unwrap();
+        let forward = left.compare(&right, 1.0).unwrap();
+        let reverse = right.compare(&left, 1.0).unwrap();
         assert_eq!(forward.normalized_response_distance, Some(0.5));
         assert_eq!(
             forward.normalized_response_distance,
