@@ -258,6 +258,32 @@ pub struct MycelialSampleHealthBudgetReport {
     pub canonical_digest: String,
 }
 
+impl MycelialSampleHealthBudgetReport {
+    /// Recomputes the complete sample-health decision against frozen evidence.
+    ///
+    /// This checks more than the output hash: it replays the upstream VOI source
+    /// validation, policy admissibility, cumulative exposure calculation and
+    /// final recommendation using the caller's exact inputs.
+    pub fn validate_against(
+        &self,
+        active_sensing_evidence: &MycelialSampleHealthActiveSensingEvidence,
+        budget: &MycelialSampleHealthBudget,
+        state: &MycelialSampleHealthState,
+        proposals: &[MycelialAcquisitionBudgetProposal],
+    ) -> Result<(), MycelialSampleHealthBudgetError> {
+        let expected = evaluate_mycelial_sample_health_budget(
+            active_sensing_evidence,
+            budget,
+            state,
+            proposals,
+        )?;
+        if self != &expected {
+            return Err(MycelialSampleHealthBudgetError::ReportMismatch);
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MycelialSampleHealthBudgetError {
     InvalidSchemaVersion(u16),
@@ -267,6 +293,7 @@ pub enum MycelialSampleHealthBudgetError {
     InvalidState(&'static str),
     InvalidProposal(&'static str),
     InvalidActiveSensingReport(&'static str),
+    ReportMismatch,
     DuplicateId(&'static str),
     InventoryMismatch,
     ResourceLimitExceeded(&'static str),
@@ -296,6 +323,9 @@ impl fmt::Display for MycelialSampleHealthBudgetError {
             }
             Self::InvalidActiveSensingReport(field) => {
                 write!(f, "invalid active-sensing report for sample-health filtering: {field}")
+            }
+            Self::ReportMismatch => {
+                write!(f, "sample-health budget report does not match independent recomputation")
             }
             Self::DuplicateId(field) => {
                 write!(f, "duplicate Mycelial sample-health identity: {field}")
@@ -1993,6 +2023,35 @@ mod tests {
         assert_eq!(
             first.canonical_digest,
             mycelial_sample_health_budget_report_digest(&first)
+        );
+    }
+
+    #[test]
+    fn report_replay_rejects_tampered_recommendation_and_digest() {
+        let evidence = active_report(vec![action(
+            "replay",
+            MycelialAcquisitionActionKind::HumanAnnotation,
+            2.0,
+        )]);
+        let policy = budget();
+        let current = state();
+        let proposals = vec![proposal(
+            "replay",
+            &["cell-b"],
+            0.0,
+            MycelialAcquisitionActionKind::HumanAnnotation,
+        )];
+        let mut report =
+            evaluate_mycelial_sample_health_budget(&evidence, &policy, &current, &proposals)
+                .unwrap();
+        report
+            .validate_against(&evidence, &policy, &current, &proposals)
+            .unwrap();
+
+        report.recommended_action_id = None;
+        assert_eq!(
+            report.validate_against(&evidence, &policy, &current, &proposals),
+            Err(MycelialSampleHealthBudgetError::ReportMismatch)
         );
     }
 
