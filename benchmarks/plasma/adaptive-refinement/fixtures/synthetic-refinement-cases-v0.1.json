@@ -1,0 +1,74 @@
+{
+  "schema_version": "0.1",
+  "policy_id": "tail-or-future-response-with-memory-reserve-v1",
+  "thresholds": {
+    "spectral_tail_threshold": 10,
+    "response_risk_threshold": 1
+  },
+  "memory_policy": {
+    "memory_budget_bytes": 1000,
+    "reserved_headroom_bytes": 100,
+    "projected_peak_includes_temporary_buffers": true
+  },
+  "cases": [
+    {
+      "case_id": "quiet-tail-low-response-hold",
+      "spectral_tail_measure": 5,
+      "response_risk_upper_bound": 0.5,
+      "projected_peak_bytes": 700,
+      "expected_decision": "Hold",
+      "expected_reason": "NoTrigger",
+      "expected_qualification": "NoTrigger"
+    },
+    {
+      "case_id": "weak-tail-high-future-response",
+      "spectral_tail_measure": 2,
+      "response_risk_upper_bound": 1.2,
+      "projected_peak_bytes": 700,
+      "expected_decision": "Refine",
+      "expected_reason": "FutureResponse",
+      "expected_qualification": "Triggered"
+    },
+    {
+      "case_id": "spectral-tail-exceeded",
+      "spectral_tail_measure": 10,
+      "response_risk_upper_bound": 0.2,
+      "projected_peak_bytes": 700,
+      "expected_decision": "Refine",
+      "expected_reason": "SpectralTail",
+      "expected_qualification": "Triggered"
+    },
+    {
+      "case_id": "response-assessment-missing",
+      "spectral_tail_measure": 1,
+      "response_risk_upper_bound": null,
+      "projected_peak_bytes": 700,
+      "expected_decision": "Refine",
+      "expected_reason": "ResponseUnknown",
+      "expected_qualification": "UnknownResponse"
+    },
+    {
+      "case_id": "response-risk-blocked-by-memory",
+      "spectral_tail_measure": 1,
+      "response_risk_upper_bound": 2,
+      "projected_peak_bytes": 901,
+      "expected_decision": "BlockedByMemory",
+      "expected_reason": "FutureResponse",
+      "expected_qualification": "UnknownBlockedByMemory"
+    },
+    {
+      "case_id": "both-signals-exceeded",
+      "spectral_tail_measure": 12,
+      "response_risk_upper_bound": 1.5,
+      "projected_peak_bytes": 800,
+      "expected_decision": "Refine",
+      "expected_reason": "Both",
+      "expected_qualification": "Triggered"
+    }
+  ],
+  "claim_boundary": {
+    "synthetic_policy_only": true,
+    "spectral_solver_evaluated": false,
+    "physical_qoi_result_claimed": false
+  }
+}
