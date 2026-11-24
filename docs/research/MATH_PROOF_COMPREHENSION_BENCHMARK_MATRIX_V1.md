@@ -443,3 +443,9 @@ The proof-action workstream now has a bounded `And.comm` Lean source pilot. The 
 A second pinned Lean source now deliberately applies `And.symm` to the wrong proposition (`a ∧ b → a ∧ b`). The manifest pins its digest and states that the expected result is a Lean type error. The focused workflow accepts this control only when the negative compile is rejected with a type/application-type mismatch, and fails if Lean accepts it. The machine-readable replay receipt records the negative source and log digests separately from the positive certificate proof.
 
 **Status:** negative source, manifest binding and focused workflow check are committed. Its exact-head execution remains pending; the expected rejection is not yet a measured pass. This is one mutation control, not comprehensive adversarial coverage.
+
+## 17. Manifest-to-plan binding and mutation gate (2026-11-24)
+
+The focused workflow now checks that the action-certificate manifest's plan ID, action node IDs, action kinds, input goals and output subgoals match the pinned ProofPlanV1 fixture. It checks that forward/reverse expected proposition strings match the exact corresponding subgoal statements. A generated mutation that substitutes the identity proposition for the forward target must be rejected by the same binding check.
+
+**Status:** workflow source is committed; exact-head execution is pending. This tests consistency of the declared manifest with the provisional plan fixture. It does not authenticate the author of the plan or establish that the conceptual role labels are correct.
