@@ -2494,7 +2494,9 @@ pub fn evaluate_scalar_unstable_mode_interface(
         contract.minimum_bandwidth_multiple,
         contract.maximum_loop_latency_efold_fraction,
     ];
-    if positive_finite.iter().any(|value| !value.is_finite() || *value <= 0.0)
+    if positive_finite
+        .iter()
+        .any(|value| !value.is_finite() || *value <= 0.0)
         || !contract.diagnostic_gain.is_finite()
         || contract.diagnostic_gain < 0.0
         || !contract.actuator_gain.is_finite()
@@ -2574,7 +2576,8 @@ pub fn evaluate_scalar_unstable_mode_interface(
     let mut controllability_gramian = 0.0_f64;
     let mut actuator_compensation = 0.0_f64;
     let mut command_step = 0_u32;
-    while let Some(applied_step) = command_step.checked_add(contract.actuator_delivery_delay_steps) {
+    while let Some(applied_step) = command_step.checked_add(contract.actuator_delivery_delay_steps)
+    {
         if applied_step >= contract.horizon_steps {
             break;
         }
@@ -2587,7 +2590,11 @@ pub fn evaluate_scalar_unstable_mode_interface(
                 "finite-horizon actuator Gramian overflowed",
             ));
         }
-        kahan_add(contribution, &mut controllability_gramian, &mut actuator_compensation);
+        kahan_add(
+            contribution,
+            &mut controllability_gramian,
+            &mut actuator_compensation,
+        );
         actuator_command_count += 1;
         match command_step.checked_add(contract.actuator_update_stride_steps) {
             Some(next) => command_step = next,
@@ -2622,8 +2629,7 @@ pub fn evaluate_scalar_unstable_mode_interface(
         conservative_loop_latency_seconds * contract.growth_rate_per_second;
     let diagnostic_delay_efold_fraction =
         diagnostic_delay_seconds * contract.growth_rate_per_second;
-    let actuator_delay_efold_fraction =
-        actuator_delay_seconds * contract.growth_rate_per_second;
+    let actuator_delay_efold_fraction = actuator_delay_seconds * contract.growth_rate_per_second;
     let derived = [
         effective_diagnostic_bandwidth_hz,
         effective_actuator_bandwidth_hz,
@@ -4951,13 +4957,12 @@ mod tests {
 
     #[test]
     fn scalar_unstable_mode_oracle_matches_exact_observability_and_controllability_sums() {
-        let report = evaluate_scalar_unstable_mode_interface(scalar_unstable_mode_contract()).unwrap();
+        let report =
+            evaluate_scalar_unstable_mode_interface(scalar_unstable_mode_contract()).unwrap();
         assert!((report.discrete_growth_factor_per_step - 1.005012520859401).abs() < 1.0e-13);
         assert_eq!(report.observation_sample_count, 5);
         assert_eq!(report.actuator_command_count, 5);
-        assert!(
-            (report.observability_fisher_information - 2082.4542913757846).abs() < 1.0e-9
-        );
+        assert!((report.observability_fisher_information - 2082.4542913757846).abs() < 1.0e-9);
         assert!((report.controllability_gramian - 1.3015339321098656).abs() < 1.0e-12);
         assert!((report.effective_diagnostic_bandwidth_hz - 25.0).abs() < 1.0e-12);
         assert!((report.effective_actuator_bandwidth_hz - 20.0).abs() < 1.0e-12);
