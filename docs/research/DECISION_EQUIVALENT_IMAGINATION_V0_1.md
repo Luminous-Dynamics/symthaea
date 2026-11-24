@@ -510,3 +510,40 @@ The local-to-closed-loop sign-reversal rate is a diagnostic of how often a local
 4. Compare against DEEP's allocator/oracle methodology only on a compatible perception-escalation subproblem. Do not compare its driving results directly with manipulation success.
 
 This addendum extends the existing #13445 experiment contract; it is not a new standalone score or execution authority.
+
+## Numeric-control baseline parity: MRS.Q and WIMLE — 2026-11-24
+
+The first external numerical-control experiment should reuse the already pinned CMAQ-011 protocol rather than introduce a new benchmark adapter.
+
+### Source and licence pins
+
+- MRS.Q: `facebookresearch/MRSQ@b12abaf309833f28619dfd87f4251074abed3ae3`, CC BY-NC 4.0. Treat as an isolated upstream dependency; do not vendor, relicense or imply commercial reuse permission.
+- WIMLE: `mehranagh20/wimle@be730d6e7cd1538ca5519b8f505feff126b92938`, MIT, subject to preserving upstream attribution and checking dependency licences.
+
+These are source pins recorded by #9095, not evidence that either baseline has been reproduced in the current Symthaea campaign.
+
+### Two different experiments
+
+1. **Paper-native reproduction:** run each baseline with its published wrappers and settings. This establishes whether its own reference result can be reproduced, not whether it is directly comparable with the other system.
+2. **Wrapper-normalized head-to-head:** run compatible agents through one frozen environment adapter with identical action cadence, action transforms, reward aggregation, controller decisions, termination/reset rules and base physics-step horizon. Label this as a normalized adaptation, not a paper reproduction.
+
+The DMC wrapper audit in #9095 found a concrete parity hazard:
+- MRS.Q defaults to action-repeat 2, aggregates two underlying DMC rewards and uses 500 controller decisions / 1,000 base simulator steps.
+- WIMLE uses one underlying DMC step per selected action, action rescaling and SinglePrecision, with 1,000 controller decisions.
+
+The approximately equal number of base physics transitions does not make the decision opportunities or reward semantics equivalent. Both decision count and base simulator transitions must be captured in receipts. Compatible shared DMC tasks identified by #9095 are `quadruped-run`, `humanoid-run` and `dog-run`; MRS.Q's `quadruped-walk` reference is MRS.Q-only and must remain a separate native reproduction.
+
+### Comparison method and interpretation
+
+Use #9122's existing five-arm auditor:
+- D0: direct policy, no predictive rollout;
+- D1: compute-matched direct/value policy;
+- W1: learned action-conditioned world-model planner;
+- W2: shuffled-future negative control;
+- W3: evaluator-only oracle-dynamics diagnostic.
+
+Add MRS.Q's minimum-over-value-functions selector as a named **value-aggregation/search baseline**. Do not describe it as an independent ensemble of dynamics models. Reuse #9396 for adaptive search/optimism-pocket stress and #9127 for selection-conditioned uncertainty calibration. If observations are an experimental treatment, reuse #13281's signed compute×observation contrasts.
+
+First use the checked-in MRS.Q Gym-HalfCheetah-v4 and DMC quadruped-walk reference rows as source/parity diagnostics; then run the shared-task normalized DMC comparison. Report prediction error, selected-action regret, return, lower-tail/CVaR outcomes, search-induced optimism, selected-action coverage, inference work, simulator calls, p50/p95/p99 latency and memory separately. Preserve each environment/task and protocol as its own result row; no pooled score across vector-control, visual-world and manipulation tracks.
+
+This is the low-cost falsification stage before visual and robot acquisition. It tests whether Symthaea's decision-focused controls improve search decisions under a known environment contract, not whether it has already beaten the world-action-model leaderboard.
