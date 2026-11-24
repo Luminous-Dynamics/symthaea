@@ -51,6 +51,8 @@ pub enum DelayedAciReasonV1 {
     EligibilityReportDigestMismatch,
     DeliveredValueMismatch,
     LabelNotYetAvailable,
+    LabelAvailableBeforeMeasurement,
+    DeliveryBeforePrediction,
     EligibilityReportBeforeLabel,
     EligibilityReportUnavailableAtDelivery,
     FeedbackStepMismatch,
@@ -364,6 +366,11 @@ pub fn issue_delayed_aci_prediction_v1(
     }
     let step = engine.next_prediction_step;
     let delay = engine.policy.feedback_delay_steps;
+    if engine.pending_predictions.values().any(|pending| {
+        pending.prediction_step.saturating_add(delay) <= step
+    }) {
+        engine.state.fixed_delay_assumptions_intact = false;
+    }
     let lane = step % delay;
     let lane_index = usize::try_from(lane)
         .map_err(|_| DelayedAciErrorV1("ACI lane exceeds addressable memory".into()))?;
@@ -515,6 +522,12 @@ pub fn deliver_delayed_aci_feedback_v1(
     }
     if delivery.delivered_at_unix_seconds < delivery.label_available_at_unix_seconds {
         reasons.push(DelayedAciReasonV1::LabelNotYetAvailable);
+    }
+    if delivery.label_available_at_unix_seconds < prediction.event_time_unix_seconds {
+        reasons.push(DelayedAciReasonV1::LabelAvailableBeforeMeasurement);
+    }
+    if delivery.delivered_at_unix_seconds < prediction.prediction_at_unix_seconds {
+        reasons.push(DelayedAciReasonV1::DeliveryBeforePrediction);
     }
     if delivery.eligibility_report_available_at_unix_seconds
         < delivery.label_available_at_unix_seconds
@@ -906,6 +919,73 @@ mod tests {
         issue(&mut engine, "s0", "e0");
         engine.pending_predictions.get_mut("s0").unwrap().upper_bound = 3.0;
         assert!(validate_engine(&engine).is_err());
+    }
+
+    #[test]
+    fn missing_feedback_deadline_invalidates_assumptions_before_next_prediction() {
+        let mut engine = engine(2);
+        issue(&mut engine, "s0", "e0");
+        issue(&mut engine, "s1", "e1");
+        assert!(engine.state.fixed_delay_assumptions_intact);
+        let third = issue(&mut engine, "s2", "e2");
+        assert_eq!(third.prediction_step, 2);
+        assert!(!third.fixed_delay_assumptions_intact_at_issue);
+        assert!(!engine.state.fixed_delay_assumptions_intact);
+    }
+
+    #[test]
+    fn label_cannot_be_available_before_its_measurement_event() {
+        let mut engine = engine(1);
+        issue(&mut engine, "s0", "e0");
+        let mut candidate = delivery(
+            "s0",
+            "e0",
+            "l0",
+            1,
+            0.5,
+            1,
+            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+        );
+        candidate.label_available_at_unix_seconds = 999;
+        candidate.eligibility_report_available_at_unix_seconds = 1_011;
+        let update = deliver_delayed_aci_feedback_v1(&mut engine, &candidate).unwrap();
+        assert_eq!(update.disposition, DelayedAciDispositionV1::Rejected);
+        assert!(update.reasons.contains(&DelayedAciReasonV1::LabelAvailableBeforeMeasurement));
+        assert!(!update.alpha_state_mutated);
+    }
+
+    #[test]
+    fn historical_interval_receipt_never_changes_after_feedback() {
+        let mut engine = engine(1);
+        let prediction = issue(&mut engine, "s0", "e0");
+        let frozen = prediction.clone();
+        deliver_delayed_aci_feedback_v1(
+            &mut engine,
+            &delivery(
+                "s0",
+                "e0",
+                "l0",
+                1,
+                0.5,
+                1,
+                LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            ),
+        )
+        .unwrap();
+        assert_eq!(prediction, frozen);
+        assert_eq!(prediction.lower_bound, 0.0);
+        assert_eq!(prediction.upper_bound, 1.0);
+        assert_eq!(prediction.alpha_used, 0.10);
+    }
+
+    #[test]
+    fn interval_method_digest_mismatch_blocks_prediction() {
+        let mut engine = engine(1);
+        let mut candidate = prediction("s0", "e0", 0.10);
+        candidate.interval_method_sha256 = digest('f');
+        assert!(issue_delayed_aci_prediction_v1(&mut engine, &candidate).is_err());
+        assert_eq!(engine.next_prediction_step, 0);
+        assert!(engine.pending_predictions.is_empty());
     }
 
     #[test]
