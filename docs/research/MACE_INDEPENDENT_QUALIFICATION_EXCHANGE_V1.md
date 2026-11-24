@@ -21,7 +21,7 @@ The exchange order is:
 - `QualificationUseContextV1` is consumer-owned context; it is not populated from the issuer response.
 - `EvidenceQualificationRequestV1` carries canonical candidate JSONL and a strict complete use binding. Its request digest is a transport/idempotency identity, not a trust assertion.
 - `IndependentEvidenceQualificationIssuerV1` is an injected transport contract. A real implementation must connect to a different authority and map timeout/ambiguous outcomes to `Unavailable`.
-- `independently_qualify_candidate_batch_v1` is the fail-closed consumer path. It verifies the returned receipt with the caller's pinned verifier and applies `project_qualified_candidate_evidence_v1`.
+- `independently_qualify_candidate_batch_v1` is the fail-closed consumer path. It verifies the returned receipt with the caller's pinned verifier and applies `project_qualified_candidate_evidence_v1`. It obtains receipt-verification time from an injected `QualificationTrustedClockV1`; the request carries no timestamp supplied by the candidate backend.
 
 Wire schema: `data/schemas/mace_evidence_qualification_request_v1.schema.json`. Rust consumers may decode with `EvidenceQualificationRequestV1::from_json_value`; this rejects unknown/missing fields, non-canonical JSONL, candidate/binding mismatches, unsorted IDs and request-digest mismatches.
 
