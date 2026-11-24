@@ -3,19 +3,17 @@
 //! post-hoc and must never be passed to the candidate.
 
 use crate::local_global::{
-    BooleanCountermodel, BooleanSequent, FiniteTruthTableResult, ModelIdentity,
-    MAX_FINITE_BOOLEAN_ATOMS, check_finite_boolean_sequent,
+    BooleanCountermodel, BooleanSequent, FiniteTruthTableResult, MAX_FINITE_BOOLEAN_ATOMS,
+    ModelIdentity, check_finite_boolean_sequent,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 
 #[cfg(test)]
-const FIXTURE: &str =
-    include_str!("../../../../docs/research/MATH_HARDMODE_SYNTHETIC_V1.json");
+const FIXTURE: &str = include_str!("../../../../docs/research/MATH_HARDMODE_SYNTHETIC_V1.json");
 #[cfg(test)]
-const SCHEMA: &str =
-    include_str!("../../../../docs/research/MATH_HARDMODE_RECEIPT_V1.schema.json");
+const SCHEMA: &str = include_str!("../../../../docs/research/MATH_HARDMODE_RECEIPT_V1.schema.json");
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -163,7 +161,10 @@ impl HardModeReceiptV1 {
     }
 
     pub fn candidate_view_sha256(&self) -> Result<String, String> {
-        domain_separated_sha256("candidate_payload", &(&self.schema_version, &self.candidate))
+        domain_separated_sha256(
+            "candidate_payload",
+            &(&self.schema_version, &self.candidate),
+        )
     }
 }
 
@@ -210,7 +211,9 @@ fn validate_digest<T: Serialize>(
 
 fn validate_refs(label: &str, refs: &[String], errors: &mut Vec<String>) {
     if refs.is_empty() || refs.iter().any(|value| !non_empty(value)) {
-        errors.push(format!("{label} must contain non-empty evidence references"));
+        errors.push(format!(
+            "{label} must contain non-empty evidence references"
+        ));
         return;
     }
     let mut unique = HashSet::new();
@@ -237,7 +240,10 @@ pub fn validate_receipt(receipt: &HardModeReceiptV1) -> Vec<String> {
         ("formal_source_revision", &task.formal_source_revision),
         ("formal_source_path", &task.formal_source_path),
         ("formal_declaration", &task.formal_declaration),
-        ("model_identity.provider", &candidate.model_identity.provider),
+        (
+            "model_identity.provider",
+            &candidate.model_identity.provider,
+        ),
         ("model_identity.model", &candidate.model_identity.model),
         ("model_identity.version", &candidate.model_identity.version),
         ("answer_text", &candidate.answer_text),
@@ -247,10 +253,17 @@ pub fn validate_receipt(receipt: &HardModeReceiptV1) -> Vec<String> {
         }
     }
     if !valid_sha256(&candidate.model_identity.decoding_config_sha256) {
-        errors.push("model_identity.decoding_config_sha256 must be lowercase SHA-256 hex".to_owned());
+        errors
+            .push("model_identity.decoding_config_sha256 must be lowercase SHA-256 hex".to_owned());
     }
 
-    validate_digest("problem_sha256", &task.problem_sha256, "problem", &task.problem_text, &mut errors);
+    validate_digest(
+        "problem_sha256",
+        &task.problem_sha256,
+        "problem",
+        &task.problem_text,
+        &mut errors,
+    );
     validate_digest(
         "prompt_sha256",
         &task.prompt_sha256,
@@ -260,7 +273,11 @@ pub fn validate_receipt(receipt: &HardModeReceiptV1) -> Vec<String> {
     );
     match task.task_variant {
         TaskVariant::AnswerProvided => {
-            if task.visible_answer.as_ref().is_none_or(|value| !non_empty(value)) {
+            if task
+                .visible_answer
+                .as_ref()
+                .is_none_or(|value| !non_empty(value))
+            {
                 errors.push("answer_provided task requires visible_answer".to_owned());
             }
         }
@@ -307,7 +324,8 @@ pub fn validate_receipt(receipt: &HardModeReceiptV1) -> Vec<String> {
             }
             (None, None) => {}
             _ => errors.push(
-                "finite_boolean_sequent and its digest must both be present or both be null".to_owned(),
+                "finite_boolean_sequent and its digest must both be present or both be null"
+                    .to_owned(),
             ),
         }
     } else if candidate.candidate_countermodel.is_some()
@@ -332,18 +350,25 @@ pub fn validate_receipt(receipt: &HardModeReceiptV1) -> Vec<String> {
 
     if let Some(proof) = &candidate.proof_submission {
         if !non_empty(&proof.artifact_ref) || !valid_sha256(&proof.sha256) {
-            errors.push("proof_submission requires an artifact_ref and lowercase SHA-256".to_owned());
+            errors
+                .push("proof_submission requires an artifact_ref and lowercase SHA-256".to_owned());
         }
     }
     if let Some(plan) = &candidate.proof_plan_submission {
         if !non_empty(&plan.artifact_ref) || !valid_sha256(&plan.sha256) {
-            errors.push("proof_plan_submission requires an artifact_ref and lowercase SHA-256".to_owned());
+            errors.push(
+                "proof_plan_submission requires an artifact_ref and lowercase SHA-256".to_owned(),
+            );
         }
     }
 
     if let Some(evaluator) = &receipt.evaluator_only {
         if evaluator.answer_correct.is_some() {
-            validate_refs("answer_evidence_refs", &evaluator.answer_evidence_refs, &mut errors);
+            validate_refs(
+                "answer_evidence_refs",
+                &evaluator.answer_evidence_refs,
+                &mut errors,
+            );
         }
         if evaluator.formalization_matches_target.is_some() {
             validate_refs(
@@ -363,7 +388,8 @@ pub fn validate_receipt(receipt: &HardModeReceiptV1) -> Vec<String> {
                         errors.push(format!("gold_countermodel is invalid: {reason}"));
                     }
                 }
-                None => errors.push("gold_countermodel requires a finite Boolean formalization".to_owned()),
+                None => errors
+                    .push("gold_countermodel requires a finite Boolean formalization".to_owned()),
             }
         }
 
@@ -373,7 +399,9 @@ pub fn validate_receipt(receipt: &HardModeReceiptV1) -> Vec<String> {
                 errors.push("not_run proof status must not carry checker evidence".to_owned());
             }
             (status, None) => {
-                errors.push(format!("{status:?} proof status requires verification evidence"));
+                errors.push(format!(
+                    "{status:?} proof status requires verification evidence"
+                ));
             }
             (status, Some(verification)) => {
                 for (field, value) in [
@@ -381,8 +409,14 @@ pub fn validate_receipt(receipt: &HardModeReceiptV1) -> Vec<String> {
                     ("checker_version", &verification.checker_version),
                     ("toolchain", &verification.toolchain),
                     ("verified_task_id", &verification.verified_task_id),
-                    ("verified_formal_source_revision", &verification.verified_formal_source_revision),
-                    ("verified_statement_sha256", &verification.verified_statement_sha256),
+                    (
+                        "verified_formal_source_revision",
+                        &verification.verified_formal_source_revision,
+                    ),
+                    (
+                        "verified_statement_sha256",
+                        &verification.verified_statement_sha256,
+                    ),
                     ("verified_proof_sha256", &verification.verified_proof_sha256),
                     ("result_artifact_ref", &verification.result_artifact_ref),
                 ] {
@@ -391,11 +425,19 @@ pub fn validate_receipt(receipt: &HardModeReceiptV1) -> Vec<String> {
                     }
                 }
                 if !valid_sha256(&verification.environment_manifest_sha256) {
-                    errors.push("proof_verification.environment_manifest_sha256 must be SHA-256".to_owned());
+                    errors.push(
+                        "proof_verification.environment_manifest_sha256 must be SHA-256".to_owned(),
+                    );
                 }
-                validate_refs("proof_verification.evidence_refs", &verification.evidence_refs, &mut errors);
+                validate_refs(
+                    "proof_verification.evidence_refs",
+                    &verification.evidence_refs,
+                    &mut errors,
+                );
                 if candidate.proof_submission.is_none() {
-                    errors.push("proof verification requires a candidate proof submission".to_owned());
+                    errors.push(
+                        "proof verification requires a candidate proof submission".to_owned(),
+                    );
                 }
                 if verification.verified_task_id != task.task_id {
                     errors.push("proof verification task identity mismatch".to_owned());
@@ -405,7 +447,8 @@ pub fn validate_receipt(receipt: &HardModeReceiptV1) -> Vec<String> {
                 }
                 let formalization = candidate.formalization.as_ref();
                 if formalization.is_none()
-                    || verification.verified_statement_sha256 != formalization.unwrap().statement_sha256
+                    || verification.verified_statement_sha256
+                        != formalization.unwrap().statement_sha256
                 {
                     errors.push("proof verification formal statement digest mismatch".to_owned());
                 }
@@ -418,7 +461,9 @@ pub fn validate_receipt(receipt: &HardModeReceiptV1) -> Vec<String> {
                     errors.push("accepted proof requires lean-kernel authority".to_owned());
                 }
                 if *status == ProofStatus::Accepted && evaluator.gold_countermodel.is_some() {
-                    errors.push("accepted proof conflicts with evaluator gold countermodel".to_owned());
+                    errors.push(
+                        "accepted proof conflicts with evaluator gold countermodel".to_owned(),
+                    );
                 }
             }
         }
@@ -431,15 +476,15 @@ pub fn parse_receipt(input: &str) -> Result<HardModeReceiptV1, String> {
     serde_json::from_str(input).map_err(|error| format!("invalid HardModeReceiptV1 JSON: {error}"))
 }
 
-pub fn evaluate_receipt(
-    receipt: &HardModeReceiptV1,
-) -> Result<HardModeEvaluationV1, Vec<String>> {
+pub fn evaluate_receipt(receipt: &HardModeReceiptV1) -> Result<HardModeEvaluationV1, Vec<String>> {
     let errors = validate_receipt(receipt);
     if !errors.is_empty() {
         return Err(errors);
     }
     let Some(evaluator) = &receipt.evaluator_only else {
-        return Err(vec!["evaluator_only partition required for post-hoc evaluation".to_owned()]);
+        return Err(vec![
+            "evaluator_only partition required for post-hoc evaluation".to_owned(),
+        ]);
     };
 
     let (finite_semantics, candidate_witness) = match receipt
@@ -451,12 +496,25 @@ pub fn evaluate_receipt(
         Some(sequent) => {
             let result = check_finite_boolean_sequent(sequent, MAX_FINITE_BOOLEAN_ATOMS);
             let semantics = match result {
-                Ok(FiniteTruthTableResult::Countermodel { valuation, assignments_checked }) =>
-                    FiniteSemanticStatus::CountermodelFound { assignments_checked, witness: valuation },
-                Ok(FiniteTruthTableResult::NoCountermodelFound { assignments_checked }) =>
-                    FiniteSemanticStatus::NoCountermodelFound { assignments_checked },
-                Ok(FiniteTruthTableResult::AtomBudgetExceeded { atom_count, max_atoms }) =>
-                    FiniteSemanticStatus::UnknownAtomBudgetExceeded { atom_count, max_atoms },
+                Ok(FiniteTruthTableResult::Countermodel {
+                    valuation,
+                    assignments_checked,
+                }) => FiniteSemanticStatus::CountermodelFound {
+                    assignments_checked,
+                    witness: valuation,
+                },
+                Ok(FiniteTruthTableResult::NoCountermodelFound {
+                    assignments_checked,
+                }) => FiniteSemanticStatus::NoCountermodelFound {
+                    assignments_checked,
+                },
+                Ok(FiniteTruthTableResult::AtomBudgetExceeded {
+                    atom_count,
+                    max_atoms,
+                }) => FiniteSemanticStatus::UnknownAtomBudgetExceeded {
+                    atom_count,
+                    max_atoms,
+                },
                 Err(_) => FiniteSemanticStatus::NotApplicable,
             };
             let witness = match &receipt.candidate.candidate_countermodel {
@@ -468,7 +526,10 @@ pub fn evaluate_receipt(
             };
             (semantics, witness)
         }
-        None => (FiniteSemanticStatus::NotApplicable, CandidateWitnessStatus::NotApplicable),
+        None => (
+            FiniteSemanticStatus::NotApplicable,
+            CandidateWitnessStatus::NotApplicable,
+        ),
     };
 
     Ok(HardModeEvaluationV1 {
@@ -513,7 +574,10 @@ mod tests {
         assert_eq!(result.answer_correct, Some(true));
         assert_eq!(result.formalization_matches_target, Some(true));
         assert_eq!(result.proof_status, ProofStatus::NotRun);
-        assert!(matches!(result.finite_semantics, FiniteSemanticStatus::CountermodelFound { .. }));
+        assert!(matches!(
+            result.finite_semantics,
+            FiniteSemanticStatus::CountermodelFound { .. }
+        ));
         assert_eq!(result.candidate_witness, CandidateWitnessStatus::Validated);
     }
 
@@ -553,25 +617,49 @@ mod tests {
         receipt.candidate.task.visible_answer = Some("hidden answer".to_owned());
         receipt.candidate.task.prompt_sha256 = domain_separated_sha256(
             "prompt",
-            &(&receipt.candidate.task.prompt_text, &receipt.candidate.task.visible_answer),
-        ).unwrap();
-        assert!(validate_receipt(&receipt).iter().any(|error| error.contains("no_answer task must not expose")));
+            &(
+                &receipt.candidate.task.prompt_text,
+                &receipt.candidate.task.visible_answer,
+            ),
+        )
+        .unwrap();
+        assert!(
+            validate_receipt(&receipt)
+                .iter()
+                .any(|error| error.contains("no_answer task must not expose"))
+        );
     }
 
     #[test]
     fn answer_provided_variant_requires_a_visible_answer() {
         let mut receipt = fixture();
         receipt.candidate.task.task_variant = TaskVariant::AnswerProvided;
-        assert!(validate_receipt(&receipt).iter().any(|error| error.contains("answer_provided task requires")));
+        assert!(
+            validate_receipt(&receipt)
+                .iter()
+                .any(|error| error.contains("answer_provided task requires"))
+        );
     }
 
     #[test]
     fn invalid_candidate_witness_is_scored_not_silently_accepted() {
         let mut receipt = fixture();
-        receipt.candidate.candidate_countermodel.as_mut().unwrap()
-            .valuation.iter_mut().find(|item| item.atom == "p").unwrap().value = true;
-        let result = evaluate_receipt(&receipt).expect("invalid candidate witness remains scorable");
-        assert!(matches!(result.candidate_witness, CandidateWitnessStatus::Invalid { .. }));
+        receipt
+            .candidate
+            .candidate_countermodel
+            .as_mut()
+            .unwrap()
+            .valuation
+            .iter_mut()
+            .find(|item| item.atom == "p")
+            .unwrap()
+            .value = true;
+        let result =
+            evaluate_receipt(&receipt).expect("invalid candidate witness remains scorable");
+        assert!(matches!(
+            result.candidate_witness,
+            CandidateWitnessStatus::Invalid { .. }
+        ));
         assert_eq!(result.answer_correct, Some(true));
     }
 
@@ -579,7 +667,11 @@ mod tests {
     fn completed_proof_check_requires_a_candidate_submission() {
         let mut receipt = fixture();
         receipt.evaluator_only.as_mut().unwrap().proof_status = ProofStatus::Accepted;
-        assert!(validate_receipt(&receipt).iter().any(|error| error.contains("requires verification evidence")));
+        assert!(
+            validate_receipt(&receipt)
+                .iter()
+                .any(|error| error.contains("requires verification evidence"))
+        );
     }
 
     #[test]
@@ -598,12 +690,22 @@ mod tests {
             environment_manifest_sha256: "b".repeat(64),
             verified_task_id: receipt.candidate.task.task_id.clone(),
             verified_formal_source_revision: receipt.candidate.task.formal_source_revision.clone(),
-            verified_statement_sha256: receipt.candidate.formalization.as_ref().unwrap().statement_sha256.clone(),
+            verified_statement_sha256: receipt
+                .candidate
+                .formalization
+                .as_ref()
+                .unwrap()
+                .statement_sha256
+                .clone(),
             verified_proof_sha256: "c".repeat(64),
             result_artifact_ref: "artifact://lean-result".to_owned(),
             evidence_refs: vec!["LEAN-KERNEL-CHECK-001".to_owned()],
         });
-        assert!(validate_receipt(&receipt).iter().any(|error| error.contains("conflicts with evaluator gold countermodel")));
+        assert!(
+            validate_receipt(&receipt)
+                .iter()
+                .any(|error| error.contains("conflicts with evaluator gold countermodel"))
+        );
     }
 
     #[test]

@@ -2,7 +2,7 @@ use std::env;
 use std::fs;
 use std::process::ExitCode;
 
-use proof_plan_contract::hard_mode::{evaluate_receipt_json, FiniteSemanticStatus};
+use proof_plan_contract::hard_mode::{FiniteSemanticStatus, evaluate_receipt_json};
 
 fn main() -> ExitCode {
     let Some(path) = env::args().nth(1) else {
@@ -29,18 +29,51 @@ fn main() -> ExitCode {
 
     println!("HARD_MODE_RECEIPT_VALID task_id={}", report.task_id);
     println!("task_variant={:?}", report.task_variant);
-    println!("answer_correct={}", report.answer_correct.map(|value| value.to_string()).unwrap_or_else(|| "unknown".to_owned()));
-    println!("formalization_matches_target={}", report.formalization_matches_target.map(|value| value.to_string()).unwrap_or_else(|| "unknown".to_owned()));
+    println!(
+        "answer_correct={}",
+        report
+            .answer_correct
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| "unknown".to_owned())
+    );
+    println!(
+        "formalization_matches_target={}",
+        report
+            .formalization_matches_target
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| "unknown".to_owned())
+    );
     match &report.finite_semantics {
-        FiniteSemanticStatus::CountermodelFound { assignments_checked, witness } => {
-            let text = witness.iter().map(|item| format!("{}={}", item.atom, item.value)).collect::<Vec<_>>().join(",");
-            println!("finite_semantics=countermodel assignments_checked={} witness={}", assignments_checked, text);
+        FiniteSemanticStatus::CountermodelFound {
+            assignments_checked,
+            witness,
+        } => {
+            let text = witness
+                .iter()
+                .map(|item| format!("{}={}", item.atom, item.value))
+                .collect::<Vec<_>>()
+                .join(",");
+            println!(
+                "finite_semantics=countermodel assignments_checked={} witness={}",
+                assignments_checked, text
+            );
         }
-        FiniteSemanticStatus::NoCountermodelFound { assignments_checked } => {
-            println!("finite_semantics=no_countermodel_found assignments_checked={}", assignments_checked);
+        FiniteSemanticStatus::NoCountermodelFound {
+            assignments_checked,
+        } => {
+            println!(
+                "finite_semantics=no_countermodel_found assignments_checked={}",
+                assignments_checked
+            );
         }
-        FiniteSemanticStatus::UnknownAtomBudgetExceeded { atom_count, max_atoms } => {
-            println!("finite_semantics=unknown atom_count={} max_atoms={}", atom_count, max_atoms);
+        FiniteSemanticStatus::UnknownAtomBudgetExceeded {
+            atom_count,
+            max_atoms,
+        } => {
+            println!(
+                "finite_semantics=unknown atom_count={} max_atoms={}",
+                atom_count, max_atoms
+            );
         }
         FiniteSemanticStatus::NotApplicable => println!("finite_semantics=not_applicable"),
     }
