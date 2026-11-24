@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/crates/domains/symthaea-experiment-design/fixtures/covariance-design.schema.json",
-  "title": "Covariance-aware physics experiment design input",
+  "title": "Joint-covariance physics experiment design input",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -12,7 +12,7 @@
   ],
   "properties": {
     "schema_version": {
-      "const": "physics-experiment-design-covariance-v0.1"
+      "const": "physics-experiment-design-joint-covariance-v0.2"
     },
     "target": {
       "type": "string",
@@ -103,44 +103,57 @@
         "means": {
           "type": "array",
           "minItems": 1,
+          "maxItems": 8,
           "items": {
             "type": "number"
           }
         }
       }
     },
-    "pairwise_difference_covariance": {
+    "joint_covariance": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "first_hypothesis_id",
-        "second_hypothesis_id",
+        "hypothesis_order",
+        "observable_order",
         "covariance",
         "covariance_descriptor",
         "covariance_descriptor_digest_sha256",
         "covariance_matrix_digest_sha256"
       ],
       "properties": {
-        "first_hypothesis_id": {
-          "type": "string",
-          "minLength": 1
+        "hypothesis_order": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         },
-        "second_hypothesis_id": {
-          "type": "string",
-          "minLength": 1
+        "observable_order": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "covariance": {
           "type": "array",
-          "minItems": 1,
+          "minItems": 2,
+          "maxItems": 16,
           "items": {
             "type": "array",
-            "minItems": 1,
+            "minItems": 2,
+            "maxItems": 16,
             "items": {
               "type": "number"
-            },
-            "maxItems": 8
-          },
-          "maxItems": 8
+            }
+          }
         },
         "covariance_descriptor": {
           "type": "string",
@@ -167,7 +180,7 @@
         "duration_hours",
         "observables",
         "predictions",
-        "pairwise_difference_covariances"
+        "joint_output_covariance"
       ],
       "properties": {
         "experiment_id": {
@@ -209,13 +222,8 @@
             "$ref": "#/$defs/prediction"
           }
         },
-        "pairwise_difference_covariances": {
-          "type": "array",
-          "minItems": 1,
-          "maxItems": 28,
-          "items": {
-            "$ref": "#/$defs/pairwise_difference_covariance"
-          }
+        "joint_output_covariance": {
+          "$ref": "#/$defs/joint_covariance"
         }
       }
     }
