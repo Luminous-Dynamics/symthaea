@@ -1,0 +1,472 @@
+name: Math Proof Comprehension Pilot
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "scripts/research/proof_comprehension_oracle.rs"
+      - "scripts/research/proof-plan-contract/**"
+      - "scripts/research/lean-proof-extractor/**"
+      - "docs/research/MATHLIB_ELABORATED_DEPENDENCY_GRAPH_V1.schema.json"
+      - "docs/research/MATHLIB_ELABORATED_DEPENDENCY_GRAPH_V429_V1.schema.json"
+      - "docs/research/PROOF_PLAN_*.json"
+      - "docs/research/LOCAL_GLOBAL_PAIR_*"
+      - "docs/research/PROOF_PLAN_*.md"
+      - "docs/research/MATH_PROOF_COMPREHENSION_*.json"
+      - "docs/research/MATHLIB_PROOF_COMPREHENSION_PILOT_V1.*"
+      - "docs/research/ETH_REDUCTION_COMPREHENSION_TOY_V1.*"
+      - "docs/research/RH_PROOF_GRAPH_BASELINE_V1.*"
+      - "docs/research/RH_MAIN_INEQUALITY_M_MAP_V1.*"
+      - "docs/research/MATH_PROOF_COMPREHENSION_COMPETITIVE_LEDGER_V1.md"
+      - "docs/research/MATH_PROOF_COMPREHENSION_HUMAN_STUDY_PREREG_V1.md"
+      - "docs/research/README.md"
+      - ".github/workflows/math-proof-comprehension-pilot.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  finite-reference:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca
+        with:
+          components: rustfmt
+
+      - name: Record exact execution identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "HEAD=$(git rev-parse HEAD)"
+          rustc --version
+          rustfmt --version
+
+      - name: Check Rust formatting
+        run: rustfmt --edition 2021 --check scripts/research/proof_comprehension_oracle.rs
+
+      - name: Compile and run dependency-free finite oracle
+        shell: bash
+        run: |
+          set -euo pipefail
+          bin="$RUNNER_TEMP/proof-comprehension-oracle"
+          rustc --edition=2021 --test -D warnings scripts/research/proof_comprehension_oracle.rs -o "$bin"
+          "$bin"
+
+      - name: Parse and assert frozen pilot fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          set -x
+          files=(
+            docs/research/MATH_PROOF_COMPREHENSION_PILOT_V1.json
+            docs/research/MATH_PROOF_COMPREHENSION_PILOT_V1.schema.json
+            docs/research/PROOF_PLAN_V1.schema.json
+            docs/research/PROOF_PLAN_AND_COMM_V1.json
+            docs/research/PROOF_PLAN_MUTATION_FIXTURES_V1.schema.json
+            docs/research/PROOF_PLAN_MUTATION_FIXTURES_V1.json
+            docs/research/LOCAL_GLOBAL_PAIR_V1.schema.json
+            docs/research/LOCAL_GLOBAL_PAIR_SYNTHETIC_V1.json
+            docs/research/MATH_PROOF_COMPREHENSION_THEOREM_SANDWICH_V1.schema.json
+            docs/research/MATH_PROOF_COMPREHENSION_THEOREM_SANDWICH_V1.json
+            docs/research/MATH_PROOF_COMPREHENSION_RECEIPT_V1.schema.json
+            docs/research/MATHLIB_PROOF_COMPREHENSION_PILOT_V1.json
+            docs/research/MATHLIB_PROOF_COMPREHENSION_PILOT_V1.schema.json
+            docs/research/MATHLIB_ELABORATED_DEPENDENCY_GRAPH_V1.schema.json
+            docs/research/MATHLIB_ELABORATED_DEPENDENCY_GRAPH_V429_V1.schema.json
+            docs/research/ETH_REDUCTION_COMPREHENSION_TOY_V1.json
+            docs/research/RH_PROOF_GRAPH_BASELINE_V1.json
+            docs/research/RH_MAIN_INEQUALITY_M_MAP_V1.json
+            docs/research/RH_MAIN_INEQUALITY_M_MAP_V1.schema.json
+          )
+          for file in "${files[@]}"; do
+            jq -e . "$file" >/dev/null
+          done
+
+          jq -e '.candidate.statement_context == []
+            and .evaluator_only.target_statement_context == []
+            and (.evaluator_only.translation_reviews | length) == 2
+            and ([.evaluator_only.translation_reviews[].reviewer_id] | unique | length) == 2
+            and all(.evaluator_only.translation_reviews[]; .disposition == "aligned" and (.evidence_refs | length) > 0)
+            and ([.evaluator_only.translation_reviews[].evidence_refs[]] | unique | length) == 2
+            and (.evaluator_only | has("translation_assessment") | not)
+            and (.evaluator_only | has("translation_assessor") | not)
+            and (.evaluator_only | has("translation_review_refs") | not)' \
+            docs/research/MATH_PROOF_COMPREHENSION_THEOREM_SANDWICH_V1.json >/dev/null
+          echo "THEOREM_SANDWICH_FIXTURE_PASS"
+
+          jq -e '.task_count == (.tasks | length) and .task_count == 6 and .status == "source_pinned_seed_not_gold"' \
+            docs/research/MATH_PROOF_COMPREHENSION_PILOT_V1.json >/dev/null
+
+          jq -e '.task_count == (.tasks | length) and .task_count == 4 and .status == "source_pinned_seed_not_gold"' \
+            docs/research/MATHLIB_PROOF_COMPREHENSION_PILOT_V1.json >/dev/null
+          jq -e '.source_snapshot.lean_toolchain == "leanprover/lean4:v4.37.0-rc1"
+            and .source_snapshot.lean_core_revision == "0b77e12952ad39077d80d8bd6b66d601f225c321"
+            and .source_snapshot.lean_core_commit_url == "https://github.com/leanprover/lean4/commit/0b77e12952ad39077d80d8bd6b66d601f225c321"' \
+            docs/research/MATHLIB_PROOF_COMPREHENSION_PILOT_V1.json >/dev/null
+
+          jq -e '.finite_oracle.source_satisfying_assignments == 5
+            and .finite_oracle.correct_encoded_satisfying_assignments == 5
+            and .finite_oracle.mutated_encoded_satisfying_assignments == 6
+            and .finite_oracle.decision_equivalence_correct == true
+            and .finite_oracle.decision_equivalence_mutated == true
+            and .finite_oracle.unique_extension_correct == true
+            and .finite_oracle.unique_extension_mutated == false' \
+            docs/research/ETH_REDUCTION_COMPREHENSION_TOY_V1.json >/dev/null
+
+          jq -e '.upstream.revision == "70fbb2fc21fed8de3c02d9f6df0b6067bf22e879"
+            and .upstream.dataset_version == "0.2.1"
+            and .upstream.license == "CC0-1.0"' \
+            docs/research/RH_PROOF_GRAPH_BASELINE_V1.json >/dev/null
+
+          jq -e '.source_identity.revision == "40e56bab026552e089d7afcfeff08d2defb9c005"
+            and (.proof_bridge | any(.declarations | index("each_unit_bound_statement")))
+            and (.proof_bridge | any(.declarations | index("Deduction.ch_top")))
+            and (.explicit_non_used_or_ambiguous | any(.declaration == "MeanBoundSecondForm"))' \
+            docs/research/RH_MAIN_INEQUALITY_M_MAP_V1.json >/dev/null
+
+          jq -e '.finite_translation_oracle.group_sizes == [2,3,4,5,6]
+            and .finite_translation_oracle.group_target_cases == 620
+            and .finite_translation_oracle.row_indicator_cases == 1240
+            and .finite_translation_oracle.product_group_target_cases == 66447
+            and .finite_translation_oracle.product_group_row_indicator_cases == 132894
+            and .finite_translation_oracle.total_group_target_cases == 67067
+            and .finite_translation_oracle.total_row_indicator_cases == 134134
+            and .finite_translation_oracle.status == "passed_exact_head_ci"
+            and .finite_translation_oracle.ci_receipt.tested_pr_head == "861db995fc80aa52c3339233fd6ce0cec0168458"
+            and .finite_translation_oracle.ci_receipt.workflow_run_id == 45075362857
+            and .finite_translation_oracle.ci_receipt.rust_tests_passed == 11
+            and .finite_translation_oracle.ci_receipt.rust_tests_failed == 0
+            and .finite_translation_oracle.ci_receipt.conclusion == "success"' \
+            docs/research/RH_MAIN_INEQUALITY_M_MAP_V1.json >/dev/null
+
+          echo "RH_PROOF_GRAPH_AND_M_MAP_FIXTURES_PASS"
+          test -s docs/research/MATH_PROOF_COMPREHENSION_COMPETITIVE_LEDGER_V1.md
+          test -s docs/research/MATH_PROOF_COMPREHENSION_HUMAN_STUDY_PREREG_V1.md
+          grep -F "No human study has been run" docs/research/MATH_PROOF_COMPREHENSION_HUMAN_STUDY_PREREG_V1.md >/dev/null
+          echo "HUMAN_STUDY_STATUS_FIXTURE_PASS"
+          grep -F "Scores and budgets are not directly comparable" docs/research/MATH_PROOF_COMPREHENSION_COMPETITIVE_LEDGER_V1.md >/dev/null
+          echo "COMPETITIVE_LEDGER_STATUS_FIXTURE_PASS"
+          jq -e '.schema_version == "1.0.0"
+            and .status == "source_pinned_provisional"
+            and .theorem.elaborated_type_sha256 == null
+            and .environment.status == "source_only"
+            and .validation.lean_kernel_status == "not_run"
+            and (.nodes | length) == 8
+            and (.edges | length) == 8' \
+            docs/research/PROOF_PLAN_AND_COMM_V1.json >/dev/null
+          echo "PROOF_PLAN_FIXTURE_PASS"
+
+          jq -e '.schema_version == "1.0.0"
+            and (.cases | length) == 6
+            and ([.cases[] | select(.id == "MUT-ROUTE-ONLY" and .mathematical_disposition == "not_refuted")] | length) == 1
+            and ([.cases[] | select(.id == "MUT-LOCAL-GLOBAL-CONTEXT" and .mathematical_disposition == "unknown" and .oracle_status == "not_run")] | length) == 1' \
+            docs/research/PROOF_PLAN_MUTATION_FIXTURES_V1.json >/dev/null
+          echo "PROOF_PLAN_MUTATION_FIXTURE_PASS"
+
+          jq -e '.schema_version == "1.0.0"
+            and .candidate.task_class == "synthetic_control_not_model_evaluation"
+            and .candidate.local_stage.verdict == "reject"
+            and .candidate.global_stage.scope_binding == .candidate.local_stage.scope_binding
+            and .evaluator_only.eligibility == "eligible"
+            and .evaluator_only.independently_assessed_warrant == "invalid"
+            and .evaluator_only.global_disposition == "used_directly"
+            and .candidate.local_stage.scope_binding.premises == ["(p → q)"]
+            and .candidate.local_stage.scope_binding.conclusion_text == "(q → p)"
+            and .candidate.local_stage.scope_binding.root_goal_text == "(q → p)"
+            and .candidate.local_stage.scope_binding.warrant_text == "From (p → q) infer (q → p)."
+            and .candidate.local_stage.scope_binding.finite_boolean_sequent.hypotheses == []
+            and .candidate.local_stage.scope_binding.finite_boolean_sequent.premises[0].op == "implies"
+            and .candidate.local_stage.scope_binding.finite_boolean_sequent.conclusion.op == "implies"
+            and .candidate.local_stage.scope_binding.finite_boolean_sequent_sha256 == "d8511631e228ae06b643a5995e1e5e888382c9e0a5a5521fa35c899e30351199"
+            and .evaluator_only.finite_boolean_countermodel.valuation == [{ "atom": "p", "value": false }, { "atom": "q", "value": true }]
+            and (.evaluator_only.finite_boolean_countermodel | has("premises") | not)
+            and (.evaluator_only.finite_boolean_countermodel | has("conclusion") | not)' \
+            docs/research/LOCAL_GLOBAL_PAIR_SYNTHETIC_V1.json >/dev/null
+          echo "LOCAL_GLOBAL_PAIR_FIXTURE_PASS"
+
+          jq -e '.schema_version == "1.0.0" and .candidate.task_id == "SYNTHETIC-SANDWICH-IMPLICATION-001" and .evaluator_only.stronger_obligations[0].id == "UPPER-STRONGER-P-IMPLIES-Q-AND-R" and (.evaluator_only.corollary_obligations | length) == 2' docs/research/MATH_PROOF_COMPREHENSION_THEOREM_SANDWICH_V1.json >/dev/null
+          echo "THEOREM_SANDWICH_FIXTURE_PASS"
+          echo "PROOF_PLAN_FIXTURES_PASS"
+          echo "MATH_PROOF_COMPREHENSION_PILOT_FIXTURES_PASS"
+          echo "FINITE_TRANSLATION_CASES=67067; ROW_CHECKS=134134"
+
+      - name: Check ProofPlanV1 Rust formatting
+        run: cargo fmt --manifest-path scripts/research/proof-plan-contract/Cargo.toml -- --check
+
+      - name: Test standalone ProofPlanV1 contract validator
+        shell: bash
+        run: |
+          set -euo pipefail
+          export CARGO_TARGET_DIR="$RUNNER_TEMP/proof-plan-target"
+          cargo test --manifest-path scripts/research/proof-plan-contract/Cargo.toml
+          cargo run --manifest-path scripts/research/proof-plan-contract/Cargo.toml --bin proof-plan-contract -- \
+            docs/research/PROOF_PLAN_AND_COMM_V1.json
+          cargo run --manifest-path scripts/research/proof-plan-contract/Cargo.toml --bin local-global -- \
+            docs/research/LOCAL_GLOBAL_PAIR_SYNTHETIC_V1.json | tee local-global-cli.out
+          grep -Eq '^candidate_payload_sha256=[a-f0-9]{64}$' local-global-cli.out
+          grep -Fq 'finite_truth_table=countermodel' local-global-cli.out
+          grep -Fq 'stored_evaluator_witness_matches_minimum=true' local-global-cli.out
+            docs/research/MATH_PROOF_COMPREHENSION_THEOREM_SANDWICH_V1.json
+
+      - name: Export generated Cargo.lock for dependency pinning
+        if: success()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: proof-plan-contract-cargo-lock-bootstrap
+          path: scripts/research/proof-plan-contract/Cargo.lock
+          if-no-files-found: error
+
+  mathlib-elaborated-extraction:
+    name: Pinned Mathlib elaborated dependency extraction
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Check out pinned Mathlib snapshot
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: leanprover-community/mathlib4
+          ref: 6ebcce37335bcb6bca64596e5d57bb3035648030
+          path: mathlib4
+          persist-credentials: false
+
+      - name: Install exact Mathlib Lean toolchain and restore public cache
+        uses: leanprover/lean-action@fe408643ea7367d8c0404a8be3975bb145f5fb64
+        with:
+          lake-package-directory: mathlib4
+          auto-config: "false"
+          build: "false"
+          test: "false"
+          lint: "false"
+          use-mathlib-cache: "true"
+          use-github-cache: "false"
+
+      - name: Verify source and toolchain identity
+        working-directory: mathlib4
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "6ebcce37335bcb6bca64596e5d57bb3035648030"
+          test "$(cat lean-toolchain)" = "leanprover/lean4:v4.37.0-rc1"
+          lean --version | grep -F "4.37.0-rc1"
+          lake --version
+
+      - name: Run Lean-native elaborated dependency extractor
+        working-directory: mathlib4
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp "$GITHUB_WORKSPACE/scripts/research/lean-proof-extractor/ProofComprehensionExtract.lean" .
+          lake env lean ProofComprehensionExtract.lean
+          for declaration in Nat.choose_pos Set.countable_union Multiset.map_id Finset.card_map; do
+            file="proof-comprehension-extract-${declaration}.json"
+            test -s "$file"
+            jq -e --arg declaration "$declaration" '.schema_version == "1.0.0"
+              and .source_revision == "6ebcce37335bcb6bca64596e5d57bb3035648030"
+              and .lean_revision == "0b77e12952ad39077d80d8bd6b66d601f225c321"
+              and .declaration == $declaration
+              and (.unresolved_dependencies | length) == 0
+              and (.edges | length) > 0
+              and .value_kind == "theorem_proof"
+              and .value_dependencies == .proof_value_dependencies
+              and (.definition_value_dependencies | length) == 0
+              and (.opaque_value_dependencies | length) == 0
+              and .trust_profile.closure_status == "complete"
+              and (.trust_profile.unresolved_declarations | length) == 0
+              and (.trust_profile.transitive_declaration_count > 0)
+              and (if $declaration == "Nat.choose_pos" then ((.helper_nodes | length) > 0 and all(.helper_nodes[]; .trust_profile.closure_status == "complete" and (.trust_profile.unresolved_declarations | length) == 0 and .value_kind == "definition_body" and (.proof_value_dependencies | length) == 0 and .value_dependencies == .definition_value_dependencies)) else true end)' "$file" >/dev/null
+          done
+          for declaration in List List.nil List.cons List.rec; do
+            file="proof-comprehension-extract-${declaration}.json"
+            test -s "$file"
+            jq -e --arg declaration "$declaration" '.declaration == $declaration
+              and (.unresolved_dependencies | length) == 0
+              and .trust_profile.closure_status == "complete"
+              and (.trust_profile.unresolved_declarations | length) == 0
+              and (if $declaration == "List" then (.declaration_kind == "inductive" and any(.edges[]; .relation == "inductive_constructor" and .target == "List.nil") and any(.edges[]; .relation == "inductive_constructor" and .target == "List.cons")) else true end)
+              and (if $declaration == "List.nil" or $declaration == "List.cons" then (.declaration_kind == "constructor" and any(.edges[]; .relation == "constructor_of" and .target == "List")) else true end)
+              and (if $declaration == "List.rec" then (.declaration_kind == "recursor" and any(.edges[]; .relation == "recursor_for_inductive" and .target == "List") and any(.edges[]; .relation == "recursor_rule_constructor")) else true end)' "$file" >/dev/null
+          done
+          echo "MATHLIB_STRUCTURAL_CALIBRATION_PASS"
+          echo "MATHLIB_ELABORATED_DEPENDENCY_EXTRACTION_PASS"
+
+      - name: Preserve extracted graph artifacts
+        if: success()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: mathlib-elaborated-dependency-graphs
+          path: mathlib4/proof-comprehension-extract-*.json
+          if-no-files-found: error
+  mathlib-v429-direct-edge-cohort:
+    name: Mathlib v4.29.0 direct-edge comparison cohort (LeanGraph-compatible)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Check out exact Mathlib v4.29.0 tag commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: leanprover-community/mathlib4
+          ref: 8a178386ffc0f5fef0b77738bb5449d50efeea95
+          path: mathlib4-v429
+          persist-credentials: false
+
+      - name: Install Lean v4.29.0 and restore public cache
+        uses: leanprover/lean-action@fe408643ea7367d8c0404a8be3975bb145f5fb64
+        with:
+          lake-package-directory: mathlib4-v429
+          auto-config: "false"
+          build: "false"
+          test: "false"
+          lint: "false"
+          use-mathlib-cache: "true"
+          use-github-cache: "false"
+
+      - name: Verify exact LeanGraph-compatible source identity
+        working-directory: mathlib4-v429
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "8a178386ffc0f5fef0b77738bb5449d50efeea95"
+          test "$(cat lean-toolchain)" = "leanprover/lean4:v4.29.0"
+          lean --version | grep -F "4.29.0"
+          lake --version
+
+      - name: Extract direct type and proof-value dependencies at v4.29.0
+        working-directory: mathlib4-v429
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp "$GITHUB_WORKSPACE/scripts/research/lean-proof-extractor/ProofComprehensionExtractV429.lean" .
+          lake env lean ProofComprehensionExtractV429.lean
+          for declaration in Nat.choose_pos Set.countable_union Multiset.map_id Finset.card_map; do
+            file="proof-comprehension-extract-${declaration}.json"
+            test -s "$file"
+            jq -e --arg declaration "$declaration" '.schema_version == "1.0.0" and .source_revision == "8a178386ffc0f5fef0b77738bb5449d50efeea95" and .lean_revision == "98dc76e3c0a9b856c9b98726b713fb04fab16740" and .declaration == $declaration and (.unresolved_dependencies | length) == 0 and (.edges | length) > 0 and .value_kind == "theorem_proof" and .value_dependencies == .proof_value_dependencies and (.definition_value_dependencies | length) == 0 and (.opaque_value_dependencies | length) == 0 and .trust_profile.closure_status == "complete" and (.trust_profile.unresolved_declarations | length) == 0 and (.trust_profile.transitive_declaration_count > 0) and (if $declaration == "Nat.choose_pos" then ((.helper_nodes | length) > 0 and all(.helper_nodes[]; .trust_profile.closure_status == "complete" and (.trust_profile.unresolved_declarations | length) == 0 and .value_kind == "definition_body" and (.proof_value_dependencies | length) == 0 and .value_dependencies == .definition_value_dependencies)) else true end)' "$file" >/dev/null
+          done
+          for declaration in List List.nil List.cons List.rec; do
+            file="proof-comprehension-extract-${declaration}.json"
+            test -s "$file"
+            jq -e --arg declaration "$declaration" '.declaration == $declaration
+              and (.unresolved_dependencies | length) == 0
+              and .trust_profile.closure_status == "complete"
+              and (.trust_profile.unresolved_declarations | length) == 0
+              and (if $declaration == "List" then (.declaration_kind == "inductive" and any(.edges[]; .relation == "inductive_constructor" and .target == "List.nil") and any(.edges[]; .relation == "inductive_constructor" and .target == "List.cons")) else true end)
+              and (if $declaration == "List.nil" or $declaration == "List.cons" then (.declaration_kind == "constructor" and any(.edges[]; .relation == "constructor_of" and .target == "List")) else true end)
+              and (if $declaration == "List.rec" then (.declaration_kind == "recursor" and any(.edges[]; .relation == "recursor_for_inductive" and .target == "List") and any(.edges[]; .relation == "recursor_rule_constructor")) else true end)' "$file" >/dev/null
+          done
+          echo "MATHLIB_V429_STRUCTURAL_CALIBRATION_PASS"
+          echo "MATHLIB_V429_DIRECT_EXTRACTION_PASS"
+
+      - name: Preserve v4.29.0 comparison artifacts
+        if: success()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: mathlib-v429-lean-graph-compatible-direct-dependencies
+          path: mathlib4-v429/proof-comprehension-extract-*.json
+          if-no-files-found: error
+  mathlib-source-snapshot-differential:
+    name: Mathlib v4.29 versus v4.37 direct dependency differential
+    needs: [mathlib-elaborated-extraction, mathlib-v429-direct-edge-cohort]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Download v4.29.0 extraction artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: mathlib-v429-lean-graph-compatible-direct-dependencies
+          path: artifacts/mathlib-v429
+
+      - name: Download v4.37.0 extraction artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: mathlib-elaborated-dependency-graphs
+          path: artifacts/mathlib-v437
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca
+
+      - name: Run source-snapshot differential
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked --manifest-path scripts/research/proof-plan-contract/Cargo.toml --bin source-snapshot-diff -- \
+            artifacts/mathlib-v429 artifacts/mathlib-v437 > "$RUNNER_TEMP/mathlib-source-snapshot-diff.json"
+          jq -e '.schema_version == "1.0.0"
+            and .comparison_kind == "mathlib_source_snapshot_direct_dependency_differential"
+            and .source_revisions_differ == true
+            and .lean_toolchains_differ == true
+            and (.declarations | length) == 4
+            and all(.declarations[]; .baseline_value_kind == "theorem_proof" and .candidate_value_kind == "theorem_proof")
+            and ([.declarations[] | select(.classification == "identical_type_value_and_closure_sets")] | length) == 2
+            and ([.declarations[] | select(.declaration == "Nat.choose_pos" and .classification == "stable_type_interface_value_drift" and .type_dependencies.jaccard == 1)] | length) == 1
+            and ([.declarations[] | select(.declaration == "Nat.choose_pos" and .helper_expansion_explains_direct_drift == true and .helper_expanded_value_dependencies.jaccard >= 0.9 and .value_dependencies.jaccard < 0.5 and .proof_value_dependencies.jaccard < 0.5)] | length) == 1
+            and ([.declarations[] | select(.declaration == "Set.countable_union" and .classification == "type_and_or_closure_dependency_drift")] | length) == 1
+            and ([.declarations[] | select(.baseline_closure_reconciles == false or .candidate_closure_reconciles == false or .baseline_unresolved_count != 0 or .candidate_unresolved_count != 0)] | length) == 0
+            and ([.declarations[] | select(.declaration == "Nat.choose_pos" and (.helper_nodes_baseline | length) > 0 and (.helper_nodes_candidate | length) > 0)] | length) == 1' \
+            "$RUNNER_TEMP/mathlib-source-snapshot-diff.json" >/dev/null
+          cat "$RUNNER_TEMP/mathlib-source-snapshot-diff.json" >> "$GITHUB_STEP_SUMMARY"
+          echo "MATHLIB_SOURCE_SNAPSHOT_DIFFERENTIAL_PASS"
+
+      - name: Preserve source-snapshot differential
+        if: success()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: mathlib-source-snapshot-differential
+          path: ${{ runner.temp }}/mathlib-source-snapshot-diff.json
+          if-no-files-found: error
+
+      - name: Export generated Cargo.lock for dependency pinning
+        if: success()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: proof-plan-contract-cargo-lock-bootstrap
+          path: scripts/research/proof-plan-contract/Cargo.lock
+          if-no-files-found: error
+ local-global-cli.out
+          grep -Fq 'finite_truth_table=countermodel' local-global-cli.out
+          grep -Fq 'stored_evaluator_witness_matches_minimum=true' local-global-cli.out
+          cargo run --manifest-path scripts/research/proof-plan-contract/Cargo.toml --bin theorem-sandwich -- \
+            docs/research/MATH_PROOF_COMPREHENSION_THEOREM_SANDWICH_V1.json
+
+      - name: Export generated Cargo.lock for dependency pinning
+        if: success()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: proof-plan-contract-cargo-lock-bootstrap
+          path: scripts/research/proof-plan-contract/Cargo.lock
+          if-no-files-found: error
+
+      - name: Assert focused workflow job uniqueness
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(grep -c '^  finite-reference:$' .github/workflows/math-proof-comprehension-pilot.yml)" -eq 1
+          test "$(grep -c '^  mathlib-elaborated-extraction:$' .github/workflows/math-proof-comprehension-pilot.yml)" -eq 1
+          test "$(grep -c '^  mathlib-v429-direct-edge-cohort:$' .github/workflows/math-proof-comprehension-pilot.yml)" -eq 1
+          test "$(grep -c '^  mathlib-source-snapshot-differential:$' .github/workflows/math-proof-comprehension-pilot.yml)" -eq 1
