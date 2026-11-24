@@ -1060,7 +1060,9 @@ mod tests {
             LabelEvidenceFrontierV1::CurrentAtK1,
         );
         assert_eq!(
-            deliver_delayed_aci_label_v1(&mut engine, &unknown).unwrap().disposition,
+            deliver_delayed_aci_label_v1(&mut engine, &unknown)
+                .unwrap()
+                .disposition,
             AciUpdateDispositionV1::HeldUnknown
         );
         assert_eq!(engine.phase_alphas, vec![0.10]);
@@ -1075,7 +1077,9 @@ mod tests {
             LabelEvidenceFrontierV1::CurrentAtK1,
         );
         assert_eq!(
-            deliver_delayed_aci_label_v1(&mut engine, &qualified).unwrap().disposition,
+            deliver_delayed_aci_label_v1(&mut engine, &qualified)
+                .unwrap()
+                .disposition,
             AciUpdateDispositionV1::Updated
         );
         assert_eq!(engine.phase_alphas, vec![0.12]);
@@ -1095,7 +1099,9 @@ mod tests {
             LabelEvidenceFrontierV1::CurrentAtK1,
         );
         assert_eq!(
-            deliver_delayed_aci_label_v1(&mut engine, &blocked).unwrap().disposition,
+            deliver_delayed_aci_label_v1(&mut engine, &blocked)
+                .unwrap()
+                .disposition,
             AciUpdateDispositionV1::Blocked
         );
         assert_eq!(engine.phase_alphas, vec![0.10]);
@@ -1106,7 +1112,11 @@ mod tests {
         let mut engine = engine(2);
         begin_and_issue(&mut engine, 0, AciPredictionIntervalV1::bounded(9.0, 11.0));
         begin_and_issue(&mut engine, 1, AciPredictionIntervalV1::bounded(9.0, 11.0));
-        assert!(begin_delayed_aci_round_v1(&mut engine, 2).unwrap().is_empty());
+        assert!(
+            begin_delayed_aci_round_v1(&mut engine, 2)
+                .unwrap()
+                .is_empty()
+        );
         let missing = begin_delayed_aci_round_v1(&mut engine, 3).unwrap();
         assert_eq!(missing.len(), 1);
         assert_eq!(engine.phase_alphas, vec![0.10, 0.10]);
@@ -1143,7 +1153,9 @@ mod tests {
             LabelEvidenceFrontierV1::CurrentAtK1,
         );
         assert_eq!(
-            deliver_delayed_aci_label_v1(&mut engine, &accepted).unwrap().disposition,
+            deliver_delayed_aci_label_v1(&mut engine, &accepted)
+                .unwrap()
+                .disposition,
             AciUpdateDispositionV1::Updated
         );
         let alpha = engine.phase_alphas.clone();
@@ -1173,7 +1185,11 @@ mod tests {
         candidate.eligibility_report.report_sha256 = json_sha256(&canonical).unwrap();
         let receipt = deliver_delayed_aci_label_v1(&mut engine, &candidate).unwrap();
         assert_eq!(receipt.disposition, AciUpdateDispositionV1::Rejected);
-        assert!(receipt.reasons.contains(&AciUpdateReasonV1::LabelRevisionMismatch));
+        assert!(
+            receipt
+                .reasons
+                .contains(&AciUpdateReasonV1::LabelRevisionMismatch)
+        );
         assert_eq!(engine.phase_alphas, vec![0.10]);
     }
 
@@ -1221,7 +1237,12 @@ mod tests {
         begin_delayed_aci_round_v1(&mut full_engine, 0).unwrap();
         issue_delayed_aci_prediction_v1(
             &mut full_engine,
-            &prediction_input("sample-0", "event-0", 0, AciPredictionIntervalV1::full_real_line()),
+            &prediction_input(
+                "sample-0",
+                "event-0",
+                0,
+                AciPredictionIntervalV1::full_real_line(),
+            ),
         )
         .unwrap();
         begin_delayed_aci_round_v1(&mut full_engine, 1).unwrap();
@@ -1294,12 +1315,8 @@ mod tests {
 
     #[test]
     fn fixed_delay_finite_horizon_bound_matches_paper_formula() {
-        let bound = delayed_aci_finite_horizon_miscoverage_bound_v1(
-            &[0.10, 0.20, 0.35],
-            0.20,
-            100,
-        )
-        .unwrap();
+        let bound = delayed_aci_finite_horizon_miscoverage_bound_v1(&[0.10, 0.20, 0.35], 0.20, 100)
+            .unwrap();
         let expected = (0.90 + 0.80 + 0.65) / (0.20 * 100.0) + 3.0 / 100.0;
         assert!(close(bound, expected));
         assert!(delayed_aci_finite_horizon_miscoverage_bound_v1(&[], 0.2, 100).is_err());
@@ -1317,7 +1334,12 @@ mod tests {
     fn round_sequence_and_single_prediction_per_round_are_enforced() {
         let mut engine = engine(2);
         begin_delayed_aci_round_v1(&mut engine, 0).unwrap();
-        let input = prediction_input("sample-0", "event-0", 0, AciPredictionIntervalV1::bounded(9.0, 11.0));
+        let input = prediction_input(
+            "sample-0",
+            "event-0",
+            0,
+            AciPredictionIntervalV1::bounded(9.0, 11.0),
+        );
         issue_delayed_aci_prediction_v1(&mut engine, &input).unwrap();
         assert!(issue_delayed_aci_prediction_v1(&mut engine, &input).is_err());
         assert!(begin_delayed_aci_round_v1(&mut engine, 2).is_err());
@@ -1327,7 +1349,12 @@ mod tests {
     fn interval_alpha_semantics_are_fail_closed() {
         let mut engine = engine(1);
         begin_delayed_aci_round_v1(&mut engine, 0).unwrap();
-        let invalid = prediction_input("sample-0", "event-0", 0, AciPredictionIntervalV1::full_real_line());
+        let invalid = prediction_input(
+            "sample-0",
+            "event-0",
+            0,
+            AciPredictionIntervalV1::full_real_line(),
+        );
         assert!(issue_delayed_aci_prediction_v1(&mut engine, &invalid).is_err());
     }
 }
