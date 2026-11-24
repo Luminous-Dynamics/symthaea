@@ -1,0 +1,103 @@
+name: Mycelial Renderer Contract
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-canvas/**"
+      - "crates/bridges/symthaea-mycelial-renderer/**"
+      - ".github/workflows/mycelial-renderer.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mycelial-renderer-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  canvas-and-native-renderer:
+    name: Canvas contract + Bevy 0.20 native adapter
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Linux renderer build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            pkg-config \
+            libasound2-dev \
+            libudev-dev \
+            libx11-dev \
+            libxi-dev \
+            libxcursor-dev \
+            libxrandr-dev \
+            libxinerama-dev \
+            libwayland-dev \
+            libxkbcommon-dev
+
+      - name: Install Rust 1.96.0
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Assemble isolated validation workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          scratch="$GITHUB_WORKSPACE/.mycelial-renderer-validation"
+          rm -rf "$scratch"
+          mkdir -p "$scratch/crates/domains" "$scratch/crates/bridges"
+          cp -a crates/domains/symthaea-canvas "$scratch/crates/domains/"
+          cp -a crates/bridges/symthaea-mycelial-renderer "$scratch/crates/bridges/"
+          cat > "$scratch/Cargo.toml" <<'EOF'
+          [workspace]
+          resolver = "2"
+          members = [
+              "crates/domains/symthaea-canvas",
+              "crates/bridges/symthaea-mycelial-renderer",
+          ]
+
+          [workspace.package]
+          edition = "2024"
+          license = "AGPL-3.0-or-later"
+
+          [workspace.dependencies]
+          serde = { version = "1.0", features = ["derive"] }
+          serde_json = "1.0"
+          blake3 = "1.5"
+          EOF
+          cargo generate-lockfile --manifest-path "$scratch/Cargo.toml"
+
+      - name: Cache Cargo artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            .mycelial-renderer-validation -> target
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path .mycelial-renderer-validation/Cargo.toml --all -- --check
+
+      - name: Test renderer-neutral canvas contract
+        run: cargo test --locked --manifest-path .mycelial-renderer-validation/Cargo.toml -p symthaea-canvas --all-targets
+
+      - name: Install Rust 1.97.1 for Bevy 0.20.1
+        uses: dtolnay/rust-toolchain@1.97.1
+        with:
+          components: rustfmt, clippy
+
+      - name: Verify Bevy Rust toolchain
+        run: rustc +1.97.1 --version
+
+      - name: Test isolated Bevy 0.20.1 adapter
+        run: cargo +1.97.1 test --locked --manifest-path .mycelial-renderer-validation/Cargo.toml -p symthaea-mycelial-renderer --all-targets
+
+      - name: Clippy isolated Bevy 0.20.1 adapter
+        run: cargo +1.97.1 clippy --locked --manifest-path .mycelial-renderer-validation/Cargo.toml -p symthaea-mycelial-renderer --all-targets -- -D warnings

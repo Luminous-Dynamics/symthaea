@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "session_id": "sefb-fixture-v1",
+  "events": [
+    {
+      "sequence": 1,
+      "monotonic_ns": 500000,
+      "provenance": "runtime_event",
+      "kind": {
+        "type": "activity_changed",
+        "activity": "listening"
+      }
+    },
+    {
+      "sequence": 2,
+      "monotonic_ns": 1000000,
+      "provenance": "runtime_event",
+      "kind": {
+        "type": "speech_output_changed",
+        "state": "synthesizing"
+      }
+    },
+    {
+      "sequence": 3,
+      "monotonic_ns": 1100000,
+      "provenance": "runtime_event",
+      "kind": {
+        "type": "speech_output_changed",
+        "state": "ready"
+      }
+    },
+    {
+      "sequence": 4,
+      "monotonic_ns": 1200000,
+      "provenance": "runtime_event",
+      "kind": {
+        "type": "speech_output_changed",
+        "state": "queued"
+      }
+    },
+    {
+      "sequence": 5,
+      "monotonic_ns": 1300000,
+      "provenance": "runtime_event",
+      "kind": {
+        "type": "speech_output_changed",
+        "state": "playing"
+      }
+    },
+    {
+      "sequence": 6,
+      "monotonic_ns": 1500000,
+      "provenance": "runtime_derived",
+      "kind": {
+        "type": "viseme_changed",
+        "viseme": "aa",
+        "weight": 0.82
+      }
+    },
+    {
+      "sequence": 7,
+      "monotonic_ns": 1700000,
+      "provenance": "runtime_derived",
+      "kind": {
+        "type": "viseme_changed",
+        "viseme": "ih",
+        "weight": 0.64
+      }
+    },
+    {
+      "sequence": 8,
+      "monotonic_ns": 3000000,
+      "provenance": "runtime_event",
+      "kind": {
+        "type": "speech_output_changed",
+        "state": "completed"
+      }
+    },
+    {
+      "sequence": 9,
+      "monotonic_ns": 3100000,
+      "provenance": "runtime_event",
+      "kind": {
+        "type": "activity_changed",
+        "activity": "idle"
+      }
+    },
+    {
+      "sequence": 10,
+      "monotonic_ns": 3200000,
+      "provenance": "runtime_derived",
+      "kind": {
+        "type": "uncertainty_changed",
+        "level": 0.25
+      }
+    },
+    {
+      "sequence": 11,
+      "monotonic_ns": 4000000,
+      "provenance": "runtime_event",
+      "kind": {
+        "type": "reset"
+      }
+    }
+  ]
+}

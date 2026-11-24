@@ -12,16 +12,11 @@ pub const NOMINAL_CYCLES_PER_SECOND: f64 = 234.0;
 pub const BREATH_PERIOD_CYCLES: f64 = 120.0;
 
 /// User or platform motion preference.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MotionPreference {
+    #[default]
     Full,
     Reduced,
-}
-
-impl Default for MotionPreference {
-    fn default() -> Self {
-        Self::Full
-    }
 }
 
 /// One explicit visual frame on a monotonic timeline.

@@ -1,0 +1,213 @@
+{
+  "schema_version": 1,
+  "session_id": "fixture-session",
+  "revision": 3,
+  "last_sequence": 3,
+  "nodes": [
+    {
+      "id": "memory:forest",
+      "kind": "memory",
+      "label": "Forest restoration notes",
+      "status": "observed",
+      "evidence": {
+        "event_id": "event:retrieval",
+        "producer": "synthetic-fixture",
+        "sequence": 1,
+        "monotonic_ns": 1000,
+        "provenance": "synthetic_fixture",
+        "trace_digest": null
+      },
+      "activation": 0.6
+    },
+    {
+      "id": "concept:mycelium",
+      "kind": "concept",
+      "label": "Mycelial networks",
+      "status": "observed",
+      "evidence": {
+        "event_id": "event:retrieval",
+        "producer": "synthetic-fixture",
+        "sequence": 1,
+        "monotonic_ns": 1000,
+        "provenance": "synthetic_fixture",
+        "trace_digest": null
+      },
+      "activation": null
+    },
+    {
+      "id": "concept:soil",
+      "kind": "concept",
+      "label": "Soil restoration",
+      "status": "observed",
+      "evidence": {
+        "event_id": "event:retrieval",
+        "producer": "synthetic-fixture",
+        "sequence": 1,
+        "monotonic_ns": 1000,
+        "provenance": "synthetic_fixture",
+        "trace_digest": null
+      },
+      "activation": null
+    },
+    {
+      "id": "concept:water",
+      "kind": "concept",
+      "label": "Water retention",
+      "status": "candidate",
+      "evidence": {
+        "event_id": "event:association",
+        "producer": "synthetic-fixture",
+        "sequence": 2,
+        "monotonic_ns": 2000,
+        "provenance": "synthetic_fixture",
+        "trace_digest": null
+      },
+      "activation": null
+    },
+    {
+      "id": "prediction:resilience",
+      "kind": "prediction",
+      "label": "Possible ecosystem resilience",
+      "status": "candidate",
+      "evidence": {
+        "event_id": "event:prediction",
+        "producer": "synthetic-fixture",
+        "sequence": 3,
+        "monotonic_ns": 3000,
+        "provenance": "synthetic_fixture",
+        "trace_digest": null
+      },
+      "activation": null
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge:retrieval",
+      "source": "concept:soil",
+      "target": "memory:forest",
+      "relation": "retrieved_from",
+      "status": "observed",
+      "evidence": {
+        "event_id": "event:retrieval",
+        "producer": "synthetic-fixture",
+        "sequence": 1,
+        "monotonic_ns": 1000,
+        "provenance": "synthetic_fixture",
+        "trace_digest": null
+      },
+      "activation": null
+    },
+    {
+      "id": "edge:association-a",
+      "source": "concept:soil",
+      "target": "concept:mycelium",
+      "relation": "associated_with",
+      "status": "candidate",
+      "evidence": {
+        "event_id": "event:association",
+        "producer": "synthetic-fixture",
+        "sequence": 2,
+        "monotonic_ns": 2000,
+        "provenance": "synthetic_fixture",
+        "trace_digest": null
+      },
+      "activation": null
+    },
+    {
+      "id": "edge:association-b",
+      "source": "concept:soil",
+      "target": "concept:water",
+      "relation": "associated_with",
+      "status": "candidate",
+      "evidence": {
+        "event_id": "event:association",
+        "producer": "synthetic-fixture",
+        "sequence": 2,
+        "monotonic_ns": 2000,
+        "provenance": "synthetic_fixture",
+        "trace_digest": null
+      },
+      "activation": null
+    },
+    {
+      "id": "edge:prediction",
+      "source": "concept:mycelium",
+      "target": "prediction:resilience",
+      "relation": "predicts",
+      "status": "candidate",
+      "evidence": {
+        "event_id": "event:prediction",
+        "producer": "synthetic-fixture",
+        "sequence": 3,
+        "monotonic_ns": 3000,
+        "provenance": "synthetic_fixture",
+        "trace_digest": null
+      },
+      "activation": null
+    }
+  ],
+  "episodes": [
+    {
+      "id": "episode:retrieval",
+      "kind": "retrieval",
+      "state": "completed",
+      "evidence": {
+        "event_id": "event:retrieval",
+        "producer": "synthetic-fixture",
+        "sequence": 1,
+        "monotonic_ns": 1000,
+        "provenance": "synthetic_fixture",
+        "trace_digest": null
+      },
+      "node_ids": [
+        "memory:forest",
+        "concept:soil"
+      ],
+      "edge_ids": [
+        "edge:retrieval"
+      ]
+    },
+    {
+      "id": "episode:association",
+      "kind": "association",
+      "state": "completed",
+      "evidence": {
+        "event_id": "event:association",
+        "producer": "synthetic-fixture",
+        "sequence": 2,
+        "monotonic_ns": 2000,
+        "provenance": "synthetic_fixture",
+        "trace_digest": null
+      },
+      "node_ids": [
+        "concept:soil",
+        "concept:mycelium",
+        "concept:water"
+      ],
+      "edge_ids": [
+        "edge:association-a",
+        "edge:association-b"
+      ]
+    },
+    {
+      "id": "episode:prediction",
+      "kind": "prediction",
+      "state": "unresolved",
+      "evidence": {
+        "event_id": "event:prediction",
+        "producer": "synthetic-fixture",
+        "sequence": 3,
+        "monotonic_ns": 3000,
+        "provenance": "synthetic_fixture",
+        "trace_digest": null
+      },
+      "node_ids": [
+        "concept:mycelium",
+        "prediction:resilience"
+      ],
+      "edge_ids": [
+        "edge:prediction"
+      ]
+    }
+  ]
+}

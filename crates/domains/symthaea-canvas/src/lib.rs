@@ -3,11 +3,11 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # symthaea-canvas
 //!
-//! Living topology UI: real-time SVG projection of Symthaea's cognitive geometry.
+//! Renderer-neutral living topology model with deterministic SVG and 3D mesh adapters.
 //!
 //! Converts cognitive telemetry (consciousness level, neuromodulators, Betti numbers,
 //! Cantor depth, harmony activations) into a declarative scene graph, then renders
-//! self-contained animated SVG.
+//! self-contained animated SVG or portable indexed 3D tube geometry.
 //!
 //! Pipeline: `CognitiveSnapshot → AestheticEngine → AestheticState → build_scene() → render_svg()`
 //!
@@ -18,8 +18,28 @@
 pub mod aesthetic_engine;
 pub mod aesthetic_score;
 pub mod animation;
+pub mod cognitive_events;
+pub mod cognitive_layout;
+pub mod cognitive_morphology;
+pub mod cognitive_svg;
+pub mod cognitive_topology;
 pub mod color;
+pub mod embodiment;
+pub mod embodiment_trace;
 pub mod geometry;
+pub mod mycelial_annotation_triage;
+pub mod mycelial_contact_persistence;
+pub mod mycelial_failure_resilience;
+pub mod mycelial_fusion_counterfactual;
+pub mod mycelial_junction_graph;
+pub mod mycelial_mesh;
+pub mod mycelial_model;
+pub mod mycelial_network;
+pub mod mycelial_presence;
+pub mod mycelial_reconstruction_calibration;
+pub mod mycelial_reconstruction_metrics;
+pub mod mycelial_reference_networks;
+pub mod mycelial_temporal_cycles;
 pub mod scene_features;
 pub mod scene_graph;
 pub mod svg_renderer;
@@ -31,8 +51,157 @@ use serde::{Deserialize, Serialize};
 pub use aesthetic_engine::{AestheticEngine, AestheticState};
 pub use aesthetic_score::aesthetic_score;
 pub use animation::{FrameContext, MotionPreference};
+pub use cognitive_events::{
+    COGNITIVE_TOPOLOGY_EVENT_SCHEMA_VERSION, CognitiveEventApplyOutcome, CognitiveEventError,
+    CognitiveItemDelta, CognitiveTopologyChange, CognitiveTopologyDiff, CognitiveTopologyEvent,
+    CognitiveTopologyReducer, MAX_COGNITIVE_EVENT_LOG, MAX_COGNITIVE_EVENTS_PER_BATCH,
+    diff_cognitive_topologies,
+};
+pub use cognitive_layout::{
+    COGNITIVE_PROJECTION_SCHEMA_VERSION, CognitiveAnchor, CognitiveLayoutConfig,
+    CognitiveLayoutError, CognitiveSpatialLink, CognitiveSpatialProjection,
+    layout_cognitive_topology, project_cognitive_topology,
+};
+pub use cognitive_morphology::{
+    COGNITIVE_MORPHOLOGY_SCHEMA_VERSION, CognitiveHypha, CognitiveMorphologyConfig,
+    CognitiveMorphologyError, CognitiveMorphologyNode, CognitiveMorphologyProjection,
+    build_cognitive_morphology,
+};
+pub use cognitive_svg::{
+    CognitiveSvgError, CognitiveSvgOptions, render_cognitive_morphology_svg,
+    render_cognitive_projection_svg,
+};
+pub use cognitive_topology::{
+    COGNITIVE_TOPOLOGY_SCHEMA_VERSION, CognitiveEdge, CognitiveEpisode, CognitiveEpisodeKind,
+    CognitiveEpisodeState, CognitiveEvidence, CognitiveNode, CognitiveNodeKind,
+    CognitiveProvenance, CognitiveRelation, CognitiveTopology, CognitiveTopologyError,
+    EpistemicStatus, MAX_COGNITIVE_EDGES, MAX_COGNITIVE_EPISODES, MAX_COGNITIVE_NODES,
+};
 pub use color::{Color, Palette};
+pub use embodiment::{
+    EmbodimentActivity, EmbodimentController, EmbodimentEvent, EmbodimentEventKind,
+    EmbodimentEventSequencer, EmbodimentIngestError, EmbodimentSequenceError, EmbodimentSnapshot,
+    GazeTarget, Observed, SignalProvenance, SpeechOutputState, Viseme, VisemeSignal,
+};
+pub use embodiment_trace::{
+    EMBODIMENT_TRACE_SCHEMA_VERSION, EmbodimentSession, EmbodimentSessionError, EmbodimentTrace,
+    EmbodimentTraceError, EmbodimentTraceSummary, MAX_EMBODIMENT_SESSION_ID_BYTES,
+    MAX_EMBODIMENT_TRACE_EVENTS, OpenActivityInterval, OpenPlaybackInterval,
+};
 pub use geometry::build_scene;
+pub use mycelial_annotation_triage::{
+    MAX_MYCELIAL_ANNOTATION_TRIAGE_ITEMS, MYCELIAL_ANNOTATION_TRIAGE_SCHEMA_VERSION,
+    MycelialAnnotationTriageConfig, MycelialAnnotationTriageError, MycelialAnnotationTriageReport,
+    MycelialAnnotationTriageTopologySummary, MycelialJunctionReviewItem,
+    MycelialReviewOrderingPolicy, build_mycelial_annotation_triage,
+};
+pub use mycelial_contact_persistence::{
+    DEFAULT_MAX_CONTACT_TOLERANCE_MODEL_UNITS, MAX_CONTACT_FILTRATION_CANDIDATES,
+    MYCELIAL_CONTACT_FILTRATION_SCHEMA_VERSION, MycelialContactBaselineEdge,
+    MycelialContactCandidateObservation, MycelialContactComponentMerge,
+    MycelialContactConflictGroup, MycelialContactCycleBirth, MycelialContactFiltration,
+    MycelialContactFiltrationConfig, MycelialContactFiltrationError,
+    MycelialContactFiltrationMetrics, MycelialContactFiltrationSnapshot, MycelialCyclePathStep,
+    build_mycelial_contact_filtration,
+};
+pub use mycelial_failure_resilience::{
+    MAX_FAILURE_DELIVERY_EVALUATIONS, MAX_FAILURE_DELIVERY_TRIALS_PER_SCENARIO,
+    MAX_FAILURE_DEMAND_PAIRS, MAX_FAILURE_DEMAND_SOURCES, MAX_FAILURE_ID_BYTES,
+    MAX_FAILURE_JUNCTIONS, MAX_FAILURE_SCENARIOS, MAX_FAILURE_SEGMENTS,
+    MAX_FAILURE_TOTAL_DEMAND_WEIGHT, MYCELIAL_FAILURE_ATTACK_PLAN_SCHEMA_VERSION,
+    MYCELIAL_FAILURE_DELIVERY_PROFILE_SCHEMA_VERSION, MYCELIAL_FAILURE_PROFILE_SCHEMA_VERSION,
+    MycelialDemandPair, MycelialDemandPairOutcome, MycelialDemandPathLoad,
+    MycelialFailureAttackConfig, MycelialFailureAttackEvaluation, MycelialFailureAttackPlan,
+    MycelialFailureAttackStrategy, MycelialFailureDeliveryConfig, MycelialFailureDeliveryProfile,
+    MycelialFailureDeliveryScenarioSummary, MycelialFailureDeliveryTrial, MycelialFailureMetrics,
+    MycelialFailureResilienceError, MycelialFailureResilienceProfile, MycelialFailureScenario,
+    build_mycelial_failure_attack_plan, build_mycelial_failure_delivery_profile,
+    build_mycelial_failure_resilience_profile, build_single_failure_resilience_profile,
+    evaluate_mycelial_failure_attack_plan,
+};
+pub use mycelial_fusion_counterfactual::{
+    MAX_MYCELIAL_FUSION_COUNTERFACTUAL_CANDIDATES, MAX_MYCELIAL_FUSION_COUNTERFACTUAL_JUNCTIONS,
+    MAX_MYCELIAL_FUSION_COUNTERFACTUAL_SEGMENTS, MAX_MYCELIAL_FUSION_DEMAND_EVALUATIONS,
+    MAX_MYCELIAL_FUSION_DEMAND_PAIRS, MAX_MYCELIAL_FUSION_DISRUPTION_SCENARIOS,
+    MAX_MYCELIAL_FUSION_GRAPH_VIEW_EVALUATIONS, MAX_MYCELIAL_FUSION_ID_BYTES,
+    MAX_MYCELIAL_FUSION_TOTAL_DEMAND_WEIGHT, MAX_SIDE_CONTACT_FRACTION_MICROS,
+    MIN_SIDE_CONTACT_FRACTION_MICROS, MYCELIAL_FUSION_COUNTERFACTUAL_SCHEMA_VERSION,
+    MycelialFusionBridgeLengthBasis, MycelialFusionCandidate, MycelialFusionCandidateImpact,
+    MycelialFusionCounterfactualError, MycelialFusionCounterfactualReport,
+    MycelialFusionDemandDelta, MycelialFusionDemandOutcome, MycelialFusionDemandPair,
+    MycelialFusionDisruptionDelta, MycelialFusionDisruptionScenario, MycelialFusionTarget,
+    MycelialFusionTopologyEffect, MycelialFusionViewMetrics,
+    evaluate_mycelial_fusion_counterfactuals,
+};
+
+pub use mycelial_junction_graph::{
+    GeometricEfficiencyReport, JunctionKind, JunctionLengthUnit, MAX_JUNCTION_GRAPH_JUNCTIONS,
+    MAX_JUNCTION_GRAPH_SEGMENTS, MYCELIAL_JUNCTION_GRAPH_SCHEMA_VERSION, MycelialHyphaSegment,
+    MycelialJunction, MycelialJunctionGraphConfig, MycelialJunctionGraphError,
+    MycelialJunctionGraphMetrics, MycelialJunctionHyphaGraph, PARAMETER_SCALE,
+    build_mycelial_junction_hypha_graph,
+};
+pub use mycelial_reconstruction_calibration::{
+    JunctionCalibrationObservation, JunctionClassProbabilityPrediction,
+    MAX_RECONSTRUCTION_CALIBRATION_BINS, MAX_RECONSTRUCTION_CALIBRATION_PREDICTIONS,
+    MYCELIAL_RECONSTRUCTION_CALIBRATION_SCHEMA_VERSION, MycelialReconstructionCalibrationError,
+    MycelialReconstructionCalibrationReport, ReconstructionCalibrationBin,
+    ReconstructionCalibrationClass, ReconstructionCalibrationConfig,
+    ReconstructionCalibrationCounts, ReconstructionClassCalibration,
+    ReconstructionSelectiveRiskPoint, ReconstructionSelectiveRiskSummary,
+    ReconstructionTopLabelCalibration, evaluate_mycelial_reconstruction_calibration,
+};
+pub use mycelial_reconstruction_metrics::{
+    AnnotatedHyphaSegment, AnnotatedJunction, AnnotatedJunctionKind, AnnotatedMycelialSkeleton,
+    JunctionIdentityMatch, JunctionKindScore, MAX_AUTOMATIC_MATCH_JUNCTIONS_PER_GRAPH,
+    MAX_RECONSTRUCTION_ID_BYTES, MAX_RECONSTRUCTION_JUNCTIONS, MAX_RECONSTRUCTION_SEGMENTS,
+    MYCELIAL_RECONSTRUCTION_SCHEMA_VERSION, MYCELIAL_RECONSTRUCTION_SCORE_SCHEMA_VERSION,
+    MycelialReconstructionError, MycelialReconstructionScore, ReconstructionComponentAttribution,
+    ReconstructionComponentErrorSummary, ReconstructionCounts, ReconstructionDimensionality,
+    ReconstructionEvaluationConfig, ReconstructionLengthError, ReconstructionLengthUnit,
+    ReconstructionLocalizationError, ReconstructionPoint3, ReconstructionTopologyDelta,
+    ReconstructionTopologySummary, evaluate_mycelial_reconstruction, match_junctions_hungarian,
+};
+pub use mycelial_reference_networks::{
+    MAX_REFERENCE_NETWORK_JUNCTIONS, MYCELIAL_EUCLIDEAN_MST_SCHEMA_VERSION,
+    MycelialEuclideanMstEdge, MycelialEuclideanMstReport, MycelialMinimumSpanningForestReport,
+    MycelialReferenceNetworkError, SpatialReferenceDimensionality,
+    SpatialReferenceEfficiencyReport, build_euclidean_minimum_spanning_tree,
+    build_observed_network_minimum_spanning_forest,
+};
+pub use mycelial_temporal_cycles::{
+    MAX_TEMPORAL_CYCLE_RECORDS, MAX_TEMPORAL_CYCLE_SEARCH_STEPS,
+    MAX_TEMPORAL_CYCLE_WINDOW_OBSERVATIONS, MAX_TEMPORAL_CYCLES_PER_WINDOW,
+    MAX_TEMPORAL_EDGE_WINDOW_OBSERVATIONS, MAX_TEMPORAL_MYCELIAL_EDGES,
+    MAX_TEMPORAL_MYCELIAL_NODES, MAX_TEMPORAL_MYCELIAL_WINDOWS,
+    MYCELIAL_TEMPORAL_CYCLE_PROFILE_SCHEMA_VERSION, MYCELIAL_TEMPORAL_CYCLE_SCHEMA_VERSION,
+    MycelialTemporalCycleError, TemporalCycleWindowObservation, TemporalCycleWindowState,
+    TemporalEdgeEvidence, TemporalMycelialCycleConfig, TemporalMycelialCycleHyperedge,
+    TemporalMycelialCycleProfile, TemporalMycelialCycleRecord, TemporalMycelialEdge,
+    TemporalMycelialEdgeEvidenceCounts, TemporalMycelialEdgeEvidenceRecord,
+    TemporalMycelialNodeMetrics, TemporalMycelialSequence, TemporalMycelialSnapshot,
+    TemporalMycelialSnapshotMetrics, TemporalWindowCoverage, build_temporal_mycelial_cycle_profile,
+    temporal_snapshot_from_annotated_skeleton,
+};
+
+pub use mycelial_mesh::{
+    FilamentMeshRange, MAX_MYCELIAL_FILAMENTS, MAX_TUBE_MESH_VERTICES, MycelialTubeMesh,
+    TubeTessellationConfig, TubeTessellationError, tessellate_mycelial_model,
+};
+pub use mycelial_model::{
+    MYCELIAL_MODEL_VERSION, MycelialFilament, MycelialModel, OrbitalCell, PresenceMode,
+    SpatialPoint3, build_mycelial_model,
+};
+pub use mycelial_network::{
+    AnastomosisKind, MAX_MYCELIAL_ANASTOMOSES, MYCELIAL_NETWORK_SCHEMA_VERSION,
+    MycelialAnastomosis, MycelialAnastomosisCandidate, MycelialConnectionKind,
+    MycelialNetworkConfig, MycelialNetworkConnection, MycelialNetworkError, MycelialNetworkGraph,
+    MycelialNetworkMetrics, build_mycelial_network_graph, detect_anastomosis_candidates,
+};
+pub use mycelial_presence::{
+    build_mycelial_presence, build_mycelial_presence_with_mode, render_mycelial_presence,
+    render_mycelial_presence_with_mode,
+};
 pub use scene_features::{SceneFeatures, extract_scene_features};
 pub use scene_graph::SceneNode;
 pub use svg_renderer::{SvgRenderOptions, render_svg, render_svg_with_options};
