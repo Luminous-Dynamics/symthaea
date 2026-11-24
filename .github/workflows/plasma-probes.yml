@@ -88,6 +88,10 @@ jobs:
             "${tmp_root}/benchmarks/plasma/topology-lifting/"
           cp benchmarks/plasma/topology-lifting/fixtures/weighted-fourier-measure-known-answer-v0.1.json \
             "${tmp_root}/benchmarks/plasma/topology-lifting/fixtures/"
+          cp benchmarks/plasma/topology-lifting/weighted-measure-tail-stability-v0.1.schema.json \
+            "${tmp_root}/benchmarks/plasma/topology-lifting/"
+          cp benchmarks/plasma/topology-lifting/fixtures/weighted-measure-tail-stability-v0.1.json \
+            "${tmp_root}/benchmarks/plasma/topology-lifting/fixtures/"
           cp benchmarks/plasma/micro-macro/micro-macro-scaling-contract-v0.1.schema.json \
             "${tmp_root}/benchmarks/plasma/micro-macro/"
           cp benchmarks/plasma/micro-macro/fixtures/synthetic-micro-macro-contract-v0.1.json \
@@ -186,8 +190,23 @@ jobs:
           assert sum(measure["weights"]) > 0
           assert len(measure["expected_normalized_complex_moments"]) == measure["max_harmonic"]
           assert measure["claim_boundary"]["finite_fourier_band_is_not_injective"] is True
+
+          tail_schema = json.loads((root / "weighted-measure-tail-stability-v0.1.schema.json").read_text())
+          tail = json.loads((root / "fixtures/weighted-measure-tail-stability-v0.1.json").read_text())
+          Draft202012Validator.check_schema(tail_schema)
+          Draft202012Validator(tail_schema).validate(tail)
+          assert len(tail["base_positions"]) == len(tail["base_weights"])
+          assert len(tail["augmented_positions"]) == len(tail["augmented_weights"])
+          assert tail["augmented_positions"][:-1] == tail["base_positions"]
+          assert abs(sum(tail["base_weights"]) - 1.0) < 1e-12
+          assert abs(tail["augmented_weights"][-1] - tail["outlier_mass"]) < 1e-24
+          epsilon = tail["outlier_mass"]
+          bound = 2 * epsilon / (1 + epsilon)
+          assert abs(bound - tail["mathematical_bound"]["expected_upper_bound"]) < 1e-24
+          assert tail["claim_boundary"]["low_mass_does_not_imply_dynamically_irrelevant"] is True
           print("topology_lift_schema_validation=PASS")
           print("weighted_fourier_measure_schema_validation=PASS")
+          print("weighted_measure_tail_stability_validation=PASS")
           PY
 
       - name: Validate high-field VPFP micro-macro scaling schema and fixture
