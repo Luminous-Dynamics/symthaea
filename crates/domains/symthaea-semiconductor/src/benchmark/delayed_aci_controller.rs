@@ -571,7 +571,13 @@ pub fn deliver_delayed_aci_feedback_v1(
     let expected_next_feedback_step = engine
         .last_feedback_step
         .and_then(|step| step.checked_add(1))
-        .unwrap_or(engine.policy.feedback_delay_steps);
+        .unwrap_or_else(|| {
+            if engine.prediction_stream_closed {
+                engine.next_prediction_step
+            } else {
+                engine.policy.feedback_delay_steps
+            }
+        });
     let schedule_matches = delivery.feedback_step == expected_step
         && if engine.prediction_stream_closed {
             delivery.feedback_step == expected_next_feedback_step
