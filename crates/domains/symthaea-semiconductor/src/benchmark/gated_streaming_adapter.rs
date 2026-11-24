@@ -1079,7 +1079,12 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(report.disposition, StreamingUpdateDispositionV1::Updated);
+        assert_eq!(
+            report.disposition,
+            StreamingUpdateDispositionV1::Updated,
+            "rejection reasons: {:?}",
+            report.reasons
+        );
         assert!(report.adapter_state_mutated);
         assert_ne!(report.adapter_state_after_sha256, before);
         assert_eq!(
@@ -1130,7 +1135,9 @@ mod tests {
 
         assert_eq!(
             old_update.disposition,
-            StreamingUpdateDispositionV1::Updated
+            StreamingUpdateDispositionV1::Updated,
+            "rejection reasons: {:?}",
+            old_update.reasons
         );
         assert_eq!(
             old_update.prediction_receipt_sha256,
@@ -1265,7 +1272,7 @@ mod tests {
             LabelEvidenceFrontierV1::CurrentAtK1,
             (110, 112),
         );
-        wrong_payload.label_payload_sha256 = digest('z');
+        wrong_payload.label_payload_sha256 = digest('d');
         cases.push(wrong_payload);
 
         for (index, candidate) in cases.into_iter().enumerate() {
