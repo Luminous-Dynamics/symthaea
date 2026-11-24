@@ -749,6 +749,7 @@ mod tests {
         revision: u64,
         status: LabelConsumptionEligibilityV1,
         payload: &str,
+        corrected_value: f64,
     ) -> LabelConsumptionEligibilityReportV1 {
         let mut value = LabelConsumptionEligibilityReportV1 {
             schema: "luminous.semi-bench.label-consumption-report.v1".into(),
@@ -763,7 +764,7 @@ mod tests {
             reasons: Vec::new(),
             label_sha256: payload.into(),
             measurement_sha256: digest('b'),
-            qualified_corrected_value: 0.5,
+            qualified_corrected_value: corrected_value,
             qualified_standard_uncertainty_upper_bound: Some(0.01),
             qualification_report_sha256: digest('c'),
             requalification_report_sha256: digest('d'),
@@ -803,7 +804,7 @@ mod tests {
             feedback_step: step,
             clock_domain_id: "fab-clock".into(),
             idempotency_key: format!("{label}:{revision}"),
-            eligibility_report: report(label, event, revision, status, &payload),
+            eligibility_report: report(label, event, revision, status, &payload, value),
         }
     }
 
@@ -847,7 +848,7 @@ mod tests {
 
         let third = issue(&mut engine, "s2", "e2");
         assert_eq!(third.lane, 0);
-        assert_eq!(third.alpha_used, 0.11);
+        assert!((third.alpha_used - 0.11).abs() < 1.0e-12);
     }
 
     #[test]
