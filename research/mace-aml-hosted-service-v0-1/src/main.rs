@@ -305,6 +305,16 @@ fn validate_search_response_image_budget(
     Ok(())
 }
 
+fn memory_table_columns(connection: &Connection) -> Result<BTreeSet<String>, rusqlite::Error> {
+    let mut statement = connection.prepare("PRAGMA table_info(memory_items)")?;
+    let rows = statement.query_map([], |row| row.get::<_, String>(1))?;
+    let mut columns = BTreeSet::new();
+    for row in rows {
+        columns.insert(row?);
+    }
+    Ok(columns)
+}
+
 fn open_database(path: &Path) -> Result<Connection, Box<dyn std::error::Error + Send + Sync>> {
     if let Some(parent) = path.parent() {
         if !parent.as_os_str().is_empty() { std::fs::create_dir_all(parent)?; }
@@ -359,6 +369,30 @@ fn open_database(path: &Path) -> Result<Connection, Box<dyn std::error::Error + 
          CREATE INDEX IF NOT EXISTS search_trace_scope_idx
              ON search_trace_receipts(principal_id, tenant_id, user_scope_sha256, returned_at);",
     )?;
+
+    // Non-destructive v1 -> v2 migration. The first prototype stored ingestion
+    // time in the created_at column; v2 distinguishes event time from ingest.
+    // Rename the old column so existing local databases remain usable.
+    let mut columns = memory_table_columns(&connection)?;
+    if columns.contains("created_at") && !columns.contains("ingested_at") {
+        connection.execute_batch(
+            "ALTER TABLE memory_items RENAME COLUMN created_at TO ingested_at;"
+        )?;
+        columns.remove("created_at");
+        columns.insert("ingested_at".to_owned());
+    }
+    if !columns.contains("event_timestamp_ms") {
+        connection.execute_batch(
+            "ALTER TABLE memory_items ADD COLUMN event_timestamp_ms INTEGER;"
+        )?;
+    }
+    if !columns.contains("ingested_at") {
+        connection.execute_batch(
+            "ALTER TABLE memory_items ADD COLUMN ingested_at TEXT NOT NULL DEFAULT '';"
+        )?;
+    }
+    connection.execute_batch("PRAGMA user_version = 2;")?;
+
     Ok(connection)
 }
 
@@ -721,6 +755,53 @@ mod tests {
             query: Content::Text("blue notebook".into()), options: None, user_id: "user-2".into(), top_k: 10,
         }).unwrap();
         assert!(results.data.is_empty());
+    }
+
+    #[test]
+    fn legacy_created_at_database_migrates_without_losing_rows() {
+        let path = std::env::temp_dir().join(format!("mace-legacy-{}.sqlite3", Uuid::new_v4()));
+        {
+            let legacy = Connection::open(&path).unwrap();
+            legacy.execute_batch(
+                "CREATE TABLE memory_items (
+                    memory_id TEXT PRIMARY KEY,
+                    principal_id TEXT NOT NULL,
+                    tenant_id TEXT NOT NULL,
+                    user_id TEXT NOT NULL,
+                    session_id TEXT NOT NULL,
+                    request_id TEXT NOT NULL,
+                    role TEXT NOT NULL,
+                    content_json TEXT NOT NULL,
+                    searchable_text TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    lifecycle_state TEXT NOT NULL
+                 );"
+            ).unwrap();
+            legacy.execute(
+                "INSERT INTO memory_items VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+                params![
+                    "legacy-memory", "participant-1", "tenant-1", "user-1",
+                    "session-1", "legacy-request", "user", "\"legacy source\"",
+                    "legacy source", "2026-11-23T10:00:00Z", "active"
+                ],
+            ).unwrap();
+        }
+        let migrated = open_database(&path).unwrap();
+        let columns = memory_table_columns(&migrated).unwrap();
+        assert!(columns.contains("event_timestamp_ms"));
+        assert!(columns.contains("ingested_at"));
+        assert!(!columns.contains("created_at"));
+        let (content, ingested_at): (String, String) = migrated.query_row(
+            "SELECT content_json, ingested_at FROM memory_items WHERE memory_id = 'legacy-memory'",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        ).unwrap();
+        assert_eq!(content, "\"legacy source\"");
+        assert_eq!(ingested_at, "2026-11-23T10:00:00Z");
+        drop(migrated);
+        let _ = std::fs::remove_file(&path);
+        let _ = std::fs::remove_file(path.with_extension("sqlite3-wal"));
+        let _ = std::fs::remove_file(path.with_extension("sqlite3-shm"));
     }
 
     #[test]
