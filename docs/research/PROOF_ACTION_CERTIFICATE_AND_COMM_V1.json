@@ -17,7 +17,7 @@
   "proof_source": {
     "repository": "Luminous-Dynamics/symthaea",
     "path": "scripts/research/lean-proof-extractor/ProofActionCertificateAndComm.lean",
-    "sha256": "1e9eae95fbe85d3b32793c22313f8e1b67608b19fc266fb047e278663cd1ac73"
+    "sha256": "9d1096dc51b80c06b35ee6ac987ec6f2bb92be4f0a3267f1df4074ed4372dcc4"
   },
   "actions": [
     {
@@ -67,7 +67,7 @@
   ],
   "negative_control": {
     "path": "scripts/research/lean-proof-extractor/ProofActionCertificateAndCommNegative.lean",
-    "sha256": "87f2c53a03395b5a614883e111a4ab8c7f734eb8d6823638ce832b3eb75d269e",
+    "sha256": "f0352539bcdccf967b97f1aebf5f8cdd19d46596a25c279db74294a00a4bfb72",
     "expected_result": "lean_type_error"
   },
   "axiom_negative_control": {
