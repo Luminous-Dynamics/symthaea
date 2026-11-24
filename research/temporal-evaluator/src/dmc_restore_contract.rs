@@ -15,8 +15,7 @@
 use std::collections::BTreeSet;
 use std::fmt;
 
-pub const PINNED_DM_CONTROL_COMMIT: &str =
-    "d7e52e3602a555df6cc20cc928ea5b41e9920158";
+pub const PINNED_DM_CONTROL_COMMIT: &str = "d7e52e3602a555df6cc20cc928ea5b41e9920158";
 pub const PINNED_DM_CONTROL_VERSION: &str = "1.0.52";
 pub const PINNED_MUJOCO_VERSION: &str = "4.0.1";
 /// Errors are reported in integer nanounits to avoid floating tolerance drift.
@@ -31,9 +30,7 @@ pub const MAX_DMC_BRANCHES: usize = 16;
 pub enum PhysicsSnapshotKind {
     /// Legacy Physics.get_state() without a MuJoCo state signature.
     /// This is intentionally rejected as an incomplete snapshot.
-    LegacyCompactGetState {
-        state_sha256: [u8; 32],
-    },
+    LegacyCompactGetState { state_sha256: [u8; 32] },
     /// Physics.get_state(sig=mujoco.mjtState.mjSTATE_INTEGRATION.value).
     IntegrationState {
         signature_name: String,
@@ -157,7 +154,9 @@ pub enum DmcRestoreError {
     EmptyRuntimePlatform,
     EmptyRuntimeArchitecture,
     EmptyTaskClass,
-    MissingDigest { field: &'static str },
+    MissingDigest {
+        field: &'static str,
+    },
     LegacyCompactStateRejected,
     WrongIntegrationSignature,
     EmptyIntegrationState,
@@ -172,21 +171,47 @@ pub enum DmcRestoreError {
     InvalidStepLimit,
     RestOperationNotInFactualPrefix,
     EmptyActionSet,
-    TooManyBranches { requested: usize, maximum: usize },
+    TooManyBranches {
+        requested: usize,
+        maximum: usize,
+    },
     EmptyActionId,
-    DuplicateExpectedActionId { action_id: String },
-    WrongBranchCount { expected: usize, actual: usize },
-    DuplicateBranchActionId { action_id: String },
-    UnexpectedBranchActionId { action_id: String },
-    DuplicateRunId { run_id: u64 },
-    MissingExpectedBranch { action_id: String },
+    DuplicateExpectedActionId {
+        action_id: String,
+    },
+    WrongBranchCount {
+        expected: usize,
+        actual: usize,
+    },
+    DuplicateBranchActionId {
+        action_id: String,
+    },
+    UnexpectedBranchActionId {
+        action_id: String,
+    },
+    DuplicateRunId {
+        run_id: u64,
+    },
+    MissingExpectedBranch {
+        action_id: String,
+    },
     ZeroRunId,
     ZeroActionSequenceDigest,
-    SnapshotManifestMismatch { action_id: String },
-    ExogenousScheduleMismatch { action_id: String },
-    PrefixTraceMismatch { action_id: String },
-    PrefixStepCountMismatch { action_id: String },
-    PrefixBranchPointMismatch { action_id: String },
+    SnapshotManifestMismatch {
+        action_id: String,
+    },
+    ExogenousScheduleMismatch {
+        action_id: String,
+    },
+    PrefixTraceMismatch {
+        action_id: String,
+    },
+    PrefixStepCountMismatch {
+        action_id: String,
+    },
+    PrefixBranchPointMismatch {
+        action_id: String,
+    },
     PrefixStateMismatch {
         action_id: String,
         error_nano: u64,
@@ -197,59 +222,169 @@ pub enum DmcRestoreError {
         error_nano: u64,
         maximum_nano: u64,
     },
-    FreshProcessReplayMissing { action_id: String },
-    BranchRestOperationMismatch { action_id: String },
-    MissingPostInterventionTrajectory { action_id: String },
+    FreshProcessReplayMissing {
+        action_id: String,
+    },
+    BranchRestOperationMismatch {
+        action_id: String,
+    },
+    MissingPostInterventionTrajectory {
+        action_id: String,
+    },
 }
 
 impl fmt::Display for DmcRestoreError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::WrongDmControlCommit => write!(formatter, "dm_control source commit does not match the pinned DMC pilot"),
-            Self::WrongDmControlVersion => write!(formatter, "dm_control package version does not match the pinned DMC pilot"),
-            Self::WrongMujocoVersion => write!(formatter, "MuJoCo package version does not match the pinned DMC pilot"),
+            Self::WrongDmControlCommit => write!(
+                formatter,
+                "dm_control source commit does not match the pinned DMC pilot"
+            ),
+            Self::WrongDmControlVersion => write!(
+                formatter,
+                "dm_control package version does not match the pinned DMC pilot"
+            ),
+            Self::WrongMujocoVersion => write!(
+                formatter,
+                "MuJoCo package version does not match the pinned DMC pilot"
+            ),
             Self::EmptyRuntimePlatform => write!(formatter, "runtime platform must be declared"),
-            Self::EmptyRuntimeArchitecture => write!(formatter, "runtime architecture must be declared"),
+            Self::EmptyRuntimeArchitecture => {
+                write!(formatter, "runtime architecture must be declared")
+            }
             Self::EmptyTaskClass => write!(formatter, "DMC task class must be declared"),
-            Self::MissingDigest { field } => write!(formatter, "required DMC restore digest {field} is missing"),
-            Self::LegacyCompactStateRejected => write!(formatter, "legacy Physics.get_state() without sig is not a complete branch-point snapshot"),
-            Self::WrongIntegrationSignature => write!(formatter, "physics state signature must be mjSTATE_INTEGRATION"),
-            Self::EmptyIntegrationState => write!(formatter, "integration-state signature, size and digest must be nonzero"),
-            Self::SharedModelCopyRejected => write!(formatter, "deep Physics copy must not share the MuJoCo model"),
-            Self::MissingPluginState => write!(formatter, "MuJoCo model has plugins but the restore snapshot omits plugin state"),
-            Self::MissingSensorNoiseRngState => write!(formatter, "sensor noise is enabled but its independent MuJoCo RNG state is not captured"),
-            Self::WrapperResetPending => write!(formatter, "dm_env wrapper says the next step must reset; this is not an admissible mid-episode branch point"),
-            Self::ZeroActionRepeat => write!(formatter, "n_sub_steps/action repeat must be nonzero"),
+            Self::MissingDigest { field } => {
+                write!(formatter, "required DMC restore digest {field} is missing")
+            }
+            Self::LegacyCompactStateRejected => write!(
+                formatter,
+                "legacy Physics.get_state() without sig is not a complete branch-point snapshot"
+            ),
+            Self::WrongIntegrationSignature => {
+                write!(formatter, "physics state signature must be mjSTATE_INTEGRATION")
+            }
+            Self::EmptyIntegrationState => write!(
+                formatter,
+                "integration-state signature, size and digest must be nonzero"
+            ),
+            Self::SharedModelCopyRejected => {
+                write!(formatter, "deep Physics copy must not share the MuJoCo model")
+            }
+            Self::MissingPluginState => write!(
+                formatter,
+                "MuJoCo model has plugins but the restore snapshot omits plugin state"
+            ),
+            Self::MissingSensorNoiseRngState => write!(
+                formatter,
+                "sensor noise is enabled but its independent MuJoCo RNG state is not captured"
+            ),
+            Self::WrapperResetPending => write!(
+                formatter,
+                "dm_env wrapper says the next step must reset; this is not an admissible mid-episode branch point"
+            ),
+            Self::ZeroActionRepeat => {
+                write!(formatter, "n_sub_steps/action repeat must be nonzero")
+            }
             Self::ZeroControlTimestep => write!(formatter, "control timestep must be nonzero"),
-            Self::BranchPointStepMismatch => write!(formatter, "wrapper step count must equal the declared branch-point control step"),
-            Self::StepLimitAlreadyReached => write!(formatter, "branch point is at or beyond the declared environment step limit"),
-            Self::InvalidStepLimit => write!(formatter, "environment step limit must be a positive finite value or positive infinity"),
-            Self::RestOperationNotInFactualPrefix => write!(formatter, "auxiliary rest/settling operation is not part of the common factual prefix"),
-            Self::EmptyActionSet => write!(formatter, "DMC restore cohort requires at least two expected action IDs"),
-            Self::TooManyBranches { requested, maximum } => write!(formatter, "DMC restore cohort has {requested} branches; maximum is {maximum}"),
+            Self::BranchPointStepMismatch => write!(
+                formatter,
+                "wrapper step count must equal the declared branch-point control step"
+            ),
+            Self::StepLimitAlreadyReached => write!(
+                formatter,
+                "branch point is at or beyond the declared environment step limit"
+            ),
+            Self::InvalidStepLimit => write!(
+                formatter,
+                "environment step limit must be a positive finite value or positive infinity"
+            ),
+            Self::RestOperationNotInFactualPrefix => write!(
+                formatter,
+                "auxiliary rest/settling operation is not part of the common factual prefix"
+            ),
+            Self::EmptyActionSet => write!(
+                formatter,
+                "DMC restore cohort requires at least two expected action IDs"
+            ),
+            Self::TooManyBranches { requested, maximum } => write!(
+                formatter,
+                "DMC restore cohort has {requested} branches; maximum is {maximum}"
+            ),
             Self::EmptyActionId => write!(formatter, "DMC branch action ID must be nonempty"),
-            Self::DuplicateExpectedActionId { action_id } => write!(formatter, "duplicate expected DMC action ID {action_id}"),
-            Self::WrongBranchCount { expected, actual } => write!(formatter, "DMC branch count {actual} does not match expected action count {expected}"),
-            Self::DuplicateBranchActionId { action_id } => write!(formatter, "duplicate DMC branch action ID {action_id}"),
-            Self::UnexpectedBranchActionId { action_id } => write!(formatter, "unexpected DMC branch action ID {action_id}"),
-            Self::DuplicateRunId { run_id } => write!(formatter, "duplicate DMC branch run ID {run_id}"),
-            Self::MissingExpectedBranch { action_id } => write!(formatter, "missing DMC branch action ID {action_id}"),
+            Self::DuplicateExpectedActionId { action_id } => {
+                write!(formatter, "duplicate expected DMC action ID {action_id}")
+            }
+            Self::WrongBranchCount { expected, actual } => write!(
+                formatter,
+                "DMC branch count {actual} does not match expected action count {expected}"
+            ),
+            Self::DuplicateBranchActionId { action_id } => {
+                write!(formatter, "duplicate DMC branch action ID {action_id}")
+            }
+            Self::UnexpectedBranchActionId { action_id } => {
+                write!(formatter, "unexpected DMC branch action ID {action_id}")
+            }
+            Self::DuplicateRunId { run_id } => {
+                write!(formatter, "duplicate DMC branch run ID {run_id}")
+            }
+            Self::MissingExpectedBranch { action_id } => {
+                write!(formatter, "missing DMC branch action ID {action_id}")
+            }
             Self::ZeroRunId => write!(formatter, "DMC branch run ID must be nonzero"),
-            Self::ZeroActionSequenceDigest => write!(formatter, "DMC action-sequence digest must be nonzero"),
-            Self::SnapshotManifestMismatch { action_id } => write!(formatter, "branch {action_id} does not restore the common complete snapshot manifest"),
-            Self::ExogenousScheduleMismatch { action_id } => write!(formatter, "branch {action_id} does not share the frozen exogenous schedule"),
-            Self::PrefixTraceMismatch { action_id } => write!(formatter, "branch {action_id} factual-prefix digest differs from the common reference"),
-            Self::PrefixStepCountMismatch { action_id } => write!(formatter, "branch {action_id} factual-prefix step count is inconsistent"),
-            Self::PrefixBranchPointMismatch { action_id } => write!(formatter, "branch {action_id} starts its intervention at a different control step"),
-            Self::PrefixStateMismatch { action_id, error_nano, maximum_nano } => write!(formatter, "branch {action_id} prefix state error {error_nano} nano-units exceeds {maximum_nano}"),
-            Self::PrefixObservationMismatch { action_id, error_nano, maximum_nano } => write!(formatter, "branch {action_id} prefix observation error {error_nano} nano-units exceeds {maximum_nano}"),
-            Self::FreshProcessReplayMissing { action_id } => write!(formatter, "branch {action_id} has no passing fresh-process replay"),
-            Self::BranchRestOperationMismatch { action_id } => write!(formatter, "branch {action_id} rest/settling operation differs from the common factual prefix"),
-            Self::MissingPostInterventionTrajectory { action_id } => write!(formatter, "branch {action_id} has no post-intervention trajectory digest"),
+            Self::ZeroActionSequenceDigest => {
+                write!(formatter, "DMC action-sequence digest must be nonzero")
+            }
+            Self::SnapshotManifestMismatch { action_id } => write!(
+                formatter,
+                "branch {action_id} does not restore the common complete snapshot manifest"
+            ),
+            Self::ExogenousScheduleMismatch { action_id } => write!(
+                formatter,
+                "branch {action_id} does not share the frozen exogenous schedule"
+            ),
+            Self::PrefixTraceMismatch { action_id } => write!(
+                formatter,
+                "branch {action_id} factual-prefix digest differs from the common reference"
+            ),
+            Self::PrefixStepCountMismatch { action_id } => write!(
+                formatter,
+                "branch {action_id} factual-prefix step count is inconsistent"
+            ),
+            Self::PrefixBranchPointMismatch { action_id } => write!(
+                formatter,
+                "branch {action_id} starts its intervention at a different control step"
+            ),
+            Self::PrefixStateMismatch {
+                action_id,
+                error_nano,
+                maximum_nano,
+            } => write!(
+                formatter,
+                "branch {action_id} prefix state error {error_nano} nano-units exceeds {maximum_nano}"
+            ),
+            Self::PrefixObservationMismatch {
+                action_id,
+                error_nano,
+                maximum_nano,
+            } => write!(
+                formatter,
+                "branch {action_id} prefix observation error {error_nano} nano-units exceeds {maximum_nano}"
+            ),
+            Self::FreshProcessReplayMissing { action_id } => write!(
+                formatter,
+                "branch {action_id} has no passing fresh-process replay"
+            ),
+            Self::BranchRestOperationMismatch { action_id } => write!(
+                formatter,
+                "branch {action_id} rest/settling operation differs from the common factual prefix"
+            ),
+            Self::MissingPostInterventionTrajectory { action_id } => write!(
+                formatter,
+                "branch {action_id} has no post-intervention trajectory digest"
+            ),
         }
     }
 }
-
 impl std::error::Error for DmcRestoreError {}
 
 fn digest_is_empty(digest: &[u8; 32]) -> bool {
@@ -285,16 +420,40 @@ fn validate_snapshot(snapshot: &DmcSnapshotManifest) -> Result<(), DmcRestoreErr
 
     for (digest, field) in [
         (&snapshot.model_mjcf_sha256, "model_mjcf_sha256"),
-        (&snapshot.task_configuration_sha256, "task_configuration_sha256"),
-        (&snapshot.task_private_state_sha256, "task_private_state_sha256"),
-        (&snapshot.task_random_state_sha256, "task_random_state_sha256"),
+        (
+            &snapshot.task_configuration_sha256,
+            "task_configuration_sha256",
+        ),
+        (
+            &snapshot.task_private_state_sha256,
+            "task_private_state_sha256",
+        ),
+        (
+            &snapshot.task_random_state_sha256,
+            "task_random_state_sha256",
+        ),
         (&snapshot.wrapper_state_sha256, "wrapper_state_sha256"),
-        (&snapshot.driver_controller_state_sha256, "driver_controller_state_sha256"),
-        (&snapshot.exogenous_schedule_sha256, "exogenous_schedule_sha256"),
+        (
+            &snapshot.driver_controller_state_sha256,
+            "driver_controller_state_sha256",
+        ),
+        (
+            &snapshot.exogenous_schedule_sha256,
+            "exogenous_schedule_sha256",
+        ),
         (&snapshot.prefix_trace_sha256, "prefix_trace_sha256"),
-        (&snapshot.prefix_state_snapshot_sha256, "prefix_state_snapshot_sha256"),
-        (&snapshot.prefix_observation_sha256, "prefix_observation_sha256"),
-        (&snapshot.snapshot_manifest_sha256, "snapshot_manifest_sha256"),
+        (
+            &snapshot.prefix_state_snapshot_sha256,
+            "prefix_state_snapshot_sha256",
+        ),
+        (
+            &snapshot.prefix_observation_sha256,
+            "prefix_observation_sha256",
+        ),
+        (
+            &snapshot.snapshot_manifest_sha256,
+            "snapshot_manifest_sha256",
+        ),
     ] {
         require_digest(digest, field)?;
     }
@@ -367,7 +526,11 @@ fn validate_snapshot(snapshot: &DmcSnapshotManifest) -> Result<(), DmcRestoreErr
     {
         return Err(DmcRestoreError::StepLimitAlreadyReached);
     }
-    if snapshot.rest_operation_sha256.as_ref().is_some_and(digest_is_empty) {
+    if snapshot
+        .rest_operation_sha256
+        .as_ref()
+        .is_some_and(digest_is_empty)
+    {
         return Err(DmcRestoreError::MissingDigest {
             field: "rest_operation_sha256",
         });
@@ -492,7 +655,8 @@ pub fn validate_dmc_restore_cohort(
             });
         }
         if branch.rest_operation_sha256 != cohort.snapshot.rest_operation_sha256
-            || branch.rest_operation_in_factual_prefix != cohort.snapshot.rest_operation_in_factual_prefix
+            || branch.rest_operation_in_factual_prefix
+                != cohort.snapshot.rest_operation_in_factual_prefix
         {
             return Err(DmcRestoreError::BranchRestOperationMismatch {
                 action_id: branch.action_id.clone(),
@@ -584,7 +748,11 @@ mod tests {
         }
     }
 
-    fn branch(action_id: &str, run_id: u64, snapshot: &DmcSnapshotManifest) -> DmcBranchRestoreEvidence {
+    fn branch(
+        action_id: &str,
+        run_id: u64,
+        snapshot: &DmcSnapshotManifest,
+    ) -> DmcBranchRestoreEvidence {
         DmcBranchRestoreEvidence {
             run_id,
             action_id: action_id.to_owned(),
@@ -657,8 +825,7 @@ mod tests {
     fn wrong_integration_signature_value_rejects() {
         let mut input = cohort();
         if let PhysicsSnapshotKind::IntegrationState {
-            signature_value,
-            ..
+            signature_value, ..
         } = &mut input.snapshot.physics_snapshot
         {
             *signature_value = PINNED_MJ_STATE_INTEGRATION_MASK - 1;
