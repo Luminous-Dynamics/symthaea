@@ -587,9 +587,10 @@ mod tests {
             ActiveSensingActionKind::TransmitSummary,
             cost(100, 10, 100, 10, 2_048, 0),
             100,
-            vec![
-                ObservationOutcomeEstimate { probability_ppm: 1_000_000, posterior_decision_loss_ppm: 100_000 },
-            ],
+            vec![ObservationOutcomeEstimate {
+                probability_ppm: 1_000_000,
+                posterior_decision_loss_ppm: 100_000,
+            }],
         );
         let plan = plan_active_sensing_actions(context(), &[expensive]).unwrap();
         assert!(plan.pareto_frontier.is_empty());
