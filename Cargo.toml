@@ -24,32 +24,6 @@ exclude = [
     "crates/domains/symthaea-rea-compat",
     "crates/domains/symthaea-rea-evidence-verifier",
 ]
-# NOTE: the root package ("symthaea") is automatically a workspace member
-# because this manifest has both [package] and [workspace] — it does NOT
-# need (and must NOT have) an explicit "." entry here. Verified 2026-07-03:
-# with cargo 1.95.0, an explicit "." in `members` silently disables
-# `exclude` for every glob-matched member (spark-engine, symthaea-lab, and
-# the old symthaea-muse-wasm path were all being compiled as full workspace
-# members despite being listed below, because of this). `default-members`
-# below may still reference "." — only the `members` array triggers the bug.
-exclude = [
-    # nixward-web's own crate-type (cdylib+rlib for wasm-bindgen) doesn't fit
-    # cleanly into workspace-wide manifest resolution alongside its native
-    # `nixward` path dependency. Keep it out of the workspace and build it
-    # standalone (`cargo build -p nixward-web` from its own directory).
-    "crates/core/nixward-web",
-    "crates/core/symthaea-zkproof/methods",
-    "crates/core/symthaea-zkproof/host",
-    "crates/domains/symthaea-spore/fuzz",
-    "crates/domains/spark-engine",
-    "crates/domains/symthaea-lab",
-    # ARCHIVED 2026-07-16 (vision review P2.2): real SigLIP/Moondream/ocrs ONNX
-    # stack, but zero consumers — its only reference is foveation's non-default
-    # `perception` feature nothing enables, and it duplicates src/perception/'s
-    # live modules. Excluded so the workspace stops compiling a dead island;
-    # the adopt path (foveation RealVentralPipeline) still works via path dep.
-    "crates/domains/symthaea-perception",
-]
 default-members = [
     "xtask",
     ".",
