@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Covariance-aware, prior-free experiment discrimination.
 //!
-//! The caller supplies Cov(Y_first - Y_second) for every hypothesis pair.
-//! This matrix must already include the shared model, calibration,
-//! measurement, and numerical-error contributions intended by the declared
-//! uncertainty model. The selector does not assume hypotheses are independent.
+//! The caller supplies one PSD covariance for the *stacked output vector*
+//! across all hypotheses. Pairwise Cov(Y_i - Y_j) matrices are derived from
+//! its blocks, so they are coherent by construction and retain common-error
+//! and cross-hypothesis terms.
 //!
 //! The Mahalanobis score is a covariance-geometry screening statistic, not
 //! expected information gain, a Bayes factor, a posterior, or a truth oracle.
@@ -19,8 +19,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
-pub const COVARIANCE_SCHEMA_VERSION: &str = "physics-experiment-design-covariance-v0.1";
-pub const COVARIANCE_ALGORITHM_VERSION: &str = "correlation-whitened-jacobi-pseudoinverse-v0.1";
+pub const COVARIANCE_SCHEMA_VERSION: &str = "physics-experiment-design-joint-covariance-v0.2";
+pub const COVARIANCE_ALGORITHM_VERSION: &str = "joint-output-correlation-whitened-jacobi-v0.2";
 pub const RELATIVE_EIGENVALUE_TOLERANCE: f64 = 1.0e-12;
 pub const RELATIVE_SUPPORT_TOLERANCE: f64 = 1.0e-10;
 const NEGATIVE_EIGENVALUE_TOLERANCE: f64 = 1.0e-10;
@@ -30,8 +30,8 @@ const MAX_OBSERVABLES: usize = 8;
 const MAX_JOINT_COVARIANCE_DIMENSION: usize = 16;
 const MAX_EXPERIMENTS: usize = 256;
 
-/// Complete design request. Each experiment must provide one difference
-/// covariance matrix for every unordered pair of competing hypotheses.
+/// Complete design request. Each experiment provides a single joint covariance
+/// over all hypothesis × observable outputs, in the explicit canonical order.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CovarianceAwareDesignInput {
@@ -52,7 +52,7 @@ pub struct CovarianceAwareCandidateExperiment {
     /// Matrix order for means and covariance rows/columns.
     pub observables: Vec<CovarianceObservable>,
     pub predictions: Vec<VectorHypothesisPrediction>,
-    pub pairwise_difference_covariances: Vec<PairwiseDifferenceCovariance>,
+    pub joint_output_covariance: JointOutputCovariance,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -72,14 +72,18 @@ pub struct VectorHypothesisPrediction {
     pub means: Vec<f64>,
 }
 
-/// IDs must be in canonical lexical order. Matrix rows and columns follow the
-/// experiment's observable order.
+/// One joint covariance over all competing hypotheses' output vectors.
+///
+/// Rows and columns use hypothesis-major order:
+/// sorted hypothesis IDs, then the experiment's declared observable order.
+/// The pairwise difference covariance is derived as
+/// Gamma_ii + Gamma_jj - Gamma_ij - Gamma_ji. This avoids accepting
+/// individually valid but mutually impossible pairwise covariance inputs.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct PairwiseDifferenceCovariance {
-    pub first_hypothesis_id: String,
-    pub second_hypothesis_id: String,
-    /// Covariance of Y_first - Y_second, not two independent marginal covariances.
+pub struct JointOutputCovariance {
+    pub hypothesis_order: Vec<String>,
+    pub observable_order: Vec<String>,
     pub covariance: Vec<Vec<f64>>,
     pub covariance_descriptor: String,
     pub covariance_descriptor_digest_sha256: String,
@@ -133,7 +137,6 @@ pub enum CovarianceDesignError {
     InvalidCovariance(String),
     DigestMismatch(String),
     NonPsdCovariance(String),
-    InconsistentPairwiseCovariances(String),
     NumericalFailure(String),
 }
 
@@ -146,26 +149,33 @@ impl Display for CovarianceDesignError {
             Self::NonPsdCovariance(message) => {
                 write!(f, "covariance is not positive semidefinite: {message}")
             }
-            Self::InconsistentPairwiseCovariances(message) => write!(
-                f,
-                "pairwise covariances do not admit a common joint model: {message}"
-            ),
             Self::NumericalFailure(message) => write!(f, "covariance numerical failure: {message}"),
         }
     }
 }
 impl Error for CovarianceDesignError {}
 
-/// Rank by the minimum pairwise Mahalanobis separation, then divide by
-/// caller-supplied relative cost. Covariance is supplied for the difference
-/// vector, preserving cross-hypothesis covariance and cross-observable terms.
+/// Rank by the minimum pairwise Mahalanobis separation, then divide
+/// by caller-supplied relative cost. The caller supplies one PSD covariance
+/// for the complete stacked vector (Y_1, ..., Y_H), with each Y_i ordered by
+/// the experiment's declared observables. Pairwise difference covariance is
+/// derived from the joint blocks:
 ///
-/// The matrix is converted to a correlation matrix before eigendecomposition.
-/// This makes eigenvalue cutoff and support decisions invariant to positive
+/// Cov(Y_i - Y_j) = Gamma_ii + Gamma_jj - Gamma_ij - Gamma_ji.
+///
+/// Supplying the full joint covariance makes cross-hypothesis and
+/// cross-observable dependence explicit and guarantees that all derived
+/// pairwise difference covariances come from one common uncertainty model.
+/// The caller must justify the coupling/shared-noise semantics in the
+/// covariance descriptor. If no defensible joint coupling exists, use
+/// interval/set-valued design rather than inventing one.
+///
+/// The matrix is correlation-standardized before eigendecomposition. This
+/// makes eigenvalue cutoff and support decisions invariant to positive
 /// diagonal unit rescaling (for example, metres to millimetres).
 ///
 /// If a mean difference has a material component in a zero-variance direction,
-/// the candidate is emitted in support_review_required and is excluded from
+/// the candidate is emitted in support_review_required and excluded from
 /// automatic ranking. The pseudoinverse alone would miss this condition.
 pub fn rank_covariance_aware_experiments(
     input: &CovarianceAwareDesignInput,
@@ -181,21 +191,10 @@ pub fn rank_covariance_aware_experiments(
         let predictions: BTreeMap<&str, &VectorHypothesisPrediction> = experiment
             .predictions
             .iter()
-            .map(|p| (p.hypothesis_id.as_str(), p))
+            .map(|prediction| (prediction.hypothesis_id.as_str(), prediction))
             .collect();
-        let covariances: BTreeMap<(&str, &str), &PairwiseDifferenceCovariance> = experiment
-            .pairwise_difference_covariances
-            .iter()
-            .map(|c| {
-                (
-                    (
-                        c.first_hypothesis_id.as_str(),
-                        c.second_hypothesis_id.as_str(),
-                    ),
-                    c,
-                )
-            })
-            .collect();
+        let joint = &experiment.joint_output_covariance.covariance;
+        let observable_count = experiment.observables.len();
 
         let mut worst_squared = f64::INFINITY;
         let mut closest_pair: Option<[String; 2]> = None;
@@ -214,8 +213,9 @@ pub fn rank_covariance_aware_experiments(
                         first_id, second_id, experiment.experiment_id
                     )));
                 }
-                let covariance = covariances[&(first_id.as_str(), second_id.as_str())];
-                match mahalanobis_squared(&delta, &covariance.covariance)? {
+                let difference_covariance =
+                    derive_difference_covariance(joint, i, j, observable_count);
+                match mahalanobis_squared(&delta, &difference_covariance)? {
                     PairScore::Finite(score) => {
                         if score < worst_squared {
                             worst_squared = score;
@@ -261,7 +261,7 @@ pub fn rank_covariance_aware_experiments(
             worst_case_separation_squared: worst_squared,
             separation_per_cost_unit: score,
             closest_hypothesis_pair: pair,
-            observable_count: experiment.observables.len(),
+            observable_count,
         });
     }
 
@@ -284,22 +284,44 @@ pub fn rank_covariance_aware_experiments(
         schema_version: COVARIANCE_SCHEMA_VERSION.to_owned(),
         algorithm_version: COVARIANCE_ALGORITHM_VERSION.to_owned(),
         target: input.target.clone(),
-        criterion: "prior-free maximin Mahalanobis separation of rival mean vectors under the supplied covariance of their difference, divided by declared relative cost".to_owned(),
+        criterion: "prior-free maximin Mahalanobis separation of rival mean vectors derived from one caller-supplied joint output covariance, divided by declared relative cost".to_owned(),
         relative_eigenvalue_tolerance: RELATIVE_EIGENVALUE_TOLERANCE,
         relative_support_tolerance: RELATIVE_SUPPORT_TOLERANCE,
         ranked_experiments: ranked,
         support_review_required: review,
         limitations: vec![
             "This is a covariance-geometry screening statistic, not expected information gain, a Bayes factor, a posterior, or a truth oracle.".to_owned(),
-            "The supplied pairwise difference covariances must be jointly realizable by one common collection of random output vectors; each matrix being PSD individually is not sufficient.".to_owned(),
-            "The supplied covariance must include the cross-hypothesis and cross-observable covariance contributions intended by the uncertainty model.".to_owned(),
+            "The full joint covariance is supplied over the stacked hypothesis-output vector; all pairwise difference covariances are derived from its blocks and are jointly coherent by construction.".to_owned(),
+            "The covariance descriptor must justify how rival hypotheses are coupled and which shared model, calibration, measurement, and numerical-error sources are included.".to_owned(),
             "The descriptor digest binds provenance text; the matrix digest binds numeric matrix values. Neither proves that an executable generated the supplied values.".to_owned(),
             "A mean outside a singular covariance support is quarantined for review, not assigned a finite pseudoinverse score or an automatic infinite score.".to_owned(),
-            "Covariance uncertainty sets, nuisance profiling, non-Gaussian predictive distributions, and calibrated Monte Carlo EIG are not implemented in this v0.1 selector.".to_owned(),
+            "Covariance uncertainty sets, nuisance profiling, non-Gaussian predictive distributions, and calibrated Monte Carlo EIG are not implemented in this v0.2 selector.".to_owned(),
             "Cost is caller-defined relative units. Solver calls, CPU/GPU, memory, wall time, tokens, and human review must also be reported separately.".to_owned(),
             "Predictions are not observations. Symtropy execution and independent qualification remain separate authorities.".to_owned(),
         ],
     })
+}
+
+/// Derive Cov(Y_i - Y_j) from one joint covariance over the stacked
+/// hypothesis-major vector (Y_0, ..., Y_H-1).
+fn derive_difference_covariance(
+    joint: &[Vec<f64>],
+    first_hypothesis: usize,
+    second_hypothesis: usize,
+    observable_count: usize,
+) -> Vec<Vec<f64>> {
+    let mut difference = vec![vec![0.0; observable_count]; observable_count];
+    for (a, row) in difference.iter_mut().enumerate() {
+        for (b, value) in row.iter_mut().enumerate() {
+            let first_a = first_hypothesis * observable_count + a;
+            let first_b = first_hypothesis * observable_count + b;
+            let second_a = second_hypothesis * observable_count + a;
+            let second_b = second_hypothesis * observable_count + b;
+            *value = joint[first_a][first_b] + joint[second_a][second_b]
+                - joint[first_a][second_b] - joint[second_a][first_b];
+        }
+    }
+    difference
 }
 
 enum PairScore {
@@ -495,9 +517,10 @@ fn validate_input(input: &CovarianceAwareDesignInput) -> Result<(), CovarianceDe
             "hypothesis IDs must be non-empty and unique".to_owned(),
         ));
     }
-    let expected_pairs = input.hypothesis_ids.len() * (input.hypothesis_ids.len() - 1) / 2;
-    let mut experiment_ids = BTreeSet::new();
+    let mut canonical_hypotheses = input.hypothesis_ids.clone();
+    canonical_hypotheses.sort();
 
+    let mut experiment_ids = BTreeSet::new();
     for experiment in &input.experiments {
         let eid = &experiment.experiment_id;
         if eid.trim().is_empty() || !experiment_ids.insert(eid.as_str()) {
@@ -506,14 +529,11 @@ fn validate_input(input: &CovarianceAwareDesignInput) -> Result<(), CovarianceDe
             )));
         }
         if experiment.observables.len() > MAX_OBSERVABLES
-            || experiment
-                .observables
-                .len()
-                .saturating_mul(input.hypothesis_ids.len())
+            || experiment.observables.len().saturating_mul(input.hypothesis_ids.len())
                 > MAX_JOINT_COVARIANCE_DIMENSION
         {
             return Err(CovarianceDesignError::InvalidInput(format!(
-                "observable/hypothesis covariance dimension exceeds {MAX_JOINT_COVARIANCE_DIMENSION} in {eid}"
+                "stacked joint covariance dimension exceeds {MAX_JOINT_COVARIANCE_DIMENSION} in {eid}"
             )));
         }
         if experiment.description.trim().is_empty()
@@ -529,21 +549,21 @@ fn validate_input(input: &CovarianceAwareDesignInput) -> Result<(), CovarianceDe
             )));
         }
         let mut setting_ids = BTreeSet::new();
-        if experiment.settings.iter().any(|s| {
-            s.parameter_id.trim().is_empty()
-                || s.unit.trim().is_empty()
-                || !s.value.is_finite()
-                || !setting_ids.insert(s.parameter_id.as_str())
+        if experiment.settings.iter().any(|setting| {
+            setting.parameter_id.trim().is_empty()
+                || setting.unit.trim().is_empty()
+                || !setting.value.is_finite()
+                || !setting_ids.insert(setting.parameter_id.as_str())
         }) {
             return Err(CovarianceDesignError::InvalidInput(format!(
                 "invalid or duplicate parameter setting in {eid}"
             )));
         }
         let mut observable_ids = BTreeSet::new();
-        if experiment.observables.iter().any(|o| {
-            o.observable_id.trim().is_empty()
-                || o.unit.trim().is_empty()
-                || !observable_ids.insert(o.observable_id.as_str())
+        if experiment.observables.iter().any(|observable| {
+            observable.observable_id.trim().is_empty()
+                || observable.unit.trim().is_empty()
+                || !observable_ids.insert(observable.observable_id.as_str())
         }) {
             return Err(CovarianceDesignError::InvalidInput(format!(
                 "invalid or duplicate observable in {eid}"
@@ -560,7 +580,7 @@ fn validate_input(input: &CovarianceAwareDesignInput) -> Result<(), CovarianceDe
             if !hypotheses.contains(prediction.hypothesis_id.as_str())
                 || !prediction_ids.insert(prediction.hypothesis_id.as_str())
                 || prediction.means.len() != experiment.observables.len()
-                || prediction.means.iter().any(|v| !v.is_finite())
+                || prediction.means.iter().any(|value| !value.is_finite())
                 || prediction.model_descriptor.trim().is_empty()
             {
                 return Err(CovarianceDesignError::InvalidInput(format!(
@@ -579,234 +599,97 @@ fn validate_input(input: &CovarianceAwareDesignInput) -> Result<(), CovarianceDe
             }
         }
 
-        if experiment.pairwise_difference_covariances.len() != expected_pairs {
+        let covariance = &experiment.joint_output_covariance;
+        let canonical_observables: Vec<String> = experiment
+            .observables
+            .iter()
+            .map(|observable| observable.observable_id.clone())
+            .collect();
+        if covariance.hypothesis_order != canonical_hypotheses
+            || covariance.observable_order != canonical_observables
+        {
             return Err(CovarianceDesignError::InvalidInput(format!(
-                "wrong covariance pair count in {eid}"
+                "joint covariance order must be sorted hypothesis IDs followed by the declared observable order in {eid}"
             )));
         }
-        let mut supplied_pairs = BTreeSet::new();
-        for pair in &experiment.pairwise_difference_covariances {
-            let first = pair.first_hypothesis_id.as_str();
-            let second = pair.second_hypothesis_id.as_str();
-            if first >= second || !hypotheses.contains(first) || !hypotheses.contains(second) {
-                return Err(CovarianceDesignError::InvalidInput(format!(
-                    "unknown or non-canonical covariance pair ({first}, {second}) in {eid}"
-                )));
-            }
-            if !supplied_pairs.insert((first.to_owned(), second.to_owned())) {
-                return Err(CovarianceDesignError::InvalidInput(format!(
-                    "duplicate covariance pair ({first}, {second}) in {eid}"
-                )));
-            }
-            let n = experiment.observables.len();
-            if pair.covariance.len() != n || pair.covariance.iter().any(|row| row.len() != n) {
-                return Err(CovarianceDesignError::InvalidCovariance(format!(
-                    "wrong matrix shape for ({first}, {second}) in {eid}"
-                )));
-            }
-            if pair.covariance.iter().flatten().any(|v| !v.is_finite()) {
-                return Err(CovarianceDesignError::InvalidCovariance(format!(
-                    "non-finite entry for ({first}, {second}) in {eid}"
-                )));
-            }
-            for i in 0..n {
-                for j in 0..n {
-                    let a = pair.covariance[i][j];
-                    let b = pair.covariance[j][i];
-                    if (a - b).abs() > 1.0e-12 * a.abs().max(b.abs()) {
-                        return Err(CovarianceDesignError::InvalidCovariance(format!(
-                            "asymmetric matrix for ({first}, {second}) in {eid}"
-                        )));
-                    }
-                }
-                if pair.covariance[i][i] < 0.0 {
+        let dimension = input.hypothesis_ids.len() * experiment.observables.len();
+        if covariance.covariance.len() != dimension
+            || covariance
+                .covariance
+                .iter()
+                .any(|row| row.len() != dimension)
+        {
+            return Err(CovarianceDesignError::InvalidCovariance(format!(
+                "joint covariance must be {dimension}×{dimension} in {eid}"
+            )));
+        }
+        if covariance.covariance.iter().flatten().any(|value| !value.is_finite()) {
+            return Err(CovarianceDesignError::InvalidCovariance(format!(
+                "joint covariance contains a non-finite entry in {eid}"
+            )));
+        }
+        for i in 0..dimension {
+            for j in 0..dimension {
+                let a = covariance.covariance[i][j];
+                let b = covariance.covariance[j][i];
+                if (a - b).abs() > 1.0e-12 * a.abs().max(b.abs()) {
                     return Err(CovarianceDesignError::InvalidCovariance(format!(
-                        "negative diagonal for ({first}, {second}) in {eid}"
+                        "joint covariance is asymmetric in {eid}"
                     )));
                 }
             }
-            if pair.covariance_descriptor.trim().is_empty()
-                || !descriptor_digest_matches(
-                    &pair.covariance_descriptor,
-                    &pair.covariance_descriptor_digest_sha256,
-                )
-            {
-                return Err(CovarianceDesignError::DigestMismatch(format!(
-                    "covariance provenance descriptor for ({first}, {second}) in {eid}"
-                )));
-            }
-            if matrix_digest_sha256(&pair.covariance) != pair.covariance_matrix_digest_sha256 {
-                return Err(CovarianceDesignError::DigestMismatch(format!(
-                    "numeric covariance matrix for ({first}, {second}) in {eid}"
-                )));
-            }
-            let correlation = correlation_matrix(&pair.covariance)
-                .ok_or_else(|| CovarianceDesignError::InvalidCovariance(format!("nonzero covariance with a zero-variance observable for ({first}, {second}) in {eid}")))?;
-            let (eigenvalues, _) = jacobi_symmetric_eigen(&correlation).ok_or_else(|| {
-                CovarianceDesignError::NumericalFailure(format!(
-                    "eigendecomposition for ({first}, {second}) in {eid}"
-                ))
-            })?;
-            let max_eigenvalue = eigenvalues.iter().copied().fold(0.0_f64, f64::max).max(1.0);
-            if let Some(minimum) = eigenvalues.iter().copied().reduce(f64::min)
-                && minimum < -NEGATIVE_EIGENVALUE_TOLERANCE * max_eigenvalue
-            {
-                return Err(CovarianceDesignError::NonPsdCovariance(format!(
-                    "minimum eigenvalue {minimum} for ({first}, {second}) in {eid}"
+            if covariance.covariance[i][i] < 0.0 {
+                return Err(CovarianceDesignError::InvalidCovariance(format!(
+                    "joint covariance has a negative diagonal in {eid}"
                 )));
             }
         }
-        for i in 0..input.hypothesis_ids.len() {
-            for j in (i + 1)..input.hypothesis_ids.len() {
-                let (first, second) = if input.hypothesis_ids[i] < input.hypothesis_ids[j] {
-                    (
-                        input.hypothesis_ids[i].clone(),
-                        input.hypothesis_ids[j].clone(),
-                    )
-                } else {
-                    (
-                        input.hypothesis_ids[j].clone(),
-                        input.hypothesis_ids[i].clone(),
-                    )
-                };
-                if !supplied_pairs.contains(&(first.clone(), second.clone())) {
-                    return Err(CovarianceDesignError::InvalidInput(format!(
-                        "missing covariance pair ({first}, {second}) in {eid}"
-                    )));
-                }
-            }
-        }
-
-        validate_pairwise_covariance_consistency(experiment, &input.hypothesis_ids)?;
-    }
-    Ok(())
-}
-
-/// Pairwise covariances Cov(Y_i - Y_j) are not independent inputs: all pairs
-/// must be jointly realizable by one collection of random output vectors.
-/// This is the matrix-valued variogram / conditional-negative-definiteness
-/// condition; validating each pair matrix as PSD is necessary but insufficient.
-///
-/// A block matrix of pairwise difference covariances is a matrix-valued
-/// variogram. Its double-centred form K = -1/2 (J ⊗ I) Δ (J ⊗ I) must be PSD.
-/// This catches individually-PSD but mutually impossible pairwise covariances,
-/// which would otherwise produce a meaningless maximin ranking.
-///
-/// Observable dimensions are standardized by their maximum declared pairwise
-/// variance before the PSD test; this keeps the consistency test invariant to
-/// positive diagonal unit changes.
-fn validate_pairwise_covariance_consistency(
-    experiment: &CovarianceAwareCandidateExperiment,
-    hypothesis_ids: &[String],
-) -> Result<(), CovarianceDesignError> {
-    let h = hypothesis_ids.len();
-    let p = experiment.observables.len();
-    let dim = h * p;
-    let mut scales = vec![0.0_f64; p];
-    let covariance_map: BTreeMap<(&str, &str), &PairwiseDifferenceCovariance> = experiment
-        .pairwise_difference_covariances
-        .iter()
-        .map(|pair| {
-            (
-                (
-                    pair.first_hypothesis_id.as_str(),
-                    pair.second_hypothesis_id.as_str(),
-                ),
-                pair,
+        if covariance.covariance_descriptor.trim().is_empty()
+            || !descriptor_digest_matches(
+                &covariance.covariance_descriptor,
+                &covariance.covariance_descriptor_digest_sha256,
             )
-        })
-        .collect();
-
-    for pair in &experiment.pairwise_difference_covariances {
-        for (observable, scale) in scales.iter_mut().enumerate() {
-            *scale = scale.max(pair.covariance[observable][observable].sqrt());
+        {
+            return Err(CovarianceDesignError::DigestMismatch(format!(
+                "joint covariance provenance descriptor in {eid}"
+            )));
         }
-    }
-
-    let mut delta = vec![vec![0.0_f64; dim]; dim];
-    for i in 0..h {
-        for j in (i + 1)..h {
-            let (first, second) = if hypothesis_ids[i] < hypothesis_ids[j] {
-                (hypothesis_ids[i].as_str(), hypothesis_ids[j].as_str())
-            } else {
-                (hypothesis_ids[j].as_str(), hypothesis_ids[i].as_str())
-            };
-            let pair = covariance_map[&(first, second)];
-            for a in 0..p {
-                for b in 0..p {
-                    let scale_a = scales[a];
-                    let scale_b = scales[b];
-                    let value = pair.covariance[a][b];
-                    let standardized = if scale_a == 0.0 || scale_b == 0.0 {
-                        if value != 0.0 {
-                            return Err(CovarianceDesignError::InvalidCovariance(format!(
-                                "nonzero covariance for zero-variance observable in {}",
-                                experiment.experiment_id
-                            )));
-                        }
-                        0.0
-                    } else {
-                        value / scale_a / scale_b
-                    };
-                    let ia = i * p + a;
-                    let jb = j * p + b;
-                    let ja = j * p + a;
-                    let ib = i * p + b;
-                    delta[ia][jb] = standardized;
-                    delta[ja][ib] = standardized;
-                }
-            }
+        if matrix_digest_sha256(&covariance.covariance)
+            != covariance.covariance_matrix_digest_sha256
+        {
+            return Err(CovarianceDesignError::DigestMismatch(format!(
+                "joint numeric covariance matrix in {eid}"
+            )));
         }
-    }
 
-    // Compute K = -1/2 (J ⊗ I) Δ (J ⊗ I), with J = I - 11ᵀ/h.
-    // The block-centering is performed independently for every observable pair.
-    let mut centered = vec![vec![0.0_f64; dim]; dim];
-    for a in 0..p {
-        for b in 0..p {
-            let mut row_means = vec![0.0_f64; h];
-            let mut col_means = vec![0.0_f64; h];
-            let mut grand_mean = 0.0_f64;
-            for i in 0..h {
-                for j in 0..h {
-                    let value = delta[i * p + a][j * p + b];
-                    row_means[i] += value / h as f64;
-                    col_means[j] += value / h as f64;
-                    grand_mean += value / ((h * h) as f64);
-                }
-            }
-            for i in 0..h {
-                for j in 0..h {
-                    centered[i * p + a][j * p + b] = -0.5
-                        * (delta[i * p + a][j * p + b] - row_means[i] - col_means[j] + grand_mean);
-                }
-            }
+        let correlation = correlation_matrix(&covariance.covariance).ok_or_else(|| {
+            CovarianceDesignError::InvalidCovariance(format!(
+                "joint covariance has invalid zero-variance cross-covariance in {eid}"
+            ))
+        })?;
+        let (eigenvalues, _) = jacobi_symmetric_eigen(&correlation).ok_or_else(|| {
+            CovarianceDesignError::NumericalFailure(format!(
+                "joint covariance eigendecomposition did not converge in {eid}"
+            ))
+        })?;
+        let max_eigenvalue = eigenvalues.iter().copied().fold(0.0_f64, f64::max).max(1.0);
+        let negative_cutoff = NEGATIVE_EIGENVALUE_TOLERANCE * max_eigenvalue;
+        if let Some(minimum) = eigenvalues.iter().copied().reduce(f64::min)
+            && minimum < -negative_cutoff
+        {
+            return Err(CovarianceDesignError::NonPsdCovariance(format!(
+                "joint covariance minimum standardized eigenvalue {minimum} in {eid}"
+            )));
         }
-    }
-
-    let (eigenvalues, _) = jacobi_symmetric_eigen(&centered).ok_or_else(|| {
-        CovarianceDesignError::NumericalFailure(format!(
-            "joint covariance-consistency eigensolver did not converge for {}",
-            experiment.experiment_id
-        ))
-    })?;
-    let max_eigenvalue = eigenvalues.iter().copied().fold(0.0_f64, f64::max).max(1.0);
-    let negative_cutoff = NEGATIVE_EIGENVALUE_TOLERANCE * max_eigenvalue;
-    if let Some(minimum) = eigenvalues.iter().copied().reduce(f64::min)
-        && minimum < -negative_cutoff
-    {
-        return Err(CovarianceDesignError::InconsistentPairwiseCovariances(
-            format!(
-                "double-centred joint covariance has minimum eigenvalue {minimum} in {}",
-                experiment.experiment_id
-            ),
-        ));
     }
     Ok(())
 }
 
 fn correlation_matrix(covariance: &[Vec<f64>]) -> Option<Vec<Vec<f64>>> {
     let n = covariance.len();
+    if (0..n).any(|index| covariance[index][index] < 0.0) {
+        return None;
+    }
     let scales: Vec<f64> = (0..n).map(|i| covariance[i][i].sqrt()).collect();
     let mut correlation = vec![vec![0.0; n]; n];
     for i in 0..n {
