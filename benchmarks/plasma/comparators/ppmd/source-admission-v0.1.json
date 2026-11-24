@@ -22,7 +22,15 @@
       "demonstrations on flow past a cylinder and backward-facing step",
       "comparison with POD plus Gaussian process regression",
       "improved generalization beyond training parameter range on reported flow cases"
-    ]
+    ],
+    "supplementary_archive": {
+      "title": "Parametric-Probabilistic-Manifold-Decomposition-for-Nonlinear-Model-Reduction-main.zip",
+      "page_reported_size_bytes": 12320,
+      "page_url": "https://epubs.siam.org/doi/suppl/10.1137/26M185758X/suppl_file/Parametric-Probabilistic-Manifold-Decomposition-for-Nonlinear-Model-Reduction-main.zip",
+      "description": "The SIAM page describes this as a zipped snapshot of the git repository required for the reproducibility badge.",
+      "inspection_status": "NOT_INSPECTED",
+      "inspection_note": "The archive link is present on the official SIAM page, but this session's binary retrieval failed. Do not infer its contents from the public GitHub tree; inspect the archive and compute its digest in the next source-reproduction pass."
+    }
   },
   "repository": {
     "url": "https://github.com/apprenticeGuo/Parametric-Probabilistic-Manifold-Decomposition-for-Nonlinear-Model-Reduction",
@@ -57,7 +65,8 @@
       "repository_tree_contains_only_three_files",
       "no_dataset_or_vtu_inputs_in_inspected_tree",
       "no_dependency_lock_or_environment_spec_in_inspected_tree",
-      "PPMD.py_uses_hard_coded_windows_local_data_roots"
+      "PPMD.py_uses_hard_coded_windows_local_data_roots",
+      "official_supplementary_zip_linked_but_binary_contents_not_yet_inspected"
     ],
     "observed_local_data_roots": [
       "D:\\parametric PMD\\Flow around a cylinder",
