@@ -581,7 +581,19 @@ The 2026 Vlasov–Poisson control study by Guerra et al. (JCP 115169) notes that
 
 The next benchmark must jointly freeze measurement operators, sample periods, transport latency, timestamp age, jitter, noise, dropout policy, actuator update period, delivery delay, bandwidth, amplitude, slew limit, controller WCET and fallback. Deployment-scored controllers cannot observe hidden full state or command unavailable instantaneous fields. A full-state/zero-delay controller is retained only as an explicit oracle upper bound.
 
-The synthetic timing contract and schema are in [PR #13405](https://github.com/Luminous-Dynamics/symthaea/pull/13405). Its Rust auditor checks the raw age/deadline constraints and derives worst-case actuator command latency, minimum effective actuator bandwidth after digital Nyquist limits, and conservative observation-to-actuation latency. The six/seven derived values must remain separate from any empirical hardware measurement. The next physical comparison is delay-aware observer + constrained MPC versus robust/tube MPC, RL and response-Gramian sensor/actuator co-design on the same mode/QoI subspace. Score observability, actuator authority, peak/integrated growth, delay margin, dropout robustness and sensor/compute/energy costs separately.
+The synthetic timing contract and schema are in [PR #13405](https://github.com/Luminous-Dynamics/symthaea/pull/13405). Its Rust auditor checks the raw age/deadline constraints and derives worst-case actuator command latency, minimum effective actuator bandwidth after digital Nyquist limits, minimum effective diagnostic bandwidth after sample-Nyquist limits, and conservative observation-to-actuation latency.
+
+**New timescale qualification:** the fixture now declares a target unstable-mode frequency and e-folding time. It reports:
+- diagnostic bandwidth multiple = minimum effective diagnostic bandwidth / target instability frequency;
+- actuator bandwidth multiple = minimum effective actuator bandwidth / target instability frequency;
+- loop-latency e-fold fraction = conservative observation-to-actuation latency / target instability e-fold time;
+- `interface_timescale_qualified` against a frozen minimum bandwidth multiple and maximum latency/e-fold fraction.
+
+The synthetic fixture uses 5 Hz, 100 ms, 20 Hz effective diagnostic and actuator bandwidth, and 71.5 ms loop latency: 4× bandwidth and 0.715 e-folds. It passes its illustrative 2× / 0.8 thresholds. Negative tests make the interface unqualified when the diagnostic sampling rate is too slow or the instability e-fold time is shortened to 50 ms. These are synthetic ratios only, not measured hardware performance.
+
+This is an **interface-timescale feasibility check**, not a closed-loop stability proof. The target mode frequency and growth time must come from the exact cohort's independently qualified dispersion relation / reference analysis. A successful optimizer is not a deployment result when the diagnostics cannot observe the mode quickly enough or the actuator cannot respond within the growth window.
+
+The next physical comparison is delay-aware observer + constrained MPC versus robust/tube MPC, RL and response-Gramian sensor/actuator co-design on the same mode/QoI subspace. Score observability, actuator authority, peak/integrated growth, delay margin, dropout robustness and sensor/compute/energy costs separately.
 
 ## PPMD source-reproduction boundary
 
