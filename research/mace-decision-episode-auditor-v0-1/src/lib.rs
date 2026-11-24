@@ -598,7 +598,8 @@ mod tests {
             serde_json::json!("dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd");
         pair["control"]["selected_evidence_ids"] = serde_json::json!(["clean-memory"]);
         pair["treatment"]["memory_condition"] = serde_json::json!("poisoned");
-        pair["treatment"]["retrieval_policy_sha256"] = pair["control"]["retrieval_policy_sha256"].clone();
+        let fixed_policy_digest = pair["control"]["retrieval_policy_sha256"].clone();
+        pair["treatment"]["retrieval_policy_sha256"] = fixed_policy_digest;
         assert!(audit_json(&serde_json::to_vec(&value).unwrap()).is_ok());
 
         pair["treatment"]["retrieval_policy_sha256"] =
