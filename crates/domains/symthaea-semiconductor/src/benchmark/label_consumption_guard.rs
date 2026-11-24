@@ -344,6 +344,7 @@ pub fn assess_label_consumption_eligibility_v1(
     let mut report = LabelConsumptionEligibilityReportV1 {
         schema: LABEL_CONSUMPTION_REPORT_SCHEMA_V1.into(),
         label_id: label.label_id.clone(),
+        label_revision: label.revision,
         measurement_event_id: measurement.measurement_event_id.clone(),
         calibration_certificate_id: certificate.certificate_id.clone(),
         frontier,
