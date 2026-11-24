@@ -49,6 +49,17 @@ Treat the biological network/plate as the independent grouping unit. The more th
 
 Use the frozen AMFTrack/AMFTravellingWave publication pipeline as the reproduction baseline, then compare persistence, morphology-only, local geometry/distance-to-root, topology-only and BARE travelling-wave model baselines. Add shuffled trajectory-to-edge registration and reversed-time controls to detect spurious alignment or temporal leakage.
 
+**Proposed AMF benchmark gates (not achieved):**
+- Reproduction lane: reproduce published node/edge counts, growth-front position/speed, density profiles, global/root geometric efficiency and construction-cost summaries with the paper's coordinate transforms, graph weights, connected-pair denominators and MST/Delaunay construction rules. Any intentional deviation gets a separate metric name.
+- Node/edge tracking: on an independently adjudicated, plate-disjoint subset, target at least a 10% relative reduction in identity switches and graph-edge association errors versus the frozen publication pipeline, without reducing node/edge detection recall.
+- Growth-front forecasting: at fixed 2-hour observation cadence, target at least a 10% relative reduction in 24-hour wavefront-position MAE versus persistence and morphology-only baselines on held-out plates.
+- Flow prediction: target at least a 10% relative reduction in held-out plate-clustered MAE for signed flow speed and reversal timing versus per-strain mean-speed, local geometry and topology-only baselines. Report rootward and tipward flows separately and preserve antiparallel streams.
+- Registration negative controls: shuffled video-to-edge mapping and reversed time must materially degrade trajectory-to-topology coupling; otherwise the coupling metric is not discriminative.
+- Generalization: report within-strain plate-disjoint and leave-one-strain-out metrics separately; three strains are not enough to claim broad fungal transfer.
+- Uncertainty: bootstrap/resample at the plate/network level and report the effective biological sample count alongside the nested trajectory count.
+
+These relative-improvement percentages are prospective targets only. The first acceptance step is faithful reproduction with correct experimental units and denominators, not beating the paper's result by changing the metric.
+
 Data and code:
 - Figshare source data: https://doi.org/10.6084/m9.figshare.27889143
 - Frozen analysis repository (MIT): https://github.com/Cocopyth/AMFTravellingWave
