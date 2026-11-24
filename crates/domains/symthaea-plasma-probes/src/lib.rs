@@ -3744,7 +3744,7 @@ mod tests {
     }
 
     #[test]
-    fn weighted_fourier_measure_is_stable_to_tiny_mass_outlier_while_sample_minmax_moves_all_inliers()
+    fn weighted_measure_tail_outlier_stability_and_minmax_drift()
     {
         let fixture: serde_json::Value =
             serde_json::from_str(WEIGHTED_MEASURE_TAIL_STABILITY_FIXTURE).unwrap();
@@ -3768,8 +3768,7 @@ mod tests {
         let maximum_coordinate_shift = base_positions
             .iter()
             .map(|position| {
-                (base_map.apply(*position).unwrap() - augmented_map.apply(*position).unwrap())
-                    .abs()
+                (base_map.apply(*position).unwrap() - augmented_map.apply(*position).unwrap()).abs()
             })
             .fold(0.0_f64, f64::max);
         let expected_coordinate_shift =
