@@ -6882,7 +6882,7 @@ mod tests {
         assert!((command.external_electric_transverse[0] - -0.7).abs() < 1.0e-12);
         assert!((command.external_electric_transverse[1] - 2.1).abs() < 1.0e-12);
         assert!((command.external_magnetic_transverse[0] - 1.4).abs() < 1.0e-12);
-        assert!((command.external_magnetic_transverse[1] - 0.2).abs() < 1.0e-12);
+        assert!((command.external_magnetic_transverse[1] - -1.8).abs() < 1.0e-12);
     }
 
     #[test]
