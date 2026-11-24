@@ -1066,9 +1066,9 @@ mod tests {
         let p3 = register(&mut engine, "s3", "e3", 109, -1.0, 1.0);
         let p4 = register(&mut engine, "s4", "e4", 112, -1.0, 1.0);
         let p5 = register(&mut engine, "s5", "e5", 115, -1.0, 1.0);
-        assert_eq!(p3.alpha_at_prediction, 0.10);
-        assert!(p4.alpha_at_prediction < 0.10);
-        assert!(p5.alpha_at_prediction > p4.alpha_at_prediction);
+        assert!(p3.alpha_at_prediction < 0.10);
+        assert!(p4.alpha_at_prediction > 0.10);
+        assert_eq!(p5.alpha_at_prediction, p4.alpha_at_prediction);
         assert_eq!(p2.alpha_at_prediction, 0.10);
     }
 
