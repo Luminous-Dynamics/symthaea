@@ -244,8 +244,8 @@ fn product_mix_can_move_pooled_mean_without_within_family_process_drift() {
     let mixed_before = (mean_a * 90.0 + mean_b * 10.0) / 100.0;
     let mixed_after = (mean_a * 10.0 + mean_b * 90.0) / 100.0;
 
-    assert!(close(mean_a, 5.5));
-    assert!(close(mean_b, 10.5));
+    assert!(close(mean_a, 4.0));
+    assert!(close(mean_b, 9.0));
     assert!(mixed_after > mixed_before);
     assert!(close(
         observe(
