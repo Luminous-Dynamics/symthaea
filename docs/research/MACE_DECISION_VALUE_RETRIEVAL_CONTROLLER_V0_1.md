@@ -207,6 +207,46 @@ The following are project targets derived from the published Cycle 2 reference s
 
 Phase I establishes a strong open-method outperformance target; it does not imply commercial parity on every track. Phase II is deliberately an aspiration above the commercial reference. Before claiming either result, reproduce the matching track's actual Add/Search protocol, division, corpus, reader, model settings and resource budget. Publish exact run manifests, paired confidence intervals and failure counts. A result from one track cannot be used to imply a win on another.
 
+#### Textual capability targets
+
+Cycle 2 publishes separate scores for explicit fact recall (A), relational/multi-hop reasoning (B), temporal/event sequencing (C), memory governance (D), personalization/care (E), workflow execution (G), epistemic safety/privacy (H), and streaming (S). The following MACE targets use the Resurface open-method leader for Phase I (+5) and set Phase II to the greater of Phase I or MemoraX commercial leader (+2), so the stretch target never falls below Phase I.
+
+| Capability | Resurface open | MemoraX commercial | Phase I | Phase II floor |
+|---|---:|---:|---:|---:|
+| A — Explicit fact recall | 62.98 | 70.85 | 67.98 | 72.85 |
+| B — Relational/multi-hop | 58.94 | 64.40 | 63.94 | 66.40 |
+| C — Temporal/event sequence | 57.76 | 67.05 | 62.76 | 69.05 |
+| D — Memory governance | 76.55 | 78.10 | 81.55 | 81.55 |
+| E — Personalization/care | 38.82 | 54.70 | 43.82 | 56.70 |
+| G — Workflow/rule execution | 59.67 | 61.20 | 64.67 | 64.67 |
+| H — Epistemic safety/privacy | 68.59 | 81.98 | 73.59 | 83.98 |
+| S — Streaming | 49.65 | 63.11 | 54.65 | 65.11 |
+
+This table suggests two high-leverage research fronts. First, preserve and improve governance/epistemic safety without assuming that security mechanisms automatically translate to benchmark points. Second, close the open-to-commercial gaps in personalization and streaming; the latter especially requires an actual streaming protocol, not just fast batch retrieval. Do not optimize the subscore in isolation: report the official overall score, all capability scores, failure rates and resource tiers.
+
+#### Multimodal and coding target decomposition
+
+| Multimodal capability | Khipu open | MemoraX commercial | Phase I (+5) | Phase II (+2 commercial) |
+|---|---:|---:|---:|---:|
+| Retrieval | 50.28 | 66.73 | 55.28 | 68.73 |
+| Relational reasoning | 45.82 | 53.87 | 50.82 | 55.87 |
+| Temporal reasoning | 34.23 | 40.12 | 39.23 | 42.12 |
+| Continual learning | 38.45 | 48.40 | 43.45 | 50.40 |
+| Personalization | 11.04 | 12.21 | 16.04 | 14.21 |
+| Evidence governance | 31.29 | 33.59 | 36.29 | 35.59 |
+
+| Coding measure | InsightMem open | MemoraX commercial | Phase I (+5) | Phase II (+2 commercial) |
+|---|---:|---:|---:|---:|
+| Overall resolved | 63.33% | 68.00% | 68.33% | 70.00% |
+| Relevant — new feature | 74.51% | 70.59% | 79.51% | 79.51% |
+| Relevant — bug fix | 57.58% | 65.66% | 62.58% | 67.66% |
+| Noisy — new feature | 74.51% | 74.51% | 79.51% | 79.51% |
+| Noisy — bug fix | 57.58% | 65.66% | 62.58% | 67.66% |
+
+The personalization phase-II value is 14.21 rather than 16.04 because the commercial reference plus two points is below the Phase-I threshold; for this capability the true stretch floor should therefore be max(16.04, 14.21) = 16.04. Apply that same max rule to every capability when freezing the target manifest.
+
+Reference: [Agent Memory Leaderboard Cycle 2 official results, November 19, 2026](https://agentmemoryleaderboard.ai/results/cycle-2/). Scores and divisions are track-specific; do not combine textual, multimodal and coding points into a synthetic project score.
+
 For AMA-Bench, after reproducing a strongest matched-backbone baseline, a proposed initial gate is at least +3 absolute accuracy points with a positive preregistered 95% confidence interval, without a task-family regression beyond 2 points. For MemoryArena, target at least +5 points in held-out multi-session task completion at matched tool/model budgets, with per-family transfer and worst-family results reported. These are proposed experimental gates, not official leaderboard targets.
 
 
