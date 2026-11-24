@@ -1144,7 +1144,7 @@ mod tests {
     }
 
     #[test]
-    fn proxy_expiry_uses_strict_less_than_boundary() {
+    fn feedback_on_proxy_expiry_round_is_received_before_eviction() {
         let mut engine = engine(1, 2, vec![1.0, 1.0, 1.0]);
         advance_ca_ocrc_round_v1(
             &mut engine,
@@ -1152,39 +1152,101 @@ mod tests {
             &[],
         )
         .unwrap();
-        let exact = advance_ca_ocrc_round_v1(
+        advance_ca_ocrc_round_v1(
             &mut engine,
             &round(2, None, Some((0.0, 1.0)), Some(0.5)),
             &[],
         )
         .unwrap();
-        assert!(exact.evicted_round_ids.is_empty());
-        let expired = advance_ca_ocrc_round_v1(
+        let exact = advance_ca_ocrc_round_v1(
             &mut engine,
-            &round(3, None, Some((0.0, 1.0)), Some(0.5)),
-            &[],
+            &round(3, Some(CaoOcrcTrivialSetV1::Full), None, None),
+            &[feedback(
+                1,
+                3,
+                2.0,
+                "label-1",
+                1,
+                LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            )],
         )
         .unwrap();
-        assert_eq!(expired.evicted_round_ids, vec![1]);
+        assert!(exact.evicted_round_ids.is_empty());
+        assert_eq!(
+            exact.received_feedback_receipts[0].disposition,
+            CaoOcrcFeedbackDispositionV1::ReceivedAndApplied
+        );
+        assert!(!engine.tracked_rounds.contains_key(&1));
     }
 
     #[test]
-    fn immediate_feedback_requires_current_round_admission() {
-        let mut engine = engine(1, 1, vec![1.0, 1.0]);
-        let receipt = advance_ca_ocrc_round_v1(
+    fn feedback_after_proxy_expiry_is_permanently_lost_to_online_update() {
+        let mut engine = engine(1, 2, vec![1.0, 1.0, 1.0]);
+        advance_ca_ocrc_round_v1(
             &mut engine,
             &round(1, None, Some((0.0, 1.0)), Some(0.5)),
             &[],
         )
         .unwrap();
-        assert_eq!(receipt.admission, CaoOcrcAdmissionV1::CapacityAdmitted);
-        let feedback = feedback(1, 1, 2.0, "label-1", 1, LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy);
-        // Delay zero must be processed at the end of the same round.
-        assert_eq!(feedback.delivery_round, 1);
+        for round_index in 2..=3 {
+            advance_ca_ocrc_round_v1(
+                &mut engine,
+                &round(round_index, Some(CaoOcrcTrivialSetV1::Full), None, None),
+                &[],
+            )
+            .unwrap();
+        }
+        let late = advance_ca_ocrc_round_v1(
+            &mut engine,
+            &round(4, Some(CaoOcrcTrivialSetV1::Full), None, None),
+            &[feedback(
+                1,
+                4,
+                2.0,
+                "label-late",
+                1,
+                LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            )],
+        )
+        .unwrap();
+        assert_eq!(late.evicted_round_ids, vec![1]);
+        assert_eq!(
+            late.received_feedback_receipts[0].disposition,
+            CaoOcrcFeedbackDispositionV1::AlreadyExpired
+        );
     }
 
     #[test]
-    fn proxy_minus_one_is_not_admitted_and_later_feedback_is_lost() {
+    fn immediate_feedback_is_received_only_when_current_round_was_admitted() {
+        let mut engine = engine(1, 0, vec![1.0]);
+        let receipt = advance_ca_ocrc_round_v1(
+            &mut engine,
+            &round(1, None, Some((0.0, 1.0)), Some(0.5)),
+            &[feedback(
+                1,
+                1,
+                2.0,
+                "label-1",
+                1,
+                LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            )],
+        )
+        .unwrap();
+        assert_eq!(receipt.admission, CaoOcrcAdmissionV1::CapacityAdmitted);
+        assert_eq!(
+            receipt.received_feedback_receipts[0].disposition,
+            CaoOcrcFeedbackDispositionV1::ReceivedAndApplied
+        );
+        assert_eq!(
+            receipt.received_feedback_receipts[0].actual_delay_rounds,
+            Some(0)
+        );
+        assert!(receipt.threshold_after > receipt.threshold_before);
+        assert!(engine.tracked_rounds.is_empty());
+    }
+
+    #[test]
+    fn proxy_minus_one_is_not_admitted_and_feedback_is_reported_lost() {
         let mut engine = engine(1, 2, vec![0.5, 0.5, 0.5]);
         let receipt = advance_ca_ocrc_round_v1(
             &mut engine,
@@ -1194,15 +1256,25 @@ mod tests {
         .unwrap();
         assert_eq!(receipt.selected_proxy_delay_rounds, -1);
         assert_eq!(receipt.admission, CaoOcrcAdmissionV1::ProxyNotTracked);
-        let _ = advance_ca_ocrc_round_v1(
+        let later = advance_ca_ocrc_round_v1(
             &mut engine,
             &round(2, None, Some((0.0, 1.0)), Some(0.8)),
-            &[],
+            &[feedback(
+                1,
+                2,
+                2.0,
+                "label-1",
+                1,
+                LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            )],
         )
         .unwrap();
-        let delivery = feedback(1, 2, 2.0, "label-1", 1, LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy);
-        assert_eq!(delivery.delivery_round, 2);
+        assert_eq!(
+            later.received_feedback_receipts[0].disposition,
+            CaoOcrcFeedbackDispositionV1::NotTracked
+        );
         assert!(!engine.tracked_rounds.contains_key(&1));
+        assert!((engine.threshold - 10.0).abs() < f64::EPSILON);
     }
 
     #[test]
