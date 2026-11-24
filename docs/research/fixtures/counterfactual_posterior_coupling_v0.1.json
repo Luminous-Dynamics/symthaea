@@ -219,17 +219,17 @@
           -2,
           2
         ],
-        "matched_same_u_effect_variance": 4,
         "independently_sampled_cross_branch_effect_samples": [
           -12,
           -2,
           2,
           12
         ],
-        "independently_sampled_cross_branch_effect_variance": 74
+        "matched_same_u_effect_population_variance": 4,
+        "independently_sampled_cross_branch_effect_population_variance": 74
       },
       "expected": "PRESERVE_PAIRED_VARIANCE",
-      "reason": "Independent branch draws mix variation in stable individual identity into the treatment contrast."
+      "reason": "Population variance is calculated under the equally weighted posterior support, not as an unbiased sample variance. Independent branch draws mix variation in stable individual identity into the treatment contrast."
     },
     {
       "id": "PCIR-F12-OUTER-CAUSAL-MECHANISM-AMBIGUITY",
@@ -364,6 +364,7 @@
     "same_exogenous_u": "Okita formalizes counterfactual pairs by holding the same individual-specific exogenous u and factual history fixed across interventions (Eq. 10). This is established semantics, not a PCIR novelty claim.",
     "abduction_posterior": "Okita defines abduction as P(U | factual observations) and maps the RSSM posterior q_phi(z_t | h_t, o_t) to this role structurally; numerical correspondence between learned z and physical U is an empirical question.",
     "pcir_scope": "An auditable Symthaea implementation/ablation protocol for explicit stable-trait posterior/sample identity versus a standard RSSM-style branch-point latent copied across sibling action branches.",
-    "required_control": "A9 standard RSSM-style posterior latent with identical branch-point deterministic/stochastic state cloned across sibling action branches."
+    "required_control": "A9 standard RSSM-style posterior latent with identical branch-point deterministic/stochastic state cloned across sibling action branches.",
+    "dynamic_mechanism_bounds": "Haugh & Singal (ICML 2023) already optimize over possibly infinitely many mechanisms for upper/lower dynamic counterfactual bounds. A finite candidate model range is only empirical unless completeness is certified; PCIR Section 13 is an integration proposal, not a novel bounds algorithm."
   }
 }
