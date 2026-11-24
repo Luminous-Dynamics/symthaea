@@ -133,6 +133,22 @@ struct AddResponse {
 #[derive(Clone, Debug, Serialize)]
 struct SearchResponse { data: Vec<SearchItem> }
 
+#[derive(Serialize)]
+struct SearchTraceReceiptPayloadV1 {
+    schema_version: &'static str,
+    search_id: String,
+    principal_id: String,
+    tenant_id: String,
+    user_scope_sha256: String,
+    query_sha256: String,
+    request_sha256: String,
+    top_k: usize,
+    ordered_memory_ids_sha256: String,
+    response_sha256: String,
+    retrieval_policy: &'static str,
+    returned_at: String,
+}
+
 #[derive(Clone, Debug, Serialize)]
 struct SearchItem {
     id: String,
@@ -165,6 +181,15 @@ fn sha256_hex(bytes: &[u8]) -> String {
 }
 
 fn now_rfc3339() -> String { Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true) }
+
+fn sha256_fields(fields: &[&str]) -> String {
+    let mut bytes = Vec::new();
+    for field in fields {
+        bytes.extend_from_slice(&(field.len() as u64).to_be_bytes());
+        bytes.extend_from_slice(field.as_bytes());
+    }
+    sha256_hex(&bytes)
+}
 
 fn content_text(content: &Content) -> String {
     match content {
@@ -298,7 +323,24 @@ fn open_database(path: &Path) -> Result<Connection, Box<dyn std::error::Error + 
              response_json TEXT NOT NULL,
              committed_at TEXT NOT NULL,
              PRIMARY KEY (principal_id, tenant_id, request_id)
-         );",
+         );
+         CREATE TABLE IF NOT EXISTS search_trace_receipts (
+             search_id TEXT PRIMARY KEY,
+             principal_id TEXT NOT NULL,
+             tenant_id TEXT NOT NULL,
+             user_scope_sha256 TEXT NOT NULL,
+             query_sha256 TEXT NOT NULL,
+             request_sha256 TEXT NOT NULL,
+             ordered_memory_ids_json TEXT NOT NULL,
+             ordered_memory_ids_sha256 TEXT NOT NULL,
+             response_sha256 TEXT NOT NULL,
+             retrieval_policy TEXT NOT NULL,
+             returned_at TEXT NOT NULL,
+             receipt_json TEXT NOT NULL,
+             receipt_sha256 TEXT NOT NULL
+         );
+         CREATE INDEX IF NOT EXISTS search_trace_scope_idx
+             ON search_trace_receipts(principal_id, tenant_id, user_scope_sha256, returned_at);",
     )?;
     Ok(connection)
 }
@@ -390,10 +432,13 @@ fn bm25_score(query_terms: &[String], doc_terms: &[String], df: &BTreeMap<String
 fn search_query(state: &AppState, request: SearchRequest) -> Result<SearchResponse, ApiError> {
     validate_search(state.track, &request)?;
     let query_terms = tokenize(&content_text(&request.query));
-    if query_terms.is_empty() { return Ok(SearchResponse { data: Vec::new() }); }
 
-    let connection = state.db.lock().map_err(|_| ApiError::Unavailable)?;
-    let mut statement = connection.prepare(
+    // Search exposure and its internal receipt share one transaction. If the
+    // receipt cannot be committed, no evidence is returned to the caller.
+    let mut connection = state.db.lock().map_err(|_| ApiError::Unavailable)?;
+    let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)
+        .map_err(|_| ApiError::Unavailable)?;
+    let mut statement = tx.prepare(
         "SELECT memory_id, content_json, searchable_text, event_timestamp_ms, ingested_at
          FROM memory_items
          WHERE principal_id = ?1 AND tenant_id = ?2 AND user_id = ?3
@@ -438,8 +483,56 @@ fn search_query(state: &AppState, request: SearchRequest) -> Result<SearchRespon
 
     let data = ranked.into_iter().take(request.top_k).map(|(score, candidate)| SearchItem {
         id: candidate.id, content: candidate.content, score, created_at: candidate.created_at,
-    }).collect();
-    Ok(SearchResponse { data })
+    }).collect::<Vec<_>>();
+    let response = SearchResponse { data };
+
+    // Persist only digests and opaque memory IDs: never store raw query text or
+    // raw user identifiers in this retrieval audit stream.
+    let search_id = Uuid::new_v4().to_string();
+    let returned_at = now_rfc3339();
+    let user_scope_sha256 = sha256_fields(&[
+        &state.principal_id,
+        &state.tenant_id,
+        &request.user_id,
+    ]);
+    let query_bytes = serde_json::to_vec(&request.query).map_err(|_| ApiError::Internal)?;
+    let request_bytes = serde_json::to_vec(&request).map_err(|_| ApiError::Internal)?;
+    let ordered_memory_ids: Vec<&str> = response.data.iter().map(|item| item.id.as_str()).collect();
+    let ordered_memory_ids_json = serde_json::to_string(&ordered_memory_ids).map_err(|_| ApiError::Internal)?;
+    let ordered_memory_ids_sha256 = sha256_hex(ordered_memory_ids_json.as_bytes());
+    let response_bytes = serde_json::to_vec(&response).map_err(|_| ApiError::Internal)?;
+    let response_sha256 = sha256_hex(&response_bytes);
+    let receipt_payload = SearchTraceReceiptPayloadV1 {
+        schema_version: "mace.search-trace-receipt.v1",
+        search_id: search_id.clone(),
+        principal_id: state.principal_id.clone(),
+        tenant_id: state.tenant_id.clone(),
+        user_scope_sha256: user_scope_sha256.clone(),
+        query_sha256: sha256_hex(&query_bytes),
+        request_sha256: sha256_hex(&request_bytes),
+        top_k: request.top_k,
+        ordered_memory_ids_sha256: ordered_memory_ids_sha256.clone(),
+        response_sha256: response_sha256.clone(),
+        retrieval_policy: "bm25_unicode_token_v1",
+        returned_at: returned_at.clone(),
+    };
+    let receipt_json = serde_json::to_string(&receipt_payload).map_err(|_| ApiError::Internal)?;
+    let receipt_sha256 = sha256_hex(receipt_json.as_bytes());
+    tx.execute(
+        "INSERT INTO search_trace_receipts (
+             search_id, principal_id, tenant_id, user_scope_sha256, query_sha256,
+             request_sha256, ordered_memory_ids_json, ordered_memory_ids_sha256,
+             response_sha256, retrieval_policy, returned_at, receipt_json, receipt_sha256
+         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+        params![
+            search_id, state.principal_id, state.tenant_id, user_scope_sha256,
+            receipt_payload.query_sha256, receipt_payload.request_sha256,
+            ordered_memory_ids_json, ordered_memory_ids_sha256, response_sha256,
+            receipt_payload.retrieval_policy, returned_at, receipt_json, receipt_sha256
+        ],
+    ).map_err(|_| ApiError::Unavailable)?;
+    tx.commit().map_err(|_| ApiError::Unavailable)?;
+    Ok(response)
 }
 
 fn presented_key(headers: &HeaderMap) -> Option<Vec<u8>> {
@@ -673,6 +766,52 @@ mod tests {
         assert!(!exceeds_wire_max_length(&valid, 4096));
         assert!(exceeds_wire_max_length(&too_long, 4096));
         assert!(valid.len() > 4096);
+    }
+
+    #[test]
+    fn every_search_commits_a_trace_receipt_before_returning_results() {
+        let state = test_state();
+        add_transaction(&state, add_request("r-audit", "red bicycle in the garage")).unwrap();
+        let response = search_query(&state, SearchRequest {
+            query: Content::Text("red bicycle".into()),
+            options: None,
+            user_id: "private-user-scope".into(),
+            top_k: 10,
+        }).unwrap();
+        assert_eq!(response.data.len(), 1);
+
+        let connection = state.db.lock().unwrap();
+        let (ids_json, ids_sha, response_sha, receipt_json, receipt_sha, query_sha, scope_sha):
+            (String, String, String, String, String, String, String) = connection.query_row(
+                "SELECT ordered_memory_ids_json, ordered_memory_ids_sha256, response_sha256,
+                        receipt_json, receipt_sha256, query_sha256, user_scope_sha256
+                 FROM search_trace_receipts",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?, row.get(6)?)),
+            ).unwrap();
+        assert_eq!(ids_json, serde_json::to_string(&vec![response.data[0].id.as_str()]).unwrap());
+        assert_eq!(ids_sha, sha256_hex(ids_json.as_bytes()));
+        assert_eq!(response_sha, sha256_hex(&serde_json::to_vec(&response).unwrap()));
+        assert_eq!(receipt_sha, sha256_hex(receipt_json.as_bytes()));
+        assert_eq!(query_sha, sha256_hex(&serde_json::to_vec(&Content::Text("red bicycle".into())).unwrap()));
+        assert_eq!(scope_sha, sha256_fields(&["participant-1", "tenant-1", "private-user-scope"]));
+        assert!(!receipt_json.contains("red bicycle"));
+        assert!(!receipt_json.contains("private-user-scope"));
+    }
+
+    #[test]
+    fn empty_search_is_also_audited() {
+        let state = test_state();
+        let response = search_query(&state, SearchRequest {
+            query: Content::Text("no matching term".into()),
+            options: None,
+            user_id: "user-1".into(),
+            top_k: 5,
+        }).unwrap();
+        assert!(response.data.is_empty());
+        let connection = state.db.lock().unwrap();
+        let count: i64 = connection.query_row("SELECT COUNT(*) FROM search_trace_receipts", [], |row| row.get(0)).unwrap();
+        assert_eq!(count, 1);
     }
 
     #[test]
