@@ -149,3 +149,27 @@ This work adds no new simulator, branch engine, causal pairing validator, counte
 - Decision-equivalent imagination fixtures #13468: https://github.com/Luminous-Dynamics/symthaea/pull/13468
 - Branch trajectory owner #13377: https://github.com/Luminous-Dynamics/symthaea/pull/13377
 - Symtropy stochastic verifier owner #3741: https://github.com/Luminous-Dynamics/symtropy/issues/3741
+
+## Existing training-surface audit — avoid the wrong contrastive pathway
+
+A source inspection at Symthaea commit `3ca654b0544b5ad398b2129a4884027f4d9074f4` found useful primitives, but no already-qualified individual-effect world-model trainer:
+
+- `crates/core/symthaea-core/src/hdc/hdc_ltc_unified.rs` exposes per-step BPTT gradients for a single evolved state against a target state, plus `apply_gradients`. Its `contrastive_update(positive, negative, lr)` is a positive/negative hypervector update. It is **not** the pairwise action-trajectory contrast objective from the paper.
+- `crates/domains/symthaea-broca/src/training.rs` is a teacher-forced next-token training pipeline. `crates/domains/symthaea-broca/src/liquid_mamba.rs` has contrastive loss between tokens/thoughts of different intent. That is semantic-intent discrimination, not an individual's physical treatment-effect contrast. Do not repurpose Broca's contrastive head for this DMC objective.
+- `crates/core/symthaea-hdc-ltc/src/network.rs` exposes a separate network-level temporal forward interface. The source audit has not established that this API and the older `symthaea-core` per-neuron BPTT path are interchangeable; resolve the intended network/trainer path before implementation.
+- `crates/core/symthaea-stt/src/phoneme_hdc_ltc.rs` contains an ignored `test_training_changes_output` test marked as a known training issue. It is not evidence that the target training pathway is already validated.
+- Domain controllers such as `symthaea-multirotor` and `symthaea-vehicle` train action-output projections from sensor hypervectors. They are policy/controller paths, not action-conditioned world-transition models.
+
+### Correct next implementation boundary
+
+Build the pairwise contrast loss as a training primitive in a dedicated research world-model trainer, then integrate only after a real HDC/CfC/LTC trajectory trainer is selected and its gradient flow is validated. For one individual with K action branches:
+
+1. Clone the identical factual-history/branch-point state for all K interventions.
+2. Roll all K branches with the same pre-update model parameters; preserve the shared inferred individual state but let each branch's endogenous state evolve independently.
+3. Compute trajectory-prediction gradients and the complete set of pairwise contrast gradients (K(K-1)/2 unordered pairs, or the exactly equivalent ordered sum). Accumulate every branch's gradient before performing one optimizer update; never update weights between sibling branches.
+4. Backpropagate each branch's accumulated contrast gradient through its own action-conditioned rollout. Do not freeze the whole latent trajectory and thereby suppress real action effects.
+5. Train only on training individuals/branches; select checkpoints using held-out validation individuals and contrast metrics; keep confirmatory individuals and held-out intervention pairs sealed.
+6. Evaluate the frozen-latent readout and the imagined rollout separately. A successful scalar loss implementation is not evidence of a trained model improvement.
+
+This is a deliberate non-reuse boundary: the paper's contrast objective is prior art; the existing HDC triplet update and Broca intent-contrast pathway are not equivalent. A correct experiment must show that the new gradient reaches the predicted individual treatment contrast in the action-conditioned rollout, not merely that two latent vectors become more separable.
+
