@@ -25,7 +25,7 @@ use axum::{
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use chrono::{SecondsFormat, Utc};
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
@@ -80,9 +80,17 @@ struct AddRequest {
 #[serde(deny_unknown_fields)]
 struct Message {
     role: Role,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_timestamp")]
     timestamp: Option<i64>,
     content: Content,
+}
+
+fn deserialize_timestamp<'de, D>(deserializer: D) -> Result<Option<i64>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    // Missing is handled by serde(default); explicit null is rejected.
+    i64::deserialize(deserializer).map(Some)
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
@@ -224,10 +232,14 @@ fn validate_content(track: Track, content: &Content) -> Result<usize, ApiError> 
     }
 }
 
+fn exceeds_wire_max_length(value: &str, max_chars: usize) -> bool {
+    value.chars().count() > max_chars
+}
+
 fn validate_add(track: Track, request: &AddRequest) -> Result<(), ApiError> {
-    if request.request_id.trim().is_empty() || request.request_id.len() > 4096 { return Err(ApiError::BadRequest("request_id must be non-empty and at most 4096 bytes")); }
-    if request.user_id.trim().is_empty() || request.user_id.len() > 4096 { return Err(ApiError::BadRequest("user_id must be non-empty and at most 4096 bytes")); }
-    if request.session_id.trim().is_empty() || request.session_id.len() > 4096 { return Err(ApiError::BadRequest("session_id must be non-empty and at most 4096 bytes")); }
+    if request.request_id.trim().is_empty() || exceeds_wire_max_length(&request.request_id, 4096) { return Err(ApiError::BadRequest("request_id must be non-empty and at most 4096 characters")); }
+    if request.user_id.trim().is_empty() || exceeds_wire_max_length(&request.user_id, 4096) { return Err(ApiError::BadRequest("user_id must be non-empty and at most 4096 characters")); }
+    if request.session_id.trim().is_empty() || exceeds_wire_max_length(&request.session_id, 4096) { return Err(ApiError::BadRequest("session_id must be non-empty and at most 4096 characters")); }
     if request.messages.is_empty() { return Err(ApiError::BadRequest("messages must not be empty")); }
     if track == Track::Textual && request.messages.len() > MAX_MESSAGES { return Err(ApiError::BadRequest("textual Add accepts at most 20 messages per chunk")); }
     let mut total_image_bytes = 0usize;
@@ -243,7 +255,7 @@ fn validate_add(track: Track, request: &AddRequest) -> Result<(), ApiError> {
 }
 
 fn validate_search(track: Track, request: &SearchRequest) -> Result<(), ApiError> {
-    if request.user_id.trim().is_empty() || request.user_id.len() > 4096 { return Err(ApiError::BadRequest("user_id must be non-empty and at most 4096 bytes")); }
+    if request.user_id.trim().is_empty() || exceeds_wire_max_length(&request.user_id, 4096) { return Err(ApiError::BadRequest("user_id must be non-empty and at most 4096 characters")); }
     if request.top_k == 0 || request.top_k > MAX_TOP_K { return Err(ApiError::BadRequest("top_k must be between 1 and 100")); }
     if request.options.as_ref().is_some_and(|values| values.iter().any(|value| value.trim().is_empty())) { return Err(ApiError::BadRequest("options must not contain empty strings")); }
     let image_bytes = validate_content(track, &request.query)?;
@@ -644,6 +656,23 @@ mod tests {
         let connection = state.db.lock().unwrap();
         let count: i64 = connection.query_row("SELECT COUNT(*) FROM memory_items", [], |row| row.get(0)).unwrap();
         assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn missing_optional_timestamp_is_accepted_but_explicit_null_is_rejected() {
+        let missing = serde_json::json!({"role":"user","content":"hello"});
+        assert!(serde_json::from_value::<Message>(missing).is_ok());
+        let explicit_null = serde_json::json!({"role":"user","timestamp":null,"content":"hello"});
+        assert!(serde_json::from_value::<Message>(explicit_null).is_err());
+    }
+
+    #[test]
+    fn wire_max_length_counts_unicode_characters_not_utf8_bytes() {
+        let valid = "é".repeat(4096);
+        let too_long = "é".repeat(4097);
+        assert!(!exceeds_wire_max_length(&valid, 4096));
+        assert!(exceeds_wire_max_length(&too_long, 4096));
+        assert!(valid.len() > 4096);
     }
 
     #[test]
