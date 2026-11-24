@@ -406,11 +406,15 @@ fn validate_digest(
 
 fn footprint_digest(
     coordinate_frame_id: &str,
+    acquisition_plan_digest: &str,
+    device_capability_manifest_digest: &str,
     cell_ids: &[String],
 ) -> String {
     let mut hasher = blake3::Hasher::new();
-    hasher.update(b"symthaea-mycelial-spatial-footprint-v1");
+    hasher.update(b"symthaea-mycelial-spatial-footprint-v2");
     hash_string(&mut hasher, coordinate_frame_id);
+    hash_string(&mut hasher, acquisition_plan_digest);
+    hash_string(&mut hasher, device_capability_manifest_digest);
     hasher.update(&(cell_ids.len() as u64).to_le_bytes());
     for cell_id in cell_ids {
         hash_string(&mut hasher, cell_id);
@@ -739,6 +743,8 @@ fn validate_proposal(
     }
     if footprint_digest(
         &proposal.coordinate_frame_id,
+        &proposal.acquisition_plan_digest,
+        &proposal.device_capability_manifest_digest,
         &proposal.spatial_footprint_cell_ids,
     ) != proposal.spatial_footprint_digest
     {
@@ -1620,7 +1626,12 @@ mod tests {
             acquisition_plan_digest: digest('k'),
             device_capability_manifest_digest: digest('j'),
             coordinate_frame_id: "specimen-frame-v1".to_string(),
-            spatial_footprint_digest: footprint_digest("specimen-frame-v1", &cell_ids),
+            spatial_footprint_digest: footprint_digest(
+                "specimen-frame-v1",
+                &digest('k'),
+                &digest('j'),
+                &cell_ids,
+            ),
             spatial_footprint_cell_ids: cell_ids,
             required_illumination_channel_ids: if kind == MycelialAcquisitionActionKind::HumanAnnotation {
                 Vec::new()
