@@ -409,23 +409,112 @@ fn handle_request(
                 0
             };
             let index_ref = index.as_ref().ok_or("indexes unavailable after build")?;
-            let bm25_result = index_ref.bm25
-                .search(&config.domain, query, config.top_k, config.neighbor_radius)
-                .map_err(|error| format!("trajectory BM25 query: {error:?}"))?;
-            let entity_literal_result = index_ref.entity_literal
-                .search(&config.domain, query, config.top_k)
-                .map_err(|error| format!("trajectory entity-literal query: {error:?}"))?;
-            let retrieval_search_ns = bm25_result.search_latency_ns
-                .saturating_add(entity_literal_result.search_latency_ns);
-            let bm25_evidence_ids = trace_evidence_ids(&bm25_result.hits);
-            let entity_evidence_ids = trace_evidence_ids(&entity_literal_result.hits);
-            let result = hybrid_rrf_result(
-                &bm25_result.hits,
-                &entity_literal_result.hits,
-                bm25_result.neighbor_context,
-                config.top_k,
-                retrieval_search_ns,
-            );
+            let mut operations = Vec::<RetrievalOperationV1>::with_capacity(2);
+            let mut bm25_hit_count = 0_usize;
+            let mut entity_literal_hit_count = 0_usize;
+
+            let result = match config.retrieval_mode {
+                RetrievalModeV1::Bm25Only => {
+                    let retrieved = index_ref.bm25.as_ref()
+                        .ok_or("BM25 index unavailable for BM25-only mode")?
+                        .search(&config.domain, query, config.top_k, config.neighbor_radius)
+                        .map_err(|error| format!("trajectory BM25 query: {error:?}"))?;
+                    bm25_hit_count = retrieved.hits.len();
+                    operations.push(RetrievalOperationV1 {
+                        tool_id: "trajectory.bm25.search".to_owned(),
+                        tool_revision_sha256: config.backend_revision_sha256.clone(),
+                        action_template_sha256: bm25_action_template_sha256(config),
+                        observed_evidence_ids: trace_evidence_ids(&retrieved.hits),
+                        outcome: if retrieved.hits.is_empty() {
+                            RetrievalOperationOutcomeV1::NoEvidence
+                        } else {
+                            RetrievalOperationOutcomeV1::EvidenceObserved
+                        },
+                        elapsed_ns: retrieved.search_latency_ns,
+                        inspected_bytes: 0,
+                        inspected_bytes_measured: false,
+                    });
+                    LongMemEvalV2SearchResultV1 {
+                        hits: retrieved.hits,
+                        neighbor_context: retrieved.neighbor_context,
+                        search_latency_ns: retrieved.search_latency_ns,
+                    }
+                }
+                RetrievalModeV1::EntityLiteralOnly => {
+                    let retrieved = index_ref.entity_literal.as_ref()
+                        .ok_or("entity-literal index unavailable for entity-only mode")?
+                        .search(&config.domain, query, config.top_k)
+                        .map_err(|error| format!("trajectory entity-literal query: {error:?}"))?;
+                    entity_literal_hit_count = retrieved.hits.len();
+                    operations.push(RetrievalOperationV1 {
+                        tool_id: "trajectory.entity_literal.search".to_owned(),
+                        tool_revision_sha256: config.backend_revision_sha256.clone(),
+                        action_template_sha256: entity_literal_action_template_sha256(config),
+                        observed_evidence_ids: trace_evidence_ids(&retrieved.hits),
+                        outcome: if retrieved.hits.is_empty() {
+                            RetrievalOperationOutcomeV1::NoEvidence
+                        } else {
+                            RetrievalOperationOutcomeV1::EvidenceObserved
+                        },
+                        elapsed_ns: retrieved.search_latency_ns,
+                        inspected_bytes: 0,
+                        inspected_bytes_measured: false,
+                    });
+                    LongMemEvalV2SearchResultV1 {
+                        hits: retrieved.hits,
+                        neighbor_context: Vec::new(),
+                        search_latency_ns: retrieved.search_latency_ns,
+                    }
+                }
+                RetrievalModeV1::HybridRrf => {
+                    let bm25 = index_ref.bm25.as_ref()
+                        .ok_or("BM25 index unavailable for hybrid mode")?
+                        .search(&config.domain, query, config.top_k, config.neighbor_radius)
+                        .map_err(|error| format!("trajectory BM25 query: {error:?}"))?;
+                    let entity = index_ref.entity_literal.as_ref()
+                        .ok_or("entity-literal index unavailable for hybrid mode")?
+                        .search(&config.domain, query, config.top_k)
+                        .map_err(|error| format!("trajectory entity-literal query: {error:?}"))?;
+                    bm25_hit_count = bm25.hits.len();
+                    entity_literal_hit_count = entity.hits.len();
+                    operations.push(RetrievalOperationV1 {
+                        tool_id: "trajectory.bm25.search".to_owned(),
+                        tool_revision_sha256: config.backend_revision_sha256.clone(),
+                        action_template_sha256: bm25_action_template_sha256(config),
+                        observed_evidence_ids: trace_evidence_ids(&bm25.hits),
+                        outcome: if bm25.hits.is_empty() {
+                            RetrievalOperationOutcomeV1::NoEvidence
+                        } else {
+                            RetrievalOperationOutcomeV1::EvidenceObserved
+                        },
+                        elapsed_ns: bm25.search_latency_ns,
+                        inspected_bytes: 0,
+                        inspected_bytes_measured: false,
+                    });
+                    operations.push(RetrievalOperationV1 {
+                        tool_id: "trajectory.entity_literal.search".to_owned(),
+                        tool_revision_sha256: config.backend_revision_sha256.clone(),
+                        action_template_sha256: entity_literal_action_template_sha256(config),
+                        observed_evidence_ids: trace_evidence_ids(&entity.hits),
+                        outcome: if entity.hits.is_empty() {
+                            RetrievalOperationOutcomeV1::NoEvidence
+                        } else {
+                            RetrievalOperationOutcomeV1::EvidenceObserved
+                        },
+                        elapsed_ns: entity.search_latency_ns,
+                        inspected_bytes: 0,
+                        inspected_bytes_measured: false,
+                    });
+                    hybrid_rrf_result(
+                        &bm25.hits,
+                        &entity.hits,
+                        bm25.neighbor_context,
+                        config.top_k,
+                        bm25.search_latency_ns.saturating_add(entity.search_latency_ns),
+                    )
+                }
+            };
+
 
             let mut items = Vec::new();
             let mut seen_images = BTreeSet::new();
