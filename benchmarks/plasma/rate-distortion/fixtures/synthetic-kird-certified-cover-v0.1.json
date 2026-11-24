@@ -96,7 +96,11 @@
     "covering_set_sha256": "8ffd84cdced28800babde7c1b04085aade89153474ce3631c9f81cb52c698e6a",
     "branch_association_stable": true,
     "branch_stability_evidence_sha256": "503bf73da7a083387892abc8291457937430e6b0a43a54804f673555bcbb182b",
-    "independent_checker_revision": "symthaea-plasma-probes/kird-auditor-0.1"
+    "independent_checker_revision": "symthaea-plasma-probes/kird-auditor-0.1",
+    "intervention_domain_sha256": "f2e1e5d4c3b2a1908f7e6d5c4b3a2910f2e1e5d4c3b2a1908f7e6d5c4b3a2910",
+    "metric_definition_sha256": "e1d2c3b4a5968778695a4b3c2d1e0f1ae1d2c3b4a5968778695a4b3c2d1e0f1a",
+    "compactness_evidence_sha256": "d1c2b3a495867768594a3b2c1d0e0f1ad1c2b3a495867768594a3b2c1d0e0f1a",
+    "cover_radius_evidence_sha256": "c1d2e3f4a5b6c7d8e9f0011223344556c1d2e3f4a5b6c7d8e9f0011223344556"
   },
   "provenance": {
     "candidate_output_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
