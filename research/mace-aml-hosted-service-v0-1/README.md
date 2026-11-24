@@ -8,7 +8,7 @@ This crate implements the missing HTTP/storage boundary behind the frozen Add/Se
 
 - Axum `GET /health`, `POST /add`, and `POST /search` endpoints.
 - Strict Serde request structs reject unknown fields.
-- Required API-key authentication through `Authorization: Bearer`, `Authorization: Token`, or `X-Api-Key`; the key is configured outside source and logs.
+- Required API-key authentication through `Authorization: Bearer`, `Authorization: Token`, or `X-Api-Key`; a route middleware checks the key before the JSON extractor consumes the request body, and the key is configured outside source and logs.
 - One configured service principal and tenant per process; Search filters by principal, tenant, and the exact AML `user_id`; `/health` checks the database connection.
 - SQLite WAL mode with `synchronous=FULL`, an immediate transaction, immutable request-ID/payload binding, and source rows plus searchable text projection committed together.
 - Same request ID plus same normalized request payload returns the original Add response without another write; same request ID plus changed payload returns HTTP 422 and never overwrites the first write.
