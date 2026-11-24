@@ -3810,6 +3810,18 @@ mod tests {
     }
 
     #[test]
+    fn spectral_refinement_distinguishes_matched_tail_different_response_witnesses() {
+        let low_response =
+            decide_spectral_refinement(refinement_input(2.0, Some(0.5), 700)).unwrap();
+        let high_response =
+            decide_spectral_refinement(refinement_input(2.0, Some(1.2), 700)).unwrap();
+        assert_eq!(low_response.spectral_tail_ratio, high_response.spectral_tail_ratio);
+        assert_eq!(low_response.decision, SpectralRefinementDecision::Hold);
+        assert_eq!(high_response.decision, SpectralRefinementDecision::Refine);
+        assert_eq!(high_response.reason, SpectralRefinementReason::FutureResponse);
+    }
+
+    #[test]
     fn spectral_refinement_holds_when_both_signals_are_below_threshold() {
         let report = decide_spectral_refinement(refinement_input(5.0, Some(0.5), 700)).unwrap();
         assert_eq!(report.decision, SpectralRefinementDecision::Hold);
