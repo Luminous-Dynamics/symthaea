@@ -25,6 +25,10 @@ pub const RELATIVE_EIGENVALUE_TOLERANCE: f64 = 1.0e-12;
 pub const RELATIVE_SUPPORT_TOLERANCE: f64 = 1.0e-10;
 const NEGATIVE_EIGENVALUE_TOLERANCE: f64 = 1.0e-10;
 const JACOBI_CONVERGENCE_TOLERANCE: f64 = 1.0e-14;
+const MAX_HYPOTHESES: usize = 8;
+const MAX_OBSERVABLES: usize = 8;
+const MAX_JOINT_COVARIANCE_DIMENSION: usize = 16;
+const MAX_EXPERIMENTS: usize = 256;
 
 /// Complete design request. Each experiment must provide one difference
 /// covariance matrix for every unordered pair of competing hypotheses.
@@ -129,6 +133,7 @@ pub enum CovarianceDesignError {
     InvalidCovariance(String),
     DigestMismatch(String),
     NonPsdCovariance(String),
+    InconsistentPairwiseCovariances(String),
     NumericalFailure(String),
 }
 
@@ -139,6 +144,7 @@ impl Display for CovarianceDesignError {
             Self::InvalidCovariance(message) => write!(f, "invalid covariance: {message}"),
             Self::DigestMismatch(message) => write!(f, "covariance digest mismatch: {message}"),
             Self::NonPsdCovariance(message) => write!(f, "covariance is not positive semidefinite: {message}"),
+            Self::InconsistentPairwiseCovariances(message) => write!(f, "pairwise covariances do not admit a common joint model: {message}"),
             Self::NumericalFailure(message) => write!(f, "covariance numerical failure: {message}"),
         }
     }
@@ -437,6 +443,11 @@ fn validate_input(input: &CovarianceAwareDesignInput) -> Result<(), CovarianceDe
     if input.target.trim().is_empty() || input.hypothesis_ids.len() < 2 || input.experiments.is_empty() {
         return Err(CovarianceDesignError::InvalidInput("target, at least two hypotheses, and at least one experiment are required".to_owned()));
     }
+    if input.hypothesis_ids.len() > MAX_HYPOTHESES || input.experiments.len() > MAX_EXPERIMENTS {
+        return Err(CovarianceDesignError::InvalidInput(format!(
+            "input exceeds resource caps: at most {MAX_HYPOTHESES} hypotheses and {MAX_EXPERIMENTS} experiments"
+        )));
+    }
     let hypotheses: BTreeSet<&str> = input.hypothesis_ids.iter().map(String::as_str).collect();
     if hypotheses.len() != input.hypothesis_ids.len() || hypotheses.iter().any(|id| id.trim().is_empty()) {
         return Err(CovarianceDesignError::InvalidInput("hypothesis IDs must be non-empty and unique".to_owned()));
@@ -448,6 +459,12 @@ fn validate_input(input: &CovarianceAwareDesignInput) -> Result<(), CovarianceDe
         let eid = &experiment.experiment_id;
         if eid.trim().is_empty() || !experiment_ids.insert(eid.as_str()) {
             return Err(CovarianceDesignError::InvalidInput(format!("empty or duplicate experiment ID: {eid}")));
+        }
+        if experiment.observables.len() > MAX_OBSERVABLES
+            || experiment.observables.len().saturating_mul(input.hypothesis_ids.len()) > MAX_JOINT_COVARIANCE_DIMENSION {
+            return Err(CovarianceDesignError::InvalidInput(format!(
+                "observable/hypothesis covariance dimension exceeds {MAX_JOINT_COVARIANCE_DIMENSION} in {eid}"
+            )));
         }
         if experiment.description.trim().is_empty()
             || experiment.settings.is_empty()
@@ -548,6 +565,118 @@ fn validate_input(input: &CovarianceAwareDesignInput) -> Result<(), CovarianceDe
                     return Err(CovarianceDesignError::InvalidInput(format!("missing covariance pair ({first}, {second}) in {eid}")));
                 }
             }
+        }
+
+        validate_pairwise_covariance_consistency(experiment, &input.hypothesis_ids)?;
+    }
+    Ok(())
+}
+
+/// Pairwise covariances Cov(Y_i - Y_j) are not independent inputs: all pairs
+/// must be jointly realizable by one collection of random output vectors.
+///
+/// A block matrix of pairwise difference covariances is a matrix-valued
+/// variogram. Its double-centred form K = -1/2 (J ⊗ I) Δ (J ⊗ I) must be PSD.
+/// This catches individually-PSD but mutually impossible pairwise covariances,
+/// which would otherwise produce a meaningless maximin ranking.
+///
+/// Observable dimensions are standardized by their maximum declared pairwise
+/// variance before the PSD test; this keeps the consistency test invariant to
+/// positive diagonal unit changes.
+fn validate_pairwise_covariance_consistency(
+    experiment: &CovarianceAwareCandidateExperiment,
+    hypothesis_ids: &[String],
+) -> Result<(), CovarianceDesignError> {
+    let h = hypothesis_ids.len();
+    let p = experiment.observables.len();
+    let dim = h * p;
+    let mut scales = vec![0.0_f64; p];
+    let covariance_map: BTreeMap<(&str, &str), &PairwiseDifferenceCovariance> = experiment
+        .pairwise_difference_covariances
+        .iter()
+        .map(|pair| ((pair.first_hypothesis_id.as_str(), pair.second_hypothesis_id.as_str()), pair))
+        .collect();
+
+    for pair in &experiment.pairwise_difference_covariances {
+        for observable in 0..p {
+            scales[observable] = scales[observable].max(pair.covariance[observable][observable].sqrt());
+        }
+    }
+
+    let mut delta = vec![vec![0.0_f64; dim]; dim];
+    for i in 0..h {
+        for j in (i + 1)..h {
+            let (first, second) = if hypothesis_ids[i] < hypothesis_ids[j] {
+                (hypothesis_ids[i].as_str(), hypothesis_ids[j].as_str())
+            } else {
+                (hypothesis_ids[j].as_str(), hypothesis_ids[i].as_str())
+            };
+            let pair = covariance_map[&(first, second)];
+            for a in 0..p {
+                for b in 0..p {
+                    let scale_a = scales[a];
+                    let scale_b = scales[b];
+                    let value = pair.covariance[a][b];
+                    let standardized = if scale_a == 0.0 || scale_b == 0.0 {
+                        if value != 0.0 {
+                            return Err(CovarianceDesignError::InvalidCovariance(format!(
+                                "nonzero covariance for zero-variance observable in {}",
+                                experiment.experiment_id
+                            )));
+                        }
+                        0.0
+                    } else {
+                        value / scale_a / scale_b
+                    };
+                    let ia = i * p + a;
+                    let jb = j * p + b;
+                    let ja = j * p + a;
+                    let ib = i * p + b;
+                    delta[ia][jb] = standardized;
+                    delta[ja][ib] = standardized;
+                }
+            }
+        }
+    }
+
+    // Compute K = -1/2 (J ⊗ I) Δ (J ⊗ I), with J = I - 11ᵀ/h.
+    // The block-centering is performed independently for every observable pair.
+    let mut centered = vec![vec![0.0_f64; dim]; dim];
+    for a in 0..p {
+        for b in 0..p {
+            let mut row_means = vec![0.0_f64; h];
+            let mut col_means = vec![0.0_f64; h];
+            let mut grand_mean = 0.0_f64;
+            for i in 0..h {
+                for j in 0..h {
+                    let value = delta[i * p + a][j * p + b];
+                    row_means[i] += value / h as f64;
+                    col_means[j] += value / h as f64;
+                    grand_mean += value / ((h * h) as f64);
+                }
+            }
+            for i in 0..h {
+                for j in 0..h {
+                    centered[i * p + a][j * p + b] =
+                        -0.5 * (delta[i * p + a][j * p + b] - row_means[i] - col_means[j] + grand_mean);
+                }
+            }
+        }
+    }
+
+    let (eigenvalues, _) = jacobi_symmetric_eigen(&centered)
+        .ok_or_else(|| CovarianceDesignError::NumericalFailure(format!(
+            "joint covariance-consistency eigensolver did not converge for {}",
+            experiment.experiment_id
+        )))?;
+    let max_eigenvalue = eigenvalues.iter().copied().fold(0.0_f64, f64::max).max(1.0);
+    let negative_cutoff = NEGATIVE_EIGENVALUE_TOLERANCE * max_eigenvalue;
+    if let Some(minimum) = eigenvalues.iter().copied().reduce(f64::min) {
+        if minimum < -negative_cutoff {
+            return Err(CovarianceDesignError::InconsistentPairwiseCovariances(format!(
+                "double-centred joint covariance has minimum eigenvalue {minimum} in {}",
+                experiment.experiment_id
+            )));
         }
     }
     Ok(())
