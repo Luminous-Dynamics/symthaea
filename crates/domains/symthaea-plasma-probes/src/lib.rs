@@ -6864,6 +6864,28 @@ mod tests {
     }
 
     #[test]
+    fn maxwell_delay_history_means_feed_the_cancellation_predictor() {
+        let averages =
+            integrate_maxwell_delay_history(&maxwell_delay_history_fixture(), 2.0, 3.0).unwrap();
+        let observation = MaxwellDelayCancellationObservation {
+            delayed_electric_longitudinal: vec![0.6, -0.2],
+            delayed_electric_transverse: vec![1.2, 0.4],
+            delayed_magnetic_transverse: vec![-0.4, 0.8],
+            interval_mean_current_longitudinal: averages.current_longitudinal,
+            interval_mean_current_transverse: averages.current_transverse,
+            interval_mean_gradient_electric_transverse: averages.gradient_electric_transverse,
+            interval_mean_gradient_magnetic_transverse: averages.gradient_magnetic_transverse,
+        };
+        let command = predict_maxwell_delay_cancellation(&observation, 1.0).unwrap();
+        assert!((command.external_electric_longitudinal[0] - 0.9).abs() < 1.0e-12);
+        assert!((command.external_electric_longitudinal[1] - 3.2).abs() < 1.0e-12);
+        assert!((command.external_electric_transverse[0] - -0.7).abs() < 1.0e-12);
+        assert!((command.external_electric_transverse[1] - 2.1).abs() < 1.0e-12);
+        assert!((command.external_magnetic_transverse[0] - 1.4).abs() < 1.0e-12);
+        assert!((command.external_magnetic_transverse[1] - 0.2).abs() < 1.0e-12);
+    }
+
+    #[test]
     fn maxwell_delay_predictor_matches_manufactured_interval_integral_identity() {
         let command =
             predict_maxwell_delay_cancellation(&maxwell_delay_observation_fixture(), 0.5)
