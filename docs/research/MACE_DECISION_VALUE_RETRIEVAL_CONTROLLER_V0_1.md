@@ -1,7 +1,7 @@
 # MACE v0.1 — Decision-Value Retrieval Controller and Counterfactual Evaluation
 
 **Status:** research / implementation contract. This document specifies the next controller increment; it is not evidence that the controller, adapters, or benchmark runs are implemented.  
-**Related:** [#13477](https://github.com/Luminous-Dynamics/symthaea/issues/13477), [#13455](https://github.com/Luminous-Dynamics/symthaea/issues/13455), [#13261](https://github.com/Luminous-Dynamics/symthaea/issues/13261), [#13284](https://github.com/Luminous-Dynamics/symthaea/issues/13284), [PR #13436](https://github.com/Luminous-Dynamics/symthaea/pull/13436), [PR #13491](https://github.com/Luminous-Dynamics/symthaea/pull/13491) — deterministic risk-adjusted retrieval selection kernel, [PR #13512](https://github.com/Luminous-Dynamics/symthaea/pull/13512) — BM25 + entity-literal hybrid RRF retrieval.
+**Related:** [#13477](https://github.com/Luminous-Dynamics/symthaea/issues/13477), [#13455](https://github.com/Luminous-Dynamics/symthaea/issues/13455), [#13261](https://github.com/Luminous-Dynamics/symthaea/issues/13261), [#13284](https://github.com/Luminous-Dynamics/symthaea/issues/13284), [#13517](https://github.com/Luminous-Dynamics/symthaea/issues/13517) — sealed official LongMemEval-V2 paired evaluator, [PR #13436](https://github.com/Luminous-Dynamics/symthaea/pull/13436), [PR #13491](https://github.com/Luminous-Dynamics/symthaea/pull/13491) — deterministic risk-adjusted retrieval selection kernel, [PR #13512](https://github.com/Luminous-Dynamics/symthaea/pull/13512) — BM25 + entity-literal hybrid RRF retrieval.
 
 ## 1. Problem statement
 
@@ -96,6 +96,9 @@ Use three explicit statuses:
 The policy process must not read benchmark answer keys, gold answers, evaluator labels, hidden question IDs, or evaluator signing credentials. It may observe its own retrieval actions, source/tool outcomes, qualification dispositions, elapsed time, measured resource use and explicitly permitted operational feedback.
 
 The independent evaluator may use sealed labels to calculate decision utility. It writes immutable evaluation receipts and aggregate metrics only after the candidate policy and run manifest are frozen. Do not feed per-question answer correctness back into the policy-memory process during the same evaluation.
+
+The existing `evaluator/src/bin/mace_paired_intervention.rs` is a public, co-located synthetic diagnostic: its own manifest describes the evaluator as public/non-secret. It is useful for internal falsification but is not an independent official LongMemEval-V2 evaluator or a leaderboard score. Issue #13517 specifies the separate official-harness paired evaluator, sealed task outcomes, and evaluator-owned receipts required for external benchmark claims.
+
 
 ### Paired experiment protocol
 
