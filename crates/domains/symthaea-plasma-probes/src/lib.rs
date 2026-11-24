@@ -3938,6 +3938,66 @@ mod tests {
     }
 
     #[test]
+    fn spectral_refinement_treats_stale_response_assessment_as_unknown() {
+        let mut input = refinement_input(1.0, Some(0.1), 700);
+        input.response_assessment_fresh = false;
+        let report = decide_spectral_refinement(input).unwrap();
+        assert_eq!(report.decision, SpectralRefinementDecision::Refine);
+        assert_eq!(report.reason, SpectralRefinementReason::ResponseUnknown);
+        assert_eq!(
+            report.qualification,
+            SpectralRefinementQualification::UnknownResponse
+        );
+        assert!(!report.response_assessment_valid);
+    }
+
+    #[test]
+    fn spectral_refinement_treats_unstable_branch_association_as_unknown() {
+        let mut input = refinement_input(1.0, Some(0.1), 700);
+        input.response_branch_association_stable = false;
+        let report = decide_spectral_refinement(input).unwrap();
+        assert_eq!(report.decision, SpectralRefinementDecision::Refine);
+        assert_eq!(report.reason, SpectralRefinementReason::ResponseUnknown);
+        assert!(!report.response_assessment_valid);
+    }
+
+    #[test]
+    fn spectral_refinement_treats_late_response_estimate_as_unknown() {
+        let mut input = refinement_input(1.0, Some(0.1), 700);
+        input.response_estimator_latency_seconds = 0.02;
+        let report = decide_spectral_refinement(input).unwrap();
+        assert_eq!(report.decision, SpectralRefinementDecision::Refine);
+        assert_eq!(report.reason, SpectralRefinementReason::ResponseUnknown);
+        assert!(!report.response_assessment_valid);
+    }
+
+    #[test]
+    fn spectral_refinement_rejects_projected_memory_without_temporary_buffers() {
+        let mut input = refinement_input(1.0, Some(0.1), 700);
+        input.projected_peak_includes_temporary_buffers = false;
+        assert_eq!(
+            decide_spectral_refinement(input),
+            Err(ContractError::IncompleteRefinementMemoryEstimate)
+        );
+    }
+
+    #[test]
+    fn spectral_refinement_labels_tail_trigger_with_unknown_response_explicitly() {
+        let mut input = refinement_input(12.0, Some(0.1), 700);
+        input.response_branch_association_stable = false;
+        let report = decide_spectral_refinement(input).unwrap();
+        assert_eq!(report.decision, SpectralRefinementDecision::Refine);
+        assert_eq!(
+            report.reason,
+            SpectralRefinementReason::SpectralTailAndResponseUnknown
+        );
+        assert_eq!(
+            report.qualification,
+            SpectralRefinementQualification::UnknownResponse
+        );
+    }
+
+    #[test]
     fn spectral_refinement_rejects_invalid_signal_and_memory_contracts() {
         assert_eq!(
             decide_spectral_refinement(refinement_input(f64::NAN, Some(0.1), 100)),
