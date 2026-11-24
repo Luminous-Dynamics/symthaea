@@ -63,11 +63,11 @@ jobs:
           git ls-files --error-unmatch Cargo.lock >/dev/null
           cargo +1.96.0 metadata --locked --no-deps --format-version 1 > "$RUNNER_TEMP/metadata.json"
 
-      - name: Run exact-source temporal-grounding tests
-        run: cargo +1.96.0 test --locked -p mel-temporal-grounding-qualifier
+      - name: Bootstrap exact harness dependency lock and run tests
+        run: cargo +1.96.0 test -p mel-temporal-grounding-qualifier
 
       - name: Warnings-denied Clippy on exact production source
-        run: cargo +1.96.0 clippy --locked -p mel-temporal-grounding-qualifier --all-targets -- -D warnings
+        run: cargo +1.96.0 clippy -p mel-temporal-grounding-qualifier --all-targets -- -D warnings
 
       - name: Assemble exact-head evidence
         if: always()
