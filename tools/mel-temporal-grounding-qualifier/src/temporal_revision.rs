@@ -46,9 +46,18 @@ pub struct RevisionCaseV2 {
     pub case_id: String,
     /// Shared stable identifier for the same query/model trial across evidence arms.
     pub experiment_unit_id: String,
+    /// Stable source-work lineage identifier for held-out/source-disjoint analysis.
+    pub source_lineage_id: String,
     pub model_identity_sha256: String,
     pub prompt_sha256: String,
     pub adapter_sha256: String,
+    /// Immutable identity of the executable/runtime/container/weights environment.
+    pub runtime_identity_sha256: String,
+    pub decoding_config_sha256: String,
+    pub max_output_tokens: u32,
+    pub actual_output_tokens: u32,
+    pub max_wall_time_ms: u64,
+    pub elapsed_wall_time_ms: u64,
     pub evidence_condition: EvidenceConditionV1,
     pub evidence: Option<RevisionEvidenceV1>,
     pub actions: Vec<RevisionActionV1>,
@@ -102,6 +111,13 @@ pub struct RevisionScoreSnapshotV1 {
 pub struct RevisionReportV1 {
     pub case_id: String,
     pub experiment_unit_id: String,
+    pub source_lineage_id: String,
+    pub runtime_identity_sha256: String,
+    pub decoding_config_sha256: String,
+    pub max_output_tokens: u32,
+    pub actual_output_tokens: u32,
+    pub max_wall_time_ms: u64,
+    pub elapsed_wall_time_ms: u64,
     pub evaluator_version: String,
     pub query_id: String,
     pub audio_sha256: String,
@@ -132,6 +148,12 @@ pub struct MatchedEvidenceContrastV1 {
     pub local_minus_yoked_count_gated_f1: Option<f64>,
     pub local_revision_gain: Option<f64>,
     pub yoked_revision_gain: Option<f64>,
+    pub local_output_tokens: u32,
+    pub no_evidence_output_tokens: u32,
+    pub yoked_output_tokens: u32,
+    pub local_elapsed_wall_time_ms: u64,
+    pub no_evidence_elapsed_wall_time_ms: u64,
+    pub yoked_elapsed_wall_time_ms: u64,
     pub local_beats_yoked: Option<bool>,
 }
 
@@ -216,6 +238,11 @@ pub fn compare_matched_evidence_arms(
                 || arm.model_identity_sha256 != no_evidence.model_identity_sha256
                 || arm.prompt_sha256 != no_evidence.prompt_sha256
                 || arm.adapter_sha256 != no_evidence.adapter_sha256
+                || arm.source_lineage_id != no_evidence.source_lineage_id
+                || arm.runtime_identity_sha256 != no_evidence.runtime_identity_sha256
+                || arm.decoding_config_sha256 != no_evidence.decoding_config_sha256
+                || arm.max_output_tokens != no_evidence.max_output_tokens
+                || arm.max_wall_time_ms != no_evidence.max_wall_time_ms
             {
                 return Err(format!(
                     "experiment unit {unit_id} is not a matched evidence-ablation triplet"
@@ -264,6 +291,12 @@ pub fn compare_matched_evidence_arms(
             local_minus_yoked_count_gated_f1,
             local_revision_gain,
             yoked_revision_gain,
+            local_output_tokens: local.actual_output_tokens,
+            no_evidence_output_tokens: no_evidence.actual_output_tokens,
+            yoked_output_tokens: yoked.actual_output_tokens,
+            local_elapsed_wall_time_ms: local.elapsed_wall_time_ms,
+            no_evidence_elapsed_wall_time_ms: no_evidence.elapsed_wall_time_ms,
+            yoked_elapsed_wall_time_ms: yoked.elapsed_wall_time_ms,
             local_beats_yoked,
         });
     }
@@ -291,9 +324,13 @@ pub fn audit_revision_v2(case: &RevisionCaseV2) -> Result<RevisionReportV1, Stri
     }
     require_text(&case.case_id, "case_id")?;
     require_text(&case.experiment_unit_id, "experiment_unit_id")?;
+    require_text(&case.source_lineage_id, "source_lineage_id")?;
     validate_digest(&case.model_identity_sha256, "model_identity_sha256")?;
     validate_digest(&case.prompt_sha256, "prompt_sha256")?;
     validate_digest(&case.adapter_sha256, "adapter_sha256")?;
+    validate_digest(&case.runtime_identity_sha256, "runtime_identity_sha256")?;
+    validate_digest(&case.decoding_config_sha256, "decoding_config_sha256")?;
+    validate_budget(case)?;
     validate_actions(&case.actions)?;
 
     let truth_issues = validate_temporal_ground_truth(&case.truth);
@@ -439,6 +476,13 @@ pub fn audit_revision(case: &RevisionCaseV1) -> Result<RevisionReportV1, String>
     Ok(RevisionReportV1 {
         case_id: case.case_id.clone(),
         experiment_unit_id: case.experiment_unit_id.clone(),
+        source_lineage_id: case.source_lineage_id.clone(),
+        runtime_identity_sha256: case.runtime_identity_sha256.clone(),
+        decoding_config_sha256: case.decoding_config_sha256.clone(),
+        max_output_tokens: case.max_output_tokens,
+        actual_output_tokens: case.actual_output_tokens,
+        max_wall_time_ms: case.max_wall_time_ms,
+        elapsed_wall_time_ms: case.elapsed_wall_time_ms,
         evaluator_version: case.draft.evaluator_version.clone(),
         query_id: case.draft.query_id.clone(),
         audio_sha256: case.draft.audio_sha256.clone(),
@@ -566,6 +610,19 @@ pub fn aggregate_revision_reports(
             .filter(|report| report.absence_regressed == Some(true))
             .count(),
     })
+}
+
+fn validate_budget(case: &RevisionCaseV2) -> Result<(), String> {
+    if case.max_output_tokens == 0 || case.max_wall_time_ms == 0 {
+        return Err("revision case must declare positive token and wall-time budgets".into());
+    }
+    if case.actual_output_tokens > case.max_output_tokens {
+        return Err("actual output tokens exceed the declared maximum".into());
+    }
+    if case.elapsed_wall_time_ms > case.max_wall_time_ms {
+        return Err("elapsed wall time exceeds the declared maximum".into());
+    }
+    Ok(())
 }
 
 fn validate_actions(actions: &[RevisionActionV1]) -> Result<(), String> {
@@ -846,9 +903,16 @@ mod tests {
             schema: "mel-temporal-revision-case-v2".into(),
             case_id: "case-v2".into(),
             experiment_unit_id: "unit-v2".into(),
+            source_lineage_id: "source-lineage-001".into(),
             model_identity_sha256: MODEL.into(),
             prompt_sha256: PROMPT.into(),
             adapter_sha256: ADAPTER.into(),
+            runtime_identity_sha256: EVIDENCE.into(),
+            decoding_config_sha256: RETRIEVAL.into(),
+            max_output_tokens: 512,
+            actual_output_tokens: 128,
+            max_wall_time_ms: 30_000,
+            elapsed_wall_time_ms: 4_000,
             evidence_condition: EvidenceConditionV1::NoEvidence,
             evidence: None,
             actions: vec![RevisionActionV1::Other],
