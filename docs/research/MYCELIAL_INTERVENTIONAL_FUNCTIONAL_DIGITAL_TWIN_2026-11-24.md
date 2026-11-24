@@ -47,6 +47,8 @@ Benchmark lanes must remain separate:
 
 Treat the biological network/plate as the independent grouping unit. The more than 100,000 flow trajectories, image frames, nodes and sampled positions are nested observations. Hold out entire networks/plates for within-strain generalization, and report leave-one-strain-out transfer separately across the three strains. The two-dimensional plate results are not 3D soil ground truth; bright-field particle trajectories are not direct isotope delivery or a complete mass-flux measurement. The short-track detection threshold creates a measurable selection window that should be explicitly re-evaluated.
 
+A further measurement boundary is tracked in Issue #13509: particle/marker kinematics do not identify cross-sectionally averaged volumetric flow, analyte-specific solute flux or integrated source-to-sink delivery without measured cross-sectional geometry, representative velocity/concentration profiles and independent tracer/isotope evidence.
+
 Use the frozen AMFTrack/AMFTravellingWave publication pipeline as the reproduction baseline, then compare persistence, morphology-only, local geometry/distance-to-root, topology-only and BARE travelling-wave model baselines. Add shuffled trajectory-to-edge registration and reversed-time controls to detect spurious alignment or temporal leakage.
 
 **Proposed AMF benchmark gates (not achieved):**
@@ -424,6 +426,7 @@ This protocol connects rather than duplicates the current portfolio:
 - Issue #13504 / draft PR #13505 — randomized observer-effect trial registry with independent illumination-cluster accounting, endpoint-specific estimands and replayable allocation/exposure/observation receipts.
 - Issue #13419 — posterior adequacy, candidate-generation coverage and common-cause residuals.
 - Issue #13352 — independent functional observations and transport benchmarks.
+- Issue #13509 — identifiability bridge from intrahyphal particle kinematics to volumetric flow and analyte mass flux.
 - Issue #13423 — multiplex transport and causal perturbation programme.
 - Issue #13435 — HDC/CfC/LTC evaluation.
 - Issue #13450 — demand-responsive morphogenesis.
