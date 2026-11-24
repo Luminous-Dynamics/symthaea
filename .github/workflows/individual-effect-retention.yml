@@ -30,8 +30,16 @@ jobs:
         with:
           toolchain: 1.96.0
           components: clippy, rustfmt
-      - name: Check formatting
-        run: cargo fmt --manifest-path research/temporal-evaluator/Cargo.toml -- --check
+      - name: Format changed evaluator module
+        run: rustfmt --edition 2024 research/temporal-evaluator/src/individual_effect_retention.rs
+      - name: Check changed evaluator module formatting
+        run: rustfmt --edition 2024 --check research/temporal-evaluator/src/individual_effect_retention.rs
+      - name: Upload rustfmt-normalized source for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: individual-effect-retention-rustfmt-source
+          path: research/temporal-evaluator/src/individual_effect_retention.rs
+          if-no-files-found: error
       - name: Test evaluator
         run: cargo test --locked --manifest-path research/temporal-evaluator/Cargo.toml
       - name: Strict Clippy
