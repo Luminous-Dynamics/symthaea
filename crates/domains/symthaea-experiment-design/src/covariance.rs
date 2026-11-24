@@ -832,6 +832,52 @@ mod tests {
     }
 
     #[test]
+    fn jacobi_eigenvalues_match_independent_nalgebra_reference() {
+        use nalgebra::{DMatrix, SymmetricEigen};
+
+        for (n, rank) in [(2, 2), (3, 3), (8, 4), (16, 7), (16, 16)] {
+            let factor: Vec<Vec<f64>> = (0..n)
+                .map(|i| {
+                    (0..rank)
+                        .map(|j| {
+                            let pattern = ((i + 1) * (j + 3) % 19) as f64 / 19.0;
+                            pattern + if i == j { 0.25 } else { 0.0 }
+                        })
+                        .collect()
+                })
+                .collect();
+            let mut covariance = vec![vec![0.0; n]; n];
+            for (i, row) in covariance.iter_mut().enumerate() {
+                for (j, value) in row.iter_mut().enumerate().skip(i) {
+                    let dot: f64 = factor[i]
+                        .iter()
+                        .zip(&factor[j])
+                        .map(|(left, right)| left * right)
+                        .sum();
+                    *value = dot;
+                    covariance[j][i] = dot;
+                }
+            }
+            let correlation = correlation_matrix(&covariance).unwrap();
+            let (mut actual, _) = jacobi_symmetric_eigen(&correlation).unwrap();
+            let matrix = DMatrix::from_fn(n, n, |i, j| correlation[i][j]);
+            let oracle = SymmetricEigen::new(matrix);
+            let mut expected = oracle.eigenvalues.as_slice().to_vec();
+            actual.sort_by(f64::total_cmp);
+            expected.sort_by(f64::total_cmp);
+            let max_error = actual
+                .iter()
+                .zip(&expected)
+                .map(|(observed, reference)| (observed - reference).abs())
+                .fold(0.0_f64, f64::max);
+            assert!(
+                max_error < 1.0e-10,
+                "dimension={n}, rank={rank}, maximum eigenvalue error={max_error:e}"
+            );
+        }
+    }
+
+    #[test]
     fn jacobi_solver_reconstructs_a_deterministic_16_dimensional_psd_matrix() {
         let n = 16;
         let rank = 7;
