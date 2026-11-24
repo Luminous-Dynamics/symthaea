@@ -1184,30 +1184,72 @@ mod tests {
 
 
     #[test]
-    fn legacy_evidence_sufficient_label_remains_readable_but_is_not_policy_eligible() {
-        let original = trace(
-            "legacy-candidate-hit",
-            "a141414141414141414141414141414141414141414141414141414141414141",
-            "web-shop-a",
-            ENV_A,
-            TOOL_PROFILE_A,
-            ACTION_SEARCH,
-        );
-        let mut value = original.to_json_value();
-        value["stop_reason"] = Value::String("evidence_sufficient".to_owned());
-        // The legacy label and the new candidate-returned label preserve the
-        // same v1 binary tag so previously persisted receipt digests still verify.
-        value["receipt_sha256"] = Value::String(original.receipt_sha256());
-        let decoded = RetrievalTraceReceiptV1::from_json_value(&value)
-            .expect("legacy v1 receipt remains readable");
-        assert_eq!(decoded.stop_reason, RetrievalStopReasonV1::EvidenceSufficient);
-
+    fn legacy_evidence_sufficient_label_remains_readable_but_only_exploratory() {
         let mut memory = RetrievalPolicyMemoryV1::default();
-        memory.record_trace(decoded).expect("legacy observation accepted");
-        assert!(memory
-            .promote_strategy(&refs(&["legacy-candidate-hit"]), ALGORITHM, 200, 300)
-            .is_err());
+        for (invocation, query) in [
+            ("legacy-a", "a141414141414141414141414141414141414141414141414141414141414141"),
+            ("legacy-b", "a242424242424242424242424242424242424242424242424242424242424242"),
+            ("legacy-c", "a343434343434343434343434343434343434343434343434343434343434343"),
+        ] {
+            let original = trace(
+                invocation, query, "web-shop-a", ENV_A, TOOL_PROFILE_A, ACTION_SEARCH,
+            );
+            let mut value = original.to_json_value();
+            value["stop_reason"] = Value::String("evidence_sufficient".to_owned());
+            // Legacy label and candidate-returned label share the old v1 tag,
+            // preserving digest verification without preserving its unsafe meaning.
+            value["receipt_sha256"] = Value::String(original.receipt_sha256());
+            let decoded = RetrievalTraceReceiptV1::from_json_value(&value)
+                .expect("legacy v1 receipt remains readable");
+            assert_eq!(decoded.stop_reason, RetrievalStopReasonV1::EvidenceSufficient);
+            memory.record_trace(decoded).expect("legacy observation accepted");
+        }
+
+        let note = memory
+            .promote_strategy(&refs(&["legacy-a", "legacy-b", "legacy-c"]), ALGORITHM, 200, 300)
+            .expect("legacy observations may be consolidated for diagnostics");
+        assert_eq!(note.status, RetrievalStrategyStatusV1::Exploratory);
         assert!(memory.applicable_notes("web-shop-a", ENV_A, TOOL_PROFILE_A, 250).is_empty());
+    }
+
+    #[test]
+    fn candidates_returned_receipt_matches_cross_language_reference_vector() {
+        let receipt = RetrievalTraceReceiptV1 {
+            run_id: "run-candidate-test".to_owned(),
+            query_invocation_id: "invocation-candidate-test".to_owned(),
+            domain_id: "web".to_owned(),
+            environment_revision_sha256: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_owned(),
+            tool_profile_sha256: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_owned(),
+            query_sha256: "fcef6f729579a929adf41fb9249bf3c2fa8fb4de403fe1019163ba6729646fb1".to_owned(),
+            candidate_set_sha256: Some("dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd".to_owned()),
+            operations: vec![RetrievalOperationV1 {
+                tool_id: "trajectory.bm25.search".to_owned(),
+                tool_revision_sha256: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_owned(),
+                action_template_sha256: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc".to_owned(),
+                observed_evidence_ids: vec!["evidence:1".to_owned()],
+                outcome: RetrievalOperationOutcomeV1::EvidenceObserved,
+                elapsed_ns: 17,
+                inspected_bytes: 128,
+                inspected_bytes_measured: true,
+            }],
+            stop_reason: RetrievalStopReasonV1::CandidatesReturned,
+            tool_call_budget: 1,
+            tool_calls_used: 1,
+            elapsed_ns: 17,
+            inspected_bytes: 128,
+            inspected_bytes_complete: true,
+            created_at_unix: 100,
+        };
+        assert_eq!(
+            receipt.receipt_sha256(),
+            "c925ead961171cd7a01381c4ca0dc4d518e26442a34388d9cec3d364b15a2c0e"
+        );
+        let value = receipt.to_json_value();
+        assert_eq!(value["stop_reason"], "candidates_returned");
+        assert_eq!(
+            RetrievalTraceReceiptV1::from_json_value(&value).unwrap(),
+            receipt
+        );
     }
 
     #[test]
