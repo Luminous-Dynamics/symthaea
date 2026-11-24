@@ -1,0 +1,165 @@
+{
+  "schema_version": "0.1.0",
+  "benchmark_id": "MAG-AM-001",
+  "title": "Recycled anisotropic Nd-Fe-B LPBF bonded magnet literature baseline",
+  "prepared_date": "2026-11-24",
+  "evidence_status": "source_reported_not_locally_reproduced",
+  "scientific_scope": "recycled rare-earth-containing Nd-Fe-B powder bonded with PA12 and fabricated by LPBF",
+  "source": {
+    "citation": "K. Schäfer et al., Fabrication of Sustainable 3D Printed Anisotropic Bonded Magnets Using Recycled Nd-Fe-B Powder and Low CO2 Footprint Polyamide 12",
+    "journal": "Advanced Energy and Sustainability Research",
+    "first_published": "2026-01-05",
+    "doi": "10.1002/aesr.202500339",
+    "url": "https://doi.org/10.1002/aesr.202500339",
+    "access": "open_access_article",
+    "raw_data_availability": "supporting data available from corresponding author on reasonable request",
+    "locally_reproduced": false,
+    "benchmark_admission_note": "Values in this file are transcribed from the paper; they are not raw observations acquired by Luminous Dynamics."
+  },
+  "process": {
+    "additive_process": "laser_powder_bed_fusion",
+    "machine": "Sinterit Lisa Pro",
+    "laser": {
+      "type": "diode",
+      "power_W": 5,
+      "wavelength_nm": 808
+    },
+    "powder_surface_temperature_C": 177.5,
+    "chamber_temperature_C": 140,
+    "laser_spot_mm": 0.4,
+    "hatch_distance_mm": 0.4,
+    "layer_height_um": 150,
+    "coupon_geometry": {
+      "shape": "cube",
+      "side_mm": 5
+    },
+    "nominal_magnetic_filler_fraction_wt_percent": 90,
+    "powder_mixing_duration_min": 15,
+    "binder": "PA12 (low-CO2-footprint grade)",
+    "settings_status": "source_reported_not_transferable_without_machine_and_feedstock_requalification"
+  },
+  "measurement": {
+    "powder_hysteresis": {
+      "instrument_family": "PPMS-VSM",
+      "maximum_applied_field_T": 5,
+      "specimen_preparation": "powder embedded in epoxy and aligned using a 1 T permanent-magnet field",
+      "directions": [
+        "easy",
+        "hard"
+      ],
+      "method_status": "source_reported"
+    },
+    "printed_composite_magnetization": {
+      "instrument_family": "PPMS-VSM",
+      "maximum_applied_field_T": 5,
+      "temperature_condition": "room_temperature",
+      "directions": [
+        "parallel_to_build_z",
+        "perpendicular_to_build_z"
+      ],
+      "reported_demagnetization_factor_N": 0.2,
+      "correction_note": "The source reports N=0.2 in its measurement description. A new study must independently establish correction applicability for its exact specimen geometry and method."
+    },
+    "feedstock_characterization": [
+      "laser_diffraction_PSD",
+      "SEM_morphology"
+    ],
+    "printed_specimen_characterization": [
+      "geometrical_density",
+      "TGA_filler_fraction",
+      "SEM_microstructure",
+      "Kerr_microscopy_particles"
+    ],
+    "stray_field_mapping": {
+      "probe": "three_axis_Hall_probe",
+      "measurement": "three_components_at_each_grid_point",
+      "status": "source_reports_custom_setup"
+    },
+    "alignment_metric": {
+      "name": "mean_cos_theta",
+      "definition": "cos(arctan(1.7263 * r))",
+      "r_definition": "remanent_polarization_hard_direction / remanent_polarization_easy_direction",
+      "caution": "Preserve this source definition for reproduction; do not silently substitute a different texture metric."
+    }
+  },
+  "feedstocks": [
+    {
+      "route": "hydrogen_decrepitated_then_desorbed_hot_deformed_EOL_magnet",
+      "source_label": "HD + desorbed",
+      "d10_um": 43,
+      "d50_um": 102,
+      "d90_um": 276,
+      "mean_particle_aspect_ratio": 2.8,
+      "theoretical_density_g_cm3": 7.6,
+      "remanence_T": 1.22,
+      "coercivity_kA_per_m": 1269,
+      "evidence_status": "source_reported"
+    },
+    {
+      "route": "industrial_hammer_milled_hot_deformed_EOL_magnet",
+      "source_label": "Milled",
+      "d10_um": 27,
+      "d50_um": 114,
+      "d90_um": 210,
+      "mean_particle_aspect_ratio": 2.2,
+      "theoretical_density_g_cm3": 7.6,
+      "remanence_T": 1.12,
+      "coercivity_kA_per_m": 1290,
+      "evidence_status": "source_reported"
+    }
+  ],
+  "printed_composites": [
+    {
+      "source_label": "HD",
+      "feedstock_route": "hydrogen_decrepitated_then_desorbed_hot_deformed_EOL_magnet",
+      "filler_fraction_wt_percent": 89.6,
+      "theoretical_density_g_cm3": 4.6,
+      "geometrical_density_g_cm3": 3.1,
+      "porosity_percent": 32.6,
+      "remanence_T": 0.34,
+      "coercivity_kA_per_m": 1238,
+      "magnetic_alignment_degree": 0.75,
+      "evidence_status": "source_reported"
+    },
+    {
+      "source_label": "Milled",
+      "feedstock_route": "industrial_hammer_milled_hot_deformed_EOL_magnet",
+      "filler_fraction_wt_percent": 89.8,
+      "theoretical_density_g_cm3": 4.6,
+      "geometrical_density_g_cm3": 3.3,
+      "porosity_percent": 28.3,
+      "remanence_T": 0.32,
+      "coercivity_kA_per_m": 1226,
+      "magnetic_alignment_degree": 0.65,
+      "evidence_status": "source_reported"
+    }
+  ],
+  "reported_comparison": {
+    "commercial_anisotropic_bonded_magnet_remanence_gap_percent": 60,
+    "comparator_absolute_remanence_T": null,
+    "comparator_test_geometry": null,
+    "comparator_measurement_method": null,
+    "comparability": "source-reported approximate relative gap only; do not infer an absolute comparator value or claim a matched comparison",
+    "coercivity_comparison": "paper describes composite coercivity as within the range of commercial anisotropic bonded magnets; exact matched grade data not encoded here"
+  },
+  "authors_identified_research_directions": [
+    "optimize mixture ratio of smaller and larger particles to balance densification and particle alignment",
+    "optimize layer height to balance densification and geometric alignment",
+    "investigate a homogeneous fabrication magnetic field to improve particle alignment"
+  ],
+  "reproduction_requirements": [
+    "obtain supporting raw data if available from authors",
+    "verify exact powder lot, composition, PSD method, morphology and build history",
+    "match specimen geometry, magnetization direction, temperature, applied field and demagnetization correction",
+    "preserve all attempted builds and failed or excluded specimens",
+    "report source transcription uncertainty separately from new measurement uncertainty"
+  ],
+  "prohibited_inferences": [
+    "source_reported_values_are_not_local_measurements",
+    "recycled_NdFeB_is_not_rare_earth_free",
+    "predicted_microstructure_is_not_observed_microstructure",
+    "intrinsic_Ms_or_K1_is_not_coercivity_or_BHmax",
+    "coupon_performance_is_not_component_qualification",
+    "approximate_60_percent_gap_does_not_supply_an_absolute_commercial_reference_value"
+  ]
+}
