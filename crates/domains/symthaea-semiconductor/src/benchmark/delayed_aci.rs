@@ -1021,10 +1021,6 @@ mod tests {
         (left - right).abs() <= 1.0e-12
     }
 
-    fn close(left: f64, right: f64) -> bool {
-        (left - right).abs() <= 1.0e-12
-    }
-
     fn policy(delay_rounds: u64) -> DelayedAciPolicyV1 {
         DelayedAciPolicyV1 {
             schema: DELAYED_ACI_POLICY_SCHEMA_V1.into(),
