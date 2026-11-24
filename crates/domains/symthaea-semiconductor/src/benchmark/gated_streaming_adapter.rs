@@ -936,7 +936,7 @@ mod tests {
         create_gated_streaming_adapter_engine_v1(
             "stream-engine-001",
             "fab-clock",
-            &digest('g'),
+            &digest('c'),
             &digest('a'),
             vec![0.0, 0.0],
             policy(),
@@ -960,7 +960,7 @@ mod tests {
             feature_available_at_unix_seconds: event_time + 1,
             prediction_at_unix_seconds: prediction_time,
             clock_domain_id: "fab-clock".into(),
-            global_model_artifact_sha256: digest('g'),
+            global_model_artifact_sha256: digest('c'),
             feature_schema_sha256: digest('a'),
             selected_feature_indices: vec![0, 1],
             feature_vector: features,
