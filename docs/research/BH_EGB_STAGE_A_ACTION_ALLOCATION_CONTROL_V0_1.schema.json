@@ -1,0 +1,292 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/BH_EGB_STAGE_A_ACTION_ALLOCATION_CONTROL_V0_1.schema.json",
+  "title": "Stage-A research-action allocation synthetic control",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "fixture_kind",
+    "title",
+    "claim_boundary",
+    "utility_scale",
+    "cost_scale",
+    "scenarios",
+    "computation_contract"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "bh-egb-stage-a-action-allocation-v0.1"
+    },
+    "fixture_kind": {
+      "const": "synthetic_exact_finite_world"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "utility_scale": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cost_scale": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "$ref": "#/$defs/scenario"
+      }
+    },
+    "computation_contract": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    }
+  },
+  "$defs": {
+    "utilityDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision_id",
+        "utility_by_state"
+      ],
+      "properties": {
+        "decision_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "utility_by_state": {
+          "type": "object",
+          "minProperties": 2,
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        }
+      }
+    },
+    "outcomeLikelihood": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "outcome_id",
+        "likelihood_by_state"
+      ],
+      "properties": {
+        "outcome_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "likelihood_by_state": {
+          "type": "object",
+          "minProperties": 2,
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        }
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action_id",
+        "kind",
+        "cost_units",
+        "outcome_likelihoods",
+        "expected_post_action_best_utility",
+        "gross_evsi",
+        "net_decision_value",
+        "worst_case_loss",
+        "risk_gate",
+        "expected_information_gain_bits",
+        "expected_best_decision_after_action"
+      ],
+      "properties": {
+        "action_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cost_units": {
+          "type": "number",
+          "minimum": 0
+        },
+        "outcome_likelihoods": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/outcomeLikelihood"
+          }
+        },
+        "expected_post_action_best_utility": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "gross_evsi": {
+          "type": "number"
+        },
+        "net_decision_value": {
+          "type": "number"
+        },
+        "worst_case_loss": {
+          "type": "number",
+          "minimum": 0
+        },
+        "risk_gate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "eligible",
+            "reason"
+          ],
+          "properties": {
+            "eligible": {
+              "type": "boolean"
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "expected_information_gain_bits": {
+          "type": "number",
+          "minimum": 0
+        },
+        "expected_best_decision_after_action": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "scenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario_id",
+        "description",
+        "state_ids",
+        "prior_probabilities",
+        "decisions",
+        "baseline_best_decision",
+        "baseline_best_expected_utility",
+        "risk_policy",
+        "actions",
+        "known_answer"
+      ],
+      "properties": {
+        "scenario_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "state_ids": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "prior_probabilities": {
+          "type": "object",
+          "minProperties": 2,
+          "additionalProperties": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1
+          }
+        },
+        "decisions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/utilityDecision"
+          }
+        },
+        "baseline_best_decision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "baseline_best_expected_utility": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "risk_policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "max_worst_case_loss",
+            "loss_scale"
+          ],
+          "properties": {
+            "max_worst_case_loss": {
+              "type": "number",
+              "minimum": 0
+            },
+            "loss_scale": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "actions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/action"
+          }
+        },
+        "known_answer": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "selected_action",
+            "rationale",
+            "required_invariants"
+          ],
+          "properties": {
+            "selected_action": {
+              "type": "string",
+              "minLength": 1
+            },
+            "rationale": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required_invariants": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
