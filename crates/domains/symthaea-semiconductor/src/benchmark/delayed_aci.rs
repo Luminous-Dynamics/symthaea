@@ -501,9 +501,7 @@ pub fn issue_delayed_aci_prediction_v1(
     )?;
     require_text(&input.clock_domain_id, "prediction.clock_domain_id")?;
     if input.clock_domain_id != engine.clock_domain_id {
-        return Err(DelayedAciErrorV1(
-            "prediction clock domain mismatch".into(),
-        ));
+        return Err(DelayedAciErrorV1("prediction clock domain mismatch".into()));
     }
     if !valid_sha256(&input.model_artifact_sha256) || !input.point_prediction.is_finite() {
         return Err(DelayedAciErrorV1(
@@ -770,7 +768,9 @@ pub fn deliver_delayed_aci_label_v1(
                 .iter()
                 .all(|reason| *reason == AciUpdateReasonV1::LabelNotEligible);
         let only_blocked = report.eligibility == LabelConsumptionEligibilityV1::Blocked
-            && reasons.iter().all(|reason| *reason == AciUpdateReasonV1::LabelNotEligible);
+            && reasons
+                .iter()
+                .all(|reason| *reason == AciUpdateReasonV1::LabelNotEligible);
         let disposition = if only_unknown {
             AciUpdateDispositionV1::HeldUnknown
         } else if only_blocked {
