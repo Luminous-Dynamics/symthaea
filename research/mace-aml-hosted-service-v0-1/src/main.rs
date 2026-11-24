@@ -112,7 +112,7 @@ enum ContentPart {
 #[serde(deny_unknown_fields)]
 struct ImageUrl { url: String }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct SearchRequest {
     query: Content,
@@ -797,6 +797,23 @@ mod tests {
         assert_eq!(scope_sha, sha256_fields(&["participant-1", "tenant-1", "private-user-scope"]));
         assert!(!receipt_json.contains("red bicycle"));
         assert!(!receipt_json.contains("private-user-scope"));
+    }
+
+    #[test]
+    fn search_fails_closed_when_exposure_receipt_cannot_be_persisted() {
+        let state = test_state();
+        add_transaction(&state, add_request("r-audit-fail", "evidence must not escape without receipt")).unwrap();
+        {
+            let connection = state.db.lock().unwrap();
+            connection.execute("DROP TABLE search_trace_receipts", []).unwrap();
+        }
+        let result = search_query(&state, SearchRequest {
+            query: Content::Text("evidence must not escape".into()),
+            options: None,
+            user_id: "user-1".into(),
+            top_k: 5,
+        });
+        assert!(matches!(result, Err(ApiError::Unavailable)));
     }
 
     #[test]
