@@ -368,3 +368,5 @@ The initial seed is source-pinned to Lean 4 core and is explicitly not expert-re
 - [HDC / CfC proof-comprehension ablation protocol](MATH_PROOF_COMPREHENSION_HDC_CFC_ABLATION_V1.md) — prospective only, with matched retrieval/symbolic baselines.
 
 - [Evaluator calibration protocol](MATH_PROOF_COMPREHENSION_EVALUATOR_CALIBRATION_V1.md) — compares expert review, formal/finite checkers, ProofGrader-style and evidence-constrained LLM judges; issue #13476.
+
+- [HardModeReceiptV1 protocol](MATH_HARDMODE_RECEIPT_V1.md), [schema](MATH_HARDMODE_RECEIPT_V1.schema.json) and [synthetic receipt](MATH_HARDMODE_SYNTHETIC_V1.json) — separately records answer discovery, formalization, countermodel quality and proof-checker outcome.

@@ -11,6 +11,7 @@ on:
       - "docs/research/MATHLIB_ELABORATED_DEPENDENCY_GRAPH_V429_V1.schema.json"
       - "docs/research/PROOF_PLAN_*.json"
       - "docs/research/LOCAL_GLOBAL_PAIR_*"
+      - "docs/research/MATH_HARDMODE_*"
       - "docs/research/PROOF_PLAN_*.md"
       - "docs/research/MATH_PROOF_COMPREHENSION_*.json"
       - "docs/research/MATHLIB_PROOF_COMPREHENSION_PILOT_V1.*"
@@ -101,6 +102,8 @@ jobs:
             and (.evaluator_only | has("translation_assessor") | not)
             and (.evaluator_only | has("translation_review_refs") | not)' \
             docs/research/MATH_PROOF_COMPREHENSION_THEOREM_SANDWICH_V1.json >/dev/null
+          jq -e '.schema_version == "1.0.0" and .candidate.task.task_id == "HARDMODE-IMPLICATION-REVERSAL-001" and .candidate.task.task_variant == "no_answer" and .candidate.task.visible_answer == null and .evaluator_only.proof_status == "not_run"' docs/research/MATH_HARDMODE_SYNTHETIC_V1.json >/dev/null
+          echo "HARD_MODE_FIXTURE_PASS"
           echo "THEOREM_SANDWICH_FIXTURE_PASS"
 
           jq -e '.task_count == (.tasks | length) and .task_count == 6 and .status == "source_pinned_seed_not_gold"' \
@@ -220,6 +223,10 @@ jobs:
           grep -Fq "THEOREM_SANDWICH_RECEIPT_VALID task_id=SYNTHETIC-SANDWICH-IMPLICATION-001" theorem-sandwich-cli.out
           grep -Fq "classification=consistent_with_selected_controls" theorem-sandwich-cli.out
           grep -Fq "evaluator_controls_passed=3 evaluator_controls_total=3" theorem-sandwich-cli.out
+          cargo run --locked --manifest-path scripts/research/proof-plan-contract/Cargo.toml --bin hard-mode -- docs/research/MATH_HARDMODE_SYNTHETIC_V1.json | tee hard-mode-cli.out
+          grep -Fq "HARD_MODE_RECEIPT_VALID task_id=HARDMODE-IMPLICATION-REVERSAL-001" hard-mode-cli.out
+          grep -Fq "finite_semantics=countermodel" hard-mode-cli.out
+          grep -Fq "proof_status=NotRun" hard-mode-cli.out
 
       - name: Export generated Cargo.lock for dependency pinning
         if: success()

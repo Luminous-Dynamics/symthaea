@@ -1,0 +1,63 @@
+{
+  "schema_version": "1.0.0",
+  "candidate": {
+    "task": {
+      "benchmark_id": "SYTH-HARDMODE-SYNTHETIC-V1",
+      "benchmark_revision": "fixture-v1",
+      "task_id": "HARDMODE-IMPLICATION-REVERSAL-001",
+      "task_variant": "no_answer",
+      "problem_text": "Given propositions p and q, decide whether every implication p → q can be reversed to q → p. If not, supply a truth assignment proving the reversal invalid.",
+      "problem_sha256": "d9464da838f0dd029debeb0d232610625f7b1b37869cb0a483e5ab882d45e381",
+      "prompt_text": "Answer the question. Do not assume the answer; discover it from the stated logic. Given propositions p and q, decide whether every implication p → q can be reversed to q → p. If not, supply a truth assignment proving the reversal invalid.",
+      "prompt_sha256": "01a497eaa766305729d2c747869920522d56e60148b5adea909b8b48024c8d77",
+      "visible_answer": null,
+      "formal_source_repository": "symthaea.synthetic",
+      "formal_source_revision": "fixture-v1",
+      "formal_source_path": "truth_tables/implication_reversal.json",
+      "formal_declaration": "synthetic.implication_reversal"
+    },
+    "model_identity": {
+      "provider": "synthetic_fixture",
+      "model": "deterministic_stipulated_output",
+      "version": "1",
+      "decoding_config_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    "answer_text": "No; set p=false and q=true. Then p → q is true while q → p is false.",
+    "answer_sha256": "f434259f35f1b42efac35c2230b61ce3e3391f98fa5bf1908dc00e917131d901",
+    "answer_abstained": false,
+    "formalization": {
+      "statement_text": "From premise p → q, infer conclusion q → p.",
+      "statement_sha256": "5fc7f3b4c1b71adf234caf9f040058d8ed4ec64e95850208217fad9aae55a51d",
+      "finite_boolean_sequent": {
+        "hypotheses": [],
+        "premises": [
+          { "op": "implies", "left": { "op": "atom", "name": "p" }, "right": { "op": "atom", "name": "q" } }
+        ],
+        "conclusion": { "op": "implies", "left": { "op": "atom", "name": "q" }, "right": { "op": "atom", "name": "p" } }
+      },
+      "finite_boolean_sequent_sha256": "c9f57c009e4e48d8718ac5cba23c99b1571033efa6204f0128fffb0004ae6cd0"
+    },
+    "candidate_countermodel": {
+      "valuation": [
+        { "atom": "p", "value": false },
+        { "atom": "q", "value": true }
+      ]
+    },
+    "proof_submission": null,
+    "proof_plan_submission": null
+  },
+  "evaluator_only": {
+    "answer_correct": true,
+    "answer_evidence_refs": ["SYNTHETIC-TRUTH-TABLE-ADJUDICATION"],
+    "formalization_matches_target": true,
+    "formalization_evidence_refs": ["SYNTHETIC-TYPED-SEQUENT-ADJUDICATION"],
+    "gold_countermodel": {
+      "valuation": [
+        { "atom": "p", "value": false },
+        { "atom": "q", "value": true }
+      ]
+    },
+    "proof_status": "not_run",
+    "proof_verification": null
+  }
+}
