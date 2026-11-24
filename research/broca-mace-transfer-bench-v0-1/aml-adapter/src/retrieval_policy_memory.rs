@@ -3,12 +3,14 @@
 
 //! Label-blind retrieval-policy memory, kept separate from world/evidence memory.
 //!
-//! This module learns only reusable tool/action templates and their operating
-//! envelope. It does not store query text, question IDs, gold answers, evaluator
-//! judgments, hidden task families, attack assignments, retrieved facts or
-//! source payloads. A strategy note may recommend where/how to search; it is
-//! never evidence that a world-state claim is true or that a source is
-//! authorized for a purpose.
+//! This module records label-blind retrieval observations and exploratory
+//! tool/action templates. It does not store query text, question IDs, gold
+//! answers, evaluator judgments, hidden task families, attack assignments,
+//! retrieved facts or source payloads. Candidate-return observations can
+//! create exploratory notes only; they cannot make a strategy policy-eligible.
+//! A separate held-out counterfactual qualification is required before a note
+//! may influence retrieval policy. A strategy note is never evidence that a
+//! world-state claim is true or that a source is authorized for a purpose.
 //!
 //! The in-memory implementation is a deterministic reference prototype. A
 //! hosted service must persist trace receipts and promoted notes durably and
@@ -505,7 +507,7 @@ fn strategy_steps(trace: &RetrievalTraceReceiptV1) -> Vec<RetrievalStrategyStepV
 
 fn note_digest(note: &RetrievalStrategyNoteV1) -> String {
     let mut hasher = Sha256::new();
-    hasher.update(b"luminous:mace:retrieval-strategy-note:v1\0");
+    hasher.update(b"luminous:mace:retrieval-strategy-note:v2\0");
     hasher.update(note.status.tag().to_be_bytes());
     for value in [
         note.domain_id.as_str(),
