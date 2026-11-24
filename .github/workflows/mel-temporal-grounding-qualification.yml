@@ -83,7 +83,6 @@ jobs:
           cp tools/mel-temporal-grounding-qualifier/Cargo.toml "$evidence/harness-Cargo.toml"
           cp tools/mel-temporal-grounding-qualifier/Cargo.lock "$evidence/harness-Cargo.lock"
           cp tools/mel-temporal-grounding-qualifier/src/lib.rs "$evidence/harness-lib.rs"
-          cp tools/mel-temporal-grounding-qualifier/src/temporal_revision.rs "$evidence/"
           cp crates/domains/symthaea-muse/src/temporal_grounding.rs "$evidence/"
           cp crates/domains/symthaea-muse/src/evidence_digest.rs "$evidence/"
           cp docs/research/MEL-GROUND-001-TEMPORAL-GROUNDING-SCORER-V1.md "$evidence/"
