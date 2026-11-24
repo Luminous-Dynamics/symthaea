@@ -1,10 +1,10 @@
 # Copyright (C) 2026 Luminous Dynamics
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""Thin LongMemEval-V2 Memory API bridge for the Rust MACE BM25 sidecar.
+"""Thin LongMemEval-V2 Memory API bridge for the Rust MACE hybrid sidecar.
 
-This first arm retrieves text and returns the original screenshots attached to
-selected trajectory states. It accepts query_image for API compatibility but
-does not use query-image pixels for retrieval.
+The retrieval portfolio combines BM25 prose retrieval with a structured
+exact-literal channel. Original screenshots attached to selected trajectory
+states are returned; query_image remains accepted but is not used for ranking.
 """
 
 from __future__ import annotations
@@ -38,17 +38,49 @@ _ALLOWED_PARAMS = {
     "neighbor_radius",
     "bm25_k1",
     "bm25_b",
+    "retrieval_mode",
 }
 _ALLOWED_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif"}
 MAX_SCREENSHOT_BYTES = 32 * 1024 * 1024
 MAX_TRAJECTORY_SCREENSHOT_BYTES = 512 * 1024 * 1024
+
+_RETRIEVAL_MODE_PROFILES: dict[str, dict[str, Any]] = {
+    "bm25_only": {
+        "backend_id": "mace_lmev2_bm25_only",
+        "retrieval_mode_label": "bm25_only_with_original_image_evidence",
+        "evidence_channel": "trajectory_bm25_text",
+        "retrieval_channels": ["trajectory_bm25_search_v1"],
+        "fusion_profile": {"algorithm": "none"},
+    },
+    "entity_literal_only": {
+        "backend_id": "mace_lmev2_entity_literal_only",
+        "retrieval_mode_label": "entity_literal_only_with_original_image_evidence",
+        "evidence_channel": "trajectory_entity_literal",
+        "retrieval_channels": ["trajectory_entity_literal_search_v1"],
+        "fusion_profile": {"algorithm": "none"},
+    },
+    "hybrid_rrf": {
+        "backend_id": "mace_lmev2_hybrid_rrf_bm25_entity",
+        "retrieval_mode_label": "hybrid_bm25_entity_literal_with_original_image_evidence",
+        "evidence_channel": "hybrid_rrf_bm25_entity",
+        "retrieval_channels": [
+            "trajectory_bm25_search_v1",
+            "trajectory_entity_literal_search_v1",
+        ],
+        "fusion_profile": {
+            "algorithm": "reciprocal_rank_fusion_v1",
+            "k": 60,
+            "channel_weights": {"bm25": 1.0, "entity_literal": 1.0},
+        },
+    },
+}
 
 
 @register_memory
 class MaceLongMemEvalV2Memory(Memory):
     """Official LongMemEval-V2 plugin backed by a persistent Rust sidecar."""
 
-    memory_type = "mace_lmev2_bm25_text"
+    memory_type = "mace_lmev2_retrieval_ablation_v1"
 
     def __init__(self, memory_params: dict[str, object]) -> None:
         require(isinstance(memory_params, dict), "MACE memory_params must be an object")
@@ -61,6 +93,11 @@ class MaceLongMemEvalV2Memory(Memory):
         domain = memory_params.get("domain", "web")
         run_id = memory_params.get("run_id")
         environment_revision_sha256 = memory_params.get("environment_revision_sha256")
+        retrieval_mode = memory_params.get("retrieval_mode", "hybrid_rrf")
+        require(
+            isinstance(retrieval_mode, str) and retrieval_mode in _RETRIEVAL_MODE_PROFILES,
+            "retrieval_mode must be bm25_only, entity_literal_only, or hybrid_rrf",
+        )
         require(isinstance(sidecar_value, str) and sidecar_value, "sidecar_binary is required")
         require(isinstance(source_root_value, str) and source_root_value, "source_screenshot_root is required")
         require(isinstance(workspace_value, str) and workspace_value, "workspace_dir is required")
@@ -112,6 +149,10 @@ class MaceLongMemEvalV2Memory(Memory):
         self.domain = str(domain)
         self.run_id = run_id
         self.environment_revision_sha256 = environment_revision_sha256
+        self.retrieval_mode = retrieval_mode
+        self.retrieval_profile = dict(_RETRIEVAL_MODE_PROFILES[retrieval_mode])
+        self.backend_id = str(self.retrieval_profile["backend_id"])
+        self.retrieval_mode_label = str(self.retrieval_profile["retrieval_mode_label"])
         self.top_k = self._bounded_int(memory_params.get("top_k", 8), "top_k", 1, 100)
         self.slice_radius = self._bounded_int(memory_params.get("slice_radius", 1), "slice_radius", 0, 32)
         self.neighbor_radius = self._bounded_int(
@@ -122,21 +163,41 @@ class MaceLongMemEvalV2Memory(Memory):
         require(self.bm25_k1 > 0.0, "bm25_k1 must be greater than zero")
         require(self.bm25_b <= 1.0, "bm25_b must be <= 1")
 
+        backend_profile: dict[str, Any] = {
+            "schema_version": "mace_lmev2_backend_profile_v1",
+            "memory_type": self.memory_type,
+            "backend_id": self.backend_id,
+            "domain": self.domain,
+            "sidecar_binary_sha256": self.sidecar_binary_sha256,
+            "top_k": self.top_k,
+            "slice_radius": self.slice_radius,
+            "neighbor_radius": self.neighbor_radius,
+            "bm25_k1": self.bm25_k1,
+            "bm25_b": self.bm25_b,
+            "tokenizer_version": "unicode_alphanumeric_v1",
+            "retrieval_mode": self.retrieval_mode_label,
+            "retrieval_mode_id": self.retrieval_mode,
+            "retrieval_channels": self.retrieval_profile["retrieval_channels"],
+            "evidence_channel": self.retrieval_profile["evidence_channel"],
+            "fusion_profile": self.retrieval_profile["fusion_profile"],
+        }
+        if self.retrieval_mode in {"entity_literal_only", "hybrid_rrf"}:
+            backend_profile["entity_literal_profile"] = {
+                "schema_version": "structured_literals_v1",
+                "numeric_or_structural_tokens_only": True,
+                "field_weights": {
+                    "trajectory_id": 5,
+                    "goal": 2,
+                    "start_url": 4,
+                    "state_url": 4,
+                    "state_action": 3,
+                    "source_state_index": 3,
+                    "step": 3,
+                },
+            }
         self.backend_revision_sha256 = hashlib.sha256(
             json.dumps(
-                {
-                    "schema_version": "mace_lmev2_backend_profile_v1",
-                    "memory_type": self.memory_type,
-                    "domain": self.domain,
-                    "sidecar_binary_sha256": self.sidecar_binary_sha256,
-                    "top_k": self.top_k,
-                    "slice_radius": self.slice_radius,
-                    "neighbor_radius": self.neighbor_radius,
-                    "bm25_k1": self.bm25_k1,
-                    "bm25_b": self.bm25_b,
-                    "tokenizer_version": "unicode_alphanumeric_v1",
-                    "retrieval_mode": "text_bm25_with_original_image_evidence",
-                },
+                backend_profile,
                 sort_keys=True,
                 separators=(",", ":"),
             ).encode("utf-8")
@@ -598,6 +659,11 @@ class MaceLongMemEvalV2Memory(Memory):
         query: str,
         response: dict[str, Any],
     ) -> None:
+        retrieval_mode = response.get("retrieval_mode")
+        require(
+            retrieval_mode == self.retrieval_mode_label,
+            "sidecar retrieval mode does not match the pinned retrieval backend profile",
+        )
         candidate_jsonl = response.get("candidate_evidence_jsonl")
         record_count = response.get("candidate_record_count")
         candidate_set_sha256 = response.get("candidate_set_sha256")
@@ -667,7 +733,7 @@ class MaceLongMemEvalV2Memory(Memory):
                 require(record.get("run_id") == self.run_id, "candidate run_id mismatch")
                 require(record.get("candidate_id") == candidate_id, "candidate invocation ID mismatch")
                 require(
-                    record.get("backend_id") == "mace_lmev2_bm25_text",
+                    record.get("backend_id") == self.backend_id,
                     "candidate backend ID mismatch",
                 )
                 require(
@@ -699,14 +765,14 @@ class MaceLongMemEvalV2Memory(Memory):
             "candidate_id": candidate_id,
             "query_sha256": query_sha256,
             "domain": self.domain,
-            "backend_id": "mace_lmev2_bm25_text",
+            "backend_id": self.backend_id,
             "backend_revision_sha256": self.backend_revision_sha256,
             "sidecar_binary_sha256": self.sidecar_binary_sha256,
             "candidate_record_count": record_count,
             "candidate_set_sha256": candidate_set_sha256,
             "candidate_jsonl_sha256": hashlib.sha256(candidate_bytes).hexdigest(),
             "candidate_file": candidate_filename,
-            "retrieval_mode": "text_bm25_with_original_image_evidence",
+            "retrieval_mode": retrieval_mode,
         }
         receipt_bytes = json.dumps(
             receipt, ensure_ascii=False, sort_keys=True, separators=(",", ":")
@@ -757,7 +823,7 @@ class MaceLongMemEvalV2Memory(Memory):
                     "saved candidate receipt schema mismatch")
             require(receipt.get("run_id") == self.run_id, "saved candidate receipt run mismatch")
             require(receipt.get("domain") == self.domain, "saved candidate receipt domain mismatch")
-            require(receipt.get("backend_id") == "mace_lmev2_bm25_text",
+            require(receipt.get("backend_id") == self.backend_id,
                     "saved candidate receipt backend mismatch")
             require(receipt.get("backend_revision_sha256") == self.backend_revision_sha256,
                     "saved candidate receipt execution-profile digest mismatch")
@@ -765,7 +831,7 @@ class MaceLongMemEvalV2Memory(Memory):
                     "saved candidate receipt binary digest mismatch")
             require(receipt.get("candidate_file") == expected_payload_name,
                     "saved candidate receipt payload filename mismatch")
-            require(receipt.get("retrieval_mode") == "text_bm25_with_original_image_evidence",
+            require(receipt.get("retrieval_mode") == self.retrieval_mode_label,
                     "saved candidate receipt retrieval mode mismatch")
             require(
                 isinstance(receipt.get("query_sha256"), str)
@@ -823,7 +889,7 @@ class MaceLongMemEvalV2Memory(Memory):
                         "saved candidate record query digest mismatch")
                 require(record.get("backend_revision_sha256") == self.backend_revision_sha256,
                         "saved candidate record execution-profile digest mismatch")
-                require(record.get("backend_id") == "mace_lmev2_bm25_text",
+                require(record.get("backend_id") == self.backend_id,
                         "saved candidate record backend mismatch")
                 require(record.get("query_scope") == f"longmemeval-v2:domain:{self.domain}",
                         "saved candidate record scope mismatch")
@@ -883,6 +949,7 @@ class MaceLongMemEvalV2Memory(Memory):
                 "MACE_LMEV2_RUN_ID": self.run_id,
                 "MACE_LMEV2_ENVIRONMENT_REVISION_SHA256": self.environment_revision_sha256,
                 "MACE_LMEV2_BACKEND_REVISION_SHA256": self.backend_revision_sha256,
+                "MACE_LMEV2_RETRIEVAL_MODE": self.retrieval_mode,
                 "MACE_LMEV2_POLICY_TRACE_DIR": str(self.retrieval_trace_dir.resolve()),
                 "MACE_LMEV2_DATASET_ROOT": str(self.asset_root.resolve()),
                 "MACE_LMEV2_TOP_K": str(self.top_k),

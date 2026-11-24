@@ -179,6 +179,24 @@ pub fn encode_longmemeval_v2_candidate_evidence_v1(
     domain: &str,
     hits: &[LongMemEvalV2HitV1],
 ) -> Result<CandidateEvidenceBatchV1, LongMemEvalV2CandidateReject> {
+    encode_longmemeval_v2_candidate_evidence_for_channel_v1(
+        identity,
+        query,
+        domain,
+        hits,
+        "trajectory_bm25_text",
+    )
+}
+
+/// Project hits for one explicitly named retrieval channel. Channel names are
+/// protocol-controlled labels, never caller-supplied free text.
+pub fn encode_longmemeval_v2_candidate_evidence_for_channel_v1(
+    identity: &LongMemEvalV2CandidateIdentityV1,
+    query: &str,
+    domain: &str,
+    hits: &[LongMemEvalV2HitV1],
+    retrieval_channel: &str,
+) -> Result<CandidateEvidenceBatchV1, LongMemEvalV2CandidateReject> {
     if query.trim().is_empty() {
         return Err(LongMemEvalV2CandidateReject::EmptyQuery);
     }
@@ -187,6 +205,14 @@ pub fn encode_longmemeval_v2_candidate_evidence_v1(
     }
     if hits.is_empty() {
         return Err(LongMemEvalV2CandidateReject::EmptyHits);
+    }
+    if !matches!(
+        retrieval_channel,
+        "trajectory_bm25_text"
+            | "trajectory_entity_literal"
+            | "hybrid_rrf_bm25_entity"
+    ) {
+        return Err(LongMemEvalV2CandidateReject::InvalidHit);
     }
 
     let query_sha256 = sha256_hex(query.as_bytes());
@@ -305,7 +331,7 @@ pub fn encode_longmemeval_v2_candidate_evidence_v1(
                 hit.trajectory_id, hit.chunk_id
             ),
             modality: EvidenceModalityV1::Text,
-            retrieval_channel: "trajectory_bm25_text".to_owned(),
+            retrieval_channel: retrieval_channel.to_owned(),
             retrieval_rank,
             retrieval_score: Some(hit.score),
             parent_evidence_ids,
@@ -327,15 +353,34 @@ pub fn encode_longmemeval_v2_search_candidate_evidence_v1(
     domain: &str,
     result: &LongMemEvalV2SearchResultV1,
 ) -> Result<CandidateEvidenceBatchV1, LongMemEvalV2CandidateReject> {
+    encode_longmemeval_v2_search_candidate_evidence_for_channel_v1(
+        identity,
+        query,
+        domain,
+        result,
+        "trajectory_bm25_text",
+    )
+}
+
+/// Project a fused/search result while retaining its channel identity in each
+/// candidate record. The per-channel action trace remains a separate receipt.
+pub fn encode_longmemeval_v2_search_candidate_evidence_for_channel_v1(
+    identity: &LongMemEvalV2CandidateIdentityV1,
+    query: &str,
+    domain: &str,
+    result: &LongMemEvalV2SearchResultV1,
+    retrieval_channel: &str,
+) -> Result<CandidateEvidenceBatchV1, LongMemEvalV2CandidateReject> {
     if result.hits.is_empty() {
         return Err(LongMemEvalV2CandidateReject::EmptyHits);
     }
 
-    let hit_batch = encode_longmemeval_v2_candidate_evidence_v1(
+    let hit_batch = encode_longmemeval_v2_candidate_evidence_for_channel_v1(
         identity,
         query,
         domain,
         &result.hits,
+        retrieval_channel,
     )?;
     let query_sha256 = sha256_hex(query.as_bytes());
     let query_scope = format!("longmemeval-v2:domain:{domain}");
@@ -616,6 +661,32 @@ mod tests {
     }
 
     #[test]
+    fn candidate_projection_preserves_allowlisted_retrieval_channel() {
+        let batch = encode_longmemeval_v2_candidate_evidence_for_channel_v1(
+            &identity(),
+            "order 42",
+            "web",
+            &[hit()],
+            "hybrid_rrf_bm25_entity",
+        ).expect("hybrid candidate evidence");
+        let text = batch.evidence.iter()
+            .find(|item| item.modality == EvidenceModalityV1::Text)
+            .expect("text evidence");
+        assert_eq!(text.retrieval_channel, "hybrid_rrf_bm25_entity");
+
+        assert_eq!(
+            encode_longmemeval_v2_candidate_evidence_for_channel_v1(
+                &identity(),
+                "order 42",
+                "web",
+                &[hit()],
+                "caller_supplied_untrusted_channel",
+            ),
+            Err(LongMemEvalV2CandidateReject::InvalidHit)
+        );
+    }
+
+    #[test]
     fn search_result_encoder_includes_neighbors_without_inheriting_bm25_scores() {
         let hit = hit();
         let mut neighbor_state = state(
@@ -633,7 +704,8 @@ mod tests {
             center_state_ordinal: 3,
             window_start_ordinal: 3,
             window_end_ordinal_exclusive: 4,
-            source_trajectory_sha256: "3333333333333333333333333333333333333333333333333333333333333333".to_owned(),
+            source_trajectory_sha256:
+                "3333333333333333333333333333333333333333333333333333333333333333".to_owned(),
             state_window: vec![neighbor_state],
             screenshot_references: vec!["trajectory-2/state-3.png".to_owned()],
             chunk_sha256: "2222222222222222222222222222222222222222222222222222222222222222".to_owned(),
@@ -665,7 +737,12 @@ mod tests {
             item.evidence_id == neighbor.parent_evidence_ids[0]
                 && item.retrieval_channel == "source_state_lineage"
         }));
-        assert!(batch.evidence.iter().filter(|item| item.retrieval_channel == "source_state_lineage").count() == 3);
+        assert_eq!(
+            batch.evidence.iter()
+                .filter(|item| item.retrieval_channel == "source_state_lineage")
+                .count(),
+            3
+        );
     }
 
     #[test]
