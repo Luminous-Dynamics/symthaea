@@ -3747,6 +3747,10 @@ mod tests {
         serde_json::from_str(SENSOR_ACTUATOR_FIXTURE).unwrap()
     }
 
+    const REFINEMENT_POLICY_FIXTURE: &str = include_str!(
+        "../../../../benchmarks/plasma/adaptive-refinement/fixtures/synthetic-refinement-cases-v0.1.json"
+    );
+
     fn refinement_input(
         spectral_tail_measure: f64,
         response_risk_upper_bound: Option<f64>,
@@ -3760,6 +3764,50 @@ mod tests {
             projected_peak_bytes,
             memory_budget_bytes: 1_000,
             reserved_headroom_bytes: 100,
+        }
+    }
+
+    #[test]
+    fn spectral_refinement_fixture_matches_all_six_known_answers() {
+        let fixture: serde_json::Value =
+            serde_json::from_str(REFINEMENT_POLICY_FIXTURE).unwrap();
+        let thresholds = &fixture["thresholds"];
+        let memory = &fixture["memory_policy"];
+        let tail_threshold = thresholds["spectral_tail_threshold"].as_f64().unwrap();
+        let response_threshold = thresholds["response_risk_threshold"].as_f64().unwrap();
+        let budget = memory["memory_budget_bytes"].as_u64().unwrap();
+        let reserve = memory["reserved_headroom_bytes"].as_u64().unwrap();
+
+        for case in fixture["cases"].as_array().unwrap() {
+            let response_risk = case["response_risk_upper_bound"].as_f64();
+            let input = SpectralRefinementInput {
+                spectral_tail_measure: case["spectral_tail_measure"].as_f64().unwrap(),
+                spectral_tail_threshold: tail_threshold,
+                response_risk_upper_bound: response_risk,
+                response_risk_threshold: response_threshold,
+                projected_peak_bytes: case["projected_peak_bytes"].as_u64().unwrap(),
+                memory_budget_bytes: budget,
+                reserved_headroom_bytes: reserve,
+            };
+            let report = decide_spectral_refinement(input).unwrap();
+            assert_eq!(
+                format!("{:?}", report.decision),
+                case["expected_decision"].as_str().unwrap(),
+                "decision mismatch for {}",
+                case["case_id"].as_str().unwrap()
+            );
+            assert_eq!(
+                format!("{:?}", report.reason),
+                case["expected_reason"].as_str().unwrap(),
+                "reason mismatch for {}",
+                case["case_id"].as_str().unwrap()
+            );
+            assert_eq!(
+                format!("{:?}", report.qualification),
+                case["expected_qualification"].as_str().unwrap(),
+                "qualification mismatch for {}",
+                case["case_id"].as_str().unwrap()
+            );
         }
     }
 
