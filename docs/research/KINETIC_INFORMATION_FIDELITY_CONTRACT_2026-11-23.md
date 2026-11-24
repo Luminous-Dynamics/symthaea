@@ -631,6 +631,34 @@ The key separation is:
 
 The first two are now independently measurable on the scalar synthetic fixture. Neither implies the third. The immediate next reference should be a coupled non-normal linear system with exact matrix-exponential / discrete finite-horizon Gramians, mode coupling and sensor/actuator subspace comparisons before a nonlinear kinetic controller is attempted.
 
+### Phase-aware two-quadrature mode oracle
+
+The implementation branch now adds a second, more faithful manufactured reference in [PR #13405](https://github.com/Luminous-Dynamics/symthaea/pull/13405). It represents one complex unstable mode by \(x=[\Re(a),\Im(a)]^T\) and discrete homogeneous evolution
+
+\[
+x_{k+1}=e^{\gamma\Delta t}R(2\pi f\Delta t)x_k.
+\]
+
+For a fixed noisy diagnostic row \(c^T\), the finite-horizon Fisher/observability matrix is
+
+\[
+W_o=\sum_{k\in\mathcal S_{\rm arrived}}\frac{(c^TA^k)^T(c^TA^k)}{\sigma^2},
+\]
+
+where the schedule includes only samples delivered within the horizon. For actuator input vector \(B\) and delivered impulses,
+
+\[
+W_c=\sum_{j:\,k_j+d_a<H} A^{q_j}BB^T(A^{q_j})^T,\quad
+q_j=H-1-k_j-d_a.
+\]
+
+The controller-interface gate uses the **minimum eigenvalue** of both Gramians. A large trace or maximum eigenvalue cannot hide an unobservable or uncontrollable quadrature.
+
+The known-answer fixture uses five observations and five commands, with \(W_o\)'s minimum eigenvalue about 275.028 and \(W_c\)'s about 0.7317, above its illustrative thresholds. The aliasing negative control sets a 50 Hz mode with 20 ms sensor/actuator update spacing: phase repeats at each observation/command, and both minimum eigenvalues collapse toward zero despite unchanged sample/command counts.
+
+This is a synthetic single-mode linear oracle only. The next extension is a coupled non-normal mode block with matrix-valued Gramians and exact discrete/reference comparison, followed by linearized Vlasov–Poisson mode subspaces. No nonlinear closed-loop stability result is claimed.
+
+
 
 ## PPMD source-reproduction boundary
 
