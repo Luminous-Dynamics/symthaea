@@ -47,10 +47,16 @@ pub enum TicketStatus {
     Closed,
 }
 
+/// Requested support autonomy tier. This is descriptive policy input only:
+/// it never grants permission to perform a machine mutation. Consequential
+/// operations require separate act-bound authorization at the target.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum AutonomyLevel {
+    /// Observe and recommend; no action execution.
     Advisory,
+    /// Legacy tier label. The local action gate remains read-only.
     SemiAutonomous,
+    /// Legacy tier label. This value is not a bypass or an authorization grant.
     FullAutonomous,
 }
 
