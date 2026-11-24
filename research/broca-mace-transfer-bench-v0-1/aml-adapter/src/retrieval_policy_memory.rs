@@ -1119,6 +1119,38 @@ mod tests {
             receipt.receipt_sha256(),
             "e818d458148b2edd093a95d45afffb3d86b65291ee1b399149abf4ca4d18edb6"
         );
+
+        // Cross-language golden vector for the new acquisition-only status.
+        let candidates_returned = RetrievalTraceReceiptV1 {
+            run_id: "run-acquisition".to_owned(),
+            query_invocation_id: "opaque-acquisition-1".to_owned(),
+            domain_id: "web".to_owned(),
+            environment_revision_sha256: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_owned(),
+            tool_profile_sha256: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_owned(),
+            query_sha256: "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff".to_owned(),
+            candidate_set_sha256: Some("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_owned()),
+            operations: vec![RetrievalOperationV1 {
+                tool_id: "trajectory.bm25.search".to_owned(),
+                tool_revision_sha256: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_owned(),
+                action_template_sha256: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc".to_owned(),
+                observed_evidence_ids: vec!["source:evidence-1".to_owned()],
+                outcome: RetrievalOperationOutcomeV1::EvidenceObserved,
+                elapsed_ns: 17,
+                inspected_bytes: 0,
+                inspected_bytes_measured: false,
+            }],
+            stop_reason: RetrievalStopReasonV1::CandidatesReturned,
+            tool_call_budget: 1,
+            tool_calls_used: 1,
+            elapsed_ns: 17,
+            inspected_bytes: 0,
+            inspected_bytes_complete: false,
+            created_at_unix: 100,
+        };
+        assert_eq!(
+            candidates_returned.receipt_sha256(),
+            "3c3431c6f31419de7a270ca49c04a93bd94f573fedd949993fa21d17a3b4c723"
+        );
     }
 
     #[test]
