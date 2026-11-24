@@ -21,3 +21,12 @@ The revision audit is an evaluation layer, not a model-training loop, waveform o
 The evaluator can compare one NoEvidence, one LocalRetrieved, and one YokedRetrieved V2 case under the same experiment_unit_id. All three arms must share the identical raw draft prediction, truth annotations, scoring plan, model, prompt, adapter and source recording. Only the final prediction and evidence condition may differ.
 
 The contrast reports local-minus-no-evidence and local-minus-yoked final F1, count-gated F1, draft-to-final gains, and whether local evidence beats yoked evidence on both revision gain and final F1. Missing/duplicate arms and changed drafts are rejected. This does not itself prove causal effects in a population; it enforces the paired experimental design so subsequent statistics can estimate them correctly.
+
+
+## CLI replay
+
+Run a single V2 case or a matched evidence-triplet JSON file:
+
+    cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-temporal-revision-audit -- path/to/case-or-triplet.json
+
+Use a hyphen as the path to read JSON from standard input. For an array input, the CLI audits each V2 case and emits matched evidence-ablation contrasts. The committed synthetic triplet fixture is at fixtures/mel-temporal-revision-triplet.synthetic.json.
