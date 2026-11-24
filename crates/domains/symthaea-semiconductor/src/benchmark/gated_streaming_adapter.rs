@@ -1023,7 +1023,7 @@ mod tests {
             label_payload_sha256: payload.clone(),
             label_value: 11.0,
             label_available_at_unix_seconds: available_at,
-            eligibility_report_available_at_unix_seconds: delivered_at.saturating_sub(1),
+            eligibility_report_available_at_unix_seconds: available_at,
             delivered_at_unix_seconds: delivered_at,
             clock_domain_id: "fab-clock".into(),
             idempotency_key: format!("{label_id}:{revision}"),
