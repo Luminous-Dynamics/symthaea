@@ -195,5 +195,25 @@
     ],
     "implementation_status": "No individual-effect HDC/CfC/LTC trainer exists in this pilot branch. Do not repurpose Broca intent-contrast training or HDC positive/negative contrastive_update. The next implementation must accumulate trajectory and all sibling-pair contrast gradients using shared pre-update parameters, then update once after all branches.",
     "claim_boundary": "Source inspection only. No training implementation, model run, or performance result is claimed."
+  },
+  "pair_admission_receipt_contract": {
+    "consumer_field": "IndividualEffectContext.pairing_receipt_sha256",
+    "semantics": "Digest of a pair-level admission certificate that commits to both baseline and alternative branches; the digest alone is not authentication.",
+    "required_bound_artifacts": [
+      "individual/factual-history/restored-branch-point/task/intervention-pair/dynamics-model/paired-seed identity",
+      "separate baseline and alternative branch IDs, trajectory receipts, action digests, application timestamps and realized outcome digests",
+      "per-tick state-chain and observation-delivery commitments with shared exogenous event identity where applicable",
+      "per-branch driver execution receipt and independent replay/audit receipt",
+      "source CorrespondenceSet, EventDrawScope, re-projected draw bundle and verifier receipt when stochastic correspondence is used",
+      "exact verifier profile, verifier result, and independently retained signature or trust-root anchor"
+    ],
+    "admission_rule": "External wrapper retrieves and verifies actual source/artifact bytes, signatures/anchors, branch application and replay, factual-prefix identity, and permitted post-action divergence before passing the pair digest/outcomes to #13520.",
+    "not_sufficient": [
+      "nonempty SHA-256 field",
+      "self-consistent unkeyed content digest",
+      "caller-supplied replay_passed boolean",
+      "four-arm #13377 validator treated as a generic two-branch verifier"
+    ],
+    "stochastic_boundary": "Use Symtropy #3741/#3743 source-to-address-to-Philox re-projection only when the pinned experiment has a stochastic draw/correspondence domain; do not invent a stochastic verifier for deterministic DMC runs."
   }
 }
