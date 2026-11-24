@@ -79,8 +79,8 @@ jobs:
           cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-temporal-revision-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-temporal-revision-triplet.synthetic.json > "$RUNNER_TEMP/temporal-revision-report.json"
           jq -e '
             .schema == "mel-temporal-revision-batch-report-v1"
-            and .cases == 3
-            and (.matched_evidence_contrasts | length) == 1
+            and .cases == 6
+            and (.matched_evidence_contrasts | length) == 2
             and .matched_evidence_contrasts[0].local_minus_no_evidence_f1 == 0.5
             and .matched_evidence_contrasts[0].local_minus_yoked_f1 == 0.5
             and .matched_evidence_contrasts[0].local_beats_yoked == true
@@ -88,6 +88,12 @@ jobs:
             and .reports[0].source_lineage_id == "synthetic-lineage-001"
             and .reports[0].runtime_identity_sha256 != null
             and .reports[0].actual_output_tokens == 128
+            and .source_work_bootstrap.source_work_clusters == 2
+            and .source_work_bootstrap.one_to_many_source_work_clusters == 2
+            and .source_work_bootstrap.recommended_confirmatory_cluster_floor == 30
+            and .source_work_bootstrap.confirmatory_source_cluster_floor_met == false
+            and .source_work_bootstrap.local_minus_no_evidence_f1.estimate == 0.5
+            and .source_work_bootstrap.local_minus_no_evidence_count_gated_f1.estimate == 1.0
           ' "$RUNNER_TEMP/temporal-revision-report.json" > /dev/null
 
       - name: Replay transformed-view equivariance when module is present
