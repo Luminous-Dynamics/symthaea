@@ -13,6 +13,7 @@ on:
       - "docs/research/LOCAL_GLOBAL_PAIR_*"
       - "docs/research/MATH_METAMORPHIC_*"
       - "docs/research/MATH_SCOPE_EQUIVALENCE_TIER1_V1.*"
+      - "docs/research/MATH_SCOPE_EQUIVALENCE_TIER2_AND_COMM_V1.*"
       - "docs/research/MATH_HARDMODE_*"
       - "docs/research/PROOF_ACTION_CERTIFICATE_AND_COMM_V1.*"
       - "docs/research/PROOF_PLAN_*.md"
@@ -83,6 +84,8 @@ jobs:
             docs/research/MATH_METAMORPHIC_PAIR_V1.json
             docs/research/MATH_SCOPE_EQUIVALENCE_TIER1_V1.schema.json
             docs/research/MATH_SCOPE_EQUIVALENCE_TIER1_V1.json
+            docs/research/MATH_SCOPE_EQUIVALENCE_TIER2_AND_COMM_V1.schema.json
+            docs/research/MATH_SCOPE_EQUIVALENCE_TIER2_AND_COMM_V1.json
             docs/research/PROOF_ACTION_CERTIFICATE_AND_COMM_V1.schema.json
             docs/research/PROOF_ACTION_CERTIFICATE_AND_COMM_V1.json
             docs/research/MATH_PROOF_COMPREHENSION_THEOREM_SANDWICH_V1.schema.json
@@ -258,6 +261,21 @@ jobs:
             and (."$defs".formula.oneOf | length == 6)' \
             docs/research/MATH_SCOPE_EQUIVALENCE_TIER1_V1.schema.json >/dev/null
           echo "SCOPE_EQUIVALENCE_TIER1_FIXTURES_PASS"
+
+          jq -e '.schema_version == "1.0.0"
+            and .status == "kernel_replay_pending"
+            and .comparison_tier == "tier2_kernel_certified_transport"
+            and .environment.mathlib_revision == "6ebcce37335bcb6bca64596e5d57bb3035648030"
+            and .proof_source.sha256 == "720875c1096f615d966bb45f194a4e99ec910f1bfe1423fae4cc9390b3b19d79"
+            and (.certificates | length) == 6
+            and ([.certificates[].role] == ["local_context_entails_global", "global_context_entails_local", "context_equivalence", "warrant_local_to_global", "warrant_global_to_local", "warrant_transport_equivalence"])' \\
+            docs/research/MATH_SCOPE_EQUIVALENCE_TIER2_AND_COMM_V1.json >/dev/null
+          jq -e '."$schema" == "https://json-schema.org/draft/2020-12/schema"
+            and .properties.status.const == "kernel_replay_pending"
+            and .properties.certificates.minItems == 6
+            and .properties.certificates.maxItems == 6' \\
+            docs/research/MATH_SCOPE_EQUIVALENCE_TIER2_AND_COMM_V1.schema.json >/dev/null
+          echo "SCOPE_EQUIVALENCE_TIER2_MANIFEST_PASS"
 
       - name: Bind local action certificates to ProofPlanV1 nodes
         shell: bash
@@ -553,6 +571,88 @@ jobs:
             mathlib4/proof-action-certificate-and-comm.log
             mathlib4/ProofActionCertificateAndCommNegative.lean
             mathlib4/proof-action-certificate-negative.log
+          if-no-files-found: error
+
+      - name: Replay Tier-2 Lean context and warrant transport
+        working-directory: mathlib4
+        shell: bash
+        run: |
+          set -euo pipefail
+          proof_source="$GITHUB_WORKSPACE/scripts/research/lean-proof-extractor/ScopeEquivalenceTier2AndComm.lean"
+          manifest="$GITHUB_WORKSPACE/docs/research/MATH_SCOPE_EQUIVALENCE_TIER2_AND_COMM_V1.json"
+          cp "$proof_source" ScopeEquivalenceTier2AndComm.lean
+          test "$(git rev-parse HEAD)" = "6ebcce37335bcb6bca64596e5d57bb3035648030"
+          test "$(cat lean-toolchain)" = "leanprover/lean4:v4.37.0-rc1"
+          actual_source_sha256="$(sha256sum ScopeEquivalenceTier2AndComm.lean | cut -d' ' -f1)"
+          expected_source_sha256="$(jq -r '.proof_source.sha256' "$manifest")"
+          test "$actual_source_sha256" = "$expected_source_sha256"
+          test "$(jq -r '.environment.mathlib_revision' "$manifest")" = "$(git rev-parse HEAD)"
+
+          lake env lean ScopeEquivalenceTier2AndComm.lean 2>&1 | tee scope-equivalence-tier2-and-comm.log
+          for declaration in \
+            "ScopeEquivalenceTier2AndComm.local_context_to_global" \
+            "ScopeEquivalenceTier2AndComm.global_context_to_local" \
+            "ScopeEquivalenceTier2AndComm.context_equivalence" \
+            "ScopeEquivalenceTier2AndComm.warrant_local_to_global" \
+            "ScopeEquivalenceTier2AndComm.warrant_global_to_local" \
+            "ScopeEquivalenceTier2AndComm.warrant_transport_equivalence"; do
+            grep -Fq "$declaration" scope-equivalence-tier2-and-comm.log
+          done
+
+          manifest_sha256="$(sha256sum "$manifest" | cut -d' ' -f1)"
+          axioms_log_sha256="$(sha256sum scope-equivalence-tier2-and-comm.log | cut -d' ' -f1)"
+          lake_manifest_sha256="$(sha256sum lake-manifest.json | cut -d' ' -f1)"
+          lean_version="$(lean --version)"
+          mathlib_revision="$(git rev-parse HEAD)"
+          symthaea_revision="$(git -C "$GITHUB_WORKSPACE" rev-parse HEAD)"
+          certificates="$(jq -c '.certificates' "$manifest")"
+          receipt="scope-equivalence-tier2-and-comm-replay-receipt.json"
+          jq -n \
+            --arg symthaea_revision "$symthaea_revision" \
+            --arg source_sha256 "$actual_source_sha256" \
+            --arg manifest_sha256 "$manifest_sha256" \
+            --arg lean_version "$lean_version" \
+            --arg mathlib_revision "$mathlib_revision" \
+            --arg lake_manifest_sha256 "$lake_manifest_sha256" \
+            --arg axioms_log_sha256 "$axioms_log_sha256" \
+            --argjson certificates "$certificates" \
+            '{
+              schema_version: "1.0.0",
+              receipt_kind: "lean_kernel_scope_transport_replay",
+              status: "accepted",
+              pair_id: "SCOPE-TIER2-AND-COMM-001",
+              comparison_tier: "tier2_kernel_certified_transport",
+              repository: "Luminous-Dynamics/symthaea",
+              symthaea_revision: $symthaea_revision,
+              proof_source_path: "scripts/research/lean-proof-extractor/ScopeEquivalenceTier2AndComm.lean",
+              proof_source_sha256: $source_sha256,
+              manifest_path: "docs/research/MATH_SCOPE_EQUIVALENCE_TIER2_AND_COMM_V1.json",
+              manifest_sha256: $manifest_sha256,
+              lean_version: $lean_version,
+              mathlib_revision: $mathlib_revision,
+              lake_manifest_sha256: $lake_manifest_sha256,
+              certificates: $certificates,
+              axiom_report: {captured: true, parsed: false, log_sha256: $axioms_log_sha256},
+              claim_ceiling: [
+                "Both context-entailment directions and bidirectional warrant transport were accepted by Lean in this exact run environment.",
+                "The target proposition is unchanged and the context is non-dependent propositional conjunction only.",
+                "Dependent binders, local instances, typeclass parameters, universe changes and arbitrary telescope transport are not covered.",
+                "The raw #print axioms output is retained by digest but not yet parsed into structured dependency closure.",
+                "This synthetic seed is not an empirical scope-CIRR result or expert-reviewed explanation."
+              ]
+            }' > "$receipt"
+          jq -e '.status == "accepted" and .comparison_tier == "tier2_kernel_certified_transport" and (.certificates | length) == 6 and .axiom_report.captured == true and .axiom_report.parsed == false' "$receipt" >/dev/null
+          cat "$receipt" >> "$GITHUB_STEP_SUMMARY"
+          echo "SCOPE_EQUIVALENCE_TIER2_LEAN_REPLAY_PASS"
+
+      - name: Preserve Tier-2 scope-transport replay receipt
+        if: success()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: scope-equivalence-tier2-and-comm-lean-replay
+          path: |
+            mathlib4/scope-equivalence-tier2-and-comm-replay-receipt.json
+            mathlib4/scope-equivalence-tier2-and-comm.log
           if-no-files-found: error
 
       - name: Preserve extracted graph artifacts
