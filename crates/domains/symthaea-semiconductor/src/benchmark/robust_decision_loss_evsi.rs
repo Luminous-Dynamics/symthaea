@@ -13,7 +13,7 @@ use thiserror::Error;
 
 use super::decision_loss_metrology_policy::{
     MetrologyCandidateEvsiReportV1, MetrologyCandidateStatusV1, MetrologyCandidateV1,
-    MetrologyDecisionLossModelV1, MetrologyDecisionLossPolicyV1, MetrologyPortfolioStatusV1,
+    MetrologyDecisionLossModelV1, MetrologyDecisionLossPolicyV1, validate_policy,
     score_candidate,
 };
 
@@ -107,12 +107,20 @@ pub struct RobustEvsiCandidateReportV1 {
     pub report_sha256: String,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RobustEvsiPortfolioStatusV1 {
+    Feasible,
+    InfeasibleCoverage,
+    Unknown,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct RobustEvsiPortfolioReportV1 {
     pub schema: String,
     pub input_id: String,
     pub policy_sha256: String,
-    pub status: MetrologyPortfolioStatusV1,
+    pub status: RobustEvsiPortfolioStatusV1,
     pub candidate_reports: Vec<RobustEvsiCandidateReportV1>,
     pub selected_candidate_ids: Vec<String>,
     pub total_measurement_cost_units: u32,
@@ -457,6 +465,7 @@ pub fn optimize_robust_metrology_evsi_portfolio_v1(
         return Err(RobustEvsiErrorV1("robust EVSI input schema is unsupported".into()));
     }
     require_text(&input.input_id, "input.input_id")?;
+    validate_policy(&input.base_policy).map_err(|error| RobustEvsiErrorV1(error.to_string()))?;
     if input.maximum_scenarios_per_candidate == 0 || input.maximum_scenarios_per_candidate > 32 {
         return Err(RobustEvsiErrorV1("maximum scenario count must be in 1..=32".into()));
     }
@@ -488,7 +497,11 @@ pub fn optimize_robust_metrology_evsi_portfolio_v1(
         )?);
     }
 
-    if !input.uncertainty_set_complete {
+    if !input.uncertainty_set_complete
+        || candidate_reports
+            .iter()
+            .any(|report| report.status == RobustEvsiCandidateStatusV1::IncompleteScenarioSet)
+    {
         return make_unknown_portfolio(input, candidate_reports, "uncertainty_set_incomplete");
     }
 
@@ -563,9 +576,9 @@ pub fn optimize_robust_metrology_evsi_portfolio_v1(
         input_id: input.input_id.clone(),
         policy_sha256: json_sha256(&input.base_policy)?,
         status: if found {
-            MetrologyPortfolioStatusV1::Feasible
+            RobustEvsiPortfolioStatusV1::Feasible
         } else {
-            MetrologyPortfolioStatusV1::InfeasibleCoverage
+            RobustEvsiPortfolioStatusV1::InfeasibleCoverage
         },
         candidate_reports,
         selected_candidate_ids: best_ids,
