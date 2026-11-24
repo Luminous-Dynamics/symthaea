@@ -652,12 +652,9 @@ mod tests {
     fn pair(
         pair_id: u64,
         individual: u8,
-        realized_baseline: i64,
-        realized_alternative: i64,
-        latent_baseline: i64,
-        latent_alternative: i64,
-        rollout_baseline: i64,
-        rollout_alternative: i64,
+        realized: (i64, i64),
+        latent: (i64, i64),
+        rollout: (i64, i64),
     ) -> IndividualEffectPair {
         let context = context(pair_id, individual);
         IndividualEffectPair {
@@ -665,17 +662,17 @@ mod tests {
                 pair_id * 2,
                 "baseline",
                 &context,
-                realized_baseline,
-                latent_baseline,
-                rollout_baseline,
+                realized.0,
+                latent.0,
+                rollout.0,
             ),
             alternative: branch(
                 pair_id * 2 + 1,
                 "alternative",
                 &context,
-                realized_alternative,
-                latent_alternative,
-                rollout_alternative,
+                realized.1,
+                latent.1,
+                rollout.1,
             ),
             context,
         }
@@ -684,8 +681,8 @@ mod tests {
     #[test]
     fn f8_mean_cancellation_preserves_individual_contrast() {
         let pairs = vec![
-            pair(1, 1, 0, 10, 0, 10, 0, 0),
-            pair(2, 2, 0, -10, 0, -10, 0, 0),
+            pair(1, 1, (0, 10), (0, 10), (0, 0)),
+            pair(2, 2, (0, -10), (0, -10), (0, 0)),
         ];
         let certificate = evaluate_individual_effect_retention(&pairs).unwrap();
         assert_eq!(certificate.individual_count, 2);
@@ -704,8 +701,8 @@ mod tests {
     #[test]
     fn average_effect_accuracy_does_not_hide_individual_rollout_error() {
         let pairs = vec![
-            pair(1, 1, 0, 10, 0, 10, 0, 0),
-            pair(2, 2, 0, -10, 0, -10, 0, 0),
+            pair(1, 1, (0, 10), (0, 10), (0, 0)),
+            pair(2, 2, (0, -10), (0, -10), (0, 0)),
         ];
         let result = evaluate_individual_effect_retention(&pairs).unwrap();
         assert_eq!(result.rollout_effect_bias_sum_units, 0);
@@ -715,7 +712,7 @@ mod tests {
 
     #[test]
     fn exact_latent_and_rollout_effects_are_separated() {
-        let pairs = vec![pair(1, 1, -4, 7, -4, 7, -4, 7)];
+        let pairs = vec![pair(1, 1, (-4, 7), (-4, 7), (-4, 7))];
         let result = evaluate_individual_effect_retention(&pairs).unwrap();
         assert_eq!(result.latent_absolute_error_sum_units, 0);
         assert_eq!(result.rollout_absolute_error_sum_units, 0);
@@ -734,8 +731,8 @@ mod tests {
     #[test]
     fn duplicate_individual_is_rejected() {
         let pairs = vec![
-            pair(1, 1, 0, 2, 0, 2, 0, 2),
-            pair(2, 1, 0, 3, 0, 3, 0, 3),
+            pair(1, 1, (0, 2), (0, 2), (0, 2)),
+            pair(2, 1, (0, 3), (0, 3), (0, 3)),
         ];
         assert_eq!(
             evaluate_individual_effect_retention(&pairs),
@@ -746,8 +743,8 @@ mod tests {
     #[test]
     fn duplicate_run_id_is_rejected() {
         let mut pairs = vec![
-            pair(1, 1, 0, 2, 0, 2, 0, 2),
-            pair(2, 2, 0, 3, 0, 3, 0, 3),
+            pair(1, 1, (0, 2), (0, 2), (0, 2)),
+            pair(2, 2, (0, 3), (0, 3), (0, 3)),
         ];
         pairs[1].baseline.run_id = pairs[0].alternative.run_id;
         assert!(matches!(
@@ -758,7 +755,7 @@ mod tests {
 
     #[test]
     fn missing_pairing_receipt_is_rejected() {
-        let mut pairs = vec![pair(1, 1, 0, 2, 0, 2, 0, 2)];
+        let mut pairs = vec![pair(1, 1, (0, 2), (0, 2), (0, 2))];
         pairs[0].context.pairing_receipt_sha256 = [0; 32];
         assert_eq!(
             evaluate_individual_effect_retention(&pairs),
@@ -770,7 +767,7 @@ mod tests {
 
     #[test]
     fn branch_point_mismatch_is_rejected() {
-        let mut pairs = vec![pair(1, 1, 0, 2, 0, 2, 0, 2)];
+        let mut pairs = vec![pair(1, 1, (0, 2), (0, 2), (0, 2))];
         pairs[0].alternative.branch_point_state_sha256 = digest(200);
         assert!(matches!(
             evaluate_individual_effect_retention(&pairs),
@@ -783,7 +780,7 @@ mod tests {
 
     #[test]
     fn exogenous_forcing_mismatch_is_rejected() {
-        let mut pairs = vec![pair(1, 1, 0, 2, 0, 2, 0, 2)];
+        let mut pairs = vec![pair(1, 1, (0, 2), (0, 2), (0, 2))];
         pairs[0].alternative.exogenous_forcing_manifest_sha256 = digest(201);
         assert!(matches!(
             evaluate_individual_effect_retention(&pairs),
@@ -796,7 +793,7 @@ mod tests {
 
     #[test]
     fn model_or_latent_identity_mismatch_is_rejected() {
-        let mut model_mismatch = vec![pair(1, 1, 0, 2, 0, 2, 0, 2)];
+        let mut model_mismatch = vec![pair(1, 1, (0, 2), (0, 2), (0, 2))];
         model_mismatch[0].alternative.model_configuration_sha256 = digest(202);
         assert!(matches!(
             evaluate_individual_effect_retention(&model_mismatch),
@@ -806,7 +803,7 @@ mod tests {
             })
         ));
 
-        let mut latent_mismatch = vec![pair(2, 2, 0, 2, 0, 2, 0, 2)];
+        let mut latent_mismatch = vec![pair(2, 2, (0, 2), (0, 2), (0, 2))];
         latent_mismatch[0].alternative.latent_state_sha256 = digest(203);
         assert!(matches!(
             evaluate_individual_effect_retention(&latent_mismatch),
@@ -819,7 +816,7 @@ mod tests {
 
     #[test]
     fn non_applied_branch_is_not_imputed_as_zero() {
-        let mut pairs = vec![pair(1, 1, 0, 2, 0, 2, 0, 2)];
+        let mut pairs = vec![pair(1, 1, (0, 2), (0, 2), (0, 2))];
         pairs[0].alternative.disposition = BranchDisposition::NotApplied {
             terminal_at_us: 5_000,
             reason: NonApplicationReason::DeadlineMiss,
@@ -838,8 +835,8 @@ mod tests {
     #[test]
     fn incompatible_task_or_loss_scale_is_rejected() {
         let mut task_mismatch = vec![
-            pair(1, 1, 0, 2, 0, 2, 0, 2),
-            pair(2, 2, 0, 3, 0, 3, 0, 3),
+            pair(1, 1, (0, 2), (0, 2), (0, 2)),
+            pair(2, 2, (0, 3), (0, 3), (0, 3)),
         ];
         task_mismatch[1].context.task_sha256 = digest(222);
         assert!(matches!(
@@ -848,8 +845,8 @@ mod tests {
         ));
 
         let mut loss_mismatch = vec![
-            pair(1, 1, 0, 2, 0, 2, 0, 2),
-            pair(2, 2, 0, 3, 0, 3, 0, 3),
+            pair(1, 1, (0, 2), (0, 2), (0, 2)),
+            pair(2, 2, (0, 3), (0, 3), (0, 3)),
         ];
         loss_mismatch[1].context.loss_scale_sha256 = digest(223);
         assert!(matches!(
@@ -860,14 +857,14 @@ mod tests {
 
     #[test]
     fn empty_or_identical_action_ids_are_rejected() {
-        let mut empty = vec![pair(1, 1, 0, 2, 0, 2, 0, 2)];
+        let mut empty = vec![pair(1, 1, (0, 2), (0, 2), (0, 2))];
         empty[0].context.alternative_action_id.clear();
         assert_eq!(
             evaluate_individual_effect_retention(&empty),
             Err(IndividualEffectError::EmptyActionId)
         );
 
-        let mut identical = vec![pair(1, 1, 0, 2, 0, 2, 0, 2)];
+        let mut identical = vec![pair(1, 1, (0, 2), (0, 2), (0, 2))];
         identical[0].context.alternative_action_id = "baseline".to_owned();
         assert_eq!(
             evaluate_individual_effect_retention(&identical),
@@ -877,7 +874,7 @@ mod tests {
 
     #[test]
     fn sibling_branches_must_share_the_frozen_paired_seed() {
-        let mut pairs = vec![pair(1, 1, 0, 2, 0, 2, 0, 2)];
+        let mut pairs = vec![pair(1, 1, (0, 2), (0, 2), (0, 2))];
         pairs[0].alternative.paired_seed = 4321;
         assert!(matches!(
             evaluate_individual_effect_retention(&pairs),
