@@ -383,11 +383,13 @@ The initial finite-only implementation is now present in `scripts/research/proof
 - `MATH_METAMORPHIC_PAIR_V1.schema.json`
 - `MATH_METAMORPHIC_PAIR_V1.json`
 
-The three synthetic controls cover:
-1. a semantics-preserving rewrite of implication as disjunction with negation;
+The five synthetic controls now cover:
+1. a semantics-preserving implication/disjunction rewrite;
 2. removal of a hypothesis that changes a modus-ponens sequent's finite semantic relation;
-3. a proof-route-only change with the same exact sequent digest and distinct route receipts.
+3. a proof-route-only change with the same exact sequent digest and distinct route receipts;
+4. permutation of independent hypotheses, which must remain equivalent despite a changed raw digest;
+5. unrelated atomic conclusions, which must be classified as incomparable.
 
-The Rust validator recomputes typed sequent digests, derives the two-way finite entailment relation, enforces transformation-class consistency, and serializes candidate inputs separately from evaluator-only labels. It is limited to the Boolean AST and its 16-atom budget.
+The Rust validator recomputes typed sequent digests, derives two-way finite entailment, enforces transformation-class consistency, and serializes candidate inputs separately from evaluator-only labels. It is limited to the Boolean AST and its 16-atom budget.
 
-**Status:** implementation and fixtures committed; the exact-head finite-reference job passed on `da35bc584c5dfed8923654fda83c2c2319ebd338` (run [45463952889](https://github.com/Luminous-Dynamics/symthaea/actions/runs/45463952889)): rustfmt passed, **100 Rust tests passed / 0 failed**, and the three-pair CLI passed. Lean 4.29/4.37 extraction and differential lanes remained in progress at this update. No Lean kernel result, model evaluation, human review or empirical CIRR result is claimed. See protocol [MATH_METAMORPHIC_V1.md](MATH_METAMORPHIC_V1.md) and issue [#13547](https://github.com/Luminous-Dynamics/symthaea/issues/13547).
+**Qualification boundary:** the earlier exact-head run [45463952889](https://github.com/Luminous-Dynamics/symthaea/actions/runs/45463952889) passed the first three-pair implementation with **100 Rust tests passed / 0 failed**. The new hypothesis-order and incomparable controls, plus their two additional tests, were committed afterward and are not covered by that earlier pass. They require the latest exact-head run. No Lean kernel result, model evaluation, human review or empirical CIRR result is claimed. See protocol [MATH_METAMORPHIC_V1.md](MATH_METAMORPHIC_V1.md) and issue [#13547](https://github.com/Luminous-Dynamics/symthaea/issues/13547).
