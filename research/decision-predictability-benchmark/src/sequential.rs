@@ -653,7 +653,7 @@ fn enumerate_node(
                     decision_id: decision_id.clone(),
                     state_id: state_id.clone(),
                 })?;
-            worst = if loss > worst { loss } else { worst };
+            worst = worst.max(loss);
         }
         let is_better = match &stop_decision {
             None => true,
@@ -1032,6 +1032,36 @@ mod tests {
         let value = evaluate_sequential_robust(&problem).unwrap();
         assert_eq!(value.worst_case_terminal_loss, 1.0);
         assert!(matches!(value.policy, SequentialPolicyNode::Stop { .. }));
+    }
+
+    #[test]
+    fn an_action_with_incomplete_outcome_support_fails_closed() {
+        let mut problem = branch_unlock_world();
+        let action = problem
+            .actions
+            .iter_mut()
+            .find(|action| action.action_id == "B")
+            .unwrap();
+        action.outcomes[0].possible_state_ids.clear();
+        assert!(matches!(
+            evaluate_sequential_robust(&problem),
+            Err(SequentialOracleError::UncoveredState { .. })
+        ));
+    }
+
+    #[test]
+    fn protocol_permissions_exclude_otherwise_useful_actions() {
+        let mut problem = branch_unlock_world();
+        let root = problem
+            .protocol_states
+            .iter_mut()
+            .find(|state| state.protocol_state_id == "root")
+            .unwrap();
+        root.legal_action_ids = vec!["A".to_owned()];
+        let value = evaluate_sequential_robust(&problem).unwrap();
+        assert_eq!(value.worst_case_terminal_loss, 1.0);
+        assert!(matches!(value.policy, SequentialPolicyNode::Stop { .. }));
+        assert!(!value.root_risk_gate_passed);
     }
 
     #[test]
