@@ -103,7 +103,7 @@ fn interleaved_controller_matches_independent_long_stream_recursion() {
     .unwrap();
 
     let mut oracle_lanes = vec![target; delay as usize];
-    let mut issued = Vec::new();
+    let mut issued: Vec<DelayedAciPredictionReceiptV1> = Vec::new();
     let mut accepted = 0_u64;
 
     for stream_step in 0..(sample_count as u64 + delay) {
