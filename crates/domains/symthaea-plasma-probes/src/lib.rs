@@ -1617,8 +1617,7 @@ pub fn validate_sensor_actuator_timing_contract_value(
         ));
     }
 
-    let clock_skew =
-        timing_number(value, "clock.maximum_clock_skew_seconds")?;
+    let clock_skew = timing_number(value, "clock.maximum_clock_skew_seconds")?;
     if clock_skew < 0.0 {
         return Err(control_timing_error(
             "clock.maximum_clock_skew_seconds",
@@ -1645,12 +1644,9 @@ pub fn validate_sensor_actuator_timing_contract_value(
                 "diagnostic channel IDs must be unique",
             ));
         }
-        let sampling_period =
-            timing_number(diagnostic, "sampling_period_seconds")?;
-        let transport_latency =
-            timing_number(diagnostic, "transport_latency_seconds")?;
-        let timestamp_age_bound =
-            timing_number(diagnostic, "timestamp_age_bound_seconds")?;
+        let sampling_period = timing_number(diagnostic, "sampling_period_seconds")?;
+        let transport_latency = timing_number(diagnostic, "transport_latency_seconds")?;
+        let timestamp_age_bound = timing_number(diagnostic, "timestamp_age_bound_seconds")?;
         let jitter = timing_number(diagnostic, "jitter_bound_seconds")?;
         let noise_std = timing_number(diagnostic, "noise_std")?;
         if sampling_period <= 0.0
@@ -1666,16 +1662,13 @@ pub fn validate_sensor_actuator_timing_contract_value(
         }
         let minimum_age_bound = sampling_period + transport_latency + jitter + clock_skew;
         let allowance = 1.0e-12_f64.max(minimum_age_bound.abs() * 1.0e-10);
-        if !minimum_age_bound.is_finite()
-            || timestamp_age_bound + allowance < minimum_age_bound
-        {
+        if !minimum_age_bound.is_finite() || timestamp_age_bound + allowance < minimum_age_bound {
             return Err(control_timing_error(
                 "diagnostics.timestamp_age_bound_seconds",
                 "age bound must cover sampling period + transport latency + jitter + clock skew",
             ));
         }
-        maximum_observation_age_seconds =
-            maximum_observation_age_seconds.max(timestamp_age_bound);
+        maximum_observation_age_seconds = maximum_observation_age_seconds.max(timestamp_age_bound);
     }
 
     let mut actuator_ids = BTreeSet::new();
@@ -1708,10 +1701,8 @@ pub fn validate_sensor_actuator_timing_contract_value(
             maximum_actuator_delivery_delay_seconds.max(delivery_delay);
     }
 
-    let controller_update_period =
-        timing_number(value, "controller.update_period_seconds")?;
-    let controller_wcet =
-        timing_number(value, "controller.worst_case_execution_seconds")?;
+    let controller_update_period = timing_number(value, "controller.update_period_seconds")?;
+    let controller_wcet = timing_number(value, "controller.worst_case_execution_seconds")?;
     let controller_deadline = timing_number(value, "controller.deadline_seconds")?;
     let maximum_allowed_observation_age =
         timing_number(value, "controller.maximum_observation_age_seconds")?;
@@ -1927,7 +1918,9 @@ pub fn project_weighted_micro_fluctuation(
     }
 
     let mut correction_norm_squared = 0.0;
-    for ((projected, original), weight) in micro_fluctuation.iter().zip(values).zip(diagonal_weights) {
+    for ((projected, original), weight) in
+        micro_fluctuation.iter().zip(values).zip(diagonal_weights)
+    {
         let correction = projected - original;
         correction_norm_squared += weight * correction * correction;
     }
@@ -3611,7 +3604,10 @@ mod tests {
     fn sensor_actuator_timing_auditor_accepts_consistent_asynchronous_fixture() {
         let report =
             validate_sensor_actuator_timing_contract_json(SENSOR_ACTUATOR_FIXTURE).unwrap();
-        assert_eq!(report.contract_id, "KINETIC-MULTIRATE-INTERFACE-SYNTHETIC-001");
+        assert_eq!(
+            report.contract_id,
+            "KINETIC-MULTIRATE-INTERFACE-SYNTHETIC-001"
+        );
         assert_eq!(report.diagnostic_channel_count, 2);
         assert_eq!(report.actuator_channel_count, 1);
         assert_eq!(report.maximum_observation_age_seconds, 0.04);
@@ -3677,17 +3673,14 @@ mod tests {
         let values = [1.0, 2.0, -1.0, 4.0];
         let weights = [1.0, 2.0, 1.5, 3.0];
         let constraints = vec![vec![1.0, 1.0, 1.0, 1.0], vec![-1.0, -0.25, 0.5, 1.0]];
-        let result = project_weighted_micro_fluctuation(
-            &values,
-            &constraints,
-            &weights,
-            1.0e-11,
-        )
-        .unwrap();
-        assert!(result
-            .post_projection_moments
-            .iter()
-            .all(|moment| moment.abs() < 1.0e-10));
+        let result =
+            project_weighted_micro_fluctuation(&values, &constraints, &weights, 1.0e-11).unwrap();
+        assert!(
+            result
+                .post_projection_moments
+                .iter()
+                .all(|moment| moment.abs() < 1.0e-10)
+        );
         assert!(result.weighted_correction_norm.is_finite());
         assert!(result.weighted_correction_norm > 0.0);
         assert_ne!(result.micro_fluctuation, values);
@@ -3698,13 +3691,8 @@ mod tests {
         let values = [2.0, -1.0, 3.0, 0.5];
         let weights = [0.5, 1.0, 2.0, 3.0];
         let constraints = vec![vec![1.0, 1.0, 1.0, 1.0], vec![-1.0, 0.0, 0.0, 1.0]];
-        let first = project_weighted_micro_fluctuation(
-            &values,
-            &constraints,
-            &weights,
-            1.0e-11,
-        )
-        .unwrap();
+        let first =
+            project_weighted_micro_fluctuation(&values, &constraints, &weights, 1.0e-11).unwrap();
         let second = project_weighted_micro_fluctuation(
             &first.micro_fluctuation,
             &constraints,
