@@ -16,6 +16,7 @@ use sha2::{Digest, Sha256};
 
 use crate::candidate_evidence::{
     CandidateEvidenceBatchV1, CandidateEvidenceReject, encode_candidate_evidence_jsonl,
+    parse_candidate_evidence_jsonl,
 };
 use crate::evidence_qualification_gate::{
     EvidenceQualificationBindingV1, EvidenceQualificationReceiptV1,
@@ -113,6 +114,130 @@ impl EvidenceQualificationRequestV1 {
             "request_sha256": self.request_sha256,
         })
     }
+
+    /// Strictly decode a request at the independent issuer boundary.
+    ///
+    /// This validates the complete JSON shape, canonical candidate JSONL,
+    /// exact candidate/binding correspondence, sorted complete ID set, and
+    /// request digest. It does not authenticate the caller or establish that
+    /// the candidate sources are genuine; the issuer must independently
+    /// resolve and verify those sources before signing a receipt.
+    pub fn from_json_value(
+        value: &Value,
+    ) -> Result<Self, IndependentQualificationExchangeRejectV1> {
+        let object = value.as_object()
+            .ok_or(IndependentQualificationExchangeRejectV1::InvalidRequestJson)?;
+        if object.len() != 4
+            || object.get("schema_version").and_then(Value::as_str)
+                != Some(QUALIFICATION_REQUEST_SCHEMA_V1)
+        {
+            return Err(IndependentQualificationExchangeRejectV1::InvalidRequestJson);
+        }
+        let required_string = |field: &str| -> Result<String, IndependentQualificationExchangeRejectV1> {
+            object.get(field).and_then(Value::as_str).map(str::to_owned)
+                .ok_or(IndependentQualificationExchangeRejectV1::InvalidRequestJson)
+        };
+        let candidate_batch_jsonl = required_string("candidate_batch_jsonl")?;
+        let request_sha256 = required_string("request_sha256")?;
+        if !valid_sha256(&request_sha256) {
+            return Err(IndependentQualificationExchangeRejectV1::InvalidRequestJson);
+        }
+
+        let binding_object = object.get("binding").and_then(Value::as_object)
+            .ok_or(IndependentQualificationExchangeRejectV1::InvalidRequestJson)?;
+        if binding_object.len() != 15 {
+            return Err(IndependentQualificationExchangeRejectV1::InvalidRequestJson);
+        }
+        let binding_string = |field: &str| -> Result<String, IndependentQualificationExchangeRejectV1> {
+            binding_object.get(field).and_then(Value::as_str).map(str::to_owned)
+                .ok_or(IndependentQualificationExchangeRejectV1::InvalidRequestJson)
+        };
+        let candidate_evidence_ids = binding_object
+            .get("candidate_evidence_ids")
+            .and_then(Value::as_array)
+            .ok_or(IndependentQualificationExchangeRejectV1::InvalidRequestJson)?
+            .iter()
+            .map(|value| value.as_str().map(str::to_owned)
+                .ok_or(IndependentQualificationExchangeRejectV1::InvalidRequestJson))
+            .collect::<Result<Vec<_>, _>>()?;
+        let now_unix = binding_object.get("now_unix").and_then(Value::as_u64)
+            .ok_or(IndependentQualificationExchangeRejectV1::InvalidRequestJson)?;
+        let binding = EvidenceQualificationRequestBindingV1 {
+            run_id: binding_string("run_id")?,
+            query_invocation_id: binding_string("query_invocation_id")?,
+            domain_id: binding_string("domain_id")?,
+            subject_scope_sha256: binding_string("subject_scope_sha256")?,
+            environment_revision_sha256: binding_string("environment_revision_sha256")?,
+            tool_profile_sha256: binding_string("tool_profile_sha256")?,
+            query_sha256: binding_string("query_sha256")?,
+            candidate_set_sha256: binding_string("candidate_set_sha256")?,
+            candidate_evidence_ids,
+            decision_need_sha256: binding_string("decision_need_sha256")?,
+            purpose_sha256: binding_string("purpose_sha256")?,
+            qualification_policy_sha256: binding_string("qualification_policy_sha256")?,
+            lifecycle_snapshot_sha256: binding_string("lifecycle_snapshot_sha256")?,
+            verifier_profile_sha256: binding_string("verifier_profile_sha256")?,
+            now_unix,
+        };
+
+        let use_context = QualificationUseContextV1 {
+            query_invocation_id: binding.query_invocation_id.clone(),
+            domain_id: binding.domain_id.clone(),
+            subject_scope_sha256: binding.subject_scope_sha256.clone(),
+            environment_revision_sha256: binding.environment_revision_sha256.clone(),
+            tool_profile_sha256: binding.tool_profile_sha256.clone(),
+            decision_need_sha256: binding.decision_need_sha256.clone(),
+            purpose_sha256: binding.purpose_sha256.clone(),
+            qualification_policy_sha256: binding.qualification_policy_sha256.clone(),
+            lifecycle_snapshot_sha256: binding.lifecycle_snapshot_sha256.clone(),
+            verifier_profile_sha256: binding.verifier_profile_sha256.clone(),
+            now_unix: binding.now_unix,
+        };
+        validate_use_context(&use_context)?;
+        if !valid_atom(&binding.run_id, 256)
+            || !valid_sha256(&binding.query_sha256)
+            || !valid_sha256(&binding.candidate_set_sha256)
+            || binding.candidate_evidence_ids.is_empty()
+            || binding.candidate_evidence_ids.len() > 10_000
+            || binding.candidate_evidence_ids.iter().any(|id| !valid_atom(id, 256))
+            || binding.candidate_evidence_ids.windows(2).any(|pair| pair[0] >= pair[1])
+        {
+            return Err(IndependentQualificationExchangeRejectV1::CandidateIdsNotCanonical);
+        }
+
+        let candidate_batch = parse_candidate_evidence_jsonl(&candidate_batch_jsonl)
+            .map_err(IndependentQualificationExchangeRejectV1::CandidateBatch)?;
+        if candidate_batch.to_jsonl()
+            .map_err(IndependentQualificationExchangeRejectV1::CandidateBatch)?
+            != candidate_batch_jsonl
+        {
+            return Err(IndependentQualificationExchangeRejectV1::CandidateBatch(
+                CandidateEvidenceReject::InvalidDigest,
+            ));
+        }
+        let actual_ids = candidate_batch.evidence.iter()
+            .map(|item| item.evidence_id.clone())
+            .collect::<Vec<_>>();
+        if candidate_batch.run_id != binding.run_id
+            || candidate_batch.query_sha256 != binding.query_sha256
+            || candidate_batch.candidate_set_sha256 != binding.candidate_set_sha256
+            || actual_ids != binding.candidate_evidence_ids
+        {
+            return Err(IndependentQualificationExchangeRejectV1::CandidateBatchBindingMismatch);
+        }
+
+        let calculated = request_digest(&candidate_batch_jsonl, &binding);
+        if calculated != request_sha256 {
+            return Err(IndependentQualificationExchangeRejectV1::RequestDigestMismatch);
+        }
+
+        Ok(Self {
+            schema_version: QUALIFICATION_REQUEST_SCHEMA_V1.to_owned(),
+            candidate_batch_jsonl,
+            binding,
+            request_sha256,
+        })
+    }
 }
 
 /// A transport implementation should call a separately governed qualification
@@ -135,7 +260,10 @@ pub enum QualificationIssuerErrorV1 {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum IndependentQualificationExchangeRejectV1 {
     InvalidUseContext,
+    InvalidRequestJson,
+    RequestDigestMismatch,
     CandidateBatch(CandidateEvidenceReject),
+    CandidateBatchBindingMismatch,
     CandidateIdentityMismatch,
     CandidateIdsNotCanonical,
     IssuerUnavailable,
