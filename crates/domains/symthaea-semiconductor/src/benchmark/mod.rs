@@ -2,6 +2,7 @@
 
 pub mod binary_metrics;
 pub mod calibration_requalification;
+pub mod delayed_aci;
 pub mod dtco_manifest;
 pub mod gated_streaming_adapter;
 pub mod label_consumption_guard;
@@ -148,4 +149,15 @@ pub use gated_streaming_adapter::{
     StreamingPredictionReceiptV1, StreamingUpdateDispositionV1, StreamingUpdateReasonV1,
     StreamingUpdateReceiptV1, create_gated_streaming_adapter_engine_v1,
     deliver_qualified_stream_label_v1, predict_and_register_stream_sample_v1,
+};
+
+pub use delayed_aci::{
+    ACI_DELAY_MEMORY_DIAGNOSTIC_SCHEMA_V1, ACI_LABEL_DELIVERY_SCHEMA_V1,
+    ACI_PREDICTION_INPUT_SCHEMA_V1, ACI_PREDICTION_RECEIPT_SCHEMA_V1, ACI_UPDATE_RECEIPT_SCHEMA_V1,
+    AciCalibratorStateV1, AciDelayMemoryDiagnosticV1, AciLabelDeliveryV1, AciPredictionInputV1,
+    AciPredictionReceiptV1, AciUpdateDispositionV1, AciUpdateModeV1, AciUpdateReasonV1,
+    AciUpdateReceiptV1, DELAYED_ACI_ENGINE_SCHEMA_V1, DELAYED_ACI_POLICY_SCHEMA_V1,
+    DelayMemoryRegimeV1, DelayedAciEngineV1, DelayedAciErrorV1, DelayedAciPolicyV1,
+    ResidualDependenceFamilyV1, compute_delay_memory_diagnostic_v1, create_delayed_aci_engine_v1,
+    current_aci_alpha_v1, deliver_aci_label_v1, register_aci_prediction_v1,
 };
