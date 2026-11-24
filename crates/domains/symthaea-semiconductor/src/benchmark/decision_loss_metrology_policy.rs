@@ -14,6 +14,8 @@ use thiserror::Error;
 
 pub const METROLOGY_DECISION_LOSS_POLICY_SCHEMA_V1: &str =
     "luminous.semi-bench.metrology-decision-loss-policy.v1";
+pub const METROLOGY_DECISION_LOSS_INPUT_SCHEMA_V1: &str =
+    "luminous.semi-bench.metrology-decision-loss-input.v1";
 pub const METROLOGY_ASSAY_MODEL_SCHEMA_V1: &str =
     "luminous.semi-bench.metrology-assay-model.v1";
 pub const METROLOGY_READINESS_SCHEMA_V1: &str =
@@ -269,6 +271,7 @@ fn validate_decision_model(
             "decision model requires a revision, states and actions".into(),
         ));
     }
+    require_text(&model.assay.model_id, "assay.model_id")?;
     if model.assay.schema != METROLOGY_ASSAY_MODEL_SCHEMA_V1
         || model.assay.revision == 0
         || model.assay.outcomes.is_empty()
@@ -436,6 +439,7 @@ fn score_candidate(
     require_text(&candidate.instrument_id, "candidate.instrument_id")?;
     require_text(&candidate.measurand_id, "candidate.measurand_id")?;
     require_text(&candidate.unit, "candidate.unit")?;
+    require_text(&candidate.readiness.certificate_id, "readiness.certificate_id")?;
     require_text(&candidate.readiness.instrument_id, "readiness.instrument_id")?;
     require_text(&candidate.readiness.measurand_id, "readiness.measurand_id")?;
     require_text(&candidate.readiness.unit, "readiness.unit")?;
@@ -449,6 +453,7 @@ fn score_candidate(
         ));
     }
     if candidate.readiness.schema != METROLOGY_READINESS_SCHEMA_V1
+        || candidate.readiness.valid_from_unix_seconds >= candidate.readiness.valid_until_unix_seconds
         || !valid_sha256(&candidate.readiness.report_sha256)
         || readiness_digest(&candidate.readiness)? != candidate.readiness.report_sha256
     {
@@ -570,7 +575,7 @@ fn lexicographically_preferred(left: &[String], right: &[String]) -> bool {
 pub fn optimize_metrology_decision_loss_portfolio_v1(
     input: &MetrologyDecisionLossInputV1,
 ) -> Result<MetrologyPortfolioReportV1, MetrologyDecisionLossErrorV1> {
-    if input.schema != METROLOGY_DECISION_LOSS_POLICY_SCHEMA_V1 {
+    if input.schema != METROLOGY_DECISION_LOSS_INPUT_SCHEMA_V1 {
         return Err(MetrologyDecisionLossErrorV1("decision-loss input schema is unsupported".into()));
     }
     require_text(&input.input_id, "input.input_id")?;
@@ -828,7 +833,7 @@ mod tests {
 
     fn input(candidates: Vec<MetrologyCandidateV1>, policy: MetrologyDecisionLossPolicyV1) -> MetrologyDecisionLossInputV1 {
         MetrologyDecisionLossInputV1 {
-            schema: METROLOGY_DECISION_LOSS_POLICY_SCHEMA_V1.into(),
+            schema: METROLOGY_DECISION_LOSS_INPUT_SCHEMA_V1.into(),
             input_id: "decision-loss-fixture-001".into(),
             policy,
             candidates,
@@ -929,6 +934,116 @@ mod tests {
         let report = optimize_metrology_decision_loss_portfolio_v1(&input(vec![candidate], policy(1))).unwrap();
         assert!(report.selected_candidate_ids.is_empty());
         assert_eq!(report.candidate_reports[0].status, MetrologyCandidateStatusV1::ReadinessRejected);
+    }
+
+    #[test]
+    fn negative_net_value_candidate_is_not_selected_without_a_quota() {
+        let input = input(
+            vec![candidate(
+                "expensive",
+                "chamber-1",
+                1,
+                1_000.0,
+                MetrologyReadinessStatusV1::Qualified,
+                10,
+                1_000,
+                0.95,
+            )],
+            policy(1),
+        );
+        let report = optimize_metrology_decision_loss_portfolio_v1(&input).unwrap();
+        assert!(report.selected_candidate_ids.is_empty());
+        assert_eq!(
+            report.candidate_reports[0].status,
+            MetrologyCandidateStatusV1::NonPositiveNetValue
+        );
+    }
+
+    #[test]
+    fn exact_optimizer_rejects_duplicate_candidate_ids() {
+        let candidate = candidate(
+            "same",
+            "chamber-1",
+            1,
+            0.1,
+            MetrologyReadinessStatusV1::Qualified,
+            10,
+            1_000,
+            0.95,
+        );
+        let input = input(vec![candidate.clone(), candidate], policy(2));
+        assert!(optimize_metrology_decision_loss_portfolio_v1(&input).is_err());
+    }
+
+    #[test]
+    fn exact_optimizer_rejects_more_than_the_declared_candidate_limit() {
+        let mut p = policy(30);
+        p.maximum_exact_candidates = 2;
+        let candidates = (0..3)
+            .map(|i| candidate(
+                &format!("c{i}"),
+                "chamber-1",
+                1,
+                0.1,
+                MetrologyReadinessStatusV1::Qualified,
+                10,
+                1_000,
+                0.95,
+            ))
+            .collect();
+        assert!(optimize_metrology_decision_loss_portfolio_v1(&input(candidates, p)).is_err());
+    }
+
+    #[test]
+    fn invalid_assay_probability_matrix_is_rejected() {
+        let mut model = decision_model(0.95);
+        model.assay.outcomes[0]
+            .likelihood_by_state
+            .insert("good".into(), 1.5);
+        assert!(compute_expected_value_of_sample_information_v1(&model).is_err());
+    }
+
+    #[test]
+    fn tampered_readiness_receipt_is_rejected() {
+        let mut candidate = candidate(
+            "tampered",
+            "chamber-1",
+            1,
+            0.1,
+            MetrologyReadinessStatusV1::Qualified,
+            10,
+            1_000,
+            0.95,
+        );
+        candidate.readiness.expected_standard_uncertainty_upper_bound = 0.50;
+        assert!(optimize_metrology_decision_loss_portfolio_v1(&input(vec![candidate], policy(1))).is_err());
+    }
+
+    #[test]
+    fn candidate_input_order_does_not_change_portfolio_receipt() {
+        let a = candidate(
+            "a",
+            "chamber-1",
+            1,
+            0.1,
+            MetrologyReadinessStatusV1::Qualified,
+            10,
+            1_000,
+            0.90,
+        );
+        let b = candidate(
+            "b",
+            "chamber-2",
+            1,
+            0.1,
+            MetrologyReadinessStatusV1::Qualified,
+            10,
+            1_000,
+            0.90,
+        );
+        let first = optimize_metrology_decision_loss_portfolio_v1(&input(vec![a.clone(), b.clone()], policy(1))).unwrap();
+        let second = optimize_metrology_decision_loss_portfolio_v1(&input(vec![b, a], policy(1))).unwrap();
+        assert_eq!(first.report_sha256, second.report_sha256);
     }
 
     #[test]
