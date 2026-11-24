@@ -1,8 +1,8 @@
 //! Finite metamorphic-pair validator for mathematical invariance/sensitivity.
 //!
- //! The finite oracle classifies equivalence relations only for the declared
- //! Boolean AST. It is not a Lean proof, theorem prover, or authority for
- //! arbitrary mathematical propositions.
+//! The finite oracle classifies equivalence relations only for the declared
+//! Boolean AST. It is not a Lean proof, theorem prover, or authority for
+//! arbitrary mathematical propositions.
 
 use crate::local_global::{
     BooleanFormula, BooleanSequent, FiniteTruthTableResult, MAX_FINITE_BOOLEAN_ATOMS,
