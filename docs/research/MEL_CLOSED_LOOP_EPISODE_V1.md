@@ -1,6 +1,6 @@
 # MEL-CLOSED-LOOP-001 — Forecast-to-observed-effect episode v1
 
-**Status:** composition-envelope draft. The JSON Schema and three synthetic examples are authored and locally schema-validated. No Rust reducer, live adapter, hardware test, detector study or musician study is claimed by this first increment.
+**Status:** v1 schema and four synthetic examples are committed; the structural Rust reducer and exact-head qualification workflow are implemented in [PR #13496](https://github.com/Luminous-Dynamics/symthaea/pull/13496). This is still an offline composition/replay layer: no live adapter, physical hardware test, detector accuracy study or musician study is claimed.
 
 **Parent / integration:** [#13480](https://github.com/Luminous-Dynamics/symthaea/issues/13480). This work is stacked on [PR #13348](https://github.com/Luminous-Dynamics/symthaea/pull/13348) and composes [#13349](https://github.com/Luminous-Dynamics/symthaea/issues/13349), [#10382](https://github.com/Luminous-Dynamics/symthaea/issues/10382), [#13313](https://github.com/Luminous-Dynamics/symthaea/issues/13313), [#10190](https://github.com/Luminous-Dynamics/symthaea/issues/10190), [#10265](https://github.com/Luminous-Dynamics/symthaea/issues/10265), [#13254](https://github.com/Luminous-Dynamics/symthaea/issues/13254) and [#10206](https://github.com/Luminous-Dynamics/symthaea/issues/10206).
 
@@ -16,6 +16,7 @@ This v1 document is a **join envelope**, not a second implementation of any upst
 - `fixtures/mel-closed-loop-episode-present.synthetic.json` — complete capture with a detector-reported event.
 - `fixtures/mel-closed-loop-episode-absent.synthetic.json` — complete empty window after WAIT/ignore; no producer realization record is required (`effect: null`).
 - `fixtures/mel-closed-loop-episode-unobserved.synthetic.json` — sequence gap, dropped frames and XRUN; observation is explicitly unobserved.
+- `fixtures/mel-closed-loop-episode-midi-absent.synthetic.json` — complete-empty independent MIDI monitor with fully reconciled heartbeat/sequence accounting and no audio sample-frame requirement.
 
 All hashes, clocks, identities, event records and receipt references in these fixtures are synthetic sentinels. They are not real artifacts, signatures or qualifications.
 
@@ -33,7 +34,9 @@ Required joins:
 7. Producer, capture-recorder and event-observer principal/role separation.
 8. Clock-domain identity and time-window coverage, retaining mapping uncertainty and expiry from owner receipts.
 
-The top-level reported closure and detector result are **untrusted summaries**. The reducer must replay upstream closure and observer receipts and derive its own outcome.
+The top-level reported closure and detector result are **untrusted summaries**. The structural reducer checks the modality-specific arithmetic and joins, but reports upstream receipt authentication and verifier replay as false. The owning closure and detector verifiers must still be replayed independently before the observation can be admitted as verified evidence.
+
+Capture modality is explicit: `rendered_audio_loopback` requires nonzero, fully reconciled sample frames with no drops/XRUNs and zero MIDI-heartbeat accounting; `midi_output_monitor` requires nonzero, fully reconciled heartbeat and sequence accounting, and zero audio-frame accounting. Neither path can substitute its counters for the other. The synthetic MIDI case proves only the reducer's structural branch, not a live MIDI device monitor.
 
 ## Outcome semantics
 
