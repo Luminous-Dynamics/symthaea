@@ -378,7 +378,11 @@ mod tests {
 
     #[test]
     fn all_permutations_of_five_hypotheses_share_one_normalized_digest() {
-        fn permutations(items: &mut [BooleanFormula], start: usize, output: &mut Vec<Vec<BooleanFormula>>) {
+        fn permutations(
+            items: &mut [BooleanFormula],
+            start: usize,
+            output: &mut Vec<Vec<BooleanFormula>>,
+        ) {
             if start == items.len() {
                 output.push(items.to_vec());
                 return;
@@ -432,7 +436,7 @@ mod tests {
         sequent.hypotheses.push(atom("R"));
         let normalized = normalize_hypothesis_set(&sequent).unwrap();
         assert!(normalized.hypotheses.iter().any(|formula| {
-            matches!(formula, BooleanFormula::Atom { name } if name == "R")
+            matches!(formula, BooleanFormula::Atom { name } if name.as_str() == "R")
         }));
     }
 }
