@@ -18,7 +18,7 @@ The contract is intended to feed the decision-influence protocol in [#13397](htt
 
 - Strict Serde decoding with unknown-field rejection.
 - Versioned JSON dataset schema and a synthetic example fixture.
-- Four typed contrasts: memory vs no memory; clean vs poisoned; poisoned vs repaired; baseline vs candidate.
+- Four typed contrasts: memory vs no memory; clean vs poisoned; poisoned vs repaired; baseline vs candidate. Poisoning and repair contrasts hold the retrieval-policy digest fixed while changing the memory snapshot, isolating the memory-state intervention.
 - Per-pair frozen task/model/prompt/evaluator/environment/seed/budget binding.
 - Mandatory decision and outcome receipt digest references for each arm.
 - Pair and memory-condition validation, unique pair IDs, unique selected evidence IDs, and strict SHA-256 syntax checks.
