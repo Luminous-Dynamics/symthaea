@@ -1,0 +1,10 @@
+[package]
+name = "decision-relevant-predictability"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.96"
+license = "AGPL-3.0-or-later"
+publish = false
+description = "Finite-world evaluator primitives for decision-relevant predictability and value of information"
+
+[workspace]
