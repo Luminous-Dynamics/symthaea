@@ -298,6 +298,18 @@ pub fn validate_map(view_map: &TemporalViewMapV1) -> Result<(), String> {
                 "view map segment {index} exceeds canonical source duration"
             ));
         }
+        if view_map.relation == TransformRelationV1::NuisanceInvariant {
+            let view_duration_scaled = (segment.view_end_frame - segment.view_start_frame) as u128
+                * view_map.source_artifact.sample_rate_hz as u128;
+            let canonical_duration_scaled =
+                (segment.canonical_end_frame - segment.canonical_start_frame) as u128
+                    * view_map.view_artifact.sample_rate_hz as u128;
+            if view_duration_scaled != canonical_duration_scaled {
+                return Err(format!(
+                    "nuisance-invariant segment {index} changes elapsed time; use TimeWarpEquivariant for tempo/time scaling"
+                ));
+            }
+        }
         if let Some(previous_end) = previous_canonical_end
             && segment.canonical_start_frame != previous_end
         {
@@ -812,6 +824,52 @@ mod tests {
             }],
         );
         assert!(map_prediction_to_canonical(&outside, &identity).is_err());
+    }
+
+    #[test]
+    fn nuisance_invariant_map_accepts_crop_and_resampling_without_time_change() {
+        let mut cropped = map(
+            1_000,
+            200,
+            vec![TemporalTransformSegmentV1 {
+                view_start_frame: 0,
+                view_end_frame: 200,
+                canonical_start_frame: 400,
+                canonical_end_frame: 600,
+            }],
+        );
+        cropped.relation = TransformRelationV1::NuisanceInvariant;
+        assert!(validate_map(&cropped).is_ok());
+
+        let mut resampled = map(
+            44_100,
+            48_000,
+            vec![TemporalTransformSegmentV1 {
+                view_start_frame: 0,
+                view_end_frame: 48_000,
+                canonical_start_frame: 0,
+                canonical_end_frame: 44_100,
+            }],
+        );
+        resampled.relation = TransformRelationV1::NuisanceInvariant;
+        resampled.source_artifact.sample_rate_hz = 44_100;
+        assert!(validate_map(&resampled).is_ok());
+    }
+
+    #[test]
+    fn nuisance_invariant_map_rejects_tempo_stretch() {
+        let mut stretched = map(
+            1_000,
+            2_000,
+            vec![TemporalTransformSegmentV1 {
+                view_start_frame: 0,
+                view_end_frame: 2_000,
+                canonical_start_frame: 0,
+                canonical_end_frame: 1_000,
+            }],
+        );
+        stretched.relation = TransformRelationV1::NuisanceInvariant;
+        assert!(validate_map(&stretched).is_err());
     }
 
     #[test]
