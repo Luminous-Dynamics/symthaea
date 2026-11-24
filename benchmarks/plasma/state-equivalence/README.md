@@ -13,3 +13,9 @@ The fixture is a minimal counterexample to treating approximate pairwise similar
 The signature's structure class, intervention ID, QoI ID, time grid, branch IDs and complex responses are all explicit. The contract must match exactly before comparison. The fixture is analytic only; it contains no Vlasov reference output or physical state pair.
 
 See [#13503](https://github.com/Luminous-Dynamics/symthaea/issues/13503).
+
+## Per-QoI normalization
+
+The response-signature schema includes a positive, finite scale for each registered QoI. The comparison divides each complex residual by the scale of its QoI before taking the RMS across the fixed intervention/QoI/time grid. Signatures with different scale vectors cannot be compared. This prevents unit mismatches (for example field amplitude versus energy) and prevents a caller from changing the comparison normalization after signatures are created.
+
+The Rust tests include a two-QoI known-answer case with scales [1, 10] and a negative control rejecting a pair whose scale vectors differ.
