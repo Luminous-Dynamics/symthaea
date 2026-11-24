@@ -1,0 +1,38 @@
+name: Individual Effect Retention Evaluator
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, edited]
+    branches: ["research/temporal-representation-preservation-20261122"]
+    paths:
+      - "research/temporal-evaluator/**"
+      - "docs/research/INDIVIDUAL_COUNTERFACTUAL_EFFECT_RETENTION_V0_1.md"
+      - ".github/workflows/individual-effect-retention.yml"
+  push:
+    branches: ["research/individual-effect-retention-evaluator-20261124"]
+    paths:
+      - "research/temporal-evaluator/**"
+      - "docs/research/INDIVIDUAL_COUNTERFACTUAL_EFFECT_RETENTION_V0_1.md"
+      - ".github/workflows/individual-effect-retention.yml"
+
+concurrency:
+  group: individual-effect-retention-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  evaluator:
+    name: Rust 1.96 evaluator tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up pinned Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          components: clippy, rustfmt
+      - name: Check formatting
+        run: cargo fmt --manifest-path research/temporal-evaluator/Cargo.toml -- --check
+      - name: Test evaluator
+        run: cargo test --locked --manifest-path research/temporal-evaluator/Cargo.toml
+      - name: Strict Clippy
+        run: cargo clippy --locked --manifest-path research/temporal-evaluator/Cargo.toml --all-targets -- -D warnings
