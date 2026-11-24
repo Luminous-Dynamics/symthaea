@@ -56,8 +56,11 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      - name: Check exact-source harness formatting
-        run: cargo +1.96.0 fmt --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --check
+      - name: Bootstrap canonical Rust 1.96 formatting
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 fmt --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml
+          cargo +1.96.0 fmt --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --check
 
       - name: Verify committed lock and workspace resolution
         shell: bash
