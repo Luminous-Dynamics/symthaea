@@ -110,7 +110,10 @@ fn main() -> ExitCode {
     if argument == "--api-fixtures" {
         return match validate_api_fixtures() {
             Ok(report) => {
-                println!("{}", serde_json::to_string_pretty(&report).expect("serializable report"));
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&report).expect("serializable report")
+                );
                 ExitCode::SUCCESS
             }
             Err(error) => {
