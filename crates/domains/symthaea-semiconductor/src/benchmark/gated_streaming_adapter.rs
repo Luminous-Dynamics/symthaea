@@ -109,7 +109,9 @@ pub struct GatedStreamingAdapterEngineV1 {
     pub schema: String,
     pub engine_id: String,
     pub clock_domain_id: String,
+    pub global_model_artifact_sha256: String,
     pub feature_schema_sha256: String,
+    pub policy_sha256: String,
     pub policy: StreamingAdapterPolicyV1,
     pub adapter_state: StreamingAdapterStateV1,
     pub next_prediction_sequence: u64,
@@ -127,6 +129,7 @@ pub struct StreamingPredictionInputV1 {
     pub feature_available_at_unix_seconds: i64,
     pub prediction_at_unix_seconds: i64,
     pub clock_domain_id: String,
+    pub global_model_artifact_sha256: String,
     pub feature_schema_sha256: String,
     pub feature_vector: Vec<f64>,
     /// Indices are in the input feature vector's declared schema order.
@@ -146,7 +149,9 @@ pub struct StreamingPredictionReceiptV1 {
     pub feature_available_at_unix_seconds: i64,
     pub prediction_at_unix_seconds: i64,
     pub clock_domain_id: String,
+    pub global_model_artifact_sha256: String,
     pub feature_schema_sha256: String,
+    pub policy_sha256: String,
     pub context_key: Option<String>,
     pub feature_vector_sha256: String,
     pub selected_feature_indices: Vec<usize>,
@@ -191,6 +196,7 @@ pub struct StreamingUpdateReceiptV1 {
     pub reasons: Vec<StreamingUpdateReasonV1>,
     pub prediction_receipt_sha256: Option<String>,
     pub eligibility_report_sha256: Option<String>,
+    pub policy_sha256: String,
     pub label_payload_sha256: String,
     pub adapter_state_before_sha256: String,
     pub adapter_state_after_sha256: String,
@@ -305,12 +311,20 @@ fn validate_engine(engine: &GatedStreamingAdapterEngineV1) -> Result<(), GatedSt
     }
     require_text(&engine.engine_id, "engine.engine_id")?;
     require_text(&engine.clock_domain_id, "engine.clock_domain_id")?;
-    if !valid_sha256(&engine.feature_schema_sha256) {
+    if !valid_sha256(&engine.global_model_artifact_sha256)
+        || !valid_sha256(&engine.feature_schema_sha256)
+        || !valid_sha256(&engine.policy_sha256)
+    {
         return Err(GatedStreamingAdapterErrorV1(
-            "engine feature-schema digest is malformed".into(),
+            "engine model, feature-schema or policy digest is malformed".into(),
         ));
     }
     validate_policy(&engine.policy)?;
+    if json_sha256(&engine.policy)? != engine.policy_sha256 {
+        return Err(GatedStreamingAdapterErrorV1(
+            "streaming adapter policy content differs from its sealed digest".into(),
+        ));
+    }
     if engine.adapter_state.feature_weights.is_empty()
         || engine
             .adapter_state
@@ -335,18 +349,22 @@ fn validate_engine(engine: &GatedStreamingAdapterEngineV1) -> Result<(), GatedSt
 pub fn create_gated_streaming_adapter_engine_v1(
     engine_id: &str,
     clock_domain_id: &str,
+    global_model_artifact_sha256: &str,
     feature_schema_sha256: &str,
     initial_feature_weights: Vec<f64>,
     policy: StreamingAdapterPolicyV1,
 ) -> Result<GatedStreamingAdapterEngineV1, GatedStreamingAdapterErrorV1> {
     require_text(engine_id, "engine_id")?;
     require_text(clock_domain_id, "clock_domain_id")?;
-    if !valid_sha256(feature_schema_sha256) {
+    if !valid_sha256(global_model_artifact_sha256)
+        || !valid_sha256(feature_schema_sha256)
+    {
         return Err(GatedStreamingAdapterErrorV1(
-            "feature_schema_sha256: malformed lowercase SHA-256".into(),
+            "global model or feature-schema digest is malformed".into(),
         ));
     }
     validate_policy(&policy)?;
+    let policy_sha256 = json_sha256(&policy)?;
     if initial_feature_weights.is_empty()
         || initial_feature_weights.iter().any(|weight| !weight.is_finite())
     {
@@ -358,7 +376,9 @@ pub fn create_gated_streaming_adapter_engine_v1(
         schema: GATED_STREAMING_ADAPTER_SCHEMA_V1.into(),
         engine_id: engine_id.into(),
         clock_domain_id: clock_domain_id.into(),
+        global_model_artifact_sha256: global_model_artifact_sha256.into(),
         feature_schema_sha256: feature_schema_sha256.into(),
+        policy_sha256,
         policy,
         adapter_state: StreamingAdapterStateV1 {
             feature_weights: initial_feature_weights,
@@ -416,6 +436,11 @@ pub fn predict_and_register_stream_sample_v1(
     if input.clock_domain_id != engine.clock_domain_id {
         return Err(GatedStreamingAdapterErrorV1(
             "prediction clock domain does not match the engine".into(),
+        ));
+    }
+    if input.global_model_artifact_sha256 != engine.global_model_artifact_sha256 {
+        return Err(GatedStreamingAdapterErrorV1(
+            "prediction global-model artifact does not match the engine".into(),
         ));
     }
     if input.feature_schema_sha256 != engine.feature_schema_sha256 {
@@ -507,7 +532,9 @@ pub fn predict_and_register_stream_sample_v1(
         feature_available_at_unix_seconds: input.feature_available_at_unix_seconds,
         prediction_at_unix_seconds: input.prediction_at_unix_seconds,
         clock_domain_id: input.clock_domain_id.clone(),
+        global_model_artifact_sha256: input.global_model_artifact_sha256.clone(),
         feature_schema_sha256: input.feature_schema_sha256.clone(),
+        policy_sha256: engine.policy_sha256.clone(),
         context_key: input.context_key.clone(),
         feature_vector_sha256,
         selected_feature_indices: input.selected_feature_indices.clone(),
@@ -555,6 +582,7 @@ fn update_receipt(
         reasons,
         prediction_receipt_sha256: prediction.map(|value| value.receipt_sha256.clone()),
         eligibility_report_sha256: Some(delivery.eligibility_report.report_sha256.clone()),
+        policy_sha256: engine.policy_sha256.clone(),
         label_payload_sha256: delivery.label_payload_sha256.clone(),
         adapter_state_before_sha256: before.into(),
         adapter_state_after_sha256: after.into(),
@@ -858,6 +886,7 @@ mod tests {
         create_gated_streaming_adapter_engine_v1(
             "stream-engine-001",
             "fab-clock",
+            &digest('g'),
             &digest('a'),
             vec![0.0, 0.0],
             policy(),
@@ -881,6 +910,7 @@ mod tests {
             feature_available_at_unix_seconds: event_time + 1,
             prediction_at_unix_seconds: prediction_time,
             clock_domain_id: "fab-clock".into(),
+            global_model_artifact_sha256: digest('g'),
             feature_schema_sha256: digest('a'),
             selected_feature_indices: vec![0, 1],
             feature_vector: features,
