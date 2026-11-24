@@ -261,7 +261,7 @@ fn validate_policy(
     Ok(())
 }
 
-fn validate_decision_model(
+pub(crate) fn validate_decision_model(
     model: &MetrologyDecisionLossModelV1,
 ) -> Result<(), MetrologyDecisionLossErrorV1> {
     require_text(&model.model_id, "decision_loss_model.model_id")?;
