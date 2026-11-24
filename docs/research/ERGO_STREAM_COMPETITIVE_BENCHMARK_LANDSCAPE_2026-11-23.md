@@ -14,6 +14,7 @@ Existing suites measure complementary capabilities. They should be used as adapt
 | Track | External benchmark / system | What it tests | Fit to ErgoStream | Limitation / correct use |
 |---|---|---|---|---|
 | Ansatz-free scientific discovery | [Unsatz](https://arxiv.org/abs/2611.03713) | Learner proposes variables, hidden state, interactions and measurement/model form, buys experiments and predicts held-out interventions/conditions/horizons | **Closest direct comparator** for structural/model-form discovery | Agent starts with a scientific task and a model-program language; it is not a generic pre-task acquisition benchmark. Reproduce its exact task protocol before comparing |
+| Scientific rediscovery | [FIRE-Bench](https://proceedings.mlr.press/v306/wang26d.html) | Agents rediscover established, documented findings from recent high-impact ML papers through independent experiment design, execution and evidence-backed conclusions | Direct comparator for scientific reproducibility and evidence validation after transfer | Rediscovery tasks are benchmark-specified; they do not establish novel discovery or pre-task structural acquisition |
 | Interactive scientific research agents | [SciAgentArena](https://sciagentarena.github.io/) | ~200 stepwise-verified tasks across five scientific domains, four task categories and 18 evaluated agents; reports reliability, stability and cost as well as task outcomes | External reality check for whether acquired structural knowledge improves actual scientific workflows | Tasks are user/task exposed and span data-analysis workflows; it does not isolate pre-task structural acquisition or frozen cross-domain transfer |
 | Graph foundation model transfer | [GFMBenchmark](https://github.com/smufang/GFMBenchmark) | Eight graph foundation models over 33 datasets, seven topic domains and six graph-format domains; separates semantic/topic shifts from representation-format shifts | Direct graph transfer baseline and two-axis OOD test | Pretraining/adaptation benchmark, not task-agnostic relational acquisition or intervention validation |
 | Adaptive benchmark generation | [AutoSciBench](https://arxiv.org/abs/2610.05140) | Automatically revises scientific task/data/verification recipes from solver trajectories and judge feedback to close shortcuts | Strong model for an evaluator that refreshes hidden world families as agents learn benchmark shortcuts | Generated tasks are still recipe/judge-dependent; keep independent scientific review and frozen confirmatory cohorts |
@@ -51,11 +52,19 @@ Source: https://sciagentarena.github.io/ · Paper: https://arxiv.org/abs/2606.12
 
 ### Autonomous Science Bench is now the closest laboratory-loop comparison
 
-Autonomous Science Bench 0.1 evaluates the complete configuration—model, agent, tools and harness—on six pilot tasks across biology, chemistry and materials. Its loop explicitly requires choosing experiments, reading results, adapting to surprises and recognizing when evidence is insufficient. It uses two final gates: discovery quality of chosen designs and learning/ranking quality on designs never measured. The current published leaderboard lists GPT-6 Astra + Codex at 72.2%, Opus 5.5 + Claude Code at 66.7%, and GPT-5.6 Terra + Codex at 44.4%; however, it ran only three trials per task and its maintainers caution that small gaps are not meaningful yet.
+Autonomous Science Bench 0.1 evaluates the complete configuration—model, agent, tools and harness—on six pilot tasks across biology, chemistry and materials. Its loop explicitly requires choosing experiments, reading results, adapting to surprises and recognizing when evidence is insufficient. It uses two final gates: discovery quality of chosen designs and learning/ranking quality on designs never measured. The current published leaderboard lists GPT-6 Astra + Codex at 72.2% (reported total cost $190.23 and agent time 557 minutes), Opus 5.5 + Claude Code at 66.7% ($172.91; 1,142 minutes), and GPT-5.6 Terra + Codex at 44.4% ($51.57; 300 minutes). Ten configurations ran all six tasks with three trials each. The maintainers caution that small gaps are not meaningful at this sample size. These are pilot resolution rates for complete model/agent/tool/harness configurations, not model-only scores.
 
 **Response:** make ASB the primary external laboratory-loop benchmark after the #11060/#11171 adapter exists. Match the full model/agent/tool/harness configuration, report task-level and cost-frontier outcomes, and do not compare only leaderboard percentages. Its planned backends are especially useful: replay oracle (v0), digital twin (v1), live lab (v2). This aligns with Luminous' evidence-execution architecture and offers a staged route from replay to physical qualification.
 
 Source: https://asb.open-ssi.org/about
+
+### FIRE-Bench tests rediscovery of verifiable scientific findings
+
+FIRE-Bench (ICML 2026) addresses a central weakness of generated-paper / LLM-as-judge scoring: it asks agents to rediscover established findings from recent high-impact machine-learning studies. Agents receive only a high-level research question, design and execute experiments, then produce evidence-backed conclusions that are compared against the paper's documented findings.
+
+**Response:** use FIRE-Bench as a downstream scientific rediscovery track. It is valuable for checking whether a transferred structural library helps an agent reproduce a known result with evidence. Keep it distinct from discovery of genuinely novel mechanisms and from pre-task acquisition: the finding/task is specified by the benchmark, even though the agent must independently rediscover it.
+
+Paper: https://proceedings.mlr.press/v306/wang26d.html
 
 ### Active exploration changes grounding more than measured originality
 
@@ -266,6 +275,9 @@ These are prospective engineering targets, not external standards or achieved re
 - AutoSciBench: https://arxiv.org/abs/2610.05140
 - AgentIdeaBench: https://arxiv.org/abs/2609.07611
 - Autonomous Science Bench 0.1: https://asb.open-ssi.org/about## 7. References
+- GFMBenchmark: https://github.com/smufang/GFMBenchmark
+- FIRE-Bench (ICML 2026): https://proceedings.mlr.press/v306/wang26d.html
+- Autonomous Science Bench leaderboard and protocol: https://asb.open-ssi.org/leaderboard · https://asb.open-ssi.org/about
 - CARV compositional visual analogy: https://arxiv.org/abs/2603.27958
 - ERD / latent displacement analogical reasoning: https://proceedings.mlr.press/v326/dats26a.html
 - Continual Learning of Domain-Invariant Representations (ICML 2026): https://proceedings.mlr.press/v306/janetzky26a.html
