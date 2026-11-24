@@ -1,0 +1,124 @@
+{
+  "schema": "mel-closed-loop-episode-v1",
+  "episode_id": "synthetic-absent-001",
+  "session": {
+    "session_id": "session-002",
+    "turn_id": "turn-002",
+    "input_sequence": 70,
+    "target_window": {
+      "clock_domain": "fixture-clock-v1",
+      "start_ns": 3000000000,
+      "end_ns": 4000000000
+    }
+  },
+  "execution_identity": {
+    "kind": "synthetic_rule_fixture",
+    "policy_id": "rule-forecast-fixture",
+    "policy_version": "1",
+    "backend_id": "synthetic-offline",
+    "identity_sha256": "2121212121212121212121212121212121212121212121212121212121212121",
+    "model_artifact_sha256": null,
+    "configuration_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "tokenizer_sha256": null,
+    "adapter_sha256": "2323232323232323232323232323232323232323232323232323232323232323",
+    "runtime_sha256": "2424242424242424242424242424242424242424242424242424242424242424"
+  },
+  "forecast": {
+    "forecast_id": "forecast-002",
+    "revision": 0,
+    "committed_sequence": 71,
+    "input_through_sequence": 70,
+    "target_window": {
+      "clock_domain": "fixture-clock-v1",
+      "start_ns": 3000000000,
+      "end_ns": 4000000000
+    },
+    "expires_at_sequence": 90,
+    "uncertainty": "unavailable",
+    "receipt": {
+      "receipt_sha256": "2525252525252525252525252525252525252525252525252525252525252525",
+      "verifier_profile_id": "forecast-v1",
+      "verification_receipt_sha256": "2626262626262626262626262626262626262626262626262626262626262626"
+    }
+  },
+  "disposition": {
+    "action": "ignore",
+    "forecast_id": "forecast-002",
+    "forecast_revision": 0,
+    "sequence": 72,
+    "actor_identity": "human-principal-fixture",
+    "scope_sha256": "2727272727272727272727272727272727272727272727272727272727272727",
+    "superseding_forecast_id": null,
+    "receipt": {
+      "receipt_sha256": "2828282828282828282828282828282828282828282828282828282828282828",
+      "verifier_profile_id": "disposition-v1",
+      "verification_receipt_sha256": "2929292929292929292929292929292929292929292929292929292929292929"
+    }
+  },
+  "decision": {
+    "action": "WAIT",
+    "sequence": 73,
+    "observed_through_input_sequence": 70,
+    "forecast_id": "forecast-002",
+    "forecast_revision": 0,
+    "receipt": {
+      "receipt_sha256": "3030303030303030303030303030303030303030303030303030303030303030",
+      "verifier_profile_id": "turn-decision-v1",
+      "verification_receipt_sha256": "3131313131313131313131313131313131313131313131313131313131313131"
+    }
+  },
+  "effect": null,
+  "capture": {
+    "capture_id": "capture-002",
+    "payload_sha256": "3434343434343434343434343434343434343434343434343434343434343434",
+    "recorder_identity": "recorder-fixture",
+    "target_window": {
+      "clock_domain": "fixture-clock-v1",
+      "start_ns": 3000000000,
+      "end_ns": 4000000000
+    },
+    "reported_closure": "eligible",
+    "sequence_accounting": {
+      "expected": 100,
+      "observed": 100,
+      "missing": 0,
+      "duplicate": 0
+    },
+    "frame_accounting": {
+      "expected": 48000,
+      "observed": 48000,
+      "dropped": 0,
+      "xrun_count": 0
+    },
+    "terminal_watermark": 200,
+    "receipt": {
+      "receipt_sha256": "3535353535353535353535353535353535353535353535353535353535353535",
+      "verifier_profile_id": "capture-closure-v2",
+      "verification_receipt_sha256": "3636363636363636363636363636363636363636363636363636363636363636"
+    }
+  },
+  "observation": {
+    "detector_result": "absent",
+    "capture_id": "capture-002",
+    "capture_payload_sha256": "3434343434343434343434343434343434343434343434343434343434343434",
+    "observer_identity": "event-observer-fixture",
+    "detector_build_sha256": "3737373737373737373737373737373737373737373737373737373737373737",
+    "detector_config_sha256": "3838383838383838383838383838383838383838383838383838383838383838",
+    "qualification_status": "qualified",
+    "qualification_receipt": {
+      "receipt_sha256": "3939393939393939393939393939393939393939393939393939393939393939",
+      "verifier_profile_id": "detector-qualification-v1",
+      "verification_receipt_sha256": "4040404040404040404040404040404040404040404040404040404040404040"
+    },
+    "event_manifest_sha256": "4141414141414141414141414141414141414141414141414141414141414141",
+    "receipt": {
+      "receipt_sha256": "4242424242424242424242424242424242424242424242424242424242424242",
+      "verifier_profile_id": "event-manifest-v1",
+      "verification_receipt_sha256": "4343434343434343434343434343434343434343434343434343434343434343"
+    }
+  },
+  "provenance": {
+    "episode_verifier_profile": "mel-closed-loop-episode-verifier-v1",
+    "manifest_version": 1
+  }
+}
