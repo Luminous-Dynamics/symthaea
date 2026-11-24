@@ -164,24 +164,41 @@ mod tests {
     fn completed_job_advances_only_with_one_row_per_design() {
         let completed = job(JobStatus::Completed, Some(two_results()));
         assert!(completed.advances_stage().expect("complete batch"));
-        assert_eq!(completed.completed_measurements().expect("complete batch").unwrap().len(), 2);
+        assert_eq!(
+            completed
+                .completed_measurements()
+                .expect("complete batch")
+                .unwrap()
+                .len(),
+            2
+        );
     }
 
     #[test]
     fn rejects_completed_job_without_results() {
         let completed = job(JobStatus::Completed, None);
         assert_eq!(
-            completed.validate().expect_err("completed job needs results"),
+            completed
+                .validate()
+                .expect_err("completed job needs results"),
             JobContractError::CompletedJobMissingResults
         );
     }
 
     #[test]
     fn rejects_completed_batch_with_wrong_result_count() {
-        let completed = job(JobStatus::Completed, Some(vec![serde_json::json!({"measurement": 1})]));
+        let completed = job(
+            JobStatus::Completed,
+            Some(vec![serde_json::json!({"measurement": 1})]),
+        );
         assert_eq!(
-            completed.validate().expect_err("result count must match batch"),
-            JobContractError::CompletedResultCountMismatch { designs: 2, results: 1 }
+            completed
+                .validate()
+                .expect_err("result count must match batch"),
+            JobContractError::CompletedResultCountMismatch {
+                designs: 2,
+                results: 1
+            }
         );
     }
 
@@ -189,7 +206,9 @@ mod tests {
     fn rejects_pending_job_with_results() {
         let pending = job(JobStatus::Running, Some(two_results()));
         assert_eq!(
-            pending.validate().expect_err("pending jobs cannot expose completed results"),
+            pending
+                .validate()
+                .expect_err("pending jobs cannot expose completed results"),
             JobContractError::PendingJobHasResults
         );
     }
@@ -198,7 +217,9 @@ mod tests {
     fn rejects_failed_job_with_results() {
         let failed = job(JobStatus::Failed, Some(two_results()));
         assert_eq!(
-            failed.validate().expect_err("failed job cannot be a completed batch"),
+            failed
+                .validate()
+                .expect_err("failed job cannot be a completed batch"),
             JobContractError::FailedJobHasResults
         );
     }
@@ -208,7 +229,9 @@ mod tests {
         let mut repeated = job(JobStatus::Queued, None);
         repeated.designs[1] = repeated.designs[0].clone();
         assert_eq!(
-            repeated.validate().expect_err("campaign cannot remeasure design"),
+            repeated
+                .validate()
+                .expect_err("campaign cannot remeasure design"),
             JobContractError::DuplicateDesignId("design-a".to_owned())
         );
     }
