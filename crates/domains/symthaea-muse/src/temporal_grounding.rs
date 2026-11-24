@@ -760,6 +760,11 @@ pub struct TemporalGroundingAggregateV1 {
     pub one_to_many_queries: usize,
     pub one_to_many_exact_count: usize,
     pub one_to_many_count_accuracy: Option<f64>,
+    /// Macro temporal F1 over queries with more than one ground-truth occurrence.
+    pub one_to_many_macro_temporal_f1: Option<f64>,
+    /// Per-query temporal F1 gated by exact occurrence cardinality, macro-averaged
+    /// over the same one-to-many cohort. A wrong count contributes zero.
+    pub one_to_many_count_gated_f1: Option<f64>,
     pub negative_absence_claims: usize,
     pub negative_correct_absence_claims: usize,
     pub negative_absence_accuracy: Option<f64>,
@@ -899,6 +904,22 @@ pub fn aggregate_temporal_grounding_scores(
     } else {
         Some(one_to_many_exact_count as f64 / one_to_many.len() as f64)
     };
+    let one_to_many_temporal_f1_values: Vec<_> = one_to_many
+        .iter()
+        .map(|score| score.f1.unwrap_or(0.0))
+        .collect();
+    let one_to_many_macro_temporal_f1 = mean_option(&one_to_many_temporal_f1_values);
+    let one_to_many_count_gated_values: Vec<_> = one_to_many
+        .iter()
+        .map(|score| {
+            if score.exact_occurrence_count == Some(true) {
+                score.f1.unwrap_or(0.0)
+            } else {
+                0.0
+            }
+        })
+        .collect();
+    let one_to_many_count_gated_f1 = mean_option(&one_to_many_count_gated_values);
 
     let negative_absence_claims = negative
         .iter()
@@ -943,6 +964,8 @@ pub fn aggregate_temporal_grounding_scores(
         one_to_many_queries: one_to_many.len(),
         one_to_many_exact_count,
         one_to_many_count_accuracy,
+        one_to_many_macro_temporal_f1,
+        one_to_many_count_gated_f1,
         negative_absence_claims,
         negative_correct_absence_claims,
         negative_absence_accuracy,
@@ -1312,6 +1335,134 @@ mod tests {
         assert_eq!(aggregate.negative_absence_coverage, Some(1.0));
         assert_eq!(aggregate.start_boundary_mae_ms, Some(1.0));
         assert_eq!(aggregate.end_boundary_mae_ms, Some(1.0));
+    }
+
+    #[test]
+    fn one_to_many_count_gated_f1_zeroes_high_f1_when_count_is_wrong() {
+        let truth = truth(
+            GroundTruthStateV1::Present,
+            vec![
+                FrameIntervalV1 {
+                    start_frame: 100,
+                    end_frame: 200,
+                },
+                FrameIntervalV1 {
+                    start_frame: 500,
+                    end_frame: 600,
+                },
+            ],
+        );
+        let prediction = prediction(GroundingPredictionStateV1::Occurrences {
+            intervals: vec![
+                FrameIntervalV1 {
+                    start_frame: 100,
+                    end_frame: 200,
+                },
+                FrameIntervalV1 {
+                    start_frame: 500,
+                    end_frame: 600,
+                },
+                FrameIntervalV1 {
+                    start_frame: 800,
+                    end_frame: 900,
+                },
+            ],
+        });
+        let score = score_temporal_grounding(&truth, &prediction, &plan()).unwrap();
+        assert_eq!(score.exact_occurrence_count, Some(false));
+        assert!((score.f1.unwrap() - 0.8).abs() < 1e-12);
+
+        let aggregate = aggregate_temporal_grounding_scores(&[score]).unwrap();
+        assert_eq!(aggregate.one_to_many_count_accuracy, Some(0.0));
+        assert_eq!(aggregate.one_to_many_macro_temporal_f1, Some(0.8));
+        assert_eq!(aggregate.one_to_many_count_gated_f1, Some(0.0));
+    }
+
+    #[test]
+    fn one_merged_interval_cannot_cover_two_overlapping_occurrences() {
+        let truth = truth(
+            GroundTruthStateV1::Present,
+            vec![
+                FrameIntervalV1 {
+                    start_frame: 100,
+                    end_frame: 300,
+                },
+                FrameIntervalV1 {
+                    start_frame: 200,
+                    end_frame: 400,
+                },
+            ],
+        );
+        let prediction = prediction(GroundingPredictionStateV1::Occurrences {
+            intervals: vec![FrameIntervalV1 {
+                start_frame: 100,
+                end_frame: 400,
+            }],
+        });
+        let score = score_temporal_grounding(&truth, &prediction, &plan()).unwrap();
+        assert_eq!(score.true_positives, 1);
+        assert_eq!(score.false_negatives, 1);
+        assert_eq!(score.exact_occurrence_count, Some(false));
+        assert!((score.f1.unwrap() - (2.0 / 3.0)).abs() < 1e-12);
+
+        let aggregate = aggregate_temporal_grounding_scores(&[score]).unwrap();
+        assert_eq!(aggregate.one_to_many_macro_temporal_f1, Some(2.0 / 3.0));
+        assert_eq!(aggregate.one_to_many_count_gated_f1, Some(0.0));
+    }
+
+    #[test]
+    fn exact_count_perfect_one_to_many_preserves_temporal_f1() {
+        let truth = truth(
+            GroundTruthStateV1::Present,
+            vec![
+                FrameIntervalV1 {
+                    start_frame: 100,
+                    end_frame: 200,
+                },
+                FrameIntervalV1 {
+                    start_frame: 500,
+                    end_frame: 600,
+                },
+            ],
+        );
+        let prediction = prediction(GroundingPredictionStateV1::Occurrences {
+            intervals: vec![
+                FrameIntervalV1 {
+                    start_frame: 100,
+                    end_frame: 200,
+                },
+                FrameIntervalV1 {
+                    start_frame: 500,
+                    end_frame: 600,
+                },
+            ],
+        });
+        let score = score_temporal_grounding(&truth, &prediction, &plan()).unwrap();
+        let aggregate = aggregate_temporal_grounding_scores(&[score]).unwrap();
+        assert_eq!(aggregate.one_to_many_macro_temporal_f1, Some(1.0));
+        assert_eq!(aggregate.one_to_many_count_gated_f1, Some(1.0));
+    }
+
+    #[test]
+    fn single_occurrence_and_negative_queries_do_not_enter_one_to_many_metrics() {
+        let truth = truth(
+            GroundTruthStateV1::Present,
+            vec![FrameIntervalV1 {
+                start_frame: 100,
+                end_frame: 200,
+            }],
+        );
+        let prediction = prediction(GroundingPredictionStateV1::Occurrences {
+            intervals: vec![FrameIntervalV1 {
+                start_frame: 100,
+                end_frame: 200,
+            }],
+        });
+        let score = score_temporal_grounding(&truth, &prediction, &plan()).unwrap();
+        let aggregate = aggregate_temporal_grounding_scores(&[score]).unwrap();
+        assert_eq!(aggregate.one_to_many_queries, 0);
+        assert_eq!(aggregate.one_to_many_macro_temporal_f1, None);
+        assert_eq!(aggregate.one_to_many_count_gated_f1, None);
     }
 
     #[test]
