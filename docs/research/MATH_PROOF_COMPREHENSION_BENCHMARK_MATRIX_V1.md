@@ -469,3 +469,12 @@ The manifest maps six declarations to the Tier-2 obligations and pins the source
 **Status:** source, manifest, schema and workflow integration are committed; exact-head replay is pending. The static manifest intentionally remains `kernel_replay_pending` until a successful run reports the receipt.
 
 **Claim ceiling:** synthetic, non-dependent propositional context permutation only; same target; no dependent binders, typeclasses, local instances, universe changes, altered premises or arbitrary context transport. Axiom output is captured but not parsed. This is not a model score or evidence that general Tier-2 scope equivalence is solved.
+
+## 20. Proof-action composition and injected-axiom controls (2026-11-24)
+
+The `And.comm` proof-action pilot has two more fail-closed controls in the focused workflow:
+
+- **Subgoal accounting:** the action output-goal multiset must equal the downstream input-goal multiset, each output ID must be unique, and the expected number of split obligations must be two. A mutation omitting `G_REVERSE` must fail the manifest-to-plan validator.
+- **Injected-axiom detection:** a separate Lean source deliberately introduces `ProofActionCertificateAxiomControl.injected_premise` and proves a proposition from it. The workflow requires Lean's `#print axioms` output to contain that exact declaration name, and stores the source/log digests in the action-certificate replay receipt. This tests one known dependency-detection path rather than accepting arbitrary kernel-checked terms without scrutiny.
+
+**Status:** these checks are committed to the focused workflow, but they remain pending exact-head execution. Their claim ceiling is narrow: one omitted-subgoal mutation, one wrong-proposition rejection and one explicit injected-axiom observation. General proof-graph accounting and a parsed transitive axiom/admission closure are still future work.
