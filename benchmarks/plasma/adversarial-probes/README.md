@@ -116,3 +116,14 @@ The companion schema and known-answer fixture live under `benchmarks/plasma/topo
 The focused workflow validates the Draft 2020-12 schema/fixture. Rust tests validate seam equality, derivative equality, near-seam continuity and integer-period wrapping for the periodic feature map, plus the fact that open-boundary endpoints remain distinct.
 
 These checks qualify coordinate features only. They do not establish learned field equivariance, force accuracy, or physical solver fidelity; those require a matched particle-field operator and independent reference runs under #13447.
+
+
+## Weighted micro–macro projection primitive
+
+The crate now exposes `project_weighted_micro_fluctuation` for a discrete micro-space defined by caller-supplied constraint rows. Given a positive diagonal metric W and constraint matrix C, it solves the minimum-correction problem
+
+`min 0.5*(g_micro-g)^T W (g_micro-g), subject to C*g_micro=0`.
+
+The implementation forms `C W^-1 C^T`, solves the small KKT system with pivoted elimination, reports pre/post constraint moments and the weighted correction norm, and rejects dependent constraints or invalid inputs. Tests check moment annihilation, idempotence, dependent-row rejection and invalid weights/dimensions.
+
+The caller must derive C from the exact discrete collision operator and its actual macro/micro decomposition. This primitive does not assume that density is the only collision invariant, does not implement a VPFP solver, and does not establish an asymptotic-preserving limit. The associated schema-only high-field scaling contract is in `benchmarks/plasma/micro-macro/` and is owned by [#13483](https://github.com/Luminous-Dynamics/symthaea/issues/13483).
