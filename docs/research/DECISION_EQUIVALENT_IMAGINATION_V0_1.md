@@ -395,3 +395,56 @@ Streaming-WAM's distinctive result in that table is its asynchronous efficiency 
 Source: https://sjtu-deng-lab.github.io/Streaming-WAM/
 
 Therefore, Symthaea should not use 98.35% as a universal world-model SOTA threshold. On near-saturated standard LIBERO, a more discriminating result would be matched-budget latency/energy, robustness under dynamic/contact perturbations, harmful-intervention rate, and performance on the unsolved tail. For LIBERO-Dynamic and RoboDyna, compare only against their own protocol-specific baselines.
+
+
+## Benchmark protocol ledger: native denominators and fair targets
+
+This crosswalk is a planning-time source audit, not a reproduction. It prevents the same-looking percentages from being treated as matched results.
+
+### RoboDyna
+
+The official project describes 30 dynamic manipulation tasks, 3,500 demonstrations and ten evaluation seeds per task/condition. Its main policy table reports success averaged over synchronous and asynchronous execution. The displayed 18% π0.5 overall figure aggregates its Easy, Medium and household slices and **excludes the Hard split**. Human study numbers use a separate slice/control protocol: 12 people played hard conceptual tasks and household tasks, using teleoperation or direct scene-interactive controls. Do not compare the policy's 18% overall denominator directly to the human 50.2% teleoperation or 77.1% interactive results.
+
+Official sources:
+- https://robodyna.github.io/robodyna/
+- https://robodyna.github.io/robodyna/index.html
+
+For Symthaea, report the published overall population and the Hard held-out composition separately. The prospective +5 percentage-point target applies only to the exact same policy/episode/metric denominator. A higher score on Easy or the human-study slice cannot be used to claim that overall target.
+
+### LIBERO-Dynamic
+
+The official project describes 40 tasks and a shared 1,800-episode evaluation population per configuration: 40 tasks × 3 motion families × 5 reviewed trajectories × 3 target speeds. The world advances during calibrated inference latency.
+
+Published references must remain separated:
+- Frozen/static-trained π0.5 (JAX), asynchronous best measured action horizon: 57.8% across 1,800 episodes.
+- π0.5 mixed dynamic+static fine-tuning: 69.3%; a separately trained recipe, with a different training budget, not a frozen-backbone augmentation result.
+- On the same π0.5 PyTorch checkpoint, the reported execution-strategy references include Async Queue 48.4%, measured-latency Sync Hold 43.1%, and RTC fixed=10 37.8%. Zero-latency Sync Hold at 50.4% is an idealized timing diagnostic, not a deployable baseline. VLASH at 55.4% uses a separately trained delay-aware checkpoint and is a system reference, not a same-checkpoint controller ablation.
+
+Official sources:
+- https://renshaojie233.github.io/LIBERO-Dynamic/
+- https://github.com/renshaojie233/LIBERO-Dynamic
+
+The first Symthaea comparison should target the frozen 57.8% reference under the exact 1,800 episodes and calibrated clock. The 69.3% recipe is a later end-to-end system target, not evidence of the isolated Symthaea contribution.
+
+### Standard LIBERO and Streaming-WAM
+
+Standard LIBERO is not LIBERO-Dynamic. The Streaming-WAM project's standard-LIBERO table reports 98.85% for FastWAM-Joint-CD, 98.60% for FastWAM-Joint and 98.35% for Streaming-WAM. Streaming-WAM's notable advantage is runtime: 41 ms chunk preparation versus 493 ms for FastWAM, with 12× reported chunk-time speedup. Use it as an asynchronous execution/latency comparator, not as a LIBERO-Dynamic policy result or the highest raw standard-LIBERO success result.
+
+Official source: https://sjtu-deng-lab.github.io/Streaming-WAM/
+
+### World-In-World
+
+Keep its Active Recognition, Active Embodied QA, Image-Goal Navigation and Robotic Manipulation tasks as a separate closed-loop visual-world-model track. Its report that inference-time compute can improve outcomes motivates adaptive budget allocation, but it does not license pooling its score with RoboDyna, LIBERO-Dynamic, RoboTwin, RoboWM-Bench or H2RBench.
+
+Official source: https://world-in-world.github.io/
+
+### Targeting strategy
+
+- **Near-saturated standard LIBERO:** prioritize p95/p99 latency, resource use, long-tail failures, controllability and matched execution quality, not an arbitrary 1-point success chase.
+- **RoboDyna:** target dynamic and compositional failure families; report Easy/Medium/household and Hard separately; match sync/async conditions and denominators.
+- **LIBERO-Dynamic:** first isolate frozen-policy Symthaea lift from action-timing effects; then test fine-tuned full-system recipes separately.
+- **World-In-World:** test whether adaptive inference compute improves task success on its native four tasks at matched total episode compute and deadline.
+- **RoboWM-Bench:** measure whether predicted futures can be converted into executable actions.
+- **H2RBench:** retain per-task simulated and physical results plus Pearson, Spearman and MMRV as separate rank-agreement diagnostics.
+
+A result only beats a comparator when the exact benchmark, population, checkpoint/training recipe, action semantics, timing, hardware/resource envelope and failure accounting are matched or the difference is explicitly treated as a separate track.
