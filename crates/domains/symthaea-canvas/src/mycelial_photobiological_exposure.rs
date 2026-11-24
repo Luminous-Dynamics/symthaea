@@ -65,6 +65,34 @@ pub enum MycelialPhotoperiodPhase {
     Unknown,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MycelialAmbientLightState {
+    VerifiedDark,
+    AmbientMeasured,
+    Unknown,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MycelialAmbientLightObservation {
+    pub state: MycelialAmbientLightState,
+    /// Measurement coverage in the exposure's monotonic timebase.
+    pub measurement_start_ns: u64,
+    pub measurement_end_ns: u64,
+    /// Conservative specimen-plane ambient irradiance upper bound, in W/cm².
+    pub specimen_plane_irradiance_watts_per_cm2_upper: Option<f64>,
+    pub spectral_distribution_digest: Option<String>,
+    pub calibration_digest: Option<String>,
+    /// Experiment-specific threshold for classifying a measured-dark condition.
+    pub dark_classification_threshold_watts_per_cm2: Option<f64>,
+    pub classification_policy_digest: Option<String>,
+    /// Required only when ambient state is unknown.
+    pub unknown_reason: Option<String>,
+    /// External ambient sensor / measurement receipt.
+    pub evidence_receipt_digest: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct MycelialPhotobiologicalChannelExposure {
@@ -124,6 +152,8 @@ pub struct MycelialPhotobiologicalExposureRecord {
     pub illumination_schedule_digest: String,
     /// Exact schedule intervals, canonicalized by channel then start/end offset.
     pub illumination_intervals: Vec<MycelialIlluminationInterval>,
+    /// Ambient light is measured independently of microscope illumination channels.
+    pub ambient_light: MycelialAmbientLightObservation,
     /// Ambient biological photoperiod, distinct from microscope channel scheduling.
     pub photoperiod_phase: MycelialPhotoperiodPhase,
     pub photoperiod_cycle_id: String,
@@ -473,6 +503,134 @@ pub fn mycelial_photobiological_footprint_digest(
     Ok(hasher.finalize().to_hex().to_string())
 }
 
+fn validate_ambient_light_observation(
+    observation: &MycelialAmbientLightObservation,
+    exposure_start_ns: u64,
+    exposure_end_ns: u64,
+) -> Result<(), MycelialPhotobiologicalExposureError> {
+    validate_digest(&observation.evidence_receipt_digest, "ambient.evidence_receipt_digest")?;
+    if observation.measurement_start_ns > exposure_start_ns
+        || observation.measurement_end_ns < exposure_end_ns
+        || observation.measurement_start_ns >= observation.measurement_end_ns
+    {
+        return Err(MycelialPhotobiologicalExposureError::InvalidExposure(
+            "ambient-light measurement must cover the full exposure window",
+        ));
+    }
+    match observation.state {
+        MycelialAmbientLightState::VerifiedDark | MycelialAmbientLightState::AmbientMeasured => {
+            let Some(irradiance) = observation.specimen_plane_irradiance_watts_per_cm2_upper else {
+                return Err(MycelialPhotobiologicalExposureError::InvalidExposure(
+                    "classified ambient-light state requires measured irradiance",
+                ));
+            };
+            let Some(threshold) = observation.dark_classification_threshold_watts_per_cm2 else {
+                return Err(MycelialPhotobiologicalExposureError::InvalidExposure(
+                    "classified ambient-light state requires an experiment-specific dark threshold",
+                ));
+            };
+            let Some(spectrum_digest) = observation.spectral_distribution_digest.as_deref() else {
+                return Err(MycelialPhotobiologicalExposureError::InvalidExposure(
+                    "classified ambient-light state requires a spectral-distribution digest",
+                ));
+            };
+            let Some(calibration_digest) = observation.calibration_digest.as_deref() else {
+                return Err(MycelialPhotobiologicalExposureError::InvalidExposure(
+                    "classified ambient-light state requires a calibration digest",
+                ));
+            };
+            let Some(policy_digest) = observation.classification_policy_digest.as_deref() else {
+                return Err(MycelialPhotobiologicalExposureError::InvalidExposure(
+                    "classified ambient-light state requires a classification-policy digest",
+                ));
+            };
+            validate_digest(spectrum_digest, "ambient.spectral_distribution_digest")?;
+            validate_digest(calibration_digest, "ambient.calibration_digest")?;
+            validate_digest(policy_digest, "ambient.classification_policy_digest")?;
+            if !irradiance.is_finite()
+                || irradiance < 0.0
+                || !threshold.is_finite()
+                || threshold < 0.0
+                || observation.unknown_reason.is_some()
+            {
+                return Err(MycelialPhotobiologicalExposureError::InvalidExposure(
+                    "ambient irradiance, classification threshold or state fields are invalid",
+                ));
+            }
+            match observation.state {
+                MycelialAmbientLightState::VerifiedDark if irradiance > threshold => {
+                    return Err(MycelialPhotobiologicalExposureError::InvalidExposure(
+                        "measured-dark irradiance exceeds the experiment-specific threshold",
+                    ));
+                }
+                MycelialAmbientLightState::AmbientMeasured if irradiance <= threshold => {
+                    return Err(MycelialPhotobiologicalExposureError::InvalidExposure(
+                        "ambient-measured irradiance does not exceed the dark threshold",
+                    ));
+                }
+                _ => {}
+            }
+        }
+        MycelialAmbientLightState::Unknown => {
+            let Some(reason) = observation.unknown_reason.as_deref() else {
+                return Err(MycelialPhotobiologicalExposureError::InvalidExposure(
+                    "unknown ambient-light state requires an explicit reason",
+                ));
+            };
+            if reason.trim().is_empty()
+                || reason.len() > MAX_MYCELIAL_PHOTOBIOLOGICAL_REASON_BYTES
+                || reason.chars().any(char::is_control)
+                || observation.specimen_plane_irradiance_watts_per_cm2_upper.is_some()
+                || observation.spectral_distribution_digest.is_some()
+                || observation.calibration_digest.is_some()
+                || observation.dark_classification_threshold_watts_per_cm2.is_some()
+                || observation.classification_policy_digest.is_some()
+            {
+                return Err(MycelialPhotobiologicalExposureError::InvalidExposure(
+                    "unknown ambient state must have a reason and must not masquerade as classified measurement",
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn hash_ambient_light_observation(
+    hasher: &mut blake3::Hasher,
+    observation: &MycelialAmbientLightObservation,
+) {
+    hasher.update(&[match observation.state {
+        MycelialAmbientLightState::VerifiedDark => 0,
+        MycelialAmbientLightState::AmbientMeasured => 1,
+        MycelialAmbientLightState::Unknown => 2,
+    }]);
+    hasher.update(&observation.measurement_start_ns.to_le_bytes());
+    hasher.update(&observation.measurement_end_ns.to_le_bytes());
+    match observation.specimen_plane_irradiance_watts_per_cm2_upper {
+        Some(value) => {
+            hasher.update(&[1]);
+            hash_f64(hasher, value);
+        }
+        None => {
+            hasher.update(&[0]);
+        }
+    }
+    hash_option_string(hasher, observation.spectral_distribution_digest.as_deref());
+    hash_option_string(hasher, observation.calibration_digest.as_deref());
+    match observation.dark_classification_threshold_watts_per_cm2 {
+        Some(value) => {
+            hasher.update(&[1]);
+            hash_f64(hasher, value);
+        }
+        None => {
+            hasher.update(&[0]);
+        }
+    }
+    hash_option_string(hasher, observation.classification_policy_digest.as_deref());
+    hash_option_string(hasher, observation.unknown_reason.as_deref());
+    hash_string(hasher, &observation.evidence_receipt_digest);
+}
+
 impl MycelialPhotobiologicalExposureRecord {
     pub fn validate(&self) -> Result<(), MycelialPhotobiologicalExposureError> {
         if self.schema_version != MYCELIAL_PHOTOBIOLOGICAL_EXPOSURE_SCHEMA_VERSION {
@@ -563,6 +721,7 @@ impl MycelialPhotobiologicalExposureRecord {
                 "exposure start must precede exposure end",
             ));
         }
+        validate_ambient_light_observation(&self.ambient_light, self.exposure_start_ns, self.exposure_end_ns)?;
         match (
             self.photoperiod_phase,
             self.elapsed_since_photoperiod_transition_ns,
@@ -791,6 +950,7 @@ impl MycelialPhotobiologicalExposureRecord {
             hasher.update(&interval.start_offset_ns.to_le_bytes());
             hasher.update(&interval.end_offset_ns.to_le_bytes());
         }
+        hash_ambient_light_observation(&mut hasher, &self.ambient_light);
         hasher.update(&[
             stage_tag(self.developmental_stage),
             purpose_tag(self.illumination_purpose),
@@ -1327,6 +1487,18 @@ mod tests {
             temperature_evidence_digest: Some(digest('3')),
             illumination_purpose: MycelialIlluminationPurpose::ImagingIllumination,
             schedule_kind: MycelialIlluminationScheduleKind::Fractionated,
+            ambient_light: MycelialAmbientLightObservation {
+                state: MycelialAmbientLightState::VerifiedDark,
+                measurement_start_ns: 1_000,
+                measurement_end_ns: 2_000,
+                specimen_plane_irradiance_watts_per_cm2_upper: Some(0.000_000_1),
+                spectral_distribution_digest: Some(digest('b')),
+                calibration_digest: Some(digest('c')),
+                dark_classification_threshold_watts_per_cm2: Some(0.000_001),
+                classification_policy_digest: Some(digest('d')),
+                unknown_reason: None,
+                evidence_receipt_digest: digest('e'),
+            },
             illumination_schedule_digest: digest('e'),
             photoperiod_phase: MycelialPhotoperiodPhase::Light,
             photoperiod_cycle_id: "cycle-001".to_string(),
@@ -1621,6 +1793,47 @@ mod tests {
             first.canonical_digest_hex().unwrap(),
             second.canonical_digest_hex().unwrap()
         );
+    }
+
+    #[test]
+    fn measured_dark_must_be_below_the_experiment_specific_threshold() {
+        let mut record = exposure();
+        record.ambient_light.specimen_plane_irradiance_watts_per_cm2_upper = Some(0.01);
+        assert!(matches!(
+            record.validate(),
+            Err(MycelialPhotobiologicalExposureError::InvalidExposure(_))
+        ));
+        record.ambient_light.state = MycelialAmbientLightState::AmbientMeasured;
+        record.validate().unwrap();
+    }
+
+    #[test]
+    fn unknown_ambient_light_is_explicit_and_not_mislabelled_as_dark() {
+        let mut record = exposure();
+        record.ambient_light.state = MycelialAmbientLightState::Unknown;
+        record.ambient_light.specimen_plane_irradiance_watts_per_cm2_upper = None;
+        record.ambient_light.spectral_distribution_digest = None;
+        record.ambient_light.calibration_digest = None;
+        record.ambient_light.dark_classification_threshold_watts_per_cm2 = None;
+        record.ambient_light.classification_policy_digest = None;
+        record.ambient_light.unknown_reason = Some("ambient sensor unavailable".to_string());
+        record.validate().unwrap();
+
+        record.ambient_light.unknown_reason = None;
+        assert!(matches!(
+            record.validate(),
+            Err(MycelialPhotobiologicalExposureError::InvalidExposure(_))
+        ));
+    }
+
+    #[test]
+    fn ambient_measurement_must_cover_the_full_exposure_window() {
+        let mut record = exposure();
+        record.ambient_light.measurement_end_ns = record.exposure_end_ns - 1;
+        assert!(matches!(
+            record.validate(),
+            Err(MycelialPhotobiologicalExposureError::InvalidExposure(_))
+        ));
     }
 
     #[test]
