@@ -13,6 +13,7 @@ on:
       - "docs/research/LOCAL_GLOBAL_PAIR_*"
       - "docs/research/MATH_METAMORPHIC_*"
       - "docs/research/MATH_HARDMODE_*"
+      - "docs/research/PROOF_ACTION_CERTIFICATE_AND_COMM_V1.*"
       - "docs/research/PROOF_PLAN_*.md"
       - "docs/research/MATH_PROOF_COMPREHENSION_*.json"
       - "docs/research/MATHLIB_PROOF_COMPREHENSION_PILOT_V1.*"
@@ -79,6 +80,8 @@ jobs:
             docs/research/LOCAL_GLOBAL_PAIR_SYNTHETIC_V1.json
             docs/research/MATH_METAMORPHIC_PAIR_V1.schema.json
             docs/research/MATH_METAMORPHIC_PAIR_V1.json
+            docs/research/PROOF_ACTION_CERTIFICATE_AND_COMM_V1.schema.json
+            docs/research/PROOF_ACTION_CERTIFICATE_AND_COMM_V1.json
             docs/research/MATH_PROOF_COMPREHENSION_THEOREM_SANDWICH_V1.schema.json
             docs/research/MATH_PROOF_COMPREHENSION_THEOREM_SANDWICH_V1.json
             docs/research/MATH_PROOF_COMPREHENSION_RECEIPT_V1.schema.json
@@ -217,6 +220,25 @@ jobs:
             and ([.pairs[] | select(.evaluator_only.transformation_class == "proof_route_only" and .evaluator_only.oracle_relation == "equivalent" and .candidate.base.sequent_sha256 == .candidate.variant.sequent_sha256)] | length) == 1' \
             docs/research/MATH_METAMORPHIC_PAIR_V1.json >/dev/null
           echo "MATH_METAMORPHIC_FIXTURE_ASSERTIONS_PASS"
+
+          jq -e '.schema_version == "1.0.0"
+            and .artifact_id == "PROOFACTION-AND-COMM-001"
+            and .status == "kernel_replay_pending"
+            and .plan_id == "PROOFPLAN-AND-COMM-001"
+            and .environment.lean_toolchain == "leanprover/lean4:v4.37.0-rc1"
+            and .environment.mathlib_revision == "6ebcce37335bcb6bca64596e5d57bb3035648030"
+            and .proof_source.sha256 == "efe4b42620f333ba90fd09e706d181adeaa0aa62ebc99883311b67d38ff71622"
+            and ([.actions[].plan_node_id] == ["A_SPLIT_IFF", "A_FORWARD", "A_REVERSE"])
+            and .root_declaration.certificate_declaration == "ProofPlanActionCertificatePilot.and_comm_plan_replay"
+            and (.claim_ceiling | length) >= 5' \
+            docs/research/PROOF_ACTION_CERTIFICATE_AND_COMM_V1.json >/dev/null
+          jq -e '."$schema" == "https://json-schema.org/draft/2020-12/schema"
+            and .properties.status.const == "kernel_replay_pending"
+            and .properties.proof_source.properties.sha256.pattern == "^[a-f0-9]{64}$"
+            and .properties.actions.minItems == 3
+            and .properties.actions.maxItems == 3' \
+            docs/research/PROOF_ACTION_CERTIFICATE_AND_COMM_V1.schema.json >/dev/null
+          echo "PROOF_ACTION_CERTIFICATE_MANIFEST_PASS"
 
           jq -e '."$schema" == "https://json-schema.org/draft/2020-12/schema"
             and (getpath(["$defs","evaluator","required"]) | index("global_use_adjudication") != null)
@@ -360,6 +382,90 @@ jobs:
           done
           echo "MATHLIB_STRUCTURAL_CALIBRATION_PASS"
           echo "MATHLIB_ELABORATED_DEPENDENCY_EXTRACTION_PASS"
+
+      - name: Replay source-pinned And.comm local action certificates
+        working-directory: mathlib4
+        shell: bash
+        run: |
+          set -euo pipefail
+          proof_source="$GITHUB_WORKSPACE/scripts/research/lean-proof-extractor/ProofActionCertificateAndComm.lean"
+          manifest="$GITHUB_WORKSPACE/docs/research/PROOF_ACTION_CERTIFICATE_AND_COMM_V1.json"
+          cp "$proof_source" ProofActionCertificateAndComm.lean
+          test "$(git rev-parse HEAD)" = "6ebcce37335bcb6bca64596e5d57bb3035648030"
+          test "$(cat lean-toolchain)" = "leanprover/lean4:v4.37.0-rc1"
+
+          actual_source_sha256="$(sha256sum ProofActionCertificateAndComm.lean | cut -d' ' -f1)"
+          expected_source_sha256="$(jq -r '.proof_source.sha256' "$manifest")"
+          test "$actual_source_sha256" = "$expected_source_sha256"
+          test "$(jq -r '.environment.mathlib_revision' "$manifest")" = "$(git rev-parse HEAD)"
+
+          lake env lean ProofActionCertificateAndComm.lean 2>&1 | tee proof-action-certificate-and-comm.log
+          for declaration in \
+            "ProofPlanActionCertificatePilot.and_comm_split_iff" \
+            "ProofPlanActionCertificatePilot.and_comm_forward" \
+            "ProofPlanActionCertificatePilot.and_comm_reverse" \
+            "ProofPlanActionCertificatePilot.and_comm_plan_replay"; do
+            grep -Fq "$declaration" proof-action-certificate-and-comm.log
+          done
+          grep -Fq "And.comm" proof-action-certificate-and-comm.log
+          grep -Fq "a ∧ b → b ∧ a" proof-action-certificate-and-comm.log
+          grep -Fq "b ∧ a → a ∧ b" proof-action-certificate-and-comm.log
+
+          manifest_sha256="$(sha256sum "$manifest" | cut -d' ' -f1)"
+          axiom_log_sha256="$(sha256sum proof-action-certificate-and-comm.log | cut -d' ' -f1)"
+          lake_manifest_sha256="$(sha256sum lake-manifest.json | cut -d' ' -f1)"
+          lean_version="$(lean --version)"
+          mathlib_revision="$(git rev-parse HEAD)"
+          symthaea_revision="$(git -C "$GITHUB_WORKSPACE" rev-parse HEAD)"
+          action_certificates="$(jq -c '[.actions[] | {plan_node_id, certificate_declaration, expected_statement}]' "$manifest")"
+          root_declaration="$(jq -r '.root_declaration.certificate_declaration' "$manifest")"
+          receipt="proof-action-certificate-replay-receipt.json"
+          jq -n \
+            --arg symthaea_revision "$symthaea_revision" \
+            --arg source_sha256 "$actual_source_sha256" \
+            --arg manifest_sha256 "$manifest_sha256" \
+            --arg lean_version "$lean_version" \
+            --arg mathlib_revision "$mathlib_revision" \
+            --arg lake_manifest_sha256 "$lake_manifest_sha256" \
+            --arg axiom_log_sha256 "$axiom_log_sha256" \
+            --arg root_declaration "$root_declaration" \
+            --argjson action_certificates "$action_certificates" \
+            '{
+              schema_version: "1.0.0",
+              receipt_kind: "lean_kernel_source_replay",
+              status: "accepted",
+              repository: "Luminous-Dynamics/symthaea",
+              symthaea_revision: $symthaea_revision,
+              proof_source_path: "scripts/research/lean-proof-extractor/ProofActionCertificateAndComm.lean",
+              proof_source_sha256: $source_sha256,
+              manifest_path: "docs/research/PROOF_ACTION_CERTIFICATE_AND_COMM_V1.json",
+              manifest_sha256: $manifest_sha256,
+              lean_version: $lean_version,
+              mathlib_revision: $mathlib_revision,
+              lake_manifest_sha256: $lake_manifest_sha256,
+              action_certificates: $action_certificates,
+              root_declaration: $root_declaration,
+              axiom_report: {captured: true, parsed: false, log_sha256: $axiom_log_sha256},
+              claim_ceiling: [
+                "Lean accepted the declared action propositions and composed root theorem in this exact run environment.",
+                "The raw #print axioms output is retained as a log hash but its dependency closure is not yet parsed into structured evidence.",
+                "Pre-goal binder identity, local-instance context digests and emitted post-action goal-state receipts are not yet implemented.",
+                "The action-to-plan mapping remains provisional and has not received independent expert review."
+              ]
+            }' > "$receipt"
+          jq -e '.status == "accepted" and (.action_certificates | length) == 3 and .root_declaration == "ProofPlanActionCertificatePilot.and_comm_plan_replay" and .axiom_report.captured == true and .axiom_report.parsed == false' "$receipt" >/dev/null
+          cat "$receipt" >> "$GITHUB_STEP_SUMMARY"
+          echo "PROOF_ACTION_CERTIFICATE_AND_COMM_LEAN_REPLAY_PASS"
+
+      - name: Preserve Lean action-certificate replay receipt
+        if: success()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: proof-action-certificate-and-comm-lean-replay
+          path: |
+            mathlib4/proof-action-certificate-replay-receipt.json
+            mathlib4/proof-action-certificate-and-comm.log
+          if-no-files-found: error
 
       - name: Preserve extracted graph artifacts
         if: success()
