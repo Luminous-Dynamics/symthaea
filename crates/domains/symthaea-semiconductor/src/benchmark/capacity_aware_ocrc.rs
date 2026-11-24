@@ -140,6 +140,7 @@ pub struct CaoOcrcRoundRecordV1 {
     pub interval_lower: Option<f64>,
     pub interval_upper: Option<f64>,
     pub prediction_receipt_sha256: String,
+    pub round_record_sha256: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -149,6 +150,7 @@ pub struct CaoOcrcTrackedRoundV1 {
     pub proxy_expiry_round: u64,
     pub proxy_uniform_draw: f64,
     pub prediction_receipt_sha256: String,
+    pub round_record_sha256: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -279,6 +281,14 @@ fn eligibility_report_digest(
 ) -> Result<String, CaoOcrcErrorV1> {
     let mut canonical = report.clone();
     canonical.report_sha256.clear();
+    json_sha256(&canonical)
+}
+
+fn round_record_digest(
+    record: &CaoOcrcRoundRecordV1,
+) -> Result<String, CaoOcrcErrorV1> {
+    let mut canonical = record.clone();
+    canonical.round_record_sha256.clear();
     json_sha256(&canonical)
 }
 
@@ -562,6 +572,7 @@ pub fn advance_ca_ocrc_round_v1(
                     proxy_expiry_round: expiry,
                     proxy_uniform_draw: draw,
                     prediction_receipt_sha256: input.upstream_prediction_receipt_sha256.clone(),
+                    round_record_sha256: String::new(),
                 },
             );
             (None, proxy_delay, Some(draw), CaoOcrcAdmissionV1::CapacityAdmitted)
@@ -582,7 +593,13 @@ pub fn advance_ca_ocrc_round_v1(
         interval_lower: input.interval_lower,
         interval_upper: input.interval_upper,
         prediction_receipt_sha256: input.upstream_prediction_receipt_sha256.clone(),
+        round_record_sha256: String::new(),
     };
+    let mut round_record = round_record;
+    round_record.round_record_sha256 = round_record_digest(&round_record)?;
+    if let Some(tracked) = next.tracked_rounds.get_mut(&input.round_index) {
+        tracked.round_record_sha256 = round_record.round_record_sha256.clone();
+    }
     if next.round_ledger.insert(input.round_index, round_record).is_some() {
         return Err(CaoOcrcErrorV1("duplicate CA-OCRC round ledger entry".into()));
     }
@@ -847,6 +864,9 @@ fn validate_feedback(
     {
         return Ok(Some(CaoOcrcFeedbackReasonV1::EligibilityReportDigestMismatch));
     }
+    if round_record_digest(round)? != round.round_record_sha256 {
+        return Ok(Some(CaoOcrcFeedbackReasonV1::PredictionIntervalInvalid));
+    }
     if report.frontier != LabelEvidenceFrontierV1::CurrentAtK1 {
         return Ok(Some(CaoOcrcFeedbackReasonV1::LabelNotCurrentK1));
     }
@@ -905,8 +925,12 @@ fn validate_feedback(
     {
         return Ok(Some(CaoOcrcFeedbackReasonV1::ReportUnavailableAtDelivery));
     }
-    if round.prediction_receipt_sha256 != tracked.unwrap().prediction_receipt_sha256 {
-        return Ok(Some(CaoOcrcFeedbackReasonV1::PredictionReceiptMismatch));
+    if let Some(tracked) = tracked {
+        if round.prediction_receipt_sha256 != tracked.prediction_receipt_sha256
+            || round.round_record_sha256 != tracked.round_record_sha256
+        {
+            return Ok(Some(CaoOcrcFeedbackReasonV1::PredictionReceiptMismatch));
+        }
     }
     Ok(None)
 }
@@ -1090,9 +1114,9 @@ mod tests {
             measurement_event_id: event_id,
             label_payload_sha256: payload,
             corrected_measurement_value: value,
-            label_available_at_unix_seconds: delivery_round as i64 * 10 - 2,
-            eligibility_report_available_at_unix_seconds: delivery_round as i64 * 10 - 1,
-            delivered_at_unix_seconds: delivery_round as i64 * 10,
+            label_available_at_unix_seconds: origin as i64 * 10 + 2,
+            eligibility_report_available_at_unix_seconds: delivery_round as i64 * 10 + 2,
+            delivered_at_unix_seconds: delivery_round as i64 * 10 + 3,
             clock_domain_id: "fab-clock".into(),
             idempotency_key: format!("{label}:{revision}"),
             eligibility_report: report,
