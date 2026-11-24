@@ -1688,10 +1688,17 @@ mod tests {
         let mut pair = fixture();
         {
             let scope = &mut pair.candidate.global_stage.scope_binding;
-            scope.hypotheses = vec!["changed assumption".to_owned()];
+            scope.hypotheses = vec!["r".to_owned()];
             let canonical = canonical_string_set(&scope.hypotheses, "hypotheses").unwrap();
             scope.hypothesis_set_sha256 =
                 domain_separated_sha256("hypotheses", &canonical).unwrap();
+
+            let sequent = scope.finite_boolean_sequent.as_mut().unwrap();
+            sequent.hypotheses = vec![BooleanFormula::Atom {
+                name: "r".to_owned(),
+            }];
+            scope.finite_boolean_sequent_sha256 =
+                Some(domain_separated_sha256("finite_boolean_sequent", sequent).unwrap());
         }
         let evaluator = pair.evaluator_only.as_mut().unwrap();
         evaluator.eligibility = EvaluationEligibility::Excluded;
