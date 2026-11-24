@@ -1,0 +1,118 @@
+{
+  "schema": "sfeb-mon003-dsse-receipt-report-v1",
+  "status": "passed",
+  "deterministic_cases": 22,
+  "cases": [
+    {
+      "name": "DSSE PAE encodes UTF-8 byte lengths and exact payload bytes",
+      "result": "pass"
+    },
+    {
+      "name": "valid Ed25519 DSSE receipt verifies against issuer and scope trust record",
+      "result": "pass"
+    },
+    {
+      "name": "payload-byte tampering fails signature verification",
+      "result": "pass"
+    },
+    {
+      "name": "payload-type substitution is rejected",
+      "result": "pass"
+    },
+    {
+      "name": "signature-byte tampering fails verification",
+      "result": "pass"
+    },
+    {
+      "name": "unknown keyid hint does not resolve to trusted authority",
+      "result": "pass"
+    },
+    {
+      "name": "attacker signature cannot be relabeled with an allowed keyid",
+      "result": "pass"
+    },
+    {
+      "name": "revoked signing key is rejected even when the signature is valid",
+      "result": "pass"
+    },
+    {
+      "name": "key outside not-before/not-after interval is rejected",
+      "result": "pass"
+    },
+    {
+      "name": "expired signing key is rejected even for an intact envelope",
+      "result": "pass"
+    },
+    {
+      "name": "trusted key cannot sign for a tenant outside its trust scope",
+      "result": "pass"
+    },
+    {
+      "name": "trusted key cannot sign for a source outside its trust scope",
+      "result": "pass"
+    },
+    {
+      "name": "payload issuer must equal the registered key issuer",
+      "result": "pass"
+    },
+    {
+      "name": "receipt tenant must equal the independently requested tenant",
+      "result": "pass"
+    },
+    {
+      "name": "receipt source must equal the independently requested source",
+      "result": "pass"
+    },
+    {
+      "name": "expired receipt is rejected after successful signature verification",
+      "result": "pass"
+    },
+    {
+      "name": "future-issued or future-occurred receipt is rejected",
+      "result": "pass"
+    },
+    {
+      "name": "malformed payload base64 is rejected before JSON parsing",
+      "result": "pass"
+    },
+    {
+      "name": "malformed signature base64 is rejected",
+      "result": "pass"
+    },
+    {
+      "name": "multiple signatures fail the single-signer profile closed",
+      "result": "pass"
+    },
+    {
+      "name": "valid signature over non-JSON bytes is rejected before receipt use",
+      "result": "pass"
+    },
+    {
+      "name": "revocation after the supplied verification time does not backdate key invalidity",
+      "result": "pass"
+    }
+  ],
+  "cryptography": {
+    "algorithm": "Ed25519",
+    "envelope": "DSSE v1",
+    "payload_type": "application/vnd.luminous.sfeb.source-receipt.v1+json",
+    "implementation": "Node.js built-in crypto; actual sign/verify"
+  },
+  "limitations": [
+    "Ephemeral test keypairs and an in-memory trust store; no root-of-trust provisioning, HSM, certificate transparency, production key rotation service or durable revocation feed.",
+    "Single-signer profile only. Multi-signer thresholds and cross-issuer consensus are not implemented.",
+    "This verifies payload integrity and configured issuer/tenant/source authorization at a supplied time; it does not prove the source event itself is truthful.",
+    "The test profile signs exact serialized JSON bytes and does not canonicalize JSON. Use RFC 8785/JCS only where semantic JSON equality across serializers is required."
+  ],
+  "source": {
+    "repository_path": "benchmarks/frontend/monitoring/mon003-dsse-receipt-v1.mjs",
+    "git_blob_sha": "4fe15aa5f023c1fd844a33fb7e6cc53f071ba527",
+    "sha256": "969628be8d061d4597e89b82fb9412772db598cd1e9974fa67d9534c5317c20c",
+    "node_version": "v22.16.0",
+    "local_execution": [
+      "node --check mon003-dsse-receipt-v1.mjs",
+      "node mon003-dsse-receipt-v1.mjs"
+    ],
+    "qualification": "Actual ephemeral Ed25519 sign/verify and in-memory trust-scope checks; not production PKI or a live-source qualification."
+  }
+}
