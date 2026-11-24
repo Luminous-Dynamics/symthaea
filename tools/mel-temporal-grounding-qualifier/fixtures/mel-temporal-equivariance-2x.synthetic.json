@@ -1,0 +1,109 @@
+{
+  "schema": "mel-temporal-equivariance-case-v1",
+  "truth": {
+    "schema_version": "mel-temporal-grounding-v1",
+    "query_id": "query-piano-entry",
+    "query_text": "Every piano entrance",
+    "artifact": {
+      "audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "sample_rate_hz": 48000,
+      "channels": 2,
+      "total_frames": 1000
+    },
+    "annotation_policy_version": "synthetic-annotation-v1",
+    "annotation_set_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "annotator_count": 2,
+    "state": "Present",
+    "intervals": [
+      {
+        "start_frame": 100,
+        "end_frame": 200
+      },
+      {
+        "start_frame": 500,
+        "end_frame": 600
+      }
+    ],
+    "status_reason": null
+  },
+  "plan": {
+    "evaluator_version": "mel-temporal-grounding-evaluator-v1",
+    "minimum_interval_iou": 0.5
+  },
+  "view_map": {
+    "schema": "mel-temporal-view-map-v1",
+    "transform_id": "synthetic-2x-stretch",
+    "transform_family": "synthetic-time-stretch",
+    "task_scope": "instrument-entrance-occurrence-and-interval",
+    "relation": "TimeWarpEquivariant",
+    "source_artifact": {
+      "audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "sample_rate_hz": 48000,
+      "channels": 2,
+      "total_frames": 1000
+    },
+    "view_artifact": {
+      "audio_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "sample_rate_hz": 48000,
+      "channels": 2,
+      "total_frames": 2000
+    },
+    "upstream_qualification_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "segments": [
+      {
+        "view_start_frame": 0,
+        "view_end_frame": 2000,
+        "canonical_start_frame": 0,
+        "canonical_end_frame": 1000
+      }
+    ]
+  },
+  "baseline_prediction": {
+    "schema_version": "mel-temporal-grounding-v1",
+    "query_id": "query-piano-entry",
+    "artifact": {
+      "audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "sample_rate_hz": 48000,
+      "channels": 2,
+      "total_frames": 1000
+    },
+    "state": {
+      "Occurrences": {
+        "intervals": [
+          {
+            "start_frame": 100,
+            "end_frame": 200
+          },
+          {
+            "start_frame": 500,
+            "end_frame": 600
+          }
+        ]
+      }
+    }
+  },
+  "transformed_prediction": {
+    "schema_version": "mel-temporal-grounding-v1",
+    "query_id": "query-piano-entry",
+    "artifact": {
+      "audio_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "sample_rate_hz": 48000,
+      "channels": 2,
+      "total_frames": 2000
+    },
+    "state": {
+      "Occurrences": {
+        "intervals": [
+          {
+            "start_frame": 200,
+            "end_frame": 400
+          },
+          {
+            "start_frame": 1000,
+            "end_frame": 1200
+          }
+        ]
+      }
+    }
+  }
+}
