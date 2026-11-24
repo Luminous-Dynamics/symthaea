@@ -361,7 +361,7 @@ jobs:
           grep -Fq "MATH_METAMORPHIC_PAIR_VALID pair_id=MMP-HYPOTHESIS-ORDER-PERMUTATION-001" math-metamorphic-cli.out
           grep -Fq "MATH_METAMORPHIC_PAIR_VALID pair_id=MMP-INCOMPARABLE-CONCLUSIONS-001" math-metamorphic-cli.out
           grep -Fq "MATH_METAMORPHIC_DATASET_VALID pairs=5" math-metamorphic-cli.out
-          cargo run --locked --manifest-path scripts/research/proof-plan-contract/Cargo.toml --bin scope-equivalence -- \\
+          cargo run --locked --manifest-path scripts/research/proof-plan-contract/Cargo.toml --bin scope-equivalence -- \
             docs/research/MATH_SCOPE_EQUIVALENCE_TIER1_V1.json | tee scope-equivalence-cli.out
           grep -Fq "SCOPE_EQUIVALENCE_PAIR_VALID pair_id=SCOPE-T1-EXACT-IDENTITY-001 relation=ExactIdentity" scope-equivalence-cli.out
           grep -Fq "SCOPE_EQUIVALENCE_PAIR_VALID pair_id=SCOPE-T1-HYPOTHESIS-PERMUTATION-001 relation=Tier1HypothesisPermutationEquivalent raw_same=false normalized_same=true" scope-equivalence-cli.out
