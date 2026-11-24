@@ -78,7 +78,8 @@
       "receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
       "verifier_profile_id": "action-effect-v1",
       "verification_receipt_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
-    }
+    },
+    "capture_id": "capture-001"
   },
   "capture": {
     "capture_id": "capture-001",
