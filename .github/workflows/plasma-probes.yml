@@ -115,6 +115,10 @@ jobs:
             "${tmp_root}/benchmarks/plasma/control-interface/"
           cp benchmarks/plasma/control-interface/fixtures/oscillatory-unstable-mode-known-answer-v0.1.json \
             "${tmp_root}/benchmarks/plasma/control-interface/fixtures/"
+          cp benchmarks/plasma/control-interface/coupled-unstable-mode-authority-v0.1.schema.json \
+            "${tmp_root}/benchmarks/plasma/control-interface/"
+          cp benchmarks/plasma/control-interface/fixtures/coupled-unstable-mode-authority-known-answer-v0.1.json \
+            "${tmp_root}/benchmarks/plasma/control-interface/fixtures/"
           cp benchmarks/plasma/adaptive-refinement/refinement-policy-contract-v0.1.schema.json \
             "${tmp_root}/benchmarks/plasma/adaptive-refinement/"
           cp benchmarks/plasma/adaptive-refinement/fixtures/synthetic-refinement-cases-v0.1.json \
@@ -399,6 +403,29 @@ jobs:
           assert known["controllability_min_eigenvalue"] > fixture["controller"]["minimum_controllability_min_eigenvalue"]
           assert fixture["claim_boundary"]["no_closed_loop_stability_claim"] is True
           print("oscillatory_unstable_mode_schema_validation=PASS")
+          PY
+
+      - name: Validate coupled unstable-mode authority schema and known answers
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path("${{ runner.temp }}/plasma-probe-validation/benchmarks/plasma/control-interface")
+          schema = json.loads((root / "coupled-unstable-mode-authority-v0.1.schema.json").read_text())
+          fixture = json.loads((root / "fixtures/coupled-unstable-mode-authority-known-answer-v0.1.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(fixture)
+          cases = {case["case_id"]: case for case in fixture["cases"]}
+          positive = cases["positive-distinct-growth-two-channel-diagnostic-one-actuator"]["expected"]
+          sensor = cases["negative-collinear-diagnostics-after-delay"]["expected"]
+          actuator = cases["negative-rank-one-actuator-on-repeated-unstable-eigenspace"]["expected"]
+          assert positive["observable"] and positive["controllable"] and positive["authority_qualified"]
+          assert not sensor["observable"] and sensor["controllable"] and not sensor["authority_qualified"]
+          assert actuator["observable"] and not actuator["controllable"] and not actuator["authority_qualified"]
+          assert fixture["claim_boundary"]["no_closed_loop_stability_claim"] is True
+          print("coupled_mode_authority_schema_validation=PASS")
           PY
 
       - name: Run strict Clippy
