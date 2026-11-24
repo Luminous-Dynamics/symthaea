@@ -408,12 +408,12 @@ pub fn mycelial_illumination_schedule_digest(
                 "illumination intervals must be strictly canonical by channel/start/end",
             ));
         }
-        if let Some(previous_end) = previous_end_by_channel.get(&interval.channel_id) {
-            if interval.start_offset_ns < *previous_end {
-                return Err(MycelialPhotobiologicalExposureError::InvalidExposure(
-                    "illumination intervals overlap within a channel",
-                ));
-            }
+        if let Some(previous_end) = previous_end_by_channel.get(&interval.channel_id)
+            && interval.start_offset_ns < *previous_end
+        {
+            return Err(MycelialPhotobiologicalExposureError::InvalidExposure(
+                "illumination intervals overlap within a channel",
+            ));
         }
         previous_end_by_channel.insert(interval.channel_id.clone(), interval.end_offset_ns);
         hash_string(&mut hasher, &interval.channel_id);
