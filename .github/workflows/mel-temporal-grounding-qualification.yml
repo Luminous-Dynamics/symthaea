@@ -71,6 +71,21 @@ jobs:
       - name: Warnings-denied Clippy on exact production source
         run: cargo +1.96.0 clippy --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --all-targets -- -D warnings
 
+      - name: Replay synthetic matched evidence-ablation triplet
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-temporal-revision-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-temporal-revision-triplet.synthetic.json > "$RUNNER_TEMP/revision-triplet-report.json"
+          jq -e '
+            .cases == 3
+            and (.matched_evidence_contrasts | length) == 1
+            and .matched_evidence_contrasts[0].local_minus_no_evidence_f1 == 0.5
+            and .matched_evidence_contrasts[0].local_minus_yoked_f1 == 0.5
+            and .matched_evidence_contrasts[0].local_minus_no_evidence_count_gated_f1 == 0.5
+            and .matched_evidence_contrasts[0].local_minus_yoked_count_gated_f1 == 0.5
+            and .matched_evidence_contrasts[0].local_beats_yoked == true
+          ' "$RUNNER_TEMP/revision-triplet-report.json" > /dev/null
+
       - name: Assemble exact-head evidence
         if: always()
         shell: bash
@@ -85,6 +100,9 @@ jobs:
           cp tools/mel-temporal-grounding-qualifier/Cargo.lock "$evidence/harness-Cargo.lock"
           cp tools/mel-temporal-grounding-qualifier/src/lib.rs "$evidence/harness-lib.rs"
           cp tools/mel-temporal-grounding-qualifier/src/temporal_revision.rs "$evidence/"
+          cp tools/mel-temporal-grounding-qualifier/src/bin/mel-temporal-revision-audit.rs "$evidence/"
+          cp tools/mel-temporal-grounding-qualifier/fixtures/mel-temporal-revision-triplet.synthetic.json "$evidence/"
+          cp "$RUNNER_TEMP/revision-triplet-report.json" "$evidence/"
           cp crates/domains/symthaea-muse/src/temporal_grounding.rs "$evidence/"
           cp crates/domains/symthaea-muse/src/evidence_digest.rs "$evidence/"
           cp docs/research/MEL-GROUND-001-TEMPORAL-GROUNDING-SCORER-V1.md "$evidence/"
