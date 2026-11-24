@@ -2833,10 +2833,20 @@ pub fn evaluate_coupled_two_mode_authority(
             }
         }
         observation_sample_count = observation_sample_count.saturating_add(1);
-        sample_step = match sample_step.checked_add(contract.diagnostic_sampling_stride_steps) {
-            Some(next) => next,
-            None => break,
-        };
+        let next_sample_step =
+            match sample_step.checked_add(contract.diagnostic_sampling_stride_steps) {
+                Some(next) => next,
+                None => break,
+            };
+        let next_delivery_step = next_sample_step
+            .checked_add(contract.diagnostic_delivery_delay_steps)
+            .ok_or(ContractError::InvalidCoupledModeAuthority(
+                "diagnostic delivery step overflowed",
+            ))?;
+        if next_delivery_step >= contract.horizon_steps {
+            break;
+        }
+        sample_step = next_sample_step;
         power = multiply_mat2(power, a)?;
     }
 
@@ -2961,10 +2971,21 @@ fn symmetric_2x2_spectrum(
     }
     let discriminant = (a - d).mul_add(a - d, 4.0 * b * b);
     let root = discriminant.sqrt();
+    if !discriminant.is_finite() || !root.is_finite() {
+        return Err(ContractError::InvalidCoupledModeAuthority(
+            "Gramian eigenvalue arithmetic overflowed",
+        ));
+    }
     let minimum = (0.5 * (a + d - root)).max(0.0);
     let maximum = (0.5 * (a + d + root)).max(0.0);
+    if !minimum.is_finite() || !maximum.is_finite() {
+        return Err(ContractError::InvalidCoupledModeAuthority(
+            "Gramian eigenvalues are non-finite",
+        ));
+    }
     let condition = if minimum > 0.0 {
-        Some(maximum / minimum)
+        let ratio = maximum / minimum;
+        ratio.is_finite().then_some(ratio)
     } else {
         None
     };
