@@ -35,3 +35,19 @@ The timescale qualification is an interface-feasibility check, **not a stability
 For the synthetic fixture: actuator command latency 26.5 ms; effective actuator bandwidth 20 Hz; effective diagnostic bandwidth 20 Hz; target mode frequency 5 Hz; diagnostic/actuator bandwidth multiples 4; e-fold time 100 ms; conservative loop latency 71.5 ms = 0.715 e-folds. With required bandwidth multiple 2 and maximum latency fraction 0.8, the synthetic interface timescale check passes. These are only derived synthetic values, not measured hardware timing or a closed-loop result.
 
 The tests include an asynchronous two-diagnostic / one-actuator fixture and negative controls for stale timestamps, missed execution deadlines, hidden state and duplicate channel identity. These are timing-contract checks, not a proof of closed-loop stability or sufficient controllability.
+
+
+## Coupled unstable-subspace authority
+
+The coupled-mode owner is [#13564](https://github.com/Luminous-Dynamics/symthaea/issues/13564). The Rust primitive `evaluate_coupled_two_mode_authority` extends the scalar and two-quadrature oracles to a manufactured real two-state system:
+
+`x[k+1] = A*x[k] + B*u[k]`, `y_j[k] = C_j*x[k] + noise_j[k]`.
+
+It computes the actual finite-horizon observability Gramian from both diagnostic channels, whitened by their independent noise variances, and the controllability Gramian from the single actuator direction on its declared update/delivery schedule. Samples or commands arriving after the horizon do not count. Both eigenvalues of the declared 2-state transition must be unstable; this keeps the reported authority restricted to the declared unstable two-state subspace.
+
+The fixture contains three matched known-answer cases:
+1. **Positive:** distinct unstable growth factors, independent diagnostic channels and one actuator direction. The sampled dynamics make the pair both observable and controllable.
+2. **Sensor-rank negative:** two collinear diagnostic rows and a delivery delay that leaves only one sample; the system remains controllable but is not observable.
+3. **Actuator-rank negative:** repeated unstable eigenvalues, full independent observation, but one actuator direction; the system is observable but not controllable.
+
+The checks report the smallest/largest Gramian eigenvalues and condition numbers, plus the Boolean authority disposition. They are exact finite-horizon linear-system checks only. They do not establish Vlasov–Poisson observability, nonlinear stabilizability, actuator feasibility or closed-loop stability. The matrix must eventually be supplied by a separately qualified linearization / dispersion analysis for the exact kinetic cohort.
