@@ -115,6 +115,12 @@ struct Effect {
 #[serde(deny_unknown_fields)]
 struct VetoRaceEvidence {
     authorization_id: String,
+    session_id: String,
+    turn_id: String,
+    decision_receipt_sha256: String,
+    disposition_receipt_sha256: String,
+    effect_receipt_sha256: String,
+    output_artifact_sha256: String,
     admission_stage: String,
     admission_event_sequence: u64,
     veto_event_sequence: u64,
@@ -229,7 +235,7 @@ pub enum ObservationOutcome {
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub enum VetoRaceClassification {
     QueuedOutputWithoutCallbackObservation,
-    ApplicationOutputStaleDiscardedBeforeCallback,
+    OldEpochOutputStaleDiscardedAtCallback,
     CallbackAdmittedBeforeVetoResidualPossible,
     PostVetoPlaybackPredictionFromPreVetoCallbackAdmission,
     PostVetoLoopbackObservedFromPreVetoCallbackAdmission,
@@ -759,12 +765,12 @@ fn validate_veto_race_for_episode(
     let race = race.ok_or_else(|| {
         "veto with a reported output effect requires stage-aware veto_race evidence".to_string()
     })?;
-    validate_veto_race(effect, race)?;
+    validate_veto_race(episode, effect, race)?;
 
     let classification = match race.callback_disposition.as_str() {
         "not_observed" => VetoRaceClassification::QueuedOutputWithoutCallbackObservation,
         "stale_discarded_after_veto" => {
-            VetoRaceClassification::ApplicationOutputStaleDiscardedBeforeCallback
+            VetoRaceClassification::OldEpochOutputStaleDiscardedAtCallback
         }
         "admitted_before_veto" => match effect.reported_stage.as_str() {
             "loopback_observed" => {
@@ -780,9 +786,40 @@ fn validate_veto_race_for_episode(
     Ok(Some(classification))
 }
 
-fn validate_veto_race(effect: &Effect, race: &VetoRaceEvidence) -> Result<(), String> {
+fn validate_veto_race(
+    episode: &Episode,
+    effect: &Effect,
+    race: &VetoRaceEvidence,
+) -> Result<(), String> {
     require_text(&race.authorization_id, "effect.veto_race.authorization_id")?;
+    require_text(&race.session_id, "effect.veto_race.session_id")?;
+    require_text(&race.turn_id, "effect.veto_race.turn_id")?;
+    validate_digest(
+        &race.decision_receipt_sha256,
+        "effect.veto_race.decision_receipt_sha256",
+    )?;
+    validate_digest(
+        &race.disposition_receipt_sha256,
+        "effect.veto_race.disposition_receipt_sha256",
+    )?;
+    validate_digest(
+        &race.effect_receipt_sha256,
+        "effect.veto_race.effect_receipt_sha256",
+    )?;
+    validate_digest(
+        &race.output_artifact_sha256,
+        "effect.veto_race.output_artifact_sha256",
+    )?;
     validate_receipt(&race.receipt, "effect.veto_race.receipt")?;
+    if race.session_id != episode.session.session_id
+        || race.turn_id != episode.session.turn_id
+        || race.decision_receipt_sha256 != episode.decision.receipt.receipt_sha256
+        || race.disposition_receipt_sha256 != episode.disposition.receipt.receipt_sha256
+        || race.effect_receipt_sha256 != effect.receipt.receipt_sha256
+        || Some(race.output_artifact_sha256.as_str()) != effect.output_artifact_sha256.as_deref()
+    {
+        return Err("veto_race evidence is not bound to the exact session, turn, disposition, decision, effect receipt and output artifact".into());
+    }
 
     if !matches!(
         race.admission_stage.as_str(),
@@ -802,8 +839,17 @@ fn validate_veto_race(effect: &Effect, race: &VetoRaceEvidence) -> Result<(), St
     {
         return Err("veto_race event sequence is invalid or admission did not precede veto".into());
     }
-    if race.reported_stage_event_sequence < race.admission_event_sequence {
-        return Err("veto_race reported stage precedes output admission".into());
+    let reported_stage_rank = effect_stage_rank(&effect.reported_stage)
+        .expect("output-stage check precedes veto-race validation");
+    let admission_stage_rank = effect_stage_rank(&race.admission_stage)
+        .expect("admission-stage validation precedes rank comparison");
+    if race.reported_stage_event_sequence < race.admission_event_sequence
+        || (reported_stage_rank == admission_stage_rank
+            && race.reported_stage_event_sequence != race.admission_event_sequence)
+        || (reported_stage_rank > admission_stage_rank
+            && race.reported_stage_event_sequence == race.admission_event_sequence)
+    {
+        return Err("veto_race reported-stage sequence does not follow its exact output-stage transition".into());
     }
     if race.veto_output_epoch != race.prior_output_epoch.checked_add(1).ok_or_else(|| {
         "veto_race prior output epoch is exhausted".to_string()
@@ -1187,6 +1233,12 @@ mod tests {
         value["effect"]["reported_stage"] = serde_json::json!("loopback_observed");
         value["effect"]["veto_race"] = serde_json::json!({
             "authorization_id": "authorization-fixture",
+            "session_id": "session-001",
+            "turn_id": "turn-001",
+            "decision_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "disposition_receipt_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+            "effect_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "output_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
             "admission_stage": "application_enqueued",
             "admission_event_sequence": 44,
             "veto_event_sequence": 46,
@@ -1269,6 +1321,12 @@ mod tests {
         value["effect"]["capture_id"] = serde_json::Value::Null;
         value["effect"]["veto_race"] = serde_json::json!({
             "authorization_id": "authorization-fixture",
+            "session_id": "session-001",
+            "turn_id": "turn-001",
+            "decision_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "disposition_receipt_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+            "effect_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "output_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
             "admission_stage": "application_enqueued",
             "admission_event_sequence": 44,
             "veto_event_sequence": 46,
@@ -1293,7 +1351,7 @@ mod tests {
         let report = parse_and_reduce(&raw).expect("old-epoch frames are reported as stale");
         assert_eq!(
             report.veto_race_classification,
-            Some(VetoRaceClassification::ApplicationOutputStaleDiscardedBeforeCallback)
+            Some(VetoRaceClassification::OldEpochOutputStaleDiscardedAtCallback)
         );
         assert_eq!(report.veto_stale_callback_discarded_frames, Some(240));
         assert_eq!(report.veto_callback_admitted_frames, Some(0));
