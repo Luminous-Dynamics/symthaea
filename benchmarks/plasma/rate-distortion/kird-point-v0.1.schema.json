@@ -395,6 +395,22 @@
         "independent_checker_revision": {
           "type": "string",
           "minLength": 1
+        },
+        "intervention_domain_sha256": {
+          "type": "string",
+          "pattern": "^(?!0{64}$)[0-9a-f]{64}$"
+        },
+        "metric_definition_sha256": {
+          "type": "string",
+          "pattern": "^(?!0{64}$)[0-9a-f]{64}$"
+        },
+        "compactness_evidence_sha256": {
+          "type": "string",
+          "pattern": "^(?!0{64}$)[0-9a-f]{64}$"
+        },
+        "cover_radius_evidence_sha256": {
+          "type": "string",
+          "pattern": "^(?!0{64}$)[0-9a-f]{64}$"
         }
       }
     },
@@ -613,7 +629,11 @@
               "covering_set_sha256",
               "branch_association_stable",
               "branch_stability_evidence_sha256",
-              "independent_checker_revision"
+              "independent_checker_revision",
+              "intervention_domain_sha256",
+              "metric_definition_sha256",
+              "compactness_evidence_sha256",
+              "cover_radius_evidence_sha256"
             ],
             "properties": {
               "globally_bounded": {
