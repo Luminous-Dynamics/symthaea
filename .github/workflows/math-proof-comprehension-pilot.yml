@@ -250,12 +250,12 @@ jobs:
             and ([.pairs[].candidate.pair_id] | unique | length) == 5
             and .pairs[0].evaluator_only.expected_relation == "exact_identity"
             and .pairs[1].evaluator_only.expected_relation == "tier1_hypothesis_permutation_equivalent"
-            and all(.pairs[2:][]; .evaluator_only.expected_relation == "not_tier1_equivalent")' \\
+            and all(.pairs[2:][]; .evaluator_only.expected_relation == "not_tier1_equivalent")' \
             docs/research/MATH_SCOPE_EQUIVALENCE_TIER1_V1.json >/dev/null
           jq -e '."$schema" == "https://json-schema.org/draft/2020-12/schema"
             and .properties.schema_version.const == "1.0.0"
             and .properties.pairs.minItems == 1
-            and (."$defs".formula.oneOf | length == 6)' \\
+            and (."$defs".formula.oneOf | length == 6)' \
             docs/research/MATH_SCOPE_EQUIVALENCE_TIER1_V1.schema.json >/dev/null
           echo "SCOPE_EQUIVALENCE_TIER1_FIXTURES_PASS"
 
