@@ -17,7 +17,7 @@
       "measurement_operator_id": "spatial-fourier-mode-1-v1",
       "sampling_period_seconds": 0.01,
       "transport_latency_seconds": 0.004,
-      "timestamp_age_bound_seconds": 0.015,
+      "timestamp_age_bound_seconds": 0.016,
       "jitter_bound_seconds": 0.001,
       "noise_std": 0.0001,
       "dropout_policy": "predict_with_uncertainty"
