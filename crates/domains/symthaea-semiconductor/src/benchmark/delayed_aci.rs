@@ -236,6 +236,7 @@ pub struct AciMissingFeedbackRecordV1 {
     pub expected_delivery_round: u64,
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct AciDegenerateResolutionReceiptV1 {
     pub schema: String,
     pub engine_id: String,
@@ -502,17 +503,23 @@ pub fn issue_delayed_aci_prediction_v1(
     Ok(receipt)
 }
 
-fn make_update_receipt(
-    engine: &DelayedAciEngineV1,
-    delivery: &DelayedAciLabelDeliveryV1,
-    prediction: Option<&DelayedAciPredictionReceiptV1>,
+struct AciUpdateReceiptDetailsV1<'a> {
     disposition: AciUpdateDispositionV1,
     reasons: Vec<AciUpdateReasonV1>,
     phase: Option<u64>,
     miscoverage_observed: Option<bool>,
-    alphas: (Option<f64>, Option<f64>),
+    alpha_before: Option<f64>,
+    alpha_after: Option<f64>,
     update_sequence: Option<u64>,
-    state_digests: (&str, &str),
+    state_before: &'a str,
+    state_after: &'a str,
+}
+
+fn make_update_receipt(
+    engine: &DelayedAciEngineV1,
+    delivery: &DelayedAciLabelDeliveryV1,
+    prediction: Option<&DelayedAciPredictionReceiptV1>,
+    details: AciUpdateReceiptDetailsV1<'_>,
 ) -> Result<DelayedAciUpdateReceiptV1, DelayedAciErrorV1> {
     let mut receipt = DelayedAciUpdateReceiptV1 {
         schema: DELAYED_ACI_UPDATE_RECEIPT_SCHEMA_V1.into(),
@@ -524,113 +531,21 @@ fn make_update_receipt(
         prediction_receipt_sha256: prediction.map(|item| item.receipt_sha256.clone()),
         eligibility_report_sha256: Some(delivery.eligibility_report.report_sha256.clone()),
         label_payload_sha256: delivery.label_payload_sha256.clone(),
-        phase,
-        disposition,
-        reasons,
-        miscoverage_observed,
-        alpha_before: alphas.0,
-        alpha_after: alphas.1,
-        update_sequence,
+        phase: details.phase,
+        disposition: details.disposition,
+        reasons: details.reasons,
+        miscoverage_observed: details.miscoverage_observed,
+        alpha_before: details.alpha_before,
+        alpha_after: details.alpha_after,
+        update_sequence: details.update_sequence,
         guarantee_state: engine.guarantee_state,
-        calibration_state_before_sha256: state_digests.0.into(),
-        calibration_state_after_sha256: state_digests.1.into(),
-        phase_state_mutated: update_sequence.is_some(),
+        calibration_state_before_sha256: details.state_before.into(),
+        calibration_state_after_sha256: details.state_after.into(),
+        phase_state_mutated: details.update_sequence.is_some(),
         equipment_control_authority: false,
         receipt_sha256: String::new(),
     };
     receipt.receipt_sha256 = update_digest(&receipt)?;
-    Ok(receipt)
-}
-
-fn degenerate_resolution_digest(
-    receipt: &AciDegenerateResolutionReceiptV1,
-) -> Result<String, DelayedAciErrorV1> {
-    let mut canonical = receipt.clone();
-    canonical.receipt_sha256.clear();
-    json_sha256(&canonical)
-}
-
-/// Resolves a full-real-line or empty prediction set at its due round.
-/// The miss bit is mathematically determined by the set itself, so no physical
-/// label or K1 receipt is needed. This outcome source remains distinct from a
-/// metrology-observed coverage result.
-pub fn resolve_degenerate_aci_interval_v1(
-    engine: &mut DelayedAciEngineV1,
-    sample_id: &str,
-) -> Result<AciDegenerateResolutionReceiptV1, DelayedAciErrorV1> {
-    validate_engine(engine)?;
-    require_text(sample_id, "sample_id")?;
-    let current_round = engine
-        .current_round
-        .ok_or_else(|| DelayedAciErrorV1("ACI round has not begun".into()))?;
-    let prediction = engine
-        .pending_predictions
-        .values()
-        .find(|item| item.sample_id == sample_id)
-        .cloned()
-        .ok_or_else(|| DelayedAciErrorV1("pending ACI prediction not found".into()))?;
-    if prediction.expected_delivery_round != current_round {
-        return Err(DelayedAciErrorV1(
-            "degenerate interval can only be resolved in its exact due round".into(),
-        ));
-    }
-    let misses = match prediction.interval.kind {
-        AciIntervalKindV1::FullRealLine => false,
-        AciIntervalKindV1::Empty => true,
-        AciIntervalKindV1::Bounded => {
-            return Err(DelayedAciErrorV1(
-                "bounded intervals require a qualified physical label".into(),
-            ));
-        }
-    };
-    let state_before = phase_state_digest(engine)?;
-    let alpha_before = engine.phase_alphas[prediction.phase as usize];
-    if alpha_before.to_bits() != prediction.alpha_at_issue.to_bits() {
-        return Err(DelayedAciErrorV1(
-            "phase alpha changed before its fixed-delay feedback".into(),
-        ));
-    }
-    let error_value = if misses { 1.0 } else { 0.0 };
-    let alpha_after = alpha_before
-        + engine.policy.learning_rate * (engine.policy.target_miscoverage - error_value);
-    if !alpha_after.is_finite()
-        || alpha_after < -engine.policy.learning_rate - 1.0e-12
-        || alpha_after > 1.0 + engine.policy.learning_rate + 1.0e-12
-    {
-        return Err(DelayedAciErrorV1(
-            "degenerate ACI update escaped the theoretical phase bound".into(),
-        ));
-    }
-    let update_sequence = engine
-        .accepted_update_count
-        .checked_add(1)
-        .ok_or_else(|| DelayedAciErrorV1("ACI update count overflow".into()))?;
-    let mut next_engine = engine.clone();
-    next_engine.phase_alphas[prediction.phase as usize] = alpha_after;
-    next_engine.accepted_update_count = update_sequence;
-    next_engine.pending_predictions.remove(&prediction.round);
-    let state_after = phase_state_digest(&next_engine)?;
-    let mut receipt = AciDegenerateResolutionReceiptV1 {
-        schema: "luminous.semi-bench.delayed-aci-degenerate-resolution.v1".into(),
-        engine_id: engine.engine_id.clone(),
-        sample_id: prediction.sample_id,
-        measurement_event_id: prediction.measurement_event_id,
-        issued_round: prediction.round,
-        resolution_round: current_round,
-        phase: prediction.phase,
-        interval_kind: prediction.interval.kind,
-        miscoverage_observed: misses,
-        alpha_before,
-        alpha_after,
-        update_sequence,
-        calibration_state_before_sha256: state_before,
-        calibration_state_after_sha256: state_after,
-        receipt_sha256: String::new(),
-    };
-    receipt.receipt_sha256 = degenerate_resolution_digest(&receipt)?;
-    engine.phase_alphas = next_engine.phase_alphas;
-    engine.accepted_update_count = next_engine.accepted_update_count;
-    engine.pending_predictions = next_engine.pending_predictions;
     Ok(receipt)
 }
 
@@ -668,13 +583,17 @@ pub fn deliver_delayed_aci_label_v1(
             engine,
             delivery,
             prediction,
-            AciUpdateDispositionV1::Duplicate,
-            vec![AciUpdateReasonV1::DuplicateAcceptedLabelRevision],
-            prediction.map(|item| item.phase),
-            None,
-            (None, None),
-            None,
-            (&state_before, &state_before),
+            AciUpdateReceiptDetailsV1 {
+                disposition: AciUpdateDispositionV1::Duplicate,
+                reasons: vec![AciUpdateReasonV1::DuplicateAcceptedLabelRevision],
+                phase: prediction.map(|item| item.phase),
+                miscoverage_observed: None,
+                alpha_before: None,
+                alpha_after: None,
+                update_sequence: None,
+                state_before: &state_before,
+                state_after: &state_before,
+            },
         );
     }
 
@@ -770,13 +689,17 @@ pub fn deliver_delayed_aci_label_v1(
             engine,
             delivery,
             None,
-            AciUpdateDispositionV1::PendingPredictionMissing,
-            reasons,
-            None,
-            None,
-            (None, None),
-            None,
-            (&state_before, &state_before),
+            AciUpdateReceiptDetailsV1 {
+                disposition: AciUpdateDispositionV1::PendingPredictionMissing,
+                reasons,
+                phase: None,
+                miscoverage_observed: None,
+                alpha_before: None,
+                alpha_after: None,
+                update_sequence: None,
+                state_before: &state_before,
+                state_after: &state_before,
+            },
         );
     };
 
@@ -796,13 +719,17 @@ pub fn deliver_delayed_aci_label_v1(
             engine,
             delivery,
             Some(&prediction),
-            disposition,
-            reasons,
-            Some(prediction.phase),
-            None,
-            (None, None),
-            None,
-            (&state_before, &state_before),
+            AciUpdateReceiptDetailsV1 {
+                disposition,
+                reasons,
+                phase: Some(prediction.phase),
+                miscoverage_observed: None,
+                alpha_before: None,
+                alpha_after: None,
+                update_sequence: None,
+                state_before: &state_before,
+                state_after: &state_before,
+            },
         );
     }
 
@@ -838,13 +765,17 @@ pub fn deliver_delayed_aci_label_v1(
         &next_engine,
         delivery,
         Some(&prediction),
-        AciUpdateDispositionV1::Updated,
-        Vec::new(),
-        Some(prediction.phase),
-        Some(misses),
-        (Some(alpha_before), Some(alpha_after)),
-        Some(next_update_count),
-        (&state_before, &state_after),
+        AciUpdateReceiptDetailsV1 {
+            disposition: AciUpdateDispositionV1::Updated,
+            reasons: Vec::new(),
+            phase: Some(prediction.phase),
+            miscoverage_observed: Some(misses),
+            alpha_before: Some(alpha_before),
+            alpha_after: Some(alpha_after),
+            update_sequence: Some(next_update_count),
+            state_before: &state_before,
+            state_after: &state_after,
+        },
     )?;
     engine.phase_alphas = next_engine.phase_alphas;
     engine.accepted_update_count = next_engine.accepted_update_count;
