@@ -3,9 +3,10 @@
 
 //! Persistent JSONL sidecar for the LongMemEval-V2 official Memory API shim.
 //!
-//! The first arm is deliberately text-retrieval-only: query_image is accepted
-//! at the protocol boundary but does not affect BM25 ranking. Retrieved
-//! trajectory windows may still return their original screenshot evidence.
+//! The current retrieval portfolio combines BM25 prose retrieval with a
+//! structured exact-literal channel using reciprocal-rank fusion. query_image
+//! remains accepted for API compatibility but does not affect ranking;
+//! retrieved windows may still return original screenshot evidence.
 
 use std::collections::BTreeSet;
 use std::env;
@@ -17,7 +18,8 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use broca_aml_adapter::longmemeval_v2::{
     LongMemEvalV2Bm25IndexV1, LongMemEvalV2ContextKind,
     LongMemEvalV2ContextItemV1, LongMemEvalV2HitV1,
-    LongMemEvalV2TrajectoryV1, resolve_screenshot_reference,
+    LongMemEvalV2TrajectoryV1, LongMemEvalV2SearchResultV1,
+    resolve_screenshot_reference,
 };
 use broca_aml_adapter::raw_session::Bm25ProfileV1;
 use broca_aml_adapter::longmemeval_v2_candidate_adapter::{
