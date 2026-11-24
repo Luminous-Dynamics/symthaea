@@ -402,7 +402,6 @@ class MaceLongMemEvalV2IngressTests(unittest.TestCase):
                 "query",
                 {
                     "retrieval_mode": memory.retrieval_mode_label,
-                    "retrieval_mode": memory.retrieval_mode_label,
                     "candidate_evidence_jsonl": "",
                     "candidate_record_count": 0,
                     "candidate_set_sha256": None,
