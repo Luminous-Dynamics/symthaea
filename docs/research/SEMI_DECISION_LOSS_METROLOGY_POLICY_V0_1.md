@@ -160,3 +160,8 @@ The GFA-VM+ few-shot benchmark, GRAPE chronological streaming benchmark and NIST
 ## Claim ceiling
 
 This is a synthetic Bayes decision/EVSI calculator and exact small-portfolio optimizer. It does not establish real fab cost coefficients, assay likelihoods, physical measurement traceability, escaped-defect performance or manufacturing ROI. It does not authorize sampling-plan changes, wafer disposition, APC/R2R, recipe changes or equipment control.
+
+
+## Independent optimizer oracle extension
+
+A third integration test now independently enumerates every feasible subset on a four-candidate, two-chamber fixture. It recomputes candidate net EVSI from the separate posterior-risk oracle, applies capacity and minimum-group constraints, and compares selected IDs, total net value, budget use and group counts with the exact production optimizer. This tests the optimizer's claimed exactness independently of its bitmask loop.
