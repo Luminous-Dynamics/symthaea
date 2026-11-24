@@ -1,139 +1,15 @@
-# Covariance-aware experiment design v0.1
+# Covariance-aware experiment design v0.1 — superseded
 
-**Status:** research implementation slice and synthetic regression controls. Not yet Rust/CI-qualified, connected to the live Symtropy response atlas, calibrated on physical data, or validated as expected information gain.
+This initial draft described a caller-supplied covariance matrix for every unordered pair of rival hypotheses. A later mathematical review found that a double-centering "matrix variogram" consistency test is not valid for arbitrary vector-valued outputs: it can reject legitimate joint models whose cross-observable blocks contain admissible antisymmetric components.
 
-## Why this extension exists
+The package now uses a stronger v0.2 contract: one PSD **joint covariance of the stacked hypothesis-output vector**, from which all pairwise difference covariances are derived. This guarantees common-model coherence without relying on the invalid pairwise matrix completion test.
 
-The v0.1 scalar planner in this crate computes standardized distances independently for every observable and adds their squares. That calculation is only justified when the declared observable channels are conditionally independent under the adopted uncertainty model.
+Use the current specification instead:
 
-For a response matrix, this is generally false. Matrix entries, determinant, singular values, condition number, basis-transformed quantities, and residual summaries can all be functions of the same small set of numerical values. Treating all of them as independent measurements can make the same information appear multiple times.
+- [Joint-covariance experiment design v0.2](COVARIANCE_AWARE_DESIGN_V0_2.md)
+- [Joint covariance JSON schema](../fixtures/covariance-design.schema.json)
+- [Synthetic redundancy fixture](../fixtures/covariance-redundancy-v0.1.json)
 
-This module adds a vector-output contract and consumes a complete covariance matrix for each unordered rival-hypothesis pair. It is an additive extension of the existing package, not another selector service or scheduler.
+The original pairwise-covariance implementation must not be used for vector-output experiments. The v0.2 code retains the singular-support quarantine, PSD validation, digest binding, resource caps, covariance-aware Mahalanobis screening and exact duplicate-observable controls, but changes the input model and covariance validation boundary.
 
-## Mathematical contract
-
-For hypothesis pair i,j and design d, let the frozen observable vector be Y(d). Define:
-
-\[
-\Delta\mu_{ij}(d)=\mu_i(d)-\mu_j(d).
-\]
-
-The input supplies the full covariance of the difference vector:
-
-\[
-S_{ij}(d)=\operatorname{Cov}\big(Y_i(d)-Y_j(d)\big).
-\]
-
-Where this is derived from marginal covariance matrices, the cross-hypothesis terms must be retained:
-
-\[
-S_{ij}=\Sigma_i+\Sigma_j-C_{ij}-C_{ij}^{T},
-\qquad C_{ij}=\operatorname{Cov}(Y_i,Y_j).
-\]
-
-The covariance descriptor must state the adopted coupling/uncertainty semantics and identify which shared errors, numerical errors, calibration terms, and measurement terms are included. There is no universal way to infer cross-hypothesis covariance from two marginal standard deviations. The selector therefore consumes the difference covariance directly instead of guessing it.
-
-For a positive-definite covariance, the screening statistic is:
-
-\[
-D_{ij}^{2}(d)=\Delta\mu_{ij}(d)^T S_{ij}(d)^{-1}\Delta\mu_{ij}(d).
-\]
-
-For singular positive-semidefinite covariance, the module computes the Moore–Penrose quadratic form only on positive-eigenvalue modes, while separately testing whether the mean difference lies in the covariance support. If a material component lies in a zero-variance direction, the candidate is **quarantined for support review** and omitted from automatic ranking. This avoids a dangerous property of the pseudoinverse alone: it can silently discard a mean difference in the null space and return a finite score.
-
-For eligible candidates, the design score is the minimum D_ij across all rival pairs, divided by the caller's frozen relative cost units. Cost is not inferred from covariance or model confidence.
-
-This is a prior-free covariance-geometry screen. It is **not** Bayesian expected information gain, a likelihood ratio, a Bayes factor, a posterior, or a truth oracle.
-
-## Numerical treatment and limitations
-
-- Covariance matrices are checked for dimensions, finiteness, symmetry, non-negative diagonal entries, positive semidefiniteness, and exact pair coverage.
-- The complete family of pairwise difference covariance matrices is also checked for **joint realizability**. Individually PSD matrices can still be mutually impossible. Their block variogram must be conditionally negative semidefinite; equivalently, its double-centred Gram/covariance matrix must be PSD. The implementation rejects incoherent pairwise sets instead of ranking them.
-- Resource guards cap the request at 8 hypotheses, 8 observables per candidate, 16 joint hypothesis-observable dimensions, 256 candidate experiments, and 8 MiB of CLI JSON input. These are explicit v0.1 safety bounds, not claims about the maximum scale of future algorithms.
-- A descriptor SHA-256 binds the supplied provenance text. A separate canonical matrix digest binds the numeric matrix dimensions and row-major IEEE-754 values. Neither digest proves that an executable generated the data.
-- Covariance eigendecomposition is applied to a diagonal-standardized correlation matrix. This makes numerical rank/support cutoffs invariant to positive diagonal unit changes (for example, metres to millimetres). The algorithm and tolerances are versioned in the output.
-- No diagonal jitter, automatic shrinkage, or undocumented regularization is applied.
-- The Jacobi eigensolver and tolerances are a deterministic v0.1 numerical implementation. They require independent comparison with a trusted linear-algebra implementation, adversarial conditioning tests, dimension-scaling tests, and exact-head Rust/CI qualification before production use.
-- Covariance uncertainty sets, nuisance-parameter profiling, non-Gaussian predictive distributions, and calibrated Monte Carlo EIG are not implemented.
-- The current schema does not yet encode the full basis/endpoint Gram-metric contract required by Symtropy #7131. It must not be used to make EGB response-atlas claims until an adapter carries that exact basis identity and metric transport semantics.
-
-## Exact synthetic known-answer control
-
-The fixture at fixtures/covariance-redundancy-v0.1.json is purely synthetic.
-
-\[
-\Sigma=
-\begin{pmatrix}
-1 & 1/2\\
-1/2 & 1
-\end{pmatrix},
-\qquad
-\Delta\mu=
-\begin{pmatrix}
-1\\2
-\end{pmatrix}.
-\]
-
-The inverse and quadratic form are:
-
-\[
-\Sigma^{-1}=
-\begin{pmatrix}
-4/3 & -2/3\\
--2/3 & 4/3
-\end{pmatrix},
-\qquad
-\Sigma^{-1}\Delta\mu=
-\begin{pmatrix}
-0\\2
-\end{pmatrix},
-\qquad D^2=4.
-\]
-
-Append x3=x1+x2. The augmented difference is (1,2,3)^T and its covariance is AΣA^T, where:
-
-\[
-A=\begin{pmatrix}1&0\\0&1\\1&1\end{pmatrix}.
-\]
-
-The augmented covariance has rank two. Its covariance-aware pseudoinverse score remains D²=4. The diagonal-only independence calculation instead changes from 5 to 8, falsely rewarding the duplicate.
-
-A second hostile test uses S=[[1,1],[1,1]] and Δμ=(1,0)^T. Because the mean difference has a component outside range(S), the candidate must be quarantined rather than assigned the finite value returned by the pseudoinverse quadratic form alone.
-
-A third hostile control demonstrates **pairwise covariance incoherence**. For three scalar hypotheses, each of these pairwise difference variances is individually valid and non-negative:
-
-[
-operatorname{Var}(Y_0-Y_1)=1,quad
-operatorname{Var}(Y_0-Y_2)=1,quad
-operatorname{Var}(Y_1-Y_2)=9.
-]
-
-Together they are impossible: setting X=Y_1-Y_0 and Z=Y_2-Y_0 would require Var(X)=Var(Z)=1 and Cov(X,Z)=-3.5, violating Cauchy–Schwarz. The selector must reject this family. The coherent control (1,4,1) is accepted. The implementation checks the matrix-valued variogram through its double-centred PSD condition.
-
-A further metamorphic control applies the invertible transformation A=[[2,1],[-1,1]] (determinant 3) to both the mean vector and covariance, producing S'=[[7,-1/2],[-1/2,1]]. The quadratic form remains D²=4. A three-hypothesis test also confirms that the selector ranks by the least-separated pair and rejects a missing pairwise covariance.
-
-These tests are linear-algebra controls, not EGB calculations, not physical covariance estimates, and not validation of the scalar #8034 planner.
-
-## Run locally
-
-    cargo test --locked -p symthaea-experiment-design
-    cargo run --locked -p symthaea-experiment-design -- --covariance-demo
-    cargo run --locked -p symthaea-experiment-design -- --covariance < crates/domains/symthaea-experiment-design/fixtures/covariance-redundancy-v0.1.json
-
-The demo command emits the base and exactly-redundant candidates with the same D²=4 score and an empty support-review list. The stdin command exercises the public covariance JSON contract against the same frozen fixture; callers can replace that fixture with an episode-specific request matching the documented schema.
-
-## Required next qualifications
-
-1. Compare the Jacobi result against an independent LAPACK/BLAS or high-precision reference over randomized SPD, PSD, nearly singular, badly conditioned, and indefinite matrices.
-2. Expand the existing invertible-basis metamorphic control across randomized, badly conditioned and endpoint Gram-metric transformations, verifying AΔμ, ASA^T and invariant quadratic form where numerically justified.
-3. Add interval/uncertainty-set covariance bounds. A single point covariance is not robust to covariance-estimation uncertainty.
-4. Add a predictive calibration campaign: coverage, standardized residuals, and covariance calibration on held-out synthetic and independently solved controls.
-5. Add a Symtropy #7131 adapter that carries the response operator, endpoint bases and Gram metrics, chart identity, units, and uncertainty provenance without reconstructing or duplicating the physical response model.
-6. Compare with Monte Carlo expected information gain only on tasks where predictive distributions and priors are independently justified. Keep the prior-free screen as a distinct method.
-7. Freeze budgets and episodes before comparing against fixed, random, scalar-independence, covariance-aware, and exact tiny-world oracle arms.
-
-## Acceptance and claim ceiling
-
-Before merging, require exact-head formatting, locked tests, Clippy, the covariance demo, JSON contract tests, and the existing planner's regression suite. Preserve all failures and denominators.
-
-The present branch proves no performance gain, no SOTA result, no live Symtropy integration, no finite-coupling EGB solution, no branch event, no theorem, and no physical measurement claim. It only adds a testable covariance-aware candidate method and synthetic negative controls.
+This history is preserved so that the earlier contract is not mistaken for the current implementation.
