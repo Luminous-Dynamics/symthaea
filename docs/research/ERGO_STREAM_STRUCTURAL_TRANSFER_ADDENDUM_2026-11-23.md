@@ -310,6 +310,8 @@ The current #7173 Rust witnesses now cover the following finite contracts:
 
 The sidecar schemas bind candidate transfer artifacts to the original AgentSubmission digest, source/target episode IDs and evidence-prefix hashes without mutating the strict AgentEpisode v0 wire protocol. The quotient validator is a one-system abstraction witness; it does not yet validate target-side quotient transfer or preserve task-specific observables/rewards. Simulation and bisimulation are scope-limited finite LTS witnesses; probabilistic, weak, approximate and continuous-time variants remain future work under Symtropy #7230 and the continuous-dynamics protocol.
 
+The latest follow-on adds `calibration.rs` for proper scoring (Brier/log loss/ECE) and selective risk–coverage under explicit assert/reject/abstain decisions. This extends the claim boundary from “is the proposed finite map valid?” to “how well calibrated is the system's probability that this exact scoped claim will qualify?” The new source and schema additions are pending exact-head Rust checks; the earlier 86-test pass does not cover them.
+
 The exact combined Symtropy #7173 code head `9735f9f7ddaabce19b75a96a0e97783d3cc04a9d` passed focused Rust 1.96 formatting, 86 unit tests plus doctests, and strict Clippy in workflow [#45296666519](https://github.com/Luminous-Dynamics/symtropy/actions/runs/45296666519). This qualifies the finite microcosm crate only. It does not implement CfC/LTC dynamics, continuous ODE/DAE/PDE execution, contact simulation, production #11171 integration, or a continuous-time equivalence proof. The next meaningful implementation is the learned-policy/owner-side adapter from existing AV-STREAM and finite scientific episodes—not a duplicate simulator.
 
 ## 8. Execution order
