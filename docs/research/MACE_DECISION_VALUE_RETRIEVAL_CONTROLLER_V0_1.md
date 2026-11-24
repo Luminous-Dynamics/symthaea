@@ -110,7 +110,7 @@ For each benchmark family:
 7. Evaluate per task family and operating point. Report paired absolute differences, confidence intervals, sample counts, missing runs and all exclusions. Use a preregistered paired bootstrap or randomization test; correct for multiple comparisons when promoting among many candidate policies.
 8. Publish exact manifests and raw result receipts. A score without a reproducible source/data/model/evaluator/budget manifest is not a reproduced baseline.
 
-For policy \(\pi\) and held-out task \(q\), define realized uplift:
+For policy $\pi$ and held-out task $q$, define realized uplift:
 
 [
 \Delta_q = R_q(\pi_{\mathrm{baseline}})-R_q(\pi).
