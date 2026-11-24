@@ -1184,7 +1184,6 @@ mod tests {
         );
     }
 
-
     #[test]
     fn legacy_evidence_sufficient_label_remains_readable_but_only_exploratory() {
         let mut memory = RetrievalPolicyMemoryV1::default();
