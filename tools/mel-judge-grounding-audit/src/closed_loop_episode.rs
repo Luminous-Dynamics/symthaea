@@ -825,12 +825,16 @@ fn validate_veto_race(
         race.admission_stage.as_str(),
         "queue_applied" | "application_enqueued"
     ) {
-        return Err("veto_race admission_stage must be queue_applied or application_enqueued".into());
+        return Err(
+            "veto_race admission_stage must be queue_applied or application_enqueued".into(),
+        );
     }
-    if effect_stage_rank(&effect.reported_stage).is_none()
-        || effect_stage_rank(&race.admission_stage).is_none()
-        || effect_stage_rank(&effect.reported_stage) < effect_stage_rank(&race.admission_stage)
-    {
+    let reported_stage_rank = effect_stage_rank(&effect.reported_stage).ok_or_else(|| {
+        "veto_race reported stage is not a successful output stage".to_string()
+    })?;
+    let admission_stage_rank = effect_stage_rank(&race.admission_stage)
+        .ok_or_else(|| "veto_race admission stage is not a successful output stage".to_string())?;
+    if reported_stage_rank < admission_stage_rank {
         return Err("veto_race reported stage precedes or contradicts its admission stage".into());
     }
     if race.admission_event_sequence == 0
@@ -851,9 +855,12 @@ fn validate_veto_race(
     {
         return Err("veto_race reported-stage sequence does not follow its exact output-stage transition".into());
     }
-    if race.veto_output_epoch != race.prior_output_epoch.checked_add(1).ok_or_else(|| {
-        "veto_race prior output epoch is exhausted".to_string()
-    })? {
+    if race.veto_output_epoch
+        != race
+            .prior_output_epoch
+            .checked_add(1)
+            .ok_or_else(|| "veto_race prior output epoch is exhausted".to_string())?
+    {
         return Err("veto_race veto must advance the prior output epoch exactly once".into());
     }
     if race.post_veto_new_admissions != 0 {
@@ -890,25 +897,35 @@ fn validate_veto_race(
                 || race.callback_admitted_frames == 0
                 || race.stale_callback_discarded_frames != 0
             {
-                return Err("callback admission is not proven to precede veto under the prior epoch".into());
+                return Err(
+                    "callback admission is not proven to precede veto under the prior epoch".into(),
+                );
             }
             if !matches!(
                 effect.reported_stage.as_str(),
                 "callback_observed" | "cpal_predicted" | "loopback_observed"
             ) {
-                return Err("pre-veto callback admission is inconsistent with the reported effect stage".into());
+                return Err(
+                    "pre-veto callback admission is inconsistent with the reported effect stage"
+                        .into(),
+                );
             }
             if effect.reported_stage == "callback_observed"
                 && race.reported_stage_event_sequence != callback_sequence
             {
-                return Err("callback_observed stage sequence does not match the callback admission event".into());
+                return Err(
+                    "callback_observed stage sequence does not match the callback admission event"
+                        .into(),
+                );
             }
             if matches!(
                 effect.reported_stage.as_str(),
                 "cpal_predicted" | "loopback_observed"
             ) && race.reported_stage_event_sequence <= race.veto_event_sequence
             {
-                return Err("post-veto playback/loopback observation must follow the veto event".into());
+                return Err(
+                    "post-veto playback/loopback observation must follow the veto event".into(),
+                );
             }
         }
         "stale_discarded_after_veto" => {
@@ -925,10 +942,16 @@ fn validate_veto_race(
                 || effect.reported_stage != "application_enqueued"
                 || race.reported_stage_event_sequence >= race.veto_event_sequence
             {
-                return Err("stale callback discard is inconsistent with the post-veto epoch fence".into());
+                return Err(
+                    "stale callback discard is inconsistent with the post-veto epoch fence".into(),
+                );
             }
         }
-        other => return Err(format!("unknown callback disposition in veto_race evidence: {other}")),
+        other => {
+            return Err(format!(
+                "unknown callback disposition in veto_race evidence: {other}"
+            ));
+        }
     }
     Ok(())
 }
