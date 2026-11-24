@@ -11,10 +11,10 @@ use std::collections::BTreeSet;
 use serde::{Deserialize, Serialize};
 
 use crate::temporal_grounding::{
-    score_temporal_grounding, validate_temporal_grounding_prediction, AudioArtifactClockV1,
-    FrameIntervalV1, GroundTruthStateV1, TemporalGroundTruthV1,
-    TemporalGroundingOutcomeV1, TemporalGroundingPlanV1, TemporalGroundingPredictionV1,
-    TemporalGroundingScoreV1, TEMPORAL_GROUNDING_SCHEMA_V1,
+    AudioArtifactClockV1, FrameIntervalV1, GroundTruthStateV1, TEMPORAL_GROUNDING_SCHEMA_V1,
+    TemporalGroundTruthV1, TemporalGroundingOutcomeV1, TemporalGroundingPlanV1,
+    TemporalGroundingPredictionV1, TemporalGroundingScoreV1, score_temporal_grounding,
+    validate_temporal_grounding_prediction,
 };
 
 const CASE_SCHEMA_V1: &str = "mel-multi-annotator-temporal-grounding-v1";
@@ -123,12 +123,18 @@ pub fn audit_multi_annotator_case(
     case: &MultiAnnotatorTemporalCaseV1,
 ) -> Result<MultiAnnotatorGroundingReportV1, String> {
     if case.schema != CASE_SCHEMA_V1 {
-        return Err(format!("unsupported multi-annotator schema: {}", case.schema));
+        return Err(format!(
+            "unsupported multi-annotator schema: {}",
+            case.schema
+        ));
     }
     require_text(&case.query_id, "query_id")?;
     require_text(&case.query_text, "query_text")?;
     require_text(&case.annotation_policy_version, "annotation_policy_version")?;
-    validate_digest(&case.annotation_manifest_sha256, "annotation_manifest_sha256")?;
+    validate_digest(
+        &case.annotation_manifest_sha256,
+        "annotation_manifest_sha256",
+    )?;
     validate_artifact(&case.artifact)?;
     if case.minimum_annotator_count < 2 {
         return Err("minimum_annotator_count must be at least two independent annotators".into());
@@ -169,7 +175,9 @@ pub fn audit_multi_annotator_case(
             &format!("annotations[{index}].annotation_sha256"),
         )?;
         if !annotator_ids.insert(annotation.annotator_id_sha256.as_str()) {
-            return Err(format!("duplicate annotator identity at panel index {index}"));
+            return Err(format!(
+                "duplicate annotator identity at panel index {index}"
+            ));
         }
         if !annotation_digests.insert(annotation.annotation_sha256.as_str()) {
             return Err(format!(
@@ -190,8 +198,8 @@ pub fn audit_multi_annotator_case(
             status_reason: annotation.status_reason.clone(),
         };
 
-        let score = score_temporal_grounding(&truth, &case.prediction, &case.plan)
-            .map_err(|issues| {
+        let score =
+            score_temporal_grounding(&truth, &case.prediction, &case.plan).map_err(|issues| {
                 format!("annotator panel index {index} rejected by production scorer: {issues:?}")
             })?;
         let fully_correct_for_this_annotation = fully_correct(&score);
@@ -248,10 +256,7 @@ fn summarize_results(
         .filter(|item| item.state == GroundTruthStateV1::NotEstimable)
         .count();
 
-    let positive_f1: Vec<_> = present
-        .iter()
-        .filter_map(|item| item.score.f1)
-        .collect();
+    let positive_f1: Vec<_> = present.iter().filter_map(|item| item.score.f1).collect();
     let count_errors: Vec<_> = present
         .iter()
         .filter_map(|item| item.score.count_absolute_error)
@@ -418,8 +423,8 @@ fn percentile(values: &[f64], quantile: f64) -> Option<f64> {
 mod tests {
     use super::*;
     use crate::temporal_grounding::{
-        GroundingPredictionStateV1, TemporalGroundingPredictionV1,
-        TEMPORAL_GROUNDING_SCHEMA_V1, TEMPORAL_GROUNDING_EVALUATOR_V1,
+        GroundingPredictionStateV1, TEMPORAL_GROUNDING_EVALUATOR_V1, TEMPORAL_GROUNDING_SCHEMA_V1,
+        TemporalGroundingPredictionV1,
     };
 
     const AUDIO: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
@@ -495,13 +500,31 @@ mod tests {
     #[test]
     fn identical_annotators_preserve_independent_records_and_zero_spread() {
         let intervals = vec![
-            FrameIntervalV1 { start_frame: 100, end_frame: 200 },
-            FrameIntervalV1 { start_frame: 500, end_frame: 600 },
+            FrameIntervalV1 {
+                start_frame: 100,
+                end_frame: 200,
+            },
+            FrameIntervalV1 {
+                start_frame: 500,
+                end_frame: 600,
+            },
         ];
         let input = case(
             vec![
-                annotation('1', 'a', GroundTruthStateV1::Present, intervals.clone(), None),
-                annotation('2', 'b', GroundTruthStateV1::Present, intervals.clone(), None),
+                annotation(
+                    '1',
+                    'a',
+                    GroundTruthStateV1::Present,
+                    intervals.clone(),
+                    None,
+                ),
+                annotation(
+                    '2',
+                    'b',
+                    GroundTruthStateV1::Present,
+                    intervals.clone(),
+                    None,
+                ),
             ],
             prediction(intervals),
         );
@@ -512,7 +535,10 @@ mod tests {
         assert_eq!(report.summary.present_min_f1, Some(1.0));
         assert_eq!(report.summary.present_max_f1, Some(1.0));
         assert_eq!(report.summary.present_exact_count_accuracy, Some(1.0));
-        assert_eq!(report.summary.unanimous_correct_across_scored_annotators, Some(true));
+        assert_eq!(
+            report.summary.unanimous_correct_across_scored_annotators,
+            Some(true)
+        );
         assert_eq!(report.annotator_results.len(), 2);
         assert_eq!(report.annotator_results[0].score.f1, Some(1.0));
         assert_eq!(report.annotator_results[1].score.f1, Some(1.0));
@@ -528,18 +554,27 @@ mod tests {
                     '1',
                     'a',
                     GroundTruthStateV1::Present,
-                    vec![FrameIntervalV1 { start_frame: 100, end_frame: 200 }],
+                    vec![FrameIntervalV1 {
+                        start_frame: 100,
+                        end_frame: 200,
+                    }],
                     None,
                 ),
                 annotation(
                     '2',
                     'b',
                     GroundTruthStateV1::Present,
-                    vec![FrameIntervalV1 { start_frame: 120, end_frame: 220 }],
+                    vec![FrameIntervalV1 {
+                        start_frame: 120,
+                        end_frame: 220,
+                    }],
                     None,
                 ),
             ],
-            prediction(vec![FrameIntervalV1 { start_frame: 100, end_frame: 200 }]),
+            prediction(vec![FrameIntervalV1 {
+                start_frame: 100,
+                end_frame: 200,
+            }]),
         );
         let report = audit_multi_annotator_case(&input).unwrap();
         assert_eq!(report.annotator_results.len(), 2);
@@ -551,18 +586,47 @@ mod tests {
             report.annotator_results[0].score.matched_interval_iou_mean,
             report.annotator_results[1].score.matched_interval_iou_mean
         );
-        assert_eq!(report.summary.present_min_f1, report.annotator_results.iter().map(|item| item.score.f1.unwrap()).reduce(f64::min));
-        assert_eq!(report.summary.present_max_f1, report.annotator_results.iter().map(|item| item.score.f1.unwrap()).reduce(f64::max));
+        assert_eq!(
+            report.summary.present_min_f1,
+            report
+                .annotator_results
+                .iter()
+                .map(|item| item.score.f1.unwrap())
+                .reduce(f64::min)
+        );
+        assert_eq!(
+            report.summary.present_max_f1,
+            report
+                .annotator_results
+                .iter()
+                .map(|item| item.score.f1.unwrap())
+                .reduce(f64::max)
+        );
         assert!(report.summary.start_boundary_mae_frames.unwrap() > 0.0);
     }
 
     #[test]
     fn ambiguous_annotation_is_excluded_only_from_its_own_denominator() {
-        let intervals = vec![FrameIntervalV1 { start_frame: 100, end_frame: 200 }];
+        let intervals = vec![FrameIntervalV1 {
+            start_frame: 100,
+            end_frame: 200,
+        }];
         let input = case(
             vec![
-                annotation('1', 'a', GroundTruthStateV1::Present, intervals.clone(), None),
-                annotation('2', 'b', GroundTruthStateV1::Ambiguous, Vec::new(), Some("gradual onset")),
+                annotation(
+                    '1',
+                    'a',
+                    GroundTruthStateV1::Present,
+                    intervals.clone(),
+                    None,
+                ),
+                annotation(
+                    '2',
+                    'b',
+                    GroundTruthStateV1::Ambiguous,
+                    Vec::new(),
+                    Some("gradual onset"),
+                ),
                 annotation('3', 'c', GroundTruthStateV1::Absent, Vec::new(), None),
             ],
             prediction(intervals),
@@ -575,7 +639,10 @@ mod tests {
         assert_eq!(report.summary.ambiguous_exclusions, 1);
         assert_eq!(report.summary.not_estimable_exclusions, 0);
         assert_eq!(report.summary.absent_claim_accuracy, Some(0.0));
-        assert_eq!(report.summary.unanimous_correct_across_scored_annotators, Some(false));
+        assert_eq!(
+            report.summary.unanimous_correct_across_scored_annotators,
+            Some(false)
+        );
     }
 
     #[test]
@@ -587,8 +654,14 @@ mod tests {
                     'a',
                     GroundTruthStateV1::Present,
                     vec![
-                        FrameIntervalV1 { start_frame: 100, end_frame: 200 },
-                        FrameIntervalV1 { start_frame: 500, end_frame: 600 },
+                        FrameIntervalV1 {
+                            start_frame: 100,
+                            end_frame: 200,
+                        },
+                        FrameIntervalV1 {
+                            start_frame: 500,
+                            end_frame: 600,
+                        },
                     ],
                     None,
                 ),
@@ -596,13 +669,22 @@ mod tests {
                     '2',
                     'b',
                     GroundTruthStateV1::Present,
-                    vec![FrameIntervalV1 { start_frame: 100, end_frame: 200 }],
+                    vec![FrameIntervalV1 {
+                        start_frame: 100,
+                        end_frame: 200,
+                    }],
                     None,
                 ),
             ],
             prediction(vec![
-                FrameIntervalV1 { start_frame: 100, end_frame: 200 },
-                FrameIntervalV1 { start_frame: 500, end_frame: 600 },
+                FrameIntervalV1 {
+                    start_frame: 100,
+                    end_frame: 200,
+                },
+                FrameIntervalV1 {
+                    start_frame: 500,
+                    end_frame: 600,
+                },
             ]),
         );
         let report = audit_multi_annotator_case(&input).unwrap();
@@ -615,17 +697,38 @@ mod tests {
 
     #[test]
     fn insufficient_duplicate_or_mismatched_panel_is_rejected() {
-        let intervals = vec![FrameIntervalV1 { start_frame: 100, end_frame: 200 }];
+        let intervals = vec![FrameIntervalV1 {
+            start_frame: 100,
+            end_frame: 200,
+        }];
         let one = case(
-            vec![annotation('1', 'a', GroundTruthStateV1::Present, intervals.clone(), None)],
+            vec![annotation(
+                '1',
+                'a',
+                GroundTruthStateV1::Present,
+                intervals.clone(),
+                None,
+            )],
             prediction(intervals.clone()),
         );
         assert!(audit_multi_annotator_case(&one).is_err());
 
         let duplicate = case(
             vec![
-                annotation('1', 'a', GroundTruthStateV1::Present, intervals.clone(), None),
-                annotation('1', 'b', GroundTruthStateV1::Present, intervals.clone(), None),
+                annotation(
+                    '1',
+                    'a',
+                    GroundTruthStateV1::Present,
+                    intervals.clone(),
+                    None,
+                ),
+                annotation(
+                    '1',
+                    'b',
+                    GroundTruthStateV1::Present,
+                    intervals.clone(),
+                    None,
+                ),
             ],
             prediction(intervals.clone()),
         );
@@ -633,8 +736,20 @@ mod tests {
 
         let bad = case(
             vec![
-                annotation('1', 'a', GroundTruthStateV1::Present, intervals.clone(), None),
-                annotation('2', 'b', GroundTruthStateV1::Present, intervals.clone(), None),
+                annotation(
+                    '1',
+                    'a',
+                    GroundTruthStateV1::Present,
+                    intervals.clone(),
+                    None,
+                ),
+                annotation(
+                    '2',
+                    'b',
+                    GroundTruthStateV1::Present,
+                    intervals.clone(),
+                    None,
+                ),
             ],
             prediction(intervals),
         );
