@@ -1,0 +1,58 @@
+{
+  "artifact": "SFEB MON-006 SCITT-compatible action evidence and COSE receipts v1",
+  "date": "2026-11-24",
+  "runtime": "Node.js v22.16.0",
+  "source_file": "mon006-scitt-action-evidence-v1.mjs",
+  "source_bytes": 32574,
+  "source_sha256": "b8f9163278a655c5407fa8419e727d0e124031732f07074cea915af5789a1c40",
+  "compressed_file": "mon006-scitt-action-evidence-v1.mjs.gz",
+  "compressed_bytes": 8554,
+  "compressed_sha256": "dabe9e86058a561c9da8248fcc3aeb090203edc78b284f5424673224dc6dd96f",
+  "tests": 28,
+  "passed": 28,
+  "failed": 0,
+  "raw_invocations": 4,
+  "compressed_stdin_invocation": 1,
+  "wire_examples_stable_across_invocations": true,
+  "whole_run_output_byte_identical": false,
+  "benchmark": {
+    "signed_action_create_verify_ops_per_second": {
+      "runs": [
+        2908,
+        2922,
+        2672,
+        2476
+      ],
+      "median": 2790,
+      "range": [
+        2476,
+        2922
+      ]
+    },
+    "detached_receipt_verify_ops_per_second": {
+      "runs": [
+        5706,
+        5982,
+        4856,
+        5719
+      ],
+      "median": 5712.5,
+      "range": [
+        4856,
+        5982
+      ]
+    },
+    "scope": "same-process built-in CBOR/Ed25519/Merkle CPU only; no network, persistence, live TS, external sink or independent readback; not an industry benchmark"
+  },
+  "wire_shape": "CBOR tag 18 COSE_Sign1; EdDSA -8; protected content_type, kid, CWT iss/sub; two separate mock TS COSE receipt structures with VDS=1 and inclusion proof type -1 at header 396; receipts attached at label 394",
+  "limitations": [
+    "No live SCITT Transparency Service API or external service was contacted.",
+    "CBOR parser/encoder is a strict deterministic subset for the exercised structures, not a general RFC 8949 implementation.",
+    "No independent cross-implementation COSE/SCITT differential test was run.",
+    "Issuer and TS keys are deterministic fixtures, not production KMS/HSM keys.",
+    "Both TSs are mock logs in one process, not independently operated services.",
+    "No key rotation/revocation, trust-policy governance, network gossip, source/authority service, external mutation sink or independent readback exists.",
+    "application/sfeb-action-evidence+cbor is a prototype media type and not a published SFEB profile.",
+    "A transparency receipt establishes signer provenance and VDS inclusion, not the truth of the action statement."
+  ]
+}
