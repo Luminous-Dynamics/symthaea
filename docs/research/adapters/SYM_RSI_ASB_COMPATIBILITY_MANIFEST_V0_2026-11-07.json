@@ -95,7 +95,8 @@
         "orderable_designs": 20000,
         "rounds": 4,
         "batch_size": 96,
-        "total_measurement_budget": 384
+        "total_measurement_budget": 384,
+        "held_out_designs": 5000
       },
       "gates": {
         "discovery": [
