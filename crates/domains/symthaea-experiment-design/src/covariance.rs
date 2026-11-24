@@ -1075,9 +1075,13 @@ mod tests {
         ];
         let descriptor = "synthetic joint covariance:independent unit variance per hypothesis:v1";
         uniform.joint_output_covariance.covariance_descriptor = descriptor.to_owned();
-        uniform.joint_output_covariance.covariance_descriptor_digest_sha256 =
+        uniform
+            .joint_output_covariance
+            .covariance_descriptor_digest_sha256 =
             format!("{:x}", Sha256::digest(descriptor.as_bytes()));
-        uniform.joint_output_covariance.covariance_matrix_digest_sha256 =
+        uniform
+            .joint_output_covariance
+            .covariance_matrix_digest_sha256 =
             matrix_digest_sha256(&uniform.joint_output_covariance.covariance);
 
         input.experiments.push(uniform);
@@ -1091,7 +1095,10 @@ mod tests {
             "one_unresolved_close_pair"
         );
         assert!((report.ranked_experiments[0].worst_case_separation_squared - 0.5).abs() < 1.0e-10);
-        assert!((report.ranked_experiments[0].separation_per_cost_unit - 2.0_f64.sqrt()).abs() < 1.0e-10);
+        assert!(
+            (report.ranked_experiments[0].separation_per_cost_unit - 2.0_f64.sqrt()).abs()
+                < 1.0e-10
+        );
         assert!((report.ranked_experiments[1].separation_per_cost_unit - 0.1).abs() < 1.0e-10);
     }
 
