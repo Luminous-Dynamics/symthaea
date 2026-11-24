@@ -323,7 +323,11 @@ fn robust_candidate_minimum_matches_independent_scenario_oracle() {
         Some(expected.0.as_str())
     );
     assert!(
-        (candidate_report.worst_case_net_expected_loss_reduction.unwrap() - expected.1).abs()
+        (candidate_report
+            .worst_case_net_expected_loss_reduction
+            .unwrap()
+            - expected.1)
+            .abs()
             < 1.0e-10
     );
 }
