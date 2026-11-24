@@ -1381,6 +1381,44 @@ mod tests {
     }
 
     #[test]
+    fn veto_race_rejects_cross_decision_or_disposition_receipt_binding() {
+        let mut value: serde_json::Value = serde_json::from_str(PRESENT).expect("fixture JSON");
+        attach_valid_pre_veto_loopback_race(&mut value);
+        value["effect"]["veto_race"]["decision_receipt_sha256"] =
+            serde_json::json!("2525252525252525252525252525252525252525252525252525252525252525");
+        let raw = serde_json::to_string(&value).expect("serialize fixture");
+        assert!(parse_and_reduce(&raw).is_err());
+    }
+
+    #[test]
+    fn veto_race_rejects_cross_artifact_substitution() {
+        let mut value: serde_json::Value = serde_json::from_str(PRESENT).expect("fixture JSON");
+        attach_valid_pre_veto_loopback_race(&mut value);
+        value["effect"]["veto_race"]["output_artifact_sha256"] =
+            serde_json::json!("2626262626262626262626262626262626262626262626262626262626262626");
+        let raw = serde_json::to_string(&value).expect("serialize fixture");
+        assert!(parse_and_reduce(&raw).is_err());
+    }
+
+    #[test]
+    fn post_veto_loopback_stage_must_follow_the_veto_event() {
+        let mut value: serde_json::Value = serde_json::from_str(PRESENT).expect("fixture JSON");
+        attach_valid_pre_veto_loopback_race(&mut value);
+        value["effect"]["veto_race"]["reported_stage_event_sequence"] = serde_json::json!(45);
+        let raw = serde_json::to_string(&value).expect("serialize fixture");
+        assert!(parse_and_reduce(&raw).is_err());
+    }
+
+    #[test]
+    fn veto_race_evidence_is_rejected_for_non_veto_disposition() {
+        let mut value: serde_json::Value = serde_json::from_str(PRESENT).expect("fixture JSON");
+        attach_valid_pre_veto_loopback_race(&mut value);
+        value["disposition"]["action"] = serde_json::json!("accept");
+        let raw = serde_json::to_string(&value).expect("serialize fixture");
+        assert!(parse_and_reduce(&raw).is_err());
+    }
+
+    #[test]
     fn duplicate_and_missing_capture_sequences_never_qualify_absence() {
         let mut value: serde_json::Value = serde_json::from_str(ABSENT).expect("fixture JSON");
         value["capture"]["sequence_accounting"]["duplicate"] = serde_json::json!(1);
