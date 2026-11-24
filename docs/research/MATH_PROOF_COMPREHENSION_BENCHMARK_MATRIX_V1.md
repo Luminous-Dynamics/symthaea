@@ -449,3 +449,13 @@ A second pinned Lean source now deliberately applies `And.symm` to the wrong pro
 The focused workflow now checks that the action-certificate manifest's plan ID, action node IDs, action kinds, input goals and output subgoals match the pinned ProofPlanV1 fixture. It checks that forward/reverse expected proposition strings match the exact corresponding subgoal statements. A generated mutation that substitutes the identity proposition for the forward target must be rejected by the same binding check.
 
 **Status:** workflow source is committed; exact-head execution is pending. This tests consistency of the declared manifest with the provisional plan fixture. It does not authenticate the author of the plan or establish that the conceptual role labels are correct.
+
+## 18. Executable Tier-1 scope-equivalence subset (2026-11-24)
+
+A bounded Rust implementation now exists in `scope_equivalence.rs` with a `scope-equivalence` CLI and a five-pair synthetic fixture. It sorts only contextual Boolean hypotheses and preserves premise order, duplicate hypotheses, free atom names and conclusion structure. It computes domain-separated raw and normalized digests and keeps evaluator-only expected relations separate from candidate inputs.
+
+The fixture includes exact identity, a positive hypothesis-order permutation, and negative structural controls for premise reordering, hypothesis multiplicity change and conclusion change. Tests also require false equivalence adjudications and unknown JSON fields to be rejected.
+
+**Prospective target:** 100% reproducible normalized digests and zero false Tier-1 equivalence on the frozen negative controls. These are targets, not results. The exact-head Rust test/CLI execution is pending.
+
+**Scope boundary:** the current BooleanSequent has no binders, so this does not implement alpha-renaming; it does not normalize logical equivalences, alter free atom identities, sort premises or establish kernel-certified context transport. Tier 0 exact CIRR is not modified. Tier 1 must have its own denominators, exclusions and false-comparability reporting.
