@@ -878,9 +878,7 @@ mod tests {
         let semantics = semantics();
         let mut rows = Vec::new();
         for (index, stratum) in (0..8).map(|i| (i, if i < 4 { "tool-a" } else { "tool-b" })) {
-            let (method, selected, probability) = if full_census {
-                (MetrologySelectionMethodV1::DeterministicExploit, true, 1.0)
-            } else if index == 0 || index == 4 {
+            let (method, selected, probability) = if full_census || index == 0 || index == 4 {
                 (MetrologySelectionMethodV1::DeterministicExploit, true, 1.0)
             } else if index == 1 || index == 2 || index == 5 || index == 6 {
                 (MetrologySelectionMethodV1::RandomizedAudit, true, 2.0 / 3.0)
