@@ -52,6 +52,7 @@ jobs:
         run: |
           rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/lib.rs
           rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/bin/kird_point_audit.rs
+          rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/bin/sensor_actuator_contract_audit.rs
 
       - name: Prepare isolated crate validation workspace
         shell: bash
@@ -67,6 +68,7 @@ jobs:
           mkdir -p "${tmp_root}/benchmarks/plasma/control-interface/fixtures"
           cp crates/domains/symthaea-plasma-probes/src/lib.rs "${crate_dir}/src/lib.rs"
           cp crates/domains/symthaea-plasma-probes/src/bin/kird_point_audit.rs "${crate_dir}/src/bin/kird_point_audit.rs"
+          cp crates/domains/symthaea-plasma-probes/src/bin/sensor_actuator_contract_audit.rs "${crate_dir}/src/bin/sensor_actuator_contract_audit.rs"
           cp benchmarks/plasma/adversarial-probes/fixtures/synthetic-pulse-family-v0.1.json \
             "${tmp_root}/benchmarks/plasma/adversarial-probes/fixtures/"
           cp benchmarks/plasma/rate-distortion/kird-point-v0.1.schema.json \
@@ -202,6 +204,9 @@ jobs:
           assert len(fixture["actuators"]) == 1
           print("sensor_actuator_interface_schema_validation=PASS")
           PY
+
+      - name: Run sensor/actuator timing semantic audit
+        run: cargo run --locked --manifest-path "${RUNNER_TEMP}/plasma-probe-validation/crates/domains/symthaea-plasma-probes/Cargo.toml" --bin sensor_actuator_contract_audit -- "${RUNNER_TEMP}/plasma-probe-validation/benchmarks/plasma/control-interface/fixtures/synthetic-multirate-interface-v0.1.json"
 
       - name: Run KIRD semantic audit fixtures
         run: |
