@@ -2121,6 +2121,15 @@ pub struct SensorActuatorTimingSummary {
     pub maximum_actuator_command_latency_seconds: f64,
     pub minimum_effective_actuator_bandwidth_hz: f64,
     pub conservative_closed_loop_latency_seconds: f64,
+    pub minimum_effective_diagnostic_bandwidth_hz: f64,
+    pub target_instability_frequency_hz: f64,
+    pub diagnostic_bandwidth_multiple: f64,
+    pub actuator_bandwidth_multiple: f64,
+    pub target_instability_efold_time_seconds: f64,
+    pub loop_latency_efold_fraction: f64,
+    pub minimum_required_bandwidth_multiple: f64,
+    pub maximum_allowed_loop_latency_efold_fraction: f64,
+    pub interface_timescale_qualified: bool,
     pub controller_update_period_seconds: f64,
     pub controller_deadline_seconds: f64,
     pub controller_worst_case_execution_seconds: f64,
@@ -2177,6 +2186,7 @@ pub fn validate_sensor_actuator_timing_contract_value(
 
     let mut diagnostic_ids = BTreeSet::new();
     let mut maximum_observation_age_seconds = 0.0_f64;
+    let mut minimum_effective_diagnostic_bandwidth_hz = f64::INFINITY;
     for diagnostic in diagnostics {
         let channel_id = timing_string(diagnostic, "channel_id")?;
         if !diagnostic_ids.insert(channel_id.to_owned()) {
@@ -2186,11 +2196,13 @@ pub fn validate_sensor_actuator_timing_contract_value(
             ));
         }
         let sampling_period = timing_number(diagnostic, "sampling_period_seconds")?;
+        let measurement_bandwidth = timing_number(diagnostic, "bandwidth_hz")?;
         let transport_latency = timing_number(diagnostic, "transport_latency_seconds")?;
         let timestamp_age_bound = timing_number(diagnostic, "timestamp_age_bound_seconds")?;
         let jitter = timing_number(diagnostic, "jitter_bound_seconds")?;
         let noise_std = timing_number(diagnostic, "noise_std")?;
         if sampling_period <= 0.0
+            || measurement_bandwidth <= 0.0
             || transport_latency < 0.0
             || timestamp_age_bound < 0.0
             || jitter < 0.0
@@ -2210,6 +2222,9 @@ pub fn validate_sensor_actuator_timing_contract_value(
             ));
         }
         maximum_observation_age_seconds = maximum_observation_age_seconds.max(timestamp_age_bound);
+        let sampling_nyquist_hz = 0.5 / sampling_period;
+        minimum_effective_diagnostic_bandwidth_hz =
+            minimum_effective_diagnostic_bandwidth_hz.min(measurement_bandwidth.min(sampling_nyquist_hz));
     }
 
     let mut actuator_ids = BTreeSet::new();
@@ -2254,10 +2269,22 @@ pub fn validate_sensor_actuator_timing_contract_value(
     let controller_deadline = timing_number(value, "controller.deadline_seconds")?;
     let maximum_allowed_observation_age =
         timing_number(value, "controller.maximum_observation_age_seconds")?;
+    let target_instability_frequency_hz =
+        timing_number(value, "controller.target_instability_frequency_hz")?;
+    let target_instability_efold_time_seconds =
+        timing_number(value, "controller.target_instability_efold_time_seconds")?;
+    let minimum_bandwidth_multiple =
+        timing_number(value, "controller.minimum_bandwidth_multiple")?;
+    let maximum_loop_latency_efold_fraction =
+        timing_number(value, "controller.maximum_loop_latency_efold_fraction")?;
     if controller_update_period <= 0.0
         || controller_wcet < 0.0
         || controller_deadline <= 0.0
         || maximum_allowed_observation_age <= 0.0
+        || target_instability_frequency_hz <= 0.0
+        || target_instability_efold_time_seconds <= 0.0
+        || minimum_bandwidth_multiple <= 0.0
+        || maximum_loop_latency_efold_fraction <= 0.0
     {
         return Err(control_timing_error(
             "controller",
@@ -2296,9 +2323,22 @@ pub fn validate_sensor_actuator_timing_contract_value(
     let conservative_closed_loop_latency_seconds = maximum_observation_age_seconds
         + controller_wcet
         + maximum_actuator_command_latency_seconds;
+    let diagnostic_bandwidth_multiple =
+        minimum_effective_diagnostic_bandwidth_hz / target_instability_frequency_hz;
+    let actuator_bandwidth_multiple =
+        minimum_effective_actuator_bandwidth_hz / target_instability_frequency_hz;
+    let loop_latency_efold_fraction =
+        conservative_closed_loop_latency_seconds / target_instability_efold_time_seconds;
+    let interface_timescale_qualified = diagnostic_bandwidth_multiple >= minimum_bandwidth_multiple
+        && actuator_bandwidth_multiple >= minimum_bandwidth_multiple
+        && loop_latency_efold_fraction <= maximum_loop_latency_efold_fraction;
     if !maximum_actuator_command_latency_seconds.is_finite()
         || !minimum_effective_actuator_bandwidth_hz.is_finite()
+        || !minimum_effective_diagnostic_bandwidth_hz.is_finite()
         || !conservative_closed_loop_latency_seconds.is_finite()
+        || !diagnostic_bandwidth_multiple.is_finite()
+        || !actuator_bandwidth_multiple.is_finite()
+        || !loop_latency_efold_fraction.is_finite()
     {
         return Err(control_timing_error(
             "actuators",
@@ -2315,6 +2355,15 @@ pub fn validate_sensor_actuator_timing_contract_value(
         maximum_actuator_command_latency_seconds,
         minimum_effective_actuator_bandwidth_hz,
         conservative_closed_loop_latency_seconds,
+        minimum_effective_diagnostic_bandwidth_hz,
+        target_instability_frequency_hz,
+        diagnostic_bandwidth_multiple,
+        actuator_bandwidth_multiple,
+        target_instability_efold_time_seconds,
+        loop_latency_efold_fraction,
+        minimum_required_bandwidth_multiple: minimum_bandwidth_multiple,
+        maximum_allowed_loop_latency_efold_fraction: maximum_loop_latency_efold_fraction,
+        interface_timescale_qualified,
         controller_update_period_seconds: controller_update_period,
         controller_deadline_seconds: controller_deadline,
         controller_worst_case_execution_seconds: controller_wcet,
@@ -4645,7 +4694,36 @@ mod tests {
         assert!((report.maximum_actuator_command_latency_seconds - 0.0265).abs() < 1.0e-12);
         assert!((report.minimum_effective_actuator_bandwidth_hz - 20.0).abs() < 1.0e-12);
         assert!((report.conservative_closed_loop_latency_seconds - 0.0715).abs() < 1.0e-12);
+        assert!((report.minimum_effective_diagnostic_bandwidth_hz - 20.0).abs() < 1.0e-12);
+        assert!((report.target_instability_frequency_hz - 5.0).abs() < 1.0e-12);
+        assert!((report.diagnostic_bandwidth_multiple - 4.0).abs() < 1.0e-12);
+        assert!((report.actuator_bandwidth_multiple - 4.0).abs() < 1.0e-12);
+        assert!((report.target_instability_efold_time_seconds - 0.1).abs() < 1.0e-12);
+        assert!((report.loop_latency_efold_fraction - 0.715).abs() < 1.0e-12);
+        assert!(report.interface_timescale_qualified);
         assert!((report.controller_update_period_seconds - 0.02).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn sensor_actuator_timescale_audit_rejects_underresolved_observation_rate_as_unqualified() {
+        let mut value = sensor_actuator_fixture_value();
+        value["diagnostics"][1]["sampling_period_seconds"] = serde_json::json!(0.2);
+        value["diagnostics"][1]["timestamp_age_bound_seconds"] = serde_json::json!(0.22);
+        value["controller"]["maximum_observation_age_seconds"] = serde_json::json!(0.25);
+        let report = validate_sensor_actuator_timing_contract_value(&value).unwrap();
+        assert!(report.diagnostic_bandwidth_multiple < report.minimum_required_bandwidth_multiple);
+        assert!(!report.interface_timescale_qualified);
+    }
+
+    #[test]
+    fn sensor_actuator_timescale_audit_rejects_loop_latency_too_slow_for_growth_time() {
+        let mut value = sensor_actuator_fixture_value();
+        value["controller"]["target_instability_efold_time_seconds"] =
+            serde_json::json!(0.05);
+        let report = validate_sensor_actuator_timing_contract_value(&value).unwrap();
+        assert!(report.loop_latency_efold_fraction
+            > report.maximum_allowed_loop_latency_efold_fraction);
+        assert!(!report.interface_timescale_qualified);
     }
 
     #[test]
