@@ -38,6 +38,7 @@ pub mod mycelial_junction_graph;
 pub mod mycelial_mesh;
 pub mod mycelial_model;
 pub mod mycelial_network;
+pub mod mycelial_photobiological_exposure;
 pub mod mycelial_presence;
 pub mod mycelial_reconstruction_calibration;
 pub mod mycelial_reconstruction_metrics;
@@ -228,6 +229,20 @@ pub use mycelial_network::{
     MycelialAnastomosis, MycelialAnastomosisCandidate, MycelialConnectionKind,
     MycelialNetworkConfig, MycelialNetworkConnection, MycelialNetworkError, MycelialNetworkGraph,
     MycelialNetworkMetrics, build_mycelial_network_graph, detect_anastomosis_candidates,
+};
+pub use mycelial_photobiological_exposure::{
+    MAX_MYCELIAL_PHOTOBIOLOGICAL_CHANNELS, MAX_MYCELIAL_PHOTOBIOLOGICAL_FOOTPRINT_CELLS,
+    MAX_MYCELIAL_PHOTOBIOLOGICAL_ID_BYTES, MAX_MYCELIAL_PHOTOBIOLOGICAL_REASON_BYTES,
+    MAX_MYCELIAL_PHOTOBIOLOGICAL_SCHEDULE_INTERVALS,
+    MYCELIAL_PHOTOBIOLOGICAL_EXPOSURE_SCHEMA_VERSION,
+    MYCELIAL_PHOTOBIOLOGICAL_RESPONSE_SCHEMA_VERSION, MycelialIlluminationInterval,
+    MycelialIlluminationPurpose, MycelialIlluminationScheduleKind,
+    MycelialPhotobiologicalChannelExposure, MycelialPhotobiologicalExposureError,
+    MycelialPhotobiologicalExposureRecord, MycelialPhotobiologicalMeasurement,
+    MycelialPhotobiologicalMissingStatus, MycelialPhotobiologicalObservationWindow,
+    MycelialPhotobiologicalResponseObservation, MycelialPhotobiologicalStage,
+    MycelialPhotoperiodPhase, mycelial_illumination_schedule_digest,
+    mycelial_photobiological_footprint_digest,
 };
 pub use mycelial_presence::{
     build_mycelial_presence, build_mycelial_presence_with_mode, render_mycelial_presence,
