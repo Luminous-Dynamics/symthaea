@@ -1921,6 +1921,12 @@ fn validate_kird_global_coverage(
             "certified_global coverage requires registered and confirmed probes",
         ));
     }
+    if confirmed_probe_count != registered_probe_count {
+        return Err(kird_error(
+            "response_scope.confirmed_probe_count",
+            "a global cover cannot contain unconfirmed or unresolved registered probes",
+        ));
+    }
 
     let metric_id = kird_string(root, "response_scope.coverage_metric_id")?;
     let method = kird_string(root, "response_scope.bound_method")?;
@@ -1967,8 +1973,12 @@ fn validate_kird_global_coverage(
     }
 
     for digest_path in [
-        "response_scope.bound_evidence_sha256",
+        "response_scope.intervention_domain_sha256",
+        "response_scope.metric_definition_sha256",
+        "response_scope.compactness_evidence_sha256",
         "response_scope.covering_set_sha256",
+        "response_scope.cover_radius_evidence_sha256",
+        "response_scope.bound_evidence_sha256",
         "response_scope.branch_stability_evidence_sha256",
     ] {
         let digest = kird_string(root, digest_path)?;
@@ -2761,6 +2771,35 @@ mod tests {
         assert_eq!(summary.verified_lipschitz_constant, Some(2.0));
         assert_eq!(summary.uncertainty_budget, Some(0.05));
         assert_eq!(summary.global_normalized_error_bound, Some(0.75));
+    }
+
+    #[test]
+    fn kird_audit_rejects_global_cover_with_unconfirmed_registered_probes() {
+        let mut value = certified_kird_value();
+        value["response_scope"]["registered_probe_count"] = serde_json::json!(2);
+        value["response_scope"]["confirmed_probe_count"] = serde_json::json!(1);
+        assert!(matches!(
+            validate_kird_record_value(&value),
+            Err(ContractError::InvalidKirdField {
+                field: "response_scope.confirmed_probe_count",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn kird_audit_rejects_global_cover_without_domain_or_fill_distance_proof() {
+        let mut value = certified_kird_value();
+        value["response_scope"]["cover_radius_evidence_sha256"] = serde_json::json!(
+            "0000000000000000000000000000000000000000000000000000000000000000"
+        );
+        assert!(matches!(
+            validate_kird_record_value(&value),
+            Err(ContractError::InvalidKirdField {
+                field: "response_scope.cover_radius_evidence_sha256",
+                ..
+            })
+        ));
     }
 
     #[test]
