@@ -382,19 +382,25 @@ fn handle_request(
             let build_started = Instant::now();
             let needs_build = index.is_none();
             if needs_build {
-                let bm25 = LongMemEvalV2Bm25IndexV1::build(
-                    config.domain.clone(),
-                    trajectories,
-                    config.slice_radius,
-                    config.profile,
-                )
-                .map_err(|error| format!("build trajectory BM25 index: {error:?}"))?;
-                let entity_literal = LongMemEvalV2EntityLiteralIndexV1::build(
-                    config.domain.clone(),
-                    trajectories,
-                    config.slice_radius,
-                )
-                .map_err(|error| format!("build trajectory entity-literal index: {error:?}"))?;
+                let bm25 = if config.retrieval_mode.uses_bm25() {
+                    Some(LongMemEvalV2Bm25IndexV1::build(
+                        config.domain.clone(),
+                        trajectories,
+                        config.slice_radius,
+                        config.profile,
+                    ).map_err(|error| format!("build trajectory BM25 index: {error:?}"))?)
+                } else {
+                    None
+                };
+                let entity_literal = if config.retrieval_mode.uses_entity_literal() {
+                    Some(LongMemEvalV2EntityLiteralIndexV1::build(
+                        config.domain.clone(),
+                        trajectories,
+                        config.slice_radius,
+                    ).map_err(|error| format!("build trajectory entity-literal index: {error:?}"))?)
+                } else {
+                    None
+                };
                 *index = Some(RetrievalIndexesV1 { bm25, entity_literal });
             }
             let index_build_ns = if needs_build {
