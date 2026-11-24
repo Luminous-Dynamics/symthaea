@@ -4727,6 +4727,30 @@ mod tests {
     }
 
     #[test]
+    fn sensor_actuator_timescale_audit_rejects_non_positive_target_frequency_and_margins() {
+        let mut zero_frequency = sensor_actuator_fixture_value();
+        zero_frequency["controller"]["target_instability_frequency_hz"] =
+            serde_json::json!(0.0);
+        assert!(matches!(
+            validate_sensor_actuator_timing_contract_value(&zero_frequency),
+            Err(ContractError::InvalidControlTimingField {
+                field: "controller",
+                ..
+            })
+        ));
+
+        let mut zero_margin = sensor_actuator_fixture_value();
+        zero_margin["controller"]["minimum_bandwidth_multiple"] = serde_json::json!(0.0);
+        assert!(matches!(
+            validate_sensor_actuator_timing_contract_value(&zero_margin),
+            Err(ContractError::InvalidControlTimingField {
+                field: "controller",
+                ..
+            })
+        ));
+    }
+
+    #[test]
     fn sensor_actuator_timing_auditor_rejects_understated_timestamp_age() {
         let mut value = sensor_actuator_fixture_value();
         value["diagnostics"][0]["timestamp_age_bound_seconds"] = serde_json::json!(0.01);
