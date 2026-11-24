@@ -4,14 +4,16 @@ use std::fs;
 use std::process::ExitCode;
 
 use sym_rsi_asb_adapter_reference::api_contract::{
-    validate_catalog_submission, CampaignCardV1, CampaignStatusV1, CatalogResponseV1, JobResponseV1,
+    CampaignCardV1, CampaignStatusV1, CatalogResponseV1, JobResponseV1, validate_catalog_submission,
 };
 use sym_rsi_asb_adapter_reference::parse_and_validate;
 
 fn validate_api_fixtures() -> Result<serde_json::Value, String> {
     let campaign = CampaignCardV1::parse(include_str!("../fixtures/campaign-card-v1.json"))
         .map_err(|error| format!("campaign fixture: {error}"))?;
-    campaign.validate().map_err(|error| format!("campaign contract: {error}"))?;
+    campaign
+        .validate()
+        .map_err(|error| format!("campaign contract: {error}"))?;
 
     let status = CampaignStatusV1::parse(include_str!("../fixtures/status-v1.json"))
         .map_err(|error| format!("status fixture: {error}"))?;
@@ -63,16 +65,28 @@ fn validate_api_fixtures() -> Result<serde_json::Value, String> {
         ),
     ];
     let mut pinned_campaign_reports = Vec::new();
-    for (label, expected_id, expected_design_field, expected_stages, expected_batch, expected_budget, contents)
-        in pinned_cards
+    for (
+        label,
+        expected_id,
+        expected_design_field,
+        expected_stages,
+        expected_batch,
+        expected_budget,
+        contents,
+    ) in pinned_cards
     {
         let pinned = CampaignCardV1::parse(contents)
             .map_err(|error| format!("{label} pinned campaign card: {error}"))?;
-        pinned.validate().map_err(|error| format!("{label} pinned campaign contract: {error}"))?;
+        pinned
+            .validate()
+            .map_err(|error| format!("{label} pinned campaign contract: {error}"))?;
         if pinned.campaign_id != expected_id
             || pinned.design_id_field != expected_design_field
             || pinned.stages.len() != expected_stages
-            || pinned.stages.iter().any(|stage| stage.batch_size != expected_batch)
+            || pinned
+                .stages
+                .iter()
+                .any(|stage| stage.batch_size != expected_batch)
             || pinned.budget.total != expected_budget
             || !pinned.is_shared_pool_catalog()
         {
