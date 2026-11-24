@@ -215,5 +215,74 @@
       "four-arm #13377 validator treated as a generic two-branch verifier"
     ],
     "stochastic_boundary": "Use Symtropy #3741/#3743 source-to-address-to-Philox re-projection only when the pinned experiment has a stochastic draw/correspondence domain; do not invent a stochastic verifier for deterministic DMC runs."
+  },
+  "external_benchmark_anchors": [
+    {
+      "name": "MRS.Q",
+      "venue_year": "ICML 2026",
+      "url": "https://proceedings.mlr.press/v306/chang26a.html",
+      "comparison_role": "Native model-based search comparator; report prediction accuracy separately from search value and overestimation risk.",
+      "key_warning": "Search may reduce performance even with accurate models; minimum-over-value-ensemble aggregation mitigates overestimation."
+    },
+    {
+      "name": "World-In-World",
+      "venue_year": "ICLR 2026",
+      "url": "https://proceedings.iclr.cc/paper_files/paper/2026/hash/5b4263be85820683d78675cc18d2efc7-Abstract-Conference.html",
+      "comparison_role": "Closed-loop visual embodied track with task success and a standardized action API; pair with direct-policy/no-world-model controls.",
+      "key_warning": "Do not compare task success values to DMC abducible share A or floor phi."
+    },
+    {
+      "name": "Rollback",
+      "date": "2026-10-26",
+      "paper_url": "https://arxiv.org/abs/2610.36068",
+      "project_url": "https://rollback-wm.github.io/",
+      "comparison_role": "Prior art for checkpoint rewind, action-chunk branching and branch-outcome supervision on real robots.",
+      "published_task_results": {
+        "jenga_success_percent": {
+          "rollback": 69.33,
+          "strongest_listed_baseline": 58.67
+        },
+        "ball_toss_success_percent": {
+          "rollback": 40,
+          "strongest_listed_baseline": 28.89
+        },
+        "tabletop_curling_success_percent": {
+          "rollback": 64.44,
+          "strongest_listed_baseline": 52.59
+        }
+      },
+      "key_warning": "Task-specific reported results; not comparable with DMC, LIBERO or one another absent identical protocols."
+    },
+    {
+      "name": "Do World Models Make Better Robots?",
+      "date": "2026-08-30",
+      "url": "https://arxiv.org/abs/2609.29669",
+      "comparison_role": "Benchmark landscape audit for prediction-to-action and direct-policy comparison.",
+      "survey_specific_counts": {
+        "benchmarks": 160,
+        "explicit_vla_vs_world_model_comparisons": 11,
+        "prediction_to_execution_bridges": 4
+      },
+      "key_warning": "Counts describe this survey corpus, not an exhaustive universal census."
+    }
+  ],
+  "industry_comparison_policy": {
+    "compare_only_within_matching_task_protocol": true,
+    "required_controls": [
+      "direct policy without a world model",
+      "identity/full-state oracle or reference where valid",
+      "zero-effect and branch-point-only individual-effect predictors",
+      "matched recurrent/RSSM model where faithfully reproducible",
+      "HDC-only, CfC/LTC-only and HDC+CfC/LTC"
+    ],
+    "separate_metrics": [
+      "individual counterfactual effect fidelity",
+      "decision regret / common epsilon-good set",
+      "closed-loop success and recovery",
+      "search-induced optimism / lower-tail risk",
+      "compute, latency, simulator interaction and energy"
+    ],
+    "no_cross_benchmark_score_pooling": true,
+    "desired_claim": "Matched Pareto improvement on an identical task protocol with independently reproducible evidence; no SOTA claim from cross-task score comparisons."
   }
 }
