@@ -1,6 +1,6 @@
 # MACE v0.1 — Qualified Candidate Evidence Projection
 
-**Status:** research implementation increment; draft PR. All eight new Rust tests are authored but unexecuted.
+**Status:** research implementation increment; draft PR. All twelve projection Rust tests are authored but unexecuted.
 
 ## Purpose
 
@@ -34,4 +34,4 @@ The current MACE signature is a versioned custom Ed25519 input, not DSSE. A foll
 
 ## Tests
 
-Eleven Rust tests cover admissible-only projection, expected scope mismatch, stale-batch mutation, exact ID-set mismatch, rejected-parent propagation, missing-parent abstention, cycle rejection and zero-admissible abstention, projection expiry at later consumption, context-rebinding rejection and consuming-clock rollback. They are authored but not executed. Rust compilation, formatting, Clippy, dependency resolution and exact-head CI remain unverified.
+Twelve Rust tests cover admissible-only projection, expected scope mismatch, stale-batch mutation, exact ID-set mismatch, rejected-parent propagation, missing-parent abstention, cycle rejection and zero-admissible abstention, projection expiry at later consumption, purpose/subject/lifecycle/candidate-set rebinding rejection and consuming-clock rollback. They are authored but not executed. Rust compilation, formatting, Clippy, dependency resolution and exact-head CI remain unverified.

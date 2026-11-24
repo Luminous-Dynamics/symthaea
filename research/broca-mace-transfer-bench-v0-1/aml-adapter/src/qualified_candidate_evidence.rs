@@ -567,6 +567,42 @@ mod tests {
     }
 
     #[test]
+    fn later_consumption_rejects_subject_lifecycle_and_candidate_set_changes() {
+        let batch = make_batch(&[record("a", 1, vec![])]);
+        let ids = ids(&batch);
+        let initial_binding = binding(&batch, &ids);
+        let token = token(&initial_binding, &[EvidenceDispositionV1::Admissible]);
+        let result = project_qualified_candidate_evidence_v1(
+            &batch, &token, &initial_binding, &expectation(&batch),
+        ).unwrap();
+        let CandidateEvidenceProjectionV1::Qualified(projected) = result else {
+            panic!("expected qualified projection");
+        };
+
+        let mut changed_subject = binding(&batch, &ids);
+        changed_subject.subject_scope_sha256 = A;
+        assert_eq!(
+            projected.validate_at_use(&changed_subject),
+            Err(EvidenceQualificationRejectV1::BindingMismatch)
+        );
+
+        let mut changed_lifecycle = binding(&batch, &ids);
+        changed_lifecycle.lifecycle_snapshot_sha256 = A;
+        assert_eq!(
+            projected.validate_at_use(&changed_lifecycle),
+            Err(EvidenceQualificationRejectV1::BindingMismatch)
+        );
+
+        let substituted_ids = vec!["substituted".to_owned()];
+        let mut changed_candidates = binding(&batch, &ids);
+        changed_candidates.candidate_evidence_ids = &substituted_ids;
+        assert_eq!(
+            projected.validate_at_use(&changed_candidates),
+            Err(EvidenceQualificationRejectV1::BindingMismatch)
+        );
+    }
+
+    #[test]
     fn no_admissible_evidence_is_never_reported_as_success() {
         let batch = make_batch(&[record("a", 1, vec![]), record("b", 2, vec![])]);
         let ids = ids(&batch); let binding = binding(&batch, &ids);
