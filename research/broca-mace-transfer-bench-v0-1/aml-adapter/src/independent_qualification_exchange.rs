@@ -215,9 +215,10 @@ impl EvidenceQualificationRequestV1 {
                 CandidateEvidenceReject::InvalidDigest,
             ));
         }
-        let actual_ids = candidate_batch.evidence.iter()
+        let mut actual_ids = candidate_batch.evidence.iter()
             .map(|item| item.evidence_id.clone())
             .collect::<Vec<_>>();
+        actual_ids.sort();
         if candidate_batch.run_id != binding.run_id
             || candidate_batch.query_sha256 != binding.query_sha256
             || candidate_batch.candidate_set_sha256 != binding.candidate_set_sha256
@@ -733,6 +734,17 @@ mod tests {
         assert_eq!(request.request_sha256, request_digest(
             &request.candidate_batch_jsonl, &request.binding,
         ));
+        let decoded = EvidenceQualificationRequestV1::from_json_value(
+            &request.to_json_value(),
+        ).expect("strict request decode");
+        assert_eq!(decoded, request);
+
+        let mut tampered = request.to_json_value();
+        tampered["binding"]["purpose_sha256"] = Value::String(A.to_owned());
+        assert_eq!(
+            EvidenceQualificationRequestV1::from_json_value(&tampered),
+            Err(IndependentQualificationExchangeRejectV1::RequestDigestMismatch),
+        );
         assert_eq!(
             request.to_json_value()["schema_version"],
             QUALIFICATION_REQUEST_SCHEMA_V1,
