@@ -1614,9 +1614,9 @@ pub fn project_weighted_micro_fluctuation(
         || diagonal_weights
             .iter()
             .any(|weight| !weight.is_finite() || *weight <= 0.0)
-        || constraints.iter().any(|row| {
-            row.len() != dimension || row.iter().any(|value| !value.is_finite())
-        })
+        || constraints
+            .iter()
+            .any(|row| row.len() != dimension || row.iter().any(|value| !value.is_finite()))
     {
         return Err(ContractError::InvalidGramianArithmetic);
     }
@@ -1676,11 +1676,7 @@ pub fn project_weighted_micro_fluctuation(
     }
 
     let mut correction_norm_squared = 0.0;
-    for ((projected, original), weight) in micro_fluctuation
-        .iter()
-        .zip(values)
-        .zip(diagonal_weights)
-    {
+    for ((projected, original), weight) in micro_fluctuation.iter().zip(values).zip(diagonal_weights) {
         let correction = projected - original;
         correction_norm_squared += weight * correction * correction;
     }
@@ -2984,9 +2980,8 @@ mod tests {
     #[test]
     fn kird_audit_rejects_global_cover_without_domain_or_fill_distance_proof() {
         let mut value = certified_kird_value();
-        value["response_scope"]["cover_radius_evidence_sha256"] = serde_json::json!(
-            "0000000000000000000000000000000000000000000000000000000000000000"
-        );
+        value["response_scope"]["cover_radius_evidence_sha256"] =
+            serde_json::json!("0000000000000000000000000000000000000000000000000000000000000000");
         assert!(matches!(
             validate_kird_record_value(&value),
             Err(ContractError::InvalidKirdField {
@@ -3357,10 +3352,7 @@ mod tests {
     fn weighted_micro_projector_annihilates_all_declared_moments() {
         let values = [1.0, 2.0, -1.0, 4.0];
         let weights = [1.0, 2.0, 1.5, 3.0];
-        let constraints = vec![
-            vec![1.0, 1.0, 1.0, 1.0],
-            vec![-1.0, -0.25, 0.5, 1.0],
-        ];
+        let constraints = vec![vec![1.0, 1.0, 1.0, 1.0], vec![-1.0, -0.25, 0.5, 1.0]];
         let result = project_weighted_micro_fluctuation(
             &values,
             &constraints,
@@ -3381,10 +3373,7 @@ mod tests {
     fn weighted_micro_projector_is_idempotent() {
         let values = [2.0, -1.0, 3.0, 0.5];
         let weights = [0.5, 1.0, 2.0, 3.0];
-        let constraints = vec![
-            vec![1.0, 1.0, 1.0, 1.0],
-            vec![-1.0, 0.0, 0.0, 1.0],
-        ];
+        let constraints = vec![vec![1.0, 1.0, 1.0, 1.0], vec![-1.0, 0.0, 0.0, 1.0]];
         let first = project_weighted_micro_fluctuation(
             &values,
             &constraints,
@@ -3413,10 +3402,7 @@ mod tests {
     fn weighted_micro_projector_rejects_dependent_constraints() {
         let values = [1.0, 2.0, 3.0];
         let weights = [1.0, 1.0, 1.0];
-        let constraints = vec![
-            vec![1.0, 1.0, 1.0],
-            vec![2.0, 2.0, 2.0],
-        ];
+        let constraints = vec![vec![1.0, 1.0, 1.0], vec![2.0, 2.0, 2.0]];
         assert_eq!(
             project_weighted_micro_fluctuation(&values, &constraints, &weights, 1.0e-10),
             Err(ContractError::InvalidProjectionBasis)
@@ -3428,30 +3414,15 @@ mod tests {
         let values = [1.0, -1.0, 2.0];
         let constraints = vec![vec![1.0, 1.0, 1.0]];
         assert_eq!(
-            project_weighted_micro_fluctuation(
-                &values,
-                &constraints,
-                &[1.0, 0.0, 1.0],
-                1.0e-10
-            ),
+            project_weighted_micro_fluctuation(&values, &constraints, &[1.0, 0.0, 1.0], 1.0e-10),
             Err(ContractError::InvalidGramianArithmetic)
         );
         assert_eq!(
-            project_weighted_micro_fluctuation(
-                &values,
-                &constraints,
-                &[1.0, 1.0],
-                1.0e-10
-            ),
+            project_weighted_micro_fluctuation(&values, &constraints, &[1.0, 1.0], 1.0e-10),
             Err(ContractError::InvalidProjectionBasis)
         );
         assert_eq!(
-            project_weighted_micro_fluctuation(
-                &values,
-                &constraints,
-                &[1.0, 1.0, 1.0],
-                0.0
-            ),
+            project_weighted_micro_fluctuation(&values, &constraints, &[1.0, 1.0, 1.0], 0.0),
             Err(ContractError::InvalidProjectionBasis)
         );
     }
