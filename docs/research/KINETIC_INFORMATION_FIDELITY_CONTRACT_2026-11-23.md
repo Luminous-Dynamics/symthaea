@@ -595,6 +595,36 @@ This is an **interface-timescale feasibility check**, not a closed-loop stabilit
 
 The next physical comparison is delay-aware observer + constrained MPC versus robust/tube MPC, RL and response-Gramian sensor/actuator co-design on the same mode/QoI subspace. Score observability, actuator authority, peak/integrated growth, delay margin, dropout robustness and sensor/compute/energy costs separately.
 
+
+### Exact scalar unstable-mode authority oracle
+
+A first analytic mode-level reference is now in [PR #13405](https://github.com/Luminous-Dynamics/symthaea/pull/13405), with schema and known-answer fixture under \`benchmarks/plasma/control-interface/\`.
+
+For the manufactured discrete unstable mode
+
+\[
+x_{k+1}=a x_k+b u_k,\qquad a=e^{\gamma\Delta t},
+\]
+
+with diagnostic samples \(y_k=cx_k+\eta_k\), \(\eta_k\sim(0,\sigma^2)\), the noise-whitened information about the initial mode amplitude is
+
+\[
+W_o=\sum_{k\in\mathcal S_{\rm arrived}}\frac{c^2}{\sigma^2}a^{2k},
+\]
+
+where \(\mathcal S_{\rm arrived}\) contains only samples delivered within the finite horizon.
+
+For delayed actuator impulses applied at steps \(k_j+d_a\), the finite-horizon scalar controllability Gramian is
+
+\[
+W_c=\sum_{j:\,k_j+d_a<H}b^2a^{2(H-1-k_j-d_a)}.
+\]
+
+The checked-in synthetic fixture has five available measurement samples and five delivered actuator commands, with \(W_o=2082.4542913757846\) and \(W_c=1.3015339321098656\). It also computes bandwidth ratios and total loop latency relative to the mode's e-folding time.
+
+These are exact scalar linear reference values, not a multi-mode Vlasov result or closed-loop stability proof. They make the next benchmark step measurable: replace the scalar mode with a coupled non-normal linearized kinetic mode block, compute its exact finite-horizon observability/controllability Gramians, and compare sparse sensor/actuator subsets on the same registered unstable/QoI subspace.
+
+
 ## PPMD source-reproduction boundary
 
 The PPMD paper appeared online 23 November 2026 and reports a SIAM reproducibility badge. The public GitHub `main` snapshot inspected for this programme is commit `056e4879a033cfecb44d8fb11983125b99a562eb` dated 21 December 2025, with only `PPMD.ipynb`, `PPMD.py` and `README.md`; the Python module hard-codes local Windows VTU data roots and the inspected tree has no datasets or environment lock. This is a discrepancy to resolve, not grounds to reject the paper's reproducibility claim: the exact badge-linked archive or supplementary package may differ. Until that package, data checksums, configuration, versions and train/test split are pinned and replayed, classify PPMD as a paper comparator with status `NOT_REPRODUCED`, not an executed baseline. See [#13501](https://github.com/Luminous-Dynamics/symthaea/issues/13501) and [PR #13502](https://github.com/Luminous-Dynamics/symthaea/pull/13502).
