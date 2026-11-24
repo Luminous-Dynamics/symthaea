@@ -552,7 +552,7 @@ fn handle_request(
                 let identity = LongMemEvalV2CandidateIdentityV1 {
                     run_id: config.run_id.clone(),
                     candidate_id: candidate_id.to_owned(),
-                    backend_id: "mace_lmev2_hybrid_rrf_bm25_entity".to_owned(),
+                    backend_id: config.retrieval_mode.backend_id().to_owned(),
                     backend_revision_sha256: config.backend_revision_sha256.clone(),
                 };
                 Some(
@@ -561,7 +561,7 @@ fn handle_request(
                         query,
                         &config.domain,
                         &result,
-                        "hybrid_rrf_bm25_entity",
+                        config.retrieval_mode.evidence_channel(),
                     )
                     .map_err(|error| format!("candidate evidence projection: {error:?}"))?
                 )
@@ -602,8 +602,8 @@ fn handle_request(
             };
             let query_elapsed_ns = u64::try_from(query_started.elapsed().as_nanos())
                 .unwrap_or(u64::MAX);
-            let trace_elapsed_ns = bm25_result.search_latency_ns
-                .saturating_add(entity_literal_result.search_latency_ns);
+            let trace_elapsed_ns = operations.iter()
+                .fold(0_u64, |total, operation| total.saturating_add(operation.elapsed_ns));
             let created_at_unix = unix_now_seconds()?;
             let trace = RetrievalTraceReceiptV1 {
                 run_id: config.run_id.clone(),
@@ -613,33 +613,12 @@ fn handle_request(
                 tool_profile_sha256: config.backend_revision_sha256.clone(),
                 query_sha256: sha256_hex(query.as_bytes()),
                 candidate_set_sha256: candidate_set_sha256.clone(),
-                operations: vec![
-                    RetrievalOperationV1 {
-                        tool_id: "trajectory.bm25.search".to_owned(),
-                        tool_revision_sha256: config.backend_revision_sha256.clone(),
-                        action_template_sha256: bm25_action_template_sha256(config),
-                        observed_evidence_ids: bm25_evidence_ids,
-                        outcome: bm25_outcome,
-                        elapsed_ns: bm25_result.search_latency_ns,
-                        // Index/posting reads are not fully instrumented yet.
-                        inspected_bytes: 0,
-                        inspected_bytes_measured: false,
-                    },
-                    RetrievalOperationV1 {
-                        tool_id: "trajectory.entity_literal.search".to_owned(),
-                        tool_revision_sha256: config.backend_revision_sha256.clone(),
-                        action_template_sha256: entity_literal_action_template_sha256(config),
-                        observed_evidence_ids: entity_evidence_ids,
-                        outcome: entity_outcome,
-                        elapsed_ns: entity_literal_result.search_latency_ns,
-                        // Structured-literal posting reads are not fully instrumented yet.
-                        inspected_bytes: 0,
-                        inspected_bytes_measured: false,
-                    },
-                ],
+                operations,
                 stop_reason,
-                tool_call_budget: 2,
-                tool_calls_used: 2,
+                tool_call_budget: u32::try_from(operations.len())
+                    .map_err(|_| "retrieval action count exceeds u32".to_owned())?,
+                tool_calls_used: u32::try_from(operations.len())
+                    .map_err(|_| "retrieval action count exceeds u32".to_owned())?,
                 elapsed_ns: trace_elapsed_ns,
                 inspected_bytes: 0,
                 inspected_bytes_complete: false,
@@ -662,15 +641,15 @@ fn handle_request(
                 "run_id": config.run_id,
                 "candidate_id": candidate_id,
                 "hit_count": result.hits.len(),
-                "bm25_hit_count": bm25_result.hits.len(),
-                "entity_literal_hit_count": entity_literal_result.hits.len(),
+                "bm25_hit_count": bm25_hit_count,
+                "entity_literal_hit_count": entity_literal_hit_count,
                 "neighbor_count": result.neighbor_context.len(),
                 "index_build_ns": index_build_ns,
                 "search_latency_ns": result.search_latency_ns,
                 "query_total_ns": query_elapsed_ns,
-                "retrieval_fusion": "reciprocal_rank_fusion_k60",
+                "retrieval_fusion": config.retrieval_mode.fusion_name(),
                 "query_image_used": false,
-                "retrieval_mode": "hybrid_bm25_entity_literal_with_original_image_evidence"
+                "retrieval_mode": config.retrieval_mode.as_str()
             }))
         }
         other => Err(format!("unsupported sidecar operation: {other}")),
