@@ -1567,6 +1567,200 @@ impl OpenBoundaryCoordinateLift {
     }
 }
 
+/// Result of projecting a kinetic fluctuation into a weighted discrete micro-space.
+#[derive(Clone, Debug, PartialEq)]
+pub struct WeightedMicroProjection {
+    /// Projected fluctuation. Every supplied constraint moment is zero within tolerance.
+    pub micro_fluctuation: Vec<f64>,
+    /// Constraint moments before projection.
+    pub pre_projection_moments: Vec<f64>,
+    /// Constraint moments after projection.
+    pub post_projection_moments: Vec<f64>,
+    /// Weighted norm of the correction, using the supplied diagonal metric.
+    pub weighted_correction_norm: f64,
+}
+
+/// Project values into the nullspace of caller-supplied discrete moment constraints.
+///
+/// Solves the weighted minimum-correction problem
+///
+///   minimize 0.5 * (g_micro - g)^T W (g_micro - g)
+///   subject to C * g_micro = 0,
+///
+/// where W is a positive diagonal metric and each row of C is one discrete
+/// collision-invariant / macro-moment constraint. The caller must derive C
+/// from the exact discrete collision operator and declared micro-macro split;
+/// this routine does not assume which moments are invariant.
+///
+/// The KKT system is assembled as C W^-1 C^T and solved with pivoted Gaussian
+/// elimination. Empty, non-finite, non-positive, dimensionally inconsistent,
+/// or linearly dependent constraints fail closed.
+pub fn project_weighted_micro_fluctuation(
+    values: &[f64],
+    constraints: &[Vec<f64>],
+    diagonal_weights: &[f64],
+    tolerance: f64,
+) -> Result<WeightedMicroProjection, ContractError> {
+    let dimension = values.len();
+    if dimension == 0
+        || diagonal_weights.len() != dimension
+        || constraints.is_empty()
+        || !tolerance.is_finite()
+        || tolerance <= 0.0
+    {
+        return Err(ContractError::InvalidProjectionBasis);
+    }
+    if values.iter().any(|value| !value.is_finite())
+        || diagonal_weights
+            .iter()
+            .any(|weight| !weight.is_finite() || *weight <= 0.0)
+        || constraints.iter().any(|row| {
+            row.len() != dimension || row.iter().any(|value| !value.is_finite())
+        })
+    {
+        return Err(ContractError::InvalidGramianArithmetic);
+    }
+
+    let constraint_count = constraints.len();
+    let mut gram = vec![vec![0.0; constraint_count]; constraint_count];
+    let mut rhs = vec![0.0; constraint_count];
+    let mut pre_projection_moments = vec![0.0; constraint_count];
+
+    for (row_index, row) in constraints.iter().enumerate() {
+        for (value, coefficient) in values.iter().zip(row) {
+            pre_projection_moments[row_index] =
+                coefficient.mul_add(*value, pre_projection_moments[row_index]);
+        }
+        rhs[row_index] = pre_projection_moments[row_index];
+        for (column_index, other_row) in constraints.iter().enumerate() {
+            let mut entry = 0.0;
+            for ((left, right), weight) in row.iter().zip(other_row).zip(diagonal_weights) {
+                entry += left * right / weight;
+            }
+            if !entry.is_finite() {
+                return Err(ContractError::InvalidGramianArithmetic);
+            }
+            gram[row_index][column_index] = entry;
+        }
+    }
+
+    let multipliers = solve_dense_system(gram, rhs)?;
+    let mut micro_fluctuation = values.to_vec();
+    for (coefficient_index, value) in micro_fluctuation.iter_mut().enumerate() {
+        let mut correction = 0.0;
+        for (row, multiplier) in constraints.iter().zip(&multipliers) {
+            correction += row[coefficient_index] * multiplier;
+        }
+        *value -= correction / diagonal_weights[coefficient_index];
+        if !value.is_finite() {
+            return Err(ContractError::InvalidGramianArithmetic);
+        }
+    }
+
+    let mut post_projection_moments = vec![0.0; constraint_count];
+    for (row_index, row) in constraints.iter().enumerate() {
+        for (value, coefficient) in micro_fluctuation.iter().zip(row) {
+            post_projection_moments[row_index] =
+                coefficient.mul_add(*value, post_projection_moments[row_index]);
+        }
+    }
+    let maximum_moment_scale = pre_projection_moments
+        .iter()
+        .map(|moment| moment.abs())
+        .fold(1.0_f64, f64::max);
+    if post_projection_moments
+        .iter()
+        .any(|moment| moment.abs() > tolerance * maximum_moment_scale)
+    {
+        return Err(ContractError::InvalidProjectionBasis);
+    }
+
+    let mut correction_norm_squared = 0.0;
+    for ((projected, original), weight) in micro_fluctuation
+        .iter()
+        .zip(values)
+        .zip(diagonal_weights)
+    {
+        let correction = projected - original;
+        correction_norm_squared += weight * correction * correction;
+    }
+    if !correction_norm_squared.is_finite() || correction_norm_squared < 0.0 {
+        return Err(ContractError::InvalidGramianArithmetic);
+    }
+
+    Ok(WeightedMicroProjection {
+        micro_fluctuation,
+        pre_projection_moments,
+        post_projection_moments,
+        weighted_correction_norm: correction_norm_squared.sqrt(),
+    })
+}
+
+fn solve_dense_system(
+    mut matrix: Vec<Vec<f64>>,
+    mut rhs: Vec<f64>,
+) -> Result<Vec<f64>, ContractError> {
+    let dimension = rhs.len();
+    if dimension == 0
+        || matrix.len() != dimension
+        || matrix.iter().any(|row| row.len() != dimension)
+        || matrix
+            .iter()
+            .flatten()
+            .chain(rhs.iter())
+            .any(|value| !value.is_finite())
+    {
+        return Err(ContractError::InvalidProjectionBasis);
+    }
+
+    let scale = matrix
+        .iter()
+        .flatten()
+        .map(|value| value.abs())
+        .fold(0.0_f64, f64::max);
+    if scale == 0.0 {
+        return Err(ContractError::InvalidProjectionBasis);
+    }
+    let pivot_floor = f64::EPSILON * scale * dimension as f64 * 128.0;
+
+    for pivot_index in 0..dimension {
+        let pivot_row = (pivot_index..dimension)
+            .max_by(|left, right| {
+                matrix[*left][pivot_index]
+                    .abs()
+                    .total_cmp(&matrix[*right][pivot_index].abs())
+            })
+            .ok_or(ContractError::InvalidProjectionBasis)?;
+        if matrix[pivot_row][pivot_index].abs() <= pivot_floor {
+            return Err(ContractError::InvalidProjectionBasis);
+        }
+        matrix.swap(pivot_index, pivot_row);
+        rhs.swap(pivot_index, pivot_row);
+
+        let pivot = matrix[pivot_index][pivot_index];
+        for column in pivot_index..dimension {
+            matrix[pivot_index][column] /= pivot;
+        }
+        rhs[pivot_index] /= pivot;
+
+        for row_index in 0..dimension {
+            if row_index == pivot_index {
+                continue;
+            }
+            let factor = matrix[row_index][pivot_index];
+            for column in pivot_index..dimension {
+                matrix[row_index][column] -= factor * matrix[pivot_index][column];
+            }
+            rhs[row_index] -= factor * rhs[pivot_index];
+        }
+    }
+
+    if rhs.iter().any(|value| !value.is_finite()) {
+        return Err(ContractError::InvalidGramianArithmetic);
+    }
+    Ok(rhs)
+}
+
 /// Canonical 2D symplectic-pairing defect for a manufactured basis fixture.
 ///
 /// For J = [[0, 1], [-1, 0]] and basis columns q, p:
@@ -3157,6 +3351,109 @@ mod tests {
         let report = validate_kird_record_value(&value).unwrap();
         assert_eq!(report.record_status, "physical_measurement");
         assert_eq!(report.physical_gate_status, "UNKNOWN");
+    }
+
+    #[test]
+    fn weighted_micro_projector_annihilates_all_declared_moments() {
+        let values = [1.0, 2.0, -1.0, 4.0];
+        let weights = [1.0, 2.0, 1.5, 3.0];
+        let constraints = vec![
+            vec![1.0, 1.0, 1.0, 1.0],
+            vec![-1.0, -0.25, 0.5, 1.0],
+        ];
+        let result = project_weighted_micro_fluctuation(
+            &values,
+            &constraints,
+            &weights,
+            1.0e-11,
+        )
+        .unwrap();
+        assert!(result
+            .post_projection_moments
+            .iter()
+            .all(|moment| moment.abs() < 1.0e-10));
+        assert!(result.weighted_correction_norm.is_finite());
+        assert!(result.weighted_correction_norm > 0.0);
+        assert_ne!(result.micro_fluctuation, values);
+    }
+
+    #[test]
+    fn weighted_micro_projector_is_idempotent() {
+        let values = [2.0, -1.0, 3.0, 0.5];
+        let weights = [0.5, 1.0, 2.0, 3.0];
+        let constraints = vec![
+            vec![1.0, 1.0, 1.0, 1.0],
+            vec![-1.0, 0.0, 0.0, 1.0],
+        ];
+        let first = project_weighted_micro_fluctuation(
+            &values,
+            &constraints,
+            &weights,
+            1.0e-11,
+        )
+        .unwrap();
+        let second = project_weighted_micro_fluctuation(
+            &first.micro_fluctuation,
+            &constraints,
+            &weights,
+            1.0e-11,
+        )
+        .unwrap();
+        for (left, right) in first
+            .micro_fluctuation
+            .iter()
+            .zip(&second.micro_fluctuation)
+        {
+            assert!((left - right).abs() < 1.0e-10);
+        }
+        assert!(second.weighted_correction_norm < 1.0e-10);
+    }
+
+    #[test]
+    fn weighted_micro_projector_rejects_dependent_constraints() {
+        let values = [1.0, 2.0, 3.0];
+        let weights = [1.0, 1.0, 1.0];
+        let constraints = vec![
+            vec![1.0, 1.0, 1.0],
+            vec![2.0, 2.0, 2.0],
+        ];
+        assert_eq!(
+            project_weighted_micro_fluctuation(&values, &constraints, &weights, 1.0e-10),
+            Err(ContractError::InvalidProjectionBasis)
+        );
+    }
+
+    #[test]
+    fn weighted_micro_projector_rejects_invalid_weights_dimensions_and_tolerance() {
+        let values = [1.0, -1.0, 2.0];
+        let constraints = vec![vec![1.0, 1.0, 1.0]];
+        assert_eq!(
+            project_weighted_micro_fluctuation(
+                &values,
+                &constraints,
+                &[1.0, 0.0, 1.0],
+                1.0e-10
+            ),
+            Err(ContractError::InvalidGramianArithmetic)
+        );
+        assert_eq!(
+            project_weighted_micro_fluctuation(
+                &values,
+                &constraints,
+                &[1.0, 1.0],
+                1.0e-10
+            ),
+            Err(ContractError::InvalidProjectionBasis)
+        );
+        assert_eq!(
+            project_weighted_micro_fluctuation(
+                &values,
+                &constraints,
+                &[1.0, 1.0, 1.0],
+                0.0
+            ),
+            Err(ContractError::InvalidProjectionBasis)
+        );
     }
 
     #[test]
