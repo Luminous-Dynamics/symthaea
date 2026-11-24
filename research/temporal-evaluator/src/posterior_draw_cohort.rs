@@ -372,6 +372,22 @@ fn validate_draw_binding(draw: &PosteriorDrawPair) -> Result<(), PosteriorCohort
     Ok(())
 }
 
+fn validate_same_realized_branch_outcome(
+    first: &IndividualEffectBranch,
+    current: &IndividualEffectBranch,
+    branch_name: &'static str,
+) -> Result<(), PosteriorCohortError> {
+    if first.disposition != current.disposition {
+        return Err(PosteriorCohortError::RealizedOutcomeMismatch {
+            field: match branch_name {
+                "baseline" => "baseline_realized_branch_record",
+                _ => "alternative_realized_branch_record",
+            },
+        });
+    }
+    Ok(())
+}
+
 fn validate_same_realized_outcomes(
     first: &IndividualEffectComparison,
     current: &IndividualEffectComparison,
@@ -603,6 +619,8 @@ pub fn evaluate_posterior_individual_cohort(
     let mut total_weight = 0_u64;
     let mut samples = Vec::with_capacity(cohort.draws.len());
     let mut first_comparison: Option<IndividualEffectComparison> = None;
+    let mut first_baseline_branch: Option<IndividualEffectBranch> = None;
+    let mut first_alternative_branch: Option<IndividualEffectBranch> = None;
 
     for draw in &cohort.draws {
         validate_draw_binding(draw)?;
@@ -641,8 +659,24 @@ pub fn evaluate_posterior_individual_cohort(
 
         if let Some(first_value) = &first_comparison {
             validate_same_realized_outcomes(first_value, comparison)?;
+            validate_same_realized_branch_outcome(
+                first_baseline_branch
+                    .as_ref()
+                    .ok_or(PosteriorCohortError::EmptyDrawSet)?,
+                &draw.baseline.branch,
+                "baseline",
+            )?;
+            validate_same_realized_branch_outcome(
+                first_alternative_branch
+                    .as_ref()
+                    .ok_or(PosteriorCohortError::EmptyDrawSet)?,
+                &draw.alternative.branch,
+                "alternative",
+            )?;
         } else {
             first_comparison = Some(comparison.clone());
+            first_baseline_branch = Some(draw.baseline.branch.clone());
+            first_alternative_branch = Some(draw.alternative.branch.clone());
         }
 
         samples.push(PosteriorEffectSampleComparison {
@@ -944,6 +978,42 @@ mod tests {
             error,
             PosteriorCohortError::RealizedOutcomeMismatch {
                 field: "realized_effect_units",
+            }
+        );
+    }
+
+    #[test]
+    fn branch_utility_shift_that_cancels_in_effect_still_rejects() {
+        let mut second = make_draw(1, 101, 2, 52, 500_000, (2, 1, 1));
+        if let BranchDisposition::Applied {
+            applied_at_us,
+            realized_utility_units,
+        } = second.baseline.branch.disposition
+        {
+            second.baseline.branch.disposition = BranchDisposition::Applied {
+                applied_at_us,
+                realized_utility_units: realized_utility_units + 1,
+            };
+        }
+        if let BranchDisposition::Applied {
+            applied_at_us,
+            realized_utility_units,
+        } = second.alternative.branch.disposition
+        {
+            second.alternative.branch.disposition = BranchDisposition::Applied {
+                applied_at_us,
+                realized_utility_units: realized_utility_units + 1,
+            };
+        }
+        let input = cohort(vec![
+            make_draw(1, 101, 1, 51, 500_000, (2, 1, 1)),
+            second,
+        ]);
+        let error = evaluate_posterior_individual_cohort(&input).unwrap_err();
+        assert_eq!(
+            error,
+            PosteriorCohortError::RealizedOutcomeMismatch {
+                field: "baseline_realized_branch_record",
             }
         );
     }
