@@ -15,4 +15,4 @@ Run the synthetic two-times time-stretch control with:
 
     cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-temporal-transform-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-temporal-equivariance-2x.synthetic.json
 
-This is only a coordinate-mapping evaluator. It does not transform or hash audio bytes, authenticate the upstream qualification receipt, or establish perceptual equivalence. Those responsibilities remain with the transform materialization and task-specific qualification owners (#13260).
+This is only a coordinate-mapping evaluator. It does not transform or hash audio bytes, authenticate the upstream qualification receipt, or establish perceptual equivalence. Its report always sets qualified_equivariance_claim_permitted to false; treat score deltas as diagnostics only until the task-specific qualification from #13260 is independently verified. Those responsibilities remain with the transform materialization and task-specific qualification owners (#13260).
