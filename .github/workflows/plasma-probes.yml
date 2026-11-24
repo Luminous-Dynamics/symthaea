@@ -10,6 +10,7 @@ on:
       - "benchmarks/plasma/adversarial-probes/**"
       - "benchmarks/plasma/rate-distortion/**"
       - "benchmarks/plasma/topology-lifting/**"
+      - "benchmarks/plasma/state-equivalence/**"
       - "benchmarks/plasma/micro-macro/**"
       - "benchmarks/plasma/control-interface/**"
       - "benchmarks/plasma/adaptive-refinement/**"
@@ -23,6 +24,7 @@ on:
       - "benchmarks/plasma/adversarial-probes/**"
       - "benchmarks/plasma/rate-distortion/**"
       - "benchmarks/plasma/topology-lifting/**"
+      - "benchmarks/plasma/state-equivalence/**"
       - "benchmarks/plasma/micro-macro/**"
       - "benchmarks/plasma/control-interface/**"
       - "benchmarks/plasma/adaptive-refinement/**"
@@ -66,6 +68,7 @@ jobs:
           mkdir -p "${tmp_root}/benchmarks/plasma/adversarial-probes/fixtures"
           mkdir -p "${tmp_root}/benchmarks/plasma/rate-distortion/fixtures"
           mkdir -p "${tmp_root}/benchmarks/plasma/topology-lifting/fixtures"
+          mkdir -p "${tmp_root}/benchmarks/plasma/state-equivalence/fixtures"
           mkdir -p "${tmp_root}/benchmarks/plasma/micro-macro/fixtures"
           mkdir -p "${tmp_root}/benchmarks/plasma/control-interface/fixtures"
           mkdir -p "${tmp_root}/benchmarks/plasma/adaptive-refinement/fixtures"
@@ -92,6 +95,10 @@ jobs:
             "${tmp_root}/benchmarks/plasma/topology-lifting/"
           cp benchmarks/plasma/topology-lifting/fixtures/weighted-measure-tail-stability-v0.1.json \
             "${tmp_root}/benchmarks/plasma/topology-lifting/fixtures/"
+          cp benchmarks/plasma/state-equivalence/kinetic-response-signature-v0.1.schema.json \
+            "${tmp_root}/benchmarks/plasma/state-equivalence/"
+          cp benchmarks/plasma/state-equivalence/fixtures/nontransitive-response-triple-v0.1.json \
+            "${tmp_root}/benchmarks/plasma/state-equivalence/fixtures/"
           cp benchmarks/plasma/micro-macro/micro-macro-scaling-contract-v0.1.schema.json \
             "${tmp_root}/benchmarks/plasma/micro-macro/"
           cp benchmarks/plasma/micro-macro/fixtures/synthetic-micro-macro-contract-v0.1.json \
@@ -207,6 +214,31 @@ jobs:
           print("topology_lift_schema_validation=PASS")
           print("weighted_fourier_measure_schema_validation=PASS")
           print("weighted_measure_tail_stability_validation=PASS")
+          PY
+
+      - name: Validate intervention-equivalent kinetic state fixture
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path("${{ runner.temp }}/plasma-probe-validation/benchmarks/plasma/state-equivalence")
+          schema = json.loads((root / "kinetic-response-signature-v0.1.schema.json").read_text())
+          fixture = json.loads((root / "fixtures/nontransitive-response-triple-v0.1.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(fixture)
+          comparisons = {
+              (item["left"], item["right"]): item
+              for item in fixture["expected_pairwise_comparisons"]
+          }
+          assert comparisons[("A", "B")]["normalized_rms_distance"] == 0.75
+          assert comparisons[("A", "B")]["pairwise_compatible"] is True
+          assert comparisons[("B", "C")]["pairwise_compatible"] is True
+          assert comparisons[("A", "C")]["normalized_rms_distance"] == 1.5
+          assert comparisons[("A", "C")]["pairwise_compatible"] is False
+          assert fixture["claim_boundary"]["approximate_pairwise_compatibility_is_not_transitive"] is True
+          print("intervention_equivalent_state_schema_validation=PASS")
           PY
 
       - name: Validate high-field VPFP micro-macro scaling schema and fixture
