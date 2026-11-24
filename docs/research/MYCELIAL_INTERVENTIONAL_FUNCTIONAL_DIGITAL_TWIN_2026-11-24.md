@@ -163,12 +163,22 @@ A hard limit is not a cost to be traded against expected information gain. An in
 The proposed Rust implementation is split into two layers:
 - PR #13379 computes expected reduction in Bayes decision risk minus declared acquisition cost.
 - Issue #13486 / draft PR #13487 adds specimen-health admissibility using cumulative dose, session time, ROI, temperature and channel-calibration evidence.
+- The sample-health gate accepts only a replay-qualified VOI evidence bundle: the upstream report is independently recomputed against the exact source skeleton, candidate inventory, posterior, decision table and acquisition-response models. The final sample-health receipt binds both the report and the qualified source-evidence digest.
 
-The first policy is advisory-only. It does not infer biological viability from photon counts, guarantee absence of phototoxicity, issue microscope commands or override a laboratory protocol. Dose and temperature bounds must be established for the specific specimen, fluorophore, modality, instrument and assay by qualified personnel.
+Hard constraints require exact calibration binding:
+- the health-model digest in every acquisition proposal must match the versioned sample-health policy;
+- each illuminated channel has a policy-bound wavelength band and calibration digest;
+- each optical action supplies a conservative dose estimate for every required illumination channel;
+- each historical exposure records its source receipt and calibration digest; an unqualified or incompatible historical exposure blocks further optical acquisition until reconciled;
+- overlapping spatial footprints are accumulated by canonical source-region cell identity, not by ROI label.
+
+The policy is advisory-only. It does not infer biological viability from photon counts, guarantee absence of phototoxicity, issue microscope commands or override a laboratory protocol. Dose and temperature bounds must be established for the specific specimen, fluorophore, modality, instrument and assay by qualified personnel.
 
 Evaluation must compare fixed schedules, random sampling, confidence-only, entropy-only, VOI-only and VOI-plus-health-constraints at equal measurement budgets. Report both:
 1. downstream decision regret at equal photon/time budget; and
 2. photon/time budget required to reach equal decision quality.
+
+Plot a Pareto frontier of decision regret against cumulative photon dose, acquisition time and independently measured specimen-health outcomes. The admissible-policy hard-constraint violation count must remain zero in synthetic and recorded-session replay. Do not infer specimen viability from dose alone: health outcomes need independent assay measurements and matched sham controls.
 
 Also report dose-bound violations, sample-health outcome drift, missed rare events, calibration, abstention and human overrides separately. A single composite score must not conceal a policy that improves inference by damaging the specimen.
 
