@@ -306,5 +306,313 @@
     "actual_output_tokens": 128,
     "max_wall_time_ms": 30000,
     "elapsed_wall_time_ms": 4000
+  },
+  {
+    "schema": "mel-temporal-revision-case-v2",
+    "case_id": "synthetic-unit-002-0",
+    "experiment_unit_id": "synthetic-unit-002",
+    "model_identity_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "prompt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "adapter_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "evidence_condition": "NoEvidence",
+    "evidence": null,
+    "actions": [
+      "Other"
+    ],
+    "truth": {
+      "schema_version": "mel-temporal-grounding-v1",
+      "query_id": "query-fixture-001",
+      "query_text": "Every piano entrance",
+      "artifact": {
+        "audio_sha256": "1414141414141414141414141414141414141414141414141414141414141414",
+        "sample_rate_hz": 48000,
+        "channels": 2,
+        "total_frames": 2880000
+      },
+      "annotation_policy_version": "synthetic-annotation-v1",
+      "annotation_set_sha256": "1616161616161616161616161616161616161616161616161616161616161616",
+      "annotator_count": 2,
+      "state": "Present",
+      "intervals": [
+        {
+          "start_frame": 100,
+          "end_frame": 200
+        },
+        {
+          "start_frame": 500,
+          "end_frame": 600
+        }
+      ],
+      "status_reason": null
+    },
+    "plan": {
+      "evaluator_version": "mel-temporal-grounding-evaluator-v1",
+      "minimum_interval_iou": 0.5
+    },
+    "draft_prediction": {
+      "schema_version": "mel-temporal-grounding-v1",
+      "query_id": "query-fixture-001",
+      "artifact": {
+        "audio_sha256": "1414141414141414141414141414141414141414141414141414141414141414",
+        "sample_rate_hz": 48000,
+        "channels": 2,
+        "total_frames": 2880000
+      },
+      "state": {
+        "Occurrences": {
+          "intervals": [
+            {
+              "start_frame": 100,
+              "end_frame": 200
+            },
+            {
+              "start_frame": 800,
+              "end_frame": 900
+            }
+          ]
+        }
+      }
+    },
+    "final_prediction": {
+      "schema_version": "mel-temporal-grounding-v1",
+      "query_id": "query-fixture-001",
+      "artifact": {
+        "audio_sha256": "1414141414141414141414141414141414141414141414141414141414141414",
+        "sample_rate_hz": 48000,
+        "channels": 2,
+        "total_frames": 2880000
+      },
+      "state": {
+        "Occurrences": {
+          "intervals": [
+            {
+              "start_frame": 100,
+              "end_frame": 200
+            },
+            {
+              "start_frame": 800,
+              "end_frame": 900
+            }
+          ]
+        }
+      }
+    },
+    "source_lineage_id": "synthetic-lineage-002",
+    "runtime_identity_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "decoding_config_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "max_output_tokens": 512,
+    "actual_output_tokens": 128,
+    "max_wall_time_ms": 30000,
+    "elapsed_wall_time_ms": 4000
+  },
+  {
+    "schema": "mel-temporal-revision-case-v2",
+    "case_id": "synthetic-unit-002-1",
+    "experiment_unit_id": "synthetic-unit-002",
+    "model_identity_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "prompt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "adapter_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "evidence_condition": "LocalRetrieved",
+    "evidence": {
+      "source_audio_sha256": "1414141414141414141414141414141414141414141414141414141414141414",
+      "source_sample_rate_hz": 48000,
+      "evidence_payload_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "retrieval_config_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "start_frame": 0,
+      "end_frame": 48000
+    },
+    "actions": [
+      "Other"
+    ],
+    "truth": {
+      "schema_version": "mel-temporal-grounding-v1",
+      "query_id": "query-fixture-001",
+      "query_text": "Every piano entrance",
+      "artifact": {
+        "audio_sha256": "1414141414141414141414141414141414141414141414141414141414141414",
+        "sample_rate_hz": 48000,
+        "channels": 2,
+        "total_frames": 2880000
+      },
+      "annotation_policy_version": "synthetic-annotation-v1",
+      "annotation_set_sha256": "1616161616161616161616161616161616161616161616161616161616161616",
+      "annotator_count": 2,
+      "state": "Present",
+      "intervals": [
+        {
+          "start_frame": 100,
+          "end_frame": 200
+        },
+        {
+          "start_frame": 500,
+          "end_frame": 600
+        }
+      ],
+      "status_reason": null
+    },
+    "plan": {
+      "evaluator_version": "mel-temporal-grounding-evaluator-v1",
+      "minimum_interval_iou": 0.5
+    },
+    "draft_prediction": {
+      "schema_version": "mel-temporal-grounding-v1",
+      "query_id": "query-fixture-001",
+      "artifact": {
+        "audio_sha256": "1414141414141414141414141414141414141414141414141414141414141414",
+        "sample_rate_hz": 48000,
+        "channels": 2,
+        "total_frames": 2880000
+      },
+      "state": {
+        "Occurrences": {
+          "intervals": [
+            {
+              "start_frame": 100,
+              "end_frame": 200
+            },
+            {
+              "start_frame": 800,
+              "end_frame": 900
+            }
+          ]
+        }
+      }
+    },
+    "final_prediction": {
+      "schema_version": "mel-temporal-grounding-v1",
+      "query_id": "query-fixture-001",
+      "artifact": {
+        "audio_sha256": "1414141414141414141414141414141414141414141414141414141414141414",
+        "sample_rate_hz": 48000,
+        "channels": 2,
+        "total_frames": 2880000
+      },
+      "state": {
+        "Occurrences": {
+          "intervals": [
+            {
+              "start_frame": 100,
+              "end_frame": 200
+            },
+            {
+              "start_frame": 500,
+              "end_frame": 600
+            }
+          ]
+        }
+      }
+    },
+    "source_lineage_id": "synthetic-lineage-002",
+    "runtime_identity_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "decoding_config_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "max_output_tokens": 512,
+    "actual_output_tokens": 128,
+    "max_wall_time_ms": 30000,
+    "elapsed_wall_time_ms": 4000
+  },
+  {
+    "schema": "mel-temporal-revision-case-v2",
+    "case_id": "synthetic-unit-002-2",
+    "experiment_unit_id": "synthetic-unit-002",
+    "model_identity_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "prompt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "adapter_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "evidence_condition": "YokedRetrieved",
+    "evidence": {
+      "source_audio_sha256": "1515151515151515151515151515151515151515151515151515151515151515",
+      "source_sample_rate_hz": 48000,
+      "evidence_payload_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "retrieval_config_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "start_frame": 0,
+      "end_frame": 48000
+    },
+    "actions": [
+      "Other"
+    ],
+    "truth": {
+      "schema_version": "mel-temporal-grounding-v1",
+      "query_id": "query-fixture-001",
+      "query_text": "Every piano entrance",
+      "artifact": {
+        "audio_sha256": "1414141414141414141414141414141414141414141414141414141414141414",
+        "sample_rate_hz": 48000,
+        "channels": 2,
+        "total_frames": 2880000
+      },
+      "annotation_policy_version": "synthetic-annotation-v1",
+      "annotation_set_sha256": "1616161616161616161616161616161616161616161616161616161616161616",
+      "annotator_count": 2,
+      "state": "Present",
+      "intervals": [
+        {
+          "start_frame": 100,
+          "end_frame": 200
+        },
+        {
+          "start_frame": 500,
+          "end_frame": 600
+        }
+      ],
+      "status_reason": null
+    },
+    "plan": {
+      "evaluator_version": "mel-temporal-grounding-evaluator-v1",
+      "minimum_interval_iou": 0.5
+    },
+    "draft_prediction": {
+      "schema_version": "mel-temporal-grounding-v1",
+      "query_id": "query-fixture-001",
+      "artifact": {
+        "audio_sha256": "1414141414141414141414141414141414141414141414141414141414141414",
+        "sample_rate_hz": 48000,
+        "channels": 2,
+        "total_frames": 2880000
+      },
+      "state": {
+        "Occurrences": {
+          "intervals": [
+            {
+              "start_frame": 100,
+              "end_frame": 200
+            },
+            {
+              "start_frame": 800,
+              "end_frame": 900
+            }
+          ]
+        }
+      }
+    },
+    "final_prediction": {
+      "schema_version": "mel-temporal-grounding-v1",
+      "query_id": "query-fixture-001",
+      "artifact": {
+        "audio_sha256": "1414141414141414141414141414141414141414141414141414141414141414",
+        "sample_rate_hz": 48000,
+        "channels": 2,
+        "total_frames": 2880000
+      },
+      "state": {
+        "Occurrences": {
+          "intervals": [
+            {
+              "start_frame": 100,
+              "end_frame": 200
+            },
+            {
+              "start_frame": 800,
+              "end_frame": 900
+            }
+          ]
+        }
+      }
+    },
+    "source_lineage_id": "synthetic-lineage-002",
+    "runtime_identity_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "decoding_config_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "max_output_tokens": 512,
+    "actual_output_tokens": 128,
+    "max_wall_time_ms": 30000,
+    "elapsed_wall_time_ms": 4000
   }
 ]
