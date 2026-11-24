@@ -133,7 +133,7 @@ The companion V2 sidecar now emits one policy trace for each official query invo
 - tool revision: deterministic backend execution-profile digest;
 - action template: SHA-256 of the BM25 search operation and its pinned domain/top-k/window/neighbor/k1/b/tokenizer parameters;
 - observed evidence IDs: the candidate-evidence graph records produced for that query;
-- stop reason: candidate-side evidence sufficient or no candidate evidence;
+- stop reason: candidates returned or no candidate evidence (legacy V1 field only; not independent qualification or decision sufficiency);
 - latency: measured end-to-end sidecar query work;
 - inspected bytes: explicitly incomplete because the current BM25 index does not expose posting/index bytes read.
 
