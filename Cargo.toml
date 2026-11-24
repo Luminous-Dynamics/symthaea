@@ -43,6 +43,9 @@ exclude = [
     "crates/domains/symthaea-dishwasher-design",
     "crates/domains/symthaea-rea-compat",
     "crates/domains/symthaea-rea-evidence-verifier",
+    # Research/source directories without package manifests; promote only with a deliberate Cargo target.
+    "crates/domains/symthaea-experiment-design",
+    "crates/domains/symthaea-marine-geometry",
 ]
 default-members = [
     "xtask",
