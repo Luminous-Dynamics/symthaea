@@ -2783,19 +2783,22 @@ pub fn integrate_maxwell_delay_history(
     }
 
     let spatial_count = history.current_longitudinal.first().map_or(0, Vec::len);
-    let total_work = time_count
+    let time_space_work = time_count
         .checked_mul(spatial_count)
         .ok_or_else(|| control_timing_error("delay_history", "time-space work overflowed"))?;
+    let total_field_work = time_space_work
+        .checked_mul(4)
+        .ok_or_else(|| control_timing_error("delay_history", "four-field work overflowed"))?;
     if spatial_count == 0 || spatial_count > MAX_DELAY_CANCELLATION_SAMPLES {
         return Err(control_timing_error(
             "delay_history",
             "spatial axis must be non-empty and within the sample budget",
         ));
     }
-    if total_work > MAX_DELAY_HISTORY_WORK {
+    if total_field_work > MAX_DELAY_HISTORY_WORK {
         return Err(control_timing_error(
             "delay_history",
-            "time-space history exceeds the bounded integration budget",
+            "four-field time-space history exceeds the bounded integration budget",
         ));
     }
 
@@ -6843,13 +6846,13 @@ mod tests {
                 ..
             })
         ));
-        let wide = vec![0.0; MAX_DELAY_HISTORY_WORK / 2 + 1];
+        let wide = vec![0.0; MAX_DELAY_HISTORY_WORK / 8 + 1];
         let excessive = MaxwellDelayHistorySamples {
             sample_times_seconds: vec![0.0, 1.0],
-            current_longitudinal: vec![wide.clone(), wide.clone()],
-            current_transverse: vec![wide.clone(), wide.clone()],
-            gradient_electric_transverse: vec![wide.clone(), wide.clone()],
-            gradient_magnetic_transverse: vec![wide.clone(), wide],
+            current_longitudinal: vec![wide.clone(), wide],
+            current_transverse: Vec::new(),
+            gradient_electric_transverse: Vec::new(),
+            gradient_magnetic_transverse: Vec::new(),
         };
         assert!(matches!(
             integrate_maxwell_delay_history(&excessive, 0.0, 1.0),
