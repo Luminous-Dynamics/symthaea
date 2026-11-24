@@ -1,7 +1,7 @@
 # MACE v0.1 — Decision-Value Retrieval Controller and Counterfactual Evaluation
 
 **Status:** research / implementation contract. This document specifies the next controller increment; it is not evidence that the controller, adapters, or benchmark runs are implemented.  
-**Related:** [#13477](https://github.com/Luminous-Dynamics/symthaea/issues/13477), [#13455](https://github.com/Luminous-Dynamics/symthaea/issues/13455), [#13261](https://github.com/Luminous-Dynamics/symthaea/issues/13261), [#13284](https://github.com/Luminous-Dynamics/symthaea/issues/13284), [PR #13436](https://github.com/Luminous-Dynamics/symthaea/pull/13436).
+**Related:** [#13477](https://github.com/Luminous-Dynamics/symthaea/issues/13477), [#13455](https://github.com/Luminous-Dynamics/symthaea/issues/13455), [#13261](https://github.com/Luminous-Dynamics/symthaea/issues/13261), [#13284](https://github.com/Luminous-Dynamics/symthaea/issues/13284), [PR #13436](https://github.com/Luminous-Dynamics/symthaea/pull/13436), [PR #13491](https://github.com/Luminous-Dynamics/symthaea/pull/13491) — deterministic risk-adjusted retrieval selection kernel.
 
 ## 1. Problem statement
 
