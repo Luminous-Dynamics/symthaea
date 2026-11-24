@@ -661,6 +661,32 @@ mod tests {
     }
 
     #[test]
+    fn candidate_projection_preserves_allowlisted_retrieval_channel() {
+        let batch = encode_longmemeval_v2_candidate_evidence_for_channel_v1(
+            &identity(),
+            "order 42",
+            "web",
+            &[hit()],
+            "hybrid_rrf_bm25_entity",
+        ).expect("hybrid candidate evidence");
+        let text = batch.evidence.iter()
+            .find(|item| item.modality == EvidenceModalityV1::Text)
+            .expect("text evidence");
+        assert_eq!(text.retrieval_channel, "hybrid_rrf_bm25_entity");
+
+        assert_eq!(
+            encode_longmemeval_v2_candidate_evidence_for_channel_v1(
+                &identity(),
+                "order 42",
+                "web",
+                &[hit()],
+                "caller_supplied_untrusted_channel",
+            ),
+            Err(LongMemEvalV2CandidateReject::InvalidHit)
+        );
+    }
+
+    #[test]
     fn search_result_encoder_includes_neighbors_without_inheriting_bm25_scores() {
         let hit = hit();
         let mut neighbor_state = state(
