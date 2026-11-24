@@ -548,6 +548,14 @@ The nonlinear extension must separately qualify tangent response, signed finite-
 
 Success means greater held-out intervention-response fidelity per retained byte/rank at matched total construction and simulation cost, without worsening mandatory physical gates. It does not mean a good singular-value capture plot, nor does it imply a universal nonlinear error bound.
 
+## Response-aware memory-bounded spectral adaptation (RAMBSA)
+
+New companion programme: [#13485 — benchmark response-aware spectral refinement under hard memory budgets](https://github.com/Luminous-Dynamics/symthaea/issues/13485).
+
+Cho & Russo's adaptive Fourier VP method (arXiv:2607.12368) provides a source-reported tail-trigger baseline. RAMBSA asks whether a future-QoI / intervention-response signal can detect a low-energy but consequential filament before the conventional tail threshold fires. The first policy primitive in [PR #13405](https://github.com/Luminous-Dynamics/symthaea/pull/13405) uses a transparent rule: refine if either the spectral-tail ratio or the normalized future-response upper bound reaches its threshold; an unresolved response estimate is not interpreted as zero risk. Projected peak memory includes padded state and temporary buffers. If refinement cannot fit under the budget after reserved headroom, the result is BLOCKED_BY_MEMORY / UNKNOWN.
+
+The six-case synthetic fixture is checked by Rust tests and Draft 2020-12 schema validation. It covers quiet-tail/low-response hold, response-trigger with quiet tail, tail-trigger, missing-response conservative action, blocked expansion, and both-triggered. It validates policy logic only; no spectral solver, echo trajectory or physical QoI result is claimed.
+
 ## Asymptotic-preserving response-aware micro–macro reduction (AP-RAMMR)
 
 New companion programme: [#13483 — build response-aware asymptotic-preserving micro–macro reduction for high-field VPFP](https://github.com/Luminous-Dynamics/symthaea/issues/13483).
