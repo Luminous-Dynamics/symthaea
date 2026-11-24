@@ -1500,8 +1500,15 @@ mod tests {
             100,
             'd',
         );
-        observation.calibration_report.as_mut().unwrap().current_at_k1.status =
-            MeasurementQualificationStatusV1::Unknown;
+        let report = observation.calibration_report.as_mut().unwrap();
+        report.current_at_k1.status = MeasurementQualificationStatusV1::Unknown;
+        report.report_sha256 = calibration_report_digest(report).unwrap();
+        observation.evidence_receipt_sha256 = observation
+            .calibration_report
+            .as_ref()
+            .unwrap()
+            .report_sha256
+            .clone();
         let receipt = observe_drift_channel_v1(&mut engine, &observation).unwrap();
         assert_eq!(receipt.disposition, DriftObservationDispositionV1::HeldUnknown);
         assert!(engine.channels.is_empty());
