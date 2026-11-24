@@ -23,7 +23,21 @@ The exchange order is:
 - `IndependentEvidenceQualificationIssuerV1` is an injected transport contract. A real implementation must connect to a different authority and map timeout/ambiguous outcomes to `Unavailable`.
 - `independently_qualify_candidate_batch_v1` is the fail-closed consumer path. It verifies the returned receipt with the caller's pinned verifier and applies `project_qualified_candidate_evidence_v1`.
 
-Wire schema: `data/schemas/mace_evidence_qualification_request_v1.schema.json`.
+Wire schema: `data/schemas/mace_evidence_qualification_request_v1.schema.json`. Rust consumers may decode with `EvidenceQualificationRequestV1::from_json_value`; this rejects unknown/missing fields, non-canonical JSONL, candidate/binding mismatches, unsorted IDs and request-digest mismatches.
+
+### Request digest preimage
+
+The `request_sha256` field is SHA-256 over the following exact sequence:
+
+1. The domain prefix `luminous:mace:evidence-qualification-request:v1\0`.
+2. A u64 big-endian byte length followed by UTF-8 bytes for the schema version.
+3. The same length-prefixed encoding of the exact canonical candidate JSONL string.
+4. Length-prefixed UTF-8 values, in order: `run_id`, `query_invocation_id`, `domain_id`, `subject_scope_sha256`, `environment_revision_sha256`, `tool_profile_sha256`, `query_sha256`, `candidate_set_sha256`.
+5. A u64 big-endian candidate-ID count, then each sorted candidate ID as a length-prefixed UTF-8 value.
+6. Length-prefixed `decision_need_sha256`, `purpose_sha256`, `qualification_policy_sha256`, `lifecycle_snapshot_sha256`, `verifier_profile_sha256`.
+7. `now_unix` as u64 big-endian.
+
+The request digest is an idempotency/canonicalization aid only. It is not signed, does not authenticate the caller, and does not replace issuer-side parsing, candidate/source digest recomputation, or signature verification. The Rust test suite includes a fixed digest vector for cross-implementation parity.
 
 ## Independence requirements not supplied by this module
 
