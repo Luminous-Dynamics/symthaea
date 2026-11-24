@@ -290,6 +290,7 @@ pub fn audit_revision_v2(case: &RevisionCaseV2) -> Result<RevisionReportV1, Stri
         return Err(format!("unsupported temporal revision V2 schema: {}", case.schema));
     }
     require_text(&case.case_id, "case_id")?;
+    require_text(&case.experiment_unit_id, "experiment_unit_id")?;
     validate_digest(&case.model_identity_sha256, "model_identity_sha256")?;
     validate_digest(&case.prompt_sha256, "prompt_sha256")?;
     validate_digest(&case.adapter_sha256, "adapter_sha256")?;
@@ -1195,6 +1196,16 @@ mod tests {
         assert!(audit_revision(&local).is_ok());
         local.evidence_condition = EvidenceConditionV1::YokedRetrieved;
         assert!(audit_revision(&local).is_err());
+    }
+
+    #[test]
+    fn empty_experiment_unit_identity_is_rejected() {
+        let mut input = case(
+            positive_score(0.5, 1, 1, 1),
+            positive_score(1.0, 2, 0, 0),
+        );
+        input.experiment_unit_id.clear();
+        assert!(audit_revision(&input).is_err());
     }
 
     #[test]
