@@ -81,7 +81,7 @@ No benchmark should claim that the adjacent work is absent. The opportunity is t
 18. Hidden-profile information discovery: whether participants solicit, surface, attribute and preserve unique information that other members have not yet contributed.
 19. Multi-party memory quality against BM25, source-exact retrieval and human transactive-memory baselines, including knowledge updates, temporal reasoning, ambiguity and abstention.
 20. Agent sovereignty: portability, transparency, auditability, verifiability, modifiability and controllability, each with evidence rather than self-reported claims.
-14. Coalition contribution allocation with exact Shapley values when every required counterfactual coalition is identifiable.
+21. Coalition contribution allocation with exact Shapley values when every required counterfactual coalition is identifiable.
 
 The benchmark's contribution is the integrated measurement protocol and reproducible corpus, not a claim that any one of these constructs is newly invented.
 
