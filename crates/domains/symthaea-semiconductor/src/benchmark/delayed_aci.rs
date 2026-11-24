@@ -638,7 +638,7 @@ pub fn deliver_aci_label_v1(
                 current_alpha_after: engine.state.alpha_state,
                 scheduled_sequence: None,
                 state_before_sha256: before.clone(),
-                state_after_sha256: &before.into(),
+                state_after_sha256: before.into(),
                 mutated: false,
             },
         );
@@ -701,7 +701,7 @@ pub fn deliver_aci_label_v1(
                 current_alpha_after: engine.state.alpha_state,
                 scheduled_sequence: None,
                 state_before_sha256: before.clone(),
-                state_after_sha256: &before.into(),
+                state_after_sha256: before.into(),
                 mutated: false,
             },
         );
@@ -748,7 +748,7 @@ pub fn deliver_aci_label_v1(
                             current_alpha_after: engine.state.alpha_state,
                             scheduled_sequence: None,
                             state_before_sha256: before.clone(),
-                            state_after_sha256: &before.into(),
+                            state_after_sha256: before.into(),
                             mutated: false,
                         },
                     );
@@ -771,7 +771,7 @@ pub fn deliver_aci_label_v1(
                             current_alpha_after: engine.state.alpha_state,
                             scheduled_sequence: None,
                             state_before_sha256: before.clone(),
-                            state_after_sha256: &before.into(),
+                            state_after_sha256: before.into(),
                             mutated: false,
                         },
                     );
