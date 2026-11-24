@@ -2,6 +2,7 @@
 
 pub mod binary_metrics;
 pub mod calibration_requalification;
+pub mod continuous_metrology_audit;
 pub mod dtco_manifest;
 pub mod label_consumption_guard;
 pub mod metrology_audit;
@@ -136,4 +137,13 @@ pub use vm_snapshot_dependency_impact::{
     VmSnapshotDependencyGraphV1, VmSnapshotImpactEntryV1, VmSnapshotImpactStateV1,
     compute_vm_snapshot_impact_closure_v1, seal_vm_snapshot_dependency_edge_v1,
     seal_vm_snapshot_dependency_graph_v1,
+};
+
+pub use continuous_metrology_audit::{
+    CONTINUOUS_AUDIT_INPUT_SCHEMA_V1, CONTINUOUS_AUDIT_REPORT_SCHEMA_V1,
+    ContinuousAuditOutcomeStateV1, ContinuousAuditStatusV1, ContinuousMetrologyAuditErrorV1,
+    ContinuousMetrologyAuditInputV1, ContinuousMetrologyAuditReportV1,
+    ContinuousMetrologyOutcomeV1, ContinuousMetrologyPredictionV1,
+    ContinuousMetrologyStratumEstimateV1, compute_continuous_audit_frame_sha256_v1,
+    estimate_continuous_metrology_audit_v1,
 };
