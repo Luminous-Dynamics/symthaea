@@ -108,6 +108,13 @@
       "receipt_sha256": "5858585858585858585858585858585858585858585858585858585858585858",
       "verifier_profile_id": "capture-closure-v2",
       "verification_receipt_sha256": "5959595959595959595959595959595959595959595959595959595959595959"
+    },
+    "source_kind": "rendered_audio_loopback",
+    "heartbeat_accounting": {
+      "expected": 0,
+      "observed": 0,
+      "missing": 0,
+      "duplicate": 0
     }
   },
   "observation": {
