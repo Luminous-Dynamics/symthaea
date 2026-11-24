@@ -1039,6 +1039,55 @@ mod tests {
     }
 
     #[test]
+    fn closed_prediction_stream_drains_final_feedback_window_in_order() {
+        let mut engine = engine(2);
+        issue(&mut engine, "s0", "e0");
+        issue(&mut engine, "s1", "e1");
+        let first = delivery(
+            "s0",
+            "e0",
+            "l0",
+            1,
+            0.5,
+            2,
+            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+        );
+        let first_update = deliver_delayed_aci_feedback_v1(&mut engine, &first).unwrap();
+        assert_eq!(first_update.disposition, DelayedAciDispositionV1::Updated);
+
+        issue(&mut engine, "s2", "e2");
+        close_delayed_aci_prediction_stream_v1(&mut engine).unwrap();
+        assert!(engine.prediction_stream_closed);
+        assert!(issue(&mut engine, "s3", "e3").is_err());
+
+        let second = delivery(
+            "s1",
+            "e1",
+            "l1",
+            1,
+            0.5,
+            3,
+            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+        );
+        let second_update = deliver_delayed_aci_feedback_v1(&mut engine, &second).unwrap();
+        assert_eq!(second_update.disposition, DelayedAciDispositionV1::Updated);
+
+        let third = delivery(
+            "s2",
+            "e2",
+            "l2",
+            1,
+            0.5,
+            4,
+            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+        );
+        let third_update = deliver_delayed_aci_feedback_v1(&mut engine, &third).unwrap();
+        assert_eq!(third_update.disposition, DelayedAciDispositionV1::Updated);
+        assert!(engine.pending_predictions.is_empty());
+        assert_eq!(engine.state.accepted_feedback_count, 3);
+    }
+
+    #[test]
     fn missing_feedback_deadline_invalidates_assumptions_before_next_prediction() {
         let mut engine = engine(2);
         issue(&mut engine, "s0", "e0");
