@@ -448,3 +448,65 @@ Official source: https://world-in-world.github.io/
 - **H2RBench:** retain per-task simulated and physical results plus Pearson, Spearman and MMRV as separate rank-agreement diagnostics.
 
 A result only beats a comparator when the exact benchmark, population, checkpoint/training recipe, action semantics, timing, hardware/resource envelope and failure accounting are matched or the difference is explicitly treated as a separate track.
+
+## DEEP v2: single-step value versus sequential closed-loop value — 2026-11-24
+
+Pham Cong and Luong, *The Decision Value of Perception Compute* (arXiv:2609.35910v2, revised 16 November 2026), is directly relevant prior art for decision-value-aware compute allocation:
+
+- It values an escalation by the change in downstream decision loss, not by perception accuracy alone.
+- It explicitly allows escalation to have negative decision value.
+- It compares pre-escalation allocators with a budget-constrained decision oracle, charges allocator cost, and treats all-full inference as a baseline rather than an upper bound.
+- Its v2 reports that 34–62% of escalations that change downstream loss make it worse across its evaluated driving settings.
+
+Sources:
+- https://arxiv.org/abs/2609.35910
+- https://arxiv.org/html/2609.35910v2
+
+### Exact scope distinction
+
+DEEP's core estimand is a **single-step escalation value** for a fixed input and reference scene. Where the downstream decision depends on prior action, both counterfactual branches use the all-cheap prior action. The paper explicitly says this is not the escalation's closed-loop value (Section 3, “Single-step scope”). Its measured budget is an average per-input budget, not a per-frame deadline.
+
+Symthaea must therefore not claim to invent decision-value-aware compute allocation. The research question here is the sequential extension:
+
+> When additional imagination changes an action, does its apparent local benefit survive the state, observation, contact and recovery consequences of that changed action?
+
+The required comparison has two distinct estimands:
+
+1. **Fixed-context local value:** evaluate low- and higher-budget decisions against the same frozen decision context. This is the closest compatible DEEP-style diagnostic.
+2. **Branch-evolving episode value:** execute each budget policy from the same initial state and exogenous forcing commitment, but let each branch evolve under its own actions and observations. After action divergence, do not replay a shared prerecorded future state trajectory. Use #13375/#13377 for causal trajectory pairing and event identity.
+
+A positive local value does not imply positive episode value. The exact semantic counterexample is F7 in the machine-readable fixture.
+
+### Required comparison arms
+
+- Fixed low-budget imagination.
+- Fixed high-budget imagination.
+- Fixed per-decision and fixed per-episode compute schedules.
+- Adaptive per-decision allocation using only candidate-visible evidence.
+- Entropy/uncertainty-threshold allocation as a diagnostic baseline, not the target objective.
+- DEEP-style per-decision budget oracle, evaluator-only and not deployable.
+- Episode-level hindsight oracle, evaluator-only diagnostic and not a candidate baseline.
+
+Use #13281 for paired compute/observation interaction where the treatment design matches; #9122 for the existing paired direct-versus-predictive advantage auditor; #13375/#13377 for branch-evolving causal pairing; #13176 for resource/exposure attribution; and #9437 for evaluator isolation. Do not add another regret oracle, VOI estimator, trajectory replayer, scheduler, bootstrap engine or action authority.
+
+### Additional diagnostics
+
+Report, without combining them into a new composite score:
+
+- local-to-closed-loop value sign-reversal rate;
+- local and episode-level net decision value, with all compute, sensing, queueing, action delay, recovery and failure costs included at their actual timestamps;
+- harmful-imagination intervention rate and realized regret after selection;
+- episode success, verified progress, recovery success/time and no-output/abstention exposure;
+- total and stage p50/p95/p99 latency, measured energy, peak memory and inference work;
+- performance by task family, contact regime, supported horizon and deadline stratum.
+
+The local-to-closed-loop sign-reversal rate is a diagnostic of how often a local escalation conclusion fails after feedback changes the trajectory. It is not a safety probability and is not a replacement for episode-level task outcomes.
+
+### Experimental priority
+
+1. Reproduce the cheap/high decision-value contrast on a small numerical-control slice, with the fixed-context and branch-evolving outcomes kept separate.
+2. Test the same distinction on World-In-World at matched episode compute and deadline, preserving its four native task families.
+3. Move to one RoboDyna or LIBERO-Dynamic slice only after the exact checkpoint, native denominator, timing profile and causal-pairing prerequisites are pinned.
+4. Compare against DEEP's allocator/oracle methodology only on a compatible perception-escalation subproblem. Do not compare its driving results directly with manipulation success.
+
+This addendum extends the existing #13445 experiment contract; it is not a new standalone score or execution authority.
