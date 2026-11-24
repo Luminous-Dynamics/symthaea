@@ -84,3 +84,17 @@ The v2 musical forecast panel binds one independent capture-closure record per s
       tools/mel-judge-grounding-audit/fixtures/valid-musical-forecast-v2.json report.json
 
 The synthetic fixture demonstrates schema/evaluator behavior only. Capture digests are shape-checked, not authenticated; detector sensitivity/specificity and actual loopback completeness require independent live qualification. See docs/research/MEL_OUTPUT_OBSERVATION_CLOSURE_V1_2026-11-23.md.
+
+
+## Closed-loop musical episode reducer v1
+
+The closed-loop episode reducer joins the existing forecast, musician disposition, turn decision, action-effect, independent capture and detector-observation summaries without replacing their owning verifiers.
+
+```sh
+cargo +1.96.0 run --locked --manifest-path tools/mel-judge-grounding-audit/Cargo.toml --bin mel-closed-loop-episode-audit -- audit \
+  docs/research/fixtures/mel-closed-loop-episode-present.synthetic.json report.json
+```
+
+The reducer reports `DetectorReportedPresent`, `DetectorReportedAbsent`, `Ambiguous`, `NotEstimable` or `Unobserved`. It checks chronology, exact forecast/disposition/decision joins, action compatibility, capture accounting, payload/capture binding and structural identity separation. It deliberately reports `upstream_receipts_authenticated=false` and `upstream_verifiers_replayed=false`: receipt references must still be resolved and replayed by their owning verifier services. A complete empty capture can produce a detector-reported absence with no producer effect record; incomplete frame/sequence accounting downgrades detector absence to unobserved.
+
+This is a structural reducer, not a waveform decoder, physical capture verifier, detector accuracy benchmark or human-agency study. See `docs/research/MEL_CLOSED_LOOP_EPISODE_V1.md` and `docs/research/MEL_CLOSED_LOOP_BENCHMARK_PROTOCOL_V1.md`.
