@@ -60,11 +60,14 @@ pub enum AciUpdateReasonV1 {
     LabelPayloadDigestMismatch,
     EligibilityReportDigestMismatch,
     DeliveredValueNonFinite,
+    DeliveredValueOutOfPolicy,
     DeliveredValueMismatch,
+    PendingPredictionMissing,
     ClockDomainMismatch,
     LabelAvailableBeforeMeasurement,
     DeliveryBeforePrediction,
     DeliveryBeforeLabelAvailability,
+    DeliveryDelayExceeded,
     ReportBeforeLabelAvailability,
     ReportUnavailableAtDelivery,
     DuplicateAcceptedLabelRevision,
@@ -538,7 +541,7 @@ pub fn deliver_aci_label_v1(
     let Some(prediction_receipt) = prediction.cloned() else {
         return make_update_receipt(
             engine, delivery, None, AciUpdateDispositionV1::PendingPredictionMissing,
-            Some(AciUpdateReasonV1::PredictionAlreadyRegistered), None,
+            Some(AciUpdateReasonV1::PendingPredictionMissing), None,
             engine.state.alpha_state, engine.state.alpha_state, engine.state.alpha_state,
             None, &before, &before, false,
         );
@@ -579,10 +582,10 @@ pub fn deliver_aci_label_v1(
         || prediction_receipt.measurement_event_id != delivery.measurement_event_id
     {
         reason = Some(AciUpdateReasonV1::MeasurementEventMismatch);
-    } else if !delivery.target_value.is_finite()
-        || delivery.target_value.abs() > engine.policy.maximum_abs_target
-    {
+    } else if !delivery.target_value.is_finite() {
         reason = Some(AciUpdateReasonV1::DeliveredValueNonFinite);
+    } else if delivery.target_value.abs() > engine.policy.maximum_abs_target {
+        reason = Some(AciUpdateReasonV1::DeliveredValueOutOfPolicy);
     } else if report.qualified_corrected_value != delivery.target_value {
         reason = Some(AciUpdateReasonV1::DeliveredValueMismatch);
     } else if delivery.label_payload_sha256 != report.label_sha256 {
@@ -615,7 +618,7 @@ pub fn deliver_aci_label_v1(
         - prediction_receipt.prediction_at_unix_seconds
         > engine.policy.maximum_delivery_delay_seconds
     {
-        reason = Some(AciUpdateReasonV1::DeliveryBeforePrediction);
+        reason = Some(AciUpdateReasonV1::DeliveryDelayExceeded);
     } else if delivery.idempotency_key != revision_key {
         reason = Some(AciUpdateReasonV1::LabelIdentityMismatch);
     }
@@ -1018,6 +1021,55 @@ mod tests {
         let receipt = deliver_aci_label_v1(&mut engine, &candidate).unwrap();
         assert_eq!(receipt.disposition, AciUpdateDispositionV1::Rejected);
         assert_eq!(state_digest(&engine.state).unwrap(), before);
+    }
+
+    #[test]
+    fn out_of_order_label_arrivals_update_only_current_arrival_order_state() {
+        let mut engine = engine(AciUpdateModeV1::ArrivalOrder);
+        register(&mut engine, "s1", "e1", 100, -1.0, 1.0);
+        register(&mut engine, "s2", "e2", 103, -1.0, 1.0);
+        let before = engine.state.alpha_state;
+
+        let later_sample_first = delivery(
+            "s2", "e2", "l2", 1, 2.0, -1.0, 1.0, 120, 121, 122,
+        );
+        let later_receipt = deliver_aci_label_v1(&mut engine, &later_sample_first).unwrap();
+        assert_eq!(later_receipt.disposition, AciUpdateDispositionV1::UpdatedArrivalOrder);
+        let after_first = engine.state.alpha_state;
+        assert!(after_first < before);
+
+        let earlier_sample_late = delivery(
+            "s1", "e1", "l1", 1, 0.0, -1.0, 1.0, 110, 111, 130,
+        );
+        let earlier_receipt = deliver_aci_label_v1(&mut engine, &earlier_sample_late).unwrap();
+        assert_eq!(earlier_receipt.disposition, AciUpdateDispositionV1::UpdatedArrivalOrder);
+        assert!(engine.state.alpha_state > after_first);
+        assert_eq!(earlier_receipt.effective_delay_seconds, Some(29));
+    }
+
+    #[test]
+    fn fixed_horizon_schedule_is_deterministic_with_multiple_interleaved_phases() {
+        let mut engine = engine(AciUpdateModeV1::FixedHorizonDelayed { horizon_steps: 3 });
+        let p0 = register(&mut engine, "s0", "e0", 100, -1.0, 1.0);
+        let p1 = register(&mut engine, "s1", "e1", 103, -1.0, 1.0);
+        let p2 = register(&mut engine, "s2", "e2", 106, -1.0, 1.0);
+        let d0 = delivery("s0", "e0", "l0", 1, 2.0, -1.0, 1.0, 110, 111, 112);
+        let d1 = delivery("s1", "e1", "l1", 1, 0.0, -1.0, 1.0, 113, 114, 115);
+        assert_eq!(
+            deliver_aci_label_v1(&mut engine, &d0).unwrap().scheduled_sequence,
+            Some(p0.sequence + 3)
+        );
+        assert_eq!(
+            deliver_aci_label_v1(&mut engine, &d1).unwrap().scheduled_sequence,
+            Some(p1.sequence + 3)
+        );
+        let p3 = register(&mut engine, "s3", "e3", 109, -1.0, 1.0);
+        let p4 = register(&mut engine, "s4", "e4", 112, -1.0, 1.0);
+        let p5 = register(&mut engine, "s5", "e5", 115, -1.0, 1.0);
+        assert_eq!(p3.alpha_at_prediction, 0.10);
+        assert!(p4.alpha_at_prediction < 0.10);
+        assert!(p5.alpha_at_prediction > p4.alpha_at_prediction);
+        assert_eq!(p2.alpha_at_prediction, 0.10);
     }
 
     #[test]
