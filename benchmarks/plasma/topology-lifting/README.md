@@ -53,3 +53,16 @@ The implementation max-scales weights before normalization to avoid overflow, us
 A checked-in synthetic known-answer fixture demonstrates the first four moments for positions [0, 1/4, 1/2, 3/4] and weights [0.1, 0.2, 0.3, 0.4]. The focused workflow validates its schema and the Rust unit test checks the expected complex values.
 
 **Important limitation:** a finite set of Fourier moments is not an injective representation of an arbitrary particle measure. It is a band-limited observable embedding, not a lossless microscopic state or substitute for high-k / echo response qualification. Compare its storage and future-response distortion through KIRD rather than calling it a complete kinetic reconstruction.
+
+
+## Sample-support sensitivity versus weighted-measure stability
+
+The paired fixture `weighted-measure-tail-stability-v0.1.json` contrasts two behaviours on the same synthetic particle cloud:
+
+1. **Sample-extrema coordinate map:** adding an outlier at x=0 changes the observed support from [0.1,0.9] to [0,0.9] and moves the normalized coordinate of an existing inlier by as much as 1/9.
+2. **Fixed physical torus + weighted Fourier measure:** retain the existing physical coordinates, append the outlier with weight epsilon=1e-12, and compute normalized Fourier moments of the weighted empirical measure. If the original measure has unit mass, the augmented normalized measure is `mu'=(mu+epsilon*delta_x)/(1+epsilon)`. Since each Fourier character has magnitude one, every moment obeys
+   `|m'_k-m_k| <= 2*epsilon/(1+epsilon)`.
+
+The focused Rust test checks the observed moment difference against this analytic bound and independently checks the sample-support displacement. The fixture is also schema-validated in CI.
+
+This supports a representation-level stability property, not a physical-safety conclusion. A tiny-mass particle can still matter to high-velocity energy moments, extreme gradients, rare-event observables or future nonlinear response. Those require separate kinetic invariants, tail diagnostics and registered intervention tests. It is also still a finite-band embedding and therefore not a lossless reconstruction of the full measure.
