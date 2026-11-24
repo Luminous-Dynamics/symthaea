@@ -170,6 +170,11 @@ def export_checkpoint(path: Path) -> None:
         )
 
     full_state = physics.get_state(sig=signature).copy()
+    expected_state_size = int(mujoco.mj_stateSize(physics.model.ptr, signature))
+    if full_state.size != expected_state_size:
+        raise AssertionError(
+            f"integration state size {full_state.size} != mj_stateSize {expected_state_size}"
+        )
     prefix_observation = env.task.get_observation(physics)
     prefix_observation = {key: np.asarray(value).copy() for key, value in prefix_observation.items()}
 
@@ -184,44 +189,49 @@ def export_checkpoint(path: Path) -> None:
     }
     expected_rng = task_rng_tuple(env.task)
 
+    def observation_payload(prefix: str, observation: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
+        keys = sorted(observation)
+        values = {f"{prefix}_keys": np.asarray(keys, dtype=np.str_)}
+        values.update(
+            {
+                f"{prefix}_array_{index}": np.asarray(observation[key]).copy()
+                for index, key in enumerate(keys)
+            }
+        )
+        return values
+
+    payload = {
+        "integration_state": full_state,
+        "integration_state_size": np.asarray(expected_state_size, dtype=np.int64),
+        "task_rng_name": np.asarray(task_rng[0]),
+        "task_rng_keys": task_rng[1],
+        "task_rng_position": np.asarray(task_rng[2], dtype=np.int64),
+        "task_rng_has_gauss": np.asarray(task_rng[3], dtype=np.int64),
+        "task_rng_cached_gaussian": np.asarray(task_rng[4], dtype=np.float64),
+        "wrapper_step_count": np.asarray(PREFIX_STEPS, dtype=np.int64),
+        "wrapper_reset_next_step": np.asarray(False, dtype=np.bool_),
+        "wrapper_n_sub_steps": np.asarray(env._n_sub_steps, dtype=np.int64),
+        "wrapper_step_limit": np.asarray(env._step_limit, dtype=np.float64),
+        "wrapper_legacy_step": np.asarray(env.physics.legacy_step, dtype=np.bool_),
+        "control_timestep": np.asarray(env.control_timestep(), dtype=np.float64),
+        "prefix_observation_sha256": np.asarray(digest_observation(prefix_observation)),
+        "task_rng_sha256": np.asarray(digest_task_rng(task_rng)),
+        "next_action": next_action,
+        "expected_next_state": expected_state,
+        "expected_next_reward": np.asarray(expected_step.reward, dtype=np.float64),
+        "expected_next_discount": np.asarray(expected_step.discount, dtype=np.float64),
+        "expected_next_step_type": np.asarray(int(expected_step.step_type), dtype=np.int64),
+        "expected_next_task_rng_sha256": np.asarray(digest_task_rng(expected_rng)),
+        "expected_next_wrapper_step_count": np.asarray(env._step_count, dtype=np.int64),
+        "expected_next_wrapper_reset_next_step": np.asarray(env._reset_next_step, dtype=np.bool_),
+        "source_model_nplugin": np.asarray(physics.model.nplugin, dtype=np.int64),
+    }
+    payload.update(observation_payload("prefix_observation", prefix_observation))
+    payload.update(observation_payload("expected_next_observation", expected_observation))
+
     if path.exists():
         path.unlink()
-    np.savez_compressed(
-        path,
-        integration_state=full_state,
-        task_rng_name=np.asarray(task_rng[0]),
-        task_rng_keys=task_rng[1],
-        task_rng_position=np.asarray(task_rng[2], dtype=np.int64),
-        task_rng_has_gauss=np.asarray(task_rng[3], dtype=np.int64),
-        task_rng_cached_gaussian=np.asarray(task_rng[4], dtype=np.float64),
-        wrapper_step_count=np.asarray(PREFIX_STEPS, dtype=np.int64),
-        wrapper_reset_next_step=np.asarray(False, dtype=np.bool_),
-        wrapper_n_sub_steps=np.asarray(env._n_sub_steps, dtype=np.int64),
-        wrapper_step_limit=np.asarray(env._step_limit, dtype=np.float64),
-        wrapper_legacy_step=np.asarray(env.physics.legacy_step, dtype=np.bool_),
-        control_timestep=np.asarray(env.control_timestep(), dtype=np.float64),
-        prefix_observation_keys=np.asarray(sorted(prefix_observation), dtype=np.str_),
-        prefix_observation_values=np.asarray(
-            [prefix_observation[key] for key in sorted(prefix_observation)],
-            dtype=object,
-        ),
-        prefix_observation_sha256=np.asarray(digest_observation(prefix_observation)),
-        task_rng_sha256=np.asarray(digest_task_rng(task_rng)),
-        next_action=next_action,
-        expected_next_state=expected_state,
-        expected_next_observation_keys=np.asarray(sorted(expected_observation), dtype=np.str_),
-        expected_next_observation_values=np.asarray(
-            [expected_observation[key] for key in sorted(expected_observation)],
-            dtype=object,
-        ),
-        expected_next_reward=np.asarray(expected_step.reward, dtype=np.float64),
-        expected_next_discount=np.asarray(expected_step.discount, dtype=np.float64),
-        expected_next_step_type=np.asarray(int(expected_step.step_type), dtype=np.int64),
-        expected_next_task_rng_sha256=np.asarray(digest_task_rng(expected_rng)),
-        expected_next_wrapper_step_count=np.asarray(env._step_count, dtype=np.int64),
-        expected_next_wrapper_reset_next_step=np.asarray(env._reset_next_step, dtype=np.bool_),
-        source_model_nplugin=np.asarray(physics.model.nplugin, dtype=np.int64),
-    )
+    np.savez_compressed(path, **payload)
     print(json.dumps({
         "mode": "export",
         "checkpoint": str(path),
@@ -238,12 +248,16 @@ def export_checkpoint(path: Path) -> None:
     }, sort_keys=True))
 
 
-def load_observation(keys: np.ndarray, values: np.ndarray) -> dict[str, np.ndarray]:
-    return {str(key): np.asarray(value).copy() for key, value in zip(keys.tolist(), values, strict=True)}
+def load_observation(data: Any, prefix: str) -> dict[str, np.ndarray]:
+    keys = data[f"{prefix}_keys"].tolist()
+    return {
+        str(key): np.asarray(data[f"{prefix}_array_{index}"]).copy()
+        for index, key in enumerate(keys)
+    }
 
 
 def replay_checkpoint(path: Path) -> None:
-    with np.load(path, allow_pickle=True) as data:
+    with np.load(path, allow_pickle=False) as data:
         saved = {key: data[key].copy() for key in data.files}
 
     env = make_environment()
@@ -262,6 +276,9 @@ def replay_checkpoint(path: Path) -> None:
         int(saved["task_rng_has_gauss"]),
         float(saved["task_rng_cached_gaussian"]),
     )
+    expected_state_size = int(mujoco.mj_stateSize(env.physics.model.ptr, signature))
+    if expected_state_size != int(saved["integration_state_size"]):
+        raise AssertionError("fresh-process MuJoCo integration state size differs")
     env.physics.set_state(saved["integration_state"], sig=signature)
     env.task.random.set_state(task_rng_state)
     env._step_count = int(saved["wrapper_step_count"])
@@ -273,9 +290,7 @@ def replay_checkpoint(path: Path) -> None:
     # Recompute derived MuJoCo quantities before reading observations.
     env.physics.forward()
     prefix_actual = env.task.get_observation(env.physics)
-    prefix_expected = load_observation(
-        saved["prefix_observation_keys"], saved["prefix_observation_values"]
-    )
+    prefix_expected = load_observation(saved, "prefix_observation")
     prefix_error = compare_observations(prefix_actual, prefix_expected, PREFIX_TOLERANCE)
     if digest_observation(prefix_actual) != str(saved["prefix_observation_sha256"].item()):
         raise AssertionError("fresh-process factual prefix observation digest differs")
@@ -290,9 +305,7 @@ def replay_checkpoint(path: Path) -> None:
     ):
         state_error = float(np.max(np.abs(actual_state - saved["expected_next_state"])))
         raise AssertionError(f"fresh-process next-step integration state differs: {state_error}")
-    next_expected = load_observation(
-        saved["expected_next_observation_keys"], saved["expected_next_observation_values"]
-    )
+    next_expected = load_observation(saved, "expected_next_observation")
     next_error = compare_observations(
         actual_step.observation, next_expected, PREFIX_TOLERANCE
     )
