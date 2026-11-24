@@ -649,6 +649,8 @@ pub fn evaluate_posterior_effect_cohort(
         individuals.push(evaluate_posterior_individual_cohort(cohort)?);
     }
 
+    individuals.sort_unstable_by_key(|summary| summary.individual_id_sha256);
+
     Ok(PosteriorEffectCohortCertificate {
         task_sha256: first_context.task_sha256,
         intervention_pair_sha256: first_context.intervention_pair_sha256,
@@ -954,6 +956,21 @@ mod tests {
             result.individuals[0].individual_id_sha256,
             result.individuals[1].individual_id_sha256
         );
+    }
+
+    #[test]
+    fn cohort_and_draw_input_order_produce_canonical_output() {
+        let first = cohort(vec![
+            make_draw(1, 101, 2, 52, 500_000, (2, 4, 5)),
+            make_draw(1, 101, 1, 51, 500_000, (2, 1, 1)),
+        ]);
+        let second = cohort(vec![
+            make_draw(2, 102, 1, 61, 1_000_000, (-1, -1, -1)),
+        ]);
+        let forward = evaluate_posterior_effect_cohort(&[first.clone(), second.clone()]).unwrap();
+        let reverse = evaluate_posterior_effect_cohort(&[second, first]).unwrap();
+        assert_eq!(forward, reverse);
+        assert_eq!(forward.individuals[0].samples[0].posterior_draw_id, 1);
     }
 
     #[test]
