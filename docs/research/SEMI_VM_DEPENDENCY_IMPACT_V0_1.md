@@ -68,7 +68,7 @@ Seventeen unit tests cover:
 16. distillation inheritance from a blocked teacher;
 17. mixed blocked/unknown parent sources with blocked precedence.
 
-The integration oracle uses fixed-point graph relaxation and a separate parent-first DFS ordering routine to verify direct/transitive impact sets, per-node states, rebuild candidates, incomplete-inventory UNKNOWN behavior, and input-order-invariant receipts. It does not call the production topological propagation routine.
+The integration oracle uses fixed-point graph relaxation and a separate parent-first DFS ordering routine to verify direct/transitive impact sets, per-node states, rebuild candidates, direct and inherited source-label IDs, incomplete-inventory UNKNOWN behavior, and input-order-invariant receipts. It does not call the production topological propagation routine.
 
 Tests are authored; exact-head rustfmt, strict Clippy, crate tests and SEMI-BENCH-001 reference workflow are required before claiming a pass.
 
