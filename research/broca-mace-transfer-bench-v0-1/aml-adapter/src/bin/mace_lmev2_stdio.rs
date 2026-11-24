@@ -35,9 +35,66 @@ use broca_aml_adapter::retrieval_policy_store::RetrievalPolicyTraceFileStoreV1;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum RetrievalModeV1 {
+    Bm25Only,
+    EntityLiteralOnly,
+    HybridRrf,
+}
+
+impl RetrievalModeV1 {
+    fn parse(value: &str) -> Result<Self, String> {
+        match value {
+            "bm25_only" => Ok(Self::Bm25Only),
+            "entity_literal_only" => Ok(Self::EntityLiteralOnly),
+            "hybrid_rrf" => Ok(Self::HybridRrf),
+            _ => Err("MACE_LMEV2_RETRIEVAL_MODE must be bm25_only, entity_literal_only, or hybrid_rrf".to_owned()),
+        }
+    }
+
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Bm25Only => "bm25_only_with_original_image_evidence",
+            Self::EntityLiteralOnly => "entity_literal_only_with_original_image_evidence",
+            Self::HybridRrf => "hybrid_bm25_entity_literal_with_original_image_evidence",
+        }
+    }
+
+    const fn backend_id(self) -> &'static str {
+        match self {
+            Self::Bm25Only => "mace_lmev2_bm25_only",
+            Self::EntityLiteralOnly => "mace_lmev2_entity_literal_only",
+            Self::HybridRrf => "mace_lmev2_hybrid_rrf_bm25_entity",
+        }
+    }
+
+    const fn evidence_channel(self) -> &'static str {
+        match self {
+            Self::Bm25Only => "trajectory_bm25_text",
+            Self::EntityLiteralOnly => "trajectory_entity_literal",
+            Self::HybridRrf => "hybrid_rrf_bm25_entity",
+        }
+    }
+
+    const fn uses_bm25(self) -> bool {
+        matches!(self, Self::Bm25Only | Self::HybridRrf)
+    }
+
+    const fn uses_entity_literal(self) -> bool {
+        matches!(self, Self::EntityLiteralOnly | Self::HybridRrf)
+    }
+
+    const fn fusion_name(self) -> &'static str {
+        match self {
+            Self::Bm25Only | Self::EntityLiteralOnly => "none",
+            Self::HybridRrf => "reciprocal_rank_fusion_k60",
+        }
+    }
+}
+
 struct RetrievalIndexesV1 {
-    bm25: LongMemEvalV2Bm25IndexV1,
-    entity_literal: LongMemEvalV2EntityLiteralIndexV1,
+    bm25: Option<LongMemEvalV2Bm25IndexV1>,
+    entity_literal: Option<LongMemEvalV2EntityLiteralIndexV1>,
 }
 
 struct Config {
@@ -45,6 +102,7 @@ struct Config {
     run_id: String,
     environment_revision_sha256: String,
     backend_revision_sha256: String,
+    retrieval_mode: RetrievalModeV1,
     policy_trace_dir: PathBuf,
     dataset_root: PathBuf,
     top_k: usize,
@@ -82,6 +140,9 @@ impl Config {
         if !valid_sha256(&backend_revision_sha256) {
             return Err("MACE_LMEV2_BACKEND_REVISION_SHA256 must be lowercase SHA-256".into());
         }
+        let retrieval_mode_value = env::var("MACE_LMEV2_RETRIEVAL_MODE")
+            .unwrap_or_else(|_| "hybrid_rrf".to_owned());
+        let retrieval_mode = RetrievalModeV1::parse(&retrieval_mode_value)?;
         let root = env::var("MACE_LMEV2_DATASET_ROOT")
             .map_err(|_| "MACE_LMEV2_DATASET_ROOT is required".to_string())?;
         let dataset_root = fs::canonicalize(root)
@@ -127,6 +188,7 @@ impl Config {
             run_id,
             environment_revision_sha256,
             backend_revision_sha256,
+            retrieval_mode,
             policy_trace_dir,
             dataset_root,
             top_k,
