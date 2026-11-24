@@ -624,10 +624,81 @@ fn bump_enumeration(work: &mut usize) -> Result<(), SequentialOracleError> {
     Ok(())
 }
 
+// These two transition helpers deliberately duplicate the small
+// feasibility/support calculations used by the dynamic programme. The
+// exhaustive oracle shares the validated problem schema, but not the dynamic
+// programme's resource or outcome-intersection implementation.
+
+fn enumeration_feasible_action(
+    problem: &SequentialRobustProblem,
+    action: &SequentialAction,
+    remaining_budget: &BTreeMap<String, u64>,
+    current_step: u64,
+) -> Result<Option<(BTreeMap<String, u64>, u64)>, SequentialOracleError> {
+    let completed_at = current_step
+        .checked_add(action.result_delay_steps)
+        .ok_or(SequentialOracleError::TimeOverflow)?;
+    if completed_at > problem.decision_deadline_step {
+        return Ok(None);
+    }
+
+    let mut budget_after = BTreeMap::new();
+    for (dimension, available) in remaining_budget {
+        let Some(required) = action.resource_costs.get(dimension) else {
+            return Err(SequentialOracleError::ResourceDimensionMismatch {
+                action_id: action.action_id.clone(),
+                expected: remaining_budget.keys().cloned().collect(),
+                actual: action.resource_costs.keys().cloned().collect(),
+            });
+        };
+        if required > available {
+            return Ok(None);
+        }
+        budget_after.insert(dimension.clone(), available - required);
+    }
+    Ok(Some((budget_after, completed_at)))
+}
+
+fn enumeration_active_branches(
+    action: &SequentialAction,
+    possible_states: &[String],
+) -> Result<Vec<(String, Vec<String>, String)>, SequentialOracleError> {
+    let mut branches = Vec::new();
+    let mut states_accounted_for = BTreeSet::new();
+
+    for outcome in &action.outcomes {
+        let mut consistent = Vec::new();
+        for current_state in possible_states {
+            if outcome.possible_state_ids.iter().any(|id| id == current_state) {
+                consistent.push(current_state.clone());
+                states_accounted_for.insert(current_state.clone());
+            }
+        }
+        if !consistent.is_empty() {
+            consistent.sort();
+            branches.push((
+                outcome.outcome_id.clone(),
+                consistent,
+                outcome.next_protocol_state_id.clone(),
+            ));
+        }
+    }
+
+    for current_state in possible_states {
+        if !states_accounted_for.contains(current_state) {
+            return Err(SequentialOracleError::UncoveredState {
+                action_id: action.action_id.clone(),
+                state_id: current_state.clone(),
+            });
+        }
+    }
+    Ok(branches)
+}
+
 /// Independently enumerate every legal contingent policy tree for a tiny
-/// world. This intentionally does not call the dynamic-programming solver or
-/// its terminal-value helper. It is computationally bounded and exists only
-/// to cross-check known-answer worlds.
+/// world. This does not call the dynamic-programming solver, its terminal
+/// value helper, or its resource/support transition helpers. It is bounded
+/// and exists only to cross-check known-answer worlds.
 fn enumerate_node(
     problem: &SequentialRobustProblem,
     possible_states: &[String],
@@ -696,11 +767,11 @@ fn enumerate_node(
             .find(|candidate| candidate.action_id == action_id)
             .ok_or_else(|| SequentialOracleError::UnknownAction(action_id.clone()))?;
         let Some((budget_after, step_after)) =
-            feasible_action(problem, action, remaining_budget, current_step)?
+            enumeration_feasible_action(problem, action, remaining_budget, current_step)?
         else {
             continue;
         };
-        let active = active_branches(action, possible_states)?;
+        let active = enumeration_active_branches(action, possible_states)?;
 
         // Cartesian product of all branch-continuation choices constructs
         // complete policies. Each branch sees only its own public outcome.
