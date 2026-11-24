@@ -5031,6 +5031,7 @@ mod tests {
     fn scalar_unstable_mode_oracle_fails_closed_on_growth_overflow_and_excessive_horizon() {
         let mut overflow = scalar_unstable_mode_contract();
         overflow.growth_rate_per_second = 1_000.0;
+        overflow.time_step_seconds = 1.0;
         assert!(matches!(
             evaluate_scalar_unstable_mode_interface(overflow),
             Err(ContractError::InvalidControlTimingField {
