@@ -12,7 +12,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
 
 use super::calibration_requalification::{
-    CALIBRATION_REQUALIFICATION_REPORT_SCHEMA_V1, CalibrationRequalificationReportV1,
+    CALIBRATION_REQUALIFICATION_REPORT_SCHEMA_V1,
+    CalibrationRequalificationFrontierReportV1, CalibrationRequalificationReportV1,
 };
 use super::label_consumption_guard::{
     LABEL_CONSUMPTION_REPORT_SCHEMA_V1, LabelConsumptionEligibilityReportV1,
@@ -212,6 +213,7 @@ pub struct DriftObservationReceiptV1 {
     pub baseline_sha256: String,
     pub clock_domain_id: String,
     pub qualification_report_sha256: Option<String>,
+    pub calibration_report_sha256: Option<String>,
     pub prediction_receipt_sha256: Option<String>,
     pub source_label_ids: Vec<String>,
     pub policy_sha256: String,
@@ -440,6 +442,10 @@ fn make_receipt(
         clock_domain_id: input.clock_domain_id.clone(),
         qualification_report_sha256: input
             .qualification_report
+            .as_ref()
+            .map(|report| report.report_sha256.clone()),
+        calibration_report_sha256: input
+            .calibration_report
             .as_ref()
             .map(|report| report.report_sha256.clone()),
         prediction_receipt_sha256: input.prediction_receipt_sha256.clone(),
@@ -1023,7 +1029,7 @@ mod tests {
     }
 
     fn eligible_calibration_report(event_id: &str, evidence: char) -> CalibrationRequalificationReportV1 {
-        let frontier = super::super::super::super::benchmark::calibration_requalification::CalibrationRequalificationFrontierReportV1 {
+        let frontier = CalibrationRequalificationFrontierReportV1 {
             frontier_input_sha256: digest(evidence),
             status: MeasurementQualificationStatusV1::Qualified,
             downstream_consumption_allowed_at_frontier: true,
@@ -1414,7 +1420,18 @@ mod tests {
             schema: SHARED_RESOURCE_GRAPH_SCHEMA_V1.into(),
             graph_id: "resources-1".into(),
             inventory_complete: true,
-            bindings: Vec::new(),
+            bindings: vec![
+                SharedResourceBindingV1 {
+                    context_id: "tool-1/ch-1".into(),
+                    resource_id: "reference-1".into(),
+                    resource_kind: "calibration_reference".into(),
+                },
+                SharedResourceBindingV1 {
+                    context_id: "tool-2/ch-2".into(),
+                    resource_id: "reference-2".into(),
+                    resource_kind: "calibration_reference".into(),
+                },
+            ],
             graph_sha256: String::new(),
         };
         graph.graph_sha256 = seal_shared_resource_graph_v1(&graph).unwrap();
@@ -1436,6 +1453,58 @@ mod tests {
             CommonCauseAssessmentStateV1::NoDeclaredSharedResource
         );
         assert_eq!(report.causal_attribution, CausalAttributionStateV1::NotEstablished);
+    }
+
+    #[test]
+    fn unrepresented_context_in_claimed_complete_inventory_returns_unknown() {
+        let mut graph = SharedResourceGraphV1 {
+            schema: SHARED_RESOURCE_GRAPH_SCHEMA_V1.into(),
+            graph_id: "resources-1".into(),
+            inventory_complete: true,
+            bindings: vec![SharedResourceBindingV1 {
+                context_id: "tool-1/ch-1".into(),
+                resource_id: "cal-ref-1".into(),
+                resource_kind: "calibration_reference".into(),
+            }],
+            graph_sha256: String::new(),
+        };
+        graph.graph_sha256 = seal_shared_resource_graph_v1(&graph).unwrap();
+        let alerts = vec![
+            DriftAlertContextV1 {
+                alert_id: "a1".into(),
+                context_id: "tool-1/ch-1".into(),
+                observation_receipt_sha256: digest('a'),
+            },
+            DriftAlertContextV1 {
+                alert_id: "a2".into(),
+                context_id: "tool-2/ch-2".into(),
+                observation_receipt_sha256: digest('b'),
+            },
+        ];
+        let report = assess_declared_common_resource_association_v1(&graph, &alerts).unwrap();
+        assert_eq!(report.state, CommonCauseAssessmentStateV1::Unknown);
+        assert!(report.shared_resource_ids.is_empty());
+    }
+
+    #[test]
+    fn calibration_unknown_does_not_update_measurement_system_drift_channel() {
+        let mut engine = engine();
+        let mut observation = input(
+            "m1",
+            "calibration",
+            DriftEvidencePlaneV1::MeasurementSystem,
+            DriftDetectorKindV1::EventChange,
+            DriftEvidenceKindV1::CalibrationQualification,
+            DriftQualificationV1::Unknown,
+            Some(1.0),
+            100,
+            'd',
+        );
+        observation.calibration_report.as_mut().unwrap().current_at_k1.status =
+            MeasurementQualificationStatusV1::Unknown;
+        let receipt = observe_drift_channel_v1(&mut engine, &observation).unwrap();
+        assert_eq!(receipt.disposition, DriftObservationDispositionV1::HeldUnknown);
+        assert!(engine.channels.is_empty());
     }
 
     #[test]
