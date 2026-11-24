@@ -15,10 +15,15 @@ Existing suites measure complementary capabilities. They should be used as adapt
 |---|---|---|---|---|
 | Ansatz-free scientific discovery | [Unsatz](https://arxiv.org/abs/2611.03713) | Learner proposes variables, hidden state, interactions and measurement/model form, buys experiments and predicts held-out interventions/conditions/horizons | **Closest direct comparator** for structural/model-form discovery | Agent starts with a scientific task and a model-program language; it is not a generic pre-task acquisition benchmark. Reproduce its exact task protocol before comparing |
 | Interactive scientific research agents | [SciAgentArena](https://sciagentarena.github.io/) | ~200 stepwise-verified tasks across five scientific domains, four task categories and 18 evaluated agents; reports reliability, stability and cost as well as task outcomes | External reality check for whether acquired structural knowledge improves actual scientific workflows | Tasks are user/task exposed and span data-analysis workflows; it does not isolate pre-task structural acquisition or frozen cross-domain transfer |
+| Graph foundation model transfer | [GFMBenchmark](https://github.com/smufang/GFMBenchmark) | Eight graph foundation models over 33 datasets, seven topic domains and six graph-format domains; separates semantic/topic shifts from representation-format shifts | Direct graph transfer baseline and two-axis OOD test | Pretraining/adaptation benchmark, not task-agnostic relational acquisition or intervention validation |
+| Adaptive benchmark generation | [AutoSciBench](https://arxiv.org/abs/2610.05140) | Automatically revises scientific task/data/verification recipes from solver trajectories and judge feedback to close shortcuts | Strong model for an evaluator that refreshes hidden world families as agents learn benchmark shortcuts | Generated tasks are still recipe/judge-dependent; keep independent scientific review and frozen confirmatory cohorts |
+| Scientific ideation under active exploration | [AgentIdeaBench](https://arxiv.org/abs/2609.07611) | 33 LLMs across 40 subfields and five disciplines, comparing static observation with active exploration and literature-grounded critics | Direct probe for whether structural memory improves testable hypothesis formation and exploration | Active exploration improves grounding/feasibility/clarity but measured originality did not improve; do not equate better ideas with novel discoveries |
+| Autonomous laboratory research | [Autonomous Science Bench 0.1](https://asb.open-ssi.org/about) | Six pilot tasks across biology, chemistry and materials; full model/agent/tool/harness evaluated across experimental design, learning and final ranking | Direct experiment-loop benchmark for whether acquired structures improve laboratory decisions | Only three trials per task in the initial release; the leaderboard's small gaps are not statistically decisive. Keep task/backend/cost conditions matched |
 | Interactive exploration | [ARC-AGI-3](https://arcprize.org/arc-agi/3) | Explore unfamiliar interactive environments, infer goals/rules, build adaptive world models and learn from actions without natural-language instructions | Strong external probe for acquired structures supporting exploration and transfer | It is task/game-centric and does not independently measure a pre-task structural library. The ARC Prize site currently lists GPT-6.2 (Astra/Sol) at 100.00% on its ARC-AGI-3 model-performance table (entry dated 2026-11-17), while the 2026 competition prize results are still scheduled for 2026-12-04. Keep these two reporting surfaces distinct and verify the exact evaluation protocol before using a leaderboard number as a matched result |
 | Visual causal reasoning | [CLEVRER](https://clevrer.csail.mit.edu/) | Descriptive, explanatory, predictive and counterfactual questions over object-interaction videos | Good post-acquisition probe for temporal/event relations and causal predictions | Synthetic, short, object-collision videos; task labels/questions are exposed at evaluation, so this is not task-agnostic acquisition by itself |
 | Interactive physical reasoning | [PHYRE](https://phyre.ai/) | Sample-efficient solving and generalization across 2D physical puzzles | Useful for testing whether discovered dynamics/relations support action selection | Puzzle goals are provided; not a test of open-ended or goal-free acquisition |
 | Graph OOD generalization | [GOOD](https://github.com/divelab/GOOD) | Covariate and concept shifts across 11 datasets, 17 domain selections and 51 curated splits | Tests whether discovered graph structures survive domain shifts and spurious-motif changes | Node/graph prediction under dataset shifts is not the same as cross-domain structural-analogy discovery |
+| Graph foundation model transfer theory | [When Do Graph Foundation Models Transfer?](https://proceedings.mlr.press/v306/zhu26e.html) | Graphon-based decomposition of cross-domain output shift into finite-sample approximation and intrinsic relabeling-invariant structural discrepancy; includes synthetic and real graph experiments | Diagnostic baseline for whether explicit ErgoStream structural witnesses add predictive value beyond domain discrepancy / feature overlap | Theory for GFM output shift, not a task-agnostic structure-discovery or causal-transfer benchmark |
 | Generalized category discovery | [CoGe-GCD](https://proceedings.mlr.press/v306/tang26ai.html) | Unlabeled known/novel category assignment and unseen combinations of learned primitives with spatial-relation calibration | Adjacent comparator for acquiring reusable primitives and discovering new compositions | Static category discovery; it does not test temporal task-agnostic stream acquisition or false causal transfer |
 | Compositional graph reasoning | [CGGC](https://aclanthology.org/2024.findings-emnlp.492/) | Reasoning graphs with previously unseen combinations of relation types | Useful external probe for recombining acquired relation primitives | Graph-conditioned language generation; not a task-agnostic acquisition test |
 | Compositional visual analogy | [CARV](https://arxiv.org/abs/2603.27958) | 5,500-sample visual analogy set requiring rule extraction from multiple pairs and composition into a new transformation | Direct multimodal analogy baseline and probe for composing acquired transformations | It supplies the analogy task at evaluation; it does not test pre-task, long-lived structural acquisition or action-conditioned dynamics |
@@ -43,6 +48,44 @@ SciAgentArena (2026) supplies approximately 200 stepwise-verified tasks across f
 **Response:** use SciAgentArena as an external workflow track after the finite structural-transfer contract is stable. Measure whether a frozen acquired library improves task execution, verification, method selection, reliability and cost. Keep this distinct from the pre-task acquisition claim: SciAgentArena presents a task and scores its execution; ErgoStream must additionally show that the library was built before the downstream task was disclosed.
 
 Source: https://sciagentarena.github.io/ · Paper: https://arxiv.org/abs/2606.12736
+
+### Autonomous Science Bench is now the closest laboratory-loop comparison
+
+Autonomous Science Bench 0.1 evaluates the complete configuration—model, agent, tools and harness—on six pilot tasks across biology, chemistry and materials. Its loop explicitly requires choosing experiments, reading results, adapting to surprises and recognizing when evidence is insufficient. It uses two final gates: discovery quality of chosen designs and learning/ranking quality on designs never measured. The current published leaderboard lists GPT-6 Astra + Codex at 72.2%, Opus 5.5 + Claude Code at 66.7%, and GPT-5.6 Terra + Codex at 44.4%; however, it ran only three trials per task and its maintainers caution that small gaps are not meaningful yet.
+
+**Response:** make ASB the primary external laboratory-loop benchmark after the #11060/#11171 adapter exists. Match the full model/agent/tool/harness configuration, report task-level and cost-frontier outcomes, and do not compare only leaderboard percentages. Its planned backends are especially useful: replay oracle (v0), digital twin (v1), live lab (v2). This aligns with Luminous' evidence-execution architecture and offers a staged route from replay to physical qualification.
+
+Source: https://asb.open-ssi.org/about
+
+### Active exploration changes grounding more than measured originality
+
+AgentIdeaBench compares static observation with active exploration across 33 LLMs, 40 subfields and five disciplines. The authors report that active exploration reveals more headroom and improves grounding-related dimensions such as feasibility, clarity and specificity, while measured originality does not improve under their critics.
+
+**Response:** split ErgoStream outcomes into at least three different estimands: (1) structural discovery/novelty, (2) evidence grounding and testability, and (3) downstream validation. A higher score on feasibility or specificity must not be reported as increased scientific novelty. Include both static-evidence and interactive-evidence arms, with the same evidence budget.
+
+Paper: https://arxiv.org/abs/2609.07611
+
+### Benchmark refresh should be adversarial and evidence-preserving
+
+AutoSciBench generates and revises scientific benchmark recipes using solver trajectories and judge feedback. In its reported evaluations, generated tasks reduce average solver accuracy by 22.4 and 25.5 percentage points versus human-curated benchmark tasks in computational biology and materials science, respectively.
+
+**Response:** borrow the task-refresh loop for ErgoStream's hidden generator families: inspect failure clusters, generate counterexamples that close the discovered shortcut, add fresh held-out seeds and modalities, and have independent domain reviewers validate the new generator/oracle. Maintain two cohorts: an adaptive development corpus that can refresh continuously, and a sealed confirmatory corpus that never changes during a registered comparison. Otherwise adaptive benchmark generation risks a moving target and destroys reproducibility.
+
+Paper: https://arxiv.org/abs/2610.05140
+
+### Graph transfer must separate topic shift from representation-format shift
+
+GFMBenchmark evaluates eight graph foundation models over 33 datasets, seven topic domains and six graph-format domains. Its protocol separates unseen semantic/topic domains from unseen representations/formats, rather than collapsing them into one OOD score.
+
+Zhu et al. (ICML 2026) further derive a graphon-based, relabeling-invariant domain discrepancy term for graph foundation-model transfer and report validation on synthetic and real graphs.
+
+**Response:** give the Transfer Atlas two independent shift axes:
+- **semantic/mechanism shift:** domain meaning, relation semantics, generating mechanism;
+- **representation shift:** node/edge identifiers, ordering, serialization, graph construction, modality encoding or coordinate format.
+
+Test each axis alone and then factorially combined. Include a discrepancy-only GFM baseline. The value proposition for ErgoStream is whether its explicit scope and counterexample witnesses predict *when* transfer fails and how to abstain, beyond what graph embeddings and domain discrepancy already predict.
+
+Benchmark: https://github.com/smufang/GFMBenchmark · Theory: https://proceedings.mlr.press/v306/zhu26e.html
 
 ### Compositional category discovery is an adjacent frontier
 
@@ -154,12 +197,13 @@ All arms should receive the same stream, split, modality availability, observati
 
 1. **Simple controls:** no-change/persistence, random acquisition, passive next-frame, shuffled temporal order, shuffled modality alignment, and constant/IID-noise controls.
 2. **Acquisition policies:** surprise/prediction-error only, random-network-distillation novelty, learning-progress, information gain, cost-normalized information gain, predictive compression / MDL, and a hybrid acquisition policy.
-3. **Representation controls:** strong modality-specific encoders with event association; frozen dense multimodal embeddings; latent-displacement / linear-map analogy (ERD-style); continual domain-invariant representation learning; explicit graph-isomorphism / graph-edit baselines (VF2-style matching, Nauty/Traces or Bliss where applicable); HDC only; CfC/LTC only; explicit typed graph/hypergraph; bounded symbolic/e-graph; HDC–CfC plus graph/e-graph hybrid.
+3. **Representation controls:** strong modality-specific encoders with event association; frozen dense multimodal embeddings; latent-displacement / linear-map analogy (ERD-style); continual domain-invariant representation learning; graph foundation models with separate topic-shift and format-shift pretraining/adaptation controls (GFMBenchmark); graphon / relabeling-invariant discrepancy-only diagnostics; explicit graph-isomorphism / graph-edit baselines (VF2-style matching, Nauty/Traces or Bliss where applicable); HDC only; CfC/LTC only; explicit typed graph/hypergraph; bounded symbolic/e-graph; HDC–CfC plus graph/e-graph hybrid.
 4. **Analogy and compositional transfer controls:** CARV for compositional visual analogy; CGGC for unseen relation combinations; CoGe-GCD for discovery of primitives and new category compositions; GOOD for graph OOD shifts; Heidelberg Graph Matching Benchmark, Neuen-Schweitzer and labeled graph-edit datasets for algorithmic matching quality/scaling. Distinguish task-exposed analogy tests from pre-task acquisition; none substitutes for intervention-divergent false-analogy worlds.
 5. **World-model and action-policy controls:** object/event-centric recurrent and transformer models; the strongest compatible action-conditioned world model; a direct reactive/VLA policy with no explicit world model; a no-transfer/fresh-learning control. Report same-budget and best-available tracks separately. The primary question is incremental decision utility from acquired structure, not video fidelity alone.
 6. **Scientific-discovery and causal controls:** Unsatz-compatible agent/program interface; ACDB-compatible PC + greedy active orientation, density-aware random-DAG and other admitted causal baselines; PySR or another pinned symbolic-regression baseline when the candidate grammar and task class match; SINDy only when its sparse-regression assumptions are satisfied; exact tiny-world enumeration as evaluator diagnostic only.
-7. **Interactive scientific workflow control:** SciAgentArena-compatible task subsets for stepwise validity, method choice, reliability and cost. Treat this as a downstream workflow evaluation; it does not substitute for hidden paired-world and pre-task acquisition experiments.
-8. **Human reference:** where the task supports meaningful human interaction, include a human sample-efficiency / action-efficiency reference. It is not a substitute for a matched machine baseline.
+7. **Scientific-agent and laboratory controls:** SciAgentArena for stepwise workflow validity/reliability/cost; Autonomous Science Bench 0.1 for experiment selection, sequential learning and held-out ranking across laboratory tasks; AgentIdeaBench for static-vs-active ideation and grounding; FIRE-Bench for full-cycle rediscovery of published findings. Keep each task-exposed downstream evaluation separate from ErgoStream's pre-task structural-acquisition estimand.
+8. **Benchmark hardening control:** AutoSciBench-style task recipe refresh to close discovered shortcuts; independently review generated worlds/oracles and keep a sealed, frozen confirmatory cohort distinct from the adaptive development corpus.
+9. **Human reference:** where the task supports meaningful human interaction, include a human sample-efficiency / action-efficiency reference. It is not a substitute for a matched machine baseline.
 
 No name-only reproduction. Record exact code commit, weights, model/API revision, prompt, tool access, preprocessing, operator set, task subset, compute, retries, failed runs and licensing/data exclusions. For proprietary APIs, report black-box evaluation conditions and do not imply implementation-level parity.
 
@@ -216,7 +260,12 @@ These are prospective engineering targets, not external standards or achieved re
 
 **Stage 6 — confirmatory study:** six or more generator families, family-held-out test, preregistered uncertainty plan, matched strongest baselines, full resource accounting and external review.
 
-## 7. References
+
+- When Do Graph Foundation Models Transfer? (ICML 2026): https://proceedings.mlr.press/v306/zhu26e.html
+- GFMBenchmark (8 models / 33 datasets / 7 topics / 6 formats): https://github.com/smufang/GFMBenchmark
+- AutoSciBench: https://arxiv.org/abs/2610.05140
+- AgentIdeaBench: https://arxiv.org/abs/2609.07611
+- Autonomous Science Bench 0.1: https://asb.open-ssi.org/about## 7. References
 - CARV compositional visual analogy: https://arxiv.org/abs/2603.27958
 - ERD / latent displacement analogical reasoning: https://proceedings.mlr.press/v326/dats26a.html
 - Continual Learning of Domain-Invariant Representations (ICML 2026): https://proceedings.mlr.press/v306/janetzky26a.html
