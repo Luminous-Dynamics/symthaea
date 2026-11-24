@@ -51,7 +51,7 @@ The interface alone does not establish process, credential, storage, trust-root 
 - sign the typed receipt with a key represented in a trust profile provisioned outside the candidate backend and protected by a monotonic profile-version floor;
 - expose authenticated, bounded request/response transport with replay protection, timeout handling and auditable service health.
 
-The verifier profile in the consumer must be pinned out of band; copying the profile digest from the same request or candidate database is not trust bootstrap. The consumer clock passed to the exchange must be protected and monotonic; the exchange samples it after the issuer responds, so a stale or caller-backdated timestamp cannot make an expired key or receipt appear valid. A local subprocess under the same user account is not, by itself, sufficient separation for a hostile-host threat model.
+The verifier profile in the consumer must be pinned out of band; copying the profile digest from the same request or candidate database is not trust bootstrap. The consumer clock passed to the exchange must be protected and monotonic; the exchange samples it after the issuer responds, so a stale or caller-backdated timestamp cannot make an expired key or receipt appear valid. The optional `MonotonicQualificationClockGuardV1` rejects decreasing readings during one process lifetime. It does not survive process restart or protect a rolled-back underlying clock; production still needs externally protected monotonic time state or a rollback-resistant witness across restarts. A local subprocess under the same user account is not, by itself, sufficient separation for a hostile-host threat model.
 
 ## Fail-closed semantics
 
