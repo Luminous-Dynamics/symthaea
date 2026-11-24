@@ -154,6 +154,10 @@ pub struct MycelialAcquisitionBudgetProposal {
     pub action_id: String,
     pub session_id: String,
     pub sample_id: String,
+    /// Exact hardware-neutral intent compiled for the proposed acquisition.
+    pub acquisition_plan_digest: String,
+    /// Exact device/software/firmware capability manifest used for plan compilation.
+    pub device_capability_manifest_digest: String,
     pub coordinate_frame_id: String,
     /// Canonical sorted, unique spatial cells. Cell identities are stable across
     /// acquisitions so overlapping ROIs accumulate dose on shared cells.
@@ -194,6 +198,8 @@ pub struct MycelialCumulativePhotonExposure {
 pub struct MycelialSampleHealthState {
     pub sample_id: String,
     pub session_id: String,
+    /// Active device capability manifest for this recorded acquisition session.
+    pub device_capability_manifest_digest: String,
     pub coordinate_frame_id: String,
     pub elapsed_session_duration_ns: u64,
     pub completed_actions_in_session: u32,
@@ -455,6 +461,10 @@ fn validate_state(
 ) -> Result<(), MycelialSampleHealthBudgetError> {
     validate_identifier(&state.sample_id, "state.sample_id")?;
     validate_identifier(&state.session_id, "state.session_id")?;
+    validate_digest(
+        &state.device_capability_manifest_digest,
+        "state.device_capability_manifest_digest",
+    )?;
     validate_identifier(&state.coordinate_frame_id, "state.coordinate_frame_id")?;
     if state.coordinate_frame_id != budget.coordinate_frame_id {
         return Err(MycelialSampleHealthBudgetError::InvalidState(
@@ -647,6 +657,14 @@ fn validate_proposal(
             "proposal.spatial_footprint_digest",
         ),
         (
+            proposal.acquisition_plan_digest.as_str(),
+            "proposal.acquisition_plan_digest",
+        ),
+        (
+            proposal.device_capability_manifest_digest.as_str(),
+            "proposal.device_capability_manifest_digest",
+        ),
+        (
             proposal.acquisition_model_digest.as_str(),
             "proposal.acquisition_model_digest",
         ),
@@ -664,6 +682,11 @@ fn validate_proposal(
     if proposal.session_id != state.session_id || proposal.sample_id != state.sample_id {
         return Err(MycelialSampleHealthBudgetError::InvalidProposal(
             "sample or session identity differs from current state",
+        ));
+    }
+    if proposal.device_capability_manifest_digest != state.device_capability_manifest_digest {
+        return Err(MycelialSampleHealthBudgetError::InvalidProposal(
+            "device capability manifest differs from the active acquisition session",
         ));
     }
     if proposal.coordinate_frame_id != state.coordinate_frame_id
@@ -785,6 +808,7 @@ fn state_digest(state: &MycelialSampleHealthState) -> String {
     hasher.update(b"symthaea-mycelial-sample-health-state-v1");
     hash_string(&mut hasher, &state.sample_id);
     hash_string(&mut hasher, &state.session_id);
+    hash_string(&mut hasher, &state.device_capability_manifest_digest);
     hash_string(&mut hasher, &state.coordinate_frame_id);
     hasher.update(&state.elapsed_session_duration_ns.to_le_bytes());
     hasher.update(&state.completed_actions_in_session.to_le_bytes());
@@ -832,6 +856,8 @@ fn proposal_inventory_digest(proposals: &[MycelialAcquisitionBudgetProposal]) ->
         hash_string(&mut hasher, &proposal.action_id);
         hash_string(&mut hasher, &proposal.session_id);
         hash_string(&mut hasher, &proposal.sample_id);
+        hash_string(&mut hasher, &proposal.acquisition_plan_digest);
+        hash_string(&mut hasher, &proposal.device_capability_manifest_digest);
         hash_string(&mut hasher, &proposal.coordinate_frame_id);
         hash_string(&mut hasher, &proposal.spatial_footprint_digest);
         hasher.update(&(proposal.required_illumination_channel_ids.len() as u64).to_le_bytes());
@@ -1343,6 +1369,7 @@ mod tests {
         MycelialSampleHealthState {
             sample_id: "sample-001".to_string(),
             session_id: "session-001".to_string(),
+            device_capability_manifest_digest: digest('j'),
             coordinate_frame_id: "specimen-frame-v1".to_string(),
             elapsed_session_duration_ns: 20,
             completed_actions_in_session: 1,
@@ -1569,6 +1596,8 @@ mod tests {
             action_id: action_id.to_string(),
             session_id: "session-001".to_string(),
             sample_id: "sample-001".to_string(),
+            acquisition_plan_digest: digest('k'),
+            device_capability_manifest_digest: digest('j'),
             coordinate_frame_id: "specimen-frame-v1".to_string(),
             spatial_footprint_digest: footprint_digest("specimen-frame-v1", &cell_ids),
             spatial_footprint_cell_ids: cell_ids,
