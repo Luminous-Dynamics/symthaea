@@ -740,6 +740,12 @@
       "additionalProperties": false,
       "required": [
         "authorization_id",
+        "session_id",
+        "turn_id",
+        "decision_receipt_sha256",
+        "disposition_receipt_sha256",
+        "effect_receipt_sha256",
+        "output_artifact_sha256",
         "admission_stage",
         "admission_event_sequence",
         "veto_event_sequence",
@@ -831,6 +837,28 @@
         },
         "receipt": {
           "$ref": "#/$defs/receipt_ref"
+        },
+        "session_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "turn_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "decision_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "disposition_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "effect_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "output_artifact_sha256": {
+          "$ref": "#/$defs/sha256"
         }
       }
     }
