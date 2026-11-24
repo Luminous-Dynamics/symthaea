@@ -1048,8 +1048,8 @@ pub fn assess_declared_common_resource_association_v1(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::calibration_requalification::CalibrationRequalificationFrontierReportV1;
+    use super::*;
 
     fn digest(ch: char) -> String {
         std::iter::repeat_n(ch, 64).collect()
@@ -1470,8 +1470,20 @@ mod tests {
         let mut engine = engine();
         let mut receipts = Vec::new();
         for (id, channel, plane, signal, evidence) in [
-            ("x1", "feature", DriftEvidencePlaneV1::InputFeature, 0.5, 'c'),
-            ("r1", "residual", DriftEvidencePlaneV1::QualifiedResidual, 0.7, 'd'),
+            (
+                "x1",
+                "feature",
+                DriftEvidencePlaneV1::InputFeature,
+                0.5,
+                'c',
+            ),
+            (
+                "r1",
+                "residual",
+                DriftEvidencePlaneV1::QualifiedResidual,
+                0.7,
+                'd',
+            ),
         ] {
             let detector = DriftDetectorKindV1::Ewma;
             let observation = input(id, channel, plane, detector, Some(signal), 100, evidence);
