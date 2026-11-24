@@ -229,10 +229,11 @@ fn validate_v2_evidence(case: &RevisionCaseV2) -> Result<(), String> {
             if evidence.source_sample_rate_hz == 0 || evidence.end_frame <= evidence.start_frame {
                 return Err("evidence sample rate and half-open frame window must be valid".into());
             }
-            let same_audio = evidence.source_audio_sha256 == scored_audio.audio_sha256
+            let same_audio_digest = evidence.source_audio_sha256 == scored_audio.audio_sha256;
+            let same_audio_clock = same_audio_digest
                 && evidence.source_sample_rate_hz == scored_audio.sample_rate_hz;
             match condition {
-                EvidenceConditionV1::LocalRetrieved if !same_audio => {
+                EvidenceConditionV1::LocalRetrieved if !same_audio_clock => {
                     Err("local evidence must bind the exact scored audio digest and sample rate".into())
                 }
                 EvidenceConditionV1::LocalRetrieved
@@ -240,7 +241,7 @@ fn validate_v2_evidence(case: &RevisionCaseV2) -> Result<(), String> {
                 {
                     Err("local evidence window exceeds the scored recording".into())
                 }
-                EvidenceConditionV1::YokedRetrieved if same_audio => {
+                EvidenceConditionV1::YokedRetrieved if same_audio_digest => {
                     Err("yoked evidence must originate from a different audio artifact".into())
                 }
                 _ => Ok(()),
@@ -469,13 +470,14 @@ fn validate_evidence(case: &RevisionCaseV1) -> Result<(), String> {
             if evidence.source_sample_rate_hz == 0 || evidence.end_frame <= evidence.start_frame {
                 return Err("evidence sample rate and half-open frame window must be valid".into());
             }
-            let same_audio = evidence.source_audio_sha256 == case.draft.audio_sha256
+            let same_audio_digest = evidence.source_audio_sha256 == case.draft.audio_sha256;
+            let same_audio_clock = same_audio_digest
                 && evidence.source_sample_rate_hz == case.draft.sample_rate_hz;
             match condition {
-                EvidenceConditionV1::LocalRetrieved if !same_audio => {
+                EvidenceConditionV1::LocalRetrieved if !same_audio_clock => {
                     Err("local evidence must bind the exact scored audio digest and sample rate".into())
                 }
-                EvidenceConditionV1::YokedRetrieved if same_audio => {
+                EvidenceConditionV1::YokedRetrieved if same_audio_digest => {
                     Err("yoked evidence must originate from a different audio artifact".into())
                 }
                 _ => Ok(()),
@@ -829,6 +831,25 @@ mod tests {
         );
         case.final_prediction.artifact.audio_sha256 =
             "1212121212121212121212121212121212121212121212121212121212121212".into();
+        assert!(audit_revision_v2(&case).is_err());
+    }
+
+    #[test]
+    fn yoked_evidence_cannot_relabel_the_same_audio_with_a_different_sample_rate() {
+        let mut case = revision_case_v2(
+            vec![interval(100, 200), interval(500, 600)],
+            vec![interval(100, 200), interval(800, 900)],
+            vec![interval(100, 200), interval(500, 600)],
+        );
+        case.evidence_condition = EvidenceConditionV1::YokedRetrieved;
+        case.evidence = Some(RevisionEvidenceV1 {
+            source_audio_sha256: AUDIO.into(),
+            source_sample_rate_hz: 44_100,
+            evidence_payload_sha256: EVIDENCE.into(),
+            retrieval_config_sha256: RETRIEVAL.into(),
+            start_frame: 100,
+            end_frame: 200,
+        });
         assert!(audit_revision_v2(&case).is_err());
     }
 
