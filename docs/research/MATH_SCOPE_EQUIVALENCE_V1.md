@@ -3,7 +3,7 @@
 **Issue:** [#13537 — MATH-SCOPE-EQUIVALENCE-001](https://github.com/Luminous-Dynamics/symthaea/issues/13537)  
 **Programme:** [#13293 — MATH-COMPREHENSION-001](https://github.com/Luminous-Dynamics/symthaea/issues/13293)  
 **Paired receipt:** [#13345 — MATH-LOCAL-GLOBAL-RECEIPT-001](https://github.com/Luminous-Dynamics/symthaea/issues/13345)  
-**Status:** proposed protocol. No equivalence-tier implementation, model run, or Symthaea score is claimed.
+**Status:** protocol plus a bounded executable Tier-1 normalizer for independent propositional hypothesis sets. Quantified alpha-equivalence, Tier-2 Lean transport, model evaluation, and empirical scope-CIRR scores remain unimplemented.
 
 ## 1. Research question
 
@@ -172,3 +172,19 @@ These are prospective gates, not measured Symthaea performance.
 - Finite propositional normalization does not solve dependent-context equivalence.
 - A valid scope-equivalence receipt does not certify the candidate's proof plan.
 - A small eligible cohort cannot support broad reliability claims.
+
+
+## 12. Bounded Tier-1 implementation (2026-11-24)
+
+A first executable Tier-1 subset is now implemented in `scripts/research/proof-plan-contract/src/scope_equivalence.rs`, with CLI `scope-equivalence` and frozen fixture/schema:
+
+- `MATH_SCOPE_EQUIVALENCE_TIER1_V1.json`
+- `MATH_SCOPE_EQUIVALENCE_TIER1_V1.schema.json`
+
+The v1 normalizer sorts only the explicitly unordered BooleanSequent `hypotheses` collection by canonical typed-JSON representation. It preserves hypothesis multiplicity, all atom names, the ordered `premises` array, and the conclusion AST. Raw and normalized digests are separately domain-separated and reported.
+
+The five synthetic controls are: exact identity; hypothesis permutation (raw digest changes, normalized digest is stable); premise order mutation; duplicate-hypothesis/multiplicity mutation; and conclusion mutation. Evaluator-only expected relations are checked against the derived digest relation, and candidate-only serialization excludes the evaluator labels.
+
+**Claim ceiling:** this is a narrow structural comparator for the current finite BooleanSequent type. It does not implement bound-variable alpha-renaming because the AST has no binders; it does not use finite truth-table entailment to upgrade structural comparability; and it does not perform Lean definitional equality or dependent-context transport. Exact-identity Tier 0 LocalGlobalPairV1/CIRR is unchanged, and Tier-1 results must remain separately reported.
+
+**Execution state:** Rust source, CLI, fixtures, schema and focused workflow integration are committed. The exact-head run is pending; the five-pair CLI and tests are not yet reported as passing until that workflow provides a successful receipt.
