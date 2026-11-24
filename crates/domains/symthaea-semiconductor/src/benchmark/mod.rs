@@ -144,5 +144,6 @@ pub use continuous_metrology_audit::{
     ContinuousAuditOutcomeStateV1, ContinuousAuditStatusV1, ContinuousMetrologyAuditErrorV1,
     ContinuousMetrologyAuditInputV1, ContinuousMetrologyAuditReportV1,
     ContinuousMetrologyOutcomeV1, ContinuousMetrologyPredictionV1,
-    ContinuousMetrologyStratumEstimateV1, estimate_continuous_metrology_audit_v1,
+    ContinuousMetrologyStratumEstimateV1, compute_continuous_audit_frame_sha256_v1,
+    estimate_continuous_metrology_audit_v1,
 };
