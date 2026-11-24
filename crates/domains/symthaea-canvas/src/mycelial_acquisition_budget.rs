@@ -221,6 +221,8 @@ pub struct MycelialSampleHealthState {
     pub completed_actions_in_session: u32,
     /// True only when all prior specimen optical exposures are represented in the ledger.
     pub exposure_history_complete: bool,
+    /// Evidence digest for the complete exposure-history inventory and recovery clock.
+    pub exposure_history_evidence_digest: String,
     /// Elapsed time since the most recent optical exposure, from a qualified timebase.
     /// None means the complete exposure history contains no prior optical exposure.
     pub elapsed_since_last_optical_exposure_ns: Option<u64>,
@@ -903,7 +905,9 @@ fn state_digest(state: &MycelialSampleHealthState) -> String {
             hasher.update(&[1]);
             hasher.update(&elapsed.to_le_bytes());
         }
-        None => hasher.update(&[0]),
+        None => {
+            hasher.update(&[0]);
+        },
     }
     let mut exposures: Vec<_> = state.cumulative_photon_exposures.iter().collect();
     exposures.sort_by(|left, right| {
@@ -1011,7 +1015,9 @@ fn active_sensing_report_digest(report: &MycelialActiveSensingReport) -> String 
             hasher.update(&[1]);
             hash_string(&mut hasher, action_id);
         }
-        None => hasher.update(&[0]),
+        None => {
+            hasher.update(&[0]);
+        },
     }
     let mut actions: Vec<_> = report.actions.iter().collect();
     actions.sort_by(|left, right| left.action_id.cmp(&right.action_id));
@@ -1045,14 +1051,18 @@ fn active_sensing_report_digest(report: &MycelialActiveSensingReport) -> String 
                     hasher.update(&[1]);
                     hash_string(&mut hasher, decision_id);
                 }
-                None => hasher.update(&[0]),
+                None => {
+            hasher.update(&[0]);
+        },
             }
             match outcome.conditional_bayes_risk {
                 Some(value) => {
                     hasher.update(&[1]);
                     hash_f64(&mut hasher, value);
                 }
-                None => hasher.update(&[0]),
+                None => {
+            hasher.update(&[0]);
+        },
             }
             hash_f64(&mut hasher, outcome.expected_risk_contribution);
         }
@@ -1456,7 +1466,9 @@ pub fn mycelial_sample_health_budget_report_digest(
             hasher.update(&[1]);
             hash_string(&mut hasher, action_id);
         }
-        None => hasher.update(&[0]),
+        None => {
+            hasher.update(&[0]);
+        },
     }
     hasher.update(&(report.eligible_actions.len() as u64).to_le_bytes());
     for action in &report.eligible_actions {
@@ -2270,15 +2282,15 @@ mod tests {
             MycelialAcquisitionActionKind::AlternateIllumination,
             1.0,
         )]);
-        let mut proposal = proposal(
+        let mut unknown_channel_proposal = proposal(
             "wrong-channel",
             &["cell-b"],
             1.0,
             MycelialAcquisitionActionKind::AlternateIllumination,
         );
-        proposal.photon_dose_estimates[0].channel_id = "unknown".to_string();
+        unknown_channel_proposal.photon_dose_estimates[0].channel_id = "unknown".to_string();
         let result =
-            evaluate_mycelial_sample_health_budget(&report, &budget(), &state(), &[proposal])
+            evaluate_mycelial_sample_health_budget(&report, &budget(), &state(), &[unknown_channel_proposal])
                 .unwrap();
         assert!(
             result.rejected_actions[0]
@@ -2286,15 +2298,15 @@ mod tests {
                 .contains(&MycelialSampleHealthRejectionReason::UnknownIlluminationChannel)
         );
 
-        let mut proposal = proposal(
+        let mut out_of_band_proposal = proposal(
             "wrong-channel",
             &["cell-b"],
             1.0,
             MycelialAcquisitionActionKind::AlternateIllumination,
         );
-        proposal.photon_dose_estimates[0].wavelength_nm = 550;
+        out_of_band_proposal.photon_dose_estimates[0].wavelength_nm = 550;
         let result =
-            evaluate_mycelial_sample_health_budget(&report, &budget(), &state(), &[proposal])
+            evaluate_mycelial_sample_health_budget(&report, &budget(), &state(), &[out_of_band_proposal])
                 .unwrap();
         assert!(
             result.rejected_actions[0]
