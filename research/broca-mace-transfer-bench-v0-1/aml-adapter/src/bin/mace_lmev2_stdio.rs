@@ -212,7 +212,10 @@ fn valid_sha256(value: &str) -> bool {
 
 fn bm25_action_template_sha256(config: &Config) -> String {
     let template = format!(
-        "mace-lmev2-bm25-search:v1|domain={}|top_k={}|slice_radius={}|neighbor_radius={}|k1={:.17}|b={:.17}|tokenizer={}",
+        concat!(
+            "mace-lmev2-bm25-search:v1|domain={}|top_k={}|",
+            "slice_radius={}|neighbor_radius={}|k1={:.17}|b={:.17}|tokenizer={}"
+        ),
         config.domain,
         config.top_k,
         config.slice_radius,
