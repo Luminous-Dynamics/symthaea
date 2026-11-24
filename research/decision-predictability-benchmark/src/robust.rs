@@ -67,10 +67,14 @@ pub enum RobustProbeAdmission {
 pub struct RobustProbeValue {
     pub probe_id: String,
     pub admission: RobustProbeAdmission,
-    /// Minimax decision loss before acquiring the observation.
+    /// Unconstrained minimax task loss before acquiring the observation.
     pub current_minimax_loss: f64,
-    /// Worst-case, across possible outcomes, of the posterior minimax loss.
+    /// Whether at least one declared decision satisfies the frozen risk threshold now.
+    pub current_risk_gate_passed: bool,
+    /// Worst-case, across possible outcomes, of the post-observation minimax loss.
     pub worst_case_post_observation_minimax_loss: f64,
+    /// Whether every possible outcome leaves at least one risk-admissible decision.
+    pub post_observation_risk_gate_passed: bool,
     /// Guaranteed reduction in minimax task loss. Not a probabilistic expectation.
     pub guaranteed_worst_case_loss_reduction: f64,
     /// Kept separate because application cost units need not equal task-loss units.
@@ -302,12 +306,13 @@ fn minimax_loss(
             })?;
             worst = worst.max(loss);
         }
-        if worst <= problem.maximum_worst_case_loss + TOLERANCE {
-            best = best.min(worst);
-        }
+        // Minimax value and risk admissibility are separate quantities. Do not
+        // discard unsafe decisions here: a probe may reduce the information set
+        // enough to make a post-observation decision admissible.
+        best = best.min(worst);
     }
     if !best.is_finite() {
-        return Err(RobustEvaluationError::NoRiskAdmissibleDecision);
+        return Err(RobustEvaluationError::EmptyDecisionSet);
     }
     Ok(best)
 }
@@ -409,6 +414,9 @@ pub fn evaluate_robust_probe(
     }
 
     let current_minimax_loss = minimax_loss(problem, &problem.state_ids)?;
+    let current_risk_gate_passed =
+        current_minimax_loss <= problem.maximum_worst_case_loss + TOLERANCE;
+
     let mut worst_case_post_observation_minimax_loss = 0.0_f64;
     for outcome in &probe.outcomes {
         let outcome_loss = minimax_loss(problem, &outcome.possible_state_ids)?;
@@ -421,6 +429,9 @@ pub fn evaluate_robust_probe(
             after_bits: worst_case_post_observation_minimax_loss.to_bits(),
         });
     }
+    let post_observation_risk_gate_passed =
+        worst_case_post_observation_minimax_loss
+            <= problem.maximum_worst_case_loss + TOLERANCE;
 
     let admission = if !permitted.contains(probe.probe_id.as_str()) {
         RobustProbeAdmission::NotPermitted
@@ -440,7 +451,9 @@ pub fn evaluate_robust_probe(
         probe_id: probe.probe_id.clone(),
         admission,
         current_minimax_loss,
+        current_risk_gate_passed,
         worst_case_post_observation_minimax_loss,
+        post_observation_risk_gate_passed,
         guaranteed_worst_case_loss_reduction: (current_minimax_loss
             - worst_case_post_observation_minimax_loss)
             .max(0.0),
@@ -620,6 +633,81 @@ mod tests {
         assert!((value.current_minimax_loss - 0.4).abs() < TOLERANCE);
         assert!(value.worst_case_post_observation_minimax_loss.abs() < TOLERANCE);
         assert!((value.guaranteed_worst_case_loss_reduction - 0.4).abs() < TOLERANCE);
+    }
+
+    #[test]
+    fn probe_can_move_an_unsafe_information_state_to_a_safe_decision() {
+        let problem = problem(
+            &["H_A", "H_B"],
+            &["choose_A", "choose_B"],
+            &[
+                ("choose_A", &[("H_A", 0.0), ("H_B", 1.0)]),
+                ("choose_B", &[("H_A", 1.0), ("H_B", 0.0)]),
+            ],
+            0.2,
+        );
+        let value = evaluate_robust_probe(&problem, &perfect_probe(), &context()).unwrap();
+
+        assert!((value.current_minimax_loss - 1.0).abs() < TOLERANCE);
+        assert!(!value.current_risk_gate_passed);
+        assert!(value.worst_case_post_observation_minimax_loss.abs() < TOLERANCE);
+        assert!(value.post_observation_risk_gate_passed);
+        assert!((value.guaranteed_worst_case_loss_reduction - 1.0).abs() < TOLERANCE);
+    }
+
+    #[test]
+    fn probe_can_reduce_risk_without_yet_passing_the_risk_gate() {
+        let problem = problem(
+            &["H_A", "H_B", "H_C"],
+            &["choose_A", "choose_B", "choose_C"],
+            &[
+                ("choose_A", &[("H_A", 0.0), ("H_B", 0.4), ("H_C", 1.0)]),
+                ("choose_B", &[("H_A", 1.0), ("H_B", 0.0), ("H_C", 0.4)]),
+                ("choose_C", &[("H_A", 0.4), ("H_B", 1.0), ("H_C", 0.0)]),
+            ],
+            0.2,
+        );
+        let probe = RobustProbe {
+            probe_id: "reference".to_owned(),
+            acquisition_cost_units: 0.1,
+            result_delay_steps: 1,
+            outcomes: vec![
+                RobustProbeOutcome {
+                    outcome_id: "AB".to_owned(),
+                    possible_state_ids: vec!["H_A".to_owned(), "H_B".to_owned()],
+                },
+                RobustProbeOutcome {
+                    outcome_id: "BC".to_owned(),
+                    possible_state_ids: vec!["H_B".to_owned(), "H_C".to_owned()],
+                },
+                RobustProbeOutcome {
+                    outcome_id: "CA".to_owned(),
+                    possible_state_ids: vec!["H_C".to_owned(), "H_A".to_owned()],
+                },
+            ],
+        };
+        let value = evaluate_robust_probe(&problem, &probe, &context()).unwrap();
+
+        assert!((value.current_minimax_loss - 1.0).abs() < TOLERANCE);
+        assert!(!value.current_risk_gate_passed);
+        assert!((value.worst_case_post_observation_minimax_loss - 0.4).abs() < TOLERANCE);
+        assert!(!value.post_observation_risk_gate_passed);
+        assert!((value.guaranteed_worst_case_loss_reduction - 0.6).abs() < TOLERANCE);
+    }
+
+    #[test]
+    fn already_admissible_state_remains_admissible_after_uninformative_probe() {
+        let problem = problem(
+            &["H_A", "H_B"],
+            &["continue"],
+            &[("continue", &[("H_A", 0.0), ("H_B", 0.0)])],
+            0.0,
+        );
+        let value = evaluate_robust_probe(&problem, &perfect_probe(), &context()).unwrap();
+
+        assert!(value.current_risk_gate_passed);
+        assert!(value.post_observation_risk_gate_passed);
+        assert!(value.guaranteed_worst_case_loss_reduction.abs() < TOLERANCE);
     }
 
     #[test]
