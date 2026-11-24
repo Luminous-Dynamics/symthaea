@@ -1195,7 +1195,7 @@ mod tests {
         .unwrap();
         let exact = advance_ca_ocrc_round_v1(
             &mut engine,
-            &round(3, Some(CaoOcrcTrivialSetV1::Full), None, None),
+            &round(3, None, Some((0.0, 1.0)), Some(0.5)),
             &[feedback(
                 1,
                 3,
@@ -1226,14 +1226,14 @@ mod tests {
         for round_index in 2..=3 {
             advance_ca_ocrc_round_v1(
                 &mut engine,
-                &round(round_index, Some(CaoOcrcTrivialSetV1::Full), None, None),
+                &round(round_index, None, Some((0.0, 1.0)), Some(0.5)),
                 &[],
             )
             .unwrap();
         }
         let late = advance_ca_ocrc_round_v1(
             &mut engine,
-            &round(4, Some(CaoOcrcTrivialSetV1::Full), None, None),
+            &round(4, None, Some((0.0, 1.0)), Some(0.5)),
             &[feedback(
                 1,
                 4,
@@ -1315,9 +1315,12 @@ mod tests {
     #[test]
     fn trivial_empty_and_full_sets_update_immediately_without_tracking() {
         let mut empty_engine = engine(1, 2, vec![1.0, 1.0, 1.0]);
+        empty_engine.threshold = -0.5;
+        let mut empty_round = round(1, Some(CaoOcrcTrivialSetV1::Empty), None, None);
+        empty_round.threshold_used = -0.5;
         let empty = advance_ca_ocrc_round_v1(
             &mut empty_engine,
-            &round(1, Some(CaoOcrcTrivialSetV1::Empty), None, None),
+            &empty_round,
             &[],
         )
         .unwrap();
@@ -1326,9 +1329,12 @@ mod tests {
         assert!(empty.threshold_after > empty.threshold_before);
 
         let mut full_engine = engine(1, 2, vec![1.0, 1.0, 1.0]);
+        full_engine.threshold = 100.0;
+        let mut full_round = round(1, Some(CaoOcrcTrivialSetV1::Full), None, None);
+        full_round.threshold_used = 100.0;
         let full = advance_ca_ocrc_round_v1(
             &mut full_engine,
-            &round(1, Some(CaoOcrcTrivialSetV1::Full), None, None),
+            &full_round,
             &[],
         )
         .unwrap();
@@ -1401,7 +1407,7 @@ mod tests {
             }
             let _ = advance_ca_ocrc_round_v1(
                 &mut engine,
-                &round(3, Some(CaoOcrcTrivialSetV1::Full), None, None),
+                &round(3, None, Some((0.0, 1.0)), Some(0.5)),
                 &feedbacks,
             )
             .unwrap();
