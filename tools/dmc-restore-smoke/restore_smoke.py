@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.metadata
 import json
 from pathlib import Path
 import sys
@@ -203,6 +204,7 @@ def export_checkpoint(path: Path) -> None:
     payload = {
         "integration_state": full_state,
         "integration_state_size": np.asarray(expected_state_size, dtype=np.int64),
+        "prefix_state_sha256": np.asarray(digest_array(full_state)),
         "task_rng_name": np.asarray(task_rng[0]),
         "task_rng_keys": task_rng[1],
         "task_rng_position": np.asarray(task_rng[2], dtype=np.int64),
@@ -340,7 +342,12 @@ def main() -> None:
     parser.add_argument("checkpoint", type=Path)
     arguments = parser.parse_args()
 
-    installed_mujoco = getattr(mujoco, "__version__", "")
+    installed_dm_control = importlib.metadata.version("dm-control")
+    if installed_dm_control != DM_CONTROL_VERSION:
+        raise RuntimeError(
+            f"expected dm_control {DM_CONTROL_VERSION}; found {installed_dm_control}"
+        )
+    installed_mujoco = importlib.metadata.version("mujoco")
     if installed_mujoco != MUJOCO_VERSION:
         raise RuntimeError(f"expected MuJoCo {MUJOCO_VERSION}; found {installed_mujoco}")
     if int(mujoco.mjtState.mjSTATE_INTEGRATION.value) != EXPECTED_INTEGRATION_MASK:
