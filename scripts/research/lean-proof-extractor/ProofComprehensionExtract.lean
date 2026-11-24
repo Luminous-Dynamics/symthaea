@@ -76,12 +76,12 @@ def theoremProofDependencies (info : ConstantInfo) (values : Array Name) : Array
   | .thmInfo _ => values
   | _ => #[]
 
-def definitionValueDependencies (info : ConstantInfo) (values : Array Name) : Array Name :=
+def classifyDefinitionValueDependencies (info : ConstantInfo) (values : Array Name) : Array Name :=
   match info with
   | .defnInfo _ => values
   | _ => #[]
 
-def opaqueValueDependencies (info : ConstantInfo) (values : Array Name) : Array Name :=
+def classifyOpaqueValueDependencies (info : ConstantInfo) (values : Array Name) : Array Name :=
   match info with
   | .opaqueInfo _ => values
   | _ => #[]
@@ -169,8 +169,8 @@ elab "#emit_proof_comprehension " declaration:ident : command => do
   let valueDependencies := value?.map Expr.getUsedConstants |>.getD #[]
   let valueKind := valueKindString info value?.isSome
   let proofValueDependencies := theoremProofDependencies info valueDependencies
-  let definitionValueDependencies := definitionValueDependencies info valueDependencies
-  let opaqueValueDependencies := opaqueValueDependencies info valueDependencies
+  let classifyDefinitionValueDependencies := classifyDefinitionValueDependencies info valueDependencies
+  let classifyOpaqueValueDependencies := classifyOpaqueValueDependencies info valueDependencies
   let closureDependencies := info.getUsedConstantsAsSet.toList.toArray
   let unresolvedDependencies :=
     closureDependencies.filter fun dependency => (env.find? dependency).isNone
@@ -199,8 +199,8 @@ elab "#emit_proof_comprehension " declaration:ident : command => do
           let helperValueDependencies := helperValue?.map Expr.getUsedConstants |>.getD #[]
           let helperValueKind := valueKindString helperInfo helperValue?.isSome
           let helperProofDependencies := theoremProofDependencies helperInfo helperValueDependencies
-          let helperDefinitionValueDependencies := definitionValueDependencies helperInfo helperValueDependencies
-          let helperOpaqueValueDependencies := opaqueValueDependencies helperInfo helperValueDependencies
+          let helperDefinitionValueDependencies := classifyDefinitionValueDependencies helperInfo helperValueDependencies
+          let helperOpaqueValueDependencies := classifyOpaqueValueDependencies helperInfo helperValueDependencies
           let helperClosure := helperInfo.getUsedConstantsAsSet.toList.toArray
           let helperUnresolved :=
             helperClosure.filter fun dependency => (env.find? dependency).isNone
@@ -244,8 +244,8 @@ elab "#emit_proof_comprehension " declaration:ident : command => do
     , ("type_dependencies", namesJson typeDependencies)
     , ("value_dependencies", namesJson valueDependencies)
     , ("proof_value_dependencies", namesJson proofValueDependencies)
-    , ("definition_value_dependencies", namesJson definitionValueDependencies)
-    , ("opaque_value_dependencies", namesJson opaqueValueDependencies)
+    , ("definition_value_dependencies", namesJson classifyDefinitionValueDependencies)
+    , ("opaque_value_dependencies", namesJson classifyOpaqueValueDependencies)
     , ("constant_info_dependency_closure", namesJson closureDependencies)
     , ("unresolved_dependencies", namesJson unresolvedDependencies)
     , ("edges", Json.arr edges)
