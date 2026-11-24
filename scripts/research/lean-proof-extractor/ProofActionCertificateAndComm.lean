@@ -21,15 +21,11 @@ theorem and_comm_split_iff (a b : Prop) :
 
 /-- Local certificate for ProofPlan node `A_FORWARD`. -/
 theorem and_comm_forward (a b : Prop) :
-    a ∧ b → b ∧ a := by
-  intro h
-  exact And.intro h.right h.left
+    a ∧ b → b ∧ a := And.symm
 
 /-- Local certificate for ProofPlan node `A_REVERSE`. -/
 theorem and_comm_reverse (a b : Prop) :
-    b ∧ a → a ∧ b := by
-  intro h
-  exact And.intro h.right h.left
+    b ∧ a → a ∧ b := And.symm
 
 /-- Root theorem assembled only from the two locally certified actions. -/
 theorem and_comm_plan_replay (a b : Prop) :
