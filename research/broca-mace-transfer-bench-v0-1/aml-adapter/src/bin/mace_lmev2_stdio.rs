@@ -924,6 +924,7 @@ mod tests {
         assert!(response["candidate_evidence_jsonl"].as_str().unwrap().contains("lmev2:text:"));
         assert_eq!(response["retrieval_trace"]["run_id"], "fixture-run");
         assert_eq!(response["retrieval_trace"]["query_invocation_id"], "query-invocation-1");
+        assert_eq!(response["retrieval_trace"]["stop_reason"], "candidates_returned");
         assert_eq!(response["retrieval_trace"]["inspected_bytes_complete"], false);
         assert!(response["retrieval_trace_sha256"].as_str().is_some());
         assert_eq!(response["policy_trace_count"], 1);
