@@ -143,8 +143,13 @@ impl Display for CovarianceDesignError {
             Self::InvalidInput(message) => write!(f, "invalid covariance design: {message}"),
             Self::InvalidCovariance(message) => write!(f, "invalid covariance: {message}"),
             Self::DigestMismatch(message) => write!(f, "covariance digest mismatch: {message}"),
-            Self::NonPsdCovariance(message) => write!(f, "covariance is not positive semidefinite: {message}"),
-            Self::InconsistentPairwiseCovariances(message) => write!(f, "pairwise covariances do not admit a common joint model: {message}"),
+            Self::NonPsdCovariance(message) => {
+                write!(f, "covariance is not positive semidefinite: {message}")
+            }
+            Self::InconsistentPairwiseCovariances(message) => write!(
+                f,
+                "pairwise covariances do not admit a common joint model: {message}"
+            ),
             Self::NumericalFailure(message) => write!(f, "covariance numerical failure: {message}"),
         }
     }
@@ -174,10 +179,22 @@ pub fn rank_covariance_aware_experiments(
 
     for experiment in &input.experiments {
         let predictions: BTreeMap<&str, &VectorHypothesisPrediction> = experiment
-            .predictions.iter().map(|p| (p.hypothesis_id.as_str(), p)).collect();
+            .predictions
+            .iter()
+            .map(|p| (p.hypothesis_id.as_str(), p))
+            .collect();
         let covariances: BTreeMap<(&str, &str), &PairwiseDifferenceCovariance> = experiment
-            .pairwise_difference_covariances.iter()
-            .map(|c| ((c.first_hypothesis_id.as_str(), c.second_hypothesis_id.as_str()), c))
+            .pairwise_difference_covariances
+            .iter()
+            .map(|c| {
+                (
+                    (
+                        c.first_hypothesis_id.as_str(),
+                        c.second_hypothesis_id.as_str(),
+                    ),
+                    c,
+                )
+            })
             .collect();
 
         let mut worst_squared = f64::INFINITY;
@@ -229,7 +246,8 @@ pub fn rank_covariance_aware_experiments(
         let score = separation / experiment.cost_units;
         if !separation.is_finite() || !score.is_finite() {
             return Err(CovarianceDesignError::NumericalFailure(format!(
-                "non-finite score for experiment {}", experiment.experiment_id
+                "non-finite score for experiment {}",
+                experiment.experiment_id
             )));
         }
         ranked.push(RankedCovarianceExperiment {
@@ -248,15 +266,19 @@ pub fn rank_covariance_aware_experiments(
     }
 
     ranked.sort_by(|a, b| {
-        b.separation_per_cost_unit.total_cmp(&a.separation_per_cost_unit)
+        b.separation_per_cost_unit
+            .total_cmp(&a.separation_per_cost_unit)
             .then_with(|| a.experiment_id.cmp(&b.experiment_id))
     });
     for (index, candidate) in ranked.iter_mut().enumerate() {
         candidate.rank = index + 1;
     }
-    review.sort_by(|a, b| a.experiment_id.cmp(&b.experiment_id)
-        .then_with(|| a.first_hypothesis_id.cmp(&b.first_hypothesis_id))
-        .then_with(|| a.second_hypothesis_id.cmp(&b.second_hypothesis_id)));
+    review.sort_by(|a, b| {
+        a.experiment_id
+            .cmp(&b.experiment_id)
+            .then_with(|| a.first_hypothesis_id.cmp(&b.first_hypothesis_id))
+            .then_with(|| a.second_hypothesis_id.cmp(&b.second_hypothesis_id))
+    });
 
     Ok(CovarianceDesignReport {
         schema_version: COVARIANCE_SCHEMA_VERSION.to_owned(),
@@ -296,7 +318,10 @@ fn mahalanobis_squared(
         if covariance[i][i] == 0.0 {
             if delta[i] != 0.0 {
                 let norm = delta.iter().fold(0.0_f64, |acc, value| acc.hypot(*value));
-                return Ok(PairScore::OutsideSupport { residual: delta[i].abs(), norm });
+                return Ok(PairScore::OutsideSupport {
+                    residual: delta[i].abs(),
+                    norm,
+                });
             }
         } else {
             scales[i] = covariance[i][i].sqrt();
@@ -321,9 +346,12 @@ fn mahalanobis_squared(
             "standardized mean difference overflowed".to_owned(),
         ));
     }
-    let norm = standardized_delta.iter().fold(0.0_f64, |acc, value| acc.hypot(*value));
-    let (eigenvalues, eigenvectors) = jacobi_symmetric_eigen(&correlation)
-        .ok_or_else(|| CovarianceDesignError::NumericalFailure("Jacobi eigensolver did not converge".to_owned()))?;
+    let norm = standardized_delta
+        .iter()
+        .fold(0.0_f64, |acc, value| acc.hypot(*value));
+    let (eigenvalues, eigenvectors) = jacobi_symmetric_eigen(&correlation).ok_or_else(|| {
+        CovarianceDesignError::NumericalFailure("Jacobi eigensolver did not converge".to_owned())
+    })?;
     let max_eigenvalue = eigenvalues.iter().copied().fold(0.0_f64, f64::max).max(1.0);
     let cutoff = RELATIVE_EIGENVALUE_TOLERANCE * max_eigenvalue;
     let negative_cutoff = NEGATIVE_EIGENVALUE_TOLERANCE * max_eigenvalue;
@@ -352,7 +380,9 @@ fn mahalanobis_squared(
         return Ok(PairScore::OutsideSupport { residual, norm });
     }
     if !score.is_finite() || score < 0.0 {
-        return Err(CovarianceDesignError::NumericalFailure("non-finite pseudoinverse quadratic form".to_owned()));
+        return Err(CovarianceDesignError::NumericalFailure(
+            "non-finite pseudoinverse quadratic form".to_owned(),
+        ));
     }
     Ok(PairScore::Finite(score))
 }
@@ -431,7 +461,8 @@ fn jacobi_symmetric_eigen(matrix: &[Vec<f64>]) -> Option<(Vec<f64>, Vec<Vec<f64>
     }
     let eigenvalues: Vec<f64> = (0..n).map(|i| a[i][i]).collect();
     if eigenvalues.iter().any(|v| !v.is_finite())
-        || vectors.iter().flatten().any(|v| !v.is_finite()) {
+        || vectors.iter().flatten().any(|v| !v.is_finite())
+    {
         return None;
     }
     Some((eigenvalues, vectors))
@@ -439,10 +470,17 @@ fn jacobi_symmetric_eigen(matrix: &[Vec<f64>]) -> Option<(Vec<f64>, Vec<Vec<f64>
 
 fn validate_input(input: &CovarianceAwareDesignInput) -> Result<(), CovarianceDesignError> {
     if input.schema_version != COVARIANCE_SCHEMA_VERSION {
-        return Err(CovarianceDesignError::InvalidInput("unsupported schema version".to_owned()));
+        return Err(CovarianceDesignError::InvalidInput(
+            "unsupported schema version".to_owned(),
+        ));
     }
-    if input.target.trim().is_empty() || input.hypothesis_ids.len() < 2 || input.experiments.is_empty() {
-        return Err(CovarianceDesignError::InvalidInput("target, at least two hypotheses, and at least one experiment are required".to_owned()));
+    if input.target.trim().is_empty()
+        || input.hypothesis_ids.len() < 2
+        || input.experiments.is_empty()
+    {
+        return Err(CovarianceDesignError::InvalidInput(
+            "target, at least two hypotheses, and at least one experiment are required".to_owned(),
+        ));
     }
     if input.hypothesis_ids.len() > MAX_HYPOTHESES || input.experiments.len() > MAX_EXPERIMENTS {
         return Err(CovarianceDesignError::InvalidInput(format!(
@@ -450,8 +488,12 @@ fn validate_input(input: &CovarianceAwareDesignInput) -> Result<(), CovarianceDe
         )));
     }
     let hypotheses: BTreeSet<&str> = input.hypothesis_ids.iter().map(String::as_str).collect();
-    if hypotheses.len() != input.hypothesis_ids.len() || hypotheses.iter().any(|id| id.trim().is_empty()) {
-        return Err(CovarianceDesignError::InvalidInput("hypothesis IDs must be non-empty and unique".to_owned()));
+    if hypotheses.len() != input.hypothesis_ids.len()
+        || hypotheses.iter().any(|id| id.trim().is_empty())
+    {
+        return Err(CovarianceDesignError::InvalidInput(
+            "hypothesis IDs must be non-empty and unique".to_owned(),
+        ));
     }
     let expected_pairs = input.hypothesis_ids.len() * (input.hypothesis_ids.len() - 1) / 2;
     let mut experiment_ids = BTreeSet::new();
@@ -459,10 +501,17 @@ fn validate_input(input: &CovarianceAwareDesignInput) -> Result<(), CovarianceDe
     for experiment in &input.experiments {
         let eid = &experiment.experiment_id;
         if eid.trim().is_empty() || !experiment_ids.insert(eid.as_str()) {
-            return Err(CovarianceDesignError::InvalidInput(format!("empty or duplicate experiment ID: {eid}")));
+            return Err(CovarianceDesignError::InvalidInput(format!(
+                "empty or duplicate experiment ID: {eid}"
+            )));
         }
         if experiment.observables.len() > MAX_OBSERVABLES
-            || experiment.observables.len().saturating_mul(input.hypothesis_ids.len()) > MAX_JOINT_COVARIANCE_DIMENSION {
+            || experiment
+                .observables
+                .len()
+                .saturating_mul(input.hypothesis_ids.len())
+                > MAX_JOINT_COVARIANCE_DIMENSION
+        {
             return Err(CovarianceDesignError::InvalidInput(format!(
                 "observable/hypothesis covariance dimension exceeds {MAX_JOINT_COVARIANCE_DIMENSION} in {eid}"
             )));
@@ -473,23 +522,38 @@ fn validate_input(input: &CovarianceAwareDesignInput) -> Result<(), CovarianceDe
             || experiment.cost_units <= 0.0
             || !experiment.duration_hours.is_finite()
             || experiment.duration_hours < 0.0
-            || experiment.observables.is_empty() {
-            return Err(CovarianceDesignError::InvalidInput(format!("invalid description, settings, cost, duration, or observables for {eid}")));
+            || experiment.observables.is_empty()
+        {
+            return Err(CovarianceDesignError::InvalidInput(format!(
+                "invalid description, settings, cost, duration, or observables for {eid}"
+            )));
         }
         let mut setting_ids = BTreeSet::new();
-        if experiment.settings.iter().any(|s| s.parameter_id.trim().is_empty()
-            || s.unit.trim().is_empty() || !s.value.is_finite()
-            || !setting_ids.insert(s.parameter_id.as_str())) {
-            return Err(CovarianceDesignError::InvalidInput(format!("invalid or duplicate parameter setting in {eid}")));
+        if experiment.settings.iter().any(|s| {
+            s.parameter_id.trim().is_empty()
+                || s.unit.trim().is_empty()
+                || !s.value.is_finite()
+                || !setting_ids.insert(s.parameter_id.as_str())
+        }) {
+            return Err(CovarianceDesignError::InvalidInput(format!(
+                "invalid or duplicate parameter setting in {eid}"
+            )));
         }
         let mut observable_ids = BTreeSet::new();
-        if experiment.observables.iter().any(|o| o.observable_id.trim().is_empty()
-            || o.unit.trim().is_empty() || !observable_ids.insert(o.observable_id.as_str())) {
-            return Err(CovarianceDesignError::InvalidInput(format!("invalid or duplicate observable in {eid}")));
+        if experiment.observables.iter().any(|o| {
+            o.observable_id.trim().is_empty()
+                || o.unit.trim().is_empty()
+                || !observable_ids.insert(o.observable_id.as_str())
+        }) {
+            return Err(CovarianceDesignError::InvalidInput(format!(
+                "invalid or duplicate observable in {eid}"
+            )));
         }
 
         if experiment.predictions.len() != input.hypothesis_ids.len() {
-            return Err(CovarianceDesignError::InvalidInput(format!("wrong prediction count in {eid}")));
+            return Err(CovarianceDesignError::InvalidInput(format!(
+                "wrong prediction count in {eid}"
+            )));
         }
         let mut prediction_ids = BTreeSet::new();
         for prediction in &experiment.predictions {
@@ -497,73 +561,118 @@ fn validate_input(input: &CovarianceAwareDesignInput) -> Result<(), CovarianceDe
                 || !prediction_ids.insert(prediction.hypothesis_id.as_str())
                 || prediction.means.len() != experiment.observables.len()
                 || prediction.means.iter().any(|v| !v.is_finite())
-                || prediction.model_descriptor.trim().is_empty() {
-                return Err(CovarianceDesignError::InvalidInput(format!("invalid vector prediction for {} in {eid}", prediction.hypothesis_id)));
+                || prediction.model_descriptor.trim().is_empty()
+            {
+                return Err(CovarianceDesignError::InvalidInput(format!(
+                    "invalid vector prediction for {} in {eid}",
+                    prediction.hypothesis_id
+                )));
             }
-            if !descriptor_digest_matches(&prediction.model_descriptor, &prediction.model_digest_sha256) {
-                return Err(CovarianceDesignError::DigestMismatch(format!("model descriptor for {} in {eid}", prediction.hypothesis_id)));
+            if !descriptor_digest_matches(
+                &prediction.model_descriptor,
+                &prediction.model_digest_sha256,
+            ) {
+                return Err(CovarianceDesignError::DigestMismatch(format!(
+                    "model descriptor for {} in {eid}",
+                    prediction.hypothesis_id
+                )));
             }
         }
 
         if experiment.pairwise_difference_covariances.len() != expected_pairs {
-            return Err(CovarianceDesignError::InvalidInput(format!("wrong covariance pair count in {eid}")));
+            return Err(CovarianceDesignError::InvalidInput(format!(
+                "wrong covariance pair count in {eid}"
+            )));
         }
         let mut supplied_pairs = BTreeSet::new();
         for pair in &experiment.pairwise_difference_covariances {
             let first = pair.first_hypothesis_id.as_str();
             let second = pair.second_hypothesis_id.as_str();
             if first >= second || !hypotheses.contains(first) || !hypotheses.contains(second) {
-                return Err(CovarianceDesignError::InvalidInput(format!("unknown or non-canonical covariance pair ({first}, {second}) in {eid}")));
+                return Err(CovarianceDesignError::InvalidInput(format!(
+                    "unknown or non-canonical covariance pair ({first}, {second}) in {eid}"
+                )));
             }
             if !supplied_pairs.insert((first.to_owned(), second.to_owned())) {
-                return Err(CovarianceDesignError::InvalidInput(format!("duplicate covariance pair ({first}, {second}) in {eid}")));
+                return Err(CovarianceDesignError::InvalidInput(format!(
+                    "duplicate covariance pair ({first}, {second}) in {eid}"
+                )));
             }
             let n = experiment.observables.len();
             if pair.covariance.len() != n || pair.covariance.iter().any(|row| row.len() != n) {
-                return Err(CovarianceDesignError::InvalidCovariance(format!("wrong matrix shape for ({first}, {second}) in {eid}")));
+                return Err(CovarianceDesignError::InvalidCovariance(format!(
+                    "wrong matrix shape for ({first}, {second}) in {eid}"
+                )));
             }
             if pair.covariance.iter().flatten().any(|v| !v.is_finite()) {
-                return Err(CovarianceDesignError::InvalidCovariance(format!("non-finite entry for ({first}, {second}) in {eid}")));
+                return Err(CovarianceDesignError::InvalidCovariance(format!(
+                    "non-finite entry for ({first}, {second}) in {eid}"
+                )));
             }
             for i in 0..n {
                 for j in 0..n {
                     let a = pair.covariance[i][j];
                     let b = pair.covariance[j][i];
                     if (a - b).abs() > 1.0e-12 * a.abs().max(b.abs()) {
-                        return Err(CovarianceDesignError::InvalidCovariance(format!("asymmetric matrix for ({first}, {second}) in {eid}")));
+                        return Err(CovarianceDesignError::InvalidCovariance(format!(
+                            "asymmetric matrix for ({first}, {second}) in {eid}"
+                        )));
                     }
                 }
                 if pair.covariance[i][i] < 0.0 {
-                    return Err(CovarianceDesignError::InvalidCovariance(format!("negative diagonal for ({first}, {second}) in {eid}")));
+                    return Err(CovarianceDesignError::InvalidCovariance(format!(
+                        "negative diagonal for ({first}, {second}) in {eid}"
+                    )));
                 }
             }
             if pair.covariance_descriptor.trim().is_empty()
-                || !descriptor_digest_matches(&pair.covariance_descriptor, &pair.covariance_descriptor_digest_sha256) {
-                return Err(CovarianceDesignError::DigestMismatch(format!("covariance provenance descriptor for ({first}, {second}) in {eid}")));
+                || !descriptor_digest_matches(
+                    &pair.covariance_descriptor,
+                    &pair.covariance_descriptor_digest_sha256,
+                )
+            {
+                return Err(CovarianceDesignError::DigestMismatch(format!(
+                    "covariance provenance descriptor for ({first}, {second}) in {eid}"
+                )));
             }
             if matrix_digest_sha256(&pair.covariance) != pair.covariance_matrix_digest_sha256 {
-                return Err(CovarianceDesignError::DigestMismatch(format!("numeric covariance matrix for ({first}, {second}) in {eid}")));
+                return Err(CovarianceDesignError::DigestMismatch(format!(
+                    "numeric covariance matrix for ({first}, {second}) in {eid}"
+                )));
             }
             let correlation = correlation_matrix(&pair.covariance)
                 .ok_or_else(|| CovarianceDesignError::InvalidCovariance(format!("nonzero covariance with a zero-variance observable for ({first}, {second}) in {eid}")))?;
-            let (eigenvalues, _) = jacobi_symmetric_eigen(&correlation)
-                .ok_or_else(|| CovarianceDesignError::NumericalFailure(format!("eigendecomposition for ({first}, {second}) in {eid}")))?;
+            let (eigenvalues, _) = jacobi_symmetric_eigen(&correlation).ok_or_else(|| {
+                CovarianceDesignError::NumericalFailure(format!(
+                    "eigendecomposition for ({first}, {second}) in {eid}"
+                ))
+            })?;
             let max_eigenvalue = eigenvalues.iter().copied().fold(0.0_f64, f64::max).max(1.0);
             if let Some(minimum) = eigenvalues.iter().copied().reduce(f64::min) {
                 if minimum < -NEGATIVE_EIGENVALUE_TOLERANCE * max_eigenvalue {
-                    return Err(CovarianceDesignError::NonPsdCovariance(format!("minimum eigenvalue {minimum} for ({first}, {second}) in {eid}")));
+                    return Err(CovarianceDesignError::NonPsdCovariance(format!(
+                        "minimum eigenvalue {minimum} for ({first}, {second}) in {eid}"
+                    )));
                 }
             }
         }
         for i in 0..input.hypothesis_ids.len() {
             for j in (i + 1)..input.hypothesis_ids.len() {
                 let (first, second) = if input.hypothesis_ids[i] < input.hypothesis_ids[j] {
-                    (input.hypothesis_ids[i].clone(), input.hypothesis_ids[j].clone())
+                    (
+                        input.hypothesis_ids[i].clone(),
+                        input.hypothesis_ids[j].clone(),
+                    )
                 } else {
-                    (input.hypothesis_ids[j].clone(), input.hypothesis_ids[i].clone())
+                    (
+                        input.hypothesis_ids[j].clone(),
+                        input.hypothesis_ids[i].clone(),
+                    )
                 };
                 if !supplied_pairs.contains(&(first.clone(), second.clone())) {
-                    return Err(CovarianceDesignError::InvalidInput(format!("missing covariance pair ({first}, {second}) in {eid}")));
+                    return Err(CovarianceDesignError::InvalidInput(format!(
+                        "missing covariance pair ({first}, {second}) in {eid}"
+                    )));
                 }
             }
         }
@@ -597,12 +706,21 @@ fn validate_pairwise_covariance_consistency(
     let covariance_map: BTreeMap<(&str, &str), &PairwiseDifferenceCovariance> = experiment
         .pairwise_difference_covariances
         .iter()
-        .map(|pair| ((pair.first_hypothesis_id.as_str(), pair.second_hypothesis_id.as_str()), pair))
+        .map(|pair| {
+            (
+                (
+                    pair.first_hypothesis_id.as_str(),
+                    pair.second_hypothesis_id.as_str(),
+                ),
+                pair,
+            )
+        })
         .collect();
 
     for pair in &experiment.pairwise_difference_covariances {
         for observable in 0..p {
-            scales[observable] = scales[observable].max(pair.covariance[observable][observable].sqrt());
+            scales[observable] =
+                scales[observable].max(pair.covariance[observable][observable].sqrt());
         }
     }
 
@@ -660,26 +778,29 @@ fn validate_pairwise_covariance_consistency(
             }
             for i in 0..h {
                 for j in 0..h {
-                    centered[i * p + a][j * p + b] =
-                        -0.5 * (delta[i * p + a][j * p + b] - row_means[i] - col_means[j] + grand_mean);
+                    centered[i * p + a][j * p + b] = -0.5
+                        * (delta[i * p + a][j * p + b] - row_means[i] - col_means[j] + grand_mean);
                 }
             }
         }
     }
 
-    let (eigenvalues, _) = jacobi_symmetric_eigen(&centered)
-        .ok_or_else(|| CovarianceDesignError::NumericalFailure(format!(
+    let (eigenvalues, _) = jacobi_symmetric_eigen(&centered).ok_or_else(|| {
+        CovarianceDesignError::NumericalFailure(format!(
             "joint covariance-consistency eigensolver did not converge for {}",
             experiment.experiment_id
-        )))?;
+        ))
+    })?;
     let max_eigenvalue = eigenvalues.iter().copied().fold(0.0_f64, f64::max).max(1.0);
     let negative_cutoff = NEGATIVE_EIGENVALUE_TOLERANCE * max_eigenvalue;
     if let Some(minimum) = eigenvalues.iter().copied().reduce(f64::min) {
         if minimum < -negative_cutoff {
-            return Err(CovarianceDesignError::InconsistentPairwiseCovariances(format!(
-                "double-centred joint covariance has minimum eigenvalue {minimum} in {}",
-                experiment.experiment_id
-            )));
+            return Err(CovarianceDesignError::InconsistentPairwiseCovariances(
+                format!(
+                    "double-centred joint covariance has minimum eigenvalue {minimum} in {}",
+                    experiment.experiment_id
+                ),
+            ));
         }
     }
     Ok(())
@@ -755,11 +876,25 @@ mod tests {
     #[test]
     fn duplicated_observable_does_not_increase_the_score() {
         let report = rank_covariance_aware_experiments(&covariance_redundancy_fixture()).unwrap();
-        let base = report.ranked_experiments.iter().find(|x| x.experiment_id == "base_two_observables").unwrap();
-        let redundant = report.ranked_experiments.iter().find(|x| x.experiment_id == "with_exact_redundant_sum").unwrap();
-        assert!((base.worst_case_separation_squared - redundant.worst_case_separation_squared).abs() < 1.0e-10);
+        let base = report
+            .ranked_experiments
+            .iter()
+            .find(|x| x.experiment_id == "base_two_observables")
+            .unwrap();
+        let redundant = report
+            .ranked_experiments
+            .iter()
+            .find(|x| x.experiment_id == "with_exact_redundant_sum")
+            .unwrap();
+        assert!(
+            (base.worst_case_separation_squared - redundant.worst_case_separation_squared).abs()
+                < 1.0e-10
+        );
         assert_eq!(1.0_f64.powi(2) / 1.0 + 2.0_f64.powi(2) / 1.0, 5.0);
-        assert_eq!(1.0_f64.powi(2) / 1.0 + 2.0_f64.powi(2) / 1.0 + 3.0_f64.powi(2) / 3.0, 8.0);
+        assert_eq!(
+            1.0_f64.powi(2) / 1.0 + 2.0_f64.powi(2) / 1.0 + 3.0_f64.powi(2) / 3.0,
+            8.0
+        );
     }
 
     #[test]
@@ -786,7 +921,9 @@ mod tests {
             let mut pair_02 = experiment.pairwise_difference_covariances[0].clone();
             pair_02.first_hypothesis_id = "H0".to_owned();
             pair_02.second_hypothesis_id = "H2".to_owned();
-            experiment.pairwise_difference_covariances.push(pair_02.clone());
+            experiment
+                .pairwise_difference_covariances
+                .push(pair_02.clone());
 
             let mut pair_12 = pair_02;
             pair_12.first_hypothesis_id = "H1".to_owned();
@@ -814,7 +951,11 @@ mod tests {
     #[test]
     fn diagonal_unit_rescaling_preserves_the_score() {
         let mut input = covariance_redundancy_fixture();
-        let experiment = input.experiments.iter_mut().find(|x| x.experiment_id == "base_two_observables").unwrap();
+        let experiment = input
+            .experiments
+            .iter_mut()
+            .find(|x| x.experiment_id == "base_two_observables")
+            .unwrap();
         experiment.observables[0].unit = "millibase-unit".to_owned();
         for prediction in &mut experiment.predictions {
             prediction.means[0] *= 1000.0;
@@ -829,7 +970,12 @@ mod tests {
             pair.covariance_matrix_digest_sha256 = matrix_digest_sha256(&pair.covariance);
         }
         let report = rank_covariance_aware_experiments(&input).unwrap();
-        let score = report.ranked_experiments.iter().find(|x| x.experiment_id == "base_two_observables").unwrap().worst_case_separation_squared;
+        let score = report
+            .ranked_experiments
+            .iter()
+            .find(|x| x.experiment_id == "base_two_observables")
+            .unwrap()
+            .worst_case_separation_squared;
         assert!((score - 4.0).abs() < 1.0e-10);
     }
 
@@ -898,7 +1044,9 @@ mod tests {
     #[test]
     fn invertible_observable_basis_change_preserves_the_score() {
         let mut input = covariance_redundancy_fixture();
-        let experiment = input.experiments.iter_mut()
+        let experiment = input
+            .experiments
+            .iter_mut()
             .find(|x| x.experiment_id == "base_two_observables")
             .unwrap();
 
@@ -917,7 +1065,9 @@ mod tests {
         pair.covariance_matrix_digest_sha256 = matrix_digest_sha256(&pair.covariance);
 
         let report = rank_covariance_aware_experiments(&input).unwrap();
-        let score = report.ranked_experiments.iter()
+        let score = report
+            .ranked_experiments
+            .iter()
             .find(|x| x.experiment_id == "base_two_observables")
             .unwrap()
             .worst_case_separation_squared;
@@ -928,27 +1078,52 @@ mod tests {
     fn singular_covariance_outside_support_is_quarantined() {
         let mut input = covariance_redundancy_fixture();
         let experiment = &mut input.experiments[0];
-        experiment.predictions.iter_mut().find(|p| p.hypothesis_id == "H1").unwrap().means = vec![1.0, 0.0];
+        experiment
+            .predictions
+            .iter_mut()
+            .find(|p| p.hypothesis_id == "H1")
+            .unwrap()
+            .means = vec![1.0, 0.0];
         let pair = &mut experiment.pairwise_difference_covariances[0];
         pair.covariance = vec![vec![1.0, 1.0], vec![1.0, 1.0]];
         pair.covariance_matrix_digest_sha256 = matrix_digest_sha256(&pair.covariance);
         let target = experiment.experiment_id.clone();
         let report = rank_covariance_aware_experiments(&input).unwrap();
-        assert!(report.ranked_experiments.iter().all(|x| x.experiment_id != target));
-        assert!(report.support_review_required.iter().any(|x| x.experiment_id == target));
+        assert!(
+            report
+                .ranked_experiments
+                .iter()
+                .all(|x| x.experiment_id != target)
+        );
+        assert!(
+            report
+                .support_review_required
+                .iter()
+                .any(|x| x.experiment_id == target)
+        );
     }
 
     #[test]
     fn singular_covariance_inside_support_is_scored() {
         let mut input = covariance_redundancy_fixture();
         let experiment = &mut input.experiments[0];
-        experiment.predictions.iter_mut().find(|p| p.hypothesis_id == "H1").unwrap().means = vec![1.0, 1.0];
+        experiment
+            .predictions
+            .iter_mut()
+            .find(|p| p.hypothesis_id == "H1")
+            .unwrap()
+            .means = vec![1.0, 1.0];
         let pair = &mut experiment.pairwise_difference_covariances[0];
         pair.covariance = vec![vec![1.0, 1.0], vec![1.0, 1.0]];
         pair.covariance_matrix_digest_sha256 = matrix_digest_sha256(&pair.covariance);
         let target = experiment.experiment_id.clone();
         let report = rank_covariance_aware_experiments(&input).unwrap();
-        let score = report.ranked_experiments.iter().find(|x| x.experiment_id == target).unwrap().worst_case_separation_squared;
+        let score = report
+            .ranked_experiments
+            .iter()
+            .find(|x| x.experiment_id == target)
+            .unwrap()
+            .worst_case_separation_squared;
         assert!((score - 1.0).abs() < 1.0e-10);
     }
 
@@ -958,23 +1133,37 @@ mod tests {
         let pair = &mut input.experiments[0].pairwise_difference_covariances[0];
         pair.covariance = vec![vec![1.0, 2.0], vec![2.0, 1.0]];
         pair.covariance_matrix_digest_sha256 = matrix_digest_sha256(&pair.covariance);
-        assert!(matches!(rank_covariance_aware_experiments(&input), Err(CovarianceDesignError::NonPsdCovariance(_))));
+        assert!(matches!(
+            rank_covariance_aware_experiments(&input),
+            Err(CovarianceDesignError::NonPsdCovariance(_))
+        ));
 
         let mut input = covariance_redundancy_fixture();
         input.experiments[0].pairwise_difference_covariances[0].covariance[0][0] = 1.25;
-        assert!(matches!(rank_covariance_aware_experiments(&input), Err(CovarianceDesignError::DigestMismatch(_))));
+        assert!(matches!(
+            rank_covariance_aware_experiments(&input),
+            Err(CovarianceDesignError::DigestMismatch(_))
+        ));
     }
 
     #[test]
     fn missing_covariance_pair_and_non_finite_values_are_rejected() {
         let mut input = covariance_redundancy_fixture();
         input.experiments[0].pairwise_difference_covariances.clear();
-        assert!(matches!(rank_covariance_aware_experiments(&input), Err(CovarianceDesignError::InvalidInput(_))));
+        assert!(matches!(
+            rank_covariance_aware_experiments(&input),
+            Err(CovarianceDesignError::InvalidInput(_))
+        ));
 
         let mut input = covariance_redundancy_fixture();
         input.experiments[0].pairwise_difference_covariances[0].covariance[0][0] = f64::NAN;
         input.experiments[0].pairwise_difference_covariances[0].covariance_matrix_digest_sha256 =
-            matrix_digest_sha256(&input.experiments[0].pairwise_difference_covariances[0].covariance);
-        assert!(matches!(rank_covariance_aware_experiments(&input), Err(CovarianceDesignError::InvalidCovariance(_))));
+            matrix_digest_sha256(
+                &input.experiments[0].pairwise_difference_covariances[0].covariance,
+            );
+        assert!(matches!(
+            rank_covariance_aware_experiments(&input),
+            Err(CovarianceDesignError::InvalidCovariance(_))
+        ));
     }
 }
