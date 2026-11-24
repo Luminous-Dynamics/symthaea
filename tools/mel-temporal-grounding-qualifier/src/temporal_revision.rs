@@ -544,7 +544,7 @@ mod tests {
             adapter_sha256: ADAPTER.into(),
             evidence_condition: EvidenceConditionV1::NoEvidence,
             evidence: None,
-            actions: vec![RevisionActionV1::NoChange],
+            actions: vec![RevisionActionV1::Other],
             draft,
             final_score,
         }
@@ -579,6 +579,42 @@ mod tests {
         let mut final_score = positive_score(1.0, 2, 0, 0);
         final_score.audio_sha256 = "1212121212121212121212121212121212121212121212121212121212121212".into();
         assert!(audit_revision(&case(draft, final_score)).is_err());
+    }
+
+    #[test]
+    fn absence_revision_reports_improvement_without_relabeling_abstention_as_absence() {
+        let absent = audit_revision(&case(
+            absent_score(Some(false)),
+            absent_score(Some(true)),
+        ))
+        .unwrap();
+        assert_eq!(absent.absence_improved, Some(true));
+        assert_eq!(absent.absence_regressed, Some(false));
+        assert_eq!(absent.f1_delta, None);
+
+        let abstained = audit_revision(&case(
+            absent_score(Some(false)),
+            absent_score(None),
+        ))
+        .unwrap();
+        assert_eq!(abstained.absence_improved, Some(false));
+        assert_eq!(abstained.absence_regressed, Some(false));
+        assert_eq!(abstained.final_score.correct_absence_claim, None);
+    }
+
+    #[test]
+    fn valid_yoked_evidence_requires_a_distinct_source_recording() {
+        let mut yoked = case(positive_score(0.5, 1, 1, 1), positive_score(1.0, 2, 0, 0));
+        yoked.evidence_condition = EvidenceConditionV1::YokedRetrieved;
+        yoked.evidence = Some(RevisionEvidenceV1 {
+            source_audio_sha256: "1212121212121212121212121212121212121212121212121212121212121212".into(),
+            source_sample_rate_hz: 44_100,
+            evidence_payload_sha256: EVIDENCE.into(),
+            retrieval_config_sha256: RETRIEVAL.into(),
+            start_frame: 100,
+            end_frame: 200,
+        });
+        assert!(audit_revision(&yoked).is_ok());
     }
 
     #[test]
