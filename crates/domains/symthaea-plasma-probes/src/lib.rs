@@ -2831,10 +2831,10 @@ pub fn evaluate_oscillatory_unstable_mode_interface(
         let radius = exponent.exp();
         let angle = (phase_step * sample_step as f64).rem_euclid(TAU);
         let (sin_phase, cos_phase) = angle.sin_cos();
-        let c0 =
-            radius * (contract.diagnostic_gain[0] * cos_phase + contract.diagnostic_gain[1] * sin_phase);
-        let c1 =
-            radius * (-contract.diagnostic_gain[0] * sin_phase + contract.diagnostic_gain[1] * cos_phase);
+        let c0 = radius
+            * (contract.diagnostic_gain[0] * cos_phase + contract.diagnostic_gain[1] * sin_phase);
+        let c1 = radius
+            * (-contract.diagnostic_gain[0] * sin_phase + contract.diagnostic_gain[1] * cos_phase);
         let contribution = [
             c0 * c0 * inverse_noise_variance,
             c0 * c1 * inverse_noise_variance,
@@ -2874,7 +2874,8 @@ pub fn evaluate_oscillatory_unstable_mode_interface(
         let radius = exponent.exp();
         let angle = (phase_step * remaining_steps as f64).rem_euclid(TAU);
         let (sin_phase, cos_phase) = angle.sin_cos();
-        let b0 = radius * (cos_phase * contract.actuator_gain[0] - sin_phase * contract.actuator_gain[1]);
+        let b0 = radius
+            * (cos_phase * contract.actuator_gain[0] - sin_phase * contract.actuator_gain[1]);
         let b1 = radius * (sin_phase * contract.actuator_gain[0] + cos_phase * contract.actuator_gain[1]);
         let contribution = [b0 * b0, b0 * b1, b1 * b1];
         if contribution.iter().any(|value| !value.is_finite()) {
