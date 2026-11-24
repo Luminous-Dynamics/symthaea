@@ -42,6 +42,8 @@ pub mod analysis_crosscheck;
 pub mod analyst;
 pub mod audio_analyzer;
 #[cfg(feature = "theory")]
+pub mod temporal_grounding;
+#[cfg(feature = "theory")]
 pub mod blinded_study;
 pub mod choreography;
 #[cfg(feature = "clap-fad")]
