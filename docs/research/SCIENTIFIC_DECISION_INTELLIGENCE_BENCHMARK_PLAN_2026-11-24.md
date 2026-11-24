@@ -101,7 +101,7 @@ A promising theoretical line for the probabilistic arm is the September 2026 pap
 ### Scientific campaign and research workflow
 
 - **AS-Bench:** target at least 15/18 resolved trials (83.3%) on the six-task, three-trial pilot, with both discovery and held-out learning gates passing for every resolved campaign. Report replay/twin, cost and agent time separately. Then test a held-out campaign not used for tuning.
-- **ASI-Bench:** target at least 70 overall on the same task-set/scorer/runtime release, with no B2–B4 collapse (target at least 65 on each autonomous/distractor tier). Use three independent runs and task-level artifacts; do not compare to the current aggregate unless the task-set identifier is reconciled.
+- **ASI-Bench:** target at least 70 overall on the same task-set/scorer/runtime release. Also target a 25% reduction in the B1-to-B2 score drop, and at least a 10-point improvement over the strongest matched baseline on B2–B4 without sacrificing B1. Use three independent runs and task-level artifacts; do not compare to the current aggregate unless the task-set identifier is reconciled.
 - **SciWorkBench:** target at least 65 mean under the same official harness and grader, with per-domain breakdowns and explicit procedure/evidence/self-correction failure rates.
 - **FIRE-Bench:** target at least 55 F1 on the same 30 tasks, while also reporting precision, recall, trial variance and atomic-claim support. Target fewer than half of errors in planning, not just higher final F1.
 
