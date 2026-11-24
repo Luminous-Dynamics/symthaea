@@ -32,7 +32,10 @@ pub struct ActiveSensingError {
 
 impl ActiveSensingError {
     fn new(field: impl Into<String>, message: impl Into<String>) -> Self {
-        Self { field: field.into(), message: message.into() }
+        Self {
+            field: field.into(),
+            message: message.into(),
+        }
     }
 }
 
@@ -212,7 +215,9 @@ fn compute_expected_loss_ppm(
         }
         probability_sum = probability_sum
             .checked_add(u64::from(outcome.probability_ppm))
-            .ok_or_else(|| ActiveSensingError::new("action.outcomes", "probability sum overflow"))?;
+            .ok_or_else(|| {
+                ActiveSensingError::new("action.outcomes", "probability sum overflow")
+            })?;
         weighted_loss = weighted_loss
             .checked_add(
                 u128::from(outcome.probability_ppm)
@@ -230,16 +235,21 @@ fn compute_expected_loss_ppm(
         .checked_add(u128::from(PROBABILITY_SCALE / 2))
         .ok_or_else(|| ActiveSensingError::new("action.outcomes", "rounding overflow"))?
         / u128::from(PROBABILITY_SCALE);
-    u32::try_from(rounded)
-        .map_err(|_| ActiveSensingError::new("action.outcomes", "expected loss does not fit in u32"))
+    u32::try_from(rounded).map_err(|_| {
+        ActiveSensingError::new("action.outcomes", "expected loss does not fit in u32")
+    })
 }
 
 fn dominates(left: &ActiveSensingActionValue, right: &ActiveSensingActionValue) -> bool {
     let benefit_no_worse =
         left.expected_task_loss_reduction_ppm >= right.expected_task_loss_reduction_ppm;
-    let resources_no_worse = left.resource_cost.componentwise_no_more_than(right.resource_cost);
+    let resources_no_worse = left
+        .resource_cost
+        .componentwise_no_more_than(right.resource_cost);
     let strict = left.expected_task_loss_reduction_ppm > right.expected_task_loss_reduction_ppm
-        || left.resource_cost.componentwise_strictly_less(right.resource_cost);
+        || left
+            .resource_cost
+            .componentwise_strictly_less(right.resource_cost);
     benefit_no_worse && resources_no_worse && strict
 }
 
@@ -296,7 +306,10 @@ pub fn plan_active_sensing_actions(
         &context.forecast_model_sha256,
         &context.calibration_receipt_sha256,
         &context.decision_policy_sha256,
-    ].iter().all(|digest| digest_is_nonzero(digest)) {
+    ]
+    .iter()
+    .all(|digest| digest_is_nonzero(digest))
+    {
         return Err(ActiveSensingError::new(
             "context.provenance",
             "public state, forecast model, calibration receipt and decision policy digests must be non-zero",
@@ -314,7 +327,10 @@ pub fn plan_active_sensing_actions(
             format!("action count must be in 1..={MAX_ACTIONS}"),
         ));
     }
-    if actions.windows(2).any(|pair| pair[0].action_id >= pair[1].action_id) {
+    if actions
+        .windows(2)
+        .any(|pair| pair[0].action_id >= pair[1].action_id)
+    {
         return Err(ActiveSensingError::new(
             "actions.action_id",
             "actions must be sorted by unique action_id",
@@ -352,8 +368,8 @@ pub fn plan_active_sensing_actions(
             outcome_estimates: action.outcomes.clone(),
             expected_loss_without_observation_ppm: context.current_expected_decision_loss_ppm,
             expected_loss_after_observation_ppm: expected_after,
-            expected_task_loss_reduction_ppm:
-                i64::from(context.current_expected_decision_loss_ppm) - i64::from(expected_after),
+            expected_task_loss_reduction_ppm: i64::from(context.current_expected_decision_loss_ppm)
+                - i64::from(expected_after),
         };
 
         if !action.resource_cost.fits(context.remaining_resource_budget) {
@@ -373,9 +389,10 @@ pub fn plan_active_sensing_actions(
 
     let mut frontier = Vec::new();
     for (index, value) in values.iter().enumerate() {
-        let dominated = values.iter().enumerate().any(|(other_index, other)| {
-            other_index != index && dominates(other, value)
-        });
+        let dominated = values
+            .iter()
+            .enumerate()
+            .any(|(other_index, other)| other_index != index && dominates(other, value));
         if !dominated {
             frontier.push(value.clone());
         }
@@ -404,37 +421,63 @@ pub fn validate_active_sensing_plan_receipt(
     receipt: &ActiveSensingPlanReceipt,
 ) -> Result<(), ActiveSensingError> {
     if receipt.schema != MANIFEST_SCHEMA || receipt.version != VERSION {
-        return Err(ActiveSensingError::new("schema_version", "unsupported plan schema/version"));
+        return Err(ActiveSensingError::new(
+            "schema_version",
+            "unsupported plan schema/version",
+        ));
     }
     if ![
         &receipt.public_state_sha256,
         &receipt.forecast_model_sha256,
         &receipt.calibration_receipt_sha256,
         &receipt.decision_policy_sha256,
-    ].iter().all(|digest| digest_is_nonzero(digest)) {
-        return Err(ActiveSensingError::new("plan.provenance", "required provenance digests are missing"));
+    ]
+    .iter()
+    .all(|digest| digest_is_nonzero(digest))
+    {
+        return Err(ActiveSensingError::new(
+            "plan.provenance",
+            "required provenance digests are missing",
+        ));
     }
     if receipt.current_expected_decision_loss_ppm > PROBABILITY_SCALE as u32 {
-        return Err(ActiveSensingError::new("current_expected_decision_loss_ppm", "must be in [0, 1,000,000] ppm"));
+        return Err(ActiveSensingError::new(
+            "current_expected_decision_loss_ppm",
+            "must be in [0, 1,000,000] ppm",
+        ));
     }
-    if receipt.pareto_frontier.windows(2).any(|pair| pair[0].action_id >= pair[1].action_id)
-        || receipt.rejected_actions.windows(2).any(|pair| pair[0].action_id >= pair[1].action_id)
+    if receipt
+        .pareto_frontier
+        .windows(2)
+        .any(|pair| pair[0].action_id >= pair[1].action_id)
+        || receipt
+            .rejected_actions
+            .windows(2)
+            .any(|pair| pair[0].action_id >= pair[1].action_id)
     {
-        return Err(ActiveSensingError::new("plan.order", "frontier and rejected lists must be sorted by unique action ID"));
+        return Err(ActiveSensingError::new(
+            "plan.order",
+            "frontier and rejected lists must be sorted by unique action ID",
+        ));
     }
-    let mut all_action_ids = HashSet::with_capacity(
-        receipt.pareto_frontier.len() + receipt.rejected_actions.len()
-    );
+    let mut all_action_ids =
+        HashSet::with_capacity(receipt.pareto_frontier.len() + receipt.rejected_actions.len());
     for action in &receipt.pareto_frontier {
         if !all_action_ids.insert(action.action_id.as_str()) {
-            return Err(ActiveSensingError::new("plan.action_ids", "duplicate action ID across plan receipt"));
+            return Err(ActiveSensingError::new(
+                "plan.action_ids",
+                "duplicate action ID across plan receipt",
+            ));
         }
     }
     for rejected in &receipt.rejected_actions {
         if rejected.action_id.trim().is_empty()
             || !all_action_ids.insert(rejected.action_id.as_str())
         {
-            return Err(ActiveSensingError::new("plan.rejected_actions", "rejected action IDs must be non-empty and unique across frontier/rejections"));
+            return Err(ActiveSensingError::new(
+                "plan.rejected_actions",
+                "rejected action IDs must be non-empty and unique across frontier/rejections",
+            ));
         }
     }
     for action in &receipt.pareto_frontier {
@@ -445,7 +488,8 @@ pub fn validate_active_sensing_plan_receipt(
             || action.claimed_entropy_reduction_ppm > PROBABILITY_SCALE as u32
             || action.outcome_estimates.is_empty()
             || action.expected_task_loss_reduction_ppm <= 0
-            || action.expected_loss_without_observation_ppm != receipt.current_expected_decision_loss_ppm
+            || action.expected_loss_without_observation_ppm
+                != receipt.current_expected_decision_loss_ppm
             || action.expected_loss_after_observation_ppm > PROBABILITY_SCALE as u32
             || action.expected_loss_after_observation_ppm != reproduced_loss
             || i64::from(action.expected_loss_without_observation_ppm)
@@ -453,18 +497,30 @@ pub fn validate_active_sensing_plan_receipt(
                 != action.expected_task_loss_reduction_ppm
             || !action.resource_cost.fits(receipt.remaining_resource_budget)
         {
-            return Err(ActiveSensingError::new("plan.frontier", "frontier action metrics/resource cost are inconsistent"));
+            return Err(ActiveSensingError::new(
+                "plan.frontier",
+                "frontier action metrics/resource cost are inconsistent",
+            ));
         }
     }
     for (index, action) in receipt.pareto_frontier.iter().enumerate() {
-        if receipt.pareto_frontier.iter().enumerate().any(|(other_index, other)| {
-            other_index != index && dominates(other, action)
-        }) {
-            return Err(ActiveSensingError::new("plan.frontier", "frontier contains a dominated action"));
+        if receipt
+            .pareto_frontier
+            .iter()
+            .enumerate()
+            .any(|(other_index, other)| other_index != index && dominates(other, action))
+        {
+            return Err(ActiveSensingError::new(
+                "plan.frontier",
+                "frontier contains a dominated action",
+            ));
         }
     }
     if compute_active_sensing_plan_sha256(receipt) != receipt.plan_sha256 {
-        return Err(ActiveSensingError::new("plan_sha256", "does not match canonical plan receipt"));
+        return Err(ActiveSensingError::new(
+            "plan_sha256",
+            "does not match canonical plan receipt",
+        ));
     }
     Ok(())
 }
@@ -528,13 +584,22 @@ mod tests {
             cost(100, 10, 100, 10, 0, 0),
             900_000,
             vec![
-                ObservationOutcomeEstimate { probability_ppm: 500_000, posterior_decision_loss_ppm: 300_000 },
-                ObservationOutcomeEstimate { probability_ppm: 500_000, posterior_decision_loss_ppm: 300_000 },
+                ObservationOutcomeEstimate {
+                    probability_ppm: 500_000,
+                    posterior_decision_loss_ppm: 300_000,
+                },
+                ObservationOutcomeEstimate {
+                    probability_ppm: 500_000,
+                    posterior_decision_loss_ppm: 300_000,
+                },
             ],
         );
         let plan = plan_active_sensing_actions(context(), &[irrelevant]).unwrap();
         assert!(plan.pareto_frontier.is_empty());
-        assert_eq!(plan.rejected_actions[0].reason, ActiveSensingRejectionReason::NoExpectedTaskLossReduction);
+        assert_eq!(
+            plan.rejected_actions[0].reason,
+            ActiveSensingRejectionReason::NoExpectedTaskLossReduction
+        );
     }
 
     #[test]
@@ -545,13 +610,22 @@ mod tests {
             cost(100, 10, 100, 10, 0, 0),
             100,
             vec![
-                ObservationOutcomeEstimate { probability_ppm: 500_000, posterior_decision_loss_ppm: 100_000 },
-                ObservationOutcomeEstimate { probability_ppm: 500_000, posterior_decision_loss_ppm: 200_000 },
+                ObservationOutcomeEstimate {
+                    probability_ppm: 500_000,
+                    posterior_decision_loss_ppm: 100_000,
+                },
+                ObservationOutcomeEstimate {
+                    probability_ppm: 500_000,
+                    posterior_decision_loss_ppm: 200_000,
+                },
             ],
         );
         let plan = plan_active_sensing_actions(context(), &[useful]).unwrap();
         assert_eq!(plan.pareto_frontier.len(), 1);
-        assert_eq!(plan.pareto_frontier[0].expected_task_loss_reduction_ppm, 150_000);
+        assert_eq!(
+            plan.pareto_frontier[0].expected_task_loss_reduction_ppm,
+            150_000
+        );
     }
 
     #[test]
@@ -562,8 +636,14 @@ mod tests {
             cost(50, 10, 100, 10, 0, 0),
             100,
             vec![
-                ObservationOutcomeEstimate { probability_ppm: 500_000, posterior_decision_loss_ppm: 150_000 },
-                ObservationOutcomeEstimate { probability_ppm: 500_000, posterior_decision_loss_ppm: 250_000 },
+                ObservationOutcomeEstimate {
+                    probability_ppm: 500_000,
+                    posterior_decision_loss_ppm: 150_000,
+                },
+                ObservationOutcomeEstimate {
+                    probability_ppm: 500_000,
+                    posterior_decision_loss_ppm: 250_000,
+                },
             ],
         );
         let lower_compute = action(
@@ -572,11 +652,18 @@ mod tests {
             cost(100, 20, 50, 10, 32, 0),
             200,
             vec![
-                ObservationOutcomeEstimate { probability_ppm: 500_000, posterior_decision_loss_ppm: 100_000 },
-                ObservationOutcomeEstimate { probability_ppm: 500_000, posterior_decision_loss_ppm: 150_000 },
+                ObservationOutcomeEstimate {
+                    probability_ppm: 500_000,
+                    posterior_decision_loss_ppm: 100_000,
+                },
+                ObservationOutcomeEstimate {
+                    probability_ppm: 500_000,
+                    posterior_decision_loss_ppm: 150_000,
+                },
             ],
         );
-        let plan = plan_active_sensing_actions(context(), &[cheaper_sensor, lower_compute]).unwrap();
+        let plan =
+            plan_active_sensing_actions(context(), &[cheaper_sensor, lower_compute]).unwrap();
         assert_eq!(plan.pareto_frontier.len(), 2);
     }
 
@@ -594,7 +681,10 @@ mod tests {
         );
         let plan = plan_active_sensing_actions(context(), &[expensive]).unwrap();
         assert!(plan.pareto_frontier.is_empty());
-        assert_eq!(plan.rejected_actions[0].reason, ActiveSensingRejectionReason::ExceedsResourceBudget);
+        assert_eq!(
+            plan.rejected_actions[0].reason,
+            ActiveSensingRejectionReason::ExceedsResourceBudget
+        );
     }
 
     #[test]
@@ -604,7 +694,10 @@ mod tests {
             ActiveSensingActionKind::SampleNow,
             cost(100, 10, 100, 10, 0, 0),
             100,
-            vec![ObservationOutcomeEstimate { probability_ppm: 999_999, posterior_decision_loss_ppm: 100_000 }],
+            vec![ObservationOutcomeEstimate {
+                probability_ppm: 999_999,
+                posterior_decision_loss_ppm: 100_000,
+            }],
         );
         assert!(plan_active_sensing_actions(context(), &[invalid]).is_err());
 
@@ -613,14 +706,20 @@ mod tests {
             ActiveSensingActionKind::SampleNow,
             cost(100, 10, 100, 10, 0, 0),
             100,
-            vec![ObservationOutcomeEstimate { probability_ppm: 1_000_000, posterior_decision_loss_ppm: 100_000 }],
+            vec![ObservationOutcomeEstimate {
+                probability_ppm: 1_000_000,
+                posterior_decision_loss_ppm: 100_000,
+            }],
         );
         let b = action(
             "a",
             ActiveSensingActionKind::SampleNow,
             cost(100, 10, 100, 10, 0, 0),
             100,
-            vec![ObservationOutcomeEstimate { probability_ppm: 1_000_000, posterior_decision_loss_ppm: 100_000 }],
+            vec![ObservationOutcomeEstimate {
+                probability_ppm: 1_000_000,
+                posterior_decision_loss_ppm: 100_000,
+            }],
         );
         assert!(plan_active_sensing_actions(context(), &[a, b]).is_err());
     }
@@ -632,12 +731,10 @@ mod tests {
             ActiveSensingActionKind::SampleNow,
             cost(100, 10, 100, 10, 0, 0),
             100,
-            vec![
-                ObservationOutcomeEstimate {
-                    probability_ppm: 1_000_000,
-                    posterior_decision_loss_ppm: 100_000,
-                },
-            ],
+            vec![ObservationOutcomeEstimate {
+                probability_ppm: 1_000_000,
+                posterior_decision_loss_ppm: 100_000,
+            }],
         );
         let mut invalid_context = context();
         invalid_context.calibration_receipt_sha256 = [0; 32];
