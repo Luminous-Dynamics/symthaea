@@ -18,21 +18,11 @@ use serde::{Deserialize, Serialize};
 
 use crate::mycelial_active_sensing::{
     MYCELIAL_ACTIVE_SENSING_SCHEMA_VERSION, MycelialAcquisitionAction,
-    MycelialAcquisitionActionKind, MycelialAcquisitionDecision, MycelialAcquisitionOutcome,
-    MycelialActiveSensingReport, MycelialHypothesisLikelihood, MycelialHypothesisLoss,
-    evaluate_mycelial_active_sensing,
+    MycelialAcquisitionActionKind, MycelialAcquisitionDecision, MycelialActiveSensingReport,
 };
-use crate::mycelial_fusion_counterfactual::{
-    MycelialFusionBridgeLengthBasis, MycelialFusionCandidate, MycelialFusionTarget,
-};
-use crate::mycelial_graph_hypothesis_posterior::{
-    MycelialGraphHypothesisPosterior, evaluate_mycelial_graph_hypothesis_posterior,
-};
-use crate::mycelial_reconstruction_metrics::{
-    AnnotatedHyphaSegment, AnnotatedJunction, AnnotatedJunctionKind, AnnotatedMycelialSkeleton,
-    MYCELIAL_RECONSTRUCTION_SCHEMA_VERSION, ReconstructionDimensionality, ReconstructionLengthUnit,
-    ReconstructionPoint3,
-};
+use crate::mycelial_fusion_counterfactual::MycelialFusionCandidate;
+use crate::mycelial_graph_hypothesis_posterior::MycelialGraphHypothesisPosterior;
+use crate::mycelial_reconstruction_metrics::AnnotatedMycelialSkeleton;
 
 pub const MYCELIAL_SAMPLE_HEALTH_BUDGET_SCHEMA_VERSION: u16 = 1;
 pub const MAX_MYCELIAL_HEALTH_BUDGET_ACTIONS: usize = 64;
@@ -1516,7 +1506,18 @@ pub fn mycelial_sample_health_budget_report_digest(
 mod tests {
     use super::*;
     use crate::mycelial_active_sensing::{
-        MycelialAcquisitionActionValue, MycelialAcquisitionOutcomeValue,
+        MycelialAcquisitionActionValue, MycelialAcquisitionOutcome,
+        MycelialAcquisitionOutcomeValue, MycelialHypothesisLikelihood, MycelialHypothesisLoss,
+        evaluate_mycelial_active_sensing,
+    };
+    use crate::mycelial_fusion_counterfactual::{
+        MycelialFusionBridgeLengthBasis, MycelialFusionTarget,
+    };
+    use crate::mycelial_graph_hypothesis_posterior::evaluate_mycelial_graph_hypothesis_posterior;
+    use crate::mycelial_reconstruction_metrics::{
+        AnnotatedHyphaSegment, AnnotatedJunction, AnnotatedJunctionKind,
+        MYCELIAL_RECONSTRUCTION_SCHEMA_VERSION, ReconstructionDimensionality,
+        ReconstructionLengthUnit, ReconstructionPoint3,
     };
 
     fn digest(character: char) -> String {
