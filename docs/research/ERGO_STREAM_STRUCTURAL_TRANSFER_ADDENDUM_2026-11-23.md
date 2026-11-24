@@ -300,24 +300,27 @@ The separate Symtropy protocol now defines this next step:
 
 It covers measurement time versus arrival time, asynchronous and irregular sampling, delayed/missing observations, clock calibration, hybrid guards/resets, impact/contact events, uncertainty decomposition, held-out trajectory and event-time metrics, and matched continuous-time baselines (CfC, LTC, neural ODE/continuous recurrent, discrete recurrent, sequence transformer and domain-appropriate system identification).
 
-The current #7173 Rust witnesses now cover:
+The current #7173 Rust witnesses now cover the following finite contracts:
 - total finite structural isomorphism;
 - scope-aware induced and subgraph embeddings with explicit selected/excluded entities;
-- deterministic finite action-conditioned transition commutation.
+- deterministic finite action-conditioned transition commutation;
+- congruence-checked finite quotients of deterministic transition systems;
+- finite labelled-transition-system simulation and bisimulation with nondeterministic outcomes and many-to-many state relations;
+- exact finite decision-value / EVSI calculation separate from mutual information.
 
-The standalone `scoped_transfer_proposal_v0.schema.json` binds source/target episode IDs and evidence-prefix hashes without mutating the strict AgentEpisode v0 wire protocol. Homomorphism, quotient/coarse-graining, simulation, bisimulation and approximate variants remain separate work under Symtropy #7230.
+The sidecar schemas bind candidate transfer artifacts to the original AgentSubmission digest, source/target episode IDs and evidence-prefix hashes without mutating the strict AgentEpisode v0 wire protocol. The quotient validator is a one-system abstraction witness; it does not yet validate target-side quotient transfer or preserve task-specific observables/rewards. Simulation and bisimulation are scope-limited finite LTS witnesses; probabilistic, weak, approximate and continuous-time variants remain future work under Symtropy #7230 and the continuous-dynamics protocol.
 
-These are conformance validators. They do not implement CfC/LTC dynamics, continuous ODE/DAE/PDE execution, contact simulation, or a continuous-time equivalence proof. The next meaningful implementation is an adapter from existing AV-STREAM / physics interfaces into the continuous protocol, not a duplicate simulator.
+The exact combined Symtropy #7173 code head `9735f9f7ddaabce19b75a96a0e97783d3cc04a9d` passed focused Rust 1.96 formatting, 86 unit tests plus doctests, and strict Clippy in workflow [#45296666519](https://github.com/Luminous-Dynamics/symtropy/actions/runs/45296666519). This qualifies the finite microcosm crate only. It does not implement CfC/LTC dynamics, continuous ODE/DAE/PDE execution, contact simulation, production #11171 integration, or a continuous-time equivalence proof. The next meaningful implementation is the learned-policy/owner-side adapter from existing AV-STREAM and finite scientific episodes—not a duplicate simulator.
 
 ## 8. Execution order
 
 **P0 — close the transfer contract**
 - Land or revise the Symtropy #7173 witness validator after exact-head format/test/Clippy.
-- Use the v0.2 scoped witness for induced/subgraph embeddings; keep v0.1 full isomorphism strict. Track homomorphism, quotient, simulation and bisimulation independently in Symtropy #7230.
+- Use the v0.2 scoped witness for induced/subgraph embeddings; keep v0.1 full isomorphism strict. Finite quotient, simulation and bisimulation witnesses now exist; #7230 continues with homomorphism, quotient-to-target transfer, weak/probabilistic/approximate behaviour and stronger independent oracles.
 - Add paired-world generation with one invariant, one equivariant and one false-analogy pair.
 
 **P0 — baseline before complexity**
-- Retain the fixed segmentation/passive and unique-incidence baselines already added; next add strong VF2-style/graph-edit solvers and the optional #11171 structural-transfer sidecar adapter.
+- Retain the fixed segmentation/passive and unique-incidence baselines already added; next add strong VF2-style/graph-edit solvers and integrate the optional evidence-bound structural/behavioural transfer bundle into the #11171 research-policy adapter.
 - Freeze structural snapshots before the evaluator releases hidden intervention outcomes.
 - Add leakage negatives and non-identifiability controls.
 
@@ -327,8 +330,8 @@ These are conformance validators. They do not implement CfC/LTC dynamics, contin
 - Do not make the hybrid the default winner.
 
 **P1 — active transfer**
-- Add ACDB-compatible interventions and expected-value-of-discrimination acquisition.
-- Test when a learner should ask, stop, abstain or retract.
+- Use the exact finite EVSI oracle as a decision-value known-answer baseline; add ACDB-compatible interventions and expected-value-of-discrimination acquisition through the existing #5476/#5478/#8721 owners. Do not create a second scheduler.
+- Test when a learner should ask, stop, abstain or retract; compare mutual-information, disagreement, learning-progress and net-EVSI selection under matched cost.
 - Record intervention receipts and all rejected / over-budget actions.
 
 **P2 — multimodal and physical qualification**
