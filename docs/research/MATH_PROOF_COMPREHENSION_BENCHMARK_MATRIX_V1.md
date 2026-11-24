@@ -375,3 +375,19 @@ This is distinct from:
 - formal theorem proving pass@k or LLM proof-grader scores.
 
 **Prospective gates:** ≥25% explanation-token reduction, immediate comprehension non-inferiority within 5 percentage points, ≥95% side-condition coverage, zero observed false mathematical claims in the frozen set, and +10 percentage points delayed cross-family transfer as a stretch target. No MSE or human-transfer result has been collected.
+
+
+## 11. Executable finite metamorphic contract (2026-11-24)
+
+The initial finite-only implementation is now present in `scripts/research/proof-plan-contract/src/metamorphic.rs` with CLI `math-metamorphic` and versioned schema/fixtures:
+- `MATH_METAMORPHIC_PAIR_V1.schema.json`
+- `MATH_METAMORPHIC_PAIR_V1.json`
+
+The three synthetic controls cover:
+1. a semantics-preserving rewrite of implication as disjunction with negation;
+2. removal of a hypothesis that changes a modus-ponens sequent's finite semantic relation;
+3. a proof-route-only change with the same exact sequent digest and distinct route receipts.
+
+The Rust validator recomputes typed sequent digests, derives the two-way finite entailment relation, enforces transformation-class consistency, and serializes candidate inputs separately from evaluator-only labels. It is limited to the Boolean AST and its 16-atom budget.
+
+**Status:** implementation and fixtures committed; exact-head execution pending. No Lean kernel result, model evaluation, human review or empirical CIRR result is claimed. See protocol [MATH_METAMORPHIC_V1.md](MATH_METAMORPHIC_V1.md) and issue [#13547](https://github.com/Luminous-Dynamics/symthaea/issues/13547).
