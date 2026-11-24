@@ -6,6 +6,8 @@ on:
       - research/sym-rsi-asb-adapter-v0
     paths:
       - "tools/sym-rsi-asb-adapter-reference/**"
+      - "docs/research/adapters/SYM_RSI_ASB_COMPATIBILITY_MANIFEST_V0_2026-11-07.json"
+      - "docs/research/adapters/SYM_RSI_ASB_COMPATIBILITY_MANIFEST_V0_2026-11-07.json"
       - ".github/workflows/sym-rsi-asb-adapter.yml"
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
