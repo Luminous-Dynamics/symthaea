@@ -18,6 +18,7 @@ import unittest
 from memory_modules.mace_lmev2_memory import (
     MAX_SCREENSHOT_BYTES,
     MaceLongMemEvalV2Memory,
+    _RETRIEVAL_MODE_PROFILES,
 )
 
 
@@ -36,6 +37,10 @@ class MaceLongMemEvalV2IngressTests(unittest.TestCase):
         memory.retrieval_trace_dir = root / "workspace" / "retrieval_traces"
         memory.retrieval_trace_dir.mkdir(mode=0o700, parents=True)
         memory.domain = "web"
+        memory.retrieval_mode = "hybrid_rrf"
+        memory.retrieval_profile = dict(_RETRIEVAL_MODE_PROFILES["hybrid_rrf"])
+        memory.backend_id = str(memory.retrieval_profile["backend_id"])
+        memory.retrieval_mode_label = str(memory.retrieval_profile["retrieval_mode_label"])
         return memory
 
     def trajectory(self, screenshot: str) -> dict[str, object]:
@@ -250,7 +255,7 @@ class MaceLongMemEvalV2IngressTests(unittest.TestCase):
                 "record_type": "candidate_evidence",
                 "run_id": memory.run_id,
                 "candidate_id": "opaque-invocation-1",
-                "backend_id": "mace_lmev2_hybrid_rrf_bm25_entity",
+                "backend_id": memory.backend_id,
                 "backend_revision_sha256": memory.backend_revision_sha256,
                 "query_scope": "longmemeval-v2:domain:web",
                 "query_purpose": "benchmark:memory-context",
@@ -270,13 +275,19 @@ class MaceLongMemEvalV2IngressTests(unittest.TestCase):
             candidate_jsonl = json.dumps(candidate, sort_keys=True, separators=(",", ":"))
             candidate_set_sha256 = memory._candidate_set_digest_from_records([candidate])
             response = {
-                "retrieval_mode": "hybrid_bm25_entity_literal_with_original_image_evidence",
+                "retrieval_mode": memory.retrieval_mode_label,
                 "candidate_evidence_jsonl": candidate_jsonl,
                 "candidate_record_count": 1,
                 "candidate_set_sha256": candidate_set_sha256,
             }
-            invalid_mode = dict(response, retrieval_mode="text_bm25_with_original_image_evidence")
-            with self.assertRaisesRegex(RuntimeError, "does not match the pinned hybrid backend profile"):
+            invalid_mode = dict(
+                response,
+                retrieval_mode="bm25_only_with_original_image_evidence",
+            )
+            with self.assertRaisesRegex(
+                RuntimeError,
+                "does not match the pinned retrieval backend profile",
+            ):
                 memory._persist_candidate_envelope(
                     "opaque-invocation-1", query, invalid_mode
                 )
@@ -371,6 +382,7 @@ class MaceLongMemEvalV2IngressTests(unittest.TestCase):
                 "opaque-invocation",
                 "query",
                 {
+                    "retrieval_mode": memory.retrieval_mode_label,
                     "candidate_evidence_jsonl": "",
                     "candidate_record_count": 0,
                     "candidate_set_sha256": None,
@@ -395,6 +407,7 @@ class MaceLongMemEvalV2IngressTests(unittest.TestCase):
             query_sha256 = hashlib.sha256(query.encode("utf-8")).hexdigest()
 
             candidate_response = {
+                "retrieval_mode": memory.retrieval_mode_label,
                 "candidate_evidence_jsonl": "",
                 "candidate_record_count": 0,
                 "candidate_set_sha256": None,
