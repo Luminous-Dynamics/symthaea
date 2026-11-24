@@ -67,24 +67,25 @@ It does not authenticate the pairing receipt bytes. The trusted launcher must va
 
 ## Tests
 
-Seventeen deterministic Rust tests cover:
+Eighteen deterministic Rust tests cover:
 1. bimodal effect distribution with zero mean but nonzero sign ambiguity;
 2. draw-ID mismatch between siblings;
 3. draw-digest mismatch between siblings;
 4. fixed actual branch evidence reused across draws;
 5. realized-effect drift across draws;
-6. application-time drift across draws;
-7. source run-ID drift across draws;
-8. exact PPM weight-sum enforcement;
-9. duplicate draw-ID rejection;
-10. duplicate draw-digest rejection;
-11. posterior draws not inflating individual count;
-12. model-profile drift rejection;
-13. typed non-application propagation;
-14. latent and rollout distributions remaining distinct;
-15. exact weighted mean and error numerators;
-16. canonical output under reordered individual/draw input;
-17. empty draw-set rejection.
+6. common-mode branch utility shifts that leave the effect unchanged;
+7. application-time drift across draws;
+8. source run-ID drift across draws;
+9. exact PPM weight-sum enforcement;
+10. duplicate draw-ID rejection;
+11. duplicate draw-digest rejection;
+12. posterior draws not inflating individual count;
+13. model-profile drift rejection;
+14. typed non-application propagation;
+15. latent and rollout distributions remaining distinct;
+16. exact weighted mean and error numerators;
+17. canonical output under reordered individual/draw input;
+18. empty draw-set rejection.
 
 These tests are authored in source. No Rust test/format/Clippy result is claimed until the exact-head workflow completes successfully.
 
