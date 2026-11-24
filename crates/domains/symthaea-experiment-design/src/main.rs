@@ -130,7 +130,7 @@ fn print_usage() {
     println!("Ranks candidate interventions from explicit rival-model predictions.");
     println!("  --demo              run the bundled synthetic Galileo screening fixture");
     println!("  --covariance-demo   run the synthetic covariance/redundancy known-answer control");
-    println!("  --covariance        read a covariance-design-v0.1 JSON request from stdin");
+    println!("  --covariance        read a joint-covariance-design-v0.2 JSON request from stdin");
     println!("  --help              show this help");
     println!("  no args             read a physics-experiment-design-v0.1 JSON request from stdin");
     println!(
