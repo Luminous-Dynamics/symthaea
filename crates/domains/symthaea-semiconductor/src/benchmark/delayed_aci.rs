@@ -1252,7 +1252,7 @@ mod tests {
     }
 
     #[test]
-    fn full_and_empty_intervals_force_their_defined_miss_indicators() {
+    fn full_and_empty_intervals_resolve_without_physical_labels() {
         let mut full_engine = engine(1);
         full_engine.phase_alphas[0] = -0.05;
         begin_delayed_aci_round_v1(&mut full_engine, 0).unwrap();
@@ -1262,18 +1262,10 @@ mod tests {
         )
         .unwrap();
         begin_delayed_aci_round_v1(&mut full_engine, 1).unwrap();
-        let full = delivery(
-            ("sample-0", "event-0", "label-0"),
-            1,
-            1,
-            1.0e9,
-            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
-            LabelEvidenceFrontierV1::CurrentAtK1,
-        );
-        assert_eq!(
-            deliver_delayed_aci_label_v1(&mut full_engine, &full).unwrap().miscoverage_observed,
-            Some(false)
-        );
+        let full = resolve_degenerate_aci_interval_v1(&mut full_engine, "sample-0").unwrap();
+        assert!(!full.miscoverage_observed);
+        assert_eq!(full.interval_kind, AciIntervalKindV1::FullRealLine);
+        assert!(full_engine.pending_predictions.is_empty());
 
         let mut empty_engine = engine(1);
         empty_engine.phase_alphas[0] = 1.05;
@@ -1284,18 +1276,20 @@ mod tests {
         )
         .unwrap();
         begin_delayed_aci_round_v1(&mut empty_engine, 1).unwrap();
-        let empty = delivery(
-            ("sample-0", "event-0", "label-0"),
-            1,
-            1,
-            10.0,
-            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
-            LabelEvidenceFrontierV1::CurrentAtK1,
-        );
-        assert_eq!(
-            deliver_delayed_aci_label_v1(&mut empty_engine, &empty).unwrap().miscoverage_observed,
-            Some(true)
-        );
+        let empty = resolve_degenerate_aci_interval_v1(&mut empty_engine, "sample-0").unwrap();
+        assert!(empty.miscoverage_observed);
+        assert_eq!(empty.interval_kind, AciIntervalKindV1::Empty);
+        assert!(empty_engine.pending_predictions.is_empty());
+    }
+
+    #[test]
+    fn bounded_interval_cannot_use_label_free_resolution() {
+        let mut engine = engine(1);
+        begin_and_issue(&mut engine, 0, AciPredictionIntervalV1::bounded(9.0, 11.0));
+        begin_delayed_aci_round_v1(&mut engine, 1).unwrap();
+        assert!(resolve_degenerate_aci_interval_v1(&mut engine, "sample-0").is_err());
+        assert_eq!(engine.phase_alphas, vec![0.10]);
+        assert!(engine.pending_predictions.contains_key(&0));
     }
 
     #[test]
