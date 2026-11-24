@@ -36,6 +36,7 @@ const MAX_BODY_BYTES: usize = 48 * 1024 * 1024;
 const MAX_MESSAGES: usize = 20;
 const MAX_IMAGE_BYTES: usize = 10 * 1024 * 1024;
 const MAX_REQUEST_IMAGE_BYTES: usize = 30 * 1024 * 1024;
+const MAX_SEARCH_RESPONSE_IMAGE_BYTES: usize = 30 * 1024 * 1024;
 const MAX_TOP_K: usize = 100;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -158,12 +159,13 @@ struct SearchItem {
 }
 
 #[derive(Debug)]
-enum ApiError { BadRequest(&'static str), Unauthorized, Conflict, Unavailable, Internal }
+enum ApiError { BadRequest(&'static str), PayloadTooLarge, Unauthorized, Conflict, Unavailable, Internal }
 
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
         let (status, message) = match self {
             Self::BadRequest(m) => (StatusCode::UNPROCESSABLE_ENTITY, m),
+            Self::PayloadTooLarge => (StatusCode::PAYLOAD_TOO_LARGE, "Search response image payload exceeds 30 MiB"),
             Self::Unauthorized => (StatusCode::UNAUTHORIZED, "authentication required"),
             Self::Conflict => (StatusCode::UNPROCESSABLE_ENTITY, "request id is already bound to different content"),
             Self::Unavailable => (StatusCode::SERVICE_UNAVAILABLE, "storage outcome unavailable; retry with the same request id"),
@@ -285,6 +287,21 @@ fn validate_search(track: Track, request: &SearchRequest) -> Result<(), ApiError
     if request.options.as_ref().is_some_and(|values| values.iter().any(|value| value.trim().is_empty())) { return Err(ApiError::BadRequest("options must not contain empty strings")); }
     let image_bytes = validate_content(track, &request.query)?;
     if image_bytes > MAX_REQUEST_IMAGE_BYTES { return Err(ApiError::BadRequest("query image bytes exceed 30 MiB")); }
+    Ok(())
+}
+
+fn validate_search_response_image_budget(
+    track: Track,
+    items: &[SearchItem],
+    maximum_bytes: usize,
+) -> Result<(), ApiError> {
+    let mut total_image_bytes = 0usize;
+    for item in items {
+        total_image_bytes = total_image_bytes.saturating_add(validate_content(track, &item.content)?);
+        if total_image_bytes > maximum_bytes {
+            return Err(ApiError::PayloadTooLarge);
+        }
+    }
     Ok(())
 }
 
@@ -484,6 +501,11 @@ fn search_query(state: &AppState, request: SearchRequest) -> Result<SearchRespon
     let data = ranked.into_iter().take(request.top_k).map(|(score, candidate)| SearchItem {
         id: candidate.id, content: candidate.content, score, created_at: candidate.created_at,
     }).collect::<Vec<_>>();
+    validate_search_response_image_budget(
+        state.track,
+        &data,
+        MAX_SEARCH_RESPONSE_IMAGE_BYTES,
+    )?;
     let response = SearchResponse { data };
 
     // Persist only digests and opaque memory IDs: never store raw query text or
@@ -814,6 +836,23 @@ mod tests {
             top_k: 5,
         });
         assert!(matches!(result, Err(ApiError::Unavailable)));
+    }
+
+    #[test]
+    fn multimodal_search_response_enforces_aggregate_image_budget_without_truncation() {
+        let image = Content::Parts(vec![ContentPart::ImageUrl {
+            image_url: ImageUrl { url: "data:image/png;base64,iVBORw0KGgo=".into() },
+        }]);
+        let items = vec![
+            SearchItem { id: "m1".into(), content: image.clone(), score: 1.0, created_at: "2026-11-24T00:00:00Z".into() },
+            SearchItem { id: "m2".into(), content: image, score: 0.5, created_at: "2026-11-24T00:00:01Z".into() },
+        ];
+        assert!(validate_search_response_image_budget(Track::Multimodal, &items, 16).is_ok());
+        assert!(matches!(
+            validate_search_response_image_budget(Track::Multimodal, &items, 15),
+            Err(ApiError::PayloadTooLarge)
+        ));
+        assert_eq!(ApiError::PayloadTooLarge.into_response().status(), StatusCode::PAYLOAD_TOO_LARGE);
     }
 
     #[test]
