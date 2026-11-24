@@ -439,6 +439,10 @@ The benchmark must separate periodic from open / mixed boundary cohorts. Periodi
 
 The first fixtures are analytic seam continuity / derivative tests, global periodic translations, particle permutation, and exact split/merge equivalence. Only then compare trained field operators on Landau damping, two-stream, and open-boundary cohorts at matched architecture and compute budget.
 
+The implementation PR #13405 now includes `WeightedFourierMeasureEmbedding`, which computes normalized complex empirical-measure moments (m_k=\sum_i (w_i/\sum_j w_j)e^{i2\pi kx_i}). The primitive is invariant to particle permutations, exact co-located split/merge, and global weight rescaling; a torus translation rotates each moment by (e^{i2\pi k\delta}). It uses max-scaled weight normalization, compensated summation, and bounded particle/harmonic work. A known-answer fixture is in `benchmarks/plasma/topology-lifting/fixtures/weighted-fourier-measure-known-answer-v0.1.json`.
+
+A finite Fourier band is not injective: two different measures can share the same first (K) moments. Treat it as a compact weak-observable embedding, not a lossless microscopic representation. The next experiment is to compare moment bandwidth (K) against future-response distortion and KIRD bytes, especially high-k filament and echo probes.
+
 
 
 ## Kinetic Response Spectroscopy (KRS)
