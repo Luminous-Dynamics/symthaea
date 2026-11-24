@@ -69,7 +69,10 @@ pub struct SequentialOutcome {
     pub next_protocol_state_id: String,
 }
 
-/// One branch of an adaptive policy tree.
+/// One branch of an evaluator-side adaptive policy tree.
+///
+/// The possible-state support is hidden model information. Never serialize
+/// this branch or its support into a candidate-facing AgentView.
 #[derive(Clone, Debug, PartialEq)]
 pub struct SequentialPolicyBranch {
     pub outcome_id: String,
@@ -93,6 +96,9 @@ pub enum SequentialPolicyNode {
     },
 }
 
+/// Evaluator-only oracle output. Neither the policy tree nor its
+/// possible-state support sets may be disclosed to a candidate during a blind
+/// episode. This value is a reference for scoring, not an agent action.
 #[derive(Clone, Debug, PartialEq)]
 pub struct SequentialPolicyValue {
     pub worst_case_terminal_loss: f64,
