@@ -5,7 +5,8 @@ use sha2::{Digest, Sha256};
 
 use symthaea_semiconductor::benchmark::{
     DELAYED_ACI_DELIVERY_SCHEMA_V1, DELAYED_ACI_POLICY_SCHEMA_V1, DELAYED_ACI_PREDICTION_SCHEMA_V1,
-    DelayedAciLabelDeliveryV1, DelayedAciPolicyV1, DelayedAciPredictionInputV1,
+    DelayedAciDispositionV1, DelayedAciLabelDeliveryV1, DelayedAciPolicyV1,
+    DelayedAciPredictionInputV1, DelayedAciPredictionReceiptV1,
     LabelConsumptionEligibilityReportV1, LabelConsumptionEligibilityV1, LabelEvidenceFrontierV1,
     create_delayed_aci_engine_v1, deliver_delayed_aci_feedback_v1, issue_delayed_aci_prediction_v1,
 };
