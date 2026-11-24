@@ -345,6 +345,14 @@ fn update_digest(value: &DelayedAciUpdateReceiptV1) -> Result<String, DelayedAci
     json_sha256(&canonical)
 }
 
+fn degenerate_resolution_digest(
+    receipt: &AciDegenerateResolutionReceiptV1,
+) -> Result<String, DelayedAciErrorV1> {
+    let mut canonical = receipt.clone();
+    canonical.receipt_sha256.clear();
+    json_sha256(&canonical)
+}
+
 fn eligibility_report_digest(
     value: &LabelConsumptionEligibilityReportV1,
 ) -> Result<String, DelayedAciErrorV1> {
@@ -600,6 +608,92 @@ fn make_update_receipt(
         receipt_sha256: String::new(),
     };
     receipt.receipt_sha256 = update_digest(&receipt)?;
+    Ok(receipt)
+}
+
+/// Resolves a full-real-line or empty prediction set at its exact due round.
+/// The miss bit is determined by the issued set, so no physical label is
+/// required or fabricated. Bounded intervals must use qualified K1 feedback.
+pub fn resolve_degenerate_aci_interval_v1(
+    engine: &mut DelayedAciEngineV1,
+    sample_id: &str,
+) -> Result<AciDegenerateResolutionReceiptV1, DelayedAciErrorV1> {
+    validate_engine(engine)?;
+    require_text(sample_id, "sample_id")?;
+    let current_round = engine
+        .current_round
+        .ok_or_else(|| DelayedAciErrorV1("ACI round has not begun".into()))?;
+    let prediction = engine
+        .pending_predictions
+        .values()
+        .find(|item| item.sample_id == sample_id)
+        .cloned()
+        .ok_or_else(|| DelayedAciErrorV1("pending ACI prediction not found".into()))?;
+
+    if prediction.expected_delivery_round != current_round {
+        return Err(DelayedAciErrorV1(
+            "degenerate interval can only be resolved in its exact due round".into(),
+        ));
+    }
+    let misses = match prediction.interval.kind {
+        AciIntervalKindV1::FullRealLine => false,
+        AciIntervalKindV1::Empty => true,
+        AciIntervalKindV1::Bounded => {
+            return Err(DelayedAciErrorV1(
+                "bounded interval requires a qualified physical label".into(),
+            ));
+        }
+    };
+
+    let state_before = phase_state_digest(engine)?;
+    let alpha_before = engine.phase_alphas[prediction.phase as usize];
+    if alpha_before.to_bits() != prediction.alpha_at_issue.to_bits() {
+        return Err(DelayedAciErrorV1(
+            "phase alpha changed before degenerate resolution".into(),
+        ));
+    }
+    let error_value = if misses { 1.0 } else { 0.0 };
+    let alpha_after = alpha_before
+        + engine.policy.learning_rate * (engine.policy.target_miscoverage - error_value);
+    if !alpha_after.is_finite()
+        || alpha_after < -engine.policy.learning_rate - 1.0e-12
+        || alpha_after > 1.0 + engine.policy.learning_rate + 1.0e-12
+    {
+        return Err(DelayedAciErrorV1(
+            "degenerate ACI update escaped the theoretical phase bound".into(),
+        ));
+    }
+    let update_sequence = engine
+        .accepted_update_count
+        .checked_add(1)
+        .ok_or_else(|| DelayedAciErrorV1("ACI update count overflow".into()))?;
+
+    let mut next_engine = engine.clone();
+    next_engine.phase_alphas[prediction.phase as usize] = alpha_after;
+    next_engine.accepted_update_count = update_sequence;
+    next_engine.pending_predictions.remove(&prediction.round);
+    let state_after = phase_state_digest(&next_engine)?;
+    let mut receipt = AciDegenerateResolutionReceiptV1 {
+        schema: "luminous.semi-bench.delayed-aci-degenerate-resolution.v1".into(),
+        engine_id: engine.engine_id.clone(),
+        sample_id: prediction.sample_id,
+        measurement_event_id: prediction.measurement_event_id,
+        issued_round: prediction.round,
+        resolution_round: current_round,
+        phase: prediction.phase,
+        interval_kind: prediction.interval.kind,
+        miscoverage_observed: misses,
+        alpha_before,
+        alpha_after,
+        update_sequence,
+        calibration_state_before_sha256: state_before,
+        calibration_state_after_sha256: state_after,
+        receipt_sha256: String::new(),
+    };
+    receipt.receipt_sha256 = degenerate_resolution_digest(&receipt)?;
+    engine.phase_alphas = next_engine.phase_alphas;
+    engine.accepted_update_count = next_engine.accepted_update_count;
+    engine.pending_predictions = next_engine.pending_predictions;
     Ok(receipt)
 }
 
