@@ -3711,6 +3711,86 @@ mod tests {
     }
 
     #[test]
+    fn weighted_micro_projector_is_invariant_to_constraint_row_scaling() {
+        let values = [1.25, -2.0, 0.75, 3.0, -0.5];
+        let weights = [0.5, 1.0, 2.0, 1.5, 3.0];
+        let base_constraints = vec![
+            vec![1.0, 1.0, 1.0, 1.0, 1.0],
+            vec![-2.0, -1.0, 0.0, 1.0, 2.0],
+        ];
+        let scaled_constraints = vec![
+            base_constraints[0].iter().map(|value| value * 7.0).collect(),
+            base_constraints[1].iter().map(|value| value * -0.25).collect(),
+        ];
+        let base = project_weighted_micro_fluctuation(
+            &values,
+            &base_constraints,
+            &weights,
+            1.0e-10,
+        )
+        .unwrap();
+        let scaled = project_weighted_micro_fluctuation(
+            &values,
+            &scaled_constraints,
+            &weights,
+            1.0e-10,
+        )
+        .unwrap();
+        for (left, right) in base
+            .micro_fluctuation
+            .iter()
+            .zip(&scaled.micro_fluctuation)
+        {
+            assert!((left - right).abs() < 1.0e-9);
+        }
+    }
+
+    #[test]
+    fn weighted_micro_projector_correction_is_orthogonal_to_micro_nullspace() {
+        let values = [1.0, -2.0, 0.5, 3.0, -1.5];
+        let weights = [1.0, 2.0, 0.5, 3.0, 1.5];
+        let constraints = vec![
+            vec![1.0, 1.0, 1.0, 1.0, 1.0],
+            vec![-2.0, -1.0, 0.0, 1.0, 2.0],
+        ];
+        let result = project_weighted_micro_fluctuation(
+            &values,
+            &constraints,
+            &weights,
+            1.0e-10,
+        )
+        .unwrap();
+        let correction: Vec<f64> = result
+            .micro_fluctuation
+            .iter()
+            .zip(values)
+            .map(|(projected, original)| projected - original)
+            .collect();
+        let micro_tangent = [0.0, 1.0, -2.0, 1.0, 0.0];
+        let weighted_inner_product = correction
+            .iter()
+            .zip(micro_tangent)
+            .zip(weights)
+            .map(|((delta, tangent), weight)| delta * tangent * weight)
+            .sum::<f64>();
+        assert!(weighted_inner_product.abs() < 1.0e-9);
+    }
+
+    #[test]
+    fn weighted_micro_projector_rejects_nearly_dependent_constraints() {
+        let values = [1.0, -1.0, 2.0, 0.5];
+        let weights = [1.0, 1.0, 1.0, 1.0];
+        let constraints = vec![
+            vec![1.0, 1.0, 1.0, 1.0],
+            vec![1.0, 1.0 + 1.0e-14, 1.0, 1.0],
+        ];
+        assert_eq!(
+            project_weighted_micro_fluctuation(&values, &constraints, &weights, 1.0e-10),
+            Err(ContractError::InvalidProjectionBasis)
+        );
+    }
+
+    #[test]
     fn weighted_micro_projector_rejects_dependent_constraints() {
         let values = [1.0, 2.0, 3.0];
         let weights = [1.0, 1.0, 1.0];
