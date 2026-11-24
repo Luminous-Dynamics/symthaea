@@ -860,7 +860,7 @@ mod tests {
 
     #[test]
     fn actual_branch_run_id_drift_across_draws_rejects() {
-        let mut second = make_draw(1, 101, 2, 52, 500_000, 2, 1, 1);
+        let mut second = make_draw(1, 101, 2, 52, 500_000, (2, 1, 1));
         second.baseline.branch.run_id = 5_111;
         let input = cohort(vec![
             make_draw(1, 101, 1, 51, 500_000, (2, 1, 1)),
@@ -879,8 +879,8 @@ mod tests {
     #[test]
     fn posterior_weights_must_sum_to_one_million_ppm() {
         let input = cohort(vec![
-            make_draw(1, 101, 1, 51, 400_000, 2, 1, 1),
-            make_draw(1, 101, 2, 52, 400_000, 2, 3, 3),
+            make_draw(1, 101, 1, 51, 400_000, (2, 1, 1)),
+            make_draw(1, 101, 2, 52, 400_000, (2, 3, 3)),
         ]);
         let error = evaluate_posterior_individual_cohort(&input).unwrap_err();
         assert_eq!(
@@ -893,7 +893,7 @@ mod tests {
     fn duplicate_posterior_draw_id_rejects() {
         let input = cohort(vec![
             make_draw(1, 101, 1, 51, 500_000, (2, 1, 1)),
-            make_draw(1, 101, 1, 52, 500_000, 2, 3, 3),
+            make_draw(1, 101, 1, 52, 500_000, (2, 3, 3)),
         ]);
         let error = evaluate_posterior_individual_cohort(&input).unwrap_err();
         assert_eq!(
