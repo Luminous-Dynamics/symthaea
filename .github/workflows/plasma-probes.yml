@@ -107,6 +107,10 @@ jobs:
             "${tmp_root}/benchmarks/plasma/control-interface/"
           cp benchmarks/plasma/control-interface/fixtures/synthetic-multirate-interface-v0.1.json \
             "${tmp_root}/benchmarks/plasma/control-interface/fixtures/"
+          cp benchmarks/plasma/control-interface/scalar-unstable-mode-contract-v0.1.schema.json \
+            "${tmp_root}/benchmarks/plasma/control-interface/"
+          cp benchmarks/plasma/control-interface/fixtures/scalar-unstable-mode-known-answer-v0.1.json \
+            "${tmp_root}/benchmarks/plasma/control-interface/fixtures/"
           cp benchmarks/plasma/adaptive-refinement/refinement-policy-contract-v0.1.schema.json \
             "${tmp_root}/benchmarks/plasma/adaptive-refinement/"
           cp benchmarks/plasma/adaptive-refinement/fixtures/synthetic-refinement-cases-v0.1.json \
@@ -345,6 +349,28 @@ jobs:
           manifest="${RUNNER_TEMP}/plasma-probe-validation/crates/domains/symthaea-plasma-probes/Cargo.toml"
           fixture="${RUNNER_TEMP}/plasma-probe-validation/benchmarks/plasma/control-interface/fixtures/synthetic-multirate-interface-v0.1.json"
           cargo run --locked --manifest-path "$manifest" --bin sensor_actuator_contract_audit -- "$fixture"
+
+      - name: Validate scalar unstable-mode authority Draft 2020-12 contract
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path("${{ runner.temp }}/plasma-probe-validation/benchmarks/plasma/control-interface")
+          schema = json.loads((root / "scalar-unstable-mode-contract-v0.1.schema.json").read_text())
+          fixture = json.loads((root / "fixtures/scalar-unstable-mode-known-answer-v0.1.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(fixture)
+          known = fixture["known_answers"]
+          assert known["observation_sample_count"] == 5
+          assert known["actuator_command_count"] == 5
+          assert abs(known["observability_fisher_information"] - 2082.4542913757846) < 1e-9
+          assert abs(known["controllability_gramian"] - 1.3015339321098656) < 1e-12
+          assert known["mode_interface_qualified"] is True
+          assert fixture["claim_boundary"]["no_closed_loop_stability_claim"] is True
+          print("scalar_unstable_mode_schema_validation=PASS")
+          PY
 
       - name: Run strict Clippy
         run: cargo clippy --locked --manifest-path "${RUNNER_TEMP}/plasma-probe-validation/crates/domains/symthaea-plasma-probes/Cargo.toml" --all-targets -- -D warnings
