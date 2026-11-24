@@ -56,7 +56,6 @@ The official harness then discovers the mode-neutral `mace_lmev2_retrieval_ablat
   "memory_type": "mace_lmev2_retrieval_ablation_v1",
   "memory_params": {
     "retrieval_mode": "hybrid_rrf",
-  "memory_params": {
     "sidecar_binary": "/absolute/path/to/mace_lmev2_stdio",
     "source_screenshot_root": "/absolute/path/to/trajectory_screenshot_assets",
     "workspace_dir": "/absolute/path/to/mace_lmev2_workspace",
