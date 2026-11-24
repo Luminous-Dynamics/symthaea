@@ -33,13 +33,42 @@ jobs:
           components: clippy, rustfmt
       - name: Verify shared Galileo handoff fixture fingerprint
         run: test "$(git hash-object crates/domains/symthaea-experiment-design/fixtures/galileo-discrimination-v0.1.json)" = "0548cf58562517e69c93e5f810bfee822acee1a2"
+      - name: Verify covariance redundancy fixture fingerprint
+        run: test "$(git hash-object crates/domains/symthaea-experiment-design/fixtures/covariance-redundancy-v0.1.json)" = "1b8be1ebaf84e51bffcde02ccd7996c5156cc444"
       - name: Check planner formatting
         run: cargo fmt --package symthaea-experiment-design -- --check
+      - name: Reconcile workspace lockfile and preserve exact diff
+        shell: bash
+        run: |
+          cp Cargo.lock /tmp/Cargo.lock.before
+          cargo metadata --format-version 1 > /dev/null
+          cp Cargo.lock Cargo.lock.after
+          git diff -- Cargo.lock > Cargo.lock.workspace.patch || true
+          if cmp -s /tmp/Cargo.lock.before Cargo.lock.after; then
+            echo "Cargo.lock already matches the repaired workspace."
+          else
+            echo "::warning::Workspace membership changed Cargo.lock; the updated file and exact patch will be uploaded for review."
+          fi
       - name: Run planner tests with locked dependencies
         run: cargo test --locked -p symthaea-experiment-design
       - name: Run Clippy on planner targets
         run: cargo clippy --locked -p symthaea-experiment-design --all-targets -- -D warnings
       - name: Run bundled Galileo discrimination demo
         run: cargo run --locked -p symthaea-experiment-design -- --demo
+      - name: Run covariance redundancy control
+        run: cargo run --locked -p symthaea-experiment-design -- --covariance-demo
+      - name: Exercise covariance JSON input/output contract
+        run: cargo run --locked --quiet -p symthaea-experiment-design -- --covariance < crates/domains/symthaea-experiment-design/fixtures/covariance-redundancy-v0.1.json
       - name: Exercise JSON input/output contract
         run: cargo run --locked --quiet -p symthaea-experiment-design < crates/domains/symthaea-experiment-design/fixtures/galileo-discrimination-v0.1.json
+      - name: Upload workspace lockfile reconciliation
+        if: always() && hashFiles('Cargo.lock.after') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: experiment-design-workspace-lockfile
+          path: |
+            Cargo.lock.after
+            Cargo.lock.workspace.patch
+          if-no-files-found: error
+      - name: Require lockfile change to be committed
+        run: git diff --exit-code -- Cargo.lock

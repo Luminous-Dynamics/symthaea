@@ -115,20 +115,38 @@ pub enum PlanError {
     UnsupportedSchema(String),
     EmptyTarget,
     TooFewHypotheses,
-    InvalidIdentifier { kind: String },
-    DuplicateIdentifier { kind: String, id: String },
+    InvalidIdentifier {
+        kind: String,
+    },
+    DuplicateIdentifier {
+        kind: String,
+        id: String,
+    },
     NoExperiments,
-    InvalidExperimentDescription { experiment_id: String },
-    NoSettings { experiment_id: String },
-    DuplicateSetting { experiment_id: String, parameter_id: String },
+    InvalidExperimentDescription {
+        experiment_id: String,
+    },
+    NoSettings {
+        experiment_id: String,
+    },
+    DuplicateSetting {
+        experiment_id: String,
+        parameter_id: String,
+    },
     InvalidParameterSetting {
         experiment_id: String,
         parameter_id: String,
         reason: String,
     },
-    InvalidCost { experiment_id: String },
-    InvalidDuration { experiment_id: String },
-    NoObservables { experiment_id: String },
+    InvalidCost {
+        experiment_id: String,
+    },
+    InvalidDuration {
+        experiment_id: String,
+    },
+    NoObservables {
+        experiment_id: String,
+    },
     DuplicateObservable {
         experiment_id: String,
         observable_id: String,
@@ -165,7 +183,9 @@ pub enum PlanError {
         hypothesis_id: String,
         reason: String,
     },
-    NonFiniteScore { experiment_id: String },
+    NonFiniteScore {
+        experiment_id: String,
+    },
 }
 
 impl Display for PlanError {
@@ -180,13 +200,25 @@ impl Display for PlanError {
             }
             Self::NoExperiments => write!(f, "at least one candidate experiment is required"),
             Self::InvalidExperimentDescription { experiment_id } => {
-                write!(f, "experiment {experiment_id} needs a non-empty intervention description")
+                write!(
+                    f,
+                    "experiment {experiment_id} needs a non-empty intervention description"
+                )
             }
             Self::NoSettings { experiment_id } => {
-                write!(f, "experiment {experiment_id} needs at least one explicit setting")
+                write!(
+                    f,
+                    "experiment {experiment_id} needs at least one explicit setting"
+                )
             }
-            Self::DuplicateSetting { experiment_id, parameter_id } => {
-                write!(f, "experiment {experiment_id} repeats setting {parameter_id}")
+            Self::DuplicateSetting {
+                experiment_id,
+                parameter_id,
+            } => {
+                write!(
+                    f,
+                    "experiment {experiment_id} repeats setting {parameter_id}"
+                )
             }
             Self::InvalidParameterSetting {
                 experiment_id,
@@ -197,19 +229,37 @@ impl Display for PlanError {
                 "experiment {experiment_id}, setting {parameter_id}: invalid setting ({reason})"
             ),
             Self::InvalidCost { experiment_id } => {
-                write!(f, "experiment {experiment_id} needs finite positive cost_units")
+                write!(
+                    f,
+                    "experiment {experiment_id} needs finite positive cost_units"
+                )
             }
             Self::InvalidDuration { experiment_id } => {
-                write!(f, "experiment {experiment_id} needs finite non-negative duration_hours")
+                write!(
+                    f,
+                    "experiment {experiment_id} needs finite non-negative duration_hours"
+                )
             }
             Self::NoObservables { experiment_id } => {
                 write!(f, "experiment {experiment_id} has no predicted observables")
             }
-            Self::DuplicateObservable { experiment_id, observable_id } => {
-                write!(f, "experiment {experiment_id} repeats observable {observable_id}")
+            Self::DuplicateObservable {
+                experiment_id,
+                observable_id,
+            } => {
+                write!(
+                    f,
+                    "experiment {experiment_id} repeats observable {observable_id}"
+                )
             }
-            Self::InvalidObservableUnit { experiment_id, observable_id } => {
-                write!(f, "experiment {experiment_id}, observable {observable_id} needs a non-empty unit")
+            Self::InvalidObservableUnit {
+                experiment_id,
+                observable_id,
+            } => {
+                write!(
+                    f,
+                    "experiment {experiment_id}, observable {observable_id} needs a non-empty unit"
+                )
             }
             Self::DescriptorDigestMismatch {
                 experiment_id,
@@ -255,7 +305,10 @@ impl Display for PlanError {
                 "experiment {experiment_id}, observable {observable_id}, hypothesis {hypothesis_id}: invalid prediction ({reason})"
             ),
             Self::NonFiniteScore { experiment_id } => {
-                write!(f, "experiment {experiment_id} produced a non-finite separation score")
+                write!(
+                    f,
+                    "experiment {experiment_id} produced a non-finite separation score"
+                )
             }
         }
     }
@@ -581,7 +634,6 @@ fn validate_input(input: &ExperimentDesignInput) -> Result<(), PlanError> {
                     });
                 }
             }
-
         }
     }
     Ok(())
@@ -611,7 +663,10 @@ mod tests {
         );
         assert!(report.ranked_experiments[0].worst_case_separation_sigma > 60.0);
         assert!(
-            report.ranked_experiments[1].worst_case_separation_sigma.abs() < 1.0e-12
+            report.ranked_experiments[1]
+                .worst_case_separation_sigma
+                .abs()
+                < 1.0e-12
         );
     }
 
@@ -631,8 +686,7 @@ mod tests {
         let first = rank_experiments(&original).unwrap();
         let second = rank_experiments(&permuted).unwrap();
         assert_eq!(
-            first.ranked_experiments,
-            second.ranked_experiments,
+            first.ranked_experiments, second.ranked_experiments,
             "equivalent reordered input should not change the ranking or score"
         );
     }
@@ -673,10 +727,12 @@ mod tests {
             }
         }
         let report = rank_experiments(&input).unwrap();
-        assert!(report
-            .ranked_experiments
-            .iter()
-            .all(|experiment| experiment.worst_case_separation_sigma.abs() < 1.0e-12));
+        assert!(
+            report
+                .ranked_experiments
+                .iter()
+                .all(|experiment| experiment.worst_case_separation_sigma.abs() < 1.0e-12)
+        );
     }
 
     #[test]
@@ -716,7 +772,7 @@ mod tests {
 
     #[test]
     fn intervention_description_and_unit_bearing_settings_are_required() {
-        let mut input = galileo_demo_input();
+        let input = galileo_demo_input();
         let ranked = rank_experiments(&input).unwrap();
         assert_eq!(
             ranked.ranked_experiments[0].settings[0].parameter_id,
@@ -724,7 +780,11 @@ mod tests {
         );
         assert_eq!(ranked.ranked_experiments[0].settings[0].value, 4.0);
         assert_eq!(ranked.ranked_experiments[0].settings[0].unit, "s");
-        assert!(ranked.ranked_experiments[0].description.contains("four seconds"));
+        assert!(
+            ranked.ranked_experiments[0]
+                .description
+                .contains("four seconds")
+        );
 
         let mut input = galileo_demo_input();
         input.experiments[0].settings.clear();
@@ -763,8 +823,7 @@ mod tests {
             &valid.uncertainty_digest_sha256
         ));
 
-        input.experiments[0].observables[0].predictions[0].model_digest_sha256 =
-            "0".repeat(64);
+        input.experiments[0].observables[0].predictions[0].model_digest_sha256 = "0".repeat(64);
         assert!(matches!(
             rank_experiments(&input),
             Err(PlanError::DescriptorDigestMismatch {
@@ -818,3 +877,6 @@ mod tests {
         assert!(serialized.contains("not Bayesian expected information gain"));
     }
 }
+
+/// Covariance-aware experiment design with explicit singular-support handling.
+pub mod covariance;

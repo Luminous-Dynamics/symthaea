@@ -1,0 +1,291 @@
+{
+  "schema_version": "luminous-external-science-benchmark-snapshot-v0.1",
+  "snapshot_date": "2026-11-24",
+  "purpose": "Source-pinned comparison references for evidence-directed scientific discovery. Records describe external publications/leaderboards; none are Symthaea or Symtropy results.",
+  "global_rules": [
+    "Do not pool scores across benchmarks: task units, harnesses, graders, budgets and outcomes differ.",
+    "Separate official benchmark reproduction from custom adapters and synthetic controls.",
+    "Record exact benchmark version, model/harness, task set, run count, confidence intervals, failures and budget before making a superiority claim.",
+    "A provider-reported benchmark score is not an independent multi-provider leaderboard unless independent reproduction is available."
+  ],
+  "benchmarks": [
+    {
+      "id": "asbench-0.1",
+      "name": "Autonomous Science Bench",
+      "family": "closed_loop_experiment_design",
+      "version": "0.1",
+      "task_scope": {
+        "official_campaigns": 6,
+        "domains": [
+          "biology",
+          "chemistry",
+          "materials science"
+        ],
+        "trials_per_task": 3
+      },
+      "metrics": {
+        "primary": "joint campaign resolution",
+        "gates": [
+          "discovery on measured designs",
+          "learning/ranking on never-measured designs"
+        ],
+        "published_leading_configurations": [
+          {
+            "model": "GPT-6 Astra",
+            "harness": "Codex",
+            "resolution_percent": 72.2
+          },
+          {
+            "model": "Opus 5.5",
+            "harness": "Claude Code",
+            "resolution_percent": 66.7
+          }
+        ]
+      },
+      "qualification_notes": [
+        "A campaign resolves only when both discovery and learning gates pass.",
+        "Only three trials per task in the v0.1 pilot; benchmark authors caution that the 5.5-point leader gap is not statistically meaningful.",
+        "These are model+harness system results, not model-only capabilities.",
+        "Official v0.1 task set differs from extra tasks appearing in the upstream repository README."
+      ],
+      "symthaea_mapping": "Primary external Stage-B/closed-loop benchmark; use #10921 / PR #10947. Current Nuclease+Propylene adapter is a pilot, not full six-task reproduction.",
+      "sources": [
+        "https://asb.open-ssi.org/about",
+        "https://asb.open-ssi.org/run",
+        "https://github.com/Open-SSI/autonomous-science-bench",
+        "https://arxiv.org/abs/2610.18449"
+      ]
+    },
+    {
+      "id": "biobasicsbench-2026-11",
+      "name": "BioBasicsBench",
+      "family": "wet_lab_evidence_interpretation",
+      "version": "2026-11-06 announcement",
+      "task_scope": {
+        "tasks": 100,
+        "attempts_per_model_effort": 5,
+        "reported_model_effort_configurations": 37,
+        "total_answers": 18500
+      },
+      "metrics": {
+        "primary": "mean rubric reward",
+        "published_leading_configurations": [
+          {
+            "model": "GPT-6 Astra",
+            "effort": "xhigh",
+            "mean_reward_percent": 66.7,
+            "ci95_whole_task_bootstrap": [
+              60.3,
+              73.1
+            ]
+          },
+          {
+            "model": "GPT-6.1 Sol",
+            "effort": "xhigh",
+            "mean_reward_percent": 62,
+            "ci95_whole_task_bootstrap": [
+              55.6,
+              68.4
+            ]
+          },
+          {
+            "model": "GPT-5.6 Sol",
+            "effort": "xhigh",
+            "mean_reward_percent": 43.8,
+            "ci95_whole_task_bootstrap": [
+              37.6,
+              50
+            ]
+          }
+        ]
+      },
+      "qualification_notes": [
+        "Provider-reported OpenAI/Ligo evaluation, not an independent multi-provider leaderboard.",
+        "Public release announcement does not provide a third-party runnable task and grader package; direct reproduction is not claimed.",
+        "The task families include raw gels/blots, plate images, microscopy, instrument outputs, quantification and insufficient-evidence recognition."
+      ],
+      "symthaea_mapping": "Complementary evidence-interpretation scorecard; do not claim reproduction until task/rubric access is available. Use BIABench for open replication.",
+      "sources": [
+        "https://openai.com/index/measuring-how-ai-agents-handle-wet-lab-science/"
+      ]
+    },
+    {
+      "id": "biabench-v1.0",
+      "name": "BIABench",
+      "family": "bioimage_analysis_and_quality_control",
+      "version": "1.0",
+      "task_scope": {
+        "tasks": 16,
+        "subtasks": 11,
+        "runs_per_agent_task_pair_in_paper_protocol": 3
+      },
+      "metrics": {
+        "primary": "ground-truth outcome score",
+        "secondary": "analysis process / quality-control rubric",
+        "published_reliability_findings": {
+          "agent_task_pairs_with_run_score_range_over_0_2_percent": 40,
+          "run_to_run_variance_relative_to_agent_choice": 6,
+          "process_outcome_correlation_pearson": 0.29,
+          "process_outcome_correlation_excluding_near_zero": 0.09,
+          "expert_process_outcome_correlation_pearson": -0.03,
+          "hardest_some_3d_or_time_axis_tasks_best_agent_score_at_most": 0.19
+        }
+      },
+      "qualification_notes": [
+        "Outcome and process/QC scores are distinct and must not be collapsed.",
+        "Process score is not a correctness proxy: it has weak correlation with outcome.",
+        "Evaluation data are explicitly evaluation-only; do not train/fine-tune on evaluation.zip or re-host archives; preserve the canary.",
+        "The paper's run protocol uses v1.0, basic instructions, three runs per agent/task pair and its stated process judge.",
+        "Per-source dataset licenses still apply."
+      ],
+      "symthaea_mapping": "Open reproducible evidence-interpretation benchmark; issue #13473. Internal confirmatory extension should use at least 10 runs/task and report every denominator.",
+      "sources": [
+        "https://arxiv.org/abs/2609.34274",
+        "https://github.com/BIABench/BIABench",
+        "https://huggingface.co/datasets/BIABench/BIABench"
+      ]
+    },
+    {
+      "id": "labbench2-2026",
+      "name": "LABBench2",
+      "family": "biology_research_subtasks",
+      "version": "2026",
+      "task_scope": {
+        "approximate_tasks": 1900
+      },
+      "metrics": {
+        "primary": "per-subtask task performance",
+        "secondary": "tool/harness execution and evidence subskill performance"
+      },
+      "qualification_notes": [
+        "Broad biology research task suite; not a full multi-round laboratory campaign or raw-image analysis benchmark.",
+        "Keep task-family and subtask scores separate."
+      ],
+      "symthaea_mapping": "Complementary knowledge/evidence/task competence scorecard; use exact dataset and harness revisions.",
+      "sources": [
+        "https://arxiv.org/abs/2604.09554",
+        "https://github.com/EdisonScientific/labbench2",
+        "https://huggingface.co/datasets/futurehouse/labbench2"
+      ]
+    },
+    {
+      "id": "sciworkbench-2026-11",
+      "name": "SciWorkBench",
+      "family": "end_to_end_scientific_workflow",
+      "version": "2026-11-17 preprint",
+      "task_scope": {
+        "domains": [
+          "biology",
+          "chemistry",
+          "materials science",
+          "physics"
+        ]
+      },
+      "metrics": {
+        "primary": "best reported model+harness mean",
+        "published_best_mean": 57.38
+      },
+      "qualification_notes": [
+        "Score describes a model-plus-harness system, not a base-model capability constant.",
+        "Task procedures, multimodal evidence and scientific self-correction are distinct failure modes."
+      ],
+      "symthaea_mapping": "Full workflow comparator; require exact task/harness and budget match.",
+      "sources": [
+        "https://arxiv.org/abs/2611.22490"
+      ]
+    },
+    {
+      "id": "firebench-icml-2026",
+      "name": "FIRE-Bench",
+      "family": "verified_scientific_rediscovery",
+      "version": "ICML 2026",
+      "task_scope": {
+        "primary": "rediscover published findings with experimental design, execution and evidence-backed conclusion"
+      },
+      "metrics": {
+        "primary": "F1",
+        "published_best_tested_f1": 46.7
+      },
+      "qualification_notes": [
+        "High run-to-run variance; report repeated trials and outcome calibration.",
+        "Not directly comparable to EGB numerical residuals or AS-Bench resolution."
+      ],
+      "symthaea_mapping": "End-to-end rediscovery comparator; match benchmark version, harness and costs.",
+      "sources": [
+        "https://proceedings.mlr.press/v306/wang26d.html",
+        "https://firebench.github.io/"
+      ]
+    },
+    {
+      "id": "astabench-e2e-hard-spring-2026",
+      "name": "AstaBench E2E-Bench-Hard",
+      "family": "end_to_end_scientific_discovery",
+      "version": "Spring 2026 historical Asta v0 report",
+      "metrics": {
+        "primary": "exact perfect completion",
+        "historical_perfect_completion_percent": 3
+      },
+      "qualification_notes": [
+        "Historical 3% all-requirements perfect-completion result must not be conflated with later partial-completion rubric scores or leaderboard snapshots.",
+        "Reproduce the exact grader and benchmark snapshot before any current comparison."
+      ],
+      "symthaea_mapping": "End-to-end deliverable comparator; report perfect completion and partial rubric score separately.",
+      "sources": [
+        "https://allenai.org/asta/bench",
+        "https://allenai.org/blog/astabench-update-spring-2026"
+      ]
+    },
+    {
+      "id": "newtonbench-2026",
+      "name": "NewtonBench",
+      "family": "interactive_law_discovery",
+      "version": "2026",
+      "task_scope": {
+        "tasks": 324,
+        "physics_domains": 12
+      },
+      "metrics": {
+        "primary": "interactive law recovery under counterfactual shifts, probes, complexity and noise"
+      },
+      "qualification_notes": [
+        "Tool assistance can sometimes induce premature exploitation; tool access must be an ablation, not an assumed benefit."
+      ],
+      "symthaea_mapping": "Stage-A/Stage-B action-selection and mechanistic discovery benchmark.",
+      "sources": [
+        "https://arxiv.org/abs/2510.07172",
+        "https://github.com/HKUST-KnowComp/NewtonBench"
+      ]
+    },
+    {
+      "id": "kleihaus-kunz-radu-5d-egb-2023",
+      "name": "Phases of Rotating Black Objects in d=5 Einstein-Gauss-Bonnet Theory",
+      "family": "same_theory_numerical_physics",
+      "version": "2023",
+      "task_scope": {
+        "theory": "asymptotically flat 5D EGB",
+        "symmetry": "two equal-magnitude angular momenta",
+        "reported_numerical_points_approx": 1000
+      },
+      "metrics": {
+        "primary": "background branch, extremal near-horizon attractor consistency, charges and thermodynamics"
+      },
+      "qualification_notes": [
+        "Same background symmetry class is a closer physical comparator than generic high-curvature solver benchmarks.",
+        "A matching background branch does not validate Symtropy's spin-2 response operator, its derivatives, or endpoint Gram metrics.",
+        "Published scan is not an exact machine-readable benchmark or proof of branch completeness."
+      ],
+      "symthaea_mapping": "Primary physical reproduction/coverage comparator for the equal-spin EGB background; separate from response-map and agent-intelligence scorecards.",
+      "sources": [
+        "https://www.mdpi.com/2218-1997/9/4/156",
+        "https://doi.org/10.3390/universe9040156"
+      ]
+    }
+  ],
+  "prohibited_aggregations": [
+    "Do not average AS-Bench resolution, BIABench outcome/process, BioBasicsBench reward, SciWorkBench mean, FIRE-Bench F1 and EGB residuals into a composite SOTA score.",
+    "Do not equate a low physics residual with scientific-agent competence.",
+    "Do not equate a high process score with correct scientific measurements.",
+    "Do not equate high expected information gain with positive decision value.",
+    "Do not treat a provider-reported model leaderboard as an independent external replication."
+  ]
+}
