@@ -656,9 +656,10 @@ mod tests {
             ActiveSensingActionKind::SampleNow,
             cost(100, 10, 100, 10, 0, 0),
             100,
-            vec![
-                ObservationOutcomeEstimate { probability_ppm: 1_000_000, posterior_decision_loss_ppm: 100_000 },
-            ],
+            vec![ObservationOutcomeEstimate {
+                probability_ppm: 1_000_000,
+                posterior_decision_loss_ppm: 100_000,
+            }],
         );
         let mut plan = plan_active_sensing_actions(context(), &[useful]).unwrap();
         validate_active_sensing_plan_receipt(&plan).unwrap();
