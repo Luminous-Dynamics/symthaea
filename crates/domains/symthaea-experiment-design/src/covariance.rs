@@ -815,6 +815,57 @@ mod tests {
     }
 
     #[test]
+    fn jacobi_solver_reconstructs_a_deterministic_16_dimensional_psd_matrix() {
+        let n = 16;
+        let rank = 7;
+        let factor: Vec<Vec<f64>> = (0..n)
+            .map(|i| {
+                (0..rank)
+                    .map(|j| {
+                        let value = ((i + 1) * (j + 3) % 19) as f64;
+                        value / 19.0 + if i == j { 0.25 } else { 0.0 }
+                    })
+                    .collect()
+            })
+            .collect();
+        let mut covariance = vec![vec![0.0; n]; n];
+        for i in 0..n {
+            for j in i..n {
+                let value: f64 = factor[i]
+                    .iter()
+                    .zip(&factor[j])
+                    .map(|(left, right)| left * right)
+                    .sum();
+                covariance[i][j] = value;
+                covariance[j][i] = value;
+            }
+        }
+        let correlation = correlation_matrix(&covariance).unwrap();
+        let (eigenvalues, eigenvectors) = jacobi_symmetric_eigen(&correlation).unwrap();
+
+        let mut max_eigenpair_residual = 0.0_f64;
+        let mut max_orthogonality_error = 0.0_f64;
+        for i in 0..n {
+            for mode in 0..n {
+                let product: f64 = (0..n)
+                    .map(|j| correlation[i][j] * eigenvectors[j][mode])
+                    .sum();
+                max_eigenpair_residual =
+                    max_eigenpair_residual.max((product - eigenvalues[mode] * eigenvectors[i][mode]).abs());
+            }
+            for j in 0..n {
+                let dot: f64 = (0..n)
+                    .map(|mode| eigenvectors[mode][i] * eigenvectors[mode][j])
+                    .sum();
+                let expected = if i == j { 1.0 } else { 0.0 };
+                max_orthogonality_error = max_orthogonality_error.max((dot - expected).abs());
+            }
+        }
+        assert!(max_eigenpair_residual < 1.0e-10);
+        assert!(max_orthogonality_error < 1.0e-10);
+    }
+
+    #[test]
     fn derived_difference_covariance_is_exactly_symmetric_after_roundoff() {
         let joint = vec![
             vec![2.0, 0.3, 1.5, 0.2 + 1.0e-14],
