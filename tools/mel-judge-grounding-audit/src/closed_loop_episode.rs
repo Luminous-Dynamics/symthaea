@@ -264,6 +264,7 @@ fn reduce_episode(episode: &Episode) -> Result<EpisodeReport, String> {
     validate_receipt(&episode.decision.receipt, "decision.receipt")?;
     validate_receipt(&episode.capture.receipt, "capture.receipt")?;
     validate_receipt(&episode.observation.receipt, "observation.receipt")?;
+    require_text(&episode.disposition.actor_identity, "disposition.actor_identity")?;
     validate_digest(
         &episode.disposition.scope_sha256,
         "disposition.scope_sha256",
@@ -761,6 +762,14 @@ mod tests {
         assert!(report.capture_accounting_complete);
         assert!(report.effect_stage_reported.is_none());
         assert_eq!(report.action_disposition, ActionDisposition::Ignored);
+    }
+
+    #[test]
+    fn incomplete_capture_fixture_is_unobserved() {
+        let report = parse_and_reduce(UNOBSERVED).expect("valid incomplete fixture");
+        assert_eq!(report.observation_outcome, ObservationOutcome::Unobserved);
+        assert!(!report.capture_accounting_complete);
+        assert!(!report.observation_structurally_eligible);
     }
 
     #[test]
