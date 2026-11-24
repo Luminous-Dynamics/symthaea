@@ -671,3 +671,31 @@ These are deterministic semantic controls, not empirical abducible-share estimat
 Start with deterministic, branchable simulation formulations where the same individual can be restored and multiple interventions actually executed. The Okita paper's own formulation audit is instructive: its robosuite push formulation fails individual dependence (C3) and therefore cannot support the individual-effect question; its stack formulation meets C1-C3 but does not clear the complete measurement conditions for a readable abducible-share estimate; its DMC swing-up formulation is among the five that meet C1-C5. This makes DMC swing-up the strongest immediate candidate for a faithful individual-effect measurement pilot, while stack can be a lower-level branchability/heterogeneity diagnostic only unless fresh sample-size/floor analysis qualifies it. Do not use push as a third-rung individual-effect benchmark merely because it is robotic manipulation. For every new task/intervention, rerun the five-condition audit: simulator name alone is insufficient. Then add held-out dynamic manipulation cases through #13389. Observational real-world datasets may support population-effect estimation under appropriate assumptions, but they do not supply exact individual counterfactual ground truth by themselves. Do not label an observational comparison as a third-rung reproduction.
 
 This extension belongs to #13255's representation/temporal experiment and #13445's decision-value evaluation. It adds no new policy, simulator, causal oracle, calibration engine, scorer, scheduler or action authority.
+
+## Selective counterfactual preservation: keep fidelity and decision sufficiency separate — 2026-11-24
+
+The individual-effect evaluator must not create a new objective that forces every individual effect to be reconstructed perfectly. The system has two different obligations:
+
+1. **Counterfactual fidelity:** did the latent readout and imagined rollout preserve the individual's action-effect contrast?
+2. **Decision sufficiency:** does the compressed/available information still support an epsilon-good common action under the declared task utility and hard constraints?
+
+Use #13239/#13152 as the decision-regret authority. For each individual i, compute the declared epsilon-good set from the evaluator's admissible actions and realized utility. The common epsilon-good set is the intersection across the supported individuals/worlds. Never derive it from the candidate's own rollout or effect predictions.
+
+This yields four scientifically distinct outcomes:
+- high effect fidelity + decision sufficient;
+- low effect fidelity + decision sufficient (the causal model is wrong, but the loss may be decision-irrelevant at this epsilon);
+- high average effect fidelity + decision insufficient (mean cancellation can hide opposing individual effects);
+- low effect fidelity + decision insufficient.
+
+A decision-sufficient pass does **not** license an individual-counterfactual capability claim. A causal-fidelity pass does not authorize action and does not replace the independent hard-constraint or decision-regret checks.
+
+### F10 and F11 — same effects, different decision tolerance
+
+Both fixtures use two individuals with true effects +10 and -10, so the population mean is zero and a collapsed rollout prediction of zero has individual MAE 10.
+
+- **F10:** with epsilon=10, both actions are epsilon-good for both individuals. The common epsilon-good set is {A, B}; selecting A has worst-case regret 10, within epsilon. Individual-effect fidelity fails, but decision sufficiency passes for this declared task tolerance.
+- **F11:** with epsilon=0, the individuals require different exact-optimal actions. The common epsilon-good set is empty; the same collapsed representation is decision-insufficient and must trigger refinement, further evidence acquisition, or defer/fallback.
+
+Only epsilon changes between F10 and F11. This tests whether the representation learns the distinctions that matter at the task's declared tolerance, instead of preserving every latent difference or discarding every difference whose population mean is small.
+
+The branch budget policy can prioritize individual/action pairs where the evaluator-supported decision envelope is sensitive, reusing #10320 and #13445. Do not build a new branch scheduler or regret oracle. Keep the causal-fidelity vector visible even when the decision gate passes.
