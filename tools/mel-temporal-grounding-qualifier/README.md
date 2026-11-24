@@ -37,3 +37,17 @@ Use a hyphen as the path to read JSON from standard input. For an array input, t
 V2 case inputs also bind a source-lineage identifier, immutable runtime identity digest, decoding-configuration digest, maximum output-token budget, actual output tokens, maximum wall-time budget and observed elapsed wall time. The evaluator rejects actual usage beyond the declared budget. A matched NoEvidence/LocalRetrieved/YokedRetrieved triplet must share source lineage, runtime, decoding configuration and maximum budgets; actual token/time consumption is reported separately for each arm.
 
 These fields are self-reported run metadata until backed by an independently authenticated execution receipt. They make the paired protocol's intended controls explicit; they do not authenticate the runtime or prove that the model consumed retrieved audio.
+
+
+## Source-work-clustered uncertainty
+
+The matched-evidence API returns per-experiment-unit paired contrasts. For inferential summaries, call bootstrap_matched_evidence_contrasts on those contrasts. It:
+- averages repeated query units within each source_lineage_id;
+- resamples source-work clusters with replacement using deterministic SplitMix64;
+- uses the supplied nonzero seed and at least 1,000 replicates;
+- reports percentile 95% intervals separately for F1 and count-gated one-to-many F1;
+- reports separate ordinary and one-to-many cluster counts.
+
+A computable interval is not automatically confirmatory. The report exposes a proposed 30-source-work floor and separate booleans for ordinary and one-to-many cohorts. The floor is a minimum reporting warning, not a substitute for preregistered power analysis; a credible study may need more clusters. Do not treat two synthetic source works as evidence of model improvement.
+
+V2 runtime identity, decoding-configuration, output-token budget, actual token use and wall-time fields are included in reports and matched-arm checks. They remain self-reported unless bound to an independently authenticated execution receipt.
