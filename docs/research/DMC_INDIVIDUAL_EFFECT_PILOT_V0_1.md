@@ -192,3 +192,11 @@ For the deterministic DMC formulation, the shared individual parameters and bran
 
 This contract is deliberately compatible with a two-branch pair while preserving #13377's existing four-arm DVPC scope. It adds no verifier to #13520; it specifies what the external admission wrapper must prove before the arithmetic consumer is called.
 
+Training-surface source snapshots inspected at Symthaea commit `3ca654b0544b5ad398b2129a4884027f4d9074f4`:
+- [HDC-LTC per-neuron BPTT and positive/negative contrastive update](https://github.com/Luminous-Dynamics/symthaea/blob/3ca654b0544b5ad398b2129a4884027f4d9074f4/crates/core/symthaea-core/src/hdc/hdc_ltc_unified.rs)
+- [Broca next-token training](https://github.com/Luminous-Dynamics/symthaea/blob/3ca654b0544b5ad398b2129a4884027f4d9074f4/crates/domains/symthaea-broca/src/training.rs)
+- [Broca liquid-Mamba contrastive intent configuration](https://github.com/Luminous-Dynamics/symthaea/blob/3ca654b0544b5ad398b2129a4884027f4d9074f4/crates/domains/symthaea-broca/src/liquid_mamba.rs)
+- [HDC-LTC network-level forward API](https://github.com/Luminous-Dynamics/symthaea/blob/3ca654b0544b5ad398b2129a4884027f4d9074f4/crates/core/symthaea-hdc-ltc/src/network.rs)
+- [STT HDC-LTC trainer and ignored training-change test](https://github.com/Luminous-Dynamics/symthaea/blob/3ca654b0544b5ad398b2129a4884027f4d9074f4/crates/core/symthaea-stt/src/phoneme_hdc_ltc.rs)
+- [Multirotor sensor-to-action controller trainer](https://github.com/Luminous-Dynamics/symthaea/blob/3ca654b0544b5ad398b2129a4884027f4d9074f4/crates/domains/symthaea-multirotor/src/controller.rs)
+
