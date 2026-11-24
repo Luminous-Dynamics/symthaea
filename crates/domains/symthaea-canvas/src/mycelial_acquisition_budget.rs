@@ -830,7 +830,7 @@ fn validate_proposal(
 
 fn policy_digest(budget: &MycelialSampleHealthBudget) -> String {
     let mut hasher = blake3::Hasher::new();
-    hasher.update(b"symthaea-mycelial-sample-health-budget-v1");
+    hasher.update(b"symthaea-mycelial-sample-health-budget-v2");
     hasher.update(&budget.schema_version.to_le_bytes());
     hash_string(&mut hasher, &budget.policy_id);
     hash_string(&mut hasher, &budget.policy_version);
@@ -858,7 +858,7 @@ fn policy_digest(budget: &MycelialSampleHealthBudget) -> String {
 
 fn state_digest(state: &MycelialSampleHealthState) -> String {
     let mut hasher = blake3::Hasher::new();
-    hasher.update(b"symthaea-mycelial-sample-health-state-v1");
+    hasher.update(b"symthaea-mycelial-sample-health-state-v2");
     hash_string(&mut hasher, &state.sample_id);
     hash_string(&mut hasher, &state.session_id);
     hash_string(&mut hasher, &state.device_capability_manifest_digest);
@@ -912,7 +912,7 @@ fn proposal_inventory_digest(proposals: &[MycelialAcquisitionBudgetProposal]) ->
     let mut ordered: Vec<_> = proposals.iter().collect();
     ordered.sort_by(|left, right| left.action_id.cmp(&right.action_id));
     let mut hasher = blake3::Hasher::new();
-    hasher.update(b"symthaea-mycelial-acquisition-budget-proposals-v1");
+    hasher.update(b"symthaea-mycelial-acquisition-budget-proposals-v2");
     hasher.update(&(ordered.len() as u64).to_le_bytes());
     for proposal in ordered {
         hash_string(&mut hasher, &proposal.action_id);
@@ -980,10 +980,6 @@ fn active_sensing_report_digest(report: &MycelialActiveSensingReport) -> String 
     hasher.update(&(actions.len() as u64).to_le_bytes());
     for action in actions {
         hash_string(&mut hasher, &action.action_id);
-        hash_string(&mut hasher, &action.acquisition_plan_digest);
-        hash_string(&mut hasher, &action.device_capability_manifest_digest);
-        hash_string(&mut hasher, &action.spatial_footprint_digest);
-        hash_string(&mut hasher, &action.health_model_digest);
         hasher.update(&[match action.action_kind {
             MycelialAcquisitionActionKind::AdditionalZPlane => 0,
             MycelialAcquisitionActionKind::HighResolutionCrop => 1,
@@ -1413,7 +1409,7 @@ pub fn mycelial_sample_health_budget_report_digest(
     report: &MycelialSampleHealthBudgetReport,
 ) -> String {
     let mut hasher = blake3::Hasher::new();
-    hasher.update(b"symthaea-mycelial-sample-health-budget-report-v1");
+    hasher.update(b"symthaea-mycelial-sample-health-budget-report-v2");
     hasher.update(&report.schema_version.to_le_bytes());
     hash_string(&mut hasher, &report.active_sensing_report_digest);
     hash_string(&mut hasher, &report.active_sensing_evidence_digest);
@@ -1430,6 +1426,10 @@ pub fn mycelial_sample_health_budget_report_digest(
     hasher.update(&(report.eligible_actions.len() as u64).to_le_bytes());
     for action in &report.eligible_actions {
         hash_string(&mut hasher, &action.action_id);
+        hash_string(&mut hasher, &action.acquisition_plan_digest);
+        hash_string(&mut hasher, &action.device_capability_manifest_digest);
+        hash_string(&mut hasher, &action.spatial_footprint_digest);
+        hash_string(&mut hasher, &action.health_model_digest);
         hasher.update(&[match action.action_kind {
             MycelialAcquisitionActionKind::AdditionalZPlane => 0,
             MycelialAcquisitionActionKind::HighResolutionCrop => 1,
