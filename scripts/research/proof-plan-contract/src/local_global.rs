@@ -910,16 +910,17 @@ fn validate_global_use_adjudication(
                 }
             }
         }
-        let matching_candidate_mention = candidate
-            .global_stage
-            .warrant_mentions
-            .iter()
-            .any(|mention| {
-                mention.mention_id == node.mention_id
-                    && mention.plan_node_id == node.plan_node_id
-                    && mention.warrant_id == node.warrant_id
-                    && mention.relation == node.relation
-            });
+        let matching_candidate_mention =
+            candidate
+                .global_stage
+                .warrant_mentions
+                .iter()
+                .any(|mention| {
+                    mention.mention_id == node.mention_id
+                        && mention.plan_node_id == node.plan_node_id
+                        && mention.warrant_id == node.warrant_id
+                        && mention.relation == node.relation
+                });
         if !matching_candidate_mention {
             errors.push(format!(
                 "global-use node {} must match a candidate-visible warrant mention by exact mention ID",
@@ -2035,13 +2036,19 @@ mod tests {
     fn complete_review_must_account_for_every_target_warrant_mention() {
         let mut pair = fixture();
         let extra = pair.candidate.global_stage.warrant_mentions[0].clone();
-        pair.candidate.global_stage.warrant_mentions.push(WarrantMention {
-            mention_id: "MENTION-UNREVIEWED-002".to_owned(),
-            ..extra
-        });
-        assert!(validate_pair(&pair)
-            .iter()
-            .any(|error| error.contains("omits candidate warrant mention MENTION-UNREVIEWED-002")));
+        pair.candidate
+            .global_stage
+            .warrant_mentions
+            .push(WarrantMention {
+                mention_id: "MENTION-UNREVIEWED-002".to_owned(),
+                ..extra
+            });
+        assert!(
+            validate_pair(&pair)
+                .iter()
+                .any(|error| error
+                    .contains("omits candidate warrant mention MENTION-UNREVIEWED-002"))
+        );
     }
 
     #[test]
