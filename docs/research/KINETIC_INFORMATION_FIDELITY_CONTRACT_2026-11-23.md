@@ -548,6 +548,26 @@ The nonlinear extension must separately qualify tangent response, signed finite-
 
 Success means greater held-out intervention-response fidelity per retained byte/rank at matched total construction and simulation cost, without worsening mandatory physical gates. It does not mean a good singular-value capture plot, nor does it imply a universal nonlinear error bound.
 
+## Asymptotic-preserving response-aware micro–macro reduction (AP-RAMMR)
+
+New companion programme: [#13483 — build response-aware asymptotic-preserving micro–macro reduction for high-field VPFP](https://github.com/Luminous-Dynamics/symthaea/issues/13483).
+
+The direct 2026 comparator is Zhang & Hu's high-field VPFP Micro-ROM (arXiv:2610.25569). It retains macroscopic density on the full spatial grid and reduces only the microscopic fluctuation; precomputed Chebyshev approximations handle field-dependent Maxwellian terms, and separable collision blocks reduce online dependence on velocity-grid resolution. The paper reports discrete mass conservation, formal recovery of a discretized high-field limit as epsilon tends to zero, and velocity-grid-independent online cost per step. These are source-reported properties and must be independently reproduced.
+
+This is a separate collisional / singularly perturbed cohort. It must not share the collisionless VP Landau / echo leaderboard. The benchmark freezes the nondimensionalization, epsilon definition and sequence, macro variables, exact discrete collision operator/nullspace, dissipation law, and target limiting model. The micro projector may only use constraints derived from that exact discrete operator. The first Rust increment in [PR #13405](https://github.com/Luminous-Dynamics/symthaea/pull/13405) is a weighted minimum-correction projector onto a caller-supplied moment-constraint nullspace; it does not select the physical invariants itself and does not constitute an AP solver.
+
+Required baselines include Zhang–Hu Micro-ROM, the 2023 APNN micro–macro and mass-conserving neural methods (arXiv:2308.05650), the 2025 micro–macro tensor neural surrogate hierarchy (arXiv:2512.24205), full-order VPFP, and matched POD/local-POD. The decisive result is not velocity-grid-independent timing alone: it is response-aware cost reduction while preserving the selected AP limit, required moments, positivity/realizability, collision dissipation and future QoI envelope.
+
+## Multi-rate kinetic observation–actuation co-design (MROAC)
+
+New companion programme: [#13484 — co-design multi-rate kinetic sensing and actuation under delay](https://github.com/Luminous-Dynamics/symthaea/issues/13484).
+
+The 2026 Vlasov–Poisson control study by Guerra et al. (JCP 115169) notes that diagnostic / actuation timescales around 25 ms may be mismatched with some instability timescales below 1 ms or even nanoseconds. That study examines static external-field optimization, not a complete real-time closed loop. In a different physical setting, Degrave et al. demonstrated deep-RL suppression of tearing instability on DIII-D using a multimodal dynamical model and real diagnostics/actuators (Nature 2024). This is meaningful experimental control evidence, but it does not validate transfer to electrostatic 1D1V Vlasov–Poisson.
+
+The next benchmark must jointly freeze measurement operators, sample periods, transport latency, timestamp age, jitter, noise, dropout policy, actuator update period, delivery delay, bandwidth, amplitude, slew limit, controller WCET and fallback. Deployment-scored controllers cannot observe hidden full state or command unavailable instantaneous fields. A full-state/zero-delay controller is retained only as an explicit oracle upper bound.
+
+The synthetic timing contract and schema are in [PR #13405](https://github.com/Luminous-Dynamics/symthaea/pull/13405). The next physical comparison is delay-aware observer + constrained MPC versus robust/tube MPC, RL and response-Gramian sensor/actuator co-design on the same mode/QoI subspace. Score observability, actuator authority, peak/integrated growth, delay margin, dropout robustness and sensor/compute/energy costs separately.
+
 ## Robust kinetic stabilization objectives
 
 New companion programme: [#13457 — optimize robust kinetic stabilization objectives](https://github.com/Luminous-Dynamics/symthaea/issues/13457).
