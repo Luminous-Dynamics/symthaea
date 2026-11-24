@@ -3,7 +3,7 @@
 **Issue:** [#13537 — MATH-SCOPE-EQUIVALENCE-001](https://github.com/Luminous-Dynamics/symthaea/issues/13537)  
 **Programme:** [#13293 — MATH-COMPREHENSION-001](https://github.com/Luminous-Dynamics/symthaea/issues/13293)  
 **Paired receipt:** [#13345 — MATH-LOCAL-GLOBAL-RECEIPT-001](https://github.com/Luminous-Dynamics/symthaea/issues/13345)  
-**Status:** protocol plus a bounded executable Tier-1 normalizer for independent propositional hypothesis sets. Quantified alpha-equivalence, Tier-2 Lean transport, model evaluation, and empirical scope-CIRR scores remain unimplemented.
+**Status:** protocol plus a bounded executable Tier-1 normalizer and a source-pinned Lean Tier-2 propositional context/warrant-transport pilot whose exact-head replay is pending. Quantified alpha-equivalence, dependent-context transport, model evaluation, and empirical scope-CIRR scores remain unimplemented.
 
 ## 1. Research question
 
@@ -188,3 +188,15 @@ The five synthetic controls are: exact identity; hypothesis permutation (raw dig
 **Claim ceiling:** this is a narrow structural comparator for the current finite BooleanSequent type. It does not implement bound-variable alpha-renaming because the AST has no binders; it does not use finite truth-table entailment to upgrade structural comparability; and it does not perform Lean definitional equality or dependent-context transport. Exact-identity Tier 0 LocalGlobalPairV1/CIRR is unchanged, and Tier-1 results must remain separately reported.
 
 **Execution state:** Rust source, CLI, fixtures, schema and focused workflow integration are committed. The first workflow attempt [45494166481](https://github.com/Luminous-Dynamics/symthaea/actions/runs/45494166481) failed in the shell fixture step because a line continuation passed a literal backslash to `jq`; the Rust formatter step had passed before that assertion. The shell continuation was corrected in commit [8dc3247](https://github.com/Luminous-Dynamics/symthaea/commit/8dc3247a0c87e1aaf8dea5214074c475db0f5f29). Corrected run [45494435432](https://github.com/Luminous-Dynamics/symthaea/actions/runs/45494435432) is in progress. The five-pair CLI and Rust tests are not yet reported as passing.
+
+## 13. Tier-2 Lean context and warrant-transport pilot (2026-11-24)
+
+A source-pinned Lean pilot is now committed at `scripts/research/lean-proof-extractor/ScopeEquivalenceTier2AndComm.lean`, with [manifest](MATH_SCOPE_EQUIVALENCE_TIER2_AND_COMM_V1.json) and [schema](MATH_SCOPE_EQUIVALENCE_TIER2_AND_COMM_V1.schema.json).
+
+The bounded pair has local context `p ∧ q`, global context `q ∧ p`, and unchanged target `r`. The source declares and checks six certificates: local-to-global context entailment, global-to-local context entailment, two-way context equivalence, local-to-global warrant transport, global-to-local warrant transport, and their bidirectional equivalence. The latter two prove that a warrant for the exact same target can be transported between these reordered contexts.
+
+The source pins Lean `4.37.0-rc1`, Mathlib revision `6ebcce37335bcb6bca64596e5d57bb3035648030`, and Lean core commit `0b77e12952ad39077d80d8bd6b66d601f225c321`. The focused workflow verifies the source digest, replays all six Lean declarations, hashes the source/manifest/toolchain/axiom log and emits a separate receipt artifact. The static manifest stays `kernel_replay_pending`; only an accepted exact-run receipt can record replay.
+
+**Claim ceiling:** this is a synthetic, non-dependent propositional context permutation with an unchanged target. It does not cover dependent binders, local instances, typeclass parameters, changed targets/premises, universe transformations or arbitrary telescope transport. The workflow captures `#print axioms` output but does not yet parse a structured dependency closure. This is not an empirical scope-CIRR result and does not establish general Tier-2 support.
+
+**Execution state:** source, manifest, schema and workflow integration are committed; exact-head execution is pending.
