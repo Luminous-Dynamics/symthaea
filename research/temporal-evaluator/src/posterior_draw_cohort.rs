@@ -1120,9 +1120,7 @@ mod tests {
             make_draw(1, 101, 2, 52, 500_000, (2, 4, 5)),
             make_draw(1, 101, 1, 51, 500_000, (2, 1, 1)),
         ]);
-        let second = cohort(vec![
-            make_draw(2, 102, 1, 61, 1_000_000, (-1, -1, -1)),
-        ]);
+        let second = cohort(vec![make_draw(2, 102, 1, 61, 1_000_000, (-1, -1, -1))]);
         let forward = evaluate_posterior_effect_cohort(&[first.clone(), second.clone()]).unwrap();
         let reverse = evaluate_posterior_effect_cohort(&[second, first]).unwrap();
         assert_eq!(forward, reverse);
