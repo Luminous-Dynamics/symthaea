@@ -890,12 +890,9 @@ mod tests {
         let pairs = vec![pair(
             1,
             1,
-            i64::MIN,
-            i64::MAX,
-            i64::MIN,
-            i64::MAX,
-            i64::MIN,
-            i64::MAX,
+            (i64::MIN, i64::MAX),
+            (i64::MIN, i64::MAX),
+            (i64::MIN, i64::MAX),
         )];
         let result = evaluate_individual_effect_retention(&pairs).unwrap();
         assert_eq!(result.realized_effect_sum_units, (i64::MAX as i128) - (i64::MIN as i128));
