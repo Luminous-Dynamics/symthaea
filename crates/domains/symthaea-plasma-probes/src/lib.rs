@@ -2815,9 +2815,9 @@ pub fn integrate_maxwell_delay_history(
         ),
     ] {
         if values.len() != time_count
-            || values.iter().any(|row| {
-                row.len() != spatial_count || row.iter().any(|value| !value.is_finite())
-            })
+            || values
+                .iter()
+                .any(|row| row.len() != spatial_count || row.iter().any(|value| !value.is_finite()))
         {
             return Err(control_timing_error(
                 field,
@@ -2961,8 +2961,16 @@ pub fn predict_maxwell_delay_cancellation(
         .chain(observation.delayed_magnetic_transverse.iter())
         .chain(observation.interval_mean_current_longitudinal.iter())
         .chain(observation.interval_mean_current_transverse.iter())
-        .chain(observation.interval_mean_gradient_electric_transverse.iter())
-        .chain(observation.interval_mean_gradient_magnetic_transverse.iter());
+        .chain(
+            observation
+                .interval_mean_gradient_electric_transverse
+                .iter(),
+        )
+        .chain(
+            observation
+                .interval_mean_gradient_magnetic_transverse
+                .iter(),
+        );
     if all_values.clone().any(|value| !value.is_finite()) {
         return Err(control_timing_error(
             "field_observations",
@@ -2982,8 +2990,7 @@ pub fn predict_maxwell_delay_cancellation(
                 * (observation.interval_mean_current_transverse[index]
                     + observation.interval_mean_gradient_magnetic_transverse[index]);
         let b_ext = -observation.delayed_magnetic_transverse[index]
-            + delay_seconds
-                * observation.interval_mean_gradient_electric_transverse[index];
+            + delay_seconds * observation.interval_mean_gradient_electric_transverse[index];
 
         if !h1.is_finite() || !h2.is_finite() || !b_ext.is_finite() {
             return Err(control_timing_error(
@@ -3162,8 +3169,7 @@ pub fn evaluate_coupled_two_mode_authority(
             break;
         }
         sample_step = next_sample_step;
-        let sample_transition =
-            matrix_power_2x2(a, contract.diagnostic_sampling_stride_steps)?;
+        let sample_transition = matrix_power_2x2(a, contract.diagnostic_sampling_stride_steps)?;
         power = multiply_mat2(power, sample_transition)?;
     }
 
@@ -6781,24 +6787,15 @@ mod tests {
             sample_times_seconds: vec![2.0, 2.25, 3.0],
             current_longitudinal: vec![vec![1.0, 2.0], vec![1.25, 2.5], vec![2.0, 4.0]],
             current_transverse: vec![vec![-1.0, 0.0], vec![-0.75, 0.5], vec![0.0, 2.0]],
-            gradient_electric_transverse: vec![
-                vec![2.0, -2.0],
-                vec![1.5, -1.5],
-                vec![0.0, 0.0],
-            ],
-            gradient_magnetic_transverse: vec![
-                vec![0.0, 1.0],
-                vec![0.5, 1.25],
-                vec![2.0, 2.0],
-            ],
+            gradient_electric_transverse: vec![vec![2.0, -2.0], vec![1.5, -1.5], vec![0.0, 0.0]],
+            gradient_magnetic_transverse: vec![vec![0.0, 1.0], vec![0.5, 1.25], vec![2.0, 2.0]],
         }
     }
 
     #[test]
     fn maxwell_delay_history_integrates_nonuniform_time_samples() {
         let averages =
-            integrate_maxwell_delay_history(&maxwell_delay_history_fixture(), 2.0, 3.0)
-                .unwrap();
+            integrate_maxwell_delay_history(&maxwell_delay_history_fixture(), 2.0, 3.0).unwrap();
         assert_eq!(averages.current_longitudinal, vec![1.5, 3.0]);
         assert_eq!(averages.current_transverse, vec![-0.5, 1.0]);
         assert_eq!(averages.gradient_electric_transverse, vec![1.0, -1.0]);
@@ -6888,8 +6885,7 @@ mod tests {
     #[test]
     fn maxwell_delay_predictor_matches_manufactured_interval_integral_identity() {
         let command =
-            predict_maxwell_delay_cancellation(&maxwell_delay_observation_fixture(), 0.5)
-                .unwrap();
+            predict_maxwell_delay_cancellation(&maxwell_delay_observation_fixture(), 0.5).unwrap();
         assert!((command.external_electric_longitudinal[0] - -0.2).abs() < 1.0e-12);
         assert!((command.external_electric_transverse[0] - -1.0).abs() < 1.0e-12);
         assert!((command.external_magnetic_transverse[0] - -0.1).abs() < 1.0e-12);
@@ -7118,11 +7114,8 @@ mod tests {
 
     #[test]
     fn coupled_two_mode_authority_advances_by_the_declared_sensor_stride() {
-        let mut contract = coupled_two_mode_contract(
-            [1.2, 0.0, 0.0, 1.1],
-            [[1.0, 0.0], [0.0, 1.0]],
-            [1.0, 1.0],
-        );
+        let mut contract =
+            coupled_two_mode_contract([1.2, 0.0, 0.0, 1.1], [[1.0, 0.0], [0.0, 1.0]], [1.0, 1.0]);
         contract.horizon_steps = 5;
         contract.diagnostic_sampling_stride_steps = 2;
         contract.actuator_update_stride_steps = 2;
