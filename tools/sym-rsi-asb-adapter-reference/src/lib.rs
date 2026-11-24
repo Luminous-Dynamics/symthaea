@@ -151,24 +151,45 @@ fn gate_matches(
 
 fn validate_campaign(campaign: &Campaign, issues: &mut Vec<String>) {
     if campaign.gates.combination != EXPECTED_COMBINATION {
-        issues.push(format!("{}: discovery and learning must both gate success", campaign.id));
+        issues.push(format!(
+            "{}: discovery and learning must both gate success",
+            campaign.id
+        ));
     }
-    match campaign.design_space.rounds.checked_mul(campaign.design_space.batch_size) {
+    match campaign
+        .design_space
+        .rounds
+        .checked_mul(campaign.design_space.batch_size)
+    {
         Some(total) if total == campaign.design_space.total_measurement_budget => {}
-        _ => issues.push(format!("{}: total budget must equal rounds × batch size", campaign.id)),
+        _ => issues.push(format!(
+            "{}: total budget must equal rounds × batch size",
+            campaign.id
+        )),
     }
     if campaign.design_space.total_measurement_budget > campaign.design_space.orderable_designs {
-        issues.push(format!("{}: budget exceeds orderable design pool", campaign.id));
+        issues.push(format!(
+            "{}: budget exceeds orderable design pool",
+            campaign.id
+        ));
     }
     if campaign.gates.discovery.is_empty() || campaign.gates.learning.is_empty() {
-        issues.push(format!("{}: both discovery and learning gates are required", campaign.id));
+        issues.push(format!(
+            "{}: both discovery and learning gates are required",
+            campaign.id
+        ));
     }
-    for gate in campaign.gates.discovery.iter().chain(&campaign.gates.learning) {
-        if gate.metric.trim().is_empty()
-            || gate.operator != ">="
-            || !gate.threshold.is_finite()
-        {
-            issues.push(format!("{}: invalid or unsupported gate contract", campaign.id));
+    for gate in campaign
+        .gates
+        .discovery
+        .iter()
+        .chain(&campaign.gates.learning)
+    {
+        if gate.metric.trim().is_empty() || gate.operator != ">=" || !gate.threshold.is_finite() {
+            issues.push(format!(
+                "{}: invalid or unsupported gate contract",
+                campaign.id
+            ));
         }
     }
 
@@ -183,23 +204,55 @@ fn validate_campaign(campaign: &Campaign, issues: &mut Vec<String>) {
                 || campaign.design_space.held_out_designs != Some(5_000)
                 || campaign.gates.discovery.len() != 2
                 || campaign.gates.learning.len() != 1
-                || !gate_matches(&campaign.gates.discovery[0], "discovery_hits", ">=", 190.0, None)
-                || !gate_matches(&campaign.gates.discovery[1], "distinct_hit_families", ">=", 175.0, None)
-                || !gate_matches(&campaign.gates.learning[0], "ndcg_at_100", ">=", 0.42, Some(5_000))
+                || !gate_matches(
+                    &campaign.gates.discovery[0],
+                    "discovery_hits",
+                    ">=",
+                    190.0,
+                    None,
+                )
+                || !gate_matches(
+                    &campaign.gates.discovery[1],
+                    "distinct_hit_families",
+                    ">=",
+                    175.0,
+                    None,
+                )
+                || !gate_matches(
+                    &campaign.gates.learning[0],
+                    "ndcg_at_100",
+                    ">=",
+                    0.42,
+                    Some(5_000),
+                )
             {
-                issues.push("nuclease-active-learning: pinned replay task contract changed".to_owned());
+                issues.push(
+                    "nuclease-active-learning: pinned replay task contract changed".to_owned(),
+                );
             }
             if campaign.data_license != "CC-BY-4.0"
                 || value_u64(&campaign.reference_shipped_split, "discovery_hits") != Some(278)
-                || value_u64(&campaign.reference_shipped_split, "distinct_hit_families") != Some(215)
-                || campaign.reference_shipped_split.get("ndcg_at_100").and_then(Value::as_f64)
+                || value_u64(&campaign.reference_shipped_split, "distinct_hit_families")
+                    != Some(215)
+                || campaign
+                    .reference_shipped_split
+                    .get("ndcg_at_100")
+                    .and_then(Value::as_f64)
                     .is_none_or(|value| (value - 0.488).abs() > 1e-12)
-                || campaign.reference_shipped_split.get("role").and_then(Value::as_str)
+                || campaign
+                    .reference_shipped_split
+                    .get("role")
+                    .and_then(Value::as_str)
                     != Some("upstream_reference_solution_result_not_a_Symthaea_result")
-                || campaign.observation_semantics.get("measurement_source").and_then(Value::as_str)
+                || campaign
+                    .observation_semantics
+                    .get("measurement_source")
+                    .and_then(Value::as_str)
                     != Some("published replay table")
             {
-                issues.push("nuclease-active-learning: reference/provenance declaration changed".to_owned());
+                issues.push(
+                    "nuclease-active-learning: reference/provenance declaration changed".to_owned(),
+                );
             }
         }
         "propylene-active-learning" => {
@@ -212,23 +265,55 @@ fn validate_campaign(campaign: &Campaign, issues: &mut Vec<String>) {
                 || campaign.design_space.held_out_designs != Some(244)
                 || campaign.gates.discovery.len() != 1
                 || campaign.gates.learning.len() != 1
-                || !gate_matches(&campaign.gates.discovery[0], "discovery_hits", ">=", 7.0, None)
-                || !gate_matches(&campaign.gates.learning[0], "ndcg_at_20", ">=", 0.52, Some(244))
+                || !gate_matches(
+                    &campaign.gates.discovery[0],
+                    "discovery_hits",
+                    ">=",
+                    7.0,
+                    None,
+                )
+                || !gate_matches(
+                    &campaign.gates.learning[0],
+                    "ndcg_at_20",
+                    ">=",
+                    0.52,
+                    Some(244),
+                )
             {
-                issues.push("propylene-active-learning: pinned twin task contract changed".to_owned());
+                issues.push(
+                    "propylene-active-learning: pinned twin task contract changed".to_owned(),
+                );
             }
             if campaign.data_license != "CC-BY-4.0"
                 || value_u64(&campaign.reference_shipped_split, "discovery_hits") != Some(8)
-                || campaign.reference_shipped_split.get("ndcg_at_20").and_then(Value::as_f64)
+                || campaign
+                    .reference_shipped_split
+                    .get("ndcg_at_20")
+                    .and_then(Value::as_f64)
                     .is_none_or(|value| (value - 0.626).abs() > 1e-12)
-                || campaign.reference_shipped_split.get("role").and_then(Value::as_str)
+                || campaign
+                    .reference_shipped_split
+                    .get("role")
+                    .and_then(Value::as_str)
                     != Some("upstream_reference_solution_result_not_a_Symthaea_result")
-                || value_u64(&campaign.observation_semantics, "exact_published_measurements") != Some(96)
-                || value_u64(&campaign.observation_semantics, "surrogate_model_outputs") != Some(884)
-                || value_bool(&campaign.observation_semantics, "twin_is_noiseless_mean_output") != Some(true)
-                || value_bool(&campaign.observation_semantics, "live_laboratory_measurements") != Some(false)
+                || value_u64(
+                    &campaign.observation_semantics,
+                    "exact_published_measurements",
+                ) != Some(96)
+                || value_u64(&campaign.observation_semantics, "surrogate_model_outputs")
+                    != Some(884)
+                || value_bool(
+                    &campaign.observation_semantics,
+                    "twin_is_noiseless_mean_output",
+                ) != Some(true)
+                || value_bool(
+                    &campaign.observation_semantics,
+                    "live_laboratory_measurements",
+                ) != Some(false)
             {
-                issues.push("propylene-active-learning: twin measurement provenance changed".to_owned());
+                issues.push(
+                    "propylene-active-learning: twin measurement provenance changed".to_owned(),
+                );
             }
         }
         other => issues.push(format!("unknown campaign in pinned v0 contract: {other}")),
@@ -244,10 +329,15 @@ pub fn validate_manifest(manifest: &Manifest) -> ValidationReport {
         issues.push("unsupported manifest_version".to_owned());
     }
     if manifest.status != REQUIRED_STATUS {
-        issues.push("status must remain NOT_YET_RUN until adapter conformance is evidenced".to_owned());
+        issues.push(
+            "status must remain NOT_YET_RUN until adapter conformance is evidenced".to_owned(),
+        );
     }
     if manifest.generated_utc_date != "2026-11-07" {
-        issues.push("unexpected manifest date; create a new version rather than silently retiming v0".to_owned());
+        issues.push(
+            "unexpected manifest date; create a new version rather than silently retiming v0"
+                .to_owned(),
+        );
     }
     if manifest.compatibility.mode != "read_only_upstream_replay_and_twin"
         || manifest.compatibility.official_benchmark_claim
@@ -266,26 +356,63 @@ pub fn validate_manifest(manifest: &Manifest) -> ValidationReport {
     }
     if manifest.adapter_scope.first_backend != "replay"
         || manifest.adapter_scope.second_backend != "twin"
-        || !manifest.adapter_scope.excluded_backends.iter().any(|item| item == "live")
+        || !manifest
+            .adapter_scope
+            .excluded_backends
+            .iter()
+            .any(|item| item == "live")
         || manifest.adapter_scope.excluded_claims.is_empty()
     {
-        issues.push("adapter scope must begin with replay/twin and explicitly exclude live claims".to_owned());
+        issues.push(
+            "adapter scope must begin with replay/twin and explicitly exclude live claims"
+                .to_owned(),
+        );
     }
 
     const REQUIRED_PINS: [(&str, &str); 10] = [
         ("README.md", "f5430803960bdbe8e4c2fb0f2bd3dca25dbe52a9"),
-        ("docs/ARCHITECTURE.md", "c056f367ec6f92ab91057465ed21b417e4ce0645"),
-        ("runtime/api/openapi.yaml", "db5c272a5ffd13ac79d0ed9682a90ed6ffdd27dc"),
-        ("task-template.toml", "4e60ee6d88d8ddc83c6b677163e0d944a67e6560"),
-        ("tasks/biology/deepmind/nuclease-active-learning/task.toml", "f5cd2ab065844cad9209697aa2e559d5caa84542"),
-        ("tasks/biology/deepmind/nuclease-active-learning/README.md", "2eb8d04d8c8e89efc2bbe4b85a33690fb3ff68e7"),
-        ("tasks/chemistry/sargent-lab/propylene-active-learning/task.toml", "31a26d7baf312520d1eabd803fa40912ca43e4b9"),
-        ("tasks/chemistry/sargent-lab/propylene-active-learning/README.md", "05513bae497d1c66fa9dd39253bf6bbaa6bb054d"),
-        ("tasks/biology/deepmind/nuclease-active-learning/environment/lab/campaign/campaign.json", "75681198b0ecc70d38130c08fd1b1d8e5a8e10fb"),
-        ("tasks/chemistry/sargent-lab/propylene-active-learning/environment/lab/campaign/campaign.json", "18920080073338f64500db4d0ccd4ffea425e9c1"),
+        (
+            "docs/ARCHITECTURE.md",
+            "c056f367ec6f92ab91057465ed21b417e4ce0645",
+        ),
+        (
+            "runtime/api/openapi.yaml",
+            "db5c272a5ffd13ac79d0ed9682a90ed6ffdd27dc",
+        ),
+        (
+            "task-template.toml",
+            "4e60ee6d88d8ddc83c6b677163e0d944a67e6560",
+        ),
+        (
+            "tasks/biology/deepmind/nuclease-active-learning/task.toml",
+            "f5cd2ab065844cad9209697aa2e559d5caa84542",
+        ),
+        (
+            "tasks/biology/deepmind/nuclease-active-learning/README.md",
+            "2eb8d04d8c8e89efc2bbe4b85a33690fb3ff68e7",
+        ),
+        (
+            "tasks/chemistry/sargent-lab/propylene-active-learning/task.toml",
+            "31a26d7baf312520d1eabd803fa40912ca43e4b9",
+        ),
+        (
+            "tasks/chemistry/sargent-lab/propylene-active-learning/README.md",
+            "05513bae497d1c66fa9dd39253bf6bbaa6bb054d",
+        ),
+        (
+            "tasks/biology/deepmind/nuclease-active-learning/environment/lab/campaign/campaign.json",
+            "75681198b0ecc70d38130c08fd1b1d8e5a8e10fb",
+        ),
+        (
+            "tasks/chemistry/sargent-lab/propylene-active-learning/environment/lab/campaign/campaign.json",
+            "18920080073338f64500db4d0ccd4ffea425e9c1",
+        ),
     ];
     for pin in &manifest.upstream.pinned_files {
-        if pin.path.trim().is_empty() || pin.purpose.trim().is_empty() || !is_hex_sha(&pin.git_blob_sha) {
+        if pin.path.trim().is_empty()
+            || pin.purpose.trim().is_empty()
+            || !is_hex_sha(&pin.git_blob_sha)
+        {
             issues.push(format!("invalid upstream file pin: {}", pin.path));
         }
         if !paths.insert(pin.path.as_str()) {
@@ -293,10 +420,18 @@ pub fn validate_manifest(manifest: &Manifest) -> ValidationReport {
         }
     }
     if manifest.upstream.pinned_files.len() != REQUIRED_PINS.len() {
-        issues.push(format!("expected {} upstream pinned files", REQUIRED_PINS.len()));
+        issues.push(format!(
+            "expected {} upstream pinned files",
+            REQUIRED_PINS.len()
+        ));
     }
     for (path, sha) in REQUIRED_PINS {
-        if !manifest.upstream.pinned_files.iter().any(|pin| pin.path == path && pin.git_blob_sha == sha) {
+        if !manifest
+            .upstream
+            .pinned_files
+            .iter()
+            .any(|pin| pin.path == path && pin.git_blob_sha == sha)
+        {
             issues.push(format!("missing or changed upstream pin: {path}"));
         }
     }
@@ -311,11 +446,19 @@ pub fn validate_manifest(manifest: &Manifest) -> ValidationReport {
         validate_campaign(campaign, &mut issues);
     }
     for required in ["nuclease-active-learning", "propylene-active-learning"] {
-        if !campaign_ids.iter().any(|campaign_id| *campaign_id == required) {
+        if !campaign_ids
+            .iter()
+            .any(|campaign_id| *campaign_id == required)
+        {
             issues.push(format!("required campaign missing: {required}"));
         }
     }
-    if manifest.invariants.len() < 10 || manifest.invariants.iter().any(|item| item.trim().is_empty()) {
+    if manifest.invariants.len() < 10
+        || manifest
+            .invariants
+            .iter()
+            .any(|item| item.trim().is_empty())
+    {
         issues.push("required adapter invariants are incomplete".to_owned());
     }
     for owner in [10877, 9230, 8721, 9332, 10756, 10717, 10630, 10497] {
@@ -349,8 +492,9 @@ pub fn parse_and_validate(contents: &str) -> Result<ValidationReport, serde_json
 mod tests {
     use super::*;
 
-    const MANIFEST: &str =
-        include_str!("../../../docs/research/adapters/SYM_RSI_ASB_COMPATIBILITY_MANIFEST_V0_2026-11-07.json");
+    const MANIFEST: &str = include_str!(
+        "../../../docs/research/adapters/SYM_RSI_ASB_COMPATIBILITY_MANIFEST_V0_2026-11-07.json"
+    );
 
     fn valid_manifest() -> Manifest {
         serde_json::from_str(MANIFEST).expect("checked-in compatibility manifest parses")
@@ -370,7 +514,12 @@ mod tests {
         value["upstream"]["commit"] = Value::String("0".repeat(40));
         let manifest: Manifest = serde_json::from_value(value).expect("mutated manifest parses");
         let report = validate_manifest(&manifest);
-        assert!(report.issues.iter().any(|issue| issue.contains("upstream repository, commit")));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.contains("upstream repository, commit"))
+        );
     }
 
     #[test]
@@ -379,16 +528,27 @@ mod tests {
         value["campaigns"][0]["gates"]["discovery"][0]["threshold"] = Value::from(1);
         let manifest: Manifest = serde_json::from_value(value).expect("mutated manifest parses");
         let report = validate_manifest(&manifest);
-        assert!(report.issues.iter().any(|issue| issue.contains("pinned replay task contract changed")));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.contains("pinned replay task contract changed"))
+        );
     }
 
     #[test]
     fn rejects_a_twin_mislabeled_as_live_measurement() {
         let mut value: Value = serde_json::from_str(MANIFEST).expect("manifest JSON parses");
-        value["campaigns"][1]["observation_semantics"]["live_laboratory_measurements"] = Value::Bool(true);
+        value["campaigns"][1]["observation_semantics"]["live_laboratory_measurements"] =
+            Value::Bool(true);
         let manifest: Manifest = serde_json::from_value(value).expect("mutated manifest parses");
         let report = validate_manifest(&manifest);
-        assert!(report.issues.iter().any(|issue| issue.contains("twin measurement provenance changed")));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.contains("twin measurement provenance changed"))
+        );
     }
 
     #[test]
@@ -397,6 +557,11 @@ mod tests {
         value["campaigns"][0]["design_space"]["total_measurement_budget"] = Value::from(383);
         let manifest: Manifest = serde_json::from_value(value).expect("mutated manifest parses");
         let report = validate_manifest(&manifest);
-        assert!(report.issues.iter().any(|issue| issue.contains("rounds × batch size")));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.contains("rounds × batch size"))
+        );
     }
 }
