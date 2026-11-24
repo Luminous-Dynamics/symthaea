@@ -127,14 +127,33 @@ An ablation must show that each cognitive component changes prospective action s
 - **DiscoverPhysics (2026):** 22 altered-physics worlds with sequential experiments and separate held-out trajectory-prediction and explanation scoring. The public/private split is useful for guarding against memorized laws and for testing the difference between fitting observations and understanding a mechanism.
   https://arxiv.org/abs/2605.26087
 
-### Direct numerical-gravity comparator
+### Direct numerical-gravity comparators: same theory first, methods second
 
-**Akribeia** pairs physics-informed neural networks with pseudo-spectral refinement to construct rotating higher-curvature black-hole solutions; its paper was accepted in Physical Review D on 12 November 2026. It is a meaningful comparator for the numerical-gravity layer, not for general scientific-agent intelligence.
+**Primary same-problem reference — Kleihaus, Kunz & Radu (2023).** *Phases of Rotating Black Objects in d=5 Einstein–Gauss–Bonnet Theory* studies five-dimensional asymptotically flat EGB black holes with two equal-magnitude angular momenta, exactly the background symmetry class relevant to the current equal-spin EGB campaign. The authors solve the nonperturbative second-order field equations with boundary conditions, report a scan of roughly one thousand numerical data points for the equal-spin existence domain, construct extremal configurations directly, and cross-check their numerical extremal solutions against an analytic near-horizon attractor family. They also state that integration becomes increasingly difficult near the critical endpoint. This is the closest published physical reference for background-branch validation—not a modern agent benchmark and not automatically the same perturbation/response problem as #7131.
 
-A fair comparison must match the theory, dimensions, angular momenta, gauge, boundary conditions, coupling/spin domain, observables, resolution, residual definitions, and independent qualification. Compare source-pinned equations, convergence, endpoint behavior, and interval/proof status—not marketing labels or unmatched residual digits. Akribeia's reported high-precision residuals do not, by themselves, establish equivalence to Symtropy's response-operator goals or a theorem for this EGB problem.
+Use this as a reproduction/coverage matrix:
+- Einstein limit (alpha=0): recover the five-dimensional equal-spin Myers–Perry branch and its limiting behavior.
+- Static EGB limit: recover the Schwarzschild–Tangherlini/EGB thermodynamic quantities and the allowed coupling bound.
+- Non-extremal equal-spin domain: compare the same normalized quantities (mass, angular momentum, horizon area, entropy, temperature, horizon angular velocity) at matched dimensionless parameters and gauge.
+- Extremal boundary: compare horizon expansions and near-horizon attractor data, not only extrapolated global curves.
+- First law and asymptotic charges: independently reconstruct mass/angular momentum from far-field coefficients and check the thermodynamic first law along the continuation family.
+- Critical endpoint: preserve unresolved intervals where conditioning/integration degrades; do not turn extrapolation into a certified branch endpoint.
+
+The paper reports that the equal-spin solutions are found with a symmetry-reduced radial ansatz and ODEs. Its non-extremal gauge and extremal parametrization differ, so comparisons must include the coordinate/gauge map and normalization, not raw metric-function arrays. The reported ~1,000-point scan is an approximate literature coverage target, not a machine-readable exact benchmark dataset. Reproduce published plots/tables and maintain our own source-pinned grid with solver receipts.
+
+https://www.mdpi.com/2218-1997/9/4/156
+https://doi.org/10.3390/universe9040156
+
+**Adjacent numerical-method comparator — Akribeia (2026).** Akribeia pairs physics-informed neural networks with pseudo-spectral refinement to construct rotating higher-curvature black-hole solutions. Its paper was accepted in Physical Review D on 12 November 2026. It covers quadratic and cubic curvature theories and multiple non-vanishing angular momenta, but its published problem set must be matched carefully before calling it a direct EGB comparator. It is meaningful for comparing the neural-to-spectral refinement pipeline, global field-equation residuals, parameterized solution families, and multi-angular-momentum handling—not for general scientific-agent intelligence.
+
+A fair Akribeia comparison must match the theory, dimensions, angular momenta, gauge, boundary conditions, coupling/spin domain, observables, resolution, residual definitions, and independent qualification. Compare source-pinned equations, convergence, endpoint behavior, and interval/proof status—not marketing labels or unmatched residual digits. Akribeia's “certified neural-field” wording and high-precision residuals should not be interpreted as an existence/uniqueness theorem for the Symtropy EGB boundary-value problem without checking the paper's precise certification definition.
 
 https://arxiv.org/abs/2607.07418
 https://doi.org/10.1103/3kz2-6dvv
+
+**Adjacent high-spin perturbation comparator — Husken et al. (2026).** A separate PRD paper computes scalar quasinormal-mode corrections for rapidly rotating black holes in scalar-Gauss–Bonnet and dynamical Chern–Simons gravity with pseudo-spectral collocation, reporting spins up to a/M=0.99 and mode-dependent accuracies. This is not the same five-dimensional pure EGB background or spin-2 response operator, but it is a useful numerical-method/perturbation benchmark for endpoint conditions, spectral convergence, and high-spin sensitivity. Keep the field content, dimension, and theory differences explicit.
+
+https://doi.org/10.1103/jrnh-wsxw
 
 ## Benchmark programme
 
