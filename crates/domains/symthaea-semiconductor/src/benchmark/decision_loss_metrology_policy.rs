@@ -884,8 +884,7 @@ mod tests {
                     1,
                     0.1,
                     MetrologyReadinessStatusV1::Unknown,
-                    10,
-                    1_000,
+                    (10, 1_000),
                     0.95,
                 ),
                 candidate(
@@ -894,8 +893,7 @@ mod tests {
                     1,
                     0.1,
                     MetrologyReadinessStatusV1::Rejected,
-                    10,
-                    1_000,
+                    (10, 1_000),
                     0.95,
                 ),
             ],
@@ -915,8 +913,7 @@ mod tests {
                     1,
                     0.5,
                     MetrologyReadinessStatusV1::Qualified,
-                    10,
-                    1_000,
+                    (10, 1_000),
                     0.20,
                 ),
                 candidate(
@@ -925,8 +922,7 @@ mod tests {
                     1,
                     0.1,
                     MetrologyReadinessStatusV1::Qualified,
-                    10,
-                    1_000,
+                    (10, 1_000),
                     0.95,
                 ),
                 candidate(
@@ -935,8 +931,7 @@ mod tests {
                     1,
                     0.3,
                     MetrologyReadinessStatusV1::Qualified,
-                    10,
-                    1_000,
+                    (10, 1_000),
                     0.65,
                 ),
             ],
@@ -961,8 +956,7 @@ mod tests {
                     1,
                     0.1,
                     MetrologyReadinessStatusV1::Qualified,
-                    10,
-                    1_000,
+                    (10, 1_000),
                     0.9,
                 ),
                 candidate(
@@ -971,8 +965,7 @@ mod tests {
                     1,
                     0.1,
                     MetrologyReadinessStatusV1::Qualified,
-                    10,
-                    1_000,
+                    (10, 1_000),
                     0.9,
                 ),
             ],
@@ -997,8 +990,7 @@ mod tests {
                 1,
                 0.1,
                 MetrologyReadinessStatusV1::Qualified,
-                10,
-                1_000,
+                (10, 1_000),
                 0.9,
             )],
             p,
@@ -1041,8 +1033,7 @@ mod tests {
             1,
             0.1,
             MetrologyReadinessStatusV1::Qualified,
-            10,
-            1_000,
+            (10, 1_000),
             0.95,
         );
         candidate.readiness.revoked_at_unix_seconds = Some(99);
@@ -1066,8 +1057,7 @@ mod tests {
                 1,
                 1_000.0,
                 MetrologyReadinessStatusV1::Qualified,
-                10,
-                1_000,
+                (10, 1_000),
                 0.95,
             )],
             policy(1),
@@ -1088,8 +1078,7 @@ mod tests {
             1,
             0.1,
             MetrologyReadinessStatusV1::Qualified,
-            10,
-            1_000,
+            (10, 1_000),
             0.95,
         );
         let input = input(vec![candidate.clone(), candidate], policy(2));
@@ -1108,8 +1097,7 @@ mod tests {
                     1,
                     0.1,
                     MetrologyReadinessStatusV1::Qualified,
-                    10,
-                    1_000,
+                    (10, 1_000),
                     0.95,
                 )
             })
@@ -1134,8 +1122,7 @@ mod tests {
             1,
             0.1,
             MetrologyReadinessStatusV1::Qualified,
-            10,
-            1_000,
+            (10, 1_000),
             0.95,
         );
         candidate
@@ -1155,8 +1142,7 @@ mod tests {
             1,
             0.1,
             MetrologyReadinessStatusV1::Qualified,
-            10,
-            1_000,
+            (10, 1_000),
             0.90,
         );
         let b = candidate(
@@ -1165,8 +1151,7 @@ mod tests {
             1,
             0.1,
             MetrologyReadinessStatusV1::Qualified,
-            10,
-            1_000,
+            (10, 1_000),
             0.90,
         );
         let first = optimize_metrology_decision_loss_portfolio_v1(&input(
@@ -1189,8 +1174,7 @@ mod tests {
                     1,
                     0.1,
                     MetrologyReadinessStatusV1::Qualified,
-                    10,
-                    1_000,
+                    (10, 1_000),
                     0.90,
                 ),
                 candidate(
@@ -1199,8 +1183,7 @@ mod tests {
                     1,
                     0.1,
                     MetrologyReadinessStatusV1::Qualified,
-                    10,
-                    1_000,
+                    (10, 1_000),
                     0.90,
                 ),
             ],
