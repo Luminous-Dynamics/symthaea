@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/PROOF_ACTION_CERTIFICATE_AND_COMM_V1.schema.json",
+  "title": "ProofActionCertificateAndCommV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "artifact_id", "status", "plan_id", "source_statement", "environment", "proof_source", "actions", "root_declaration", "claim_ceiling"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "artifact_id": {"const": "PROOFACTION-AND-COMM-001"},
+    "status": {"const": "kernel_replay_pending"},
+    "plan_id": {"const": "PROOFPLAN-AND-COMM-001"},
+    "source_statement": {
+      "type": "object", "additionalProperties": false,
+      "required": ["declaration", "statement"],
+      "properties": {"declaration": {"const": "And.comm"}, "statement": {"type": "string", "minLength": 1}}
+    },
+    "environment": {
+      "type": "object", "additionalProperties": false,
+      "required": ["lean_toolchain", "mathlib_repository", "mathlib_revision", "lean_core_repository", "lean_core_revision"],
+      "properties": {
+        "lean_toolchain": {"const": "leanprover/lean4:v4.37.0-rc1"},
+        "mathlib_repository": {"const": "leanprover-community/mathlib4"},
+        "mathlib_revision": {"const": "6ebcce37335bcb6bca64596e5d57bb3035648030"},
+        "lean_core_repository": {"const": "leanprover/lean4"},
+        "lean_core_revision": {"const": "0b77e12952ad39077d80d8bd6b66d601f225c321"}
+      }
+    },
+    "proof_source": {
+      "type": "object", "additionalProperties": false,
+      "required": ["repository", "path", "sha256"],
+      "properties": {
+        "repository": {"const": "Luminous-Dynamics/symthaea"},
+        "path": {"const": "scripts/research/lean-proof-extractor/ProofActionCertificateAndComm.lean"},
+        "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+      }
+    },
+    "actions": {
+      "type": "array", "minItems": 3, "maxItems": 3,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["plan_node_id", "operation", "certificate_declaration", "expected_statement", "input_goal_ids", "output_goal_ids"],
+        "properties": {
+          "plan_node_id": {"enum": ["A_SPLIT_IFF", "A_FORWARD", "A_REVERSE"]},
+          "operation": {"enum": ["split_iff", "apply_lemma"]},
+          "certificate_declaration": {"type": "string", "minLength": 1},
+          "expected_statement": {"type": "string", "minLength": 1},
+          "input_goal_ids": {"type": "array", "items": {"type": "string"}},
+          "output_goal_ids": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "root_declaration": {
+      "type": "object", "additionalProperties": false,
+      "required": ["certificate_declaration", "expected_statement"],
+      "properties": {"certificate_declaration": {"type": "string", "minLength": 1}, "expected_statement": {"type": "string", "minLength": 1}}
+    },
+    "claim_ceiling": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}
+  }
+}
