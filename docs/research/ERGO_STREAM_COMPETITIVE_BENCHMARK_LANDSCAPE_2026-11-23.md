@@ -61,6 +61,24 @@ The current leaderboard also makes cost/latency trade-offs visible: GPT-6 Astra 
 
 Source: https://asb.open-ssi.org/about
 
+### Calibration is a deployment-shift problem, not just a reliability score
+
+ErgoStream now has an evaluator-side empirical calibration metric for exact transfer claims: Brier score, log loss, fixed-bin ECE, and risk–coverage over assert/reject/abstain decisions. Its latest finite implementation reports these measures by evaluator-owned strata (representation-only, semantic/mechanism, combined shift and claim family). This is a scorecard, not a guarantee.
+
+For a stronger comparison, separate four statistical regimes:
+1. **Split conformal under exchangeability** — finite-sample marginal coverage under the exchangeability assumptions.
+2. **Weighted conformal under covariate shift** — requires a defensible density-ratio/support model; extreme weights and poor overlap must be reported.
+3. **Finite shift-class / group-conditional guarantees** — define the admitted shift class or subgroup family in advance; do not imply universal exact conditional coverage.
+4. **Online/adaptive conformal under temporal dependence** — specify the predict/update timing, dependence assumptions, drift alarms, adaptation budget and long-run error criterion.
+
+Relevant current methods:
+- **CAP (JMLR 2025):** selection-conditional finite-sample coverage under its stated setup; dynamic conformal variant for long-run false coverage rate control. https://www.jmlr.org/beta/papers/v26/24-0452.html
+- **Online martingale PAC-Bayes calibration (UAI 2026):** time-series predict-then-update certificates under temporal dependence and covariate/concept shift. https://proceedings.mlr.press/v337/huang26b.html
+- **Conformal prediction with conditional guarantees (JRSSB 2025):** useful finite-dimensional shift-class guarantees, alongside the impossibility of universal exact conditional coverage in finite samples. https://academic.oup.com/jrsssb/article/87/4/1100/8058684
+- **Weighted conformal under covariate shift:** compare known-ratio oracle and estimated-ratio variants; score support, weight concentration and effective sample size rather than treating reweighting as universally valid. https://arxiv.org/abs/1904.06019
+
+**Response:** keep the current Brier/ECE/risk–coverage evaluator as a diagnostic baseline. A later conformal adapter should be a separate validator with explicit assumptions, calibration cohort identity, temporal protocol and finite-sample guarantee. Never describe low ECE or Brier as a coverage guarantee.
+
 ### OpenScience is an industry-scale harness comparator (with a disclosed caveat)
 
 OpenScience reports 371 reusable scientific skills across 18 categories, 42 scientific-data connectors across six domains, and a lead agent that can delegate to seven bounded specialist workers. Its September 2026 benchmark page reports 75.7% on 70 Terminal-Bench Science tasks, 82.2 on 50 BiomniBench-DA tasks, and 47.3% pass@3 on its own OpenScience Bench. The same page explicitly says its evaluation setup contained issues and some comparisons were not perfect; it says the harness would be improved and results rerun. It also states that OpenScience counted one trial per task for Terminal-Bench Science while public leaderboard entries averaged three, and that OpenScience Bench is internal.
@@ -286,6 +304,10 @@ These are prospective engineering targets, not external standards or achieved re
 - AutoSciBench: https://arxiv.org/abs/2610.05140
 - AgentIdeaBench: https://arxiv.org/abs/2609.07611
 - Autonomous Science Bench 0.1: https://asb.open-ssi.org/about## 7. References
+- Weighted Conformal Prediction under Covariate Shift: https://arxiv.org/abs/1904.06019
+- Conformal Prediction with Conditional Guarantees (JRSSB 2025): https://academic.oup.com/jrsssb/article/87/4/1100/8058684
+- Online Martingale PAC-Bayes Certificates for Time Series Calibration (UAI 2026): https://proceedings.mlr.press/v337/huang26b.html
+- CAP: A General Algorithm for Online Selective Conformal Prediction with FCR Control (JMLR 2025): https://www.jmlr.org/beta/papers/v26/24-0452.html
 - GFMBenchmark: https://github.com/smufang/GFMBenchmark
 - FIRE-Bench (ICML 2026): https://proceedings.mlr.press/v306/wang26d.html
 - OpenScience benchmark and disclosed 1 October 2026 evaluation update: https://www.openscience.sh/benchmark
