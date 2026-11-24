@@ -261,7 +261,7 @@ fn validate_policy(
     Ok(())
 }
 
-fn validate_decision_model(
+pub(crate) fn validate_decision_model(
     model: &MetrologyDecisionLossModelV1,
 ) -> Result<(), MetrologyDecisionLossErrorV1> {
     require_text(&model.model_id, "decision_loss_model.model_id")?;
@@ -429,7 +429,7 @@ pub fn compute_expected_value_of_sample_information_v1(
     Ok((before, after))
 }
 
-fn score_candidate(
+pub(crate) fn score_candidate(
     candidate: &MetrologyCandidateV1,
     policy: &MetrologyDecisionLossPolicyV1,
 ) -> Result<MetrologyCandidateEvsiReportV1, MetrologyDecisionLossErrorV1> {
