@@ -392,6 +392,26 @@ mod tests {
     }
 
     #[test]
+    fn normalization_is_idempotent_and_preserves_duplicate_hypotheses() {
+        let sequent = BooleanSequent {
+            hypotheses: vec![atom("Q"), atom("P"), atom("Q"), atom("R")],
+            premises: vec![atom("S")],
+            conclusion: atom("T"),
+        };
+        let once = normalize_hypothesis_set(&sequent).unwrap();
+        let twice = normalize_hypothesis_set(&once).unwrap();
+        assert_eq!(once, twice);
+        assert_eq!(once.hypotheses.len(), sequent.hypotheses.len());
+        assert_eq!(
+            once.hypotheses
+                .iter()
+                .filter(|formula| **formula == atom("Q"))
+                .count(),
+            2
+        );
+    }
+
+    #[test]
     fn raw_and_normalized_hashes_are_domain_separated() {
         let dataset = fixture();
         let sequent = dataset.pairs[1].candidate.base.clone();
