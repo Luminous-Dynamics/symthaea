@@ -135,7 +135,7 @@ class MaceLongMemEvalV2Memory(Memory):
                     "bm25_k1": self.bm25_k1,
                     "bm25_b": self.bm25_b,
                     "tokenizer_version": "unicode_alphanumeric_v1",
-                    "retrieval_mode": "hybrid_bm25_entity_literal_with_original_image_evidence",
+                    "retrieval_mode": retrieval_mode,
                     "retrieval_channels": [
                         "trajectory_bm25_search_v1",
                         "trajectory_entity_literal_search_v1",
@@ -620,6 +620,11 @@ class MaceLongMemEvalV2Memory(Memory):
         query: str,
         response: dict[str, Any],
     ) -> None:
+        retrieval_mode = response.get("retrieval_mode")
+        require(
+            retrieval_mode == "hybrid_bm25_entity_literal_with_original_image_evidence",
+            "sidecar retrieval mode does not match the pinned hybrid backend profile",
+        )
         candidate_jsonl = response.get("candidate_evidence_jsonl")
         record_count = response.get("candidate_record_count")
         candidate_set_sha256 = response.get("candidate_set_sha256")
