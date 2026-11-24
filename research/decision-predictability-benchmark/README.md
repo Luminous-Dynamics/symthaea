@@ -1,10 +1,10 @@
 # Decision-Relevant Predictability Benchmark
 
-**Status: protocol proposal / landing page only. No executable Rust evaluator is currently committed in this directory.**
+**Status:** executable finite-world evaluator slice; broader chaotic-systems benchmark remains a protocol proposal.
 
 Parent research protocol: [issue #12546](https://github.com/Luminous-Dynamics/symthaea/issues/12546).
 
-The repository directory currently contains this README only. There is no Cargo.toml, src/ tree, fixture, Cargo.lock or dedicated workflow here. Therefore no Cargo commands or test results are claimed for this benchmark package. The issue's benchmark constitution defines the intended metrics and controls; it is not evidence that the evaluator has been implemented.
+Standalone Rust workspace: this directory. It has no external crate dependencies and uses a pinned Cargo.lock.
 
 ## Research question
 
@@ -12,50 +12,72 @@ Can a model preserve decision quality, calibrated uncertainty and useful dynamic
 
 Pointwise forecast accuracy, autonomous dynamical fidelity, decision utility, epistemic reliability and full resource cost are distinct evaluation axes. There should be no unqualified composite score.
 
-## Planned evaluator contract
+## Implemented finite-world evaluator
 
-The benchmark constitution in #12546 specifies three lanes:
+The current Rust library provides:
 
-1. **Known-truth dynamical systems:** Lorenz-63, Rössler, Mackey–Glass, logistic/Hénon maps and stable/periodic/stochastic controls with pinned equations, parameters, solvers, initial conditions and reference quantities.
-2. **Decision overlays:** action contracts with hidden evaluator state, candidate-visible observations, frozen losses/deadlines/constraints, paired worlds with observationally equivalent passive streams, and both high-information/zero-decision-value and low-information/positive-decision-value probes.
-3. **Irregular and active observations:** missingness, asynchronous channels, delayed/duplicated observations, sensor dropouts, event-triggered sampling and bounded sensor/compute budgets.
+- Candidate-visible episode, observation, permitted-probe and submission types.
+- Separate evaluator-side hidden state priors, decision-loss tables and evidence/probe outcome likelihoods.
+- Explicit conditional-independence declaration for multiple evidence channels. Correlated observations require one joint channel; the evaluator does not silently multiply arbitrary marginal likelihoods.
+- Posterior updating from authorized evidence.
+- Information-set Bayes risk under a frozen worst-case decision-loss constraint.
+- A separately labelled perfect-information lower bound and irreducible information gap.
+- Candidate expected loss, worst-case risk-gate result and decision regret.
+- Exact finite-outcome expected value of sample information (EVSI), acquisition cost, net EVSI and mutual information in bits.
+- Probe permission, componentwise budget admission and decision-deadline checks.
+- Fail-closed validation of prior mass, outcome likelihood normalization, missing decision losses, unknown observations/probes and mismatched public probe contracts.
 
-Planned metric families include:
-- Lyapunov-normalized forecast horizon only where the reference exponent is qualified;
-- autonomous statistical/dynamical fidelity after pointwise phase divergence;
-- information-set Bayes risk, decision regret, critical-risk violations, delay and correct abstention;
-- calibration and accepted-case risk;
-- Pareto frontiers over sensing/acquisition, compute, latency, memory, training/update, measured energy and communication.
+The current known-answer tests include:
+- observationally equivalent passive evidence and irreducible decision risk;
+- a perfectly discriminating probe with positive net decision value;
+- a one-bit diagnostic with zero downstream decision value;
+- a frozen worst-case risk veto;
+- over-budget and late probe rejection;
+- unknown/unpermitted probe rejection;
+- malformed outcome likelihood mass;
+- rejection of multiple evidence channels when conditional independence is not declared.
 
-Planned baselines include persistence, linear autoregression, ESN, NGRC, NGRC-MDS, compatible neural sequence models, HDC/CfC/LTC variants, fixed/event/uncertainty/entropy sampling, decision-focused EVSI and a clearly labelled synthetic oracle-information bound. The benchmark constitution lists versioning, source-family splits, paired seeds, hidden truth and non-anticipativity requirements.
+The evaluator is deterministic and does not simulate probe execution. It computes the value of a requested probe from the evaluator's declared likelihood model. The posterior and risk reports are evaluator outputs and must not be returned to the candidate during a confirmatory episode.
+
+## Run
+
+\`\`\`bash
+cargo fmt --manifest-path research/decision-predictability-benchmark/Cargo.toml -- --check
+cargo test --manifest-path research/decision-predictability-benchmark/Cargo.toml --locked --all-targets
+cargo clippy --manifest-path research/decision-predictability-benchmark/Cargo.toml --locked --all-targets -- -D warnings
+\`\`\`
+
+Focused workflow: [Decision-Relevant Predictability Evaluator](https://github.com/Luminous-Dynamics/symthaea/actions/workflows/decision-predictability-benchmark.yml).
+
+A passing run qualifies only this small finite-world evaluator. It does not qualify the full #12546 benchmark, chaotic-system reference generators, external baselines or physical sensor measurements.
 
 ## Existing related implementations — separate owners
 
 - [#9817](https://github.com/Luminous-Dynamics/symthaea/issues/9817) owns the active-sensing / decision-focused value-of-information task contract.
-- [PR #9821](https://github.com/Luminous-Dynamics/symthaea/pull/9821) contains a separate Rust active-sensing planner under research/temporal-bench. It estimates expected task-loss reduction, rejects high-entropy but decision-irrelevant observations, checks six sensor-specific resource dimensions, and returns a Pareto frontier with provenance-bound receipts. Its tests were authored in the PR; check its exact-head workflow before citing them as passing evidence. It is not the paired-world evaluator described here.
+- [PR #9821](https://github.com/Luminous-Dynamics/symthaea/pull/9821) contains a separate Rust active-sensing planner under research/temporal-bench. It estimates expected task-loss reduction, rejects high-entropy but decision-irrelevant observations, checks six sensor-specific resource dimensions, and returns a Pareto frontier with provenance-bound receipts. It is not the paired-world evaluator described here.
 - [#12407](https://github.com/Luminous-Dynamics/symthaea/issues/12407) owns observation time/mask/modality/event semantics.
 - [#12502](https://github.com/Luminous-Dynamics/symthaea/issues/12502), [#12505](https://github.com/Luminous-Dynamics/symthaea/issues/12505), [#12506](https://github.com/Luminous-Dynamics/symthaea/issues/12506) and [#12624](https://github.com/Luminous-Dynamics/symthaea/issues/12624) own known-truth dynamics, Lyapunov qualification and predictor comparisons.
 - [#5476](https://github.com/Luminous-Dynamics/symthaea/issues/5476), [#5477](https://github.com/Luminous-Dynamics/symthaea/issues/5477) and [#5478](https://github.com/Luminous-Dynamics/symthaea/issues/5478) own internal value-of-computation calibration, bounded enforcement and causal metareasoning ablations.
 
-Do not create a competing scheduler or claim that PR #9821 supplies the paired-world benchmark, chaotic reference generators, or independent evaluator process.
+Do not create a competing scheduler or claim that PR #9821 supplies the paired-world evaluator, chaotic reference generators, or independent evaluator process.
 
 ## Evaluator security boundary
 
-When implemented, candidate-facing code must receive only the observations authorized by the benchmark contract. Evaluator-only latent mechanisms, future truth and loss tables must be held in a separately permissioned process/environment for confirmatory evaluation. Rust type separation in one process is useful for unit tests, but is not a security boundary.
+The candidate-visible and evaluator-side types make the interface explicit, but a Rust type boundary in one process is **not** a process-security boundary. Confirmatory runs must keep evaluator truth, priors, hidden likelihoods and loss tables in a separately permissioned process/environment and release only authorized observations to candidates.
 
-Recorded high-rate traces can support an emulated acquisition model at requested timestamps; interpolation must not be presented as an actual observation. Physical energy claims require policy-controlled measurements on the target hardware, including acquisition, wake, conversion, compute, storage and transmission.
+Recorded high-rate traces can support an emulated acquisition model at requested timestamps; interpolation must not be presented as an actual observation. Physical energy claims require policy-controlled measurements on target hardware, including acquisition, wake, conversion, compute, storage and transmission.
 
-## Implementation status and next gates
+## Remaining implementation gates
 
-Before this landing page can describe an executable benchmark package, the repository needs:
-1. an isolated Rust Cargo workspace and reproducible lockfile;
-2. candidate-visible and evaluator-only data contracts;
-3. finite paired-world fixture and an independent evaluator;
-4. known-answer tests for observational equivalence, irreducible abstention risk, decision-changing probes, information-without-decision-value, invalid/late/over-budget probes and no leakage;
-5. a focused Rust 1.96.0 workflow for fmt, tests and strict Clippy;
-6. a separately permissioned evaluator boundary for confirmatory runs;
-7. matched simple/strong baselines and paired uncertainty intervals.
+Before this becomes the complete #12546 benchmark:
+1. add deterministic paired-world generation with evaluator-only truth and an independently permissioned execution boundary;
+2. add multiple observation channels with joint likelihood models for correlated modalities;
+3. add noisy, missing, delayed, duplicated and stale probe/observation controls;
+4. add reference generators and qualified Lyapunov normalization for the planned dynamical systems;
+5. add persistence, linear AR, ESN, NGRC, NGRC-MDS and eligible neural baselines under matched training/compute budgets;
+6. implement the complete active-observation policy tournament and Pareto resource accounting;
+7. publish paired confidence intervals, worst-regime results and full failure denominators.
 
-Until those files and workflows exist, this directory is documentation only. The benchmark constitution is a proposal; there are no results, passing tests, SOTA comparisons or physical reliability claims from this directory.
+Resource dimensions are comparable only when units, measurement boundaries, hardware and workloads match. This crate does not measure physical energy or hardware performance. Expected information gain about hidden state is reported separately from EVSI; a probe can reduce entropy without changing the optimal decision.
 
-No output associated with this proposal establishes consciousness, causal reconstruction, physical sensor reliability or SOTA.
+No output from this crate establishes SOTA, physical reliability, causal reconstruction or consciousness.
