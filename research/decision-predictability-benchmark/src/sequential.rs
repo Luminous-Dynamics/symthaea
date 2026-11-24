@@ -439,7 +439,7 @@ fn feasible_action(
         if cost > *remaining {
             return Ok(None);
         }
-        next_budget.insert(dimension.clone(), remaining - cost);
+        next_budget.insert(dimension.clone(), *remaining - cost);
     }
     Ok(Some((next_budget, next_step)))
 }
@@ -654,7 +654,7 @@ fn enumeration_feasible_action(
         if required > available {
             return Ok(None);
         }
-        budget_after.insert(dimension.clone(), available - required);
+        budget_after.insert(dimension.clone(), *available - *required);
     }
     Ok(Some((budget_after, completed_at)))
 }
