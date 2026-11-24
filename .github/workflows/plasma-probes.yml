@@ -10,6 +10,7 @@ on:
       - "benchmarks/plasma/adversarial-probes/**"
       - "benchmarks/plasma/rate-distortion/**"
       - "benchmarks/plasma/topology-lifting/**"
+      - "benchmarks/plasma/micro-macro/**"
       - ".github/workflows/plasma-probes.yml"
   pull_request:
     branches: [main]
@@ -20,6 +21,7 @@ on:
       - "benchmarks/plasma/adversarial-probes/**"
       - "benchmarks/plasma/rate-distortion/**"
       - "benchmarks/plasma/topology-lifting/**"
+      - "benchmarks/plasma/micro-macro/**"
       - ".github/workflows/plasma-probes.yml"
   workflow_dispatch:
 
@@ -59,6 +61,7 @@ jobs:
           mkdir -p "${tmp_root}/benchmarks/plasma/adversarial-probes/fixtures"
           mkdir -p "${tmp_root}/benchmarks/plasma/rate-distortion/fixtures"
           mkdir -p "${tmp_root}/benchmarks/plasma/topology-lifting/fixtures"
+          mkdir -p "${tmp_root}/benchmarks/plasma/micro-macro/fixtures"
           cp crates/domains/symthaea-plasma-probes/src/lib.rs "${crate_dir}/src/lib.rs"
           cp crates/domains/symthaea-plasma-probes/src/bin/kird_point_audit.rs "${crate_dir}/src/bin/kird_point_audit.rs"
           cp benchmarks/plasma/adversarial-probes/fixtures/synthetic-pulse-family-v0.1.json \
@@ -73,6 +76,10 @@ jobs:
             "${tmp_root}/benchmarks/plasma/topology-lifting/"
           cp benchmarks/plasma/topology-lifting/fixtures/topology-lift-known-answer-v0.1.json \
             "${tmp_root}/benchmarks/plasma/topology-lifting/fixtures/"
+          cp benchmarks/plasma/micro-macro/micro-macro-scaling-contract-v0.1.schema.json \
+            "${tmp_root}/benchmarks/plasma/micro-macro/"
+          cp benchmarks/plasma/micro-macro/fixtures/synthetic-micro-macro-contract-v0.1.json \
+            "${tmp_root}/benchmarks/plasma/micro-macro/fixtures/"
           cat > "${crate_dir}/Cargo.toml" <<'EOF'
           [package]
           name = "symthaea-plasma-probes"
@@ -150,6 +157,24 @@ jobs:
           assert opened["lift"]["boundary_distances_included"] is True
           assert fixture["claim_boundary"]["no_physical_plasma_run"] is True
           print("topology_lift_schema_validation=PASS")
+          PY
+
+      - name: Validate high-field VPFP micro-macro scaling schema and fixture
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path("${{ runner.temp }}/plasma-probe-validation/benchmarks/plasma/micro-macro")
+          schema = json.loads((root / "micro-macro-scaling-contract-v0.1.schema.json").read_text())
+          fixture = json.loads((root / "fixtures/synthetic-micro-macro-contract-v0.1.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(fixture)
+          assert fixture["cohort"]["equation_id"] == "high_field_vlasov_poisson_fokker_planck"
+          assert fixture["macro_contract"]["retained_full_order"] is True
+          assert fixture["claim_boundary"]["asymptotic_preservation_claimed"] is False
+          print("micro_macro_schema_validation=PASS")
           PY
 
       - name: Run KIRD semantic audit fixtures
