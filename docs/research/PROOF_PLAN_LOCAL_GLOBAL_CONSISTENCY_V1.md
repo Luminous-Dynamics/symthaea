@@ -305,3 +305,6 @@ This digest is an identity receipt, not an access-control mechanism or a signatu
 ## 18. Hypothesis-aware finite sequent semantics
 
 The finite propositional receipt now represents a sequent as explicit typed contextual hypotheses Γ, inference premises P₁…Pₙ, and conclusion C. ScopeBinding.hypotheses must match the canonical rendering of the typed hypothesis AST exactly; a free-text assumption description is not silently treated as a formal premise. Countermodel validation requires every contextual hypothesis and every inference premise to evaluate true while the conclusion evaluates false. The truth-table CLI uses the same combined sequent semantics. This closes a soundness gap where a counterexample could satisfy the inference premises but violate an omitted contextual assumption. The supported fragment remains bounded classical propositional logic (≤16 atoms), not Lean dependent type theory.
+
+
+The finite-oracle unit suite also includes a De Morgan equivalence control expressed with the biconditional operator. Together with converse-implication and modus-ponens cases, this exercises all supported propositional connectives (negation, conjunction, disjunction, implication and biconditional) against independently known tautological/invalid entailment cases.

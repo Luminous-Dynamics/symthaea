@@ -1319,6 +1319,46 @@ mod tests {
     }
 
     #[test]
+    fn truth_table_checks_de_morgan_equivalence_and_biconditional() {
+        let p = BooleanFormula::Atom {
+            name: "p".to_owned(),
+        };
+        let q = BooleanFormula::Atom {
+            name: "q".to_owned(),
+        };
+        let left = BooleanFormula::Not {
+            arg: Box::new(BooleanFormula::And {
+                left: Box::new(p.clone()),
+                right: Box::new(q.clone()),
+            }),
+        };
+        let right = BooleanFormula::Or {
+            left: Box::new(BooleanFormula::Not {
+                arg: Box::new(p),
+            }),
+            right: Box::new(BooleanFormula::Not {
+                arg: Box::new(q),
+            }),
+        };
+        let de_morgan = BooleanFormula::Iff {
+            left: Box::new(left),
+            right: Box::new(right),
+        };
+
+        assert_eq!(
+            check_finite_propositional_entailment(
+                &[],
+                &de_morgan,
+                MAX_FINITE_BOOLEAN_ATOMS
+            )
+            .unwrap(),
+            FiniteTruthTableResult::NoCountermodelFound {
+                assignments_checked: 4,
+            }
+        );
+    }
+
+    #[test]
     fn truth_table_accepts_modus_ponens_entailment() {
         let p = BooleanFormula::Atom {
             name: "p".to_owned(),
