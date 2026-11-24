@@ -907,7 +907,7 @@ fn state_digest(state: &MycelialSampleHealthState) -> String {
         }
         None => {
             hasher.update(&[0]);
-        },
+        }
     }
     let mut exposures: Vec<_> = state.cumulative_photon_exposures.iter().collect();
     exposures.sort_by(|left, right| {
@@ -1017,7 +1017,7 @@ fn active_sensing_report_digest(report: &MycelialActiveSensingReport) -> String 
         }
         None => {
             hasher.update(&[0]);
-        },
+        }
     }
     let mut actions: Vec<_> = report.actions.iter().collect();
     actions.sort_by(|left, right| left.action_id.cmp(&right.action_id));
@@ -1052,8 +1052,8 @@ fn active_sensing_report_digest(report: &MycelialActiveSensingReport) -> String 
                     hash_string(&mut hasher, decision_id);
                 }
                 None => {
-            hasher.update(&[0]);
-        },
+                    hasher.update(&[0]);
+                }
             }
             match outcome.conditional_bayes_risk {
                 Some(value) => {
@@ -1061,8 +1061,8 @@ fn active_sensing_report_digest(report: &MycelialActiveSensingReport) -> String 
                     hash_f64(&mut hasher, value);
                 }
                 None => {
-            hasher.update(&[0]);
-        },
+                    hasher.update(&[0]);
+                }
             }
             hash_f64(&mut hasher, outcome.expected_risk_contribution);
         }
@@ -1468,7 +1468,7 @@ pub fn mycelial_sample_health_budget_report_digest(
         }
         None => {
             hasher.update(&[0]);
-        },
+        }
     }
     hasher.update(&(report.eligible_actions.len() as u64).to_le_bytes());
     for action in &report.eligible_actions {
@@ -2289,9 +2289,13 @@ mod tests {
             MycelialAcquisitionActionKind::AlternateIllumination,
         );
         unknown_channel_proposal.photon_dose_estimates[0].channel_id = "unknown".to_string();
-        let result =
-            evaluate_mycelial_sample_health_budget(&report, &budget(), &state(), &[unknown_channel_proposal])
-                .unwrap();
+        let result = evaluate_mycelial_sample_health_budget(
+            &report,
+            &budget(),
+            &state(),
+            &[unknown_channel_proposal],
+        )
+        .unwrap();
         assert!(
             result.rejected_actions[0]
                 .reasons
@@ -2305,9 +2309,13 @@ mod tests {
             MycelialAcquisitionActionKind::AlternateIllumination,
         );
         out_of_band_proposal.photon_dose_estimates[0].wavelength_nm = 550;
-        let result =
-            evaluate_mycelial_sample_health_budget(&report, &budget(), &state(), &[out_of_band_proposal])
-                .unwrap();
+        let result = evaluate_mycelial_sample_health_budget(
+            &report,
+            &budget(),
+            &state(),
+            &[out_of_band_proposal],
+        )
+        .unwrap();
         assert!(
             result.rejected_actions[0]
                 .reasons
