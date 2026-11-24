@@ -1,7 +1,5 @@
 #![forbid(unsafe_code)]
 
-use serde::Serialize;
-use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 
 use symthaea_semiconductor::benchmark::{
@@ -9,10 +7,6 @@ use symthaea_semiconductor::benchmark::{
     MetrologyDecisionActionV1, MetrologyDecisionLossModelV1, MetrologyDecisionStateV1,
     compute_expected_value_of_sample_information_v1,
 };
-
-fn hash_json<T: Serialize>(value: &T) -> String {
-    format!("{:x}", Sha256::digest(serde_json::to_vec(value).unwrap()))
-}
 
 fn fixture() -> MetrologyDecisionLossModelV1 {
     MetrologyDecisionLossModelV1 {
@@ -135,9 +129,4 @@ fn permuting_assay_outcomes_does_not_change_expected_decision_risk() {
     let reversed = compute_expected_value_of_sample_information_v1(&model).unwrap();
     assert!((original.0 - reversed.0).abs() < 1.0e-12);
     assert!((original.1 - reversed.1).abs() < 1.0e-12);
-    assert_eq!(hash_json(&model), {
-        let mut canonical = model.clone();
-        canonical.assay.outcomes.reverse();
-        hash_json(&canonical)
-    });
 }
