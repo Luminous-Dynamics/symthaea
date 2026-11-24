@@ -109,6 +109,12 @@ This team-retention scorecard should be paired with Mycelix [DELIB-DIST-INFO-001
 
 Protocol and limitations: [TEAM_RETENTION_FACTORIAL_V0.1.md](../../../docs/benchmarks/sympoetic/TEAM_RETENTION_FACTORIAL_V0.1.md). The fixture is fictional. The estimator validates the declared AI-off receipt status and digest shape; it does not authenticate isolation or prove that an AI endpoint was actually unavailable.
 
+## Challenge-response process measures
+
+The challenge-response module summarizes independently coded task episodes: independent attempts before support, observed setbacks and reattempts, participant-requested hints/full solutions, and voluntary stopping. Each rate preserves its own observed denominator; missing or inapplicable observations are not imputed. A voluntary stop is not scored as failure. These measures must be interpreted with independent task outcomes, delayed retention, transfer and participant-reported burden.
+
+The study protocol and claim boundaries are in [CAPABILITY_AMPLIFICATION.md](../../../docs/benchmarks/sympoetic/CAPABILITY_AMPLIFICATION.md); the implementation track is [CHALLENGE-RESP-001 #13535](https://github.com/Luminous-Dynamics/symthaea/issues/13535).
+
 ## Status and limitations
 
 This is a first executable core, not a complete human-AI benchmark runner. It does not yet provide:
