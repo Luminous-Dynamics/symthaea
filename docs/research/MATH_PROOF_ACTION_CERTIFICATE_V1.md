@@ -4,7 +4,7 @@
 **Programme:** [#13293 — MATH-COMPREHENSION-001](https://github.com/Luminous-Dynamics/symthaea/issues/13293)  
 **Plan representation:** [#13326 — MATH-PROOF-PLAN-001](https://github.com/Luminous-Dynamics/symthaea/issues/13326)  
 **Lean extraction:** [#13295 — MATH-LEAN-EXTRACT-001](https://github.com/Luminous-Dynamics/symthaea/issues/13295)  
-**Status:** prospective protocol. No ProofActionCertificateV1 implementation or result is claimed.
+**Status:** protocol plus a bounded source-pinned Lean 4.37 `And.comm` local-action pilot committed; exact-head replay is pending. No general ProofActionCertificateV1 emitter/validator or benchmark result is claimed.
 
 ## 1. Research objective
 
@@ -157,3 +157,19 @@ ProofGrid contributes first-failure localization. ProofRank contributes proof-qu
 - Tactic traces are not the only valid proof plan.
 - Expert-reviewed concepts are not kernel theorems.
 - No ProofActionCertificateV1 implementation or measured outcome exists.
+
+
+## 12. First source-pinned Lean pilot (2026-11-24)
+
+A bounded pilot now exists for the three formal plan actions in the provisional `And.comm` fixture:
+
+- Source: [ProofActionCertificateAndComm.lean](../../scripts/research/lean-proof-extractor/ProofActionCertificateAndComm.lean).
+- Candidate mapping: [PROOF_ACTION_CERTIFICATE_AND_COMM_V1.json](PROOF_ACTION_CERTIFICATE_AND_COMM_V1.json), validated against [its schema](PROOF_ACTION_CERTIFICATE_AND_COMM_V1.schema.json).
+- Environment: Lean `4.37.0-rc1`, Mathlib repository commit `6ebcce37335bcb6bca64596e5d57bb3035648030`, with Lean core revision `0b77e12952ad39077d80d8bd6b66d601f225c321`.
+- `A_SPLIT_IFF`: a Lean theorem establishes that the parent iff proposition is equivalent to the conjunction of the forward and reverse implication obligations.
+- `A_FORWARD` and `A_REVERSE`: explicit local theorems use `And.symm` to prove the exact directional propositions.
+- `and_comm_plan_replay`: composes those two local certificates into the root iff theorem.
+
+The focused workflow now replays this Lean source after verifying the source SHA-256, pinned Mathlib revision and toolchain. On success it generates a machine-readable receipt containing the Symthaea commit, Lean version, Mathlib revision, Lake manifest digest, proof-source and manifest digests, action declaration mapping, and the hash of the raw `#print axioms` log. The replay log and receipt are uploaded as a workflow artifact. The committed manifest deliberately remains `kernel_replay_pending`; only the generated exact-run receipt can record an accepted result.
+
+**Current evidence boundary:** the source and workflow have been committed, but this turn did not run the Lean toolchain locally and no exact-head replay result is yet available. The pilot checks the declared local propositions and their composed root theorem; it does not yet emit elaborated pre/post goal-state snapshots, binder identity or local-instance context digests, parse the axiom/admission closure into structured fields, or validate arbitrary plan graphs. The action-to-plan mapping and mathematical-role descriptions remain provisional and unreviewed.
