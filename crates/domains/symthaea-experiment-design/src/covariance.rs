@@ -904,9 +904,11 @@ mod tests {
 
         for experiment in &mut input.experiments {
             let means = if experiment.experiment_id == "base_two_observables" {
-                vec![0.0, 1.0]
+                // H2 is deliberately closer to H0 than to H1, avoiding a
+                // floating-point near-tie in the closest-pair assertion.
+                vec![1.0, 0.0]
             } else {
-                vec![0.0, 1.0, 1.0]
+                vec![1.0, 0.0, 1.0]
             };
             experiment.predictions.push(VectorHypothesisPrediction {
                 hypothesis_id: "H2".to_owned(),
