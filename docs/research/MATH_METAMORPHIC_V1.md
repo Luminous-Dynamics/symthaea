@@ -179,7 +179,7 @@ The strict exact-scope local/global CIRR from [#13345](https://github.com/Lumino
 - LLM judge agreement is not an oracle.
 - A route failure is not theorem refutation.
 - A finite semantic oracle is complete only for its declared AST and atom budget.
-- No Symthaea metamorphic benchmark result has been collected.
+- No Symthaea model-evaluation result has been collected; the current exact-head run qualifies only the finite semantic fixtures and validator.
 
 
 ## 11. Initial executable finite contract (2026-11-24)
@@ -199,7 +199,7 @@ The finite checker maps a typed sequent to the implication from the conjunction 
 
 Candidate serialization omits evaluator-only gold relation and authority. The validator recomputes both typed-sequent digests and rejects a mismatch between the declared transformation class and the derived finite relation.
 
-**First exact-head qualification:** finite-reference passed on PR head `da35bc584c5dfed8923654fda83c2c2319ebd338` (workflow run [45463952889](https://github.com/Luminous-Dynamics/symthaea/actions/runs/45463952889)): formatting passed, 100 crate tests passed / 0 failed, and the three-pair CLI validated. The implementation has since been expanded with the hypothesis-order and incomparable controls; those two new fixtures and tests are **not yet qualified** by that earlier result.
+**Five-pair exact-head qualification:** the finite-reference job passed on code-bearing head `a8e907025c4021ab417abb35c6bb29d353191359` (workflow run [45465358113](https://github.com/Luminous-Dynamics/symthaea/actions/runs/45465358113)): formatting passed, the standalone crate reported **102 passed / 0 failed**, and the CLI validated all five pairs (two equivalent controls, one directional entailment, one route-identity-only control and one incomparable pair). The independent Lean 4.29 and 4.37 extraction/differential lanes were still in progress at that update. Subsequent branch commits were documentation-only relative to the code-bearing head.
 
 The runtime environment used for this audit did not contain Cargo/Rust, so Rust execution was performed by the pinned GitHub workflow, not locally. This finite contract is not Lean kernel replay, does not evaluate arbitrary mathematical propositions, and is not a model evaluation or CIRR score.
 
