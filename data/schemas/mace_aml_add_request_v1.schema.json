@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mace_aml_add_request_v1.schema.json",
+  "title": "MACE AML Add request v1",
+  "description": "Strict snapshot of the public AML Add wire contract. Runtime validators must additionally enforce decoded media byte limits and total request size.",
+  "type": "object",
+  "properties": {
+    "request_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096
+    },
+    "messages": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/message"
+      }
+    },
+    "user_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096
+    },
+    "session_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096
+    }
+  },
+  "required": [
+    "request_id",
+    "messages",
+    "user_id",
+    "session_id"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "contentPart": [
+      {
+        "type": "object",
+        "properties": {
+          "type": {
+            "const": "text"
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "type",
+          "text"
+        ],
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "properties": {
+          "type": {
+            "const": "image_url"
+          },
+          "image_url": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string",
+                "pattern": "^data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$"
+              }
+            },
+            "required": [
+              "url"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "type",
+          "image_url"
+        ],
+        "additionalProperties": false
+      }
+    ],
+    "message": {
+      "type": "object",
+      "properties": {
+        "role": {
+          "type": "string",
+          "enum": [
+            "user",
+            "assistant"
+          ]
+        },
+        "timestamp": {
+          "type": "integer"
+        },
+        "content": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/contentPart"
+              }
+            }
+          ]
+        }
+      },
+      "required": [
+        "role",
+        "content"
+      ],
+      "additionalProperties": false
+    }
+  }
+}
