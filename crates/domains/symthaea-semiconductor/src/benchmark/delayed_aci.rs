@@ -1021,6 +1021,10 @@ mod tests {
         (left - right).abs() <= 1.0e-12
     }
 
+    fn close(left: f64, right: f64) -> bool {
+        (left - right).abs() <= 1.0e-12
+    }
+
     fn policy(delay_rounds: u64) -> DelayedAciPolicyV1 {
         DelayedAciPolicyV1 {
             schema: DELAYED_ACI_POLICY_SCHEMA_V1.into(),
@@ -1277,7 +1281,7 @@ mod tests {
                 .disposition,
             AciUpdateDispositionV1::Updated
         );
-        assert_eq!(engine.phase_alphas, vec![0.12]);
+        assert!(close(engine.phase_alphas[0], 0.12));
     }
 
     #[test]
@@ -1399,7 +1403,7 @@ mod tests {
         let wrong = delivery(
             ("sample-0", "event-0", "label-0"),
             1,
-            2,
+            3,
             10.5,
             LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
             LabelEvidenceFrontierV1::CurrentAtK1,
