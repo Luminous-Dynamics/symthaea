@@ -5,10 +5,12 @@ use serde::Serialize;
 const MAX_INPUT_BYTES: u64 = 8 * 1024 * 1024;
 
 use symthaea_experiment_design::{
-    ExperimentDesignInput, covariance::{
+    ExperimentDesignInput,
+    covariance::{
         CovarianceAwareDesignInput, covariance_redundancy_fixture,
         rank_covariance_aware_experiments,
-    }, galileo_demo_input, rank_experiments,
+    },
+    galileo_demo_input, rank_experiments,
 };
 
 fn main() -> ExitCode {
@@ -131,5 +133,7 @@ fn print_usage() {
     println!("  --covariance        read a covariance-design-v0.1 JSON request from stdin");
     println!("  --help              show this help");
     println!("  no args             read a physics-experiment-design-v0.1 JSON request from stdin");
-    println!("The covariance score is a prior-free screening statistic, not expected information gain.");
+    println!(
+        "The covariance score is a prior-free screening statistic, not expected information gain."
+    );
 }
