@@ -95,6 +95,26 @@ Do not infer durable learning from a good joint artifact or one immediate post-t
 - Do not use the evaluated AI as the sole author, tutor, judge, or source of ground truth.
 - Give participants a right to stop, correct, or withdraw, and do not silently retain learning profiles beyond the approved scope.
 
+### Challenge-response process measures
+
+A capability study must describe how a participant encounters and responds to difficulty, but must not reward struggle, delayed help or persistence as ends in themselves.
+
+A randomized study first published 13 November 2026 compared human tutoring, a generative-AI tutor and unguided internet search for challenging mathematics among 16–18-year-old students. It found different effort/difficulty and attempt patterns across support conditions, but no condition difference in subsequent challenge-seeking; that outcome was more strongly associated with pre-existing challenge-seeking disposition. The design implication is to measure observable process and baseline dispositions separately, not to assume more effort or more persistence means better learning. Source: https://doi.org/10.1111/bjet.70100
+
+The v0.1 challenge-response module reports separate rates for:
+- An independent attempt before support.
+- An observed setback and a further attempt after it.
+- Participant-requested hints and full solutions.
+- Voluntary pause/stop.
+
+Each endpoint carries its own observed denominator. Not applicable or unavailable records remain None rather than becoming false. Reattempts without a recorded setback are rejected. Voluntary stopping is reported independently and is not a negative capability score. Hint and full-solution requests are not failures: the participant is entitled to request the support they prefer.
+
+These are process descriptors, not stable traits or diagnoses. Do not label participants as resilient, lazy, unmotivated, low-ability or employable from them. Effort, perceived difficulty, distress, time-on-task and task outcome remain separate measures. Process measures must be interpreted alongside independent immediate performance, delayed retention, held-out transfer, assistance dose and participant-reported burden. More effort or less AI use alone cannot qualify capability amplification.
+
+A further warning comes from the 2026 meta-analysis of eight independent cognitive-training RCTs (722 randomized participants): sustained cognitive far-transfer was near zero on average (Hedges g=0.02, 95% CI -0.26 to 0.29; five trials, N=397), with limited functional far-transfer evidence and no included trial at overall low risk of bias. This is a different population and intervention from SympoeticBench; use it as a methodological warning, not a direct effect-size comparator. Source: https://doi.org/10.3389/fnagi.2026.1952783
+
+The research question is whether a support policy enables useful work during difficulty while preserving independent capability and agency—not whether it maximizes struggle, persistence or answer withholding.
+
 ## 7. Distributional capability amplification
 
 A pooled positive treatment effect can hide a subgroup that experiences no benefit or loses independent capability. The confirmatory design should therefore preregister baseline task-capability strata (for example, low, middle, and high baseline score bands) before examining post-test outcomes.
