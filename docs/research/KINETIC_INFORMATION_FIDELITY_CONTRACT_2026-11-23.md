@@ -966,3 +966,44 @@ The report includes minimum/maximum Gramian eigenvalues, finite condition number
 
 **Claim ceiling:** this is a manufactured finite-dimensional linear interface oracle. It does not establish observability or stabilizability of nonlinear Vlasov–Poisson, and its A/B/C matrices must eventually come from an independently qualified kinetic linearization or dispersion analysis. Closed-loop nonlinear replay remains a separate mandatory gate. A timing-contract pass cannot substitute for unstable-subspace authority; a linear authority pass cannot substitute for actuator physics or full-order stability.
 
+
+
+## Structure-informed delayed Vlasov–Maxwell feedback (SIM-VM)
+
+New companion programme: [#13570 — reproduce and extend structure-informed delayed Vlasov–Maxwell feedback](https://github.com/Luminous-Dynamics/symthaea/issues/13570).
+
+A new primary baseline is Lu & Wang (2026), [Structure-Informed Electromagnetic Feedback Control of the Vlasov–Maxwell System with Delayed Observations](https://arxiv.org/abs/2611.11787), submitted 9 Nov 2026.
+
+The paper uses a 1D2V periodic VM system and combines:
+- an energy-identity-derived field-cancellation baseline;
+- electric and magnetic actuation (magnetic force alone does no particle work and cannot directly regulate radial kinetic moments);
+- delayed macro observations \(J_1,J_2,\partial_xE_2,\partial_xB_3\) derived from Maxwell's equations;
+- a low-rank linear neural operator (LNO) residual correction over delayed field cancellation;
+- adjoint-state training and a semi-Lagrangian kinetic solver coupled to Yee/leapfrog transverse field updates.
+
+The paper tests two-stream and Weibel-type/current-filamentation instability. It trains over \(t\in[0,20]\), evaluates beyond training, uses a reference delay \(\tau_{\rm ref}=0.6\), and tests mismatched delays \(\tau\in\{0.2,0.4,0.8,1.0\}\). It reports that uncorrected residuals undercompensate at longer delay and can overcompensate at shorter delay; scaling the learned dissipation by \(\tau/\tau_{\rm ref}\) improves the tested mismatch cases. It compares gradient-informed observations against raw field components and LNO against a parameter-matched FNO: FNO was less sensitive in tested shorter-delay cases, while the corrected LNO was slightly stronger in the two-stream test and the FNO moderately stronger in the current-filamentation test.
+
+Two methodological caveats matter for our benchmark:
+1. The paper's approximate gradient freezes state-dependent feedback observations during each gradient evaluation, recomputing the trajectory after each update; it omits the exact derivative contribution through changes in the closed-loop observation trajectory.
+2. The authors explicitly leave noisy observations and regularized spatial-derivative estimation for future work because spatial gradients can amplify measurement noise.
+
+The first code increment in [PR #13405](https://github.com/Luminous-Dynamics/symthaea/pull/13405) is a deterministic Maxwell delay baseline with bounded nonuniform history integration. Given delayed fields and interval-mean currents/gradients over the exact window, it evaluates
+\[
+H_1=-E_{1,\rm delayed}+\tau\overline{J_1},\quad
+H_2=-E_{2,\rm delayed}+\tau(\overline{J_2}+\overline{\partial_x B_3}),\quad
+B_{\rm ext}=-B_{3,\rm delayed}+\tau\overline{\partial_x E_2}.
+\]
+This is the exact interval-integral cancellation identity when the supplied means are exact. The history integrator uses nonuniform-time trapezoidal quadrature, requires both window endpoints, shares a common spatial grid, and fails closed on incomplete history or work-budget overflow. It does not yet include a noisy derivative observer, learned residual, VM solve or closed-loop validation.
+
+The differentiated benchmark should now compare:
+- delayed cancellation only;
+- interval-integral Maxwell predictor;
+- paper-faithful endpoint-observation LNO residual;
+- parameter-matched FNO residual;
+- field-component-only versus current/gradient-informed observations;
+- regularized derivative observers under sensor noise and finite spatial resolution;
+- delay scaling \(\tau/\tau_{\rm ref}\), explicit delay-conditioned operators and variable-delay history-state models;
+- the paper's frozen-observation adjoint against an exact discrete closed-loop adjoint.
+
+Use delay normalized by the measured modal e-fold time and oscillation period, not only an absolute \(\tau\). Include stochastic jitter, sample age, derivative-noise amplification, bounded actuator magnitude/slew, mode transfer, full kinetic \(L^2\) error, electromagnetic energy, control work, Maxwell constraints and coupled unstable-subspace authority (#13564). A controller that lowers field energy while increasing the full kinetic perturbation is not a pass.
+
