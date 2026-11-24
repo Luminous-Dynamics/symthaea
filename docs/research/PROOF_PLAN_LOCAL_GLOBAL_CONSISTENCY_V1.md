@@ -308,3 +308,32 @@ The finite propositional receipt now represents a sequent as explicit typed cont
 
 
 The finite-oracle unit suite also includes a De Morgan equivalence control expressed with the biconditional operator. Together with converse-implication and modus-ponens cases, this exercises all supported propositional connectives (negation, conjunction, disjunction, implication and biconditional) against independently known tautological/invalid entailment cases.
+
+
+## 19. Separate warrant invalidity from global-use adjudication (LocalGlobalPairV1 1.1.0)
+
+The paired receipt now keeps two evaluator questions distinct:
+
+1. **Is the proposed warrant mathematically invalid under the exact paired scope?** This is adjudicated by the existing independently-assessed warrant authority and its countermodel/formal/review evidence.
+2. **Did the global proof plan materially use that exact warrant?** This is adjudicated separately by global-use adjudication.
+
+The new global-use record binds:
+- the reviewer and declared review authority;
+- the exact candidate global proof-plan digest;
+- the exact target warrant ID, which must equal both local and global scope warrant identities;
+- a complete-plan review flag;
+- node evidence for each candidate-visible target-warrant mention, bound by exact mention ID, plan-node ID, warrant ID and relation;
+- rationale references that resolve through the adjudication evidence list.
+
+For a disposition marked as known after complete-plan review, every candidate-visible mention of the target warrant must be accounted for. This prevents a receipt from declaring omission while leaving an unreviewed target-warrant mention in the candidate plan. Material use is consistent with the typed relation: uses-as-rule and supports-inference must be material; cites, rebuts, context-only and alternative must be non-material.
+
+Disposition gates:
+- used-directly requires a material uses-as-rule node.
+- used-implicitly requires a material supports-inference node and no material direct-use node.
+- cited-rejected requires non-material cite/rebut evidence only.
+- omitted requires a complete review with no material or cite/rebut use.
+- unknown remains an explicit unresolved outcome and is still retained in CIRR's denominator/bounds when the pair is otherwise eligible.
+
+The CIRR numerator/denominator formula is unchanged. The aggregator still counts the same direct/implicit material-use dispositions, but pair validation now rejects an unsupported disposition before aggregation. The receipt schema has been incremented to 1.1.0.
+
+**Trust boundary:** reviewer ID, declared review authority and evidence references are traceability fields, not cryptographic proof of reviewer identity, independence, competence or blinding. Those properties must be established by the experimental process and, for confirmatory use, by independently retained review artifacts and governance. The synthetic fixture exercises structural consistency only; it is not a real human adjudication or a measured CIRR result.
