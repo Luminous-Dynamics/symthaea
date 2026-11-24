@@ -19,7 +19,7 @@ Mycelix owns the group-level experiment, conditions, task governance and interpr
 
 TMS scaffolding may help participants record who has relevant expertise, surface unique facts, route questions, preserve unresolved claims and invite independent contributions. It must not become a compulsory expertise registry or a surveillance mechanism.
 
-All four arms must be assessed on comparable task families, with task order, time budgets, information budgets and scoring rules specified before confirmatory collection. The AI model/runtime configuration is pinned and must match across the two AI-exposure arms; the TMS intervention is a separately declared experimental factor.
+All four arms must be assessed on comparable task families, with task order, time budgets, information budgets and scoring rules specified before confirmatory collection. The AI model/runtime configuration is pinned and must match across the two AI-exposure arms. The transactive-memory intervention also has a pinned configuration digest that must match across both TMS arms; non-TMS arms carry NA. These are independent factors and must not change together.
 
 ## Measurement contract
 
@@ -38,7 +38,7 @@ Required measures, each bounded to [0, 1]:
 
 Immediate, delayed and transfer gains are each calculated as the corresponding AI-off accuracy minus baseline accuracy. Retention, routing and agency remain separate outcomes; they are not collapsed into a single “team intelligence” score.
 
-The input also carries a task-bundle digest, pinned AI-configuration digest for AI arms, a declared AI-off gate status and a per-team AI-off receipt digest. The current v0.1 code validates digest shape, uniqueness and declared status. It does **not** authenticate the recorder, prove endpoint isolation, or independently establish that cached model outputs and agent processes were removed. A real confirmatory runner must provide that independent isolation evidence.
+The input also carries a task-bundle digest, pinned AI-configuration digest for AI arms, pinned TMS-configuration digest for TMS arms, a declared AI-off gate status and a per-team AI-off receipt digest. The current v0.1 code validates digest shape, uniqueness and declared status. It does **not** authenticate the recorder, prove endpoint isolation, or independently establish that cached model outputs and agent processes were removed. A real confirmatory runner must provide that independent isolation evidence.
 
 ## Factorial estimands
 
