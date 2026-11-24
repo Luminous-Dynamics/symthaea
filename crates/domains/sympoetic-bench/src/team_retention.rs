@@ -261,7 +261,7 @@ fn parse_tsv(input: &str) -> Result<Vec<TeamObservation>, String> {
     Ok(observations)
 }
 
-fn require_nonempty(value: &str, name: &str, line_number: usize) -> Result<&str, String> {
+fn require_nonempty<'a>(value: &'a str, name: &str, line_number: usize) -> Result<&'a str, String> {
     if value.trim().is_empty() {
         Err(format!("line {line_number}: {name} must not be empty"))
     } else {
