@@ -460,6 +460,76 @@ fn validate_graph(
     Ok((nodes, ordered))
 }
 
+fn validate_requalification_report(
+    report: &VmSnapshotRequalificationReportV1,
+    node: &VmModelSnapshotNodeV1,
+) -> Result<(), VmImpactClosureErrorV1> {
+    if report.consumed_label_count != report.label_statuses.len() {
+        return Err(VmImpactClosureErrorV1(format!(
+            "snapshot {} consumed-label count does not match its row-level K1 statuses",
+            report.snapshot_id
+        )));
+    }
+
+    let mut label_ids = BTreeSet::new();
+    let mut eligible = 0_usize;
+    let mut unknown = 0_usize;
+    let mut blocked = 0_usize;
+    for label in &report.label_statuses {
+        require_text(&label.label_id, "requalification.label_id")?;
+        if !label_ids.insert(label.label_id.as_str()) {
+            return Err(VmImpactClosureErrorV1(format!(
+                "snapshot {} repeats K1 label status {}",
+                report.snapshot_id, label.label_id
+            )));
+        }
+        match label.k1_eligibility {
+            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy => eligible += 1,
+            LabelConsumptionEligibilityV1::Unknown => unknown += 1,
+            LabelConsumptionEligibilityV1::Blocked => blocked += 1,
+        }
+        if !valid_sha256(&label.k0_projection_sha256)
+            || !valid_sha256(&label.k1_report_sha256)
+        {
+            return Err(VmImpactClosureErrorV1(format!(
+                "snapshot {} has malformed per-label K0/K1 receipt digest",
+                report.snapshot_id
+            )));
+        }
+    }
+
+    if eligible != report.current_eligible_count
+        || unknown != report.current_unknown_count
+        || blocked != report.current_blocked_count
+    {
+        return Err(VmImpactClosureErrorV1(format!(
+            "snapshot {} aggregate K1 counts disagree with row-level statuses",
+            report.snapshot_id
+        )));
+    }
+
+    let disposition_consistent = match report.current_disposition {
+        VmSnapshotCurrentDispositionV1::CurrentEligible => {
+            eligible == report.consumed_label_count && unknown == 0 && blocked == 0
+        }
+        VmSnapshotCurrentDispositionV1::Indeterminate => unknown > 0 && blocked == 0,
+        VmSnapshotCurrentDispositionV1::RebuildRequired => {
+            node.purpose == VmSnapshotPurposeV1::Training && blocked > 0
+        }
+        VmSnapshotCurrentDispositionV1::HistoricalOnly => {
+            node.purpose == VmSnapshotPurposeV1::Evaluation && blocked > 0
+        }
+    };
+    if !disposition_consistent {
+        return Err(VmImpactClosureErrorV1(format!(
+            "snapshot {} K1 disposition conflicts with its purpose or label statuses",
+            report.snapshot_id
+        )));
+    }
+
+    Ok(())
+}
+
 fn direct_risk(disposition: VmSnapshotCurrentDispositionV1) -> ImpactRiskV1 {
     match disposition {
         VmSnapshotCurrentDispositionV1::CurrentEligible => ImpactRiskV1::None,
@@ -622,6 +692,7 @@ pub fn compute_vm_snapshot_impact_closure_v1(
                 snapshot_id
             )));
         }
+        validate_requalification_report(report, node)?;
     }
 
     let mut direct_risks: BTreeMap<String, ImpactRiskV1> = BTreeMap::new();
@@ -1627,6 +1698,26 @@ mod tests {
             report.reason_codes,
             vec!["snapshot_requalification_coverage_incomplete"]
         );
+    }
+
+    #[test]
+    fn inconsistent_row_level_and_aggregate_requalification_counts_are_rejected() {
+        let root = node(
+            "root",
+            VmModelDerivationKindV1::IndependentRetrain,
+            VmSnapshotPurposeV1::Training,
+            'a',
+            'b',
+        );
+        let g = graph(vec![root.clone()], Vec::new(), true, true);
+        let mut report = requal(
+            "root",
+            &root.manifest_sha256,
+            VmSnapshotCurrentDispositionV1::CurrentEligible,
+        );
+        report.current_eligible_count = 0;
+        report.report_sha256 = requalification_digest(&report).unwrap();
+        assert!(compute_vm_snapshot_impact_closure_v1(&input(g, vec![report])).is_err());
     }
 
     #[test]
