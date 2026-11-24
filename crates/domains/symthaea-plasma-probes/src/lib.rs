@@ -6509,8 +6509,14 @@ mod tests {
                 expected["actuator_command_count"].as_u64().unwrap() as u32
             );
             assert_eq!(report.observable, expected["observable"].as_bool().unwrap());
-            assert_eq!(report.controllable, expected["controllable"].as_bool().unwrap());
-            assert_eq!(report.authority_qualified, expected["authority_qualified"].as_bool().unwrap());
+            assert_eq!(
+                report.controllable,
+                expected["controllable"].as_bool().unwrap()
+            );
+            assert_eq!(
+                report.authority_qualified,
+                expected["authority_qualified"].as_bool().unwrap()
+            );
         }
     }
 
@@ -6594,11 +6600,8 @@ mod tests {
 
     #[test]
     fn coupled_two_mode_authority_rejects_invalid_and_non_unstable_contracts() {
-        let mut contract = coupled_two_mode_contract(
-            [1.2, 0.0, 0.0, 1.1],
-            [[1.0, 0.0], [0.0, 1.0]],
-            [1.0, 1.0],
-        );
+        let mut contract =
+            coupled_two_mode_contract([1.2, 0.0, 0.0, 1.1], [[1.0, 0.0], [0.0, 1.0]], [1.0, 1.0]);
         contract.diagnostic_noise_variance = [0.0, 1.0];
         assert!(matches!(
             evaluate_coupled_two_mode_authority(contract),
