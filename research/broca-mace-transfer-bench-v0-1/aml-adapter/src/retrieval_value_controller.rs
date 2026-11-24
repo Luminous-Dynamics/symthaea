@@ -210,7 +210,12 @@ pub fn select_next_retrieval_action_v1(
         }
 
         let offer_sha256 = offer.offer_sha256();
-        if !seen.insert(offer_sha256.clone()) {
+        let action_identity = (
+            offer.kind as u8,
+            offer.tool_revision_sha256.clone(),
+            offer.action_template_sha256.clone(),
+        );
+        if !seen.insert(action_identity) {
             return Err(RetrievalControllerRejectV1::DuplicateOffer);
         }
 
@@ -474,8 +479,14 @@ mod tests {
     #[test]
     fn rejects_duplicate_identical_offers() {
         let candidate = offer(RetrievalActionKindV1::Bm25Lexical, TEMPLATE_A, 100, 0, 0, 0);
+        let same_action_with_conflicting_estimate =
+            offer(RetrievalActionKindV1::Bm25Lexical, TEMPLATE_A, 120, 0, 0, 0);
         assert_eq!(
-            select_next_retrieval_action_v1(&[candidate.clone(), candidate], &policy(), state()),
+            select_next_retrieval_action_v1(
+                &[candidate, same_action_with_conflicting_estimate],
+                &policy(),
+                state()
+            ),
             Err(RetrievalControllerRejectV1::DuplicateOffer)
         );
     }
