@@ -11,10 +11,14 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
 
+use super::calibration_requalification::{
+    CALIBRATION_REQUALIFICATION_REPORT_SCHEMA_V1, CalibrationRequalificationReportV1,
+};
 use super::label_consumption_guard::{
     LABEL_CONSUMPTION_REPORT_SCHEMA_V1, LabelConsumptionEligibilityReportV1,
     LabelConsumptionEligibilityV1, LabelEvidenceFrontierV1,
 };
+use super::metrology_qualification_gate::MeasurementQualificationStatusV1;
 
 pub const DRIFT_MONITOR_SCHEMA_V1: &str = "luminous.semi-bench.drift-monitor.v1";
 pub const DRIFT_POLICY_SCHEMA_V1: &str = "luminous.semi-bench.drift-policy.v1";
@@ -59,6 +63,7 @@ pub enum DriftEvidenceKindV1 {
 pub enum DriftQualificationV1 {
     NotApplicable,
     CurrentK1Eligible,
+    QualifiedSystemEvidence,
     Unknown,
     Blocked,
 }
@@ -172,8 +177,10 @@ pub struct DriftObservationInputV1 {
     pub baseline_sha256: String,
     pub evidence_kind: DriftEvidenceKindV1,
     pub qualification: DriftQualificationV1,
+    pub measurement_event_id: Option<String>,
     pub evidence_receipt_sha256: String,
     pub qualification_report: Option<LabelConsumptionEligibilityReportV1>,
+    pub calibration_report: Option<CalibrationRequalificationReportV1>,
     pub prediction_receipt_sha256: Option<String>,
     pub source_label_ids: Vec<String>,
     /// Standardized scalar for EWMA/CUSUM; missingness is represented separately.
@@ -200,6 +207,7 @@ pub struct DriftObservationReceiptV1 {
     pub observed_at_unix_seconds: i64,
     pub knowledge_frontier_unix_seconds: i64,
     pub evidence_receipt_sha256: String,
+    pub measurement_event_id: Option<String>,
     pub feature_schema_sha256: String,
     pub baseline_sha256: String,
     pub clock_domain_id: String,
@@ -365,7 +373,7 @@ fn evidence_kind_matches(input: &DriftObservationInputV1) -> bool {
         ) | (
             DriftEvidencePlaneV1::MeasurementSystem,
             DriftEvidenceKindV1::CalibrationQualification,
-            DriftQualificationV1::NotApplicable
+            DriftQualificationV1::QualifiedSystemEvidence
         ) | (
             DriftEvidencePlaneV1::ProcessContext,
             DriftEvidenceKindV1::ProcessEvent,
@@ -426,6 +434,7 @@ fn make_receipt(
         observed_at_unix_seconds: input.observed_at_unix_seconds,
         knowledge_frontier_unix_seconds: input.knowledge_frontier_unix_seconds,
         evidence_receipt_sha256: input.evidence_receipt_sha256.clone(),
+        measurement_event_id: input.measurement_event_id.clone(),
         feature_schema_sha256: input.feature_schema_sha256.clone(),
         baseline_sha256: input.baseline_sha256.clone(),
         clock_domain_id: input.clock_domain_id.clone(),
@@ -463,6 +472,14 @@ pub fn create_drift_monitor_engine_v1(
         channels: BTreeMap::new(),
         seen_evidence_receipt_sha256: BTreeSet::new(),
     })
+}
+
+fn calibration_report_digest(
+    report: &CalibrationRequalificationReportV1,
+) -> Result<String, DriftMonitorErrorV1> {
+    let mut canonical = report.clone();
+    canonical.report_sha256.clear();
+    json_sha256(&canonical)
 }
 
 fn validate_input(
@@ -520,11 +537,55 @@ fn validate_input(
             || !valid_sha256(&report.label_sha256)
             || input.source_label_ids.len() != 1
             || input.source_label_ids.first() != Some(&report.label_id)
+            || input.measurement_event_id.as_deref() != Some(report.measurement_event_id.as_str())
             || input.prediction_receipt_sha256.as_deref().is_none_or(|value| !valid_sha256(value))
         {
             return Err(DriftObservationReasonV1::MissingEvidenceDigest);
         }
     } else if input.qualification_report.is_some() || input.prediction_receipt_sha256.is_some() {
+        return Err(DriftObservationReasonV1::EvidenceKindPlaneMismatch);
+    }
+
+    if input.plane == DriftEvidencePlaneV1::MeasurementSystem {
+        let Some(report) = input.calibration_report.as_ref() else {
+            return Err(DriftObservationReasonV1::EvidenceKindPlaneMismatch);
+        };
+        if report.schema != CALIBRATION_REQUALIFICATION_REPORT_SCHEMA_V1
+            || input.measurement_event_id.as_deref() != Some(report.measurement_event_id.as_str())
+            || calibration_report_digest(report).ok().as_deref()
+                != Some(report.report_sha256.as_str())
+            || report.report_sha256 != input.evidence_receipt_sha256
+            || !valid_sha256(&report.current_at_k1.frontier_input_sha256)
+            || report.k1_unix_seconds > input.knowledge_frontier_unix_seconds
+            || report.equipment_control_authority
+        {
+            return Err(DriftObservationReasonV1::MissingEvidenceDigest);
+        }
+        match report.current_at_k1.status {
+            MeasurementQualificationStatusV1::Qualified
+                if report.current_at_k1.downstream_consumption_allowed_at_frontier => {}
+            MeasurementQualificationStatusV1::Unknown => {
+                return Err(DriftObservationReasonV1::QualificationUnknown);
+            }
+            MeasurementQualificationStatusV1::Rejected
+            | MeasurementQualificationStatusV1::Qualified => {
+                return Err(DriftObservationReasonV1::QualificationBlocked);
+            }
+        }
+    } else if input.calibration_report.is_some() {
+        return Err(DriftObservationReasonV1::EvidenceKindPlaneMismatch);
+    }
+
+    if input.plane != DriftEvidencePlaneV1::QualifiedResidual
+        && (!input.source_label_ids.is_empty()
+            || input.qualification_report.is_some()
+            || input.prediction_receipt_sha256.is_some())
+    {
+        return Err(DriftObservationReasonV1::EvidenceKindPlaneMismatch);
+    }
+    if input.plane != DriftEvidencePlaneV1::MeasurementSystem
+        && input.calibration_report.is_some()
+    {
         return Err(DriftObservationReasonV1::EvidenceKindPlaneMismatch);
     }
     if input.source_label_ids.iter().any(|label| label.trim().is_empty()) {
@@ -961,6 +1022,37 @@ mod tests {
         create_drift_monitor_engine_v1("drift-001", "fab-clock", policy()).unwrap()
     }
 
+    fn eligible_calibration_report(event_id: &str, evidence: char) -> CalibrationRequalificationReportV1 {
+        let frontier = super::super::super::super::benchmark::calibration_requalification::CalibrationRequalificationFrontierReportV1 {
+            frontier_input_sha256: digest(evidence),
+            status: MeasurementQualificationStatusV1::Qualified,
+            downstream_consumption_allowed_at_frontier: true,
+            reason_codes: Vec::new(),
+            potentially_applicable_event_ids: Vec::new(),
+            applied_event_ids: Vec::new(),
+        };
+        let mut report = CalibrationRequalificationReportV1 {
+            schema: CALIBRATION_REQUALIFICATION_REPORT_SCHEMA_V1.into(),
+            input_id: format!("cal-{event_id}"),
+            measurement_event_id: event_id.into(),
+            calibration_certificate_id: "cal-cert-1".into(),
+            original_k0_qualification_sha256: digest('1'),
+            owner_event_inventory_sha256: digest('2'),
+            canonical_input_sha256: digest('3'),
+            k0_unix_seconds: 99,
+            k1_unix_seconds: 101,
+            as_known_at_k0: frontier.clone(),
+            current_at_k1: frontier,
+            source_authenticity_proven: false,
+            equipment_control_authority: false,
+            report_sha256: String::new(),
+        };
+        let mut canonical = report.clone();
+        canonical.report_sha256.clear();
+        report.report_sha256 = json_sha256(&canonical).unwrap();
+        report
+    }
+
     fn eligible_label_report(label_id: &str, evidence: char) -> LabelConsumptionEligibilityReportV1 {
         let mut report = LabelConsumptionEligibilityReportV1 {
             schema: LABEL_CONSUMPTION_REPORT_SCHEMA_V1.into(),
@@ -1006,10 +1098,20 @@ mod tests {
         } else {
             None
         };
+        let calibration_report = if plane == DriftEvidencePlaneV1::MeasurementSystem {
+            Some(eligible_calibration_report(&format!("event-{id}"), receipt))
+        } else {
+            None
+        };
         let evidence_receipt_sha256 = qualification_report
             .as_ref()
             .map(|report| report.report_sha256.clone())
+            .or_else(|| calibration_report.as_ref().map(|report| report.report_sha256.clone()))
             .unwrap_or_else(|| digest(receipt));
+        let measurement_event_id = qualification_report
+            .as_ref()
+            .map(|report| report.measurement_event_id.clone())
+            .or_else(|| calibration_report.as_ref().map(|report| report.measurement_event_id.clone()));
         DriftObservationInputV1 {
             schema: DRIFT_OBSERVATION_SCHEMA_V1.into(),
             observation_id: id.into(),
@@ -1025,8 +1127,10 @@ mod tests {
             baseline_sha256: digest('b'),
             evidence_kind,
             qualification,
+            measurement_event_id,
             evidence_receipt_sha256,
             qualification_report,
+            calibration_report,
             prediction_receipt_sha256: if plane == DriftEvidencePlaneV1::QualifiedResidual {
                 Some(digest('p'))
             } else {
@@ -1263,7 +1367,7 @@ mod tests {
             DriftEvidencePlaneV1::MeasurementSystem,
             DriftDetectorKindV1::EventChange,
             DriftEvidenceKindV1::CalibrationQualification,
-            DriftQualificationV1::NotApplicable,
+            DriftQualificationV1::QualifiedSystemEvidence,
             Some(1.0),
             100,
             'd',
