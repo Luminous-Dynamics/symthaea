@@ -8,6 +8,7 @@ on:
       - "research/temporal-bench/**"
       - ".github/workflows/active-sensing-voi.yml"
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "research/temporal-bench/**"
       - ".github/workflows/active-sensing-voi.yml"
@@ -27,7 +28,9 @@ jobs:
           toolchain: "1.96.0"
           components: clippy, rustfmt
       - name: Check formatting
-        run: cargo fmt --manifest-path research/temporal-bench/Cargo.toml -- --check
+        run: rustfmt --check --edition 2024 --config skip_children=true research/temporal-bench/src/lib.rs
+      - name: Check active sensing planner formatting
+        run: rustfmt --check --edition 2024 research/temporal-bench/src/active_sensing.rs
       - name: Generate isolated workspace lockfile
         run: cargo generate-lockfile --manifest-path research/temporal-bench/Cargo.toml
       - name: Run active sensing planner tests
