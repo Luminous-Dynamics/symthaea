@@ -227,7 +227,7 @@ jobs:
             and .plan_id == "PROOFPLAN-AND-COMM-001"
             and .environment.lean_toolchain == "leanprover/lean4:v4.37.0-rc1"
             and .environment.mathlib_revision == "6ebcce37335bcb6bca64596e5d57bb3035648030"
-            and .proof_source.sha256 == "efe4b42620f333ba90fd09e706d181adeaa0aa62ebc99883311b67d38ff71622"
+            and .proof_source.sha256 == "1e9eae95fbe85d3b32793c22313f8e1b67608b19fc266fb047e278663cd1ac73"
             and ([.actions[].plan_node_id] == ["A_SPLIT_IFF", "A_FORWARD", "A_REVERSE"])
             and .root_declaration.certificate_declaration == "ProofPlanActionCertificatePilot.and_comm_plan_replay"
             and (.claim_ceiling | length) >= 5' \
