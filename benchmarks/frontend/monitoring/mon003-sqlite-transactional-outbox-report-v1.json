@@ -210,7 +210,7 @@
   },
   "core_invariant": "The local objective operation, resource intent, outbox event and causally ordered evidence journal commit or roll back together; source receipts and revocations are append-only evidence; remote effects are separately idempotent and independently read back; lost acknowledgement remains outcome_unknown until same-key reconciliation. No distributed atomicity is claimed.",
   "source": {
-    "repository_path": "benchmarks/frontend/monitoring/mon003-sqlite-transactional-outbox-v1.mjs",
+    "repository_path": "benchmarks/frontend/monitoring/mon003-sqlite-transactional-outbox-v1.mjs.gz",
     "sha256": "919a5ee17ef02c15ec2154f8730344b223feefb33b043785e4720f3ed1356965",
     "git_blob_sha": "5eed9db593b2cc0daf8a50dc06af87c26bc4a0a8",
     "bytes": 41143,
@@ -221,7 +221,16 @@
       "node --check mon003-sqlite-transactional-outbox-v1.mjs",
       "node mon003-sqlite-transactional-outbox-v1.mjs"
     ],
-    "qualification": "38 deterministic SQLite preflight cases plus five separate-process local smoke benchmark repetitions; no Rust, PostgreSQL, broker, network, real sink or production authentication executed."
+    "qualification": "38 deterministic SQLite preflight cases plus five separate-process local smoke benchmark repetitions; no Rust, PostgreSQL, broker, network, real sink or production authentication executed.",
+    "repository_blob_sha": "d479d5506f5e124a85f57b498a81c84fd7c3f100",
+    "repository_blob_size_bytes": 9501,
+    "repository_blob_sha256": "0a878fd26795a266c7f091acf66092fe212e39f287f1f8425c0a56e40eb1f836",
+    "uncompressed_source_sha256": "919a5ee17ef02c15ec2154f8730344b223feefb33b043785e4720f3ed1356965",
+    "local_execution": [
+      "gzip -dc mon003-sqlite-transactional-outbox-v1.mjs.gz | node --check -",
+      "gzip -dc mon003-sqlite-transactional-outbox-v1.mjs.gz | node -"
+    ],
+    "published_artifact_note": "Source is stored as deterministic gzip so its exact tested UTF-8 bytes can be reconstructed; run the decompressed stream directly through Node."
   },
   "benchmark_interpretation": "The throughput values are local, warm, sequential SQLite cycles over two databases on one container host. They are not comparable to DBOS published throughput or production systems; no equivalent hardware, workload, network, persistence semantics or concurrency has been matched."
 }
