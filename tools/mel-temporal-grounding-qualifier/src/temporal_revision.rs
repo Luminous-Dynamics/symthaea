@@ -1386,6 +1386,18 @@ mod tests {
     }
 
     #[test]
+    fn local_evidence_gets_no_advantage_when_yoked_evidence_reaches_the_same_result() {
+        let mut cases = matched_evidence_triplet();
+        cases[2].final_prediction = cases[1].final_prediction.clone();
+        let contrasts = compare_matched_evidence_arms(&cases).unwrap();
+        let contrast = &contrasts[0];
+        assert_eq!(contrast.local_minus_no_evidence_f1, Some(0.5));
+        assert_eq!(contrast.local_minus_yoked_f1, Some(0.0));
+        assert_eq!(contrast.local_minus_yoked_count_gated_f1, Some(0.0));
+        assert_eq!(contrast.local_beats_yoked, Some(false));
+    }
+
+    #[test]
     fn matched_evidence_triplet_rejects_changed_initial_draft() {
         let mut cases = matched_evidence_triplet();
         cases[2].draft_prediction = raw_prediction(
