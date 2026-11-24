@@ -62,7 +62,7 @@ jobs:
           Draft202012Validator.check_schema(schema)
           validator = Draft202012Validator(schema)
           paths = sorted(Path("docs/research/fixtures").glob("mel-closed-loop-episode-*.synthetic.json"))
-          assert len(paths) == 3, f"expected exactly 3 episode fixtures, got {len(paths)}"
+          assert len(paths) == 4, f"expected exactly 4 episode fixtures, got {len(paths)}"
           for path in paths:
               validator.validate(json.loads(path.read_text()))
           print(f"validated {len(paths)} episode fixtures")
@@ -84,6 +84,9 @@ jobs:
           cargo +1.96.0 run --locked --quiet --manifest-path tools/mel-judge-grounding-audit/Cargo.toml --bin mel-closed-loop-episode-audit -- audit \
             docs/research/fixtures/mel-closed-loop-episode-unobserved.synthetic.json "$RUNNER_TEMP/unobserved.json"
           jq -e '.observation_outcome == "Unobserved" and .capture_accounting_complete == false' "$RUNNER_TEMP/unobserved.json" >/dev/null
+          cargo +1.96.0 run --locked --quiet --manifest-path tools/mel-judge-grounding-audit/Cargo.toml --bin mel-closed-loop-episode-audit -- audit \
+            docs/research/fixtures/mel-closed-loop-episode-midi-absent.synthetic.json "$RUNNER_TEMP/midi-absent.json"
+          jq -e '.capture_source_kind == "midi_output_monitor" and .observation_outcome == "DetectorReportedAbsent" and .capture_accounting_complete == true and .capture_frame_accounting_applicable == false and .capture_heartbeat_accounting_consistent == true and .effect_stage_reported == null' "$RUNNER_TEMP/midi-absent.json" >/dev/null
       - name: Assemble exact-head evidence
         if: always()
         shell: bash
