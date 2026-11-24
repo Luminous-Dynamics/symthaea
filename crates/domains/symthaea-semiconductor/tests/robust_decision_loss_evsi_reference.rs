@@ -368,10 +368,7 @@ fn robust_portfolio_matches_independent_exhaustive_subset_oracle() {
             ],
         ),
     ];
-    let quotas = BTreeMap::from([
-        ("chamber-1".into(), 1),
-        ("chamber-2".into(), 1),
-    ]);
+    let quotas = BTreeMap::from([("chamber-1".into(), 1), ("chamber-2".into(), 1)]);
     let expected = independent_portfolio(&candidates, 3, &quotas);
     let mut portfolio_input = input(candidates.clone(), 3);
     portfolio_input.base_policy.minimum_group_coverage = quotas;
