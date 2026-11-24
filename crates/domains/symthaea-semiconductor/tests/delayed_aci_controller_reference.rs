@@ -75,7 +75,7 @@ fn interleaved_controller_matches_independent_long_stream_recursion() {
     let sample_count =  ninety_six();
     let target = 0.20;
     let gamma = 0.10;
-    let mut policy = DelayedAciPolicyV1 {
+    let policy = DelayedAciPolicyV1 {
         schema: DELAYED_ACI_POLICY_SCHEMA_V1.into(),
         policy_id: "independent-fixed-delay-oracle".into(),
         revision: 1,
@@ -114,7 +114,7 @@ fn interleaved_controller_matches_independent_long_stream_recursion() {
                     value,
                 ),
             ).unwrap();
-            assert_eq!(format!("{:?}", update.disposition), "Updated");
+            assert_eq!(update.disposition, DelayedAciDispositionV1::Updated);
 
             let lane = prediction.lane as usize;
             let missed = value < prediction.lower_bound || value > prediction.upper_bound;
@@ -212,7 +212,7 @@ fn k0_feedback_does_not_change_alpha_or_claim_intact_fixed_delay_assumptions() {
         eligibility_report: report,
     };
     let receipt = deliver_delayed_aci_feedback_v1(&mut engine, &delivery).unwrap();
-    assert_eq!(format!("{:?}", receipt.disposition), "Rejected");
+    assert_eq!(receipt.disposition, DelayedAciDispositionV1::Rejected);
     assert_eq!(engine.state.alpha_lanes, before);
     assert!(!engine.state.fixed_delay_assumptions_intact);
 }
