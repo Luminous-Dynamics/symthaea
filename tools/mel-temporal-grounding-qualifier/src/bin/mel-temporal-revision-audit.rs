@@ -10,8 +10,8 @@ use std::io::{self, Read};
 use std::process::ExitCode;
 
 use mel_temporal_grounding_qualifier::temporal_revision::{
-    audit_revision_v2, compare_matched_evidence_arms, MatchedEvidenceContrastV1,
-    RevisionCaseV2, RevisionReportV1,
+    audit_revision_v2, bootstrap_matched_evidence_contrasts, compare_matched_evidence_arms,
+    MatchedEvidenceBootstrapV1, MatchedEvidenceContrastV1, RevisionCaseV2, RevisionReportV1,
 };
 use serde::Serialize;
 use serde_json::Value;
@@ -22,6 +22,7 @@ struct BatchReportV1 {
     cases: usize,
     reports: Vec<RevisionReportV1>,
     matched_evidence_contrasts: Vec<MatchedEvidenceContrastV1>,
+    source_work_bootstrap: Option<MatchedEvidenceBootstrapV1>,
 }
 
 fn read_input() -> Result<String, String> {
@@ -56,11 +57,26 @@ fn run() -> Result<String, String> {
             .map(audit_revision_v2)
             .collect::<Result<Vec<_>, _>>()?;
         let matched_evidence_contrasts = compare_matched_evidence_arms(&cases)?;
+        let lineage_count = matched_evidence_contrasts
+            .iter()
+            .map(|contrast| contrast.source_lineage_id.as_str())
+            .collect::<std::collections::BTreeSet<_>>()
+            .len();
+        let source_work_bootstrap = if lineage_count >= 2 {
+            Some(bootstrap_matched_evidence_contrasts(
+                &matched_evidence_contrasts,
+                2_000,
+                0x2026_11_24,
+            )?)
+        } else {
+            None
+        };
         let report = BatchReportV1 {
             schema: "mel-temporal-revision-batch-report-v1",
             cases: reports.len(),
             reports,
             matched_evidence_contrasts,
+            source_work_bootstrap,
         };
         serde_json::to_string_pretty(&report)
             .map_err(|error| format!("failed serializing batch report: {error}"))
