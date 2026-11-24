@@ -3803,12 +3803,8 @@ mod tests {
     #[test]
     fn finite_fourier_band_has_an_explicit_noninjectivity_witness() {
         let first_four = WeightedFourierMeasureEmbedding::new(4).unwrap();
-        let five_point_measure = (0..5)
-            .map(|index| index as f64 / 5.0)
-            .collect::<Vec<_>>();
-        let ten_point_measure = (0..10)
-            .map(|index| index as f64 / 10.0)
-            .collect::<Vec<_>>();
+        let five_point_measure = (0..5).map(|index| index as f64 / 5.0).collect::<Vec<_>>();
+        let ten_point_measure = (0..10).map(|index| index as f64 / 10.0).collect::<Vec<_>>();
         let five_weights = vec![0.2; 5];
         let ten_weights = vec![0.1; 10];
 
