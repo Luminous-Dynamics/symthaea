@@ -377,6 +377,52 @@ mod tests {
     }
 
     #[test]
+    fn all_permutations_of_five_hypotheses_share_one_normalized_digest() {
+        fn permutations(items: &mut [BooleanFormula], start: usize, output: &mut Vec<Vec<BooleanFormula>>) {
+            if start == items.len() {
+                output.push(items.to_vec());
+                return;
+            }
+            for index in start..items.len() {
+                items.swap(start, index);
+                permutations(items, start + 1, output);
+                items.swap(start, index);
+            }
+        }
+
+        let hypotheses = vec![atom("A"), atom("B"), atom("C"), atom("D"), atom("E")];
+        let baseline = BooleanSequent {
+            hypotheses: hypotheses.clone(),
+            premises: vec![atom("R")],
+            conclusion: atom("Z"),
+        };
+        let expected_normalized = normalized_sequent_sha256(&baseline).unwrap();
+        let mut variants = Vec::new();
+        let mut mutable = hypotheses;
+        permutations(&mut mutable, 0, &mut variants);
+        assert_eq!(variants.len(), 120);
+
+        let mut raw_digests = HashSet::new();
+        for variant_hypotheses in variants {
+            let variant = BooleanSequent {
+                hypotheses: variant_hypotheses,
+                premises: baseline.premises.clone(),
+                conclusion: baseline.conclusion.clone(),
+            };
+            assert_eq!(
+                normalized_sequent_sha256(&variant).unwrap(),
+                expected_normalized
+            );
+            assert_eq!(
+                derive_relation(&baseline, &variant).unwrap().0,
+                ScopeRelationV1::Tier1HypothesisPermutationEquivalent
+            );
+            raw_digests.insert(raw_sequent_sha256(&variant).unwrap());
+        }
+        assert_eq!(raw_digests.len(), 120);
+    }
+
+    #[test]
     fn normalization_preserves_atom_names() {
         let mut sequent = fixture().pairs[1].candidate.base.clone();
         sequent.hypotheses.push(atom("R"));
