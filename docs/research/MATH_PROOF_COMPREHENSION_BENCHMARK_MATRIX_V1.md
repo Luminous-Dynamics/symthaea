@@ -205,3 +205,25 @@ For the bounded classical propositional tier, record three separate outcomes:
 - **minimum-support gap:** emitted witness support size minus the oracle's minimum-support countermodel size.
 
 The minimum-support oracle is a deterministic witness-selection aid over at most 16 atoms, not a general measure of mathematical simplicity. For dependent types and non-propositional mathematics, use checker-backed witnesses or explicit unknown. This diagnostic should never replace semantic correctness or proof-plan validity.
+
+## 10. Evaluator calibration and durable-learning baselines (2026-11-24)
+
+### Evaluator calibration is a separate benchmark axis
+
+[ProofBench / ProofGrader](https://proceedings.iclr.cc/paper_files/paper/2026/hash/764d4fc73ab69289b1e10f15089274f3-Abstract-Conference.html) reports expert-rated proof quality over 145 competition tasks and 435 model solutions, with 0.926 MAE for its best reported evaluator. [QEDBench](https://proceedings.mlr.press/v306/gonzalez26a.html) shows why we should not rely on a single LLM-as-judge score: on its university-level proof rubric, an evaluated judge had positive score inflation up to +0.28 and domain-specific failures.
+
+Symthaea therefore needs three separate evaluator reports: (a) formal / finite checker results where the task is in scope, (b) independent human mathematical review and adjudication, and (c) calibrated LLM-evaluator agreement with humans. The LLM judge is an auxiliary localizer, never the authority that sets theorem truth or primary benchmark eligibility. The detailed protocol is [MATH_PROOF_COMPREHENSION_EVALUATOR_CALIBRATION_V1.md](MATH_PROOF_COMPREHENSION_EVALUATOR_CALIBRATION_V1.md), tracked in [#13476](https://github.com/Luminous-Dynamics/symthaea/issues/13476).
+
+### Human proof presentation is not durable transfer
+
+A 2026 study of 143 undergraduate mathematics students found that presentation of a supplied proof was only moderately associated with later proof construction on a related irrationality task after approximately three months. This supports making delayed near-transfer the confirmatory human endpoint; immediate explanation quality, rubric score and self-reported clarity remain separate outcomes. See the [study](https://link.springer.com/article/10.1007/s40753-026-00319-4).
+
+The [Explorable Proofs UIST 2026 study](https://arxiv.org/abs/2604.02598) is an adjacent immediate-comprehension/interface baseline (n=16), not an unstudied capability. Where its task/interface is reproducible, include it as an explicit human-study comparator. Do not treat its immediate proof-description improvement as evidence of long-term retention or transfer.
+
+### SOTA comparison policy
+
+- Retrieval comparisons must include LeanGraphSearch and Lean Finder V2, each on its own published query cohort and then on a matched local rerun.
+- Statement semantics must include theorem sandwiches and successor-theorem tests; compilation alone is not a statement-fidelity metric.
+- Proof explanation evaluation must include independent expert ratings and the LLM-judge alignment gap.
+- Human comparisons must distinguish immediate comprehension from delayed cross-family transfer.
+- No SOTA win is claimed from the four-declaration extraction sample, synthetic 1/1 CIRR arithmetic, or an unpowered human feasibility pilot.

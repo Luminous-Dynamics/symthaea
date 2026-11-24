@@ -366,3 +366,5 @@ The initial seed is source-pinned to Lean 4 core and is explicitly not expert-re
 - [Mathlib source-snapshot dependency differential](MATHLIB_SOURCE_SNAPSHOT_DIFFERENTIAL_V1.md) — direct dependency-set overlap across the pinned v4.29 and v4.37 Mathlib cohorts.
 
 - [HDC / CfC proof-comprehension ablation protocol](MATH_PROOF_COMPREHENSION_HDC_CFC_ABLATION_V1.md) — prospective only, with matched retrieval/symbolic baselines.
+
+- [Evaluator calibration protocol](MATH_PROOF_COMPREHENSION_EVALUATOR_CALIBRATION_V1.md) — compares expert review, formal/finite checkers, ProofGrader-style and evidence-constrained LLM judges; issue #13476.

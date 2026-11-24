@@ -34,15 +34,16 @@ The current Lean-core and Mathlib pilot seeds are development material. They are
 
 ## 4. Study arms
 
-Use the same theorem, source snapshot, model where applicable, frozen task data, tool access and maximum time budget across arms:
+Use the same theorem, source snapshot, frozen task data, participant-facing time limit and scoring rubric across arms. Hold participant exposure and carry-over controls constant.
 
 - A — raw source: Lean declaration(s), source and task statement; no generated explanation.
 - B — generic summary: ordinary LLM explanation using the source but no typed concept graph or claim-level evidence links.
 - C — evidence-linked concept explanation: exact theorem statement, dependency provenance, reviewed mathematical-role annotations, and explicit formal-fact / interpretation / analogy / unknown labels.
-- D — evidence-linked proof-plan explanation: arm C plus a `ProofPlanV1` reconstruction of goal transformations, justifications, side conditions, subgoals, invariants and alternative routes. Tactic names remain provenance, not the plan itself.
+- D — evidence-linked proof-plan explanation: arm C plus a ProofPlanV1 reconstruction of goal transformations, justifications, side conditions, subgoals, invariants and alternative routes. Tactic names remain provenance, not the plan itself.
 - E — minimum-sufficient proof plan: arm D compressed under a token budget while preserving theorem identity, all necessary assumptions, plan-action evidence and unresolved-step labels.
+- F — interactive formal-exploration comparator: a reproducible formal-backed explorable-proof interface that exposes intermediate Lean proof states, relevant dependencies and worked examples, based on the design space in Explorable Proofs (UIST 2026). Include this arm only when the implementation and task assets can be reproduced under the same theorem, context and time budget. Otherwise document the external paper as a non-comparable published baseline and do not claim a direct superiority result.
 
-The primary comparison for the new capability is D versus C: does an explicit proof plan improve validation, plan reconstruction and transfer beyond a source-linked dependency/concept explanation? E tests explanation efficiency. Compression must never remove a required assumption, side condition or evidence link. A feasibility pilot may use fewer arms if recruitment is constrained; any reduction must be fixed before confirmatory collection and reported as a protocol amendment rather than silently changing the design.
+The primary mechanism comparison is D versus C: does an explicit evidence-bound proof plan improve validation, plan reconstruction and transfer beyond a source-linked concept/dependency explanation? E tests compression efficiency. F tests whether the proof-plan representation improves on a strong interactive formal-exploration experience, not merely on a generic chatbot. If F is run, preregister D-versus-F as a separate confirmatory contrast before recruitment; do not promote it to the primary endpoint after seeing results. A feasibility pilot may use fewer arms only if the reduction is fixed before confirmatory collection and reported as a protocol amendment.
 
 ## 5. Randomization and blinding
 
@@ -182,3 +183,13 @@ The machine baselines should include ProofGrid's proof writing/checking/masking/
 The study design now treats *Explorable Proofs* (UIST 2026, Kambhamettu et al., arXiv:2604.02598) as an adjacent benchmark rather than an unstudied novelty claim. That system links written proofs to generated Lean proofs, exposes worked examples, proof states and dependency traces, and reports an n=16 lab study with better proof descriptions than a chatbot baseline. Its authors explicitly identify remaining uncertainty around AI translation mismatch, longer/research-level proofs, retention and transfer to new problems.
 
 Where the implementation and task assets can be reproduced, add an interactive-formal-exploration arm as a comparator to the evidence-linked proof-plan arm. If it cannot be reproduced, report it as a non-comparable published baseline, not as a missing result. The confirmatory endpoint remains delayed near-transfer accuracy; immediate proof-reading comprehension is a separate secondary outcome. Any interactive interface must expose source/statement identity and allow the reader to inspect the exact proof state and counterexample provenance.
+
+## 19. Evaluator calibration and the interactive-proof comparator (2026-11-24)
+
+The scoring pipeline now has a companion protocol, MATH_PROOF_COMPREHENSION_EVALUATOR_CALIBRATION_V1.md, tracked by issue #13476.
+
+ProofBench/ProofGrader and QEDBench are required evaluator baselines where their task/rubric conditions can be matched. LLM judges are auxiliary graders only. They must be calibrated against independent human expert labels, blinded to candidate identity, and evaluated on planted false proofs, missing assumptions, route-only changes and translation mismatches. Formal or finite checkers remain separate authorities. No judge score can set theorem truth or override a checked counterexample.
+
+Add an interactive formal-exploration comparator (arm F) only when its interface and task conditions can be reproduced; otherwise report the published Explorable Proofs study as an adjacent non-comparable result. The existing study hypothesis remains about durable understanding: immediate explanation/presentation quality is a distinct secondary outcome, not a proxy for delayed near-transfer.
+
+A 2026 study of 143 undergraduates found only a moderate association between proof presentation and delayed proof construction approximately three months later. This makes the delayed endpoint essential. The study should report transfer by theorem family and reader background, plus attrition and retention, rather than using immediate proof-description scores to imply durable learning.
