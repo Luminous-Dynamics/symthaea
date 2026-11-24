@@ -397,6 +397,7 @@ mod tests {
             conclusion: atom("Z"),
         };
         let expected_normalized = normalized_sequent_sha256(&baseline).unwrap();
+        let baseline_raw = raw_sequent_sha256(&baseline).unwrap();
         let mut variants = Vec::new();
         let mut mutable = hypotheses;
         permutations(&mut mutable, 0, &mut variants);
@@ -413,11 +414,14 @@ mod tests {
                 normalized_sequent_sha256(&variant).unwrap(),
                 expected_normalized
             );
-            assert_eq!(
-                derive_relation(&baseline, &variant).unwrap().0,
+            let variant_raw = raw_sequent_sha256(&variant).unwrap();
+            let expected_relation = if variant_raw == baseline_raw {
+                ScopeRelationV1::ExactIdentity
+            } else {
                 ScopeRelationV1::Tier1HypothesisPermutationEquivalent
-            );
-            raw_digests.insert(raw_sequent_sha256(&variant).unwrap());
+            };
+            assert_eq!(derive_relation(&baseline, &variant).unwrap().0, expected_relation);
+            raw_digests.insert(variant_raw);
         }
         assert_eq!(raw_digests.len(), 120);
     }
