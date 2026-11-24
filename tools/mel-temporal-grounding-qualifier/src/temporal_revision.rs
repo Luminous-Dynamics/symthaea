@@ -173,6 +173,10 @@ pub struct MatchedEvidenceBootstrapV1 {
     pub one_to_many_source_work_clusters: usize,
     pub bootstrap_replicates: usize,
     pub seed: u64,
+    /// A proposed minimum for confirmatory reporting, not a substitute for power analysis.
+    pub recommended_confirmatory_cluster_floor: usize,
+    pub confirmatory_source_cluster_floor_met: bool,
+    pub confirmatory_one_to_many_cluster_floor_met: bool,
     pub local_minus_no_evidence_f1: BootstrapIntervalV1,
     pub local_minus_yoked_f1: BootstrapIntervalV1,
     pub local_minus_no_evidence_count_gated_f1: Option<BootstrapIntervalV1>,
@@ -455,6 +459,9 @@ pub fn bootstrap_matched_evidence_contrasts(
         one_to_many_source_work_clusters: lineage_count.len(),
         bootstrap_replicates,
         seed,
+        recommended_confirmatory_cluster_floor: 30,
+        confirmatory_source_cluster_floor_met: by_lineage.len() >= 30,
+        confirmatory_one_to_many_cluster_floor_met: lineage_count.len() >= 30,
         local_minus_no_evidence_f1: percentile_interval(estimate_local_no, local_no_samples),
         local_minus_yoked_f1: percentile_interval(estimate_local_yoked, local_yoked_samples),
         local_minus_no_evidence_count_gated_f1: count_gated_intervals
@@ -475,6 +482,17 @@ fn next_splitmix64(state: &mut u64) -> u64 {
     value ^ (value >> 31)
 }
 
+fn unbiased_index(rng_state: &mut u64, upper_bound: usize) -> usize {
+    let bound = upper_bound as u64;
+    let limit = u64::MAX - (u64::MAX % bound);
+    loop {
+        let value = next_splitmix64(rng_state);
+        if value < limit {
+            return (value % bound) as usize;
+        }
+    }
+}
+
 fn bootstrap_cluster_means(
     cluster_values: &[f64],
     replicates: usize,
@@ -485,7 +503,7 @@ fn bootstrap_cluster_means(
         .map(|_| {
             let mut sum = 0.0;
             for _ in 0..cluster_count {
-                let index = (next_splitmix64(rng_state) % cluster_count as u64) as usize;
+                let index = unbiased_index(rng_state, cluster_count);
                 sum += cluster_values[index];
             }
             sum / cluster_count as f64
