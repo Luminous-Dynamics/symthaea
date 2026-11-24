@@ -658,6 +658,11 @@ pub fn deliver_qualified_stream_label_v1(
     {
         reasons.push(StreamingUpdateReasonV1::ReportNumericValueNonFinite);
     }
+    if delivery.delivered_at_unix_seconds
+        < delivery.eligibility_report_available_at_unix_seconds
+    {
+        reasons.push(StreamingUpdateReasonV1::EligibilityReportUnavailableAtDelivery);
+    }
     if !valid_sha256(&report.label_sha256)
         || report.label_sha256 != delivery.label_payload_sha256
     {
@@ -1019,6 +1024,7 @@ mod tests {
             label_payload_sha256: payload.clone(),
             label_value: 11.0,
             label_available_at_unix_seconds: available_at,
+            eligibility_report_available_at_unix_seconds: delivered_at.saturating_sub(1),
             delivered_at_unix_seconds: delivered_at,
             clock_domain_id: "fab-clock".into(),
             idempotency_key: format!("{label_id}:{revision}"),
@@ -1299,6 +1305,93 @@ mod tests {
             assert!(!receipt.adapter_state_mutated);
             assert_eq!(adapter_state_digest(&engine.adapter_state).unwrap(), before);
         }
+    }
+
+    #[test]
+    fn eligibility_report_must_be_available_before_label_delivery() {
+        let mut engine = engine();
+        predict_and_register_stream_sample_v1(
+            &mut engine,
+            &prediction("sample-1", "event-1", 100, 102, None, vec![1.0, 1.0]),
+        )
+        .unwrap();
+        let before = adapter_state_digest(&engine.adapter_state).unwrap();
+        let mut candidate = delivery(
+            "sample-1",
+            "event-1",
+            "label-1",
+            1,
+            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            LabelEvidenceFrontierV1::CurrentAtK1,
+            110,
+            112,
+        );
+        candidate.eligibility_report_available_at_unix_seconds = 113;
+        let receipt = deliver_qualified_stream_label_v1(&mut engine, &candidate).unwrap();
+        assert_eq!(receipt.disposition, StreamingUpdateDispositionV1::Rejected);
+        assert!(
+            receipt
+                .reasons
+                .contains(&StreamingUpdateReasonV1::EligibilityReportUnavailableAtDelivery)
+        );
+        assert_eq!(adapter_state_digest(&engine.adapter_state).unwrap(), before);
+    }
+
+    #[test]
+    fn prediction_sequence_overflow_does_not_register_or_consume_sample() {
+        let mut engine = engine();
+        engine.next_prediction_sequence = u64::MAX;
+        let before = adapter_state_digest(&engine.adapter_state).unwrap();
+        assert!(predict_and_register_stream_sample_v1(
+            &mut engine,
+            &prediction("sample-1", "event-1", 100, 102, None, vec![1.0, 1.0]),
+        )
+        .is_err());
+        assert!(engine.pending_predictions.is_empty());
+        assert!(engine.seen_measurement_event_ids.is_empty());
+        assert_eq!(adapter_state_digest(&engine.adapter_state).unwrap(), before);
+    }
+
+    #[test]
+    fn failed_context_support_increment_is_atomic() {
+        let mut engine = engine();
+        predict_and_register_stream_sample_v1(
+            &mut engine,
+            &prediction(
+                "sample-1",
+                "event-1",
+                100,
+                102,
+                Some("eqp-1/ch-1"),
+                vec![1.0, 1.0],
+            ),
+        )
+        .unwrap();
+        engine.adapter_state.contexts.insert(
+            "eqp-1/ch-1".into(),
+            StreamingContextStateV1 {
+                residual_ema: 0.25,
+                support_count: u64::MAX,
+            },
+        );
+        let before = adapter_state_digest(&engine.adapter_state).unwrap();
+        assert!(deliver_qualified_stream_label_v1(
+            &mut engine,
+            &delivery(
+                "sample-1",
+                "event-1",
+                "label-1",
+                1,
+                LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+                LabelEvidenceFrontierV1::CurrentAtK1,
+                110,
+                112,
+            ),
+        )
+        .is_err());
+        assert_eq!(adapter_state_digest(&engine.adapter_state).unwrap(), before);
+        assert!(engine.pending_predictions.contains_key("sample-1"));
+        assert!(engine.accepted_label_revisions.is_empty());
     }
 
     #[test]
