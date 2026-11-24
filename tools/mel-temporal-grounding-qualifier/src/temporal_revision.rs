@@ -7,9 +7,10 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 
 use crate::temporal_grounding::{
-    TemporalGroundTruthV1, TemporalGroundingOutcomeV1, TemporalGroundingPlanV1,
-    TemporalGroundingPredictionV1, TemporalGroundingScoreV1, score_temporal_grounding,
-    validate_temporal_ground_truth, validate_temporal_grounding_prediction,
+    GroundingPredictionStateV1, TemporalGroundTruthV1, TemporalGroundingOutcomeV1,
+    TemporalGroundingPlanV1, TemporalGroundingPredictionV1, TemporalGroundingScoreV1,
+    score_temporal_grounding, validate_temporal_ground_truth,
+    validate_temporal_grounding_prediction,
 };
 
 const REVISION_SCHEMA: &str = "mel-temporal-revision-case-v1";
@@ -594,6 +595,20 @@ pub fn audit_revision_v2(case: &RevisionCaseV2) -> Result<RevisionReportV1, Stri
         .map_err(|issues| format!("draft score rejected by production evaluator: {issues:?}"))?;
     let final_score = score_temporal_grounding(&case.truth, &case.final_prediction, &case.plan)
         .map_err(|issues| format!("final score rejected by production evaluator: {issues:?}"))?;
+    validate_v2_evidence(case)?;
+    let edit_delta = derive_edit_delta(
+        &case.draft_prediction,
+        &case.final_prediction,
+        &draft_score,
+        &final_score,
+    )?;
+    let declared_actions_consistent = validate_declared_actions(
+        &case.actions,
+        &case.draft_prediction,
+        &case.final_prediction,
+        &draft_score,
+        &final_score,
+    )?;
     let legacy_case = RevisionCaseV1 {
         schema: REVISION_SCHEMA.into(),
         case_id: case.case_id.clone(),
@@ -607,7 +622,6 @@ pub fn audit_revision_v2(case: &RevisionCaseV2) -> Result<RevisionReportV1, Stri
         draft: draft_score,
         final_score,
     };
-    validate_v2_evidence(case)?;
     let mut report = audit_revision(&legacy_case)?;
     report.source_lineage_id = Some(case.source_lineage_id.clone());
     report.runtime_identity_sha256 = Some(case.runtime_identity_sha256.clone());
@@ -616,19 +630,8 @@ pub fn audit_revision_v2(case: &RevisionCaseV2) -> Result<RevisionReportV1, Stri
     report.actual_output_tokens = Some(case.actual_output_tokens);
     report.max_wall_time_ms = Some(case.max_wall_time_ms);
     report.elapsed_wall_time_ms = Some(case.elapsed_wall_time_ms);
-    report.edit_delta = Some(derive_edit_delta(
-        &case.draft_prediction,
-        &case.final_prediction,
-        &draft_score,
-        &final_score,
-    )?);
-    report.declared_actions_consistent = validate_declared_actions(
-        &case.actions,
-        &case.draft_prediction,
-        &case.final_prediction,
-        &draft_score,
-        &final_score,
-    )?;
+    report.edit_delta = Some(edit_delta);
+    report.declared_actions_consistent = declared_actions_consistent;
     Ok(report)
 }
 
