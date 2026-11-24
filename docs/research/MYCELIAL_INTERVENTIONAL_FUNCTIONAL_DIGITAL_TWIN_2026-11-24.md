@@ -61,10 +61,15 @@ A related benchmark issue has cited the suffix uqag017; the DOI above is the ide
 
 ### 2.5 Smart microscopy and interoperability
 
-The 2026 smart-microscopy roadmap describes information-driven acquisition and feedback as a developing field. Symthaea should not recreate mature microscope drivers. It should interoperate with hardware-neutral experiment descriptions and established image formats, beginning with offline and recorded-session adapters.
+The 2026 review *Smart microscopy: adaptive microscope control to improve the way we see life* defines smart microscopy as real-time analysis, feedback control and automated actuation. It distinguishes quality-, event-, target-, information- and outcome-driven acquisition, and emphasizes trade-offs among resolution, speed, signal-to-noise, field of view, photon budget and specimen viability: https://doi.org/10.1038/s44303-026-00145-y.
+
+A separate 2025/2026 *Nature Communications* study demonstrates outcome-driven microscopy by combining image feedback and optogenetic actuation to control cell migration and nucleocytoplasmic transport: https://doi.org/10.1038/s41467-025-67848-5. This is an important field direction, but it does not mean Mycelial should manipulate fungal biology with light. For Mycelial, “outcome-driven” initially means selecting observations that resolve a prespecified biological decision; sample interventions remain separate, preregistered experiments.
+
+Symthaea should not recreate mature microscope drivers. It should interoperate with hardware-neutral experiment descriptions and established image formats, beginning with offline and recorded-session adapters.
 
 References:
-- Smart microscopy roadmap: https://doi.org/10.1515/mim-2025-0029
+- Adaptive smart-microscopy review: https://doi.org/10.1038/s44303-026-00145-y
+- Smart Microscopy Working Group interoperability roadmap: https://doi.org/10.1515/mim-2025-0029
 - useq-schema: https://github.com/als-computing/useq-schema
 - OME-NGFF: https://ngff.openmicroscopy.org/
 - Micro-Manager: https://micro-manager.org/
@@ -137,6 +142,35 @@ For every intervention, preregister:
 - missingness, censoring, exclusions and analysis plan.
 
 Experiments require qualified biological collaborators, approved protocols and suitable laboratory equipment. This software protocol neither authorizes physical interventions nor creates microscope actuation.
+
+### 5.1 Active acquisition under hard sample-health constraints
+
+The active-sensing policy should not optimize only information value or collapse all costs into one scalar. The policy first filters actions against specimen and instrument constraints, then ranks only admissible actions by the existing decision-value measure.
+
+\[
+a^* = \arg\max_{a \in \mathcal{A}_{\mathrm{admissible}}} \operatorname{NetVOI}(a)
+\]
+
+subject to:
+- cumulative upper-bound photon dose per specimen × spatial cell × illumination channel remains within its calibrated assay-specific limit;
+- session duration and action count remain within the approved acquisition budget;
+- ROI area and conservative upper-bound local temperature rise remain within policy;
+- every required illumination channel has a calibrated wavelength and dose estimate;
+- coordinate frame, spatial footprint, acquisition model and calibration identities match the source evidence.
+
+A hard limit is not a cost to be traded against expected information gain. An ineligible action stays ineligible even if it would resolve every remaining graph hypothesis. Overlapping ROIs accumulate exposure on shared spatial cells; they must not reset dose simply because the ROI name changes.
+
+The proposed Rust implementation is split into two layers:
+- PR #13379 computes expected reduction in Bayes decision risk minus declared acquisition cost.
+- Issue #13486 / draft PR #13487 adds specimen-health admissibility using cumulative dose, session time, ROI, temperature and channel-calibration evidence.
+
+The first policy is advisory-only. It does not infer biological viability from photon counts, guarantee absence of phototoxicity, issue microscope commands or override a laboratory protocol. Dose and temperature bounds must be established for the specific specimen, fluorophore, modality, instrument and assay by qualified personnel.
+
+Evaluation must compare fixed schedules, random sampling, confidence-only, entropy-only, VOI-only and VOI-plus-health-constraints at equal measurement budgets. Report both:
+1. downstream decision regret at equal photon/time budget; and
+2. photon/time budget required to reach equal decision quality.
+
+Also report dose-bound violations, sample-health outcome drift, missed rare events, calibration, abstention and human overrides separately. A single composite score must not conceal a policy that improves inference by damaging the specimen.
 
 ## 6. Three-tier evaluation programme
 
@@ -248,6 +282,7 @@ This protocol connects rather than duplicates the current portfolio:
 - PR #13464 / issue #13460 — replicate-disjoint forward-time split contract.
 - PR #13369 — feasible graph-hypothesis posterior.
 - PR #13379 — decision-value active acquisition.
+- Issue #13486 / draft PR #13487 — hard cumulative specimen-health admissibility after VOI ranking.
 - Issue #13419 — posterior adequacy, candidate-generation coverage and common-cause residuals.
 - Issue #13352 — independent functional observations and transport benchmarks.
 - Issue #13423 — multiplex transport and causal perturbation programme.
@@ -299,6 +334,8 @@ That would move Mycelial from network visualization toward a genuinely testable 
 - *Agaricus* stable-isotope resource transfer (2026): https://doi.org/10.1111/1462-2920.70345
 - Hyphal Highways Device (2026): https://doi.org/10.1093/femsml/uqag035
 - Smart microscopy interoperability roadmap (2026): https://doi.org/10.1515/mim-2025-0029
+- Adaptive smart-microscopy review (2026): https://doi.org/10.1038/s44303-026-00145-y
+- Outcome-driven optogenetic microscopy (2025/2026): https://doi.org/10.1038/s41467-025-67848-5
 - Sten 2D mycelium analysis (2024): https://doi.org/10.1016/j.ecoinf.2024.102670
 - Sten 3D z-stack reconstruction (2025): https://doi.org/10.1016/j.ecoinf.2025.103317
 - Fungal Network Analysis (Fricker): https://zenodo.org/records/14931863
