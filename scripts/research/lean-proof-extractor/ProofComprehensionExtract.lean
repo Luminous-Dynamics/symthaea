@@ -169,8 +169,8 @@ elab "#emit_proof_comprehension " declaration:ident : command => do
   let valueDependencies := value?.map Expr.getUsedConstants |>.getD #[]
   let valueKind := valueKindString info value?.isSome
   let proofValueDependencies := theoremProofDependencies info valueDependencies
-  let classifyDefinitionValueDependencies := classifyDefinitionValueDependencies info valueDependencies
-  let classifyOpaqueValueDependencies := classifyOpaqueValueDependencies info valueDependencies
+  let definitionValueDependencies := classifyDefinitionValueDependencies info valueDependencies
+  let opaqueValueDependencies := classifyOpaqueValueDependencies info valueDependencies
   let closureDependencies := info.getUsedConstantsAsSet.toList.toArray
   let unresolvedDependencies :=
     closureDependencies.filter fun dependency => (env.find? dependency).isNone
@@ -244,8 +244,8 @@ elab "#emit_proof_comprehension " declaration:ident : command => do
     , ("type_dependencies", namesJson typeDependencies)
     , ("value_dependencies", namesJson valueDependencies)
     , ("proof_value_dependencies", namesJson proofValueDependencies)
-    , ("definition_value_dependencies", namesJson classifyDefinitionValueDependencies)
-    , ("opaque_value_dependencies", namesJson classifyOpaqueValueDependencies)
+    , ("definition_value_dependencies", namesJson definitionValueDependencies)
+    , ("opaque_value_dependencies", namesJson opaqueValueDependencies)
     , ("constant_info_dependency_closure", namesJson closureDependencies)
     , ("unresolved_dependencies", namesJson unresolvedDependencies)
     , ("edges", Json.arr edges)
