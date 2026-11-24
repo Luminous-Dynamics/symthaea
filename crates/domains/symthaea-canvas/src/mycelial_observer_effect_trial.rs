@@ -34,7 +34,6 @@ const DIGEST_HEX_BYTES: usize = 64;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MycelialObserverEffectArmKind {
-    DarkAmbientControl,
     DarkControl,
     AmbientControl,
     HandlingSham,
@@ -354,17 +353,16 @@ fn finish_digest(hasher: blake3::Hasher) -> String {
 
 fn arm_kind_tag(kind: MycelialObserverEffectArmKind) -> u8 {
     match kind {
-        MycelialObserverEffectArmKind::DarkAmbientControl => 0,
-        MycelialObserverEffectArmKind::DarkControl => 1,
-        MycelialObserverEffectArmKind::AmbientControl => 2,
-        MycelialObserverEffectArmKind::HandlingSham => 3,
-        MycelialObserverEffectArmKind::LowExposureImaging => 4,
-        MycelialObserverEffectArmKind::ContinuousImaging => 5,
-        MycelialObserverEffectArmKind::FractionatedImaging => 6,
-        MycelialObserverEffectArmKind::DeliberatePhotoperiod => 7,
-        MycelialObserverEffectArmKind::Photostimulation => 8,
-        MycelialObserverEffectArmKind::Photoinactivation => 9,
-        MycelialObserverEffectArmKind::Other => 10,
+        MycelialObserverEffectArmKind::DarkControl => 0,
+        MycelialObserverEffectArmKind::AmbientControl => 1,
+        MycelialObserverEffectArmKind::HandlingSham => 2,
+        MycelialObserverEffectArmKind::LowExposureImaging => 3,
+        MycelialObserverEffectArmKind::ContinuousImaging => 4,
+        MycelialObserverEffectArmKind::FractionatedImaging => 5,
+        MycelialObserverEffectArmKind::DeliberatePhotoperiod => 6,
+        MycelialObserverEffectArmKind::Photostimulation => 7,
+        MycelialObserverEffectArmKind::Photoinactivation => 8,
+        MycelialObserverEffectArmKind::Other => 9,
     }
 }
 
@@ -1005,10 +1003,6 @@ fn exposure_purpose_matches_arm(
     ambient_state: MycelialAmbientLightState,
 ) -> bool {
     match arm_kind {
-        MycelialObserverEffectArmKind::DarkAmbientControl => {
-            purpose == MycelialIlluminationPurpose::DarkAmbientControl
-                && ambient_state != MycelialAmbientLightState::Unknown
-        }
         MycelialObserverEffectArmKind::DarkControl => {
             purpose == MycelialIlluminationPurpose::DarkAmbientControl
                 && ambient_state == MycelialAmbientLightState::VerifiedDark
@@ -1603,6 +1597,21 @@ mod tests {
             trial.validate(),
             Err(MycelialObserverEffectTrialError::InvalidAssignment(_))
         ));
+    }
+
+    #[test]
+    fn measured_ambient_condition_is_a_distinct_reference_arm() {
+        let (mut trial, mut exposures, observations) = evidence();
+        trial.arms[0].arm_kind = MycelialObserverEffectArmKind::AmbientControl;
+        for exposure in exposures.iter_mut().filter(|exposure| exposure.treatment_arm_id == "dark") {
+            exposure.ambient_light.state = MycelialAmbientLightState::AmbientMeasured;
+            exposure.ambient_light.specimen_plane_irradiance_watts_per_cm2_upper =
+                Some(0.000_01);
+        }
+        let report = trial
+            .validate_against_evidence(&exposures, &observations)
+            .unwrap();
+        assert_eq!(report.assigned_cultivation_unit_count, 4);
     }
 
     #[test]
