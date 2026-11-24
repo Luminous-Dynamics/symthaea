@@ -126,7 +126,12 @@ fn interleaved_controller_matches_independent_long_stream_recursion() {
                 ),
             )
             .unwrap();
-            assert_eq!(update.disposition, DelayedAciDispositionV1::Updated);
+            assert_eq!(
+                update.disposition,
+                DelayedAciDispositionV1::Updated,
+                "stream_step={stream_step}, reasons={:?}",
+                update.reasons
+            );
 
             let lane = prediction.lane as usize;
             let missed = value < prediction.lower_bound || value > prediction.upper_bound;
