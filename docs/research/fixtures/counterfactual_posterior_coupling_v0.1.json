@@ -336,7 +336,13 @@
     "CfC_LTC_only",
     "HDC_plus_CfC_LTC",
     "matched_GRU_or_RSSM_when_reproducible",
-    "standard_RSSM_with_shared_branch_point_latent"
+    "standard_RSSM_with_shared_branch_point_latent",
+    "direct_policy_without_world_model_rollouts",
+    "MRSQ_style_minimum_value_ensemble_search_control",
+    "Rollback_branch_and_backtracking_comparator",
+    "Causal_JEPA_object_masking_visual_comparator_where_applicable",
+    "World_In_World_closed_loop_benchmark",
+    "WorldArena_2_0_visuotactile_online_RL_and_real_robot_tracks"
   ],
   "ownership": {
     "effect_arithmetic": "Symthaea #13520",
@@ -366,5 +372,56 @@
     "pcir_scope": "An auditable Symthaea implementation/ablation protocol for explicit stable-trait posterior/sample identity versus a standard RSSM-style branch-point latent copied across sibling action branches.",
     "required_control": "A9 standard RSSM-style posterior latent with identical branch-point deterministic/stochastic state cloned across sibling action branches.",
     "dynamic_mechanism_bounds": "Haugh & Singal (ICML 2023) already optimize over possibly infinitely many mechanisms for upper/lower dynamic counterfactual bounds. A finite candidate model range is only empirical unless completeness is certified; PCIR Section 13 is an integration proposal, not a novel bounds algorithm."
+  },
+  "prospective_qualification_targets": {
+    "status": "targets_not_achieved_results",
+    "environment_eligibility": {
+      "diagnostic": "reproduce DMC abducible share A and estimation floor phi on exact source formulation",
+      "certificate_convention": "A >= 3*phi",
+      "sensitivity_multipliers": [
+        2,
+        3,
+        4
+      ]
+    },
+    "rollout_retention": {
+      "metric": "A_pred / A_lat",
+      "target_minimum": 0.9,
+      "precondition": "A_lat is reliably measurable above its estimator floor"
+    },
+    "interval_calibration": {
+      "nominal_coverage": [
+        0.9,
+        0.95
+      ],
+      "report": [
+        "empirical cluster coverage",
+        "interval width",
+        "individual-stratum coverage",
+        "planner-selected coverage"
+      ]
+    },
+    "decision_value": {
+      "metric": "baseline regret minus PCIR regret",
+      "target": "positive paired held-out improvement with 95% individual-cluster interval excluding zero",
+      "matched_cost": true,
+      "hard_constraint_regressions_allowed": false
+    },
+    "resource_efficiency": {
+      "target": "Pareto improvement or explicitly reported tradeoff",
+      "metrics": [
+        "inference latency p50/p95/p99",
+        "model memory",
+        "posterior sampling cost",
+        "simulator calls",
+        "measured energy"
+      ]
+    }
+  },
+  "benchmark_reporting_policy": {
+    "no_cross_benchmark_score_pooling": true,
+    "report_per_benchmark_metrics_separately": true,
+    "mandatory_individual_cluster_resampling": true,
+    "all_interventions_histories_draws_of_an_individual_stay_in_one_split": true
   }
 }
