@@ -85,6 +85,22 @@ pub enum ContractError {
     MissingResponseEntry,
     #[error("response reference matrix has zero norm")]
     ZeroResponseReferenceNorm,
+    #[error("response signature requires non-empty contract, structure, intervention and QoI identities")]
+    InvalidResponseSignatureIdentity,
+    #[error("response signature contains duplicate intervention or QoI identities")]
+    DuplicateResponseSignatureAxis,
+    #[error("response signature dimensions do not match its declared axes")]
+    ResponseSignatureShapeMismatch,
+    #[error("response signatures have different task-contract identities")]
+    ResponseSignatureContractMismatch,
+    #[error("response signatures have different intervention, QoI or time axes")]
+    ResponseSignatureAxisMismatch,
+    #[error("response signature time samples must be finite and strictly increasing")]
+    InvalidResponseSignatureTimes,
+    #[error("response signature normalization scale must be finite and positive")]
+    InvalidResponseSignatureScale,
+    #[error("response signature tolerance must be finite and non-negative")]
+    InvalidResponseSignatureTolerance,
     #[error("finite-amplitude response estimator requires positive finite pulse amplitudes")]
     InvalidResponseAmplitude,
     #[error("storage byte-count arithmetic overflowed")]
@@ -964,6 +980,203 @@ impl ModeResponseMatrix {
             .ok_or(ContractError::UnknownResponseMode(output_mode))?;
         Ok(output_index * self.input_modes.len() + input_index)
     }
+}
+
+/// A frozen task-conditioned signature of a kinetic state's future responses.
+///
+/// Flattening order is intervention-major, then QoI-major, then time-minor.
+/// The signature is only defined relative to its contract_id, intervention
+/// registry, QoI registry, time grid and physical structure class. Missing
+/// response values and unresolved branch labels remain explicit.
+#[derive(Clone, Debug, PartialEq)]
+pub struct KineticResponseSignature {
+    contract_id: String,
+    structure_class_id: String,
+    intervention_ids: Vec<String>,
+    qoi_ids: Vec<String>,
+    time_samples: Vec<f64>,
+    responses: Vec<Option<ComplexResponse>>,
+    branch_ids: Vec<Option<String>>,
+}
+
+/// Pairwise discrepancy and admissibility diagnostics for two response signatures.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ResponseSignatureComparison {
+    /// Euclidean/Frobenius discrepancy normalized by a task-fixed scale.
+    pub normalized_response_distance: Option<f64>,
+    pub absolute_frobenius_error: f64,
+    pub measured_entry_count: usize,
+    pub missing_response_count: usize,
+    pub branch_mismatch_count: usize,
+    pub unresolved_branch_count: usize,
+    pub structure_class_compatible: bool,
+}
+
+impl KineticResponseSignature {
+    /// Construct a signature with exact task axes and explicit missingness.
+    pub fn new(
+        contract_id: String,
+        structure_class_id: String,
+        intervention_ids: Vec<String>,
+        qoi_ids: Vec<String>,
+        time_samples: Vec<f64>,
+        responses: Vec<Option<ComplexResponse>>,
+        branch_ids: Vec<Option<String>>,
+    ) -> Result<Self, ContractError> {
+        if contract_id.trim().is_empty()
+            || structure_class_id.trim().is_empty()
+            || intervention_ids.is_empty()
+            || qoi_ids.is_empty()
+            || time_samples.is_empty()
+        {
+            return Err(ContractError::InvalidResponseSignatureIdentity);
+        }
+        if has_duplicate_strings(&intervention_ids) || has_duplicate_strings(&qoi_ids) {
+            return Err(ContractError::DuplicateResponseSignatureAxis);
+        }
+        if time_samples
+            .iter()
+            .any(|time| !time.is_finite())
+            || time_samples.windows(2).any(|window| window[1] <= window[0])
+        {
+            return Err(ContractError::InvalidResponseSignatureTimes);
+        }
+        let expected_entries = intervention_ids
+            .len()
+            .checked_mul(qoi_ids.len())
+            .and_then(|count| count.checked_mul(time_samples.len()))
+            .ok_or(ContractError::ResponseMatrixSizeOverflow)?;
+        if responses.len() != expected_entries || branch_ids.len() != expected_entries {
+            return Err(ContractError::ResponseSignatureShapeMismatch);
+        }
+        if responses.iter().flatten().any(|response| {
+            !response.real.is_finite() || !response.imag.is_finite()
+        }) || branch_ids
+            .iter()
+            .flatten()
+            .any(|branch| branch.trim().is_empty())
+        {
+            return Err(ContractError::NonFiniteResponseValue);
+        }
+        Ok(Self {
+            contract_id,
+            structure_class_id,
+            intervention_ids,
+            qoi_ids,
+            time_samples,
+            responses,
+            branch_ids,
+        })
+    }
+
+    /// Compare two signatures on exactly the same frozen intervention/QoI/time axes.
+    ///
+    /// normalization_scale is fixed by the task contract and must be identical
+    /// for all pairwise comparisons in a cohort. Using a shared scale makes the
+    /// distance symmetric and supports honest non-transitivity tests for
+    /// approximate pairwise compatibility.
+    pub fn compare(
+        &self,
+        other: &Self,
+        normalization_scale: f64,
+    ) -> Result<ResponseSignatureComparison, ContractError> {
+        if !normalization_scale.is_finite() || normalization_scale <= 0.0 {
+            return Err(ContractError::InvalidResponseSignatureScale);
+        }
+        if self.contract_id != other.contract_id {
+            return Err(ContractError::ResponseSignatureContractMismatch);
+        }
+        if self.intervention_ids != other.intervention_ids
+            || self.qoi_ids != other.qoi_ids
+            || self.time_samples != other.time_samples
+        {
+            return Err(ContractError::ResponseSignatureAxisMismatch);
+        }
+
+        let mut squared_error = 0.0_f64;
+        let mut measured_entry_count = 0_usize;
+        let mut missing_response_count = 0_usize;
+        let mut branch_mismatch_count = 0_usize;
+        let mut unresolved_branch_count = 0_usize;
+
+        for index in 0..self.responses.len() {
+            match (self.responses[index], other.responses[index]) {
+                (Some(left), Some(right)) => {
+                    let real_delta = left.real - right.real;
+                    let imag_delta = left.imag - right.imag;
+                    squared_error += real_delta.mul_add(real_delta, imag_delta * imag_delta);
+                    measured_entry_count += 1;
+                }
+                _ => missing_response_count += 1,
+            }
+            match (&self.branch_ids[index], &other.branch_ids[index]) {
+                (Some(left), Some(right)) if left != right => branch_mismatch_count += 1,
+                (Some(_), Some(_)) => {}
+                _ => unresolved_branch_count += 1,
+            }
+        }
+        if !squared_error.is_finite() {
+            return Err(ContractError::InvalidGramianArithmetic);
+        }
+        let absolute_frobenius_error = squared_error.sqrt();
+        let normalized_response_distance = (measured_entry_count > 0)
+            .then_some(absolute_frobenius_error / normalization_scale);
+        if normalized_response_distance.is_some_and(|distance| !distance.is_finite()) {
+            return Err(ContractError::InvalidGramianArithmetic);
+        }
+
+        Ok(ResponseSignatureComparison {
+            normalized_response_distance,
+            absolute_frobenius_error,
+            measured_entry_count,
+            missing_response_count,
+            branch_mismatch_count,
+            unresolved_branch_count,
+            structure_class_compatible: self.structure_class_id == other.structure_class_id,
+        })
+    }
+
+    /// Pairwise tolerance test only; this relation is not generally transitive.
+    ///
+    /// Do not build equivalence classes by blindly unioning pairwise-compatible
+    /// edges. A class/cluster must separately satisfy a whole-class diameter
+    /// bound or a certified quotient construction.
+    pub fn pairwise_compatible(
+        comparison: ResponseSignatureComparison,
+        tolerance: f64,
+    ) -> Result<bool, ContractError> {
+        if !tolerance.is_finite() || tolerance < 0.0 {
+            return Err(ContractError::InvalidResponseSignatureTolerance);
+        }
+        Ok(comparison.missing_response_count == 0
+            && comparison.branch_mismatch_count == 0
+            && comparison.unresolved_branch_count == 0
+            && comparison.structure_class_compatible
+            && comparison
+                .normalized_response_distance
+                .is_some_and(|distance| distance <= tolerance))
+    }
+
+    pub fn contract_id(&self) -> &str {
+        &self.contract_id
+    }
+
+    pub fn intervention_ids(&self) -> &[String] {
+        &self.intervention_ids
+    }
+
+    pub fn qoi_ids(&self) -> &[String] {
+        &self.qoi_ids
+    }
+
+    pub fn time_samples(&self) -> &[f64] {
+        &self.time_samples
+    }
+}
+
+fn has_duplicate_strings(values: &[String]) -> bool {
+    let mut seen = BTreeSet::new();
+    values.iter().any(|value| !seen.insert(value))
 }
 
 fn has_duplicates(values: &[u32]) -> bool {
@@ -4619,6 +4832,145 @@ mod tests {
         assert_eq!(
             validate_canonical_symplectic_pair_2d([1.0, 0.0], [0.0, 1.0], f64::NAN),
             Err(ContractError::InvalidProjectionBasis)
+        );
+    }
+
+    fn make_kinetic_response_signature(
+        value: f64,
+        contract_id: &str,
+        structure_class_id: &str,
+        branch_id: Option<&str>,
+    ) -> KineticResponseSignature {
+        KineticResponseSignature::new(
+            contract_id.to_owned(),
+            structure_class_id.to_owned(),
+            vec!["pulse-mode-2-phase-0.3".to_owned()],
+            vec!["electric-field-mode-2".to_owned()],
+            vec![0.0, 0.5],
+            vec![
+                Some(ComplexResponse::new(value, 0.0).unwrap()),
+                Some(ComplexResponse::new(value, 0.0).unwrap()),
+            ],
+            vec![
+                branch_id.map(str::to_owned),
+                branch_id.map(str::to_owned),
+            ],
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn kinetic_response_signature_comparison_is_symmetric_with_fixed_contract_scale() {
+        let left = make_kinetic_response_signature(1.0, "contract-a", "hamiltonian-class-a", Some("echo"));
+        let right = make_kinetic_response_signature(1.5, "contract-a", "hamiltonian-class-a", Some("echo"));
+        let forward = left.compare(&right, 2.0).unwrap();
+        let reverse = right.compare(&left, 2.0).unwrap();
+        assert_eq!(forward.normalized_response_distance, Some(0.5));
+        assert_eq!(
+            forward.normalized_response_distance,
+            reverse.normalized_response_distance
+        );
+        assert!(KineticResponseSignature::pairwise_compatible(forward, 0.5).unwrap());
+    }
+
+    #[test]
+    fn kinetic_response_signature_rejects_different_task_contract_or_axes() {
+        let base = make_kinetic_response_signature(1.0, "contract-a", "class-a", Some("echo"));
+        let other_contract =
+            make_kinetic_response_signature(1.0, "contract-b", "class-a", Some("echo"));
+        assert_eq!(
+            base.compare(&other_contract, 1.0),
+            Err(ContractError::ResponseSignatureContractMismatch)
+        );
+        let other_axes = KineticResponseSignature::new(
+            "contract-a".to_owned(),
+            "class-a".to_owned(),
+            vec!["different-pulse".to_owned()],
+            vec!["electric-field-mode-2".to_owned()],
+            vec![0.0, 0.5],
+            vec![
+                Some(ComplexResponse::new(1.0, 0.0).unwrap()),
+                Some(ComplexResponse::new(1.0, 0.0).unwrap()),
+            ],
+            vec![Some("echo".to_owned()), Some("echo".to_owned())],
+        )
+        .unwrap();
+        assert_eq!(
+            base.compare(&other_axes, 1.0),
+            Err(ContractError::ResponseSignatureAxisMismatch)
+        );
+    }
+
+    #[test]
+    fn kinetic_response_signature_rejects_missing_responses_and_unresolved_branches_for_merge() {
+        let complete = make_kinetic_response_signature(1.0, "contract-a", "class-a", Some("echo"));
+        let incomplete = KineticResponseSignature::new(
+            "contract-a".to_owned(),
+            "class-a".to_owned(),
+            vec!["pulse-mode-2-phase-0.3".to_owned()],
+            vec!["electric-field-mode-2".to_owned()],
+            vec![0.0, 0.5],
+            vec![None, Some(ComplexResponse::new(1.0, 0.0).unwrap())],
+            vec![None, Some("echo".to_owned())],
+        )
+        .unwrap();
+        let comparison = complete.compare(&incomplete, 1.0).unwrap();
+        assert_eq!(comparison.missing_response_count, 1);
+        assert_eq!(comparison.unresolved_branch_count, 1);
+        assert!(!KineticResponseSignature::pairwise_compatible(comparison, 1.0).unwrap());
+    }
+
+    #[test]
+    fn kinetic_response_signature_keeps_structure_and_branch_identity_as_separate_gates() {
+        let base = make_kinetic_response_signature(1.0, "contract-a", "hamiltonian-class-a", Some("echo"));
+        let other_structure =
+            make_kinetic_response_signature(1.0, "contract-a", "different-structure-class", Some("echo"));
+        let other_branch =
+            make_kinetic_response_signature(1.0, "contract-a", "hamiltonian-class-a", Some("trapped"));
+        let structure_comparison = base.compare(&other_structure, 1.0).unwrap();
+        let branch_comparison = base.compare(&other_branch, 1.0).unwrap();
+        assert!(!structure_comparison.structure_class_compatible);
+        assert!(!KineticResponseSignature::pairwise_compatible(structure_comparison, 1.0).unwrap());
+        assert_eq!(branch_comparison.branch_mismatch_count, 2);
+        assert!(!KineticResponseSignature::pairwise_compatible(branch_comparison, 1.0).unwrap());
+    }
+
+    #[test]
+    fn approximate_pairwise_response_compatibility_is_not_transitive() {
+        let state_a = make_kinetic_response_signature(0.0, "contract-a", "class-a", Some("branch"));
+        let state_b = make_kinetic_response_signature(0.75, "contract-a", "class-a", Some("branch"));
+        let state_c = make_kinetic_response_signature(1.5, "contract-a", "class-a", Some("branch"));
+        let ab = state_a.compare(&state_b, 1.0).unwrap();
+        let bc = state_b.compare(&state_c, 1.0).unwrap();
+        let ac = state_a.compare(&state_c, 1.0).unwrap();
+        assert!(KineticResponseSignature::pairwise_compatible(ab, 1.0).unwrap());
+        assert!(KineticResponseSignature::pairwise_compatible(bc, 1.0).unwrap());
+        assert!(!KineticResponseSignature::pairwise_compatible(ac, 1.0).unwrap());
+    }
+
+    #[test]
+    fn kinetic_response_signature_requires_valid_axes_times_and_scale() {
+        assert_eq!(
+            KineticResponseSignature::new(
+                "contract".to_owned(),
+                "class".to_owned(),
+                vec!["pulse".to_owned()],
+                vec!["qoi".to_owned()],
+                vec![0.0, 0.0],
+                vec![
+                    Some(ComplexResponse::new(1.0, 0.0).unwrap()),
+                    Some(ComplexResponse::new(1.0, 0.0).unwrap())
+                ],
+                vec![Some("branch".to_owned()), Some("branch".to_owned())],
+            )
+            .unwrap_err(),
+            ContractError::InvalidResponseSignatureTimes
+        );
+        let signature =
+            make_kinetic_response_signature(1.0, "contract", "class", Some("branch"));
+        assert_eq!(
+            signature.compare(&signature, 0.0),
+            Err(ContractError::InvalidResponseSignatureScale)
         );
     }
 
