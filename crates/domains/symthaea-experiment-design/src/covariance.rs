@@ -832,6 +832,51 @@ mod tests {
     }
 
     #[test]
+    fn cross_hypothesis_common_error_is_subtracted_from_the_difference_covariance() {
+        let mut input = covariance_redundancy_fixture();
+        input.hypothesis_ids = vec!["H0".to_owned(), "H1".to_owned()];
+        input.experiments.truncate(1);
+        let experiment = &mut input.experiments[0];
+        experiment.experiment_id = "shared_common_error".to_owned();
+        experiment.observables = vec![CovarianceObservable {
+            observable_id: "response".to_owned(),
+            unit: "u".to_owned(),
+        }];
+        experiment.predictions = [("H0", 0.0), ("H1", 1.0)]
+            .iter()
+            .map(|(id, mean)| {
+                let descriptor = format!("synthetic-control:model:{id}:shared-error-v1");
+                VectorHypothesisPrediction {
+                    hypothesis_id: (*id).to_owned(),
+                    model_digest_sha256: format!("{:x}", Sha256::digest(descriptor.as_bytes())),
+                    model_descriptor: descriptor,
+                    means: vec![*mean],
+                }
+            })
+            .collect();
+
+        // Both models share covariance 1.5 from a common error source.
+        // Marginal variances are 2 each, so Var(Y0-Y1)=2+2-1.5-1.5=1.
+        let descriptor = "shared-common-error:two-hypothesis-joint-output:v1".to_owned();
+        let gamma = vec![vec![2.0, 1.5], vec![1.5, 2.0]];
+        experiment.joint_output_covariance = JointOutputCovariance {
+            hypothesis_order: vec!["H0".to_owned(), "H1".to_owned()],
+            observable_order: vec!["response".to_owned()],
+            covariance_matrix_digest_sha256: matrix_digest_sha256(&gamma),
+            covariance_descriptor_digest_sha256: format!("{:x}", Sha256::digest(descriptor.as_bytes())),
+            covariance_descriptor: descriptor,
+            covariance: gamma,
+        };
+
+        let report = rank_covariance_aware_experiments(&input).unwrap();
+        let score = report.ranked_experiments[0].worst_case_separation_squared;
+        assert!((score - 1.0).abs() < 1.0e-10);
+        // An incorrect independence assumption would use variance 2 + 2 = 4,
+        // yielding D²=0.25 rather than the correctly derived D²=1.
+        assert!((1.0_f64 / (2.0 + 2.0) - 0.25).abs() < f64::EPSILON);
+    }
+
+    #[test]
     fn three_hypotheses_derive_all_difference_covariances_from_one_joint_model() {
         // Y0=0, Y1=Z, Y2=2Z for Var(Z)=1 gives
         // Var(Y0-Y1)=1, Var(Y0-Y2)=4 and Var(Y1-Y2)=1.
