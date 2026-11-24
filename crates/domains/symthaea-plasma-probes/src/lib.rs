@@ -2223,8 +2223,8 @@ pub fn validate_sensor_actuator_timing_contract_value(
         }
         maximum_observation_age_seconds = maximum_observation_age_seconds.max(timestamp_age_bound);
         let sampling_nyquist_hz = 0.5 / sampling_period;
-        minimum_effective_diagnostic_bandwidth_hz =
-            minimum_effective_diagnostic_bandwidth_hz.min(measurement_bandwidth.min(sampling_nyquist_hz));
+        minimum_effective_diagnostic_bandwidth_hz = minimum_effective_diagnostic_bandwidth_hz
+            .min(measurement_bandwidth.min(sampling_nyquist_hz));
     }
 
     let mut actuator_ids = BTreeSet::new();
@@ -2273,8 +2273,7 @@ pub fn validate_sensor_actuator_timing_contract_value(
         timing_number(value, "controller.target_instability_frequency_hz")?;
     let target_instability_efold_time_seconds =
         timing_number(value, "controller.target_instability_efold_time_seconds")?;
-    let minimum_bandwidth_multiple =
-        timing_number(value, "controller.minimum_bandwidth_multiple")?;
+    let minimum_bandwidth_multiple = timing_number(value, "controller.minimum_bandwidth_multiple")?;
     let maximum_loop_latency_efold_fraction =
         timing_number(value, "controller.maximum_loop_latency_efold_fraction")?;
     if controller_update_period <= 0.0
@@ -4718,19 +4717,18 @@ mod tests {
     #[test]
     fn sensor_actuator_timescale_audit_rejects_loop_latency_too_slow_for_growth_time() {
         let mut value = sensor_actuator_fixture_value();
-        value["controller"]["target_instability_efold_time_seconds"] =
-            serde_json::json!(0.05);
+        value["controller"]["target_instability_efold_time_seconds"] = serde_json::json!(0.05);
         let report = validate_sensor_actuator_timing_contract_value(&value).unwrap();
-        assert!(report.loop_latency_efold_fraction
-            > report.maximum_allowed_loop_latency_efold_fraction);
+        assert!(
+            report.loop_latency_efold_fraction > report.maximum_allowed_loop_latency_efold_fraction
+        );
         assert!(!report.interface_timescale_qualified);
     }
 
     #[test]
     fn sensor_actuator_timescale_audit_rejects_non_positive_target_frequency_and_margins() {
         let mut zero_frequency = sensor_actuator_fixture_value();
-        zero_frequency["controller"]["target_instability_frequency_hz"] =
-            serde_json::json!(0.0);
+        zero_frequency["controller"]["target_instability_frequency_hz"] = serde_json::json!(0.0);
         assert!(matches!(
             validate_sensor_actuator_timing_contract_value(&zero_frequency),
             Err(ContractError::InvalidControlTimingField {
