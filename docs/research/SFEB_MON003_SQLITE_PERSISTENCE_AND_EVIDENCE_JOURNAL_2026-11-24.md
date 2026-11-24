@@ -22,10 +22,10 @@ A missing or mismatched readback leaves the local state `outcome_unknown`. It is
 
 ## Executed artifacts
 
-- Source: [`mon003-sqlite-transactional-outbox-v1.mjs`](../../benchmarks/frontend/monitoring/mon003-sqlite-transactional-outbox-v1.mjs)
+- Source: [`mon003-sqlite-transactional-outbox-v1.mjs.gz`](../../benchmarks/frontend/monitoring/mon003-sqlite-transactional-outbox-v1.mjs.gz)
 - Machine-readable report: [`mon003-sqlite-transactional-outbox-report-v1.json`](../../benchmarks/frontend/monitoring/mon003-sqlite-transactional-outbox-report-v1.json)
 
-**Local result:** Node.js v22.16.0, SQLite 3.49.1, **38/38 deterministic cases passed**. Node's `node:sqlite` API reports an experimental warning in Node 22; this is a toolchain limitation as well as a qualification caveat.
+**Local result:** Node.js v22.16.0, SQLite 3.49.1, **38/38 deterministic cases passed**. The tested 41,143-byte source is committed as a deterministic gzip artifact to preserve its exact byte content. Node's `node:sqlite` API reports an experimental warning in Node 22; this is a toolchain limitation as well as a qualification caveat.
 
 ### Test families
 
@@ -38,7 +38,17 @@ A missing or mismatched readback leaves the local state `outcome_unknown`. It is
 - Source receipts are immutable. Revocation is a separate append-only record carrying timestamp, reason and authority.
 - A hash-chained evidence journal records accepted objectives, reservation intent, outbox enqueue, revocation, dispatch attempts, postcondition verification and remote commit. The verifier detects modified event content; triggers reject normal row updates/deletes.
 
-### Local benchmark
+#
+To reproduce from the repository root:
+
+```sh
+gzip -dc benchmarks/frontend/monitoring/mon003-sqlite-transactional-outbox-v1.mjs.gz | node --check -
+gzip -dc benchmarks/frontend/monitoring/mon003-sqlite-transactional-outbox-v1.mjs.gz | node -
+```
+
+Uncompressed source SHA-256: `919a5ee17ef02c15ec2154f8730344b223feefb33b043785e4720f3ed1356965`. Compressed artifact SHA-256: `0a878fd26795a266c7f091acf66092fe212e39f287f1f8425c0a56e40eb1f836`.
+
+## Local benchmark
 
 Five fresh-process repetitions, each with 200 sequential end-to-end cycles, yielded:
 
