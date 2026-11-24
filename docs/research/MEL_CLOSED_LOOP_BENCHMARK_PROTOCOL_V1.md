@@ -80,6 +80,25 @@ Use registered races and musician sessions for:
 
 Measure veto propagation at each actual boundary. Do not claim already-admitted callback frames or device buffers were physically recalled. A human deviation from a prediction is agency, not a forecast violation.
 
+### Track B1 — Control restoration cost and anti-anchoring
+
+A collaborator can obey a veto in a synthetic state machine while still making a musician work too hard to regain control. Measure the *cost of intervention* explicitly:
+
+- **Veto admission boundary:** time/sequence from the externally received veto to the last newly admitted note/PCM item; target zero new admissions after the veto boundary.
+- **Residual output after veto:** already-admitted queue/callback/device material reported separately by admission epoch and actual observed end. It is not an unauthorized new admission when the admission receipt proves it preceded the veto; it is still relevant to the musician's experience.
+- **Time to control restoration:** time until the musician can safely issue a new intention without stale work continuing.
+- **Steering efficiency:** intervention count, elapsed time and wrong-scope/collateral changes until the system satisfies the revised intention.
+- **Branch/undo cost:** time and operations required to return to the previous exact score/audio state, plus any non-bit-exact restoration.
+- **Ignore/non-response semantics:** verify that not answering a preview never becomes consent.
+
+Test **preview anchoring** as well as preview utility. Randomize visible precommitted forecast, hidden forecast, uncertainty-aware alternatives and post-hoc explanation. Compare musician anticipation/entry timing against (a) the diversity of musician-originated deviations, (b) novelty and structure of the resulting joint passage, (c) ownership/autonomy ratings, and (d) willingness to continue. A preview that improves synchronization but suppresses valid creative alternatives is a trade-off, not an unqualified win.
+
+Include a *human-led reflective* interface arm (questions or optional alternatives; musician chooses the next edit) and a *model-led proactive* arm (system proposes/re-writes a candidate), with matched task/compute budgets. A 2026 CHI randomized study (N=486) compares these interaction modes in non-musical ideation; it motivates the ablation but is not evidence that the same effect holds in music. [CHI 2026 study](https://doi.org/10.1145/3772318.3791185). A 2026 qualitative study of 30 independent musicians also reports that creative agency and authorship are negotiated through selection, editing and recombination rather than being inferred from technical output quality; use it as a hypothesis and instrument-design reference, not as a benchmark score. [Study](https://so02.tci-thaijo.org/index.php/jam/article/view/288549).
+
+**Do not create one agency scalar.** Publish veto correctness, time-to-control-restoration, steering effort, branch survival, creative diversity, ownership, workload and musical quality separately.
+
+**Reducer boundary:** the current v1 Rust reducer qualifies the pre-admission veto path (veto followed by YIELD, with no newly authorized output). It does not yet model a veto arriving after an earlier output was queued or admitted to a callback. That extension must join #10382's event sequence/output epoch and report residual already-admitted output; queue invalidation must never be described as physical silence.
+
 ### Track C — Independent output and event observation
 
 The capture adapters are modality-specific and must not borrow one another's completeness counters:
