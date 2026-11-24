@@ -199,3 +199,21 @@ A proposed superiority claim requires at least a five-percentage-point absolute 
 ## 9. Claim boundary
 
 A schema or reducer pass proves only its specified structural rules. Synthetic fixtures do not prove musical quality, detector sensitivity, acoustic latency, human agency, reciprocal causal gain or SOTA superiority. An authenticated receipt proves who asserted/bound an observation, not that the physical observation was correct. Each of those claims needs its own evidence and independent validation.
+
+
+### Commercial creator/workstation frontier — verified 24 November 2026
+
+The public product surface has advanced beyond prompt-to-song generation; Melothaea must benchmark against actual editing workflows rather than claim that score control or local regeneration is unoccupied.
+
+- **Suno Studio 2.0** publicly documents audio/MIDI tracks, import/record/edit MIDI on a timeline, a wavetable synth, automation/effects, take lanes, and chat-directed generation of MIDI clips and audio. Its September 17, 2026 release notes describe improved MIDI-to-audio accuracy/context and generation of audio stems from MIDI clips; October 8 notes describe beat-one detection, clip stretching and fade curves. [Studio 2.0](https://help.suno.com/en/articles/13670529) · [MIDI in Studio](https://help.suno.com/en/articles/13670593) · [September MIDI update](https://suno.com/release-notes/studio-improved-midi) · [October Studio update](https://suno.com/release-notes)
+- **Eleven Music v2.5** publicly documents section-by-section composition and inpainting. Its composition plan can mix generation chunks with audio-reference chunks that are inserted unchanged; a generation chunk can be conditioned on a slice of stored audio with a declared context-adherence/conditioning strength. The docs describe up to 30 chunks and 3–120 second generation chunks. Audio Reference is style/sound guidance, not a remix guarantee. [Music API overview](https://elevenlabs.io/docs/overview/capabilities/music) · [Inpainting guide](https://elevenlabs.io/docs/eleven-api/guides/how-to/music/inpainting)
+- **Lyria 3.5** is now visible in Google's official Gemini API pricing as a full-song model, while legacy Lyria 3 clip/full-song endpoints are separately listed. Do not conflate these with the earlier Lyria RealTime streaming-control track; they are different product tasks and interfaces. [Official model/pricing table](https://ai.google.dev/gemini-api/docs/pricing)
+
+**Competitive implication:** do not claim "local editing", MIDI prompting, or unchanged-section regeneration as unique features. The stronger differentiated claim is a verifiable edit contract across symbolic material/PartId lineage, explicit protected musical constraints, candidate-specific execution and observation evidence, reversible transactions, and musician-controlled authorization. The comparison should include:
+1. Suno Studio 2.0 native MIDI + chat-to-audio-stem workflow;
+2. Eleven Music v2.5 generation/reference-chunk inpainting workflow;
+3. deterministic direct symbolic/DSP edit;
+4. expert musician/orchestrator edit;
+5. Melothaea typed edit plan plus qualified realizer and independent preservation evidence.
+
+Match source material, instruction, permitted scope, duration, candidate count, render/compute budget and output modality. Report native edit-task metrics and human correction time separately. Product documentation is evidence of advertised surface capability, not an internal architecture audit; do not infer undocumented competitor limitations.
