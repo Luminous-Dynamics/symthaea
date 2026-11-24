@@ -772,7 +772,7 @@ mod tests {
 
     #[test]
     fn intervention_description_and_unit_bearing_settings_are_required() {
-        let mut input = galileo_demo_input();
+        let input = galileo_demo_input();
         let ranked = rank_experiments(&input).unwrap();
         assert_eq!(
             ranked.ranked_experiments[0].settings[0].parameter_id,
