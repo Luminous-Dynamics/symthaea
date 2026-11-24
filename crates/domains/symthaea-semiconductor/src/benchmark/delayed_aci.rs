@@ -569,7 +569,7 @@ pub fn deliver_aci_label_v1(
                 alpha_after_or_scheduled: engine.state.alpha_state,
                 current_alpha_after: engine.state.alpha_state,
                 scheduled_sequence: None,
-                state_before_sha256: &before.into(),
+                state_before_sha256: before.clone(),
                 state_after_sha256: &before.into(),
                 mutated: false,
             },
@@ -589,7 +589,7 @@ pub fn deliver_aci_label_v1(
                 alpha_after_or_scheduled: engine.state.alpha_state,
                 current_alpha_after: engine.state.alpha_state,
                 scheduled_sequence: None,
-                state_before_sha256: &before.into(),
+                state_before_sha256: before.clone(),
                 state_after_sha256: &before.into(),
                 mutated: false,
             },
@@ -619,7 +619,7 @@ pub fn deliver_aci_label_v1(
                 alpha_after_or_scheduled: engine.state.alpha_state,
                 current_alpha_after: engine.state.alpha_state,
                 scheduled_sequence: None,
-                state_before_sha256: &before.into(),
+                state_before_sha256: before.clone(),
                 state_after_sha256: &before.into(),
                 mutated: false,
             },
@@ -637,7 +637,7 @@ pub fn deliver_aci_label_v1(
                 alpha_after_or_scheduled: engine.state.alpha_state,
                 current_alpha_after: engine.state.alpha_state,
                 scheduled_sequence: None,
-                state_before_sha256: &before.into(),
+                state_before_sha256: before.clone(),
                 state_after_sha256: &before.into(),
                 mutated: false,
             },
@@ -700,7 +700,7 @@ pub fn deliver_aci_label_v1(
                 alpha_after_or_scheduled: engine.state.alpha_state,
                 current_alpha_after: engine.state.alpha_state,
                 scheduled_sequence: None,
-                state_before_sha256: &before.into(),
+                state_before_sha256: before.clone(),
                 state_after_sha256: &before.into(),
                 mutated: false,
             },
@@ -736,22 +736,22 @@ pub fn deliver_aci_label_v1(
                     })?;
                 if target_sequence < engine.state.next_prediction_sequence {
                     return make_update_receipt(
-            engine,
-            delivery,
-            Some(&prediction_receipt),
-            AciUpdateOutcomeV1 {
-                disposition: AciUpdateDispositionV1::Rejected,
-                reason: Some(AciUpdateReasonV1::FixedHorizonSlotAlreadyPassed),
-                miss: Some(miss),
-                alpha_before: alpha_before,
-                alpha_after_or_scheduled: alpha_before,
-                current_alpha_after: engine.state.alpha_state,
-                scheduled_sequence: None,
-                state_before_sha256: &before.into(),
-                state_after_sha256: &before.into(),
-                mutated: false,
-            },
-        );
+                        engine,
+                        delivery,
+                        Some(&prediction_receipt),
+                        AciUpdateOutcomeV1 {
+                            disposition: AciUpdateDispositionV1::Rejected,
+                            reason: Some(AciUpdateReasonV1::FixedHorizonSlotAlreadyPassed),
+                            miss: Some(miss),
+                            alpha_before: alpha_before,
+                            alpha_after_or_scheduled: alpha_before,
+                            current_alpha_after: engine.state.alpha_state,
+                            scheduled_sequence: None,
+                            state_before_sha256: before.clone(),
+                            state_after_sha256: &before.into(),
+                            mutated: false,
+                        },
+                    );
                 }
                 if engine
                     .state
@@ -759,22 +759,22 @@ pub fn deliver_aci_label_v1(
                     .contains_key(&target_sequence)
                 {
                     return make_update_receipt(
-            engine,
-            delivery,
-            Some(&prediction_receipt),
-            AciUpdateOutcomeV1 {
-                disposition: AciUpdateDispositionV1::Rejected,
-                reason: Some(AciUpdateReasonV1::FixedHorizonScheduleConflict),
-                miss: Some(miss),
-                alpha_before: alpha_before,
-                alpha_after_or_scheduled: alpha_before,
-                current_alpha_after: engine.state.alpha_state,
-                scheduled_sequence: None,
-                state_before_sha256: &before.into(),
-                state_after_sha256: &before.into(),
-                mutated: false,
-            },
-        );
+                        engine,
+                        delivery,
+                        Some(&prediction_receipt),
+                        AciUpdateOutcomeV1 {
+                            disposition: AciUpdateDispositionV1::Rejected,
+                            reason: Some(AciUpdateReasonV1::FixedHorizonScheduleConflict),
+                            miss: Some(miss),
+                            alpha_before: alpha_before,
+                            alpha_after_or_scheduled: alpha_before,
+                            current_alpha_after: engine.state.alpha_state,
+                            scheduled_sequence: None,
+                            state_before_sha256: before.clone(),
+                            state_after_sha256: &before.into(),
+                            mutated: false,
+                        },
+                    );
                 }
                 (
                     AciUpdateDispositionV1::Scheduled,
@@ -795,22 +795,22 @@ pub fn deliver_aci_label_v1(
     }
     let after = state_digest(&next_state)?;
     let receipt = make_update_receipt(
-            engine,
-            delivery,
-            Some(&prediction_receipt),
-            AciUpdateOutcomeV1 {
-                disposition: disposition,
-                reason: None,
-                miss: Some(miss),
-                alpha_before: alpha_before,
-                alpha_after_or_scheduled: alpha_after_or_scheduled,
-                current_alpha_after: current_alpha_after,
-                scheduled_sequence: scheduled_sequence,
-                state_before_sha256: &before.into(),
-                state_after_sha256: &after.into(),
-                mutated: true,
-            },
-        )?;
+        engine,
+        delivery,
+        Some(&prediction_receipt),
+        AciUpdateOutcomeV1 {
+            disposition: disposition,
+            reason: None,
+            miss: Some(miss),
+            alpha_before: alpha_before,
+            alpha_after_or_scheduled: alpha_after_or_scheduled,
+            current_alpha_after: current_alpha_after,
+            scheduled_sequence: scheduled_sequence,
+            state_before_sha256: before.clone(),
+            state_after_sha256: after.clone(),
+            mutated: true,
+        },
+    )?;
 
     engine.state = next_state;
     engine.accepted_label_revisions.insert(revision_key);
@@ -1243,7 +1243,14 @@ mod tests {
                 );
                 deliver_aci_label_v1(
                     &mut engine,
-                    &delivery(&format!("s{index}"), &format!("e{index}"), &format!("l{index}"), 1, if index == 1 { 2.0 } else { 0.0 }, (110 + index * 3, 111 + index * 3, 112 + index * 3)),
+                    &delivery(
+                        &format!("s{index}"),
+                        &format!("e{index}"),
+                        &format!("l{index}"),
+                        1,
+                        if index == 1 { 2.0 } else { 0.0 },
+                        (110 + index * 3, 111 + index * 3, 112 + index * 3),
+                    ),
                 )
                 .unwrap();
             }
