@@ -115,6 +115,9 @@ pub struct CaoOcrcRoundInputV1 {
     pub global_model_artifact_sha256: String,
     pub interval_policy_sha256: String,
     pub upstream_prediction_receipt_sha256: String,
+    pub threshold_used: f64,
+    /// Regression score center for the bounded residual score |y - center|.
+    pub score_location: f64,
     /// None means a nontrivial interval that requires physical feedback.
     /// Empty/full sets have known loss and consume no tracking slot.
     pub trivial_set: Option<CaoOcrcTrivialSetV1>,
@@ -136,6 +139,8 @@ pub struct CaoOcrcRoundRecordV1 {
     pub global_model_artifact_sha256: String,
     pub interval_policy_sha256: String,
     pub upstream_prediction_receipt_sha256: String,
+    pub threshold_at_prediction: f64,
+    pub score_location: f64,
     pub trivial_set: Option<CaoOcrcTrivialSetV1>,
     pub interval_lower: Option<f64>,
     pub interval_upper: Option<f64>,
@@ -479,6 +484,9 @@ pub fn advance_ca_ocrc_round_v1(
     require_text(&input.measurement_event_id, "input.measurement_event_id")?;
     if input.clock_domain_id != engine.clock_domain_id
         || input.event_time_unix_seconds > input.prediction_at_unix_seconds
+        || !input.threshold_used.is_finite()
+        || input.threshold_used != engine.threshold
+        || !input.score_location.is_finite()
         || !valid_sha256(&input.global_model_artifact_sha256)
         || !valid_sha256(&input.interval_policy_sha256)
         || !valid_sha256(&input.upstream_prediction_receipt_sha256)
@@ -488,13 +496,25 @@ pub fn advance_ca_ocrc_round_v1(
         ));
     }
     match input.trivial_set {
-        Some(_) => {
-            if input.interval_lower.is_some()
+        Some(CaoOcrcTrivialSetV1::Empty) => {
+            if input.threshold_used >= 0.0
+                || input.interval_lower.is_some()
                 || input.interval_upper.is_some()
                 || input.proxy_uniform_draw.is_some()
             {
                 return Err(CaoOcrcErrorV1(
-                    "trivial prediction set must not also supply interval bounds or proxy draw".into(),
+                    "empty prediction set requires threshold < 0 and no interval/proxy draw".into(),
+                ));
+            }
+        }
+        Some(CaoOcrcTrivialSetV1::Full) => {
+            if input.threshold_used < engine.policy.score_upper_bound
+                || input.interval_lower.is_some()
+                || input.interval_upper.is_some()
+                || input.proxy_uniform_draw.is_some()
+            {
+                return Err(CaoOcrcErrorV1(
+                    "full prediction set requires threshold >= score bound and no interval/proxy draw".into(),
                 ));
             }
         }
@@ -508,14 +528,18 @@ pub fn advance_ca_ocrc_round_v1(
                     "nontrivial prediction set requires finite interval bounds and a proxy draw".into(),
                 ));
             };
-            if !lower.is_finite()
+            if input.threshold_used < 0.0
+                || input.threshold_used >= engine.policy.score_upper_bound
+                || !lower.is_finite()
                 || !upper.is_finite()
                 || lower > upper
+                || input.score_location < lower
+                || input.score_location > upper
                 || !draw.is_finite()
                 || !(0.0..1.0).contains(&draw)
             {
                 return Err(CaoOcrcErrorV1(
-                    "nontrivial prediction interval or proxy draw is invalid".into(),
+                    "nontrivial prediction interval, threshold or proxy draw is invalid".into(),
                 ));
             }
         }
@@ -589,6 +613,8 @@ pub fn advance_ca_ocrc_round_v1(
         global_model_artifact_sha256: input.global_model_artifact_sha256.clone(),
         interval_policy_sha256: input.interval_policy_sha256.clone(),
         upstream_prediction_receipt_sha256: input.upstream_prediction_receipt_sha256.clone(),
+        threshold_at_prediction: input.threshold_used,
+        score_location: input.score_location,
         trivial_set: input.trivial_set,
         interval_lower: input.interval_lower,
         interval_upper: input.interval_upper,
@@ -905,6 +931,11 @@ fn validate_feedback(
     if !feedback.corrected_measurement_value.is_finite() {
         return Ok(Some(CaoOcrcFeedbackReasonV1::DeliveredValueNonFinite));
     }
+    if (feedback.corrected_measurement_value - round.score_location).abs()
+        > engine.policy.score_upper_bound
+    {
+        return Ok(Some(CaoOcrcFeedbackReasonV1::ScoreRangeViolation));
+    }
     if feedback.corrected_measurement_value != report.qualified_corrected_value {
         return Ok(Some(CaoOcrcFeedbackReasonV1::DeliveredValueMismatch));
     }
@@ -1062,6 +1093,10 @@ mod tests {
             interval_policy_sha256: digest('b'),
             upstream_prediction_receipt_sha256: digest('c'),
             trivial_set: trivial,
+            threshold_used: 10.0,
+            score_location: interval
+                .map(|bounds| (bounds.0 + bounds.1) / 2.0)
+                .unwrap_or(0.0),
             interval_lower: interval.map(|bounds| bounds.0),
             interval_upper: interval.map(|bounds| bounds.1),
             proxy_uniform_draw: draw,
