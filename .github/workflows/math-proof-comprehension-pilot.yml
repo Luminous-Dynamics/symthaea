@@ -255,7 +255,7 @@ jobs:
           jq -e '."$schema" == "https://json-schema.org/draft/2020-12/schema"
             and .properties.schema_version.const == "1.0.0"
             and .properties.pairs.minItems == 1
-            and ."$defs".formula.oneOf | length == 6' \\
+            and (."$defs".formula.oneOf | length == 6)' \\
             docs/research/MATH_SCOPE_EQUIVALENCE_TIER1_V1.schema.json >/dev/null
           echo "SCOPE_EQUIVALENCE_TIER1_FIXTURES_PASS"
 
