@@ -70,6 +70,27 @@ DBOS's production checklist reports a provider benchmark of a single 16-vCPU Pos
 
 Source: [DBOS production checklist](https://docs.dbos.dev/production/checklist).
 
+## Executed pre-PostgreSQL claim/fence model
+
+Before a real PostgreSQL runtime was available, a bounded reference model was added to test the separate claim lease and objective fence contract:
+
+- Source: `benchmarks/frontend/monitoring/mon004-postgres-claim-model-v1.mjs.gz`
+- Report: `benchmarks/frontend/monitoring/mon004-postgres-claim-model-report-v1.json`
+- Run instructions: `benchmarks/frontend/monitoring/mon004-postgres-claim-model-README.md`
+- **21/21 deterministic cases passed** under Node.js v22.16.0.
+- **5,040 sequential operation orderings explored** (all permutations of seven lifecycle steps).
+- Observed across the finite model: 378 mock remote effects; 1,062 stale-claim rejection observations; 2,772 schedules in which read/reconciliation evidence was unavailable at the modeled point; 0 duplicate effects; 0 invariant violations.
+
+The model separately exercises outbox claim epoch/token, tenant/objective action fence, persisted uncertainty before remote mutation, same-key remote idempotency, separate reader grants, per-aggregate ordering, cross-tenant isolation and independent readback before delivery completion.
+
+This increases confidence in the **contract ordering**, not in PostgreSQL itself. All schedules are sequential permutations; the model assumes an atomic remote sink and deterministic clocks. It is not PostgreSQL MVCC, a concurrent memory model, network-partition testing or a reliability probability. The SQL contract still must be applied to a pinned PostgreSQL version, run with multiple real processes, and tested with crash/failover injection.
+
+Reproduce:
+```sh
+gzip -dc benchmarks/frontend/monitoring/mon004-postgres-claim-model-v1.mjs.gz | node --check -
+gzip -dc benchmarks/frontend/monitoring/mon004-postgres-claim-model-v1.mjs.gz | node -
+```
+
 ## Matched benchmark matrix
 
 All arms receive identical event traces, tenant policies, external sink behavior, idempotency keys, payload sizes and injected failure schedules.
