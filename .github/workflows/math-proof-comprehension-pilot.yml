@@ -219,8 +219,8 @@ jobs:
           echo "MATH_METAMORPHIC_FIXTURE_ASSERTIONS_PASS"
 
           jq -e '."$schema" == "https://json-schema.org/draft/2020-12/schema"
-            and getpath(["$defs","evaluator","required"]) | index("global_use_adjudication") != null
-            and getpath(["$defs","globalUseNodeEvidence","required"]) | index("mention_id") != null' \
+            and (getpath(["$defs","evaluator","required"]) | index("global_use_adjudication") != null)
+            and (getpath(["$defs","globalUseNodeEvidence","required"]) | index("mention_id") != null)' \
             docs/research/LOCAL_GLOBAL_PAIR_V1.schema.json >/dev/null
           echo "LOCAL_GLOBAL_USE_SCHEMA_PASS"
 
