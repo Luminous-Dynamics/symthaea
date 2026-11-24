@@ -5,12 +5,16 @@ on:
     branches:
       - research/edge-active-sensing-voi-v0.1
     paths:
-      - "research/temporal-bench/**"
+      - "research/temporal-bench/active-sensing-qualifier/**"
+      - "research/temporal-bench/src/active_sensing.rs"
+      - "research/temporal-bench/src/digest.rs"
       - ".github/workflows/active-sensing-voi.yml"
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
-      - "research/temporal-bench/**"
+      - "research/temporal-bench/active-sensing-qualifier/**"
+      - "research/temporal-bench/src/active_sensing.rs"
+      - "research/temporal-bench/src/digest.rs"
       - ".github/workflows/active-sensing-voi.yml"
 
 permissions:
@@ -32,15 +36,15 @@ jobs:
       - name: Check active sensing planner formatting
         run: rustfmt --check --edition 2024 research/temporal-bench/src/active_sensing.rs
       - name: Generate isolated workspace lockfile
-        run: cargo generate-lockfile --manifest-path research/temporal-bench/Cargo.toml
+        run: cargo generate-lockfile --manifest-path research/temporal-bench/active-sensing-qualifier/Cargo.toml
       - name: Run active sensing planner tests
-        run: cargo test --manifest-path research/temporal-bench/Cargo.toml --locked --all-targets
+        run: cargo test --manifest-path research/temporal-bench/active-sensing-qualifier/Cargo.toml --locked --all-targets
       - name: Run strict Clippy
-        run: cargo clippy --manifest-path research/temporal-bench/Cargo.toml --locked --all-targets -- -D warnings
+        run: cargo clippy --manifest-path research/temporal-bench/active-sensing-qualifier/Cargo.toml --locked --all-targets -- -D warnings
       - name: Upload generated lockfile for review
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: active-sensing-voi-cargo-lock
-          path: research/temporal-bench/Cargo.lock
+          path: research/temporal-bench/active-sensing-qualifier/Cargo.lock
           if-no-files-found: error
