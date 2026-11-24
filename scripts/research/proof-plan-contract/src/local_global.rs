@@ -432,6 +432,7 @@ pub struct EvaluatorReceipt {
     pub global_disposition: GlobalDisposition,
     pub adjudication_authority: String,
     pub adjudication_refs: Vec<String>,
+    pub global_use_adjudication: Option<GlobalUseAdjudicationV1>,
     pub finite_boolean_countermodel: Option<BooleanCountermodel>,
 }
 
@@ -458,6 +459,31 @@ pub enum GlobalDisposition {
     CitedRejected,
     Omitted,
     Unknown,
+}
+
+/// Independent, evaluator-only trace of how the exact target warrant was used
+/// (or not used) in the exact global proof-plan artifact.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct GlobalUseAdjudicationV1 {
+    pub disposition: GlobalDisposition,
+    pub reviewer_id: String,
+    pub reviewer_authority: String,
+    pub reviewed_plan_sha256: String,
+    pub target_warrant_id: String,
+    pub reviewed_entire_plan: bool,
+    pub node_evidence: Vec<GlobalUseNodeEvidenceV1>,
+    pub evidence_refs: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct GlobalUseNodeEvidenceV1 {
+    pub plan_node_id: String,
+    pub warrant_id: String,
+    pub relation: MentionRelation,
+    pub material_use: bool,
+    pub rationale_ref: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -757,11 +783,175 @@ fn validate_execution(execution: &ExecutionRecord, errors: &mut Vec<String>, lab
     }
 }
 
+fn validate_global_use_adjudication(
+    candidate: &CandidatePayload,
+    evaluator: &EvaluatorReceipt,
+    errors: &mut Vec<String>,
+) {
+    let Some(adjudication) = &evaluator.global_use_adjudication else {
+        if evaluator.eligibility == EvaluationEligibility::Eligible
+            || evaluator.global_disposition != GlobalDisposition::Unknown
+        {
+            errors.push(
+                "known global disposition requires a global_use_adjudication receipt".to_owned(),
+            );
+        }
+        return;
+    };
+
+    for (field, value) in [
+        ("reviewer_id", &adjudication.reviewer_id),
+        ("reviewer_authority", &adjudication.reviewer_authority),
+        ("target_warrant_id", &adjudication.target_warrant_id),
+    ] {
+        if !non_empty(value) {
+            errors.push(format!("global_use_adjudication.{field} must be non-empty"));
+        }
+    }
+    if !valid_sha256(&adjudication.reviewed_plan_sha256) {
+        errors.push(
+            "global_use_adjudication.reviewed_plan_sha256 must be lowercase SHA-256 hex"
+                .to_owned(),
+        );
+    } else if adjudication.reviewed_plan_sha256 != candidate.global_stage.proof_plan_sha256 {
+        errors.push(
+            "global_use_adjudication.reviewed_plan_sha256 must match candidate.global_stage.proof_plan_sha256"
+                .to_owned(),
+        );
+    }
+    let expected_warrant = &candidate.global_stage.scope_binding.warrant_id;
+    if &adjudication.target_warrant_id != expected_warrant
+        || adjudication.target_warrant_id
+            != candidate.local_stage.scope_binding.warrant_id
+    {
+        errors.push(
+            "global_use_adjudication.target_warrant_id must match the exact paired warrant identity"
+                .to_owned(),
+        );
+    }
+    if adjudication.disposition != evaluator.global_disposition {
+        errors.push(
+            "global_use_adjudication.disposition must match evaluator_only.global_disposition"
+                .to_owned(),
+        );
+    }
+    if adjudication.evidence_refs.is_empty()
+        || adjudication
+            .evidence_refs
+            .iter()
+            .any(|reference| !non_empty(reference))
+    {
+        errors.push(
+            "global_use_adjudication.evidence_refs must contain non-empty evidence references"
+                .to_owned(),
+        );
+    }
+    let mut evidence_refs = HashSet::new();
+    if adjudication
+        .evidence_refs
+        .iter()
+        .any(|reference| !evidence_refs.insert(reference))
+    {
+        errors.push("global_use_adjudication.evidence_refs must be unique".to_owned());
+    }
+    let mut node_ids = HashSet::new();
+    for node in &adjudication.node_evidence {
+        if !non_empty(&node.plan_node_id) || !non_empty(&node.warrant_id) {
+            errors.push("global-use plan-node evidence requires non-empty node and warrant IDs".to_owned());
+        }
+        if !node_ids.insert(&node.plan_node_id) {
+            errors.push(format!(
+                "duplicate global-use plan-node evidence: {}",
+                node.plan_node_id
+            ));
+        }
+        if node.warrant_id != adjudication.target_warrant_id {
+            errors.push(format!(
+                "global-use node {} refers to a different warrant than the adjudicated target",
+                node.plan_node_id
+            ));
+        }
+        if !non_empty(&node.rationale_ref) || !evidence_refs.contains(&node.rationale_ref) {
+            errors.push(format!(
+                "global-use node {} rationale_ref must resolve through global_use_adjudication.evidence_refs",
+                node.plan_node_id
+            ));
+        }
+        let matching_candidate_mention = candidate.global_stage.warrant_mentions.iter().any(|mention| {
+            mention.plan_node_id == node.plan_node_id
+                && mention.warrant_id == node.warrant_id
+                && mention.relation == node.relation
+        });
+        if !matching_candidate_mention {
+            errors.push(format!(
+                "global-use node {} must match a candidate-visible warrant mention",
+                node.plan_node_id
+            ));
+        }
+    }
+
+    match adjudication.disposition {
+        GlobalDisposition::UsedDirectly => {
+            if !adjudication.reviewed_entire_plan
+                || !adjudication.node_evidence.iter().any(|node| {
+                    node.material_use && node.relation == MentionRelation::UsesAsRule
+                })
+            {
+                errors.push(
+                    "used_directly requires a complete plan review and a material uses_as_rule node"
+                        .to_owned(),
+                );
+            }
+        }
+        GlobalDisposition::UsedImplicitly => {
+            if !adjudication.reviewed_entire_plan
+                || !adjudication.node_evidence.iter().any(|node| {
+                    node.material_use && node.relation == MentionRelation::SupportsInference
+                })
+            {
+                errors.push(
+                    "used_implicitly requires a complete plan review and a material supports_inference node"
+                        .to_owned(),
+                );
+            }
+        }
+        GlobalDisposition::CitedRejected => {
+            if !adjudication.reviewed_entire_plan
+                || !adjudication.node_evidence.iter().any(|node| {
+                    !node.material_use
+                        && matches!(
+                            node.relation,
+                            MentionRelation::Cites | MentionRelation::Rebuts
+                        )
+                })
+            {
+                errors.push(
+                    "cited_rejected requires a complete plan review and a non-material cite/rebut node"
+                        .to_owned(),
+                );
+            }
+            if adjudication.node_evidence.iter().any(|node| node.material_use) {
+                errors.push("cited_rejected cannot contain material-use nodes".to_owned());
+            }
+        }
+        GlobalDisposition::Omitted => {
+            if !adjudication.reviewed_entire_plan
+                || adjudication.node_evidence.iter().any(|node| node.material_use)
+            {
+                errors.push(
+                    "omitted requires a complete plan review with no material-use nodes".to_owned(),
+                );
+            }
+        }
+        GlobalDisposition::Unknown => {}
+    }
+}
+
 pub fn validate_pair(pair: &LocalGlobalPairV1) -> Vec<String> {
     let mut errors = Vec::new();
 
-    if pair.schema_version != "1.0.0" {
-        errors.push("schema_version must equal 1.0.0".to_owned());
+    if pair.schema_version != "1.1.0" {
+        errors.push("schema_version must equal 1.1.0".to_owned());
     }
 
     let candidate = &pair.candidate;
@@ -833,6 +1023,7 @@ pub fn validate_pair(pair: &LocalGlobalPairV1) -> Vec<String> {
     }
 
     if let Some(evaluator) = &pair.evaluator_only {
+        validate_global_use_adjudication(candidate, evaluator, &mut errors);
         if !non_empty(&evaluator.adjudication_authority) {
             errors.push("evaluator_only.adjudication_authority must be non-empty".to_owned());
         }
