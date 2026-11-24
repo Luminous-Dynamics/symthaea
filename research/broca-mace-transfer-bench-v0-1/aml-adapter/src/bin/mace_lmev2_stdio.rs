@@ -515,7 +515,6 @@ fn handle_request(
                 }
             };
 
-
             let mut items = Vec::new();
             let mut seen_images = BTreeSet::new();
             for hit in &result.hits {
@@ -585,16 +584,6 @@ fn handle_request(
                     .map(|item| item.evidence_id.clone())
                     .collect::<Vec<_>>())
                 .unwrap_or_default();
-            let bm25_outcome = if bm25_evidence_ids.is_empty() {
-                RetrievalOperationOutcomeV1::NoEvidence
-            } else {
-                RetrievalOperationOutcomeV1::EvidenceObserved
-            };
-            let entity_outcome = if entity_evidence_ids.is_empty() {
-                RetrievalOperationOutcomeV1::NoEvidence
-            } else {
-                RetrievalOperationOutcomeV1::EvidenceObserved
-            };
             let stop_reason = if observed_evidence_ids.is_empty() {
                 RetrievalStopReasonV1::NoCandidateEvidence
             } else {
