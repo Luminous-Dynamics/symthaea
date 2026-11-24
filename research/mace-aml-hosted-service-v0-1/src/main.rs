@@ -15,7 +15,8 @@ use std::{
 };
 
 use axum::{
-    extract::{DefaultBodyLimit, State},
+    extract::{DefaultBodyLimit, Request, State},
+    middleware::{self, Next},
     http::{header, HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     routing::{get, post},
@@ -447,6 +448,15 @@ fn authenticate(headers: &HeaderMap, state: &AppState) -> Result<(), ApiError> {
     Ok(())
 }
 
+async fn authenticate_request(
+    State(state): State<Arc<AppState>>,
+    request: Request,
+    next: Next,
+) -> Result<Response, ApiError> {
+    authenticate(request.headers(), &state)?;
+    Ok(next.run(request).await)
+}
+
 async fn health(State(state): State<Arc<AppState>>) -> Result<impl IntoResponse, ApiError> {
     let ready = tokio::task::spawn_blocking(move || {
         let connection = state.db.lock().map_err(|_| ApiError::Unavailable)?;
@@ -458,19 +468,17 @@ async fn health(State(state): State<Arc<AppState>>) -> Result<impl IntoResponse,
     Ok((StatusCode::OK, Json(json!({"status":"ready","service":"mace-aml-hosted-service-v0.1"}))))
 }
 
-async fn add(State(state): State<Arc<AppState>>, headers: HeaderMap, Json(request): Json<AddRequest>)
+async fn add(State(state): State<Arc<AppState>>, Json(request): Json<AddRequest>)
     -> Result<Json<AddResponse>, ApiError>
 {
-    authenticate(&headers, &state)?;
     let result = tokio::task::spawn_blocking(move || add_transaction(&state, request))
         .await.map_err(|_| ApiError::Internal)??;
     Ok(Json(result))
 }
 
-async fn search(State(state): State<Arc<AppState>>, headers: HeaderMap, Json(request): Json<SearchRequest>)
+async fn search(State(state): State<Arc<AppState>>, Json(request): Json<SearchRequest>)
     -> Result<Json<SearchResponse>, ApiError>
 {
-    authenticate(&headers, &state)?;
     let result = tokio::task::spawn_blocking(move || search_query(&state, request))
         .await.map_err(|_| ApiError::Internal)??;
     Ok(Json(result))
@@ -505,10 +513,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         principal_id, tenant_id, track,
     });
 
-    let app = Router::new()
-        .route("/health", get(health))
+    let protected_routes = Router::new()
         .route("/add", post(add))
         .route("/search", post(search))
+        .route_layer(middleware::from_fn_with_state(state.clone(), authenticate_request));
+
+    let app = Router::new()
+        .route("/health", get(health))
+        .merge(protected_routes)
         .layer(DefaultBodyLimit::max(MAX_BODY_BYTES))
         .with_state(state);
 
