@@ -60,8 +60,8 @@ _RETRIEVAL_MODE_PROFILES: dict[str, dict[str, Any]] = {
         "fusion_profile": {"algorithm": "none"},
     },
     "hybrid_rrf": {
-        "backend_id": "mace_lmev2_hybrid_rrf_bm25_entity",
-        "retrieval_mode_label": "hybrid_bm25_entity_literal_with_original_image_evidence",
+        "backend_id": self.backend_id,
+        "retrieval_mode_label": self.retrieval_mode_label,
         "evidence_channel": "hybrid_rrf_bm25_entity",
         "retrieval_channels": [
             "trajectory_bm25_search_v1",
@@ -661,7 +661,7 @@ class MaceLongMemEvalV2Memory(Memory):
     ) -> None:
         retrieval_mode = response.get("retrieval_mode")
         require(
-            retrieval_mode == "hybrid_bm25_entity_literal_with_original_image_evidence",
+            retrieval_mode == self.retrieval_mode_label,
             "sidecar retrieval mode does not match the pinned hybrid backend profile",
         )
         candidate_jsonl = response.get("candidate_evidence_jsonl")
@@ -733,7 +733,7 @@ class MaceLongMemEvalV2Memory(Memory):
                 require(record.get("run_id") == self.run_id, "candidate run_id mismatch")
                 require(record.get("candidate_id") == candidate_id, "candidate invocation ID mismatch")
                 require(
-                    record.get("backend_id") == "mace_lmev2_hybrid_rrf_bm25_entity",
+                    record.get("backend_id") == self.backend_id,
                     "candidate backend ID mismatch",
                 )
                 require(
@@ -765,7 +765,7 @@ class MaceLongMemEvalV2Memory(Memory):
             "candidate_id": candidate_id,
             "query_sha256": query_sha256,
             "domain": self.domain,
-            "backend_id": "mace_lmev2_hybrid_rrf_bm25_entity",
+            "backend_id": self.backend_id,
             "backend_revision_sha256": self.backend_revision_sha256,
             "sidecar_binary_sha256": self.sidecar_binary_sha256,
             "candidate_record_count": record_count,
@@ -823,7 +823,7 @@ class MaceLongMemEvalV2Memory(Memory):
                     "saved candidate receipt schema mismatch")
             require(receipt.get("run_id") == self.run_id, "saved candidate receipt run mismatch")
             require(receipt.get("domain") == self.domain, "saved candidate receipt domain mismatch")
-            require(receipt.get("backend_id") == "mace_lmev2_hybrid_rrf_bm25_entity",
+            require(receipt.get("backend_id") == self.backend_id,
                     "saved candidate receipt backend mismatch")
             require(receipt.get("backend_revision_sha256") == self.backend_revision_sha256,
                     "saved candidate receipt execution-profile digest mismatch")
@@ -831,7 +831,7 @@ class MaceLongMemEvalV2Memory(Memory):
                     "saved candidate receipt binary digest mismatch")
             require(receipt.get("candidate_file") == expected_payload_name,
                     "saved candidate receipt payload filename mismatch")
-            require(receipt.get("retrieval_mode") == "hybrid_bm25_entity_literal_with_original_image_evidence",
+            require(receipt.get("retrieval_mode") == self.retrieval_mode_label,
                     "saved candidate receipt retrieval mode mismatch")
             require(
                 isinstance(receipt.get("query_sha256"), str)
@@ -889,7 +889,7 @@ class MaceLongMemEvalV2Memory(Memory):
                         "saved candidate record query digest mismatch")
                 require(record.get("backend_revision_sha256") == self.backend_revision_sha256,
                         "saved candidate record execution-profile digest mismatch")
-                require(record.get("backend_id") == "mace_lmev2_hybrid_rrf_bm25_entity",
+                require(record.get("backend_id") == self.backend_id,
                         "saved candidate record backend mismatch")
                 require(record.get("query_scope") == f"longmemeval-v2:domain:{self.domain}",
                         "saved candidate record scope mismatch")
@@ -949,6 +949,7 @@ class MaceLongMemEvalV2Memory(Memory):
                 "MACE_LMEV2_RUN_ID": self.run_id,
                 "MACE_LMEV2_ENVIRONMENT_REVISION_SHA256": self.environment_revision_sha256,
                 "MACE_LMEV2_BACKEND_REVISION_SHA256": self.backend_revision_sha256,
+                "MACE_LMEV2_RETRIEVAL_MODE": self.retrieval_mode,
                 "MACE_LMEV2_POLICY_TRACE_DIR": str(self.retrieval_trace_dir.resolve()),
                 "MACE_LMEV2_DATASET_ROOT": str(self.asset_root.resolve()),
                 "MACE_LMEV2_TOP_K": str(self.top_k),
