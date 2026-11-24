@@ -842,11 +842,10 @@ mod tests {
             qualification_policy_sha256: "3".repeat(64),
             lifecycle_snapshot_sha256: "4".repeat(64),
             verifier_profile_sha256: "5".repeat(64),
-            now_unix: 100,
         };
         assert_eq!(
             request_digest("canonical-candidate-batch-jsonl-v1", &vector_binding),
-            "de392a7f9de0102275e4476be37cd981534f669798d2a3f68653649654456a88",
+            "495c022b39b611b578eeb7924c36c7eec7d8436df8034e444c4b7eda67ba4384",
         );
     }
 }
