@@ -3,6 +3,7 @@
 pub mod binary_metrics;
 pub mod calibration_requalification;
 pub mod dtco_manifest;
+pub mod gated_streaming_adapter;
 pub mod label_consumption_guard;
 pub mod metrology_audit;
 pub mod metrology_qualification_gate;
@@ -136,4 +137,16 @@ pub use vm_snapshot_dependency_impact::{
     VmSnapshotDependencyGraphV1, VmSnapshotImpactEntryV1, VmSnapshotImpactStateV1,
     compute_vm_snapshot_impact_closure_v1, seal_vm_snapshot_dependency_edge_v1,
     seal_vm_snapshot_dependency_graph_v1,
+};
+
+pub use gated_streaming_adapter::{
+    GATED_STREAMING_ADAPTER_SCHEMA_V1, STREAMING_ADAPTER_POLICY_SCHEMA_V1,
+    STREAMING_DELIVERY_SCHEMA_V1, STREAMING_PREDICTION_RECEIPT_SCHEMA_V1,
+    STREAMING_PREDICTION_SCHEMA_V1, STREAMING_UPDATE_RECEIPT_SCHEMA_V1,
+    GatedStreamingAdapterEngineV1, GatedStreamingAdapterErrorV1, StreamingAdapterPolicyV1,
+    StreamingAdapterStateV1, StreamingContextStateV1, StreamingLabelDeliveryV1,
+    StreamingPredictionInputV1, StreamingPredictionReceiptV1, StreamingUpdateDispositionV1,
+    StreamingUpdateReasonV1, StreamingUpdateReceiptV1,
+    create_gated_streaming_adapter_engine_v1, deliver_qualified_stream_label_v1,
+    predict_and_register_stream_sample_v1,
 };
