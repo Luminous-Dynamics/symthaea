@@ -1472,7 +1472,8 @@ mod tests {
             }
         });
         let raw = serde_json::to_string(&value).expect("serialize fixture");
-        let report = parse_and_reduce(&raw).expect("enqueued output remains distinct from callback playback");
+        let report = parse_and_reduce(&raw)
+            .expect("enqueued output remains distinct from callback playback");
         assert_eq!(
             report.veto_race_classification,
             Some(VetoRaceClassification::QueuedOutputWithoutCallbackObservation)
