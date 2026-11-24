@@ -756,5 +756,27 @@ mod tests {
             request.request_sha256,
             request_digest(&request.candidate_batch_jsonl, &changed),
         );
+
+        let vector_binding = EvidenceQualificationRequestBindingV1 {
+            run_id: "run-1".into(),
+            query_invocation_id: "invocation-1".into(),
+            domain_id: "web".into(),
+            subject_scope_sha256: B.into(),
+            environment_revision_sha256: C.into(),
+            tool_profile_sha256: D.into(),
+            query_sha256: E.into(),
+            candidate_set_sha256: F.into(),
+            candidate_evidence_ids: vec!["evidence:1".into(), "evidence:2".into()],
+            decision_need_sha256: "1".repeat(64),
+            purpose_sha256: "2".repeat(64),
+            qualification_policy_sha256: "3".repeat(64),
+            lifecycle_snapshot_sha256: "4".repeat(64),
+            verifier_profile_sha256: "5".repeat(64),
+            now_unix: 100,
+        };
+        assert_eq!(
+            request_digest("canonical-candidate-batch-jsonl-v1", &vector_binding),
+            "de392a7f9de0102275e4476be37cd981534f669798d2a3f68653649654456a88",
+        );
     }
 }
