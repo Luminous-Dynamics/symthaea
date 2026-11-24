@@ -8,10 +8,10 @@
 use serde::{Deserialize, Serialize};
 
 use crate::temporal_grounding::{
+    AudioArtifactClockV1, FrameIntervalV1, GroundingPredictionStateV1, TemporalGroundTruthV1,
+    TemporalGroundingPlanV1, TemporalGroundingPredictionV1, TemporalGroundingScoreV1,
     score_temporal_grounding, validate_temporal_ground_truth,
-    validate_temporal_grounding_prediction, AudioArtifactClockV1, FrameIntervalV1,
-    GroundingPredictionStateV1, TemporalGroundTruthV1, TemporalGroundingPlanV1,
-    TemporalGroundingPredictionV1, TemporalGroundingScoreV1,
+    validate_temporal_grounding_prediction,
 };
 
 const TRANSFORM_MAP_SCHEMA_V1: &str = "mel-temporal-view-map-v1";
@@ -103,7 +103,9 @@ pub struct TemporalTransformReportV1 {
     pub transform_bytes_recomputed: bool,
 }
 
-pub fn audit_temporal_transform_case_json(input: &str) -> Result<TemporalTransformReportV1, String> {
+pub fn audit_temporal_transform_case_json(
+    input: &str,
+) -> Result<TemporalTransformReportV1, String> {
     let case: TemporalTransformCaseV1 = serde_json::from_str(input)
         .map_err(|error| format!("invalid temporal transform case JSON: {error}"))?;
     audit_temporal_transform_case(&case)
@@ -113,7 +115,10 @@ pub fn audit_temporal_transform_case(
     case: &TemporalTransformCaseV1,
 ) -> Result<TemporalTransformReportV1, String> {
     if case.schema != TRANSFORM_CASE_SCHEMA_V1 {
-        return Err(format!("unsupported temporal transform case schema: {}", case.schema));
+        return Err(format!(
+            "unsupported temporal transform case schema: {}",
+            case.schema
+        ));
     }
     validate_map(&case.view_map)?;
 
@@ -142,30 +147,27 @@ pub fn audit_temporal_transform_case(
             return Err(format!("invalid {label}: {issues:?}"));
         }
         if prediction.artifact != *expected_artifact {
-            return Err(format!("{label} is not bound to its exact source/view artifact"));
+            return Err(format!(
+                "{label} is not bound to its exact source/view artifact"
+            ));
         }
         if prediction.query_id != case.truth.query_id {
-            return Err(format!("{label} query ID differs from canonical ground truth"));
+            return Err(format!(
+                "{label} query ID differs from canonical ground truth"
+            ));
         }
     }
 
-    let baseline_score = score_temporal_grounding(
-        &case.truth,
-        &case.baseline_prediction,
-        &case.plan,
-    )
-    .map_err(|issues| format!("baseline prediction rejected by scorer: {issues:?}"))?;
+    let baseline_score =
+        score_temporal_grounding(&case.truth, &case.baseline_prediction, &case.plan)
+            .map_err(|issues| format!("baseline prediction rejected by scorer: {issues:?}"))?;
 
-    let mapped_prediction = map_prediction_to_canonical(
-        &case.transformed_prediction,
-        &case.view_map,
-    )?;
-    let transformed_score = score_temporal_grounding(
-        &case.truth,
-        &mapped_prediction,
-        &case.plan,
-    )
-    .map_err(|issues| format!("mapped transformed prediction rejected by scorer: {issues:?}"))?;
+    let mapped_prediction =
+        map_prediction_to_canonical(&case.transformed_prediction, &case.view_map)?;
+    let transformed_score = score_temporal_grounding(&case.truth, &mapped_prediction, &case.plan)
+        .map_err(|issues| {
+        format!("mapped transformed prediction rejected by scorer: {issues:?}")
+    })?;
 
     let baseline = summarize_score(&baseline_score);
     let transformed_mapped = summarize_score(&transformed_score);
@@ -173,9 +175,8 @@ pub fn audit_temporal_transform_case(
         transformed_score.predicted_occurrences,
         baseline_score.predicted_occurrences,
     );
-    let exact_count_preserved = Some(
-        transformed_score.predicted_occurrences == baseline_score.predicted_occurrences,
-    );
+    let exact_count_preserved =
+        Some(transformed_score.predicted_occurrences == baseline_score.predicted_occurrences);
     let f1_delta = paired_delta(transformed_score.f1, baseline_score.f1);
     let count_gated_f1_delta = paired_delta(
         count_gated_f1(&transformed_score),
@@ -214,7 +215,9 @@ pub fn map_prediction_to_canonical(
     validate_map(view_map)?;
     let prediction_issues = validate_temporal_grounding_prediction(prediction);
     if !prediction_issues.is_empty() {
-        return Err(format!("invalid transformed-view prediction: {prediction_issues:?}"));
+        return Err(format!(
+            "invalid transformed-view prediction: {prediction_issues:?}"
+        ));
     }
     if prediction.artifact != view_map.view_artifact {
         return Err("prediction artifact does not match transformed view".into());
@@ -241,13 +244,22 @@ pub fn map_prediction_to_canonical(
 
 pub fn validate_map(view_map: &TemporalViewMapV1) -> Result<(), String> {
     if view_map.schema != TRANSFORM_MAP_SCHEMA_V1 {
-        return Err(format!("unsupported temporal view map schema: {}", view_map.schema));
+        return Err(format!(
+            "unsupported temporal view map schema: {}",
+            view_map.schema
+        ));
     }
     require_text(&view_map.transform_id, "transform_id")?;
     require_text(&view_map.transform_family, "transform_family")?;
     require_text(&view_map.task_scope, "task_scope")?;
-    validate_digest(&view_map.source_artifact.audio_sha256, "source_artifact.audio_sha256")?;
-    validate_digest(&view_map.view_artifact.audio_sha256, "view_artifact.audio_sha256")?;
+    validate_digest(
+        &view_map.source_artifact.audio_sha256,
+        "source_artifact.audio_sha256",
+    )?;
+    validate_digest(
+        &view_map.view_artifact.audio_sha256,
+        "view_artifact.audio_sha256",
+    )?;
     validate_digest(
         &view_map.upstream_qualification_receipt_sha256,
         "upstream_qualification_receipt_sha256",
@@ -272,13 +284,19 @@ pub fn validate_map(view_map: &TemporalViewMapV1) -> Result<(), String> {
             ));
         }
         if segment.view_end_frame <= segment.view_start_frame {
-            return Err(format!("view map segment {index} has an empty or reversed view range"));
+            return Err(format!(
+                "view map segment {index} has an empty or reversed view range"
+            ));
         }
         if segment.canonical_end_frame <= segment.canonical_start_frame {
-            return Err(format!("view map segment {index} has an empty or reversed canonical range"));
+            return Err(format!(
+                "view map segment {index} has an empty or reversed canonical range"
+            ));
         }
         if segment.canonical_end_frame > view_map.source_artifact.total_frames {
-            return Err(format!("view map segment {index} exceeds canonical source duration"));
+            return Err(format!(
+                "view map segment {index} exceeds canonical source duration"
+            ));
         }
         if let Some(previous_end) = previous_canonical_end
             && segment.canonical_start_frame != previous_end
@@ -305,7 +323,9 @@ fn map_interval_list(
         if interval.start_frame >= interval.end_frame
             || interval.end_frame > view_map.view_artifact.total_frames
         {
-            return Err(format!("prediction interval {interval_index} is outside the view clock"));
+            return Err(format!(
+                "prediction interval {interval_index} is outside the view clock"
+            ));
         }
         let mut pieces: Vec<FrameIntervalV1> = Vec::new();
         for segment in &view_map.segments {
@@ -329,7 +349,9 @@ fn map_interval_list(
             .checked_add(segment.canonical_start_frame)
             .ok_or_else(|| "canonical mapped end overflow".to_string())?;
             if canonical_start >= canonical_end {
-                return Err(format!("mapped prediction interval {interval_index} collapsed to zero frames"));
+                return Err(format!(
+                    "mapped prediction interval {interval_index} collapsed to zero frames"
+                ));
             }
             let piece = FrameIntervalV1 {
                 start_frame: canonical_start,
@@ -344,12 +366,20 @@ fn map_interval_list(
             pieces.push(piece);
         }
         if pieces.is_empty() {
-            return Err(format!("prediction interval {interval_index} has no mapped view support"));
+            return Err(format!(
+                "prediction interval {interval_index} has no mapped view support"
+            ));
         }
-        if pieces.first().is_some_and(|piece| piece.start_frame < view_map.segments[0].canonical_start_frame)
-            || pieces.last().is_some_and(|piece| piece.end_frame > view_map.source_artifact.total_frames)
+        if pieces
+            .first()
+            .is_some_and(|piece| piece.start_frame < view_map.segments[0].canonical_start_frame)
+            || pieces
+                .last()
+                .is_some_and(|piece| piece.end_frame > view_map.source_artifact.total_frames)
         {
-            return Err(format!("mapped prediction interval {interval_index} exceeds canonical source"));
+            return Err(format!(
+                "mapped prediction interval {interval_index} exceeds canonical source"
+            ));
         }
         mapped.extend(pieces);
     }
@@ -416,9 +446,7 @@ fn summarize_score(score: &TemporalGroundingScoreV1) -> TemporalTransformScoreSu
 }
 
 fn count_gated_f1(score: &TemporalGroundingScoreV1) -> Option<f64> {
-    if score.ground_truth_occurrences <= 1
-        || score.f1.is_none()
-    {
+    if score.ground_truth_occurrences <= 1 || score.f1.is_none() {
         None
     } else if score.exact_occurrence_count == Some(true) {
         score.f1
@@ -465,17 +493,13 @@ fn require_text(value: &str, label: &str) -> Result<(), String> {
 mod tests {
     use super::*;
     use crate::temporal_grounding::{
-        GroundTruthStateV1, GroundingPredictionStateV1, TemporalGroundingPredictionV1,
-        TemporalGroundTruthV1, TEMPORAL_GROUNDING_EVALUATOR_V1,
-        TEMPORAL_GROUNDING_SCHEMA_V1,
+        GroundTruthStateV1, GroundingPredictionStateV1, TEMPORAL_GROUNDING_EVALUATOR_V1,
+        TEMPORAL_GROUNDING_SCHEMA_V1, TemporalGroundTruthV1, TemporalGroundingPredictionV1,
     };
 
-    const SOURCE_DIGEST: &str =
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-    const VIEW_DIGEST: &str =
-        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
-    const RECEIPT_DIGEST: &str =
-        "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+    const SOURCE_DIGEST: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const VIEW_DIGEST: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    const RECEIPT_DIGEST: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
     const ANNOTATION_DIGEST: &str =
         "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
 
@@ -569,13 +593,25 @@ mod tests {
             }],
         );
         let input = case(
-            vec![FrameIntervalV1 { start_frame: 100, end_frame: 200 }],
-            vec![FrameIntervalV1 { start_frame: 100, end_frame: 200 }],
-            vec![FrameIntervalV1 { start_frame: 100, end_frame: 200 }],
+            vec![FrameIntervalV1 {
+                start_frame: 100,
+                end_frame: 200,
+            }],
+            vec![FrameIntervalV1 {
+                start_frame: 100,
+                end_frame: 200,
+            }],
+            vec![FrameIntervalV1 {
+                start_frame: 100,
+                end_frame: 200,
+            }],
             identity,
         );
         let report = audit_temporal_transform_case(&input).unwrap();
-        assert_eq!(report.mapped_prediction.state, input.baseline_prediction.state);
+        assert_eq!(
+            report.mapped_prediction.state,
+            input.baseline_prediction.state
+        );
         assert_eq!(report.f1_delta_after_canonical_mapping, Some(0.0));
         assert_eq!(report.exact_count_preserved, Some(true));
     }
@@ -593,16 +629,28 @@ mod tests {
             }],
         );
         let input = case(
-            vec![FrameIntervalV1 { start_frame: 100, end_frame: 200 }],
-            vec![FrameIntervalV1 { start_frame: 100, end_frame: 200 }],
-            vec![FrameIntervalV1 { start_frame: 200, end_frame: 400 }],
+            vec![FrameIntervalV1 {
+                start_frame: 100,
+                end_frame: 200,
+            }],
+            vec![FrameIntervalV1 {
+                start_frame: 100,
+                end_frame: 200,
+            }],
+            vec![FrameIntervalV1 {
+                start_frame: 200,
+                end_frame: 400,
+            }],
             stretched,
         );
         let report = audit_temporal_transform_case(&input).unwrap();
         assert_eq!(
             report.mapped_prediction.state,
             GroundingPredictionStateV1::Occurrences {
-                intervals: vec![FrameIntervalV1 { start_frame: 100, end_frame: 200 }]
+                intervals: vec![FrameIntervalV1 {
+                    start_frame: 100,
+                    end_frame: 200
+                }]
             }
         );
         assert_eq!(report.transformed_mapped_to_canonical.f1, Some(1.0));
@@ -632,7 +680,10 @@ mod tests {
         let mapped = map_prediction_to_canonical(
             &prediction(
                 warped.view_artifact.clone(),
-                vec![FrameIntervalV1 { start_frame: 900, end_frame: 1_100 }],
+                vec![FrameIntervalV1 {
+                    start_frame: 900,
+                    end_frame: 1_100,
+                }],
             ),
             &warped,
         )
@@ -640,7 +691,10 @@ mod tests {
         assert_eq!(
             mapped.state,
             GroundingPredictionStateV1::Occurrences {
-                intervals: vec![FrameIntervalV1 { start_frame: 450, end_frame: 550 }]
+                intervals: vec![FrameIntervalV1 {
+                    start_frame: 450,
+                    end_frame: 550
+                }]
             }
         );
     }
@@ -660,7 +714,10 @@ mod tests {
         let mapped = map_prediction_to_canonical(
             &prediction(
                 crop.view_artifact.clone(),
-                vec![FrameIntervalV1 { start_frame: 10, end_frame: 30 }],
+                vec![FrameIntervalV1 {
+                    start_frame: 10,
+                    end_frame: 30,
+                }],
             ),
             &crop,
         )
@@ -668,7 +725,10 @@ mod tests {
         assert_eq!(
             mapped.state,
             GroundingPredictionStateV1::Occurrences {
-                intervals: vec![FrameIntervalV1 { start_frame: 410, end_frame: 430 }]
+                intervals: vec![FrameIntervalV1 {
+                    start_frame: 410,
+                    end_frame: 430
+                }]
             }
         );
     }
@@ -688,7 +748,10 @@ mod tests {
         let mapped = map_prediction_to_canonical(
             &prediction(
                 fractional.view_artifact.clone(),
-                vec![FrameIntervalV1 { start_frame: 1, end_frame: 2 }],
+                vec![FrameIntervalV1 {
+                    start_frame: 1,
+                    end_frame: 2,
+                }],
             ),
             &fractional,
         )
@@ -696,7 +759,10 @@ mod tests {
         assert_eq!(
             mapped.state,
             GroundingPredictionStateV1::Occurrences {
-                intervals: vec![FrameIntervalV1 { start_frame: 0, end_frame: 2 }]
+                intervals: vec![FrameIntervalV1 {
+                    start_frame: 0,
+                    end_frame: 2
+                }]
             }
         );
     }
@@ -807,9 +873,18 @@ mod tests {
             }],
         );
         let mut input = case(
-            vec![FrameIntervalV1 { start_frame: 100, end_frame: 200 }],
-            vec![FrameIntervalV1 { start_frame: 100, end_frame: 200 }],
-            vec![FrameIntervalV1 { start_frame: 100, end_frame: 200 }],
+            vec![FrameIntervalV1 {
+                start_frame: 100,
+                end_frame: 200,
+            }],
+            vec![FrameIntervalV1 {
+                start_frame: 100,
+                end_frame: 200,
+            }],
+            vec![FrameIntervalV1 {
+                start_frame: 100,
+                end_frame: 200,
+            }],
             identity,
         );
         input.transformed_prediction.artifact.audio_sha256 = SOURCE_DIGEST.into();
@@ -830,14 +905,29 @@ mod tests {
         );
         let input = case(
             vec![
-                FrameIntervalV1 { start_frame: 100, end_frame: 200 },
-                FrameIntervalV1 { start_frame: 500, end_frame: 600 },
+                FrameIntervalV1 {
+                    start_frame: 100,
+                    end_frame: 200,
+                },
+                FrameIntervalV1 {
+                    start_frame: 500,
+                    end_frame: 600,
+                },
             ],
             vec![
-                FrameIntervalV1 { start_frame: 100, end_frame: 200 },
-                FrameIntervalV1 { start_frame: 500, end_frame: 600 },
+                FrameIntervalV1 {
+                    start_frame: 100,
+                    end_frame: 200,
+                },
+                FrameIntervalV1 {
+                    start_frame: 500,
+                    end_frame: 600,
+                },
             ],
-            vec![FrameIntervalV1 { start_frame: 100, end_frame: 200 }],
+            vec![FrameIntervalV1 {
+                start_frame: 100,
+                end_frame: 200,
+            }],
             identity,
         );
         let report = audit_temporal_transform_case(&input).unwrap();
