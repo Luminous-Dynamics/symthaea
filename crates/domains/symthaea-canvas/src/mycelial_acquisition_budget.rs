@@ -646,6 +646,7 @@ fn state_digest(state: &MycelialSampleHealthState) -> String {
                 right.wavelength_nm,
                 &right.source_session_id,
             ))
+            .then_with(|| left.photons_per_um2.total_cmp(&right.photons_per_um2))
     });
     hasher.update(&(exposures.len() as u64).to_le_bytes());
     for exposure in exposures {
@@ -702,27 +703,70 @@ fn proposal_inventory_digest(proposals: &[MycelialAcquisitionBudgetProposal]) ->
 
 fn active_sensing_report_digest(report: &MycelialActiveSensingReport) -> String {
     let mut hasher = blake3::Hasher::new();
-    hasher.update(b"symthaea-mycelial-active-sensing-source-v1");
+    hasher.update(b"symthaea-mycelial-active-sensing-source-v2");
     hasher.update(&report.schema_version.to_le_bytes());
     hash_string(&mut hasher, &report.source_graph_digest);
     hash_string(&mut hasher, &report.candidate_inventory_digest);
     hash_string(&mut hasher, &report.posterior_inventory_digest);
+    hasher.update(&(report.posterior_hypothesis_count as u64).to_le_bytes());
+    hash_f64(&mut hasher, report.posterior_entropy_nats);
+    hash_string(&mut hasher, &report.loss_scale_id);
     hash_string(&mut hasher, &report.decision_inventory_digest);
     hash_string(&mut hasher, &report.acquisition_action_inventory_digest);
-    hash_string(&mut hasher, &report.loss_scale_id);
     hash_string(&mut hasher, &report.baseline_best_decision_id);
     hash_f64(&mut hasher, report.baseline_bayes_risk);
+    match &report.recommended_action_id {
+        Some(action_id) => {
+            hasher.update(&[1]);
+            hash_string(&mut hasher, action_id);
+        }
+        None => hasher.update(&[0]),
+    }
     let mut actions: Vec<_> = report.actions.iter().collect();
     actions.sort_by(|left, right| left.action_id.cmp(&right.action_id));
     hasher.update(&(actions.len() as u64).to_le_bytes());
     for action in actions {
         hash_string(&mut hasher, &action.action_id);
+        hasher.update(&[match action.action_kind {
+            MycelialAcquisitionActionKind::AdditionalZPlane => 0,
+            MycelialAcquisitionActionKind::HighResolutionCrop => 1,
+            MycelialAcquisitionActionKind::AlternateIllumination => 2,
+            MycelialAcquisitionActionKind::NewTimepoint => 3,
+            MycelialAcquisitionActionKind::HumanAnnotation => 4,
+            MycelialAcquisitionActionKind::Other => 5,
+        }]);
         hash_string(&mut hasher, &action.acquisition_model_id);
         hash_string(&mut hasher, &action.acquisition_model_version);
         hash_string(&mut hasher, &action.acquisition_model_digest);
         hash_string(&mut hasher, &action.cost_evidence_digest);
+        hash_f64(&mut hasher, action.cost_in_loss_units);
+        hash_f64(&mut hasher, action.expected_posterior_bayes_risk);
+        hash_f64(&mut hasher, action.gross_value_of_information);
         hash_f64(&mut hasher, action.net_value_of_information);
+        let mut outcomes: Vec<_> = action.outcomes.iter().collect();
+        outcomes.sort_by(|left, right| left.outcome_id.cmp(&right.outcome_id));
+        hasher.update(&(outcomes.len() as u64).to_le_bytes());
+        for outcome in outcomes {
+            hash_string(&mut hasher, &outcome.outcome_id);
+            hash_f64(&mut hasher, outcome.predictive_probability);
+            match &outcome.best_decision_id {
+                Some(decision_id) => {
+                    hasher.update(&[1]);
+                    hash_string(&mut hasher, decision_id);
+                }
+                None => hasher.update(&[0]),
+            }
+            match outcome.conditional_bayes_risk {
+                Some(value) => {
+                    hasher.update(&[1]);
+                    hash_f64(&mut hasher, value);
+                }
+                None => hasher.update(&[0]),
+            }
+            hash_f64(&mut hasher, outcome.expected_risk_contribution);
+        }
     }
+    hasher.update(&[u8::from(report.advisory_only)]);
     finish_digest(hasher)
 }
 
@@ -1237,6 +1281,14 @@ mod tests {
         ];
         let mut current = state();
         current.cumulative_photon_exposures[0].photons_per_um2 = 8.0;
+        current.cumulative_photon_exposures.push(MycelialCumulativePhotonExposure {
+            sample_id: "sample-001".to_string(),
+            spatial_cell_id: "cell-a".to_string(),
+            channel_id: "gfp".to_string(),
+            wavelength_nm: 488,
+            photons_per_um2: 1.5,
+            source_session_id: "session-previous-other".to_string(),
+        });
         let result =
             evaluate_mycelial_sample_health_budget(&report, &budget(), &current, &proposals)
                 .unwrap();
