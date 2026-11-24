@@ -774,3 +774,420 @@ pub fn estimate_continuous_metrology_audit_v1(
     report.report_sha256 = output_digest(&report)?;
     Ok(report)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::benchmark::metrology_audit::{
+        MetrologyAuditSelectionRowV1, MetrologySelectionMethodV1,
+    };
+    use crate::benchmark::metrology_semantics::{
+        BinaryMeasurandSemanticsV1, PositiveConditionV1, SEMANTICS_SCHEMA_V1,
+        seal_binary_measurand_semantics_v1,
+    };
+    use crate::benchmark::process_event_graph::{
+        ClockBasisV1, MetrologyLabelV1, ProcessEventKindV1, ProcessEventV1,
+        GRAPH_SCHEMA_V1,
+    };
+
+    fn digest(ch: char) -> String {
+        std::iter::repeat_n(ch, 64).collect()
+    }
+
+    fn semantics() -> BinaryMeasurandSemanticsV1 {
+        let mut value = BinaryMeasurandSemanticsV1 {
+            schema: SEMANTICS_SCHEMA_V1.into(),
+            semantics_id: "risk-defect-v1".into(),
+            revision: 1,
+            target_measurand_id: "risk-defect".into(),
+            unit: "binary".into(),
+            positive_class_name: "defect".into(),
+            negative_class_name: "pass".into(),
+            positive_condition: PositiveConditionV1::GreaterThanOrEqual,
+            threshold: 0.5,
+            authority_ref: "quality-plan:risk-defect-v1".into(),
+            semantics_sha256: String::new(),
+        };
+        seal_binary_measurand_semantics_v1(&mut value).unwrap();
+        value
+    }
+
+    fn selection(full_census: bool) -> MetrologyAuditSelectionReportV1 {
+        let semantics = semantics();
+        let mut rows = Vec::new();
+        for (index, stratum) in (0..8).map(|i| (i, if i < 4 { "tool-a" } else { "tool-b" })) {
+            let (method, selected, probability) = if full_census {
+                (MetrologySelectionMethodV1::DeterministicExploit, true, 1.0)
+            } else if index == 0 || index == 4 {
+                (MetrologySelectionMethodV1::DeterministicExploit, true, 1.0)
+            } else if index == 1 || index == 2 || index == 5 || index == 6 {
+                (MetrologySelectionMethodV1::RandomizedAudit, true, 2.0 / 3.0)
+            } else {
+                (MetrologySelectionMethodV1::NotSelected, false, 2.0 / 3.0)
+            };
+            rows.push(MetrologyAuditSelectionRowV1 {
+                candidate_id: format!("candidate-{index:02}"),
+                subject_id: format!("wafer-{index:02}"),
+                stratum_id: stratum.into(),
+                target_measurand_id: "risk-defect".into(),
+                class_semantics_ref: semantics.semantics_id.clone(),
+                class_semantics_sha256: semantics.semantics_sha256.clone(),
+                predicted_defect_probability: 0.2,
+                priority_score: 0.4,
+                measurement_cost: 1,
+                inclusion_probability: probability,
+                selected,
+                method,
+            });
+        }
+
+        let mut report = MetrologyAuditSelectionReportV1 {
+            schema: SELECTION_SCHEMA_V1.into(),
+            policy_id: "selection-policy-v1".into(),
+            model_sha256: digest('a'),
+            prediction_packet_sha256: digest('b'),
+            policy_config_sha256: digest('c'),
+            binary_semantics: semantics,
+            seed: 77,
+            total_cost_budget: 8,
+            exploit_cost_budget: 2,
+            audit_cost_budget: if full_census { 0 } else { 4 },
+            exploit_cost_used: if full_census { 8 } else { 2 },
+            audit_cost_used: if full_census { 0 } else { 4 },
+            audit_worst_case_cost: if full_census { 0 } else { 4 },
+            total_selected_cost: if full_census { 8 } else { 6 },
+            population_count: 8,
+            exploit_count: if full_census { 8 } else { 2 },
+            randomized_audit_count: if full_census { 0 } else { 4 },
+            residual_population_by_stratum: if full_census {
+                BTreeMap::new()
+            } else {
+                BTreeMap::from([("tool-a".into(), 3), ("tool-b".into(), 3)])
+            },
+            audit_quota_by_stratum: if full_census {
+                BTreeMap::new()
+            } else {
+                BTreeMap::from([("tool-a".into(), 2), ("tool-b".into(), 2)])
+            },
+            rows,
+            selection_sha256: String::new(),
+        };
+        report.selection_sha256 = selection_digest(&report).unwrap();
+        report
+    }
+
+    fn predictions() -> Vec<ContinuousMetrologyPredictionV1> {
+        (0..8)
+            .map(|index| ContinuousMetrologyPredictionV1 {
+                candidate_id: format!("candidate-{index:02}"),
+                subject_id: format!("wafer-{index:02}"),
+                stratum_id: if index < 4 { "tool-a" } else { "tool-b" }.into(),
+                measurement_event_id: format!("event-{index:02}"),
+                target_measurand_id: "film-thickness".into(),
+                unit: "nm".into(),
+                vm_prediction_value: 10.0,
+                predicted_absolute_error: 1.0 + 0.25 * index as f64,
+                prediction_receipt_sha256: digest(char::from(b'd' + (index % 20) as u8)),
+            })
+            .collect()
+    }
+
+    fn outcome_value(index: usize) -> f64 {
+        match index {
+            0 => 12.0,
+            1 => 11.0,
+            2 => 14.0,
+            4 => 13.0,
+            5 => 9.0,
+            6 => 12.0,
+            _ => 10.0,
+        }
+    }
+
+    fn label(index: usize, value: f64) -> MetrologyLabelV1 {
+        MetrologyLabelV1 {
+            label_id: format!("label-{index:02}"),
+            measurement_event_id: format!("event-{index:02}"),
+            subject_id: format!("wafer-{index:02}"),
+            measurand_id: "film-thickness".into(),
+            value: Some(value),
+            unit: "nm".into(),
+            standard_uncertainty: Some(0.10),
+            censoring_lower_bound: None,
+            censoring_upper_bound: None,
+            censoring_basis: None,
+            status: MetrologyLabelStatusV1::Validated,
+            measurement_time: "2026-11-22T08:00:00".into(),
+            measurement_clock_domain_id: "fab-local".into(),
+            measurement_clock_basis: ClockBasisV1::SourceLocalNaive,
+            available_at: "2026-11-22T09:00:00".into(),
+            availability_clock_domain_id: "fab-local".into(),
+            availability_clock_basis: ClockBasisV1::SourceLocalNaive,
+            instrument_id: Some("ellipsometer-1".into()),
+            calibration_ref: Some("cal-certificate-1".into()),
+            revision: 1,
+            supersedes_label_id: None,
+            source_artifact_sha256: digest('e'),
+            authority_ref: "lims:validated".into(),
+        }
+    }
+
+    fn label_report(label: &MetrologyLabelV1) -> LabelConsumptionEligibilityReportV1 {
+        let mut report = LabelConsumptionEligibilityReportV1 {
+            schema: crate::benchmark::label_consumption_guard::LABEL_CONSUMPTION_REPORT_SCHEMA_V1.into(),
+            label_id: label.label_id.clone(),
+            label_revision: label.revision,
+            measurement_event_id: label.measurement_event_id.clone(),
+            calibration_certificate_id: "cal-certificate-1".into(),
+            frontier: LabelEvidenceFrontierV1::CurrentAtK1,
+            eligibility: LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            downstream_consumption_allowed: true,
+            reasons: Vec::new(),
+            label_sha256: json_sha256(label).unwrap(),
+            measurement_sha256: digest('f'),
+            qualified_corrected_value: label.value.unwrap(),
+            qualified_standard_uncertainty_upper_bound: Some(0.10),
+            qualification_report_sha256: digest('a'),
+            requalification_report_sha256: digest('b'),
+            requalification_frontier_sha256: digest('c'),
+            source_authenticity_proven: false,
+            training_snapshot_mutated: false,
+            equipment_control_authority: false,
+            report_sha256: String::new(),
+        };
+        report.report_sha256 = label_report_digest(&report).unwrap();
+        report
+    }
+
+    fn graph_and_cutoff(full_census: bool) -> (ProcessEventGraphV1, PredictionInformationCutoffV1) {
+        let selected: Vec<usize> = if full_census {
+            (0..8).collect()
+        } else {
+            vec![0, 1, 2, 4, 5, 6]
+        };
+        let mut events = Vec::new();
+        let mut labels = Vec::new();
+        for (sequence, index) in selected.into_iter().enumerate() {
+            let event_id = format!("event-{index:02}");
+            events.push(ProcessEventV1 {
+                event_id: event_id.clone(),
+                event_kind: ProcessEventKindV1::Metrology,
+                subject_id: Some(format!("wafer-{index:02}")),
+                wafer_id: Some(format!("wafer-{index:02}")),
+                lot_id: Some("lot-continuous-audit".into()),
+                carrier_id: None,
+                tool_id: Some(if index < 4 { "tool-a" } else { "tool-b" }.into()),
+                chamber_id: Some("chamber-1".into()),
+                module_id: None,
+                process_step_id: Some("film-deposition".into()),
+                recipe_id: Some("recipe-1".into()),
+                recipe_revision: Some("r1".into()),
+                event_time: "2026-11-22T08:00:00".into(),
+                event_clock_domain_id: "fab-local".into(),
+                event_clock_basis: ClockBasisV1::SourceLocalNaive,
+                available_at: "2026-11-22T08:00:01".into(),
+                availability_clock_domain_id: "fab-local".into(),
+                availability_clock_basis: ClockBasisV1::SourceLocalNaive,
+                source_sequence: Some(sequence as u64 + 1),
+                source_artifact_sha256: digest('a'),
+                transform_sha256: digest('b'),
+                authority_ref: "metrology-system".into(),
+            });
+            labels.push(label(index, outcome_value(index)));
+        }
+        (
+            ProcessEventGraphV1 {
+                schema: GRAPH_SCHEMA_V1.into(),
+                graph_id: "continuous-audit-graph-v1".into(),
+                source_artifact_sha256: digest('c'),
+                transform_sha256: digest('d'),
+                events,
+                edges: Vec::new(),
+                metrology_labels: labels,
+            },
+            PredictionInformationCutoffV1 {
+                cutoff_id: "continuous-audit-k1".into(),
+                cutoff_time: "2026-11-22T10:00:00".into(),
+                clock_domain_id: "fab-local".into(),
+                clock_basis: ClockBasisV1::SourceLocalNaive,
+            },
+        )
+    }
+
+    fn input(full_census: bool) -> ContinuousMetrologyAuditInputV1 {
+        let selection = selection(full_census);
+        let predictions = predictions();
+        let frame_id = "film-thickness-frame-2026w47".to_string();
+        let frame_sha256 = json_sha256(&(
+            frame_id.as_str(),
+            "film-thickness",
+            "nm",
+            &predictions,
+        ))
+        .unwrap();
+        let selected_indices: Vec<usize> = selection
+            .rows
+            .iter()
+            .filter(|row| row.selected)
+            .map(|row| {
+                row.candidate_id
+                    .strip_prefix("candidate-")
+                    .unwrap()
+                    .parse::<usize>()
+                    .unwrap()
+            })
+            .collect();
+        let outcomes = selected_indices
+            .iter()
+            .map(|index| {
+                let label = label(*index, outcome_value(*index));
+                ContinuousMetrologyOutcomeV1 {
+                    candidate_id: format!("candidate-{index:02}"),
+                    state: ContinuousAuditOutcomeStateV1::ReturnedQualified,
+                    label_id: Some(label.label_id.clone()),
+                    eligibility_report: Some(label_report(&label)),
+                }
+            })
+            .collect();
+        let (graph, cutoff) = graph_and_cutoff(full_census);
+        ContinuousMetrologyAuditInputV1 {
+            schema: CONTINUOUS_AUDIT_INPUT_SCHEMA_V1.into(),
+            input_id: "continuous-audit-input-v1".into(),
+            frame_id,
+            frame_sha256,
+            population_frame_complete: true,
+            target_measurand_id: "film-thickness".into(),
+            unit: "nm".into(),
+            selection,
+            predictions,
+            outcomes,
+            graph,
+            cutoff,
+        }
+    }
+
+    #[test]
+    fn stratified_ht_and_model_assisted_estimators_match_known_answers() {
+        let report = estimate_continuous_metrology_audit_v1(&input(false)).unwrap();
+        assert_eq!(report.status, ContinuousAuditStatusV1::Complete);
+        assert_eq!(report.population_count, 8);
+        assert_eq!(report.selected_count, 6);
+        assert_eq!(report.qualified_outcome_count, 6);
+        assert!((report.estimated_mean_absolute_error_ht.unwrap() - 2.125).abs() < 1.0e-12);
+        assert!(
+            (report.estimated_mean_absolute_error_model_assisted.unwrap() - 2.21875).abs()
+                < 1.0e-12
+        );
+        assert!((report.model_only_mean_absolute_error.unwrap() - 1.875).abs() < 1.0e-12);
+        assert!(report.standard_error_mean_absolute_error_ht.unwrap() > 0.0);
+        assert!(report.standard_error_mean_absolute_error_model_assisted.unwrap() > 0.0);
+        assert_eq!(report.strata.len(), 2);
+        assert!(valid_sha256(&report.report_sha256));
+    }
+
+    #[test]
+    fn full_census_reproduces_exact_population_mae_with_zero_variance() {
+        let report = estimate_continuous_metrology_audit_v1(&input(true)).unwrap();
+        let exact = (0..8)
+            .map(|index| (outcome_value(index) - 10.0).abs())
+            .sum::<f64>()
+            / 8.0;
+        assert_eq!(report.status, ContinuousAuditStatusV1::Complete);
+        assert!((report.estimated_mean_absolute_error_ht.unwrap() - exact).abs() < 1.0e-12);
+        assert!((report.estimated_mean_absolute_error_model_assisted.unwrap() - exact).abs() < 1.0e-12);
+        assert_eq!(report.standard_error_mean_absolute_error_ht, Some(0.0));
+        assert_eq!(report.standard_error_mean_absolute_error_model_assisted, Some(0.0));
+    }
+
+    #[test]
+    fn selected_but_unreturned_result_returns_unknown_without_denominator_shrinkage() {
+        let mut input = input(false);
+        let candidate = input
+            .selection
+            .rows
+            .iter()
+            .find(|row| row.method == MetrologySelectionMethodV1::RandomizedAudit)
+            .unwrap()
+            .candidate_id
+            .clone();
+        let outcome = input
+            .outcomes
+            .iter_mut()
+            .find(|outcome| outcome.candidate_id == candidate)
+            .unwrap();
+        outcome.state = ContinuousAuditOutcomeStateV1::SelectedButNotReturned;
+        outcome.label_id = None;
+        outcome.eligibility_report = None;
+
+        let report = estimate_continuous_metrology_audit_v1(&input).unwrap();
+        assert_eq!(report.status, ContinuousAuditStatusV1::Unknown);
+        assert_eq!(report.population_count, 8);
+        assert_eq!(report.selected_count, 6);
+        assert_eq!(report.nonresponse_count, 1);
+        assert_eq!(report.estimated_mean_absolute_error_ht, None);
+        assert!(report.reason_codes.contains(&"selected_outcome_not_returned".into()));
+    }
+
+    #[test]
+    fn blocked_k1_label_is_nonresponse_not_an_observed_continuous_outcome() {
+        let mut input = input(false);
+        let outcome = input.outcomes.first_mut().unwrap();
+        outcome.state = ContinuousAuditOutcomeStateV1::ReturnedUnqualified;
+        let report = outcome.eligibility_report.as_mut().unwrap();
+        report.eligibility = LabelConsumptionEligibilityV1::Blocked;
+        report.downstream_consumption_allowed = false;
+        report.report_sha256 = label_report_digest(report).unwrap();
+
+        let estimate = estimate_continuous_metrology_audit_v1(&input).unwrap();
+        assert_eq!(estimate.status, ContinuousAuditStatusV1::Unknown);
+        assert_eq!(estimate.unqualified_count, 1);
+        assert_eq!(estimate.estimated_mean_absolute_error_model_assisted, None);
+    }
+
+    #[test]
+    fn missing_frame_or_invalid_audit_propensity_never_produces_population_estimate() {
+        let mut incomplete = input(false);
+        incomplete.population_frame_complete = false;
+        let report = estimate_continuous_metrology_audit_v1(&incomplete).unwrap();
+        assert_eq!(report.status, ContinuousAuditStatusV1::Unknown);
+        assert!(report.reason_codes.contains(&"population_frame_incomplete".into()));
+
+        let mut invalid = input(false);
+        let audit = invalid
+            .selection
+            .rows
+            .iter_mut()
+            .find(|row| row.method == MetrologySelectionMethodV1::RandomizedAudit)
+            .unwrap();
+        audit.inclusion_probability = 0.0;
+        invalid.selection.selection_sha256 = selection_digest(&invalid.selection).unwrap();
+        assert!(estimate_continuous_metrology_audit_v1(&invalid).is_err());
+    }
+
+    #[test]
+    fn unit_mismatch_and_tampered_label_payload_reject() {
+        let mut wrong_unit = input(false);
+        wrong_unit.unit = "angstrom".into();
+        assert!(estimate_continuous_metrology_audit_v1(&wrong_unit).is_err());
+
+        let mut tampered = input(false);
+        let outcome = tampered.outcomes.first_mut().unwrap();
+        outcome.eligibility_report.as_mut().unwrap().label_sha256 = digest('0');
+        let report = outcome.eligibility_report.as_mut().unwrap();
+        report.report_sha256 = label_report_digest(report).unwrap();
+        assert!(estimate_continuous_metrology_audit_v1(&tampered).is_err());
+    }
+
+    #[test]
+    fn fixed_frame_and_receipt_replay_is_deterministic() {
+        let input = input(false);
+        let first = estimate_continuous_metrology_audit_v1(&input).unwrap();
+        let second = estimate_continuous_metrology_audit_v1(&input).unwrap();
+        assert_eq!(first.report_sha256, second.report_sha256);
+        assert_eq!(first.estimated_mean_absolute_error_ht, second.estimated_mean_absolute_error_ht);
+        assert_eq!(
+            first.estimated_mean_absolute_error_model_assisted,
+            second.estimated_mean_absolute_error_model_assisted
+        );
+    }
+}
