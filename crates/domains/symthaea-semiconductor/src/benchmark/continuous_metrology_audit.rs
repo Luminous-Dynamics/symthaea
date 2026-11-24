@@ -16,6 +16,7 @@ use super::label_consumption_guard::{
 use super::metrology_audit::{
     MetrologyAuditSelectionReportV1, MetrologySelectionMethodV1, SELECTION_SCHEMA_V1,
 };
+use super::metrology_semantics::validate_binary_measurand_semantics_v1;
 use super::process_event_graph::{
     MetrologyLabelStatusV1, PredictionInformationCutoffV1, ProcessEventGraphV1,
     build_information_cutoff_snapshot_v1,
@@ -275,9 +276,28 @@ pub fn estimate_continuous_metrology_audit_v1(
         ));
     }
     let mut canonical = input.clone();
-    canonical.predictions.sort_by(|left, right| left.candidate_id.cmp(&right.candidate_id));
-    canonical.outcomes.sort_by(|left, right| left.candidate_id.cmp(&right.candidate_id));
+    canonical
+        .predictions
+        .sort_by(|left, right| left.candidate_id.cmp(&right.candidate_id));
+    canonical
+        .outcomes
+        .sort_by(|left, right| left.candidate_id.cmp(&right.candidate_id));
+    let frame_material = (
+        input.frame_id.as_str(),
+        input.target_measurand_id.as_str(),
+        input.unit.as_str(),
+        &canonical.predictions,
+    );
+    if json_sha256(&frame_material)? != input.frame_sha256 {
+        return Err(ContinuousMetrologyAuditErrorV1(
+            "population frame digest does not match the frozen candidate prediction frame".into(),
+        ));
+    }
     let input_sha256 = json_sha256(&canonical)?;
+    validate_binary_measurand_semantics_v1(&input.selection.binary_semantics)
+        .map_err(|error| ContinuousMetrologyAuditErrorV1(format!(
+            "selection policy semantics rejected: {error}"
+        )))?;
 
     if input.selection.schema != SELECTION_SCHEMA_V1
         || !valid_sha256(&input.selection.selection_sha256)
@@ -362,7 +382,6 @@ pub fn estimate_continuous_metrology_audit_v1(
             )));
         };
         if prediction.subject_id != row.subject_id || prediction.stratum_id != row.stratum_id
-            || prediction.target_measurand_id != row.target_measurand_id
         {
             return Err(ContinuousMetrologyAuditErrorV1(format!(
                 "candidate {} prediction metadata differs from selection frame",
@@ -372,6 +391,12 @@ pub fn estimate_continuous_metrology_audit_v1(
         if !row.inclusion_probability.is_finite()
             || row.inclusion_probability <= 0.0
             || row.inclusion_probability > 1.0
+            || matches!(
+                &row.method,
+                MetrologySelectionMethodV1::DeterministicExploit
+            ) != (row.inclusion_probability == 1.0)
+            || matches!(&row.method, MetrologySelectionMethodV1::NotSelected) == row.selected
+            || matches!(&row.method, MetrologySelectionMethodV1::RandomizedAudit) != row.selected
         {
             return Err(ContinuousMetrologyAuditErrorV1(format!(
                 "candidate {} lacks positive known inclusion probability",
@@ -440,6 +465,8 @@ pub fn estimate_continuous_metrology_audit_v1(
                 })?;
                 if outcome.label_id.as_deref() != Some(report.label_id.as_str())
                     || label_report_digest(report)? != report.report_sha256
+                    || report.label_revision == 0
+                    || !valid_sha256(&report.label_sha256)
                 {
                     return Err(ContinuousMetrologyAuditErrorV1(format!(
                         "candidate {} returned-unqualified receipt identity/digest mismatch",
@@ -501,6 +528,7 @@ pub fn estimate_continuous_metrology_audit_v1(
                 }
                 let graph_label = graph_labels[0];
                 if graph_label.status != MetrologyLabelStatusV1::Validated
+                    || json_sha256(graph_label)? != report.label_sha256
                     || graph_label.subject_id != prediction.subject_id
                     || graph_label.measurand_id != input.target_measurand_id
                     || graph_label.measurement_event_id != prediction.measurement_event_id
