@@ -7,7 +7,11 @@ use std::collections::BTreeSet;
 use serde::{Deserialize, Serialize};
 
 use crate::temporal_grounding::{
-    TemporalGroundingOutcomeV1, TemporalGroundingScoreV1,
+    score_temporal_grounding, validate_temporal_ground_truth,
+    validate_temporal_grounding_prediction, AudioArtifactClockV1, FrameIntervalV1,
+    GroundTruthStateV1, GroundingPredictionStateV1, TemporalGroundingOutcomeV1,
+    TemporalGroundingPlanV1, TemporalGroundingPredictionV1, TemporalGroundingScoreV1,
+    TemporalGroundTruthV1, TEMPORAL_GROUNDING_SCHEMA_V1,
 };
 
 const REVISION_SCHEMA: &str = "mel-temporal-revision-case-v1";
@@ -30,6 +34,26 @@ pub enum RevisionActionV1 {
     AdjustStartBoundary,
     AdjustEndBoundary,
     Other,
+}
+
+/// Self-contained V2 input: the evaluator receives raw versioned scorer
+/// inputs and computes draft/final scores itself. Callers cannot inject or
+/// forge derived metric summaries into the revision comparison.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RevisionCaseV2 {
+    pub schema: String,
+    pub case_id: String,
+    pub model_identity_sha256: String,
+    pub prompt_sha256: String,
+    pub adapter_sha256: String,
+    pub evidence_condition: EvidenceConditionV1,
+    pub evidence: Option<RevisionEvidenceV1>,
+    pub actions: Vec<RevisionActionV1>,
+    pub truth: TemporalGroundTruthV1,
+    pub plan: TemporalGroundingPlanV1,
+    pub draft_prediction: TemporalGroundingPredictionV1,
+    pub final_prediction: TemporalGroundingPredictionV1,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -114,6 +138,115 @@ pub struct RevisionAggregateV1 {
     pub correct_absence_after: usize,
     pub absence_improvements: usize,
     pub absence_regressions: usize,
+}
+
+/// Parse and score a self-contained revision case using the exact
+/// production temporal-grounding scorer.
+pub fn audit_revision_case_v2(input: &str) -> Result<RevisionReportV1, String> {
+    let case: RevisionCaseV2 = serde_json::from_str(input)
+        .map_err(|error| format!("invalid temporal revision V2 case JSON: {error}"))?;
+    audit_revision_v2(&case)
+}
+
+/// Unlike V1's summary-input API, V2 never accepts caller-supplied derived
+/// score summaries. Both predictions are scored against one frozen truth,
+/// exact audio clock and evaluator plan.
+pub fn audit_revision_v2(case: &RevisionCaseV2) -> Result<RevisionReportV1, String> {
+    if case.schema != "mel-temporal-revision-case-v2" {
+        return Err(format!("unsupported temporal revision V2 schema: {}", case.schema));
+    }
+    require_text(&case.case_id, "case_id")?;
+    validate_digest(&case.model_identity_sha256, "model_identity_sha256")?;
+    validate_digest(&case.prompt_sha256, "prompt_sha256")?;
+    validate_digest(&case.adapter_sha256, "adapter_sha256")?;
+    validate_actions(&case.actions)?;
+
+    let truth_issues = validate_temporal_ground_truth(&case.truth);
+    if !truth_issues.is_empty() {
+        return Err(format!("invalid revision ground truth: {truth_issues:?}"));
+    }
+    for (label, prediction) in [
+        ("draft_prediction", &case.draft_prediction),
+        ("final_prediction", &case.final_prediction),
+    ] {
+        let issues = validate_temporal_grounding_prediction(prediction);
+        if !issues.is_empty() {
+            return Err(format!("invalid {label}: {issues:?}"));
+        }
+    }
+    if case.actions.as_slice() == [RevisionActionV1::NoChange]
+        && case.draft_prediction != case.final_prediction
+    {
+        return Err("NoChange action is incompatible with different draft/final predictions".into());
+    }
+
+    let draft_score = score_temporal_grounding(
+        &case.truth,
+        &case.draft_prediction,
+        &case.plan,
+    )
+    .map_err(|issues| format!("draft score rejected by production evaluator: {issues:?}"))?;
+    let final_score = score_temporal_grounding(
+        &case.truth,
+        &case.final_prediction,
+        &case.plan,
+    )
+    .map_err(|issues| format!("final score rejected by production evaluator: {issues:?}"))?;
+    let legacy_case = RevisionCaseV1 {
+        schema: REVISION_SCHEMA.into(),
+        case_id: case.case_id.clone(),
+        model_identity_sha256: case.model_identity_sha256.clone(),
+        prompt_sha256: case.prompt_sha256.clone(),
+        adapter_sha256: case.adapter_sha256.clone(),
+        evidence_condition: case.evidence_condition,
+        evidence: case.evidence.clone(),
+        actions: case.actions.clone(),
+        draft: draft_score,
+        final_score,
+    };
+    validate_v2_evidence(case)?;
+    audit_revision(&legacy_case)
+}
+
+fn validate_v2_evidence(case: &RevisionCaseV2) -> Result<(), String> {
+    let scored_audio = &case.truth.artifact;
+    match (case.evidence_condition, &case.evidence) {
+        (EvidenceConditionV1::NoEvidence, None) => Ok(()),
+        (EvidenceConditionV1::NoEvidence, Some(_)) => {
+            Err("NoEvidence condition must not carry an evidence reference".into())
+        }
+        (_, None) => Err("retrieved/yoked evidence condition requires an evidence reference".into()),
+        (condition, Some(evidence)) => {
+            validate_digest(&evidence.source_audio_sha256, "evidence.source_audio_sha256")?;
+            validate_digest(
+                &evidence.evidence_payload_sha256,
+                "evidence.evidence_payload_sha256",
+            )?;
+            validate_digest(
+                &evidence.retrieval_config_sha256,
+                "evidence.retrieval_config_sha256",
+            )?;
+            if evidence.source_sample_rate_hz == 0 || evidence.end_frame <= evidence.start_frame {
+                return Err("evidence sample rate and half-open frame window must be valid".into());
+            }
+            let same_audio = evidence.source_audio_sha256 == scored_audio.audio_sha256
+                && evidence.source_sample_rate_hz == scored_audio.sample_rate_hz;
+            match condition {
+                EvidenceConditionV1::LocalRetrieved if !same_audio => {
+                    Err("local evidence must bind the exact scored audio digest and sample rate".into())
+                }
+                EvidenceConditionV1::LocalRetrieved
+                    if evidence.end_frame > scored_audio.total_frames =>
+                {
+                    Err("local evidence window exceeds the scored recording".into())
+                }
+                EvidenceConditionV1::YokedRetrieved if same_audio => {
+                    Err("yoked evidence must originate from a different audio artifact".into())
+                }
+                _ => Ok(()),
+            }
+        }
+    }
 }
 
 pub fn audit_revision_case(input: &str) -> Result<RevisionReportV1, String> {
