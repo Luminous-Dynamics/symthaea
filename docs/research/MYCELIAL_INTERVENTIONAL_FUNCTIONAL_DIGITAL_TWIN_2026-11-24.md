@@ -1,0 +1,293 @@
+# Mycelial Interventional Functional Digital Twin
+## Research protocol and benchmark specification v0.1 — 24 November 2026
+
+**Status:** research proposal and software-integration protocol.  
+**Implementation status:** this document does not claim that raw datasets have been ingested, biological experiments performed, functional predictions validated, or benchmark targets achieved.  
+**Scope:** connect the existing reconstruction, acquisition, morphogenesis, transport, model-adequacy and value-of-information work into a falsifiable experimental programme.
+
+## 1. The research question
+
+Can we predict, before observing the outcome, how a living mycelial network will remodel and redistribute resources when substrate availability, sink demand, hydration or network connectivity changes?
+
+The objective is not simply to reconstruct a visually plausible graph. It is to build an **evidence-qualified, forward-predictive and intervention-testable digital twin** whose claims remain traceable to microscopy, calibration, independent functional assays and biological replicates.
+
+The central cycle is:
+
+1. Observe the specimen and attest what was actually acquired.
+2. Reconstruct a distribution of feasible structural hypotheses, including unresolved and unobserved regions.
+3. Predict future morphology and separately typed transport outcomes.
+4. Identify which additional measurement would most reduce decision error at a declared cost.
+5. Predict the consequences of a specified intervention before its outcome is revealed.
+6. Compare predictions with independently measured, blinded outcomes.
+7. Update the model only through a versioned, replayable evidence record.
+
+A graph edge is not a measured flow path. A shortest path is not a resource flux. A cord is not a hydraulic conductance measurement. A posterior normalized over a candidate inventory is not proof that the inventory contains the biological truth.
+
+## 2. What the current evidence supports
+
+### 2.1 Dynamic fungal networks and cytoplasmic flow
+
+The 2025 study *A travelling-wave strategy for plant–fungal trade* reports large-scale tracking of more than 500,000 fungal nodes and approximately 100,000 cytoplasmic-flow trajectories. It provides a reference for time-dependent network growth and intrahyphal transport, while its plate-based network geometry should not be mistaken for a complete model of three-dimensional soil networks.
+
+Reference: https://doi.org/10.1038/s41586-025-08614-x
+
+### 2.2 Demand-responsive cordogenesis
+
+The 2026 *Agaricus bisporus* cordogenesis study describes changes in cord formation and widening during new-substrate colonization and fruiting development. It also reports substantial cultivation-cycle variation and no significant general correlation between cord abundance and total mushroom yield.
+
+Reference: https://doi.org/10.1016/j.funbio.2026.101799  
+Dataset record: https://figshare.com/s/b241753378d5252ff808
+
+This rules out a simple “more cords means more production” objective. Cord geometry should instead be tested as a conditional predictor of resource delivery under specified distances, local depletion, hydration, developmental demand and network state.
+
+### 2.3 Isotope-based source-region attribution
+
+The 2026 stable-isotope study of *A. bisporus* reports source-region-labelled nitrogen incorporation into fruit bodies, with effects related to colonization time, cord abundance, local depletion and hydraulic resistance. It also reports substantial heterogeneity between individual mushrooms. Its experimental unit must be respected: mushrooms sampled from the same cultivation box are subsamples, not independent biological replicates.
+
+Reference: https://doi.org/10.1111/1462-2920.70345  
+Raw-data DOI reported by the article: https://doi.org/10.6084/m9.figshare.30818828
+
+**Important assay interpretation:** isotope enrichment in a fruit body is evidence of incorporation of label originating from the labelled substrate region. It is not automatically proof of direct uptake by the fungus: microbial assimilation and transfer within compost may contribute. The benchmark must preserve the assay's exact interpretation, source region, recovery and uncertainty. Do not label this outcome “direct fungal uptake” unless an assay-specific control supports that stronger attribution.
+
+The cordogenesis and isotope studies are distinct cohorts. Do not join their records, replicate IDs or outcomes unless an independently verifiable sample-level key proves that they refer to the same biological units.
+
+### 2.4 Microbial dispersal is a separate functional layer
+
+The 2026 Hyphal Highways Device study examines bacterial dispersal along hyphae under unsaturated conditions. It is a valuable reference for extracellular liquid constraints and microbial movement, not a surrogate measurement for intrahyphal cytoplasmic flow or isotope transfer.
+
+Reference: https://doi.org/10.1093/femsml/uqag035
+
+A related benchmark issue has cited the suffix uqag017; the DOI above is the identifier to use for this Hyphal Highways Device study. Verify citations at ingestion time.
+
+### 2.5 Smart microscopy and interoperability
+
+The 2026 smart-microscopy roadmap describes information-driven acquisition and feedback as a developing field. Symthaea should not recreate mature microscope drivers. It should interoperate with hardware-neutral experiment descriptions and established image formats, beginning with offline and recorded-session adapters.
+
+References:
+- Smart microscopy roadmap: https://doi.org/10.1515/mim-2025-0029
+- useq-schema: https://github.com/als-computing/useq-schema
+- OME-NGFF: https://ngff.openmicroscopy.org/
+- Micro-Manager: https://micro-manager.org/
+
+## 3. Paradigm shift: one specimen, several non-interchangeable processes
+
+Represent the living specimen as a shared, time-indexed spatial substrate with distinct biological state and observation layers.
+
+| Layer | State or observations | What it does not prove |
+|---|---|---|
+| Structural network | Hyphal segments, junctions, candidate fusions, length, radius, branching, extension, retraction and uncertainty | Viability or transport |
+| Intrahyphal cytoplasmic transport | Separate forward and reverse particle-stream trajectories, speed distributions, direction switches and observation windows | Net nutrient delivery or extracellular liquid flow |
+| Extracellular/apoplastic hydraulics | Liquid connectivity, saturation, water potential, pressure gradients and assay-specific hydraulic measurements | Intracellular streaming |
+| Resource source–sink transfer | Source-region nutrient availability, depletion, sink development, isotope ratios, recovery and arrival/censoring | A unique path through a reconstructed graph unless independently established |
+| Microbial dispersal | Organism identity, inoculation point, liquid conditions, cell counts and time-to-arrival | Fungal nutrient transfer or cytoplasmic flow |
+| Morphogenesis | Colonization proxies, cord area, width distributions, growth-front displacement and primordium/fruiting-body area | Biomass, conductance or sink strength without independent calibration |
+
+Each layer shares immutable specimen, coordinate-frame and timebase identities, but retains its own assay protocol, calibration, evidence digest, uncertainty and missingness state.
+
+Do not collapse forward and reverse cytoplasmic streams into one signed net-flow value: simultaneous antiparallel streams can coexist. Do not use bacterial arrival as a nutrient-transfer label. Do not use optical intensity as biomass without independent calibration.
+
+## 4. Model ladder: earn each additional mechanism
+
+Every model is evaluated on the same frozen split, forecast horizon, source evidence and functional endpoint. More complicated models do not receive credit merely for fitting the training data better.
+
+| Model | Inputs | Question |
+|---|---|---|
+| M0 — persistence | Last observed value / event state | Is there useful signal beyond doing nothing? |
+| M1 — trend and covariates | Time trend, substrate, hydration, treatment and developmental covariates | Do simple trends explain the outcome? |
+| M2 — static morphology and geometry | Frozen image features, measured lengths, widths and coordinates | Does the current measured structure add value? |
+| M3 — dynamic structure | Time-indexed topology, growth, branching, cordogenesis and retraction | Does network remodeling improve forward prediction? |
+| M4 — source–sink state | M3 plus independently observed source availability, depletion and sink-development indicators | Does resource demand explain structural adaptation and transfer? |
+| M5 — hydraulic/resource coupling | M4 plus measured liquid state, water-potential or pressure evidence and independently measured tracer outcomes | Does the coupled physical model improve functional predictions? |
+| M6 — multiplex dynamics | M5 plus independently observed intrahyphal forward/reverse streams and, in a separate task, microbial dispersal | Do distinct transport processes add predictive value when modeled separately? |
+
+Use a physical resistance approximation only where the relevant geometry, boundary conditions, fluid properties and compartment assumptions are justified. A Hagen–Poiseuille-style relation may be a useful sensitivity model for a declared tube-flow regime; it is not a universal law for every hyphal or extracellular transport pathway. Record the assumptions and test sensitivity to their violation.
+
+Symthaea-native HDC and CfC/LTC remain optional components:
+- HDC may retrieve local structural motifs and analogous episodes, but similarity is not a biological posterior or evidence of physical contact.
+- CfC/LTC may predict irregularly sampled dynamics, but the output is a model prediction, not a measurement.
+- A hybrid is accepted only if it improves held-out proper scores or decision value over M0–M5 at equal measurement cost and compute budget.
+
+## 5. The decisive experiments: predict interventions, not just correlations
+
+The digital twin should eventually answer questions such as:
+
+- If a source region becomes depleted, where does resource attribution shift?
+- If a new substrate patch is encountered, where and when should directional extension or cordogenesis occur?
+- If a sink develops or expands, does the network remodel in a way that improves measured transfer?
+- If hydration changes, which predictions change and which remain stable?
+- If a branch is interrupted, what is the predicted effect on a measured downstream outcome, and how does the network recover?
+
+Potential collaborator-designed, controlled interventions:
+
+| Intervention | Prediction to freeze before outcome reveal | Essential controls |
+|---|---|---|
+| Local source depletion or replenishment | Source-region attribution and time course of tracer incorporation | Matched sham, nutrient and isotope controls, manipulation-success verification |
+| Hydration / saturation change | Morphology, liquid state and functional-transfer changes | Matched moisture control, temperature and off-target monitoring |
+| New substrate patch | Direction and timing of extension, cordogenesis and colonization | Matched substrate patch, sham placement, baseline imaging |
+| Sink appearance / developmental demand | Structural remodeling and source-to-sink redistribution | Developmental-stage matching, independent sink measurements |
+| Selective branch interruption | Change in independently measured transfer and rerouting | Sham manipulation, unaffected-region control, verified interruption and regrowth observation |
+
+For every intervention, preregister:
+- the biological question, primary endpoint and smallest effect of interest;
+- independent experimental unit, block, randomization and blinded outcome procedure;
+- baseline evidence and graph-hypothesis inventory digests;
+- intervention target, time, dose/intensity and spatial footprint;
+- manipulation-success and off-target observations;
+- post-intervention imaging and independent functional observations;
+- missingness, censoring, exclusions and analysis plan.
+
+Experiments require qualified biological collaborators, approved protocols and suitable laboratory equipment. This software protocol neither authorizes physical interventions nor creates microscope actuation.
+
+## 6. Three-tier evaluation programme
+
+### Tier 0 — synthetic known-truth oracle
+
+Build bounded synthetic networks in which the true graph and process state are known. Include:
+- missing candidate edges, unobserved branches and false junctions;
+- crossings, occlusion, z-order ambiguity and coordinate-transform errors;
+- common-cause focal-plane, illumination and segmentation artifacts;
+- dynamic branching, fusion, retraction and time-varying edge geometry;
+- simultaneous antiparallel streams;
+- source depletion, multiple competing sources, sinks and incomplete tracer recovery;
+- hydration-dependent extracellular connectivity;
+- bacterial dispersal with explicit liquid-film constraints;
+- sham interventions, off-target damage and unsuccessful interventions.
+
+Synthetic fixtures qualify inference, conservation bookkeeping and failure detection. They do not establish biological performance.
+
+### Tier 1 — retrospective reproduction
+
+Create separate, rights-qualified lanes:
+1. Sten 2D fungal images and crossing/overlap data.
+2. Sten 3D z-stack reconstruction and printed-prototype geometry, scored separately from biological images.
+3. Fungal Network Analysis (FNA) images and reference processing.
+4. 2025 AM-fungal travelling-wave growth and flow trajectories.
+5. 2026 *Agaricus* cordogenesis/fructification.
+6. 2026 *Agaricus* stable-isotope source-region attribution.
+7. Hyphal Highways Device microbial-dispersal measurements.
+
+Never merge tasks just because all involve fungal or fungal-like networks. In particular, HHD is a microbial-dispersal lane; isotope incorporation is a source-region transfer lane; cytoplasmic trajectories are an intrahyphal-flow lane.
+
+### Tier 2 — prospective paired imaging and function
+
+The highest-value study is a paired dataset in which the same independent cultivation unit has:
+- calibrated time-resolved microscopy and an acquisition-domain manifest;
+- source and sink identities with a measured nutrient/depletion profile;
+- an independently measured hydration/liquid state;
+- a prespecified tracer or functional-transfer assay;
+- biological replicate and cultivation-unit identity;
+- synchronized observation times and all assay-specific uncertainty.
+
+This is the missing bridge between the current separate morphology and isotope cohorts. Design the pilot to estimate between-box and within-box variability, missingness and assay noise; choose sample size using a preregistered power or precision analysis rather than an arbitrary number of images. Individual mushrooms, fields of view, crops and time frames must not be treated as independent replicates when nested in one box or cultivation cycle.
+
+### Tier 3 — blinded intervention validation
+
+Only after the paired observational protocol is stable, test preregistered source depletion, hydration, new-substrate or branch-interruption interventions. Freeze model outputs and uncertainty before unblinding. Report both successful and failed manipulations.
+
+## 7. Benchmark suite and proposed gates
+
+All values below are **research targets, not achieved results**. Report denominators, independent-unit counts, effect sizes, clustered uncertainty intervals, missingness and all exclusions.
+
+| Lane | Baseline / comparison | Primary metrics | Proposed gate |
+|---|---|---|---|
+| 2D filament and crossing reconstruction | Sten published protocol; FNA/reference annotations | Filament F1, crossing F1, precision/recall, length error | First reproduce the published task and splits. Then target >=0.94 filament F1 and >=0.92 crossing F1 on a larger replicate-disjoint set, without increasing false fusion |
+| 3D geometry and topology | Sten 3D, printed known-geometry controls, adjudicated real z-stacks | Centerline/branch recall, crossing-versus-fusion error, geometric RMSE, graph-edit/topological error | Reproduce the narrow published 0.91–0.92 overlap result on its exact six-image scope before expanding; do not call it universal 3D SOTA |
+| False fusion | Adjudicated crossing-negative and z-order controls | False-fusion rate, precision by contact type | <=0.5% on a sufficiently large, independently adjudicated difficult-negative set |
+| Graph adequacy | Exact bounded enumerator; deliberately incomplete candidate families | Exact agreement, severe-miss detection, false adequacy, false abstention | 100% exact-oracle agreement on bounded cases; >=95% detection of predefined severe misspecification with <=5% false adequacy; <=5% false abstention on matched adequate controls |
+| Morphogenesis forecasting | Persistence, linear trend, covariate-only, morphology-only and dynamic-structure baselines | MAE/RMSE, CRPS, event precision/recall, interval coverage | Beat persistence and linear trend on frozen forward-time, independent-unit holdouts; target >=10% relative error reduction over best matched morphology-only baseline |
+| Cytoplasmic flow | Last-value, direction persistence, geometry and time-series baselines | Direction accuracy, forward/reverse speed distribution score, switch timing, calibration | Demonstrate added value over simple baselines on held-out biological networks; preserve simultaneous forward/reverse streams |
+| Source–sink transfer | Source availability/distance, static topology, measured geometry, depletion-only, hydraulic model | Source-region attribution score, tracer-incorporation prediction error, arrival/censoring score | Target >=10% relative error reduction over strongest matched topology-only baseline on a preregistered independent cohort |
+| Microbial dispersal | Distance-only, liquid-only, hypha-only and combined predictors | Arrival probability, time-to-arrival score, censored survival score | Test the incremental contribution of hyphae and liquid state on held-out device/biological replicates; do not substitute this for nutrient-transfer validation |
+| Interventional prediction | Sham, covariate-only and observational model | Effect-sign accuracy, effect-size error, interval coverage | Predict held-out intervention-effect direction and magnitude better than matched non-interventional baselines |
+| Active acquisition | Random, fixed schedule, confidence, entropy, topology, expert heuristic and existing decision-value evaluator | Decision regret, error at equal budget, acquisition time/photons/dose | Target >=10% lower decision loss at equal acquisition budget, or >=10% lower acquisition cost at equal decision quality |
+| Calibration | Uncalibrated and matched probabilistic baselines | Proper log score, Brier score, CRPS, interval coverage/width, calibration by subgroup | Nominal 90% intervals assessed at biological-unit level, with coverage and width reported together |
+| Evidence and leakage | Source inventory and split-manifest adversarial fixtures | Inventory coverage, evidence-chain validity, unit overlap, time violations | 100% accounting against declared acquisition scope; zero independent-unit overlap; zero future-to-context leakage; unsupported rights block processing |
+
+The Sten published 2D results (filament detection F1 0.88–0.94 and crossing F1 0.89 on 135 images) and the narrow Sten 3D overlap result (F1 0.91–0.92 on six manually annotated real images) are comparison anchors, not universal state-of-the-art ceilings. The new benchmark must reproduce comparable tasks and data splits before claiming improvement.
+
+For the three-cycle longitudinal *Agaricus* series, leave-one-cycle-out evaluation is necessary but statistically weak: three held-out folds do not support a definitive generalization claim. Report every fold and its uncertainty. A larger prospective set of independent cultivation cycles is needed before asserting robust superiority.
+
+## 8. Industry position: integrate where others are mature, compete where evidence is missing
+
+| System | Established strength | Symthaea strategy |
+|---|---|---|
+| ZEISS arivis | Multidimensional image analysis, 3D/4D workflows and AI-assisted segmentation | Import exports and preserve source/calibration evidence; add hypothesis adequacy and downstream functional qualification |
+| Imaris | Mature 3D/4D visualization, segmentation and quantitative microscopy workflows | Interoperate with its outputs; do not rebuild its visualization stack |
+| Fiji SNT | Open, scriptable multidimensional tracing and time-lapse analysis | Use as a reproducible tracing baseline and preserve tracing provenance |
+| Fungal Network Analysis | Fungal-specific image processing, skeletonization, width estimation and weighted graph construction | Reproduce its pipeline; compare connectivity-preserving reconstruction and functional prediction |
+| Sten methods | Explicit filament-overlap and 3D z-stack reconstruction reference methods | Reproduce published narrow evaluations before extending the benchmark |
+| Smart-microscopy ecosystems | Hardware interfaces, acquisition orchestration and interoperable formats | Reuse useq-schema, OME-TIFF/OME-Zarr and recorded-session adapters; Symthaea owns evidence qualification and advisory decisions |
+
+The defensible competitive position is not “better at every image-processing operation.” It is:
+
+**A scientific evidence and decision layer that can explain what was acquired, what remains unresolved, which biological hypotheses fit, what each hypothesis predicts, which measurement is worth acquiring next, and whether an independent intervention supports the prediction.**
+
+A mature commercial segmentation tool can be an upstream provider and a benchmark competitor at the same time.
+
+## 9. Integration with the existing public work
+
+This protocol connects rather than duplicates the current portfolio:
+
+- PR #13449 — acquisition-domain manifest and extraction coverage.
+- PR #13459 — source-bound typed morphogenesis observations.
+- PR #13464 / issue #13460 — replicate-disjoint forward-time split contract.
+- PR #13369 — feasible graph-hypothesis posterior.
+- PR #13379 — decision-value active acquisition.
+- Issue #13419 — posterior adequacy, candidate-generation coverage and common-cause residuals.
+- Issue #13352 — independent functional observations and transport benchmarks.
+- Issue #13423 — multiplex transport and causal perturbation programme.
+- Issue #13435 — HDC/CfC/LTC evaluation.
+- Issue #13450 — demand-responsive morphogenesis.
+- Issue #13451 — hardware-neutral microscopy interoperability.
+- Issue #13431 — evidence-gated acquisition, initially in offline/shadow mode.
+
+### Execution sequence independent of CI availability
+
+1. Repair the actual rustfmt drift on PR #13464 and rerun its exact-head renderer contract; do not infer test status from a formatting failure.
+2. Keep the acquisition and observation contracts as separately qualified foundations; do not mark skipped general CI as passing.
+3. Qualify registry records at file level: source identity, specimen mapping, independent unit, exact version, hash, rights, annotation provenance and permitted use.
+4. Build the synthetic multiplex transport oracle and independent exact enumerator; keep them separate from production inference code.
+5. Implement functional observation and split adapters only after the measurement semantics and source identity are fixed.
+6. Reproduce Sten/FNA baselines on rights-cleared data, then run the morphogenesis forecast baselines with the correct independent-unit split.
+7. Design the prospective paired imaging–tracer–hydration pilot with a mycology collaborator and preregister it before collecting outcomes.
+8. Add intervention prediction only when manipulation success and sham/off-target controls can be independently measured.
+
+## 10. Claim discipline
+
+Every public result should identify which of these levels it has reached:
+
+1. **Specified:** a research question, protocol or schema exists.
+2. **Implemented:** source code and tests exist at a named commit.
+3. **Structurally validated:** a named contract and its exact-head checks pass.
+4. **Data qualified:** rights, source hashes, annotations and independent-unit metadata are audited.
+5. **Reproduced:** a published result is independently reproduced on its declared task and data.
+6. **Predictively validated:** a frozen model predicts held-out independent biological outcomes.
+7. **Intervention validated:** a blinded, controlled intervention supports the prediction.
+8. **Externally replicated:** an independent laboratory reproduces the result.
+
+Never use “validated” without naming the level. CI success is software evidence, not biological validation. Simulation is not a biological experiment. Prediction is not causation. A statistically non-significant result is not evidence of equivalence.
+
+## 11. The milestone that matters
+
+The next decisive milestone is not a larger graph or a higher segmentation score. It is a reproducible, forward-in-time prediction on an unseen biological unit, followed by a blinded functional measurement that can falsify it.
+
+The first compelling demonstration would show that a model using source/sink state, hydration and measured network dynamics predicts source-region tracer incorporation better than persistence, distance-only and topology-only baselines, with calibrated uncertainty and no leakage. A later intervention should test whether the model predicts how that relationship changes when depletion or hydration is deliberately altered.
+
+That would move Mycelial from network visualization toward a genuinely testable model of living infrastructure.
+
+---
+
+## References and implementation resources
+
+- Travelling-wave plant–fungal trade (2025): https://doi.org/10.1038/s41586-025-08614-x
+- *Agaricus* cordogenesis and fruiting (2026): https://doi.org/10.1016/j.funbio.2026.101799
+- *Agaricus* stable-isotope resource transfer (2026): https://doi.org/10.1111/1462-2920.70345
+- Hyphal Highways Device (2026): https://doi.org/10.1093/femsml/uqag035
+- Smart microscopy interoperability roadmap (2026): https://doi.org/10.1515/mim-2025-0029
+- Sten 2D mycelium analysis (2024): https://doi.org/10.1016/j.ecoinf.2024.102670
+- Sten 3D z-stack reconstruction (2025): https://doi.org/10.1016/j.ecoinf.2025.103317
+- Fungal Network Analysis: https://github.com/oscar-sten/mycelium-network-analysis-tool
+- Fiji SNT: https://imagej.net/plugins/snt/
+- OME-NGFF: https://ngff.openmicroscopy.org/
+- useq-schema: https://github.com/als-computing/useq-schema
+- Micro-Manager: https://micro-manager.org/
