@@ -60,13 +60,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cargo +1.96.0 metadata --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --no-deps --format-version 1 > "$RUNNER_TEMP/metadata.json"
+          cargo +1.96.0 metadata --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --no-deps --format-version 1 > "$RUNNER_TEMP/metadata.json"
 
-      - name: Bootstrap nested exact-source harness lock and run tests
-        run: cargo +1.96.0 test --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml
+      - name: Run locked exact-source temporal-grounding tests
+        run: cargo +1.96.0 test --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml
 
       - name: Warnings-denied Clippy on exact production source
-        run: cargo +1.96.0 clippy --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --all-targets -- -D warnings
+        run: cargo +1.96.0 clippy --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --all-targets -- -D warnings
 
       - name: Assemble exact-head evidence
         if: always()
