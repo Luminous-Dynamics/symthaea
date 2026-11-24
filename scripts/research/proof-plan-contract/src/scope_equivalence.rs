@@ -5,7 +5,7 @@
 //! and the exact Tier-0 LocalGlobalPairV1 contract. It does not implement
 //! quantified alpha-renaming, definitional equality, or general logical equivalence.
 
-use crate::local_global::{BooleanFormula, BooleanSequent};
+use crate::local_global::BooleanSequent;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
