@@ -62,7 +62,7 @@ jobs:
       - name: Exercise JSON input/output contract
         run: cargo run --locked --quiet -p symthaea-experiment-design < crates/domains/symthaea-experiment-design/fixtures/galileo-discrimination-v0.1.json
       - name: Upload workspace lockfile reconciliation
-        if: always()
+        if: always() && hashFiles('Cargo.lock.after') != ''
         uses: actions/upload-artifact@v4
         with:
           name: experiment-design-workspace-lockfile
