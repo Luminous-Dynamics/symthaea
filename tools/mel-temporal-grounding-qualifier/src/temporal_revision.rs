@@ -1055,6 +1055,9 @@ mod tests {
             Some(1.0)
         );
         assert_eq!(contrast.local_beats_yoked, Some(true));
+        assert_eq!(contrast.local_output_tokens, 128);
+        assert_eq!(contrast.no_evidence_output_tokens, 128);
+        assert_eq!(contrast.local_elapsed_wall_time_ms, 4_000);
     }
 
     #[test]
@@ -1154,6 +1157,34 @@ mod tests {
         assert!(audit_revision_v2(&case).is_err());
         case.evidence.as_mut().unwrap().end_frame = 48_000;
         assert!(audit_revision_v2(&case).is_ok());
+    }
+
+    #[test]
+    fn v2_rejects_inference_budget_overrun() {
+        let mut case = revision_case_v2(
+            vec![interval(100, 200), interval(500, 600)],
+            vec![interval(100, 200), interval(800, 900)],
+            vec![interval(100, 200), interval(500, 600)],
+        );
+        case.actual_output_tokens = case.max_output_tokens + 1;
+        assert!(audit_revision_v2(&case).is_err());
+
+        case.actual_output_tokens = 100;
+        case.elapsed_wall_time_ms = case.max_wall_time_ms + 1;
+        assert!(audit_revision_v2(&case).is_err());
+    }
+
+    #[test]
+    fn matched_triplet_rejects_different_runtime_or_decoding_identity() {
+        let mut cases = matched_evidence_triplet();
+        cases[2].runtime_identity_sha256 =
+            "1212121212121212121212121212121212121212121212121212121212121212".into();
+        assert!(compare_matched_evidence_arms(&cases).is_err());
+
+        let mut cases = matched_evidence_triplet();
+        cases[2].decoding_config_sha256 =
+            "1212121212121212121212121212121212121212121212121212121212121212".into();
+        assert!(compare_matched_evidence_arms(&cases).is_err());
     }
 
     #[test]
