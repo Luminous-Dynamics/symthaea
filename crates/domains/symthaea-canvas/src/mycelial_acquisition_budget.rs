@@ -1522,7 +1522,7 @@ mod tests {
     };
 
     fn digest(character: char) -> String {
-        std::iter::repeat_n(character, DIGEST_HEX_BYTES).collect()
+        format!("{:064x}", character as u32)
     }
 
     fn budget() -> MycelialSampleHealthBudget {
