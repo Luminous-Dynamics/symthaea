@@ -526,6 +526,14 @@ fn validate_state(
             "cumulative photon exposure records",
         ));
     }
+    if state.exposure_history_complete {
+        let has_prior_optical_exposure = !state.cumulative_photon_exposures.is_empty();
+        if has_prior_optical_exposure != state.elapsed_since_last_optical_exposure_ns.is_some() {
+            return Err(MycelialSampleHealthBudgetError::InvalidState(
+                "complete exposure history and recovery clock disagree",
+            ));
+        }
+    }
     let limits_by_channel = budget
         .photon_dose_limits
         .iter()
@@ -1979,6 +1987,169 @@ mod tests {
         ));
         assert!(result.rejected_actions[0].reasons.contains(
             &MycelialSampleHealthRejectionReason::TemperatureRiseExceeded
+        ));
+    }
+
+    #[test]
+    fn irradiance_upper_bound_is_enforced_independently_of_total_dose() {
+        let evidence = active_report(vec![action(
+            "high-irradiance",
+            MycelialAcquisitionActionKind::AlternateIllumination,
+            8.0,
+        )]);
+        let mut proposal = proposal(
+            "high-irradiance",
+            &["cell-b"],
+            1.0,
+            MycelialAcquisitionActionKind::AlternateIllumination,
+        );
+        proposal.photon_dose_estimates[0].irradiance_watts_per_cm2_upper = 0.02;
+        let result =
+            evaluate_mycelial_sample_health_budget(&evidence, &budget(), &state(), &[proposal])
+                .unwrap();
+        assert_eq!(result.recommended_action_id, None);
+        assert!(result.rejected_actions[0]
+            .reasons
+            .contains(&MycelialSampleHealthRejectionReason::IrradianceExceeded));
+    }
+
+    #[test]
+    fn continuous_illumination_duration_is_a_separate_hard_limit() {
+        let evidence = active_report(vec![action(
+            "long-dwell",
+            MycelialAcquisitionActionKind::AlternateIllumination,
+            8.0,
+        )]);
+        let mut proposal = proposal(
+            "long-dwell",
+            &["cell-b"],
+            1.0,
+            MycelialAcquisitionActionKind::AlternateIllumination,
+        );
+        proposal.duration_ns = 30;
+        proposal.photon_dose_estimates[0].illumination_duration_ns = 21;
+        let result =
+            evaluate_mycelial_sample_health_budget(&evidence, &budget(), &state(), &[proposal])
+                .unwrap();
+        assert_eq!(result.recommended_action_id, None);
+        assert!(result.rejected_actions[0].reasons.contains(
+            &MycelialSampleHealthRejectionReason::ContinuousIlluminationDurationExceeded
+        ));
+    }
+
+    #[test]
+    fn recovery_interval_can_be_met_by_delaying_the_next_acquisition() {
+        let evidence = active_report(vec![action(
+            "recovery-wait",
+            MycelialAcquisitionActionKind::AlternateIllumination,
+            8.0,
+        )]);
+        let mut proposal = proposal(
+            "recovery-wait",
+            &["cell-b"],
+            1.0,
+            MycelialAcquisitionActionKind::AlternateIllumination,
+        );
+        let mut current = state();
+        current.elapsed_since_last_optical_exposure_ns = Some(1);
+        let rejected =
+            evaluate_mycelial_sample_health_budget(
+                &evidence,
+                &budget(),
+                &current,
+                &[proposal.clone()],
+            )
+            .unwrap();
+        assert!(rejected.rejected_actions[0]
+            .reasons
+            .contains(&MycelialSampleHealthRejectionReason::RecoveryIntervalNotMet));
+
+        proposal.planned_start_offset_ns = 24;
+        proposal.spatial_footprint_digest = footprint_digest(
+            &proposal.coordinate_frame_id,
+            &proposal.acquisition_plan_digest,
+            &proposal.device_capability_manifest_digest,
+            &proposal.spatial_footprint_cell_ids,
+        );
+        let eligible =
+            evaluate_mycelial_sample_health_budget(&evidence, &budget(), &current, &[proposal])
+                .unwrap();
+        assert_eq!(eligible.recommended_action_id.as_deref(), Some("recovery-wait"));
+    }
+
+    #[test]
+    fn incomplete_exposure_history_blocks_optical_but_not_human_review() {
+        let mut current = state();
+        current.exposure_history_complete = false;
+        let optical_evidence = active_report(vec![action(
+            "unknown-exposure-history",
+            MycelialAcquisitionActionKind::AdditionalZPlane,
+            8.0,
+        )]);
+        let optical_proposal = proposal(
+            "unknown-exposure-history",
+            &["cell-b"],
+            1.0,
+            MycelialAcquisitionActionKind::AdditionalZPlane,
+        );
+        let blocked = evaluate_mycelial_sample_health_budget(
+            &optical_evidence,
+            &budget(),
+            &current,
+            &[optical_proposal],
+        )
+        .unwrap();
+        assert!(blocked.rejected_actions[0].reasons.contains(
+            &MycelialSampleHealthRejectionReason::ExposureHistoryIncomplete
+        ));
+
+        let review_evidence = active_report(vec![action(
+            "human-review-with-incomplete-history",
+            MycelialAcquisitionActionKind::HumanAnnotation,
+            1.0,
+        )]);
+        let review_proposal = proposal(
+            "human-review-with-incomplete-history",
+            &["cell-b"],
+            0.0,
+            MycelialAcquisitionActionKind::HumanAnnotation,
+        );
+        let review = evaluate_mycelial_sample_health_budget(
+            &review_evidence,
+            &budget(),
+            &current,
+            &[review_proposal],
+        )
+        .unwrap();
+        assert_eq!(
+            review.recommended_action_id.as_deref(),
+            Some("human-review-with-incomplete-history")
+        );
+    }
+
+    #[test]
+    fn complete_exposure_history_requires_consistent_recovery_clock() {
+        let evidence = active_report(vec![action(
+            "inconsistent-clock",
+            MycelialAcquisitionActionKind::HumanAnnotation,
+            1.0,
+        )]);
+        let proposal = proposal(
+            "inconsistent-clock",
+            &["cell-b"],
+            0.0,
+            MycelialAcquisitionActionKind::HumanAnnotation,
+        );
+        let mut current = state();
+        current.elapsed_since_last_optical_exposure_ns = None;
+        assert!(matches!(
+            evaluate_mycelial_sample_health_budget(
+                &evidence,
+                &budget(),
+                &current,
+                &[proposal]
+            ),
+            Err(MycelialSampleHealthBudgetError::InvalidState(_))
         ));
     }
 
