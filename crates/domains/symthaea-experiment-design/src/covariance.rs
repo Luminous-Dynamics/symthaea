@@ -355,12 +355,12 @@ fn mahalanobis_squared(
     let max_eigenvalue = eigenvalues.iter().copied().fold(0.0_f64, f64::max).max(1.0);
     let cutoff = RELATIVE_EIGENVALUE_TOLERANCE * max_eigenvalue;
     let negative_cutoff = NEGATIVE_EIGENVALUE_TOLERANCE * max_eigenvalue;
-    if let Some(minimum) = eigenvalues.iter().copied().reduce(f64::min) {
-        if minimum < -negative_cutoff {
-            return Err(CovarianceDesignError::NonPsdCovariance(format!(
-                "minimum standardized eigenvalue {minimum}"
-            )));
-        }
+    if let Some(minimum) = eigenvalues.iter().copied().reduce(f64::min)
+        && minimum < -negative_cutoff
+    {
+        return Err(CovarianceDesignError::NonPsdCovariance(format!(
+            "minimum standardized eigenvalue {minimum}"
+        )));
     }
 
     let mut score = 0.0;
@@ -409,11 +409,11 @@ fn jacobi_symmetric_eigen(matrix: &[Vec<f64>]) -> Option<(Vec<f64>, Vec<Vec<f64>
         let mut q = 1;
         let mut largest = 0.0_f64;
         let mut diagonal_scale = 1.0_f64;
-        for i in 0..n {
-            diagonal_scale = diagonal_scale.max(a[i][i].abs());
-            for j in (i + 1)..n {
-                if a[i][j].abs() > largest {
-                    largest = a[i][j].abs();
+        for (i, row) in a.iter().enumerate() {
+            diagonal_scale = diagonal_scale.max(row[i].abs());
+            for (j, value) in row.iter().enumerate().skip(i + 1) {
+                if value.abs() > largest {
+                    largest = value.abs();
                     p = i;
                     q = j;
                 }
@@ -648,12 +648,12 @@ fn validate_input(input: &CovarianceAwareDesignInput) -> Result<(), CovarianceDe
                 ))
             })?;
             let max_eigenvalue = eigenvalues.iter().copied().fold(0.0_f64, f64::max).max(1.0);
-            if let Some(minimum) = eigenvalues.iter().copied().reduce(f64::min) {
-                if minimum < -NEGATIVE_EIGENVALUE_TOLERANCE * max_eigenvalue {
-                    return Err(CovarianceDesignError::NonPsdCovariance(format!(
-                        "minimum eigenvalue {minimum} for ({first}, {second}) in {eid}"
-                    )));
-                }
+            if let Some(minimum) = eigenvalues.iter().copied().reduce(f64::min)
+                && minimum < -NEGATIVE_EIGENVALUE_TOLERANCE * max_eigenvalue
+            {
+                return Err(CovarianceDesignError::NonPsdCovariance(format!(
+                    "minimum eigenvalue {minimum} for ({first}, {second}) in {eid}"
+                )));
             }
         }
         for i in 0..input.hypothesis_ids.len() {
@@ -718,9 +718,8 @@ fn validate_pairwise_covariance_consistency(
         .collect();
 
     for pair in &experiment.pairwise_difference_covariances {
-        for observable in 0..p {
-            scales[observable] =
-                scales[observable].max(pair.covariance[observable][observable].sqrt());
+        for (observable, scale) in scales.iter_mut().enumerate() {
+            *scale = scale.max(pair.covariance[observable][observable].sqrt());
         }
     }
 
@@ -793,15 +792,15 @@ fn validate_pairwise_covariance_consistency(
     })?;
     let max_eigenvalue = eigenvalues.iter().copied().fold(0.0_f64, f64::max).max(1.0);
     let negative_cutoff = NEGATIVE_EIGENVALUE_TOLERANCE * max_eigenvalue;
-    if let Some(minimum) = eigenvalues.iter().copied().reduce(f64::min) {
-        if minimum < -negative_cutoff {
-            return Err(CovarianceDesignError::InconsistentPairwiseCovariances(
-                format!(
-                    "double-centred joint covariance has minimum eigenvalue {minimum} in {}",
-                    experiment.experiment_id
-                ),
-            ));
-        }
+    if let Some(minimum) = eigenvalues.iter().copied().reduce(f64::min)
+        && minimum < -negative_cutoff
+    {
+        return Err(CovarianceDesignError::InconsistentPairwiseCovariances(
+            format!(
+                "double-centred joint covariance has minimum eigenvalue {minimum} in {}",
+                experiment.experiment_id
+            ),
+        ));
     }
     Ok(())
 }
