@@ -496,10 +496,13 @@ fn reduce_episode(episode: &Episode) -> Result<EpisodeReport, String> {
         findings.push("capture sequence accounting is inconsistent or contains duplicates".into());
     }
     if capture_frame_accounting_applicable && !capture_frame_accounting_consistent {
-        findings.push("audio capture frame accounting is incomplete, dropped, or contains XRUNs".into());
+        findings.push(
+            "audio capture frame accounting is incomplete, dropped, or contains XRUNs".into(),
+        );
     }
     if capture_heartbeat_accounting_applicable && !capture_heartbeat_accounting_consistent {
-        findings.push("MIDI monitor heartbeat accounting is incomplete or contains duplicates".into());
+        findings
+            .push("MIDI monitor heartbeat accounting is incomplete or contains duplicates".into());
     }
     if !capture_accounting_complete {
         findings.push("capture is not structurally eligible for negative-event scoring".into());
@@ -833,7 +836,10 @@ mod tests {
     #[test]
     fn complete_empty_midi_monitor_window_is_absent_without_audio_frames_or_producer() {
         let report = parse_and_reduce(MIDI_ABSENT).expect("valid MIDI monitor fixture");
-        assert_eq!(report.observation_outcome, ObservationOutcome::DetectorReportedAbsent);
+        assert_eq!(
+            report.observation_outcome,
+            ObservationOutcome::DetectorReportedAbsent
+        );
         assert_eq!(report.capture_source_kind, "midi_output_monitor");
         assert!(report.capture_accounting_complete);
         assert!(!report.capture_frame_accounting_applicable);
