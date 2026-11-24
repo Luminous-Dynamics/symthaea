@@ -1373,7 +1373,7 @@ mod tests {
 
     #[test]
     fn full_and_empty_sets_update_from_known_losses_without_tracking() {
-        let mut full_engine = engine(pmf_always_delay(2), 1, 1);
+        let mut full_engine = engine(pmf_always_delay(2), 2, 1);
         full_engine.threshold = 10.0;
         let full = process_ca_ocrc_round_v1(
             &mut full_engine,
@@ -1387,7 +1387,7 @@ mod tests {
         assert!((full.threshold_after - 9.98).abs() < 1.0e-12);
         assert!(full_engine.tracking_set.is_empty());
 
-        let mut empty_engine = engine(pmf_always_delay(2), 1, 1);
+        let mut empty_engine = engine(pmf_always_delay(2), 2, 1);
         empty_engine.threshold = -0.1;
         let empty = process_ca_ocrc_round_v1(
             &mut empty_engine,
@@ -1453,7 +1453,7 @@ mod tests {
 
     #[test]
     fn blocked_or_mismatched_feedback_never_updates_threshold() {
-        let mut engine = engine(pmf_always_delay(2), 1, 3);
+        let mut engine = engine(pmf_always_delay(2), 2, 3);
         process_ca_ocrc_round_v1(&mut engine, &round(0, "s0", "e0", 10.0), &[]).unwrap();
         let blocked = delivery(
             "s0",
