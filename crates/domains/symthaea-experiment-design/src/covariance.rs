@@ -311,15 +311,25 @@ fn derive_difference_covariance(
     observable_count: usize,
 ) -> Vec<Vec<f64>> {
     let mut difference = vec![vec![0.0; observable_count]; observable_count];
-    for (a, row) in difference.iter_mut().enumerate() {
-        for (b, value) in row.iter_mut().enumerate() {
+    for a in 0..observable_count {
+        for b in a..observable_count {
             let first_a = first_hypothesis * observable_count + a;
             let first_b = first_hypothesis * observable_count + b;
             let second_a = second_hypothesis * observable_count + a;
             let second_b = second_hypothesis * observable_count + b;
-            *value = joint[first_a][first_b] + joint[second_a][second_b]
+            let forward = joint[first_a][first_b] + joint[second_a][second_b]
                 - joint[first_a][second_b]
                 - joint[second_a][first_b];
+
+            let reverse = joint[first_b][first_a] + joint[second_b][second_a]
+                - joint[first_b][second_a]
+                - joint[second_b][first_a];
+
+            // The exact block formula is symmetric. Average both floating-point
+            // evaluation orders and write the same value to both triangles.
+            let symmetric_value = 0.5 * forward + 0.5 * reverse;
+            difference[a][b] = symmetric_value;
+            difference[b][a] = symmetric_value;
         }
     }
     difference
@@ -702,17 +712,25 @@ fn correlation_matrix(covariance: &[Vec<f64>]) -> Option<Vec<Vec<f64>>> {
     let scales: Vec<f64> = (0..n).map(|i| covariance[i][i].sqrt()).collect();
     let mut correlation = vec![vec![0.0; n]; n];
     for i in 0..n {
-        for j in 0..n {
-            if scales[i] == 0.0 || scales[j] == 0.0 {
-                if covariance[i][j] != 0.0 {
+        for j in i..n {
+            let value = if scales[i] == 0.0 || scales[j] == 0.0 {
+                if covariance[i][j] != 0.0 || covariance[j][i] != 0.0 {
                     return None;
                 }
+                0.0
             } else {
-                correlation[i][j] = covariance[i][j] / scales[i] / scales[j];
-                if !correlation[i][j].is_finite() {
+                let forward = covariance[i][j] / scales[i] / scales[j];
+                let reverse = covariance[j][i] / scales[j] / scales[i];
+                if !forward.is_finite() || !reverse.is_finite() {
                     return None;
                 }
+                0.5 * forward + 0.5 * reverse
+            };
+            if !value.is_finite() {
+                return None;
             }
+            correlation[i][j] = value;
+            correlation[j][i] = value;
         }
     }
     Some(correlation)
