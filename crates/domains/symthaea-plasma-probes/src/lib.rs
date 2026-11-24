@@ -3744,8 +3744,7 @@ mod tests {
     }
 
     #[test]
-    fn weighted_measure_tail_outlier_stability_and_minmax_drift()
-    {
+    fn weighted_measure_tail_outlier_stability_and_minmax_drift() {
         let fixture: serde_json::Value =
             serde_json::from_str(WEIGHTED_MEASURE_TAIL_STABILITY_FIXTURE).unwrap();
         let parse_numbers = |field: &str| {
