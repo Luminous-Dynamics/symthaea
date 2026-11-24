@@ -66,7 +66,7 @@ fn run() -> Result<String, String> {
             Some(bootstrap_matched_evidence_contrasts(
                 &matched_evidence_contrasts,
                 2_000,
-                0x2026_11_24,
+                0x2026_1124,
             )?)
         } else {
             None
