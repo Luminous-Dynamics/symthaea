@@ -200,6 +200,9 @@ pub struct DriftObservationReceiptV1 {
     pub observed_at_unix_seconds: i64,
     pub knowledge_frontier_unix_seconds: i64,
     pub evidence_receipt_sha256: String,
+    pub feature_schema_sha256: String,
+    pub baseline_sha256: String,
+    pub clock_domain_id: String,
     pub qualification_report_sha256: Option<String>,
     pub prediction_receipt_sha256: Option<String>,
     pub source_label_ids: Vec<String>,
@@ -423,6 +426,9 @@ fn make_receipt(
         observed_at_unix_seconds: input.observed_at_unix_seconds,
         knowledge_frontier_unix_seconds: input.knowledge_frontier_unix_seconds,
         evidence_receipt_sha256: input.evidence_receipt_sha256.clone(),
+        feature_schema_sha256: input.feature_schema_sha256.clone(),
+        baseline_sha256: input.baseline_sha256.clone(),
+        clock_domain_id: input.clock_domain_id.clone(),
         qualification_report_sha256: input
             .qualification_report
             .as_ref()
@@ -512,7 +518,8 @@ fn validate_input(
                 != Some(report.report_sha256.as_str())
             || report.report_sha256 != input.evidence_receipt_sha256
             || !valid_sha256(&report.label_sha256)
-            || input.source_label_ids.as_slice() != [report.label_id.as_str()]
+            || input.source_label_ids.len() != 1
+            || input.source_label_ids.first() != Some(&report.label_id)
             || input.prediction_receipt_sha256.as_deref().is_none_or(|value| !valid_sha256(value))
         {
             return Err(DriftObservationReasonV1::MissingEvidenceDigest);
@@ -523,11 +530,24 @@ fn validate_input(
     if input.source_label_ids.iter().any(|label| label.trim().is_empty()) {
         return Err(DriftObservationReasonV1::MissingEvidenceDigest);
     }
+    if input.plane != DriftEvidencePlaneV1::QualifiedResidual
+        && (!input.source_label_ids.is_empty()
+            || input.qualification_report.is_some()
+            || input.prediction_receipt_sha256.is_some())
+    {
+        return Err(DriftObservationReasonV1::EvidenceKindPlaneMismatch);
+    }
     match input.detector {
         DriftDetectorKindV1::MissingnessRate => {}
         DriftDetectorKindV1::EventChange => {
-            if input.standardized_signal.is_none() {
+            let Some(signal) = input.standardized_signal else {
                 return Err(DriftObservationReasonV1::InvalidSignal);
+            };
+            if !signal.is_finite() {
+                return Err(DriftObservationReasonV1::InvalidSignal);
+            }
+            if signal.abs() > engine.policy.maximum_abs_standardized_signal {
+                return Err(DriftObservationReasonV1::SignalOutOfPolicy);
             }
         }
         DriftDetectorKindV1::Ewma | DriftDetectorKindV1::TwoSidedCusum => {
@@ -754,6 +774,11 @@ pub fn seal_drift_episode_v1(
                 receipt.observation_id
             )));
         }
+        if receipt.causal_attribution != CausalAttributionStateV1::NotEstablished {
+            return Err(DriftMonitorErrorV1(
+                "episode cannot claim causal attribution without an external review receipt".into(),
+            ));
+        }
         if receipt.event_time_unix_seconds < window_start_unix_seconds
             || receipt.event_time_unix_seconds > window_end_unix_seconds
         {
@@ -839,39 +864,50 @@ pub fn assess_declared_common_resource_association_v1(
         contexts.insert(alert.context_id.as_str());
     }
 
-    let mut bindings: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
+    let mut bindings: BTreeMap<&str, BTreeSet<(&str, &str)>> = BTreeMap::new();
+    let mut unique_bindings = BTreeSet::new();
     for binding in &graph.bindings {
         require_text(&binding.context_id, "binding.context_id")?;
         require_text(&binding.resource_id, "binding.resource_id")?;
         require_text(&binding.resource_kind, "binding.resource_kind")?;
+        if !unique_bindings.insert((
+            binding.context_id.as_str(),
+            binding.resource_id.as_str(),
+            binding.resource_kind.as_str(),
+        )) {
+            return Err(DriftMonitorErrorV1("duplicate shared-resource binding".into()));
+        }
         bindings
             .entry(binding.context_id.as_str())
             .or_default()
-            .insert(binding.resource_id.as_str());
+            .insert((binding.resource_id.as_str(), binding.resource_kind.as_str()));
     }
 
     let mut shared = BTreeSet::new();
     let mut reason_codes = Vec::new();
-    let state = if !graph.inventory_complete {
+    let unrepresented_contexts: Vec<&str> = contexts
+        .iter()
+        .filter(|context| !bindings.contains_key(**context))
+        .copied()
+        .collect();
+    let state = if !graph.inventory_complete || !unrepresented_contexts.is_empty() {
         reason_codes.push("shared_resource_inventory_incomplete".into());
         CommonCauseAssessmentStateV1::Unknown
     } else if contexts.len() < 2 {
         reason_codes.push("fewer_than_two_distinct_contexts".into());
         CommonCauseAssessmentStateV1::NoDeclaredSharedResource
     } else {
-        let mut resource_counts: BTreeMap<&str, usize> = BTreeMap::new();
+        let mut resource_counts: BTreeMap<(&str, &str), usize> = BTreeMap::new();
         for context in &contexts {
-            if let Some(resources) = bindings.get(context) {
-                for resource in resources {
-                    *resource_counts.entry(resource).or_default() += 1;
-                }
+            for resource in bindings.get(context).into_iter().flatten() {
+                *resource_counts.entry(*resource).or_default() += 1;
             }
         }
         shared.extend(
             resource_counts
                 .into_iter()
                 .filter(|(_, count)| *count >= 2)
-                .map(|(resource, _)| resource.to_string()),
+                .map(|((resource, _kind), _)| resource.to_string()),
         );
         if shared.is_empty() {
             reason_codes.push("no_declared_shared_resource".into());
@@ -1067,6 +1103,28 @@ mod tests {
         let receipt = observe_drift_channel_v1(&mut engine, &blocked).unwrap();
         assert_eq!(receipt.disposition, DriftObservationDispositionV1::Blocked);
         assert_eq!(channel_state_digest(engine.channels.get("residual-tool-1")).unwrap(), before);
+    }
+
+    #[test]
+    fn tampered_k1_label_report_is_rejected_from_residual_monitor() {
+        let mut engine = engine();
+        let mut observation = input(
+            "r1",
+            "residual",
+            DriftEvidencePlaneV1::QualifiedResidual,
+            DriftDetectorKindV1::TwoSidedCusum,
+            DriftEvidenceKindV1::QualifiedMetrologyLabel,
+            DriftQualificationV1::CurrentK1Eligible,
+            Some(1.0),
+            100,
+            'c',
+        );
+        let report = observation.qualification_report.as_mut().unwrap();
+        report.label_revision = 2;
+        let receipt = observe_drift_channel_v1(&mut engine, &observation).unwrap();
+        assert_eq!(receipt.disposition, DriftObservationDispositionV1::Rejected);
+        assert_eq!(receipt.alarm_state, DriftAlarmStateV1::InsufficientEvidence);
+        assert!(engine.channels.is_empty());
     }
 
     #[test]
