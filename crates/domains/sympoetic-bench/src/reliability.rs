@@ -30,15 +30,11 @@ pub fn cohens_kappa_nominal(
         .zip(rater_b.iter().copied())
         .enumerate()
     {
-        if let Some(label) = a {
-            if label.trim().is_empty() {
-                bail!("rater A has an empty label at unit {index}");
-            }
+        if let Some(label) = a && label.trim().is_empty() {
+            bail!("rater A has an empty label at unit {index}");
         }
-        if let Some(label) = b {
-            if label.trim().is_empty() {
-                bail!("rater B has an empty label at unit {index}");
-            }
+        if let Some(label) = b && label.trim().is_empty() {
+            bail!("rater B has an empty label at unit {index}");
         }
         let (Some(a), Some(b)) = (a, b) else {
             continue;
