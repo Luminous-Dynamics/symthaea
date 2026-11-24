@@ -11,6 +11,7 @@ on:
       - "benchmarks/plasma/rate-distortion/**"
       - "benchmarks/plasma/topology-lifting/**"
       - "benchmarks/plasma/micro-macro/**"
+      - "benchmarks/plasma/control-interface/**"
       - ".github/workflows/plasma-probes.yml"
   pull_request:
     branches: [main]
@@ -22,6 +23,7 @@ on:
       - "benchmarks/plasma/rate-distortion/**"
       - "benchmarks/plasma/topology-lifting/**"
       - "benchmarks/plasma/micro-macro/**"
+      - "benchmarks/plasma/control-interface/**"
       - ".github/workflows/plasma-probes.yml"
   workflow_dispatch:
 
@@ -62,6 +64,7 @@ jobs:
           mkdir -p "${tmp_root}/benchmarks/plasma/rate-distortion/fixtures"
           mkdir -p "${tmp_root}/benchmarks/plasma/topology-lifting/fixtures"
           mkdir -p "${tmp_root}/benchmarks/plasma/micro-macro/fixtures"
+          mkdir -p "${tmp_root}/benchmarks/plasma/control-interface/fixtures"
           cp crates/domains/symthaea-plasma-probes/src/lib.rs "${crate_dir}/src/lib.rs"
           cp crates/domains/symthaea-plasma-probes/src/bin/kird_point_audit.rs "${crate_dir}/src/bin/kird_point_audit.rs"
           cp benchmarks/plasma/adversarial-probes/fixtures/synthetic-pulse-family-v0.1.json \
@@ -80,6 +83,10 @@ jobs:
             "${tmp_root}/benchmarks/plasma/micro-macro/"
           cp benchmarks/plasma/micro-macro/fixtures/synthetic-micro-macro-contract-v0.1.json \
             "${tmp_root}/benchmarks/plasma/micro-macro/fixtures/"
+          cp benchmarks/plasma/control-interface/sensor-actuator-timing-contract-v0.1.schema.json \
+            "${tmp_root}/benchmarks/plasma/control-interface/"
+          cp benchmarks/plasma/control-interface/fixtures/synthetic-multirate-interface-v0.1.json \
+            "${tmp_root}/benchmarks/plasma/control-interface/fixtures/"
           cat > "${crate_dir}/Cargo.toml" <<'EOF'
           [package]
           name = "symthaea-plasma-probes"
@@ -175,6 +182,25 @@ jobs:
           assert fixture["macro_contract"]["retained_full_order"] is True
           assert fixture["claim_boundary"]["asymptotic_preservation_claimed"] is False
           print("micro_macro_schema_validation=PASS")
+          PY
+
+      - name: Validate multi-rate sensor and actuator interface schema
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path("${{ runner.temp }}/plasma-probe-validation/benchmarks/plasma/control-interface")
+          schema = json.loads((root / "sensor-actuator-timing-contract-v0.1.schema.json").read_text())
+          fixture = json.loads((root / "fixtures/synthetic-multirate-interface-v0.1.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(fixture)
+          assert fixture["controller"]["full_state_access"] is False
+          assert fixture["claim_boundary"]["stability_claimed"] is False
+          assert len(fixture["diagnostics"]) == 2
+          assert len(fixture["actuators"]) == 1
+          print("sensor_actuator_interface_schema_validation=PASS")
           PY
 
       - name: Run KIRD semantic audit fixtures
