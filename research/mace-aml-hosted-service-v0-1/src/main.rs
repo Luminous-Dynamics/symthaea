@@ -576,6 +576,56 @@ mod tests {
     }
 
     #[test]
+    fn file_backed_store_survives_process_style_reopen() {
+        let path = std::env::temp_dir().join(format!("mace-hosted-{}.sqlite3", Uuid::new_v4()));
+        let state = AppState {
+            db: Arc::new(Mutex::new(open_database(&path).unwrap())),
+            api_key: Arc::new(b"test-secret".to_vec()),
+            principal_id: "participant-1".into(),
+            tenant_id: "tenant-1".into(),
+            track: Track::Textual,
+        };
+        add_transaction(&state, add_request("r-persist", "durable memory survives restart")).unwrap();
+        drop(state);
+
+        let reopened = AppState {
+            db: Arc::new(Mutex::new(open_database(&path).unwrap())),
+            api_key: Arc::new(b"test-secret".to_vec()),
+            principal_id: "participant-1".into(),
+            tenant_id: "tenant-1".into(),
+            track: Track::Textual,
+        };
+        let results = search_query(&reopened, SearchRequest {
+            query: Content::Text("survives restart".into()),
+            options: None,
+            user_id: "user-1".into(),
+            top_k: 5,
+        }).unwrap();
+        assert_eq!(results.data.len(), 1);
+        drop(reopened);
+        let _ = std::fs::remove_file(&path);
+        let _ = std::fs::remove_file(path.with_extension("sqlite3-wal"));
+        let _ = std::fs::remove_file(path.with_extension("sqlite3-shm"));
+    }
+
+    #[test]
+    fn concurrent_identical_retries_commit_only_once() {
+        let state = test_state();
+        let request = add_request("r-concurrent", "concurrent idempotency receipt");
+        let a_state = state.clone();
+        let b_state = state.clone();
+        let a_request = request.clone();
+        let a = std::thread::spawn(move || add_transaction(&a_state, a_request).unwrap());
+        let b = std::thread::spawn(move || add_transaction(&b_state, request).unwrap());
+        let first = a.join().unwrap();
+        let second = b.join().unwrap();
+        assert_eq!(first.request_id, second.request_id);
+        let connection = state.db.lock().unwrap();
+        let count: i64 = connection.query_row("SELECT COUNT(*) FROM memory_items", [], |row| row.get(0)).unwrap();
+        assert_eq!(count, 1);
+    }
+
+    #[test]
     fn invalid_top_k_is_rejected() {
         let state = test_state();
         let request = SearchRequest { query: Content::Text("anything".into()), options: None, user_id: "user-1".into(), top_k: 0 };
