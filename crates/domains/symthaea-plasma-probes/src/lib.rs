@@ -2876,7 +2876,8 @@ pub fn evaluate_oscillatory_unstable_mode_interface(
         let (sin_phase, cos_phase) = angle.sin_cos();
         let b0 = radius
             * (cos_phase * contract.actuator_gain[0] - sin_phase * contract.actuator_gain[1]);
-        let b1 = radius * (sin_phase * contract.actuator_gain[0] + cos_phase * contract.actuator_gain[1]);
+        let b1 = radius
+            * (sin_phase * contract.actuator_gain[0] + cos_phase * contract.actuator_gain[1]);
         let contribution = [b0 * b0, b0 * b1, b1 * b1];
         if contribution.iter().any(|value| !value.is_finite()) {
             return Err(control_timing_error(
