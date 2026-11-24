@@ -1,7 +1,5 @@
 import Lean
 
-/-- Tier-2 scope transport pilot for a non-dependent propositional context.
-    The local context is p ∧ q; the global context is q ∧ p. -/
 namespace ScopeEquivalenceTier2AndComm
 
 /-- Forward context entailment: the local context supplies the global context. -/
