@@ -1,0 +1,32 @@
+{
+  "artifact": "SFEB MON-005 witnessed evidence checkpoint reference model v2",
+  "date": "2026-11-24",
+  "runtime": "Node.js v22.16.0",
+  "source_file": "mon005-witnessed-evidence-v2.mjs",
+  "source_bytes": 45530,
+  "source_sha256": "d66719b60dbcc2e7f11877bd085d64a8806740c6a58fad385e9f0b2e45f1ef0a",
+  "compressed_file": "mon005-witnessed-evidence-v2.mjs.gz",
+  "compressed_bytes": 10141,
+  "compressed_sha256": "4d392acb891feba7f90728f60a2003459996baf31be3be336581574a4934403d",
+  "node_check": "passed (raw file and compressed stdin)",
+  "execution": "passed (raw file and compressed stdin output byte-identical)",
+  "tests": 45, "passed": 45, "failed": 0,
+  "merkle_inclusion_checks": 496,
+  "merkle_consistency_checks": 2016,
+  "witness_threshold": "3-of-4",
+  "witnessed_checkpoints": 2,
+  "records_first_checkpoint": 12,
+  "records_second_checkpoint": 18,
+  "summary": {
+    "artifact": "SFEB MON-005 witnessed evidence checkpoint reference model v2",
+    "runtime": "v22.16.0",
+    "cryptography": "Node.js built-in SHA-256 and Ed25519; deterministic test-only keys",
+    "merkleCompatibility": "RFC 9162 Merkle Tree Hash, inclusion proofs, and consistency proofs; generated/verified test vectors",
+    "merkleConsistencyChecks": 2016, "tests": 45, "passed": 45, "failed": 0,
+    "merkleInclusionChecks": 496, "witnessThreshold": "3-of-4",
+    "quorumInterpretation": "3-of-4 has quorum intersection of at least two; with at most one Byzantine witness, at least one intersecting signer is honest and refuses to equivocate, assuming durable atomic witness state",
+    "witnessedCheckpoints": 2, "recordsInFirstCheckpoint": 12, "recordsInSecondCheckpoint": 18,
+    "observedAttacksRejected": ["payload tampering","record reordering","tenant substitution","quorum downgrade","duplicate witness identity","unknown witness key","checkpoint mutation","stale challenge replay","epoch rollback/gap","same-epoch fork","historical-prefix rewrite with recomputed record hashes","broken checkpoint linkage"],
+    "limitations": ["witness state is in-memory in this reference model","witnesses are simulated in one process and do not establish operational independence","test keys are deterministic fixtures, not production keys or HSM-backed identities","witness validates append-only growth using RFC 9162 consistency plus inclusion proofs for each appended record; the reference model still creates proof bundles from a full local log array","no PostgreSQL adapter, network service, trusted timestamp authority, key rotation, or hardware isolation is implemented","canonicalization is a strict local JSON subset, not a complete RFC 8785 implementation"]
+  }
+}
