@@ -1,0 +1,110 @@
+name: MEL closed-loop episode qualification
+
+on:
+  pull_request:
+    branches:
+      - research/mel-closed-loop-episode-v1-20261124
+    paths:
+      - "tools/mel-judge-grounding-audit/**"
+      - "docs/research/MEL_CLOSED_LOOP_EPISODE_V1.md"
+      - "docs/research/MEL_CLOSED_LOOP_BENCHMARK_PROTOCOL_V1.md"
+      - "docs/research/schemas/mel-closed-loop-episode-v1.schema.json"
+      - "docs/research/fixtures/mel-closed-loop-episode-*.synthetic.json"
+      - ".github/workflows/mel-closed-loop-episode-qualification.yml"
+  push:
+    branches:
+      - research/mel-closed-loop-episode-reducer-v1-20261124
+    paths:
+      - "tools/mel-judge-grounding-audit/**"
+      - "docs/research/MEL_CLOSED_LOOP_EPISODE_V1.md"
+      - "docs/research/MEL_CLOSED_LOOP_BENCHMARK_PROTOCOL_V1.md"
+      - "docs/research/schemas/mel-closed-loop-episode-v1.schema.json"
+      - "docs/research/fixtures/mel-closed-loop-episode-*.synthetic.json"
+      - ".github/workflows/mel-closed-loop-episode-qualification.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  closed-loop-episode:
+    name: Structural episode replay and negative-evidence controls
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact PR head or pushed commit
+        uses: actions/checkout@v4
+        with:
+          ref: \${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo +1.96.0 fmt --check --manifest-path tools/mel-judge-grounding-audit/Cargo.toml
+      - name: Verify committed dependency lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          git ls-files --error-unmatch tools/mel-judge-grounding-audit/Cargo.lock >/dev/null
+          test -f tools/mel-judge-grounding-audit/Cargo.lock
+      - name: Validate episode schema and fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check jsonschema==4.26.0
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          schema = json.loads(Path("docs/research/schemas/mel-closed-loop-episode-v1.schema.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          validator = Draft202012Validator(schema)
+          paths = sorted(Path("docs/research/fixtures").glob("mel-closed-loop-episode-*.synthetic.json"))
+          assert len(paths) == 3, f"expected exactly 3 episode fixtures, got {len(paths)}"
+          for path in paths:
+              validator.validate(json.loads(path.read_text()))
+          print(f"validated {len(paths)} episode fixtures")
+          PY
+      - name: Run deterministic Rust tests
+        run: cargo +1.96.0 test --locked --manifest-path tools/mel-judge-grounding-audit/Cargo.toml
+      - name: Warnings-denied Clippy
+        run: cargo +1.96.0 clippy --locked --manifest-path tools/mel-judge-grounding-audit/Cargo.toml --all-targets -- -D warnings
+      - name: Replay all synthetic episodes
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 run --locked --quiet --manifest-path tools/mel-judge-grounding-audit/Cargo.toml --bin mel-closed-loop-episode-audit -- audit \
+            docs/research/fixtures/mel-closed-loop-episode-present.synthetic.json "$RUNNER_TEMP/present.json"
+          jq -e '.observation_outcome == "DetectorReportedPresent" and .capture_accounting_complete == true and .upstream_receipts_authenticated == false' "$RUNNER_TEMP/present.json" >/dev/null
+          cargo +1.96.0 run --locked --quiet --manifest-path tools/mel-judge-grounding-audit/Cargo.toml --bin mel-closed-loop-episode-audit -- audit \
+            docs/research/fixtures/mel-closed-loop-episode-absent.synthetic.json "$RUNNER_TEMP/absent.json"
+          jq -e '.observation_outcome == "DetectorReportedAbsent" and .capture_accounting_complete == true and .effect_stage_reported == null' "$RUNNER_TEMP/absent.json" >/dev/null
+          cargo +1.96.0 run --locked --quiet --manifest-path tools/mel-judge-grounding-audit/Cargo.toml --bin mel-closed-loop-episode-audit -- audit \
+            docs/research/fixtures/mel-closed-loop-episode-unobserved.synthetic.json "$RUNNER_TEMP/unobserved.json"
+          jq -e '.observation_outcome == "Unobserved" and .capture_accounting_complete == false' "$RUNNER_TEMP/unobserved.json" >/dev/null
+      - name: Assemble exact-head evidence
+        if: always()
+        shell: bash
+        run: |
+          set -uo pipefail
+          evidence="$RUNNER_TEMP/mel-closed-loop-episode-evidence"
+          mkdir -p "$evidence"
+          printf 'tested_head=%s\n' "$(git rev-parse HEAD)" > "$evidence/source-revision.txt"
+          rustc +1.96.0 --version > "$evidence/rustc-version.txt" 2>&1 || true
+          cargo +1.96.0 --version > "$evidence/cargo-version.txt" 2>&1 || true
+          cp tools/mel-judge-grounding-audit/Cargo.toml "$evidence/"
+          cp tools/mel-judge-grounding-audit/Cargo.lock "$evidence/"
+          cp tools/mel-judge-grounding-audit/src/closed_loop_episode.rs "$evidence/"
+          cp docs/research/schemas/mel-closed-loop-episode-v1.schema.json "$evidence/"
+          cp docs/research/fixtures/mel-closed-loop-episode-*.synthetic.json "$evidence/"
+          (cd "$evidence" && find . -maxdepth 1 -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)
+      - name: Upload exact-head evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mel-closed-loop-episode-\${{ github.event.pull_request.head.sha || github.sha }}
+          path: \${{ runner.temp }}/mel-closed-loop-episode-evidence/
+          if-no-files-found: error
+          retention-days: 90
