@@ -318,7 +318,10 @@ fn robust_candidate_minimum_matches_independent_scenario_oracle() {
     let expected = independent_robust_value(&value);
     let report = optimize_robust_metrology_evsi_portfolio_v1(&input(vec![value], 1)).unwrap();
     let candidate_report = &report.candidate_reports[0];
-    assert_eq!(candidate_report.worst_case_scenario_id.as_deref(), Some(expected.0.as_str()));
+    assert_eq!(
+        candidate_report.worst_case_scenario_id.as_deref(),
+        Some(expected.0.as_str())
+    );
     assert!(
         (candidate_report.worst_case_net_expected_loss_reduction.unwrap() - expected.1).abs()
             < 1.0e-10
