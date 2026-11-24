@@ -260,16 +260,18 @@ impl fmt::Display for DmcRestoreError {
                 formatter,
                 "legacy Physics.get_state() without sig is not a complete branch-point snapshot"
             ),
-            Self::WrongIntegrationSignature => {
-                write!(formatter, "physics state signature must be mjSTATE_INTEGRATION")
-            }
+            Self::WrongIntegrationSignature => write!(
+                formatter,
+                "physics state signature must be mjSTATE_INTEGRATION"
+            ),
             Self::EmptyIntegrationState => write!(
                 formatter,
                 "integration-state signature, size and digest must be nonzero"
             ),
-            Self::SharedModelCopyRejected => {
-                write!(formatter, "deep Physics copy must not share the MuJoCo model")
-            }
+            Self::SharedModelCopyRejected => write!(
+                formatter,
+                "deep Physics copy must not share the MuJoCo model"
+            ),
             Self::MissingPluginState => write!(
                 formatter,
                 "MuJoCo model has plugins but the restore snapshot omits plugin state"
