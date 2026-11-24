@@ -80,4 +80,4 @@ The `independent_qualification_exchange` module provides a transport-neutral con
 
 This module is **not** an independent qualifier implementation or production transport. The issuer adapter must contact a separately governed authority that independently resolves source payloads, recomputes candidate and provenance commitments, checks rights/scope/lifecycle, and signs a complete three-valued receipt. Process/credential/trust-root/rollback separation and current-at-use checks remain deployment requirements.
 
-Protocol: [MACE independent qualification exchange v1](../../../../docs/research/MACE_INDEPENDENT_QUALIFICATION_EXCHANGE_V1.md). Request schema: `data/schemas/mace_evidence_qualification_request_v1.schema.json`.
+Protocol: [MACE independent qualification exchange v1](../../../docs/research/MACE_INDEPENDENT_QUALIFICATION_EXCHANGE_V1.md). Request schema: `../../../data/schemas/mace_evidence_qualification_request_v1.schema.json`.
