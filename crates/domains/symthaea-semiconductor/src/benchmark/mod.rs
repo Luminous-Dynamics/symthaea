@@ -1,6 +1,7 @@
 //! Versioned benchmark protocols and independent scoring primitives.
 
 pub mod binary_metrics;
+pub mod ca_ocrc_tracking;
 pub mod calibration_requalification;
 pub mod delayed_aci;
 pub mod dtco_manifest;
@@ -150,4 +151,14 @@ pub use delayed_aci::{
     close_delayed_aci_stream_v1, create_delayed_aci_engine_v1, delay_to_memory_ratio_v1,
     delayed_aci_finite_horizon_miscoverage_bound_v1, deliver_delayed_aci_label_v1,
     issue_delayed_aci_prediction_v1, resolve_degenerate_aci_interval_v1,
+};
+
+pub use ca_ocrc_tracking::{
+    CA_OCRC_FEEDBACK_SCHEMA_V1, CA_OCRC_POLICY_SCHEMA_V1, CA_OCRC_ROUND_INPUT_SCHEMA_V1,
+    CA_OCRC_ROUND_RECEIPT_SCHEMA_V1, CA_OCRC_SCHEMA_V1, CaoCrcArbitraryProxyDesignV1,
+    CaoCrcErrorV1, CaoCrcFeedbackDispositionV1, CaoCrcFeedbackReasonV1, CaoCrcFeedbackResultV1,
+    CaoCrcFeedbackV1, CaoCrcGuaranteeStateV1, CaoCrcPolicyV1, CaoCrcPredictionReceiptV1,
+    CaoCrcRoundInputV1, CaoCrcRoundReceiptV1, CaoCrcTrackedEntryV1, CaoCrcTrackingEngineV1,
+    cao_crc_arbitrary_delay_risk_bound_v1, create_cao_crc_engine_v1,
+    optimal_arbitrary_cao_crc_proxy_design_v1, process_cao_crc_round_v1,
 };
