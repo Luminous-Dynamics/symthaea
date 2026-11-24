@@ -1,0 +1,167 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/MATH_SCOPE_EQUIVALENCE_TIER2_AND_COMM_V1.schema.json",
+  "title": "ScopeEquivalenceTier2AndCommV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_id",
+    "status",
+    "pair_id",
+    "comparison_tier",
+    "source_pair",
+    "environment",
+    "proof_source",
+    "certificates",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "artifact_id": {
+      "const": "MATH-SCOPE-EQUIVALENCE-TIER2-AND-COMM-001"
+    },
+    "status": {
+      "const": "kernel_replay_pending"
+    },
+    "pair_id": {
+      "const": "SCOPE-TIER2-AND-COMM-001"
+    },
+    "comparison_tier": {
+      "const": "tier2_kernel_certified_transport"
+    },
+    "source_pair": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "local_context",
+        "global_context",
+        "local_to_global_context_obligation",
+        "global_to_local_context_obligation",
+        "target",
+        "local_warrant",
+        "global_warrant",
+        "binder_fragment"
+      ],
+      "properties": {
+        "local_context": {
+          "const": "p ∧ q"
+        },
+        "global_context": {
+          "const": "q ∧ p"
+        },
+        "local_to_global_context_obligation": {
+          "const": "p ∧ q → q ∧ p"
+        },
+        "global_to_local_context_obligation": {
+          "const": "q ∧ p → p ∧ q"
+        },
+        "target": {
+          "const": "r"
+        },
+        "local_warrant": {
+          "const": "p ∧ q → r"
+        },
+        "global_warrant": {
+          "const": "q ∧ p → r"
+        },
+        "binder_fragment": {
+          "const": "non_dependent_propositional"
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lean_toolchain",
+        "mathlib_repository",
+        "mathlib_revision",
+        "lean_core_repository",
+        "lean_core_revision"
+      ],
+      "properties": {
+        "lean_toolchain": {
+          "const": "leanprover/lean4:v4.37.0-rc1"
+        },
+        "mathlib_repository": {
+          "const": "leanprover-community/mathlib4"
+        },
+        "mathlib_revision": {
+          "const": "6ebcce37335bcb6bca64596e5d57bb3035648030"
+        },
+        "lean_core_repository": {
+          "const": "leanprover/lean4"
+        },
+        "lean_core_revision": {
+          "const": "0b77e12952ad39077d80d8bd6b66d601f225c321"
+        }
+      }
+    },
+    "proof_source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "repository": {
+          "const": "Luminous-Dynamics/symthaea"
+        },
+        "path": {
+          "const": "scripts/research/lean-proof-extractor/ScopeEquivalenceTier2AndComm.lean"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "certificates": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "role",
+          "declaration",
+          "expected_statement"
+        ],
+        "properties": {
+          "role": {
+            "enum": [
+              "local_context_entails_global",
+              "global_context_entails_local",
+              "context_equivalence",
+              "warrant_local_to_global",
+              "warrant_global_to_local",
+              "warrant_transport_equivalence"
+            ]
+          },
+          "declaration": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expected_statement": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "claim_ceiling": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}
