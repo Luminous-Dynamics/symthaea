@@ -105,6 +105,26 @@ pub struct RevisionScoreSnapshotV1 {
     pub correct_absence_claim: Option<bool>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub enum ObservedRevisionEditV1 {
+    NoRawPredictionChange,
+    OccurrenceCountIncreased,
+    OccurrenceCountDecreased,
+    SameCountPredictionChanged,
+    NonOccurrenceDispositionChanged,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct RevisionEditDeltaV1 {
+    pub observed_edit: ObservedRevisionEditV1,
+    pub predicted_count_delta: i64,
+    pub true_positive_delta: i64,
+    pub false_positive_delta: i64,
+    pub false_negative_delta: i64,
+    pub start_boundary_mae_delta_frames: Option<f64>,
+    pub end_boundary_mae_delta_frames: Option<f64>,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct RevisionReportV1 {
     pub case_id: String,
@@ -131,6 +151,10 @@ pub struct RevisionReportV1 {
     pub preservation_violation: bool,
     pub absence_improved: Option<bool>,
     pub absence_regressed: Option<bool>,
+    /// Populated only for V2, where raw predictions and production scores exist.
+    pub edit_delta: Option<RevisionEditDeltaV1>,
+    /// None for legacy V1 or when only the uninterpreted Other action is declared.
+    pub declared_actions_consistent: Option<bool>,
 }
 
 /// Paired evidence-ablation result for one frozen query/model unit.
@@ -592,6 +616,19 @@ pub fn audit_revision_v2(case: &RevisionCaseV2) -> Result<RevisionReportV1, Stri
     report.actual_output_tokens = Some(case.actual_output_tokens);
     report.max_wall_time_ms = Some(case.max_wall_time_ms);
     report.elapsed_wall_time_ms = Some(case.elapsed_wall_time_ms);
+    report.edit_delta = Some(derive_edit_delta(
+        &case.draft_prediction,
+        &case.final_prediction,
+        &draft_score,
+        &final_score,
+    )?);
+    report.declared_actions_consistent = validate_declared_actions(
+        &case.actions,
+        &case.draft_prediction,
+        &case.final_prediction,
+        &draft_score,
+        &final_score,
+    )?;
     Ok(report)
 }
 
@@ -717,6 +754,8 @@ pub fn audit_revision(case: &RevisionCaseV1) -> Result<RevisionReportV1, String>
         preservation_violation,
         absence_improved,
         absence_regressed,
+        edit_delta: None,
+        declared_actions_consistent: None,
     })
 }
 
@@ -831,6 +870,143 @@ pub fn aggregate_revision_reports(
             .filter(|report| report.absence_regressed == Some(true))
             .count(),
     })
+}
+
+fn derive_edit_delta(
+    draft_prediction: &TemporalGroundingPredictionV1,
+    final_prediction: &TemporalGroundingPredictionV1,
+    draft_score: &TemporalGroundingScoreV1,
+    final_score: &TemporalGroundingScoreV1,
+) -> Result<RevisionEditDeltaV1, String> {
+    let count_delta = signed_usize_delta(
+        final_score.predicted_occurrences,
+        draft_score.predicted_occurrences,
+    )?;
+    let true_positive_delta =
+        signed_usize_delta(final_score.true_positives, draft_score.true_positives)?;
+    let false_positive_delta =
+        signed_usize_delta(final_score.false_positives, draft_score.false_positives)?;
+    let false_negative_delta =
+        signed_usize_delta(final_score.false_negatives, draft_score.false_negatives)?;
+
+    let observed_edit = if draft_prediction == final_prediction {
+        ObservedRevisionEditV1::NoRawPredictionChange
+    } else if count_delta > 0 {
+        ObservedRevisionEditV1::OccurrenceCountIncreased
+    } else if count_delta < 0 {
+        ObservedRevisionEditV1::OccurrenceCountDecreased
+    } else {
+        match (&draft_prediction.state, &final_prediction.state) {
+            (
+                GroundingPredictionStateV1::Occurrences { .. },
+                GroundingPredictionStateV1::Occurrences { .. },
+            )
+            | (
+                GroundingPredictionStateV1::Ambiguous { .. },
+                GroundingPredictionStateV1::Ambiguous { .. },
+            ) => ObservedRevisionEditV1::SameCountPredictionChanged,
+            _ => ObservedRevisionEditV1::NonOccurrenceDispositionChanged,
+        }
+    };
+
+    Ok(RevisionEditDeltaV1 {
+        observed_edit,
+        predicted_count_delta: count_delta,
+        true_positive_delta,
+        false_positive_delta,
+        false_negative_delta,
+        start_boundary_mae_delta_frames: paired_delta(
+            boundary_mae(draft_score, true),
+            boundary_mae(final_score, true),
+        ),
+        end_boundary_mae_delta_frames: paired_delta(
+            boundary_mae(draft_score, false),
+            boundary_mae(final_score, false),
+        ),
+    })
+}
+
+fn validate_declared_actions(
+    actions: &[RevisionActionV1],
+    draft_prediction: &TemporalGroundingPredictionV1,
+    final_prediction: &TemporalGroundingPredictionV1,
+    draft_score: &TemporalGroundingScoreV1,
+    final_score: &TemporalGroundingScoreV1,
+) -> Result<Option<bool>, String> {
+    if actions.len() == 1 && actions[0] == RevisionActionV1::Other {
+        return Ok(None);
+    }
+    let delta = derive_edit_delta(
+        draft_prediction,
+        final_prediction,
+        draft_score,
+        final_score,
+    )?;
+    let mut checked = false;
+
+    for action in actions {
+        let consistent = match action {
+            RevisionActionV1::NoChange => {
+                checked = true;
+                delta.observed_edit == ObservedRevisionEditV1::NoRawPredictionChange
+            }
+            RevisionActionV1::AddOccurrence | RevisionActionV1::SplitMergedOccurrence => {
+                checked = true;
+                delta.predicted_count_delta > 0 && delta.true_positive_delta > 0
+            }
+            RevisionActionV1::RemoveOccurrence | RevisionActionV1::MergeDuplicateOccurrence => {
+                checked = true;
+                delta.predicted_count_delta < 0
+                    && delta.false_positive_delta < 0
+                    && delta.true_positive_delta >= 0
+            }
+            RevisionActionV1::AdjustStartBoundary => {
+                checked = true;
+                delta.predicted_count_delta == 0
+                    && delta
+                        .start_boundary_mae_delta_frames
+                        .is_some_and(|change| change > EPSILON)
+            }
+            RevisionActionV1::AdjustEndBoundary => {
+                checked = true;
+                delta.predicted_count_delta == 0
+                    && delta
+                        .end_boundary_mae_delta_frames
+                        .is_some_and(|change| change > EPSILON)
+            }
+            RevisionActionV1::Other => true,
+        };
+        if !consistent {
+            return Ok(Some(false));
+        }
+    }
+    Ok(checked.then_some(true))
+}
+
+fn boundary_mae(score: &TemporalGroundingScoreV1, start: bool) -> Option<f64> {
+    let values: Vec<_> = score
+        .matches
+        .iter()
+        .map(|matched| {
+            if start {
+                matched.start_error_frames.unsigned_abs() as f64
+            } else {
+                matched.end_error_frames.unsigned_abs() as f64
+            }
+        })
+        .collect();
+    mean(&values)
+}
+
+fn signed_usize_delta(after: usize, before: usize) -> Result<i64, String> {
+    if after >= before {
+        i64::try_from(after - before)
+            .map_err(|_| "revision count delta exceeds i64".to_string())
+    } else {
+        i64::try_from(before - after)
+            .map(|delta| -delta)
+            .map_err(|_| "revision count delta exceeds i64".to_string())
+    }
 }
 
 fn validate_budget(case: &RevisionCaseV2) -> Result<(), String> {
