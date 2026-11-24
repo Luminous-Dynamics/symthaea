@@ -11,6 +11,8 @@
 //! malformed output, signature failure or binding mismatch returns an error;
 //! callers must not fall back to the original candidate batch.
 
+use std::sync::Mutex;
+
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
@@ -262,6 +264,42 @@ pub enum QualificationClockErrorV1 {
 /// are not an acceptable substitute.
 pub trait QualificationTrustedClockV1 {
     fn now_unix(&self) -> Result<u64, QualificationClockErrorV1>;
+}
+
+/// Process-local rollback guard for a trusted clock source.
+///
+/// This enforces non-decreasing readings during one process lifetime. It does
+/// not survive process restart or protect against rollback of the underlying
+/// clock source; production must still use an externally protected monotonic
+/// time authority or persistent anti-rollback witness across restarts.
+pub struct MonotonicQualificationClockGuardV1<C> {
+    source: C,
+    last_unix: Mutex<Option<u64>>,
+}
+
+impl<C> MonotonicQualificationClockGuardV1<C> {
+    pub fn new(source: C) -> Self {
+        Self {
+            source,
+            last_unix: Mutex::new(None),
+        }
+    }
+}
+
+impl<C: QualificationTrustedClockV1> QualificationTrustedClockV1
+    for MonotonicQualificationClockGuardV1<C>
+{
+    fn now_unix(&self) -> Result<u64, QualificationClockErrorV1> {
+        let now = self.source.now_unix()?;
+        let mut last = self.last_unix
+            .lock()
+            .map_err(|_| QualificationClockErrorV1::Untrusted)?;
+        if last.is_some_and(|previous| now < previous) {
+            return Err(QualificationClockErrorV1::Untrusted);
+        }
+        *last = Some(now);
+        Ok(now)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -588,6 +626,33 @@ mod tests {
 
     fn test_clock() -> TestClock {
         TestClock { now_unix: Ok(100) }
+    }
+
+    struct SequenceClock {
+        readings: std::sync::Mutex<std::collections::VecDeque<u64>>,
+    }
+
+    impl QualificationTrustedClockV1 for SequenceClock {
+        fn now_unix(&self) -> Result<u64, QualificationClockErrorV1> {
+            self.readings.lock()
+                .map_err(|_| QualificationClockErrorV1::Untrusted)?
+                .pop_front()
+                .ok_or(QualificationClockErrorV1::Unavailable)
+        }
+    }
+
+    #[test]
+    fn monotonic_clock_guard_rejects_rollback_and_allows_equal_time() {
+        let source = SequenceClock {
+            readings: std::sync::Mutex::new(
+                [100, 101, 101, 99].into_iter().collect(),
+            ),
+        };
+        let guarded = MonotonicQualificationClockGuardV1::new(source);
+        assert_eq!(guarded.now_unix(), Ok(100));
+        assert_eq!(guarded.now_unix(), Ok(101));
+        assert_eq!(guarded.now_unix(), Ok(101));
+        assert_eq!(guarded.now_unix(), Err(QualificationClockErrorV1::Untrusted));
     }
 
     fn batch() -> CandidateEvidenceBatchV1 {
