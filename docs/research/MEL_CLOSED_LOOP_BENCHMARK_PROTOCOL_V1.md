@@ -82,6 +82,14 @@ Measure veto propagation at each actual boundary. Do not claim already-admitted 
 
 ### Track C — Independent output and event observation
 
+The capture adapters are modality-specific and must not borrow one another's completeness counters:
+
+- **Rendered audio loopback:** reconcile sample-frame ranges, callback/stream sequences, drops, XRUNs, terminal drain/watermark and calibrated capture clock.
+- **MIDI output monitor:** reconcile MIDI event sequence and independent monitor heartbeat coverage. There is no audio sample-frame count to invent or fill with a zero-frame success.
+- **Cross-modal comparison:** retain MIDI emission and audible loopback as distinct measurements. A MIDI event can be observed even when no matching acoustic onset is detected; conversely, audio can contain events not present in the MIDI tap.
+
+The current v1 reducer has a synthetic structural fixture for a complete-empty MIDI monitor. It does not connect to a physical MIDI tap or authenticate the monitor's heartbeat source. The existing #13349 live adapter remains the integration owner.
+
 Report separately:
 - MIDI message emitted;
 - note-queue operation applied;
