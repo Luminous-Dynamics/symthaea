@@ -57,6 +57,7 @@ The v0.1 estimator is intentionally descriptive: it does not fit a hierarchical 
 ## Synthetic known-answer fixture
 
 The checked-in fixture contains 16 fictional teams, four per arm. It is designed to exercise the estimator, not to represent observed people or an empirical intervention.
+Its repeated-character SHA-256-shaped values are placeholders for parser testing, not hashes of real task, AI, TMS or receipt artifacts; the v0.1 validator checks format and consistency only.
 
 Its immediate AI-off endpoint has the following known contrasts:
 
