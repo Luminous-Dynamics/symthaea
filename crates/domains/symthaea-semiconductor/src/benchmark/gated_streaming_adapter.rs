@@ -57,6 +57,7 @@ pub enum StreamingUpdateReasonV1 {
     ClockDomainMismatch,
     DeliveryBeforeLabelAvailability,
     EligibilityReportUnavailableAtDelivery,
+    EligibilityReportBeforeLabelAvailability,
     DeliveryBeforePrediction,
     LabelAvailabilityBeforeMeasurement,
     FeatureSchemaMismatch,
@@ -664,6 +665,11 @@ pub fn deliver_qualified_stream_label_v1(
             .is_some_and(|value| !value.is_finite() || value < 0.0)
     {
         reasons.push(StreamingUpdateReasonV1::ReportNumericValueNonFinite);
+    }
+    if delivery.eligibility_report_available_at_unix_seconds
+        < delivery.label_available_at_unix_seconds
+    {
+        reasons.push(StreamingUpdateReasonV1::EligibilityReportBeforeLabelAvailability);
     }
     if delivery.delivered_at_unix_seconds < delivery.eligibility_report_available_at_unix_seconds {
         reasons.push(StreamingUpdateReasonV1::EligibilityReportUnavailableAtDelivery);
@@ -1345,6 +1351,36 @@ mod tests {
             receipt
                 .reasons
                 .contains(&StreamingUpdateReasonV1::EligibilityReportUnavailableAtDelivery)
+        );
+        assert_eq!(adapter_state_digest(&engine.adapter_state).unwrap(), before);
+    }
+
+    #[test]
+    fn eligibility_report_cannot_predate_label_availability() {
+        let mut engine = engine();
+        predict_and_register_stream_sample_v1(
+            &mut engine,
+            &prediction("sample-1", "event-1", 100, 102, None, vec![1.0, 1.0]),
+        )
+        .unwrap();
+        let before = adapter_state_digest(&engine.adapter_state).unwrap();
+        let mut candidate = delivery(
+            "sample-1",
+            "event-1",
+            "label-1",
+            1,
+            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            LabelEvidenceFrontierV1::CurrentAtK1,
+            110,
+            112,
+        );
+        candidate.eligibility_report_available_at_unix_seconds = 109;
+        let receipt = deliver_qualified_stream_label_v1(&mut engine, &candidate).unwrap();
+        assert_eq!(receipt.disposition, StreamingUpdateDispositionV1::Rejected);
+        assert!(
+            receipt
+                .reasons
+                .contains(&StreamingUpdateReasonV1::EligibilityReportBeforeLabelAvailability)
         );
         assert_eq!(adapter_state_digest(&engine.adapter_state).unwrap(), before);
     }
