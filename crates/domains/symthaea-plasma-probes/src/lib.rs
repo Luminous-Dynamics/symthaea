@@ -1707,7 +1707,8 @@ pub fn decide_spectral_refinement(
             response_assessment_valid: !response_unknown,
             effective_memory_budget_bytes,
             projected_peak_bytes: input.projected_peak_bytes,
-            projected_peak_includes_temporary_buffers: input.projected_peak_includes_temporary_buffers,
+            projected_peak_includes_temporary_buffers: input
+                .projected_peak_includes_temporary_buffers,
             remaining_headroom_bytes: effective_memory_budget_bytes
                 .saturating_sub(input.projected_peak_bytes),
         });
@@ -1881,8 +1882,8 @@ pub fn validate_sensor_actuator_timing_contract_value(
         maximum_actuator_command_latency_seconds = maximum_actuator_command_latency_seconds
             .max(update_period + delivery_delay + clock_skew);
         let command_nyquist_hz = 0.5 / update_period;
-        minimum_effective_actuator_bandwidth_hz = minimum_effective_actuator_bandwidth_hz
-            .min(bandwidth.min(command_nyquist_hz));
+        minimum_effective_actuator_bandwidth_hz =
+            minimum_effective_actuator_bandwidth_hz.min(bandwidth.min(command_nyquist_hz));
     }
 
     let controller_update_period = timing_number(value, "controller.update_period_seconds")?;
@@ -3843,11 +3844,18 @@ mod tests {
                 response_risk_upper_bound: response_risk,
                 response_risk_threshold: response_threshold,
                 response_assessment_fresh: case["response_assessment_fresh"].as_bool().unwrap(),
-                response_branch_association_stable: case["response_branch_association_stable"].as_bool().unwrap(),
-                response_estimator_latency_seconds: case["response_estimator_latency_seconds"].as_f64().unwrap(),
+                response_branch_association_stable: case["response_branch_association_stable"]
+                    .as_bool()
+                    .unwrap(),
+                response_estimator_latency_seconds: case["response_estimator_latency_seconds"]
+                    .as_f64()
+                    .unwrap(),
                 refinement_deadline_seconds: case["refinement_deadline_seconds"].as_f64().unwrap(),
                 projected_peak_bytes: case["projected_peak_bytes"].as_u64().unwrap(),
-                projected_peak_includes_temporary_buffers: memory["projected_peak_includes_temporary_buffers"].as_bool().unwrap(),
+                projected_peak_includes_temporary_buffers:
+                    memory["projected_peak_includes_temporary_buffers"]
+                        .as_bool()
+                        .unwrap(),
                 memory_budget_bytes: budget,
                 reserved_headroom_bytes: reserve,
             };
@@ -3879,10 +3887,16 @@ mod tests {
             decide_spectral_refinement(refinement_input(2.0, Some(0.5), 700)).unwrap();
         let high_response =
             decide_spectral_refinement(refinement_input(2.0, Some(1.2), 700)).unwrap();
-        assert_eq!(low_response.spectral_tail_ratio, high_response.spectral_tail_ratio);
+        assert_eq!(
+            low_response.spectral_tail_ratio,
+            high_response.spectral_tail_ratio
+        );
         assert_eq!(low_response.decision, SpectralRefinementDecision::Hold);
         assert_eq!(high_response.decision, SpectralRefinementDecision::Refine);
-        assert_eq!(high_response.reason, SpectralRefinementReason::FutureResponse);
+        assert_eq!(
+            high_response.reason,
+            SpectralRefinementReason::FutureResponse
+        );
     }
 
     #[test]
@@ -4142,25 +4156,13 @@ mod tests {
                 .map(|value| value * -0.25)
                 .collect(),
         ];
-        let base = project_weighted_micro_fluctuation(
-            &values,
-            &base_constraints,
-            &weights,
-            1.0e-10,
-        )
-        .unwrap();
-        let scaled = project_weighted_micro_fluctuation(
-            &values,
-            &scaled_constraints,
-            &weights,
-            1.0e-10,
-        )
-        .unwrap();
-        for (left, right) in base
-            .micro_fluctuation
-            .iter()
-            .zip(&scaled.micro_fluctuation)
-        {
+        let base =
+            project_weighted_micro_fluctuation(&values, &base_constraints, &weights, 1.0e-10)
+                .unwrap();
+        let scaled =
+            project_weighted_micro_fluctuation(&values, &scaled_constraints, &weights, 1.0e-10)
+                .unwrap();
+        for (left, right) in base.micro_fluctuation.iter().zip(&scaled.micro_fluctuation) {
             assert!((left - right).abs() < 1.0e-9);
         }
     }
