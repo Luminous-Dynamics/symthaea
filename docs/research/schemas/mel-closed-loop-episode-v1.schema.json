@@ -376,6 +376,9 @@
                 "null"
               ],
               "maxLength": 128
+            },
+            "veto_race": {
+              "$ref": "#/$defs/veto_race"
             }
           },
           "allOf": [
@@ -729,6 +732,105 @@
         "end_ns": {
           "type": "integer",
           "minimum": 1
+        }
+      }
+    },
+    "veto_race": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authorization_id",
+        "admission_stage",
+        "admission_event_sequence",
+        "veto_event_sequence",
+        "reported_stage_event_sequence",
+        "prior_output_epoch",
+        "veto_output_epoch",
+        "callback_disposition",
+        "callback_event_sequence",
+        "callback_observed_epoch",
+        "callback_admitted_frames",
+        "stale_callback_discarded_frames",
+        "invalidated_application_frames",
+        "discarded_unconsumed_notes",
+        "post_veto_new_admissions",
+        "receipt"
+      ],
+      "properties": {
+        "authorization_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "admission_stage": {
+          "enum": [
+            "queue_applied",
+            "application_enqueued"
+          ]
+        },
+        "admission_event_sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "veto_event_sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "reported_stage_event_sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "prior_output_epoch": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "veto_output_epoch": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "callback_disposition": {
+          "enum": [
+            "not_observed",
+            "admitted_before_veto",
+            "stale_discarded_after_veto"
+          ]
+        },
+        "callback_event_sequence": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "callback_observed_epoch": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "callback_admitted_frames": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "stale_callback_discarded_frames": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "invalidated_application_frames": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "discarded_unconsumed_notes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "post_veto_new_admissions": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "receipt": {
+          "$ref": "#/$defs/receipt_ref"
         }
       }
     }
