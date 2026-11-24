@@ -552,7 +552,6 @@ pub fn deliver_aci_label_v1(
         || !valid_sha256(&delivery.label_payload_sha256)
         || report.schema != LABEL_CONSUMPTION_REPORT_SCHEMA_V1
         || eligibility_report_digest(report)? != report.report_sha256
-        || report.report_sha256 != delivery.eligibility_report.report_sha256
         || report.label_sha256 != delivery.label_payload_sha256
     {
         reason = Some(AciUpdateReasonV1::EligibilityReportDigestMismatch);
@@ -713,6 +712,11 @@ pub fn compute_delay_memory_diagnostic_v1(
     let (ratio, regime, interpretation) = match memory_steps {
         Some(memory) if memory.is_finite() && memory > 0.0 => {
             let ratio = delay_steps as f64 / memory;
+            if !ratio.is_finite() {
+                return Err(DelayedAciErrorV1(
+                    "delay-to-memory ratio overflowed; supply a better-scaled memory estimate".into(),
+                ));
+            }
             let regime = if ratio < 0.5 {
                 DelayMemoryRegimeV1::DelayShorterThanMemory
             } else if ratio <= 2.0 {
