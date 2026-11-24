@@ -9,7 +9,8 @@ use symthaea_semiconductor::benchmark::{
     VmDependencyDimensionV1, VmImpactClosureInputV1, VmImpactClosureStatusV1,
     VmModelDerivationKindV1, VmModelSnapshotNodeV1, VmSnapshotCurrentDispositionV1,
     VmSnapshotDependencyEdgeV1, VmSnapshotDependencyGraphV1, VmSnapshotImpactStateV1,
-    VmSnapshotLabelCurrentStatusV1, VmSnapshotPurposeV1, VmSnapshotRequalificationReportV1,
+    LabelConsumptionEligibilityV1, VmSnapshotLabelCurrentStatusV1, VmSnapshotPurposeV1,
+    VmSnapshotRequalificationReportV1,
     compute_vm_snapshot_impact_closure_v1, seal_vm_snapshot_dependency_edge_v1,
     seal_vm_snapshot_dependency_graph_v1,
 };
@@ -305,6 +306,77 @@ fn independent_risk_oracle(
         .collect()
 }
 
+fn independent_label_sources(
+    input: &VmImpactClosureInputV1,
+) -> (
+    BTreeMap<String, BTreeSet<String>>,
+    BTreeMap<String, BTreeSet<String>>,
+) {
+    let mut direct: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    let mut inherited: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    let mut direct_risks = BTreeMap::new();
+    let mut inherited_risks = BTreeMap::new();
+
+    for report in &input.snapshot_requalification_reports {
+        direct.insert(
+            report.snapshot_id.clone(),
+            report
+                .label_statuses
+                .iter()
+                .filter(|label| {
+                    label.k1_eligibility != LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy
+                })
+                .map(|label| label.label_id.clone())
+                .collect(),
+        );
+        inherited.insert(report.snapshot_id.clone(), BTreeSet::new());
+        direct_risks.insert(
+            report.snapshot_id.clone(),
+            direct_risk(report.current_disposition),
+        );
+        inherited_risks.insert(report.snapshot_id.clone(), OracleRisk::None);
+    }
+
+    let mut changed = true;
+    let mut iterations = 0;
+    while changed {
+        changed = false;
+        iterations += 1;
+        assert!(
+            iterations <= input.graph.nodes.len() + 1,
+            "fixture graph must be acyclic"
+        );
+        for edge in &input.graph.edges {
+            let parent_risk =
+                direct_risks[&edge.parent_snapshot_id].max(inherited_risks[&edge.parent_snapshot_id]);
+            let propagated_risk = propagate(parent_risk, &edge.inherited_dimensions);
+            if propagated_risk == OracleRisk::None {
+                continue;
+            }
+
+            let parent_sources = direct[&edge.parent_snapshot_id]
+                .union(&inherited[&edge.parent_snapshot_id])
+                .cloned()
+                .collect::<BTreeSet<_>>();
+            let child_sources = inherited
+                .entry(edge.child_snapshot_id.clone())
+                .or_default();
+            let before = child_sources.len();
+            child_sources.extend(parent_sources);
+            if child_sources.len() != before {
+                changed = true;
+            }
+            let current = inherited_risks[&edge.child_snapshot_id];
+            if propagated_risk > current {
+                inherited_risks.insert(edge.child_snapshot_id.clone(), propagated_risk);
+                changed = true;
+            }
+        }
+    }
+
+    (direct, inherited)
+}
+
 fn expected_state(direct: OracleRisk, inherited: OracleRisk) -> VmSnapshotImpactStateV1 {
     match direct.max(inherited) {
         OracleRisk::None => VmSnapshotImpactStateV1::Unaffected,
@@ -368,6 +440,7 @@ fn independent_topological_order(input: &VmImpactClosureInputV1) -> Vec<String> 
 fn frozen_dag_matches_independent_fixed_point_impact_oracle() {
     let input = frozen_fixture();
     let expected = independent_risk_oracle(&input);
+    let (expected_direct_labels, expected_inherited_labels) = independent_label_sources(&input);
     let report = compute_vm_snapshot_impact_closure_v1(&input).unwrap();
 
     assert_eq!(report.status, VmImpactClosureStatusV1::Complete);
@@ -382,6 +455,21 @@ fn frozen_dag_matches_independent_fixed_point_impact_oracle() {
             actual[snapshot_id],
             expected_state(*direct, *inherited),
             "snapshot {snapshot_id}"
+        );
+        let entry = report
+            .entries
+            .iter()
+            .find(|entry| entry.snapshot_id == *snapshot_id)
+            .unwrap();
+        assert_eq!(
+            entry.direct_affected_label_ids,
+            expected_direct_labels[snapshot_id].iter().cloned().collect::<Vec<_>>(),
+            "direct label lineage for {snapshot_id}"
+        );
+        assert_eq!(
+            entry.inherited_affected_label_ids,
+            expected_inherited_labels[snapshot_id].iter().cloned().collect::<Vec<_>>(),
+            "inherited label lineage for {snapshot_id}"
         );
     }
 
