@@ -17,7 +17,7 @@
   "proof_source": {
     "repository": "Luminous-Dynamics/symthaea",
     "path": "scripts/research/lean-proof-extractor/ProofActionCertificateAndComm.lean",
-    "sha256": "efe4b42620f333ba90fd09e706d181adeaa0aa62ebc99883311b67d38ff71622"
+    "sha256": "1e9eae95fbe85d3b32793c22313f8e1b67608b19fc266fb047e278663cd1ac73"
   },
   "actions": [
     {
