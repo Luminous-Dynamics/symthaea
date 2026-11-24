@@ -193,7 +193,7 @@ pub fn exact_shapley_values(coalition_values: &[Option<f64>]) -> Result<Vec<f64>
     }
 
     let mut shapley = vec![0.0; player_count];
-    for player in 0..player_count {
+    for (player, player_value) in shapley.iter_mut().enumerate() {
         let bit = 1usize << player;
         for coalition in 0..values.len() {
             if coalition & bit != 0 {
@@ -202,7 +202,7 @@ pub fn exact_shapley_values(coalition_values: &[Option<f64>]) -> Result<Vec<f64>
             let coalition_size = coalition.count_ones() as usize;
             let weight = 1.0
                 / (player_count as f64 * binomial_coefficient(player_count - 1, coalition_size));
-            shapley[player] += weight * (values[coalition | bit] - values[coalition]);
+            *player_value += weight * (values[coalition | bit] - values[coalition]);
         }
     }
     Ok(shapley)
