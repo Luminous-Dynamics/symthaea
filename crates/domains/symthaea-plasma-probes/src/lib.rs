@@ -3022,6 +3022,9 @@ pub const KIRD_SYNTHETIC_CERTIFIED_FIXTURE: &str = include_str!(
 /// validator; this constant makes the exact source available to integration tests.
 pub const KIRD_POINT_SCHEMA: &str =
     include_str!("../../../../benchmarks/plasma/rate-distortion/kird-point-v0.1.schema.json");
+pub const WEIGHTED_FOURIER_MEASURE_FIXTURE: &str = include_str!(
+    "../../../../benchmarks/plasma/topology-lifting/fixtures/weighted-fourier-measure-known-answer-v0.1.json"
+);
 
 #[cfg(test)]
 mod tests {
@@ -3701,6 +3704,43 @@ mod tests {
                 ..
             })
         ));
+    }
+
+    #[test]
+    fn weighted_fourier_measure_embedding_matches_checked_in_known_answer() {
+        let fixture: serde_json::Value =
+            serde_json::from_str(WEIGHTED_FOURIER_MEASURE_FIXTURE).unwrap();
+        let positions = fixture["positions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|value| value.as_f64().unwrap())
+            .collect::<Vec<_>>();
+        let weights = fixture["weights"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|value| value.as_f64().unwrap())
+            .collect::<Vec<_>>();
+        let harmonics = fixture["max_harmonic"].as_u64().unwrap() as usize;
+        let expected = fixture["expected_normalized_complex_moments"]
+            .as_array()
+            .unwrap();
+        let embedding = WeightedFourierMeasureEmbedding::new(harmonics).unwrap();
+        let actual = embedding.moments(&positions, &weights).unwrap();
+        assert_eq!(actual.len(), expected.len());
+        for (index, moment) in actual.iter().enumerate() {
+            let expected_real = expected[index]["real"].as_f64().unwrap();
+            let expected_imag = expected[index]["imag"].as_f64().unwrap();
+            assert!((moment.real - expected_real).abs() < 1.0e-12);
+            assert!((moment.imag - expected_imag).abs() < 1.0e-12);
+        }
+        assert!(fixture["claim_boundary"]["finite_fourier_band_is_not_injective"]
+            .as_bool()
+            .unwrap());
+        assert!(fixture["claim_boundary"]["no_physical_plasma_run"]
+            .as_bool()
+            .unwrap());
     }
 
     #[test]
