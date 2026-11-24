@@ -1005,15 +1005,14 @@ mod tests {
     }
 
     fn delivery(
-        sample_id: &str,
-        event_id: &str,
-        label_id: &str,
+        identity: (&str, &str, &str),
         revision: u64,
         status: LabelConsumptionEligibilityV1,
         frontier: LabelEvidenceFrontierV1,
-        available_at: i64,
-        delivered_at: i64,
+        times: (i64, i64),
     ) -> StreamingLabelDeliveryV1 {
+        let (sample_id, event_id, label_id) = identity;
+        let (available_at, delivered_at) = times;
         let payload = digest('b');
         StreamingLabelDeliveryV1 {
             schema: STREAMING_DELIVERY_SCHEMA_V1.into(),
@@ -1071,15 +1070,12 @@ mod tests {
         let report = deliver_qualified_stream_label_v1(
             &mut engine,
             &delivery(
-                "sample-1",
-                "event-1",
-                "label-1",
-                1,
-                LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
-                LabelEvidenceFrontierV1::CurrentAtK1,
-                102,
-                102,
-            ),
+            ("sample-1", "event-1", "label-1"),
+            1,
+            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            LabelEvidenceFrontierV1::CurrentAtK1,
+            (102, 102),
+        ),
         )
         .unwrap();
 
@@ -1110,14 +1106,11 @@ mod tests {
         .unwrap();
 
         let newer_delivery = delivery(
-            "new-sample",
-            "new-event",
-            "new-label",
+            ("new-sample", "new-event", "new-label"),
             1,
             LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
             LabelEvidenceFrontierV1::CurrentAtK1,
-            104,
-            104,
+            (104, 104),
         );
         assert_eq!(
             deliver_qualified_stream_label_v1(&mut engine, &newer_delivery)
@@ -1127,14 +1120,11 @@ mod tests {
         );
         let weights_after_newer = engine.adapter_state.feature_weights.clone();
         let old_delivery = delivery(
-            "old-sample",
-            "old-event",
-            "old-label",
+            ("old-sample", "old-event", "old-label"),
             1,
             LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
             LabelEvidenceFrontierV1::CurrentAtK1,
-            110,
-            112,
+            (110, 112),
         );
         let old_update = deliver_qualified_stream_label_v1(&mut engine, &old_delivery).unwrap();
 
@@ -1162,14 +1152,11 @@ mod tests {
         .unwrap();
         let before = adapter_state_digest(&engine.adapter_state).unwrap();
         let unknown = delivery(
-            "sample-1",
-            "event-1",
-            "label-1",
+            ("sample-1", "event-1", "label-1"),
             1,
             LabelConsumptionEligibilityV1::Unknown,
             LabelEvidenceFrontierV1::CurrentAtK1,
-            110,
-            111,
+            (110, 111),
         );
         let held = deliver_qualified_stream_label_v1(&mut engine, &unknown).unwrap();
         assert_eq!(held.disposition, StreamingUpdateDispositionV1::HeldUnknown);
@@ -1178,14 +1165,11 @@ mod tests {
         assert!(engine.pending_predictions.contains_key("sample-1"));
 
         let qualified = delivery(
-            "sample-1",
-            "event-1",
-            "label-1",
+            ("sample-1", "event-1", "label-1"),
             1,
             LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
             LabelEvidenceFrontierV1::CurrentAtK1,
-            110,
-            112,
+            (110, 112),
         );
         let accepted = deliver_qualified_stream_label_v1(&mut engine, &qualified).unwrap();
         assert_eq!(accepted.disposition, StreamingUpdateDispositionV1::Updated);
@@ -1201,14 +1185,11 @@ mod tests {
         .unwrap();
         let before = adapter_state_digest(&engine.adapter_state).unwrap();
         let blocked = delivery(
-            "sample-1",
-            "event-1",
-            "label-1",
+            ("sample-1", "event-1", "label-1"),
             1,
             LabelConsumptionEligibilityV1::Blocked,
             LabelEvidenceFrontierV1::CurrentAtK1,
-            110,
-            112,
+            (110, 112),
         );
         let receipt = deliver_qualified_stream_label_v1(&mut engine, &blocked).unwrap();
         assert_eq!(receipt.disposition, StreamingUpdateDispositionV1::Blocked);
@@ -1225,14 +1206,11 @@ mod tests {
         )
         .unwrap();
         let accepted = delivery(
-            "sample-1",
-            "event-1",
-            "label-1",
+            ("sample-1", "event-1", "label-1"),
             1,
             LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
             LabelEvidenceFrontierV1::CurrentAtK1,
-            110,
-            112,
+            (110, 112),
         );
         assert_eq!(
             deliver_qualified_stream_label_v1(&mut engine, &accepted)
@@ -1254,50 +1232,38 @@ mod tests {
     fn label_id_event_value_and_payload_mismatches_are_rejected_without_update() {
         let mut cases = Vec::new();
         cases.push(delivery(
-            "sample-1",
-            "other-event",
-            "label-1",
+            ("sample-1", "other-event", "label-1"),
             1,
             LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
             LabelEvidenceFrontierV1::CurrentAtK1,
-            110,
-            112,
+            (110, 112),
         ));
         let mut wrong_label = delivery(
-            "sample-1",
-            "event-1",
-            "other-label",
+            ("sample-1", "event-1", "other-label"),
             1,
             LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
             LabelEvidenceFrontierV1::CurrentAtK1,
-            110,
-            112,
+            (110, 112),
         );
         wrong_label.eligibility_report.label_id = "label-1".into();
         wrong_label.eligibility_report.report_sha256 =
             eligibility_report_digest(&wrong_label.eligibility_report).unwrap();
         cases.push(wrong_label);
         let mut wrong_value = delivery(
-            "sample-1",
-            "event-1",
-            "label-1",
+            ("sample-1", "event-1", "label-1"),
             1,
             LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
             LabelEvidenceFrontierV1::CurrentAtK1,
-            110,
-            112,
+            (110, 112),
         );
         wrong_value.label_value = 12.0;
         cases.push(wrong_value);
         let mut wrong_payload = delivery(
-            "sample-1",
-            "event-1",
-            "label-1",
+            ("sample-1", "event-1", "label-1"),
             1,
             LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
             LabelEvidenceFrontierV1::CurrentAtK1,
-            110,
-            112,
+            (110, 112),
         );
         wrong_payload.label_payload_sha256 = digest('z');
         cases.push(wrong_payload);
@@ -1331,14 +1297,11 @@ mod tests {
         .unwrap();
         let before = adapter_state_digest(&engine.adapter_state).unwrap();
         let mut candidate = delivery(
-            "sample-1",
-            "event-1",
-            "label-1",
+            ("sample-1", "event-1", "label-1"),
             1,
             LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
             LabelEvidenceFrontierV1::CurrentAtK1,
-            110,
-            112,
+            (110, 112),
         );
         candidate.eligibility_report_available_at_unix_seconds = 113;
         let receipt = deliver_qualified_stream_label_v1(&mut engine, &candidate).unwrap();
@@ -1361,14 +1324,11 @@ mod tests {
         .unwrap();
         let before = adapter_state_digest(&engine.adapter_state).unwrap();
         let mut candidate = delivery(
-            "sample-1",
-            "event-1",
-            "label-1",
+            ("sample-1", "event-1", "label-1"),
             1,
             LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
             LabelEvidenceFrontierV1::CurrentAtK1,
-            110,
-            112,
+            (110, 112),
         );
         candidate.eligibility_report_available_at_unix_seconds = 109;
         let receipt = deliver_qualified_stream_label_v1(&mut engine, &candidate).unwrap();
@@ -1425,15 +1385,12 @@ mod tests {
             deliver_qualified_stream_label_v1(
                 &mut engine,
                 &delivery(
-                    "sample-1",
-                    "event-1",
-                    "label-1",
-                    1,
-                    LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
-                    LabelEvidenceFrontierV1::CurrentAtK1,
-                    110,
-                    112,
-                ),
+            ("sample-1", "event-1", "label-1"),
+            1,
+            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            LabelEvidenceFrontierV1::CurrentAtK1,
+            (110, 112),
+        ),
             )
             .is_err()
         );
@@ -1452,14 +1409,11 @@ mod tests {
         .unwrap();
         let before = adapter_state_digest(&engine.adapter_state).unwrap();
         let mut wrong_revision = delivery(
-            "sample-1",
-            "event-1",
-            "label-1",
+            ("sample-1", "event-1", "label-1"),
             2,
             LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
             LabelEvidenceFrontierV1::CurrentAtK1,
-            110,
-            112,
+            (110, 112),
         );
         wrong_revision.eligibility_report.label_revision = 1;
         wrong_revision.eligibility_report.report_sha256 =
@@ -1486,14 +1440,11 @@ mod tests {
         let before = adapter_state_digest(&engine.adapter_state).unwrap();
 
         let too_early = delivery(
-            "sample-1",
-            "event-1",
-            "label-1",
+            ("sample-1", "event-1", "label-1"),
             1,
             LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
             LabelEvidenceFrontierV1::CurrentAtK1,
-            110,
-            109,
+            (110, 109),
         );
         let receipt = deliver_qualified_stream_label_v1(&mut engine, &too_early).unwrap();
         assert_eq!(receipt.disposition, StreamingUpdateDispositionV1::Rejected);
@@ -1504,14 +1455,11 @@ mod tests {
         );
 
         let mut wrong_clock = delivery(
-            "sample-1",
-            "event-1",
-            "label-1",
+            ("sample-1", "event-1", "label-1"),
             1,
             LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
             LabelEvidenceFrontierV1::CurrentAtK1,
-            110,
-            112,
+            (110, 112),
         );
         wrong_clock.clock_domain_id = "other-clock".into();
         let receipt = deliver_qualified_stream_label_v1(&mut engine, &wrong_clock).unwrap();
@@ -1534,14 +1482,11 @@ mod tests {
         .unwrap();
         let before = adapter_state_digest(&engine.adapter_state).unwrap();
         let stale = delivery(
-            "sample-1",
-            "event-1",
-            "label-1",
+            ("sample-1", "event-1", "label-1"),
             1,
             LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
             LabelEvidenceFrontierV1::AsKnownAtK0,
-            110,
-            112,
+            (110, 112),
         );
         let receipt = deliver_qualified_stream_label_v1(&mut engine, &stale).unwrap();
         assert_eq!(receipt.disposition, StreamingUpdateDispositionV1::Rejected);
@@ -1553,14 +1498,11 @@ mod tests {
         assert_eq!(adapter_state_digest(&engine.adapter_state).unwrap(), before);
 
         let mut tampered = delivery(
-            "sample-1",
-            "event-1",
-            "label-2",
+            ("sample-1", "event-1", "label-2"),
             1,
             LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
             LabelEvidenceFrontierV1::CurrentAtK1,
-            110,
-            112,
+            (110, 112),
         );
         tampered.eligibility_report.report_sha256 = digest('0');
         let receipt = deliver_qualified_stream_label_v1(&mut engine, &tampered).unwrap();
@@ -1585,15 +1527,12 @@ mod tests {
         let receipt = deliver_qualified_stream_label_v1(
             &mut engine,
             &delivery(
-                "sample-1",
-                "event-1",
-                "label-1",
-                1,
-                LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
-                LabelEvidenceFrontierV1::CurrentAtK1,
-                110,
-                112,
-            ),
+            ("sample-1", "event-1", "label-1"),
+            1,
+            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            LabelEvidenceFrontierV1::CurrentAtK1,
+            (110, 112),
+        ),
         )
         .unwrap();
         assert_eq!(receipt.disposition, StreamingUpdateDispositionV1::Updated);
@@ -1618,15 +1557,12 @@ mod tests {
         deliver_qualified_stream_label_v1(
             &mut engine,
             &delivery(
-                "sample-1",
-                "event-1",
-                "label-1",
-                1,
-                LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
-                LabelEvidenceFrontierV1::CurrentAtK1,
-                110,
-                112,
-            ),
+            ("sample-1", "event-1", "label-1"),
+            1,
+            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            LabelEvidenceFrontierV1::CurrentAtK1,
+            (110, 112),
+        ),
         )
         .unwrap();
 
