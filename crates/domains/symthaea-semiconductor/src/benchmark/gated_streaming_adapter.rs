@@ -575,10 +575,8 @@ fn update_receipt(
     prediction: Option<&StreamingPredictionReceiptV1>,
     disposition: StreamingUpdateDispositionV1,
     reasons: Vec<StreamingUpdateReasonV1>,
-    before: &str,
-    after: &str,
+    state_digests: (&str, &str),
     update_sequence: Option<u64>,
-    mutated: bool,
 ) -> Result<StreamingUpdateReceiptV1, GatedStreamingAdapterErrorV1> {
     let mut receipt = StreamingUpdateReceiptV1 {
         schema: STREAMING_UPDATE_RECEIPT_SCHEMA_V1.into(),
@@ -593,10 +591,10 @@ fn update_receipt(
         eligibility_report_sha256: Some(delivery.eligibility_report.report_sha256.clone()),
         policy_sha256: engine.policy_sha256.clone(),
         label_payload_sha256: delivery.label_payload_sha256.clone(),
-        adapter_state_before_sha256: before.into(),
-        adapter_state_after_sha256: after.into(),
+        adapter_state_before_sha256: state_digests.0.into(),
+        adapter_state_after_sha256: state_digests.1.into(),
         update_sequence,
-        adapter_state_mutated: mutated,
+        adapter_state_mutated: update_sequence.is_some(),
         retraining_executed: false,
         equipment_control_authority: false,
         receipt_sha256: String::new(),
@@ -648,10 +646,8 @@ pub fn deliver_qualified_stream_label_v1(
             prediction,
             StreamingUpdateDispositionV1::Duplicate,
             reasons,
-            &before,
-            &before,
+            (&before, &before),
             None,
-            false,
         );
     }
 
@@ -904,10 +900,8 @@ pub fn deliver_qualified_stream_label_v1(
         Some(&prediction_receipt),
         StreamingUpdateDispositionV1::Updated,
         Vec::new(),
-        &before,
-        &after,
+        (&before, &after),
         Some(next_state.accepted_update_count),
-        true,
     )?;
 
     engine.adapter_state = next_state;
@@ -1040,7 +1034,14 @@ mod tests {
             delivered_at_unix_seconds: delivered_at,
             clock_domain_id: "fab-clock".into(),
             idempotency_key: format!("{label_id}:{revision}"),
-            eligibility_report: eligibility_report(label_id, event_id, &payload, status, frontier),
+            eligibility_report: eligibility_report(
+                label_id,
+                event_id,
+                &payload,
+                revision,
+                status,
+                frontier,
+            ),
         }
     }
 
