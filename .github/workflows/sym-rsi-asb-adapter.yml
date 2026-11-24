@@ -1,0 +1,47 @@
+name: Sym-RSI AS-Bench Adapter
+
+on:
+  push:
+    branches:
+      - research/sym-rsi-asb-adapter-v0
+    paths:
+      - "tools/sym-rsi-asb-adapter-reference/**"
+      - ".github/workflows/sym-rsi-asb-adapter.yml"
+  pull_request:
+    paths:
+      - "tools/sym-rsi-asb-adapter-reference/**"
+      - ".github/workflows/sym-rsi-asb-adapter.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Offline manifest and Lab API contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.96.0"
+          components: clippy, rustfmt
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/sym-rsi-asb-adapter-reference/Cargo.toml -- --check
+      - name: Generate isolated workspace lockfile
+        run: cargo generate-lockfile --manifest-path tools/sym-rsi-asb-adapter-reference/Cargo.toml
+      - name: Run offline adapter tests
+        run: cargo test --manifest-path tools/sym-rsi-asb-adapter-reference/Cargo.toml --locked --all-targets
+      - name: Run strict Clippy
+        run: cargo clippy --manifest-path tools/sym-rsi-asb-adapter-reference/Cargo.toml --locked --all-targets -- -D warnings
+      - name: Validate pinned compatibility manifest
+        run: cargo run --manifest-path tools/sym-rsi-asb-adapter-reference/Cargo.toml --locked -- docs/research/adapters/SYM_RSI_ASB_COMPATIBILITY_MANIFEST_V0_2026-11-07.json
+      - name: Validate campaign and Lab API fixtures
+        run: cargo run --manifest-path tools/sym-rsi-asb-adapter-reference/Cargo.toml --locked -- --api-fixtures
+      - name: Upload generated lockfile for review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sym-rsi-asb-adapter-cargo-lock
+          path: tools/sym-rsi-asb-adapter-reference/Cargo.lock
+          if-no-files-found: error
