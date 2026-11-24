@@ -230,6 +230,23 @@ Keep information discovery under Mycelix #6089 rather than duplicating its runti
 
 Measure unique-information solicitation/coverage, source attribution, correct use, temporal update handling, ambiguity detection, justified abstention, rights-aware withholding and stopping. HiddenBench's distributed-information and complete-profile conditions are not a matched head-to-head comparison; preserve that distinction. GroupMemBench makes BM25 a mandatory serious baseline rather than a trivial control.
 
+### 7.4 Information order and AI anchoring
+
+The companion Mycelix experiment [DELIB-INFO-ORDER-001 #6616](https://github.com/Luminous-Dynamics/mycelix/issues/6616) randomizes the order in which teams see human judgments, human evidence inventories and AI-generated synthesis:
+
+- AI-first: the AI output is visible before members submit independent judgments.
+- Independent-first: each member records an initial judgment/evidence inventory before AI output is revealed.
+- Evidence-first: the group inventories source-bound evidence and unresolved questions before AI output is revealed.
+- Human-only: no AI output during the collaboration phase.
+
+The AI snapshot, prompts, tasks, time/tool budgets and team composition must be matched across AI-enabled arms. This isolates sequencing rather than model quality or resource availability.
+
+Measure unique member-held facts surfaced before and after AI exposure, independent pre-exposure contribution, source attribution, evidence-supported versus unsupported revisions, minority-information survival, false completeness, premature stopping, AI-off group decision quality and delayed transfer. A change toward the AI's answer is not inherently a failure: a correct, independently evidenced revision is desirable. The target failure is unsupported conformity or suppression of unique/countervailing information.
+
+The first competitive objective is a Pareto improvement over AI-first deliberation: preserve more unique, decision-relevant human information without reducing decision quality, increasing participant burden unacceptably, violating disclosure rights or weakening post-AI capability. Do not define one universal target percentage before a pilot establishes task reliability and baseline rates.
+
+This is a team-level human experiment, not a claim that the agent-only PHANTOM/private-consensus benchmark measures human psychology. Mycelix #6616 owns the order randomization and human-group outcomes; Symtropy/agent topology and revision-ledger components provide only message-delivery and observable revision receipts.
+
 ### 7.3 Sovereignty and non-substitutable constraints
 
 Map each applicable control to evidence for portability, transparency, auditability, verifiability, modifiability and controllability. Record pass/partial/fail/unverified separately. Test expiry and revocation against future access, export/import without scope widening, and truthful handling of information already disclosed to recipients. Never claim revocation causes a recipient to forget information already observed.
