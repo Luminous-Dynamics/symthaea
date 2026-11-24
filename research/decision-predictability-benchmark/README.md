@@ -27,6 +27,7 @@ The current Rust library provides:
 - Probe permission, componentwise budget admission and decision-deadline checks.
 - A separate prior-free robust mode in `src/robust.rs`: set-valued outcome supports, worst-case minimax decision loss before/after an observation, and guaranteed worst-case decision-loss reduction without priors or likelihood magnitudes.
 - Permission, declared cost-budget and decision-deadline checks for the robust mode; acquisition cost remains separate from task loss and is never silently scalarized.
+- A typed covariance-to-robust adapter, `evaluate_covariance_guided_robust_probe`, which retains the Stage-B experiment/method IDs, D² diagnostic and covariance-matrix digest alongside the Stage-A robust result. It never turns D² into a probability, likelihood, support set or decision value.
 - Fail-closed validation of prior mass, outcome likelihood normalization, missing decision losses, unknown observations/probes and mismatched public probe contracts.
 
 The current known-answer tests include:
@@ -53,7 +54,7 @@ Focused workflow: [Decision-Relevant Predictability Evaluator](https://github.co
 
 A passing run qualifies only this small finite-world evaluator. It does not qualify the full #12546 benchmark, chaotic-system reference generators, external baselines or physical sensor measurements.
 
-Focused exact-head qualification: [workflow run 45382531423](https://github.com/Luminous-Dynamics/symthaea/actions/runs/45382531423), commit ee1bd6d62140f028b3f4909bfe9c056b6ba0b076. Rust 1.96.0 formatting, **14 tests (14 passed, 0 failed)** and strict Clippy all passed. This qualifies the finite-world Bayesian and robust decision-value primitives only; it is not the full #12546 benchmark.
+Focused exact-head qualification: [workflow run 45383264646](https://github.com/Luminous-Dynamics/symthaea/actions/runs/45383264646), commit d66d216d77d7b9d70cbbd7e66fa75a4bda3f6738. Rust 1.96.0 formatting, **16 tests (16 passed, 0 failed)** and strict Clippy all passed. This qualifies the finite-world Bayesian and robust decision-value primitives plus the typed covariance-to-robust adapter only; it is not the full #12546 benchmark.
 
 ## Decision-value modes and covariance integration
 
