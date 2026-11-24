@@ -9,6 +9,7 @@ pub mod metrology_audit;
 pub mod metrology_qualification_gate;
 pub mod metrology_semantics;
 pub mod mf_acquisition;
+pub mod multichannel_drift_episode;
 pub mod pair_manifest;
 pub mod process_event_graph;
 pub mod secom_fold_preprocessor;
@@ -148,4 +149,18 @@ pub use gated_streaming_adapter::{
     StreamingPredictionReceiptV1, StreamingUpdateDispositionV1, StreamingUpdateReasonV1,
     StreamingUpdateReceiptV1, create_gated_streaming_adapter_engine_v1,
     deliver_qualified_stream_label_v1, predict_and_register_stream_sample_v1,
+};
+
+pub use multichannel_drift_episode::{
+    COMMON_CAUSE_ASSESSMENT_SCHEMA_V1, CausalAttributionStateV1, CommonCauseAssessmentStateV1,
+    CommonCauseAssessmentV1, DRIFT_EPISODE_SCHEMA_V1, DRIFT_MONITOR_SCHEMA_V1,
+    DRIFT_OBSERVATION_RECEIPT_SCHEMA_V1, DRIFT_OBSERVATION_SCHEMA_V1, DRIFT_POLICY_SCHEMA_V1,
+    DriftAlarmStateV1, DriftAlertContextV1, DriftChannelStateV1, DriftDetectorKindV1,
+    DriftEpisodeReceiptV1, DriftEvidenceKindV1, DriftEvidencePlaneV1, DriftMonitorEngineV1,
+    DriftMonitorErrorV1, DriftMonitorPolicyV1, DriftObservationDispositionV1,
+    DriftObservationInputV1, DriftObservationReasonV1, DriftObservationReceiptV1,
+    DriftQualificationV1, SHARED_RESOURCE_GRAPH_SCHEMA_V1, SharedResourceBindingV1,
+    SharedResourceGraphV1, assess_declared_common_resource_association_v1,
+    create_drift_monitor_engine_v1, observe_drift_channel_v1, seal_drift_episode_v1,
+    seal_shared_resource_graph_v1,
 };
