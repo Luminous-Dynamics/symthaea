@@ -1,12 +1,5 @@
 import Lean
 
-/--
-A bounded Lean-kernel pilot for the provisional ProofPlanV1 `And.comm` plan.
-
-The declarations below certify the propositions attached to the three formal
-plan actions. They do not certify the provisional natural-language role labels
-or prove that this plan is the unique/canonical explanation of `And.comm`.
--/
 namespace ProofPlanActionCertificatePilot
 
 /-- A `split_iff` action is obligation-preserving: the parent iff goal is
