@@ -1,0 +1,681 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/schemas/muse-edit-evidence-case-v1.schema.json",
+  "title": "MUSE Paired Edit Evidence Case v1",
+  "description": "A rights-aware paired counterfactual music-edit case with exact source, instruction, target contract, protected invariants and evaluation plan.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "case_id",
+    "dataset_version",
+    "split",
+    "source_work_id",
+    "rights",
+    "source",
+    "instruction",
+    "edit_contract",
+    "target",
+    "evaluation"
+  ],
+  "properties": {
+    "schema": {
+      "const": "muse-edit-evidence-case-v1"
+    },
+    "case_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$"
+    },
+    "dataset_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "split": {
+      "enum": [
+        "train",
+        "development",
+        "public_test",
+        "private_test"
+      ]
+    },
+    "source_work_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "composer_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 128
+    },
+    "rights": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "basis",
+        "license_id",
+        "derivative_policy"
+      ],
+      "properties": {
+        "basis": {
+          "enum": [
+            "public_domain",
+            "cc0",
+            "cc_by",
+            "user_contributed",
+            "synthetic_owned",
+            "research_license"
+          ]
+        },
+        "license_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "attribution": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 1024
+        },
+        "consent_record_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "derivative_policy": {
+          "enum": [
+            "redistributable",
+            "research_only",
+            "private_evaluation"
+          ]
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "audio",
+        "score_sha256",
+        "stems"
+      ],
+      "properties": {
+        "audio": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "sha256",
+            "duration_ms",
+            "sample_rate_hz",
+            "channels",
+            "encoding"
+          ],
+          "properties": {
+            "sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "duration_ms": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "sample_rate_hz": {
+              "type": "integer",
+              "minimum": 8000,
+              "maximum": 384000
+            },
+            "channels": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 64
+            },
+            "encoding": {
+              "enum": [
+                "wav_pcm16",
+                "wav_pcm24",
+                "wav_float32",
+                "flac",
+                "other_lossless"
+              ]
+            }
+          }
+        },
+        "score_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "stems": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "track_id",
+              "audio_sha256",
+              "score_part_id"
+            ],
+            "properties": {
+              "track_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "audio_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "score_part_id": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 65534
+              }
+            }
+          }
+        }
+      }
+    },
+    "instruction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "text",
+        "locale",
+        "operation_family",
+        "strength"
+      ],
+      "properties": {
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        },
+        "locale": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 35
+        },
+        "operation_family": {
+          "enum": [
+            "velocity",
+            "gain",
+            "pan",
+            "pitch",
+            "rhythm",
+            "duration",
+            "tempo",
+            "key",
+            "harmony",
+            "instrumentation",
+            "add_part",
+            "remove_part",
+            "articulation",
+            "timbre",
+            "composite"
+          ]
+        },
+        "strength": {
+          "enum": [
+            "subtle",
+            "moderate",
+            "strong",
+            "extreme",
+            "exact"
+          ]
+        }
+      }
+    },
+    "edit_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target_scopes",
+        "protected_scopes",
+        "parameters"
+      ],
+      "properties": {
+        "target_scopes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "part_id",
+              "start",
+              "end"
+            ],
+            "properties": {
+              "part_id": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 65534
+              },
+              "start": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "numerator",
+                  "denominator"
+                ],
+                "properties": {
+                  "numerator": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000000000
+                  },
+                  "denominator": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000000
+                  }
+                }
+              },
+              "end": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "numerator",
+                  "denominator"
+                ],
+                "properties": {
+                  "numerator": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000000000
+                  },
+                  "denominator": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000000
+                  }
+                }
+              }
+            }
+          },
+          "minItems": 1
+        },
+        "protected_scopes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "part_id",
+              "start",
+              "end"
+            ],
+            "properties": {
+              "part_id": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 65534
+              },
+              "start": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "numerator",
+                  "denominator"
+                ],
+                "properties": {
+                  "numerator": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000000000
+                  },
+                  "denominator": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000000
+                  }
+                }
+              },
+              "end": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "numerator",
+                  "denominator"
+                ],
+                "properties": {
+                  "numerator": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000000000
+                  },
+                  "denominator": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000000
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "scale_numerator": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1024
+            },
+            "scale_denominator": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1024
+            },
+            "semitones": {
+              "type": "integer",
+              "minimum": -127,
+              "maximum": 127
+            },
+            "offset_beats": {
+              "type": "number",
+              "minimum": -128,
+              "maximum": 128
+            },
+            "tempo_multiplier": {
+              "type": "number",
+              "exclusiveMinimum": 0.05,
+              "maximum": 8
+            },
+            "gain_db": {
+              "type": "number",
+              "minimum": -96,
+              "maximum": 24
+            },
+            "pan": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            },
+            "instrument_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "articulation": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "description": {
+              "type": "string",
+              "maxLength": 1024
+            }
+          }
+        }
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target_kind",
+        "expected_score_sha256",
+        "expected_audio_sha256",
+        "acceptable_audio_sha256",
+        "event_correspondence"
+      ],
+      "properties": {
+        "target_kind": {
+          "enum": [
+            "exact_score_and_audio",
+            "score_target_audio_variable",
+            "audio_target_only",
+            "valid_target_set"
+          ]
+        },
+        "expected_score_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "expected_audio_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "acceptable_audio_sha256": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sha256"
+          },
+          "uniqueItems": true
+        },
+        "event_correspondence": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "source_note_ordinals",
+              "target_note_ordinals",
+              "relation"
+            ],
+            "properties": {
+              "relation": {
+                "enum": [
+                  "preserve",
+                  "modify",
+                  "split",
+                  "merge",
+                  "delete",
+                  "insert"
+                ]
+              },
+              "source_note_ordinals": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "target_note_ordinals": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "render_profile": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "required": [
+        "renderer_id",
+        "renderer_version",
+        "binary_sha256",
+        "environment_sha256",
+        "configuration_sha256",
+        "asset_sha256"
+      ],
+      "properties": {
+        "renderer_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "renderer_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "binary_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "environment_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "configuration_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "asset_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "evaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target_metrics",
+        "preservation_metrics",
+        "correspondence_required",
+        "tolerances",
+        "human_evaluation"
+      ],
+      "properties": {
+        "target_metrics": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "exact_event_accuracy",
+              "pitch_accuracy",
+              "onset_accuracy",
+              "duration_accuracy",
+              "velocity_accuracy",
+              "harmony_agreement",
+              "tempo_accuracy",
+              "key_accuracy",
+              "instrument_identity_accuracy",
+              "instruction_rubric_pass"
+            ]
+          },
+          "minItems": 1
+        },
+        "preservation_metrics": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "protected_event_agreement",
+              "outside_scope_event_agreement",
+              "protected_audio_similarity",
+              "source_identity_retention",
+              "collateral_change_rate"
+            ]
+          },
+          "minItems": 1
+        },
+        "correspondence_required": {
+          "type": "boolean"
+        },
+        "tolerances": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "onset_ms",
+            "pitch_cents",
+            "velocity_0_to_127",
+            "minimum_correspondence_coverage"
+          ],
+          "properties": {
+            "onset_ms": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 500
+            },
+            "pitch_cents": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1200
+            },
+            "velocity_0_to_127": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 127
+            },
+            "minimum_correspondence_coverage": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        },
+        "human_evaluation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "required",
+            "raters_per_item",
+            "questions"
+          ],
+          "properties": {
+            "required": {
+              "type": "boolean"
+            },
+            "raters_per_item": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "questions": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "edit_perceptibility",
+                  "instruction_recognition",
+                  "musical_validity",
+                  "collateral_change",
+                  "overall_preference"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

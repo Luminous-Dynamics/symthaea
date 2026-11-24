@@ -1,0 +1,484 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/schemas/muse-edit-evidence-result-v1.schema.json",
+  "title": "MUSE Paired Edit Evidence Result v1",
+  "description": "One system result for one paired edit case; metrics stay disaggregated and strict exact-match is conjunctive.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "case_id",
+    "system",
+    "artifacts",
+    "integrity",
+    "target",
+    "preservation",
+    "correspondence",
+    "instruction_compatibility",
+    "human_evaluation",
+    "outcome"
+  ],
+  "properties": {
+    "schema": {
+      "const": "muse-edit-evidence-result-v1"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 128
+    },
+    "system": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "system_id",
+        "version",
+        "track",
+        "compute_budget_ms"
+      ],
+      "properties": {
+        "system_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "track": {
+          "enum": [
+            "single_model",
+            "agent",
+            "symbolic_editor",
+            "human_expert",
+            "baseline"
+          ]
+        },
+        "compute_budget_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "candidate_budget": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 128
+        }
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_sha256",
+        "case_digest_schema",
+        "source_score_sha256",
+        "score_digest_schema",
+        "candidate_audio_sha256",
+        "candidate_score_sha256"
+      ],
+      "properties": {
+        "case_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "case_digest_schema": {
+          "const": "muse-edit-evidence-case-serde-json-sha256-v1"
+        },
+        "source_score_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "score_digest_schema": {
+          "const": "muse-score-serde-json-sha256-v1"
+        },
+        "candidate_audio_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "candidate_score_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "render_receipt_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "evaluation_receipt_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "verdict",
+        "verifier_id",
+        "verifier_version",
+        "receipt_sha256"
+      ],
+      "properties": {
+        "verdict": {
+          "enum": [
+            "pass",
+            "fail",
+            "abstain",
+            "not_run"
+          ]
+        },
+        "verifier_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        },
+        "verifier_version": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        },
+        "receipt_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "target": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "metric_id",
+          "numerator",
+          "denominator",
+          "score",
+          "threshold",
+          "passed"
+        ],
+        "properties": {
+          "metric_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "numerator": {
+            "type": "number",
+            "minimum": 0
+          },
+          "denominator": {
+            "type": "number",
+            "minimum": 0
+          },
+          "score": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "threshold": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "passed": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "preservation": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "metric_id",
+          "numerator",
+          "denominator",
+          "score",
+          "threshold",
+          "passed"
+        ],
+        "properties": {
+          "metric_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "numerator": {
+            "type": "number",
+            "minimum": 0
+          },
+          "denominator": {
+            "type": "number",
+            "minimum": 0
+          },
+          "score": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "threshold": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "passed": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "correspondence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "expected_source_events",
+        "mapped_source_events",
+        "unresolved_source_events",
+        "coverage",
+        "minimum_coverage_passed"
+      ],
+      "properties": {
+        "expected_source_events": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "mapped_source_events": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unresolved_source_events": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "coverage": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "minimum_coverage_passed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "instruction_compatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "verdict",
+        "evaluator_id",
+        "evaluator_version",
+        "receipt_sha256"
+      ],
+      "properties": {
+        "verdict": {
+          "enum": [
+            "pass",
+            "fail",
+            "abstain",
+            "not_run"
+          ]
+        },
+        "evaluator_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        },
+        "evaluator_version": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        },
+        "receipt_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "human_evaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "rater_count",
+        "questions"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "not_required",
+            "pending",
+            "completed",
+            "abstained"
+          ]
+        },
+        "rater_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "questions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "question",
+              "responses",
+              "positive_count",
+              "mean",
+              "ci95_low",
+              "ci95_high"
+            ],
+            "properties": {
+              "question": {
+                "enum": [
+                  "edit_perceptibility",
+                  "instruction_recognition",
+                  "musical_validity",
+                  "collateral_change",
+                  "overall_preference"
+                ]
+              },
+              "responses": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "positive_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "mean": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "ci95_low": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "ci95_high": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target_pass",
+        "preservation_pass",
+        "correspondence_pass",
+        "integrity_pass",
+        "strict_sample_exact_match",
+        "human_gate_pass",
+        "abstention_reason"
+      ],
+      "properties": {
+        "target_pass": {
+          "type": "boolean"
+        },
+        "preservation_pass": {
+          "type": "boolean"
+        },
+        "correspondence_pass": {
+          "type": "boolean"
+        },
+        "integrity_pass": {
+          "type": "boolean"
+        },
+        "strict_sample_exact_match": {
+          "type": "boolean"
+        },
+        "human_gate_pass": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "abstention_reason": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 1024
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

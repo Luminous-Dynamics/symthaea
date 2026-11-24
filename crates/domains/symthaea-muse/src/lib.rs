@@ -94,6 +94,8 @@ pub mod evidence_digest;
 #[cfg(feature = "theory")]
 pub mod experiment_manifest;
 pub mod export;
+#[cfg(feature = "theory")]
+pub mod edit_evidence;
 pub mod expressive;
 #[cfg(feature = "theory")]
 pub mod external_review_completion;
