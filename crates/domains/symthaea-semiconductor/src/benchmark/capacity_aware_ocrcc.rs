@@ -77,6 +77,8 @@ pub enum CaOcrcFeedbackReasonV1 {
     InvalidNumericReport,
     ClockDomainMismatch,
     LabelNotAvailableByDelivery,
+    DeliveryBeforePredictionTime,
+    LabelAvailableBeforeMeasurement,
     ReportBeforeLabelAvailability,
     ReportNotAvailableByDelivery,
     WrongDeliveryRound,
@@ -390,7 +392,6 @@ fn validate_policy(policy: &CaOcrcPolicyV1) -> Result<(), CaOcrcErrorV1> {
         || !policy.score_bound.is_finite()
         || policy.score_bound <= 0.0
         || policy.tracking_capacity == 0
-        || policy.maximum_real_delay == 0
     {
         return Err(CaOcrcErrorV1("CA-OCRC policy parameters are invalid".into()));
     }
@@ -544,7 +545,7 @@ fn build_prediction_receipt(
         proxy_survival_at_issue: if proxy_delay >= 0 {
             Some(proxy_survival_probability_v1(
                 &engine.policy.proxy_distribution,
-                0,
+                proxy_delay as u64,
             )?)
         } else {
             None
@@ -618,6 +619,14 @@ fn validate_delivery(
         reasons.push(CaOcrcFeedbackReasonV1::LabelNotAvailableByDelivery);
     }
     if delivery.eligibility_report_available_at_unix_seconds
+        < tracked.prediction.event_time_unix_seconds
+    {
+        reasons.push(CaOcrcFeedbackReasonV1::LabelAvailableBeforeMeasurement);
+    }
+    if delivery.delivered_at_unix_seconds < tracked.prediction.prediction_time_unix_seconds {
+        reasons.push(CaOcrcFeedbackReasonV1::DeliveryBeforePredictionTime);
+    }
+    if delivery.eligibility_report_available_at_unix_seconds
         < delivery.label_available_at_unix_seconds
     {
         reasons.push(CaOcrcFeedbackReasonV1::ReportBeforeLabelAvailability);
@@ -655,7 +664,22 @@ fn validate_delivery(
     {
         reasons.push(CaOcrcFeedbackReasonV1::LabelPayloadDigestMismatch);
     }
-    if report_digest(report).is_err_or(|digest| digest != report.report_sha256) {
+    if !report
+        .qualification_report_sha256
+        .as_str()
+        .bytes()
+        .all(|byte| byte.is_ascii_hexdigit())
+        || report.calibration_certificate_id.trim().is_empty()
+        || !valid_sha256(&report.measurement_sha256)
+        || !valid_sha256(&report.qualification_report_sha256)
+        || !valid_sha256(&report.requalification_report_sha256)
+        || !valid_sha256(&report.requalification_frontier_sha256)
+        || report.training_snapshot_mutated
+        || report.equipment_control_authority
+    {
+        reasons.push(CaOcrcFeedbackReasonV1::InvalidNumericReport);
+    }
+    if !matches!(report_digest(report), Ok(digest) if digest == report.report_sha256) {
         reasons.push(CaOcrcFeedbackReasonV1::EligibilityReportDigestMismatch);
     }
     if report.qualified_corrected_value != delivery.label_value {
@@ -685,7 +709,7 @@ fn label_loss(prediction: &CaOcrcPredictionReceiptV1, label_value: f64) -> f64 {
         CaOcrcSetKindV1::BoundedInterval => {
             let lower = prediction.interval_lower.expect("bounded interval has lower endpoint");
             let upper = prediction.interval_upper.expect("bounded interval has upper endpoint");
-            f64::from(label_value < lower || label_value > upper)
+            if label_value < lower || label_value > upper { 1.0 } else { 0.0 }
         }
     }
 }
@@ -715,7 +739,12 @@ fn process_round_inner(
     {
         return Err(CaOcrcErrorV1("CA-OCRC round input identity, clock or numeric fields are invalid".into()));
     }
-    let expected_round = engine.current_round.map_or(0, |previous| previous + 1);
+    let expected_round = match engine.current_round {
+        Some(previous) => previous
+            .checked_add(1)
+            .ok_or_else(|| CaOcrcErrorV1("round counter overflow".into()))?,
+        None => 0,
+    };
     if input.round != expected_round {
         return Err(CaOcrcErrorV1(format!(
             "round sequence mismatch: expected {expected_round}, got {}",
@@ -826,20 +855,17 @@ fn process_round_inner(
         let reasons = validate_delivery(engine, &tracked, delivery, input.round);
         if !reasons.is_empty() {
             let status = delivery.eligibility_report.eligibility;
+            let is_eligibility_only = |reason: &CaOcrcFeedbackReasonV1| {
+                matches!(
+                    reason,
+                    CaOcrcFeedbackReasonV1::LabelNotEligible
+                        | CaOcrcFeedbackReasonV1::DownstreamConsumptionNotAllowed
+                )
+            };
             let only_unknown = status == LabelConsumptionEligibilityV1::Unknown
-                && reasons.iter().all(|reason| {
-                    matches!(
-                        reason,
-                        CaOcrcFeedbackReasonV1::LabelNotEligible
-                    )
-                });
+                && reasons.iter().all(is_eligibility_only);
             let only_blocked = status == LabelConsumptionEligibilityV1::Blocked
-                && reasons.iter().all(|reason| {
-                    matches!(
-                        reason,
-                        CaOcrcFeedbackReasonV1::LabelNotEligible
-                    )
-                });
+                && reasons.iter().all(is_eligibility_only);
             let disposition = if only_unknown {
                 CaOcrcFeedbackDispositionV1::HeldUnknown
             } else if only_blocked {
