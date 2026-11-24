@@ -230,7 +230,9 @@ jobs:
             and .proof_source.sha256 == "1e9eae95fbe85d3b32793c22313f8e1b67608b19fc266fb047e278663cd1ac73"
             and ([.actions[].plan_node_id] == ["A_SPLIT_IFF", "A_FORWARD", "A_REVERSE"])
             and .root_declaration.certificate_declaration == "ProofPlanActionCertificatePilot.and_comm_plan_replay"
-            and (.claim_ceiling | length) >= 5' \
+            and (.claim_ceiling | length) >= 5
+            and .negative_control.expected_result == "lean_type_error"
+            and .negative_control.sha256 == "87f2c53a03395b5a614883e111a4ab8c7f734eb8d6823638ce832b3eb75d269e"' \
             docs/research/PROOF_ACTION_CERTIFICATE_AND_COMM_V1.json >/dev/null
           jq -e '."$schema" == "https://json-schema.org/draft/2020-12/schema"
             and .properties.status.const == "kernel_replay_pending"
@@ -389,14 +391,19 @@ jobs:
         run: |
           set -euo pipefail
           proof_source="$GITHUB_WORKSPACE/scripts/research/lean-proof-extractor/ProofActionCertificateAndComm.lean"
+          negative_source="$GITHUB_WORKSPACE/scripts/research/lean-proof-extractor/ProofActionCertificateAndCommNegative.lean"
           manifest="$GITHUB_WORKSPACE/docs/research/PROOF_ACTION_CERTIFICATE_AND_COMM_V1.json"
           cp "$proof_source" ProofActionCertificateAndComm.lean
+          cp "$negative_source" ProofActionCertificateAndCommNegative.lean
           test "$(git rev-parse HEAD)" = "6ebcce37335bcb6bca64596e5d57bb3035648030"
           test "$(cat lean-toolchain)" = "leanprover/lean4:v4.37.0-rc1"
 
           actual_source_sha256="$(sha256sum ProofActionCertificateAndComm.lean | cut -d' ' -f1)"
           expected_source_sha256="$(jq -r '.proof_source.sha256' "$manifest")"
           test "$actual_source_sha256" = "$expected_source_sha256"
+          actual_negative_source_sha256="$(sha256sum ProofActionCertificateAndCommNegative.lean | cut -d' ' -f1)"
+          expected_negative_source_sha256="$(jq -r '.negative_control.sha256' "$manifest")"
+          test "$actual_negative_source_sha256" = "$expected_negative_source_sha256"
           test "$(jq -r '.environment.mathlib_revision' "$manifest")" = "$(git rev-parse HEAD)"
 
           lake env lean ProofActionCertificateAndComm.lean 2>&1 | tee proof-action-certificate-and-comm.log
@@ -411,8 +418,16 @@ jobs:
           grep -Fq "a ∧ b → b ∧ a" proof-action-certificate-and-comm.log
           grep -Fq "b ∧ a → a ∧ b" proof-action-certificate-and-comm.log
 
+          if lake env lean ProofActionCertificateAndCommNegative.lean > proof-action-certificate-negative.log 2>&1; then
+            echo "ERROR: Lean accepted a wrong-proposition local certificate negative control"
+            exit 1
+          fi
+          grep -Eiq "type mismatch|application type mismatch" proof-action-certificate-negative.log
+          echo "PROOF_ACTION_CERTIFICATE_WRONG_PROPOSITION_REJECTED"
+
           manifest_sha256="$(sha256sum "$manifest" | cut -d' ' -f1)"
           axiom_log_sha256="$(sha256sum proof-action-certificate-and-comm.log | cut -d' ' -f1)"
+          negative_log_sha256="$(sha256sum proof-action-certificate-negative.log | cut -d' ' -f1)"
           lake_manifest_sha256="$(sha256sum lake-manifest.json | cut -d' ' -f1)"
           lean_version="$(lean --version)"
           mathlib_revision="$(git rev-parse HEAD)"
@@ -423,6 +438,8 @@ jobs:
           jq -n \
             --arg symthaea_revision "$symthaea_revision" \
             --arg source_sha256 "$actual_source_sha256" \
+            --arg negative_source_sha256 "$actual_negative_source_sha256" \
+            --arg negative_log_sha256 "$negative_log_sha256" \
             --arg manifest_sha256 "$manifest_sha256" \
             --arg lean_version "$lean_version" \
             --arg mathlib_revision "$mathlib_revision" \
@@ -446,6 +463,12 @@ jobs:
               action_certificates: $action_certificates,
               root_declaration: $root_declaration,
               axiom_report: {captured: true, parsed: false, log_sha256: $axiom_log_sha256},
+              negative_control: {
+                expected_result: "lean_type_error",
+                rejected_as_expected: true,
+                source_sha256: $negative_source_sha256,
+                log_sha256: $negative_log_sha256
+              },
               claim_ceiling: [
                 "Lean accepted the declared action propositions and composed root theorem in this exact run environment.",
                 "The raw #print axioms output is retained as a log hash but its dependency closure is not yet parsed into structured evidence.",
@@ -453,7 +476,7 @@ jobs:
                 "The action-to-plan mapping remains provisional and has not received independent expert review."
               ]
             }' > "$receipt"
-          jq -e '.status == "accepted" and (.action_certificates | length) == 3 and .root_declaration == "ProofPlanActionCertificatePilot.and_comm_plan_replay" and .axiom_report.captured == true and .axiom_report.parsed == false' "$receipt" >/dev/null
+          jq -e '.status == "accepted" and (.action_certificates | length) == 3 and .root_declaration == "ProofPlanActionCertificatePilot.and_comm_plan_replay" and .axiom_report.captured == true and .axiom_report.parsed == false and .negative_control.expected_result == "lean_type_error" and .negative_control.rejected_as_expected == true and (.negative_control.source_sha256 | test("^[a-f0-9]{64}$")) and (.negative_control.log_sha256 | test("^[a-f0-9]{64}$"))' "$receipt" >/dev/null
           cat "$receipt" >> "$GITHUB_STEP_SUMMARY"
           echo "PROOF_ACTION_CERTIFICATE_AND_COMM_LEAN_REPLAY_PASS"
 
@@ -465,6 +488,8 @@ jobs:
           path: |
             mathlib4/proof-action-certificate-replay-receipt.json
             mathlib4/proof-action-certificate-and-comm.log
+            mathlib4/ProofActionCertificateAndCommNegative.lean
+            mathlib4/proof-action-certificate-negative.log
           if-no-files-found: error
 
       - name: Preserve extracted graph artifacts
