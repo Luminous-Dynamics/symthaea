@@ -12,7 +12,7 @@
   ],
   "properties": {
     "schema_version": {
-      "const": "1.0.0"
+      "const": "1.1.0"
     },
     "candidate": {
       "$ref": "#/$defs/candidate"
@@ -339,7 +339,8 @@
         "global_disposition",
         "adjudication_authority",
         "adjudication_refs",
-        "finite_boolean_countermodel"
+        "finite_boolean_countermodel",
+        "global_use_adjudication"
       ],
       "properties": {
         "eligibility": {
@@ -391,6 +392,16 @@
           "oneOf": [
             {
               "$ref": "#/$defs/booleanCountermodel"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "global_use_adjudication": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/globalUseAdjudication"
             },
             {
               "type": "null"
@@ -571,6 +582,95 @@
           "items": {
             "$ref": "#/$defs/booleanFormula"
           }
+        }
+      }
+    },
+    "globalUseAdjudication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "disposition",
+        "reviewer_id",
+        "reviewer_authority",
+        "reviewed_plan_sha256",
+        "target_warrant_id",
+        "reviewed_entire_plan",
+        "node_evidence",
+        "evidence_refs"
+      ],
+      "properties": {
+        "disposition": {
+          "enum": [
+            "used_directly",
+            "used_implicitly",
+            "cited_rejected",
+            "omitted",
+            "unknown"
+          ]
+        },
+        "reviewer_id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "reviewer_authority": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "reviewed_plan_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "target_warrant_id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "reviewed_entire_plan": {
+          "type": "boolean"
+        },
+        "node_evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/globalUseNodeEvidence"
+          }
+        },
+        "evidence_refs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/nonEmpty"
+          }
+        }
+      }
+    },
+    "globalUseNodeEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "plan_node_id",
+        "warrant_id",
+        "relation",
+        "material_use",
+        "rationale_ref"
+      ],
+      "properties": {
+        "plan_node_id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "warrant_id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "relation": {
+          "enum": [
+            "uses_as_rule",
+            "supports_inference",
+            "cites",
+            "rebuts",
+            "context_only",
+            "alternative"
+          ]
+        },
+        "material_use": {
+          "type": "boolean"
+        },
+        "rationale_ref": {
+          "$ref": "#/$defs/nonEmpty"
         }
       }
     }
