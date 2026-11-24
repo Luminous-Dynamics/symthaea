@@ -254,7 +254,6 @@ fn same_branch_evidence(
     require_same!(exogenous_forcing_manifest_sha256);
     require_same!(model_configuration_sha256);
     require_same!(latent_representation_profile_sha256);
-    require_same!(disposition);
     // latent_state_sha256 and the two prediction values are draw-conditioned;
     // the base evaluator verifies each branch against its own draw context.
     Ok(())
@@ -854,6 +853,26 @@ mod tests {
             error,
             PosteriorCohortError::RealizedOutcomeMismatch {
                 field: "realized_effect_units",
+            }
+        );
+    }
+
+    #[test]
+    fn applied_timestamp_drift_across_draws_rejects() {
+        let mut second = make_draw(1, 101, 2, 52, 500_000, (2, 1, 1));
+        second.baseline.branch.disposition = BranchDisposition::Applied {
+            applied_at_us: 10_001,
+            realized_utility_units: 100,
+        };
+        let input = cohort(vec![
+            make_draw(1, 101, 1, 51, 500_000, (2, 1, 1)),
+            second,
+        ]);
+        let error = evaluate_posterior_individual_cohort(&input).unwrap_err();
+        assert_eq!(
+            error,
+            PosteriorCohortError::RealizedOutcomeMismatch {
+                field: "baseline_applied_at_us",
             }
         );
     }
