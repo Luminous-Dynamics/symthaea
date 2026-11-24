@@ -965,6 +965,15 @@ mod tests {
         time: i64,
         receipt: char,
     ) -> DriftObservationInputV1 {
+        let qualification_report = if plane == DriftEvidencePlaneV1::QualifiedResidual {
+            Some(eligible_label_report(&format!("label-{id}"), receipt))
+        } else {
+            None
+        };
+        let evidence_receipt_sha256 = qualification_report
+            .as_ref()
+            .map(|report| report.report_sha256.clone())
+            .unwrap_or_else(|| digest(receipt));
         DriftObservationInputV1 {
             schema: DRIFT_OBSERVATION_SCHEMA_V1.into(),
             observation_id: id.into(),
@@ -980,13 +989,8 @@ mod tests {
             baseline_sha256: digest('b'),
             evidence_kind,
             qualification,
-            evidence_receipt_sha256: digest(receipt),
-            evidence_receipt_sha256: digest(receipt),
-            qualification_report: if plane == DriftEvidencePlaneV1::QualifiedResidual {
-                Some(eligible_label_report(&format!("label-{id}"), receipt))
-            } else {
-                None
-            },
+            evidence_receipt_sha256,
+            qualification_report,
             prediction_receipt_sha256: if plane == DriftEvidencePlaneV1::QualifiedResidual {
                 Some(digest('p'))
             } else {
