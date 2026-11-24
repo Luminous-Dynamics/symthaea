@@ -111,13 +111,13 @@ pub struct RevisionScoreSnapshotV1 {
 pub struct RevisionReportV1 {
     pub case_id: String,
     pub experiment_unit_id: String,
-    pub source_lineage_id: String,
-    pub runtime_identity_sha256: String,
-    pub decoding_config_sha256: String,
-    pub max_output_tokens: u32,
-    pub actual_output_tokens: u32,
-    pub max_wall_time_ms: u64,
-    pub elapsed_wall_time_ms: u64,
+    pub source_lineage_id: Option<String>,
+    pub runtime_identity_sha256: Option<String>,
+    pub decoding_config_sha256: Option<String>,
+    pub max_output_tokens: Option<u32>,
+    pub actual_output_tokens: Option<u32>,
+    pub max_wall_time_ms: Option<u64>,
+    pub elapsed_wall_time_ms: Option<u64>,
     pub evaluator_version: String,
     pub query_id: String,
     pub audio_sha256: String,
@@ -378,7 +378,15 @@ pub fn audit_revision_v2(case: &RevisionCaseV2) -> Result<RevisionReportV1, Stri
         final_score,
     };
     validate_v2_evidence(case)?;
-    audit_revision(&legacy_case)
+    let mut report = audit_revision(&legacy_case)?;
+    report.source_lineage_id = Some(case.source_lineage_id.clone());
+    report.runtime_identity_sha256 = Some(case.runtime_identity_sha256.clone());
+    report.decoding_config_sha256 = Some(case.decoding_config_sha256.clone());
+    report.max_output_tokens = Some(case.max_output_tokens);
+    report.actual_output_tokens = Some(case.actual_output_tokens);
+    report.max_wall_time_ms = Some(case.max_wall_time_ms);
+    report.elapsed_wall_time_ms = Some(case.elapsed_wall_time_ms);
+    Ok(report)
 }
 
 fn validate_v2_evidence(case: &RevisionCaseV2) -> Result<(), String> {
@@ -476,13 +484,13 @@ pub fn audit_revision(case: &RevisionCaseV1) -> Result<RevisionReportV1, String>
     Ok(RevisionReportV1 {
         case_id: case.case_id.clone(),
         experiment_unit_id: case.experiment_unit_id.clone(),
-        source_lineage_id: case.source_lineage_id.clone(),
-        runtime_identity_sha256: case.runtime_identity_sha256.clone(),
-        decoding_config_sha256: case.decoding_config_sha256.clone(),
-        max_output_tokens: case.max_output_tokens,
-        actual_output_tokens: case.actual_output_tokens,
-        max_wall_time_ms: case.max_wall_time_ms,
-        elapsed_wall_time_ms: case.elapsed_wall_time_ms,
+        source_lineage_id: None,
+        runtime_identity_sha256: None,
+        decoding_config_sha256: None,
+        max_output_tokens: None,
+        actual_output_tokens: None,
+        max_wall_time_ms: None,
+        elapsed_wall_time_ms: None,
         evaluator_version: case.draft.evaluator_version.clone(),
         query_id: case.draft.query_id.clone(),
         audio_sha256: case.draft.audio_sha256.clone(),
