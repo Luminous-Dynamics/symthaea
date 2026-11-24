@@ -11,6 +11,7 @@ on:
       - "docs/research/MATHLIB_ELABORATED_DEPENDENCY_GRAPH_V429_V1.schema.json"
       - "docs/research/PROOF_PLAN_*.json"
       - "docs/research/LOCAL_GLOBAL_PAIR_*"
+      - "docs/research/MATH_METAMORPHIC_*"
       - "docs/research/MATH_HARDMODE_*"
       - "docs/research/PROOF_PLAN_*.md"
       - "docs/research/MATH_PROOF_COMPREHENSION_*.json"
@@ -76,6 +77,8 @@ jobs:
             docs/research/PROOF_PLAN_MUTATION_FIXTURES_V1.json
             docs/research/LOCAL_GLOBAL_PAIR_V1.schema.json
             docs/research/LOCAL_GLOBAL_PAIR_SYNTHETIC_V1.json
+            docs/research/MATH_METAMORPHIC_PAIR_V1.schema.json
+            docs/research/MATH_METAMORPHIC_PAIR_V1.json
             docs/research/MATH_PROOF_COMPREHENSION_THEOREM_SANDWICH_V1.schema.json
             docs/research/MATH_PROOF_COMPREHENSION_THEOREM_SANDWICH_V1.json
             docs/research/MATH_PROOF_COMPREHENSION_RECEIPT_V1.schema.json
@@ -196,7 +199,24 @@ jobs:
             docs/research/LOCAL_GLOBAL_PAIR_SYNTHETIC_V1.json >/dev/null
           echo "LOCAL_GLOBAL_PAIR_FIXTURE_PASS"
 
-          jq -e '.schema_version == "1.0.0" and .candidate.task_id == "SYNTHETIC-SANDWICH-IMPLICATION-001" and .evaluator_only.stronger_obligations[0].id == "UPPER-STRONGER-P-IMPLIES-Q-AND-R" and (.evaluator_only.corollary_obligations | length) == 2' docs/research/MATH_PROOF_COMPREHENSION_THEOREM_SANDWICH_V1.json >/dev/null
+          jq -e '.schema_version == "1.0.0"
+            and (.pairs | length) == 3
+            and ([.pairs[].candidate.pair_id] | unique | length) == 3
+            and ([.pairs[] | select(.evaluator_only.transformation_class == "semantics_preserving" and .evaluator_only.oracle_relation == "equivalent")] | length) == 1
+            and ([.pairs[] | select(.evaluator_only.transformation_class == "semantics_changing" and .evaluator_only.oracle_relation == "variant_entails_base")] | length) == 1
+            and ([.pairs[] | select(.evaluator_only.transformation_class == "proof_route_only" and .evaluator_only.oracle_relation == "equivalent" and .candidate.base.sequent_sha256 == .candidate.variant.sequent_sha256)] | length) == 1' \
+            docs/research/MATH_METAMORPHIC_PAIR_V1.json >/dev/null
+          echo "MATH_METAMORPHIC_FIXTURE_ASSERTIONS_PASS"
+
+          jq -e '.schema_version == "1.0.0" and .defs.evaluator.properties.oracle_relation.enum == ["equivalent","base_entails_variant","variant_entails_base","incomparable","unknown"]' \
+            docs/research/MATH_METAMORPHIC_PAIR_V1.schema.json >/dev/null
+          echo "THEOREM_SANDWICH_FIXTURE_PASS"
+          echo "PROOF_PLAN_FIXTURES_PASS"
+          echo "MATH_PROOF_COMPREHENSION_PILOT_FIXTURES_PASS"
+          echo "FINITE_TRANSLATION_CASES=67067; ROW_CHECKS=134134"
+
+      - name: Check ProofPlanV1 Rust formatting
+ and .evaluator_only.stronger_obligations[0].id == "UPPER-STRONGER-P-IMPLIES-Q-AND-R" and (.evaluator_only.corollary_obligations | length) == 2' docs/research/MATH_PROOF_COMPREHENSION_THEOREM_SANDWICH_V1.json >/dev/null
           echo "THEOREM_SANDWICH_FIXTURE_PASS"
           echo "PROOF_PLAN_FIXTURES_PASS"
           echo "MATH_PROOF_COMPREHENSION_PILOT_FIXTURES_PASS"
@@ -227,6 +247,12 @@ jobs:
           grep -Fq "HARD_MODE_RECEIPT_VALID task_id=HARDMODE-IMPLICATION-REVERSAL-001" hard-mode-cli.out
           grep -Fq "finite_semantics=countermodel" hard-mode-cli.out
           grep -Fq "proof_status=NotRun" hard-mode-cli.out
+          cargo run --locked --manifest-path scripts/research/proof-plan-contract/Cargo.toml --bin math-metamorphic -- \
+            docs/research/MATH_METAMORPHIC_PAIR_V1.json | tee math-metamorphic-cli.out
+          grep -Fq "MATH_METAMORPHIC_PAIR_VALID pair_id=MMP-EQUIVALENT-IMPLICATION-001" math-metamorphic-cli.out
+          grep -Fq "MATH_METAMORPHIC_PAIR_VALID pair_id=MMP-REMOVED-HYPOTHESIS-001" math-metamorphic-cli.out
+          grep -Fq "MATH_METAMORPHIC_PAIR_VALID pair_id=MMP-PROOF-ROUTE-ONLY-001" math-metamorphic-cli.out
+          grep -Fq "MATH_METAMORPHIC_DATASET_VALID pairs=3" math-metamorphic-cli.out
 
       - name: Export generated Cargo.lock for dependency pinning
         if: success()
