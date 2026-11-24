@@ -1028,6 +1028,25 @@ mod tests {
     }
 
     #[test]
+    fn joint_covariance_consistency_is_invariant_to_unit_rescaling() {
+        let mut input = scalar_three_hypothesis_fixture([1.0, 4.0, 1.0]);
+        let baseline = rank_covariance_aware_experiments(&input).unwrap();
+        let baseline_score = baseline.ranked_experiments[0].worst_case_separation_squared;
+        let experiment = &mut input.experiments[0];
+        experiment.observables[0].unit = "milliu".to_owned();
+        for prediction in &mut experiment.predictions {
+            prediction.means[0] *= 1000.0;
+        }
+        for pair in &mut experiment.pairwise_difference_covariances {
+            pair.covariance[0][0] *= 1_000_000.0;
+            pair.covariance_matrix_digest_sha256 = matrix_digest_sha256(&pair.covariance);
+        }
+        let rescaled = rank_covariance_aware_experiments(&input).unwrap();
+        let rescaled_score = rescaled.ranked_experiments[0].worst_case_separation_squared;
+        assert!((rescaled_score - baseline_score).abs() < 1.0e-10);
+    }
+
+    #[test]
     fn individually_psd_pairwise_covariances_must_be_jointly_realizable() {
         // Each scalar pairwise covariance is positive. Together they are
         // impossible: Var(Y0-Y1)=1, Var(Y0-Y2)=1, Var(Y1-Y2)=9 would imply
