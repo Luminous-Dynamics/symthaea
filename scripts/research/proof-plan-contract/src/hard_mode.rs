@@ -718,6 +718,31 @@ mod tests {
         assert_eq!(report.answer_correct, None);
     }
 
+
+    #[test]
+    fn answer_text_mutation_is_rejected_without_digest_update() {
+        let mut receipt = fixture();
+        receipt.candidate.answer_text.push_str(" This is a mutation.");
+        assert!(validate_receipt(&receipt)
+            .iter()
+            .any(|error| error.contains("answer_sha256 does not match its canonical preimage")));
+    }
+
+    #[test]
+    fn formal_statement_mutation_is_rejected_without_digest_update() {
+        let mut receipt = fixture();
+        receipt
+            .candidate
+            .formalization
+            .as_mut()
+            .unwrap()
+            .statement_text
+            .push_str(" and therefore the converse holds.");
+        assert!(validate_receipt(&receipt).iter().any(|error| {
+            error.contains("formalization.statement_sha256 does not match its canonical preimage")
+        }));
+    }
+
     #[test]
     fn unknown_json_fields_are_rejected() {
         let mut value: Value = serde_json::from_str(FIXTURE).unwrap();

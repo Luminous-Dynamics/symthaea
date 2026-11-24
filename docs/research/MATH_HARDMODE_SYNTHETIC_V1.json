@@ -23,24 +23,50 @@
       "decoding_config_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
     },
     "answer_text": "No; set p=false and q=true. Then p → q is true while q → p is false.",
-    "answer_sha256": "f434259f35f1b42efac35c2230b61ce3e3391f98fa5bf1908dc00e917131d901",
+    "answer_sha256": "8eb8694e56b9d8340e53987329bbb2aad55ded2cafda46053cd5a9dfa4ce26a2",
     "answer_abstained": false,
     "formalization": {
       "statement_text": "From premise p → q, infer conclusion q → p.",
-      "statement_sha256": "5fc7f3b4c1b71adf234caf9f040058d8ed4ec64e95850208217fad9aae55a51d",
+      "statement_sha256": "9a31149588233ecd2368f8ee402f2771f56eb6932dc9d7fb2cb9d52478f3c68e",
       "finite_boolean_sequent": {
         "hypotheses": [],
         "premises": [
-          { "op": "implies", "left": { "op": "atom", "name": "p" }, "right": { "op": "atom", "name": "q" } }
+          {
+            "op": "implies",
+            "left": {
+              "op": "atom",
+              "name": "p"
+            },
+            "right": {
+              "op": "atom",
+              "name": "q"
+            }
+          }
         ],
-        "conclusion": { "op": "implies", "left": { "op": "atom", "name": "q" }, "right": { "op": "atom", "name": "p" } }
+        "conclusion": {
+          "op": "implies",
+          "left": {
+            "op": "atom",
+            "name": "q"
+          },
+          "right": {
+            "op": "atom",
+            "name": "p"
+          }
+        }
       },
       "finite_boolean_sequent_sha256": "c9f57c009e4e48d8718ac5cba23c99b1571033efa6204f0128fffb0004ae6cd0"
     },
     "candidate_countermodel": {
       "valuation": [
-        { "atom": "p", "value": false },
-        { "atom": "q", "value": true }
+        {
+          "atom": "p",
+          "value": false
+        },
+        {
+          "atom": "q",
+          "value": true
+        }
       ]
     },
     "proof_submission": null,
@@ -48,13 +74,23 @@
   },
   "evaluator_only": {
     "answer_correct": true,
-    "answer_evidence_refs": ["SYNTHETIC-TRUTH-TABLE-ADJUDICATION"],
+    "answer_evidence_refs": [
+      "SYNTHETIC-TRUTH-TABLE-ADJUDICATION"
+    ],
     "formalization_matches_target": true,
-    "formalization_evidence_refs": ["SYNTHETIC-TYPED-SEQUENT-ADJUDICATION"],
+    "formalization_evidence_refs": [
+      "SYNTHETIC-TYPED-SEQUENT-ADJUDICATION"
+    ],
     "gold_countermodel": {
       "valuation": [
-        { "atom": "p", "value": false },
-        { "atom": "q", "value": true }
+        {
+          "atom": "p",
+          "value": false
+        },
+        {
+          "atom": "q",
+          "value": true
+        }
       ]
     },
     "proof_status": "not_run",
