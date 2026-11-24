@@ -188,13 +188,17 @@ The first bounded validator has now been added to the standalone Rust proof-plan
 - `scripts/research/proof-plan-contract/src/metamorphic.rs` — typed candidate/evaluator pair, domain-separated sequent digest recomputation, finite semantic relation derivation, and transformation-class consistency checks.
 - `scripts/research/proof-plan-contract/src/bin/math-metamorphic.rs` — CLI that validates a fixture dataset and emits one machine-readable line per pair.
 - `docs/research/MATH_METAMORPHIC_PAIR_V1.schema.json` — strict JSON Schema for the typed pair dataset.
-- `docs/research/MATH_METAMORPHIC_PAIR_V1.json` — three controls: equivalent implication/disjunction rewrite, removed-hypothesis mutation, and proof-route-only change.
+- `docs/research/MATH_METAMORPHIC_PAIR_V1.json` — five controls: equivalent implication/disjunction rewrite, removed-hypothesis mutation, proof-route-only change, independent-hypothesis order permutation, and incomparable conclusions.
 
 The finite checker maps a typed sequent to the implication from the conjunction of its hypotheses and premises to its conclusion, then exhaustively checks entailment in both directions. For this bounded Boolean AST:
-- the equivalent rewrite must be bidirectionally entailed;
-- the removed-hypothesis case must be one-way related and cannot be labelled semantics-preserving;
-- the route-only case must keep the exact sequent digest while carrying two distinct, non-empty route digests.
+- equivalent connective rewrites must be bidirectionally entailed;
+- reordering independent hypotheses must preserve entailment even though the raw sequent digest changes;
+- removing a hypothesis can produce a directional entailment change and cannot be labelled semantics-preserving;
+- unrelated atomic conclusions are incomparable;
+- a proof-route-only control must retain exact sequent digest while carrying two distinct, non-empty route digests.
 
 Candidate serialization omits evaluator-only gold relation and authority. The validator recomputes both typed-sequent digests and rejects a mismatch between the declared transformation class and the derived finite relation.
 
-**Status:** source and fixtures committed. The focused finite-reference job passed on exact PR head `da35bc584c5dfed8923654fda83c2c2319ebd338` (workflow run [45463952889](https://github.com/Luminous-Dynamics/symthaea/actions/runs/45463952889)): rustfmt passed, the standalone crate reported **100 passed / 0 failed**, and the CLI validated all three metamorphic fixtures. The Lean 4.29 and 4.37 extraction/differential lanes remained in progress at this update. The runtime environment used for this audit did not contain Cargo/Rust, so the Rust execution was performed by the pinned GitHub workflow, not locally. This finite contract is not Lean kernel replay, does not evaluate arbitrary mathematical propositions, and is not a model evaluation or CIRR score.
+**First exact-head qualification:** finite-reference passed on PR head `da35bc584c5dfed8923654fda83c2c2319ebd338` (workflow run [45463952889](https://github.com/Luminous-Dynamics/symthaea/actions/runs/45463952889)): formatting passed, 100 crate tests passed / 0 failed, and the three-pair CLI validated. The implementation has since been expanded with the hypothesis-order and incomparable controls; those two new fixtures and tests are **not yet qualified** by that earlier result.
+
+The runtime environment used for this audit did not contain Cargo/Rust, so Rust execution was performed by the pinned GitHub workflow, not locally. This finite contract is not Lean kernel replay, does not evaluate arbitrary mathematical propositions, and is not a model evaluation or CIRR score.
