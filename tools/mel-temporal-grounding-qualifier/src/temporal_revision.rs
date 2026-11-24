@@ -20,7 +20,7 @@ pub enum EvidenceConditionV1 {
     YokedRetrieved,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum RevisionActionV1 {
     NoChange,
     AddOccurrence,
@@ -136,6 +136,11 @@ pub fn audit_revision(case: &RevisionCaseV1) -> Result<RevisionReportV1, String>
     validate_score(&case.draft, "draft")?;
     validate_score(&case.final_score, "final_score")?;
     validate_score_pair(&case.draft, &case.final_score)?;
+    if case.actions.as_slice() == [RevisionActionV1::NoChange]
+        && case.draft != case.final_score
+    {
+        return Err("NoChange action is incompatible with different draft/final score records".into());
+    }
 
     let draft = snapshot(&case.draft);
     let final_score = snapshot(&case.final_score);
@@ -304,7 +309,7 @@ fn validate_actions(actions: &[RevisionActionV1]) -> Result<(), String> {
     }
     let mut seen = BTreeSet::new();
     for action in actions {
-        if !seen.insert(format!("{action:?}")) {
+        if !seen.insert(*action) {
             return Err("revision actions must not repeat".into());
         }
     }
@@ -366,15 +371,50 @@ fn validate_score(
             return Err(format!("{label}.{metric} must be finite and in [0,1]"));
         }
     }
-    if score.true_positives + score.false_positives != score.predicted_occurrences
-        && score.outcome == TemporalGroundingOutcomeV1::ScoredPresentQuery
-    {
-        return Err(format!("{label} prediction count does not equal TP + FP"));
+    if score.outcome == TemporalGroundingOutcomeV1::ScoredPresentQuery {
+        if score.true_positives.checked_add(score.false_positives)
+            != Some(score.predicted_occurrences)
+        {
+            return Err(format!("{label} prediction count does not equal TP + FP"));
+        }
+        if score.true_positives.checked_add(score.false_negatives)
+            != Some(score.ground_truth_occurrences)
+        {
+            return Err(format!("{label} truth count does not equal TP + FN"));
+        }
+        if score.count_absolute_error
+            != Some(score.predicted_occurrences.abs_diff(score.ground_truth_occurrences))
+            || score.exact_occurrence_count
+                != Some(score.predicted_occurrences == score.ground_truth_occurrences)
+        {
+            return Err(format!("{label} occurrence-count diagnostics are inconsistent"));
+        }
+        if score.matches.len() != score.true_positives {
+            return Err(format!("{label} one-to-one match count differs from true_positives"));
+        }
+        let mut prediction_indices = BTreeSet::new();
+        let mut annotation_indices = BTreeSet::new();
+        for matched in &score.matches {
+            if matched.prediction_index >= score.predicted_occurrences
+                || matched.annotation_index >= score.ground_truth_occurrences
+                || !prediction_indices.insert(matched.prediction_index)
+                || !annotation_indices.insert(matched.annotation_index)
+                || !matched.interval_iou.is_finite()
+                || !(0.0..=1.0).contains(&matched.interval_iou)
+            {
+                return Err(format!("{label} match vector is not a valid one-to-one interval assignment"));
+            }
+        }
     }
-    if score.true_positives + score.false_negatives != score.ground_truth_occurrences
-        && score.outcome == TemporalGroundingOutcomeV1::ScoredPresentQuery
+    if score.outcome == TemporalGroundingOutcomeV1::ScoredAbsentQuery
+        && (score.ground_truth_occurrences != 0
+            || score.predicted_occurrences != 0
+            || score.true_positives != 0
+            || score.false_positives != 0
+            || score.false_negatives != 0
+            || !score.matches.is_empty())
     {
-        return Err(format!("{label} truth count does not equal TP + FN"));
+        return Err(format!("{label} absent-query score carries positive occurrence counts"));
     }
     match score.outcome {
         TemporalGroundingOutcomeV1::ScoredPresentQuery if !score.scored || score.f1.is_none() => {
@@ -579,6 +619,16 @@ mod tests {
         let mut final_score = positive_score(1.0, 2, 0, 0);
         final_score.audio_sha256 = "1212121212121212121212121212121212121212121212121212121212121212".into();
         assert!(audit_revision(&case(draft, final_score)).is_err());
+    }
+
+    #[test]
+    fn declared_no_change_cannot_hide_a_different_final_score() {
+        let mut revision = case(
+            positive_score(0.5, 1, 1, 1),
+            positive_score(1.0, 2, 0, 0),
+        );
+        revision.actions = vec![RevisionActionV1::NoChange];
+        assert!(audit_revision(&revision).is_err());
     }
 
     #[test]
