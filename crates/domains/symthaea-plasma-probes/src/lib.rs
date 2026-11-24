@@ -105,6 +105,8 @@ pub enum ContractError {
     InvalidRefinementSignal,
     #[error("memory budget is smaller than the reserved headroom")]
     InvalidRefinementMemoryBudget,
+    #[error("projected refinement memory omits required temporary buffers")]
+    IncompleteRefinementMemoryEstimate,
     #[error("canonical symplectic basis contains non-finite values")]
     NonFiniteSymplecticBasis,
     #[error("canonical symplectic pair defect exceeds the declared tolerance")]
@@ -1588,7 +1590,12 @@ pub struct SpectralRefinementInput {
     pub spectral_tail_threshold: f64,
     pub response_risk_upper_bound: Option<f64>,
     pub response_risk_threshold: f64,
+    pub response_assessment_fresh: bool,
+    pub response_branch_association_stable: bool,
+    pub response_estimator_latency_seconds: f64,
+    pub refinement_deadline_seconds: f64,
     pub projected_peak_bytes: u64,
+    pub projected_peak_includes_temporary_buffers: bool,
     pub memory_budget_bytes: u64,
     pub reserved_headroom_bytes: u64,
 }
@@ -1607,6 +1614,7 @@ pub enum SpectralRefinementReason {
     FutureResponse,
     Both,
     ResponseUnknown,
+    SpectralTailAndResponseUnknown,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -1624,8 +1632,10 @@ pub struct SpectralRefinementReport {
     pub qualification: SpectralRefinementQualification,
     pub spectral_tail_ratio: f64,
     pub response_risk_upper_bound: Option<f64>,
+    pub response_assessment_valid: bool,
     pub effective_memory_budget_bytes: u64,
     pub projected_peak_bytes: u64,
+    pub projected_peak_includes_temporary_buffers: bool,
     pub remaining_headroom_bytes: u64,
 }
 
@@ -1645,11 +1655,18 @@ pub fn decide_spectral_refinement(
         || input.spectral_tail_threshold <= 0.0
         || !input.response_risk_threshold.is_finite()
         || input.response_risk_threshold <= 0.0
+        || !input.response_estimator_latency_seconds.is_finite()
+        || input.response_estimator_latency_seconds < 0.0
+        || !input.refinement_deadline_seconds.is_finite()
+        || input.refinement_deadline_seconds <= 0.0
         || input
             .response_risk_upper_bound
             .is_some_and(|risk| !risk.is_finite() || risk < 0.0)
     {
         return Err(ContractError::InvalidRefinementSignal);
+    }
+    if !input.projected_peak_includes_temporary_buffers {
+        return Err(ContractError::IncompleteRefinementMemoryEstimate);
     }
     if input.reserved_headroom_bytes > input.memory_budget_bytes {
         return Err(ContractError::InvalidRefinementMemoryBudget);
@@ -1661,14 +1678,19 @@ pub fn decide_spectral_refinement(
         return Err(ContractError::InvalidRefinementSignal);
     }
     let tail_triggered = spectral_tail_ratio >= 1.0;
-    let response_unknown = input.response_risk_upper_bound.is_none();
-    let response_triggered = input
-        .response_risk_upper_bound
-        .is_some_and(|risk| risk >= input.response_risk_threshold);
+    let response_unknown = input.response_risk_upper_bound.is_none()
+        || !input.response_assessment_fresh
+        || !input.response_branch_association_stable
+        || input.response_estimator_latency_seconds > input.refinement_deadline_seconds;
+    let response_triggered = !response_unknown
+        && input
+            .response_risk_upper_bound
+            .is_some_and(|risk| risk >= input.response_risk_threshold);
 
     let reason = match (tail_triggered, response_triggered, response_unknown) {
         (true, true, _) => SpectralRefinementReason::Both,
-        (true, false, _) => SpectralRefinementReason::SpectralTail,
+        (true, false, true) => SpectralRefinementReason::SpectralTailAndResponseUnknown,
+        (true, false, false) => SpectralRefinementReason::SpectralTail,
         (false, true, _) => SpectralRefinementReason::FutureResponse,
         (false, false, true) => SpectralRefinementReason::ResponseUnknown,
         (false, false, false) => SpectralRefinementReason::NoTrigger,
@@ -1682,8 +1704,10 @@ pub fn decide_spectral_refinement(
             qualification: SpectralRefinementQualification::NoTrigger,
             spectral_tail_ratio,
             response_risk_upper_bound: input.response_risk_upper_bound,
+            response_assessment_valid: !response_unknown,
             effective_memory_budget_bytes,
             projected_peak_bytes: input.projected_peak_bytes,
+            projected_peak_includes_temporary_buffers: input.projected_peak_includes_temporary_buffers,
             remaining_headroom_bytes: effective_memory_budget_bytes
                 .saturating_sub(input.projected_peak_bytes),
         });
@@ -1696,8 +1720,10 @@ pub fn decide_spectral_refinement(
             qualification: SpectralRefinementQualification::UnknownBlockedByMemory,
             spectral_tail_ratio,
             response_risk_upper_bound: input.response_risk_upper_bound,
+            response_assessment_valid: !response_unknown,
             effective_memory_budget_bytes,
             projected_peak_bytes: input.projected_peak_bytes,
+            projected_peak_includes_temporary_buffers: input.projected_peak_includes_temporary_buffers,
             remaining_headroom_bytes: 0,
         });
     }
@@ -1712,8 +1738,10 @@ pub fn decide_spectral_refinement(
         },
         spectral_tail_ratio,
         response_risk_upper_bound: input.response_risk_upper_bound,
+        response_assessment_valid: !response_unknown,
         effective_memory_budget_bytes,
         projected_peak_bytes: input.projected_peak_bytes,
+        projected_peak_includes_temporary_buffers: input.projected_peak_includes_temporary_buffers,
         remaining_headroom_bytes: effective_memory_budget_bytes - input.projected_peak_bytes,
     })
 }
@@ -3786,7 +3814,12 @@ mod tests {
             spectral_tail_threshold: 10.0,
             response_risk_upper_bound,
             response_risk_threshold: 1.0,
+            response_assessment_fresh: true,
+            response_branch_association_stable: true,
+            response_estimator_latency_seconds: 0.005,
+            refinement_deadline_seconds: 0.01,
             projected_peak_bytes,
+            projected_peak_includes_temporary_buffers: true,
             memory_budget_bytes: 1_000,
             reserved_headroom_bytes: 100,
         }
@@ -3809,7 +3842,12 @@ mod tests {
                 spectral_tail_threshold: tail_threshold,
                 response_risk_upper_bound: response_risk,
                 response_risk_threshold: response_threshold,
+                response_assessment_fresh: case["response_assessment_fresh"].as_bool().unwrap(),
+                response_branch_association_stable: case["response_branch_association_stable"].as_bool().unwrap(),
+                response_estimator_latency_seconds: case["response_estimator_latency_seconds"].as_f64().unwrap(),
+                refinement_deadline_seconds: case["refinement_deadline_seconds"].as_f64().unwrap(),
                 projected_peak_bytes: case["projected_peak_bytes"].as_u64().unwrap(),
+                projected_peak_includes_temporary_buffers: memory["projected_peak_includes_temporary_buffers"].as_bool().unwrap(),
                 memory_budget_bytes: budget,
                 reserved_headroom_bytes: reserve,
             };
