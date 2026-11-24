@@ -1,0 +1,288 @@
+{
+  "schema_version": "luminous.dmc-individual-effect-pilot.v0.1",
+  "status": "protocol_recovery_required",
+  "created_utc_date": "2026-11-24",
+  "purpose": "Separate an exact replication of the paper's DMC environment-eligibility diagnostic from a new Symthaea model-side experiment.",
+  "paper": {
+    "title": "Where Individual-Effect Information Survives: A Diagnostic Ladder for World Models",
+    "author": "Tsuyoshi Okita",
+    "published_date": "2026-11-04",
+    "journal": "Machine Learning and Knowledge Extraction",
+    "volume_issue_article": "8(11), 363",
+    "doi": "10.3390/make8110363",
+    "url": "https://www.mdpi.com/2504-4990/8/11/363",
+    "scope_limit": "The paper's results cover twelve deliberately formulated environments and small, low-dimensional models; transfer to large visual/robotic world models is open."
+  },
+  "paper_dmc_formulation": {
+    "family": "T_DMC*",
+    "selected_task": "cartpole.swingup",
+    "other_family_tasks": [
+      "cartpole.two_poles",
+      "cartpole.three_poles",
+      "walker.walk"
+    ],
+    "individual_definition": "One realization of exogenous physical-body parameters; perturbations include pole length.",
+    "individuals_per_task": 150,
+    "action_sequence_count": 6,
+    "unordered_intervention_pairs_per_individual": 15,
+    "history_blocks": 12,
+    "branch_point_block": 12,
+    "rollout_horizon_blocks": 12,
+    "mask_sweep": {
+      "published_description": "Five mask rates and four orderings; seventeen groups; five seeds each.",
+      "table_7_rows": [
+        {
+          "condition": "None",
+          "branch_point_share": 0.511,
+          "abducible_share": 0.396,
+          "seed_sd": 0.035,
+          "estimation_floor": 0.093
+        },
+        {
+          "condition": "Last-value probes only",
+          "branch_point_share": 0.512,
+          "abducible_share": 0.395,
+          "seed_sd": 0.034,
+          "estimation_floor": 0.093
+        },
+        {
+          "condition": "Including pole angular velocity",
+          "branch_point_share": 0.147,
+          "abducible_share": 0.759,
+          "seed_sd": 0.061,
+          "estimation_floor": 0.093
+        },
+        {
+          "condition": "Plus first-value probes",
+          "branch_point_share": 0.108,
+          "abducible_share": 0.8,
+          "seed_sd": 0.08,
+          "estimation_floor": 0.093
+        }
+      ],
+      "unresolved": [
+        "Exact five mask-rate values and complete seventeen-group design",
+        "Exact ordered observation-column list and fixed random masking permutation",
+        "Exact mapping between the four table labels and all seventeen experimental groups"
+      ]
+    },
+    "eligibility_result": {
+      "action_efficacy_C1": "pass",
+      "branchability_C2": "pass",
+      "individual_dependence_C3": "pass",
+      "measurability_C4": "pass under the paper's A >= 3*phi convention",
+      "convergence_C5": "pass as reported by the paper",
+      "abducible_share_A": 0.396,
+      "estimation_floor_phi": 0.093,
+      "paper_threshold": "A >= 3*phi",
+      "threshold_multiple": 3,
+      "note": "These are paper-reported environment/measurement values for its exact formulation, not Symthaea measurements and not a trained DMC world-model score."
+    },
+    "model_checkpoint": {
+      "exists_in_paper_dataset": false,
+      "consequence": "The paper does not report a trained-world-model latent-versus-rollout comparison for this DMC formulation. DMC is an environment-eligibility/observability diagnostic in the paper. A Symthaea model-side result on this task is a new extension, not a reproduction of a paper DMC model result."
+    },
+    "paper_method_details_to_preserve": [
+      "Individual contrasts are centred within each intervention pair before the third-rung diagnostic, separating heterogeneous individual effects from the pair's mean treatment effect.",
+      "The paper uses a random-forest estimator and five seeds for its DMC mask diagnostic.",
+      "Individuals, not the 15 pair rows, are the independent resampling unit.",
+      "C4 reports the estimation floor beside A; the three-times-floor convention is paper-specific, not a universal theorem."
+    ]
+  },
+  "current_upstream_reference": {
+    "repository": "google-deepmind/dm_control",
+    "commit": "d7e52e3602a555df6cc20cc928ea5b41e9920158",
+    "commit_url": "https://github.com/google-deepmind/dm_control/commit/d7e52e3602a555df6cc20cc928ea5b41e9920158",
+    "package_version": "1.0.52",
+    "setup_file": {
+      "path": "setup.py",
+      "git_blob_sha1": "f7b7a4c28fdd6070a2321408bdb1a39839a7af09",
+      "mujoco_requirement": ">=4.0.1"
+    },
+    "task_source": {
+      "path": "dm_control/suite/cartpole.py",
+      "git_blob_sha1": "4b6a026e4914ea040ca4cd24f32ac48d38ea808b",
+      "upstream_factory": "cartpole.swingup(time_limit=10, random=None, environment_kwargs=None)",
+      "defaults": {
+        "num_poles": 1,
+        "swing_up": true,
+        "sparse_reward": false,
+        "time_limit_seconds": 10
+      },
+      "initial_state": "Standard upstream implementation randomizes cart/pole positions and small initial velocities; this is not the paper's individual physical-body-parameter perturbation protocol."
+    },
+    "status": "current upstream API/source pin only; not yet proven to match the paper's simulator version, physical-parameter sampling, branch driver, or exact task configuration."
+  },
+  "unresolved_reproduction_inputs": [
+    "Exact DMC and MuJoCo versions used for the paper, including model XML and physical constants.",
+    "Names, distributions, ranges, correlations and sampling seeds for each perturbed physical-body parameter.",
+    "The six action-sequence vectors, durations, control scaling, branch point semantics and terminal horizon.",
+    "Exact observation block construction, feature ordering, mask-rate values and fixed random masking permutation.",
+    "The exact individual/cohort seeds, split and five-seed mapping.",
+    "Exact simulator snapshot/restore procedure and proof of factual-prefix equality for all 6 branches.",
+    "Exact outcome component and aggregation over the 12-block horizon.",
+    "Exact random-forest settings, cross-fitting folds, residual/floor calculation, and C5 sample-size convergence rule.",
+    "A public link to the paper's promised simulation scripts, generated data and figure/table reproduction code."
+  ],
+  "benchmark_admission": {
+    "preconditions": [
+      "Recover and hash the complete paper task/intervention/estimator configuration before labelling any run a replication.",
+      "Re-run C1 action efficacy, C2 same-individual branchability, C3 individual dependence, C4 estimation-floor/readability and C5 sample-size convergence on the pinned implementation.",
+      "Require factual-prefix equality across sibling interventions, same hidden individual parameters and shared exogenous forcing; allow post-action endogenous trajectories to diverge.",
+      "Validate snapshot/restore and stochastic source-to-draw evidence using the owning Symtropy verifier; hash fields alone are not authentication.",
+      "Keep the 15 contrasts from one individual together in all splits and resamples.",
+      "Freeze train/validation/test individual IDs, intervention pairs, masks, seeds and evaluator profile before training."
+    ],
+    "paper_replication_success": [
+      "Exact parameterization and all unresolved inputs recovered and source-pinned.",
+      "C1-C5 reproduced with an estimation floor and individual-cluster uncertainty.",
+      "Table 7 values and seed spread reproduced within a preregistered tolerance on the identical formulation.",
+      "No claim of a DMC model-side comparison, since the paper contains no DMC trained checkpoint."
+    ],
+    "symthaea_extension_success_targets_not_results": [
+      "HDC+CfC/LTC rollout predicts centred individual contrasts better than zero-effect, branch-point-only and history-only simple baselines on held-out individuals.",
+      "HDC+CfC/LTC is compared against HDC-only, CfC/LTC-only, a matched GRU/RSSM baseline where faithfully implemented, and reconstruction-only versus reconstruction-plus-contrast training.",
+      "The frozen-latent readout and imagined rollout are reported separately; report A_lat, A_pred and the loss at each transition.",
+      "Aspirational rollout-retention target: A_pred/A_lat >= 0.90 where A_lat is itself estimable above the declared floor; this is a prospective target requiring preregistration, not a paper result.",
+      "Report individual-effect MAE relative to the zero-effect predictor, sign accuracy, within-pair-centred correlation, calibration slope/intercept, worst-bin bias, action ranking, and decision regret separately.",
+      "Decision sufficiency remains owned by Symthaea #13239/#13152; statistical cluster inference remains owned by #8578.",
+      "Any claimed resource advantage uses measured bytes, compute, latency and energy on the actual candidate path."
+    ]
+  },
+  "explicit_non_claims": [
+    "No paper source code or generated data has yet been recovered from a linked public repository.",
+    "The current dm_control 1.0.52 pin is not asserted to be the paper's DMC version.",
+    "A=0.396 and phi=0.093 are not Symthaea results.",
+    "No DMC training run, model benchmark, HDC/CfC advantage, SOTA improvement, simulator validation, HIL restoration or physical safety result is claimed."
+  ],
+  "ownership": {
+    "individual_effect_arithmetic": "Symthaea #13520",
+    "temporal_representation_and_hdc_cfc_hypothesis": "Symthaea #13255/#13258",
+    "decision_sufficiency": "Symthaea #13239/#13152",
+    "branch_pairing_and_replay_lineage": "Symthaea #13375/#13377 and generic #8764",
+    "stochastic_correspondence_source_reprojection": "Symtropy #3741 / draft PR #3743",
+    "evaluator_isolation": "Symthaea #9437",
+    "cluster_inference": "Symthaea #8578",
+    "external_closed_loop_world_model_benchmarks": "Symthaea #9094/#13389"
+  },
+  "implementation_surface_audit": {
+    "inspected_commit": "3ca654b0544b5ad398b2129a4884027f4d9074f4",
+    "findings": [
+      {
+        "path": "crates/core/symthaea-core/src/hdc/hdc_ltc_unified.rs",
+        "finding": "Per-step BPTT uses a single evolved-state target; contrastive_update is positive/negative hypervector attraction/repulsion, not a paired action-trajectory effect loss."
+      },
+      {
+        "path": "crates/domains/symthaea-broca/src/training.rs",
+        "finding": "Teacher-forced next-token cross-entropy training, not a physical world-transition trainer."
+      },
+      {
+        "path": "crates/domains/symthaea-broca/src/liquid_mamba.rs",
+        "finding": "Contrastive loss separates thought/token intents; not an individual treatment-effect contrast."
+      },
+      {
+        "path": "crates/core/symthaea-hdc-ltc/src/network.rs",
+        "finding": "Separate network-level temporal forward interface; compatibility with the older per-neuron BPTT API has not been established."
+      },
+      {
+        "path": "crates/core/symthaea-stt/src/phoneme_hdc_ltc.rs",
+        "finding": "Contains an ignored test_training_changes_output test marked as a known training issue; not evidence of validated training."
+      },
+      {
+        "path": "crates/domains/symthaea-multirotor/src/controller.rs",
+        "finding": "Sensor-to-action controller BPTT, not an action-conditioned world-transition model."
+      }
+    ],
+    "implementation_status": "No individual-effect HDC/CfC/LTC trainer exists in this pilot branch. Do not repurpose Broca intent-contrast training or HDC positive/negative contrastive_update. The next implementation must accumulate trajectory and all sibling-pair contrast gradients using shared pre-update parameters, then update once after all branches.",
+    "claim_boundary": "Source inspection only. No training implementation, model run, or performance result is claimed."
+  },
+  "pair_admission_receipt_contract": {
+    "consumer_field": "IndividualEffectContext.pairing_receipt_sha256",
+    "semantics": "Digest of a pair-level admission certificate that commits to both baseline and alternative branches; the digest alone is not authentication.",
+    "required_bound_artifacts": [
+      "individual/factual-history/restored-branch-point/task/intervention-pair/dynamics-model/paired-seed identity",
+      "separate baseline and alternative branch IDs, trajectory receipts, action digests, application timestamps and realized outcome digests",
+      "per-tick state-chain and observation-delivery commitments with shared exogenous event identity where applicable",
+      "per-branch driver execution receipt and independent replay/audit receipt",
+      "source CorrespondenceSet, EventDrawScope, re-projected draw bundle and verifier receipt when stochastic correspondence is used",
+      "exact verifier profile, verifier result, and independently retained signature or trust-root anchor"
+    ],
+    "admission_rule": "External wrapper retrieves and verifies actual source/artifact bytes, signatures/anchors, branch application and replay, factual-prefix identity, and permitted post-action divergence before passing the pair digest/outcomes to #13520.",
+    "not_sufficient": [
+      "nonempty SHA-256 field",
+      "self-consistent unkeyed content digest",
+      "caller-supplied replay_passed boolean",
+      "four-arm #13377 validator treated as a generic two-branch verifier"
+    ],
+    "stochastic_boundary": "Use Symtropy #3741/#3743 source-to-address-to-Philox re-projection only when the pinned experiment has a stochastic draw/correspondence domain; do not invent a stochastic verifier for deterministic DMC runs."
+  },
+  "external_benchmark_anchors": [
+    {
+      "name": "MRS.Q",
+      "venue_year": "ICML 2026",
+      "url": "https://proceedings.mlr.press/v306/chang26a.html",
+      "comparison_role": "Native model-based search comparator; report prediction accuracy separately from search value and overestimation risk.",
+      "key_warning": "Search may reduce performance even with accurate models; minimum-over-value-ensemble aggregation mitigates overestimation."
+    },
+    {
+      "name": "World-In-World",
+      "venue_year": "ICLR 2026",
+      "url": "https://proceedings.iclr.cc/paper_files/paper/2026/hash/5b4263be85820683d78675cc18d2efc7-Abstract-Conference.html",
+      "comparison_role": "Closed-loop visual embodied track with task success and a standardized action API; pair with direct-policy/no-world-model controls.",
+      "key_warning": "Do not compare task success values to DMC abducible share A or floor phi."
+    },
+    {
+      "name": "Rollback",
+      "date": "2026-10-26",
+      "paper_url": "https://arxiv.org/abs/2610.36068",
+      "project_url": "https://rollback-wm.github.io/",
+      "comparison_role": "Prior art for checkpoint rewind, action-chunk branching and branch-outcome supervision on real robots.",
+      "published_task_results": {
+        "jenga_success_percent": {
+          "rollback": 69.33,
+          "strongest_listed_baseline": 58.67
+        },
+        "ball_toss_success_percent": {
+          "rollback": 40,
+          "strongest_listed_baseline": 28.89
+        },
+        "tabletop_curling_success_percent": {
+          "rollback": 64.44,
+          "strongest_listed_baseline": 52.59
+        }
+      },
+      "key_warning": "Task-specific reported results; not comparable with DMC, LIBERO or one another absent identical protocols."
+    },
+    {
+      "name": "Do World Models Make Better Robots?",
+      "date": "2026-08-30",
+      "url": "https://arxiv.org/abs/2609.29669",
+      "comparison_role": "Benchmark landscape audit for prediction-to-action and direct-policy comparison.",
+      "survey_specific_counts": {
+        "benchmarks": 160,
+        "explicit_vla_vs_world_model_comparisons": 11,
+        "prediction_to_execution_bridges": 4
+      },
+      "key_warning": "Counts describe this survey corpus, not an exhaustive universal census."
+    }
+  ],
+  "industry_comparison_policy": {
+    "compare_only_within_matching_task_protocol": true,
+    "required_controls": [
+      "direct policy without a world model",
+      "identity/full-state oracle or reference where valid",
+      "zero-effect and branch-point-only individual-effect predictors",
+      "matched recurrent/RSSM model where faithfully reproducible",
+      "HDC-only, CfC/LTC-only and HDC+CfC/LTC"
+    ],
+    "separate_metrics": [
+      "individual counterfactual effect fidelity",
+      "decision regret / common epsilon-good set",
+      "closed-loop success and recovery",
+      "search-induced optimism / lower-tail risk",
+      "compute, latency, simulator interaction and energy"
+    ],
+    "no_cross_benchmark_score_pooling": true,
+    "desired_claim": "Matched Pareto improvement on an identical task protocol with independently reproducible evidence; no SOTA claim from cross-task score comparisons."
+  }
+}

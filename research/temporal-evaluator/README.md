@@ -42,3 +42,12 @@ The module does not estimate the paper's abducible share, prove structural causa
 For external interpretation, distinguish deterministic simulator snapshot/restore (Tier S), hardware-in-the-loop with measured restoration (Tier H), and randomized matched physical units (Tier R). Only Tier S/H with qualified branch identity can support an individual counterfactual claim; Tier R estimates population/subgroup effects, not both potential outcomes for the same physical unit. The first low-cost pilot is the paper-audited `dm_control/cartpole/swingup` task, after exact upstream parameterization/intervention reproduction and C1-C5 re-audit. Its published A=0.396 and phi=0.093 are prior-paper values, not Symthaea measurements.
 
 The individual comparison retains both actual branch application timestamps and their signed alternative-minus-baseline delay. Application-time differences are treatment outcomes (e.g. compute-induced delay), not pairing errors. #13377 remains responsible for binding each realized outcome to its exact trajectory tick, action digest and application timestamp; this evaluator only preserves those values for downstream analysis.
+
+## DMC individual-effect pilot boundary
+
+The versioned DMC pilot contract is in [DMC_INDIVIDUAL_EFFECT_PILOT_V0_1.md](../../docs/research/DMC_INDIVIDUAL_EFFECT_PILOT_V0_1.md), with its machine-readable source/parameter manifest at [dmc_individual_effect_pilot_manifest_v0.1.json](../../docs/research/fixtures/dmc_individual_effect_pilot_manifest_v0.1.json).
+
+Important distinction: the paper's `cartpole.swingup` result is an environment-eligibility / observation-masking diagnostic (150 individuals, six interventions, 15 pairs, 12 history blocks, A=0.396, phi=0.093). The paper's data table reports no trained world-model checkpoint for this DMC formulation. Symthaea model training on this task is therefore a new extension, not a reproduction of a paper DMC latent-versus-rollout result. The exact physical-parameter perturbations, action sequences, masks, seeds and simulator driver still require recovery before calling the DMC eligibility track a reproduction.
+
+No DMC benchmark execution or Symthaea model-side result is claimed by the pilot contract.
+
