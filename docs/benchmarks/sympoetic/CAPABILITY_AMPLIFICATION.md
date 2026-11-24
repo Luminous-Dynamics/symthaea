@@ -115,6 +115,8 @@ A further warning comes from the 2026 meta-analysis of eight independent cogniti
 
 The research question is whether a support policy enables useful work during difficulty while preserving independent capability and agency—not whether it maximizes struggle, persistence or answer withholding.
 
+The group-level sequencing complement is [Mycelix DELIB-INFO-ORDER-001 #6616](https://github.com/Luminous-Dynamics/mycelix/issues/6616), which compares AI-first, independent-first, evidence-first and human-only collaboration. Individual capability measures here should be interpreted alongside the group's preservation of unique member-held information and its post-AI decision capability; individual pre/post improvement alone cannot establish collective benefit.
+
 ## 7. Distributional capability amplification
 
 A pooled positive treatment effect can hide a subgroup that experiences no benefit or loses independent capability. The confirmatory design should therefore preregister baseline task-capability strata (for example, low, middle, and high baseline score bands) before examining post-test outcomes.
