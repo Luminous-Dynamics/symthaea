@@ -173,3 +173,22 @@ Build the pairwise contrast loss as a training primitive in a dedicated research
 
 This is a deliberate non-reuse boundary: the paper's contrast objective is prior art; the existing HDC triplet update and Broca intent-contrast pathway are not equivalent. A correct experiment must show that the new gradient reaches the predicted individual treatment contrast in the action-conditioned rollout, not merely that two latent vectors become more separable.
 
+## Pair-admission receipt contract for #13520
+
+The current #13520 API has a single `pairing_receipt_sha256` on the individual comparison context. Interpret that digest as the commitment to a **pair-level admission certificate** that binds both sibling branches, not as the digest of one branch and not as proof by itself.
+
+Before passing an `IndividualEffectPair` to #13520, the independent wrapper must retrieve and verify the certificate and all referenced artifacts. At minimum the certificate must bind:
+
+- the individual, factual history, restored branch point, task/intervention pair, dynamics/model build and paired seed;
+- distinct baseline and alternative branch IDs, branch-local trajectory receipts, action digests, application timestamps and realized outcome digests;
+- all per-tick pre/post-state and observation-delivery commitments, plus shared exogenous event identity where applicable;
+- the driver execution receipt and independent replay/audit receipt for each branch;
+- the source `CorrespondenceSet`, draw scopes and re-projected stochastic draw bundle/verifier receipt when stochastic correspondence is used;
+- the exact verifier profile, verifier result, and an independently retained signature or trust-root commitment that authenticates the admitted bytes.
+
+The wrapper checks the source bytes and signatures/anchors, confirms each branch is fully applied and replayed, checks factual-prefix identity and allowed post-action divergence, and only then supplies the pair-level digest and realized branch outcomes to #13520. A nonempty hash field, a self-consistent unkeyed content digest, or a caller-supplied `replay_passed=true` flag is not admission evidence.
+
+For the deterministic DMC formulation, the shared individual parameters and branch-point snapshot are essential; stochastic event/draw evidence is required only if the pinned implementation actually has a stochastic forcing/draw domain. Where it does, use Symtropy's source-to-address-to-Philox re-projection contract (#3741/#3743), not a parallel local verifier.
+
+This contract is deliberately compatible with a two-branch pair while preserving #13377's existing four-arm DVPC scope. It adds no verifier to #13520; it specifies what the external admission wrapper must prove before the arithmetic consumer is called.
+
