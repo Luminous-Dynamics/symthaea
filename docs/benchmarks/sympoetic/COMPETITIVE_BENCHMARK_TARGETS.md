@@ -231,6 +231,33 @@ Keep information discovery under Mycelix #6089 rather than duplicating its runti
 
 Measure unique-information solicitation/coverage, source attribution, correct use, temporal update handling, ambiguity detection, justified abstention, rights-aware withholding and stopping. HiddenBench's distributed-information and complete-profile conditions are not a matched head-to-head comparison; preserve that distinction. GroupMemBench makes BM25 a mandatory serious baseline rather than a trivial control.
 
+### 7.5 Neurotechnology: generalization and user burden, not peak decoder accuracy
+
+For any future speech/communication BCI or neural-interface comparison, declare the held-out deployment shift and adaptation regime. These are separate experiments:
+
+- Cross-session (same participant, later recording).
+- Cross-participant (new participant).
+- Cross-task (new vocabulary, command set or communication task).
+- Cross-device / electrode configuration.
+- Cross-site / clinical setting.
+- Cross-modality (only where the task and output semantics permit a meaningful match).
+
+For each axis, report zero-shot performance, target-data access, calibration examples/time, online adaptation, recalibration frequency, drift recovery, latency, communication rate, error correction burden, interruption and sustained use. A model fine-tuned on a new participant is not a zero-shot cross-participant result. A held-out session result does not establish cross-user transfer.
+
+A 2026 systematic review of 115 AI brain-to-speech studies found 84.3% used subject-dependent evaluation, only 4.3% used exclusively subject-independent evaluation, and patient-selection bias was high in 62.6% of studies. Its raw invasive/non-invasive accuracy comparison is not a fair leaderboard because tasks, vocabularies and populations differ. Source: https://doi.org/10.1186/s12911-026-03552-8
+
+An October 2026 review explicitly separates cross-session, cross-participant, cross-task, cross-device, cross-site and cross-modality generalization, and distinguishes fixed transfer from target-data adaptation. It emphasizes sustained function, acceptable risk/cost and manageable training/recalibration/maintenance burden. Source: https://www.nature.com/articles/s44385-026-00119-0
+
+The competitive target is therefore:
+1. Reproduce the strongest baseline on the same participants, sessions, task and output representation.
+2. Demonstrate held-out-session and held-out-participant results separately.
+3. Report the performance-versus-calibration-burden frontier.
+4. Preserve communication intent, user correction and stop control; do not silently infer broader mental states.
+5. Keep invasive, non-invasive and assistive interfaces in separate product/use-case strata.
+6. Require prospective, clinically appropriate validation before clinical claims; a synthetic or offline decoding pass is not a clinical efficacy or safety result.
+
+These benchmarks should be connected to Symthaea's neurosemantic interface work and Mycelix [sovereign neurosemantic consent #3991](https://github.com/Luminous-Dynamics/mycelix/issues/3991). The latter owns purpose-bound consent semantics; this section defines evaluation dimensions, not permission to collect neural or inferred mental-state data.
+
 ### 7.4 Information order and AI anchoring
 
 The companion Mycelix experiment [DELIB-INFO-ORDER-001 #6616](https://github.com/Luminous-Dynamics/mycelix/issues/6616) randomizes the order in which teams see human judgments, human evidence inventories and AI-generated synthesis:
