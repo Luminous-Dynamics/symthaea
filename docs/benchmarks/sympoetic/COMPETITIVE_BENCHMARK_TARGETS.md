@@ -1,6 +1,6 @@
 # SympoeticBench Competitive Benchmark Targets and SOTA Strategy
 
-**Status:** research and engineering targets, 15 November 2026  
+**Status:** research and engineering targets, 24 November 2026  
 **Release:** SympoeticBench v0.1 development track  
 **Important:** target values below are qualification objectives, not achieved results or universal standards.
 
@@ -31,6 +31,10 @@ We should publish a vector of outcomes and evidence, not a single unqualified sc
 | Common Ground Benchmark (2026) | Shared beliefs, goals, situation awareness, referential coordination, repair | Interactive human-AI puzzle and confirmatory user study | Dynamic common ground and misunderstanding repair |
 | KaBLE (AI Index 2026) | Knowledge/belief distinction and first-person false-belief robustness | 13,000 questions across 13 tasks, 24 models | First-person false belief, provenance, and confidence updating |
 | OHAI (2026) | Configuration, enacted collective functioning, and persistent-team collective intelligence | Staged theoretical and empirical framework | Do not infer collective intelligence from one-shot or repeated independent task scores |
+| CMU Human-AI Complementarity programme (2026) | Individual persistence and unaided skill after AI withdrawal; team AI × transactive-memory interaction | Programme reports randomized individual trials (N=1,222) and a 159-team 2×2 study | Replicate with matched AI × TMS cells, immediate/delayed/transfer outcomes and AI-off isolation |
+| HiddenBench (ICML 2026) | Reasoning when relevant facts are distributed across participants/agents | 65 tasks; 15 frontier models; 30.1% multi-agent accuracy under distributed information vs 80.7% for a single model with the complete profile | Report information-access conditions explicitly; add solicitation, unique-fact coverage, attribution and full-information diagnostic reference |
+| GroupMemBench (2026) | Multi-party conversation memory, knowledge updates, ambiguity, temporal reasoning and abstention | 715 adversarial questions; strongest tested system 46.0% average; BM25 competitive with or above many agent-memory systems | Require BM25, exact-provenance retrieval, update/ambiguity and abstention baselines before claiming semantic-memory superiority |
+| Agent Sovereignty Benchmark (public preview, v1.1) | Portability, transparency, auditability, verifiability, modifiability and controllability | Public-preview framework with 26 evidence-scored tests; not a regulatory standard | Use as an adjacent evidence crosswalk; report pass/partial/fail/unverified per control, not a single sovereignty score |
 
 External source links:
 - AOBench benchmark card: https://mskazemi.com/aobench/latest/about/benchmark-card/
@@ -40,6 +44,10 @@ External source links:
 - Common Ground Benchmark: https://www.microsoft.com/en-us/research/publication/a-benchmark-to-assess-common-ground-in-human-ai-collaboration/
 - Stanford AI Index 2026: https://hai.stanford.edu/ai-index/2026-ai-index-report
 - OHAI persistent teams: https://doi.org/10.3389/forgp.2026.1941058
+- CMU Human-AI Complementarity programme: https://www.cmu.edu/ai-sdm/research/human-ai-workshop/2026_workshop/2026-programming/index.html
+- HiddenBench (ICML 2026): https://proceedings.mlr.press/v306/li26ej.html
+- GroupMemBench: https://www.microsoft.com/en-us/research/publication/groupmembench-benchmarking-llm-agent-memory-in-multi-party-conversations/
+- Agent Sovereignty Benchmark (public preview): https://agentsofhumanity.ai/
 
 Scores are not directly comparable across these programmes. Different task sets, tools, environments, agents, populations, and scoring methods change the estimand. Reproduce external baselines under their own documented contracts before claiming a comparative result.
 
@@ -180,6 +188,53 @@ The trajectory validator qualifies receipts and recorded continuity; it does not
 | M4 — Collective-intelligence evidence | Qualified multi-task measurement model, adequate team sampling, generalization, independent replication | A bounded collective-intelligence claim for the stated task universe |
 
 Do not create a collective-intelligence headline from 17 development scenarios or a two-cycle fixture.
+
+### 7.1 Team capability after AI withdrawal: a 2×2 confirmatory track
+
+The four randomized cells are:
+
+| Arm | Collaboration condition | Qualification phase |
+|---|---|---|
+| H0 | Human-only | Immediate, delayed and transfer tasks without AI |
+| H1 | Human + transactive-memory scaffold (TMS) | Same independent tasks |
+| A0 | Human + AI | Same independent tasks after AI access is removed |
+| A1 | Human + AI + TMS | Same independent tasks after AI access is removed |
+
+The AI runtime must be pinned across A0/A1. The TMS protocol must be pinned across H1/A1. Task bundle, time/information budgets, scoring rubric, randomization, exclusions and delayed interval must be frozen before confirmatory collection.
+
+Keep these outcomes separate:
+- Assisted-phase task accuracy (descriptive exposure-phase outcome).
+- Immediate AI-off task accuracy and gain relative to baseline.
+- Delayed AI-off retention gain.
+- Transfer gain on held-out task families or changed contexts.
+- Unique member-held fact retention and correct use.
+- Expertise-routing accuracy.
+- Participant/team agency, dissent preservation and workload.
+
+Estimate AI main effect, TMS main effect and AI×TMS interaction for every preregistered primary/secondary endpoint. Resample randomized **teams** for team-level uncertainty; conversation turns, utterances and repeated tasks are nested observations, not independent teams. The two-team-per-cell floor in the v0.1 software is only a guard against undefined intervals, not an adequate sample-size target.
+
+Use pilot variance and the smallest practically important effect to power the confirmatory team count prospectively. Pre-register the primary endpoint, model, missingness/attrition policy, multiplicity correction, exclusion rules and harm/non-inferiority margins. Report all four cells and negative outcomes. No aggregate may conceal an arm or subgroup whose capability, agency or safety worsens.
+
+The AI-off condition must be technically verified by an independent runner: remove endpoint/API access, agent processes, cached answers and model-generated artifacts from the participant's evaluation path; record a signed run-specific receipt; and use negative controls to demonstrate that an attempted model call fails. A declaration or SHA-256-shaped string is not proof of isolation.
+
+The current SympoeticBench v0.1 implementation is only a team-level TSV validator and descriptive factorial estimator with synthetic fixture. It does not recruit participants, randomize teams, score tasks, enforce the AI-off boundary, authenticate receipts, calculate confirmatory power or establish causal benefit. Those are separate gates before human-study or superiority claims.
+
+### 7.2 Distributed information and group-memory tournament
+
+Keep information discovery under Mycelix #6089 rather than duplicating its runtime inside SympoeticBench. Compare at minimum:
+- Human transactive-memory baseline.
+- BM25 lexical retrieval.
+- Exact/source-bound provenance retrieval.
+- The candidate semantic/agent-memory system.
+- A complete-information diagnostic reference, clearly labeled as a different information-access condition.
+
+Measure unique-information solicitation/coverage, source attribution, correct use, temporal update handling, ambiguity detection, justified abstention, rights-aware withholding and stopping. HiddenBench's distributed-information and complete-profile conditions are not a matched head-to-head comparison; preserve that distinction. GroupMemBench makes BM25 a mandatory serious baseline rather than a trivial control.
+
+### 7.3 Sovereignty and non-substitutable constraints
+
+Map each applicable control to evidence for portability, transparency, auditability, verifiability, modifiability and controllability. Record pass/partial/fail/unverified separately. Test expiry and revocation against future access, export/import without scope widening, and truthful handling of information already disclosed to recipients. Never claim revocation causes a recipient to forget information already observed.
+
+Sovereignty, consent, stop/refusal, privacy, dignity and safety remain hard gates. They cannot be offset by higher accuracy, productivity, retention or cost scores.
 
 ## 8. SOTA comparison protocol
 
