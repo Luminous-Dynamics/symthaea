@@ -1005,10 +1005,7 @@ mod tests {
                 realized_utility_units: realized_utility_units + 1,
             };
         }
-        let input = cohort(vec![
-            make_draw(1, 101, 1, 51, 500_000, (2, 1, 1)),
-            second,
-        ]);
+        let input = cohort(vec![make_draw(1, 101, 1, 51, 500_000, (2, 1, 1)), second]);
         let error = evaluate_posterior_individual_cohort(&input).unwrap_err();
         assert_eq!(
             error,
@@ -1039,10 +1036,7 @@ mod tests {
     fn actual_branch_run_id_drift_across_draws_rejects() {
         let mut second = make_draw(1, 101, 2, 52, 500_000, (2, 1, 1));
         second.baseline.branch.run_id = 5_111;
-        let input = cohort(vec![
-            make_draw(1, 101, 1, 51, 500_000, (2, 1, 1)),
-            second,
-        ]);
+        let input = cohort(vec![make_draw(1, 101, 1, 51, 500_000, (2, 1, 1)), second]);
         let error = evaluate_posterior_individual_cohort(&input).unwrap_err();
         assert_eq!(
             error,
