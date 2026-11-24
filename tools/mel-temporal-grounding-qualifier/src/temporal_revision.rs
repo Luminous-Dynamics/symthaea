@@ -139,6 +139,7 @@ pub struct RevisionReportV1 {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct MatchedEvidenceContrastV1 {
     pub experiment_unit_id: String,
+    pub source_lineage_id: String,
     pub no_evidence_case_id: String,
     pub local_evidence_case_id: String,
     pub yoked_evidence_case_id: String,
@@ -155,6 +156,27 @@ pub struct MatchedEvidenceContrastV1 {
     pub no_evidence_elapsed_wall_time_ms: u64,
     pub yoked_elapsed_wall_time_ms: u64,
     pub local_beats_yoked: Option<bool>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct BootstrapIntervalV1 {
+    pub estimate: f64,
+    pub percentile_95_low: f64,
+    pub percentile_95_high: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct MatchedEvidenceBootstrapV1 {
+    pub schema: &'static str,
+    pub experiment_units: usize,
+    pub source_work_clusters: usize,
+    pub one_to_many_source_work_clusters: usize,
+    pub bootstrap_replicates: usize,
+    pub seed: u64,
+    pub local_minus_no_evidence_f1: BootstrapIntervalV1,
+    pub local_minus_yoked_f1: BootstrapIntervalV1,
+    pub local_minus_no_evidence_count_gated_f1: Option<BootstrapIntervalV1>,
+    pub local_minus_yoked_count_gated_f1: Option<BootstrapIntervalV1>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -282,6 +304,7 @@ pub fn compare_matched_evidence_arms(
 
         results.push(MatchedEvidenceContrastV1 {
             experiment_unit_id: unit_id.to_owned(),
+            source_lineage_id: no_evidence.source_lineage_id.clone(),
             no_evidence_case_id: no_evidence.case_id.clone(),
             local_evidence_case_id: local.case_id.clone(),
             yoked_evidence_case_id: yoked.case_id.clone(),
@@ -301,6 +324,185 @@ pub fn compare_matched_evidence_arms(
         });
     }
     Ok(results)
+}
+
+/// Compute source-work-clustered percentile intervals for paired evidence
+/// contrasts. Each source lineage contributes one cluster mean so repeated
+/// excerpts from one work do not masquerade as independent observations.
+pub fn bootstrap_matched_evidence_contrasts(
+    contrasts: &[MatchedEvidenceContrastV1],
+    bootstrap_replicates: usize,
+    seed: u64,
+) -> Result<MatchedEvidenceBootstrapV1, String> {
+    if contrasts.is_empty() {
+        return Err("matched evidence contrast set must not be empty".into());
+    }
+    if bootstrap_replicates < 1_000 {
+        return Err("source-work bootstrap requires at least 1,000 replicates".into());
+    }
+    if seed == 0 {
+        return Err("bootstrap seed must be nonzero".into());
+    }
+
+    let mut units = BTreeSet::new();
+    let mut by_lineage: BTreeMap<&str, Vec<&MatchedEvidenceContrastV1>> = BTreeMap::new();
+    for contrast in contrasts {
+        require_text(&contrast.experiment_unit_id, "experiment_unit_id")?;
+        require_text(&contrast.source_lineage_id, "source_lineage_id")?;
+        if !units.insert(contrast.experiment_unit_id.as_str()) {
+            return Err(format!(
+                "duplicate matched-evidence experiment unit: {}",
+                contrast.experiment_unit_id
+            ));
+        }
+        if contrast.local_minus_no_evidence_f1.is_none()
+            || contrast.local_minus_yoked_f1.is_none()
+        {
+            return Err("matched F1 contrasts must be present for every experiment unit".into());
+        }
+        by_lineage
+            .entry(contrast.source_lineage_id.as_str())
+            .or_default()
+            .push(contrast);
+    }
+
+    if by_lineage.len() < 2 {
+        return Err("source-work bootstrap requires at least two independent lineages".into());
+    }
+
+    let lineage_f1: Vec<(f64, f64)> = by_lineage
+        .values()
+        .map(|items| {
+            let count = items.len() as f64;
+            let local_no = items
+                .iter()
+                .map(|item| item.local_minus_no_evidence_f1.unwrap_or(0.0))
+                .sum::<f64>()
+                / count;
+            let local_yoked = items
+                .iter()
+                .map(|item| item.local_minus_yoked_f1.unwrap_or(0.0))
+                .sum::<f64>()
+                / count;
+            (local_no, local_yoked)
+        })
+        .collect();
+
+    let lineage_count: Vec<(f64, f64)> = by_lineage
+        .values()
+        .filter_map(|items| {
+            let local_no: Vec<_> = items
+                .iter()
+                .filter_map(|item| item.local_minus_no_evidence_count_gated_f1)
+                .collect();
+            let local_yoked: Vec<_> = items
+                .iter()
+                .filter_map(|item| item.local_minus_yoked_count_gated_f1)
+                .collect();
+            if local_no.is_empty() || local_yoked.is_empty() {
+                return None;
+            }
+            Some((
+                local_no.iter().sum::<f64>() / local_no.len() as f64,
+                local_yoked.iter().sum::<f64>() / local_yoked.len() as f64,
+            ))
+        })
+        .collect();
+
+    let mut rng_state = seed;
+    let estimate_local_no = lineage_f1.iter().map(|item| item.0).sum::<f64>()
+        / lineage_f1.len() as f64;
+    let estimate_local_yoked = lineage_f1.iter().map(|item| item.1).sum::<f64>()
+        / lineage_f1.len() as f64;
+    let local_no_samples = bootstrap_cluster_means(
+        &lineage_f1.iter().map(|item| item.0).collect::<Vec<_>>(),
+        bootstrap_replicates,
+        &mut rng_state,
+    );
+    let local_yoked_samples = bootstrap_cluster_means(
+        &lineage_f1.iter().map(|item| item.1).collect::<Vec<_>>(),
+        bootstrap_replicates,
+        &mut rng_state,
+    );
+
+    let count_gated_intervals = if lineage_count.is_empty() {
+        None
+    } else {
+        let no_values: Vec<_> = lineage_count.iter().map(|item| item.0).collect();
+        let yoked_values: Vec<_> = lineage_count.iter().map(|item| item.1).collect();
+        let no_estimate = no_values.iter().sum::<f64>() / no_values.len() as f64;
+        let yoked_estimate = yoked_values.iter().sum::<f64>() / yoked_values.len() as f64;
+        let no_samples = bootstrap_cluster_means(
+            &no_values,
+            bootstrap_replicates,
+            &mut rng_state,
+        );
+        let yoked_samples = bootstrap_cluster_means(
+            &yoked_values,
+            bootstrap_replicates,
+            &mut rng_state,
+        );
+        Some((
+            percentile_interval(no_estimate, no_samples),
+            percentile_interval(yoked_estimate, yoked_samples),
+        ))
+    };
+
+    Ok(MatchedEvidenceBootstrapV1 {
+        schema: "mel-matched-evidence-bootstrap-v1",
+        experiment_units: contrasts.len(),
+        source_work_clusters: by_lineage.len(),
+        one_to_many_source_work_clusters: lineage_count.len(),
+        bootstrap_replicates,
+        seed,
+        local_minus_no_evidence_f1: percentile_interval(estimate_local_no, local_no_samples),
+        local_minus_yoked_f1: percentile_interval(estimate_local_yoked, local_yoked_samples),
+        local_minus_no_evidence_count_gated_f1: count_gated_intervals
+            .as_ref()
+            .map(|item| item.0.clone()),
+        local_minus_yoked_count_gated_f1: count_gated_intervals
+            .map(|item| item.1),
+    })
+}
+
+/// SplitMix64: a small deterministic generator with a fixed, reproducible
+/// algorithm and no runtime/global entropy dependency.
+fn next_splitmix64(state: &mut u64) -> u64 {
+    *state = state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+    let mut value = *state;
+    value = (value ^ (value >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    value = (value ^ (value >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    value ^ (value >> 31)
+}
+
+fn bootstrap_cluster_means(
+    cluster_values: &[f64],
+    replicates: usize,
+    rng_state: &mut u64,
+) -> Vec<f64> {
+    let cluster_count = cluster_values.len();
+    (0..replicates)
+        .map(|_| {
+            let mut sum = 0.0;
+            for _ in 0..cluster_count {
+                let index = (next_splitmix64(rng_state) % cluster_count as u64) as usize;
+                sum += cluster_values[index];
+            }
+            sum / cluster_count as f64
+        })
+        .collect()
+}
+
+fn percentile_interval(estimate: f64, mut samples: Vec<f64>) -> BootstrapIntervalV1 {
+    samples.sort_by(f64::total_cmp);
+    let last = samples.len() - 1;
+    let low_index = ((last as f64) * 0.025).floor() as usize;
+    let high_index = ((last as f64) * 0.975).ceil() as usize;
+    BootstrapIntervalV1 {
+        estimate,
+        percentile_95_low: samples[low_index],
+        percentile_95_high: samples[high_index.min(last)],
+    }
 }
 
 fn paired_delta(left: Option<f64>, right: Option<f64>) -> Option<f64> {
