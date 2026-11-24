@@ -1,0 +1,59 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_id": "PROOFACTION-AND-COMM-001",
+  "status": "kernel_replay_pending",
+  "plan_id": "PROOFPLAN-AND-COMM-001",
+  "source_statement": {
+    "declaration": "And.comm",
+    "statement": "∀ {a b : Prop}, a ∧ b ↔ b ∧ a"
+  },
+  "environment": {
+    "lean_toolchain": "leanprover/lean4:v4.37.0-rc1",
+    "mathlib_repository": "leanprover-community/mathlib4",
+    "mathlib_revision": "6ebcce37335bcb6bca64596e5d57bb3035648030",
+    "lean_core_repository": "leanprover/lean4",
+    "lean_core_revision": "0b77e12952ad39077d80d8bd6b66d601f225c321"
+  },
+  "proof_source": {
+    "repository": "Luminous-Dynamics/symthaea",
+    "path": "scripts/research/lean-proof-extractor/ProofActionCertificateAndComm.lean",
+    "sha256": "efe4b42620f333ba90fd09e706d181adeaa0aa62ebc99883311b67d38ff71622"
+  },
+  "actions": [
+    {
+      "plan_node_id": "A_SPLIT_IFF",
+      "operation": "split_iff",
+      "certificate_declaration": "ProofPlanActionCertificatePilot.and_comm_split_iff",
+      "expected_statement": "(a ∧ b ↔ b ∧ a) ↔ ((a ∧ b → b ∧ a) ∧ (b ∧ a → a ∧ b))",
+      "input_goal_ids": ["G_MAIN"],
+      "output_goal_ids": ["G_FORWARD", "G_REVERSE"]
+    },
+    {
+      "plan_node_id": "A_FORWARD",
+      "operation": "apply_lemma",
+      "certificate_declaration": "ProofPlanActionCertificatePilot.and_comm_forward",
+      "expected_statement": "a ∧ b → b ∧ a",
+      "input_goal_ids": ["G_FORWARD"],
+      "output_goal_ids": []
+    },
+    {
+      "plan_node_id": "A_REVERSE",
+      "operation": "apply_lemma",
+      "certificate_declaration": "ProofPlanActionCertificatePilot.and_comm_reverse",
+      "expected_statement": "b ∧ a → a ∧ b",
+      "input_goal_ids": ["G_REVERSE"],
+      "output_goal_ids": []
+    }
+  ],
+  "root_declaration": {
+    "certificate_declaration": "ProofPlanActionCertificatePilot.and_comm_plan_replay",
+    "expected_statement": "a ∧ b ↔ b ∧ a"
+  },
+  "claim_ceiling": [
+    "A successful Lean replay checks the declared local propositions and the composed root theorem under the pinned Lean/Mathlib environment.",
+    "The split certificate establishes obligation equivalence for the two implication subgoals; the forward and reverse declarations certify those exact implications.",
+    "This pilot does not yet emit elaborated pre-goal binder identities, local-instance context digests, generated subgoal-state receipts, or a parsed axiom/admission dependency closure.",
+    "The ProofPlan action-to-declaration mapping and natural-language mathematical-role labels remain provisional and are not expert-reviewed gold annotations.",
+    "This is not a general ProofActionCertificateV1 validator or a benchmark result."
+  ]
+}
