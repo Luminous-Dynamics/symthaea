@@ -367,6 +367,10 @@ jobs:
           assert known["actuator_command_count"] == 5
           assert abs(known["observability_fisher_information"] - 2082.4542913757846) < 1e-9
           assert abs(known["controllability_gramian"] - 1.3015339321098656) < 1e-12
+          assert known["minimum_required_observability_fisher_information"] == 1000.0
+          assert known["minimum_required_controllability_gramian"] == 1.0
+          assert fixture["controller"]["minimum_observability_fisher_information"] == 1000.0
+          assert fixture["controller"]["minimum_controllability_gramian"] == 1.0
           assert known["mode_interface_qualified"] is True
           assert fixture["claim_boundary"]["no_closed_loop_stability_claim"] is True
           print("scalar_unstable_mode_schema_validation=PASS")
