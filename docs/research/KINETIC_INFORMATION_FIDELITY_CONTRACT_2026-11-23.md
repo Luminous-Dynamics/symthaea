@@ -647,6 +647,29 @@ The November 2026 study by Guerra, Li, Yue & Zepeda-Núñez (JCP 115169) compare
 
 Our controller benchmark will compare terminal, time-integrated, modal-growth, phase-space/entropy and robust sampled-worst-case objectives, using dispersion-derived initialization, discrete adjoints and independent full-order replay. It must detect delayed instability and energy transfer to unregistered modes, and must count control energy / smoothness / amplitude constraints. #13452 is required before converting a finite perturbation campaign into a global robustness claim.
 
+## Intervention-Equivalent Kinetic State Quotients (IEKSQ)
+
+New companion programme: [#13503 — define intervention-equivalent kinetic state quotients](https://github.com/Luminous-Dynamics/symthaea/issues/13503).
+
+This connects task-conditioned compression to established predictive-state theory. Computational mechanics defines causal states by grouping histories that induce the same conditional distribution over futures; Predictive State Representations use action-conditional predictions of future observations as the state coordinates. Bisimulation formalizes when input/output behaviours are preserved under state abstraction. These are prior art, not claims of novelty:
+- [Computational mechanics / causal equivalence](https://pmc.ncbi.nlm.nih.gov/articles/PMC7517337/)
+- [Littman & Sutton, Predictive Representations of State, NeurIPS 2001](https://proceedings.neurips.cc/paper/2001/hash/1e4d36177d71bbb3558e43af9577d70e-Abstract.html)
+- [van der Schaft, Equivalence of Dynamical Systems by Bisimulation, IEEE TAC 2004](https://doi.org/10.1109/TAC.2004.838495)
+
+For a frozen \((\mathcal U,\mathcal Q,T,\mathcal I)\) contract, define the future response signature of a full kinetic state \(f\):
+
+\[
+G_f(u)=\{q_j(\Phi_t^u(f)): q_j\in\mathcal Q,\;0\le t\le T\}.
+\]
+
+Exact task-conditioned response equivalence is \(f\sim g\) iff \(G_f(u)=G_g(u)\) for all admissible intervention sequences \(u\in\mathcal U\), with both states satisfying the same physical structure/invariant class \(\mathcal I\). The quotient is task-specific: it changes when the intervention family, QoI registry, prediction horizon or structure contract changes.
+
+The approximate distance is a task-conditioned pseudometric over the frozen response axes. Crucially, the relation \(d(f,g)\le\epsilon\) is **not generally transitive**. Pairwise-compatible edges cannot be blindly unioned into equivalence classes. A valid approximate class needs an explicit whole-class diameter bound or a certified quotient / simulation relation. Missing responses, unresolved branches or different physical structure classes prohibit merging even if the observed response values are close.
+
+The first generic Rust primitive is in [PR #13405](https://github.com/Luminous-Dynamics/symthaea/pull/13405): \`KineticResponseSignature\` stores contract identity, structure-class identity, intervention/QoI axes, time grid, complex response values and branch IDs. Comparison returns RMS response distance, missing-value count, branch mismatches and structure compatibility separately. It is serializable as an evidence receipt. The checked-in [non-transitive synthetic triple](https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/plasma/state-equivalence/fixtures/nontransitive-response-triple-v0.1.json) demonstrates A≈B and B≈C but A≉C under the same tolerance. This is a manufactured semantic control, not a measured kinetic equivalence class.
+
+The next physical benchmark is a pair of phase-mixed states with nearly identical density / low-order moments but distinct response after a registered second pulse. Any claimed merge must be confirmed against independently refined full-order echo amplitude, phase, timing, waveform and branch identity, plus applicable invariant/structure gates. A finite probe suite remains empirical unless #13452's CIC assumptions provide a validated global cover.
+
 ## Certified Intervention Coverage (CIC)
 
 New companion programme: [#13452 — certify compact intervention covers with validated response bounds](https://github.com/Luminous-Dynamics/symthaea/issues/13452).
