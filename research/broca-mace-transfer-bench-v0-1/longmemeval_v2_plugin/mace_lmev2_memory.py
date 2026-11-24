@@ -1,10 +1,10 @@
 # Copyright (C) 2026 Luminous Dynamics
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""Thin LongMemEval-V2 Memory API bridge for the Rust MACE BM25 sidecar.
+"""Thin LongMemEval-V2 Memory API bridge for the Rust MACE hybrid sidecar.
 
-This first arm retrieves text and returns the original screenshots attached to
-selected trajectory states. It accepts query_image for API compatibility but
-does not use query-image pixels for retrieval.
+The retrieval portfolio combines BM25 prose retrieval with a structured
+exact-literal channel. Original screenshots attached to selected trajectory
+states are returned; query_image remains accepted but is not used for ranking.
 """
 
 from __future__ import annotations
@@ -48,7 +48,7 @@ MAX_TRAJECTORY_SCREENSHOT_BYTES = 512 * 1024 * 1024
 class MaceLongMemEvalV2Memory(Memory):
     """Official LongMemEval-V2 plugin backed by a persistent Rust sidecar."""
 
-    memory_type = "mace_lmev2_bm25_text"
+    memory_type = "mace_lmev2_hybrid_bm25_entity_literal"
 
     def __init__(self, memory_params: dict[str, object]) -> None:
         require(isinstance(memory_params, dict), "MACE memory_params must be an object")
@@ -135,7 +135,29 @@ class MaceLongMemEvalV2Memory(Memory):
                     "bm25_k1": self.bm25_k1,
                     "bm25_b": self.bm25_b,
                     "tokenizer_version": "unicode_alphanumeric_v1",
-                    "retrieval_mode": "text_bm25_with_original_image_evidence",
+                    "retrieval_mode": "hybrid_bm25_entity_literal_with_original_image_evidence",
+                    "retrieval_channels": [
+                        "trajectory_bm25_search_v1",
+                        "trajectory_entity_literal_search_v1",
+                    ],
+                    "entity_literal_profile": {
+                        "schema_version": "structured_literals_v1",
+                        "numeric_or_structural_tokens_only": True,
+                        "field_weights": {
+                            "trajectory_id": 5,
+                            "goal": 2,
+                            "start_url": 4,
+                            "state_url": 4,
+                            "state_action": 3,
+                            "source_state_index": 3,
+                            "step": 3,
+                        },
+                    },
+                    "fusion_profile": {
+                        "algorithm": "reciprocal_rank_fusion_v1",
+                        "k": 60,
+                        "channel_weights": {"bm25": 1.0, "entity_literal": 1.0},
+                    },
                 },
                 sort_keys=True,
                 separators=(",", ":"),
@@ -667,7 +689,7 @@ class MaceLongMemEvalV2Memory(Memory):
                 require(record.get("run_id") == self.run_id, "candidate run_id mismatch")
                 require(record.get("candidate_id") == candidate_id, "candidate invocation ID mismatch")
                 require(
-                    record.get("backend_id") == "mace_lmev2_bm25_text",
+                    record.get("backend_id") == "mace_lmev2_hybrid_rrf_bm25_entity",
                     "candidate backend ID mismatch",
                 )
                 require(
@@ -699,14 +721,14 @@ class MaceLongMemEvalV2Memory(Memory):
             "candidate_id": candidate_id,
             "query_sha256": query_sha256,
             "domain": self.domain,
-            "backend_id": "mace_lmev2_bm25_text",
+            "backend_id": "mace_lmev2_hybrid_rrf_bm25_entity",
             "backend_revision_sha256": self.backend_revision_sha256,
             "sidecar_binary_sha256": self.sidecar_binary_sha256,
             "candidate_record_count": record_count,
             "candidate_set_sha256": candidate_set_sha256,
             "candidate_jsonl_sha256": hashlib.sha256(candidate_bytes).hexdigest(),
             "candidate_file": candidate_filename,
-            "retrieval_mode": "text_bm25_with_original_image_evidence",
+            "retrieval_mode": "hybrid_bm25_entity_literal_with_original_image_evidence",
         }
         receipt_bytes = json.dumps(
             receipt, ensure_ascii=False, sort_keys=True, separators=(",", ":")
@@ -757,7 +779,7 @@ class MaceLongMemEvalV2Memory(Memory):
                     "saved candidate receipt schema mismatch")
             require(receipt.get("run_id") == self.run_id, "saved candidate receipt run mismatch")
             require(receipt.get("domain") == self.domain, "saved candidate receipt domain mismatch")
-            require(receipt.get("backend_id") == "mace_lmev2_bm25_text",
+            require(receipt.get("backend_id") == "mace_lmev2_hybrid_rrf_bm25_entity",
                     "saved candidate receipt backend mismatch")
             require(receipt.get("backend_revision_sha256") == self.backend_revision_sha256,
                     "saved candidate receipt execution-profile digest mismatch")
@@ -765,7 +787,7 @@ class MaceLongMemEvalV2Memory(Memory):
                     "saved candidate receipt binary digest mismatch")
             require(receipt.get("candidate_file") == expected_payload_name,
                     "saved candidate receipt payload filename mismatch")
-            require(receipt.get("retrieval_mode") == "text_bm25_with_original_image_evidence",
+            require(receipt.get("retrieval_mode") == "hybrid_bm25_entity_literal_with_original_image_evidence",
                     "saved candidate receipt retrieval mode mismatch")
             require(
                 isinstance(receipt.get("query_sha256"), str)
@@ -823,7 +845,7 @@ class MaceLongMemEvalV2Memory(Memory):
                         "saved candidate record query digest mismatch")
                 require(record.get("backend_revision_sha256") == self.backend_revision_sha256,
                         "saved candidate record execution-profile digest mismatch")
-                require(record.get("backend_id") == "mace_lmev2_bm25_text",
+                require(record.get("backend_id") == "mace_lmev2_hybrid_rrf_bm25_entity",
                         "saved candidate record backend mismatch")
                 require(record.get("query_scope") == f"longmemeval-v2:domain:{self.domain}",
                         "saved candidate record scope mismatch")
