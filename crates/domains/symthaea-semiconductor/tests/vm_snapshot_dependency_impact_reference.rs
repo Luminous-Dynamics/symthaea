@@ -5,14 +5,13 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
 use symthaea_semiconductor::benchmark::{
-    VM_DEPENDENCY_EDGE_SCHEMA_V1, VM_DEPENDENCY_GRAPH_SCHEMA_V1, VM_IMPACT_CLOSURE_INPUT_SCHEMA_V1,
-    VmDependencyDimensionV1, VmImpactClosureInputV1, VmImpactClosureStatusV1,
-    VmModelDerivationKindV1, VmModelSnapshotNodeV1, VmSnapshotCurrentDispositionV1,
-    VmSnapshotDependencyEdgeV1, VmSnapshotDependencyGraphV1, VmSnapshotImpactStateV1,
-    LabelConsumptionEligibilityV1, VmSnapshotLabelCurrentStatusV1, VmSnapshotPurposeV1,
-    VmSnapshotRequalificationReportV1,
-    compute_vm_snapshot_impact_closure_v1, seal_vm_snapshot_dependency_edge_v1,
-    seal_vm_snapshot_dependency_graph_v1,
+    LabelConsumptionEligibilityV1, VM_DEPENDENCY_EDGE_SCHEMA_V1, VM_DEPENDENCY_GRAPH_SCHEMA_V1,
+    VM_IMPACT_CLOSURE_INPUT_SCHEMA_V1, VmDependencyDimensionV1, VmImpactClosureInputV1,
+    VmImpactClosureStatusV1, VmModelDerivationKindV1, VmModelSnapshotNodeV1,
+    VmSnapshotCurrentDispositionV1, VmSnapshotDependencyEdgeV1, VmSnapshotDependencyGraphV1,
+    VmSnapshotImpactStateV1, VmSnapshotLabelCurrentStatusV1, VmSnapshotPurposeV1,
+    VmSnapshotRequalificationReportV1, compute_vm_snapshot_impact_closure_v1,
+    seal_vm_snapshot_dependency_edge_v1, seal_vm_snapshot_dependency_graph_v1,
 };
 
 fn digest(ch: char) -> String {
@@ -324,7 +323,8 @@ fn independent_label_sources(
                 .label_statuses
                 .iter()
                 .filter(|label| {
-                    label.k1_eligibility != LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy
+                    label.k1_eligibility
+                        != LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy
                 })
                 .map(|label| label.label_id.clone())
                 .collect(),
