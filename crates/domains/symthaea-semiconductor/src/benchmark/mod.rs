@@ -149,6 +149,7 @@ pub use delayed_aci::{
     DelayedAciEngineV1, DelayedAciErrorV1, DelayedAciLabelDeliveryV1,
     DelayedAciPolicyV1, DelayedAciPredictionInputV1, DelayedAciPredictionReceiptV1,
     DelayedAciUpdateReceiptV1, begin_delayed_aci_round_v1, close_delayed_aci_stream_v1,
-    create_delayed_aci_engine_v1, delay_to_memory_ratio_v1, deliver_delayed_aci_label_v1,
+    create_delayed_aci_engine_v1, delay_to_memory_ratio_v1,
+    delayed_aci_finite_horizon_miscoverage_bound_v1, deliver_delayed_aci_label_v1,
     issue_delayed_aci_prediction_v1, resolve_degenerate_aci_interval_v1,
 };
