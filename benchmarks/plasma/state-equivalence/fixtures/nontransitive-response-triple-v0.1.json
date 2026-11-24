@@ -1,0 +1,127 @@
+{
+  "schema_version": "0.1",
+  "fixture_id": "kinetic-response-signature-nontransitive-triple-v1",
+  "status": "synthetic_analytic_only",
+  "normalization_scale": 1,
+  "pairwise_tolerance": 1,
+  "states": [
+    {
+      "state_id": "A",
+      "signature": {
+        "contract_id": "manufactured-pulse-qoi-contract-v1",
+        "structure_class_id": "manufactured-hamiltonian-class-v1",
+        "intervention_ids": [
+          "pulse-mode-2-phase-0.3"
+        ],
+        "qoi_ids": [
+          "electric-field-mode-2"
+        ],
+        "time_samples": [
+          0,
+          0.5
+        ],
+        "responses": [
+          {
+            "real": 0,
+            "imag": 0
+          },
+          {
+            "real": 0,
+            "imag": 0
+          }
+        ],
+        "branch_ids": [
+          "echo-branch-1",
+          "echo-branch-1"
+        ]
+      }
+    },
+    {
+      "state_id": "B",
+      "signature": {
+        "contract_id": "manufactured-pulse-qoi-contract-v1",
+        "structure_class_id": "manufactured-hamiltonian-class-v1",
+        "intervention_ids": [
+          "pulse-mode-2-phase-0.3"
+        ],
+        "qoi_ids": [
+          "electric-field-mode-2"
+        ],
+        "time_samples": [
+          0,
+          0.5
+        ],
+        "responses": [
+          {
+            "real": 0.75,
+            "imag": 0
+          },
+          {
+            "real": 0.75,
+            "imag": 0
+          }
+        ],
+        "branch_ids": [
+          "echo-branch-1",
+          "echo-branch-1"
+        ]
+      }
+    },
+    {
+      "state_id": "C",
+      "signature": {
+        "contract_id": "manufactured-pulse-qoi-contract-v1",
+        "structure_class_id": "manufactured-hamiltonian-class-v1",
+        "intervention_ids": [
+          "pulse-mode-2-phase-0.3"
+        ],
+        "qoi_ids": [
+          "electric-field-mode-2"
+        ],
+        "time_samples": [
+          0,
+          0.5
+        ],
+        "responses": [
+          {
+            "real": 1.5,
+            "imag": 0
+          },
+          {
+            "real": 1.5,
+            "imag": 0
+          }
+        ],
+        "branch_ids": [
+          "echo-branch-1",
+          "echo-branch-1"
+        ]
+      }
+    }
+  ],
+  "expected_pairwise_comparisons": [
+    {
+      "left": "A",
+      "right": "B",
+      "normalized_rms_distance": 0.75,
+      "pairwise_compatible": true
+    },
+    {
+      "left": "B",
+      "right": "C",
+      "normalized_rms_distance": 0.75,
+      "pairwise_compatible": true
+    },
+    {
+      "left": "A",
+      "right": "C",
+      "normalized_rms_distance": 1.5,
+      "pairwise_compatible": false
+    }
+  ],
+  "claim_boundary": {
+    "approximate_pairwise_compatibility_is_not_transitive": true,
+    "no_kinetic_state_pair_evaluated": true,
+    "no_physical_plasma_run": true
+  }
+}
