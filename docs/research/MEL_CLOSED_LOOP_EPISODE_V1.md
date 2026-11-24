@@ -51,9 +51,20 @@ Capture modality is explicit: `rendered_audio_loopback` requires nonzero, fully 
 
 A veto is an action-authority fact, not an acoustic observation. Already-admitted callback frames or device buffers cannot be claimed physically recalled. Queue invalidation is not a claim that hardware was silenced.
 
+### Late-veto receipt composition
+
+The episode reducer now accepts an optional, strict `effect.veto_race` projection when the disposition is a veto but an output-stage receipt already exists. It records the authorization identity, the admission stage and event sequence, veto sequence, exact old/new output epochs, reported-stage sequence, callback disposition, callback epoch, admitted/stale-discarded frame counts, queue invalidation counts, discarded-note count and an owning receipt reference.
+
+The projection distinguishes three materially different cases:
+- **Callback admitted before veto:** callback event sequence precedes the veto under the prior epoch. Subsequent CPAL prediction or independent loopback observation may arrive after the veto; this is pre-veto-admitted residual output, not a new post-veto admission.
+- **Stale callback discarded after veto:** the callback observes the new epoch after the veto and discards old-epoch enqueued frames. This is not callback admission or audible output.
+- **No callback observation yet:** queue/application admission remains the highest reported successful stage. It is not safe to infer either playback or silence.
+
+The reducer rejects post-veto new admissions, event-sequence inversions, an epoch transition other than exactly +1, a callback marked admitted under the wrong epoch, or a stale discard reported as successful callback output. The action/effect domain remains owned by [#10659](https://github.com/Luminous-Dynamics/symthaea/pull/10659); the separate race oracle is [#10800](https://github.com/Luminous-Dynamics/symthaea/pull/10800). This episode-layer projection checks supplied structure only. It does not replay or authenticate either owner’s receipt, prove a physical device transition, or demonstrate that output was acoustically absent after queue invalidation.
+
 ## Reducer requirements (next increment)
 
-The Rust reducer should fail closed on ID/revision/sequence mismatches; stale, expired or superseded forecasts; RESPOND/CONTINUE without valid authorization; effects scheduled after a veto boundary; producer/capture/observer identity collapse; receipt or payload substitution; mismatched capture/window/clock identities; incomplete frame/sequence accounting, missing watermarks, gaps, drops, XRUNs, restarts, ring overflow or unknown clock mapping; present/absent without eligible closure and detector qualification; `absent` represented as ground truth; unknown execution treated as retry permission; and model/adapter/config/runtime drift across paired counterfactual arms.
+The Rust reducer must fail closed on ID/revision/sequence mismatches; stale, expired or superseded forecasts; RESPOND/CONTINUE without valid authorization; unreceipted or post-veto new admissions; producer/capture/observer identity collapse; receipt or payload substitution; mismatched capture/window/clock identities; incomplete frame/sequence accounting, missing watermarks, gaps, drops, XRUNs, restarts, ring overflow or unknown clock mapping; present/absent without eligible closure and detector qualification; `absent` represented as ground truth; unknown execution treated as retry permission; and model/adapter/config/runtime drift across paired counterfactual arms. For pre-veto admissions observed after veto, it must preserve the earlier admission boundary and report residual/in-flight frames separately rather than rejecting every later observation or mislabelling it as new unauthorized admission.
 
 The reducer must preserve failed, pending and unobserved attempts. A steer or branch cannot rewrite an earlier forecast.
 
