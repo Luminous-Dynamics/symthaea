@@ -56,7 +56,11 @@ impl RetrievalOperationOutcomeV1 {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RetrievalStopReasonV1 {
+    /// Legacy V1 label retained only so durable receipts can be decoded.
+    /// It never represented independent qualification or decision sufficiency.
     EvidenceSufficient,
+    /// The retrieval adapter returned at least one candidate reference.
+    CandidatesReturned,
     BudgetExhausted,
     NoCandidateEvidence,
     ToolError,
@@ -71,6 +75,7 @@ impl RetrievalStopReasonV1 {
             Self::NoCandidateEvidence => 3,
             Self::ToolError => 4,
             Self::Abstained => 5,
+            Self::CandidatesReturned => 6,
         }
     }
 
@@ -81,6 +86,7 @@ impl RetrievalStopReasonV1 {
             Self::NoCandidateEvidence => "no_candidate_evidence",
             Self::ToolError => "tool_error",
             Self::Abstained => "abstained",
+            Self::CandidatesReturned => "candidates_returned",
         }
     }
 }
@@ -174,6 +180,7 @@ impl RetrievalTraceReceiptV1 {
         };
         let stop_reason = match required_string("stop_reason")?.as_str() {
             "evidence_sufficient" => RetrievalStopReasonV1::EvidenceSufficient,
+            "candidates_returned" => RetrievalStopReasonV1::CandidatesReturned,
             "budget_exhausted" => RetrievalStopReasonV1::BudgetExhausted,
             "no_candidate_evidence" => RetrievalStopReasonV1::NoCandidateEvidence,
             "tool_error" => RetrievalStopReasonV1::ToolError,
@@ -355,6 +362,8 @@ pub enum RetrievalPolicyRejectV1 {
     MixedToolProfile,
     MixedStrategy,
     UnsupportedTraceOutcome,
+    /// Raw acquisition observations cannot establish downstream decision value.
+    DecisionOutcomeReceiptRequired,
     EmptyStrategy,
     InvalidPromotionTime,
     StrategyExpired,
@@ -597,7 +606,8 @@ fn validate_trace(trace: &RetrievalTraceReceiptV1) -> Result<(), RetrievalPolicy
     }
 
     match trace.stop_reason {
-        RetrievalStopReasonV1::EvidenceSufficient => {
+        RetrievalStopReasonV1::EvidenceSufficient
+        | RetrievalStopReasonV1::CandidatesReturned => {
             if !observed_any
                 || !trace
                     .candidate_set_sha256
@@ -681,9 +691,9 @@ impl RetrievalPolicyMemoryV1 {
             .map(|stored| stored.receipt_sha256.as_str())
     }
 
-    /// Promote a search strategy only after at least three distinct successful
-    /// query invocations share exactly the same domain, environment, tool
-    /// profile and ordered tool/action template sequence.
+    /// Legacy API retained while callers migrate. Acquisition traces alone
+    /// cannot promote a reusable policy: a separate qualified decision/outcome
+    /// receipt and held-out counterfactual qualification are required.
     pub fn promote_strategy(
         &mut self,
         references: &[RetrievalTraceRefV1],
@@ -727,9 +737,6 @@ impl RetrievalPolicyMemoryV1 {
                 .traces
                 .get(&key)
                 .ok_or(RetrievalPolicyRejectV1::UnknownTrace)?;
-            if stored.receipt.stop_reason != RetrievalStopReasonV1::EvidenceSufficient {
-                return Err(RetrievalPolicyRejectV1::UnsupportedTraceOutcome);
-            }
             if !seen_queries.insert(stored.receipt.query_sha256.clone()) {
                 return Err(RetrievalPolicyRejectV1::DuplicateSupportingQuery);
             }
@@ -758,6 +765,22 @@ impl RetrievalPolicyMemoryV1 {
             }
             supporting_trace_receipt_sha256.push(stored.receipt_sha256.clone());
         }
+
+        // Both the old V1 "evidence_sufficient" label and the new
+        // "candidates_returned" state describe acquisition only. Neither
+        // proves independent admissibility, decision sufficiency or outcome.
+        if selected.iter().any(|stored| {
+            !matches!(
+                stored.receipt.stop_reason,
+                RetrievalStopReasonV1::EvidenceSufficient
+                    | RetrievalStopReasonV1::CandidatesReturned
+            )
+        }) {
+            return Err(RetrievalPolicyRejectV1::UnsupportedTraceOutcome);
+        }
+        return Err(RetrievalPolicyRejectV1::DecisionOutcomeReceiptRequired);
+
+        #[allow(unreachable_code)]
         supporting_trace_receipt_sha256.sort();
 
         let mut note = RetrievalStrategyNoteV1 {
@@ -871,7 +894,7 @@ mod tests {
             query_sha256: query_digest.to_owned(),
             candidate_set_sha256: Some(CANDIDATE_SET.to_owned()),
             operations,
-            stop_reason: RetrievalStopReasonV1::EvidenceSufficient,
+            stop_reason: RetrievalStopReasonV1::CandidatesReturned,
             tool_call_budget: 8,
             tool_calls_used: 2,
             elapsed_ns: 20,
@@ -891,7 +914,7 @@ mod tests {
             .collect()
     }
 
-    fn three_successful_traces(memory: &mut RetrievalPolicyMemoryV1) -> Vec<RetrievalTraceRefV1> {
+    fn three_candidate_return_traces(memory: &mut RetrievalPolicyMemoryV1) -> Vec<RetrievalTraceRefV1> {
         let samples = [
             ("query-a", "1010101010101010101010101010101010101010101010101010101010101010"),
             ("query-b", "2020202020202020202020202020202020202020202020202020202020202020"),
@@ -942,20 +965,18 @@ mod tests {
     }
 
     #[test]
-    fn promotion_requires_three_distinct_successful_query_invocations() {
+    fn repeated_candidate_returns_cannot_promote_without_decision_outcomes() {
         let mut memory = RetrievalPolicyMemoryV1::default();
-        let references = three_successful_traces(&mut memory);
-        let note = memory
-            .promote_strategy(&references[..2], ALGORITHM, 200, 300)
-            .expect_err("two traces do not meet support threshold");
-        assert_eq!(note, RetrievalPolicyRejectV1::TooFewSupportingTraces);
-
-        let note = memory
-            .promote_strategy(&references, ALGORITHM, 200, 300)
-            .expect("three traces promote");
-        assert_eq!(note.supporting_trace_receipt_sha256.len(), 3);
-        assert_eq!(note.steps.len(), 2);
-        assert_eq!(memory.note_count(), 1);
+        let references = three_candidate_return_traces(&mut memory);
+        assert_eq!(
+            memory.promote_strategy(&references[..2], ALGORITHM, 200, 300),
+            Err(RetrievalPolicyRejectV1::TooFewSupportingTraces)
+        );
+        assert_eq!(
+            memory.promote_strategy(&references, ALGORITHM, 200, 300),
+            Err(RetrievalPolicyRejectV1::DecisionOutcomeReceiptRequired)
+        );
+        assert_eq!(memory.note_count(), 0);
     }
 
     #[test]
@@ -1020,38 +1041,21 @@ mod tests {
     }
 
     #[test]
-    fn policy_note_is_not_applicable_outside_its_exact_domain_and_versions() {
+    fn acquisition_only_traces_never_create_applicable_strategy_notes() {
         let mut memory = RetrievalPolicyMemoryV1::default();
-        let supporting = three_successful_traces(&mut memory);
-        let note = memory.promote_strategy(&supporting, ALGORITHM, 200, 300).unwrap();
-
+        let supporting = three_candidate_return_traces(&mut memory);
         assert_eq!(
-            memory.applicable_notes("web-shop-a", ENV_A, TOOL_PROFILE_A, 250),
-            vec![&note]
+            memory.promote_strategy(&supporting, ALGORITHM, 200, 300),
+            Err(RetrievalPolicyRejectV1::DecisionOutcomeReceiptRequired)
         );
-        assert!(memory.applicable_notes("web-shop-b", ENV_A, TOOL_PROFILE_A, 250).is_empty());
-        assert!(memory.applicable_notes(
-            "web-shop-a",
-            "9999999999999999999999999999999999999999999999999999999999999999",
-            TOOL_PROFILE_A,
-            250
-        ).is_empty());
-        assert!(memory.applicable_notes(
-            "web-shop-a",
-            ENV_A,
-            "8888888888888888888888888888888888888888888888888888888888888888",
-            250
-        ).is_empty());
+        assert_eq!(memory.note_count(), 0);
+        assert!(memory.applicable_notes("web-shop-a", ENV_A, TOOL_PROFILE_A, 250).is_empty());
     }
 
     #[test]
-    fn expired_and_not_yet_promoted_notes_are_never_returned() {
+    fn raw_retrieval_traces_cannot_create_notes_regardless_of_ttl() {
         let mut memory = RetrievalPolicyMemoryV1::default();
-        let supporting = three_successful_traces(&mut memory);
-        memory.promote_strategy(&supporting, ALGORITHM, 200, 300).unwrap();
-
-        assert!(memory.applicable_notes("web-shop-a", ENV_A, TOOL_PROFILE_A, 199).is_empty());
-        assert!(memory.applicable_notes("web-shop-a", ENV_A, TOOL_PROFILE_A, 300).is_empty());
+        let supporting = three_candidate_return_traces(&mut memory);
         assert_eq!(
             memory.promote_strategy(&supporting, ALGORITHM, 200, 200),
             Err(RetrievalPolicyRejectV1::InvalidPromotionTime)
@@ -1060,6 +1064,11 @@ mod tests {
             memory.promote_strategy(&supporting, ALGORITHM, 200, 200 + MAX_STRATEGY_TTL_SECONDS_V1 + 1),
             Err(RetrievalPolicyRejectV1::InvalidTtl)
         );
+        assert_eq!(
+            memory.promote_strategy(&supporting, ALGORITHM, 200, 300),
+            Err(RetrievalPolicyRejectV1::DecisionOutcomeReceiptRequired)
+        );
+        assert_eq!(memory.note_count(), 0);
     }
 
     #[test]
@@ -1113,6 +1122,33 @@ mod tests {
             memory.record_trace(early_stop),
             Err(RetrievalPolicyRejectV1::InvalidStopReason)
         );
+    }
+
+    #[test]
+    fn legacy_v1_evidence_sufficient_receipts_decode_but_cannot_promote() {
+        let mut legacy = trace(
+            "legacy-invocation",
+            "abababababababababababababababababababababababababababababababab",
+            "web-shop-a",
+            ENV_A,
+            TOOL_PROFILE_A,
+            ACTION_SEARCH,
+        );
+        legacy.stop_reason = RetrievalStopReasonV1::EvidenceSufficient;
+        let value = legacy.to_json_value();
+        assert_eq!(value["stop_reason"], "evidence_sufficient");
+        assert_eq!(
+            RetrievalTraceReceiptV1::from_json_value(&value),
+            Ok(legacy.clone())
+        );
+
+        let mut memory = RetrievalPolicyMemoryV1::default();
+        memory.record_trace(legacy).expect("legacy observation remains replayable");
+        assert_eq!(
+            memory.promote_strategy(&refs(&["legacy-invocation"]), ALGORITHM, 200, 300),
+            Err(RetrievalPolicyRejectV1::TooFewSupportingTraces)
+        );
+        assert_eq!(memory.note_count(), 0);
     }
 
     #[test]
