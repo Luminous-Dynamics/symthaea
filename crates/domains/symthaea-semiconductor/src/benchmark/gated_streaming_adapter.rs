@@ -1606,6 +1606,22 @@ mod tests {
             for index in 0..2 {
                 let sample_id = format!("sample-{index}");
                 let event_id = format!("event-{index}");
+                predict_and_register_stream_sample_v1(
+                    &mut engine,
+                    &prediction(
+                        &sample_id,
+                        &event_id,
+                        100 + index * 3,
+                        102 + index * 3,
+                        Some("eqp-1/ch-1"),
+                        vec![1.0 + index as f64, 2.0],
+                    ),
+                )
+                .unwrap();
+            }
+            for index in 0..2 {
+                let sample_id = format!("sample-{index}");
+                let event_id = format!("event-{index}");
                 let label_id = format!("label-{index}");
                 deliver_qualified_stream_label_v1(
                     &mut engine,
@@ -1615,22 +1631,6 @@ mod tests {
                         LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
                         LabelEvidenceFrontierV1::CurrentAtK1,
                         (110 + index * 3, 112 + index * 3),
-                    ),
-                )
-                .unwrap();
-            }
-            for index in 0..2 {
-                deliver_qualified_stream_label_v1(
-                    &mut engine,
-                    &delivery(
-                        &format!("sample-{index}"),
-                        &format!("event-{index}"),
-                        &format!("label-{index}"),
-                        1,
-                        LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
-                        LabelEvidenceFrontierV1::CurrentAtK1,
-                        110 + index * 3,
-                        112 + index * 3,
                     ),
                 )
                 .unwrap();
