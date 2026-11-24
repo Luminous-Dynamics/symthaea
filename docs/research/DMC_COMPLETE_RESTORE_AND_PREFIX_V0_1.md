@@ -97,7 +97,9 @@ The companion JSON fixtures cover:
 - legal post-intervention branch divergence;
 - legal identical-trajectory null case.
 
-These are deterministic semantic controls. The Rust validator does not execute dm_control or prove that a Python adapter captured the declared bytes. A pinned Python smoke harness must generate the state/replay records; the exact-head Rust workflow qualifies the finite manifest admission.
+The Rust module has 27 deterministic unit tests covering snapshot kind/version, mask, plugin/RNG completeness, wrapper state, rest symmetry, action/run uniqueness, prefix identity and tolerance, fresh-process replay, exogenous schedule and legal branch divergence. These tests validate the finite contract only; they are not dm_control simulation results.
+
+The Rust validator does not execute dm_control or prove that a Python adapter captured the declared bytes. A pinned Python smoke harness must generate the state/replay records; the exact-head Rust workflow qualifies the finite manifest admission.
 
 ## 7. Ownership and claim boundary
 
