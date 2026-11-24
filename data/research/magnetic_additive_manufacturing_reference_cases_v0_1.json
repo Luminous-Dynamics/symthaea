@@ -171,5 +171,161 @@
       "disposition": "unresolved_internal_source_discrepancy",
       "input_policy": "do_not_treat_either_scalar_as_the_exact_full_particle_size_distribution; obtain full PSD or preserve uncertainty"
     }
+  ],
+  "process_route_comparators": [
+    {
+      "id": "PEM-RECYCLED-SINTERED-2025",
+      "doi": "10.1038/s41598-025-19111-6",
+      "process": "hydrogen-processing-of-magnetic-scrap powder extrusion moulding, thermal debinding, sintering",
+      "evidence_class": "source_reported",
+      "specimens": [
+        {
+          "material": "M1",
+          "nozzle_temperature_C": 190,
+          "remanence_mT": 964,
+          "coercivity_kA_per_m": 1213,
+          "bhmax_kJ_per_m3": 148,
+          "br_over_js": 0.95,
+          "density_g_cm3": 7.2
+        },
+        {
+          "material": "M1",
+          "nozzle_temperature_C": 200,
+          "remanence_mT": 984,
+          "coercivity_kA_per_m": 1255,
+          "bhmax_kJ_per_m3": 158,
+          "br_over_js": 0.96,
+          "density_g_cm3": 7.21
+        },
+        {
+          "material": "M2",
+          "nozzle_temperature_C": 190,
+          "remanence_mT": 833,
+          "coercivity_kA_per_m": 1465,
+          "bhmax_kJ_per_m3": 120,
+          "br_over_js": 0.92,
+          "density_g_cm3": 7.16
+        },
+        {
+          "material": "M2",
+          "nozzle_temperature_C": 200,
+          "remanence_mT": 882,
+          "coercivity_kA_per_m": 1398,
+          "bhmax_kJ_per_m3": 128,
+          "br_over_js": 0.92,
+          "density_g_cm3": 7.21
+        }
+      ],
+      "alignment_metric": "Br/Js; not interchangeable with LPBF <cos(theta)>",
+      "comparability": "different output form (sintered), feedstock and thermal process; route comparator only"
+    },
+    {
+      "id": "LCM-FIELD-ALIGNED-EBPC-2025",
+      "doi": "10.1080/17452759.2025.2593543",
+      "process": "lithography-based DLP composite manufacturing with in-situ magnetic alignment and electron beam post-curing",
+      "filler_fraction_wt_percent_range": [
+        60,
+        80
+      ],
+      "reported_magnetic_alignment_effects": {
+        "remanence_improvement_percent_range": [
+          42.05,
+          137.4
+        ],
+        "coercivity_improvement_percent_range": [
+          14.77,
+          122.82
+        ],
+        "specimen_replicates_per_condition": 3
+      },
+      "reported_ebpc_optimal_dose_kGy": 100,
+      "reported_flexural_strength_and_modulus_improvement": "more than fivefold",
+      "reported_endpoint_mass_specific": {
+        "intrinsic_coercivity_as_written_T": 1.9,
+        "saturation_magnetization_A_m2_per_kg": 101.02,
+        "remanence_A_m2_per_kg": 87.57,
+        "caution": "verify units/definitions from underlying measurement tables before comparing; mass-specific magnetization is not volumetric remanence in T"
+      },
+      "dataset_identifier_conflict": {
+        "publisher_statement_doi": "10.5281/zenodo.17404587",
+        "nlm_catalog_record_doi": "10.5281/zenodo.17510759",
+        "disposition": "unresolved_do_not_ingest_until_authoritative_record_confirmed"
+      },
+      "comparability": "different binder and fabrication process, 18-37 vol% solids; no direct Br ranking against 90 wt% PA12-LPBF"
+    },
+    {
+      "id": "MULTIMATERIAL-PATTERNED-POLES-SLS-2026",
+      "doi": "10.1038/s41598-026-43131-5",
+      "process": "multi-material selective laser sintering with hard/soft magnetic islands and local field orientation",
+      "materials": [
+        "NdFeB",
+        "FeSi",
+        "FeCo",
+        "nylon"
+      ],
+      "source_reported_process": {
+        "build_field_mT": 230,
+        "post_print_magnetizing_field_T_range": [
+          1.5,
+          1.9
+        ],
+        "layers": 5,
+        "layer_thickness_um": 50,
+        "magnetic_islands": 2
+      },
+      "field_reading_type": "surface probe measurements/differential field contours under declared external-field conditions",
+      "raw_data": "available from corresponding author on request",
+      "caveats": [
+        "surface probe mT values are not intrinsic Br/Hcj",
+        "reported contours are not a substitute for raw 3D field-map data",
+        "patent-pending apparatus/process embodiments require independent IP review"
+      ]
+    },
+    {
+      "id": "NDFEB-SINTERED-ACTIVE-LEARNING-2025",
+      "doi": "10.1038/s41524-025-01914-w",
+      "data_samples": {
+        "total": 1994,
+        "literature": 815,
+        "enterprise": 1179
+      },
+      "experiment_type": "simulation-based acquisition from a fully pre-labelled pool; no new physical experiments",
+      "findings": {
+        "random_forest_and_svr": "active selection accelerates convergence in the reported setup",
+        "xgboost": "random sampling often matches or exceeds active selection",
+        "qsvr": "does not outperform classical models in the reported study; acquisition signal can invert benefit",
+        "svr_label_saving_percent_approx": 23
+      },
+      "required_baselines": [
+        "random",
+        "space_filling",
+        "stratified_or_domain_aware",
+        "DOE",
+        "model_specific_active_learning",
+        "full_data_upper_bound"
+      ],
+      "caveat": "methodological comparator on sintered magnets, not evidence of prospective discovery or transfer to recycled bonded LPBF"
+    },
+    {
+      "id": "SRFE12O19-PROCESS-MICROSTRUCTURE-ML-2026",
+      "doi": "10.1038/s41598-026-55574-x",
+      "process": "experimental-literature-derived process/microstructure/coercivity ML on M-type strontium hexaferrite",
+      "reported_test_r2": 0.97,
+      "features": [
+        "processing_temperature",
+        "processing_time",
+        "grain_size",
+        "Ms",
+        "K1"
+      ],
+      "comparability": "different chemistry and dataset scope; ML methodology comparator only"
+    }
+  ],
+  "comparability_policy": [
+    "do_not_compare_mass_specific_magnetization_A_m2_per_kg_with_volumetric_Br_T_without source-qualified density and method",
+    "do_not_compare Br/Js with a different alignment metric without an explicit mapping",
+    "do_not treat surface probe flux under external field as intrinsic remanence",
+    "do_not combine process routes with different specimen forms in one leaderboard",
+    "do_not label simulated active learning on prelabelled data as prospective physical discovery"
   ]
 }
