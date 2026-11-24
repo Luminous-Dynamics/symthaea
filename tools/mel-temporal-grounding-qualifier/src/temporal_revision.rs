@@ -527,7 +527,7 @@ fn mean(values: &[f64]) -> Option<f64> {
 mod tests {
     use super::*;
     use crate::temporal_grounding::{
-        GroundingPredictionKindV1, TemporalGroundingOutcomeV1,
+        GroundingPredictionKindV1, TemporalGroundingOutcomeV1, TemporalIntervalMatchV1,
     };
 
     const EVALUATOR: &str = "mel-temporal-grounding-v1";
@@ -571,7 +571,15 @@ mod tests {
             count_absolute_error: Some(fp.abs_diff(fn_)),
             exact_occurrence_count: Some(fp == fn_),
             correct_absence_claim: None,
-            matches: Vec::new(),
+            matches: (0..tp)
+                .map(|index| TemporalIntervalMatchV1 {
+                    prediction_index: index,
+                    annotation_index: index,
+                    interval_iou: f1,
+                    start_error_frames: 0,
+                    end_error_frames: 0,
+                })
+                .collect(),
         }
     }
 
