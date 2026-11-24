@@ -150,7 +150,7 @@ CREATE TABLE IF NOT EXISTS sfeb.evidence_events (
 
 -- Atomic outbox claim protocol.
 -- Run this as a short transaction; never hold row locks while calling a network API.
--- $1 = batch size; $2 = worker identity; $3 = fresh claim UUID; $4 = lease interval.
+-- $1 = batch size; $2 = worker identity; $3 = lease interval. Each row gets a unique DB-generated claim token.
 WITH eligible AS (
     SELECT o.tenant_id, o.event_id
     FROM sfeb.outbox AS o
@@ -175,18 +175,30 @@ WITH eligible AS (
 UPDATE sfeb.outbox AS o
 SET status = 'leased',
     claim_epoch = o.claim_epoch + 1,
-    claim_token = $3::uuid,
+    claim_token = gen_random_uuid(),
     claimed_by = $2,
-    claim_expires_at = clock_timestamp() + $4::interval,
-    attempts = o.attempts + 1,
-    remote_outcome = CASE
-        WHEN o.remote_outcome = 'not_attempted' THEN 'unknown'
-        ELSE o.remote_outcome
-    END
+    claim_expires_at = clock_timestamp() + $3::interval,
+    attempts = o.attempts + 1
 FROM eligible AS e
 WHERE o.tenant_id = e.tenant_id
   AND o.event_id = e.event_id
 RETURNING o.*;
+
+
+-- Immediately before the dispatcher sends the network request, persist the
+-- uncertainty boundary. This MUST commit before the remote call starts.
+-- A pre-send failure can still release the claim while remote_outcome='not_attempted'.
+UPDATE sfeb.outbox
+SET remote_outcome = 'unknown'
+WHERE tenant_id = $1
+  AND event_id = $2
+  AND status = 'leased'
+  AND claimed_by = $3
+  AND claim_epoch = $4
+  AND claim_token = $5
+  AND claim_expires_at > clock_timestamp()
+  AND remote_outcome IN ('not_attempted','unknown')
+RETURNING event_id, action_key, request_digest, objective_fencing_epoch;
 
 -- After the separate sink has committed AND independent readback has
 -- verified the operation key, request digest and postcondition, complete
@@ -233,6 +245,27 @@ WHERE tenant_id = $1
   AND claim_token = $5
   AND remote_outcome = 'not_attempted'
 RETURNING event_id;
+
+
+-- On a definitive sink-side rejection that proves no effect occurred, quarantine
+-- the event and record a signed denial receipt. Do not auto-retry under a fresh key.
+-- This transition, operation rejection and evidence append belong in one local tx.
+-- $1 tenant; $2 event; $3 worker; $4 claim epoch; $5 token.
+UPDATE sfeb.outbox
+SET status = 'quarantined',
+    remote_outcome = 'rejected',
+    claimed_by = NULL,
+    claim_token = NULL,
+    claim_expires_at = NULL
+WHERE tenant_id = $1
+  AND event_id = $2
+  AND status = 'leased'
+  AND claimed_by = $3
+  AND claim_epoch = $4
+  AND claim_token = $5
+  AND claim_expires_at > clock_timestamp()
+  AND remote_outcome = 'unknown'
+RETURNING event_id, action_key;
 
 -- Contract invariant:
 -- Outbox claim_epoch/token fences only delivery workers. objective_fencing_epoch
