@@ -19,7 +19,11 @@
       "expected_decision": "Hold",
       "expected_reason": "NoTrigger",
       "expected_qualification": "NoTrigger",
-      "matched_pair_id": "same-tail-different-response-risk"
+      "matched_pair_id": "same-tail-different-response-risk",
+      "response_assessment_fresh": true,
+      "response_branch_association_stable": true,
+      "response_estimator_latency_seconds": 0.005,
+      "refinement_deadline_seconds": 0.01
     },
     {
       "case_id": "matched-pair-high-future-response",
@@ -29,7 +33,11 @@
       "expected_decision": "Refine",
       "expected_reason": "FutureResponse",
       "expected_qualification": "Triggered",
-      "matched_pair_id": "same-tail-different-response-risk"
+      "matched_pair_id": "same-tail-different-response-risk",
+      "response_assessment_fresh": true,
+      "response_branch_association_stable": true,
+      "response_estimator_latency_seconds": 0.005,
+      "refinement_deadline_seconds": 0.01
     },
     {
       "case_id": "spectral-tail-exceeded",
@@ -38,7 +46,11 @@
       "projected_peak_bytes": 700,
       "expected_decision": "Refine",
       "expected_reason": "SpectralTail",
-      "expected_qualification": "Triggered"
+      "expected_qualification": "Triggered",
+      "response_assessment_fresh": true,
+      "response_branch_association_stable": true,
+      "response_estimator_latency_seconds": 0.005,
+      "refinement_deadline_seconds": 0.01
     },
     {
       "case_id": "response-assessment-missing",
@@ -47,7 +59,11 @@
       "projected_peak_bytes": 700,
       "expected_decision": "Refine",
       "expected_reason": "ResponseUnknown",
-      "expected_qualification": "UnknownResponse"
+      "expected_qualification": "UnknownResponse",
+      "response_assessment_fresh": true,
+      "response_branch_association_stable": true,
+      "response_estimator_latency_seconds": 0.005,
+      "refinement_deadline_seconds": 0.01
     },
     {
       "case_id": "response-risk-blocked-by-memory",
@@ -56,7 +72,11 @@
       "projected_peak_bytes": 901,
       "expected_decision": "BlockedByMemory",
       "expected_reason": "FutureResponse",
-      "expected_qualification": "UnknownBlockedByMemory"
+      "expected_qualification": "UnknownBlockedByMemory",
+      "response_assessment_fresh": true,
+      "response_branch_association_stable": true,
+      "response_estimator_latency_seconds": 0.005,
+      "refinement_deadline_seconds": 0.01
     },
     {
       "case_id": "both-signals-exceeded",
@@ -65,7 +85,63 @@
       "projected_peak_bytes": 800,
       "expected_decision": "Refine",
       "expected_reason": "Both",
-      "expected_qualification": "Triggered"
+      "expected_qualification": "Triggered",
+      "response_assessment_fresh": true,
+      "response_branch_association_stable": true,
+      "response_estimator_latency_seconds": 0.005,
+      "refinement_deadline_seconds": 0.01
+    },
+    {
+      "case_id": "stale-response-assessment-is-unknown",
+      "spectral_tail_measure": 1,
+      "response_risk_upper_bound": 0.1,
+      "projected_peak_bytes": 700,
+      "expected_decision": "Refine",
+      "expected_reason": "ResponseUnknown",
+      "expected_qualification": "UnknownResponse",
+      "response_assessment_fresh": false,
+      "response_branch_association_stable": true,
+      "response_estimator_latency_seconds": 0.005,
+      "refinement_deadline_seconds": 0.01
+    },
+    {
+      "case_id": "unstable-response-branch-is-unknown",
+      "spectral_tail_measure": 1,
+      "response_risk_upper_bound": 0.1,
+      "projected_peak_bytes": 700,
+      "expected_decision": "Refine",
+      "expected_reason": "ResponseUnknown",
+      "expected_qualification": "UnknownResponse",
+      "response_assessment_fresh": true,
+      "response_branch_association_stable": false,
+      "response_estimator_latency_seconds": 0.005,
+      "refinement_deadline_seconds": 0.01
+    },
+    {
+      "case_id": "late-response-arrives-after-refinement-deadline",
+      "spectral_tail_measure": 1,
+      "response_risk_upper_bound": 0.1,
+      "projected_peak_bytes": 700,
+      "expected_decision": "Refine",
+      "expected_reason": "ResponseUnknown",
+      "expected_qualification": "UnknownResponse",
+      "response_assessment_fresh": true,
+      "response_branch_association_stable": true,
+      "response_estimator_latency_seconds": 0.02,
+      "refinement_deadline_seconds": 0.01
+    },
+    {
+      "case_id": "tail-trigger-with-unstable-response-branch",
+      "spectral_tail_measure": 12,
+      "response_risk_upper_bound": 0.1,
+      "projected_peak_bytes": 700,
+      "expected_decision": "Refine",
+      "expected_reason": "SpectralTailAndResponseUnknown",
+      "expected_qualification": "UnknownResponse",
+      "response_assessment_fresh": true,
+      "response_branch_association_stable": false,
+      "response_estimator_latency_seconds": 0.005,
+      "refinement_deadline_seconds": 0.01
     }
   ],
   "claim_boundary": {
