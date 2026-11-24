@@ -269,6 +269,7 @@ pub fn rank_covariance_aware_experiments(
         support_review_required: review,
         limitations: vec![
             "This is a covariance-geometry screening statistic, not expected information gain, a Bayes factor, a posterior, or a truth oracle.".to_owned(),
+            "The supplied pairwise difference covariances must be jointly realizable by one common collection of random output vectors; each matrix being PSD individually is not sufficient.".to_owned(),
             "The supplied covariance must include the cross-hypothesis and cross-observable covariance contributions intended by the uncertainty model.".to_owned(),
             "The descriptor digest binds provenance text; the matrix digest binds numeric matrix values. Neither proves that an executable generated the supplied values.".to_owned(),
             "A mean outside a singular covariance support is quarantined for review, not assigned a finite pseudoinverse score or an automatic infinite score.".to_owned(),
@@ -574,6 +575,8 @@ fn validate_input(input: &CovarianceAwareDesignInput) -> Result<(), CovarianceDe
 
 /// Pairwise covariances Cov(Y_i - Y_j) are not independent inputs: all pairs
 /// must be jointly realizable by one collection of random output vectors.
+/// This is the matrix-valued variogram / conditional-negative-definiteness
+/// condition; validating each pair matrix as PSD is necessary but insufficient.
 ///
 /// A block matrix of pairwise difference covariances is a matrix-valued
 /// variogram. Its double-centred form K = -1/2 (J ⊗ I) Δ (J ⊗ I) must be PSD.
