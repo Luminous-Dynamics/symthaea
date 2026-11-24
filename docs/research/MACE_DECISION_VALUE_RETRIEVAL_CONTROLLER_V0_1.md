@@ -56,7 +56,7 @@ The first real multi-action increment should add at least one genuinely differen
 |---|---|---|
 | BM25 / lexical | Exact terms and rare identifiers | Preserve source spans and offsets |
 | Dense retrieval | Semantic paraphrase and related concepts | Pin embedding model and revision |
-| Hybrid rank fusion | Combine lexical and dense candidate rankings | Use rank fusion or calibrated scores; never add incomparable raw scores |
+| Hybrid rank fusion | Combine independent lexical, structured-literal and/or dense candidate rankings | Preserve per-channel ranks and provenance; use RRF initially, calibrated score fusion only after calibration tests |
 | Entity / literal | Names, IDs, values, versions and exact strings | Preserve normalized and original forms |
 | Temporal / state | Dates, event order, supersession and current state | Bind valid-time and observation/transaction-time |
 | Causal / lineage graph | Parent dependencies, interventions and consequences | Return traversable, digest-bound edges |
@@ -103,7 +103,7 @@ For each benchmark family:
 
 1. Freeze the corpus, trajectories, query set, reader/model, prompt, tools, embedding and reranker revisions, environment, timeouts, seeds and total budget.
 2. Split by session / trajectory / project / domain as appropriate. Do not split near-duplicate turns from one trajectory across support and held-out evaluation.
-3. Run paired conditions on identical held-out tasks: no-note baseline, fixed BM25, fixed hybrid BM25+dense, random safe action, strategy-note controller, and (where implemented) EVSI-guided controller.
+3. Run paired conditions on identical held-out tasks: no-retrieval/reader-only control, BM25-only, entity-literal-only, fixed BM25+entity-literal RRF, random safe action over the same allowlist, strategy-note controller, and (where implemented) EVSI-guided controller. Add a dense channel only as a separately pinned arm after its embedder/revision and calibration are frozen.
 4. Keep model, reasoning tier, reader, evaluator and total resource budget identical. Randomize policy assignment/order where possible and pin deterministic replay inputs.
 5. Include an abstain/no-additional-evidence arm. A controller must not receive credit for retrieving more material if decision regret increases.
 6. Record action sequences, returned evidence digests, qualification dispositions, provenance closures, candidate coverage, latency, context tokens, storage, embedding/reranking cost, CPU/GPU time, network bytes and consolidation cost.
@@ -283,7 +283,7 @@ These are fixed benchmark arms, not learned action selection. The new capability
 
 1. **Source audit:** locate the exact sidecar, trace store, strategy promotion and applicability functions; map the current public API before modifying it.
 2. **Pure controller contract:** define typed action, observation, plan, policy note and use-receipt structures. Keep planning deterministic for fixed state and seed.
-3. **Two real actions:** wire BM25 plus one independent channel (dense or entity/literal) behind explicit adapters. A second alias of BM25 does not count.
+3. **Additional independent actions:** BM25 and exact entity/literal are now available as distinct arms in PR #13512. Next add a pinned dense retriever or a genuinely useful temporal/graph action as a separately versioned arm; do not treat neighbor expansion as a second retriever.
 4. **Advisory integration:** call applicability and promotion in the sidecar; record plan digest, action receipt and policy-use decision. Keep BM25-only fallback explicit and versioned.
 5. **Deterministic fake adapters:** test action ordering, budget stop, abstention, duplicate support traces, task-family overfitting, note expiry, backend/environment mismatch, poisoned proposals and restart/replay.
 6. **Paired evaluation harness:** freeze manifests and implement paired runs, confidence intervals, task-family guardrails, cost accounting and sealed evaluator custody.
