@@ -52,6 +52,9 @@ pub struct RetrievalActionOfferV1 {
     pub tool_revision_sha256: String,
     /// Digest of the bounded, typed action template; never raw query text.
     pub action_template_sha256: String,
+    /// Digest of the exact DecisionNeed, qualified context and current state.
+    /// All offers considered in one planning call must bind the same state.
+    pub decision_state_sha256: String,
     /// Predicted reduction in downstream decision regret, in micro-units.
     /// Negative values are permitted and represent predicted harm.
     pub expected_regret_reduction_micros: i64,
@@ -71,6 +74,7 @@ impl RetrievalActionOfferV1 {
         hasher.update([self.kind as u8]);
         hash_field(&mut hasher, &self.tool_revision_sha256);
         hash_field(&mut hasher, &self.action_template_sha256);
+        hash_field(&mut hasher, &self.decision_state_sha256);
         hasher.update(self.expected_regret_reduction_micros.to_be_bytes());
         hasher.update(self.uncertainty_micros.to_be_bytes());
         hasher.update(self.estimated_cost_micros.to_be_bytes());
@@ -135,6 +139,7 @@ pub struct SelectedRetrievalActionV1 {
     pub kind: RetrievalActionKindV1,
     pub tool_revision_sha256: String,
     pub action_template_sha256: String,
+    pub decision_state_sha256: String,
     pub offer_sha256: String,
     pub policy_sha256: String,
     /// Lower confidence bound before cost and risk penalties.
@@ -155,6 +160,7 @@ pub enum RetrievalControllerDecisionV1 {
 pub enum RetrievalControllerRejectV1 {
     InvalidPolicy,
     InvalidOfferDigest,
+    MixedDecisionState,
     DuplicateOffer,
 }
 
@@ -196,6 +202,11 @@ pub fn select_next_retrieval_action_v1(
         ));
     }
 
+    let decision_state_sha256 = offers[0].decision_state_sha256.as_str();
+    if !valid_sha256(decision_state_sha256) {
+        return Err(RetrievalControllerRejectV1::InvalidOfferDigest);
+    }
+
     let mut seen = BTreeSet::new();
     let mut ranked = Vec::with_capacity(offers.len());
     let mut cost_blocked = false;
@@ -205,8 +216,12 @@ pub fn select_next_retrieval_action_v1(
     for offer in offers {
         if !valid_sha256(&offer.tool_revision_sha256)
             || !valid_sha256(&offer.action_template_sha256)
+            || !valid_sha256(&offer.decision_state_sha256)
         {
             return Err(RetrievalControllerRejectV1::InvalidOfferDigest);
+        }
+        if offer.decision_state_sha256 != decision_state_sha256 {
+            return Err(RetrievalControllerRejectV1::MixedDecisionState);
         }
 
         let offer_sha256 = offer.offer_sha256();
@@ -214,6 +229,7 @@ pub fn select_next_retrieval_action_v1(
             offer.kind as u8,
             offer.tool_revision_sha256.clone(),
             offer.action_template_sha256.clone(),
+            offer.decision_state_sha256.clone(),
         );
         if !seen.insert(action_identity) {
             return Err(RetrievalControllerRejectV1::DuplicateOffer);
@@ -284,6 +300,7 @@ pub fn select_next_retrieval_action_v1(
             kind: offer.kind,
             tool_revision_sha256: offer.tool_revision_sha256.clone(),
             action_template_sha256: offer.action_template_sha256.clone(),
+            decision_state_sha256: offer.decision_state_sha256.clone(),
             offer_sha256,
             policy_sha256: policy.policy_sha256(),
             lower_bound_value_micros: lower_bound,
@@ -323,6 +340,7 @@ mod tests {
     const TOOL: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     const TEMPLATE_A: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
     const TEMPLATE_B: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+    const DECISION_STATE: &str = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
 
     fn offer(
         kind: RetrievalActionKindV1,
@@ -336,6 +354,7 @@ mod tests {
             kind,
             tool_revision_sha256: TOOL.to_owned(),
             action_template_sha256: template.to_owned(),
+            decision_state_sha256: DECISION_STATE.to_owned(),
             expected_regret_reduction_micros: value,
             uncertainty_micros: uncertainty,
             estimated_cost_micros: cost,
@@ -467,6 +486,17 @@ mod tests {
     }
 
     #[test]
+    fn rejects_mixed_decision_state_bindings() {
+        let first = offer(RetrievalActionKindV1::Bm25Lexical, TEMPLATE_A, 100, 0, 0, 0);
+        let mut second = offer(RetrievalActionKindV1::EntityLiteral, TEMPLATE_B, 90, 0, 0, 0);
+        second.decision_state_sha256 = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_owned();
+        assert_eq!(
+            select_next_retrieval_action_v1(&[first, second], &policy(), state()),
+            Err(RetrievalControllerRejectV1::MixedDecisionState)
+        );
+    }
+
+    #[test]
     fn rejects_malformed_tool_or_template_digests() {
         let mut candidate = offer(RetrievalActionKindV1::Bm25Lexical, TEMPLATE_A, 100, 0, 0, 0);
         candidate.tool_revision_sha256 = "not-a-digest".to_owned();
@@ -525,6 +555,9 @@ mod tests {
         assert_ne!(original.offer_sha256(), changed.offer_sha256());
         changed = original.clone();
         changed.expected_regret_reduction_micros -= 1;
+        assert_ne!(original.offer_sha256(), changed.offer_sha256());
+        changed = original.clone();
+        changed.decision_state_sha256 = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_owned();
         assert_ne!(original.offer_sha256(), changed.offer_sha256());
     }
 }
