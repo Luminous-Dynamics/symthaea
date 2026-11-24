@@ -12,37 +12,37 @@ const HEADER: &str = "team_id\ttask_bundle_sha256\tai_configuration_sha256\ttms_
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Arm {
-    HumanOnly,
-    HumanTms,
-    HumanAi,
-    HumanAiTms,
+    Control,
+    Tms,
+    Ai,
+    AiTms,
 }
 
 impl Arm {
     fn parse(value: &str) -> Result<Self, String> {
         match value {
-            "human_only" => Ok(Self::HumanOnly),
-            "human_tms" => Ok(Self::HumanTms),
-            "human_ai" => Ok(Self::HumanAi),
-            "human_ai_tms" => Ok(Self::HumanAiTms),
+            "human_only" => Ok(Self::Control),
+            "human_tms" => Ok(Self::Tms),
+            "human_ai" => Ok(Self::Ai),
+            "human_ai_tms" => Ok(Self::AiTms),
             _ => Err(format!("unknown arm {value:?}")),
         }
     }
 
     fn has_ai(self) -> bool {
-        matches!(self, Self::HumanAi | Self::HumanAiTms)
+        matches!(self, Self::Ai | Self::AiTms)
     }
 
     fn has_tms(self) -> bool {
-        matches!(self, Self::HumanTms | Self::HumanAiTms)
+        matches!(self, Self::Tms | Self::AiTms)
     }
 
     fn index(self) -> usize {
         match self {
-            Self::HumanOnly => 0,
-            Self::HumanTms => 1,
-            Self::HumanAi => 2,
-            Self::HumanAiTms => 3,
+            Self::Control => 0,
+            Self::Tms => 1,
+            Self::Ai => 2,
+            Self::AiTms => 3,
         }
     }
 }
@@ -648,14 +648,14 @@ mod tests {
 
     fn all_arms() -> Vec<TeamObservation> {
         vec![
-            row("h0-1", Arm::HumanOnly, 0.50),
-            row("h0-2", Arm::HumanOnly, 0.50),
-            row("h1-1", Arm::HumanTms, 0.60),
-            row("h1-2", Arm::HumanTms, 0.60),
-            row("a0-1", Arm::HumanAi, 0.40),
-            row("a0-2", Arm::HumanAi, 0.40),
-            row("a1-1", Arm::HumanAiTms, 0.65),
-            row("a1-2", Arm::HumanAiTms, 0.65),
+            row("h0-1", Arm::Control, 0.50),
+            row("h0-2", Arm::Control, 0.50),
+            row("h1-1", Arm::Tms, 0.60),
+            row("h1-2", Arm::Tms, 0.60),
+            row("a0-1", Arm::Ai, 0.40),
+            row("a0-2", Arm::Ai, 0.40),
+            row("a1-1", Arm::AiTms, 0.65),
+            row("a1-2", Arm::AiTms, 0.65),
         ]
     }
 
@@ -686,10 +686,10 @@ mod tests {
     #[test]
     fn one_team_per_arm_yields_point_estimate_without_interval() {
         let rows = vec![
-            row("h0", Arm::HumanOnly, 0.50),
-            row("h1", Arm::HumanTms, 0.60),
-            row("a0", Arm::HumanAi, 0.40),
-            row("a1", Arm::HumanAiTms, 0.65),
+            row("h0", Arm::Control, 0.50),
+            row("h1", Arm::Tms, 0.60),
+            row("a0", Arm::Ai, 0.40),
+            row("a1", Arm::AiTms, 0.65),
         ];
         let result = analyze(&rows, 500, 42).unwrap();
         assert!(
