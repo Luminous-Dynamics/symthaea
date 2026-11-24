@@ -24,6 +24,7 @@ A covariance separation score is not EVSI. Mutual information is not decision va
 | Symthaea PR #9821 — decision-focused active sensing | Focused workflow passed at source f203c5e4fd62c985c32414e8c038929f031f2d67: 9 tests, rustfmt, strict Clippy and isolated lockfile artifact | Planner and receipt correctness on synthetic tests; no calibrated prospective forecasts or physical energy result |
 | Symthaea PR #10947 — AS-Bench compatibility adapter | Focused workflow passed at source f23caa7b8a177f002ee25eaec34404d4e675946f: 38 tests, rustfmt, strict Clippy, pinned manifest and Lab API fixtures | Offline compatibility/request-response contract only; no live API call, campaign execution, verifier access or official submission |
 | Symthaea #12546 — finite-world decision evaluator | Focused workflow passed at source d66d216d77d7b9d70cbbd7e66fa75a4bda3f6738: 16 tests, rustfmt and strict Clippy. Includes Bayesian and prior-free robust decision-value modes plus a typed covariance-to-robust adapter. | Executable finite-world evaluator primitives; full chaotic-systems generators, sealed evaluator process, external predictor tournament and physical sensing remain future work |
+| Symthaea PR #13545 — robust risk-gate separation | Draft source change at head `ba0c0b4e2ee6c11879017fb040ebe6899c368416`; separates unconstrained minimax value from current/post-observation risk gates and adds three known-answer tests. | **Unqualified:** formatting, compilation, tests and strict Clippy have not run on this head; no external or physical result is claimed |
 
 The focused work is deliberately split across existing owners. #9817/#9821 own active sensing; #12546 owns the paired-world decision evaluator; #12407 owns observation time/mask/modality semantics; #12502/#12505/#12506/#12624 own dynamical reference and predictor baselines; #5476/#5477/#5478 own prospective value-of-computation calibration and causal metareasoning ablations.
 
@@ -67,6 +68,17 @@ Every action needs an explicit hypothesis target, predicted outcomes, decision i
 
 Pre-commit the question, model version, covariance/likelihood, random seed and decision rule. Record execution intent, actual observation, clock semantics, raw artifacts and independent verification. Unknown execution outcome must trigger reconciliation, not another mutation. Candidate code must never receive evaluator truth or future observations during confirmatory scoring.
 
+### 6. From fixed benchmarks to independently hardened challenge suites
+
+A public benchmark can become saturated or acquire answer shortcuts even when its original tasks are valid. Use a versioned `concept × recipe × instance` representation and a controlled task-hardening loop: discover shortcuts from permitted traces, revise the recipe without changing the scientific construct, independently revalidate the oracle, then freeze a new recipe version and retain older versions for regression measurement.
+
+Compose with:
+- [#9332 — adaptive scientific benchmark generation with sealed oracle verification](https://github.com/Luminous-Dynamics/symthaea/issues/9332) for candidate generation, independent task validation, rotating challenge instances and hidden-oracle custody;
+- [#10756 — evaluator research and independent target judgments](https://github.com/Luminous-Dynamics/symthaea/issues/10756) for evaluator construct validity, sealed-target transfer and scorer attack resistance;
+- [#12567 — information-channel integrity and non-anticipativity](https://github.com/Luminous-Dynamics/symthaea/issues/12567) for candidate/evaluator separation and metadata side-channel controls.
+
+AutoSciBench (arXiv:2610.05140) is a relevant methodological comparator for adaptive benchmark construction, not a leaderboard score. A benchmark generator must not control the final qualification oracle, its own acceptance thresholds, or sealed labels.
+
 ## Current external benchmark landscape
 
 The figures below are public reference points, not results from Luminous Dynamics. Benchmarks are different tasks and must not be combined into one league table.
@@ -77,6 +89,7 @@ The figures below are public reference points, not results from Luminous Dynamic
 | ASI-Bench | 60 tasks / 11 domains / B1–B4; latest supplied overall leader 63.90 | Tests project-level scientific execution as methodological guidance is progressively removed | Latest leaderboard says no external tools; exact scored task-set identifier is unverified; preserve B1–B4 and run counts |
 | SciWorkBench | Best reported mean 57.38 | Tests scientific workflows across biology, chemistry, materials and physics | Follow the official harness/scorer; reported bottlenecks include procedural translation, multimodal evidence integration and self-correction |
 | FIRE-Bench | Best published F1 46.7 across 30 tasks and three trials | Tests verifiable scientific rediscovery with atomic claim precision/recall | Claim-level rediscovery is not the same as running physical experiments |
+| BIABench | 16 real-world bioimage-analysis tasks; separate outcome and process/QC scores; 11 subtasks/modalities | Tests raw scientific imagery, procedure choice, measurement, controls and analysis reproducibility | Keep outcome and process scores separate; use official v1.0 data/rubrics and keep evaluation-only ground truth inaccessible to the agent |
 | DEEP | 34–54% of tested decision-changing escalations made downstream loss worse | Direct evidence that perception/compute gains can harm decisions | Robotics/perception domain; methodology transfers, raw numbers do not |
 | ActiveArena | 35 active-perception tasks; reported OOD gap, with best aggregate ID/OOD 62.97/47.60 | Multi-round evidence acquisition and memory under OOD shifts | Robotic manipulation; not a general science-agent score |
 | SynTSBench | NeurIPS 2025; programmable time-series features with theoretical-optimum baselines | Separates forecast skill from mathematical limits and irregularity robustness | Synthetic forecasting benchmark, not closed-loop experiment selection |
@@ -88,6 +101,8 @@ Primary links:
 - ASI-Bench: https://asibench.apexin.ai/ and https://asibench.apexin.ai/leaderboard/
 - SciWorkBench: https://arxiv.org/abs/2611.22490
 - FIRE-Bench: https://firebench.github.io/
+- BIABench: https://github.com/BIABench/BIABench and https://huggingface.co/datasets/BIABench/BIABench (DOI 10.57967/hf/10561)
+- AutoSciBench (adaptive benchmark-generation method): https://arxiv.org/abs/2610.05140
 - DEEP: https://arxiv.org/abs/2609.35910
 - ActiveArena: https://arxiv.org/abs/2609.24124
 - SynTSBench: https://proceedings.neurips.cc/paper_files/paper/2025/hash/d60361f3d0021c76626b2597957261d6-Abstract-Datasets_and_Benchmarks_Track.html
@@ -104,6 +119,7 @@ A promising theoretical line for the probabilistic arm is the September 2026 pap
 - **ASI-Bench:** target at least 70 overall on the same task-set/scorer/runtime release. Also target a 25% reduction in the B1-to-B2 score drop, and at least a 10-point improvement over the strongest matched baseline on B2–B4 without sacrificing B1. Use three independent runs and task-level artifacts; do not compare to the current aggregate unless the task-set identifier is reconciled.
 - **SciWorkBench:** target at least 65 mean under the same official harness and grader, with per-domain breakdowns and explicit procedure/evidence/self-correction failure rates.
 - **FIRE-Bench:** target at least 55 F1 on the same 30 tasks, while also reporting precision, recall, trial variance and atomic-claim support. Target fewer than half of errors in planning, not just higher final F1.
+- **BIABench:** reproduce the official v1.0/basic/three-run baseline with the published process judge before tuning; then improve the outcome/process Pareto frontier, especially on 3D and time-lapse tasks, without regressing 2D outcome quality. Report task-level run variance, invalid outputs, insufficient-evidence recognition and all resource costs. Use [#13473](https://github.com/Luminous-Dynamics/symthaea/issues/13473); keep the upstream ground-truth package evaluator-only.
 
 ### Decision and active evidence acquisition
 
