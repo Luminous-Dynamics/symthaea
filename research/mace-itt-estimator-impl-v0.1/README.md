@@ -35,6 +35,8 @@ Supply a preregistered roster with every pair ID:
 go run ./cmd/mace-itt -roster fixtures/assignment-roster.json < fixtures/pairs.jsonl
 ```
 
+The estimator accepts 200 to 100,000 bootstrap replicates (default 2,000) and rejects larger requests before allocating bootstrap buffers. This bounds accidental or untrusted CLI resource requests.
+
 The roster check requires exact ID coverage and rejects missing, duplicate or substituted IDs. It does **not** authenticate the roster signature, prove it was preregistered before execution, prove randomization, or establish that the input run records are truthful. Those require an independently authenticated assignment manifest and run observer.
 
 ## Run verification
