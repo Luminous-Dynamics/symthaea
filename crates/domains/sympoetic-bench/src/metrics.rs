@@ -727,6 +727,8 @@ pub struct CognitiveProcessObservation {
 pub struct CognitiveProcessSummary {
     pub opportunity_count: usize,
     pub ai_core_step_count: usize,
+    /// AI supplied a core step / all independently coded opportunities.
+    pub ai_core_step_supply_rate: Option<f64>,
     pub human_planning_rate: Option<f64>,
     pub human_first_attempt_rate: Option<f64>,
     pub human_monitoring_rate: Option<f64>,
