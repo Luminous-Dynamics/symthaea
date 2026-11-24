@@ -8,6 +8,8 @@
 //! a process-security boundary. Confirmatory runs must keep EvaluatorWorld in
 //! a separately permissioned evaluator process.
 
+pub mod robust;
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
