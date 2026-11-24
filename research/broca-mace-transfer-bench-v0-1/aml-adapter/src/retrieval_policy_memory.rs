@@ -473,45 +473,6 @@ fn strategy_signature(trace: &RetrievalTraceReceiptV1) -> String {
     hex_digest(&hasher.finalize())
 }
 
-fn strategy_steps(trace: &RetrievalTraceReceiptV1) -> Vec<RetrievalStrategyStepV1> {
-    trace
-        .operations
-        .iter()
-        .map(|operation| RetrievalStrategyStepV1 {
-            tool_id: operation.tool_id.clone(),
-            tool_revision_sha256: operation.tool_revision_sha256.clone(),
-            action_template_sha256: operation.action_template_sha256.clone(),
-        })
-        .collect()
-}
-
-fn note_digest(note: &RetrievalStrategyNoteV1) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(b"luminous:mace:retrieval-strategy-note:v1\0");
-    for value in [
-        note.domain_id.as_str(),
-        note.environment_revision_sha256.as_str(),
-        note.tool_profile_sha256.as_str(),
-        note.strategy_signature_sha256.as_str(),
-        note.consolidation_algorithm_sha256.as_str(),
-    ] {
-        hash_field(&mut hasher, value);
-    }
-    hasher.update(note.promoted_at_unix.to_be_bytes());
-    hasher.update(note.expires_at_unix.to_be_bytes());
-    hasher.update((note.steps.len() as u64).to_be_bytes());
-    for step in &note.steps {
-        hash_field(&mut hasher, &step.tool_id);
-        hash_field(&mut hasher, &step.tool_revision_sha256);
-        hash_field(&mut hasher, &step.action_template_sha256);
-    }
-    hasher.update((note.supporting_trace_receipt_sha256.len() as u64).to_be_bytes());
-    for receipt in &note.supporting_trace_receipt_sha256 {
-        hash_field(&mut hasher, receipt);
-    }
-    hex_digest(&hasher.finalize())
-}
-
 fn validate_trace(trace: &RetrievalTraceReceiptV1) -> Result<(), RetrievalPolicyRejectV1> {
     if !valid_atom_with_limit(&trace.run_id, MAX_IDENTIFIER_BYTES_V1)
         || !valid_atom_with_limit(&trace.query_invocation_id, MAX_IDENTIFIER_BYTES_V1)
@@ -744,7 +705,6 @@ impl RetrievalPolicyMemoryV1 {
         }
 
         let first = selected[0];
-        let mut supporting_trace_receipt_sha256 = Vec::with_capacity(selected.len());
         for stored in &selected {
             if stored.receipt.domain_id != first.receipt.domain_id {
                 return Err(RetrievalPolicyRejectV1::MixedDomain);
@@ -763,46 +723,17 @@ impl RetrievalPolicyMemoryV1 {
             if stored.receipt.created_at_unix > promoted_at_unix {
                 return Err(RetrievalPolicyRejectV1::InvalidPromotionTime);
             }
-            supporting_trace_receipt_sha256.push(stored.receipt_sha256.clone());
-        }
-
-        // Both the old V1 "evidence_sufficient" label and the new
-        // "candidates_returned" state describe acquisition only. Neither
-        // proves independent admissibility, decision sufficiency or outcome.
-        if selected.iter().any(|stored| {
-            !matches!(
+        let has_acquisition_only_status = selected.iter().any(|stored| {
+            matches!(
                 stored.receipt.stop_reason,
                 RetrievalStopReasonV1::EvidenceSufficient
                     | RetrievalStopReasonV1::CandidatesReturned
             )
-        }) {
-            return Err(RetrievalPolicyRejectV1::UnsupportedTraceOutcome);
+        });
+        if has_acquisition_only_status {
+            return Err(RetrievalPolicyRejectV1::DecisionOutcomeReceiptRequired);
         }
-        return Err(RetrievalPolicyRejectV1::DecisionOutcomeReceiptRequired);
-
-        #[allow(unreachable_code)]
-        supporting_trace_receipt_sha256.sort();
-
-        let mut note = RetrievalStrategyNoteV1 {
-            note_sha256: String::new(),
-            domain_id: first.receipt.domain_id.clone(),
-            environment_revision_sha256: first.receipt.environment_revision_sha256.clone(),
-            tool_profile_sha256: first.receipt.tool_profile_sha256.clone(),
-            strategy_signature_sha256: first.strategy_signature_sha256.clone(),
-            steps: strategy_steps(&first.receipt),
-            supporting_trace_receipt_sha256,
-            consolidation_algorithm_sha256: consolidation_algorithm_sha256.to_owned(),
-            promoted_at_unix,
-            expires_at_unix,
-        };
-        if note.steps.is_empty() {
-            return Err(RetrievalPolicyRejectV1::EmptyStrategy);
-        }
-        note.note_sha256 = note_digest(&note);
-        self.notes
-            .entry(note.note_sha256.clone())
-            .or_insert_with(|| note.clone());
-        Ok(note)
+        Err(RetrievalPolicyRejectV1::UnsupportedTraceOutcome)
     }
 
     /// Return only notes whose domain, environment revision, tool profile and
@@ -1126,27 +1057,31 @@ mod tests {
 
     #[test]
     fn legacy_v1_evidence_sufficient_receipts_decode_but_cannot_promote() {
-        let mut legacy = trace(
-            "legacy-invocation",
-            "abababababababababababababababababababababababababababababababab",
-            "web-shop-a",
-            ENV_A,
-            TOOL_PROFILE_A,
-            ACTION_SEARCH,
-        );
-        legacy.stop_reason = RetrievalStopReasonV1::EvidenceSufficient;
-        let value = legacy.to_json_value();
-        assert_eq!(value["stop_reason"], "evidence_sufficient");
-        assert_eq!(
-            RetrievalTraceReceiptV1::from_json_value(&value),
-            Ok(legacy.clone())
-        );
-
         let mut memory = RetrievalPolicyMemoryV1::default();
-        memory.record_trace(legacy).expect("legacy observation remains replayable");
+        let samples = [
+            ("legacy-a", "abababababababababababababababababababababababababababababababab"),
+            ("legacy-b", "acacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacac"),
+            ("legacy-c", "adadadadadadadadadadadadadadadadadadadadadadadadadadadadadadadad"),
+        ];
+        for (invocation, query_digest) in samples {
+            let mut legacy = trace(
+                invocation,
+                query_digest,
+                "web-shop-a",
+                ENV_A,
+                TOOL_PROFILE_A,
+                ACTION_SEARCH,
+            );
+            legacy.stop_reason = RetrievalStopReasonV1::EvidenceSufficient;
+            let value = legacy.to_json_value();
+            assert_eq!(value["stop_reason"], "evidence_sufficient");
+            assert_eq!(RetrievalTraceReceiptV1::from_json_value(&value), Ok(legacy.clone()));
+            memory.record_trace(legacy).expect("legacy observation remains replayable");
+        }
+
         assert_eq!(
-            memory.promote_strategy(&refs(&["legacy-invocation"]), ALGORITHM, 200, 300),
-            Err(RetrievalPolicyRejectV1::TooFewSupportingTraces)
+            memory.promote_strategy(&refs(&["legacy-a", "legacy-b", "legacy-c"]), ALGORITHM, 200, 300),
+            Err(RetrievalPolicyRejectV1::DecisionOutcomeReceiptRequired)
         );
         assert_eq!(memory.note_count(), 0);
     }
