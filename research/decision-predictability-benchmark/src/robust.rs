@@ -85,43 +85,123 @@ pub enum RobustEvaluationError {
     TooManyDecisions(usize),
     TooManyOutcomes(usize),
     EmptyIdentifier(&'static str),
-    DuplicateIdentifier { field: &'static str, id: String },
+    DuplicateIdentifier {
+        field: &'static str,
+        id: String,
+    },
     InvalidThreshold(f64),
-    InvalidLoss { decision_id: String, state_id: String, value_bits: u64 },
-    MissingDecisionLoss { decision_id: String, state_id: String },
+    InvalidLoss {
+        decision_id: String,
+        state_id: String,
+        value_bits: u64,
+    },
+    MissingDecisionLoss {
+        decision_id: String,
+        state_id: String,
+    },
     InvalidCost(f64),
     InvalidBudget(f64),
     InvalidDeadline,
     EmptyOutcomeSupport(String),
-    DuplicateStateInSupport { outcome_id: String, state_id: String },
-    UnknownStateInSupport { outcome_id: String, state_id: String },
+    DuplicateStateInSupport {
+        outcome_id: String,
+        state_id: String,
+    },
+    UnknownStateInSupport {
+        outcome_id: String,
+        state_id: String,
+    },
     UncoveredState(String),
     NoRiskAdmissibleDecision,
-    InformationIncreasedWorstCaseRisk { before_bits: u64, after_bits: u64 },
+    InformationIncreasedWorstCaseRisk {
+        before_bits: u64,
+        after_bits: u64,
+    },
 }
 
 impl Display for RobustEvaluationError {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Self::EmptyStateSet => write!(formatter, "robust decision problem requires at least one possible state"),
-            Self::EmptyDecisionSet => write!(formatter, "robust decision problem requires at least one decision"),
-            Self::TooManyStates(count) => write!(formatter, "state count {count} exceeds {MAX_STATES}"),
-            Self::TooManyDecisions(count) => write!(formatter, "decision count {count} exceeds {MAX_DECISIONS}"),
-            Self::TooManyOutcomes(count) => write!(formatter, "outcome count {count} exceeds {MAX_OUTCOMES}"),
-            Self::EmptyIdentifier(field) => write!(formatter, "{field} identifier must be non-empty"),
-            Self::DuplicateIdentifier { field, id } => write!(formatter, "duplicate {field} identifier: {id}"),
-            Self::InvalidThreshold(value) => write!(formatter, "maximum worst-case loss is invalid: {value}"),
-            Self::InvalidLoss { decision_id, state_id, value_bits } => write!(formatter, "decision {decision_id} has invalid loss {} for state {state_id}", f64::from_bits(*value_bits)),
-            Self::MissingDecisionLoss { decision_id, state_id } => write!(formatter, "decision {decision_id} has no loss for state {state_id}"),
-            Self::InvalidCost(value) => write!(formatter, "probe acquisition cost is invalid: {value}"),
-            Self::InvalidBudget(value) => write!(formatter, "remaining cost budget is invalid: {value}"),
+            Self::EmptyStateSet => write!(
+                formatter,
+                "robust decision problem requires at least one possible state"
+            ),
+            Self::EmptyDecisionSet => write!(
+                formatter,
+                "robust decision problem requires at least one decision"
+            ),
+            Self::TooManyStates(count) => {
+                write!(formatter, "state count {count} exceeds {MAX_STATES}")
+            }
+            Self::TooManyDecisions(count) => {
+                write!(formatter, "decision count {count} exceeds {MAX_DECISIONS}")
+            }
+            Self::TooManyOutcomes(count) => {
+                write!(formatter, "outcome count {count} exceeds {MAX_OUTCOMES}")
+            }
+            Self::EmptyIdentifier(field) => {
+                write!(formatter, "{field} identifier must be non-empty")
+            }
+            Self::DuplicateIdentifier { field, id } => {
+                write!(formatter, "duplicate {field} identifier: {id}")
+            }
+            Self::InvalidThreshold(value) => {
+                write!(formatter, "maximum worst-case loss is invalid: {value}")
+            }
+            Self::InvalidLoss {
+                decision_id,
+                state_id,
+                value_bits,
+            } => write!(
+                formatter,
+                "decision {decision_id} has invalid loss {} for state {state_id}",
+                f64::from_bits(*value_bits)
+            ),
+            Self::MissingDecisionLoss {
+                decision_id,
+                state_id,
+            } => write!(
+                formatter,
+                "decision {decision_id} has no loss for state {state_id}"
+            ),
+            Self::InvalidCost(value) => {
+                write!(formatter, "probe acquisition cost is invalid: {value}")
+            }
+            Self::InvalidBudget(value) => {
+                write!(formatter, "remaining cost budget is invalid: {value}")
+            }
             Self::InvalidDeadline => write!(formatter, "decision deadline precedes current step"),
-            Self::EmptyOutcomeSupport(outcome) => write!(formatter, "outcome {outcome} has no possible hidden states"),
-            Self::DuplicateStateInSupport { outcome_id, state_id } => write!(formatter, "outcome {outcome_id} repeats state {state_id}"),
-            Self::UnknownStateInSupport { outcome_id, state_id } => write!(formatter, "outcome {outcome_id} names unknown state {state_id}"),
-            Self::UncoveredState(state) => write!(formatter, "probe outcome supports do not cover possible state {state}"),
-            Self::NoRiskAdmissibleDecision => write!(formatter, "no decision satisfies the frozen worst-case risk constraint"),
-            Self::InformationIncreasedWorstCaseRisk { before_bits, after_bits } => write!(formatter, "observing a probe increased worst-case minimax risk from {} to {}", f64::from_bits(*before_bits), f64::from_bits(*after_bits)),
+            Self::EmptyOutcomeSupport(outcome) => {
+                write!(formatter, "outcome {outcome} has no possible hidden states")
+            }
+            Self::DuplicateStateInSupport {
+                outcome_id,
+                state_id,
+            } => write!(formatter, "outcome {outcome_id} repeats state {state_id}"),
+            Self::UnknownStateInSupport {
+                outcome_id,
+                state_id,
+            } => write!(
+                formatter,
+                "outcome {outcome_id} names unknown state {state_id}"
+            ),
+            Self::UncoveredState(state) => write!(
+                formatter,
+                "probe outcome supports do not cover possible state {state}"
+            ),
+            Self::NoRiskAdmissibleDecision => write!(
+                formatter,
+                "no decision satisfies the frozen worst-case risk constraint"
+            ),
+            Self::InformationIncreasedWorstCaseRisk {
+                before_bits,
+                after_bits,
+            } => write!(
+                formatter,
+                "observing a probe increased worst-case minimax risk from {} to {}",
+                f64::from_bits(*before_bits),
+                f64::from_bits(*after_bits)
+            ),
         }
     }
 }
@@ -133,13 +213,17 @@ fn validate_problem(problem: &RobustDecisionProblem) -> Result<(), RobustEvaluat
         return Err(RobustEvaluationError::EmptyStateSet);
     }
     if problem.state_ids.len() > MAX_STATES {
-        return Err(RobustEvaluationError::TooManyStates(problem.state_ids.len()));
+        return Err(RobustEvaluationError::TooManyStates(
+            problem.state_ids.len(),
+        ));
     }
     if problem.decision_ids.is_empty() {
         return Err(RobustEvaluationError::EmptyDecisionSet);
     }
     if problem.decision_ids.len() > MAX_DECISIONS {
-        return Err(RobustEvaluationError::TooManyDecisions(problem.decision_ids.len()));
+        return Err(RobustEvaluationError::TooManyDecisions(
+            problem.decision_ids.len(),
+        ));
     }
     if !problem.maximum_worst_case_loss.is_finite()
         || !(0.0..=1.0).contains(&problem.maximum_worst_case_loss)
@@ -173,13 +257,12 @@ fn validate_problem(problem: &RobustDecisionProblem) -> Result<(), RobustEvaluat
                 id: decision_id.clone(),
             });
         }
-        let losses = problem
-            .decision_loss
-            .get(decision_id)
-            .ok_or_else(|| RobustEvaluationError::MissingDecisionLoss {
+        let losses = problem.decision_loss.get(decision_id).ok_or_else(|| {
+            RobustEvaluationError::MissingDecisionLoss {
                 decision_id: decision_id.clone(),
                 state_id: problem.state_ids[0].clone(),
-            })?;
+            }
+        })?;
         for state_id in &problem.state_ids {
             let loss = losses.get(state_id).copied().ok_or_else(|| {
                 RobustEvaluationError::MissingDecisionLoss {
@@ -237,7 +320,9 @@ fn validate_probe(
         return Err(RobustEvaluationError::EmptyIdentifier("probe"));
     }
     if !probe.acquisition_cost_units.is_finite() || probe.acquisition_cost_units < 0.0 {
-        return Err(RobustEvaluationError::InvalidCost(probe.acquisition_cost_units));
+        return Err(RobustEvaluationError::InvalidCost(
+            probe.acquisition_cost_units,
+        ));
     }
     if probe.outcomes.is_empty() || probe.outcomes.len() > MAX_OUTCOMES {
         return Err(RobustEvaluationError::TooManyOutcomes(probe.outcomes.len()));
@@ -301,8 +386,7 @@ pub fn evaluate_robust_probe(
 ) -> Result<RobustProbeValue, RobustEvaluationError> {
     validate_problem(problem)?;
     validate_probe(problem, probe)?;
-    if !context.remaining_cost_budget_units.is_finite()
-        || context.remaining_cost_budget_units < 0.0
+    if !context.remaining_cost_budget_units.is_finite() || context.remaining_cost_budget_units < 0.0
     {
         return Err(RobustEvaluationError::InvalidBudget(
             context.remaining_cost_budget_units,
@@ -497,7 +581,9 @@ mod tests {
         let mut blocked = context();
         blocked.permitted_probe_ids.clear();
         assert_eq!(
-            evaluate_robust_probe(&problem, &probe, &blocked).unwrap().admission,
+            evaluate_robust_probe(&problem, &probe, &blocked)
+                .unwrap()
+                .admission,
             RobustProbeAdmission::NotPermitted
         );
 
@@ -513,7 +599,9 @@ mod tests {
         let mut late = context();
         late.decision_deadline_step = 0;
         assert_eq!(
-            evaluate_robust_probe(&problem, &probe, &late).unwrap().admission,
+            evaluate_robust_probe(&problem, &probe, &late)
+                .unwrap()
+                .admission,
             RobustProbeAdmission::MissesDecisionDeadline
         );
     }
