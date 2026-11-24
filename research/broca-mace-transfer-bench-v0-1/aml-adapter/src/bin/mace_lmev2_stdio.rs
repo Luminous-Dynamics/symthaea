@@ -22,8 +22,9 @@ use broca_aml_adapter::longmemeval_v2::{
 use broca_aml_adapter::raw_session::Bm25ProfileV1;
 use broca_aml_adapter::longmemeval_v2_candidate_adapter::{
     LongMemEvalV2CandidateIdentityV1,
-    encode_longmemeval_v2_search_candidate_evidence_v1,
+    encode_longmemeval_v2_search_candidate_evidence_for_channel_v1,
 };
+use broca_aml_adapter::longmemeval_v2_entity::LongMemEvalV2EntityLiteralIndexV1;
 use broca_aml_adapter::retrieval_policy_memory::{
     RetrievalOperationOutcomeV1, RetrievalOperationV1, RetrievalPolicyMemoryV1,
     RetrievalStopReasonV1, RetrievalTraceReceiptV1,
@@ -31,6 +32,11 @@ use broca_aml_adapter::retrieval_policy_memory::{
 use broca_aml_adapter::retrieval_policy_store::RetrievalPolicyTraceFileStoreV1;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
+
+struct RetrievalIndexesV1 {
+    bm25: LongMemEvalV2Bm25IndexV1,
+    entity_literal: LongMemEvalV2EntityLiteralIndexV1,
+}
 
 struct Config {
     domain: String,
@@ -151,6 +157,67 @@ fn bm25_action_template_sha256(config: &Config) -> String {
     sha256_hex(template.as_bytes())
 }
 
+fn entity_literal_action_template_sha256(config: &Config) -> String {
+    let template = format!(
+        "mace-lmev2-entity-literal-search:v1|domain={}|top_k={}|slice_radius={}",
+        config.domain,
+        config.top_k,
+        config.slice_radius
+    );
+    sha256_hex(template.as_bytes())
+}
+
+fn trace_evidence_ids(hits: &[LongMemEvalV2HitV1]) -> Vec<String> {
+    let mut identifiers = hits.iter()
+        .map(|hit| format!("lmev2:text:{}:{}", hit.trajectory_id, hit.chunk_id))
+        .collect::<Vec<_>>();
+    identifiers.sort();
+    identifiers.dedup();
+    identifiers
+}
+
+fn hybrid_rrf_result(
+    bm25_hits: &[LongMemEvalV2HitV1],
+    entity_hits: &[LongMemEvalV2HitV1],
+    neighbor_context: Vec<broca_aml_adapter::longmemeval_v2::LongMemEvalV2NeighborV1>,
+    top_k: usize,
+    search_latency_ns: u64,
+) -> LongMemEvalV2SearchResultV1 {
+    const RRF_K: f64 = 60.0;
+    let mut fused = std::collections::BTreeMap::<
+        String,
+        (LongMemEvalV2HitV1, f64),
+    >::new();
+
+    for (channel_weight, hits) in [(1.0_f64, bm25_hits), (1.0_f64, entity_hits)] {
+        for hit in hits {
+            let contribution = channel_weight / (RRF_K + hit.rank as f64);
+            let entry = fused.entry(hit.chunk_id.clone())
+                .or_insert_with(|| (hit.clone(), 0.0));
+            entry.1 += contribution;
+        }
+    }
+
+    let mut ranked = fused.into_values().collect::<Vec<_>>();
+    ranked.sort_by(|left, right| {
+        right.1.total_cmp(&left.1)
+            .then_with(|| left.0.chunk_id.cmp(&right.0.chunk_id))
+    });
+    ranked.truncate(top_k);
+
+    let hits = ranked.into_iter().enumerate().map(|(index, (mut hit, score))| {
+        hit.score = score;
+        hit.rank = index + 1;
+        hit
+    }).collect();
+
+    LongMemEvalV2SearchResultV1 {
+        hits,
+        neighbor_context,
+        search_latency_ns,
+    }
+}
+
 fn unix_now_seconds() -> Result<u64, String> {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -201,7 +268,7 @@ fn handle_request(
     request: Value,
     config: &Config,
     trajectories: &mut Vec<LongMemEvalV2TrajectoryV1>,
-    index: &mut Option<LongMemEvalV2Bm25IndexV1>,
+    index: &mut Option<RetrievalIndexesV1>,
     policy_memory: &mut RetrievalPolicyMemoryV1,
     policy_trace_store: &RetrievalPolicyTraceFileStoreV1,
 ) -> Result<Value, String> {
@@ -251,24 +318,44 @@ fn handle_request(
             let build_started = Instant::now();
             let needs_build = index.is_none();
             if needs_build {
-                let built = LongMemEvalV2Bm25IndexV1::build(
+                let bm25 = LongMemEvalV2Bm25IndexV1::build(
                     config.domain.clone(),
                     trajectories,
                     config.slice_radius,
                     config.profile,
                 )
                 .map_err(|error| format!("build trajectory BM25 index: {error:?}"))?;
-                *index = Some(built);
+                let entity_literal = LongMemEvalV2EntityLiteralIndexV1::build(
+                    config.domain.clone(),
+                    trajectories,
+                    config.slice_radius,
+                )
+                .map_err(|error| format!("build trajectory entity-literal index: {error:?}"))?;
+                *index = Some(RetrievalIndexesV1 { bm25, entity_literal });
             }
             let index_build_ns = if needs_build {
                 u64::try_from(build_started.elapsed().as_nanos()).unwrap_or(u64::MAX)
             } else {
                 0
             };
-            let index_ref = index.as_ref().ok_or("index unavailable after build")?;
-            let result = index_ref
+            let index_ref = index.as_ref().ok_or("indexes unavailable after build")?;
+            let bm25_result = index_ref.bm25
                 .search(&config.domain, query, config.top_k, config.neighbor_radius)
                 .map_err(|error| format!("trajectory BM25 query: {error:?}"))?;
+            let entity_literal_result = index_ref.entity_literal
+                .search(&config.domain, query, config.top_k)
+                .map_err(|error| format!("trajectory entity-literal query: {error:?}"))?;
+            let retrieval_search_ns = bm25_result.search_latency_ns
+                .saturating_add(entity_literal_result.search_latency_ns);
+            let bm25_evidence_ids = trace_evidence_ids(&bm25_result.hits);
+            let entity_evidence_ids = trace_evidence_ids(&entity_literal_result.hits);
+            let result = hybrid_rrf_result(
+                &bm25_result.hits,
+                &entity_literal_result.hits,
+                bm25_result.neighbor_context,
+                config.top_k,
+                retrieval_search_ns,
+            );
 
             let mut items = Vec::new();
             let mut seen_images = BTreeSet::new();
@@ -306,15 +393,16 @@ fn handle_request(
                 let identity = LongMemEvalV2CandidateIdentityV1 {
                     run_id: config.run_id.clone(),
                     candidate_id: candidate_id.to_owned(),
-                    backend_id: "mace_lmev2_bm25_text".to_owned(),
+                    backend_id: "mace_lmev2_hybrid_rrf_bm25_entity".to_owned(),
                     backend_revision_sha256: config.backend_revision_sha256.clone(),
                 };
                 Some(
-                    encode_longmemeval_v2_search_candidate_evidence_v1(
+                    encode_longmemeval_v2_search_candidate_evidence_for_channel_v1(
                         &identity,
                         query,
                         &config.domain,
                         &result,
+                        "hybrid_rrf_bm25_entity",
                     )
                     .map_err(|error| format!("candidate evidence projection: {error:?}"))?
                 )
@@ -338,7 +426,12 @@ fn handle_request(
                     .map(|item| item.evidence_id.clone())
                     .collect::<Vec<_>>())
                 .unwrap_or_default();
-            let outcome = if observed_evidence_ids.is_empty() {
+            let bm25_outcome = if bm25_evidence_ids.is_empty() {
+                RetrievalOperationOutcomeV1::NoEvidence
+            } else {
+                RetrievalOperationOutcomeV1::EvidenceObserved
+            };
+            let entity_outcome = if entity_evidence_ids.is_empty() {
                 RetrievalOperationOutcomeV1::NoEvidence
             } else {
                 RetrievalOperationOutcomeV1::EvidenceObserved
@@ -350,6 +443,8 @@ fn handle_request(
             };
             let query_elapsed_ns = u64::try_from(query_started.elapsed().as_nanos())
                 .unwrap_or(u64::MAX);
+            let trace_elapsed_ns = bm25_result.search_latency_ns
+                .saturating_add(entity_literal_result.search_latency_ns);
             let created_at_unix = unix_now_seconds()?;
             let trace = RetrievalTraceReceiptV1 {
                 run_id: config.run_id.clone(),
@@ -359,22 +454,34 @@ fn handle_request(
                 tool_profile_sha256: config.backend_revision_sha256.clone(),
                 query_sha256: sha256_hex(query.as_bytes()),
                 candidate_set_sha256: candidate_set_sha256.clone(),
-                operations: vec![RetrievalOperationV1 {
-                    tool_id: "trajectory.bm25.search".to_owned(),
-                    tool_revision_sha256: config.backend_revision_sha256.clone(),
-                    action_template_sha256: bm25_action_template_sha256(config),
-                    observed_evidence_ids,
-                    outcome,
-                    elapsed_ns: query_elapsed_ns,
-                    // BM25 posting/index reads are not currently instrumented.
-                    // Zero is explicitly marked as incomplete, never total cost.
-                    inspected_bytes: 0,
-                    inspected_bytes_measured: false,
-                }],
+                operations: vec![
+                    RetrievalOperationV1 {
+                        tool_id: "trajectory.bm25.search".to_owned(),
+                        tool_revision_sha256: config.backend_revision_sha256.clone(),
+                        action_template_sha256: bm25_action_template_sha256(config),
+                        observed_evidence_ids: bm25_evidence_ids,
+                        outcome: bm25_outcome,
+                        elapsed_ns: bm25_result.search_latency_ns,
+                        // Index/posting reads are not fully instrumented yet.
+                        inspected_bytes: 0,
+                        inspected_bytes_measured: false,
+                    },
+                    RetrievalOperationV1 {
+                        tool_id: "trajectory.entity_literal.search".to_owned(),
+                        tool_revision_sha256: config.backend_revision_sha256.clone(),
+                        action_template_sha256: entity_literal_action_template_sha256(config),
+                        observed_evidence_ids: entity_evidence_ids,
+                        outcome: entity_outcome,
+                        elapsed_ns: entity_literal_result.search_latency_ns,
+                        // Structured-literal posting reads are not fully instrumented yet.
+                        inspected_bytes: 0,
+                        inspected_bytes_measured: false,
+                    },
+                ],
                 stop_reason,
-                tool_call_budget: 1,
-                tool_calls_used: 1,
-                elapsed_ns: query_elapsed_ns,
+                tool_call_budget: 2,
+                tool_calls_used: 2,
+                elapsed_ns: trace_elapsed_ns,
                 inspected_bytes: 0,
                 inspected_bytes_complete: false,
                 created_at_unix,
@@ -396,11 +503,15 @@ fn handle_request(
                 "run_id": config.run_id,
                 "candidate_id": candidate_id,
                 "hit_count": result.hits.len(),
+                "bm25_hit_count": bm25_result.hits.len(),
+                "entity_literal_hit_count": entity_literal_result.hits.len(),
                 "neighbor_count": result.neighbor_context.len(),
                 "index_build_ns": index_build_ns,
                 "search_latency_ns": result.search_latency_ns,
+                "query_total_ns": query_elapsed_ns,
+                "retrieval_fusion": "reciprocal_rank_fusion_k60",
                 "query_image_used": false,
-                "retrieval_mode": "text_bm25_with_original_image_evidence"
+                "retrieval_mode": "hybrid_bm25_entity_literal_with_original_image_evidence"
             }))
         }
         other => Err(format!("unsupported sidecar operation: {other}")),
