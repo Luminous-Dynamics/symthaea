@@ -248,6 +248,11 @@ pub fn validate_map(view_map: &TemporalViewMapV1) -> Result<(), String> {
     )?;
     validate_artifact_clock(&view_map.source_artifact, "source_artifact")?;
     validate_artifact_clock(&view_map.view_artifact, "view_artifact")?;
+    if view_map.source_artifact.audio_sha256 == view_map.view_artifact.audio_sha256
+        && view_map.source_artifact != view_map.view_artifact
+    {
+        return Err("identical source/view digests cannot declare different audio clocks".into());
+    }
     if view_map.segments.is_empty() {
         return Err("view map must contain at least one segment".into());
     }
@@ -687,6 +692,53 @@ mod tests {
                 intervals: vec![FrameIntervalV1 { start_frame: 0, end_frame: 2 }]
             }
         );
+    }
+
+    #[test]
+    fn same_audio_digest_cannot_claim_a_different_frame_clock() {
+        let mut invalid = map(
+            1_000,
+            1_000,
+            vec![TemporalTransformSegmentV1 {
+                view_start_frame: 0,
+                view_end_frame: 1_000,
+                canonical_start_frame: 0,
+                canonical_end_frame: 1_000,
+            }],
+        );
+        invalid.view_artifact.audio_sha256 = SOURCE_DIGEST.into();
+        invalid.view_artifact.total_frames = 999;
+        assert!(validate_map(&invalid).is_err());
+    }
+
+    #[test]
+    fn empty_or_out_of_view_prediction_intervals_are_rejected() {
+        let identity = map(
+            1_000,
+            1_000,
+            vec![TemporalTransformSegmentV1 {
+                view_start_frame: 0,
+                view_end_frame: 1_000,
+                canonical_start_frame: 0,
+                canonical_end_frame: 1_000,
+            }],
+        );
+        let empty = prediction(
+            identity.view_artifact.clone(),
+            vec![FrameIntervalV1 {
+                start_frame: 100,
+                end_frame: 100,
+            }],
+        );
+        assert!(map_prediction_to_canonical(&empty, &identity).is_err());
+        let outside = prediction(
+            identity.view_artifact.clone(),
+            vec![FrameIntervalV1 {
+                start_frame: 999,
+                end_frame: 1_001,
+            }],
+        );
+        assert!(map_prediction_to_canonical(&outside, &identity).is_err());
     }
 
     #[test]
