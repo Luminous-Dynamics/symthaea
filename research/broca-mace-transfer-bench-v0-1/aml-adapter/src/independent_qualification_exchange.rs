@@ -49,7 +49,6 @@ pub struct QualificationUseContextV1 {
     pub lifecycle_snapshot_sha256: String,
     /// Must equal the digest of the consumer's separately pinned trust profile.
     pub verifier_profile_sha256: String,
-    pub now_unix: u64,
 }
 
 /// Owned, transport-neutral qualification request. The canonical candidate
@@ -109,7 +108,6 @@ impl EvidenceQualificationRequestV1 {
                 "qualification_policy_sha256": self.binding.qualification_policy_sha256,
                 "lifecycle_snapshot_sha256": self.binding.lifecycle_snapshot_sha256,
                 "verifier_profile_sha256": self.binding.verifier_profile_sha256,
-                "now_unix": self.binding.now_unix,
             },
             "request_sha256": self.request_sha256,
         })
@@ -145,7 +143,7 @@ impl EvidenceQualificationRequestV1 {
 
         let binding_object = object.get("binding").and_then(Value::as_object)
             .ok_or(IndependentQualificationExchangeRejectV1::InvalidRequestJson)?;
-        if binding_object.len() != 15 {
+        if binding_object.len() != 14 {
             return Err(IndependentQualificationExchangeRejectV1::InvalidRequestJson);
         }
         let binding_string = |field: &str| -> Result<String, IndependentQualificationExchangeRejectV1> {
@@ -160,8 +158,6 @@ impl EvidenceQualificationRequestV1 {
             .map(|value| value.as_str().map(str::to_owned)
                 .ok_or(IndependentQualificationExchangeRejectV1::InvalidRequestJson))
             .collect::<Result<Vec<_>, _>>()?;
-        let now_unix = binding_object.get("now_unix").and_then(Value::as_u64)
-            .ok_or(IndependentQualificationExchangeRejectV1::InvalidRequestJson)?;
         let binding = EvidenceQualificationRequestBindingV1 {
             run_id: binding_string("run_id")?,
             query_invocation_id: binding_string("query_invocation_id")?,
@@ -177,7 +173,6 @@ impl EvidenceQualificationRequestV1 {
             qualification_policy_sha256: binding_string("qualification_policy_sha256")?,
             lifecycle_snapshot_sha256: binding_string("lifecycle_snapshot_sha256")?,
             verifier_profile_sha256: binding_string("verifier_profile_sha256")?,
-            now_unix,
         };
 
         let use_context = QualificationUseContextV1 {
@@ -191,7 +186,6 @@ impl EvidenceQualificationRequestV1 {
             qualification_policy_sha256: binding.qualification_policy_sha256.clone(),
             lifecycle_snapshot_sha256: binding.lifecycle_snapshot_sha256.clone(),
             verifier_profile_sha256: binding.verifier_profile_sha256.clone(),
-            now_unix: binding.now_unix,
         };
         validate_use_context(&use_context)?;
         if !valid_atom(&binding.run_id, 256)
@@ -259,6 +253,19 @@ pub enum QualificationIssuerErrorV1 {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum QualificationClockErrorV1 {
+    Unavailable,
+    Untrusted,
+}
+
+/// Trusted consumer clock. Implementations must use a protected, monotonic
+/// time source; wall-clock values supplied by requests or candidate storage
+/// are not an acceptable substitute.
+pub trait QualificationTrustedClockV1 {
+    fn now_unix(&self) -> Result<u64, QualificationClockErrorV1>;
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum IndependentQualificationExchangeRejectV1 {
     InvalidUseContext,
     InvalidRequestJson,
@@ -270,6 +277,8 @@ pub enum IndependentQualificationExchangeRejectV1 {
     IssuerUnavailable,
     IssuerRejected,
     IssuerMalformedResponse,
+    TrustedClockUnavailable,
+    TrustedClockUntrusted,
     Qualification(EvidenceQualificationRejectV1),
     Projection(CandidateEvidenceProjectionRejectV1),
 }
@@ -324,7 +333,6 @@ fn request_digest(
     ] {
         hash_field(&mut hasher, value);
     }
-    hasher.update(binding.now_unix.to_be_bytes());
     let digest = hasher.finalize();
     const HEX: &[u8; 16] = b"0123456789abcdef";
     let mut output = String::with_capacity(64);
@@ -433,6 +441,7 @@ pub fn independently_qualify_candidate_batch_v1(
     expected: &CandidateEvidenceBatchExpectationV1<'_>,
     issuer: &impl IndependentEvidenceQualificationIssuerV1,
     verifier: &impl EvidenceQualificationSignatureVerifierV1,
+    clock: &impl QualificationTrustedClockV1,
 ) -> Result<CandidateEvidenceProjectionV1, IndependentQualificationExchangeRejectV1> {
     let request = build_request(batch, context, expected)?;
     let receipt = issuer.issue(&request).map_err(|error| match error {
@@ -444,6 +453,14 @@ pub fn independently_qualify_candidate_batch_v1(
             IndependentQualificationExchangeRejectV1::IssuerMalformedResponse,
     })?;
 
+    // Obtain current time after the issuer response; never trust a timestamp
+    // supplied by the candidate backend or echoed in the request.
+    let trusted_now_unix = clock.now_unix().map_err(|error| match error {
+        QualificationClockErrorV1::Unavailable =>
+            IndependentQualificationExchangeRejectV1::TrustedClockUnavailable,
+        QualificationClockErrorV1::Untrusted =>
+            IndependentQualificationExchangeRejectV1::TrustedClockUntrusted,
+    })?;
     let evidence_qualification_binding = EvidenceQualificationBindingV1 {
         run_id: &request.binding.run_id,
         query_invocation_id: &request.binding.query_invocation_id,
@@ -459,7 +476,7 @@ pub fn independently_qualify_candidate_batch_v1(
         qualification_policy_sha256: &request.binding.qualification_policy_sha256,
         lifecycle_snapshot_sha256: &request.binding.lifecycle_snapshot_sha256,
         verifier_profile_sha256: &request.binding.verifier_profile_sha256,
-        now_unix: request.binding.now_unix,
+        now_unix: trusted_now_unix,
     };
     let verified = VerifiedEvidenceQualificationV1::verify_and_bind(
         &receipt,
@@ -505,6 +522,7 @@ mod tests {
         disposition: EvidenceDispositionV1,
         failure: Option<QualificationIssuerErrorV1>,
         rebind_purpose: bool,
+        issued_at_unix: u64,
     }
 
     impl IndependentEvidenceQualificationIssuerV1 for TestIssuer {
@@ -549,8 +567,8 @@ mod tests {
                 lifecycle_snapshot_sha256: binding.lifecycle_snapshot_sha256.clone(),
                 verifier_profile_sha256: self.profile_sha256.clone(),
                 key_id: qualification_key_id_v1(&self.signing_key.verifying_key().to_bytes()),
-                issued_at_unix: binding.now_unix,
-                expires_at_unix: binding.now_unix + 300,
+                issued_at_unix: self.issued_at_unix,
+                expires_at_unix: self.issued_at_unix + 300,
                 entries,
                 signature: Vec::new(),
             };
@@ -655,6 +673,7 @@ mod tests {
             disposition,
             failure: None,
             rebind_purpose,
+            issued_at_unix: 90,
         };
         (issuer, verifier, context(profile_sha256))
     }
@@ -734,7 +753,7 @@ mod tests {
         };
         assert_eq!(
             independently_qualify_candidate_batch_v1(
-                &batch, &context, &wrong, &MustNotBeCalled, &verifier,
+                &batch, &context, &wrong, &MustNotBeCalled, &verifier, &test_clock(),
             ),
             Err(IndependentQualificationExchangeRejectV1::CandidateIdentityMismatch),
         );
