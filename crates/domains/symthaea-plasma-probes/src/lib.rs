@@ -4640,12 +4640,12 @@ mod tests {
         );
         assert_eq!(report.diagnostic_channel_count, 2);
         assert_eq!(report.actuator_channel_count, 1);
-        assert_eq!(report.maximum_observation_age_seconds, 0.04);
-        assert_eq!(report.maximum_actuator_delivery_delay_seconds, 0.006);
-        assert_eq!(report.maximum_actuator_command_latency_seconds, 0.0265);
-        assert_eq!(report.minimum_effective_actuator_bandwidth_hz, 20.0);
-        assert_eq!(report.conservative_closed_loop_latency_seconds, 0.0715);
-        assert_eq!(report.controller_update_period_seconds, 0.02);
+        assert!((report.maximum_observation_age_seconds - 0.04).abs() < 1.0e-12);
+        assert!((report.maximum_actuator_delivery_delay_seconds - 0.006).abs() < 1.0e-12);
+        assert!((report.maximum_actuator_command_latency_seconds - 0.0265).abs() < 1.0e-12);
+        assert!((report.minimum_effective_actuator_bandwidth_hz - 20.0).abs() < 1.0e-12);
+        assert!((report.conservative_closed_loop_latency_seconds - 0.0715).abs() < 1.0e-12);
+        assert!((report.controller_update_period_seconds - 0.02).abs() < 1.0e-12);
     }
 
     #[test]
