@@ -1,5 +1,7 @@
 #![forbid(unsafe_code)]
 
+use serde::Serialize;
+use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 
 use symthaea_semiconductor::benchmark::{
@@ -12,6 +14,10 @@ use symthaea_semiconductor::benchmark::{
     compute_expected_value_of_sample_information_v1,
     optimize_metrology_decision_loss_portfolio_v1,
 };
+
+fn hash_json<T: Serialize>(value: &T) -> String {
+    format!("{:x}", Sha256::digest(serde_json::to_vec(value).unwrap()))
+}
 
 fn fixture(evidence_quality: f64) -> MetrologyDecisionLossModelV1 {
     MetrologyDecisionLossModelV1 {
