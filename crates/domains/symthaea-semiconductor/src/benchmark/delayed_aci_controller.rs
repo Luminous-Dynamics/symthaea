@@ -54,6 +54,7 @@ pub enum DelayedAciReasonV1 {
     EligibilityReportBeforeLabel,
     EligibilityReportUnavailableAtDelivery,
     FeedbackStepMismatch,
+    ClockDomainMismatch,
     DuplicateAcceptedRevision,
     IntervalMethodMismatch,
     InvalidNumericInput,
@@ -278,6 +279,21 @@ fn validate_engine(engine: &DelayedAciEngineV1) -> Result<(), DelayedAciErrorV1>
     {
         return Err(DelayedAciErrorV1("delayed ACI lane state is invalid".into()));
     }
+    for (sample_id, receipt) in &engine.pending_predictions {
+        if sample_id != &receipt.sample_id
+            || receipt.schema != DELAYED_ACI_PREDICTION_RECEIPT_SCHEMA_V1
+            || !valid_sha256(&receipt.receipt_sha256)
+            || prediction_digest(receipt)? != receipt.receipt_sha256
+            || receipt.policy_sha256 != engine.policy_sha256
+            || receipt.interval_method_sha256 != engine.interval_method_sha256
+            || receipt.lane >= engine.policy.feedback_delay_steps
+            || receipt.lane != receipt.prediction_step % engine.policy.feedback_delay_steps
+        {
+            return Err(DelayedAciErrorV1(
+                "pending prediction receipt is malformed or tampered".into(),
+            ));
+        }
+    }
     Ok(())
 }
 
@@ -490,7 +506,7 @@ pub fn deliver_delayed_aci_feedback_v1(
     if delivery.clock_domain_id != engine.clock_domain_id
         || prediction.clock_domain_id != delivery.clock_domain_id
     {
-        reasons.push(DelayedAciReasonV1::FeedbackStepMismatch);
+        reasons.push(DelayedAciReasonV1::ClockDomainMismatch);
     }
     if delivery.feedback_step != expected_step
         || delivery.feedback_step != engine.next_prediction_step
@@ -535,6 +551,13 @@ pub fn deliver_delayed_aci_feedback_v1(
     if report.qualified_corrected_value != delivery.label_value {
         reasons.push(DelayedAciReasonV1::DeliveredValueMismatch);
     }
+    if !report.qualified_corrected_value.is_finite()
+        || report
+            .qualified_standard_uncertainty_upper_bound
+            .is_none_or(|bound| !bound.is_finite() || bound < 0.0)
+    {
+        reasons.push(DelayedAciReasonV1::InvalidNumericInput);
+    }
     if delivery.idempotency_key
         != format!("{}:{}", delivery.label_id, delivery.label_revision)
     {
@@ -558,10 +581,22 @@ pub fn deliver_delayed_aci_feedback_v1(
     reasons.dedup();
     if !reasons.is_empty() {
         engine.state.fixed_delay_assumptions_intact = false;
-        let disposition = match report.eligibility {
-            LabelConsumptionEligibilityV1::Unknown => DelayedAciDispositionV1::HeldUnknown,
-            LabelConsumptionEligibilityV1::Blocked => DelayedAciDispositionV1::Blocked,
-            _ => DelayedAciDispositionV1::Rejected,
+        let only_eligibility_unknown =
+            report.eligibility == LabelConsumptionEligibilityV1::Unknown
+                && reasons
+                    .iter()
+                    .all(|reason| *reason == DelayedAciReasonV1::LabelNotEligible);
+        let only_eligibility_blocked =
+            report.eligibility == LabelConsumptionEligibilityV1::Blocked
+                && reasons
+                    .iter()
+                    .all(|reason| *reason == DelayedAciReasonV1::LabelNotEligible);
+        let disposition = if only_eligibility_unknown {
+            DelayedAciDispositionV1::HeldUnknown
+        } else if only_eligibility_blocked {
+            DelayedAciDispositionV1::Blocked
+        } else {
+            DelayedAciDispositionV1::Rejected
         };
         return make_update_receipt(
             engine,
@@ -841,6 +876,36 @@ mod tests {
         assert_eq!(update.disposition, DelayedAciDispositionV1::Rejected);
         assert_eq!(engine.state.alpha_lanes, before);
         assert!(!engine.state.fixed_delay_assumptions_intact);
+    }
+
+    #[test]
+    fn report_availability_must_follow_label_and_precede_delivery() {
+        let mut engine = engine(1);
+        issue(&mut engine, "s0", "e0");
+        let mut candidate = delivery(
+            "s0",
+            "e0",
+            "l0",
+            1,
+            0.5,
+            1,
+            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+        );
+        candidate.eligibility_report_available_at_unix_seconds = 1_009;
+        let before = engine.state.alpha_lanes.clone();
+        let update = deliver_delayed_aci_feedback_v1(&mut engine, &candidate).unwrap();
+        assert_eq!(update.disposition, DelayedAciDispositionV1::Rejected);
+        assert!(update.reasons.contains(&DelayedAciReasonV1::EligibilityReportBeforeLabel));
+        assert_eq!(engine.state.alpha_lanes, before);
+        assert!(!engine.state.fixed_delay_assumptions_intact);
+    }
+
+    #[test]
+    fn tampered_pending_prediction_receipt_is_rejected() {
+        let mut engine = engine(1);
+        issue(&mut engine, "s0", "e0");
+        engine.pending_predictions.get_mut("s0").unwrap().upper_bound = 3.0;
+        assert!(validate_engine(&engine).is_err());
     }
 
     #[test]
