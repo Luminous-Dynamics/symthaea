@@ -2687,6 +2687,312 @@ pub fn evaluate_scalar_unstable_mode_interface(
     })
 }
 
+/// Two-quadrature real representation of one complex growing kinetic mode.
+///
+/// The unforced dynamics are
+/// \`x[k+1] = exp(gamma*dt) * R(omega*dt) * x[k]\`,
+/// where \`x=[Re(a), Im(a)]\` and R is a planar rotation. A diagnostic observes
+/// a fixed real row vector; an actuator injects a fixed two-component vector.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct OscillatoryUnstableModeContract {
+    pub growth_rate_per_second: f64,
+    pub oscillation_frequency_hz: f64,
+    pub time_step_seconds: f64,
+    pub horizon_steps: u32,
+    pub diagnostic_gain: [f64; 2],
+    pub diagnostic_noise_std: f64,
+    pub diagnostic_bandwidth_hz: f64,
+    pub diagnostic_sampling_stride_steps: u32,
+    pub diagnostic_delivery_delay_steps: u32,
+    pub actuator_gain: [f64; 2],
+    pub actuator_bandwidth_hz: f64,
+    pub actuator_update_stride_steps: u32,
+    pub actuator_delivery_delay_steps: u32,
+    pub controller_execution_latency_seconds: f64,
+    pub minimum_bandwidth_multiple: f64,
+    pub maximum_loop_latency_efold_fraction: f64,
+    pub minimum_observability_min_eigenvalue: f64,
+    pub minimum_controllability_min_eigenvalue: f64,
+}
+
+/// Matrix-valued finite-horizon sensing and actuation scores for one complex mode.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+pub struct OscillatoryUnstableModeReport {
+    pub discrete_growth_factor_per_step: f64,
+    pub phase_advance_radians_per_step: f64,
+    pub observation_sample_count: u32,
+    pub actuator_command_count: u32,
+    pub observability_gramian: [f64; 3],
+    pub observability_min_eigenvalue: f64,
+    pub observability_max_eigenvalue: f64,
+    pub controllability_gramian: [f64; 3],
+    pub controllability_min_eigenvalue: f64,
+    pub controllability_max_eigenvalue: f64,
+    pub effective_diagnostic_bandwidth_hz: f64,
+    pub effective_actuator_bandwidth_hz: f64,
+    pub diagnostic_bandwidth_multiple: f64,
+    pub actuator_bandwidth_multiple: f64,
+    pub conservative_loop_latency_seconds: f64,
+    pub loop_latency_efold_fraction: f64,
+    pub diagnostic_delay_efold_fraction: f64,
+    pub actuator_delay_efold_fraction: f64,
+    pub minimum_required_bandwidth_multiple: f64,
+    pub maximum_allowed_loop_latency_efold_fraction: f64,
+    pub minimum_required_observability_min_eigenvalue: f64,
+    pub minimum_required_controllability_min_eigenvalue: f64,
+    pub mode_interface_qualified: bool,
+}
+
+/// Compute exact discrete finite-horizon 2x2 observability and controllability
+/// Gramians for a manufactured complex growing mode with asynchronous sensing
+/// and delayed, sparse actuation.
+///
+/// This model captures both quadratures and therefore detects sampling/actuation
+/// schedules that alias the oscillation phase. It remains a single-mode linear
+/// oracle, not a multi-mode Vlasov controller or nonlinear stability proof.
+pub fn evaluate_oscillatory_unstable_mode_interface(
+    contract: OscillatoryUnstableModeContract,
+) -> Result<OscillatoryUnstableModeReport, ContractError> {
+    let positive_finite = [
+        contract.growth_rate_per_second,
+        contract.oscillation_frequency_hz,
+        contract.time_step_seconds,
+        contract.diagnostic_noise_std,
+        contract.diagnostic_bandwidth_hz,
+        contract.actuator_bandwidth_hz,
+        contract.minimum_bandwidth_multiple,
+        contract.maximum_loop_latency_efold_fraction,
+        contract.minimum_observability_min_eigenvalue,
+        contract.minimum_controllability_min_eigenvalue,
+    ];
+    if positive_finite
+        .iter()
+        .any(|value| !value.is_finite() || *value <= 0.0)
+        || contract.diagnostic_gain.iter().any(|value| !value.is_finite())
+        || contract.actuator_gain.iter().any(|value| !value.is_finite())
+        || !contract.controller_execution_latency_seconds.is_finite()
+        || contract.controller_execution_latency_seconds < 0.0
+        || contract.diagnostic_sampling_stride_steps == 0
+        || contract.actuator_update_stride_steps == 0
+        || contract.horizon_steps == 0
+    {
+        return Err(control_timing_error(
+            "oscillatory_mode",
+            "growth, frequency, time step, noise, bandwidths and margins must be positive; gains/latency finite; strides and horizon positive",
+        ));
+    }
+    if contract.horizon_steps > MAX_SCALAR_MODE_HORIZON_STEPS {
+        return Err(control_timing_error(
+            "oscillatory_mode.horizon_steps",
+            "horizon exceeds bounded mode-oracle work budget",
+        ));
+    }
+
+    let growth_exponent = contract.growth_rate_per_second * contract.time_step_seconds;
+    let phase_step = TAU * contract.oscillation_frequency_hz * contract.time_step_seconds;
+    if !growth_exponent.is_finite() || !phase_step.is_finite() {
+        return Err(control_timing_error(
+            "oscillatory_mode",
+            "per-step growth and phase must be finite",
+        ));
+    }
+    let growth_factor = growth_exponent.exp();
+    if !growth_factor.is_finite() || growth_factor <= 0.0 {
+        return Err(control_timing_error(
+            "oscillatory_mode.growth_rate_per_second",
+            "discrete growth factor must be finite and positive",
+        ));
+    }
+
+    let inverse_noise_variance = 1.0 / (contract.diagnostic_noise_std * contract.diagnostic_noise_std);
+    if !inverse_noise_variance.is_finite() {
+        return Err(control_timing_error(
+            "oscillatory_mode.diagnostic_noise_std",
+            "inverse noise variance must be finite",
+        ));
+    }
+
+    // Symmetric matrices are stored as [m00, m01, m11].
+    let mut observability = [0.0_f64; 3];
+    let mut observability_compensation = [0.0_f64; 3];
+    let mut observation_sample_count = 0_u32;
+    let last_sample_step = contract
+        .horizon_steps
+        .saturating_sub(contract.diagnostic_delivery_delay_steps);
+    let mut sample_step = 0_u32;
+    while sample_step <= last_sample_step {
+        let exponent = growth_exponent * sample_step as f64;
+        let radius = exponent.exp();
+        let angle = (phase_step * sample_step as f64).rem_euclid(TAU);
+        let (sin_phase, cos_phase) = angle.sin_cos();
+        let c0 = radius
+            * (contract.diagnostic_gain[0] * cos_phase
+                + contract.diagnostic_gain[1] * sin_phase);
+        let c1 = radius
+            * (-contract.diagnostic_gain[0] * sin_phase
+                + contract.diagnostic_gain[1] * cos_phase);
+        let contribution = [
+            c0 * c0 * inverse_noise_variance,
+            c0 * c1 * inverse_noise_variance,
+            c1 * c1 * inverse_noise_variance,
+        ];
+        if contribution.iter().any(|value| !value.is_finite()) {
+            return Err(control_timing_error(
+                "oscillatory_mode.observability_gramian",
+                "finite-horizon observation Gramian overflowed",
+            ));
+        }
+        for index in 0..3 {
+            kahan_add(
+                contribution[index],
+                &mut observability[index],
+                &mut observability_compensation[index],
+            );
+        }
+        observation_sample_count += 1;
+        match sample_step.checked_add(contract.diagnostic_sampling_stride_steps) {
+            Some(next) => sample_step = next,
+            None => break,
+        }
+    }
+
+    let mut controllability = [0.0_f64; 3];
+    let mut controllability_compensation = [0.0_f64; 3];
+    let mut actuator_command_count = 0_u32;
+    let mut command_step = 0_u32;
+    while let Some(applied_step) = command_step.checked_add(contract.actuator_delivery_delay_steps) {
+        if applied_step >= contract.horizon_steps {
+            break;
+        }
+        let remaining_steps = contract.horizon_steps - 1 - applied_step;
+        let exponent = growth_exponent * remaining_steps as f64;
+        let radius = exponent.exp();
+        let angle = (phase_step * remaining_steps as f64).rem_euclid(TAU);
+        let (sin_phase, cos_phase) = angle.sin_cos();
+        let b0 = radius
+            * (cos_phase * contract.actuator_gain[0]
+                - sin_phase * contract.actuator_gain[1]);
+        let b1 = radius
+            * (sin_phase * contract.actuator_gain[0]
+                + cos_phase * contract.actuator_gain[1]);
+        let contribution = [b0 * b0, b0 * b1, b1 * b1];
+        if contribution.iter().any(|value| !value.is_finite()) {
+            return Err(control_timing_error(
+                "oscillatory_mode.controllability_gramian",
+                "finite-horizon actuator Gramian overflowed",
+            ));
+        }
+        for index in 0..3 {
+            kahan_add(
+                contribution[index],
+                &mut controllability[index],
+                &mut controllability_compensation[index],
+            );
+        }
+        actuator_command_count += 1;
+        match command_step.checked_add(contract.actuator_update_stride_steps) {
+            Some(next) => command_step = next,
+            None => break,
+        }
+    }
+
+    let observability_eigenvalues = symmetric_2x2_eigenvalues(observability);
+    let controllability_eigenvalues = symmetric_2x2_eigenvalues(controllability);
+    let diagnostic_interval_seconds =
+        contract.diagnostic_sampling_stride_steps as f64 * contract.time_step_seconds;
+    let actuator_interval_seconds =
+        contract.actuator_update_stride_steps as f64 * contract.time_step_seconds;
+    let effective_diagnostic_bandwidth_hz = contract
+        .diagnostic_bandwidth_hz
+        .min(0.5 / diagnostic_interval_seconds);
+    let effective_actuator_bandwidth_hz = contract
+        .actuator_bandwidth_hz
+        .min(0.5 / actuator_interval_seconds);
+    let diagnostic_bandwidth_multiple =
+        effective_diagnostic_bandwidth_hz / contract.oscillation_frequency_hz;
+    let actuator_bandwidth_multiple =
+        effective_actuator_bandwidth_hz / contract.oscillation_frequency_hz;
+    let diagnostic_delay_seconds =
+        contract.diagnostic_delivery_delay_steps as f64 * contract.time_step_seconds;
+    let actuator_delay_seconds =
+        contract.actuator_delivery_delay_steps as f64 * contract.time_step_seconds;
+    let conservative_loop_latency_seconds = diagnostic_interval_seconds
+        + diagnostic_delay_seconds
+        + contract.controller_execution_latency_seconds
+        + actuator_interval_seconds
+        + actuator_delay_seconds;
+    let loop_latency_efold_fraction =
+        conservative_loop_latency_seconds * contract.growth_rate_per_second;
+    let diagnostic_delay_efold_fraction =
+        diagnostic_delay_seconds * contract.growth_rate_per_second;
+    let actuator_delay_efold_fraction =
+        actuator_delay_seconds * contract.growth_rate_per_second;
+    let derived = [
+        observability_eigenvalues[0],
+        observability_eigenvalues[1],
+        controllability_eigenvalues[0],
+        controllability_eigenvalues[1],
+        effective_diagnostic_bandwidth_hz,
+        effective_actuator_bandwidth_hz,
+        diagnostic_bandwidth_multiple,
+        actuator_bandwidth_multiple,
+        conservative_loop_latency_seconds,
+        loop_latency_efold_fraction,
+        diagnostic_delay_efold_fraction,
+        actuator_delay_efold_fraction,
+    ];
+    if derived.iter().any(|value| !value.is_finite()) {
+        return Err(control_timing_error(
+            "oscillatory_mode",
+            "derived Gramian eigenvalues and timing metrics must be finite",
+        ));
+    }
+
+    let mode_interface_qualified = observation_sample_count > 0
+        && actuator_command_count > 0
+        && observability_eigenvalues[0]
+            >= contract.minimum_observability_min_eigenvalue
+        && controllability_eigenvalues[0] >= contract.minimum_controllability_min_eigenvalue
+        && diagnostic_bandwidth_multiple >= contract.minimum_bandwidth_multiple
+        && actuator_bandwidth_multiple >= contract.minimum_bandwidth_multiple
+        && loop_latency_efold_fraction <= contract.maximum_loop_latency_efold_fraction;
+
+    Ok(OscillatoryUnstableModeReport {
+        discrete_growth_factor_per_step: growth_factor,
+        phase_advance_radians_per_step: phase_step.rem_euclid(TAU),
+        observation_sample_count,
+        actuator_command_count,
+        observability_gramian: observability,
+        observability_min_eigenvalue: observability_eigenvalues[0],
+        observability_max_eigenvalue: observability_eigenvalues[1],
+        controllability_gramian: controllability,
+        controllability_min_eigenvalue: controllability_eigenvalues[0],
+        controllability_max_eigenvalue: controllability_eigenvalues[1],
+        effective_diagnostic_bandwidth_hz,
+        effective_actuator_bandwidth_hz,
+        diagnostic_bandwidth_multiple,
+        actuator_bandwidth_multiple,
+        conservative_loop_latency_seconds,
+        loop_latency_efold_fraction,
+        diagnostic_delay_efold_fraction,
+        actuator_delay_efold_fraction,
+        minimum_required_bandwidth_multiple: contract.minimum_bandwidth_multiple,
+        maximum_allowed_loop_latency_efold_fraction: contract.maximum_loop_latency_efold_fraction,
+        minimum_required_observability_min_eigenvalue: contract.minimum_observability_min_eigenvalue,
+        minimum_required_controllability_min_eigenvalue: contract.minimum_controllability_min_eigenvalue,
+        mode_interface_qualified,
+    })
+}
+
+fn symmetric_2x2_eigenvalues(matrix: [f64; 3]) -> [f64; 2] {
+    let difference = matrix[0] - matrix[2];
+    let discriminant = difference.mul_add(difference, 4.0 * matrix[1] * matrix[1]).sqrt();
+    let trace = matrix[0] + matrix[2];
+    let minimum = ((trace - discriminant) * 0.5).max(0.0);
+    let maximum = (trace + discriminant) * 0.5;
+    [minimum, maximum]
+}
+
 /// Result of projecting a kinetic fluctuation into a weighted discrete micro-space.
 #[derive(Clone, Debug, PartialEq)]
 pub struct WeightedMicroProjection {
