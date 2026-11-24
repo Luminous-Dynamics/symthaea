@@ -828,3 +828,611 @@ pub fn deliver_qualified_stream_label_v1(
     )
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn digest(ch: char) -> String {
+        std::iter::repeat_n(ch, 64).collect()
+    }
+
+    fn policy() -> StreamingAdapterPolicyV1 {
+        StreamingAdapterPolicyV1 {
+            schema: STREAMING_ADAPTER_POLICY_SCHEMA_V1.into(),
+            policy_id: "grape-evidence-gated-adapter.v1".into(),
+            revision: 1,
+            feature_learning_rate: 0.20,
+            feature_norm_floor: 1.0e-6,
+            maximum_abs_weight_delta: 0.25,
+            maximum_abs_feature_value: 100.0,
+            maximum_abs_prediction_error: 100.0,
+            global_context_ema_alpha: 0.25,
+            local_context_ema_alpha: 0.50,
+            minimum_context_support: 2,
+            temporal_ema_alpha: 0.20,
+            temporal_activation_threshold: 0.05,
+        }
+    }
+
+    fn engine() -> GatedStreamingAdapterEngineV1 {
+        create_gated_streaming_adapter_engine_v1(
+            "stream-engine-001",
+            "fab-clock",
+            &digest('a'),
+            vec![0.0, 0.0],
+            policy(),
+        )
+        .unwrap()
+    }
+
+    fn prediction(
+        sample_id: &str,
+        event_id: &str,
+        event_time: i64,
+        prediction_time: i64,
+        context_key: Option<&str>,
+        features: Vec<f64>,
+    ) -> StreamingPredictionInputV1 {
+        StreamingPredictionInputV1 {
+            schema: STREAMING_PREDICTION_SCHEMA_V1.into(),
+            sample_id: sample_id.into(),
+            measurement_event_id: event_id.into(),
+            event_time_unix_seconds: event_time,
+            feature_available_at_unix_seconds: event_time + 1,
+            prediction_at_unix_seconds: prediction_time,
+            clock_domain_id: "fab-clock".into(),
+            feature_schema_sha256: digest('a'),
+            selected_feature_indices: vec![0, 1],
+            feature_vector: features,
+            global_baseline_prediction: 10.0,
+            context_key: context_key.map(str::to_string),
+        }
+    }
+
+    fn eligibility_report(
+        label_id: &str,
+        event_id: &str,
+        payload_digest: &str,
+        eligibility: LabelConsumptionEligibilityV1,
+        frontier: LabelEvidenceFrontierV1,
+    ) -> LabelConsumptionEligibilityReportV1 {
+        let mut report = LabelConsumptionEligibilityReportV1 {
+            schema: "luminous.semi-bench.label-consumption-report.v1".into(),
+            label_id: label_id.into(),
+            measurement_event_id: event_id.into(),
+            calibration_certificate_id: "cal-cert-001".into(),
+            frontier,
+            eligibility,
+            downstream_consumption_allowed:
+                eligibility == LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            reasons: Vec::new(),
+            label_sha256: payload_digest.into(),
+            measurement_sha256: digest('c'),
+            qualified_corrected_value: 11.0,
+            qualified_standard_uncertainty_upper_bound: Some(0.10),
+            qualification_report_sha256: digest('d'),
+            requalification_report_sha256: digest('e'),
+            requalification_frontier_sha256: digest('f'),
+            source_authenticity_proven: false,
+            training_snapshot_mutated: false,
+            equipment_control_authority: false,
+            report_sha256: String::new(),
+        };
+        report.report_sha256 = eligibility_report_digest(&report).unwrap();
+        report
+    }
+
+    fn delivery(
+        sample_id: &str,
+        event_id: &str,
+        label_id: &str,
+        revision: u64,
+        status: LabelConsumptionEligibilityV1,
+        frontier: LabelEvidenceFrontierV1,
+        available_at: i64,
+        delivered_at: i64,
+    ) -> StreamingLabelDeliveryV1 {
+        let payload = digest('b');
+        StreamingLabelDeliveryV1 {
+            schema: STREAMING_DELIVERY_SCHEMA_V1.into(),
+            sample_id: sample_id.into(),
+            label_id: label_id.into(),
+            label_revision: revision,
+            measurement_event_id: event_id.into(),
+            label_payload_sha256: payload.clone(),
+            label_value: 11.0,
+            label_available_at_unix_seconds: available_at,
+            delivered_at_unix_seconds: delivered_at,
+            clock_domain_id: "fab-clock".into(),
+            idempotency_key: format!("{label_id}:{revision}"),
+            eligibility_report: eligibility_report(
+                label_id,
+                event_id,
+                &payload,
+                status,
+                frontier,
+            ),
+        }
+    }
+
+    #[test]
+    fn prediction_is_read_only_and_freezes_features_and_state_digest() {
+        let mut engine = engine();
+        let before = adapter_state_digest(&engine.adapter_state).unwrap();
+        let receipt = predict_and_register_stream_sample_v1(
+            &mut engine,
+            &prediction(
+                "sample-1",
+                "event-1",
+                100,
+                102,
+                Some("eqp-1/ch-1"),
+                vec![1.0, 2.0],
+            ),
+        )
+        .unwrap();
+
+        assert_eq!(receipt.adapter_state_before_sha256, before);
+        assert_eq!(receipt.adapter_state_after_sha256, before);
+        assert_eq!(adapter_state_digest(&engine.adapter_state).unwrap(), before);
+        assert_eq!(receipt.selected_feature_vector, vec![1.0, 2.0]);
+        assert_eq!(receipt.context_key.as_deref(), Some("eqp-1/ch-1"));
+        assert_eq!(receipt.prediction_value, 10.0);
+    }
+
+    #[test]
+    fn qualified_zero_delay_label_updates_adapter_once() {
+        let mut engine = engine();
+        let prediction = predict_and_register_stream_sample_v1(
+            &mut engine,
+            &prediction("sample-1", "event-1", 100, 102, None, vec![1.0, 2.0]),
+        )
+        .unwrap();
+        let before = adapter_state_digest(&engine.adapter_state).unwrap();
+        let report = deliver_qualified_stream_label_v1(
+            &mut engine,
+            &delivery(
+                "sample-1",
+                "event-1",
+                "label-1",
+                1,
+                LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+                LabelEvidenceFrontierV1::CurrentAtK1,
+                102,
+                102,
+            ),
+        )
+        .unwrap();
+
+        assert_eq!(report.disposition, StreamingUpdateDispositionV1::Updated);
+        assert!(report.adapter_state_mutated);
+        assert_ne!(report.adapter_state_after_sha256, before);
+        assert_eq!(report.prediction_receipt_sha256, Some(prediction.receipt_sha256));
+        assert_eq!(engine.adapter_state.accepted_update_count, 1);
+        assert!(!report.retraining_executed);
+        assert!(!report.equipment_control_authority);
+    }
+
+    #[test]
+    fn delayed_label_uses_the_original_prediction_record_after_intervening_update() {
+        let mut engine = engine();
+        let old_prediction = predict_and_register_stream_sample_v1(
+            &mut engine,
+            &prediction("old-sample", "old-event", 100, 102, None, vec![1.0, 0.0]),
+        )
+        .unwrap();
+        let new_prediction = predict_and_register_stream_sample_v1(
+            &mut engine,
+            &prediction("new-sample", "new-event", 103, 104, None, vec![0.0, 1.0]),
+        )
+        .unwrap();
+
+        let newer_delivery = delivery(
+            "new-sample",
+            "new-event",
+            "new-label",
+            1,
+            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            LabelEvidenceFrontierV1::CurrentAtK1,
+            104,
+            104,
+        );
+        assert_eq!(
+            deliver_qualified_stream_label_v1(&mut engine, &newer_delivery)
+                .unwrap()
+                .disposition,
+            StreamingUpdateDispositionV1::Updated
+        );
+        let weights_after_newer = engine.adapter_state.feature_weights.clone();
+        let old_delivery = delivery(
+            "old-sample",
+            "old-event",
+            "old-label",
+            1,
+            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            LabelEvidenceFrontierV1::CurrentAtK1,
+            110,
+            112,
+        );
+        let old_update = deliver_qualified_stream_label_v1(&mut engine, &old_delivery).unwrap();
+
+        assert_eq!(old_update.disposition, StreamingUpdateDispositionV1::Updated);
+        assert_eq!(old_update.prediction_receipt_sha256, Some(old_prediction.receipt_sha256));
+        assert_ne!(engine.adapter_state.feature_weights, weights_after_newer);
+        assert_eq!(new_prediction.base_prediction, 10.0);
+        assert_eq!(old_prediction.base_prediction, 10.0);
+        assert_eq!(engine.adapter_state.accepted_update_count, 2);
+    }
+
+    #[test]
+    fn unknown_label_is_held_without_state_mutation_and_can_be_requalified_later() {
+        let mut engine = engine();
+        predict_and_register_stream_sample_v1(
+            &mut engine,
+            &prediction("sample-1", "event-1", 100, 102, None, vec![1.0, 1.0]),
+        )
+        .unwrap();
+        let before = adapter_state_digest(&engine.adapter_state).unwrap();
+        let unknown = delivery(
+            "sample-1",
+            "event-1",
+            "label-1",
+            1,
+            LabelConsumptionEligibilityV1::Unknown,
+            LabelEvidenceFrontierV1::CurrentAtK1,
+            110,
+            111,
+        );
+        let held = deliver_qualified_stream_label_v1(&mut engine, &unknown).unwrap();
+        assert_eq!(held.disposition, StreamingUpdateDispositionV1::HeldUnknown);
+        assert!(!held.adapter_state_mutated);
+        assert_eq!(adapter_state_digest(&engine.adapter_state).unwrap(), before);
+        assert!(engine.pending_predictions.contains_key("sample-1"));
+
+        let qualified = delivery(
+            "sample-1",
+            "event-1",
+            "label-1",
+            1,
+            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            LabelEvidenceFrontierV1::CurrentAtK1,
+            110,
+            112,
+        );
+        let accepted = deliver_qualified_stream_label_v1(&mut engine, &qualified).unwrap();
+        assert_eq!(accepted.disposition, StreamingUpdateDispositionV1::Updated);
+    }
+
+    #[test]
+    fn blocked_label_never_updates_adapter_state() {
+        let mut engine = engine();
+        predict_and_register_stream_sample_v1(
+            &mut engine,
+            &prediction("sample-1", "event-1", 100, 102, None, vec![1.0, 1.0]),
+        )
+        .unwrap();
+        let before = adapter_state_digest(&engine.adapter_state).unwrap();
+        let blocked = delivery(
+            "sample-1",
+            "event-1",
+            "label-1",
+            1,
+            LabelConsumptionEligibilityV1::Blocked,
+            LabelEvidenceFrontierV1::CurrentAtK1,
+            110,
+            112,
+        );
+        let receipt = deliver_qualified_stream_label_v1(&mut engine, &blocked).unwrap();
+        assert_eq!(receipt.disposition, StreamingUpdateDispositionV1::Blocked);
+        assert!(!receipt.adapter_state_mutated);
+        assert_eq!(adapter_state_digest(&engine.adapter_state).unwrap(), before);
+    }
+
+    #[test]
+    fn accepted_label_revision_is_idempotent() {
+        let mut engine = engine();
+        predict_and_register_stream_sample_v1(
+            &mut engine,
+            &prediction("sample-1", "event-1", 100, 102, None, vec![1.0, 1.0]),
+        )
+        .unwrap();
+        let accepted = delivery(
+            "sample-1",
+            "event-1",
+            "label-1",
+            1,
+            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            LabelEvidenceFrontierV1::CurrentAtK1,
+            110,
+            112,
+        );
+        assert_eq!(
+            deliver_qualified_stream_label_v1(&mut engine, &accepted).unwrap().disposition,
+            StreamingUpdateDispositionV1::Updated
+        );
+        let after = adapter_state_digest(&engine.adapter_state).unwrap();
+        let duplicate = deliver_qualified_stream_label_v1(&mut engine, &accepted).unwrap();
+        assert_eq!(duplicate.disposition, StreamingUpdateDispositionV1::Duplicate);
+        assert!(!duplicate.adapter_state_mutated);
+        assert_eq!(adapter_state_digest(&engine.adapter_state).unwrap(), after);
+    }
+
+    #[test]
+    fn label_id_event_value_and_payload_mismatches_are_rejected_without_update() {
+        let mut cases = Vec::new();
+        cases.push(delivery(
+            "sample-1",
+            "other-event",
+            "label-1",
+            1,
+            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            LabelEvidenceFrontierV1::CurrentAtK1,
+            110,
+            112,
+        ));
+        let mut wrong_label = delivery(
+            "sample-1",
+            "event-1",
+            "other-label",
+            1,
+            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            LabelEvidenceFrontierV1::CurrentAtK1,
+            110,
+            112,
+        );
+        wrong_label.eligibility_report.label_id = "label-1".into();
+        wrong_label.eligibility_report.report_sha256 =
+            eligibility_report_digest(&wrong_label.eligibility_report).unwrap();
+        cases.push(wrong_label);
+        let mut wrong_value = delivery(
+            "sample-1",
+            "event-1",
+            "label-1",
+            1,
+            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            LabelEvidenceFrontierV1::CurrentAtK1,
+            110,
+            112,
+        );
+        wrong_value.label_value = 12.0;
+        cases.push(wrong_value);
+        let mut wrong_payload = delivery(
+            "sample-1",
+            "event-1",
+            "label-1",
+            1,
+            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            LabelEvidenceFrontierV1::CurrentAtK1,
+            110,
+            112,
+        );
+        wrong_payload.label_payload_sha256 = digest('z');
+        cases.push(wrong_payload);
+
+        for (index, candidate) in cases.into_iter().enumerate() {
+            let mut engine = engine();
+            predict_and_register_stream_sample_v1(
+                &mut engine,
+                &prediction("sample-1", "event-1", 100, 102, None, vec![1.0, 1.0]),
+            )
+            .unwrap();
+            let before = adapter_state_digest(&engine.adapter_state).unwrap();
+            let receipt = deliver_qualified_stream_label_v1(&mut engine, &candidate).unwrap();
+            assert_eq!(receipt.disposition, StreamingUpdateDispositionV1::Rejected, "case {index}");
+            assert!(!receipt.adapter_state_mutated);
+            assert_eq!(adapter_state_digest(&engine.adapter_state).unwrap(), before);
+        }
+    }
+
+    #[test]
+    fn availability_and_clock_failures_never_update() {
+        let mut engine = engine();
+        predict_and_register_stream_sample_v1(
+            &mut engine,
+            &prediction("sample-1", "event-1", 100, 102, None, vec![1.0, 1.0]),
+        )
+        .unwrap();
+        let before = adapter_state_digest(&engine.adapter_state).unwrap();
+
+        let too_early = delivery(
+            "sample-1",
+            "event-1",
+            "label-1",
+            1,
+            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            LabelEvidenceFrontierV1::CurrentAtK1,
+            110,
+            109,
+        );
+        let receipt = deliver_qualified_stream_label_v1(&mut engine, &too_early).unwrap();
+        assert_eq!(receipt.disposition, StreamingUpdateDispositionV1::Rejected);
+        assert!(receipt.reasons.contains(&StreamingUpdateReasonV1::DeliveryBeforeLabelAvailability));
+
+        let mut wrong_clock = delivery(
+            "sample-1",
+            "event-1",
+            "label-1",
+            1,
+            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            LabelEvidenceFrontierV1::CurrentAtK1,
+            110,
+            112,
+        );
+        wrong_clock.clock_domain_id = "other-clock".into();
+        let receipt = deliver_qualified_stream_label_v1(&mut engine, &wrong_clock).unwrap();
+        assert_eq!(receipt.disposition, StreamingUpdateDispositionV1::Rejected);
+        assert!(receipt.reasons.contains(&StreamingUpdateReasonV1::ClockDomainMismatch));
+        assert_eq!(adapter_state_digest(&engine.adapter_state).unwrap(), before);
+    }
+
+    #[test]
+    fn stale_or_non_k1_report_is_not_consumed() {
+        let mut engine = engine();
+        predict_and_register_stream_sample_v1(
+            &mut engine,
+            &prediction("sample-1", "event-1", 100, 102, None, vec![1.0, 1.0]),
+        )
+        .unwrap();
+        let before = adapter_state_digest(&engine.adapter_state).unwrap();
+        let stale = delivery(
+            "sample-1",
+            "event-1",
+            "label-1",
+            1,
+            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            LabelEvidenceFrontierV1::AsKnownAtK0,
+            110,
+            112,
+        );
+        let receipt = deliver_qualified_stream_label_v1(&mut engine, &stale).unwrap();
+        assert_eq!(receipt.disposition, StreamingUpdateDispositionV1::Rejected);
+        assert!(receipt.reasons.contains(&StreamingUpdateReasonV1::LabelNotCurrentK1));
+        assert_eq!(adapter_state_digest(&engine.adapter_state).unwrap(), before);
+
+        let mut tampered = delivery(
+            "sample-1",
+            "event-1",
+            "label-2",
+            1,
+            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            LabelEvidenceFrontierV1::CurrentAtK1,
+            110,
+            112,
+        );
+        tampered.eligibility_report.report_sha256 = digest('0');
+        let receipt = deliver_qualified_stream_label_v1(&mut engine, &tampered).unwrap();
+        assert_eq!(receipt.disposition, StreamingUpdateDispositionV1::Rejected);
+        assert!(receipt.reasons.contains(&StreamingUpdateReasonV1::EligibilityReportDigestMismatch));
+        assert_eq!(adapter_state_digest(&engine.adapter_state).unwrap(), before);
+    }
+
+    #[test]
+    fn zero_feature_vector_is_safe_and_does_not_change_feature_weights() {
+        let mut engine = engine();
+        predict_and_register_stream_sample_v1(
+            &mut engine,
+            &prediction("sample-1", "event-1", 100, 102, None, vec![0.0, 0.0]),
+        )
+        .unwrap();
+        let before_weights = engine.adapter_state.feature_weights.clone();
+        let receipt = deliver_qualified_stream_label_v1(
+            &mut engine,
+            &delivery(
+                "sample-1",
+                "event-1",
+                "label-1",
+                1,
+                LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+                LabelEvidenceFrontierV1::CurrentAtK1,
+                110,
+                112,
+            ),
+        )
+        .unwrap();
+        assert_eq!(receipt.disposition, StreamingUpdateDispositionV1::Updated);
+        assert_eq!(engine.adapter_state.feature_weights, before_weights);
+    }
+
+    #[test]
+    fn context_correction_is_local_and_shrunk_toward_global_support() {
+        let mut engine = engine();
+        predict_and_register_stream_sample_v1(
+            &mut engine,
+            &prediction(
+                "sample-1",
+                "event-1",
+                100,
+                102,
+                Some("eqp-1/ch-1"),
+                vec![1.0, 0.0],
+            ),
+        )
+        .unwrap();
+        deliver_qualified_stream_label_v1(
+            &mut engine,
+            &delivery(
+                "sample-1",
+                "event-1",
+                "label-1",
+                1,
+                LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+                LabelEvidenceFrontierV1::CurrentAtK1,
+                110,
+                112,
+            ),
+        )
+        .unwrap();
+
+        let unseen_context = predict_and_register_stream_sample_v1(
+            &mut engine,
+            &prediction(
+                "sample-2",
+                "event-2",
+                113,
+                115,
+                Some("eqp-2/ch-9"),
+                vec![1.0, 0.0],
+            ),
+        )
+        .unwrap();
+        assert_eq!(
+            unseen_context.context_correction,
+            engine.adapter_state.global_context_residual_ema
+        );
+        assert!(engine.adapter_state.contexts.contains_key("eqp-1/ch-1"));
+        assert!(!engine.adapter_state.contexts.contains_key("eqp-2/ch-9"));
+    }
+
+    #[test]
+    fn wrong_feature_schema_and_duplicate_measurement_events_reject_prediction() {
+        let mut engine = engine();
+        let mut wrong_schema =
+            prediction("sample-1", "event-1", 100, 102, None, vec![1.0, 1.0]);
+        wrong_schema.feature_schema_sha256 = digest('f');
+        assert!(predict_and_register_stream_sample_v1(&mut engine, &wrong_schema).is_err());
+
+        let good = prediction("sample-1", "event-1", 100, 102, None, vec![1.0, 1.0]);
+        predict_and_register_stream_sample_v1(&mut engine, &good).unwrap();
+        let duplicate = prediction("sample-2", "event-1", 103, 105, None, vec![1.0, 1.0]);
+        assert!(predict_and_register_stream_sample_v1(&mut engine, &duplicate).is_err());
+    }
+
+    #[test]
+    fn same_fixed_arrival_schedule_replays_identically() {
+        fn run() -> String {
+            let mut engine = engine();
+            for index in 0..2 {
+                predict_and_register_stream_sample_v1(
+                    &mut engine,
+                    &prediction(
+                        &format!("sample-{index}"),
+                        &format!("event-{index}"),
+                        100 + index * 3,
+                        102 + index * 3,
+                        Some("eqp-1/ch-1"),
+                        vec![1.0 + index as f64, 2.0],
+                    ),
+                )
+                .unwrap();
+            }
+            for index in 0..2 {
+                deliver_qualified_stream_label_v1(
+                    &mut engine,
+                    &delivery(
+                        &format!("sample-{index}"),
+                        &format!("event-{index}"),
+                        &format!("label-{index}"),
+                        1,
+                        LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+                        LabelEvidenceFrontierV1::CurrentAtK1,
+                        110 + index * 3,
+                        112 + index * 3,
+                    ),
+                )
+                .unwrap();
+            }
+            adapter_state_digest(&engine.adapter_state).unwrap()
+        }
+        assert_eq!(run(), run());
+    }
+}
