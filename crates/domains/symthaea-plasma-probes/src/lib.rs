@@ -3661,7 +3661,8 @@ mod tests {
     #[test]
     fn sensor_actuator_timing_auditor_rejects_duplicate_channel_ids() {
         let mut value = sensor_actuator_fixture_value();
-        value["diagnostics"][1]["channel_id"] = value["diagnostics"][0]["channel_id"].clone();
+        let first_channel_id = value["diagnostics"][0]["channel_id"].clone();
+        value["diagnostics"][1]["channel_id"] = first_channel_id;
         assert!(matches!(
             validate_sensor_actuator_timing_contract_value(&value),
             Err(ContractError::InvalidControlTimingField {
