@@ -17,10 +17,10 @@ use std::fmt;
 use serde::{Deserialize, Serialize};
 
 use crate::mycelial_active_sensing::{
-    MYCELIAL_ACTIVE_SENSING_SCHEMA_VERSION, MycelialActiveSensingReport,
-    MycelialAcquisitionAction, MycelialAcquisitionActionKind,
-    MycelialAcquisitionDecision, MycelialAcquisitionOutcome,
-    MycelialHypothesisLikelihood, MycelialHypothesisLoss, evaluate_mycelial_active_sensing,
+    MYCELIAL_ACTIVE_SENSING_SCHEMA_VERSION, MycelialAcquisitionAction,
+    MycelialAcquisitionActionKind, MycelialAcquisitionDecision, MycelialAcquisitionOutcome,
+    MycelialActiveSensingReport, MycelialHypothesisLikelihood, MycelialHypothesisLoss,
+    evaluate_mycelial_active_sensing,
 };
 use crate::mycelial_fusion_counterfactual::{
     MycelialFusionBridgeLengthBasis, MycelialFusionCandidate, MycelialFusionTarget,
@@ -29,9 +29,9 @@ use crate::mycelial_graph_hypothesis_posterior::{
     MycelialGraphHypothesisPosterior, evaluate_mycelial_graph_hypothesis_posterior,
 };
 use crate::mycelial_reconstruction_metrics::{
-    AnnotatedHyphaSegment, AnnotatedJunction, AnnotatedJunctionKind,
-    AnnotatedMycelialSkeleton, MYCELIAL_RECONSTRUCTION_SCHEMA_VERSION,
-    ReconstructionDimensionality, ReconstructionLengthUnit, ReconstructionPoint3,
+    AnnotatedHyphaSegment, AnnotatedJunction, AnnotatedJunctionKind, AnnotatedMycelialSkeleton,
+    MYCELIAL_RECONSTRUCTION_SCHEMA_VERSION, ReconstructionDimensionality, ReconstructionLengthUnit,
+    ReconstructionPoint3,
 };
 
 pub const MYCELIAL_SAMPLE_HEALTH_BUDGET_SCHEMA_VERSION: u16 = 1;
@@ -97,7 +97,10 @@ impl MycelialSampleHealthActiveSensingEvidence {
         hash_string(&mut hasher, &self.report.candidate_inventory_digest);
         hash_string(&mut hasher, &self.report.posterior_inventory_digest);
         hash_string(&mut hasher, &self.report.decision_inventory_digest);
-        hash_string(&mut hasher, &self.report.acquisition_action_inventory_digest);
+        hash_string(
+            &mut hasher,
+            &self.report.acquisition_action_inventory_digest,
+        );
         hash_string(&mut hasher, &self.skeleton.source_observation_digest);
         hash_string(&mut hasher, &self.skeleton.calibration_digest);
         hasher.update(&(self.candidates.len() as u64).to_le_bytes());
@@ -342,7 +345,10 @@ impl fmt::Display for MycelialSampleHealthBudgetError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidSchemaVersion(version) => {
-                write!(f, "unsupported Mycelial sample-health budget schema version {version}")
+                write!(
+                    f,
+                    "unsupported Mycelial sample-health budget schema version {version}"
+                )
             }
             Self::InvalidIdentifier(field) => {
                 write!(f, "invalid Mycelial sample-health identifier: {field}")
@@ -360,16 +366,25 @@ impl fmt::Display for MycelialSampleHealthBudgetError {
                 write!(f, "invalid Mycelial acquisition budget proposal: {field}")
             }
             Self::InvalidActiveSensingReport(field) => {
-                write!(f, "invalid active-sensing report for sample-health filtering: {field}")
+                write!(
+                    f,
+                    "invalid active-sensing report for sample-health filtering: {field}"
+                )
             }
             Self::ReportMismatch => {
-                write!(f, "sample-health budget report does not match independent recomputation")
+                write!(
+                    f,
+                    "sample-health budget report does not match independent recomputation"
+                )
             }
             Self::DuplicateId(field) => {
                 write!(f, "duplicate Mycelial sample-health identity: {field}")
             }
             Self::InventoryMismatch => {
-                write!(f, "sample-health proposal IDs do not exactly match active-sensing action IDs")
+                write!(
+                    f,
+                    "sample-health proposal IDs do not exactly match active-sensing action IDs"
+                )
             }
             Self::ResourceLimitExceeded(field) => {
                 write!(f, "Mycelial sample-health resource limit exceeded: {field}")
@@ -472,7 +487,10 @@ fn validate_budget(
     let mut channels = BTreeSet::new();
     for limit in &budget.photon_dose_limits {
         validate_identifier(&limit.channel_id, "photon_dose_limit.channel_id")?;
-        validate_digest(&limit.calibration_digest, "photon_dose_limit.calibration_digest")?;
+        validate_digest(
+            &limit.calibration_digest,
+            "photon_dose_limit.calibration_digest",
+        )?;
         if !channels.insert(limit.channel_id.as_str()) {
             return Err(MycelialSampleHealthBudgetError::DuplicateId(
                 "photon_dose_limit.channel_id",
@@ -544,7 +562,10 @@ fn validate_state(
         validate_identifier(&exposure.spatial_cell_id, "exposure.spatial_cell_id")?;
         validate_identifier(&exposure.channel_id, "exposure.channel_id")?;
         validate_identifier(&exposure.source_session_id, "exposure.source_session_id")?;
-        validate_digest(&exposure.evidence_receipt_digest, "exposure.evidence_receipt_digest")?;
+        validate_digest(
+            &exposure.evidence_receipt_digest,
+            "exposure.evidence_receipt_digest",
+        )?;
         validate_digest(&exposure.calibration_digest, "exposure.calibration_digest")?;
         if exposure.sample_id != state.sample_id
             || exposure.wavelength_nm == 0
@@ -599,18 +620,14 @@ fn validate_active_sensing_report(
     report: &MycelialActiveSensingReport,
 ) -> Result<(), MycelialSampleHealthBudgetError> {
     if report.schema_version != MYCELIAL_ACTIVE_SENSING_SCHEMA_VERSION {
-        return Err(
-            MycelialSampleHealthBudgetError::InvalidActiveSensingReport(
-                "schema version mismatch",
-            ),
-        );
+        return Err(MycelialSampleHealthBudgetError::InvalidActiveSensingReport(
+            "schema version mismatch",
+        ));
     }
     if !report.advisory_only {
-        return Err(
-            MycelialSampleHealthBudgetError::InvalidActiveSensingReport(
-                "physical or non-advisory reports cannot be filtered",
-            ),
-        );
+        return Err(MycelialSampleHealthBudgetError::InvalidActiveSensingReport(
+            "physical or non-advisory reports cannot be filtered",
+        ));
     }
     for (digest, field) in [
         (report.source_graph_digest.as_str(), "source_graph_digest"),
@@ -643,16 +660,17 @@ fn validate_active_sensing_report(
         || !report.baseline_bayes_risk.is_finite()
         || report.baseline_bayes_risk < 0.0
     {
-        return Err(
-            MycelialSampleHealthBudgetError::InvalidActiveSensingReport(
-                "empty, unbounded or invalid action inventory",
-            ),
-        );
+        return Err(MycelialSampleHealthBudgetError::InvalidActiveSensingReport(
+            "empty, unbounded or invalid action inventory",
+        ));
     }
     let mut action_ids = BTreeSet::new();
     for action in &report.actions {
         validate_identifier(&action.action_id, "active_sensing.action_id")?;
-        validate_identifier(&action.acquisition_model_id, "active_sensing.acquisition_model_id")?;
+        validate_identifier(
+            &action.acquisition_model_id,
+            "active_sensing.acquisition_model_id",
+        )?;
         validate_identifier(
             &action.acquisition_model_version,
             "active_sensing.acquisition_model_version",
@@ -673,11 +691,9 @@ fn validate_active_sensing_report(
             || !action.expected_posterior_bayes_risk.is_finite()
             || action.expected_posterior_bayes_risk < 0.0
         {
-            return Err(
-                MycelialSampleHealthBudgetError::InvalidActiveSensingReport(
-                    "duplicate action ID or non-finite action value",
-                ),
-            );
+            return Err(MycelialSampleHealthBudgetError::InvalidActiveSensingReport(
+                "duplicate action ID or non-finite action value",
+            ));
         }
     }
     Ok(())
@@ -755,8 +771,7 @@ fn validate_proposal(
             "acquisition, cost or health-model evidence differs from policy and active-sensing action",
         ));
     }
-    if proposal.spatial_footprint_cell_ids.len() > MAX_MYCELIAL_HEALTH_BUDGET_CELLS_PER_ACTION
-    {
+    if proposal.spatial_footprint_cell_ids.len() > MAX_MYCELIAL_HEALTH_BUDGET_CELLS_PER_ACTION {
         return Err(MycelialSampleHealthBudgetError::ResourceLimitExceeded(
             "proposal spatial footprint",
         ));
@@ -847,7 +862,11 @@ fn policy_digest(budget: &MycelialSampleHealthBudget) -> String {
     hasher.update(&budget.maximum_session_duration_ns.to_le_bytes());
     hasher.update(&budget.maximum_actions_per_session.to_le_bytes());
     hash_f64(&mut hasher, budget.maximum_roi_area_um2);
-    hasher.update(&budget.maximum_local_temperature_rise_millikelvin.to_le_bytes());
+    hasher.update(
+        &budget
+            .maximum_local_temperature_rise_millikelvin
+            .to_le_bytes(),
+    );
     let mut limits: Vec<_> = budget.photon_dose_limits.iter().collect();
     limits.sort_by(|left, right| left.channel_id.cmp(&right.channel_id));
     hasher.update(&(limits.len() as u64).to_le_bytes());
@@ -857,7 +876,11 @@ fn policy_digest(budget: &MycelialSampleHealthBudget) -> String {
         hasher.update(&limit.maximum_wavelength_nm.to_le_bytes());
         hash_string(&mut hasher, &limit.calibration_digest);
         hash_f64(&mut hasher, limit.maximum_irradiance_watts_per_cm2);
-        hasher.update(&limit.maximum_continuous_illumination_duration_ns.to_le_bytes());
+        hasher.update(
+            &limit
+                .maximum_continuous_illumination_duration_ns
+                .to_le_bytes(),
+        );
         hasher.update(&limit.minimum_recovery_interval_ns.to_le_bytes());
         hash_f64(&mut hasher, limit.maximum_cumulative_photons_per_um2);
     }
@@ -899,7 +922,10 @@ fn state_digest(state: &MycelialSampleHealthState) -> String {
                 &right.source_session_id,
             ))
             .then_with(|| left.photons_per_um2.total_cmp(&right.photons_per_um2))
-            .then_with(|| left.evidence_receipt_digest.cmp(&right.evidence_receipt_digest))
+            .then_with(|| {
+                left.evidence_receipt_digest
+                    .cmp(&right.evidence_receipt_digest)
+            })
             .then_with(|| left.calibration_digest.cmp(&right.calibration_digest))
     });
     hasher.update(&(exposures.len() as u64).to_le_bytes());
@@ -937,7 +963,11 @@ fn proposal_inventory_digest(proposals: &[MycelialAcquisitionBudgetProposal]) ->
         }
         hasher.update(&proposal.roi_area_um2.to_le_bytes());
         hasher.update(&proposal.duration_ns.to_le_bytes());
-        hasher.update(&proposal.local_temperature_rise_upper_millikelvin.to_le_bytes());
+        hasher.update(
+            &proposal
+                .local_temperature_rise_upper_millikelvin
+                .to_le_bytes(),
+        );
         hash_string(&mut hasher, &proposal.acquisition_model_digest);
         hash_string(&mut hasher, &proposal.cost_evidence_digest);
         hash_string(&mut hasher, &proposal.health_model_digest);
@@ -1189,9 +1219,7 @@ fn evaluate_proposal(
                     MycelialSampleHealthRejectionReason::IrradianceExceeded,
                 );
             }
-            if dose.illumination_duration_ns
-                > limit.maximum_continuous_illumination_duration_ns
-            {
+            if dose.illumination_duration_ns > limit.maximum_continuous_illumination_duration_ns {
                 add_reason(
                     &mut reasons,
                     MycelialSampleHealthRejectionReason::ContinuousIlluminationDurationExceeded,
@@ -1207,14 +1235,10 @@ fn evaluate_proposal(
                     );
                 }
             }
-            irradiance_by_channel.insert(
-                dose.channel_id.clone(),
-                dose.irradiance_watts_per_cm2_upper,
-            );
-            illumination_duration_by_channel.insert(
-                dose.channel_id.clone(),
-                dose.illumination_duration_ns,
-            );
+            irradiance_by_channel
+                .insert(dose.channel_id.clone(), dose.irradiance_watts_per_cm2_upper);
+            illumination_duration_by_channel
+                .insert(dose.channel_id.clone(), dose.illumination_duration_ns);
             let increment = increment_by_channel
                 .entry(dose.channel_id.clone())
                 .or_insert(0.0);
@@ -1317,7 +1341,10 @@ pub fn evaluate_mycelial_sample_health_budget(
 
     let mut proposal_by_id = BTreeMap::new();
     for proposal in proposals {
-        if proposal_by_id.insert(proposal.action_id.as_str(), proposal).is_some() {
+        if proposal_by_id
+            .insert(proposal.action_id.as_str(), proposal)
+            .is_some()
+        {
             return Err(MycelialSampleHealthBudgetError::DuplicateId(
                 "proposal.action_id",
             ));
@@ -1575,22 +1602,38 @@ mod tests {
                 AnnotatedJunction {
                     id: "A".to_string(),
                     kind: AnnotatedJunctionKind::Origin,
-                    position: ReconstructionPoint3 { x: 0.0, y: 0.0, z: 0.0 },
+                    position: ReconstructionPoint3 {
+                        x: 0.0,
+                        y: 0.0,
+                        z: 0.0,
+                    },
                 },
                 AnnotatedJunction {
                     id: "B".to_string(),
                     kind: AnnotatedJunctionKind::Tip,
-                    position: ReconstructionPoint3 { x: 1.0, y: 0.0, z: 0.0 },
+                    position: ReconstructionPoint3 {
+                        x: 1.0,
+                        y: 0.0,
+                        z: 0.0,
+                    },
                 },
                 AnnotatedJunction {
                     id: "C".to_string(),
                     kind: AnnotatedJunctionKind::Origin,
-                    position: ReconstructionPoint3 { x: 10.0, y: 0.0, z: 0.0 },
+                    position: ReconstructionPoint3 {
+                        x: 10.0,
+                        y: 0.0,
+                        z: 0.0,
+                    },
                 },
                 AnnotatedJunction {
                     id: "D".to_string(),
                     kind: AnnotatedJunctionKind::Tip,
-                    position: ReconstructionPoint3 { x: 11.0, y: 0.0, z: 0.0 },
+                    position: ReconstructionPoint3 {
+                        x: 11.0,
+                        y: 0.0,
+                        z: 0.0,
+                    },
                 },
             ],
             segments: vec![
@@ -1644,7 +1687,10 @@ mod tests {
                     .iter()
                     .map(|hypothesis| MycelialHypothesisLoss {
                         accepted_candidate_ids: hypothesis.accepted_candidate_ids.clone(),
-                        loss: if hypothesis.accepted_candidate_ids.contains(&"bridge".to_string()) {
+                        loss: if hypothesis
+                            .accepted_candidate_ids
+                            .contains(&"bridge".to_string())
+                        {
                             0.0
                         } else {
                             1_000.0
@@ -1660,7 +1706,10 @@ mod tests {
                     .iter()
                     .map(|hypothesis| MycelialHypothesisLoss {
                         accepted_candidate_ids: hypothesis.accepted_candidate_ids.clone(),
-                        loss: if hypothesis.accepted_candidate_ids.contains(&"bridge".to_string()) {
+                        loss: if hypothesis
+                            .accepted_candidate_ids
+                            .contains(&"bridge".to_string())
+                        {
                             1_000.0
                         } else {
                             0.0
@@ -1688,7 +1737,10 @@ mod tests {
                             .iter()
                             .map(|hypothesis| MycelialHypothesisLikelihood {
                                 accepted_candidate_ids: hypothesis.accepted_candidate_ids.clone(),
-                                likelihood: if hypothesis.accepted_candidate_ids.contains(&"bridge".to_string()) {
+                                likelihood: if hypothesis
+                                    .accepted_candidate_ids
+                                    .contains(&"bridge".to_string())
+                                {
                                     0.0
                                 } else {
                                     1.0
@@ -1703,7 +1755,10 @@ mod tests {
                             .iter()
                             .map(|hypothesis| MycelialHypothesisLikelihood {
                                 accepted_candidate_ids: hypothesis.accepted_candidate_ids.clone(),
-                                likelihood: if hypothesis.accepted_candidate_ids.contains(&"bridge".to_string()) {
+                                likelihood: if hypothesis
+                                    .accepted_candidate_ids
+                                    .contains(&"bridge".to_string())
+                                {
                                     1.0
                                 } else {
                                     0.0
@@ -1723,12 +1778,7 @@ mod tests {
         )
         .unwrap();
         MycelialSampleHealthActiveSensingEvidence::new(
-            report,
-            skeleton,
-            candidates,
-            posterior,
-            decisions,
-            actions,
+            report, skeleton, candidates, posterior, decisions, actions,
         )
         .unwrap()
     }
@@ -1739,7 +1789,10 @@ mod tests {
         dose: f64,
         kind: MycelialAcquisitionActionKind,
     ) -> MycelialAcquisitionBudgetProposal {
-        let cell_ids = cells.iter().map(|value| value.to_string()).collect::<Vec<_>>();
+        let cell_ids = cells
+            .iter()
+            .map(|value| value.to_string())
+            .collect::<Vec<_>>();
         MycelialAcquisitionBudgetProposal {
             action_id: action_id.to_string(),
             session_id: "session-001".to_string(),
@@ -1754,7 +1807,9 @@ mod tests {
                 &cell_ids,
             ),
             spatial_footprint_cell_ids: cell_ids,
-            required_illumination_channel_ids: if kind == MycelialAcquisitionActionKind::HumanAnnotation {
+            required_illumination_channel_ids: if kind
+                == MycelialAcquisitionActionKind::HumanAnnotation
+            {
                 Vec::new()
             } else {
                 vec!["gfp".to_string()]
@@ -1800,7 +1855,9 @@ mod tests {
         );
         assert!(matches!(
             result,
-            Err(MycelialSampleHealthBudgetError::InvalidActiveSensingReport(_))
+            Err(MycelialSampleHealthBudgetError::InvalidActiveSensingReport(
+                _
+            ))
         ));
     }
 
@@ -1831,33 +1888,52 @@ mod tests {
     #[test]
     fn overlapping_rois_accumulate_dose_on_shared_spatial_cells() {
         let report = active_report(vec![
-            action("roi-a", MycelialAcquisitionActionKind::HighResolutionCrop, 3.0),
-            action("roi-b", MycelialAcquisitionActionKind::HighResolutionCrop, 5.0),
+            action(
+                "roi-a",
+                MycelialAcquisitionActionKind::HighResolutionCrop,
+                3.0,
+            ),
+            action(
+                "roi-b",
+                MycelialAcquisitionActionKind::HighResolutionCrop,
+                5.0,
+            ),
         ]);
         let proposals = vec![
-            proposal("roi-a", &["cell-a", "cell-b"], 1.0, MycelialAcquisitionActionKind::HighResolutionCrop),
-            proposal("roi-b", &["cell-a", "cell-c"], 1.0, MycelialAcquisitionActionKind::HighResolutionCrop),
+            proposal(
+                "roi-a",
+                &["cell-a", "cell-b"],
+                1.0,
+                MycelialAcquisitionActionKind::HighResolutionCrop,
+            ),
+            proposal(
+                "roi-b",
+                &["cell-a", "cell-c"],
+                1.0,
+                MycelialAcquisitionActionKind::HighResolutionCrop,
+            ),
         ];
         let mut current = state();
         current.cumulative_photon_exposures[0].photons_per_um2 = 8.0;
-        current.cumulative_photon_exposures.push(MycelialCumulativePhotonExposure {
-            sample_id: "sample-001".to_string(),
-            spatial_cell_id: "cell-a".to_string(),
-            channel_id: "gfp".to_string(),
-            wavelength_nm: 488,
-            photons_per_um2: 1.5,
-            source_session_id: "session-previous-other".to_string(),
-            evidence_receipt_digest: digest('h'),
-            calibration_digest: digest('f'),
-        });
+        current
+            .cumulative_photon_exposures
+            .push(MycelialCumulativePhotonExposure {
+                sample_id: "sample-001".to_string(),
+                spatial_cell_id: "cell-a".to_string(),
+                channel_id: "gfp".to_string(),
+                wavelength_nm: 488,
+                photons_per_um2: 1.5,
+                source_session_id: "session-previous-other".to_string(),
+                evidence_receipt_digest: digest('h'),
+                calibration_digest: digest('f'),
+            });
         let result =
             evaluate_mycelial_sample_health_budget(&report, &budget(), &current, &proposals)
                 .unwrap();
         assert_eq!(result.rejected_actions.len(), 2);
         assert!(result.rejected_actions.iter().all(|item| {
-            item.reasons.contains(
-                &MycelialSampleHealthRejectionReason::CumulativePhotonDoseExceeded
-            )
+            item.reasons
+                .contains(&MycelialSampleHealthRejectionReason::CumulativePhotonDoseExceeded)
         }));
     }
 
@@ -1897,9 +1973,11 @@ mod tests {
             evaluate_mycelial_sample_health_budget(&report, &budget(), &state(), &[proposal])
                 .unwrap();
         assert_eq!(result.recommended_action_id, None);
-        assert!(result.rejected_actions[0].reasons.contains(
-            &MycelialSampleHealthRejectionReason::MissingSpatialFootprint
-        ));
+        assert!(
+            result.rejected_actions[0]
+                .reasons
+                .contains(&MycelialSampleHealthRejectionReason::MissingSpatialFootprint)
+        );
     }
 
     #[test]
@@ -1924,12 +2002,30 @@ mod tests {
     #[test]
     fn rejected_high_voi_action_cannot_outrank_feasible_lower_voi_action() {
         let report = active_report(vec![
-            action("unsafe-high", MycelialAcquisitionActionKind::AdditionalZPlane, 100.0),
-            action("safe-low", MycelialAcquisitionActionKind::HumanAnnotation, 1.0),
+            action(
+                "unsafe-high",
+                MycelialAcquisitionActionKind::AdditionalZPlane,
+                100.0,
+            ),
+            action(
+                "safe-low",
+                MycelialAcquisitionActionKind::HumanAnnotation,
+                1.0,
+            ),
         ]);
         let proposals = vec![
-            proposal("unsafe-high", &["cell-a"], 4.0, MycelialAcquisitionActionKind::AdditionalZPlane),
-            proposal("safe-low", &["cell-b"], 0.0, MycelialAcquisitionActionKind::HumanAnnotation),
+            proposal(
+                "unsafe-high",
+                &["cell-a"],
+                4.0,
+                MycelialAcquisitionActionKind::AdditionalZPlane,
+            ),
+            proposal(
+                "safe-low",
+                &["cell-b"],
+                0.0,
+                MycelialAcquisitionActionKind::HumanAnnotation,
+            ),
         ];
         let result =
             evaluate_mycelial_sample_health_budget(&report, &budget(), &state(), &proposals)
@@ -1953,10 +2049,15 @@ mod tests {
         let result =
             evaluate_mycelial_sample_health_budget(&report, &budget(), &state(), &[proposal])
                 .unwrap();
-        assert_eq!(result.recommended_action_id.as_deref(), Some("human-review"));
-        assert!(result.eligible_actions[0]
-            .maximum_projected_photons_per_um2_by_channel
-            .is_empty());
+        assert_eq!(
+            result.recommended_action_id.as_deref(),
+            Some("human-review")
+        );
+        assert!(
+            result.eligible_actions[0]
+                .maximum_projected_photons_per_um2_by_channel
+                .is_empty()
+        );
     }
 
     #[test]
@@ -1979,15 +2080,21 @@ mod tests {
             evaluate_mycelial_sample_health_budget(&report, &budget(), &state(), &[proposal])
                 .unwrap();
         assert_eq!(result.recommended_action_id, None);
-        assert!(result.rejected_actions[0].reasons.contains(
-            &MycelialSampleHealthRejectionReason::SessionDurationExceeded
-        ));
-        assert!(result.rejected_actions[0].reasons.contains(
-            &MycelialSampleHealthRejectionReason::RoiAreaExceeded
-        ));
-        assert!(result.rejected_actions[0].reasons.contains(
-            &MycelialSampleHealthRejectionReason::TemperatureRiseExceeded
-        ));
+        assert!(
+            result.rejected_actions[0]
+                .reasons
+                .contains(&MycelialSampleHealthRejectionReason::SessionDurationExceeded)
+        );
+        assert!(
+            result.rejected_actions[0]
+                .reasons
+                .contains(&MycelialSampleHealthRejectionReason::RoiAreaExceeded)
+        );
+        assert!(
+            result.rejected_actions[0]
+                .reasons
+                .contains(&MycelialSampleHealthRejectionReason::TemperatureRiseExceeded)
+        );
     }
 
     #[test]
@@ -2008,9 +2115,11 @@ mod tests {
             evaluate_mycelial_sample_health_budget(&evidence, &budget(), &state(), &[proposal])
                 .unwrap();
         assert_eq!(result.recommended_action_id, None);
-        assert!(result.rejected_actions[0]
-            .reasons
-            .contains(&MycelialSampleHealthRejectionReason::IrradianceExceeded));
+        assert!(
+            result.rejected_actions[0]
+                .reasons
+                .contains(&MycelialSampleHealthRejectionReason::IrradianceExceeded)
+        );
     }
 
     #[test]
@@ -2052,17 +2161,18 @@ mod tests {
         );
         let mut current = state();
         current.elapsed_since_last_optical_exposure_ns = Some(1);
-        let rejected =
-            evaluate_mycelial_sample_health_budget(
-                &evidence,
-                &budget(),
-                &current,
-                &[proposal.clone()],
-            )
-            .unwrap();
-        assert!(rejected.rejected_actions[0]
-            .reasons
-            .contains(&MycelialSampleHealthRejectionReason::RecoveryIntervalNotMet));
+        let rejected = evaluate_mycelial_sample_health_budget(
+            &evidence,
+            &budget(),
+            &current,
+            &[proposal.clone()],
+        )
+        .unwrap();
+        assert!(
+            rejected.rejected_actions[0]
+                .reasons
+                .contains(&MycelialSampleHealthRejectionReason::RecoveryIntervalNotMet)
+        );
 
         proposal.planned_start_offset_ns = 24;
         proposal.spatial_footprint_digest = footprint_digest(
@@ -2074,7 +2184,10 @@ mod tests {
         let eligible =
             evaluate_mycelial_sample_health_budget(&evidence, &budget(), &current, &[proposal])
                 .unwrap();
-        assert_eq!(eligible.recommended_action_id.as_deref(), Some("recovery-wait"));
+        assert_eq!(
+            eligible.recommended_action_id.as_deref(),
+            Some("recovery-wait")
+        );
     }
 
     #[test]
@@ -2099,9 +2212,11 @@ mod tests {
             &[optical_proposal],
         )
         .unwrap();
-        assert!(blocked.rejected_actions[0].reasons.contains(
-            &MycelialSampleHealthRejectionReason::ExposureHistoryIncomplete
-        ));
+        assert!(
+            blocked.rejected_actions[0]
+                .reasons
+                .contains(&MycelialSampleHealthRejectionReason::ExposureHistoryIncomplete)
+        );
 
         let review_evidence = active_report(vec![action(
             "human-review-with-incomplete-history",
@@ -2143,12 +2258,7 @@ mod tests {
         let mut current = state();
         current.elapsed_since_last_optical_exposure_ns = None;
         assert!(matches!(
-            evaluate_mycelial_sample_health_budget(
-                &evidence,
-                &budget(),
-                &current,
-                &[proposal]
-            ),
+            evaluate_mycelial_sample_health_budget(&evidence, &budget(), &current, &[proposal]),
             Err(MycelialSampleHealthBudgetError::InvalidState(_))
         ));
     }
@@ -2170,9 +2280,11 @@ mod tests {
         let result =
             evaluate_mycelial_sample_health_budget(&report, &budget(), &state(), &[proposal])
                 .unwrap();
-        assert!(result.rejected_actions[0].reasons.contains(
-            &MycelialSampleHealthRejectionReason::UnknownIlluminationChannel
-        ));
+        assert!(
+            result.rejected_actions[0]
+                .reasons
+                .contains(&MycelialSampleHealthRejectionReason::UnknownIlluminationChannel)
+        );
 
         let mut proposal = proposal(
             "wrong-channel",
@@ -2184,9 +2296,11 @@ mod tests {
         let result =
             evaluate_mycelial_sample_health_budget(&report, &budget(), &state(), &[proposal])
                 .unwrap();
-        assert!(result.rejected_actions[0].reasons.contains(
-            &MycelialSampleHealthRejectionReason::WavelengthOutsideCalibratedBand
-        ));
+        assert!(
+            result.rejected_actions[0]
+                .reasons
+                .contains(&MycelialSampleHealthRejectionReason::WavelengthOutsideCalibratedBand)
+        );
     }
 
     #[test]
@@ -2202,8 +2316,7 @@ mod tests {
             1.0,
             MycelialAcquisitionActionKind::AlternateIllumination,
         );
-        proposal.required_illumination_channel_ids =
-            vec!["gfp".to_string(), "red".to_string()];
+        proposal.required_illumination_channel_ids = vec!["gfp".to_string(), "red".to_string()];
         let mut policy = budget();
         policy.photon_dose_limits.push(MycelialPhotonDoseLimit {
             channel_id: "red".to_string(),
@@ -2218,9 +2331,11 @@ mod tests {
         let result =
             evaluate_mycelial_sample_health_budget(&report, &policy, &state(), &[proposal])
                 .unwrap();
-        assert!(result.rejected_actions[0].reasons.contains(
-            &MycelialSampleHealthRejectionReason::MissingOpticalDoseEstimate
-        ));
+        assert!(
+            result.rejected_actions[0]
+                .reasons
+                .contains(&MycelialSampleHealthRejectionReason::MissingOpticalDoseEstimate)
+        );
         assert_eq!(result.recommended_action_id, None);
     }
 
@@ -2282,9 +2397,11 @@ mod tests {
             evaluate_mycelial_sample_health_budget(&report, &budget(), &state(), &[proposal])
                 .unwrap();
         assert_eq!(result.recommended_action_id, None);
-        assert!(result.rejected_actions[0].reasons.contains(
-            &MycelialSampleHealthRejectionReason::PhotonCalibrationMismatch
-        ));
+        assert!(
+            result.rejected_actions[0]
+                .reasons
+                .contains(&MycelialSampleHealthRejectionReason::PhotonCalibrationMismatch)
+        );
     }
 
     #[test]
@@ -2326,9 +2443,11 @@ mod tests {
             evaluate_mycelial_sample_health_budget(&report, &budget(), &state(), &[proposal])
                 .unwrap();
         assert_eq!(result.recommended_action_id, None);
-        assert!(result.rejected_actions[0].reasons.contains(
-            &MycelialSampleHealthRejectionReason::MissingOpticalDoseEstimate
-        ));
+        assert!(
+            result.rejected_actions[0]
+                .reasons
+                .contains(&MycelialSampleHealthRejectionReason::MissingOpticalDoseEstimate)
+        );
     }
 
     #[test]
@@ -2369,20 +2488,36 @@ mod tests {
         let result =
             evaluate_mycelial_sample_health_budget(&report, &budget(), &current, &[proposal])
                 .unwrap();
-        assert!(result.rejected_actions[0].reasons.contains(
-            &MycelialSampleHealthRejectionReason::SessionActionCountExceeded
-        ));
+        assert!(
+            result.rejected_actions[0]
+                .reasons
+                .contains(&MycelialSampleHealthRejectionReason::SessionActionCountExceeded)
+        );
     }
 
     #[test]
     fn output_digest_is_stable_and_recomputable() {
         let report = active_report(vec![
             action("first", MycelialAcquisitionActionKind::HumanAnnotation, 2.0),
-            action("second", MycelialAcquisitionActionKind::HumanAnnotation, 1.0),
+            action(
+                "second",
+                MycelialAcquisitionActionKind::HumanAnnotation,
+                1.0,
+            ),
         ]);
         let proposals = vec![
-            proposal("first", &["cell-a"], 0.0, MycelialAcquisitionActionKind::HumanAnnotation),
-            proposal("second", &["cell-b"], 0.0, MycelialAcquisitionActionKind::HumanAnnotation),
+            proposal(
+                "first",
+                &["cell-a"],
+                0.0,
+                MycelialAcquisitionActionKind::HumanAnnotation,
+            ),
+            proposal(
+                "second",
+                &["cell-b"],
+                0.0,
+                MycelialAcquisitionActionKind::HumanAnnotation,
+            ),
         ];
         let policy = budget();
         let state = state();
@@ -2448,7 +2583,9 @@ mod tests {
     #[test]
     fn policy_rejects_duplicate_channels_and_invalid_limits() {
         let mut invalid = budget();
-        invalid.photon_dose_limits.push(invalid.photon_dose_limits[0].clone());
+        invalid
+            .photon_dose_limits
+            .push(invalid.photon_dose_limits[0].clone());
         assert!(matches!(
             validate_budget(&invalid),
             Err(MycelialSampleHealthBudgetError::DuplicateId(_))
