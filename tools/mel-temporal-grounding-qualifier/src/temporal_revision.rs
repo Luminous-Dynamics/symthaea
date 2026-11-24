@@ -8,10 +8,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::temporal_grounding::{
     score_temporal_grounding, validate_temporal_ground_truth,
-    validate_temporal_grounding_prediction, AudioArtifactClockV1, FrameIntervalV1,
-    GroundTruthStateV1, GroundingPredictionStateV1, TemporalGroundingOutcomeV1,
+    validate_temporal_grounding_prediction, TemporalGroundingOutcomeV1,
     TemporalGroundingPlanV1, TemporalGroundingPredictionV1, TemporalGroundingScoreV1,
-    TemporalGroundTruthV1, TEMPORAL_GROUNDING_SCHEMA_V1,
+    TemporalGroundTruthV1,
 };
 
 const REVISION_SCHEMA: &str = "mel-temporal-revision-case-v1";
@@ -1084,7 +1083,9 @@ fn mean(values: &[f64]) -> Option<f64> {
 mod tests {
     use super::*;
     use crate::temporal_grounding::{
-        GroundingPredictionKindV1, TemporalGroundingOutcomeV1, TemporalIntervalMatchV1,
+        AudioArtifactClockV1, FrameIntervalV1, GroundingPredictionKindV1,
+        GroundingPredictionStateV1, GroundTruthStateV1, TemporalGroundingOutcomeV1,
+        TemporalIntervalMatchV1, TEMPORAL_GROUNDING_SCHEMA_V1,
     };
 
     const EVALUATOR: &str = "mel-temporal-grounding-v1";
@@ -1207,6 +1208,39 @@ mod tests {
                     end_error_frames: 0,
                 })
                 .collect(),
+        }
+    }
+
+    fn absent_score(correct_absence_claim: Option<bool>) -> TemporalGroundingScoreV1 {
+        let (prediction_kind, abstained) = match correct_absence_claim {
+            Some(true) => (GroundingPredictionKindV1::QueryAbsent, false),
+            Some(false) => (GroundingPredictionKindV1::NotDetected, false),
+            None => (GroundingPredictionKindV1::NotEstimable, true),
+        };
+        TemporalGroundingScoreV1 {
+            evaluator_version: EVALUATOR.into(),
+            query_id: "query-1".into(),
+            audio_sha256: AUDIO.into(),
+            sample_rate_hz: 48_000,
+            outcome: TemporalGroundingOutcomeV1::ScoredAbsentQuery,
+            prediction_kind,
+            scored: true,
+            abstained,
+            parse_failure: false,
+            ground_truth_occurrences: 0,
+            predicted_occurrences: 0,
+            ambiguous_candidate_count: 0,
+            true_positives: 0,
+            false_positives: 0,
+            false_negatives: 0,
+            precision: None,
+            recall: None,
+            f1: None,
+            matched_interval_iou_mean: None,
+            count_absolute_error: None,
+            exact_occurrence_count: None,
+            correct_absence_claim,
+            matches: Vec::new(),
         }
     }
 
