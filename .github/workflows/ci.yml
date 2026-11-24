@@ -87,6 +87,8 @@ jobs:
 
       - name: Summarize distributional capability fixture
         run: cargo run -p sympoetic-bench -- summarize-capability-strata --input docs/benchmarks/sympoetic/fixtures/distributional-capability.example.json --draws 2000 --seed 42
+      - name: Summarize group capability after AI withdrawal
+        run: cargo run -p sympoetic-bench -- summarize-team-retention --input docs/benchmarks/sympoetic/fixtures/team-retention-synthetic-v0.1.tsv --draws 2000 --seed 42
 
   governance:
     name: Governance Check (Class A/B Changes)
