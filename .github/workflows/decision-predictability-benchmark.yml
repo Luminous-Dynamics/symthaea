@@ -7,6 +7,7 @@ on:
       - "research/decision-predictability-benchmark/**"
       - ".github/workflows/decision-predictability-benchmark.yml"
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "research/decision-predictability-benchmark/**"
       - ".github/workflows/decision-predictability-benchmark.yml"
