@@ -936,12 +936,7 @@ fn validate_declared_actions(
     if actions.len() == 1 && actions[0] == RevisionActionV1::Other {
         return Ok(None);
     }
-    let delta = derive_edit_delta(
-        draft_prediction,
-        final_prediction,
-        draft_score,
-        final_score,
-    )?;
+    let delta = derive_edit_delta(draft_prediction, final_prediction, draft_score, final_score)?;
     let mut checked = false;
 
     for action in actions {
@@ -1000,8 +995,7 @@ fn boundary_mae(score: &TemporalGroundingScoreV1, start: bool) -> Option<f64> {
 
 fn signed_usize_delta(after: usize, before: usize) -> Result<i64, String> {
     if after >= before {
-        i64::try_from(after - before)
-            .map_err(|_| "revision count delta exceeds i64".to_string())
+        i64::try_from(after - before).map_err(|_| "revision count delta exceeds i64".to_string())
     } else {
         i64::try_from(before - after)
             .map(|delta| -delta)
@@ -1644,11 +1638,8 @@ mod tests {
         let report = audit_revision_v2(&case).unwrap();
         assert_eq!(report.declared_actions_consistent, Some(true));
 
-        case.final_prediction = raw_prediction(
-            &case.truth.artifact,
-            "query-v2",
-            vec![interval(500, 600)],
-        );
+        case.final_prediction =
+            raw_prediction(&case.truth.artifact, "query-v2", vec![interval(500, 600)]);
         let report = audit_revision_v2(&case).unwrap();
         assert_eq!(report.declared_actions_consistent, Some(false));
     }
@@ -1673,11 +1664,8 @@ mod tests {
                 > 0.0
         );
 
-        case.final_prediction = raw_prediction(
-            &case.truth.artifact,
-            "query-v2",
-            vec![interval(80, 210)],
-        );
+        case.final_prediction =
+            raw_prediction(&case.truth.artifact, "query-v2", vec![interval(80, 210)]);
         let report = audit_revision_v2(&case).unwrap();
         assert_eq!(report.declared_actions_consistent, Some(false));
     }
