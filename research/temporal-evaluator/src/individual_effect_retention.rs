@@ -353,7 +353,10 @@ fn validate_branch(
         }
     }
     match branch.disposition {
-        BranchDisposition::Applied { realized_utility_units, .. } => Ok(realized_utility_units),
+        BranchDisposition::Applied {
+            applied_at_us,
+            realized_utility_units,
+        } => Ok((realized_utility_units, applied_at_us)),
         BranchDisposition::NotApplied { terminal_at_us, reason } => {
             Err(IndividualEffectError::BranchNotApplied {
                 pair_id: context.pair_id,
@@ -487,18 +490,20 @@ pub fn evaluate_individual_effect_retention(
             });
         }
 
-        let realized_baseline = validate_branch(
+        let (realized_baseline, baseline_applied_at_us) = validate_branch(
             context,
             &pair.baseline,
             &context.baseline_action_id,
         )?;
-        let realized_alternative = validate_branch(
+        let (realized_alternative, alternative_applied_at_us) = validate_branch(
             context,
             &pair.alternative,
             &context.alternative_action_id,
         )?;
 
         let realized_effect = signed_effect(realized_alternative, realized_baseline);
+        let application_time_delta_us =
+            i128::from(alternative_applied_at_us) - i128::from(baseline_applied_at_us);
         let latent_effect = signed_effect(
             pair.alternative.latent_predicted_utility_units,
             pair.baseline.latent_predicted_utility_units,
