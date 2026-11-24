@@ -1,0 +1,38 @@
+name: PCIR Posterior Draw Cohort Evaluator
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, edited]
+    branches: ["research/posterior-coupled-individual-rollouts-v0-1-20261124"]
+    paths:
+      - "research/temporal-evaluator/**"
+      - "docs/research/PCIR_POSTERIOR_DRAW_COHORT_V0_1.md"
+      - ".github/workflows/pcir-posterior-draw-cohort.yml"
+  push:
+    branches: ["research/pcir-posterior-draw-cohort-v0-1-20261124"]
+    paths:
+      - "research/temporal-evaluator/**"
+      - "docs/research/PCIR_POSTERIOR_DRAW_COHORT_V0_1.md"
+      - ".github/workflows/pcir-posterior-draw-cohort.yml"
+
+concurrency:
+  group: pcir-posterior-draw-cohort-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  evaluator:
+    name: Rust 1.96 PCIR evaluator
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up pinned Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          components: clippy, rustfmt
+      - name: Check changed-module formatting
+        run: rustfmt --edition 2024 --check research/temporal-evaluator/src/posterior_draw_cohort.rs
+      - name: Test exact evaluator package
+        run: cargo test --locked --manifest-path research/temporal-evaluator/Cargo.toml
+      - name: Strict Clippy
+        run: cargo clippy --locked --manifest-path research/temporal-evaluator/Cargo.toml --all-targets -- -D warnings
