@@ -605,7 +605,7 @@ mod tests {
             assert!(split.test_labels.iter().any(|label| label == "A"));
             assert!(split.test_labels.iter().any(|label| label == "B"));
             for group in &test {
-                *held_out_counts.entry((*group).clone()).or_insert(0) += 1;
+                *held_out_counts.entry(group.to_string()).or_insert(0) += 1;
             }
         }
         assert_eq!(held_out_counts.len(), 6);
