@@ -200,6 +200,33 @@ Issue #13488 specifies a separate, source-bound photobiological exposure ledger 
 
 The first controlled fungal study should include dark/ambient and low-exposure imaging controls, species-appropriate spectral bands, calibrated irradiance levels, continuous versus fractionated schedules at equal integrated fluence, temperature/handling shams, randomized independent cultivation units and post-exposure recovery observations. Such work requires qualified mycologists and approved protocols. PhotoFiTT and the cited fungal studies provide research design precedents, not universal Mycelial safe-dose thresholds.
 
+#### Observer-effect benchmark
+
+The microscope itself must be included in the causal graph. The acquisition policy is a treatment assignment, not just a logging covariate.
+
+Design a randomized, cultivation-unit-level comparison with:
+- dark/ambient reference;
+- handling/device sham with no added optical exposure;
+- the lowest experimentally validated imaging exposure;
+- one or more higher, still laboratory-approved exposure patterns;
+- continuous and fractionated schedules matched on integrated fluence;
+- species-appropriate spectral bands and photoperiod phase.
+
+Keep all fields, frames and follow-up observations from one cultivation unit in the same partition. Do not repeatedly expose the same specimen to sequential conditions and then treat the observations as independent; cumulative carry-over requires a separately randomized sequence/crossover design with a justified washout period.
+
+Predeclare a smallest biologically relevant change separately for hyphal extension, branching, cordogenesis, conidiation, viability, ROS and each metabolite. Use blinded/manual or orthogonal assay measurements where possible, and record when the endpoint assay itself requires illumination. A dark reference must not be scored using an unrecorded optical procedure that silently reintroduces the treatment.
+
+Proposed metrics and gates:
+- **Observer-effect detection:** detect a predeclared exposure-induced endpoint shift with sensitivity ≥95% at ≤5% false alerts on a synthetic known-effect suite; these are software test targets, not biological performance.
+- **False neutrality:** ≤5% of held-out treatment contrasts may be labelled “biologically negligible” when the independently measured effect exceeds the preregistered equivalence margin.
+- **Equivalence, not non-significance:** an imaging protocol may be called endpoint-neutral only when a prespecified equivalence test places its confidence interval wholly inside the biologically justified margin. A non-significant difference alone is insufficient.
+- **Matched-fluence discrimination:** predict endpoint differences between continuous and fractionated schedules on held-out cultivation units, even when integrated fluence is equal.
+- **Dose-response calibration:** report endpoint-specific predictive intervals and calibration by species, strain, developmental stage, hydration and photoperiod phase.
+- **Acquisition interference regret:** compare downstream morphogenesis/transport prediction error when illumination history is omitted versus included, using the same frozen holdout units.
+- **Decision policy:** at equal specimen-health and acquisition budgets, minimize both biological observer-effect and downstream decision regret; report both rather than hiding one in a composite score.
+
+The target is not “zero light effect” by assumption. It is to know when the microscope has changed the biology, which endpoints moved, and whether the resulting observations remain suitable for the scientific question.
+
 PhotoFiTT (Del Rosario et al., *Nature Communications*, 13 December 2025; https://doi.org/10.1038/s41467-025-66209-6) provides an important methodological reason not to reduce specimen illumination to one integrated dose number. In mammalian-cell confocal experiments, longer low-intensity scans produced greater mitotic delay than shorter high-intensity scans at the same total light dose. This supports treating irradiance and continuous illumination duration as separate dimensions, and recovery as a variable to test. It does **not** provide fungal phototoxicity thresholds; none of its numerical values should be copied into Mycelial policy. Fungal-specific dose-response and recovery experiments are required before any instrument actuation could be considered.
 
 Reproducible fluorescence microscopy guidance also emphasizes irradiance at the sample plane and illumination pattern, rather than nominal lamp power alone: https://doi.org/10.1038/s41592-021-01156-w.
