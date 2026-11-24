@@ -270,6 +270,7 @@ class MaceLongMemEvalV2IngressTests(unittest.TestCase):
             candidate_jsonl = json.dumps(candidate, sort_keys=True, separators=(",", ":"))
             candidate_set_sha256 = memory._candidate_set_digest_from_records([candidate])
             response = {
+                "retrieval_mode": "hybrid_bm25_entity_literal_with_original_image_evidence",
                 "candidate_evidence_jsonl": candidate_jsonl,
                 "candidate_record_count": 1,
                 "candidate_set_sha256": candidate_set_sha256,
