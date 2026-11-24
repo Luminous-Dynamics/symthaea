@@ -29,9 +29,9 @@ The database separately stores the ordered memory-ID array, the receipt payload,
 
 The current local chain is:
 
-`Add transaction → committed source/projection → Search snapshot → receipt commit → Search response`
+`Add transaction → committed source/projection → Search snapshot → receipt commit → handler returns Search response`
 
-This closes one gap: a later evaluation can correlate a decision with the exact Search response available to the client, without trusting the model's self-reported citations.
+The receipt proves the service prepared and committed a digest record for the response before the handler returned. It does **not** prove the network delivered the response to the client, that the reader consumed it, or that it influenced a decision. A later evaluation can correlate a captured request/response with the internal receipt by recomputing the request, ordered-ID and response digests; the receipt alone is not proof of reader exposure.
 
 It does **not** yet establish that a retrieved memory was admitted by Mycelix rights/authority policy, that the reader actually attended to it, that it changed the decision, or that it improved the outcome. Those require separate qualification, reader-use evidence, paired counterfactual intervention and outcome receipts.
 
