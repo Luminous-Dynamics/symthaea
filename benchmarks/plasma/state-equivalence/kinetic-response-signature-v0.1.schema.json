@@ -8,7 +8,6 @@
     "schema_version",
     "fixture_id",
     "status",
-    "normalization_scale",
     "pairwise_tolerance",
     "states",
     "expected_pairwise_comparisons",
@@ -24,10 +23,6 @@
     },
     "status": {
       "const": "synthetic_analytic_only"
-    },
-    "normalization_scale": {
-      "type": "number",
-      "exclusiveMinimum": 0
     },
     "pairwise_tolerance": {
       "type": "number",
