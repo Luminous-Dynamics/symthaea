@@ -489,7 +489,8 @@ mod tests {
     fn rejects_mixed_decision_state_bindings() {
         let first = offer(RetrievalActionKindV1::Bm25Lexical, TEMPLATE_A, 100, 0, 0, 0);
         let mut second = offer(RetrievalActionKindV1::EntityLiteral, TEMPLATE_B, 90, 0, 0, 0);
-        second.decision_state_sha256 = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_owned();
+        second.decision_state_sha256 =
+            "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_owned();
         assert_eq!(
             select_next_retrieval_action_v1(&[first, second], &policy(), state()),
             Err(RetrievalControllerRejectV1::MixedDecisionState)
@@ -504,10 +505,17 @@ mod tests {
             select_next_retrieval_action_v1(&[candidate], &policy(), state()),
             Err(RetrievalControllerRejectV1::InvalidOfferDigest)
         );
+
+        let mut candidate = offer(RetrievalActionKindV1::Bm25Lexical, TEMPLATE_A, 100, 0, 0, 0);
+        candidate.action_template_sha256 = "not-a-digest".to_owned();
+        assert_eq!(
+            select_next_retrieval_action_v1(&[candidate], &policy(), state()),
+            Err(RetrievalControllerRejectV1::InvalidOfferDigest)
+        );
     }
 
     #[test]
-    fn rejects_duplicate_identical_offers() {
+    fn rejects_duplicate_action_identity_with_conflicting_estimates() {
         let candidate = offer(RetrievalActionKindV1::Bm25Lexical, TEMPLATE_A, 100, 0, 0, 0);
         let same_action_with_conflicting_estimate =
             offer(RetrievalActionKindV1::Bm25Lexical, TEMPLATE_A, 120, 0, 0, 0);
@@ -557,7 +565,8 @@ mod tests {
         changed.expected_regret_reduction_micros -= 1;
         assert_ne!(original.offer_sha256(), changed.offer_sha256());
         changed = original.clone();
-        changed.decision_state_sha256 = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_owned();
+        changed.decision_state_sha256 =
+            "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_owned();
         assert_ne!(original.offer_sha256(), changed.offer_sha256());
     }
 }
