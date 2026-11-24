@@ -268,12 +268,12 @@ jobs:
             and .environment.mathlib_revision == "6ebcce37335bcb6bca64596e5d57bb3035648030"
             and .proof_source.sha256 == "720875c1096f615d966bb45f194a4e99ec910f1bfe1423fae4cc9390b3b19d79"
             and (.certificates | length) == 6
-            and ([.certificates[].role] == ["local_context_entails_global", "global_context_entails_local", "context_equivalence", "warrant_local_to_global", "warrant_global_to_local", "warrant_transport_equivalence"])' \\
+            and ([.certificates[].role] == ["local_context_entails_global", "global_context_entails_local", "context_equivalence", "warrant_local_to_global", "warrant_global_to_local", "warrant_transport_equivalence"])' \
             docs/research/MATH_SCOPE_EQUIVALENCE_TIER2_AND_COMM_V1.json >/dev/null
           jq -e '."$schema" == "https://json-schema.org/draft/2020-12/schema"
             and .properties.status.const == "kernel_replay_pending"
             and .properties.certificates.minItems == 6
-            and .properties.certificates.maxItems == 6' \\
+            and .properties.certificates.maxItems == 6' \
             docs/research/MATH_SCOPE_EQUIVALENCE_TIER2_AND_COMM_V1.schema.json >/dev/null
           echo "SCOPE_EQUIVALENCE_TIER2_MANIFEST_PASS"
 
