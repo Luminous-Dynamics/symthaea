@@ -51,3 +51,40 @@ Important distinction: the paper's `cartpole.swingup` result is an environment-e
 
 No DMC benchmark execution or Symthaea model-side result is claimed by the pilot contract.
 
+
+
+## Posterior-coupled individual effect cohorts
+
+The module \`src/posterior_draw_cohort.rs\` consumes #13520's existing
+\`individual_effect_retention\` pair evaluator once per supplied posterior draw.
+It does not train or sample a posterior and does not create another branch
+verifier or effect scorer.
+
+For each individual and frozen action pair:
+- both sibling predictions must bind the exact same posterior draw ID and digest;
+- the actual baseline/alternative run IDs, applied times, realized outcomes,
+  factual history, restored state and exogenous-forcing manifest must remain
+  fixed across all posterior draws;
+- draw-conditioned latent and imagined predictions may vary;
+- posterior weights must sum exactly to 1,000,000 integer PPM;
+- the result remains per individual; posterior draws never become independent
+  observations or bootstrap clusters.
+
+The output retains latent-readout and imagined-rollout effect distributions
+separately, including weighted empirical 5th/50th/95th quantiles, sign mass,
+weighted effect numerators and weighted absolute-error numerators. Quantiles
+are descriptive summaries of the supplied finite sample set, **not calibrated
+credible intervals or causal identified sets**.
+
+The module does not authenticate receipt bytes, establish posterior calibration,
+perform statistical inference, infer structural mechanisms, authorize actions,
+or certify physical safety. The trusted evaluator launcher must still validate
+the existing #13377/Symtropy pairing evidence and #9437 process isolation.
+
+Exact-head qualification:
+
+\`\`\`bash
+rustfmt --edition 2024 --check research/temporal-evaluator/src/posterior_draw_cohort.rs
+cargo test --locked --manifest-path research/temporal-evaluator/Cargo.toml
+cargo clippy --locked --manifest-path research/temporal-evaluator/Cargo.toml --all-targets -- -D warnings
+\`\`\`
