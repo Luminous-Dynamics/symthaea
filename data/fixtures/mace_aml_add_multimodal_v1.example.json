@@ -1,0 +1,23 @@
+{
+  "request_id": "eval:run_demo:multimodal:conv-0:chunk-0",
+  "messages": [
+    {
+      "role": "user",
+      "timestamp": 1795492800000,
+      "content": [
+        {
+          "type": "text",
+          "text": "Please remember this reference image."
+        },
+        {
+          "type": "image_url",
+          "image_url": {
+            "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/pYsAAAAASUVORK5CYII="
+          }
+        }
+      ]
+    }
+  ],
+  "user_id": "eval:run_demo:multimodal:conv-0",
+  "session_id": "eval:run_demo:sample-0"
+}
