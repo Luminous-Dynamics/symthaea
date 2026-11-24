@@ -99,7 +99,11 @@ The companion JSON fixtures cover:
 
 The Rust module has 27 deterministic unit tests covering snapshot kind/version, mask, plugin/RNG completeness, wrapper state, rest symmetry, action/run uniqueness, prefix identity and tolerance, fresh-process replay, exogenous schedule and legal branch divergence. These tests validate the finite contract only; they are not dm_control simulation results.
 
-The Rust validator does not execute dm_control or prove that a Python adapter captured the declared bytes. A pinned Python smoke harness must generate the state/replay records; the exact-head Rust workflow qualifies the finite manifest admission.
+A separate pinned Python smoke harness lives at tools/dmc-restore-smoke/restore_smoke.py. The dedicated workflow installs the exact dm_control source commit and MuJoCo 4.0.1, then runs two separate Python invocations: process A exports a real cartpole.swingup integration-state snapshot and expected one-step continuation; process B creates a fresh environment, restores the integration state, task RandomState and wrapper fields, checks the factual-prefix observation, applies the same next action and compares the next state/observation/reward/step counters. The harness also demonstrates that the legacy compact state does not restore a deliberately modified full integration state and that Physics.copy(share_model=False) does not alias MjData.
+
+The smoke harness covers the deterministic cartpole task only. It does not claim restoration of sensor-noise RNG state (sensor noise is disabled for this lane), every possible task-private mutable field, arbitrary plugins, all platforms, or stochastic event correspondence. Those remain explicit unsupported/extension lanes until individually exercised.
+
+The Rust validator does not execute dm_control or prove that every possible Python object field has been captured. The pinned Python smoke harness exercises the declared adapter path; the exact-head Rust workflow qualifies the finite manifest admission. Both are necessary and neither alone proves broad DMC paper replication.
 
 ## 7. Ownership and claim boundary
 
