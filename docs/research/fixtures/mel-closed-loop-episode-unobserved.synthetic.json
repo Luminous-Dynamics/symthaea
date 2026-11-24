@@ -78,7 +78,8 @@
       "receipt_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
       "verifier_profile_id": "action-effect-v1",
       "verification_receipt_sha256": "5656565656565656565656565656565656565656565656565656565656565656"
-    }
+    },
+    "capture_id": "capture-003"
   },
   "capture": {
     "capture_id": "capture-003",
