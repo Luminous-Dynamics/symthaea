@@ -384,7 +384,7 @@ For the three-cycle longitudinal *Agaricus* series, leave-one-cycle-out evaluati
 | System | Established strength | Symthaea strategy |
 |---|---|---|
 | ZEISS arivis | Multidimensional image analysis, 3D/4D workflows and AI-assisted segmentation | Import exports and preserve source/calibration evidence; add hypothesis adequacy and downstream functional qualification |
-| Imaris | Mature 3D/4D visualization, segmentation and quantitative microscopy workflows | Interoperate with its outputs; do not rebuild its visualization stack |
+| Imaris 11.1 | Mature 3D/4D visualization, segmentation, CZI import, Training Hub, workflow transparency and statistical export | Interoperate with its outputs and validate provenance/measurement semantics; do not rebuild its viewer, file reader or training hub |
 | Fiji SNT | Open, scriptable multidimensional tracing and time-lapse analysis | Use as a reproducible tracing baseline and preserve tracing provenance |
 | Fungal Network Analysis | Fungal-specific image processing, skeletonization, width estimation and weighted graph construction | Reproduce its pipeline; compare connectivity-preserving reconstruction and functional prediction |
 | SkelPy | GUI-based fungal skeletonization, customizable preprocessing, manual trace comparison and high-throughput image processing | Reproduce its skeleton-distance and runtime/memory measures; add topology, uncertainty and independent functional endpoints rather than comparing unlike metrics |
