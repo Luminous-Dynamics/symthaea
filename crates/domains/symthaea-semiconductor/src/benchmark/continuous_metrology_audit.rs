@@ -1020,15 +1020,14 @@ mod tests {
         report
     }
 
-    fn graph_and_cutoff(full_census: bool) -> (ProcessEventGraphV1, PredictionInformationCutoffV1) {
-        let selected: Vec<usize> = if full_census {
-            (0..8).collect()
-        } else {
-            vec![0, 1, 2, 4, 5, 6]
-        };
+    fn graph_and_cutoff(
+        selected: &[usize],
+    ) -> (ProcessEventGraphV1, PredictionInformationCutoffV1) {
         let mut events = Vec::new();
         let mut labels = Vec::new();
-        for (sequence, index) in selected.into_iter().enumerate() {
+        let mut ordered = selected.to_vec();
+        ordered.sort_unstable();
+        for (sequence, index) in ordered.into_iter().enumerate() {
             let event_id = format!("event-{index:02}");
             events.push(ProcessEventV1 {
                 event_id: event_id.clone(),
@@ -1075,8 +1074,7 @@ mod tests {
         )
     }
 
-    fn input(full_census: bool) -> ContinuousMetrologyAuditInputV1 {
-        let selection = selection(full_census);
+    fn input_from_selection(selection: MetrologyAuditSelectionReportV1) -> ContinuousMetrologyAuditInputV1 {
         let predictions = predictions();
         let frame_id = "film-thickness-frame-2026w47".to_string();
         let frame_sha256 = compute_continuous_audit_frame_sha256_v1(
@@ -1110,7 +1108,7 @@ mod tests {
                 }
             })
             .collect();
-        let (graph, cutoff) = graph_and_cutoff(full_census);
+        let (graph, cutoff) = graph_and_cutoff(&selected_indices);
         ContinuousMetrologyAuditInputV1 {
             schema: CONTINUOUS_AUDIT_INPUT_SCHEMA_V1.into(),
             input_id: "continuous-audit-input-v1".into(),
@@ -1125,6 +1123,37 @@ mod tests {
             graph,
             cutoff,
         }
+    }
+
+    fn input(full_census: bool) -> ContinuousMetrologyAuditInputV1 {
+        input_from_selection(selection(full_census))
+    }
+
+    fn input_for_audit_draw(audit_indices: &[usize]) -> ContinuousMetrologyAuditInputV1 {
+        let mut selected = selection(false);
+        for row in &mut selected.rows {
+            if row.method == MetrologySelectionMethodV1::DeterministicExploit {
+                continue;
+            }
+            let index = row
+                .candidate_id
+                .strip_prefix("candidate-")
+                .unwrap()
+                .parse::<usize>()
+                .unwrap();
+            if audit_indices.contains(&index) {
+                row.method = MetrologySelectionMethodV1::RandomizedAudit;
+                row.selected = true;
+            } else {
+                row.method = MetrologySelectionMethodV1::NotSelected;
+                row.selected = false;
+            }
+        }
+        selected.randomized_audit_count = audit_indices.len();
+        selected.audit_cost_used = audit_indices.len() as u64;
+        selected.total_selected_cost = selected.exploit_cost_used + selected.audit_cost_used;
+        selected.selection_sha256 = selection_digest(&selected).unwrap();
+        input_from_selection(selected)
     }
 
     #[test]
@@ -1262,6 +1291,62 @@ mod tests {
         let report = outcome.eligibility_report.as_mut().unwrap();
         report.report_sha256 = label_report_digest(report).unwrap();
         assert!(estimate_continuous_metrology_audit_v1(&tampered).is_err());
+    }
+
+    #[test]
+    fn exhaustive_srswor_draws_are_design_unbiased_for_ht_and_model_assisted_mae() {
+        let combinations = [[1_usize, 2_usize], [1, 3], [2, 3]];
+        let census = estimate_continuous_metrology_audit_v1(&input(true)).unwrap();
+        let exact = census.estimated_mean_absolute_error_ht.unwrap();
+
+        let mut ht_estimates = Vec::new();
+        let mut model_assisted_estimates = Vec::new();
+        let mut ht_variances = Vec::new();
+        let mut model_assisted_variances = Vec::new();
+
+        for left in combinations {
+            for right in [[5_usize, 6_usize], [5, 7], [6, 7]] {
+                let audit = [left[0], left[1], right[0], right[1]];
+                let report =
+                    estimate_continuous_metrology_audit_v1(&input_for_audit_draw(&audit)).unwrap();
+                assert_eq!(report.status, ContinuousAuditStatusV1::Complete);
+                ht_estimates.push(report.estimated_mean_absolute_error_ht.unwrap());
+                model_assisted_estimates
+                    .push(report.estimated_mean_absolute_error_model_assisted.unwrap());
+                ht_variances.push(
+                    report
+                        .standard_error_mean_absolute_error_ht
+                        .unwrap()
+                        .powi(2),
+                );
+                model_assisted_variances.push(
+                    report
+                        .standard_error_mean_absolute_error_model_assisted
+                        .unwrap()
+                        .powi(2),
+                );
+            }
+        }
+
+        let mean = |values: &[f64]| values.iter().sum::<f64>() / values.len() as f64;
+        assert!((mean(&ht_estimates) - exact).abs() < 1.0e-12);
+        assert!((mean(&model_assisted_estimates) - exact).abs() < 1.0e-12);
+
+        let actual_ht_sampling_variance = ht_estimates
+            .iter()
+            .map(|estimate| (estimate - exact).powi(2))
+            .sum::<f64>()
+            / ht_estimates.len() as f64;
+        let actual_model_assisted_sampling_variance = model_assisted_estimates
+            .iter()
+            .map(|estimate| (estimate - exact).powi(2))
+            .sum::<f64>()
+            / model_assisted_estimates.len() as f64;
+        assert!((mean(&ht_variances) - actual_ht_sampling_variance).abs() < 1.0e-12);
+        assert!(
+            (mean(&model_assisted_variances) - actual_model_assisted_sampling_variance).abs()
+                < 1.0e-12
+        );
     }
 
     #[test]
