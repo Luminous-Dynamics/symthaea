@@ -17,7 +17,7 @@ This crate implements the missing HTTP/storage boundary behind the frozen Add/Se
 - Deterministic lexical BM25 ranking with a stable memory-ID tie-break; Search returns source memory records only, not a generated answer.
 - Original ordered multimodal content parts and their Base64 data URIs are stored unchanged. JPEG/PNG/WebP signatures and decoded per-image / aggregate payload limits are checked at ingress.
 - A 48 MiB HTTP body bound, top-k bound of 100, and non-negative timestamp validation.
-- Thirteen focused Rust unit tests authored for read-after-write, duplicate retry, changed-payload conflict, user isolation, top-k rejection, media-signature validation, file-backed reopen recovery, concurrent duplicate retries, strict optional timestamp handling, Unicode schema-length semantics, and Search receipt verification for populated and empty results.
+- Fourteen focused Rust unit tests authored for read-after-write, duplicate retry, changed-payload conflict, user isolation, top-k rejection, media-signature validation, file-backed reopen recovery, concurrent duplicate retries, strict optional timestamp handling, Unicode schema-length semantics, Search receipt verification for populated and empty results, and fail-closed behavior when receipt persistence fails.
 
 ## Run locally
 
