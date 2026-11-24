@@ -77,7 +77,7 @@ pub struct RobustProbeValue {
     pub acquisition_cost_units: f64,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum RobustEvaluationError {
     EmptyStateSet,
     EmptyDecisionSet,
