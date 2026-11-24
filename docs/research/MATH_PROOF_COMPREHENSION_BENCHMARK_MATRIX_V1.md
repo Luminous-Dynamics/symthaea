@@ -227,3 +227,11 @@ The [Explorable Proofs UIST 2026 study](https://arxiv.org/abs/2604.02598) is an 
 - Proof explanation evaluation must include independent expert ratings and the LLM-judge alignment gap.
 - Human comparisons must distinguish immediate comprehension from delayed cross-family transfer.
 - No SOTA win is claimed from the four-declaration extraction sample, synthetic 1/1 CIRR arithmetic, or an unpowered human feasibility pilot.
+
+## 11. HDC/CfC readiness and comparison requirements
+
+The inspected current source snapshot Luminous-Dynamics/symthaea@bc915c485402eaf955370eb09cffb6e4fad09e82 contains a general-purpose HDC CodeHDEncoder and a stateful CfC network with forward(input, dt) / BPTT APIs. It does not establish that a Lean elaborated ProofPlanV1 adapter or proof-transition CfC head already exists: the inspected Broca StructuralGenerator is still a mock and describes its CfC head as future work. The cfc_gpu.rs WGPU path is a placeholder (is_gpu_available false; Auto resolves to CPU), so initial benchmarks must report CPU execution.
+
+The HDC/CfC study must introduce a typed Lean/ProofPlan adapter, binder-normalized alpha-equivalent AST inputs, exact evidence IDs outside vector similarity, and a declared fixed-dimension projection from HDC to CfC input. CfC must be compared against parameter-matched MLP, GRU, LSTM and temporal-convolution baselines. Use unit dt in the primary discrete proof-plan task; irregular dt is a separate controlled experiment, not wall-clock timing leakage. See the implementation-readiness and adapter contract in MATH_PROOF_COMPREHENSION_HDC_CFC_ABLATION_V1.md, issue #13440.
+
+These constraints materially change the claim boundary: available HDC/CfC components are not evidence of an integrated mathematical proof-comprehension system, and no accuracy/latency/GPU advantage is claimed.

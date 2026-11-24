@@ -82,3 +82,52 @@ If HDC/CfC do not beat matched baselines, retain the negative result and do not 
 ## 8. Additional mandatory transformation baseline (2026-11-24)
 
 Use the expert-authored equivalent-reformulation controls from [MathAdv](https://arxiv.org/abs/2608.25449) as an adjacent baseline. Keep its equivalent presentation transformations separate from our semantic mutations: alpha-renaming/reordering/equivalent rewrites should preserve semantic disposition, while changed domains, removed assumptions, reversed warrants and changed definitions should trigger their appropriate changed/unknown dispositions. Report invariance and mutation sensitivity separately; a model that is invariant to every change is just as defective as one that changes under harmless renaming.
+
+## 9. Implementation-readiness audit — pin the real adapter boundary (2026-11-24)
+
+The current main-branch code snapshot inspected for this audit is Luminous-Dynamics/symthaea@bc915c485402eaf955370eb09cffb6e4fad09e82. This is a source-code audit, not a benchmark execution.
+
+### What exists and what does not
+
+**HDC source-structure encoder exists.** src/hdc/code_encoder.rs defines CodeHDEncoder and encodes parsed code entities using role vectors, name vectors, annotations, ordered child positions and relation triples. It is a useful architectural starting point for compositional proof-plan encoding. It is not yet a Lean elaborated-AST / ProofPlanV1 adapter. Its encode_name path lowercases names and uses byte n-grams; raw variable identifiers therefore remain representation-sensitive. The alpha-renaming arm must use a binder-normalized typed representation (e.g. binder positions/indices) before HDC encoding, not expect the current character-name encoder to be invariant automatically.
+
+**A CfC sequence network exists.** src/dynamics/cfc/network.rs exposes stateful forward(input, dt), forward_sequence(inputs, dts), state reset/state access, BPTT sequence training, and deterministic from_genesis initialization. This can support a proof-plan trajectory experiment, but no evidence yet shows that a proof-plan transition task has been wired into this network. The runner must assert inputs.len() == dts.len() before calling forward_sequence, because that forward path truncates to the shorter sequence; BPTT training performs explicit length checks.
+
+**The inspected Broca structural generator is not the proof-plan adapter.** crates/domains/symthaea-broca/src/structural_generator.rs says that a specialized CfC head is for "real use", contains a mock two-node synthesis path, and derives its example HDC vector from value hash and source line rather than a parsed mathematical/Lean structure. Do not cite this file as evidence that mathematical proof-plan generation already uses HDC+CfC.
+
+**The WGPU CfC backend is not a GPU result.** src/dynamics/cfc_gpu.rs reports is_gpu_available() == false, describes WGPU as a placeholder and resolves Auto to CPU. Any initial HDC/CfC result must report the CPU backend. No GPU speed or acceleration claim is permitted until a real WGPU kernel path and an independently measured hardware receipt exist.
+
+### Required proof-specific adapters
+
+1. **Formal AST → typed proof-state record.** Preserve source/theorem identity outside the vector representation. Parse elaborated goals, binder scopes, hypotheses, local context, action, side conditions, subgoals, invariant and exact evidence IDs. Never collapse theorem identity into approximate vector similarity.
+2. **Typed proof-state record → HDC.** Use role vectors for goal, hypothesis, premise, warrant, action, side_condition, subgoal, invariant and evidence; relation vectors for uses, discharges, produces, preserves, specializes, rewrites and depends_on. Normalize bound-variable names before encoding. Keep the reversible/approximate HDC representation as a candidate-retrieval feature, not a truth authority.
+3. **HDC state → fixed-dimension CfC input.** HDC's default HDC_DIMENSION is 16,384 while the default CfC network input dimension is 64. Specify and freeze a projection (including seed, matrix digest and precision) or a directly matched lower-dimensional HDC configuration. The projection, hidden state, parameter count and compute cost must be shared or explicitly matched across baselines.
+4. **ProofPlanV1 trajectory → CfC.** Encode the current proof state and predict a semantic transition: action class, warrant/evidence consumed, side conditions and subgoal structure. Do not train only on tactic strings or token continuation. Use from_genesis for deterministic initialization and record the seed.
+5. **Time semantics.** A proof plan is a sequence of discrete logical events; elapsed model wall-clock time is not automatically a mathematical time variable. Primary transition ablations should use a preregistered unit-step dt=1 or a clearly defined domain-specific event-time measure. Test irregular dt as a separate intervention. Do not feed hardware/network latency into the CfC time constant and call resulting gains mathematical reasoning.
+
+### Stronger baseline factorial
+
+In addition to retrieval arms A–I already listed above, the transition-reconstruction study must compare:
+
+- static HDC embedding + symbolic retrieval;
+- a parameter-matched MLP over the same per-state features (no recurrent state);
+- GRU and LSTM sequence baselines with the same input features and parameter budget;
+- a temporal convolution / fixed-window baseline;
+- CfC with fixed unit dt;
+- CfC with controlled irregular dt;
+- HDC + each sequence model, including HDC+GRU and HDC+CfC;
+- the symbolic/Lean-constrained hybrid.
+
+The key CfC claim is not "continuous time is more biologically plausible." It is: **at matched inputs, training data, parameter count and compute, does explicit continuous-time state evolution improve held-out transition reconstruction or robustness to irregular event intervals?** A negative result is a valid result.
+
+### Mandatory acceptance gates before a model run
+
+- A compiler-checked adapter with deterministic fixtures for at least 25 proof-plan transitions across 5 held-out theorem families.
+- Binder-renaming / alpha-normalization metamorphic controls and short-name collisions.
+- Sequence-shuffle controls: the transition model should detect order changes when the proof plan is order-sensitive.
+- Context permutation controls: exact logical disposition should remain stable under a semantics-preserving reorder.
+- Missing-assumption and reversed-warrant controls must fail through symbolic/Lean authority even if HDC/CfC predicts a high-similarity state.
+- No-training and trained conditions with family-level split; no random split of variants of the same theorem.
+- Exact model, seed, parameter count, projection digest, dt schedule, tokens, tool calls, p50/p95 latency, CPU/GPU identity, peak RAM/VRAM and throughput receipts.
+
+Until these adapters and gates exist, classify HDC/CfC as **available components under prospective evaluation**, not as an implemented proof-comprehension capability.
