@@ -1726,6 +1726,9 @@ pub struct SensorActuatorTimingSummary {
     pub actuator_channel_count: usize,
     pub maximum_observation_age_seconds: f64,
     pub maximum_actuator_delivery_delay_seconds: f64,
+    pub maximum_actuator_command_latency_seconds: f64,
+    pub minimum_effective_actuator_bandwidth_hz: f64,
+    pub conservative_closed_loop_latency_seconds: f64,
     pub controller_update_period_seconds: f64,
     pub controller_deadline_seconds: f64,
     pub controller_worst_case_execution_seconds: f64,
@@ -1819,6 +1822,8 @@ pub fn validate_sensor_actuator_timing_contract_value(
 
     let mut actuator_ids = BTreeSet::new();
     let mut maximum_actuator_delivery_delay_seconds = 0.0_f64;
+    let mut maximum_actuator_command_latency_seconds = 0.0_f64;
+    let mut minimum_effective_actuator_bandwidth_hz = f64::INFINITY;
     for actuator in actuators {
         let channel_id = timing_string(actuator, "channel_id")?;
         if !actuator_ids.insert(channel_id.to_owned()) {
@@ -1845,6 +1850,11 @@ pub fn validate_sensor_actuator_timing_contract_value(
         }
         maximum_actuator_delivery_delay_seconds =
             maximum_actuator_delivery_delay_seconds.max(delivery_delay);
+        maximum_actuator_command_latency_seconds = maximum_actuator_command_latency_seconds
+            .max(update_period + delivery_delay + clock_skew);
+        let command_nyquist_hz = 0.5 / update_period;
+        minimum_effective_actuator_bandwidth_hz = minimum_effective_actuator_bandwidth_hz
+            .min(bandwidth.min(command_nyquist_hz));
     }
 
     let controller_update_period = timing_number(value, "controller.update_period_seconds")?;
@@ -1891,12 +1901,28 @@ pub fn validate_sensor_actuator_timing_contract_value(
         ));
     }
 
+    let conservative_closed_loop_latency_seconds = maximum_observation_age_seconds
+        + controller_wcet
+        + maximum_actuator_command_latency_seconds;
+    if !maximum_actuator_command_latency_seconds.is_finite()
+        || !minimum_effective_actuator_bandwidth_hz.is_finite()
+        || !conservative_closed_loop_latency_seconds.is_finite()
+    {
+        return Err(control_timing_error(
+            "actuators",
+            "derived actuator and loop timing metrics must be finite",
+        ));
+    }
+
     Ok(SensorActuatorTimingSummary {
         contract_id,
         diagnostic_channel_count: diagnostics.len(),
         actuator_channel_count: actuators.len(),
         maximum_observation_age_seconds,
         maximum_actuator_delivery_delay_seconds,
+        maximum_actuator_command_latency_seconds,
+        minimum_effective_actuator_bandwidth_hz,
+        conservative_closed_loop_latency_seconds,
         controller_update_period_seconds: controller_update_period,
         controller_deadline_seconds: controller_deadline,
         controller_worst_case_execution_seconds: controller_wcet,
@@ -3899,6 +3925,9 @@ mod tests {
         assert_eq!(report.actuator_channel_count, 1);
         assert_eq!(report.maximum_observation_age_seconds, 0.04);
         assert_eq!(report.maximum_actuator_delivery_delay_seconds, 0.006);
+        assert_eq!(report.maximum_actuator_command_latency_seconds, 0.0265);
+        assert_eq!(report.minimum_effective_actuator_bandwidth_hz, 20.0);
+        assert_eq!(report.conservative_closed_loop_latency_seconds, 0.0715);
         assert_eq!(report.controller_update_period_seconds, 0.02);
     }
 
