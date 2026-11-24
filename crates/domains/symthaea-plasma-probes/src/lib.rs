@@ -2657,8 +2657,7 @@ pub fn evaluate_scalar_unstable_mode_interface(
 
     let mode_interface_qualified = observation_sample_count > 0
         && actuator_command_count > 0
-        && observability_fisher_information
-            >= contract.minimum_observability_fisher_information
+        && observability_fisher_information >= contract.minimum_observability_fisher_information
         && controllability_gramian >= contract.minimum_controllability_gramian
         && diagnostic_bandwidth_multiple >= contract.minimum_bandwidth_multiple
         && actuator_bandwidth_multiple >= contract.minimum_bandwidth_multiple
@@ -2768,8 +2767,14 @@ pub fn evaluate_oscillatory_unstable_mode_interface(
     if positive_finite
         .iter()
         .any(|value| !value.is_finite() || *value <= 0.0)
-        || contract.diagnostic_gain.iter().any(|value| !value.is_finite())
-        || contract.actuator_gain.iter().any(|value| !value.is_finite())
+        || contract
+            .diagnostic_gain
+            .iter()
+            .any(|value| !value.is_finite())
+        || contract
+            .actuator_gain
+            .iter()
+            .any(|value| !value.is_finite())
         || !contract.controller_execution_latency_seconds.is_finite()
         || contract.controller_execution_latency_seconds < 0.0
         || contract.diagnostic_sampling_stride_steps == 0
@@ -2804,7 +2809,8 @@ pub fn evaluate_oscillatory_unstable_mode_interface(
         ));
     }
 
-    let inverse_noise_variance = 1.0 / (contract.diagnostic_noise_std * contract.diagnostic_noise_std);
+    let inverse_noise_variance =
+        1.0 / (contract.diagnostic_noise_std * contract.diagnostic_noise_std);
     if !inverse_noise_variance.is_finite() {
         return Err(control_timing_error(
             "oscillatory_mode.diagnostic_noise_std",
@@ -2825,12 +2831,10 @@ pub fn evaluate_oscillatory_unstable_mode_interface(
         let radius = exponent.exp();
         let angle = (phase_step * sample_step as f64).rem_euclid(TAU);
         let (sin_phase, cos_phase) = angle.sin_cos();
-        let c0 = radius
-            * (contract.diagnostic_gain[0] * cos_phase
-                + contract.diagnostic_gain[1] * sin_phase);
-        let c1 = radius
-            * (-contract.diagnostic_gain[0] * sin_phase
-                + contract.diagnostic_gain[1] * cos_phase);
+        let c0 =
+            radius * (contract.diagnostic_gain[0] * cos_phase + contract.diagnostic_gain[1] * sin_phase);
+        let c1 =
+            radius * (-contract.diagnostic_gain[0] * sin_phase + contract.diagnostic_gain[1] * cos_phase);
         let contribution = [
             c0 * c0 * inverse_noise_variance,
             c0 * c1 * inverse_noise_variance,
@@ -2860,7 +2864,8 @@ pub fn evaluate_oscillatory_unstable_mode_interface(
     let mut controllability_compensation = [0.0_f64; 3];
     let mut actuator_command_count = 0_u32;
     let mut command_step = 0_u32;
-    while let Some(applied_step) = command_step.checked_add(contract.actuator_delivery_delay_steps) {
+    while let Some(applied_step) = command_step.checked_add(contract.actuator_delivery_delay_steps)
+    {
         if applied_step >= contract.horizon_steps {
             break;
         }
@@ -2869,12 +2874,8 @@ pub fn evaluate_oscillatory_unstable_mode_interface(
         let radius = exponent.exp();
         let angle = (phase_step * remaining_steps as f64).rem_euclid(TAU);
         let (sin_phase, cos_phase) = angle.sin_cos();
-        let b0 = radius
-            * (cos_phase * contract.actuator_gain[0]
-                - sin_phase * contract.actuator_gain[1]);
-        let b1 = radius
-            * (sin_phase * contract.actuator_gain[0]
-                + cos_phase * contract.actuator_gain[1]);
+        let b0 = radius * (cos_phase * contract.actuator_gain[0] - sin_phase * contract.actuator_gain[1]);
+        let b1 = radius * (sin_phase * contract.actuator_gain[0] + cos_phase * contract.actuator_gain[1]);
         let contribution = [b0 * b0, b0 * b1, b1 * b1];
         if contribution.iter().any(|value| !value.is_finite()) {
             return Err(control_timing_error(
@@ -2925,8 +2926,7 @@ pub fn evaluate_oscillatory_unstable_mode_interface(
         conservative_loop_latency_seconds * contract.growth_rate_per_second;
     let diagnostic_delay_efold_fraction =
         diagnostic_delay_seconds * contract.growth_rate_per_second;
-    let actuator_delay_efold_fraction =
-        actuator_delay_seconds * contract.growth_rate_per_second;
+    let actuator_delay_efold_fraction = actuator_delay_seconds * contract.growth_rate_per_second;
     let derived = [
         observability_eigenvalues[0],
         observability_eigenvalues[1],
@@ -2950,8 +2950,7 @@ pub fn evaluate_oscillatory_unstable_mode_interface(
 
     let mode_interface_qualified = observation_sample_count > 0
         && actuator_command_count > 0
-        && observability_eigenvalues[0]
-            >= contract.minimum_observability_min_eigenvalue
+        && observability_eigenvalues[0] >= contract.minimum_observability_min_eigenvalue
         && controllability_eigenvalues[0] >= contract.minimum_controllability_min_eigenvalue
         && diagnostic_bandwidth_multiple >= contract.minimum_bandwidth_multiple
         && actuator_bandwidth_multiple >= contract.minimum_bandwidth_multiple
@@ -2978,15 +2977,19 @@ pub fn evaluate_oscillatory_unstable_mode_interface(
         actuator_delay_efold_fraction,
         minimum_required_bandwidth_multiple: contract.minimum_bandwidth_multiple,
         maximum_allowed_loop_latency_efold_fraction: contract.maximum_loop_latency_efold_fraction,
-        minimum_required_observability_min_eigenvalue: contract.minimum_observability_min_eigenvalue,
-        minimum_required_controllability_min_eigenvalue: contract.minimum_controllability_min_eigenvalue,
+        minimum_required_observability_min_eigenvalue: contract
+            .minimum_observability_min_eigenvalue,
+        minimum_required_controllability_min_eigenvalue: contract
+            .minimum_controllability_min_eigenvalue,
         mode_interface_qualified,
     })
 }
 
 fn symmetric_2x2_eigenvalues(matrix: [f64; 3]) -> [f64; 2] {
     let difference = matrix[0] - matrix[2];
-    let discriminant = difference.mul_add(difference, 4.0 * matrix[1] * matrix[1]).sqrt();
+    let discriminant = difference
+        .mul_add(difference, 4.0 * matrix[1] * matrix[1])
+        .sqrt();
     let trace = matrix[0] + matrix[2];
     let minimum = ((trace - discriminant) * 0.5).max(0.0);
     let maximum = (trace + discriminant) * 0.5;
@@ -5060,10 +5063,10 @@ mod tests {
             maximum_loop_latency_efold_fraction: controller["maximum_loop_latency_efold_fraction"]
                 .as_f64()
                 .unwrap(),
-            minimum_observability_fisher_information: controller
-                ["minimum_observability_fisher_information"]
-                .as_f64()
-                .unwrap(),
+            minimum_observability_fisher_information:
+                controller["minimum_observability_fisher_information"]
+                    .as_f64()
+                    .unwrap(),
             minimum_controllability_gramian: controller["minimum_controllability_gramian"]
                 .as_f64()
                 .unwrap(),
@@ -5111,14 +5114,14 @@ mod tests {
             maximum_loop_latency_efold_fraction: controller["maximum_loop_latency_efold_fraction"]
                 .as_f64()
                 .unwrap(),
-            minimum_observability_min_eigenvalue: controller
-                ["minimum_observability_min_eigenvalue"]
-                .as_f64()
-                .unwrap(),
-            minimum_controllability_min_eigenvalue: controller
-                ["minimum_controllability_min_eigenvalue"]
-                .as_f64()
-                .unwrap(),
+            minimum_observability_min_eigenvalue:
+                controller["minimum_observability_min_eigenvalue"]
+                    .as_f64()
+                    .unwrap(),
+            minimum_controllability_min_eigenvalue:
+                controller["minimum_controllability_min_eigenvalue"]
+                    .as_f64()
+                    .unwrap(),
         }
     }
 
@@ -5367,9 +5370,7 @@ mod tests {
             report.observability_fisher_information
                 >= report.minimum_required_observability_fisher_information
         );
-        assert!(
-            report.controllability_gramian >= report.minimum_required_controllability_gramian
-        );
+        assert!(report.controllability_gramian >= report.minimum_required_controllability_gramian);
         assert!(report.mode_interface_qualified);
     }
 
@@ -5409,9 +5410,7 @@ mod tests {
         let mut contract = scalar_unstable_mode_contract();
         contract.actuator_gain = 0.01;
         let report = evaluate_scalar_unstable_mode_interface(contract).unwrap();
-        assert!(
-            report.controllability_gramian < report.minimum_required_controllability_gramian
-        );
+        assert!(report.controllability_gramian < report.minimum_required_controllability_gramian);
         assert!(!report.mode_interface_qualified);
     }
 
@@ -5477,10 +5476,8 @@ mod tests {
         let report =
             evaluate_oscillatory_unstable_mode_interface(oscillatory_unstable_mode_contract())
                 .unwrap();
-        let expected = serde_json::from_str::<serde_json::Value>(
-            OSCILLATORY_UNSTABLE_MODE_FIXTURE,
-        )
-        .unwrap();
+        let expected =
+            serde_json::from_str::<serde_json::Value>(OSCILLATORY_UNSTABLE_MODE_FIXTURE).unwrap();
         let known = &expected["known_answers"];
         assert_eq!(report.observation_sample_count, 5);
         assert_eq!(report.actuator_command_count, 5);
@@ -5501,13 +5498,13 @@ mod tests {
         assert!(
             (report.observability_min_eigenvalue
                 - known["observability_min_eigenvalue"].as_f64().unwrap())
-                .abs()
+            .abs()
                 < 1.0e-8
         );
         assert!(
             (report.controllability_min_eigenvalue
                 - known["controllability_min_eigenvalue"].as_f64().unwrap())
-                .abs()
+            .abs()
                 < 1.0e-12
         );
         assert!((report.diagnostic_bandwidth_multiple - 5.0).abs() < 1.0e-12);
@@ -5530,7 +5527,8 @@ mod tests {
     }
 
     #[test]
-    fn oscillatory_unstable_mode_oracle_rejects_insufficient_quadrature_information_and_authority() {
+    fn oscillatory_unstable_mode_oracle_rejects_insufficient_quadrature_information_and_authority()
+    {
         let mut poor_sensor = oscillatory_unstable_mode_contract();
         poor_sensor.diagnostic_noise_std = 10.0;
         let sensor_report = evaluate_oscillatory_unstable_mode_interface(poor_sensor).unwrap();
