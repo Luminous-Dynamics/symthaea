@@ -70,6 +70,11 @@ DBOS's production checklist reports a provider benchmark of a single 16-vCPU Pos
 
 Source: [DBOS production checklist](https://docs.dbos.dev/production/checklist).
 
+
+### Tenant-scope schema audit follow-up
+
+A static review found the source-receipt relation needed tenant scope in its referential integrity, not just in application checks. The SQL contract now declares `UNIQUE (tenant_id, receipt_id)` and uses composite `(tenant_id, receipt_id)` foreign keys for both operation receipt references and receipt-revocation records. This prevents a correctly formed receipt ID from being attached to another tenant's operation or revocation row. This is a source-level correction only; it remains pending execution against PostgreSQL.
+
 ## Executed pre-PostgreSQL claim/fence model
 
 Before a real PostgreSQL runtime was available, a bounded reference model was added to test the separate claim lease and objective fence contract:
