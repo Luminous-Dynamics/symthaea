@@ -59,6 +59,22 @@ The evaluator rejects:
 
 Overlapping and nested intervals are permitted because musical events can co-occur. Exact duplicate intervals are rejected.
 
+## Cardinality-gated one-to-many metric (follow-on v1)
+
+The aggregate now reports three separate values for the one-to-many cohort (queries with more than one annotated occurrence):
+
+- **One-to-many macro temporal F1:** the existing per-query temporal F1 averaged over the cohort.
+- **One-to-many count accuracy:** the share of cohort queries whose predicted occurrence count exactly matches the annotated count.
+- **One-to-many count-gated F1:** per-query temporal F1 when the count is exact, otherwise zero, averaged over the same cohort.
+
+For query i, this is:
+
+`gated_f1_i = f1_i × 1[predicted_count_i == ground_truth_count_i]`
+
+The count gate is intentionally strict. A query with two nearby/repeated entrances cannot score as a complete retrieval by returning one broad merged interval, nor can a high-overlap extra duplicate pass as a correct event list. The original F1 and count-accuracy values remain available, so the joint score does not hide which component failed. Non-one-to-many, negative, ambiguous and not-estimable queries do not enter this cohort; an empty cohort returns `None`, not zero.
+
+This is a Melothaea-specific diagnostic, **not a claim to reproduce the ICML 2026 OMTG paper's official Effective Temporal F1**. OMTG studies video. Its relevant methodological lesson is that interval overlap alone can obscure count errors; its video leaderboard is not used as a music baseline. See https://proceedings.mlr.press/v306/xu26cc.html.
+
 ## Dataset aggregation
 
 The dataset-level aggregator rejects duplicate query IDs and mixed evaluator versions. It reports:
