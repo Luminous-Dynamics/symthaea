@@ -640,11 +640,10 @@ pub fn optimize_metrology_decision_loss_portfolio_v1(
         let mut group_counts: BTreeMap<String, u32> = BTreeMap::new();
         let mut feasible = true;
 
-        for index in 0..n {
+        for (index, report) in candidate_reports.iter().enumerate() {
             if (mask & (1_u64 << index)) == 0 {
                 continue;
             }
-            let report = &candidate_reports[index];
             if report.status != MetrologyCandidateStatusV1::Eligible
                 && report.status != MetrologyCandidateStatusV1::NonPositiveNetValue
             {
@@ -818,8 +817,7 @@ mod tests {
         cost_units: u32,
         measurement_cost: f64,
         readiness_status: MetrologyReadinessStatusV1,
-        turnaround: u64,
-        deadline: i64,
+        timing: (u64, i64),
         evidence_quality: f64,
     ) -> MetrologyCandidateV1 {
         MetrologyCandidateV1 {
@@ -831,8 +829,8 @@ mod tests {
             measurand_id: "film-thickness".into(),
             unit: "nm".into(),
             planned_measurement_at_unix_seconds: 100,
-            decision_deadline_unix_seconds: deadline,
-            turnaround_seconds: turnaround,
+            decision_deadline_unix_seconds: timing.1,
+            turnaround_seconds: timing.0,
             measurement_cost,
             measurement_cost_units: cost_units,
             readiness: readiness(readiness_status, "tool-A", "film-thickness", "nm"),
@@ -1022,8 +1020,7 @@ mod tests {
                 1,
                 0.1,
                 MetrologyReadinessStatusV1::Qualified,
-                100,
-                150,
+                (100, 150),
                 0.95,
             )],
             policy(1),
