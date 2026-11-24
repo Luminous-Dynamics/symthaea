@@ -89,6 +89,7 @@ pub struct IndividualEffectContext {
 pub struct IndividualEffectBranch {
     pub run_id: u64,
     pub action_id: String,
+    pub paired_seed: u64,
     pub factual_history_sha256: [u8; 32],
     pub branch_point_state_sha256: [u8; 32],
     pub exogenous_forcing_manifest_sha256: [u8; 32],
@@ -296,6 +297,13 @@ fn validate_branch(
             pair_id: context.pair_id,
             expected: expected_action_id.to_owned(),
             actual: branch.action_id.clone(),
+        });
+    }
+    if branch.paired_seed != context.paired_seed {
+        return Err(IndividualEffectError::BranchProvenanceMismatch {
+            pair_id: context.pair_id,
+            action_id: branch.action_id.clone(),
+            field: "paired_seed",
         });
     }
     for (actual, expected, field) in [
@@ -625,6 +633,7 @@ mod tests {
         IndividualEffectBranch {
             run_id,
             action_id: action_id.to_owned(),
+            paired_seed: context.paired_seed,
             factual_history_sha256: context.factual_history_sha256,
             branch_point_state_sha256: context.branch_point_state_sha256,
             exogenous_forcing_manifest_sha256: context.exogenous_forcing_manifest_sha256,
@@ -864,6 +873,19 @@ mod tests {
             evaluate_individual_effect_retention(&identical),
             Err(IndividualEffectError::IdenticalActions)
         );
+    }
+
+    #[test]
+    fn sibling_branches_must_share_the_frozen_paired_seed() {
+        let mut pairs = vec![pair(1, 1, 0, 2, 0, 2, 0, 2)];
+        pairs[0].alternative.paired_seed = 4321;
+        assert!(matches!(
+            evaluate_individual_effect_retention(&pairs),
+            Err(IndividualEffectError::BranchProvenanceMismatch {
+                field: "paired_seed",
+                ..
+            })
+        ));
     }
 
     #[test]
