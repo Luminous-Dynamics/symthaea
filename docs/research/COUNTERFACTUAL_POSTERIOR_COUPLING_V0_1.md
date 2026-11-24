@@ -67,9 +67,9 @@ Let the same individual's posterior support be u in {-1,+1}, each with probabili
 Y(a=0,u) = 5u  
 Y(a=1,u) = 7u
 
-Under the same-u counterfactual estimand, the individual effect is always computed from the same draw: Δ(u) = 7u - 5u = 2u. The posterior effect samples are {-2,+2}, with variance 4.
+Under the same-u counterfactual estimand, the individual effect is always computed from the same draw: Δ(u) = 7u - 5u = 2u. The posterior effect samples are {-2,+2}, with **posterior population variance** 4 (the variance under the stated two-point posterior, not the unbiased sample variance of two Monte Carlo observations).
 
-If the two action branches independently sample u_1 and u_0, the apparent contrast becomes 7u_1 - 5u_0, with support {-12,-2,+2,+12} and variance 74. The extra variance is not uncertainty about the action effect for one fixed hypothetical individual; it is contamination from comparing two different individual hypotheses.
+If the two action branches independently sample u_1 and u_0, the apparent contrast becomes 7u_1 - 5u_0, with support {-12,-2,+2,+12} and posterior population variance 74. The extra variance is not uncertainty about the action effect for one fixed hypothetical individual; it is contamination from comparing two different individual hypotheses.
 
 This toy example is a semantic known-answer control, not an empirical model result. It also shows why reporting only the posterior mean (zero in this symmetric example) is insufficient: the effect is non-zero in magnitude and its sign is uncertain.
 
@@ -270,13 +270,14 @@ The follow-up protocol should:
 6. Use #10252's cross-model ranking idea as prior art/reference where relevant, while keeping its current vehicle-specific ownership intact.
 7. If models disagree enough to change the decision, return an ambiguity/unknown disposition or acquire discriminating evidence through the existing active-sensing and value-of-information owners. Do not self-authorize an action.
 
-The existing graph-level Shpitser–Pearl ID implementation and the generic CounterfactualUncertainty structure are not this evaluator: the former reasons over causal graphs and identification rules, while the latter's heuristic uncertainty propagation does not certify the completeness of a dynamic world-model set. The future work must integrate with them where appropriate without claiming they already solve individual dynamic mechanism ambiguity.
+The existing graph-level Shpitser–Pearl ID implementation and the generic CounterfactualUncertainty structure are not this evaluator: the former reasons over causal graphs and identification rules, while the latter's heuristic uncertainty propagation does not certify the completeness of a dynamic world-model set. Haugh and Singal (ICML 2023) already provide an optimization-based method for bounding counterfactual quantities over possibly infinitely many causal mechanisms in dynamic latent-state models. The Symthaea opportunity is therefore not to claim that bounds over causal models are new, but to create an evidence-qualified adapter that connects admissible mechanism sets and per-model individual posteriors to the existing decision-regret and model-use contracts. A finite sampled model range is not a substitute for their complete-class optimization and must be labelled accordingly.
 
 This is a separate follow-on research direction, not implemented by the PCIR v0.1 contract. It is arguably the more important long-term paradigm shift: **not merely asking what a model predicts for this individual, but determining which parts of that counterfactual are identifiable across every plausible causal mechanism.**
 
 ## Sources
 
 - Okita, *Where Individual-Effect Information Survives: A Diagnostic Ladder for World Models* (2026), https://doi.org/10.3390/make8110363
+- Haugh & Singal, *Counterfactual Analysis in Dynamic Latent State Models* (ICML 2023), https://proceedings.mlr.press/v202/haugh23a.html
 - Okita supplementary material (includes S3 Simulator configuration), https://www.mdpi.com/article/10.3390/make8110363/s1
 - Hafner et al., *Learning Latent Dynamics for Planning from Pixels* (PlaNet), https://arxiv.org/abs/1811.04551
 - Hafner et al., *Mastering Diverse Domains through World Models* (DreamerV3), https://arxiv.org/abs/2301.04104
