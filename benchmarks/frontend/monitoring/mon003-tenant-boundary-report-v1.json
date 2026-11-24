@@ -1,0 +1,51 @@
+{
+  "schema": "sfeb-mon003-tenant-boundary-report-v1",
+  "status": "passed",
+  "runtime": {
+    "node_version": "v22.16.0",
+    "source_path": "benchmarks/frontend/monitoring/mon003-tenant-boundary-v1.mjs",
+    "source_git_blob_sha": "43d0550304cd6e0e8a003e913cc5241c82421f78",
+    "source_sha256": "24f80efae77fc4d31f64098febf15d5d4881a646d26e69c6cf4bf5b4f491a6de"
+  },
+  "deterministic_cases": 8,
+  "cases": [
+    {
+      "name": "source receipt from tenant A cannot authorize objective in tenant B",
+      "result": "pass"
+    },
+    {
+      "name": "sink rejects cross-tenant receipt/grant transplant",
+      "result": "pass"
+    },
+    {
+      "name": "CloudEvents source plus id deduplicates within source without cross-source collisions",
+      "result": "pass"
+    },
+    {
+      "name": "same key and same request replays the original operation once",
+      "result": "pass"
+    },
+    {
+      "name": "same key with changed request is a conflict and cannot add an effect",
+      "result": "pass"
+    },
+    {
+      "name": "current tenant permission revocation after grant issuance blocks commit",
+      "result": "pass"
+    },
+    {
+      "name": "sink rejects stale worker after a replacement epoch is installed",
+      "result": "pass"
+    },
+    {
+      "name": "grant cannot be rebound to an attacker-controlled resource",
+      "result": "pass"
+    }
+  ],
+  "total_side_effects_in_negative_controls": 0,
+  "limitations": [
+    "Pure in-memory reference model; no cryptographic issuer validation, persistent policy store or production sink is exercised.",
+    "Tenant identity and event provenance are trusted model inputs; signatures and key revocation remain unimplemented.",
+    "This does not qualify cross-tenant isolation in a real database or service mesh."
+  ]
+}

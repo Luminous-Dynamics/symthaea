@@ -1,0 +1,92 @@
+{
+  "schema": "sfeb-mon003-cursor-replay-report-v1",
+  "status": "passed",
+  "runtime": {
+    "node_version": "v22.16.0",
+    "source_path": "benchmarks/frontend/monitoring/mon003-cursor-replay-v1.mjs",
+    "source_git_blob_sha": "e6ce9dd6906564ce4c3ca9e312caee19df45a8fa",
+    "source_sha256": "6ab77037f7d33e8b008b07a6a220f811bccfe597508af291dfff3da60fbc3881"
+  },
+  "deterministic_cases": 16,
+  "cases": [
+    {
+      "name": "out-of-order event never advances over a missing prefix",
+      "result": "pass"
+    },
+    {
+      "name": "replay of missing events drains the pending suffix in order",
+      "result": "pass"
+    },
+    {
+      "name": "identical duplicate pending event is idempotent",
+      "result": "pass"
+    },
+    {
+      "name": "identical duplicate committed event adds no evidence",
+      "result": "pass"
+    },
+    {
+      "name": "same source+id with changed payload is rejected",
+      "result": "pass"
+    },
+    {
+      "name": "source+id reused on another partition quarantines both partitions",
+      "result": "pass"
+    },
+    {
+      "name": "same event id from two distinct sources is not a collision",
+      "result": "pass"
+    },
+    {
+      "name": "partition progress is isolated",
+      "result": "pass"
+    },
+    {
+      "name": "two event identities at one sequence quarantine the partition",
+      "result": "pass"
+    },
+    {
+      "name": "high watermark exposes a missing cursor interval",
+      "result": "pass"
+    },
+    {
+      "name": "replaying every missing sequence closes high-watermark gap",
+      "result": "pass"
+    },
+    {
+      "name": "high watermark cannot regress below committed cursor",
+      "result": "pass"
+    },
+    {
+      "name": "high watermark cannot regress even while cursor is behind",
+      "result": "pass"
+    },
+    {
+      "name": "new identity cannot rewrite a committed sequence",
+      "result": "pass"
+    },
+    {
+      "name": "high watermark without source events never creates eligible evidence",
+      "result": "pass"
+    },
+    {
+      "name": "invalid sequence and invalid watermark fail closed",
+      "result": "pass"
+    }
+  ],
+  "invariants": {
+    "no_cursor_advance_past_gap": "pass",
+    "source_scoped_identity": "pass",
+    "cross_partition_identity_reuse_quarantine": "pass",
+    "sequence_fork_quarantine": "pass",
+    "partition_cursor_isolation": "pass",
+    "monotonic_high_watermark": "pass",
+    "watermark_is_not_event_evidence": "pass",
+    "only_contiguous_prefix_is_eligible": "pass"
+  },
+  "limitations": [
+    "Pure in-memory cursor/replay model; no real broker, database cursor, retention or outbox transaction is exercised.",
+    "Source and partition sequence are trusted model inputs; signature and source identity authentication remain pending.",
+    "Single-threaded reference model; it does not prove concurrent cursor-update atomicity."
+  ]
+}

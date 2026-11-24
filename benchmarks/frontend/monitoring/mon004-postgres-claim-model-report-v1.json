@@ -1,0 +1,119 @@
+{
+  "schema": "sfeb-mon004-postgres-claim-model-report-v1",
+  "status": "passed",
+  "deterministic_cases": 21,
+  "cases": [
+    {
+      "name": "claim epoch/token are separate from tenant/objective action fence",
+      "result": "pass"
+    },
+    {
+      "name": "expired queue claim cannot persist remote uncertainty",
+      "result": "pass"
+    },
+    {
+      "name": "expired queue claim cannot release or finalize replacement ownership",
+      "result": "pass"
+    },
+    {
+      "name": "remote request requires persisted outcome_unknown before network boundary",
+      "result": "pass"
+    },
+    {
+      "name": "claim worker rechecks current policy revision at sink",
+      "result": "pass"
+    },
+    {
+      "name": "claim worker rechecks current objective fence at sink",
+      "result": "pass"
+    },
+    {
+      "name": "same objective identifier can exist in multiple tenants without fence collision",
+      "result": "pass"
+    },
+    {
+      "name": "per-aggregate sequence prevents later event from being claimed early",
+      "result": "pass"
+    },
+    {
+      "name": "independent aggregates can be claimed by separate workers",
+      "result": "pass"
+    },
+    {
+      "name": "quarantined aggregate predecessor blocks later events",
+      "result": "pass"
+    },
+    {
+      "name": "lost sink acknowledgement can be reconciled by replacement worker using same key",
+      "result": "pass"
+    },
+    {
+      "name": "read-only reconciliation remains possible after action permission revocation",
+      "result": "pass"
+    },
+    {
+      "name": "read-grant expiry blocks remote result disclosure",
+      "result": "pass"
+    },
+    {
+      "name": "reader revocation invalidates extant reconciliation grant",
+      "result": "pass"
+    },
+    {
+      "name": "read grant is scoped to tenant, objective and operation key",
+      "result": "pass"
+    },
+    {
+      "name": "remote same-key retries return one operation identity and one effect",
+      "result": "pass"
+    },
+    {
+      "name": "remote idempotency conflicts on same key with different digest",
+      "result": "pass"
+    },
+    {
+      "name": "readback mismatch cannot finalize claimed event",
+      "result": "pass"
+    },
+    {
+      "name": "remote commit by expired worker is impossible; replacement must write or reconcile",
+      "result": "pass"
+    },
+    {
+      "name": "objective fence blocks new sink mutation while separate auditor can reconcile old result",
+      "result": "pass"
+    },
+    {
+      "name": "tenant-scoped outbox claim namespaces stay separate",
+      "result": "pass"
+    }
+  ],
+  "bounded_schedule_exploration": {
+    "schedules": 5040,
+    "remoteEffects": 378,
+    "replayedSinkWrites": 0,
+    "staleClaimsRejected": 1062,
+    "readGrantFailures": 2772,
+    "duplicateEffects": 0,
+    "invariantViolations": []
+  },
+  "limits": [
+    "Pure in-memory sequential reference model; not PostgreSQL execution or a concurrent memory-model proof.",
+    "The model assumes an atomic idempotent remote sink and deterministic clocks; PostgreSQL MVCC, network partitions and real sink semantics are not qualified.",
+    "5,040 permutations test lifecycle-operation orderings, not probabilities or production reliability.",
+    "The SQL reference contract still requires execution against a pinned PostgreSQL version and multi-process stress tests."
+  ],
+  "source": {
+    "repository_path": "benchmarks/frontend/monitoring/mon004-postgres-claim-model-v1.mjs.gz",
+    "uncompressed_source_sha256": "e459a3cf14cdff40a221a35e5d6d34672188c6a649acacac752e76797360346d",
+    "compressed_git_blob_sha": "3b03bfb231db46c815041eba1c76877f756417d4",
+    "compressed_sha256": "0ed8ff774a709ba2d6883356655cdd3fc9f4671eade8f96dd112fa42f792ad8b",
+    "compressed_bytes": 5624,
+    "node": "v22.16.0",
+    "execution": [
+      "gzip -dc benchmarks/frontend/monitoring/mon004-postgres-claim-model-v1.mjs.gz | node --check -",
+      "gzip -dc benchmarks/frontend/monitoring/mon004-postgres-claim-model-v1.mjs.gz | node -"
+    ],
+    "qualification": "Locally executed deterministic model plus 5,040 operation orderings. Not PostgreSQL, multi-process concurrency or live sink qualification."
+  }
+}

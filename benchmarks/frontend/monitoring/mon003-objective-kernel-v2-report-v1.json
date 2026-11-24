@@ -1,0 +1,76 @@
+{
+  "schema": "sfeb-mon003-objective-kernel-v2-report-v1",
+  "status": "passed",
+  "runtime": {
+    "node_version": "v22.16.0",
+    "source_path": "benchmarks/frontend/monitoring/mon003-objective-kernel-v2.mjs",
+    "source_git_blob_sha": "07ce9c4917e191702755a32262144755ff9afb59",
+    "source_sha256": "d279eab1801fe5d3ce5fa4d39656745a2a6dad07fd29a5fc0f1af2202ff337f0"
+  },
+  "deterministic_cases": 14,
+  "cases": [
+    {
+      "name": "durable edge receipt survives current level falling false and is tenant bound",
+      "result": "pass"
+    },
+    {
+      "name": "stale worker A is fenced after worker B obtains a higher epoch",
+      "result": "pass"
+    },
+    {
+      "name": "permission revocation between grant and sink commit blocks mutation",
+      "result": "pass"
+    },
+    {
+      "name": "expired receipt cannot authorize mutation",
+      "result": "pass"
+    },
+    {
+      "name": "revoked source receipt cannot authorize mutation",
+      "result": "pass"
+    },
+    {
+      "name": "lost sink response reconciles and retries the same operation with one effect",
+      "result": "pass"
+    },
+    {
+      "name": "same idempotency key with changed request digest is rejected",
+      "result": "pass"
+    },
+    {
+      "name": "grant cannot be rebound to a different target",
+      "result": "pass"
+    },
+    {
+      "name": "fabricated source receipt cannot produce a grant",
+      "result": "pass"
+    },
+    {
+      "name": "tenant A source receipt cannot authorize tenant B objective",
+      "result": "pass"
+    },
+    {
+      "name": "sink rejects cross-tenant receipt and grant transplant",
+      "result": "pass"
+    },
+    {
+      "name": "tenant identity changes the derived idempotency key",
+      "result": "pass"
+    },
+    {
+      "name": "grant tenant mismatch is rejected even when action target matches",
+      "result": "pass"
+    },
+    {
+      "name": "event source id cannot be reused with changed source content",
+      "result": "pass"
+    }
+  ],
+  "side_effect_claim": "All negative controls produce zero side effects; lost-response replay returns the original operation and produces one side effect.",
+  "limitations": [
+    "Pure in-memory reference model; no DB, broker, cryptographic signer, external authorization service or browser is exercised.",
+    "The mock sink models fencing, current tenant permission, idempotency and mutation/result persistence as an atomic transition.",
+    "Source receipts and tenant identity are trusted model inputs, not cryptographically authenticated production artifacts.",
+    "This does not demonstrate exactly-once delivery for arbitrary external sinks."
+  ]
+}

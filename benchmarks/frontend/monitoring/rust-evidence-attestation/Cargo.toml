@@ -1,0 +1,18 @@
+[workspace]
+resolver = "2"
+
+[package]
+name = "symthaea-evidence-attestation-preflight"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Standalone strict JSON/JCS and DSSE Ed25519 source-receipt verification preflight"
+
+[dependencies]
+base64 = "0.22.1"
+ed25519-dalek = { version = "=2.1.0", features = ["rand_core"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_json_canonicalizer = "=0.4.1"
+sha2 = "0.10"
+thiserror = "1.0"

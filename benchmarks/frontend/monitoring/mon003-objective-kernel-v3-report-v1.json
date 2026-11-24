@@ -1,0 +1,105 @@
+{
+  "schema": "sfeb-mon003-objective-kernel-v3-report-v1",
+  "status": "passed",
+  "deterministic_cases": 20,
+  "cases": [
+    {
+      "name": "durable edge receipt survives current level falling false and is tenant bound",
+      "result": "pass"
+    },
+    {
+      "name": "stale worker A is fenced after worker B obtains a higher epoch",
+      "result": "pass"
+    },
+    {
+      "name": "permission revocation between grant and sink commit blocks mutation",
+      "result": "pass"
+    },
+    {
+      "name": "expired receipt cannot authorize mutation",
+      "result": "pass"
+    },
+    {
+      "name": "revoked source receipt cannot authorize mutation",
+      "result": "pass"
+    },
+    {
+      "name": "lost sink response uses separately authorized, minimized reconciliation",
+      "result": "pass"
+    },
+    {
+      "name": "read-only reconciliation remains possible after action permission is revoked",
+      "result": "pass"
+    },
+    {
+      "name": "unauthorized principal cannot reconcile a stored operation",
+      "result": "pass"
+    },
+    {
+      "name": "reconciliation grants are bound to one operation and cannot cross tenants",
+      "result": "pass"
+    },
+    {
+      "name": "expired and revoked reconciliation grants fail closed",
+      "result": "pass"
+    },
+    {
+      "name": "fencing epochs are isolated for identical objective IDs across tenants",
+      "result": "pass"
+    },
+    {
+      "name": "stale worker cannot retrieve a committed result by retrying the action",
+      "result": "pass"
+    },
+    {
+      "name": "same idempotency key with changed request digest is rejected",
+      "result": "pass"
+    },
+    {
+      "name": "grant cannot be rebound to a different target",
+      "result": "pass"
+    },
+    {
+      "name": "fabricated source receipt cannot produce a grant",
+      "result": "pass"
+    },
+    {
+      "name": "tenant A source receipt cannot authorize tenant B objective",
+      "result": "pass"
+    },
+    {
+      "name": "sink rejects cross-tenant receipt and grant transplant",
+      "result": "pass"
+    },
+    {
+      "name": "tenant identity changes the derived idempotency key",
+      "result": "pass"
+    },
+    {
+      "name": "grant tenant mismatch is rejected even when action target matches",
+      "result": "pass"
+    },
+    {
+      "name": "event source id cannot be reused with changed source content",
+      "result": "pass"
+    }
+  ],
+  "side_effect_claim": "All negative controls produce zero additional side effects; lost-response recovery returns a minimized receipt for the original operation and the original mutation remains exactly one mock effect.",
+  "limitations": [
+    "Pure in-memory reference model; no DB, broker, cryptographic signer, external authorization service or browser is exercised.",
+    "The mock sink models tenant-scoped fencing, current action permission, separately authorized minimized read-only reconciliation, idempotency and mutation/result persistence as an atomic transition.",
+    "Source receipts and tenant identity are trusted model inputs, not cryptographically authenticated production artifacts.",
+    "This does not demonstrate exactly-once delivery for arbitrary external sinks. The local canonicalizer is a test-only deterministic encoding, not RFC 8785/JCS; production request digests must use a standardized canonicalization implementation."
+  ],
+  "source": {
+    "repository_path": "benchmarks/frontend/monitoring/mon003-objective-kernel-v3.mjs",
+    "git_blob_sha": "fa4e86f6ec2761154bfa1b0ccecf5535be99b5f8",
+    "sha256": "42f018f8ea2fb94267d6fc32d725cf836322a48f08af443483aa34c6418be936",
+    "node_version": "v22.16.0",
+    "local_execution": [
+      "node --check mon003-objective-kernel-v3.mjs",
+      "node mon003-objective-kernel-v3.mjs"
+    ],
+    "qualification": "Local Node execution of a pure in-memory reference model; not a production or distributed qualification."
+  }
+}

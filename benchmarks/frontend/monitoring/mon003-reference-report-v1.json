@@ -1,0 +1,56 @@
+{
+  "schema": "sfeb-mon003-reference-kernel-report-v1",
+  "status": "passed",
+  "runtime": {
+    "node_version": "v22.16.0",
+    "source_path": "benchmarks/frontend/monitoring/mon003-objective-kernel-v1.mjs",
+    "source_sha256": "5ff04d8c395aad6fa7d3e756dbceac4fca510e4c2e92aad0d41b29386150088b",
+    "git_blob_sha": "b2eacc07839f4ba2bf31570ae74cf4397317acac"
+  },
+  "deterministic_cases": 9,
+  "cases": [
+    {
+      "name": "edge receipt survives level falling false but remains event evidence",
+      "result": "pass"
+    },
+    {
+      "name": "stale worker A is fenced after worker B acquires a higher epoch",
+      "result": "pass"
+    },
+    {
+      "name": "permission revocation between grant issuance and sink commit blocks the action",
+      "result": "pass"
+    },
+    {
+      "name": "expired and revoked event receipts cannot authorize a side effect",
+      "result": "pass"
+    },
+    {
+      "name": "lost sink response reconciles to one durable execution receipt",
+      "result": "pass"
+    },
+    {
+      "name": "same idempotency key with a different request digest is rejected",
+      "result": "pass"
+    },
+    {
+      "name": "worker cannot falsify the request digest during an idempotent replay",
+      "result": "pass"
+    },
+    {
+      "name": "authorization grant cannot be rebound to another target",
+      "result": "pass"
+    },
+    {
+      "name": "worker-supplied fabricated receipt is not accepted by the authority plane",
+      "result": "pass"
+    }
+  ],
+  "side_effect_claim": "All negative controls produced zero side effects; the lost-response recovery case produced exactly one side effect.",
+  "limitations": [
+    "Pure in-memory reference kernel; no database, broker, cryptographic signer, external authorization service or browser is exercised.",
+    "The mock sink models fence, policy-revision and idempotency checks atomically; production atomicity must be independently implemented and qualified.",
+    "The source receipt is a trusted in-memory source-of-record object, not a signed production receipt.",
+    "This does not demonstrate exactly-once delivery for arbitrary external sinks."
+  ]
+}

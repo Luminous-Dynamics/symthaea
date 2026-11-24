@@ -1,0 +1,86 @@
+{
+  "schema": "sfeb-mon003-capability-lease-report-v1",
+  "status": "passed",
+  "runtime": {
+    "node_version": "v22.16.0",
+    "source_path": "benchmarks/frontend/monitoring/mon003-capability-lease-v1.mjs",
+    "source_git_blob_sha": "3f3b8e8f9d08a41c7a62464a03176f7e86306c99",
+    "source_sha256": "f394c0fca7b395c0b01de74e9783300e439956a81d578943e4fc652e34d90ef6"
+  },
+  "deterministic_cases": 15,
+  "cases": [
+    {
+      "name": "fresh trusted attestation establishes active bounded replay",
+      "result": "pass"
+    },
+    {
+      "name": "attestation expiry blocks unqualified edge claim",
+      "result": "pass"
+    },
+    {
+      "name": "connector version upgrade invalidates prior lease",
+      "result": "pass"
+    },
+    {
+      "name": "capability profile drift invalidates prior attestation",
+      "result": "pass"
+    },
+    {
+      "name": "failed replay probe downgrades source guarantee",
+      "result": "pass"
+    },
+    {
+      "name": "source high-watermark rollback blocks capability lease",
+      "result": "pass"
+    },
+    {
+      "name": "failed sink permission revision probe blocks authority guarantee",
+      "result": "pass"
+    },
+    {
+      "name": "retention shorter than disconnect horizon is degraded",
+      "result": "pass"
+    },
+    {
+      "name": "poll-only source does not claim event-driven edge recovery",
+      "result": "pass"
+    },
+    {
+      "name": "revoked signing key prevents capability registration",
+      "result": "pass"
+    },
+    {
+      "name": "unverified signature prevents capability registration",
+      "result": "pass"
+    },
+    {
+      "name": "attestation cannot be transplanted across source identities",
+      "result": "pass"
+    },
+    {
+      "name": "attestation cannot be transplanted across connector versions",
+      "result": "pass"
+    },
+    {
+      "name": "fresh attestation is required to restore guarantee after upgrade",
+      "result": "pass"
+    },
+    {
+      "name": "attestation issued in future or already expired is rejected",
+      "result": "pass"
+    }
+  ],
+  "invariants": {
+    "capability_is_time_bounded": "pass",
+    "connector_or_profile_change_invalidates_attestation": "pass",
+    "failed_replay_or_cursor_probe_blocks_edge_guarantee": "pass",
+    "key_revocation_and_signature_trust_required": "pass",
+    "capability_recovery_requires_fresh_attestation": "pass",
+    "downgrade_instead_of_silent_overclaim": "pass"
+  },
+  "limitations": [
+    "In-memory capability-lease model; no production signature verifier, key registry, live source probe or scheduler is exercised.",
+    "Signature, issuer, key and conformance status are trusted test booleans, not cryptographic evidence.",
+    "Production adapters must persist and independently verify capability attestations, probes and connector/profile changes."
+  ]
+}
