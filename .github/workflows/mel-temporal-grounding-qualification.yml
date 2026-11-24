@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - research/mel-temporal-grounding-count-gated-f1-v1-20261124
+      - research/mel-temporal-revision-audit-v1-20261124
     paths:
       - "crates/domains/symthaea-muse/src/temporal_grounding.rs"
       - "crates/domains/symthaea-muse/src/evidence_digest.rs"
@@ -15,6 +16,7 @@ on:
   pull_request:
     branches:
       - research/mel-ground-temporal-evaluator-v1-20261103
+      - research/mel-temporal-grounding-count-gated-f1-v1-20261124
     paths:
       - "crates/domains/symthaea-muse/src/temporal_grounding.rs"
       - "crates/domains/symthaea-muse/src/evidence_digest.rs"
