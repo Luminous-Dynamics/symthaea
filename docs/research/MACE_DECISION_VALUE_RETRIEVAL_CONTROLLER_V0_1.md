@@ -266,11 +266,18 @@ Project ambition targets already proposed for LongMemEval-V2 are ΔLAFS ≥ +3.2
 
 A reject-everything controller fails the utility-retention and decision-quality gates. Security metrics cannot be traded against answer accuracy.
 
-### Current implementation checkpoint — hybrid fixed two-channel retrieval
+### Current implementation checkpoint — three identity-bound retrieval ablation arms
 
-[PR #13512](https://github.com/Luminous-Dynamics/symthaea/pull/13512) adds a distinct structured-literal channel to the LongMemEval-V2 sidecar. It indexes stable trajectory IDs, URLs, numeric state/step values, goals and structured action fields; generic prose remains BM25's responsibility. The two ranked lists are fused by RRF with k=60 and equal channel weights, and the trace retains separate per-channel operations even though candidate records identify the fused channel.
+[PR #13512](https://github.com/Luminous-Dynamics/symthaea/pull/13512) now exposes three benchmark modes through the official LongMemEval-V2 bridge:
 
-This is a fixed two-action baseline, not learned action selection. It is the first operational test of complementary retrieval channels, not evidence of improved benchmark accuracy. Its acceptance decision must come from the paired evaluation protocol below, including lexical-only, literal-only, hybrid, and matched-budget controls. The optional query-image argument remains unused; this change is not a multimodal image-query result.
+- `bm25_only`: build and execute only the prose BM25 index;
+- `entity_literal_only`: build and execute only exact structured-literal retrieval over trajectory IDs, URLs, numeric state/step values, goals and structured action fields;
+- `hybrid_rrf`: build both indexes and fuse immutable chunk IDs with reciprocal-rank fusion (k=60, equal channel weights).
+
+Every mode has a distinct backend ID, evidence-channel identity, execution-profile digest and retrieval-mode receipt. The sidecar records exactly the action(s) it actually executed. Single-channel modes do not build the inactive index, avoiding hidden index-build cost in the ablations. Generic prose remains BM25's responsibility; the exact-literal channel deliberately does not duplicate it.
+
+These are fixed benchmark arms, not learned action selection. The new capability creates a direct, reproducible comparison of BM25, literal retrieval and hybrid RRF under the same trajectory corpus and reader. It is not evidence that hybrid retrieval improves accuracy, latency or total cost; those claims require paired runs with frozen corpus, reader, context budget, environment and per-mode execution manifests. The optional query-image argument remains unused, so this is not a multimodal image-query result.
+
 
 ## 9. Implementation sequence — runner-independent work first
 
