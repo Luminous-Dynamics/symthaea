@@ -6,6 +6,8 @@
 
 Build a system that optimizes for **independently qualified knowledge per unit of research expenditure**, not for the number of hypotheses, experiments, tool calls, pages, or low residuals it produces.
 
+Machine-readable external comparator snapshot (as of 24 November 2026): [BH_EGB_EXTERNAL_BENCHMARK_SNAPSHOT_2026_11_24.json](BH_EGB_EXTERNAL_BENCHMARK_SNAPSHOT_2026_11_24.json). Each score retains its benchmark family, protocol, sample size, confidence caveats and claim boundary; no cross-benchmark composite score is defined.
+
 The architecture should separate three decisions:
 
 1. **Research-action allocation (Stage A):** Is another symbolic derivation, source replay, counterexample search, BVP correction, precision increase, independent endpoint route, interval calculation, or proof attempt worth purchasing? Reuse Symthaea #8721 and the actual policy adapter #11171.
