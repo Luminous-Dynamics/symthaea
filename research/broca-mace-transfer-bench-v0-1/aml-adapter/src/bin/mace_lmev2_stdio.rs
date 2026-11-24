@@ -666,7 +666,20 @@ mod tests {
         ).expect("query");
         assert_eq!(response["ok"], true);
         assert_eq!(response["query_image_used"], false);
-        assert_eq!(response["retrieval_mode"], "text_bm25_with_original_image_evidence");
+        assert_eq!(
+            response["retrieval_mode"],
+            "hybrid_bm25_entity_literal_with_original_image_evidence"
+        );
+        assert_eq!(response["retrieval_fusion"], "reciprocal_rank_fusion_k60");
+        let operations = response["retrieval_trace"]["operations"]
+            .as_array().expect("two retrieval action receipts");
+        assert_eq!(operations.len(), 2);
+        assert_eq!(operations[0]["tool_id"], "trajectory.bm25.search");
+        assert_eq!(operations[0]["outcome"], "evidence_observed");
+        assert_eq!(operations[1]["tool_id"], "trajectory.entity_literal.search");
+        assert_eq!(operations[1]["outcome"], "no_evidence");
+        assert!(response["candidate_evidence_jsonl"].as_str().unwrap()
+            .contains("hybrid_rrf_bm25_entity"));
         assert_eq!(response["run_id"], "fixture-run");
         assert_eq!(response["candidate_id"], "query-invocation-1");
         assert_eq!(response["candidate_record_count"], 2);
@@ -693,6 +706,26 @@ mod tests {
             restored_policy_memory.trace_receipt_sha256("fixture-run", "query-invocation-1"),
             response["retrieval_trace_sha256"].as_str()
         );
+
+        let literal_response = handle_request(
+            json!({
+                "op": "query",
+                "query": "state 42",
+                "candidate_id": "query-invocation-2"
+            }),
+            &config,
+            &mut trajectories,
+            &mut index,
+            &mut policy_memory,
+            &policy_trace_store,
+        ).expect("literal query");
+        assert_eq!(literal_response["ok"], true);
+        let literal_operations = literal_response["retrieval_trace"]["operations"]
+            .as_array().expect("two action receipts");
+        assert_eq!(literal_operations.len(), 2);
+        assert_eq!(literal_operations[1]["outcome"], "evidence_observed");
+        assert!(literal_response["candidate_evidence_jsonl"].as_str().unwrap()
+            .contains("hybrid_rrf_bm25_entity"));
         let items = response["items"].as_array().expect("context items");
         assert!(items.iter().any(|item| {
             item["type"] == "text" && item["value"].as_str()
