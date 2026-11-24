@@ -1225,6 +1225,56 @@ mod tests {
         validate_pair_json(SYNTHETIC_FIXTURE).expect("valid synthetic receipt fixture")
     }
 
+    fn set_global_disposition(pair: &mut LocalGlobalPairV1, disposition: GlobalDisposition) {
+        let warrant_id = pair.candidate.global_stage.scope_binding.warrant_id.clone();
+        let (relation, material_use, reviewed_entire_plan) = match disposition {
+            GlobalDisposition::UsedDirectly => (Some(MentionRelation::UsesAsRule), true, true),
+            GlobalDisposition::UsedImplicitly => {
+                (Some(MentionRelation::SupportsInference), true, true)
+            }
+            GlobalDisposition::CitedRejected => (Some(MentionRelation::Cites), false, true),
+            GlobalDisposition::Omitted => (None, false, true),
+            GlobalDisposition::Unknown => (None, false, false),
+        };
+
+        pair.candidate.global_stage.warrant_mentions = relation
+            .map(|relation| {
+                vec![WarrantMention {
+                    mention_id: "MENTION-TEST-001".to_owned(),
+                    warrant_id: warrant_id.clone(),
+                    plan_node_id: "N-TEST-001".to_owned(),
+                    relation,
+                }]
+            })
+            .unwrap_or_default();
+
+        let evaluator = pair.evaluator_only.as_mut().expect("evaluator receipt");
+        evaluator.global_disposition = disposition;
+        let adjudication = evaluator
+            .global_use_adjudication
+            .as_mut()
+            .expect("global-use adjudication");
+        adjudication.disposition = disposition;
+        adjudication.target_warrant_id = warrant_id.clone();
+        adjudication.reviewed_plan_sha256 = pair.candidate.global_stage.proof_plan_sha256.clone();
+        adjudication.reviewed_entire_plan = reviewed_entire_plan;
+        adjudication.evidence_refs = vec![
+            "PLAN-TRACE-TEST-001".to_owned(),
+            "PLAN-REVIEW-TEST-001".to_owned(),
+        ];
+        adjudication.node_evidence = relation
+            .map(|relation| {
+                vec![GlobalUseNodeEvidenceV1 {
+                    plan_node_id: "N-TEST-001".to_owned(),
+                    warrant_id,
+                    relation,
+                    material_use,
+                    rationale_ref: "PLAN-TRACE-TEST-001".to_owned(),
+                }]
+            })
+            .unwrap_or_default();
+    }
+
     #[test]
     fn schema_and_synthetic_fixture_are_valid_json() {
         let _: Value = serde_json::from_str(SYNTHETIC_SCHEMA).expect("schema JSON");
@@ -1866,6 +1916,85 @@ mod tests {
     }
 
     #[test]
+    fn eligible_cirr_requires_independent_global_use_adjudication() {
+        let mut pair = fixture();
+        pair.evaluator_only.as_mut().unwrap().global_use_adjudication = None;
+        assert!(validate_pair(&pair)
+            .iter()
+            .any(|error| error.contains("requires a global_use_adjudication receipt")));
+    }
+
+    #[test]
+    fn global_use_receipt_binds_exact_plan_and_target_warrant() {
+        let mut plan_mutation = fixture();
+        plan_mutation
+            .evaluator_only
+            .as_mut()
+            .unwrap()
+            .global_use_adjudication
+            .as_mut()
+            .unwrap()
+            .reviewed_plan_sha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_owned();
+        assert!(validate_pair(&plan_mutation)
+            .iter()
+            .any(|error| error.contains("must match candidate.global_stage.proof_plan_sha256")));
+
+        let mut warrant_mutation = fixture();
+        warrant_mutation
+            .evaluator_only
+            .as_mut()
+            .unwrap()
+            .global_use_adjudication
+            .as_mut()
+            .unwrap()
+            .target_warrant_id = "W-DIFFERENT-THEOREM".to_owned();
+        assert!(validate_pair(&warrant_mutation)
+            .iter()
+            .any(|error| error.contains("must match the exact paired warrant identity")));
+    }
+
+    #[test]
+    fn direct_reuse_requires_material_target_warrant_node() {
+        let mut pair = fixture();
+        pair.evaluator_only
+            .as_mut()
+            .unwrap()
+            .global_use_adjudication
+            .as_mut()
+            .unwrap()
+            .node_evidence[0]
+            .material_use = false;
+        assert!(validate_pair(&pair)
+            .iter()
+            .any(|error| error.contains("used_directly requires a complete plan review")));
+    }
+
+    #[test]
+    fn implicit_reuse_requires_supporting_inference_node() {
+        let mut pair = fixture();
+        set_global_disposition(&mut pair, GlobalDisposition::UsedImplicitly);
+        assert!(validate_pair(&pair).is_empty());
+        let summary = compute_cirr(&[pair]).expect("valid implicit material reuse");
+        assert_eq!(summary.numerator_definite_reuse, 1);
+    }
+
+    #[test]
+    fn global_use_rationale_must_resolve_to_adjudication_evidence() {
+        let mut pair = fixture();
+        pair.evaluator_only
+            .as_mut()
+            .unwrap()
+            .global_use_adjudication
+            .as_mut()
+            .unwrap()
+            .node_evidence[0]
+            .rationale_ref = "MISSING-REVIEW-EVIDENCE".to_owned();
+        assert!(validate_pair(&pair)
+            .iter()
+            .any(|error| error.contains("rationale_ref must resolve")));
+    }
+
+    #[test]
     fn synthetic_cirr_is_computed_from_adjudication_not_candidate_claims() {
         let pair = fixture();
         let summary = compute_cirr(&[pair]).expect("valid receipt");
@@ -1920,7 +2049,7 @@ mod tests {
     #[test]
     fn unknown_global_outcome_is_reported_as_an_interval() {
         let mut pair = fixture();
-        pair.evaluator_only.as_mut().unwrap().global_disposition = GlobalDisposition::Unknown;
+        set_global_disposition(&mut pair, GlobalDisposition::Unknown);
         let summary = compute_cirr(&[pair]).expect("valid unresolved receipt");
         assert_eq!(summary.numerator_definite_reuse, 0);
         assert_eq!(summary.denominator_eligible_local_rejections, 1);
@@ -1933,7 +2062,7 @@ mod tests {
     #[test]
     fn citing_a_rejected_warrant_is_not_material_reuse() {
         let mut pair = fixture();
-        pair.evaluator_only.as_mut().unwrap().global_disposition = GlobalDisposition::CitedRejected;
+        set_global_disposition(&mut pair, GlobalDisposition::CitedRejected);
         let summary = compute_cirr(&[pair]).expect("valid cited-rejected receipt");
         assert_eq!(summary.denominator_eligible_local_rejections, 1);
         assert_eq!(summary.numerator_definite_reuse, 0);
@@ -1953,14 +2082,14 @@ mod tests {
         for index in 0..20 {
             let mut pair = fixture();
             pair.candidate.pair_id = format!("PAIR-WILSON-{index:02}");
-            let evaluator = pair.evaluator_only.as_mut().unwrap();
-            evaluator.global_disposition = if index < 5 {
+            let disposition = if index < 5 {
                 GlobalDisposition::UsedDirectly
             } else if index < 15 {
                 GlobalDisposition::Omitted
             } else {
                 GlobalDisposition::Unknown
             };
+            set_global_disposition(&mut pair, disposition);
             pairs.push(pair);
         }
         let summary = compute_cirr(&pairs).expect("valid independent receipts");
