@@ -359,8 +359,8 @@ fn mahalanobis_squared(
             )));
         }
         if diagonal == 0.0 {
-            for j in 0..n {
-                if covariance[i][j] != 0.0 || covariance[j][i] != 0.0 {
+            for (row, column_value) in covariance.iter().zip(&covariance[i]) {
+                if *column_value != 0.0 || row[i] != 0.0 {
                     return Err(CovarianceDesignError::InvalidCovariance(format!(
                         "derived difference covariance has nonzero cross-covariance with zero-variance observable {i}"
                     )));
