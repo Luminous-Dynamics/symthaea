@@ -9,6 +9,7 @@
 //! a separately permissioned evaluator process.
 
 pub mod robust;
+pub mod sequential;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
