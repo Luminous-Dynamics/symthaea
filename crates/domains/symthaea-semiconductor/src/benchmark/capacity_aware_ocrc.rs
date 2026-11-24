@@ -717,7 +717,7 @@ pub fn advance_ca_ocrc_round_v1(
                 disposition,
                 Some(reason),
                 Some(actual_delay),
-                Some(tracked_round.proxy_delay_rounds),
+                tracked.as_ref().map(|item| item.proxy_delay_rounds),
                 None,
                 None,
                 Some(round.prediction_receipt_sha256.clone()),
@@ -1207,6 +1207,19 @@ mod tests {
         }
     }
 
+    fn advance(
+        engine: &mut CaoOcrcEngineV1,
+        mut input: CaoOcrcRoundInputV1,
+        feedback_events: &[CaoOcrcFeedbackInputV1],
+    ) -> Result<CaoOcrcRoundReceiptV1, CaoOcrcErrorV1> {
+        input.threshold_used = engine.threshold;
+        if input.trivial_set.is_none() {
+            input.interval_lower = Some(input.score_location - engine.threshold);
+            input.interval_upper = Some(input.score_location + engine.threshold);
+        }
+        advance_ca_ocrc_round_v1(engine, &input, feedback_events)
+    }
+
     fn feedback(
         origin: u64,
         delivery_round: u64,
@@ -1265,14 +1278,14 @@ mod tests {
     #[test]
     fn k_one_saturates_when_a_long_proxy_round_is_still_tracked() {
         let mut engine = engine(1, 2, vec![1.0, 1.0, 1.0]);
-        let first = advance_ca_ocrc_round_v1(
+        let first = advance(
             &mut engine,
             &round(1, None, Some((0.0, 1.0)), Some(0.5)),
             &[],
         )
         .unwrap();
         assert_eq!(first.admission, CaoOcrcAdmissionV1::CapacityAdmitted);
-        let second = advance_ca_ocrc_round_v1(
+        let second = advance(
             &mut engine,
             &round(2, None, Some((0.0, 1.0)), Some(0.5)),
             &[],
@@ -1285,19 +1298,19 @@ mod tests {
     #[test]
     fn feedback_on_proxy_expiry_round_is_received_before_eviction() {
         let mut engine = engine(1, 2, vec![1.0, 1.0, 1.0]);
-        advance_ca_ocrc_round_v1(
+        advance(
             &mut engine,
             &round(1, None, Some((0.0, 1.0)), Some(0.5)),
             &[],
         )
         .unwrap();
-        advance_ca_ocrc_round_v1(
+        advance(
             &mut engine,
             &round(2, None, Some((0.0, 1.0)), Some(0.5)),
             &[],
         )
         .unwrap();
-        let exact = advance_ca_ocrc_round_v1(
+        let exact = advance(
             &mut engine,
             &round(3, None, Some((0.0, 1.0)), Some(0.5)),
             &[feedback(
@@ -1321,21 +1334,21 @@ mod tests {
     #[test]
     fn feedback_after_proxy_expiry_is_permanently_lost_to_online_update() {
         let mut engine = engine(1, 2, vec![1.0, 1.0, 1.0]);
-        advance_ca_ocrc_round_v1(
+        advance(
             &mut engine,
             &round(1, None, Some((0.0, 1.0)), Some(0.5)),
             &[],
         )
         .unwrap();
         for round_index in 2..=3 {
-            advance_ca_ocrc_round_v1(
+            advance(
                 &mut engine,
                 &round(round_index, None, Some((0.0, 1.0)), Some(0.5)),
                 &[],
             )
             .unwrap();
         }
-        let late = advance_ca_ocrc_round_v1(
+        let late = advance(
             &mut engine,
             &round(4, None, Some((0.0, 1.0)), Some(0.5)),
             &[feedback(
@@ -1358,7 +1371,7 @@ mod tests {
     #[test]
     fn immediate_feedback_is_received_only_when_current_round_was_admitted() {
         let mut engine = engine(1, 0, vec![1.0]);
-        let receipt = advance_ca_ocrc_round_v1(
+        let receipt = advance(
             &mut engine,
             &round(1, None, Some((0.0, 1.0)), Some(0.5)),
             &[feedback(
@@ -1387,7 +1400,7 @@ mod tests {
     #[test]
     fn proxy_minus_one_is_not_admitted_and_feedback_is_reported_lost() {
         let mut engine = engine(1, 2, vec![0.5, 0.5, 0.5]);
-        let receipt = advance_ca_ocrc_round_v1(
+        let receipt = advance(
             &mut engine,
             &round(1, None, Some((0.0, 1.0)), Some(0.1)),
             &[],
@@ -1395,7 +1408,7 @@ mod tests {
         .unwrap();
         assert_eq!(receipt.selected_proxy_delay_rounds, -1);
         assert_eq!(receipt.admission, CaoOcrcAdmissionV1::ProxyNotTracked);
-        let later = advance_ca_ocrc_round_v1(
+        let later = advance(
             &mut engine,
             &round(2, None, Some((0.0, 1.0)), Some(0.8)),
             &[feedback(
@@ -1449,7 +1462,7 @@ mod tests {
     #[test]
     fn k1_unknown_feedback_does_not_update_threshold_or_consume_tracking() {
         let mut engine = engine(1, 2, vec![1.0, 1.0, 1.0]);
-        advance_ca_ocrc_round_v1(
+        advance(
             &mut engine,
             &round(1, None, Some((0.0, 1.0)), Some(0.5)),
             &[],
@@ -1457,7 +1470,7 @@ mod tests {
         .unwrap();
         let before = engine.threshold;
         let unknown = feedback(1, 2, 2.0, "label-1", 1, LabelConsumptionEligibilityV1::Unknown);
-        let receipt = advance_ca_ocrc_round_v1(
+        let receipt = advance(
             &mut engine,
             &round(2, None, Some((0.0, 1.0)), Some(0.5)),
             &[unknown],
@@ -1471,14 +1484,14 @@ mod tests {
     #[test]
     fn qualified_feedback_is_weighted_by_inverse_proxy_survival() {
         let mut engine = engine(1, 2, vec![1.0, 0.5, 0.5]);
-        advance_ca_ocrc_round_v1(
+        advance(
             &mut engine,
             &round(1, None, Some((0.0, 1.0)), Some(0.5)),
             &[],
         )
         .unwrap();
         // A delay-one feedback is observable only if the proxy delay is at least one.
-        let result = advance_ca_ocrc_round_v1(
+        let result = advance(
             &mut engine,
             &round(2, None, Some((0.0, 1.0)), Some(0.5)),
             &[feedback(1, 2, 2.0, "label-1", 1, LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy)],
@@ -1495,7 +1508,7 @@ mod tests {
         fn run(reverse: bool) -> (f64, String) {
             let mut engine = engine(2, 2, vec![1.0, 1.0, 1.0]);
             for index in 1..=2 {
-                advance_ca_ocrc_round_v1(
+                advance(
                     &mut engine,
                     &round(index, None, Some((0.0, 1.0)), Some(0.5)),
                     &[],
@@ -1509,7 +1522,7 @@ mod tests {
             if reverse {
                 feedbacks.reverse();
             }
-            let _ = advance_ca_ocrc_round_v1(
+            let _ = advance(
                 &mut engine,
                 &round(3, None, Some((0.0, 1.0)), Some(0.5)),
                 &feedbacks,
@@ -1533,7 +1546,7 @@ mod tests {
     #[test]
     fn zero_capacity_is_an_explicit_no_feedback_baseline() {
         let mut engine = engine(0, 2, vec![1.0, 1.0, 1.0]);
-        let receipt = advance_ca_ocrc_round_v1(
+        let receipt = advance(
             &mut engine,
             &round(1, None, Some((0.0, 1.0)), Some(0.5)),
             &[feedback(
@@ -1559,7 +1572,7 @@ mod tests {
     fn capacity_at_least_dmax_plus_one_can_track_all_pending_rounds() {
         let mut engine = engine(3, 2, vec![1.0, 1.0, 1.0]);
         for index in 1..=3 {
-            let receipt = advance_ca_ocrc_round_v1(
+            let receipt = advance(
                 &mut engine,
                 &round(index, None, Some((0.0, 1.0)), Some(0.5)),
                 &[],
@@ -1575,14 +1588,14 @@ mod tests {
     #[test]
     fn tampering_with_prediction_interval_invalidates_delayed_feedback() {
         let mut engine = engine(1, 2, vec![1.0, 1.0, 1.0]);
-        advance_ca_ocrc_round_v1(
+        advance(
             &mut engine,
             &round(1, None, Some((0.0, 1.0)), Some(0.5)),
             &[],
         )
         .unwrap();
         engine.round_ledger.get_mut(&1).unwrap().interval_upper = Some(2.0);
-        let receipt = advance_ca_ocrc_round_v1(
+        let receipt = advance(
             &mut engine,
             &round(2, None, Some((0.0, 1.0)), Some(0.5)),
             &[feedback(
@@ -1610,7 +1623,7 @@ mod tests {
     #[test]
     fn mismatched_label_revision_and_payload_do_not_update_threshold() {
         let mut engine = engine(1, 2, vec![1.0, 1.0, 1.0]);
-        advance_ca_ocrc_round_v1(
+        advance(
             &mut engine,
             &round(1, None, Some((0.0, 1.0)), Some(0.5)),
             &[],
@@ -1629,7 +1642,7 @@ mod tests {
         canonical.report_sha256.clear();
         wrong.eligibility_report.report_sha256 = json_sha256(&canonical).unwrap();
         wrong.label_payload_sha256 = digest('z');
-        let receipt = advance_ca_ocrc_round_v1(
+        let receipt = advance(
             &mut engine,
             &round(2, None, Some((0.0, 1.0)), Some(0.5)),
             &[wrong],
