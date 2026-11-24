@@ -393,3 +393,16 @@ The five synthetic controls now cover:
 The Rust validator recomputes typed sequent digests, derives two-way finite entailment, enforces transformation-class consistency, and serializes candidate inputs separately from evaluator-only labels. It is limited to the Boolean AST and its 16-atom budget.
 
 **Qualification boundary:** the earlier exact-head run [45463952889](https://github.com/Luminous-Dynamics/symthaea/actions/runs/45463952889) passed the first three-pair implementation with **100 Rust tests passed / 0 failed**. The new hypothesis-order and incomparable controls, plus their two additional tests, were committed afterward and are not covered by that earlier pass. They require the latest exact-head run. No Lean kernel result, model evaluation, human review or empirical CIRR result is claimed. See protocol [MATH_METAMORPHIC_V1.md](MATH_METAMORPHIC_V1.md) and issue [#13547](https://github.com/Luminous-Dynamics/symthaea/issues/13547).
+
+
+## 12. Proof-carrying explanation: local action certificates (2026-11-24)
+
+A final theorem kernel check is necessary for formal validity, but it does not by itself show that a generated explanation faithfully describes each local mathematical transition. The new protocol [MATH_PROOF_ACTION_CERTIFICATE_V1.md](MATH_PROOF_ACTION_CERTIFICATE_V1.md), tracked by [#13549](https://github.com/Luminous-Dynamics/symthaea/issues/13549), proposes a local certificate for every formalizable plan action.
+
+Each action binds its exact pre-goal, local hypotheses, consumed premises, side conditions, output subgoals, proof artifact and Lean kernel replay in a pinned environment. Conceptual-role labels remain a separate expert-review authority; analogies and unknowns remain explicit.
+
+This provides a compositional assurance chain:
+
+**root theorem identity → local action certificates → subgoal accounting → final kernel proof → reviewed mathematical interpretation → human transfer evaluation.**
+
+Prospective targets include 100% exact context binding and kernel replay for actions labelled kernel-checked, zero observed false local-action acceptance on seeded negative controls, ≥95% side-condition/subgoal coverage, and ≥80% independent expert acceptance of the plan-to-proof mapping. No local-action certificate implementation or result has yet been produced.
