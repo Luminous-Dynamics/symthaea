@@ -95,6 +95,8 @@ Both return `None` when the coefficient is undefined. Negative coefficients are 
 
 The team-level evaluator for Mycelix [DELIB-TEAM-RETENTION-001 #6597](https://github.com/Luminous-Dynamics/mycelix/issues/6597) compares the four AI-exposure × transactive-memory conditions. It reports immediate, delayed and transfer gain, unique-fact retention, expertise routing and agency as separate endpoints, with seeded percentile bootstrap intervals that resample teams rather than messages or turns.
 
+The input contract pins the same AI runtime across both AI arms and the same TMS configuration across both TMS arms; non-exposed arms must use `NA`. This makes the factorial contrast interpretable without silently changing the intervention between cells.
+
 Run the checked-in synthetic known-answer fixture:
 
 ```bash
