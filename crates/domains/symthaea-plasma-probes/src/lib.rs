@@ -3801,6 +3801,40 @@ mod tests {
     }
 
     #[test]
+    fn finite_fourier_band_has_an_explicit_noninjectivity_witness() {
+        let first_four = WeightedFourierMeasureEmbedding::new(4).unwrap();
+        let five_point_measure = (0..5)
+            .map(|index| index as f64 / 5.0)
+            .collect::<Vec<_>>();
+        let ten_point_measure = (0..10)
+            .map(|index| index as f64 / 10.0)
+            .collect::<Vec<_>>();
+        let five_weights = vec![0.2; 5];
+        let ten_weights = vec![0.1; 10];
+
+        assert_ne!(five_point_measure, ten_point_measure);
+        let five_moments = first_four
+            .moments(&five_point_measure, &five_weights)
+            .unwrap();
+        let ten_moments = first_four
+            .moments(&ten_point_measure, &ten_weights)
+            .unwrap();
+        for (left, right) in five_moments.iter().zip(&ten_moments) {
+            assert!(left.magnitude() < 1.0e-12);
+            assert!(right.magnitude() < 1.0e-12);
+            assert!((left.real - right.real).abs() < 1.0e-12);
+            assert!((left.imag - right.imag).abs() < 1.0e-12);
+        }
+
+        let fifth_moment = WeightedFourierMeasureEmbedding::new(5)
+            .unwrap()
+            .moments(&five_point_measure, &five_weights)
+            .unwrap()[4];
+        assert!((fifth_moment.real - 1.0).abs() < 1.0e-12);
+        assert!(fifth_moment.imag.abs() < 1.0e-12);
+    }
+
+    #[test]
     fn weighted_fourier_measure_embedding_is_permutation_invariant() {
         let embedding = WeightedFourierMeasureEmbedding::new(8).unwrap();
         let positions = [0.05, 0.23, 0.61, 0.94];
