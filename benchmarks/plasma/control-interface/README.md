@@ -51,3 +51,27 @@ The fixture contains three matched known-answer cases:
 3. **Actuator-rank negative:** repeated unstable eigenvalues, full independent observation, but one actuator direction; the system is observable but not controllable.
 
 The checks report the smallest/largest Gramian eigenvalues and condition numbers, plus the Boolean authority disposition. They are exact finite-horizon linear-system checks only. They do not establish Vlasov–Poisson observability, nonlinear stabilizability, actuator feasibility or closed-loop stability. The matrix must eventually be supplied by a separately qualified linearization / dispersion analysis for the exact kinetic cohort.
+
+
+## Deterministic Maxwell delay-cancellation predictor
+
+The Vlasov–Maxwell feedback extension is tracked in [#13570](https://github.com/Luminous-Dynamics/symthaea/issues/13570). The crate now exposes `predict_maxwell_delay_cancellation`, a deterministic baseline independent of any learned correction.
+
+It accepts:
+- delayed (E_1,E_2,B_3) samples;
+- interval-mean (J_1,J_2,\partial_x E_2,\partial_x B_3) over the exact preceding delay window;
+- the declared delay (\tau\).
+
+It returns the first-order / interval-integral field-cancellation command:
+
+```
+H1    = -E1_delayed + tau * mean(J1)
+H2    = -E2_delayed + tau * (mean(J2) + mean(dx B3))
+B_ext = -B3_delayed + tau * mean(dx E2)
+```
+
+These signs follow directly from the transverse/longitudinal Maxwell field equations. With exact interval means the formula is the delayed-to-current field cancellation identity; if the supplied quantities are merely endpoint samples, it is only a first-order approximation and must be scored as such.
+
+The API rejects empty or mismatched spatial arrays, non-finite observations, negative/non-finite delay and non-finite command arithmetic. Unit tests cover a manufactured interval-integral example, zero-delay reduction to instantaneous cancellation, shape/delay rejection and overflow.
+
+This is a deterministic model baseline only. It does not include sensor noise, derivative reconstruction, field actuation limits, learned residuals, a VM solver or closed-loop stability qualification. A future learned residual must be separately bounded and compared against this baseline.
