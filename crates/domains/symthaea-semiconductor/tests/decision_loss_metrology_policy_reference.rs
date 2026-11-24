@@ -138,7 +138,6 @@ fn permuting_assay_outcomes_does_not_change_expected_decision_risk() {
     assert!((original.1 - reversed.1).abs() < 1.0e-12);
 }
 
-
 fn digest(ch: char) -> String {
     std::iter::repeat_n(ch, 64).collect()
 }
