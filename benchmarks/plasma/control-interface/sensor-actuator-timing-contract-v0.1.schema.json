@@ -82,7 +82,8 @@
           "timestamp_age_bound_seconds",
           "jitter_bound_seconds",
           "noise_std",
-          "dropout_policy"
+          "dropout_policy",
+          "bandwidth_hz"
         ],
         "properties": {
           "channel_id": {
@@ -119,6 +120,10 @@
               "predict_with_uncertainty",
               "abstain"
             ]
+          },
+          "bandwidth_hz": {
+            "type": "number",
+            "exclusiveMinimum": 0
           }
         }
       }
@@ -187,7 +192,11 @@
         "deadline_seconds",
         "full_state_access",
         "maximum_observation_age_seconds",
-        "fallback_policy"
+        "fallback_policy",
+        "target_instability_frequency_hz",
+        "target_instability_efold_time_seconds",
+        "minimum_bandwidth_multiple",
+        "maximum_loop_latency_efold_fraction"
       ],
       "properties": {
         "update_period_seconds": {
@@ -215,6 +224,22 @@
             "safe_shutdown",
             "abstain_and_escalate"
           ]
+        },
+        "target_instability_frequency_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "target_instability_efold_time_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "minimum_bandwidth_multiple": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "maximum_loop_latency_efold_fraction": {
+          "type": "number",
+          "exclusiveMinimum": 0
         }
       }
     },
