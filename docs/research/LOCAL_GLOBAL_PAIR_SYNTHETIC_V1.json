@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.0.0",
+  "schema_version": "1.1.0",
   "candidate": {
     "pair_id": "PAIR-SYNTHETIC-IMPLICATION-CONVERSE-001",
     "task_class": "synthetic_control_not_model_evaluation",
@@ -165,6 +165,27 @@
           "atom": "q",
           "value": true
         }
+      ]
+    },
+    "global_use_adjudication": {
+      "disposition": "used_directly",
+      "reviewer_id": "SYNTHETIC-POSTHOC-REVIEWER-001",
+      "reviewer_authority": "synthetic_fixture_plan_trace_adjudication",
+      "reviewed_plan_sha256": "e0331b52d0b36a3244e42edf190b4b073bb084c1dd915a7f87c17b55b109fb74",
+      "target_warrant_id": "W-IMPLICATION-CONVERSE",
+      "reviewed_entire_plan": true,
+      "node_evidence": [
+        {
+          "plan_node_id": "N1",
+          "warrant_id": "W-IMPLICATION-CONVERSE",
+          "relation": "uses_as_rule",
+          "material_use": true,
+          "rationale_ref": "LOCAL-GLOBAL-PAIR:SYNTHETIC-ONLY"
+        }
+      ],
+      "evidence_refs": [
+        "PLAN-ARTIFACT:sha256:e0331b52d0b36a3244e42edf190b4b073bb084c1dd915a7f87c17b55b109fb74",
+        "LOCAL-GLOBAL-PAIR:SYNTHETIC-ONLY"
       ]
     }
   }
