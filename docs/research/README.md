@@ -370,3 +370,5 @@ The initial seed is source-pinned to Lean 4 core and is explicitly not expert-re
 - [Evaluator calibration protocol](MATH_PROOF_COMPREHENSION_EVALUATOR_CALIBRATION_V1.md) — compares expert review, formal/finite checkers, ProofGrader-style and evidence-constrained LLM judges; issue #13476.
 
 - [HardModeReceiptV1 protocol](MATH_HARDMODE_RECEIPT_V1.md), [schema](MATH_HARDMODE_RECEIPT_V1.schema.json) and [synthetic receipt](MATH_HARDMODE_SYNTHETIC_V1.json) — separately records answer discovery, formalization, countermodel quality and proof-checker outcome.
+
+- [Proof-scope equivalence protocol](MATH_SCOPE_EQUIVALENCE_V1.md) — retains exact-scope CIRR as primary and defines a separately reported, proof-carrying comparability tier for harmless representational changes; issue [#13537](https://github.com/Luminous-Dynamics/symthaea/issues/13537).
