@@ -95,6 +95,13 @@
       "receipt_sha256": "3535353535353535353535353535353535353535353535353535353535353535",
       "verifier_profile_id": "capture-closure-v2",
       "verification_receipt_sha256": "3636363636363636363636363636363636363636363636363636363636363636"
+    },
+    "source_kind": "rendered_audio_loopback",
+    "heartbeat_accounting": {
+      "expected": 0,
+      "observed": 0,
+      "missing": 0,
+      "duplicate": 0
     }
   },
   "observation": {
