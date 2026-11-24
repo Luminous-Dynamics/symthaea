@@ -103,6 +103,8 @@ cargo run -p sympoetic-bench -- summarize-team-retention \
   --draws 2000 --seed 42
 ```
 
+This team-retention scorecard should be paired with Mycelix [DELIB-DIST-INFO-001 #6089](https://github.com/Luminous-Dynamics/mycelix/issues/6089), which owns latent-information discovery, evidence provenance, rights-aware withholding and justified stopping. Keep the information-discovery tournament separate: it needs its own HiddenBench-style hidden-profile tasks and strong BM25/source-exact retrieval baselines. This evaluator measures post-collaboration team capability; it does not measure whether missing information was successfully discovered.
+
 Protocol and limitations: [TEAM_RETENTION_FACTORIAL_V0.1.md](../../../docs/benchmarks/sympoetic/TEAM_RETENTION_FACTORIAL_V0.1.md). The fixture is fictional. The estimator validates the declared AI-off receipt status and digest shape; it does not authenticate isolation or prove that an AI endpoint was actually unavailable.
 
 ## Status and limitations
