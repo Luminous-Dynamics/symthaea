@@ -1515,12 +1515,9 @@ mod tests {
         let ambiguous_score =
             score_temporal_grounding(&ambiguous_truth, &ambiguous_prediction, &plan()).unwrap();
 
-        let aggregate = aggregate_temporal_grounding_scores(&[
-            single_score,
-            negative_score,
-            ambiguous_score,
-        ])
-        .unwrap();
+        let aggregate =
+            aggregate_temporal_grounding_scores(&[single_score, negative_score, ambiguous_score])
+                .unwrap();
         assert_eq!(aggregate.one_to_many_queries, 0);
         assert_eq!(aggregate.one_to_many_macro_temporal_f1, None);
         assert_eq!(aggregate.one_to_many_count_gated_f1, None);
