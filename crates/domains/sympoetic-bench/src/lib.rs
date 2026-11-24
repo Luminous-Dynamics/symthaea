@@ -6,14 +6,14 @@
 
 pub mod agent_protocol;
 pub mod metrics;
-pub mod reliability;
 pub mod model;
-pub mod trajectory;
+pub mod reliability;
 pub mod team_retention;
+pub mod trajectory;
 pub mod validate;
 
 pub use model::{Scenario, Scorecard, Trace};
 pub use validate::{
-    CorpusValidation, TraceValidation, validate_corpus, validate_scenario,
-    validate_scorecard, validate_trace,
+    CorpusValidation, TraceValidation, validate_corpus, validate_scenario, validate_scorecard,
+    validate_trace,
 };

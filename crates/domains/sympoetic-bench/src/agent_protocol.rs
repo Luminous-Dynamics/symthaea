@@ -212,7 +212,11 @@ impl AgentTurnRequest {
                 bail!("duplicate available tool {:?}", tool.name);
             }
         }
-        if self.constraints.iter().any(|constraint| constraint.trim().is_empty()) {
+        if self
+            .constraints
+            .iter()
+            .any(|constraint| constraint.trim().is_empty())
+        {
             bail!("constraints must not contain empty entries");
         }
         let mut event_ids = HashSet::new();
@@ -272,7 +276,10 @@ impl AgentProtocolGuard {
         }
         require_member("decision action", &decision.action, ALLOWED_ACTIONS)?;
         if !request.authority.allowed_actions.contains(&decision.action) {
-            bail!("decision action {:?} is outside the granted authority", decision.action);
+            bail!(
+                "decision action {:?} is outside the granted authority",
+                decision.action
+            );
         }
 
         match decision.action.as_str() {
@@ -280,7 +287,10 @@ impl AgentProtocolGuard {
                 if request.budget.tool_calls_remaining == 0 {
                     bail!("tool-call budget is exhausted");
                 }
-                let call_id = decision.call_id.as_deref().context("tool_call requires call_id")?;
+                let call_id = decision
+                    .call_id
+                    .as_deref()
+                    .context("tool_call requires call_id")?;
                 let tool_name = decision
                     .tool_name
                     .as_deref()
@@ -293,7 +303,10 @@ impl AgentProtocolGuard {
                     .idempotency_key
                     .as_deref()
                     .context("tool_call requires idempotency_key")?;
-                let purpose = decision.purpose.as_deref().context("tool_call requires purpose")?;
+                let purpose = decision
+                    .purpose
+                    .as_deref()
+                    .context("tool_call requires purpose")?;
                 require_nonempty("call_id", call_id)?;
                 require_nonempty("tool_name", tool_name)?;
                 require_nonempty("idempotency_key", idempotency_key)?;
@@ -301,8 +314,15 @@ impl AgentProtocolGuard {
                 if purpose.chars().count() > 500 {
                     bail!("tool-call purpose exceeds 500 characters");
                 }
-                if !request.available_tools.iter().any(|tool| tool.name == tool_name) {
-                    bail!("tool {:?} is not in the role-filtered available tool list", tool_name);
+                if !request
+                    .available_tools
+                    .iter()
+                    .any(|tool| tool.name == tool_name)
+                {
+                    bail!(
+                        "tool {:?} is not in the role-filtered available tool list",
+                        tool_name
+                    );
                 }
                 if self.seen_call_ids.contains(call_id) {
                     bail!("duplicate call_id {:?}", call_id);
@@ -324,7 +344,10 @@ impl AgentProtocolGuard {
                 });
             }
             "ask" => {
-                let question = decision.question.as_deref().context("ask requires question")?;
+                let question = decision
+                    .question
+                    .as_deref()
+                    .context("ask requires question")?;
                 let why = decision
                     .why_required
                     .as_deref()
@@ -345,10 +368,16 @@ impl AgentProtocolGuard {
                 }
             }
             "defer" => {
-                let reason = decision.reason.as_deref().context("defer requires reason")?;
+                let reason = decision
+                    .reason
+                    .as_deref()
+                    .context("defer requires reason")?;
                 require_nonempty("defer reason", reason)?;
                 if decision.blocked_on.is_empty()
-                    || decision.blocked_on.iter().any(|item| item.trim().is_empty())
+                    || decision
+                        .blocked_on
+                        .iter()
+                        .any(|item| item.trim().is_empty())
                 {
                     bail!("defer requires at least one non-empty blocker");
                 }
@@ -363,7 +392,10 @@ impl AgentProtocolGuard {
                 }
             }
             "final_answer" => {
-                let content = decision.content.as_deref().context("final_answer requires content")?;
+                let content = decision
+                    .content
+                    .as_deref()
+                    .context("final_answer requires content")?;
                 require_nonempty("final_answer content", content)?;
                 ensure_no_tool_fields(decision)?;
                 if decision.question.is_some()

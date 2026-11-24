@@ -1,7 +1,7 @@
 use anyhow::{Context, Result, bail};
 use rand::{Rng, SeedableRng, rngs::StdRng};
-use std::collections::{BTreeMap, HashSet};
 use serde::{Deserialize, Serialize};
+use std::collections::{BTreeMap, HashSet};
 
 #[derive(Debug, Clone, Copy, Serialize)]
 pub struct BootstrapEstimate {
@@ -63,8 +63,6 @@ pub fn handoff_recovery_rate(recovered: u64, attempted: u64) -> Result<Option<f6
     Ok(Some(recovered as f64 / attempted as f64))
 }
 
-
-
 /// A blinded, task-specific adjudication of one intervention decision.
 /// These labels must come from a preregistered rubric and independent review,
 /// not from the evaluated agent's own self-score.
@@ -102,14 +100,10 @@ pub fn summarize_interventions(records: &[InterventionRecord]) -> Result<Interve
 
     for (index, record) in records.iter().enumerate() {
         if record.unnecessary && record.appropriate {
-            bail!(
-            "record {index}: an unnecessary intervention cannot be appropriate"
-        );
+            bail!("record {index}: an unnecessary intervention cannot be appropriate");
         }
         if record.critical_missed && !record.critical_opportunity {
-            bail!(
-            "record {index}: a missed critical intervention requires an opportunity"
-        );
+            bail!("record {index}: a missed critical intervention requires an opportunity");
         }
         if record.appropriate {
             appropriate_count += 1;
@@ -125,9 +119,7 @@ pub fn summarize_interventions(records: &[InterventionRecord]) -> Result<Interve
         }
         if let Some(regret) = record.counterfactual_regret {
             if !regret.is_finite() || !(0.0..=1.0).contains(&regret) {
-                bail!(
-                    "record {index}: counterfactual regret must be finite and in [0, 1]"
-                );
+                bail!("record {index}: counterfactual regret must be finite and in [0, 1]");
             }
             regret_sum += regret;
             regret_count += 1;
@@ -145,8 +137,7 @@ pub fn summarize_interventions(records: &[InterventionRecord]) -> Result<Interve
             .then_some(unnecessary_count as f64 / decision_count as f64),
         missed_critical_intervention_rate: (critical_opportunity_count > 0)
             .then_some(critical_missed_count as f64 / critical_opportunity_count as f64),
-        mean_intervention_regret: (regret_count > 0)
-            .then_some(regret_sum / regret_count as f64),
+        mean_intervention_regret: (regret_count > 0).then_some(regret_sum / regret_count as f64),
     })
 }
 
@@ -159,7 +150,10 @@ pub fn marginal_contribution_impact(
     replay_quality: f64,
     replay_identifiable: bool,
 ) -> Result<Option<f64>> {
-    for (name, score) in [("full_quality", full_quality), ("replay_quality", replay_quality)] {
+    for (name, score) in [
+        ("full_quality", full_quality),
+        ("replay_quality", replay_quality),
+    ] {
         if !score.is_finite() || !(0.0..=1.0).contains(&score) {
             bail!("{name} must be finite and in [0, 1]");
         }
@@ -169,7 +163,6 @@ pub fn marginal_contribution_impact(
     }
     Ok(Some(full_quality - replay_quality))
 }
-
 
 /// Exact Shapley attribution over a complete, bounded coalition-value table.
 ///
@@ -208,10 +201,8 @@ pub fn exact_shapley_values(coalition_values: &[Option<f64>]) -> Result<Vec<f64>
             }
             let coalition_size = coalition.count_ones() as usize;
             let weight = 1.0
-                / (player_count as f64
-                    * binomial_coefficient(player_count - 1, coalition_size));
-            shapley[player] +=
-                weight * (values[coalition | bit] - values[coalition]);
+                / (player_count as f64 * binomial_coefficient(player_count - 1, coalition_size));
+            shapley[player] += weight * (values[coalition | bit] - values[coalition]);
         }
     }
     Ok(shapley)
@@ -248,9 +239,7 @@ pub fn participant_capability_amplification(
         || collaborative_pre.len() < 2
         || control_pre.len() < 2
     {
-        bail!(
-            "capability amplification needs matched scores and two participants per arm"
-        );
+        bail!("capability amplification needs matched scores and two participants per arm");
     }
     if draws < 1_000 {
         bail!("capability amplification bootstrap requires at least 1,000 draws");
@@ -295,7 +284,6 @@ pub fn participant_capability_amplification(
         control_participants: control_gains.len(),
     })
 }
-
 
 /// One participant's independent pre/post assessment within a preregistered
 /// baseline-capability stratum. Strata must be derived from baseline task data
@@ -377,14 +365,18 @@ pub fn summarize_capability_amplification_by_stratum(
         validate_learning_score("post_score", index, observation.post_score)?;
 
         let arm = match observation.condition.as_str() {
-            "collaborative" => &mut groups
-                .entry(observation.baseline_stratum.clone())
-                .or_default()
-                .collaborative,
-            "control" => &mut groups
-                .entry(observation.baseline_stratum.clone())
-                .or_default()
-                .control,
+            "collaborative" => {
+                &mut groups
+                    .entry(observation.baseline_stratum.clone())
+                    .or_default()
+                    .collaborative
+            }
+            "control" => {
+                &mut groups
+                    .entry(observation.baseline_stratum.clone())
+                    .or_default()
+                    .control
+            }
             other => bail!("unsupported capability condition {other:?}"),
         };
         arm.pre.push(observation.pre_score);
@@ -412,8 +404,7 @@ pub fn summarize_capability_amplification_by_stratum(
         let control_n = group.control.pre.len();
         let collaborative_negative_gain_rate =
             group.collaborative.negative_gains as f64 / collaborative_n as f64;
-        let control_negative_gain_rate =
-            group.control.negative_gains as f64 / control_n as f64;
+        let control_negative_gain_rate = group.control.negative_gains as f64 / control_n as f64;
         let negative_gain_rate_difference =
             collaborative_negative_gain_rate - control_negative_gain_rate;
 
@@ -432,8 +423,7 @@ pub fn summarize_capability_amplification_by_stratum(
             .map(|(pre, post)| (*post < *pre) as u8 as f64)
             .collect::<Vec<_>>();
         let mut rng = StdRng::seed_from_u64(
-            seed
-                .wrapping_add(index as u64)
+            seed.wrapping_add(index as u64)
                 .wrapping_add(0x9e37_79b9_7f4a_7c15),
         );
         let mut negative_rate_samples = Vec::with_capacity(draws);
@@ -460,14 +450,8 @@ pub fn summarize_capability_amplification_by_stratum(
             collaborative_negative_gain_rate,
             control_negative_gain_rate,
             negative_gain_rate_difference,
-            negative_gain_rate_difference_ci_95_lower: percentile(
-                &negative_rate_samples,
-                0.025,
-            ),
-            negative_gain_rate_difference_ci_95_upper: percentile(
-                &negative_rate_samples,
-                0.975,
-            ),
+            negative_gain_rate_difference_ci_95_lower: percentile(&negative_rate_samples, 0.025),
+            negative_gain_rate_difference_ci_95_upper: percentile(&negative_rate_samples, 0.975),
         });
     }
 
@@ -576,7 +560,6 @@ pub fn synergy_bootstrap(
     paired_cluster_bootstrap_difference(&solo_best, &joint, draws, seed)
 }
 
-
 /// One independently adjudicated claim with a confidence estimate made before
 /// feedback. Confidence is the probability assigned to the claim being correct.
 #[derive(Debug, Clone, Copy)]
@@ -619,7 +602,8 @@ pub fn summarize_confidence(
     if !(2..=100).contains(&calibration_bins) {
         bail!("calibration_bins must be in 2..=100");
     }
-    if !selective_coverage.is_finite() || !(0.0..=1.0).contains(&selective_coverage)
+    if !selective_coverage.is_finite()
+        || !(0.0..=1.0).contains(&selective_coverage)
         || selective_coverage == 0.0
     {
         bail!("selective_coverage must be finite and in (0, 1]");
@@ -632,9 +616,7 @@ pub fn summarize_confidence(
     let mut correct_count = 0usize;
 
     for (index, observation) in observations.iter().enumerate() {
-        if !observation.confidence.is_finite()
-            || !(0.0..=1.0).contains(&observation.confidence)
-        {
+        if !observation.confidence.is_finite() || !(0.0..=1.0).contains(&observation.confidence) {
             bail!("confidence[{index}] must be finite and in [0, 1]");
         }
         let target = if observation.correct { 1.0 } else { 0.0 };
@@ -693,10 +675,7 @@ pub fn summarize_confidence(
         }
         let positive = correct_count as f64;
         let negative = incorrect_count as f64;
-        Some(
-            (positive_rank_sum - positive * (positive + 1.0) / 2.0)
-                / (positive * negative),
-        )
+        Some((positive_rank_sum - positive * (positive + 1.0) / 2.0) / (positive * negative))
     };
 
     let mut selective = observations.to_vec();
@@ -714,17 +693,11 @@ pub fn summarize_confidence(
         .filter(|item| item.confidence == cutoff_confidence)
         .collect::<Vec<_>>();
     let needed_from_tie = selected_count - strictly_above.len();
-    let correct_above = strictly_above
-        .iter()
-        .filter(|item| item.correct)
-        .count() as f64;
-    let correct_at_tie = tied_at_cutoff
-        .iter()
-        .filter(|item| item.correct)
-        .count() as f64;
+    let correct_above = strictly_above.iter().filter(|item| item.correct).count() as f64;
+    let correct_at_tie = tied_at_cutoff.iter().filter(|item| item.correct).count() as f64;
     // Fractional tie handling makes the result invariant to input ordering.
-    let selected_correct = correct_above
-        + correct_at_tie * needed_from_tie as f64 / tied_at_cutoff.len() as f64;
+    let selected_correct =
+        correct_above + correct_at_tie * needed_from_tie as f64 / tied_at_cutoff.len() as f64;
 
     Ok(ConfidenceSummary {
         observation_count: count,
@@ -793,9 +766,7 @@ pub fn summarize_cognitive_process(
 
     for (index, observation) in observations.iter().enumerate() {
         if observation.human_verified_ai_step && !observation.ai_supplied_core_step {
-            bail!(
-                "process observation {index}: verification requires an AI-supplied step"
-            );
+            bail!("process observation {index}: verification requires an AI-supplied step");
         }
         planned += observation.human_planned as usize;
         attempted_first += observation.human_attempted_before_ai as usize;
@@ -838,13 +809,25 @@ fn percentile(sorted: &[f64], quantile: f64) -> f64 {
 mod tests {
     use super::*;
 
-        #[test]
+    #[test]
     fn confidence_metrics_separate_calibration_from_metacognitive_sensitivity() {
         let observations = [
-            ConfidenceObservation { confidence: 0.9, correct: true },
-            ConfidenceObservation { confidence: 0.8, correct: true },
-            ConfidenceObservation { confidence: 0.2, correct: false },
-            ConfidenceObservation { confidence: 0.1, correct: false },
+            ConfidenceObservation {
+                confidence: 0.9,
+                correct: true,
+            },
+            ConfidenceObservation {
+                confidence: 0.8,
+                correct: true,
+            },
+            ConfidenceObservation {
+                confidence: 0.2,
+                correct: false,
+            },
+            ConfidenceObservation {
+                confidence: 0.1,
+                correct: false,
+            },
         ];
         let summary = summarize_confidence(&observations, 5, 0.5).unwrap();
         assert_eq!(summary.observation_count, 4);
@@ -859,16 +842,40 @@ mod tests {
     #[test]
     fn selective_accuracy_is_invariant_to_ordering_of_cutoff_ties() {
         let first = [
-            ConfidenceObservation { confidence: 0.9, correct: true },
-            ConfidenceObservation { confidence: 0.8, correct: false },
-            ConfidenceObservation { confidence: 0.8, correct: true },
-            ConfidenceObservation { confidence: 0.1, correct: false },
+            ConfidenceObservation {
+                confidence: 0.9,
+                correct: true,
+            },
+            ConfidenceObservation {
+                confidence: 0.8,
+                correct: false,
+            },
+            ConfidenceObservation {
+                confidence: 0.8,
+                correct: true,
+            },
+            ConfidenceObservation {
+                confidence: 0.1,
+                correct: false,
+            },
         ];
         let reversed_tie_order = [
-            ConfidenceObservation { confidence: 0.9, correct: true },
-            ConfidenceObservation { confidence: 0.8, correct: true },
-            ConfidenceObservation { confidence: 0.8, correct: false },
-            ConfidenceObservation { confidence: 0.1, correct: false },
+            ConfidenceObservation {
+                confidence: 0.9,
+                correct: true,
+            },
+            ConfidenceObservation {
+                confidence: 0.8,
+                correct: true,
+            },
+            ConfidenceObservation {
+                confidence: 0.8,
+                correct: false,
+            },
+            ConfidenceObservation {
+                confidence: 0.1,
+                correct: false,
+            },
         ];
         let a = summarize_confidence(&first, 5, 0.5).unwrap();
         let b = summarize_confidence(&reversed_tie_order, 5, 0.5).unwrap();
@@ -879,8 +886,14 @@ mod tests {
     #[test]
     fn confidence_auc_gives_half_credit_for_tied_confidence() {
         let observations = [
-            ConfidenceObservation { confidence: 0.5, correct: true },
-            ConfidenceObservation { confidence: 0.5, correct: false },
+            ConfidenceObservation {
+                confidence: 0.5,
+                correct: true,
+            },
+            ConfidenceObservation {
+                confidence: 0.5,
+                correct: false,
+            },
         ];
         let summary = summarize_confidence(&observations, 2, 1.0).unwrap();
         assert_eq!(summary.metacognitive_sensitivity_auc, Some(0.5));
@@ -890,8 +903,14 @@ mod tests {
     #[test]
     fn confidence_sensitivity_is_unavailable_without_both_outcome_classes() {
         let observations = [
-            ConfidenceObservation { confidence: 0.7, correct: true },
-            ConfidenceObservation { confidence: 0.8, correct: true },
+            ConfidenceObservation {
+                confidence: 0.7,
+                correct: true,
+            },
+            ConfidenceObservation {
+                confidence: 0.8,
+                correct: true,
+            },
         ];
         let summary = summarize_confidence(&observations, 4, 0.8).unwrap();
         assert_eq!(summary.metacognitive_sensitivity_auc, None);
@@ -899,10 +918,16 @@ mod tests {
 
     #[test]
     fn confidence_metrics_reject_invalid_bins_coverage_and_scores() {
-        let valid = [ConfidenceObservation { confidence: 0.7, correct: true }];
+        let valid = [ConfidenceObservation {
+            confidence: 0.7,
+            correct: true,
+        }];
         assert!(summarize_confidence(&valid, 1, 0.8).is_err());
         assert!(summarize_confidence(&valid, 4, 0.0).is_err());
-        let invalid = [ConfidenceObservation { confidence: 1.1, correct: true }];
+        let invalid = [ConfidenceObservation {
+            confidence: 1.1,
+            correct: true,
+        }];
         assert!(summarize_confidence(&invalid, 4, 0.8).is_err());
     }
 
@@ -957,7 +982,9 @@ mod tests {
             human_reflected: true,
         }];
         assert_eq!(
-            summarize_cognitive_process(&no_ai).unwrap().human_verification_rate,
+            summarize_cognitive_process(&no_ai)
+                .unwrap()
+                .human_verification_rate,
             None
         );
     }
@@ -1079,8 +1106,7 @@ mod tests {
         let values = (0..8)
             .map(|mask| {
                 Some(
-                    0.1
-                        + if mask & 1 != 0 { 0.1 } else { 0.0 }
+                    0.1 + if mask & 1 != 0 { 0.1 } else { 0.0 }
                         + if mask & 2 != 0 { 0.2 } else { 0.0 }
                         + if mask & 4 != 0 { 0.3 } else { 0.0 },
                 )
@@ -1113,13 +1139,9 @@ mod tests {
     #[test]
     fn stratified_capability_amplification_exposes_unequal_benefit_and_harm() {
         let mut observations = Vec::new();
-        for (i, (pre, post)) in [
-            (0.1, 0.2),
-            (0.2, 0.25),
-            (0.3, 0.4),
-        ]
-        .into_iter()
-        .enumerate()
+        for (i, (pre, post)) in [(0.1, 0.2), (0.2, 0.25), (0.3, 0.4)]
+            .into_iter()
+            .enumerate()
         {
             observations.push(StratifiedCapabilityObservation {
                 participant_id: format!("low-collab-{i}"),
@@ -1129,13 +1151,9 @@ mod tests {
                 post_score: post,
             });
         }
-        for (i, (pre, post)) in [
-            (0.1, 0.15),
-            (0.2, 0.3),
-            (0.3, 0.35),
-        ]
-        .into_iter()
-        .enumerate()
+        for (i, (pre, post)) in [(0.1, 0.15), (0.2, 0.3), (0.3, 0.35)]
+            .into_iter()
+            .enumerate()
         {
             observations.push(StratifiedCapabilityObservation {
                 participant_id: format!("low-control-{i}"),
@@ -1145,13 +1163,9 @@ mod tests {
                 post_score: post,
             });
         }
-        for (i, (pre, post)) in [
-            (0.7, 0.6),
-            (0.75, 0.8),
-            (0.8, 0.82),
-        ]
-        .into_iter()
-        .enumerate()
+        for (i, (pre, post)) in [(0.7, 0.6), (0.75, 0.8), (0.8, 0.82)]
+            .into_iter()
+            .enumerate()
         {
             observations.push(StratifiedCapabilityObservation {
                 participant_id: format!("high-collab-{i}"),
@@ -1161,13 +1175,9 @@ mod tests {
                 post_score: post,
             });
         }
-        for (i, (pre, post)) in [
-            (0.7, 0.75),
-            (0.75, 0.8),
-            (0.8, 0.82),
-        ]
-        .into_iter()
-        .enumerate()
+        for (i, (pre, post)) in [(0.7, 0.75), (0.75, 0.8), (0.8, 0.82)]
+            .into_iter()
+            .enumerate()
         {
             observations.push(StratifiedCapabilityObservation {
                 participant_id: format!("high-control-{i}"),
@@ -1178,10 +1188,10 @@ mod tests {
             });
         }
 
-        let first = summarize_capability_amplification_by_stratum(&observations, 2_000, 42)
-            .unwrap();
-        let second = summarize_capability_amplification_by_stratum(&observations, 2_000, 42)
-            .unwrap();
+        let first =
+            summarize_capability_amplification_by_stratum(&observations, 2_000, 42).unwrap();
+        let second =
+            summarize_capability_amplification_by_stratum(&observations, 2_000, 42).unwrap();
         assert_eq!(first.strata.len(), 2);
         assert_eq!(first.strata[0].baseline_stratum, "high_baseline");
         assert_eq!(first.strata[1].baseline_stratum, "low_baseline");
@@ -1200,14 +1210,8 @@ mod tests {
             first.strata[0].negative_gain_rate_difference_ci_95_lower,
             second.strata[0].negative_gain_rate_difference_ci_95_lower
         );
-        assert_eq!(
-            first.strata[0].ci_95_lower,
-            second.strata[0].ci_95_lower
-        );
-        assert_eq!(
-            first.strata[1].ci_95_upper,
-            second.strata[1].ci_95_upper
-        );
+        assert_eq!(first.strata[0].ci_95_lower, second.strata[0].ci_95_lower);
+        assert_eq!(first.strata[1].ci_95_upper, second.strata[1].ci_95_upper);
     }
 
     #[test]
@@ -1228,9 +1232,7 @@ mod tests {
                 post_score: 0.25,
             },
         ];
-        assert!(
-            summarize_capability_amplification_by_stratum(&duplicate, 1_000, 5).is_err()
-        );
+        assert!(summarize_capability_amplification_by_stratum(&duplicate, 1_000, 5).is_err());
 
         let underfilled = [
             StratifiedCapabilityObservation {
@@ -1248,9 +1250,7 @@ mod tests {
                 post_score: 0.4,
             },
         ];
-        assert!(
-            summarize_capability_amplification_by_stratum(&underfilled, 1_000, 5).is_err()
-        );
+        assert!(summarize_capability_amplification_by_stratum(&underfilled, 1_000, 5).is_err());
     }
 
     #[test]
@@ -1286,30 +1286,36 @@ mod tests {
 
     #[test]
     fn capability_amplification_rejects_unmatched_or_invalid_learning_scores() {
-        assert!(participant_capability_amplification(
-            &[0.2],
-            &[0.4],
-            &[0.2, 0.3],
-            &[0.3, 0.4],
-            1_000,
-            7,
-        )
-        .is_err());
-        assert!(participant_capability_amplification(
-            &[0.2, 0.3],
-            &[0.4, f64::NAN],
-            &[0.2, 0.3],
-            &[0.3, 0.4],
-            1_000,
-            7,
-        )
-        .is_err());
+        assert!(
+            participant_capability_amplification(
+                &[0.2],
+                &[0.4],
+                &[0.2, 0.3],
+                &[0.3, 0.4],
+                1_000,
+                7,
+            )
+            .is_err()
+        );
+        assert!(
+            participant_capability_amplification(
+                &[0.2, 0.3],
+                &[0.4, f64::NAN],
+                &[0.2, 0.3],
+                &[0.3, 0.4],
+                1_000,
+                7,
+            )
+            .is_err()
+        );
     }
 
     #[test]
     fn non_identifiable_counterfactual_is_reported_as_unavailable() {
         assert_eq!(marginal_contribution_impact(0.8, 0.6, false).unwrap(), None);
-        let impact = marginal_contribution_impact(0.8, 0.6, true).unwrap().unwrap();
+        let impact = marginal_contribution_impact(0.8, 0.6, true)
+            .unwrap()
+            .unwrap();
         assert!((impact - 0.2).abs() < 1e-12);
         assert!(marginal_contribution_impact(1.1, 0.6, true).is_err());
     }

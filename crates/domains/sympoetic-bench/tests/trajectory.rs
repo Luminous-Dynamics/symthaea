@@ -1,6 +1,5 @@
 use sympoetic_bench::trajectory::{
-    TeamChange, TeamCycle, TeamMember, TeamTrajectory, compute_cycle_digest,
-    validate_trajectory,
+    TeamChange, TeamCycle, TeamMember, TeamTrajectory, compute_cycle_digest, validate_trajectory,
 };
 
 fn digest(ch: char) -> String {
@@ -88,9 +87,8 @@ fn cycle_one(previous: &TeamCycle) -> TeamCycle {
 
 #[test]
 fn trajectory_fixture_file_validates_as_a_reproducible_two_cycle_example() {
-    let fixture = include_str!(
-        "../../../../docs/benchmarks/sympoetic/fixtures/team-trajectory.example.json"
-    );
+    let fixture =
+        include_str!("../../../../docs/benchmarks/sympoetic/fixtures/team-trajectory.example.json");
     let trajectory: TeamTrajectory = serde_json::from_str(fixture).unwrap();
     let receipt = validate_trajectory(&trajectory, fixture.as_bytes()).unwrap();
     assert_eq!(receipt.cycle_count, 2);

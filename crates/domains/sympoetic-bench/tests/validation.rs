@@ -1,14 +1,14 @@
+use sympoetic_bench::model::{
+    ExecutionInfo, HardGates, MetricEvidence, ProvenanceInfo, Scores, SystemInfo, ToolExecution,
+    TraceEvent,
+};
 use sympoetic_bench::{
     Scorecard, Trace,
     metrics::{
-        collaboration_gap, handoff_recovery_rate, partner_order_sensitivity, synergy_delta,
-        summarize_interventions, InterventionRecord,
+        InterventionRecord, collaboration_gap, handoff_recovery_rate, partner_order_sensitivity,
+        summarize_interventions, synergy_delta,
     },
     validate::{validate_corpus, validate_scorecard, validate_trace},
-};
-use sympoetic_bench::model::{
-    ExecutionInfo, HardGates, MetricEvidence, ProvenanceInfo, Scores, SystemInfo,
-    TraceEvent, ToolExecution,
 };
 
 const SEED_CORPUS: &str =
@@ -45,8 +45,7 @@ fn base_event(id: &str, sequence: u64, event_type: &str) -> TraceEvent {
 
 fn fixture_metric_evidence(metric_name: &str, value: f64) -> MetricEvidence {
     let scorer_kind = match metric_name {
-        "participant_agency_mean"
-        | "agency_delta_sd_vs_reference" => "participant_self_report",
+        "participant_agency_mean" | "agency_delta_sd_vs_reference" => "participant_self_report",
         "task_quality"
         | "quality_matched_diversity_ratio"
         | "expert_rater_agreement"
@@ -63,33 +62,32 @@ fn fixture_metric_evidence(metric_name: &str, value: f64) -> MetricEvidence {
         | "human_verification_rate" => "independent_observer",
         _ => "deterministic",
     };
-    let sample_unit = if metric_name.starts_with("participant_")
-        || metric_name.starts_with("human_")
-    {
-        "participant"
-    } else if metric_name.starts_with("agent_") {
-        "claim"
-    } else if metric_name.contains("intervention") || metric_name.contains("regret") {
-        "decision"
-    } else if metric_name.contains("handoff")
-        || metric_name.contains("repair")
-        || metric_name.starts_with("attribution_")
-    {
-        "event"
-    } else if metric_name.contains("synergy")
-        || metric_name.contains("collaboration")
-        || metric_name == "quality_matched_diversity_ratio"
-    {
-        "task"
-    } else if metric_name == "task_quality"
-        || metric_name == "expert_rater_agreement"
-        || metric_name == "cohen_kappa_nominal"
-        || metric_name == "krippendorff_alpha_nominal"
-    {
-        "rater"
-    } else {
-        "run"
-    };
+    let sample_unit =
+        if metric_name.starts_with("participant_") || metric_name.starts_with("human_") {
+            "participant"
+        } else if metric_name.starts_with("agent_") {
+            "claim"
+        } else if metric_name.contains("intervention") || metric_name.contains("regret") {
+            "decision"
+        } else if metric_name.contains("handoff")
+            || metric_name.contains("repair")
+            || metric_name.starts_with("attribution_")
+        {
+            "event"
+        } else if metric_name.contains("synergy")
+            || metric_name.contains("collaboration")
+            || metric_name == "quality_matched_diversity_ratio"
+        {
+            "task"
+        } else if metric_name == "task_quality"
+            || metric_name == "expert_rater_agreement"
+            || metric_name == "cohen_kappa_nominal"
+            || metric_name == "krippendorff_alpha_nominal"
+        {
+            "rater"
+        } else {
+            "run"
+        };
     MetricEvidence {
         metric_name: metric_name.to_owned(),
         value,
@@ -370,7 +368,9 @@ fn unknown_tool_outcome_blocks_next_tool_invocation_until_reconciled() {
     });
 
     let mut invocation = base_event("second-mutation", 1, "tool_invocation");
-    invocation.parent_event_ids.push("tool-result-unknown".to_owned());
+    invocation
+        .parent_event_ids
+        .push("tool-result-unknown".to_owned());
 
     let blocked = Trace {
         schema_version: "sympoetic-trace/0.1".to_owned(),
@@ -384,7 +384,9 @@ fn unknown_tool_outcome_blocks_next_tool_invocation_until_reconciled() {
 
     let mut reconciled = base_event("reconciled", 1, "execution_reconciled");
     reconciled.actor = "environment".to_owned();
-    reconciled.parent_event_ids.push("tool-result-unknown".to_owned());
+    reconciled
+        .parent_event_ids
+        .push("tool-result-unknown".to_owned());
     reconciled.reconciled_status = Some("not_executed".to_owned());
     reconciled.reconciliation_state_digest = Some(digest('f'));
     invocation.sequence = 2;
@@ -418,7 +420,9 @@ fn unknown_execution_blocks_non_tool_external_side_effects_too() {
     });
     let mut artifact_change = base_event("external-artifact-write", 1, "artifact_revised");
     artifact_change.external_side_effect = true;
-    artifact_change.parent_event_ids.push("unknown-tool-result".to_owned());
+    artifact_change
+        .parent_event_ids
+        .push("unknown-tool-result".to_owned());
 
     let trace = Trace {
         schema_version: "sympoetic-trace/0.1".to_owned(),
@@ -489,7 +493,10 @@ fn scorecard_cannot_average_away_a_hard_gate_failure() {
     let mut scorecard = base_scorecard();
     scorecard.hard_gates.consent_violation_count = 1;
     scorecard.hard_gates.pass = true;
-    scorecard.hard_gates.failure_event_ids.push("event-consent-1".to_owned());
+    scorecard
+        .hard_gates
+        .failure_event_ids
+        .push("event-consent-1".to_owned());
     assert!(validate_scorecard(&scorecard).is_err());
 
     scorecard.hard_gates.pass = false;
@@ -547,11 +554,7 @@ fn scorecard_preserves_negative_reliability_coefficients_without_clipping() {
     assert!(validate_scorecard(&scorecard).is_err());
 
     scorecard.scores.krippendorff_alpha_nominal = Some(f64::NAN);
-    sync_metric_evidence(
-        &mut scorecard,
-        "krippendorff_alpha_nominal",
-        f64::NAN,
-    );
+    sync_metric_evidence(&mut scorecard, "krippendorff_alpha_nominal", f64::NAN);
     assert!(validate_scorecard(&scorecard).is_err());
 }
 
@@ -602,13 +605,15 @@ fn confidence_assessment_requires_pre_feedback_confidence_and_valid_actor() {
 fn epistemic_source_and_revision_events_require_provenance_links() {
     let source = base_event("source", 0, "assistant_proposal");
     let mut attribution = base_event("attribution", 1, "source_attribution");
-    attribution.attribution.push(sympoetic_bench::model::Attribution {
-        contributor: "external_source".to_owned(),
-        contribution_type: "fact".to_owned(),
-        artifact_ref: "source:maintenance-log-1".to_owned(),
-        attribution_confidence: 1.0,
-        permission_ref: None,
-    });
+    attribution
+        .attribution
+        .push(sympoetic_bench::model::Attribution {
+            contributor: "external_source".to_owned(),
+            contribution_type: "fact".to_owned(),
+            artifact_ref: "source:maintenance-log-1".to_owned(),
+            attribution_confidence: 1.0,
+            permission_ref: None,
+        });
     let mut revision = base_event("revision", 2, "belief_revision");
     revision.parent_event_ids.push("source".to_owned());
     let trace = Trace {
@@ -795,9 +800,7 @@ fn canonical_score_table_and_metric_evidence_receipts_have_one_to_one_coverage()
 
     for (index, (name, _)) in entries.iter().enumerate() {
         assert!(
-            entries[index + 1..]
-                .iter()
-                .all(|(other, _)| other != name),
+            entries[index + 1..].iter().all(|(other, _)| other != name),
             "duplicate canonical metric name: {name}"
         );
     }

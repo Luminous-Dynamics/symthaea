@@ -56,9 +56,7 @@ pub fn cohens_kappa_nominal(
     let observed = observed_agreements as f64 / n;
     let expected = a_counts
         .iter()
-        .map(|(label, count_a)| {
-            *count_a as f64 * *b_counts.get(*label).unwrap_or(&0) as f64
-        })
+        .map(|(label, count_a)| *count_a as f64 * *b_counts.get(*label).unwrap_or(&0) as f64)
         .sum::<f64>()
         / (n * n);
 
@@ -74,9 +72,7 @@ pub fn cohens_kappa_nominal(
 /// ratings contribute to the marginal distribution but not observed pairwise
 /// disagreement. Returns None if there are no pairable items or expected
 /// disagreement is zero.
-pub fn krippendorff_alpha_nominal(
-    ratings: &[Vec<Option<&str>>],
-) -> Result<Option<f64>> {
+pub fn krippendorff_alpha_nominal(ratings: &[Vec<Option<&str>>]) -> Result<Option<f64>> {
     if ratings.is_empty() {
         return Ok(None);
     }
@@ -136,8 +132,7 @@ pub fn krippendorff_alpha_nominal(
         return Ok(None);
     }
 
-    let alpha = 1.0
-        - observed_disagreement * (total - 1.0) / expected_disagreement;
+    let alpha = 1.0 - observed_disagreement * (total - 1.0) / expected_disagreement;
     if !alpha.is_finite() {
         bail!("Krippendorff alpha calculation produced a non-finite value");
     }

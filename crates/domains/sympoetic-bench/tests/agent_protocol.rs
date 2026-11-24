@@ -1,7 +1,7 @@
 use serde_json::{Map, json};
 use sympoetic_bench::agent_protocol::{
-    AgentDecision, AgentProtocolGuard, AgentTask, AgentTurnRequest, Authority,
-    AvailableTool, DecisionBudget, HistoryEvent, ToolObservation,
+    AgentDecision, AgentProtocolGuard, AgentTask, AgentTurnRequest, Authority, AvailableTool,
+    DecisionBudget, HistoryEvent, ToolObservation,
 };
 
 fn digest(ch: char) -> String {
@@ -217,14 +217,20 @@ fn valid_request_and_tool_decision_are_accepted() {
     let req = request();
     req.validate().unwrap();
     let mut guard = AgentProtocolGuard::default();
-    guard.validate_decision(&req, &tool_decision("call-1", "read_service_status")).unwrap();
+    guard
+        .validate_decision(&req, &tool_decision("call-1", "read_service_status"))
+        .unwrap();
 }
 
 #[test]
 fn role_filtered_tool_catalogue_is_authoritative() {
     let req = request();
     let mut guard = AgentProtocolGuard::default();
-    assert!(guard.validate_decision(&req, &tool_decision("call-2", "delete_cluster")).is_err());
+    assert!(
+        guard
+            .validate_decision(&req, &tool_decision("call-2", "delete_cluster"))
+            .is_err()
+    );
 }
 
 #[test]
@@ -243,37 +249,67 @@ fn action_outside_granted_authority_is_rejected() {
 fn tool_call_cannot_be_followed_by_another_decision_before_observation() {
     let req = request();
     let mut guard = AgentProtocolGuard::default();
-    guard.validate_decision(&req, &tool_decision("call-4", "read_service_status")).unwrap();
-    assert!(guard.validate_decision(&req, &final_decision("decision-final")).is_err());
-    guard.apply_observation(&req, &tool_observation("call-4", "success", false)).unwrap();
-    guard.validate_decision(&req, &final_decision("decision-final")).unwrap();
+    guard
+        .validate_decision(&req, &tool_decision("call-4", "read_service_status"))
+        .unwrap();
+    assert!(
+        guard
+            .validate_decision(&req, &final_decision("decision-final"))
+            .is_err()
+    );
+    guard
+        .apply_observation(&req, &tool_observation("call-4", "success", false))
+        .unwrap();
+    guard
+        .validate_decision(&req, &final_decision("decision-final"))
+        .unwrap();
 }
 
 #[test]
 fn unknown_outcome_blocks_new_decisions_until_independent_reconciliation() {
     let req = request();
     let mut guard = AgentProtocolGuard::default();
-    guard.validate_decision(&req, &tool_decision("call-5", "read_service_status")).unwrap();
+    guard
+        .validate_decision(&req, &tool_decision("call-5", "read_service_status"))
+        .unwrap();
 
     let mut unknown = tool_observation("call-5", "unknown", true);
     unknown.postcondition_digest = None;
     guard.apply_observation(&req, &unknown).unwrap();
     assert!(guard.has_unresolved_execution());
-    assert!(guard.validate_decision(&req, &final_decision("decision-wait")).is_err());
-    assert!(guard.apply_observation(&req, &tool_observation("call-5", "success", false)).is_err());
+    assert!(
+        guard
+            .validate_decision(&req, &final_decision("decision-wait"))
+            .is_err()
+    );
+    assert!(
+        guard
+            .apply_observation(&req, &tool_observation("call-5", "success", false))
+            .is_err()
+    );
 
     guard.apply_observation(&req, &reconcile("call-5")).unwrap();
     assert!(!guard.has_unresolved_execution());
-    guard.validate_decision(&req, &final_decision("decision-after-reconcile")).unwrap();
+    guard
+        .validate_decision(&req, &final_decision("decision-after-reconcile"))
+        .unwrap();
 }
 
 #[test]
 fn reconciliation_must_match_the_unknown_call() {
     let req = request();
     let mut guard = AgentProtocolGuard::default();
-    guard.validate_decision(&req, &tool_decision("call-6", "read_service_status")).unwrap();
-    guard.apply_observation(&req, &tool_observation("call-6", "unknown", false)).unwrap();
-    assert!(guard.apply_observation(&req, &reconcile("other-call")).is_err());
+    guard
+        .validate_decision(&req, &tool_decision("call-6", "read_service_status"))
+        .unwrap();
+    guard
+        .apply_observation(&req, &tool_observation("call-6", "unknown", false))
+        .unwrap();
+    assert!(
+        guard
+            .apply_observation(&req, &reconcile("other-call"))
+            .is_err()
+    );
     assert!(guard.has_unresolved_execution());
 }
 
@@ -281,7 +317,9 @@ fn reconciliation_must_match_the_unknown_call() {
 fn successful_external_side_effect_requires_a_postcondition_digest() {
     let req = request();
     let mut guard = AgentProtocolGuard::default();
-    guard.validate_decision(&req, &tool_decision("call-7", "read_service_status")).unwrap();
+    guard
+        .validate_decision(&req, &tool_decision("call-7", "read_service_status"))
+        .unwrap();
     let mut observation = tool_observation("call-7", "success", true);
     observation.postcondition_digest = None;
     assert!(guard.apply_observation(&req, &observation).is_err());

@@ -1,6 +1,4 @@
-use sympoetic_bench::reliability::{
-    cohens_kappa_nominal, krippendorff_alpha_nominal,
-};
+use sympoetic_bench::reliability::{cohens_kappa_nominal, krippendorff_alpha_nominal};
 
 #[test]
 fn cohens_kappa_matches_known_nominal_example() {
@@ -14,10 +12,7 @@ fn cohens_kappa_matches_known_nominal_example() {
 fn cohens_kappa_handles_pairwise_missing_labels() {
     let rater_a = [Some("A"), Some("B"), None, Some("C")];
     let rater_b = [Some("A"), None, Some("B"), Some("C")];
-    assert_eq!(
-        cohens_kappa_nominal(&rater_a, &rater_b).unwrap(),
-        Some(1.0)
-    );
+    assert_eq!(cohens_kappa_nominal(&rater_a, &rater_b).unwrap(), Some(1.0));
 }
 
 #[test]
@@ -88,10 +83,7 @@ fn krippendorff_alpha_excludes_singleton_items_from_pairwise_marginals() {
 
 #[test]
 fn krippendorff_alpha_preserves_worse_than_chance_agreement() {
-    let ratings = vec![
-        vec![Some("A"), Some("B")],
-        vec![Some("A"), Some("B")],
-    ];
+    let ratings = vec![vec![Some("A"), Some("B")], vec![Some("A"), Some("B")]];
     let alpha = krippendorff_alpha_nominal(&ratings).unwrap().unwrap();
     assert!((alpha + 0.5).abs() < 1e-12);
 }

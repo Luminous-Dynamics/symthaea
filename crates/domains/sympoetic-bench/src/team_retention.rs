@@ -138,7 +138,9 @@ fn parse_tsv(input: &str) -> Result<Vec<TeamObservation>, String> {
     let mut lines = input.lines().filter(|line| !line.trim().is_empty());
     let header = lines.next().ok_or_else(|| "input is empty".to_string())?;
     if header.trim_end_matches('\r') != HEADER {
-        return Err(format!("unexpected header; required exact header is: {HEADER}"));
+        return Err(format!(
+            "unexpected header; required exact header is: {HEADER}"
+        ));
     }
 
     let mut observations = Vec::new();
@@ -176,8 +178,7 @@ fn parse_tsv(input: &str) -> Result<Vec<TeamObservation>, String> {
             _ => {}
         }
 
-        let arm = Arm::parse(fields[3])
-            .map_err(|error| format!("line {line_number}: {error}"))?;
+        let arm = Arm::parse(fields[3]).map_err(|error| format!("line {line_number}: {error}"))?;
         let ai_digest = if fields[2] == "NA" {
             None
         } else {
@@ -222,8 +223,7 @@ fn parse_tsv(input: &str) -> Result<Vec<TeamObservation>, String> {
         let delayed_ai_off_accuracy =
             parse_score(fields[7], "delayed_ai_off_accuracy", line_number)?;
         let transfer_accuracy = parse_score(fields[8], "transfer_accuracy", line_number)?;
-        let unique_fact_retention =
-            parse_score(fields[9], "unique_fact_retention", line_number)?;
+        let unique_fact_retention = parse_score(fields[9], "unique_fact_retention", line_number)?;
         let expertise_routing_accuracy =
             parse_score(fields[10], "expertise_routing_accuracy", line_number)?;
         let agency_score = parse_score(fields[11], "agency_score", line_number)?;
@@ -295,11 +295,7 @@ fn require_sha256(value: &str, name: &str, line_number: usize) -> Result<(), Str
     }
 }
 
-fn analyze(
-    observations: &[TeamObservation],
-    draws: usize,
-    seed: u64,
-) -> Result<Analysis, String> {
+fn analyze(observations: &[TeamObservation], draws: usize, seed: u64) -> Result<Analysis, String> {
     if draws < 100 {
         return Err("bootstrap draws must be at least 100".to_string());
     }
@@ -646,10 +642,12 @@ mod tests {
             row("a1", Arm::HumanAiTms, 0.65),
         ];
         let result = analyze(&rows, 500, 42).unwrap();
-        assert!(result.endpoints["immediate_ai_off_gain"]
-            .ai_main_effect
-            .interval
-            .is_none());
+        assert!(
+            result.endpoints["immediate_ai_off_gain"]
+                .ai_main_effect
+                .interval
+                .is_none()
+        );
     }
 
     #[test]
@@ -690,11 +688,15 @@ mod tests {
 
     #[test]
     fn checked_in_synthetic_fixture_is_valid_and_identifies_all_arms() {
-        let input = include_str!("../../../../docs/benchmarks/sympoetic/fixtures/team-retention-synthetic-v0.1.tsv");
+        let input = include_str!(
+            "../../../../docs/benchmarks/sympoetic/fixtures/team-retention-synthetic-v0.1.tsv"
+        );
         let report = summarize_tsv(input, 2_000, 42).unwrap();
-        assert!(report.contains(
-            "teams: 16; per_arm: human_only=4, human_tms=4, human_ai=4, human_ai_tms=4"
-        ));
+        assert!(
+            report.contains(
+                "teams: 16; per_arm: human_only=4, human_tms=4, human_ai=4, human_ai_tms=4"
+            )
+        );
         assert!(report.contains("resampling_unit=team"));
         assert!(report.contains("digest format checked only"));
         assert!(report.contains("AI main effect: -0.0350"));
@@ -727,12 +729,16 @@ mod tests {
             input.push_str(&line);
         }
         let duplicated_team = input.replace("team-3", "team-2");
-        assert!(parse_tsv(&duplicated_team)
-            .unwrap_err()
-            .contains("duplicate team_id"));
+        assert!(
+            parse_tsv(&duplicated_team)
+                .unwrap_err()
+                .contains("duplicate team_id")
+        );
         let mismatched_bundle = input.replacen(&repeated_hash('a'), &repeated_hash('d'), 1);
-        assert!(parse_tsv(&mismatched_bundle)
-            .unwrap_err()
-            .contains("task bundle differs"));
+        assert!(
+            parse_tsv(&mismatched_bundle)
+                .unwrap_err()
+                .contains("task bundle differs")
+        );
     }
 }

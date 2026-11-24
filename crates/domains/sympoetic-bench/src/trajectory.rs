@@ -132,15 +132,25 @@ pub fn validate_trajectory(
         require_nonempty("run_id", &cycle.run_id)?;
         require_nonempty("scenario_id", &cycle.scenario_id)?;
         if !valid_scenario_id(&cycle.scenario_id) {
-            bail!("cycle {} has invalid scenario_id {:?}", cycle.cycle_index, cycle.scenario_id);
+            bail!(
+                "cycle {} has invalid scenario_id {:?}",
+                cycle.cycle_index,
+                cycle.scenario_id
+            );
         }
         if !run_ids.insert(cycle.run_id.as_str()) {
             bail!("duplicate run_id {:?} in team trajectory", cycle.run_id);
         }
 
         for (name, digest) in [
-            ("team_state_before_digest", cycle.team_state_before_digest.as_str()),
-            ("team_state_after_digest", cycle.team_state_after_digest.as_str()),
+            (
+                "team_state_before_digest",
+                cycle.team_state_before_digest.as_str(),
+            ),
+            (
+                "team_state_after_digest",
+                cycle.team_state_after_digest.as_str(),
+            ),
             ("artifact_digest", cycle.artifact_digest.as_str()),
             ("outcome_digest", cycle.outcome_digest.as_str()),
         ] {
@@ -152,13 +162,20 @@ pub fn validate_trajectory(
         require_member("memory_policy", &cycle.memory_policy, MEMORY_POLICIES)?;
 
         if cycle.members.is_empty() {
-            bail!("cycle {} must contain at least one team member", cycle.cycle_index);
+            bail!(
+                "cycle {} must contain at least one team member",
+                cycle.cycle_index
+            );
         }
         let mut member_ids = HashSet::new();
         for member in &cycle.members {
             require_nonempty("member principal_id", &member.principal_id)?;
             require_nonempty("member role", &member.role)?;
-            require_member("participant_type", &member.participant_type, PARTICIPANT_TYPES)?;
+            require_member(
+                "participant_type",
+                &member.participant_type,
+                PARTICIPANT_TYPES,
+            )?;
             require_member("memory_consent", &member.memory_consent, MEMORY_CONSENT)?;
             require_sha256("member authority_digest", &member.authority_digest)?;
             if let Some(snapshot) = member.model_snapshot.as_deref() {
@@ -220,8 +237,7 @@ pub fn validate_trajectory(
                 .with_context(|| {
                     format!(
                         "cycle {} change actor {:?} is not in the before/after roster",
-                        cycle.cycle_index,
-                        change.actor_principal_id
+                        cycle.cycle_index, change.actor_principal_id
                     )
                 })?;
             if actor.participant_type != "human" {
@@ -258,9 +274,7 @@ pub fn validate_trajectory(
                     bail!("first team cycle must not reference a prior cycle digest");
                 }
                 if !cycle.changes.is_empty() {
-                    bail!(
-                        "first cycle establishes the roster; it cannot claim prior changes"
-                    );
+                    bail!("first cycle establishes the roster; it cannot claim prior changes");
                 }
             }
             Some(previous) => {
@@ -275,7 +289,10 @@ pub fn validate_trajectory(
                     );
                 }
                 if cycle.team_state_before_digest != previous.team_state_after_digest {
-                    bail!("cycle {} breaks the team-state continuity chain", cycle.cycle_index);
+                    bail!(
+                        "cycle {} breaks the team-state continuity chain",
+                        cycle.cycle_index
+                    );
                 }
                 validate_membership_changes(previous, cycle)?;
             }

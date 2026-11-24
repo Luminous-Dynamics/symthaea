@@ -201,7 +201,10 @@ fn valid_scenario_id(value: &str) -> bool {
 
 pub fn validate_scenario(scenario: &Scenario) -> Result<()> {
     if scenario.schema_version != "sympoetic-scenario/0.1" {
-        bail!("{}: unsupported scenario schema version", scenario.scenario_id);
+        bail!(
+            "{}: unsupported scenario schema version",
+            scenario.scenario_id
+        );
     }
     if !valid_scenario_id(&scenario.scenario_id) {
         bail!("invalid scenario_id {:?}", scenario.scenario_id);
@@ -212,10 +215,16 @@ pub fn validate_scenario(scenario: &Scenario) -> Result<()> {
     require_nonempty("participant_role", &scenario.participant_role)?;
     require_nonempty("task_brief", &scenario.task_brief)?;
     if scenario.task_brief.trim().len() < 30 {
-        bail!("{}: task_brief must contain at least 30 characters", scenario.scenario_id);
+        bail!(
+            "{}: task_brief must contain at least 30 characters",
+            scenario.scenario_id
+        );
     }
     if !(5..=180).contains(&scenario.duration_minutes) {
-        bail!("{}: duration_minutes must be in 5..=180", scenario.scenario_id);
+        bail!(
+            "{}: duration_minutes must be in 5..=180",
+            scenario.scenario_id
+        );
     }
     if scenario.constraints.is_empty()
         || scenario.required_capabilities.is_empty()
@@ -233,7 +242,10 @@ pub fn validate_scenario(scenario: &Scenario) -> Result<()> {
     for constraint in &scenario.constraints {
         require_nonempty("constraint", constraint)?;
         if !constraint_set.insert(constraint) {
-            bail!("{}: duplicate constraint {constraint:?}", scenario.scenario_id);
+            bail!(
+                "{}: duplicate constraint {constraint:?}",
+                scenario.scenario_id
+            );
         }
     }
 
@@ -241,7 +253,11 @@ pub fn validate_scenario(scenario: &Scenario) -> Result<()> {
     for capability in &scenario.required_capabilities {
         require_nonempty("required_capability", capability)?;
         if !capability_set.insert(capability) {
-            bail!("{}: duplicate required capability {:?}", scenario.scenario_id, capability);
+            bail!(
+                "{}: duplicate required capability {:?}",
+                scenario.scenario_id,
+                capability
+            );
         }
     }
 
@@ -251,7 +267,11 @@ pub fn validate_scenario(scenario: &Scenario) -> Result<()> {
         require_nonempty("scenario event instruction", &event.instruction)?;
         require_member("scenario event_kind", &event.event_kind, EVENT_KINDS)?;
         if !event_ids.insert(&event.event_id) {
-            bail!("{}: duplicate scenario event_id {:?}", scenario.scenario_id, event.event_id);
+            bail!(
+                "{}: duplicate scenario event_id {:?}",
+                scenario.scenario_id,
+                event.event_id
+            );
         }
     }
 
@@ -262,7 +282,11 @@ pub fn validate_scenario(scenario: &Scenario) -> Result<()> {
         require_nonempty("check pass_condition", &check.pass_condition)?;
         require_member("check scoring_mode", &check.scoring_mode, SCORING_MODES)?;
         if !check_ids.insert(&check.check_id) {
-            bail!("{}: duplicate check_id {:?}", scenario.scenario_id, check.check_id);
+            bail!(
+                "{}: duplicate check_id {:?}",
+                scenario.scenario_id,
+                check.check_id
+            );
         }
     }
 
@@ -274,7 +298,10 @@ pub fn validate_scenario(scenario: &Scenario) -> Result<()> {
         }
     }
     if scenario.baseline_conditions.len() < 2 {
-        bail!("{}: at least two baseline conditions are required", scenario.scenario_id);
+        bail!(
+            "{}: at least two baseline conditions are required",
+            scenario.scenario_id
+        );
     }
 
     require_member(
@@ -296,8 +323,7 @@ pub fn validate_scenario(scenario: &Scenario) -> Result<()> {
     for rubric in &scenario.human_rubric {
         require_nonempty("rubric dimension", &rubric.dimension)?;
         require_nonempty("rubric scale", &rubric.scale)?;
-        if rubric.anchors.len() < 2
-            || rubric.anchors.iter().any(|anchor| anchor.trim().is_empty())
+        if rubric.anchors.len() < 2 || rubric.anchors.iter().any(|anchor| anchor.trim().is_empty())
         {
             bail!(
                 "{}: rubric {:?} needs at least two non-empty anchors",
@@ -320,8 +346,7 @@ pub fn validate_corpus(bytes: &[u8]) -> Result<(Vec<Scenario>, CorpusValidation)
         }
         let scenario: Scenario = serde_json::from_str(line)
             .with_context(|| format!("invalid JSONL record on line {}", index + 1))?;
-        validate_scenario(&scenario)
-            .with_context(|| format!("scenario on line {}", index + 1))?;
+        validate_scenario(&scenario).with_context(|| format!("scenario on line {}", index + 1))?;
         if !ids.insert(scenario.scenario_id.clone()) {
             bail!("duplicate scenario_id {:?}", scenario.scenario_id);
         }
@@ -332,7 +357,10 @@ pub fn validate_corpus(bytes: &[u8]) -> Result<(Vec<Scenario>, CorpusValidation)
         bail!("scenario corpus contains no records");
     }
 
-    let scenario_ids = scenarios.iter().map(|item| item.scenario_id.clone()).collect();
+    let scenario_ids = scenarios
+        .iter()
+        .map(|item| item.scenario_id.clone())
+        .collect();
     let receipt = CorpusValidation {
         status: "pass",
         corpus_sha256: sha256_hex(bytes),
@@ -343,8 +371,8 @@ pub fn validate_corpus(bytes: &[u8]) -> Result<(Vec<Scenario>, CorpusValidation)
 }
 
 fn canonical_trace_digest(original_bytes: &[u8]) -> Result<String> {
-    let mut value: Value = serde_json::from_slice(original_bytes)
-        .context("trace bytes are not valid JSON")?;
+    let mut value: Value =
+        serde_json::from_slice(original_bytes).context("trace bytes are not valid JSON")?;
     let object = value
         .as_object_mut()
         .context("trace JSON root must be an object")?;
@@ -359,7 +387,10 @@ pub fn validate_trace(
     original_bytes: &[u8],
 ) -> Result<TraceValidation> {
     if trace.schema_version != "sympoetic-trace/0.1" {
-        bail!("unsupported trace schema version {:?}", trace.schema_version);
+        bail!(
+            "unsupported trace schema version {:?}",
+            trace.schema_version
+        );
     }
     require_nonempty("run_id", &trace.run_id)?;
     if !valid_scenario_id(&trace.scenario_id) {
@@ -394,8 +425,14 @@ pub fn validate_trace(
             bail!("event {:?} has a malformed payload_digest", event.event_id);
         }
         for (label, digest) in [
-            ("artifact_digest_before", event.artifact_digest_before.as_deref()),
-            ("artifact_digest_after", event.artifact_digest_after.as_deref()),
+            (
+                "artifact_digest_before",
+                event.artifact_digest_before.as_deref(),
+            ),
+            (
+                "artifact_digest_after",
+                event.artifact_digest_after.as_deref(),
+            ),
         ] {
             if let Some(digest) = digest {
                 if !is_sha256(digest) {
@@ -411,10 +448,15 @@ pub fn validate_trace(
         if event.payload_storage == "encrypted_consented_reference"
             && matches!(event.consent_scope.as_str(), "none" | "revoked")
         {
-            bail!("event {:?} stores content without active consent", event.event_id);
+            bail!(
+                "event {:?} stores content without active consent",
+                event.event_id
+            );
         }
-        if matches!(event.event_type.as_str(), "permission_granted" | "permission_revoked")
-            && event.actor != "human"
+        if matches!(
+            event.event_type.as_str(),
+            "permission_granted" | "permission_revoked"
+        ) && event.actor != "human"
         {
             bail!("only a human participant may grant or revoke participant consent");
         }
@@ -444,7 +486,11 @@ pub fn validate_trace(
                 );
             }
         }
-        if event.parent_event_ids.iter().any(|parent| parent == &event.event_id) {
+        if event
+            .parent_event_ids
+            .iter()
+            .any(|parent| parent == &event.event_id)
+        {
             bail!("event {:?} cannot be its own parent", event.event_id);
         }
         seen.insert(event.event_id.as_str());
@@ -586,7 +632,11 @@ pub fn validate_trace(
                 let unknown_event = awaiting_reconciliation
                     .as_deref()
                     .context("execution_reconciled has no preceding unknown outcome")?;
-                if !event.parent_event_ids.iter().any(|parent| parent == unknown_event) {
+                if !event
+                    .parent_event_ids
+                    .iter()
+                    .any(|parent| parent == unknown_event)
+                {
                     bail!(
                         "reconciliation event {:?} must name unknown result {:?} as a parent",
                         event.event_id,
@@ -594,9 +644,7 @@ pub fn validate_trace(
                     );
                 }
                 if !matches!(event.actor.as_str(), "tool" | "environment" | "evaluator") {
-                    bail!(
-                        "execution reconciliation must be independently observed"
-                    );
+                    bail!("execution reconciliation must be independently observed");
                 }
                 if event.tool_execution.is_some() {
                     bail!("execution_reconciled must not contain tool_execution");
@@ -624,8 +672,7 @@ pub fn validate_trace(
                 if event.tool_execution.is_some() {
                     bail!("only tool_result may contain tool_execution");
                 }
-                if event.reconciled_status.is_some()
-                    || event.reconciliation_state_digest.is_some()
+                if event.reconciled_status.is_some() || event.reconciliation_state_digest.is_some()
                 {
                     bail!("reconciliation fields are only valid on execution_reconciled");
                 }
@@ -659,7 +706,10 @@ pub fn validate_trace(
             if !attribution.attribution_confidence.is_finite()
                 || !(0.0..=1.0).contains(&attribution.attribution_confidence)
             {
-                bail!("event {:?} has attribution confidence outside [0, 1]", event.event_id);
+                bail!(
+                    "event {:?} has attribution confidence outside [0, 1]",
+                    event.event_id
+                );
             }
         }
     }
@@ -679,7 +729,11 @@ pub fn validate_trace(
     };
 
     Ok(TraceValidation {
-        status: if awaiting_reconciliation.is_none() { "pass" } else { "incomplete" },
+        status: if awaiting_reconciliation.is_none() {
+            "pass"
+        } else {
+            "incomplete"
+        },
         trace_sha256: sha256_hex(original_bytes),
         canonical_trace_sha256: canonical_digest,
         trace_digest_verified: digest_verified,
@@ -722,10 +776,7 @@ fn validate_metric_evidence(scorecard: &Scorecard) -> Result<()> {
         "coalition",
     ];
 
-    let metric_values = scorecard
-        .scores
-        .entries()
-        .map_err(anyhow::Error::msg)?;
+    let metric_values = scorecard.scores.entries().map_err(anyhow::Error::msg)?;
     let mut evidenced_metrics = HashSet::new();
 
     for receipt in &scorecard.metric_evidence {
@@ -744,10 +795,7 @@ fn validate_metric_evidence(scorecard: &Scorecard) -> Result<()> {
             "metric_evidence.measurement_method",
             &receipt.measurement_method,
         )?;
-        require_nonempty(
-            "metric_evidence.scorer_revision",
-            &receipt.scorer_revision,
-        )?;
+        require_nonempty("metric_evidence.scorer_revision", &receipt.scorer_revision)?;
         if receipt.scorer_revision != scorecard.provenance.scorer_revision {
             bail!(
                 "metric {:?} scorer_revision differs from the scorecard provenance",
@@ -761,7 +809,10 @@ fn validate_metric_evidence(scorecard: &Scorecard) -> Result<()> {
             );
         }
         if receipt.evidence_refs.is_empty()
-            || receipt.evidence_refs.iter().any(|reference| reference.trim().is_empty())
+            || receipt
+                .evidence_refs
+                .iter()
+                .any(|reference| reference.trim().is_empty())
         {
             bail!(
                 "metric {:?} must reference at least one non-empty evidence source",
@@ -780,18 +831,9 @@ fn validate_metric_evidence(scorecard: &Scorecard) -> Result<()> {
             );
         }
         let bound_sources = [
-            format!(
-                "scenario:sha256:{}",
-                scorecard.provenance.scenario_sha256
-            ),
-            format!(
-                "trace:sha256:{}",
-                scorecard.provenance.trace_sha256
-            ),
-            format!(
-                "artifact:sha256:{}",
-                scorecard.provenance.artifact_sha256
-            ),
+            format!("scenario:sha256:{}", scorecard.provenance.scenario_sha256),
+            format!("trace:sha256:{}", scorecard.provenance.trace_sha256),
+            format!("artifact:sha256:{}", scorecard.provenance.artifact_sha256),
         ];
         if !receipt
             .evidence_refs
@@ -804,7 +846,10 @@ fn validate_metric_evidence(scorecard: &Scorecard) -> Result<()> {
             );
         }
         if !receipt.value.is_finite() {
-            bail!("metric {:?} evidence value must be finite", receipt.metric_name);
+            bail!(
+                "metric {:?} evidence value must be finite",
+                receipt.metric_name
+            );
         }
         if !evidenced_metrics.insert(receipt.metric_name.as_str()) {
             bail!(
@@ -894,15 +939,17 @@ fn validate_metric_evidence(scorecard: &Scorecard) -> Result<()> {
 }
 
 pub fn validate_scorecard(scorecard: &Scorecard) -> Result<()> {
-    if scorecard.schema_version != "sympoetic-scorecard/0.1"
-        || scorecard.benchmark_version != "0.1"
+    if scorecard.schema_version != "sympoetic-scorecard/0.1" || scorecard.benchmark_version != "0.1"
     {
         bail!("unsupported scorecard schema or benchmark version");
     }
     require_nonempty("run_id", &scorecard.run_id)?;
     validate_metric_evidence(scorecard)?;
     if !valid_scenario_id(&scorecard.scenario_id) {
-        bail!("scorecard has invalid scenario_id {:?}", scorecard.scenario_id);
+        bail!(
+            "scorecard has invalid scenario_id {:?}",
+            scorecard.scenario_id
+        );
     }
     require_member("scorecard split", &scorecard.split, SPLITS)?;
     require_member("scorecard condition", &scorecard.condition, CONDITIONS)?;
@@ -939,9 +986,15 @@ pub fn validate_scorecard(scorecard: &Scorecard) -> Result<()> {
     }
 
     for (name, digest) in [
-        ("scenario_sha256", scorecard.provenance.scenario_sha256.as_str()),
+        (
+            "scenario_sha256",
+            scorecard.provenance.scenario_sha256.as_str(),
+        ),
         ("trace_sha256", scorecard.provenance.trace_sha256.as_str()),
-        ("artifact_sha256", scorecard.provenance.artifact_sha256.as_str()),
+        (
+            "artifact_sha256",
+            scorecard.provenance.artifact_sha256.as_str(),
+        ),
     ] {
         if !is_sha256(digest) {
             bail!("{name} must be a 64-character SHA-256 digest");
@@ -955,17 +1008,41 @@ pub fn validate_scorecard(scorecard: &Scorecard) -> Result<()> {
     require_nonempty("scorer_revision", &scorecard.provenance.scorer_revision)?;
 
     for (name, value) in [
-        ("constraint_satisfaction", scorecard.scores.constraint_satisfaction),
-        ("common_ground_accuracy", scorecard.scores.common_ground_accuracy),
+        (
+            "constraint_satisfaction",
+            scorecard.scores.constraint_satisfaction,
+        ),
+        (
+            "common_ground_accuracy",
+            scorecard.scores.common_ground_accuracy,
+        ),
         ("repair_success_rate", scorecard.scores.repair_success_rate),
-        ("attribution_precision", scorecard.scores.attribution_precision),
+        (
+            "attribution_precision",
+            scorecard.scores.attribution_precision,
+        ),
         ("attribution_recall", scorecard.scores.attribution_recall),
         ("attribution_f1", scorecard.scores.attribution_f1),
-        ("expert_rater_agreement", scorecard.scores.expert_rater_agreement),
-        ("handoff_recovery_rate", scorecard.scores.handoff_recovery_rate),
-        ("intervention_appropriateness", scorecard.scores.intervention_appropriateness),
-        ("unnecessary_intervention_rate", scorecard.scores.unnecessary_intervention_rate),
-        ("missed_critical_intervention_rate", scorecard.scores.missed_critical_intervention_rate),
+        (
+            "expert_rater_agreement",
+            scorecard.scores.expert_rater_agreement,
+        ),
+        (
+            "handoff_recovery_rate",
+            scorecard.scores.handoff_recovery_rate,
+        ),
+        (
+            "intervention_appropriateness",
+            scorecard.scores.intervention_appropriateness,
+        ),
+        (
+            "unnecessary_intervention_rate",
+            scorecard.scores.unnecessary_intervention_rate,
+        ),
+        (
+            "missed_critical_intervention_rate",
+            scorecard.scores.missed_critical_intervention_rate,
+        ),
         ("intervention_regret", scorecard.scores.intervention_regret),
     ] {
         validate_optional_unit_interval(name, value)?;
@@ -980,11 +1057,23 @@ pub fn validate_scorecard(scorecard: &Scorecard) -> Result<()> {
     }
 
     for (name, value) in [
-        ("participant_capability_gain_delta", scorecard.scores.participant_capability_gain_delta),
-        ("delayed_retention_gain_delta", scorecard.scores.delayed_retention_gain_delta),
+        (
+            "participant_capability_gain_delta",
+            scorecard.scores.participant_capability_gain_delta,
+        ),
+        (
+            "delayed_retention_gain_delta",
+            scorecard.scores.delayed_retention_gain_delta,
+        ),
         ("transfer_gain_delta", scorecard.scores.transfer_gain_delta),
-        ("agent_confidence_brier_score", scorecard.scores.agent_confidence_brier_score),
-        ("agent_expected_calibration_error", scorecard.scores.agent_expected_calibration_error),
+        (
+            "agent_confidence_brier_score",
+            scorecard.scores.agent_confidence_brier_score,
+        ),
+        (
+            "agent_expected_calibration_error",
+            scorecard.scores.agent_expected_calibration_error,
+        ),
         (
             "agent_metacognitive_sensitivity_auc",
             scorecard.scores.agent_metacognitive_sensitivity_auc,
@@ -993,7 +1082,10 @@ pub fn validate_scorecard(scorecard: &Scorecard) -> Result<()> {
             "agent_selective_accuracy_at_80pct_coverage",
             scorecard.scores.agent_selective_accuracy_at_80pct_coverage,
         ),
-        ("participant_confidence_brier_score", scorecard.scores.participant_confidence_brier_score),
+        (
+            "participant_confidence_brier_score",
+            scorecard.scores.participant_confidence_brier_score,
+        ),
         (
             "participant_expected_calibration_error",
             scorecard.scores.participant_expected_calibration_error,
@@ -1004,15 +1096,35 @@ pub fn validate_scorecard(scorecard: &Scorecard) -> Result<()> {
         ),
         (
             "participant_selective_accuracy_at_80pct_coverage",
-            scorecard.scores.participant_selective_accuracy_at_80pct_coverage,
+            scorecard
+                .scores
+                .participant_selective_accuracy_at_80pct_coverage,
         ),
         ("human_planning_rate", scorecard.scores.human_planning_rate),
-        ("human_first_attempt_rate", scorecard.scores.human_first_attempt_rate),
-        ("human_monitoring_rate", scorecard.scores.human_monitoring_rate),
-        ("human_reflection_rate", scorecard.scores.human_reflection_rate),
-        ("ai_core_step_supply_rate", scorecard.scores.ai_core_step_supply_rate),
-        ("ai_core_step_substitution_rate", scorecard.scores.ai_core_step_substitution_rate),
-        ("human_verification_rate", scorecard.scores.human_verification_rate),
+        (
+            "human_first_attempt_rate",
+            scorecard.scores.human_first_attempt_rate,
+        ),
+        (
+            "human_monitoring_rate",
+            scorecard.scores.human_monitoring_rate,
+        ),
+        (
+            "human_reflection_rate",
+            scorecard.scores.human_reflection_rate,
+        ),
+        (
+            "ai_core_step_supply_rate",
+            scorecard.scores.ai_core_step_supply_rate,
+        ),
+        (
+            "ai_core_step_substitution_rate",
+            scorecard.scores.ai_core_step_substitution_rate,
+        ),
+        (
+            "human_verification_rate",
+            scorecard.scores.human_verification_rate,
+        ),
     ] {
         if let Some(value) = value {
             if !value.is_finite() || !(-2.0..=2.0).contains(&value) {
@@ -1060,9 +1172,7 @@ pub fn validate_scorecard(scorecard: &Scorecard) -> Result<()> {
         scorecard.scores.collaboration_gap,
     ) {
         if (synergy + gap).abs() > 1e-6 {
-            bail!(
-                "synergy_delta and collaboration_gap must have opposite signs"
-            );
+            bail!("synergy_delta and collaboration_gap must have opposite signs");
         }
     }
     if let (Some(precision), Some(recall), Some(f1)) = (

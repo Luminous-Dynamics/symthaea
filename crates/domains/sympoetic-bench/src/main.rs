@@ -5,11 +5,9 @@ use clap::{Parser, Subcommand};
 use serde::Serialize;
 use sympoetic_bench::{
     Scorecard, Trace,
-    metrics::{
-        StratifiedCapabilityObservation, summarize_capability_amplification_by_stratum,
-    },
-    trajectory::{TeamTrajectory, validate_trajectory},
+    metrics::{StratifiedCapabilityObservation, summarize_capability_amplification_by_stratum},
     team_retention::summarize_tsv,
+    trajectory::{TeamTrajectory, validate_trajectory},
     validate::{sha256_hex, validate_corpus, validate_scorecard, validate_trace},
 };
 
@@ -84,33 +82,29 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
     match cli.command {
         Command::ValidateCorpus { input } => {
-            let bytes = fs::read(&input)
-                .with_context(|| format!("could not read {}", input.display()))?;
+            let bytes =
+                fs::read(&input).with_context(|| format!("could not read {}", input.display()))?;
             let (_, receipt) = validate_corpus(&bytes)?;
             println!("{}", serde_json::to_string_pretty(&receipt)?);
         }
         Command::ValidateTrace { input } => {
-            let bytes = fs::read(&input)
-                .with_context(|| format!("could not read {}", input.display()))?;
-            let trace: Trace = serde_json::from_slice(&bytes)
-                .with_context(|| {
-                    format!("{} is not a valid trace JSON document", input.display())
-                })?;
+            let bytes =
+                fs::read(&input).with_context(|| format!("could not read {}", input.display()))?;
+            let trace: Trace = serde_json::from_slice(&bytes).with_context(|| {
+                format!("{} is not a valid trace JSON document", input.display())
+            })?;
             let receipt = validate_trace(&trace, &bytes)?;
             println!("{}", serde_json::to_string_pretty(&receipt)?);
             if receipt.unresolved_unknown_outcome_count != 0 {
-                bail!(
-                    "trace is incomplete: an unknown tool outcome remains unreconciled"
-                );
+                bail!("trace is incomplete: an unknown tool outcome remains unreconciled");
             }
         }
         Command::ValidateScorecard { input } => {
-            let bytes = fs::read(&input)
-                .with_context(|| format!("could not read {}", input.display()))?;
-            let scorecard: Scorecard = serde_json::from_slice(&bytes)
-                .with_context(|| {
-                    format!("{} is not a valid scorecard JSON document", input.display())
-                })?;
+            let bytes =
+                fs::read(&input).with_context(|| format!("could not read {}", input.display()))?;
+            let scorecard: Scorecard = serde_json::from_slice(&bytes).with_context(|| {
+                format!("{} is not a valid scorecard JSON document", input.display())
+            })?;
             validate_scorecard(&scorecard)?;
             let receipt = ScorecardReceipt {
                 status: "pass",
@@ -123,42 +117,40 @@ fn main() -> Result<()> {
             println!("{}", serde_json::to_string_pretty(&receipt)?);
         }
         Command::ValidateTrajectory { input } => {
-            let bytes = fs::read(&input)
-                .with_context(|| format!("could not read {}", input.display()))?;
-            let trajectory: TeamTrajectory = serde_json::from_slice(&bytes)
-                .with_context(|| {
-                    format!("{} is not a valid team trajectory JSON document", input.display())
-                })?;
+            let bytes =
+                fs::read(&input).with_context(|| format!("could not read {}", input.display()))?;
+            let trajectory: TeamTrajectory = serde_json::from_slice(&bytes).with_context(|| {
+                format!(
+                    "{} is not a valid team trajectory JSON document",
+                    input.display()
+                )
+            })?;
             let receipt = validate_trajectory(&trajectory, &bytes)?;
             println!("{}", serde_json::to_string_pretty(&receipt)?);
         }
         Command::SummarizeCapabilityStrata { input, draws, seed } => {
-            let bytes = fs::read(&input)
-                .with_context(|| format!("could not read {}", input.display()))?;
-            let observations: Vec<StratifiedCapabilityObservation> =
-                serde_json::from_slice(&bytes).with_context(|| {
+            let bytes =
+                fs::read(&input).with_context(|| format!("could not read {}", input.display()))?;
+            let observations: Vec<StratifiedCapabilityObservation> = serde_json::from_slice(&bytes)
+                .with_context(|| {
                     format!(
                         "{} is not a valid stratified capability observation array",
                         input.display()
                     )
                 })?;
-            let summary = summarize_capability_amplification_by_stratum(
-                &observations,
-                draws,
-                seed,
-            )?;
+            let summary =
+                summarize_capability_amplification_by_stratum(&observations, draws, seed)?;
             println!("{}", serde_json::to_string_pretty(&summary)?);
         }
         Command::SummarizeTeamRetention { input, draws, seed } => {
             let contents = fs::read_to_string(&input)
                 .with_context(|| format!("could not read {}", input.display()))?;
-            let report = summarize_tsv(&contents, draws, seed)
-                .map_err(anyhow::Error::msg)?;
+            let report = summarize_tsv(&contents, draws, seed).map_err(anyhow::Error::msg)?;
             println!("{report}");
         }
         Command::Digest { input } => {
-            let bytes = fs::read(&input)
-                .with_context(|| format!("could not read {}", input.display()))?;
+            let bytes =
+                fs::read(&input).with_context(|| format!("could not read {}", input.display()))?;
             println!("{}", sha256_hex(&bytes));
         }
     }
