@@ -202,3 +202,10 @@ Candidate serialization omits evaluator-only gold relation and authority. The va
 **First exact-head qualification:** finite-reference passed on PR head `da35bc584c5dfed8923654fda83c2c2319ebd338` (workflow run [45463952889](https://github.com/Luminous-Dynamics/symthaea/actions/runs/45463952889)): formatting passed, 100 crate tests passed / 0 failed, and the three-pair CLI validated. The implementation has since been expanded with the hypothesis-order and incomparable controls; those two new fixtures and tests are **not yet qualified** by that earlier result.
 
 The runtime environment used for this audit did not contain Cargo/Rust, so Rust execution was performed by the pinned GitHub workflow, not locally. This finite contract is not Lean kernel replay, does not evaluate arbitrary mathematical propositions, and is not a model evaluation or CIRR score.
+
+
+### Route-only control qualification
+
+The finite synthetic route-only fixture currently checks that the *declared route identity digest* changes while the exact typed sequent digest remains unchanged. This is a useful anti-confusion control, but the digest alone does **not** establish that either route artifact exists, is a valid plan, or is kernel accepted.
+
+For a real Lean route-only benchmark pair, the next receipt extension must bind both proof-plan artifacts, their exact target type digests, Lean/Mathlib/Lake environment identities, and separate kernel replay receipts. The theorem target must remain identical. Route replay failure must remain a route outcome, not a theorem refutation. Until those receipts exist, report the synthetic result as **route-identity-only**, not evidence of alternative-proof validity.
