@@ -9,6 +9,7 @@ pub mod metrics;
 pub mod reliability;
 pub mod model;
 pub mod trajectory;
+pub mod team_retention;
 pub mod validate;
 
 pub use model::{Scenario, Scorecard, Trace};
