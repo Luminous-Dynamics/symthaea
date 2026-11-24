@@ -117,19 +117,23 @@ Stopping is not an implicit failure. A stop chooses the best action from the dec
 
 ## 5. Canonical non-myopic challenge family
 
-Create a small world with three separable information roles:
+Use an explicit 16-state world with:
 
-- \(x\): decision-relevant hidden mechanism, which determines the correct terminal decision;
-- \(z\): branch selector that determines which diagnostic is valid or permitted;
-- \(n\): nuisance variable that can carry substantial entropy without changing the terminal decision.
+- \\(x\\in\\{0,1\\}\\): the decision-relevant hidden mechanism;
+- \\(z\\in\\{0,1\\}\\): the branch selector;
+- \\(n\\in\\{0,1,2,3\\}\\): a nuisance variable.
 
-Provide three experiment types:
+The state is \\(s=(x,z,n)\\). The only terminal decisions are \\(d_0,d_1\\), with frozen loss \\(L(d,s)=0\\) when \\(d=x\\) and \\(L(d,s)=1\\) otherwise. The prior-free initial minimax loss is therefore 1.0.
 
-- **A — nuisance survey:** reveals several bits about \(n\), but does not reduce terminal decision loss and does not unlock a useful diagnostic;
-- **B — calibration/branch probe:** reveals less immediate information, does not itself change the terminal decision, but determines which follow-up \(C_z\) is valid;
-- **C_z — branch-specific diagnostic:** after B's public result, the corresponding diagnostic distinguishes the decision-relevant \(x\) values.
+Define the actions:
 
-Freeze the state space, observation supports, loss table, action legality, resource costs and horizon before testing. The required known-answer result is that the exact oracle identifies the B-then-C policy as optimal, while an entropy-greedy policy is attracted to A. The fixture should be constructed so that the complete B-then-C sequence is feasible and the single-step alternatives are strictly inferior under the frozen terminal loss.
+- **A — nuisance survey:** returns the exact value of \\(n\\), with four possible outcomes. Every outcome support still contains both values of \\(x\\), so the worst-case terminal loss remains 1.0. Under a uniform diagnostic distribution used only by the entropy-greedy baseline, A reveals 2 bits.
+- **B — branch probe:** returns the exact value of \\(z\\), with two possible outcomes. Each support still contains both values of \\(x\\), so B alone also leaves worst-case terminal loss at 1.0. Under the same uniform diagnostic distribution, B reveals 1 bit. Its public outcome transitions the protocol to the matching branch state.
+- **C_z — branch-specific diagnostic:** only after B returns \\(z\\), the corresponding permitted C action returns \\(x\\). Each resulting support contains only one decision-relevant value, so worst-case terminal loss becomes 0.0.
+
+Use a two-action horizon and a two-unit experiment budget. A is a terminal dead-end in the protocol; B unlocks exactly one valid C_z follow-up. Thus B-then-C is feasible and achieves worst-case loss 0.0, while A cannot resolve the terminal decision. The uniform distribution is used only to show why an entropy-greedy baseline prefers A; the robust oracle itself remains prior-free.
+
+Freeze the state space, observation supports, loss table, protocol transitions, resource costs and horizon before candidate testing. The independent exhaustive tree enumerator and dynamic programme must both return the B-then-C policy and worst-case terminal loss 0.0.
 
 This example makes three properties testable:
 
