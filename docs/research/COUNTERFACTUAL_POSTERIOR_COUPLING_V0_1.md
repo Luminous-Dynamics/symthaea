@@ -28,17 +28,25 @@ be the model's posterior over those characteristics at the frozen branch point.
 
 A Monte Carlo draw u_(i,k) is one *hypothesis about the same individual*. It is not a new individual. For every paired rollout draw k, the exact same draw must be used for all intervention branches. This makes the learned posterior's individual-conditioning explicit; it instantiates, rather than invents, the same-U semantics required by structural counterfactuals.
 
+Decompose the full SCM exogenous draw for this paired bundle as:
+
+u_(i,k) = (theta_(i,k), xi_(i,k))
+
+where theta is the stable individual characteristic and xi is the time-indexed exogenous disturbance realization or event field. Both components are fixed and shared across all sibling interventions for draw k:
+
 u_(i,k) sampled from q_phi(u_i | h_i)
 
-x_(t+1)^(a,k) = F_theta(x_t^(a,k), a_t, u_(i,k), epsilon_t^(a,k))
+x_(t+1)^(a,k) = F_theta(x_t^(a,k), a_t, u_(i,k))
 
 y_t^(a,k) = G_theta(x_t^(a,k), u_(i,k))
 
 Here:
-- u_(i,k) is stable and shared across sibling actions within draw k;
-- x_t^(a,k) is branch-local and evolves under that branch's action and observations;
-- epsilon_t^(a,k) is process noise or an exogenous event stream, with sharing permitted only where a declared source-to-event correspondence says the events are the same;
-- the factual prefix and restored branch point are common; post-intervention endogenous states are not forced to remain equal.
+- u_(i,k), including its stable traits and exogenous disturbance realization, is shared across sibling actions within draw k;
+- x_t^(a,k) is branch-local and evolves under that branch's action and resulting endogenous events;
+- a stochastic simulator must preserve the same underlying exogenous source realization across branches, using source/event correspondence and replay evidence to map it into branch-local execution. A seed string alone is not proof of this mapping;
+- the factual prefix and restored branch point are common; post-intervention endogenous states and event consequences are allowed to diverge.
+
+If a stochastic environment cannot expose or verify a shared exogenous realization for the paired potential outcomes, it cannot claim this exact same-u individual-effect estimand. It may still support a separately declared population/distributional comparison using independent randomizations.
 
 For action pair (a,b), compute the paired effect for each posterior draw:
 
@@ -72,11 +80,13 @@ This toy example is a semantic known-answer control, not an empirical model resu
 |---|---|---|
 | Stable-individual epistemic uncertainty | Which fixed physical/structural characteristics does this same unit have? | Sample once per paired rollout bundle; reuse across sibling actions |
 | Branch-local endogenous uncertainty | How does the state evolve after each alternative action? | Evolve independently under each branch's action and observations |
-| Exogenous/process stochasticity | Which external disturbances/events occur? | Share only when the task's event-correspondence contract proves they are the same event |
+| Exogenous/process stochasticity | Which external disturbances/events occur? | Part of the full exogenous draw u; hold the underlying realization fixed across sibling actions and verify its source/event mapping |
 
-Structural causal models often place realised noise inside a broad exogenous variable U. PCIR proposes a more explicit engineering decomposition into stable individual traits and time-indexed environmental/process events so the two are not accidentally conflated. This is a representation and audit choice, not a claim that they are causally unrelated. A common seed is not by itself proof of common exogenous events. Use the existing source-to-address-to-draw and replay contracts where the task is stochastic. For deterministic DMC, do not invent a stochastic correspondence requirement.
+Structural causal models place realized noise inside the exogenous variable U. PCIR therefore treats the paired exogenous draw as u=(theta, xi): theta denotes stable individual traits, while xi denotes the time-indexed disturbance realization/event field. Both are held fixed across sibling interventions. This decomposition is an engineering convenience for typed storage and audit; it does not assert that the two components are causally unrelated.
 
-Likewise, a common individual draw does not mean sharing the entire post-action state trajectory. That would erase the very causal consequences being measured.
+For stochastic execution, branch-local source/event records must demonstrate how the same underlying xi is replayed or re-projected into each branch, including when the intervention changes whether or when an endogenous event occurs. A common seed string is not by itself proof of that correspondence. Use the existing source-to-address-to-draw and replay contracts. For deterministic DMC, do not invent a stochastic correspondence requirement.
+
+A common exogenous draw does not mean sharing the entire post-action state trajectory. That would erase the very causal consequences being measured.
 
 ## 4. Model architecture hypothesis
 
@@ -112,6 +122,10 @@ For every (individual, posterior_draw_id):
 - a missing, duplicate or mismatched branch remains a failed/unknown case, not a zero effect.
 
 The adapter must validate these records before calling #13520. #13520 remains the finite effect-arithmetic consumer; this protocol does not create a second effect scorer or authenticate receipts by hashing alone.
+
+### Stochastic coupling and the same-u requirement
+
+Okita's simulator definition treats genuine stochasticity by including the realized noise in u. PCIR preserves that structural semantics: the whole exogenous realization is common across sibling interventions, while branch-local endogenous dynamics may diverge. The typed split into stable traits and time-indexed disturbance sources is for auditable representation and must not be used to sample independent potential-outcome noise when claiming the same-u individual contrast. If the environment cannot provide a defensible exogenous coupling, the output is UNKNOWN for this estimand, even if marginal action outcomes can still be compared.
 
 ### Posterior update rule
 
