@@ -643,6 +643,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
+        "mention_id",
         "plan_node_id",
         "warrant_id",
         "relation",
@@ -670,6 +671,9 @@
           "type": "boolean"
         },
         "rationale_ref": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "mention_id": {
           "$ref": "#/$defs/nonEmpty"
         }
       }
