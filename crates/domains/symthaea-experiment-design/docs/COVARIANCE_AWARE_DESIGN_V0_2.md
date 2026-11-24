@@ -95,6 +95,7 @@ This is a linear-algebra control, not an EGB computation, physical covariance es
 
 ## Additional hostile controls
 
+- **Shared common-error control:** two hypotheses each have marginal variance 2 and share covariance 1.5, so the joint matrix is Gamma=[[2,1.5],[1.5,2]]. The derived difference variance is 2+2-1.5-1.5=1, producing D²=1 for unit mean separation. An independence assumption would incorrectly use variance 4 and produce D²=0.25.
 - Singular joint covariance with a derived difference mean outside the support: candidate quarantined.
 - Singular joint covariance with a derived difference mean inside the support: candidate scored on the supported subspace.
 - Non-PSD joint matrix with positive pairwise difference variances: rejected at the joint input boundary.
@@ -109,6 +110,14 @@ This is a linear-algebra control, not an EGB computation, physical covariance es
     cargo run --locked -p symthaea-experiment-design -- --covariance < crates/domains/symthaea-experiment-design/fixtures/covariance-redundancy-v0.1.json
 
 The last command exercises the public v0.2 JSON input contract. Replace the fixture with a campaign-specific input only after its joint coupling and provenance are justified.
+
+## Independent numerical spot checks
+
+An independent Python/NumPy mirror was used to exercise the joint block formula on 1,000 seeded random PSD joint covariance matrices with 2–5 hypotheses and 1–4 observables (5,111 derived pair matrices). The maximum derived-matrix symmetry defect was approximately 1.01e-14; the smallest derived eigenvalue observed was approximately -4.53e-15 (roundoff around zero).
+
+A separate Jacobi-eigensolver mirror was compared with NumPy across 1,500 seeded positive-definite correlation matrices of dimensions 2–16: no non-convergences, maximum absolute eigenvalue error approximately 6.22e-15, and maximum Frobenius eigenpair residual approximately 1.21e-13.
+
+These are independent numerical spot checks, not Rust test receipts, not interval-certified error bounds, and not a substitute for an external LAPACK/high-precision campaign. Near-cutoff singularity decisions still require dedicated adversarial qualification.
 
 ## Remaining qualifications before physical use
 
