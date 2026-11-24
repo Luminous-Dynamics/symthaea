@@ -721,7 +721,7 @@ mod tests {
         let (issuer, verifier, context) = setup(EvidenceDispositionV1::Admissible, true);
         assert_eq!(
             independently_qualify_candidate_batch_v1(
-                &batch, &context, &expected(&batch), &issuer, &verifier,
+                &batch, &context, &expected(&batch), &issuer, &verifier, &test_clock(),
             ),
             Err(IndependentQualificationExchangeRejectV1::Qualification(
                 EvidenceQualificationRejectV1::BindingMismatch,
@@ -794,6 +794,35 @@ mod tests {
                 EvidenceQualificationRejectV1::ReceiptExpired,
             )),
         );
+    }
+
+    #[test]
+    fn request_sorts_complete_candidate_ids_independently_of_retrieval_order() {
+        let original = batch();
+        let mut second = original.evidence[0].clone();
+        second.evidence_id = "evidence:0".into();
+        second.retrieval_rank = 2;
+        second.source_id = "source:0".into();
+        second.payload_ref = "cas://source:0/payload:0".into();
+        let multiple = encode_candidate_evidence_jsonl(&[
+            original.evidence[0].clone(),
+            second,
+        ]).expect("two candidates");
+        // The canonical batch is in channel/rank order, which is not the
+        // lexical order required by the qualification receipt.
+        assert_eq!(multiple.evidence[0].evidence_id, "evidence:1");
+        let (issuer, verifier, context) = setup(EvidenceDispositionV1::Admissible, false);
+        let request = build_request(&multiple, &context, &expected(&multiple))
+            .expect("complete request binding");
+        assert_eq!(
+            request.binding.candidate_evidence_ids,
+            vec!["evidence:0".to_owned(), "evidence:1".to_owned()]
+        );
+        let decoded = EvidenceQualificationRequestV1::from_json_value(
+            &request.to_json_value(),
+        ).expect("issuer-side strict decode");
+        assert_eq!(decoded, request);
+        let _ = (issuer, verifier);
     }
 
     #[test]
