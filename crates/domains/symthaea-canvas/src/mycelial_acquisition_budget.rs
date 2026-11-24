@@ -135,6 +135,7 @@ pub enum MycelialSampleHealthRejectionReason {
     WavelengthOutsideCalibratedBand,
     MissingOpticalDoseEstimate,
     CumulativePhotonDoseExceeded,
+    PhotonCalibrationMismatch,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -568,7 +569,7 @@ fn validate_proposal(
         || proposal.health_model_digest != budget.health_model_digest
     {
         return Err(MycelialSampleHealthBudgetError::InvalidProposal(
-            "acquisition model or cost evidence differs from active-sensing action",
+            "acquisition, cost or health-model evidence differs from policy and active-sensing action",
         ));
     }
     if proposal.spatial_footprint_cell_ids.len() > MAX_MYCELIAL_HEALTH_BUDGET_CELLS_PER_ACTION
@@ -695,6 +696,8 @@ fn state_digest(state: &MycelialSampleHealthState) -> String {
                 &right.source_session_id,
             ))
             .then_with(|| left.photons_per_um2.total_cmp(&right.photons_per_um2))
+            .then_with(|| left.evidence_receipt_digest.cmp(&right.evidence_receipt_digest))
+            .then_with(|| left.calibration_digest.cmp(&right.calibration_digest))
     });
     hasher.update(&(exposures.len() as u64).to_le_bytes());
     for exposure in exposures {
@@ -957,7 +960,7 @@ fn evaluate_proposal(
             if dose.calibration_digest != limit.calibration_digest {
                 add_reason(
                     &mut reasons,
-                    MycelialSampleHealthRejectionReason::MissingOpticalDoseEstimate,
+                    MycelialSampleHealthRejectionReason::PhotonCalibrationMismatch,
                 );
                 continue;
             }
@@ -1564,13 +1567,85 @@ mod tests {
         );
         proposal.required_illumination_channel_ids =
             vec!["gfp".to_string(), "red".to_string()];
+        let mut policy = budget();
+        policy.photon_dose_limits.push(MycelialPhotonDoseLimit {
+            channel_id: "red".to_string(),
+            minimum_wavelength_nm: 600,
+            maximum_wavelength_nm: 650,
+            calibration_digest: digest('i'),
+            maximum_cumulative_photons_per_um2: 10.0,
+        });
         let result =
-            evaluate_mycelial_sample_health_budget(&report, &budget(), &state(), &[proposal])
+            evaluate_mycelial_sample_health_budget(&report, &policy, &state(), &[proposal])
                 .unwrap();
         assert!(result.rejected_actions[0].reasons.contains(
             &MycelialSampleHealthRejectionReason::MissingOpticalDoseEstimate
         ));
         assert_eq!(result.recommended_action_id, None);
+    }
+
+    #[test]
+    fn policy_and_proposal_health_model_digests_must_match() {
+        let report = active_report(vec![action(
+            "wrong-health-model",
+            MycelialAcquisitionActionKind::HumanAnnotation,
+            2.0,
+        )]);
+        let mut proposal = proposal(
+            "wrong-health-model",
+            &["cell-a"],
+            0.0,
+            MycelialAcquisitionActionKind::HumanAnnotation,
+        );
+        proposal.health_model_digest = digest('x');
+        assert!(matches!(
+            evaluate_mycelial_sample_health_budget(&report, &budget(), &state(), &[proposal]),
+            Err(MycelialSampleHealthBudgetError::InvalidProposal(_))
+        ));
+    }
+
+    #[test]
+    fn dose_estimate_must_use_the_policy_bound_channel_calibration() {
+        let report = active_report(vec![action(
+            "wrong-calibration",
+            MycelialAcquisitionActionKind::AdditionalZPlane,
+            5.0,
+        )]);
+        let mut proposal = proposal(
+            "wrong-calibration",
+            &["cell-b"],
+            1.0,
+            MycelialAcquisitionActionKind::AdditionalZPlane,
+        );
+        proposal.photon_dose_estimates[0].calibration_digest = digest('x');
+        let result =
+            evaluate_mycelial_sample_health_budget(&report, &budget(), &state(), &[proposal])
+                .unwrap();
+        assert_eq!(result.recommended_action_id, None);
+        assert!(result.rejected_actions[0].reasons.contains(
+            &MycelialSampleHealthRejectionReason::PhotonCalibrationMismatch
+        ));
+    }
+
+    #[test]
+    fn historical_exposure_must_use_the_policy_bound_channel_calibration() {
+        let report = active_report(vec![action(
+            "historical-calibration",
+            MycelialAcquisitionActionKind::AdditionalZPlane,
+            5.0,
+        )]);
+        let proposal = proposal(
+            "historical-calibration",
+            &["cell-b"],
+            1.0,
+            MycelialAcquisitionActionKind::AdditionalZPlane,
+        );
+        let mut current = state();
+        current.cumulative_photon_exposures[0].calibration_digest = digest('x');
+        assert!(matches!(
+            evaluate_mycelial_sample_health_budget(&report, &budget(), &current, &[proposal]),
+            Err(MycelialSampleHealthBudgetError::InvalidState(_))
+        ));
     }
 
     #[test]
