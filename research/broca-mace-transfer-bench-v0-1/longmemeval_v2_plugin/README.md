@@ -71,6 +71,20 @@ The official harness then discovers the mode-neutral `mace_lmev2_retrieval_ablat
 }
 ```
 
+## Reproduce the retrieval ablations
+
+Run three separate official-harness configurations using the same frozen trajectories, site/browser environment, reader, prompt, reasoning tier, top-k and context-token limit:
+
+| Arm | `memory_params.retrieval_mode` | Active retrieval |
+|---|---|---|
+| Lexical baseline | `bm25_only` | BM25 prose retrieval |
+| Structured-literal baseline | `entity_literal_only` | Exact IDs, URLs and structured numeric/action fields |
+| Hybrid candidate | `hybrid_rrf` | Both channels fused by RRF (k=60) |
+
+Use a separate workspace and unique `run_id` for every arm. Keep the same `environment_revision_sha256` and dataset digest. For the cleanest channel-value comparison, set `neighbor_radius: 0` in all three arms; evaluate BM25 neighbor expansion as a separate, explicitly named fourth condition. Keep `slice_radius`, top-k and the official reader/context-token budget identical. Do not pad a smaller result set with unrelated material.
+
+Randomize arm order across paired tasks where possible. Report cold first-query latency and index-build time separately from warm steady-state query latency; do not compare a cold build in one arm against a warm query in another. Include the returned retrieval mode, backend-profile digest, channel operation receipts, candidate count, context-token count, p50/p95/p99 latency and all-in CPU/memory/storage cost in every run manifest. The fixed hybrid mode is not presumed better: promotion requires paired held-out utility improvement at matched budgets.
+
 Use a separate clean workspace and unique `run_id` for each benchmark execution. Supply `environment_revision_sha256` as the digest of the pinned environment manifest (site/application snapshot, browser/runtime image, permissions and relevant API/schema revisions); do not use a guessed or mutable label. The configured screenshot root must contain all source screenshot files. The bridge computes `sidecar_binary_sha256` from the exact executable bytes, then computes `backend_revision_sha256` over the binary digest, domain, selected retrieval mode, actual active channel list, per-mode backend/channel identity, relevant BM25 and/or entity-literal configuration, RRF parameters when hybrid, top-k and slice/neighbor radii. The selected mode is passed to Rust and returned in every query response; the bridge rejects a response whose mode differs from the pinned backend profile. Both are passed into the Rust sidecar; the retrieval backend does not self-supply either digest. The shim rejects absolute or relative screenshot references that resolve outside that root, copies selected source bytes into a private workspace, and records both the canonical source-trajectory digest and each copied screenshot's SHA-256.
 
 For ingress, the plugin pins the configured screenshot root with a directory descriptor. It opens each intermediate directory and the final file relative to that descriptor using no-follow semantics; it rejects symlink replacement at both file and directory components. It reads through the opened file descriptor, requires a regular file, applies the byte cap while reading, and compares file identity, size, modification time and change time before/after the read. This closes the ordinary path-check/read symlink-swap window. The configured root itself must still be trusted, and the official reader's later open remains a separate boundary protected by the private evaluation workspace and sidecar pixel-digest verification.
