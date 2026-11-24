@@ -850,8 +850,8 @@ mod tests {
                 let product: f64 = (0..n)
                     .map(|j| correlation[i][j] * eigenvectors[j][mode])
                     .sum();
-                max_eigenpair_residual =
-                    max_eigenpair_residual.max((product - eigenvalues[mode] * eigenvectors[i][mode]).abs());
+                max_eigenpair_residual = max_eigenpair_residual
+                    .max((product - eigenvalues[mode] * eigenvectors[i][mode]).abs());
             }
             for j in 0..n {
                 let dot: f64 = (0..n)
