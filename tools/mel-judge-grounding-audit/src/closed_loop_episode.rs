@@ -264,7 +264,10 @@ fn reduce_episode(episode: &Episode) -> Result<EpisodeReport, String> {
     validate_receipt(&episode.decision.receipt, "decision.receipt")?;
     validate_receipt(&episode.capture.receipt, "capture.receipt")?;
     validate_receipt(&episode.observation.receipt, "observation.receipt")?;
-    require_text(&episode.disposition.actor_identity, "disposition.actor_identity")?;
+    require_text(
+        &episode.disposition.actor_identity,
+        "disposition.actor_identity",
+    )?;
     validate_digest(
         &episode.disposition.scope_sha256,
         "disposition.scope_sha256",
