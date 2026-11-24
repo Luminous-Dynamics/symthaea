@@ -931,11 +931,10 @@ mod tests {
             ],
             evidence_channels: vec![EvidenceChannelModel {
                 channel_id: "primary".into(),
-                outcomes: vec![
-                    outcome("ambiguous", &[("H_A", 1.0), ("H_B", 1.0)]),
-                    outcome("sensor_A", &[("H_A", 0.8), ("H_B", 0.2)]),
-                    outcome("sensor_B", &[("H_A", 0.2), ("H_B", 0.8)]),
-                ],
+                // This fixture models only the passive, observationally
+                // equivalent stream. Other outcomes would need probabilities
+                // that normalize across the complete channel.
+                outcomes: vec![outcome("ambiguous", &[("H_A", 1.0), ("H_B", 1.0)])],
             }],
             probes: vec![ProbeModel {
                 probe_id: "reference_probe".into(),
