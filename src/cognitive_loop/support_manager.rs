@@ -22,7 +22,7 @@ pub struct SupportManager {
     /// Triage engine for ticket classification and prioritization.
     pub triage_engine: Option<symthaea_support::triage::TriageEngine>,
 
-    /// Privacy manager for federation sharing tier enforcement.
+    /// Privacy manager for federation sharing preferences (default: local-only).
     pub privacy_manager: Option<symthaea_support::privacy::PrivacyManager>,
 
     /// Action engine for autonomous remediation proposals (reserved).
@@ -63,6 +63,10 @@ mod tests {
         assert!(mgr.knowledge_manager.is_some());
         assert!(mgr.triage_engine.is_some());
         assert!(mgr.privacy_manager.is_some());
+        assert!(
+            !mgr.privacy_manager.as_ref().unwrap().can_share_cognitive(),
+            "SupportManager must default to local-only cognitive sharing"
+        );
         assert!(mgr.action_engine.is_some());
         assert_eq!(mgr.cycle_counter, 0);
     }
