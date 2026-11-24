@@ -1,0 +1,263 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mace_retrieval_acquisition_receipt_v2.schema.json",
+  "title": "MACE Retrieval Acquisition Receipt V2",
+  "description": "Candidate-side observation of retrieval operations only. It does not attest to source authority, evidence admissibility, decision sufficiency, answer correctness, or downstream utility.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "query_invocation_id",
+    "domain_id",
+    "environment_revision_sha256",
+    "tool_profile_sha256",
+    "query_sha256",
+    "candidate_set_sha256",
+    "operations",
+    "acquisition_status",
+    "tool_call_budget",
+    "tool_calls_used",
+    "elapsed_ns",
+    "inspected_bytes",
+    "inspected_bytes_complete",
+    "created_at_unix",
+    "receipt_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mace_retrieval_acquisition_receipt_v2"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "query_invocation_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "domain_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "environment_revision_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "tool_profile_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "query_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "candidate_set_sha256": {
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "operations": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "tool_id",
+          "tool_revision_sha256",
+          "action_template_sha256",
+          "observed_evidence_ids",
+          "outcome",
+          "elapsed_ns",
+          "inspected_bytes",
+          "inspected_bytes_measured"
+        ],
+        "properties": {
+          "tool_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "tool_revision_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "action_template_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "observed_evidence_ids": {
+            "type": "array",
+            "maxItems": 10000,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            }
+          },
+          "outcome": {
+            "enum": [
+              "evidence_observed",
+              "no_evidence",
+              "tool_error"
+            ]
+          },
+          "elapsed_ns": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "inspected_bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "inspected_bytes_measured": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "acquisition_status": {
+      "enum": [
+        "candidates_returned",
+        "no_candidate_evidence",
+        "budget_exhausted",
+        "tool_error",
+        "abstained"
+      ]
+    },
+    "tool_call_budget": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 256
+    },
+    "tool_calls_used": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 256
+    },
+    "elapsed_ns": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "inspected_bytes": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "inspected_bytes_complete": {
+      "type": "boolean"
+    },
+    "created_at_unix": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "receipt_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "acquisition_status": {
+            "const": "candidates_returned"
+          }
+        },
+        "required": [
+          "acquisition_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "candidate_set_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "operations": {
+            "contains": {
+              "properties": {
+                "outcome": {
+                  "const": "evidence_observed"
+                }
+              },
+              "required": [
+                "outcome"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "acquisition_status": {
+            "const": "no_candidate_evidence"
+          }
+        },
+        "required": [
+          "acquisition_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "candidate_set_sha256": {
+            "type": "null"
+          },
+          "operations": {
+            "items": {
+              "properties": {
+                "outcome": {
+                  "enum": [
+                    "no_evidence",
+                    "tool_error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "acquisition_status": {
+            "const": "tool_error"
+          }
+        },
+        "required": [
+          "acquisition_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "operations": {
+            "contains": {
+              "properties": {
+                "outcome": {
+                  "const": "tool_error"
+                }
+              },
+              "required": [
+                "outcome"
+              ]
+            }
+          }
+        }
+      }
+    }
+  ]
+}
