@@ -85,6 +85,7 @@ jobs:
             and .f1_delta_after_canonical_mapping == 0.0
             and .count_gated_f1_delta_after_canonical_mapping == 0.0
             and .upstream_qualification_receipt_authenticated == false
+            and .qualified_equivariance_claim_permitted == false
             and .transform_bytes_recomputed == false
           ' "$RUNNER_TEMP/temporal-equivariance-report.json" > /dev/null
 
