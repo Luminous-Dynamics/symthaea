@@ -574,7 +574,7 @@ The 2026 Vlasov–Poisson control study by Guerra et al. (JCP 115169) notes that
 
 The next benchmark must jointly freeze measurement operators, sample periods, transport latency, timestamp age, jitter, noise, dropout policy, actuator update period, delivery delay, bandwidth, amplitude, slew limit, controller WCET and fallback. Deployment-scored controllers cannot observe hidden full state or command unavailable instantaneous fields. A full-state/zero-delay controller is retained only as an explicit oracle upper bound.
 
-The synthetic timing contract and schema are in [PR #13405](https://github.com/Luminous-Dynamics/symthaea/pull/13405). The next physical comparison is delay-aware observer + constrained MPC versus robust/tube MPC, RL and response-Gramian sensor/actuator co-design on the same mode/QoI subspace. Score observability, actuator authority, peak/integrated growth, delay margin, dropout robustness and sensor/compute/energy costs separately.
+The synthetic timing contract and schema are in [PR #13405](https://github.com/Luminous-Dynamics/symthaea/pull/13405). Its Rust auditor checks the raw age/deadline constraints and derives worst-case actuator command latency, minimum effective actuator bandwidth after digital Nyquist limits, and conservative observation-to-actuation latency. The six/seven derived values must remain separate from any empirical hardware measurement. The next physical comparison is delay-aware observer + constrained MPC versus robust/tube MPC, RL and response-Gramian sensor/actuator co-design on the same mode/QoI subspace. Score observability, actuator authority, peak/integrated growth, delay margin, dropout robustness and sensor/compute/energy costs separately.
 
 ## Robust kinetic stabilization objectives
 
