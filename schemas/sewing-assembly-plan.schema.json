@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/atelier/sewing-assembly-plan/0.1.0",
+  "title": "Luminous Atelier Sewing Assembly Plan",
+  "description": "A proposed, inspectable sewing-operation graph. Validation does not authorize machine actuation or establish physical sewability, quality, safety or production readiness.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "plan_id", "revision", "plan_sha256",
+    "source_brief_sha256", "source_pattern_sha256",
+    "parts", "interfaces", "machine_profiles", "operations"
+  ],
+  "properties": {
+    "schema_version": {"const": "0.1.0"},
+    "plan_id": {"type": "string", "minLength": 1, "maxLength": 120},
+    "revision": {"type": "integer", "minimum": 1},
+    "plan_sha256": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"},
+    "source_brief_sha256": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"},
+    "source_pattern_sha256": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"},
+    "claim_ceiling": {"const": "proposed_plan_only_no_actuation_authority"},
+    "parts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["part_id", "pattern_piece_id", "revision", "sha256", "edge_ids", "grain_direction"],
+        "properties": {
+          "part_id": {"type": "string", "minLength": 1, "maxLength": 120},
+          "pattern_piece_id": {"type": "string", "minLength": 1, "maxLength": 120},
+          "revision": {"type": "integer", "minimum": 1},
+          "sha256": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"},
+          "edge_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+          "grain_direction": {"enum": ["warp", "weft", "bias", "knit_wale", "knit_course", "non_directional", "unknown"]}
+        }
+      }
+    },
+    "interfaces": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["interface_id", "interface_kind", "edge_refs", "seam_allowance_mm", "tolerance_mm"],
+        "properties": {
+          "interface_id": {"type": "string", "minLength": 1, "maxLength": 120},
+          "interface_kind": {"enum": ["seam", "hem", "fold", "opening", "binding", "fastener", "joining_other"]},
+          "edge_refs": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["part_id", "edge_id", "orientation"],
+              "properties": {
+                "part_id": {"type": "string", "minLength": 1},
+                "edge_id": {"type": "string", "minLength": 1},
+                "orientation": {"enum": ["forward", "reversed", "unknown"]}
+              }
+            }
+          },
+          "seam_allowance_mm": {"type": "number", "minimum": 0, "maximum": 100},
+          "tolerance_mm": {"type": "number", "exclusiveMinimum": 0, "maximum": 20},
+          "notch_sequence": {"type": "array", "items": {"type": "string"}},
+          "construction_note": {"type": "string", "maxLength": 1000}
+        }
+      }
+    },
+    "machine_profiles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["profile_id", "revision", "sha256", "supported_operations"],
+        "properties": {
+          "profile_id": {"type": "string", "minLength": 1, "maxLength": 120},
+          "revision": {"type": "integer", "minimum": 1},
+          "sha256": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"},
+          "machine_class": {"type": "string", "minLength": 1, "maxLength": 120},
+          "supported_operations": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {"enum": ["cut", "mark", "join", "edge_finish", "dart", "gather", "attach", "insert", "press", "turn", "topstitch", "inspect", "repair_rework"]}
+          },
+          "supported_stitches": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+          "profile_basis": {"enum": ["manufacturer_specification", "independently_tested", "operator_declared", "synthetic_fixture", "unknown"]}
+        }
+      }
+    },
+    "operations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["operation_id", "kind", "predecessor_ids", "part_refs", "interface_refs", "manual", "requires_human_review"],
+        "properties": {
+          "operation_id": {"type": "string", "minLength": 1, "maxLength": 120},
+          "kind": {"enum": ["cut", "mark", "join", "edge_finish", "dart", "gather", "attach", "insert", "press", "turn", "topstitch", "inspect", "repair_rework"]},
+          "predecessor_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+          "part_refs": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+          "interface_refs": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+          "machine_profile_ref": {"type": "string", "minLength": 1, "maxLength": 120},
+          "manual": {"type": "boolean"},
+          "requires_human_review": {"type": "boolean"},
+          "irreversible": {"type": "boolean", "default": false},
+          "skill_tags": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+          "evidence_requirements": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+          "ambiguity_notes": {"type": "array", "items": {"type": "string", "maxLength": 500}}
+        }
+      }
+    }
+  }
+}

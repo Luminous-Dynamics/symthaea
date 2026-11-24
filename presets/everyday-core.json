@@ -1,0 +1,26 @@
+{
+  "schema_version": "0.1.0",
+  "preset_id": "everyday-core",
+  "name": "Everyday Core",
+  "revision": 1,
+  "compatible_families": ["top", "bottom", "outerwear", "dress", "one_piece"],
+  "intent_defaults": {
+    "description": "A versatile everyday garment with restrained detailing and a silhouette that can be styled in several ways.",
+    "style_tags": ["versatile", "understated", "layerable", "user-directed"],
+    "silhouette": "User-adjustable regular to relaxed",
+    "component_defaults": {"pockets": "Useful, low-bulk pockets where appropriate", "closure": "User-selectable conventional or adaptive closure", "hem": "Adjustable to intended use"},
+    "fit_intent": "regular"
+  },
+  "objective_defaults": [
+    {"metric": "comfort_preference", "direction": "maximize", "weight": 90},
+    {"metric": "appearance_preference", "direction": "maximize", "weight": 85},
+    {"metric": "affordability", "direction": "minimize", "weight": 75},
+    {"metric": "durability", "direction": "maximize", "weight": 75},
+    {"metric": "modularity", "direction": "maximize", "weight": 45}
+  ],
+  "hard_constraints": [],
+  "accessibility_defaults": ["Closures, openings and pocket placement remain user-editable."],
+  "circularity_defaults": ["Prefer replaceable fasteners and repairable seams where compatible with the design."],
+  "manufacturing_defaults": {"preferred_route": "unknown", "allowed_operations": []},
+  "caveats": ["This preset does not guarantee a universal fit.", "Material performance, durability, washability and environmental impact require material- and method-specific evidence."]
+}

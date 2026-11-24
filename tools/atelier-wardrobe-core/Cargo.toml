@@ -1,0 +1,14 @@
+[package]
+name = "atelier-wardrobe-core"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "Exact small-instance wardrobe coverage oracle with repair-first and no-acquisition constraints"
+
+[lib]
+path = "src/lib.rs"
+
+[profile.release]
+overflow-checks = true
+lto = true
+codegen-units = 1

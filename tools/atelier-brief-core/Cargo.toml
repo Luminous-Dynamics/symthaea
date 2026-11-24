@@ -1,0 +1,14 @@
+[package]
+name = "atelier-brief-core"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "Dependency-free semantic validation and fail-closed release gating for Luminous Atelier design briefs"
+
+[lib]
+path = "src/lib.rs"
+
+[profile.release]
+overflow-checks = true
+lto = true
+codegen-units = 1

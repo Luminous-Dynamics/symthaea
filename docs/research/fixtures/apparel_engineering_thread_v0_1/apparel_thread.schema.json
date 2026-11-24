@@ -1,0 +1,620 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/apparel-engineering-thread/0.1/schema.json",
+  "title": "Apparel Engineering Digital Thread Fixture v0.1",
+  "description": "Synthetic, evidence-bounded cross-system apparel engineering thread fixture. This schema validates structure only; it does not authenticate evidence or qualify physical performance.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "fixture_id",
+    "fixture_class",
+    "product",
+    "design",
+    "pattern",
+    "materials",
+    "bom",
+    "operations",
+    "geometry_projections",
+    "physical_tests",
+    "claims",
+    "expected_disposition"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "fixture_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "fixture_class": {
+      "const": "synthetic"
+    },
+    "functional_unit": {
+      "type": "string",
+      "minLength": 1
+    },
+    "product": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "product_id",
+        "product_family",
+        "intended_use",
+        "non_goals",
+        "article_scope"
+      ],
+      "properties": {
+        "product_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "product_family": {
+          "const": "woven_overshirt"
+        },
+        "intended_use": {
+          "type": "string",
+          "minLength": 1
+        },
+        "non_goals": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "article_scope": {
+          "enum": [
+            "single_prototype",
+            "production_batch",
+            "product_family"
+          ]
+        }
+      }
+    },
+    "design": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "design_id",
+        "revision",
+        "requirements",
+        "release_state"
+      ],
+      "properties": {
+        "design_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "requirements": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "requirement_id",
+              "statement",
+              "verification_method",
+              "status"
+            ],
+            "properties": {
+              "requirement_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "statement": {
+                "type": "string",
+                "minLength": 1
+              },
+              "verification_method": {
+                "type": "string",
+                "minLength": 1
+              },
+              "status": {
+                "enum": [
+                  "unverified",
+                  "verified_by_analysis",
+                  "verified_by_inspection",
+                  "verified_by_test",
+                  "unknown"
+                ]
+              }
+            }
+          }
+        },
+        "release_state": {
+          "enum": [
+            "concept",
+            "engineering_review",
+            "released_for_prototype",
+            "released_for_production",
+            "withdrawn"
+          ]
+        }
+      }
+    },
+    "pattern": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pattern_id",
+        "revision",
+        "units",
+        "coordinate_convention",
+        "pieces",
+        "semantic_preservation"
+      ],
+      "properties": {
+        "pattern_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "units": {
+          "enum": [
+            "mm",
+            "cm",
+            "in"
+          ]
+        },
+        "coordinate_convention": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pieces": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "piece_id",
+              "grain_direction",
+              "notch_ids",
+              "seam_allowance_ref",
+              "geometry_ref"
+            ],
+            "properties": {
+              "piece_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "grain_direction": {
+                "type": "string",
+                "minLength": 1
+              },
+              "notch_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "seam_allowance_ref": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "geometry_ref": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "semantic_preservation": {
+          "enum": [
+            "complete_for_declared_profile",
+            "partial",
+            "unknown",
+            "failed"
+          ]
+        }
+      }
+    },
+    "materials": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "material_id",
+          "material_kind",
+          "lot_id",
+          "composition_state",
+          "properties"
+        ],
+        "properties": {
+          "material_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "material_kind": {
+            "enum": [
+              "woven_fabric",
+              "knit_fabric",
+              "nonwoven",
+              "thread",
+              "trim",
+              "fastener",
+              "lining",
+              "other"
+            ]
+          },
+          "lot_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "composition_state": {
+            "enum": [
+              "measured",
+              "supplier_declared",
+              "estimated",
+              "unknown",
+              "not_applicable"
+            ]
+          },
+          "properties": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "property_id",
+                "status",
+                "value",
+                "unit",
+                "evidence_ref"
+              ],
+              "properties": {
+                "property_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "status": {
+                  "enum": [
+                    "measured",
+                    "supplier_declared",
+                    "estimated",
+                    "modelled",
+                    "unknown",
+                    "not_applicable",
+                    "not_performed"
+                  ]
+                },
+                "value": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "unit": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "evidence_ref": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "bom": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "item_id",
+          "material_id",
+          "quantity",
+          "unit",
+          "lot_binding"
+        ],
+        "properties": {
+          "item_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "material_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "quantity": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "unit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lot_binding": {
+            "enum": [
+              "bound",
+              "declared_only",
+              "unknown"
+            ]
+          }
+        }
+      }
+    },
+    "operations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operation_id",
+          "operation_kind",
+          "sequence",
+          "machine_capability_ref",
+          "planned_state",
+          "actual_event_ref"
+        ],
+        "properties": {
+          "operation_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "operation_kind": {
+            "enum": [
+              "cut",
+              "mark",
+              "join",
+              "sew",
+              "press",
+              "finish",
+              "inspect",
+              "pack",
+              "repair",
+              "disassemble",
+              "sort",
+              "recover",
+              "other"
+            ]
+          },
+          "sequence": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "machine_capability_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "planned_state": {
+            "enum": [
+              "proposed",
+              "planned",
+              "released",
+              "blocked"
+            ]
+          },
+          "actual_event_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "geometry_projections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "projection_id",
+          "source_revision",
+          "projection_kind",
+          "model_profile_ref",
+          "evidence_class",
+          "status"
+        ],
+        "properties": {
+          "projection_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_revision": {
+            "type": "string",
+            "minLength": 1
+          },
+          "projection_kind": {
+            "enum": [
+              "pattern_to_3d",
+              "seam_correspondence",
+              "fit_envelope",
+              "drape",
+              "collision_envelope",
+              "other"
+            ]
+          },
+          "model_profile_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "evidence_class": {
+            "enum": [
+              "synthetic",
+              "model_output",
+              "measured",
+              "mixed",
+              "unknown"
+            ]
+          },
+          "status": {
+            "enum": [
+              "available",
+              "incomplete",
+              "stale",
+              "failed",
+              "not_performed"
+            ]
+          }
+        }
+      }
+    },
+    "physical_tests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "test_id",
+          "method_ref",
+          "specimen_ref",
+          "status",
+          "result",
+          "evidence_ref"
+        ],
+        "properties": {
+          "test_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "method_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "specimen_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "enum": [
+              "planned",
+              "not_performed",
+              "measured",
+              "failed",
+              "inconclusive",
+              "invalidated"
+            ]
+          },
+          "result": {
+            "type": [
+              "number",
+              "string",
+              "object",
+              "null"
+            ]
+          },
+          "evidence_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "claims": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "claim_id",
+          "statement",
+          "claim_class",
+          "evidence_refs",
+          "disposition"
+        ],
+        "properties": {
+          "claim_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "statement": {
+            "type": "string",
+            "minLength": 1
+          },
+          "claim_class": {
+            "enum": [
+              "design_intent",
+              "supplier_assertion",
+              "model_output",
+              "physical_observation",
+              "physical_test",
+              "lifecycle",
+              "environmental",
+              "regulatory"
+            ]
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "disposition": {
+            "enum": [
+              "supported_within_scope",
+              "unsupported",
+              "blocked",
+              "unknown",
+              "not_applicable"
+            ]
+          }
+        }
+      }
+    },
+    "expected_disposition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "thread_state",
+        "physical_qualification",
+        "reason_codes"
+      ],
+      "properties": {
+        "thread_state": {
+          "enum": [
+            "structurally_complete",
+            "structurally_incomplete",
+            "blocked",
+            "invalid"
+          ]
+        },
+        "physical_qualification": {
+          "enum": [
+            "not_qualified",
+            "partially_qualified",
+            "qualified_for_declared_scope",
+            "unknown"
+          ]
+        },
+        "reason_codes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

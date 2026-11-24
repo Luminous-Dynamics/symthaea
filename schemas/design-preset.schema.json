@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/atelier/design-preset/0.1.0",
+  "title": "Luminous Atelier Design Preset",
+  "description": "An editable starting configuration. A preset is not a fit, safety, durability, sustainability, or manufacturability certification.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "preset_id", "name", "revision", "compatible_families", "intent_defaults", "objective_defaults", "hard_constraints", "caveats"],
+  "properties": {
+    "schema_version": {"const": "0.1.0"},
+    "preset_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{2,63}$"},
+    "name": {"type": "string", "minLength": 1, "maxLength": 100},
+    "revision": {"type": "integer", "minimum": 1},
+    "compatible_families": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["top", "bottom", "outerwear", "dress", "one_piece", "underwear", "sportswear", "workwear", "adaptive", "accessory", "footwear", "other"]}},
+    "intent_defaults": {
+      "type": "object", "additionalProperties": false,
+      "required": ["description", "style_tags"],
+      "properties": {
+        "description": {"type": "string", "minLength": 1, "maxLength": 1000},
+        "style_tags": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "maxLength": 80}},
+        "silhouette": {"type": "string", "maxLength": 160},
+        "component_defaults": {"type": "object", "additionalProperties": {"type": "string"}},
+        "fit_intent": {"enum": ["close", "regular", "relaxed", "oversized", "draped", "compression", "user_defined"]}
+      }
+    },
+    "objective_defaults": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["metric", "direction", "weight"],
+        "properties": {
+          "metric": {"enum": ["comfort_preference", "appearance_preference", "durability", "affordability", "breathability", "thermal_suitability", "moisture_management", "repairability", "modularity", "local_availability", "manufacturing_simplicity", "material_efficiency", "environmental_impact", "sensory_accessibility", "fit_preference", "design_novelty", "user_defined"]},
+          "direction": {"enum": ["minimize", "maximize", "target", "prefer"]},
+          "weight": {"type": "integer", "minimum": 0, "maximum": 100}
+        }
+      }
+    },
+    "hard_constraints": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["path", "operator", "value"], "properties": {"path": {"type": "string", "minLength": 1}, "operator": {"enum": ["eq", "neq", "lt", "lte", "gt", "gte", "in", "not_in", "contains", "not_contains"]}, "value": {}, "unit": {"type": "string", "maxLength": 40}, "acceptance_basis": {"enum": ["user_confirmation", "structural_rule", "supplier_evidence", "measured_test", "physical_trial", "not_yet_defined"]}}}},
+    "accessibility_defaults": {"type": "array", "items": {"type": "string", "maxLength": 300}},
+    "circularity_defaults": {"type": "array", "items": {"type": "string", "maxLength": 300}},
+    "manufacturing_defaults": {"type": "object", "additionalProperties": false, "properties": {"preferred_route": {"enum": ["home_sewing", "local_maker", "tailor", "cut_make_trim", "industrial_knit", "made_to_order_factory", "unknown"]}, "allowed_operations": {"type": "array", "items": {"type": "string"}}}},
+    "caveats": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1, "maxLength": 500}}
+  }
+}
