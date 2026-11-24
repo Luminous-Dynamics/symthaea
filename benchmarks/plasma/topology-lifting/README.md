@@ -66,3 +66,14 @@ The paired fixture `weighted-measure-tail-stability-v0.1.json` contrasts two beh
 The focused Rust test checks the observed moment difference against this analytic bound and independently checks the sample-support displacement. The fixture is also schema-validated in CI.
 
 This supports a representation-level stability property, not a physical-safety conclusion. A tiny-mass particle can still matter to high-velocity energy moments, extreme gradients, rare-event observables or future nonlinear response. Those require separate kinetic invariants, tail diagnostics and registered intervention tests. It is also still a finite-band embedding and therefore not a lossless reconstruction of the full measure.
+
+
+## Finite-band non-injectivity known-answer control
+
+The Rust tests include an explicit aliasing witness for K=4:
+- Measure A: five equally weighted roots of unity at positions j/5.
+- Measure B: ten equally weighted roots of unity at positions j/10.
+
+These are distinct discrete measures, but their first four nonzero complex Fourier moments are all zero. The fifth moment separates them: it is one for the five-point measure and zero for the ten-point measure.
+
+This is a constructive demonstration that a finite Fourier band is not injective over particle measures. It is a mandatory negative control for any KIRD sweep: when K is reduced, record which registered future responses become indistinguishable, and never relabel a low-band embedding as a complete microscopic state.
