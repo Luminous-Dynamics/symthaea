@@ -1,0 +1,148 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mace_decision_outcome_receipt_v1.schema.json",
+  "title": "MACE Decision Outcome Receipt V1",
+  "description": "Independently issued observation of what followed a bound decision/action. Benchmark evaluator labels and private gold data remain outside the candidate and retrieval-policy planes.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "query_invocation_id",
+    "domain_id",
+    "environment_revision_sha256",
+    "candidate_set_sha256",
+    "decision_need_sha256",
+    "decision_sufficiency_receipt_sha256",
+    "decision_action_sha256",
+    "action_execution_receipt_sha256",
+    "observed_world_receipt_sha256",
+    "outcome_status",
+    "outcome_metric_sha256",
+    "evaluator_profile_sha256",
+    "issued_at_unix",
+    "observed_at_unix",
+    "key_id",
+    "signature"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mace_decision_outcome_receipt_v1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "query_invocation_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "domain_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "environment_revision_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "candidate_set_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "decision_need_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "decision_sufficiency_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "decision_action_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "action_execution_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "observed_world_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "outcome_status": {
+      "enum": [
+        "observed",
+        "not_observable",
+        "invalidated",
+        "unknown"
+      ]
+    },
+    "outcome_metric_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "utility_micros": {
+      "type": "integer",
+      "minimum": -1000000000000,
+      "maximum": 1000000000000
+    },
+    "pair_block_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "intervention_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "evaluator_profile_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "issued_at_unix": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "observed_at_unix": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "key_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "signature": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4096,
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "outcome_status": {
+            "const": "observed"
+          }
+        },
+        "required": [
+          "outcome_status"
+        ]
+      },
+      "then": {
+        "required": [
+          "utility_micros"
+        ]
+      }
+    }
+  ]
+}
