@@ -98,6 +98,8 @@ pub struct TemporalTransformReportV1 {
     pub count_gated_f1_delta_after_canonical_mapping: Option<f64>,
     /// This module only validates the opaque digest's syntax and scope binding.
     pub upstream_qualification_receipt_authenticated: bool,
+    /// No task-equivalence verdict may be promoted without the #13260 verifier.
+    pub qualified_equivariance_claim_permitted: bool,
     /// The transform bytes are not available to this coordinate-only evaluator.
     pub transform_bytes_recomputed: bool,
 }
@@ -199,6 +201,7 @@ pub fn audit_temporal_transform_case(
         f1_delta_after_canonical_mapping: f1_delta,
         count_gated_f1_delta_after_canonical_mapping: count_gated_f1_delta,
         upstream_qualification_receipt_authenticated: false,
+        qualified_equivariance_claim_permitted: false,
         transform_bytes_recomputed: false,
     })
 }
