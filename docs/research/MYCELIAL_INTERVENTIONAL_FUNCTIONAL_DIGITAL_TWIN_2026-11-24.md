@@ -53,7 +53,7 @@ The cordogenesis and isotope studies are distinct cohorts. Do not join their rec
 
 ### 2.4 Microbial dispersal is a separate functional layer
 
-The 2026 Hyphal Highways Device study examines bacterial dispersal along hyphae under unsaturated conditions. It is a valuable reference for extracellular liquid constraints and microbial movement, not a surrogate measurement for intrahyphal cytoplasmic flow or isotope transfer.
+The 2026 Hyphal Highways Device study examines bacterial dispersal along *Pythium ultimum* hyphae under unsaturated conditions. *P. ultimum* is an oomycete, not a true fungus. The experiment is a valuable reference for extracellular liquid constraints and microbial movement, not a surrogate measurement for fungal intrahyphal cytoplasmic flow or isotope transfer.
 
 Reference: https://doi.org/10.1093/femsml/uqag035
 
@@ -297,7 +297,8 @@ That would move Mycelial from network visualization toward a genuinely testable 
 - Smart microscopy interoperability roadmap (2026): https://doi.org/10.1515/mim-2025-0029
 - Sten 2D mycelium analysis (2024): https://doi.org/10.1016/j.ecoinf.2024.102670
 - Sten 3D z-stack reconstruction (2025): https://doi.org/10.1016/j.ecoinf.2025.103317
-- Fungal Network Analysis: https://github.com/oscar-sten/mycelium-network-analysis-tool
+- Fungal Network Analysis (Fricker): https://zenodo.org/records/14931863
+- Sten mycelium-network-analysis-tool (2D filament / crossing reference): https://gitlab.iit.it/oscar.sten/mycelium-network-analysis-tool
 - Fiji SNT: https://imagej.net/plugins/snt/
 - OME-NGFF: https://ngff.openmicroscopy.org/
 - useq-schema: https://github.com/als-computing/useq-schema
