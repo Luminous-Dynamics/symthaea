@@ -297,3 +297,29 @@ For retrieval, run the 894-query and 810-query cohorts independently. For theore
 ### Claim boundary
 
 The external results above establish that current theorem-proving and retrieval performance is substantially ahead of our small proof-comprehension pilot. They do not establish that those systems solve proof comprehension, delayed transfer or local-to-global warrant consistency. Conversely, our current typed extraction and finite-receipt tests do not establish better theorem-proving accuracy. The defensible contribution is a new, independently testable reliability-and-comprehension layer composed with existing provers—provided the future matched experiments show benefit.
+
+## 13. PutnamBench saturation and retrieval cohort correction (2026-11-24)
+
+A fresh live leaderboard inspection changes the interpretation of the hard-mode baseline:
+
+- The featured Lean PutnamBench ranking currently shows **672/672 solved** by multiple pipelines.
+- The separate **Lean no-answer** ranking (346/672 tasks require answer inference) also shows **672/672** for Midas Prover, with the listed average cost of $6.17 and 31 minutes per problem.
+- The answer-provided ranking is distinct from the no-answer ranking. A result in one must not be reported as a result in the other.
+- Goedel-Architect's public project page describes 99.2% MiniF2F-test and 75.6% PutnamBench pass@1, with optional natural-language proof seeding; its project site reports 88.8% (597/672) at pass@4 and $985.67 total API cost for that PutnamBench run. These are distinct modes and budgets, not one result.
+- Goedel-Prover-V2's ICLR abstract reports 86 PutnamBench problems at pass@184; the project README has updated figures/modes (86 at pass@192). Keep the venue paper result and live project result as separate provenance rows.
+- Lean Finder v2's live Legendre comparison uses 894 gold-resolved MathlibQR queries (from the original 946; 11 gold declarations absent at pinned mathlib-4280 revision and unresolved, not misses). It reports R@1 55.0%, R@10 89.4%, R@100 97.3%, nDCG@10 0.725. LeanGraphSearch's 810-query fair subset is a distinct cohort and remains a separate comparison.
+
+### Strategic consequence
+
+PutnamBench is now useful as an integration/smoke test, but is not a discriminative SOTA target unless we use a harder, independently adjudicated, rolling, no-answer holdout with exact budget matching. Do not optimize toward a saturated public leaderboard and then claim superior mathematics.
+
+The harder research frontier for this programme should be:
+1. theorem statement reconstruction and equivalence/entailment direction;
+2. dependency role correctness, not dependency retrieval alone;
+3. proof-plan action, warrant, subgoal and side-condition fidelity;
+4. mutation-based explanation sensitivity and valid-route invariance;
+5. local rejection persistence under global planning (CIRR);
+6. delayed human near- and cross-family transfer;
+7. confidence calibration and review burden at a fixed risk ceiling.
+
+For any future Putnam comparison, publish separate answer-provided and no-answer rows, exact task revision, run timestamp, model/prompt/toolchain revision, candidate count, total inference budget, per-problem cost/time distribution, and failed/unresolved tasks. A 672/672 ceiling means the primary scientific comparison should move to those undermeasured reliability and comprehension axes.

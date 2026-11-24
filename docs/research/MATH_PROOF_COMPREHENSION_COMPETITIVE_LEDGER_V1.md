@@ -520,3 +520,22 @@ Open a dedicated matched-baseline task for:
 5. proof-plan role correctness and human transfer after successful formal proving.
 
 The first four are machine/formal tasks; item five is a separate human-study authority. None may be collapsed into a single proof-comprehension score.
+
+## 18. PutnamBench saturation finding (2026-11-24)
+
+The live PutnamBench leaderboard now reports a 672/672 solve count in its featured Lean ranking and a separate 672/672 result in its Lean no-answer ranking (Midas Prover; displayed mean cost $6.17 and 31 minutes/problem). This is a saturation signal, not proof that every possible theorem or research problem is solved. It also means answer-provided and no-answer performance must remain separate rows.
+
+Goedel-Architect must likewise be described by run mode: the paper/project summary gives 99.2% MiniF2F-test and 75.6% PutnamBench pass@1; its optional natural-language proof-seeded project run reports 88.8% (597/672) at pass@4, with $985.67 API cost. Goedel-Prover-V2's ICLR abstract reports 86 PutnamBench problems at pass@184, while its project README now lists 86 at pass@192. We preserve paper and rolling project numbers separately rather than collapse them.
+
+Lean Finder v2's live Legendre table explicitly records 894 gold-resolved MathlibQR queries (of 946 source prompts; missing pinned gold declarations are unresolved, not misses): R@1 55.0%, R@10 89.4%, R@100 97.3%, nDCG@10 0.725. LeanGraphSearch's 810-query fair subset is distinct; no cross-cohort arithmetic is valid.
+
+Implication: public PutnamBench solving is no longer the principal claim target. A future Symthaea SOTA comparison needs same-budget, no-answer and answer-provided evaluation on fresh holdouts, but differentiation should concentrate on verified proof-plan reconstruction, semantic statement fidelity, counterfactual validity, local/global consistency and human transfer.
+
+Sources:
+- PutnamBench leaderboard: https://trishullab.github.io/PutnamBench/leaderboard
+- Goedel-Architect project results/cost: https://goedelarchitect.github.io/
+- Goedel-Architect paper: https://arxiv.org/abs/2606.06468
+- Goedel-Prover-V2 ICLR paper: https://proceedings.iclr.cc/paper_files/paper/2026/hash/13e8be77982beb73d7ed0bbf122f9f3c-Abstract-Conference.html
+- Goedel-Prover-V2 project README: https://github.com/Goedel-LM/Goedel-Prover-V2
+- Legendre live leaderboard: https://www.legendre-leaderboard.com/
+- DAP hard-mode paper: https://aclanthology.org/2026.acl-long.3/
