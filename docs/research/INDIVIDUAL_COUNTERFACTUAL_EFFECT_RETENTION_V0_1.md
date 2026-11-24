@@ -142,3 +142,53 @@ A passing Rust workflow would qualify only the finite arithmetic and input/prove
 - physical safety, actuator authorization or deployment readiness.
 
 Those claims require separate source-bound experiments, held-out individuals/interventions, valid environment formulations, independent evaluator custody, complete failure denominators and reproducible closed-loop outcomes.
+
+
+## 9. Exact counterfactual restoration tiers and first pilot
+
+A digest match is a commitment to an identity, not proof that an individual was restored to the same physical or simulated state. The experiment must declare which restoration tier produced the paired outcomes.
+
+### Tier S — deterministic simulator snapshot/restore
+
+This is the first individual-effect evaluator pilot.
+
+- Restore the same serialized simulator state and hidden individual parameters before each intervention.
+- Freeze the same dynamics/build, timebase, intervention definitions and exogenous disturbance schedule.
+- Use the #13375/#13377 action-coupled branch contract: shared initial state and exogenous event identity, independent arm-local future state/observation trajectories after actions diverge.
+- Keep simulator state, hidden individual parameters and exogenous forcing outside the candidate process.
+- Run the independent replay and stochastic correspondence verifier before admitting the paired outcomes.
+
+A simulator snapshot digest and branch receipts support exact finite simulator counterfactuals only under the simulator's declared semantics. They do not establish that the simulator is physically faithful.
+
+### Tier H — hardware-in-the-loop with measured restoration
+
+A physical or HIL claim needs an additional restoration-measurement protocol: fixture/setup ID, instrument/calibration identity, pre-intervention state vector and tolerance, post-reset state vector, restoration residual, environmental conditioning, component wear, and an independently reviewed restoration receipt. Any variable outside tolerance invalidates the pair or demotes it to a non-exact matched restart. A source-state digest alone cannot qualify physical restoration.
+
+### Tier R — randomized matched physical units
+
+Where the same physical individual cannot be restored and receive both interventions, randomized matched-unit trials can estimate population-average or subgroup treatment effects under a declared design. They do **not** reveal both potential outcomes for the exact same physical individual. Do not report them as exact individual counterfactual ground truth or a third-rung reproduction.
+
+Observational logs alone are weaker still: they do not provide the missing potential outcome without additional identification assumptions and a qualified estimator.
+
+### First low-cost pilot: dm_control cartpole swing-up
+
+Prioritize the exact `dm_control/cartpole/swingup` formulation audited in Okita (2026-11-04), not a generic claim about every DMC task. The paper reports it passes its C1-C5 formulation/measurement checks, with abducible share (A=0.396) and estimation floor (phi=0.093). Its source-specific (A ge 3phi) criterion is met (0.396 vs 0.279). These values are the paper's result, not Symthaea's.
+
+Pilot sequence:
+
+1. Recover/pin the paper's exact environment version, latent/individual parameterization, intervention pair, outcome variable, seed schedule, estimator and sample-size/convergence procedure. Do not approximate its task and call that a reproduction.
+2. Reproduce the C1-C5 audit and estimation-floor sensitivity before training Symthaea. Include threshold sensitivity (2x/3x/4x) and held-out individuals.
+3. Generate exact simulator snapshot/restore pairs. Share the exogenous event/tick schedule by stable identity, but let post-action endogenous trajectories diverge.
+4. Feed the same factual history to HDC-only, CfC/LTC-only, HDC+CfC/LTC, reconstruction-first, individual-contrast and simple-latent baselines.
+5. Compare the frozen-latent effect readout with the actual imagined rollout on held-out individuals and held-out intervention pairs. Keep mean-effect error, individual-effect MAE/sign, action-ranking, decision regret and resource cost separate.
+6. Only after the low-dimensional mechanism reproduces should we choose a visual/dynamic manipulation task and rerun C1-C5 for its exact task/intervention/utility. The paper's robosuite push formulation fails individual dependence; its stack formulation does not clear the full measurability/convergence checks. A robot benchmark name does not by itself create individual-counterfactual ground truth.
+
+### Decision relevance is a separate axis
+
+PR #13468's F10/F11 fixtures demonstrate that the same individual-effect fidelity error can be decision-sufficient at a declared epsilon and decision-critical at a tighter epsilon. Reuse #13239/#13152 as the only common epsilon-good action / regret authority. This module reports counterfactual fidelity; it does not compute decision sufficiency or replace the independent hard-constraint gate.
+
+Links:
+- [Decision-Equivalent Imagination v0.1 and F1-F11](https://github.com/Luminous-Dynamics/symthaea/pull/13468)
+- [Causal trajectory pairing #13375/#13377](https://github.com/Luminous-Dynamics/symthaea/pull/13377)
+- [Okita paper](https://www.mdpi.com/2504-4990/8/11/363)
+
