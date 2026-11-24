@@ -9,3 +9,5 @@ pub mod evidence_digest;
 
 #[path = "../../../crates/domains/symthaea-muse/src/temporal_grounding.rs"]
 pub mod temporal_grounding;
+
+pub mod temporal_consensus;
