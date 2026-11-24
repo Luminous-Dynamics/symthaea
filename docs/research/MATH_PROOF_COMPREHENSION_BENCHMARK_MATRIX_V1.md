@@ -459,3 +459,13 @@ The fixture includes exact identity, a positive hypothesis-order permutation, an
 **Prospective target:** 100% reproducible normalized digests and zero false Tier-1 equivalence on the frozen negative controls. These are targets, not results. Initial exact-head attempt [45494166481](https://github.com/Luminous-Dynamics/symthaea/actions/runs/45494166481) failed before CLI/tests because a shell continuation was escaped incorrectly and `jq` received a literal backslash filename; the Rust formatter step had passed. The script was fixed in [8dc3247](https://github.com/Luminous-Dynamics/symthaea/commit/8dc3247a0c87e1aaf8dea5214074c475db0f5f29), and corrected run [45494435432](https://github.com/Luminous-Dynamics/symthaea/actions/runs/45494435432) is in progress. No Rust CLI/test pass is claimed yet.
 
 **Scope boundary:** the current BooleanSequent has no binders, so this does not implement alpha-renaming; it does not normalize logical equivalences, alter free atom identities, sort premises or establish kernel-certified context transport. Tier 0 exact CIRR is not modified. Tier 1 must have its own denominators, exclusions and false-comparability reporting.
+
+## 19. Tier-2 Lean context/warrant transport seed (2026-11-24)
+
+A second scope-equivalence tier now has a source-level Lean seed. The local context `p ∧ q` and global context `q ∧ p` are connected by explicit proofs in both directions. Separate declarations establish the two-way context equivalence and transport a warrant of unchanged target `r` from either context to the other.
+
+The manifest maps six declarations to the Tier-2 obligations and pins the source digest plus Lean 4.37/Mathlib environment. The focused workflow runs the Lean source and, on success, emits a separate exact-run receipt with source, manifest, toolchain, Lake manifest and axiom-log digests.
+
+**Status:** source, manifest, schema and workflow integration are committed; exact-head replay is pending. The static manifest intentionally remains `kernel_replay_pending` until a successful run reports the receipt.
+
+**Claim ceiling:** synthetic, non-dependent propositional context permutation only; same target; no dependent binders, typeclasses, local instances, universe changes, altered premises or arbitrary context transport. Axiom output is captured but not parsed. This is not a model score or evidence that general Tier-2 scope equivalence is solved.
