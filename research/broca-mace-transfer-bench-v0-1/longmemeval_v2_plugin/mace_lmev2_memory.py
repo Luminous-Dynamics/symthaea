@@ -60,8 +60,8 @@ _RETRIEVAL_MODE_PROFILES: dict[str, dict[str, Any]] = {
         "fusion_profile": {"algorithm": "none"},
     },
     "hybrid_rrf": {
-        "backend_id": self.backend_id,
-        "retrieval_mode_label": self.retrieval_mode_label,
+        "backend_id": "mace_lmev2_hybrid_rrf_bm25_entity",
+        "retrieval_mode_label": "hybrid_bm25_entity_literal_with_original_image_evidence",
         "evidence_channel": "hybrid_rrf_bm25_entity",
         "retrieval_channels": [
             "trajectory_bm25_search_v1",
