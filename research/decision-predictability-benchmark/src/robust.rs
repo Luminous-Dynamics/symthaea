@@ -474,9 +474,18 @@ impl Display for StageBAdapterError {
         match self {
             Self::EmptyExperimentId => write!(formatter, "Stage-B experiment ID must be non-empty"),
             Self::EmptyMethodId => write!(formatter, "Stage-B method ID must be non-empty"),
-            Self::InvalidSeparationScore(value) => write!(formatter, "Stage-B separation score must be finite and non-negative, got {value}"),
-            Self::MissingCovarianceDigest => write!(formatter, "Stage-B covariance matrix digest must be non-zero SHA-256"),
-            Self::DecisionValue(error) => write!(formatter, "Stage-A robust decision evaluation failed: {error}"),
+            Self::InvalidSeparationScore(value) => write!(
+                formatter,
+                "Stage-B separation score must be finite and non-negative, got {value}"
+            ),
+            Self::MissingCovarianceDigest => write!(
+                formatter,
+                "Stage-B covariance matrix digest must be non-zero SHA-256"
+            ),
+            Self::DecisionValue(error) => write!(
+                formatter,
+                "Stage-A robust decision evaluation failed: {error}"
+            ),
         }
     }
 }
@@ -720,7 +729,6 @@ mod tests {
     }
 }
 
-
 #[cfg(test)]
 mod stage_b_adapter_tests {
     use super::*;
@@ -730,9 +738,18 @@ mod stage_b_adapter_tests {
             state_ids: vec!["H_A".into(), "H_B".into()],
             decision_ids: vec!["choose_A".into(), "choose_B".into(), "abstain".into()],
             decision_loss: BTreeMap::from([
-                ("choose_A".into(), BTreeMap::from([("H_A".into(), 0.0), ("H_B".into(), 1.0)])),
-                ("choose_B".into(), BTreeMap::from([("H_A".into(), 1.0), ("H_B".into(), 0.0)])),
-                ("abstain".into(), BTreeMap::from([("H_A".into(), 0.4), ("H_B".into(), 0.4)])),
+                (
+                    "choose_A".into(),
+                    BTreeMap::from([("H_A".into(), 0.0), ("H_B".into(), 1.0)]),
+                ),
+                (
+                    "choose_B".into(),
+                    BTreeMap::from([("H_A".into(), 1.0), ("H_B".into(), 0.0)]),
+                ),
+                (
+                    "abstain".into(),
+                    BTreeMap::from([("H_A".into(), 0.4), ("H_B".into(), 0.4)]),
+                ),
             ]),
             maximum_worst_case_loss: 0.4,
         }
@@ -785,9 +802,22 @@ mod stage_b_adapter_tests {
         .unwrap();
 
         assert_eq!(result.stage_b_evidence.worst_case_separation_squared, 4.0);
-        assert_eq!(result.stage_b_evidence.method_id, "joint-covariance-maximin-v0.2");
-        assert!((result.stage_a_decision_value.guaranteed_worst_case_loss_reduction - 0.4).abs() < TOLERANCE);
-        assert_eq!(result.stage_a_decision_value.admission, RobustProbeAdmission::Eligible);
+        assert_eq!(
+            result.stage_b_evidence.method_id,
+            "joint-covariance-maximin-v0.2"
+        );
+        assert!(
+            (result
+                .stage_a_decision_value
+                .guaranteed_worst_case_loss_reduction
+                - 0.4)
+                .abs()
+                < TOLERANCE
+        );
+        assert_eq!(
+            result.stage_a_decision_value.admission,
+            RobustProbeAdmission::Eligible
+        );
     }
 
     #[test]
@@ -795,22 +825,39 @@ mod stage_b_adapter_tests {
         let mut missing_digest = stage_b();
         missing_digest.covariance_matrix_digest_sha256 = [0; 32];
         assert!(matches!(
-            evaluate_covariance_guided_robust_probe(missing_digest, &robust_problem(), &robust_probe(), &context()),
+            evaluate_covariance_guided_robust_probe(
+                missing_digest,
+                &robust_problem(),
+                &robust_probe(),
+                &context()
+            ),
             Err(StageBAdapterError::MissingCovarianceDigest)
         ));
 
         let mut invalid_score = stage_b();
         invalid_score.worst_case_separation_squared = f64::NAN;
         assert!(matches!(
-            evaluate_covariance_guided_robust_probe(invalid_score, &robust_problem(), &robust_probe(), &context()),
+            evaluate_covariance_guided_robust_probe(
+                invalid_score,
+                &robust_problem(),
+                &robust_probe(),
+                &context()
+            ),
             Err(StageBAdapterError::InvalidSeparationScore(_))
         ));
 
         let mut incomplete_probe = robust_probe();
         incomplete_probe.outcomes.pop();
         assert!(matches!(
-            evaluate_covariance_guided_robust_probe(stage_b(), &robust_problem(), &incomplete_probe, &context()),
-            Err(StageBAdapterError::DecisionValue(RobustEvaluationError::UncoveredState(_)))
+            evaluate_covariance_guided_robust_probe(
+                stage_b(),
+                &robust_problem(),
+                &incomplete_probe,
+                &context()
+            ),
+            Err(StageBAdapterError::DecisionValue(
+                RobustEvaluationError::UncoveredState(_)
+            ))
         ));
     }
 }
