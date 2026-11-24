@@ -15,18 +15,15 @@ use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
 
 use super::label_consumption_guard::{
-    LabelConsumptionEligibilityReportV1, LabelConsumptionEligibilityV1,
-    LabelEvidenceFrontierV1,
+    LabelConsumptionEligibilityReportV1, LabelConsumptionEligibilityV1, LabelEvidenceFrontierV1,
 };
 
 pub const GATED_STREAMING_ADAPTER_SCHEMA_V1: &str =
     "luminous.semi-bench.gated-streaming-adapter.v1";
 pub const STREAMING_ADAPTER_POLICY_SCHEMA_V1: &str =
     "luminous.semi-bench.streaming-adapter-policy.v1";
-pub const STREAMING_PREDICTION_SCHEMA_V1: &str =
-    "luminous.semi-bench.streaming-prediction.v1";
-pub const STREAMING_DELIVERY_SCHEMA_V1: &str =
-    "luminous.semi-bench.streaming-label-delivery.v1";
+pub const STREAMING_PREDICTION_SCHEMA_V1: &str = "luminous.semi-bench.streaming-prediction.v1";
+pub const STREAMING_DELIVERY_SCHEMA_V1: &str = "luminous.semi-bench.streaming-label-delivery.v1";
 pub const STREAMING_UPDATE_RECEIPT_SCHEMA_V1: &str =
     "luminous.semi-bench.streaming-update-receipt.v1";
 pub const STREAMING_PREDICTION_RECEIPT_SCHEMA_V1: &str =
@@ -233,9 +230,7 @@ fn sha256_hex(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
 
-fn json_sha256<T: Serialize + ?Sized>(
-    value: &T,
-) -> Result<String, GatedStreamingAdapterErrorV1> {
+fn json_sha256<T: Serialize + ?Sized>(value: &T) -> Result<String, GatedStreamingAdapterErrorV1> {
     let bytes = serde_json::to_vec(value).map_err(|error| {
         GatedStreamingAdapterErrorV1(format!("canonical JSON serialization failed: {error}"))
     })?;
@@ -305,7 +300,9 @@ fn validate_policy(policy: &StreamingAdapterPolicyV1) -> Result<(), GatedStreami
     Ok(())
 }
 
-fn validate_engine(engine: &GatedStreamingAdapterEngineV1) -> Result<(), GatedStreamingAdapterErrorV1> {
+fn validate_engine(
+    engine: &GatedStreamingAdapterEngineV1,
+) -> Result<(), GatedStreamingAdapterErrorV1> {
     if engine.schema != GATED_STREAMING_ADAPTER_SCHEMA_V1 {
         return Err(GatedStreamingAdapterErrorV1(
             "streaming adapter engine schema is unsupported".into(),
@@ -334,10 +331,15 @@ fn validate_engine(engine: &GatedStreamingAdapterEngineV1) -> Result<(), GatedSt
             .iter()
             .any(|value| !value.is_finite())
         || !engine.adapter_state.global_context_residual_ema.is_finite()
-        || !engine.adapter_state.global_temporal_residual_ema.is_finite()
-        || engine.adapter_state.contexts.values().any(|context| {
-            !context.residual_ema.is_finite()
-        })
+        || !engine
+            .adapter_state
+            .global_temporal_residual_ema
+            .is_finite()
+        || engine
+            .adapter_state
+            .contexts
+            .values()
+            .any(|context| !context.residual_ema.is_finite())
     {
         return Err(GatedStreamingAdapterErrorV1(
             "streaming adapter state contains an invalid numeric value".into(),
@@ -358,9 +360,7 @@ pub fn create_gated_streaming_adapter_engine_v1(
 ) -> Result<GatedStreamingAdapterEngineV1, GatedStreamingAdapterErrorV1> {
     require_text(engine_id, "engine_id")?;
     require_text(clock_domain_id, "clock_domain_id")?;
-    if !valid_sha256(global_model_artifact_sha256)
-        || !valid_sha256(feature_schema_sha256)
-    {
+    if !valid_sha256(global_model_artifact_sha256) || !valid_sha256(feature_schema_sha256) {
         return Err(GatedStreamingAdapterErrorV1(
             "global model or feature-schema digest is malformed".into(),
         ));
@@ -368,7 +368,9 @@ pub fn create_gated_streaming_adapter_engine_v1(
     validate_policy(&policy)?;
     let policy_sha256 = json_sha256(&policy)?;
     if initial_feature_weights.is_empty()
-        || initial_feature_weights.iter().any(|weight| !weight.is_finite())
+        || initial_feature_weights
+            .iter()
+            .any(|weight| !weight.is_finite())
     {
         return Err(GatedStreamingAdapterErrorV1(
             "initial feature adapter weights must be non-empty and finite".into(),
@@ -396,10 +398,7 @@ pub fn create_gated_streaming_adapter_engine_v1(
     })
 }
 
-fn context_correction(
-    engine: &GatedStreamingAdapterEngineV1,
-    context_key: Option<&str>,
-) -> f64 {
+fn context_correction(engine: &GatedStreamingAdapterEngineV1, context_key: Option<&str>) -> f64 {
     let Some(key) = context_key else {
         return engine.adapter_state.global_context_residual_ema;
     };
@@ -458,10 +457,9 @@ pub fn predict_and_register_stream_sample_v1(
         ));
     }
     if !input.global_baseline_prediction.is_finite()
-        || input
-            .feature_vector
-            .iter()
-            .any(|value| !value.is_finite() || value.abs() > engine.policy.maximum_abs_feature_value)
+        || input.feature_vector.iter().any(|value| {
+            !value.is_finite() || value.abs() > engine.policy.maximum_abs_feature_value
+        })
     {
         return Err(GatedStreamingAdapterErrorV1(
             "prediction contains a non-finite or out-of-policy feature/baseline value".into(),
@@ -494,7 +492,9 @@ pub fn predict_and_register_stream_sample_v1(
         selected_feature_vector.push(input.feature_vector[*index]);
     }
     if engine.pending_predictions.contains_key(&input.sample_id)
-        || engine.seen_measurement_event_ids.contains(&input.measurement_event_id)
+        || engine
+            .seen_measurement_event_ids
+            .contains(&input.measurement_event_id)
     {
         return Err(GatedStreamingAdapterErrorV1(
             "duplicate sample or measurement event prediction".into(),
@@ -557,8 +557,12 @@ pub fn predict_and_register_stream_sample_v1(
     };
     receipt.receipt_sha256 = prediction_receipt_digest(&receipt)?;
 
-    engine.seen_measurement_event_ids.insert(input.measurement_event_id.clone());
-    engine.pending_predictions.insert(input.sample_id.clone(), receipt.clone());
+    engine
+        .seen_measurement_event_ids
+        .insert(input.measurement_event_id.clone());
+    engine
+        .pending_predictions
+        .insert(input.sample_id.clone(), receipt.clone());
     engine.next_prediction_sequence = next_prediction_sequence;
     Ok(receipt)
 }
@@ -614,7 +618,10 @@ pub fn deliver_qualified_stream_label_v1(
     }
     require_text(&delivery.sample_id, "delivery.sample_id")?;
     require_text(&delivery.label_id, "delivery.label_id")?;
-    require_text(&delivery.measurement_event_id, "delivery.measurement_event_id")?;
+    require_text(
+        &delivery.measurement_event_id,
+        "delivery.measurement_event_id",
+    )?;
     require_text(&delivery.clock_domain_id, "delivery.clock_domain_id")?;
     require_text(&delivery.idempotency_key, "delivery.idempotency_key")?;
     if delivery.label_revision == 0 || !valid_sha256(&delivery.label_payload_sha256) {
@@ -628,10 +635,10 @@ pub fn deliver_qualified_stream_label_v1(
     let mut reasons = Vec::new();
     let prediction = engine.pending_predictions.get(&delivery.sample_id);
 
-    if engine
-        .accepted_label_revisions
-        .contains(&format!("{}:{}", delivery.label_id, delivery.label_revision))
-    {
+    if engine.accepted_label_revisions.contains(&format!(
+        "{}:{}",
+        delivery.label_id, delivery.label_revision
+    )) {
         reasons.push(StreamingUpdateReasonV1::DuplicateAcceptedLabelRevision);
         return update_receipt(
             engine,
@@ -658,14 +665,10 @@ pub fn deliver_qualified_stream_label_v1(
     {
         reasons.push(StreamingUpdateReasonV1::ReportNumericValueNonFinite);
     }
-    if delivery.delivered_at_unix_seconds
-        < delivery.eligibility_report_available_at_unix_seconds
-    {
+    if delivery.delivered_at_unix_seconds < delivery.eligibility_report_available_at_unix_seconds {
         reasons.push(StreamingUpdateReasonV1::EligibilityReportUnavailableAtDelivery);
     }
-    if !valid_sha256(&report.label_sha256)
-        || report.label_sha256 != delivery.label_payload_sha256
-    {
+    if !valid_sha256(&report.label_sha256) || report.label_sha256 != delivery.label_payload_sha256 {
         reasons.push(StreamingUpdateReasonV1::LabelPayloadDigestMismatch);
     }
     if eligibility_report_digest(report)? != report.report_sha256 {
@@ -825,10 +828,9 @@ pub fn deliver_qualified_stream_label_v1(
         }
     }
 
-    next_state.global_temporal_residual_ema =
-        (1.0 - engine.policy.temporal_ema_alpha)
-            * next_state.global_temporal_residual_ema
-            + engine.policy.temporal_ema_alpha * error;
+    next_state.global_temporal_residual_ema = (1.0 - engine.policy.temporal_ema_alpha)
+        * next_state.global_temporal_residual_ema
+        + engine.policy.temporal_ema_alpha * error;
 
     let updated_feature_correction = next_state
         .feature_weights
@@ -855,10 +857,9 @@ pub fn deliver_qualified_stream_label_v1(
             "context residual is non-finite".into(),
         ));
     }
-    next_state.global_context_residual_ema =
-        (1.0 - engine.policy.global_context_ema_alpha)
-            * next_state.global_context_residual_ema
-            + engine.policy.global_context_ema_alpha * context_residual;
+    next_state.global_context_residual_ema = (1.0 - engine.policy.global_context_ema_alpha)
+        * next_state.global_context_residual_ema
+        + engine.policy.global_context_ema_alpha * context_residual;
 
     if let Some(context_key) = prediction_receipt.context_key.clone() {
         let entry = next_state
@@ -900,10 +901,9 @@ pub fn deliver_qualified_stream_label_v1(
     )?;
 
     engine.adapter_state = next_state;
-    engine.accepted_label_revisions.insert(format!(
-        "{}:{}",
-        delivery.label_id, delivery.label_revision
-    ));
+    engine
+        .accepted_label_revisions
+        .insert(format!("{}:{}", delivery.label_id, delivery.label_revision));
     engine.pending_predictions.remove(&delivery.sample_id);
     Ok(receipt)
 }
@@ -985,8 +985,8 @@ mod tests {
             calibration_certificate_id: "cal-cert-001".into(),
             frontier,
             eligibility,
-            downstream_consumption_allowed:
-                eligibility == LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            downstream_consumption_allowed: eligibility
+                == LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
             reasons: Vec::new(),
             label_sha256: payload_digest.into(),
             measurement_sha256: digest('c'),
@@ -1028,13 +1028,7 @@ mod tests {
             delivered_at_unix_seconds: delivered_at,
             clock_domain_id: "fab-clock".into(),
             idempotency_key: format!("{label_id}:{revision}"),
-            eligibility_report: eligibility_report(
-                label_id,
-                event_id,
-                &payload,
-                status,
-                frontier,
-            ),
+            eligibility_report: eligibility_report(label_id, event_id, &payload, status, frontier),
         }
     }
 
@@ -1090,7 +1084,10 @@ mod tests {
         assert_eq!(report.disposition, StreamingUpdateDispositionV1::Updated);
         assert!(report.adapter_state_mutated);
         assert_ne!(report.adapter_state_after_sha256, before);
-        assert_eq!(report.prediction_receipt_sha256, Some(prediction.receipt_sha256));
+        assert_eq!(
+            report.prediction_receipt_sha256,
+            Some(prediction.receipt_sha256)
+        );
         assert_eq!(engine.adapter_state.accepted_update_count, 1);
         assert!(!report.retraining_executed);
         assert!(!report.equipment_control_authority);
@@ -1139,8 +1136,14 @@ mod tests {
         );
         let old_update = deliver_qualified_stream_label_v1(&mut engine, &old_delivery).unwrap();
 
-        assert_eq!(old_update.disposition, StreamingUpdateDispositionV1::Updated);
-        assert_eq!(old_update.prediction_receipt_sha256, Some(old_prediction.receipt_sha256));
+        assert_eq!(
+            old_update.disposition,
+            StreamingUpdateDispositionV1::Updated
+        );
+        assert_eq!(
+            old_update.prediction_receipt_sha256,
+            Some(old_prediction.receipt_sha256)
+        );
         assert_ne!(engine.adapter_state.feature_weights, weights_after_newer);
         assert_eq!(new_prediction.base_prediction, 10.0);
         assert_eq!(old_prediction.base_prediction, 10.0);
@@ -1230,12 +1233,17 @@ mod tests {
             112,
         );
         assert_eq!(
-            deliver_qualified_stream_label_v1(&mut engine, &accepted).unwrap().disposition,
+            deliver_qualified_stream_label_v1(&mut engine, &accepted)
+                .unwrap()
+                .disposition,
             StreamingUpdateDispositionV1::Updated
         );
         let after = adapter_state_digest(&engine.adapter_state).unwrap();
         let duplicate = deliver_qualified_stream_label_v1(&mut engine, &accepted).unwrap();
-        assert_eq!(duplicate.disposition, StreamingUpdateDispositionV1::Duplicate);
+        assert_eq!(
+            duplicate.disposition,
+            StreamingUpdateDispositionV1::Duplicate
+        );
         assert!(!duplicate.adapter_state_mutated);
         assert_eq!(adapter_state_digest(&engine.adapter_state).unwrap(), after);
     }
@@ -1301,7 +1309,11 @@ mod tests {
             .unwrap();
             let before = adapter_state_digest(&engine.adapter_state).unwrap();
             let receipt = deliver_qualified_stream_label_v1(&mut engine, &candidate).unwrap();
-            assert_eq!(receipt.disposition, StreamingUpdateDispositionV1::Rejected, "case {index}");
+            assert_eq!(
+                receipt.disposition,
+                StreamingUpdateDispositionV1::Rejected,
+                "case {index}"
+            );
             assert!(!receipt.adapter_state_mutated);
             assert_eq!(adapter_state_digest(&engine.adapter_state).unwrap(), before);
         }
@@ -1342,11 +1354,13 @@ mod tests {
         let mut engine = engine();
         engine.next_prediction_sequence = u64::MAX;
         let before = adapter_state_digest(&engine.adapter_state).unwrap();
-        assert!(predict_and_register_stream_sample_v1(
-            &mut engine,
-            &prediction("sample-1", "event-1", 100, 102, None, vec![1.0, 1.0]),
-        )
-        .is_err());
+        assert!(
+            predict_and_register_stream_sample_v1(
+                &mut engine,
+                &prediction("sample-1", "event-1", 100, 102, None, vec![1.0, 1.0]),
+            )
+            .is_err()
+        );
         assert!(engine.pending_predictions.is_empty());
         assert!(engine.seen_measurement_event_ids.is_empty());
         assert_eq!(adapter_state_digest(&engine.adapter_state).unwrap(), before);
@@ -1375,20 +1389,22 @@ mod tests {
             },
         );
         let before = adapter_state_digest(&engine.adapter_state).unwrap();
-        assert!(deliver_qualified_stream_label_v1(
-            &mut engine,
-            &delivery(
-                "sample-1",
-                "event-1",
-                "label-1",
-                1,
-                LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
-                LabelEvidenceFrontierV1::CurrentAtK1,
-                110,
-                112,
-            ),
-        )
-        .is_err());
+        assert!(
+            deliver_qualified_stream_label_v1(
+                &mut engine,
+                &delivery(
+                    "sample-1",
+                    "event-1",
+                    "label-1",
+                    1,
+                    LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+                    LabelEvidenceFrontierV1::CurrentAtK1,
+                    110,
+                    112,
+                ),
+            )
+            .is_err()
+        );
         assert_eq!(adapter_state_digest(&engine.adapter_state).unwrap(), before);
         assert!(engine.pending_predictions.contains_key("sample-1"));
         assert!(engine.accepted_label_revisions.is_empty());
@@ -1416,7 +1432,11 @@ mod tests {
         );
         let receipt = deliver_qualified_stream_label_v1(&mut engine, &too_early).unwrap();
         assert_eq!(receipt.disposition, StreamingUpdateDispositionV1::Rejected);
-        assert!(receipt.reasons.contains(&StreamingUpdateReasonV1::DeliveryBeforeLabelAvailability));
+        assert!(
+            receipt
+                .reasons
+                .contains(&StreamingUpdateReasonV1::DeliveryBeforeLabelAvailability)
+        );
 
         let mut wrong_clock = delivery(
             "sample-1",
@@ -1431,7 +1451,11 @@ mod tests {
         wrong_clock.clock_domain_id = "other-clock".into();
         let receipt = deliver_qualified_stream_label_v1(&mut engine, &wrong_clock).unwrap();
         assert_eq!(receipt.disposition, StreamingUpdateDispositionV1::Rejected);
-        assert!(receipt.reasons.contains(&StreamingUpdateReasonV1::ClockDomainMismatch));
+        assert!(
+            receipt
+                .reasons
+                .contains(&StreamingUpdateReasonV1::ClockDomainMismatch)
+        );
         assert_eq!(adapter_state_digest(&engine.adapter_state).unwrap(), before);
     }
 
@@ -1456,7 +1480,11 @@ mod tests {
         );
         let receipt = deliver_qualified_stream_label_v1(&mut engine, &stale).unwrap();
         assert_eq!(receipt.disposition, StreamingUpdateDispositionV1::Rejected);
-        assert!(receipt.reasons.contains(&StreamingUpdateReasonV1::LabelNotCurrentK1));
+        assert!(
+            receipt
+                .reasons
+                .contains(&StreamingUpdateReasonV1::LabelNotCurrentK1)
+        );
         assert_eq!(adapter_state_digest(&engine.adapter_state).unwrap(), before);
 
         let mut tampered = delivery(
@@ -1472,7 +1500,11 @@ mod tests {
         tampered.eligibility_report.report_sha256 = digest('0');
         let receipt = deliver_qualified_stream_label_v1(&mut engine, &tampered).unwrap();
         assert_eq!(receipt.disposition, StreamingUpdateDispositionV1::Rejected);
-        assert!(receipt.reasons.contains(&StreamingUpdateReasonV1::EligibilityReportDigestMismatch));
+        assert!(
+            receipt
+                .reasons
+                .contains(&StreamingUpdateReasonV1::EligibilityReportDigestMismatch)
+        );
         assert_eq!(adapter_state_digest(&engine.adapter_state).unwrap(), before);
     }
 
@@ -1556,8 +1588,7 @@ mod tests {
     #[test]
     fn wrong_feature_schema_and_duplicate_measurement_events_reject_prediction() {
         let mut engine = engine();
-        let mut wrong_schema =
-            prediction("sample-1", "event-1", 100, 102, None, vec![1.0, 1.0]);
+        let mut wrong_schema = prediction("sample-1", "event-1", 100, 102, None, vec![1.0, 1.0]);
         wrong_schema.feature_schema_sha256 = digest('f');
         assert!(predict_and_register_stream_sample_v1(&mut engine, &wrong_schema).is_err());
 
