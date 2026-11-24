@@ -198,8 +198,10 @@ impl CampaignCardV1 {
         if self.api_version != API_VERSION {
             return Err(ApiContractError::WrongApiVersion);
         }
-        if !non_empty(&self.campaign_id) || !non_empty(&self.source)
-            || !non_empty(&self.objective) || !non_empty(&self.design_id_field)
+        if !non_empty(&self.campaign_id)
+            || !non_empty(&self.source)
+            || !non_empty(&self.objective)
+            || !non_empty(&self.design_id_field)
         {
             return Err(ApiContractError::EmptyCampaign);
         }
@@ -244,7 +246,11 @@ impl CampaignCardV1 {
             if !measurement_names.insert(measurement.name.as_str()) {
                 return Err(ApiContractError::DuplicateMeasurementName);
             }
-            if measurement.kind.as_deref().is_some_and(|kind| kind != "value" && kind != "file") {
+            if measurement
+                .kind
+                .as_deref()
+                .is_some_and(|kind| kind != "value" && kind != "file")
+            {
                 return Err(ApiContractError::InvalidMeasurementKind);
             }
         }
@@ -259,7 +265,10 @@ impl CampaignCardV1 {
                     }
                 }
                 "grid" => {
-                    if space.shape.as_ref().is_none_or(|shape| shape.len() != 2 || shape.contains(&0))
+                    if space
+                        .shape
+                        .as_ref()
+                        .is_none_or(|shape| shape.len() != 2 || shape.contains(&0))
                         || space.id_format.as_deref() != Some("r{row}c{col}")
                     {
                         return Err(ApiContractError::InvalidDesignSpace);
@@ -267,7 +276,10 @@ impl CampaignCardV1 {
                 }
                 "upload" => {
                     if space.max_bytes.is_none_or(|bytes| bytes == 0)
-                        || space.format.as_deref().is_none_or(|format| !non_empty(format))
+                        || space
+                            .format
+                            .as_deref()
+                            .is_none_or(|format| !non_empty(format))
                     {
                         return Err(ApiContractError::InvalidDesignSpace);
                     }
@@ -280,8 +292,15 @@ impl CampaignCardV1 {
             || self.deliverable.format_version == 0
             || self.deliverable.max_bytes == 0
             || !non_empty(&self.deliverable.requires)
-            || self.deliverable.requires_stages.is_some_and(|count| count as usize > self.stages.len())
-            || self.deliverable.content.as_deref().is_some_and(|value| value != "binary")
+            || self
+                .deliverable
+                .requires_stages
+                .is_some_and(|count| count as usize > self.stages.len())
+            || self
+                .deliverable
+                .content
+                .as_deref()
+                .is_some_and(|value| value != "binary")
         {
             return Err(ApiContractError::InvalidDeliverable);
         }
@@ -293,9 +312,9 @@ impl CampaignCardV1 {
     }
 
     pub fn is_shared_pool_catalog(&self) -> bool {
-        self.design_space.as_ref().is_some_and(|space| {
-            space.kind == "catalog" && space.shared_pool == Some(true)
-        })
+        self.design_space
+            .as_ref()
+            .is_some_and(|space| space.kind == "catalog" && space.shared_pool == Some(true))
     }
 }
 
@@ -336,7 +355,11 @@ impl CampaignStatusV1 {
         {
             return Err(ApiContractError::InvalidBudgetAccounting);
         }
-        if self.active_job.as_deref().is_some_and(|job| !non_empty(job)) {
+        if self
+            .active_job
+            .as_deref()
+            .is_some_and(|job| !non_empty(job))
+        {
             return Err(ApiContractError::InvalidActiveJob);
         }
 
@@ -352,9 +375,12 @@ impl CampaignStatusV1 {
         let expected_spent = match self.active_job.as_ref() {
             Some(_) => {
                 let next_stage = self.next_stage.ok_or(ApiContractError::InvalidActiveJob)?;
-                let next_batch = campaign.stage(next_stage)
-                    .ok_or(ApiContractError::InvalidActiveJob)?.batch_size;
-                completed_budget.checked_add(next_batch)
+                let next_batch = campaign
+                    .stage(next_stage)
+                    .ok_or(ApiContractError::InvalidActiveJob)?
+                    .batch_size;
+                completed_budget
+                    .checked_add(next_batch)
                     .ok_or(ApiContractError::InvalidBudgetAccounting)?
             }
             None => completed_budget,
@@ -380,13 +406,20 @@ impl CatalogResponseV1 {
         if !self.ok {
             return Err(ApiContractError::ResponseNotOk);
         }
-        if campaign.design_space.as_ref().is_some_and(|space| space.kind != "catalog") {
+        if campaign
+            .design_space
+            .as_ref()
+            .is_some_and(|space| space.kind != "catalog")
+        {
             return Err(ApiContractError::InvalidDesignSpace);
         }
         if self.stage != requested_stage || campaign.stage(requested_stage).is_none() {
             return Err(ApiContractError::InvalidCatalogStage);
         }
-        if let Some(expected_size) = campaign.stage(requested_stage).and_then(|stage| stage.catalog_size) {
+        if let Some(expected_size) = campaign
+            .stage(requested_stage)
+            .and_then(|stage| stage.catalog_size)
+        {
             if self.designs.len() != expected_size as usize {
                 return Err(ApiContractError::CatalogSizeMismatch);
             }
@@ -423,7 +456,11 @@ pub fn validate_catalog_submission(
     let Some(stage) = campaign.stage(stage_number) else {
         return Err(ApiContractError::WrongSubmissionStage);
     };
-    if campaign.design_space.as_ref().is_some_and(|space| space.kind != "catalog") {
+    if campaign
+        .design_space
+        .as_ref()
+        .is_some_and(|space| space.kind != "catalog")
+    {
         return Err(ApiContractError::InvalidDesignSpace);
     }
     if design_ids.len() != stage.batch_size as usize {
@@ -462,10 +499,7 @@ impl JobResponseV1 {
         serde_json::from_str(contents)
     }
 
-    pub fn validate_against(
-        &self,
-        campaign: &CampaignCardV1,
-    ) -> Result<(), ApiContractError> {
+    pub fn validate_against(&self, campaign: &CampaignCardV1) -> Result<(), ApiContractError> {
         campaign.validate()?;
         if !self.ok {
             return Err(ApiContractError::ResponseNotOk);
@@ -474,7 +508,9 @@ impl JobResponseV1 {
         if self.job.stage > campaign.stages.len() as u32 {
             return Err(ApiContractError::WrongSubmissionStage);
         }
-        let stage = campaign.stage(self.job.stage).ok_or(ApiContractError::WrongSubmissionStage)?;
+        let stage = campaign
+            .stage(self.job.stage)
+            .ok_or(ApiContractError::WrongSubmissionStage)?;
         if self.job.designs.len() != stage.batch_size as usize {
             return Err(ApiContractError::WrongBatchSize {
                 expected: stage.batch_size as usize,
@@ -484,7 +520,10 @@ impl JobResponseV1 {
         if let Some(results) = self.job.completed_measurements()? {
             let mut result_ids = BTreeSet::new();
             for (index, result) in results.iter().enumerate() {
-                let Some(id) = result.get(&campaign.design_id_field).and_then(Value::as_str) else {
+                let Some(id) = result
+                    .get(&campaign.design_id_field)
+                    .and_then(Value::as_str)
+                else {
                     return Err(ApiContractError::ResultIdentityMissing {
                         index,
                         field: campaign.design_id_field.clone(),
@@ -522,7 +561,8 @@ impl JobResponseV1 {
             }
             if result_ids.len() != self.job.designs.len() {
                 return Err(ApiContractError::ResultIdentityMismatch(
-                    "completed result identities do not equal submitted design identities".to_owned(),
+                    "completed result identities do not equal submitted design identities"
+                        .to_owned(),
                 ));
             }
         }
@@ -543,8 +583,10 @@ mod tests {
     const STATUS: &str = include_str!("../fixtures/status-v1.json");
     const CATALOG: &str = include_str!("../fixtures/catalog-stage-1-v1.json");
     const COMPLETED_JOB: &str = include_str!("../fixtures/completed-job-v1.json");
-    const PINNED_NUCLEASE_CARD: &str = include_str!("../fixtures/asb_lab_v1/nuclease_campaign_card.json");
-    const PINNED_PROPYLENE_CARD: &str = include_str!("../fixtures/asb_lab_v1/propylene_campaign_card.json");
+    const PINNED_NUCLEASE_CARD: &str =
+        include_str!("../fixtures/asb_lab_v1/nuclease_campaign_card.json");
+    const PINNED_PROPYLENE_CARD: &str =
+        include_str!("../fixtures/asb_lab_v1/propylene_campaign_card.json");
 
     fn campaign() -> CampaignCardV1 {
         CampaignCardV1::parse(CAMPAIGN).expect("campaign fixture parses")
@@ -582,7 +624,11 @@ mod tests {
         assert_eq!(card.stages.len(), 3);
         assert!(card.stages.iter().all(|stage| stage.batch_size == 20));
         assert!(card.is_shared_pool_catalog());
-        assert!(card.deliverable.description.contains("predict(composition)"));
+        assert!(
+            card.deliverable
+                .description
+                .contains("predict(composition)")
+        );
     }
 
     #[test]
@@ -607,7 +653,8 @@ mod tests {
         value["budget"]["remaining"] = Value::from(3);
         let bad: CampaignStatusV1 = serde_json::from_value(value).expect("mutated status parses");
         assert_eq!(
-            bad.validate_against(&card).expect_err("budget must reconcile"),
+            bad.validate_against(&card)
+                .expect_err("budget must reconcile"),
             ApiContractError::InvalidBudgetAccounting
         );
     }
@@ -619,7 +666,8 @@ mod tests {
         value["active_job"] = Value::String("job-0001".to_owned());
         value["budget"]["spent"] = Value::from(2);
         value["budget"]["remaining"] = Value::from(2);
-        let pending: CampaignStatusV1 = serde_json::from_value(value).expect("pending status parses");
+        let pending: CampaignStatusV1 =
+            serde_json::from_value(value).expect("pending status parses");
         assert!(pending.validate_against(&card).is_ok());
     }
 
@@ -632,7 +680,8 @@ mod tests {
         value["active_job"] = Value::String("job-0003".to_owned());
         let bad: CampaignStatusV1 = serde_json::from_value(value).expect("mutated status parses");
         assert_eq!(
-            bad.validate_against(&card).expect_err("active job requires next stage"),
+            bad.validate_against(&card)
+                .expect_err("active job requires next stage"),
             ApiContractError::InvalidActiveJob
         );
     }
@@ -646,7 +695,8 @@ mod tests {
         value["budget"]["remaining"] = Value::from(1);
         let bad: CampaignStatusV1 = serde_json::from_value(value).expect("mutated status parses");
         assert_eq!(
-            bad.validate_against(&card).expect_err("only one next batch may be active"),
+            bad.validate_against(&card)
+                .expect_err("only one next batch may be active"),
             ApiContractError::InvalidBudgetAccounting
         );
     }
@@ -658,7 +708,8 @@ mod tests {
         value["campaign_id"] = Value::String("other".to_owned());
         let bad: CampaignStatusV1 = serde_json::from_value(value).expect("mutated status parses");
         assert_eq!(
-            bad.validate_against(&card).expect_err("campaign identity must match"),
+            bad.validate_against(&card)
+                .expect_err("campaign identity must match"),
             ApiContractError::CampaignIdentityMismatch
         );
     }
@@ -666,7 +717,9 @@ mod tests {
     #[test]
     fn accepts_catalog_with_unique_design_ids() {
         let card = campaign();
-        let ids = catalog().validate_against(&card, 1).expect("catalog is valid");
+        let ids = catalog()
+            .validate_against(&card, 1)
+            .expect("catalog is valid");
         assert_eq!(ids.len(), 3);
     }
 
@@ -686,10 +739,14 @@ mod tests {
     fn rejects_catalog_missing_design_id_field() {
         let card = campaign();
         let mut value: Value = serde_json::from_str(CATALOG).expect("catalog JSON parses");
-        value["designs"][0].as_object_mut().expect("row object").remove("design_id");
+        value["designs"][0]
+            .as_object_mut()
+            .expect("row object")
+            .remove("design_id");
         let bad: CatalogResponseV1 = serde_json::from_value(value).expect("mutated catalog parses");
         assert_eq!(
-            bad.validate_against(&card, 1).expect_err("design id field required"),
+            bad.validate_against(&card, 1)
+                .expect_err("design id field required"),
             ApiContractError::MissingDesignIdField
         );
     }
@@ -697,41 +754,91 @@ mod tests {
     #[test]
     fn accepts_valid_exact_size_eligible_catalog_batch() {
         let card = campaign();
-        let ids = catalog().validate_against(&card, 1).expect("catalog is valid");
-        assert!(validate_catalog_submission(
-            &card, 1, &["d-01".to_owned(), "d-02".to_owned()], &ids, &BTreeSet::new(), 4
-        ).is_ok());
+        let ids = catalog()
+            .validate_against(&card, 1)
+            .expect("catalog is valid");
+        assert!(
+            validate_catalog_submission(
+                &card,
+                1,
+                &["d-01".to_owned(), "d-02".to_owned()],
+                &ids,
+                &BTreeSet::new(),
+                4
+            )
+            .is_ok()
+        );
     }
 
     #[test]
     fn rejects_wrong_size_and_duplicate_batches() {
         let card = campaign();
-        let ids = catalog().validate_against(&card, 1).expect("catalog is valid");
-        let wrong_size = validate_catalog_submission(&card, 1, &["d-01".to_owned()], &ids, &BTreeSet::new(), 4);
-        assert!(matches!(wrong_size, Err(ApiContractError::WrongBatchSize { .. })));
+        let ids = catalog()
+            .validate_against(&card, 1)
+            .expect("catalog is valid");
+        let wrong_size =
+            validate_catalog_submission(&card, 1, &["d-01".to_owned()], &ids, &BTreeSet::new(), 4);
+        assert!(matches!(
+            wrong_size,
+            Err(ApiContractError::WrongBatchSize { .. })
+        ));
         let duplicate = validate_catalog_submission(
-            &card, 1, &["d-01".to_owned(), "d-01".to_owned()], &ids, &BTreeSet::new(), 4
+            &card,
+            1,
+            &["d-01".to_owned(), "d-01".to_owned()],
+            &ids,
+            &BTreeSet::new(),
+            4,
         );
-        assert!(matches!(duplicate, Err(ApiContractError::DuplicateSubmission(_))));
+        assert!(matches!(
+            duplicate,
+            Err(ApiContractError::DuplicateSubmission(_))
+        ));
     }
 
     #[test]
     fn rejects_ineligible_repeated_and_over_budget_designs() {
         let card = campaign();
-        let ids = catalog().validate_against(&card, 1).expect("catalog is valid");
+        let ids = catalog()
+            .validate_against(&card, 1)
+            .expect("catalog is valid");
         let ineligible = validate_catalog_submission(
-            &card, 1, &["d-01".to_owned(), "d-99".to_owned()], &ids, &BTreeSet::new(), 4
+            &card,
+            1,
+            &["d-01".to_owned(), "d-99".to_owned()],
+            &ids,
+            &BTreeSet::new(),
+            4,
         );
-        assert!(matches!(ineligible, Err(ApiContractError::IneligibleDesign(_))));
+        assert!(matches!(
+            ineligible,
+            Err(ApiContractError::IneligibleDesign(_))
+        ));
         let prior = BTreeSet::from(["d-01".to_owned()]);
         let repeated = validate_catalog_submission(
-            &card, 1, &["d-01".to_owned(), "d-02".to_owned()], &ids, &prior, 4
+            &card,
+            1,
+            &["d-01".to_owned(), "d-02".to_owned()],
+            &ids,
+            &prior,
+            4,
         );
-        assert!(matches!(repeated, Err(ApiContractError::AlreadyMeasured(_))));
+        assert!(matches!(
+            repeated,
+            Err(ApiContractError::AlreadyMeasured(_))
+        ));
         let over_budget = validate_catalog_submission(
-            &card, 1, &["d-01".to_owned(), "d-02".to_owned()], &ids, &BTreeSet::new(), 1
+            &card,
+            1,
+            &["d-01".to_owned(), "d-02".to_owned()],
+            &ids,
+            &BTreeSet::new(),
+            1,
         );
-        assert!(matches!(over_budget, Err(ApiContractError::InsufficientRemainingBudget { .. })));
+        assert!(matches!(
+            over_budget,
+            Err(ApiContractError::InsufficientRemainingBudget { .. })
+        ));
     }
 
     #[test]
@@ -758,12 +865,14 @@ mod tests {
     fn rejects_completed_job_missing_a_declared_measurement() {
         let card = campaign();
         let mut value: Value = serde_json::from_str(COMPLETED_JOB).expect("job JSON parses");
-        value["job"]["results"][0].as_object_mut()
+        value["job"]["results"][0]
+            .as_object_mut()
             .expect("result object")
             .remove("activity");
         let bad = JobResponseV1::parse(&value.to_string()).expect("mutated job parses");
         assert_eq!(
-            bad.validate_against(&card).expect_err("completed row needs measurement"),
+            bad.validate_against(&card)
+                .expect_err("completed row needs measurement"),
             ApiContractError::ResultMeasurementMissing {
                 index: 0,
                 field: "activity".to_owned()
@@ -778,7 +887,8 @@ mod tests {
         value["job"]["results"][0]["activity"] = Value::String("high".to_owned());
         let bad = JobResponseV1::parse(&value.to_string()).expect("mutated job parses");
         assert_eq!(
-            bad.validate_against(&card).expect_err("scalar measurements must be numeric"),
+            bad.validate_against(&card)
+                .expect_err("scalar measurements must be numeric"),
             ApiContractError::InvalidResultMeasurement {
                 index: 0,
                 field: "activity".to_owned()
@@ -805,7 +915,8 @@ mod tests {
         value["job"]["results"][0]["activity"] = Value::String("  ".to_owned());
         let bad = JobResponseV1::parse(&value.to_string()).expect("mutated job parses");
         assert_eq!(
-            bad.validate_against(&card).expect_err("file measurement reference cannot be blank"),
+            bad.validate_against(&card)
+                .expect_err("file measurement reference cannot be blank"),
             ApiContractError::InvalidResultMeasurement {
                 index: 0,
                 field: "activity".to_owned()
