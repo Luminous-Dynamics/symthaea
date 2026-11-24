@@ -1,0 +1,105 @@
+{
+  "schema_version": "0.1",
+  "comparator_id": "PPMD-GUO-XIAO-2026",
+  "comparator_name": "Parametric Probabilistic Manifold Decomposition for Nonlinear Model Reduction",
+  "publication": {
+    "authors": [
+      "Guo",
+      "Xiao"
+    ],
+    "venue": "SIAM Journal on Scientific Computing",
+    "volume": 48,
+    "issue": 6,
+    "year": 2026,
+    "pages": "A3567-A3594",
+    "doi": "10.1137/26M185758X",
+    "online_publication_date": "2026-11-23",
+    "paper_url": "https://doi.org/10.1137/26M185758X",
+    "paper_claims": [
+      "convergence analysis of linear principal subspace approximation",
+      "nonlinear solution-manifold recovery",
+      "statistical consistency of kernel-ridge latent learning",
+      "demonstrations on flow past a cylinder and backward-facing step",
+      "comparison with POD plus Gaussian process regression",
+      "improved generalization beyond training parameter range on reported flow cases"
+    ]
+  },
+  "repository": {
+    "url": "https://github.com/apprenticeGuo/Parametric-Probabilistic-Manifold-Decomposition-for-Nonlinear-Model-Reduction",
+    "default_branch": "main",
+    "inspected_ref": "main",
+    "inspected_commit": "056e4879a033cfecb44d8fb11983125b99a562eb",
+    "commit_date": "2025-12-21T03:30:28Z",
+    "tree_sha": "e4049c40e37409709ead86a44f30ce4afd0e90af",
+    "tracked_files": [
+      {
+        "path": "PPMD.ipynb",
+        "blob_sha": "1697dfb5f212d3f7634f59f8e078315d1af8a456",
+        "size_bytes": 28154
+      },
+      {
+        "path": "PPMD.py",
+        "blob_sha": "a21146d1de5e81607a3d93451833bc07e497a426",
+        "size_bytes": 9398
+      },
+      {
+        "path": "README.md",
+        "blob_sha": "0b3595513542d7f846531cce154dc04730f2f33f",
+        "size_bytes": 1775
+      }
+    ],
+    "tracked_tree_file_count": 3
+  },
+  "execution_audit": {
+    "status": "NOT_REPRODUCED",
+    "reason_codes": [
+      "source_snapshot_commit_predates_online_paper_publication",
+      "repository_tree_contains_only_three_files",
+      "no_dataset_or_vtu_inputs_in_inspected_tree",
+      "no_dependency_lock_or_environment_spec_in_inspected_tree",
+      "PPMD.py_uses_hard_coded_windows_local_data_roots"
+    ],
+    "observed_local_data_roots": [
+      "D:\\parametric PMD\\Flow around a cylinder",
+      "D:\\parametric PMD\\backward facing step"
+    ],
+    "observed_external_dependencies": [
+      "numpy",
+      "pandas",
+      "meshio",
+      "torch",
+      "tensorflow.compat.v1",
+      "scikit-learn",
+      "pydiffmap",
+      "matplotlib"
+    ],
+    "note": "This is an audit of the inspected public main snapshot, not a conclusion that no other private, supplementary or later-release reproducibility package exists. The paper reports a SIAM reproducibility badge; obtain the exact badge-linked archive/configuration/data before claiming independent replay."
+  },
+  "benchmark_use": {
+    "classification": "general_parametric_nonlinear_ROM_comparator",
+    "plasma_specific_result": "none_established",
+    "required_before_plasma_comparison": [
+      "reconcile paper version and exact source commit",
+      "obtain badge-linked dataset archive and checksums",
+      "freeze dependency versions and runtime environment",
+      "record mesh, parameter values, train/test split and sampling seed",
+      "record snapshot windows, latent dimension, kernel and hyperparameters",
+      "reproduce POD+GPR baseline and PPMD results on the original flow cases",
+      "independently replay reported interpolation and extrapolation metrics",
+      "only then port matched methodology to kinetic plasma cohorts"
+    ]
+  },
+  "adaptation_questions_for_rpkmd": [
+    "does latent uncertainty calibrate future kinetic response error?",
+    "does a local probabilistic manifold preserve branch identity around trapping and echo transitions?",
+    "what UNKNOWN/abstention policy applies near branch boundaries?",
+    "what decoder, covariance and chart metadata bytes must KIRD count?",
+    "can active full-order acquisition target response uncertainty per simulation cost?"
+  ],
+  "provenance": {
+    "audited_by": "public repository inspection",
+    "audit_date": "2026-11-24",
+    "source_execution_authorized": false,
+    "physical_plasma_run": false
+  }
+}
