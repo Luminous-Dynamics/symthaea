@@ -74,6 +74,7 @@ pub struct RevisionEvidenceV1 {
 pub struct RevisionCaseV1 {
     pub schema: String,
     pub case_id: String,
+    pub experiment_unit_id: String,
     pub model_identity_sha256: String,
     pub prompt_sha256: String,
     pub adapter_sha256: String,
@@ -183,27 +184,28 @@ pub fn compare_matched_evidence_arms(
                 "experiment unit {unit_id} must have exactly three evidence arms"
             ));
         }
-        let mut by_condition = BTreeMap::new();
+        let mut no_evidence = None;
+        let mut local = None;
+        let mut yoked = None;
         let mut case_ids = BTreeSet::new();
         for case in &group {
             if !case_ids.insert(case.case_id.as_str()) {
                 return Err(format!("experiment unit {unit_id} repeats a case_id"));
             }
-            if by_condition.insert(case.evidence_condition, *case).is_some() {
+            let slot = match case.evidence_condition {
+                EvidenceConditionV1::NoEvidence => &mut no_evidence,
+                EvidenceConditionV1::LocalRetrieved => &mut local,
+                EvidenceConditionV1::YokedRetrieved => &mut yoked,
+            };
+            if slot.replace(*case).is_some() {
                 return Err(format!("experiment unit {unit_id} repeats an evidence condition"));
             }
         }
-        let no_evidence = by_condition
-            .get(&EvidenceConditionV1::NoEvidence)
-            .copied()
+        let no_evidence = no_evidence
             .ok_or_else(|| format!("experiment unit {unit_id} lacks the no-evidence arm"))?;
-        let local = by_condition
-            .get(&EvidenceConditionV1::LocalRetrieved)
-            .copied()
+        let local = local
             .ok_or_else(|| format!("experiment unit {unit_id} lacks the local-evidence arm"))?;
-        let yoked = by_condition
-            .get(&EvidenceConditionV1::YokedRetrieved)
-            .copied()
+        let yoked = yoked
             .ok_or_else(|| format!("experiment unit {unit_id} lacks the yoked-evidence arm"))?;
 
         for arm in [local, yoked] {
@@ -842,6 +844,7 @@ mod tests {
         RevisionCaseV2 {
             schema: "mel-temporal-revision-case-v2".into(),
             case_id: "case-v2".into(),
+            experiment_unit_id: "unit-v2".into(),
             model_identity_sha256: MODEL.into(),
             prompt_sha256: PROMPT.into(),
             adapter_sha256: ADAPTER.into(),
@@ -918,6 +921,7 @@ mod tests {
         RevisionCaseV1 {
             schema: REVISION_SCHEMA.into(),
             case_id: "case-1".into(),
+            experiment_unit_id: "unit-legacy".into(),
             model_identity_sha256: MODEL.into(),
             prompt_sha256: PROMPT.into(),
             adapter_sha256: ADAPTER.into(),
