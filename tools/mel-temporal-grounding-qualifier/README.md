@@ -30,3 +30,10 @@ Run a single V2 case or a matched evidence-triplet JSON file:
     cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-temporal-revision-audit -- path/to/case-or-triplet.json
 
 Use a hyphen as the path to read JSON from standard input. For an array input, the CLI audits each V2 case and emits matched evidence-ablation contrasts. The committed synthetic triplet fixture is at fixtures/mel-temporal-revision-triplet.synthetic.json.
+
+
+## Matched-trial runtime and budget identity
+
+V2 case inputs also bind a source-lineage identifier, immutable runtime identity digest, decoding-configuration digest, maximum output-token budget, actual output tokens, maximum wall-time budget and observed elapsed wall time. The evaluator rejects actual usage beyond the declared budget. A matched NoEvidence/LocalRetrieved/YokedRetrieved triplet must share source lineage, runtime, decoding configuration and maximum budgets; actual token/time consumption is reported separately for each arm.
+
+These fields are self-reported run metadata until backed by an independently authenticated execution receipt. They make the paired protocol's intended controls explicit; they do not authenticate the runtime or prove that the model consumed retrieved audio.
