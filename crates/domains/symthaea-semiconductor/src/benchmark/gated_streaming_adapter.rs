@@ -147,6 +147,7 @@ pub struct StreamingPredictionReceiptV1 {
     pub prediction_at_unix_seconds: i64,
     pub clock_domain_id: String,
     pub feature_schema_sha256: String,
+    pub context_key: Option<String>,
     pub feature_vector_sha256: String,
     pub selected_feature_indices: Vec<usize>,
     /// The selected feature values are frozen at prediction time for delayed updates.
@@ -439,6 +440,15 @@ pub fn predict_and_register_stream_sample_v1(
             "prediction contains a non-finite or out-of-policy feature/baseline value".into(),
         ));
     }
+    if input
+        .context_key
+        .as_deref()
+        .is_some_and(|key| key.trim().is_empty())
+    {
+        return Err(GatedStreamingAdapterErrorV1(
+            "context_key cannot be empty when supplied".into(),
+        ));
+    }
     if input.selected_feature_indices.is_empty()
         || input.selected_feature_indices.len() != engine.adapter_state.feature_weights.len()
     {
@@ -498,6 +508,7 @@ pub fn predict_and_register_stream_sample_v1(
         prediction_at_unix_seconds: input.prediction_at_unix_seconds,
         clock_domain_id: input.clock_domain_id.clone(),
         feature_schema_sha256: input.feature_schema_sha256.clone(),
+        context_key: input.context_key.clone(),
         feature_vector_sha256,
         selected_feature_indices: input.selected_feature_indices.clone(),
         selected_feature_vector,
@@ -609,6 +620,7 @@ pub fn deliver_qualified_stream_label_v1(
     }
     if !delivery.label_value.is_finite()
         || !report.qualified_corrected_value.is_finite()
+        || report.qualified_standard_uncertainty_upper_bound.is_none()
         || report
             .qualified_standard_uncertainty_upper_bound
             .is_some_and(|value| !value.is_finite() || value < 0.0)
@@ -736,12 +748,11 @@ pub fn deliver_qualified_stream_label_v1(
         ));
     }
 
-    for ((weight, feature), _) in engine
+    for (weight, feature) in engine
         .adapter_state
         .feature_weights
         .iter_mut()
         .zip(&prediction_receipt.selected_feature_vector)
-        .zip(&prediction_receipt.selected_feature_indices)
     {
         let raw_delta = engine.policy.feature_learning_rate * error * feature / denominator;
         if !raw_delta.is_finite() {
@@ -776,7 +787,7 @@ pub fn deliver_qualified_stream_label_v1(
             * engine.adapter_state.global_context_residual_ema
             + engine.policy.global_context_ema_alpha * context_residual;
 
-    if let Some(context_key) = prediction_receipt_context_key_placeholder(&prediction_receipt) {
+    if let Some(context_key) = prediction_receipt.context_key.clone() {
         let entry = engine
             .adapter_state
             .contexts
@@ -817,9 +828,3 @@ pub fn deliver_qualified_stream_label_v1(
     )
 }
 
-// Placeholder replaced below by the exact context key stored in each prediction receipt.
-fn prediction_receipt_context_key_placeholder(
-    _receipt: &StreamingPredictionReceiptV1,
-) -> Option<String> {
-    None
-}
