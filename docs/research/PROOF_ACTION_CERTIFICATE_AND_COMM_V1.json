@@ -72,7 +72,7 @@
   },
   "axiom_negative_control": {
     "path": "scripts/research/lean-proof-extractor/ProofActionCertificateAndCommAxiomNegative.lean",
-    "sha256": "8e4a30f02043eaecfda1642eca155963f92283f6d7606af008699bb5ec7acf47",
+    "sha256": "86c95578c8ee6f6d60bd1109da566ddee840a590702723a38970c19cfca8d071",
     "expected_observed_axiom": "ProofActionCertificateAxiomControl.injected_premise",
     "expected_result": "axiom_dependency_reported"
   }
