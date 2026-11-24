@@ -434,16 +434,14 @@ pub fn validate_trace(
                 event.artifact_digest_after.as_deref(),
             ),
         ] {
-            if let Some(digest) = digest {
-                if !is_sha256(digest) {
-                    bail!("event {:?} has malformed {label}", event.event_id);
-                }
+            if let Some(digest) = digest && !is_sha256(digest) {
+                bail!("event {:?} has malformed {label}", event.event_id);
             }
         }
-        if let Some(confidence) = event.confidence {
-            if !confidence.is_finite() || !(0.0..=1.0).contains(&confidence) {
-                bail!("event {:?} has confidence outside [0, 1]", event.event_id);
-            }
+        if let Some(confidence) = event.confidence
+            && (!confidence.is_finite() || !(0.0..=1.0).contains(&confidence))
+        {
+            bail!("event {:?} has confidence outside [0, 1]", event.event_id);
         }
         if event.payload_storage == "encrypted_consented_reference"
             && matches!(event.consent_scope.as_str(), "none" | "revoked")
@@ -461,15 +459,11 @@ pub fn validate_trace(
             bail!("only a human participant may grant or revoke participant consent");
         }
 
-        if let Some(previous) = previous_sequence {
-            if event.sequence <= previous {
-                bail!("event sequence must be strictly increasing");
-            }
+        if let Some(previous) = previous_sequence && event.sequence <= previous {
+            bail!("event sequence must be strictly increasing");
         }
-        if let Some(previous) = previous_elapsed {
-            if event.elapsed_ms < previous {
-                bail!("event elapsed_ms must be non-decreasing");
-            }
+        if let Some(previous) = previous_elapsed && event.elapsed_ms < previous {
+            bail!("event elapsed_ms must be non-decreasing");
         }
         previous_sequence = Some(event.sequence);
         previous_elapsed = Some(event.elapsed_ms);
@@ -596,15 +590,15 @@ pub fn validate_trace(
                     &execution.status,
                     &["success", "failure", "unknown"],
                 )?;
-                if let Some(digest) = execution.precondition_digest.as_deref() {
-                    if !is_sha256(digest) {
-                        bail!("tool result has malformed precondition_digest");
-                    }
+                if let Some(digest) = execution.precondition_digest.as_deref()
+                    && !is_sha256(digest)
+                {
+                    bail!("tool result has malformed precondition_digest");
                 }
-                if let Some(digest) = execution.postcondition_digest.as_deref() {
-                    if !is_sha256(digest) {
-                        bail!("tool result has malformed postcondition_digest");
-                    }
+                if let Some(digest) = execution.postcondition_digest.as_deref()
+                    && !is_sha256(digest)
+                {
+                    bail!("tool result has malformed postcondition_digest");
                 }
                 if event.external_side_effect
                     && execution.status != "unknown"
@@ -748,10 +742,8 @@ pub fn validate_trace(
 }
 
 fn validate_optional_unit_interval(name: &str, value: Option<f64>) -> Result<()> {
-    if let Some(value) = value {
-        if !value.is_finite() || !(0.0..=1.0).contains(&value) {
-            bail!("{name} must be finite and in [0, 1]");
-        }
+    if let Some(value) = value && (!value.is_finite() || !(0.0..=1.0).contains(&value)) {
+        bail!("{name} must be finite and in [0, 1]");
     }
     Ok(())
 }
@@ -961,10 +953,8 @@ pub fn validate_scorecard(scorecard: &Scorecard) -> Result<()> {
         &scorecard.system.memory_policy,
         &["none", "session_only", "explicit_opt_in_persistent"],
     )?;
-    if let Some(digest) = scorecard.system.prompt_digest.as_deref() {
-        if !is_sha256(digest) {
-            bail!("prompt_digest is malformed");
-        }
+    if let Some(digest) = scorecard.system.prompt_digest.as_deref() && !is_sha256(digest) {
+        bail!("prompt_digest is malformed");
     }
     require_member(
         "execution status",
@@ -979,10 +969,8 @@ pub fn validate_scorecard(scorecard: &Scorecard) -> Result<()> {
             bail!("{name} must be finite and non-negative");
         }
     }
-    if let Some(cost) = scorecard.execution.cost_usd {
-        if !cost.is_finite() || cost < 0.0 {
-            bail!("cost_usd must be finite and non-negative");
-        }
+    if let Some(cost) = scorecard.execution.cost_usd && (!cost.is_finite() || cost < 0.0) {
+        bail!("cost_usd must be finite and non-negative");
     }
 
     for (name, digest) in [
@@ -1000,10 +988,10 @@ pub fn validate_scorecard(scorecard: &Scorecard) -> Result<()> {
             bail!("{name} must be a 64-character SHA-256 digest");
         }
     }
-    if let Some(digest) = scorecard.provenance.environment_digest.as_deref() {
-        if !is_sha256(digest) {
-            bail!("environment_digest is malformed");
-        }
+    if let Some(digest) = scorecard.provenance.environment_digest.as_deref()
+        && !is_sha256(digest)
+    {
+        bail!("environment_digest is malformed");
     }
     require_nonempty("scorer_revision", &scorecard.provenance.scorer_revision)?;
 
@@ -1050,10 +1038,10 @@ pub fn validate_scorecard(scorecard: &Scorecard) -> Result<()> {
     if let Some(value) = scorecard.scores.task_quality {
         validate_optional_unit_interval("task_quality", Some(value))?;
     }
-    if let Some(value) = scorecard.scores.quality_matched_diversity_ratio {
-        if !value.is_finite() || value < 0.0 {
-            bail!("quality_matched_diversity_ratio must be finite and non-negative");
-        }
+    if let Some(value) = scorecard.scores.quality_matched_diversity_ratio
+        && (!value.is_finite() || value < 0.0)
+    {
+        bail!("quality_matched_diversity_ratio must be finite and non-negative");
     }
 
     for (name, value) in [
@@ -1126,42 +1114,34 @@ pub fn validate_scorecard(scorecard: &Scorecard) -> Result<()> {
             scorecard.scores.human_verification_rate,
         ),
     ] {
-        if let Some(value) = value {
-            if !value.is_finite() || !(-2.0..=2.0).contains(&value) {
-                bail!("{name} must be finite and in [-2, 2]");
-            }
+        if let Some(value) = value && (!value.is_finite() || !(-2.0..=2.0).contains(&value)) {
+            bail!("{name} must be finite and in [-2, 2]");
         }
     }
 
-    if let Some(value) = scorecard.scores.participant_agency_mean {
-        if !value.is_finite() || !(1.0..=7.0).contains(&value) {
-            bail!("participant_agency_mean must be finite and in [1, 7]");
-        }
+    if let Some(value) = scorecard.scores.participant_agency_mean
+        && (!value.is_finite() || !(1.0..=7.0).contains(&value))
+    {
+        bail!("participant_agency_mean must be finite and in [1, 7]");
     }
-    if let Some(value) = scorecard.scores.agency_delta_sd_vs_reference {
-        if !value.is_finite() {
-            bail!("agency_delta_sd_vs_reference must be finite");
-        }
+    if let Some(value) = scorecard.scores.agency_delta_sd_vs_reference && !value.is_finite() {
+        bail!("agency_delta_sd_vs_reference must be finite");
     }
-    if let Some(value) = scorecard.scores.cohen_kappa_nominal {
-        if !value.is_finite() || !(-1.0..=1.0).contains(&value) {
-            bail!("cohen_kappa_nominal must be finite and in [-1, 1]");
-        }
+    if let Some(value) = scorecard.scores.cohen_kappa_nominal
+        && (!value.is_finite() || !(-1.0..=1.0).contains(&value))
+    {
+        bail!("cohen_kappa_nominal must be finite and in [-1, 1]");
     }
-    if let Some(value) = scorecard.scores.krippendorff_alpha_nominal {
-        if !value.is_finite() {
-            bail!("krippendorff_alpha_nominal must be finite");
-        }
+    if let Some(value) = scorecard.scores.krippendorff_alpha_nominal && !value.is_finite() {
+        bail!("krippendorff_alpha_nominal must be finite");
     }
 
     for (name, value) in [
         ("synergy_delta", scorecard.scores.synergy_delta),
         ("collaboration_gap", scorecard.scores.collaboration_gap),
     ] {
-        if let Some(value) = value {
-            if !value.is_finite() || !(-1.0..=1.0).contains(&value) {
-                bail!("{name} must be finite and in [-1, 1]");
-            }
+        if let Some(value) = value && (!value.is_finite() || !(-1.0..=1.0).contains(&value)) {
+            bail!("{name} must be finite and in [-1, 1]");
         }
     }
     if let Some(value) = scorecard.scores.partner_order_sensitivity {
@@ -1170,10 +1150,9 @@ pub fn validate_scorecard(scorecard: &Scorecard) -> Result<()> {
     if let (Some(synergy), Some(gap)) = (
         scorecard.scores.synergy_delta,
         scorecard.scores.collaboration_gap,
-    ) {
-        if (synergy + gap).abs() > 1e-6 {
-            bail!("synergy_delta and collaboration_gap must have opposite signs");
-        }
+    ) && (synergy + gap).abs() > 1e-6
+    {
+        bail!("synergy_delta and collaboration_gap must have opposite signs");
     }
     if let (Some(precision), Some(recall), Some(f1)) = (
         scorecard.scores.attribution_precision,
