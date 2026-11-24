@@ -1,6 +1,6 @@
 # Decision-Relevant Predictability Benchmark
 
-**Status:** executable finite-world evaluator slice; broader chaotic-systems benchmark remains a protocol proposal.
+**Status:** executable finite-world Bayesian and prior-free robust decision-value evaluator; broader chaotic-systems benchmark remains a protocol proposal.
 
 Parent research protocol: [issue #12546](https://github.com/Luminous-Dynamics/symthaea/issues/12546).
 
@@ -43,15 +43,17 @@ The evaluator is deterministic and does not simulate probe execution. It compute
 
 ## Run
 
-\`\`\`bash
+~~~bash
 cargo fmt --manifest-path research/decision-predictability-benchmark/Cargo.toml -- --check
 cargo test --manifest-path research/decision-predictability-benchmark/Cargo.toml --locked --all-targets
 cargo clippy --manifest-path research/decision-predictability-benchmark/Cargo.toml --locked --all-targets -- -D warnings
-\`\`\`
+~~~
 
 Focused workflow: [Decision-Relevant Predictability Evaluator](https://github.com/Luminous-Dynamics/symthaea/actions/workflows/decision-predictability-benchmark.yml).
 
 A passing run qualifies only this small finite-world evaluator. It does not qualify the full #12546 benchmark, chaotic-system reference generators, external baselines or physical sensor measurements.
+
+Focused exact-head qualification: [workflow run 45382531423](https://github.com/Luminous-Dynamics/symthaea/actions/runs/45382531423), commit ee1bd6d62140f028b3f4909bfe9c056b6ba0b076. Rust 1.96.0 formatting, **14 tests (14 passed, 0 failed)** and strict Clippy all passed. This qualifies the finite-world Bayesian and robust decision-value primitives only; it is not the full #12546 benchmark.
 
 ## Decision-value modes and covariance integration
 
