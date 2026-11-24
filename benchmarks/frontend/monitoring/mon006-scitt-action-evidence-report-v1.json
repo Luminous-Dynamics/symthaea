@@ -1,0 +1,72 @@
+{
+  "artifact": "SFEB MON-006 SCITT-compatible action evidence and COSE receipts v1 (RFC 8949 core ordering correction)",
+  "date": "2026-11-24",
+  "runtime": "Node.js v22.16.0",
+  "source_file": "mon006-scitt-action-evidence-v1.mjs",
+  "source_bytes": 32937,
+  "source_sha256": "ec7f12da8d3e6c9ab97a6dc8a39d9a00c08f6f9d9ee6bf5ab79cc7cdcfc78ad7",
+  "compressed_file": "mon006-scitt-action-evidence-v1.mjs.gz",
+  "compressed_bytes": 8668,
+  "compressed_sha256": "1aa38b50d564c5081f70a1c256f31d409cb43c547dcb4933bf4cc018c8b955c5",
+  "raw_syntax_check": "passed",
+  "compressed_stdin_syntax_check": "passed",
+  "raw_invocations": 4,
+  "compressed_stdin_invocations": 1,
+  "tests": 29,
+  "passed": 29,
+  "failed": 0,
+  "wire_fixtures_identical_across_five_invocations": true,
+  "whole_run_json_identical": false,
+  "rfc8949_core_deterministic_subset": {
+    "map_keys": "bytewise lexicographic order of deterministic encoded keys",
+    "arguments": "shortest encodings for supported integers and lengths",
+    "lengths": "definite length only",
+    "explicit_regression_vector": "mixed-length keys 10, 100, -1, z, aa where RFC 8949 core differs from legacy length-first order",
+    "scope": "supported CBOR subset only; not a general RFC 8949 implementation"
+  },
+  "wire_profile": {
+    "signed_statement": "CBOR tag 18 COSE_Sign1; EdDSA -8; protected content_type, kid, CWT iss/sub",
+    "receipts": "two detached-root COSE_Sign1 receipts; vds=1 RFC9162_SHA256; inclusion proof type -1; VDP label 396",
+    "transparent_statement": "original issuer statement with receipts attached at unprotected header label 394"
+  },
+  "benchmark": {
+    "workload": "600 signed-action create+verify and 600 detached receipt verifications per run",
+    "signed_action_create_verify_ops_s": {
+      "runs": [
+        3252,
+        3020,
+        3293,
+        3537
+      ],
+      "median": 3272.5,
+      "range": [
+        3020,
+        3537
+      ]
+    },
+    "detached_receipt_verify_ops_s": {
+      "runs": [
+        6548,
+        5335,
+        6604,
+        6571
+      ],
+      "median": 6559.5,
+      "range": [
+        5335,
+        6604
+      ]
+    },
+    "scope": "same-process JS CBOR/Ed25519/Merkle CPU only; excludes network, persistence, live TS registration, external sink and readback; not industry/SOTA comparison"
+  },
+  "limitations": [
+    "mock TS logs in one process with deterministic fixture keys",
+    "no live SCITT TS registration or independent service domains",
+    "no independent COSE/CBOR implementation differential test",
+    "not a general RFC 8949 library",
+    "no production KMS/HSM, key rotation/revocation or trust-policy governance",
+    "no real source/authority service, mutation sink or independent postcondition readback",
+    "prototype media type requires full SFEB profile",
+    "signatures and receipts prove provenance/inclusion, not truth"
+  ]
+}
