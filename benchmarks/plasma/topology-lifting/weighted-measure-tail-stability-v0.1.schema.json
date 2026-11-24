@@ -1,0 +1,159 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/plasma/topology-lifting/weighted-measure-tail-stability-v0.1.schema.json",
+  "title": "Weighted empirical-measure tail stability fixture v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "fixture_id",
+    "status",
+    "base_positions",
+    "base_weights",
+    "augmented_positions",
+    "augmented_weights",
+    "outlier_mass",
+    "max_harmonic",
+    "mathematical_bound",
+    "sample_extrema_normalization_witness",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "fixture_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "const": "synthetic_analytic_only"
+    },
+    "base_positions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "number"
+      }
+    },
+    "base_weights": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "number",
+        "minimum": 0
+      }
+    },
+    "augmented_positions": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "number"
+      }
+    },
+    "augmented_weights": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "number",
+        "minimum": 0
+      }
+    },
+    "outlier_mass": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "max_harmonic": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 4096
+    },
+    "mathematical_bound": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "expression",
+        "expected_upper_bound",
+        "assumption"
+      ],
+      "properties": {
+        "expression": {
+          "const": "2*epsilon/(1+epsilon)"
+        },
+        "expected_upper_bound": {
+          "type": "number",
+          "minimum": 0
+        },
+        "assumption": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "sample_extrema_normalization_witness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "base_support",
+        "augmented_support",
+        "max_inlier_normalized_coordinate_displacement"
+      ],
+      "properties": {
+        "base_support": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "augmented_support": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "max_inlier_normalized_coordinate_displacement": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "claim_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bounded_fourier_features_are_not_lossless_microscopic_state",
+        "low_mass_does_not_imply_dynamically_irrelevant",
+        "no_field_operator_evaluated",
+        "no_physical_plasma_run"
+      ],
+      "properties": {
+        "bounded_fourier_features_are_not_lossless_microscopic_state": {
+          "const": true
+        },
+        "low_mass_does_not_imply_dynamically_irrelevant": {
+          "const": true
+        },
+        "no_field_operator_evaluated": {
+          "const": true
+        },
+        "no_physical_plasma_run": {
+          "const": true
+        }
+      }
+    }
+  }
+}
