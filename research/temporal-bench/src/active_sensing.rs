@@ -253,6 +253,10 @@ fn dominates(left: &ActiveSensingActionValue, right: &ActiveSensingActionValue) 
     benefit_no_worse && resources_no_worse && strict
 }
 
+fn digest_is_nonzero(digest: &[u8; 32]) -> bool {
+    digest.iter().any(|byte| *byte != 0)
+}
+
 fn hash_text(hasher: &mut CanonicalHasher, value: &str) {
     hasher.bytes(value.as_bytes());
 }
@@ -528,6 +532,10 @@ pub fn validate_active_sensing_plan_receipt(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn hash(value: u8) -> [u8; 32] {
+        [value; 32]
+    }
 
     fn cost(
         sensor: u64,
