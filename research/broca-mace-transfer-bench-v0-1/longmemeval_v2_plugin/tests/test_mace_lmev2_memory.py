@@ -275,6 +275,12 @@ class MaceLongMemEvalV2IngressTests(unittest.TestCase):
                 "candidate_record_count": 1,
                 "candidate_set_sha256": candidate_set_sha256,
             }
+            invalid_mode = dict(response, retrieval_mode="text_bm25_with_original_image_evidence")
+            with self.assertRaisesRegex(RuntimeError, "does not match the pinned hybrid backend profile"):
+                memory._persist_candidate_envelope(
+                    "opaque-invocation-1", query, invalid_mode
+                )
+
             invalid_commitment = dict(response, candidate_set_sha256="0" * 64)
             with self.assertRaisesRegex(RuntimeError, "candidate-set digest mismatch"):
                 memory._persist_candidate_envelope(
