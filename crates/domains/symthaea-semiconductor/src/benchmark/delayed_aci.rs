@@ -19,8 +19,7 @@ use super::label_consumption_guard::{
 pub const DELAYED_ACI_POLICY_SCHEMA_V1: &str = "luminous.semi-bench.delayed-aci-policy.v1";
 pub const DELAYED_ACI_ENGINE_SCHEMA_V1: &str = "luminous.semi-bench.delayed-aci-engine.v1";
 pub const ACI_PREDICTION_INPUT_SCHEMA_V1: &str = "luminous.semi-bench.aci-prediction-input.v1";
-pub const ACI_PREDICTION_RECEIPT_SCHEMA_V1: &str =
-    "luminous.semi-bench.aci-prediction-receipt.v1";
+pub const ACI_PREDICTION_RECEIPT_SCHEMA_V1: &str = "luminous.semi-bench.aci-prediction-receipt.v1";
 pub const ACI_LABEL_DELIVERY_SCHEMA_V1: &str = "luminous.semi-bench.aci-label-delivery.v1";
 pub const ACI_UPDATE_RECEIPT_SCHEMA_V1: &str = "luminous.semi-bench.aci-update-receipt.v1";
 pub const ACI_DELAY_MEMORY_DIAGNOSTIC_SCHEMA_V1: &str =
@@ -272,9 +271,7 @@ fn prediction_receipt_digest(
     json_sha256(&canonical)
 }
 
-fn update_receipt_digest(
-    receipt: &AciUpdateReceiptV1,
-) -> Result<String, DelayedAciErrorV1> {
+fn update_receipt_digest(receipt: &AciUpdateReceiptV1) -> Result<String, DelayedAciErrorV1> {
     let mut canonical = receipt.clone();
     canonical.receipt_sha256.clear();
     json_sha256(&canonical)
@@ -308,7 +305,9 @@ fn validate_policy(policy: &DelayedAciPolicyV1) -> Result<(), DelayedAciErrorV1>
         || policy.maximum_abs_target <= 0.0
         || policy.maximum_delivery_delay_seconds < 0
     {
-        return Err(DelayedAciErrorV1("ACI policy contains invalid parameters".into()));
+        return Err(DelayedAciErrorV1(
+            "ACI policy contains invalid parameters".into(),
+        ));
     }
     Ok(())
 }
@@ -322,17 +321,25 @@ fn validate_engine(engine: &DelayedAciEngineV1) -> Result<(), DelayedAciErrorV1>
         || !engine.state.alpha_state.is_finite()
         || engine.state.alpha_state < engine.policy.minimum_alpha
         || engine.state.alpha_state > engine.policy.maximum_alpha
-        || engine.state.scheduled_alpha_by_sequence.values().any(|alpha| {
-            !alpha.is_finite()
-                || *alpha < engine.policy.minimum_alpha
-                || *alpha > engine.policy.maximum_alpha
-        })
+        || engine
+            .state
+            .scheduled_alpha_by_sequence
+            .values()
+            .any(|alpha| {
+                !alpha.is_finite()
+                    || *alpha < engine.policy.minimum_alpha
+                    || *alpha > engine.policy.maximum_alpha
+            })
     {
-        return Err(DelayedAciErrorV1("ACI engine or scheduled state is invalid".into()));
+        return Err(DelayedAciErrorV1(
+            "ACI engine or scheduled state is invalid".into(),
+        ));
     }
     match engine.mode {
         AciUpdateModeV1::FixedHorizonDelayed { horizon_steps: 0 } => {
-            return Err(DelayedAciErrorV1("fixed ACI horizon must be at least one step".into()));
+            return Err(DelayedAciErrorV1(
+                "fixed ACI horizon must be at least one step".into(),
+            ));
         }
         _ => {}
     }
@@ -361,8 +368,13 @@ pub fn create_delayed_aci_engine_v1(
     require_text(engine_id, "engine_id")?;
     require_text(clock_domain_id, "clock_domain_id")?;
     validate_policy(&policy)?;
-    if matches!(mode, AciUpdateModeV1::FixedHorizonDelayed { horizon_steps: 0 }) {
-        return Err(DelayedAciErrorV1("fixed ACI horizon must be at least one step".into()));
+    if matches!(
+        mode,
+        AciUpdateModeV1::FixedHorizonDelayed { horizon_steps: 0 }
+    ) {
+        return Err(DelayedAciErrorV1(
+            "fixed ACI horizon must be at least one step".into(),
+        ));
     }
     let initial_alpha = policy.target_miscoverage;
     let policy_sha256 = policy_digest(&policy)?;
@@ -392,7 +404,9 @@ pub fn register_aci_prediction_v1(
 ) -> Result<AciPredictionReceiptV1, DelayedAciErrorV1> {
     validate_engine(engine)?;
     if input.schema != ACI_PREDICTION_INPUT_SCHEMA_V1 {
-        return Err(DelayedAciErrorV1("ACI prediction input schema is unsupported".into()));
+        return Err(DelayedAciErrorV1(
+            "ACI prediction input schema is unsupported".into(),
+        ));
     }
     require_text(&input.prediction_id, "prediction_id")?;
     require_text(&input.sample_id, "sample_id")?;
@@ -409,7 +423,9 @@ pub fn register_aci_prediction_v1(
         || input.interval_lower.abs() > engine.policy.maximum_abs_target
         || input.interval_upper.abs() > engine.policy.maximum_abs_target
     {
-        return Err(DelayedAciErrorV1("ACI prediction identity, time, digest or bounds invalid".into()));
+        return Err(DelayedAciErrorV1(
+            "ACI prediction identity, time, digest or bounds invalid".into(),
+        ));
     }
 
     let sequence = engine.state.next_prediction_sequence;
@@ -423,9 +439,13 @@ pub fn register_aci_prediction_v1(
         ));
     }
     if engine.pending_predictions.contains_key(&input.sample_id)
-        || engine.seen_measurement_event_ids.contains(&input.measurement_event_id)
+        || engine
+            .seen_measurement_event_ids
+            .contains(&input.measurement_event_id)
     {
-        return Err(DelayedAciErrorV1("duplicate ACI sample or measurement event".into()));
+        return Err(DelayedAciErrorV1(
+            "duplicate ACI sample or measurement event".into(),
+        ));
     }
 
     let before = state_digest(&engine.state)?;
@@ -518,11 +538,16 @@ pub fn deliver_aci_label_v1(
 ) -> Result<AciUpdateReceiptV1, DelayedAciErrorV1> {
     validate_engine(engine)?;
     if delivery.schema != ACI_LABEL_DELIVERY_SCHEMA_V1 {
-        return Err(DelayedAciErrorV1("ACI label delivery schema is unsupported".into()));
+        return Err(DelayedAciErrorV1(
+            "ACI label delivery schema is unsupported".into(),
+        ));
     }
     require_text(&delivery.sample_id, "delivery.sample_id")?;
     require_text(&delivery.label_id, "delivery.label_id")?;
-    require_text(&delivery.measurement_event_id, "delivery.measurement_event_id")?;
+    require_text(
+        &delivery.measurement_event_id,
+        "delivery.measurement_event_id",
+    )?;
     require_text(&delivery.idempotency_key, "delivery.idempotency_key")?;
     let report = &delivery.eligibility_report;
     let prediction = engine.pending_predictions.get(&delivery.sample_id);
@@ -531,19 +556,37 @@ pub fn deliver_aci_label_v1(
 
     if engine.accepted_label_revisions.contains(&revision_key) {
         return make_update_receipt(
-            engine, delivery, prediction, AciUpdateDispositionV1::Duplicate,
-            Some(AciUpdateReasonV1::DuplicateAcceptedLabelRevision), None,
-            engine.state.alpha_state, engine.state.alpha_state, engine.state.alpha_state,
-            None, &before, &before, false,
+            engine,
+            delivery,
+            prediction,
+            AciUpdateDispositionV1::Duplicate,
+            Some(AciUpdateReasonV1::DuplicateAcceptedLabelRevision),
+            None,
+            engine.state.alpha_state,
+            engine.state.alpha_state,
+            engine.state.alpha_state,
+            None,
+            &before,
+            &before,
+            false,
         );
     }
 
     let Some(prediction_receipt) = prediction.cloned() else {
         return make_update_receipt(
-            engine, delivery, None, AciUpdateDispositionV1::PendingPredictionMissing,
-            Some(AciUpdateReasonV1::PendingPredictionMissing), None,
-            engine.state.alpha_state, engine.state.alpha_state, engine.state.alpha_state,
-            None, &before, &before, false,
+            engine,
+            delivery,
+            None,
+            AciUpdateDispositionV1::PendingPredictionMissing,
+            Some(AciUpdateReasonV1::PendingPredictionMissing),
+            None,
+            engine.state.alpha_state,
+            engine.state.alpha_state,
+            engine.state.alpha_state,
+            None,
+            &before,
+            &before,
+            false,
         );
     };
 
@@ -559,17 +602,35 @@ pub fn deliver_aci_label_v1(
         reason = Some(AciUpdateReasonV1::LabelNotCurrentK1);
     } else if report.eligibility == LabelConsumptionEligibilityV1::Unknown {
         return make_update_receipt(
-            engine, delivery, Some(&prediction_receipt), AciUpdateDispositionV1::HeldUnknown,
-            Some(AciUpdateReasonV1::LabelNotEligible), None,
-            engine.state.alpha_state, engine.state.alpha_state, engine.state.alpha_state,
-            None, &before, &before, false,
+            engine,
+            delivery,
+            Some(&prediction_receipt),
+            AciUpdateDispositionV1::HeldUnknown,
+            Some(AciUpdateReasonV1::LabelNotEligible),
+            None,
+            engine.state.alpha_state,
+            engine.state.alpha_state,
+            engine.state.alpha_state,
+            None,
+            &before,
+            &before,
+            false,
         );
     } else if report.eligibility == LabelConsumptionEligibilityV1::Blocked {
         return make_update_receipt(
-            engine, delivery, Some(&prediction_receipt), AciUpdateDispositionV1::Blocked,
-            Some(AciUpdateReasonV1::LabelNotEligible), None,
-            engine.state.alpha_state, engine.state.alpha_state, engine.state.alpha_state,
-            None, &before, &before, false,
+            engine,
+            delivery,
+            Some(&prediction_receipt),
+            AciUpdateDispositionV1::Blocked,
+            Some(AciUpdateReasonV1::LabelNotEligible),
+            None,
+            engine.state.alpha_state,
+            engine.state.alpha_state,
+            engine.state.alpha_state,
+            None,
+            &before,
+            &before,
+            false,
         );
     } else if !report.downstream_consumption_allowed {
         reason = Some(AciUpdateReasonV1::DownstreamConsumptionNotAllowed);
@@ -593,13 +654,10 @@ pub fn deliver_aci_label_v1(
         || prediction_receipt.clock_domain_id != delivery.clock_domain_id
     {
         reason = Some(AciUpdateReasonV1::ClockDomainMismatch);
-    } else if delivery.label_available_at_unix_seconds
-        < prediction_receipt.event_time_unix_seconds
+    } else if delivery.label_available_at_unix_seconds < prediction_receipt.event_time_unix_seconds
     {
         reason = Some(AciUpdateReasonV1::LabelAvailableBeforeMeasurement);
-    } else if delivery.delivered_at_unix_seconds
-        < delivery.label_available_at_unix_seconds
-    {
+    } else if delivery.delivered_at_unix_seconds < delivery.label_available_at_unix_seconds {
         reason = Some(AciUpdateReasonV1::DeliveryBeforeLabelAvailability);
     } else if delivery.eligibility_report_available_at_unix_seconds
         < delivery.label_available_at_unix_seconds
@@ -609,12 +667,9 @@ pub fn deliver_aci_label_v1(
         < delivery.eligibility_report_available_at_unix_seconds
     {
         reason = Some(AciUpdateReasonV1::ReportUnavailableAtDelivery);
-    } else if delivery.delivered_at_unix_seconds
-        < prediction_receipt.prediction_at_unix_seconds
-    {
+    } else if delivery.delivered_at_unix_seconds < prediction_receipt.prediction_at_unix_seconds {
         reason = Some(AciUpdateReasonV1::DeliveryBeforePrediction);
-    } else if delivery.delivered_at_unix_seconds
-        - prediction_receipt.prediction_at_unix_seconds
+    } else if delivery.delivered_at_unix_seconds - prediction_receipt.prediction_at_unix_seconds
         > engine.policy.maximum_delivery_delay_seconds
     {
         reason = Some(AciUpdateReasonV1::DeliveryDelayExceeded);
@@ -624,10 +679,19 @@ pub fn deliver_aci_label_v1(
 
     if let Some(reason) = reason {
         return make_update_receipt(
-            engine, delivery, Some(&prediction_receipt), AciUpdateDispositionV1::Rejected,
-            Some(reason), None,
-            engine.state.alpha_state, engine.state.alpha_state, engine.state.alpha_state,
-            None, &before, &before, false,
+            engine,
+            delivery,
+            Some(&prediction_receipt),
+            AciUpdateDispositionV1::Rejected,
+            Some(reason),
+            None,
+            engine.state.alpha_state,
+            engine.state.alpha_state,
+            engine.state.alpha_state,
+            None,
+            &before,
+            &before,
+            false,
         );
     }
 
@@ -640,10 +704,8 @@ pub fn deliver_aci_label_v1(
     };
     let candidate_alpha =
         alpha_before + engine.policy.learning_rate * (engine.policy.target_miscoverage - error);
-    let candidate_alpha = candidate_alpha.clamp(
-        engine.policy.minimum_alpha,
-        engine.policy.maximum_alpha,
-    );
+    let candidate_alpha =
+        candidate_alpha.clamp(engine.policy.minimum_alpha, engine.policy.maximum_alpha);
 
     let (disposition, current_alpha_after, scheduled_sequence, alpha_after_or_scheduled) =
         match engine.mode {
@@ -657,21 +719,45 @@ pub fn deliver_aci_label_v1(
                 let target_sequence = prediction_receipt
                     .sequence
                     .checked_add(horizon_steps)
-                    .ok_or_else(|| DelayedAciErrorV1("fixed ACI target sequence overflow".into()))?;
+                    .ok_or_else(|| {
+                        DelayedAciErrorV1("fixed ACI target sequence overflow".into())
+                    })?;
                 if target_sequence < engine.state.next_prediction_sequence {
                     return make_update_receipt(
-                        engine, delivery, Some(&prediction_receipt), AciUpdateDispositionV1::Rejected,
-                        Some(AciUpdateReasonV1::FixedHorizonSlotAlreadyPassed), Some(miss),
-                        alpha_before, alpha_before, engine.state.alpha_state, None,
-                        &before, &before, false,
+                        engine,
+                        delivery,
+                        Some(&prediction_receipt),
+                        AciUpdateDispositionV1::Rejected,
+                        Some(AciUpdateReasonV1::FixedHorizonSlotAlreadyPassed),
+                        Some(miss),
+                        alpha_before,
+                        alpha_before,
+                        engine.state.alpha_state,
+                        None,
+                        &before,
+                        &before,
+                        false,
                     );
                 }
-                if engine.state.scheduled_alpha_by_sequence.contains_key(&target_sequence) {
+                if engine
+                    .state
+                    .scheduled_alpha_by_sequence
+                    .contains_key(&target_sequence)
+                {
                     return make_update_receipt(
-                        engine, delivery, Some(&prediction_receipt), AciUpdateDispositionV1::Rejected,
-                        Some(AciUpdateReasonV1::FixedHorizonScheduleConflict), Some(miss),
-                        alpha_before, alpha_before, engine.state.alpha_state, None,
-                        &before, &before, false,
+                        engine,
+                        delivery,
+                        Some(&prediction_receipt),
+                        AciUpdateDispositionV1::Rejected,
+                        Some(AciUpdateReasonV1::FixedHorizonScheduleConflict),
+                        Some(miss),
+                        alpha_before,
+                        alpha_before,
+                        engine.state.alpha_state,
+                        None,
+                        &before,
+                        &before,
+                        false,
                     );
                 }
                 (
@@ -685,21 +771,31 @@ pub fn deliver_aci_label_v1(
 
     let mut next_state = engine.state.clone();
     if let Some(sequence) = scheduled_sequence {
-        next_state.scheduled_alpha_by_sequence.insert(sequence, alpha_after_or_scheduled);
+        next_state
+            .scheduled_alpha_by_sequence
+            .insert(sequence, alpha_after_or_scheduled);
     } else {
         next_state.alpha_state = current_alpha_after;
     }
     let after = state_digest(&next_state)?;
     let receipt = make_update_receipt(
-        engine, delivery, Some(&prediction_receipt), disposition, None, Some(miss),
-        alpha_before, alpha_after_or_scheduled, current_alpha_after,
-        scheduled_sequence, &before, &after, true,
+        engine,
+        delivery,
+        Some(&prediction_receipt),
+        disposition,
+        None,
+        Some(miss),
+        alpha_before,
+        alpha_after_or_scheduled,
+        current_alpha_after,
+        scheduled_sequence,
+        &before,
+        &after,
+        true,
     )?;
 
     engine.state = next_state;
-    engine
-        .accepted_label_revisions
-        .insert(revision_key);
+    engine.accepted_label_revisions.insert(revision_key);
     engine.pending_predictions.remove(&delivery.sample_id);
     Ok(receipt)
 }
@@ -714,7 +810,8 @@ pub fn compute_delay_memory_diagnostic_v1(
             let ratio = delay_steps as f64 / memory;
             if !ratio.is_finite() {
                 return Err(DelayedAciErrorV1(
-                    "delay-to-memory ratio overflowed; supply a better-scaled memory estimate".into(),
+                    "delay-to-memory ratio overflowed; supply a better-scaled memory estimate"
+                        .into(),
                 ));
             }
             let regime = if ratio < 0.5 {
@@ -952,7 +1049,10 @@ mod tests {
         )
         .unwrap();
         assert_eq!(receipt.disposition, AciUpdateDispositionV1::Rejected);
-        assert_eq!(receipt.reason, Some(AciUpdateReasonV1::FixedHorizonSlotAlreadyPassed));
+        assert_eq!(
+            receipt.reason,
+            Some(AciUpdateReasonV1::FixedHorizonSlotAlreadyPassed)
+        );
         assert_eq!(state_digest(&engine.state).unwrap(), before);
     }
 
@@ -963,14 +1063,18 @@ mod tests {
         let before = state_digest(&engine.state).unwrap();
         let mut unknown = delivery("s1", "e1", "l1", 1, 0.0, -1.0, 1.0, 110, 111, 112);
         unknown.eligibility_report.eligibility = LabelConsumptionEligibilityV1::Unknown;
-        unknown.eligibility_report.report_sha256 = eligibility_report_digest(&unknown.eligibility_report).unwrap();
+        unknown.eligibility_report.report_sha256 =
+            eligibility_report_digest(&unknown.eligibility_report).unwrap();
         let held = deliver_aci_label_v1(&mut engine, &unknown).unwrap();
         assert_eq!(held.disposition, AciUpdateDispositionV1::HeldUnknown);
         assert_eq!(state_digest(&engine.state).unwrap(), before);
 
         let qualified = delivery("s1", "e1", "l1", 1, 0.0, -1.0, 1.0, 110, 111, 113);
         let accepted = deliver_aci_label_v1(&mut engine, &qualified).unwrap();
-        assert_eq!(accepted.disposition, AciUpdateDispositionV1::UpdatedArrivalOrder);
+        assert_eq!(
+            accepted.disposition,
+            AciUpdateDispositionV1::UpdatedArrivalOrder
+        );
     }
 
     #[test]
@@ -980,7 +1084,8 @@ mod tests {
         let before = state_digest(&engine.state).unwrap();
         let mut blocked = delivery("s1", "e1", "l1", 1, 2.0, -1.0, 1.0, 110, 111, 112);
         blocked.eligibility_report.eligibility = LabelConsumptionEligibilityV1::Blocked;
-        blocked.eligibility_report.report_sha256 = eligibility_report_digest(&blocked.eligibility_report).unwrap();
+        blocked.eligibility_report.report_sha256 =
+            eligibility_report_digest(&blocked.eligibility_report).unwrap();
         let receipt = deliver_aci_label_v1(&mut engine, &blocked).unwrap();
         assert_eq!(receipt.disposition, AciUpdateDispositionV1::Blocked);
         assert_eq!(state_digest(&engine.state).unwrap(), before);
@@ -992,7 +1097,9 @@ mod tests {
         register(&mut engine, "s1", "e1", 100, -1.0, 1.0);
         let delivered = delivery("s1", "e1", "l1", 1, 2.0, -1.0, 1.0, 110, 111, 112);
         assert_eq!(
-            deliver_aci_label_v1(&mut engine, &delivered).unwrap().disposition,
+            deliver_aci_label_v1(&mut engine, &delivered)
+                .unwrap()
+                .disposition,
             AciUpdateDispositionV1::UpdatedArrivalOrder
         );
         let before = state_digest(&engine.state).unwrap();
@@ -1034,19 +1141,21 @@ mod tests {
         register(&mut engine, "s2", "e2", 103, -1.0, 1.0);
         let before = engine.state.alpha_state;
 
-        let later_sample_first = delivery(
-            "s2", "e2", "l2", 1, 2.0, -1.0, 1.0, 120, 121, 122,
-        );
+        let later_sample_first = delivery("s2", "e2", "l2", 1, 2.0, -1.0, 1.0, 120, 121, 122);
         let later_receipt = deliver_aci_label_v1(&mut engine, &later_sample_first).unwrap();
-        assert_eq!(later_receipt.disposition, AciUpdateDispositionV1::UpdatedArrivalOrder);
+        assert_eq!(
+            later_receipt.disposition,
+            AciUpdateDispositionV1::UpdatedArrivalOrder
+        );
         let after_first = engine.state.alpha_state;
         assert!(after_first < before);
 
-        let earlier_sample_late = delivery(
-            "s1", "e1", "l1", 1, 0.0, -1.0, 1.0, 110, 111, 130,
-        );
+        let earlier_sample_late = delivery("s1", "e1", "l1", 1, 0.0, -1.0, 1.0, 110, 111, 130);
         let earlier_receipt = deliver_aci_label_v1(&mut engine, &earlier_sample_late).unwrap();
-        assert_eq!(earlier_receipt.disposition, AciUpdateDispositionV1::UpdatedArrivalOrder);
+        assert_eq!(
+            earlier_receipt.disposition,
+            AciUpdateDispositionV1::UpdatedArrivalOrder
+        );
         assert!(engine.state.alpha_state > after_first);
         assert_eq!(earlier_receipt.effective_delay_seconds, Some(29));
     }
@@ -1060,11 +1169,15 @@ mod tests {
         let d0 = delivery("s0", "e0", "l0", 1, 2.0, -1.0, 1.0, 110, 111, 112);
         let d1 = delivery("s1", "e1", "l1", 1, 0.0, -1.0, 1.0, 113, 114, 115);
         assert_eq!(
-            deliver_aci_label_v1(&mut engine, &d0).unwrap().scheduled_sequence,
+            deliver_aci_label_v1(&mut engine, &d0)
+                .unwrap()
+                .scheduled_sequence,
             Some(p0.sequence + 3)
         );
         assert_eq!(
-            deliver_aci_label_v1(&mut engine, &d1).unwrap().scheduled_sequence,
+            deliver_aci_label_v1(&mut engine, &d1)
+                .unwrap()
+                .scheduled_sequence,
             Some(p1.sequence + 3)
         );
         let p3 = register(&mut engine, "s3", "e3", 109, -1.0, 1.0);
@@ -1078,12 +1191,9 @@ mod tests {
 
     #[test]
     fn delay_memory_diagnostic_is_explicit_and_process_specific() {
-        let ar = compute_delay_memory_diagnostic_v1(
-            10,
-            Some(20.0),
-            ResidualDependenceFamilyV1::Ar1,
-        )
-        .unwrap();
+        let ar =
+            compute_delay_memory_diagnostic_v1(10, Some(20.0), ResidualDependenceFamilyV1::Ar1)
+                .unwrap();
         assert_eq!(ar.delay_to_memory_ratio, Some(0.5));
         assert_eq!(ar.regime, DelayMemoryRegimeV1::DelayComparableToMemory);
         assert!(ar.interpretation.contains("AR(1)"));
@@ -1097,12 +1207,9 @@ mod tests {
         assert_eq!(garch.regime, DelayMemoryRegimeV1::DelayLongerThanMemory);
         assert!(garch.interpretation.contains("GARCH"));
 
-        let unknown = compute_delay_memory_diagnostic_v1(
-            5,
-            None,
-            ResidualDependenceFamilyV1::Unspecified,
-        )
-        .unwrap();
+        let unknown =
+            compute_delay_memory_diagnostic_v1(5, None, ResidualDependenceFamilyV1::Unspecified)
+                .unwrap();
         assert_eq!(unknown.regime, DelayMemoryRegimeV1::Unknown);
     }
 
@@ -1136,7 +1243,10 @@ mod tests {
                 )
                 .unwrap();
             }
-            (engine.state.alpha_state, state_digest(&engine.state).unwrap())
+            (
+                engine.state.alpha_state,
+                state_digest(&engine.state).unwrap(),
+            )
         }
         assert_eq!(run(), run());
     }
