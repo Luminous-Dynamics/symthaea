@@ -74,3 +74,8 @@ Resource receipts report local measured index-build and query latency, source/st
 The sidecar's retrieval arms are fixed benchmark ablations, not learned strategy selection. The selected mode, active channel list, backend identity, entity-literal field weights (when used), extraction rule, backend binary digest and RRF configuration (when hybrid) are included in the Python bridge's backend profile commitment. Each executed action is independently recorded even when it returns no candidates.
 
 No V2 run or score is claimed.
+
+
+## Retrieval receipt semantics
+
+A non-empty result is recorded as `candidates_returned`; it is not evidence-qualified or decision-sufficient. The legacy `evidence_sufficient` spelling remains readable for replay but is interpreted only as a historical candidate-return observation. Repeated retrieval observations create `Exploratory` strategy notes, which are not returned by the policy-eligible `applicable_notes()` API. See [MACE retrieval observation semantics](docs/MACE_RETRIEVAL_OBSERVATION_SEMANTICS_V1.md) for the boundary and remaining qualification requirements.
