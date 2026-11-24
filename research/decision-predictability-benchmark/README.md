@@ -53,7 +53,7 @@ The new `src/sequential.rs` module adds a finite-horizon, prior-free policy-tree
 - Explicit terminal decisions and a root risk-gate status; no implicit abstain action or execution authorization.
 - A 16-state non-myopic branch-unlock fixture in the linked research PR.
 
-**Qualification status: uncompiled / untested.** Six Rust test functions have been authored, including dynamic-programme versus exhaustive-enumerator comparison, nuisance dead-end handling, overlapping supports, deadline rejection and component-wise budget enforcement. No Rust formatter, compiler, test runner or strict Clippy result has yet been obtained for this module. Do not use it as a qualified evaluator until exact-head Rust 1.96 formatting, compilation, tests and strict Clippy pass.
+**Qualification status: uncompiled / untested.** Eight Rust test functions have been authored, including dynamic-programme versus exhaustive-enumerator comparison, nuisance dead-end handling, overlapping supports, deadline rejection and component-wise budget enforcement. No Rust formatter, compiler, test runner or strict Clippy result has yet been obtained for this module. Do not use it as a qualified evaluator until exact-head Rust 1.96 formatting, compilation, tests and strict Clippy pass.
 
 This module is a tiny-world reference oracle, not the production research policy, a general scheduler, a Bayesian EVSI implementation, or an experiment execution authority. It shares only the declared model semantics; the exhaustive enumerator separately constructs the full contingent policy-tree choice set rather than calling the dynamic-programming recurrence.
 
