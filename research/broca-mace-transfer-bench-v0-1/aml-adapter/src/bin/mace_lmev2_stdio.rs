@@ -684,7 +684,7 @@ mod tests {
             .contains("hybrid_rrf_bm25_entity"));
         assert_eq!(response["run_id"], "fixture-run");
         assert_eq!(response["candidate_id"], "query-invocation-1");
-        assert_eq!(response["candidate_record_count"], 2);
+        assert_eq!(response["candidate_record_count"], 3);
         assert!(response["candidate_set_sha256"].as_str().is_some());
         assert!(response["candidate_evidence_jsonl"].as_str().unwrap().contains("lmev2:text:"));
         assert_eq!(response["retrieval_trace"]["run_id"], "fixture-run");
