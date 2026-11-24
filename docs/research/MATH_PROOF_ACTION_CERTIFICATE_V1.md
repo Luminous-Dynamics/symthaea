@@ -181,3 +181,9 @@ A pinned negative Lean source, [ProofActionCertificateAndCommNegative.lean](../.
 The focused workflow must: (a) run the positive local-action source successfully; (b) run the negative source and require a Lean type/application-type mismatch diagnostic; and (c) fail the job if the negative source is accepted. The replay artifact records both the positive log digest and the expected negative rejection log digest. A generic process failure does not satisfy the negative-control check.
 
 This is one seeded mismatch control only. It is not a comprehensive adversarial suite, and the negative-control result remains pending until an exact-head workflow run reports it.
+
+### 12.2. Manifest-to-plan consistency gate
+
+The focused workflow now cross-checks the certificate manifest against the source-pinned `PROOF_PLAN_AND_COMM_V1.json`: plan IDs, action node IDs, action kinds, input goal IDs and output subgoal IDs must match. The forward and reverse expected propositions must equal the corresponding plan subgoal statements. A generated mutation that changes the forward expected proposition to the identity statement is required to fail this structural binding check.
+
+This is a finite manifest-to-plan integrity gate; it does not make the candidate plan expert-reviewed gold data or establish that the conceptual interpretation of a node is correct.
