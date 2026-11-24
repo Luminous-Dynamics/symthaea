@@ -143,6 +143,8 @@ This example makes three properties testable:
 
 Do not tune the example after observing candidate-policy results.
 
+The corresponding fully enumerated public regression fixture is `research/decision-predictability-benchmark/fixtures/sequential-policy-unlock-v0.json`. It records all 16 states, the terminal loss table, observation supports, branch transitions, costs, horizon, deadline and expected known-answer values. It is public regression material, not a blind candidate-evaluation task; blind confirmation variants require separate evaluator custody.
+
 ## 6. Required controls
 
 The frozen suite should include at least:
