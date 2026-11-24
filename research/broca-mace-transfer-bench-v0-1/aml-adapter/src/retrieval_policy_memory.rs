@@ -320,7 +320,7 @@ pub struct RetrievalStrategyStepV1 {
     pub action_template_sha256: String,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RetrievalStrategyStatusV1 {
     /// Observed retrieval patterns; diagnostic only and never auto-applied.
     Exploratory,
@@ -1180,6 +1180,34 @@ mod tests {
             memory.record_trace(early_stop),
             Err(RetrievalPolicyRejectV1::InvalidStopReason)
         );
+    }
+
+
+    #[test]
+    fn legacy_evidence_sufficient_label_remains_readable_but_is_not_policy_eligible() {
+        let original = trace(
+            "legacy-candidate-hit",
+            "a141414141414141414141414141414141414141414141414141414141414141",
+            "web-shop-a",
+            ENV_A,
+            TOOL_PROFILE_A,
+            ACTION_SEARCH,
+        );
+        let mut value = original.to_json_value();
+        value["stop_reason"] = Value::String("evidence_sufficient".to_owned());
+        // The legacy label and the new candidate-returned label preserve the
+        // same v1 binary tag so previously persisted receipt digests still verify.
+        value["receipt_sha256"] = Value::String(original.receipt_sha256());
+        let decoded = RetrievalTraceReceiptV1::from_json_value(&value)
+            .expect("legacy v1 receipt remains readable");
+        assert_eq!(decoded.stop_reason, RetrievalStopReasonV1::EvidenceSufficient);
+
+        let mut memory = RetrievalPolicyMemoryV1::default();
+        memory.record_trace(decoded).expect("legacy observation accepted");
+        assert!(memory
+            .promote_strategy(&refs(&["legacy-candidate-hit"]), ALGORITHM, 200, 300)
+            .is_err());
+        assert!(memory.applicable_notes("web-shop-a", ENV_A, TOOL_PROFILE_A, 250).is_empty());
     }
 
     #[test]
