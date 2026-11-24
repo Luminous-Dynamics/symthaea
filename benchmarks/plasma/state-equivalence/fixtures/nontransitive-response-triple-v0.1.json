@@ -2,7 +2,6 @@
   "schema_version": "0.1",
   "fixture_id": "kinetic-response-signature-nontransitive-triple-v1",
   "status": "synthetic_analytic_only",
-  "normalization_scale": 1,
   "pairwise_tolerance": 1,
   "states": [
     {
@@ -33,6 +32,9 @@
         "branch_ids": [
           "echo-branch-1",
           "echo-branch-1"
+        ],
+        "qoi_scales": [
+          1
         ]
       }
     },
@@ -64,6 +66,9 @@
         "branch_ids": [
           "echo-branch-1",
           "echo-branch-1"
+        ],
+        "qoi_scales": [
+          1
         ]
       }
     },
@@ -95,6 +100,9 @@
         "branch_ids": [
           "echo-branch-1",
           "echo-branch-1"
+        ],
+        "qoi_scales": [
+          1
         ]
       }
     }
