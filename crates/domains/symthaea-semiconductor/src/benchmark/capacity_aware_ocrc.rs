@@ -350,7 +350,6 @@ fn validate_policy(policy: &CaoOcrcPolicyV1) -> Result<(), CaoOcrcErrorV1> {
         || policy.score_upper_bound <= 0.0
         || !policy.initial_threshold.is_finite()
         || !(0.0..=policy.score_upper_bound).contains(&policy.initial_threshold)
-        || policy.tracking_capacity == 0
     {
         return Err(CaoOcrcErrorV1("CA-OCRC policy parameters are invalid".into()));
     }
@@ -535,6 +534,8 @@ pub fn advance_ca_ocrc_round_v1(
                 || lower > upper
                 || input.score_location < lower
                 || input.score_location > upper
+                || lower != input.score_location - input.threshold_used
+                || upper != input.score_location + input.threshold_used
                 || !draw.is_finite()
                 || !(0.0..1.0).contains(&draw)
             {
@@ -977,6 +978,18 @@ pub struct CaoOcrcBernoulliOptimizerResultV1 {
     pub optimizer_iterations: u32,
 }
 
+pub fn full_tracking_proxy_survival_v1(
+    maximum_delay_rounds: u64,
+) -> Vec<f64> {
+    vec![1.0; maximum_delay_rounds as usize + 1]
+}
+
+pub fn optimized_bernoulli_proxy_survival_v1(
+    result: &CaoOcrcBernoulliOptimizerResultV1,
+) -> Vec<f64> {
+    vec![result.optimal_track_probability; result.maximum_delay_rounds as usize + 1]
+}
+
 pub fn optimize_ca_ocrc_bernoulli_proxy_v1(
     capacity: usize,
     maximum_delay_rounds: u64,
@@ -986,6 +999,7 @@ pub fn optimize_ca_ocrc_bernoulli_proxy_v1(
 ) -> Result<CaoOcrcBernoulliOptimizerResultV1, CaoOcrcErrorV1> {
     if capacity == 0
         || maximum_delay_rounds == 0
+        || maximum_delay_rounds >= horizon_rounds
         || horizon_rounds == 0
         || !score_upper_bound.is_finite()
         || score_upper_bound <= 0.0
@@ -1063,7 +1077,7 @@ mod tests {
             target_risk: 0.10,
             learning_rate: 0.05,
             score_upper_bound: 100.0,
-            initial_threshold: 10.0,
+            initial_threshold: 0.5,
             tracking_capacity: capacity,
             maximum_feedback_delay_rounds: d_max,
             proxy_survival: survival,
@@ -1093,7 +1107,7 @@ mod tests {
             interval_policy_sha256: digest('b'),
             upstream_prediction_receipt_sha256: digest('c'),
             trivial_set: trivial,
-            threshold_used: 10.0,
+            threshold_used: 0.5,
             score_location: interval
                 .map(|bounds| (bounds.0 + bounds.1) / 2.0)
                 .unwrap_or(0.0),
@@ -1424,6 +1438,133 @@ mod tests {
     fn survival_vector_must_be_monotonic_and_positive_at_maximum_delay() {
         assert!(create_ca_ocrc_engine_v1("bad", "clock", policy(1, 2, vec![0.5, 0.8, 0.2])).is_err());
         assert!(create_ca_ocrc_engine_v1("bad", "clock", policy(1, 2, vec![1.0, 0.5, 0.0])).is_err());
+    }
+
+    #[test]
+    fn zero_capacity_is_an_explicit_no_feedback_baseline() {
+        let mut engine = engine(0, 2, vec![1.0, 1.0, 1.0]);
+        let receipt = advance_ca_ocrc_round_v1(
+            &mut engine,
+            &round(1, None, Some((0.0, 1.0)), Some(0.5)),
+            &[feedback(
+                1,
+                1,
+                2.0,
+                "label-zero-capacity",
+                1,
+                LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            )],
+        )
+        .unwrap();
+        assert_eq!(receipt.admission, CaoOcrcAdmissionV1::CapacitySaturated);
+        assert_eq!(
+            receipt.received_feedback_receipts[0].disposition,
+            CaoOcrcFeedbackDispositionV1::NotTracked
+        );
+        assert_eq!(engine.threshold, 0.5);
+        assert!(engine.tracked_rounds.is_empty());
+    }
+
+    #[test]
+    fn capacity_at_least_dmax_plus_one_can_track_all_pending_rounds() {
+        let mut engine = engine(3, 2, vec![1.0, 1.0, 1.0]);
+        for index in 1..=3 {
+            let receipt = advance_ca_ocrc_round_v1(
+                &mut engine,
+                &round(index, None, Some((0.0, 1.0)), Some(0.5)),
+                &[],
+            )
+            .unwrap();
+            assert_eq!(receipt.admission, CaoOcrcAdmissionV1::CapacityAdmitted);
+            assert!(engine.tracked_rounds.len() <= 3);
+        }
+        assert_eq!(engine.tracked_rounds.len(), 3);
+        assert!(full_tracking_proxy_survival_v1(2).iter().all(|value| *value == 1.0));
+    }
+
+    #[test]
+    fn tampering_with_prediction_interval_invalidates_delayed_feedback() {
+        let mut engine = engine(1, 2, vec![1.0, 1.0, 1.0]);
+        advance_ca_ocrc_round_v1(
+            &mut engine,
+            &round(1, None, Some((0.0, 1.0)), Some(0.5)),
+            &[],
+        )
+        .unwrap();
+        engine.round_ledger.get_mut(&1).unwrap().interval_upper = Some(2.0);
+        let receipt = advance_ca_ocrc_round_v1(
+            &mut engine,
+            &round(2, None, Some((0.0, 1.0)), Some(0.5)),
+            &[feedback(
+                1,
+                2,
+                2.0,
+                "label-tamper",
+                1,
+                LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            )],
+        )
+        .unwrap();
+        assert_eq!(
+            receipt.received_feedback_receipts[0].disposition,
+            CaoOcrcFeedbackDispositionV1::Rejected
+        );
+        assert_eq!(
+            receipt.received_feedback_receipts[0].reason,
+            Some(CaoOcrcFeedbackReasonV1::PredictionIntervalInvalid)
+        );
+        assert_eq!(engine.threshold, 0.5);
+        assert!(engine.tracked_rounds.contains_key(&1));
+    }
+
+    #[test]
+    fn mismatched_label_revision_and_payload_do_not_update_threshold() {
+        let mut engine = engine(1, 2, vec![1.0, 1.0, 1.0]);
+        advance_ca_ocrc_round_v1(
+            &mut engine,
+            &round(1, None, Some((0.0, 1.0)), Some(0.5)),
+            &[],
+        )
+        .unwrap();
+        let mut wrong = feedback(
+            1,
+            2,
+            2.0,
+            "label-wrong",
+            2,
+            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+        );
+        wrong.eligibility_report.label_revision = 1;
+        let mut canonical = wrong.eligibility_report.clone();
+        canonical.report_sha256.clear();
+        wrong.eligibility_report.report_sha256 = json_sha256(&canonical).unwrap();
+        wrong.label_payload_sha256 = digest('z');
+        let receipt = advance_ca_ocrc_round_v1(
+            &mut engine,
+            &round(2, None, Some((0.0, 1.0)), Some(0.5)),
+            &[wrong],
+        )
+        .unwrap();
+        assert_eq!(
+            receipt.received_feedback_receipts[0].disposition,
+            CaoOcrcFeedbackDispositionV1::Rejected
+        );
+        assert_eq!(engine.threshold, 0.5);
+    }
+
+    #[test]
+    fn malformed_non_monotone_or_zero_maximum_survival_is_rejected() {
+        assert!(engine(1, 2, vec![0.5, 0.8, 0.2]).tracked_rounds.is_empty());
+        assert!(create_ca_ocrc_engine_v1("bad", "clock", policy(1, 2, vec![1.0, 0.5, 0.0])).is_err());
+    }
+
+    #[test]
+    fn optimizer_survival_vector_tracks_maximum_delay_with_probability_p() {
+        let result = optimize_ca_ocrc_bernoulli_proxy_v1(2, 5, 1000, 1.0, 0.1).unwrap();
+        let survival = optimized_bernoulli_proxy_survival_v1(&result);
+        assert_eq!(survival.len(), 6);
+        assert!(survival.iter().all(|value| (*value - result.optimal_track_probability).abs() < f64::EPSILON));
+        assert!(result.expected_tracking_load <= 2.0);
     }
 
     #[test]
