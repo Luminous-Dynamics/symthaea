@@ -818,14 +818,13 @@ fn validate_proposal(
             "positive finite ROI area and acquisition duration are required",
         ));
     }
-    if action_kind == MycelialAcquisitionActionKind::HumanAnnotation {
-        if !proposal.photon_dose_estimates.is_empty()
-            || !proposal.required_illumination_channel_ids.is_empty()
-        {
-            return Err(MycelialSampleHealthBudgetError::InvalidProposal(
-                "human annotation must not carry optical exposure requirements",
-            ));
-        }
+    if action_kind == MycelialAcquisitionActionKind::HumanAnnotation
+        && (!proposal.photon_dose_estimates.is_empty()
+            || !proposal.required_illumination_channel_ids.is_empty())
+    {
+        return Err(MycelialSampleHealthBudgetError::InvalidProposal(
+            "human annotation must not carry optical exposure requirements",
+        ));
     }
     let mut previous_dose_channel: Option<&str> = None;
     for dose in &proposal.photon_dose_estimates {
@@ -1095,8 +1094,7 @@ fn evaluate_proposal(
     let mut reasons = Vec::new();
     let projected_duration = proposal
         .planned_start_offset_ns
-        .checked_add(proposal.duration_ns)
-        .unwrap_or(u64::MAX);
+        .saturating_add(proposal.duration_ns);
     let wait_before_action_ns = proposal
         .planned_start_offset_ns
         .saturating_sub(state.elapsed_session_duration_ns);
