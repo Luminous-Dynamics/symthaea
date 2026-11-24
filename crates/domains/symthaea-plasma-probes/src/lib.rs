@@ -1655,8 +1655,7 @@ pub fn decide_spectral_refinement(
         return Err(ContractError::InvalidRefinementMemoryBudget);
     }
 
-    let effective_memory_budget_bytes =
-        input.memory_budget_bytes - input.reserved_headroom_bytes;
+    let effective_memory_budget_bytes = input.memory_budget_bytes - input.reserved_headroom_bytes;
     let spectral_tail_ratio = input.spectral_tail_measure / input.spectral_tail_threshold;
     if !spectral_tail_ratio.is_finite() {
         return Err(ContractError::InvalidRefinementSignal);
@@ -3769,8 +3768,7 @@ mod tests {
 
     #[test]
     fn spectral_refinement_fixture_matches_all_six_known_answers() {
-        let fixture: serde_json::Value =
-            serde_json::from_str(REFINEMENT_POLICY_FIXTURE).unwrap();
+        let fixture: serde_json::Value = serde_json::from_str(REFINEMENT_POLICY_FIXTURE).unwrap();
         let thresholds = &fixture["thresholds"];
         let memory = &fixture["memory_policy"];
         let tail_threshold = thresholds["spectral_tail_threshold"].as_f64().unwrap();
@@ -3855,10 +3853,7 @@ mod tests {
     #[test]
     fn spectral_refinement_reports_unknown_when_memory_blocks_required_growth() {
         let report = decide_spectral_refinement(refinement_input(1.0, Some(2.0), 901)).unwrap();
-        assert_eq!(
-            report.decision,
-            SpectralRefinementDecision::BlockedByMemory
-        );
+        assert_eq!(report.decision, SpectralRefinementDecision::BlockedByMemory);
         assert_eq!(
             report.qualification,
             SpectralRefinementQualification::UnknownBlockedByMemory
@@ -3999,8 +3994,14 @@ mod tests {
             vec![-2.0, -1.0, 0.0, 1.0, 2.0],
         ];
         let scaled_constraints = vec![
-            base_constraints[0].iter().map(|value| value * 7.0).collect(),
-            base_constraints[1].iter().map(|value| value * -0.25).collect(),
+            base_constraints[0]
+                .iter()
+                .map(|value| value * 7.0)
+                .collect(),
+            base_constraints[1]
+                .iter()
+                .map(|value| value * -0.25)
+                .collect(),
         ];
         let base = project_weighted_micro_fluctuation(
             &values,
@@ -4033,13 +4034,8 @@ mod tests {
             vec![1.0, 1.0, 1.0, 1.0, 1.0],
             vec![-2.0, -1.0, 0.0, 1.0, 2.0],
         ];
-        let result = project_weighted_micro_fluctuation(
-            &values,
-            &constraints,
-            &weights,
-            1.0e-10,
-        )
-        .unwrap();
+        let result =
+            project_weighted_micro_fluctuation(&values, &constraints, &weights, 1.0e-10).unwrap();
         let correction: Vec<f64> = result
             .micro_fluctuation
             .iter()
@@ -4060,10 +4056,7 @@ mod tests {
     fn weighted_micro_projector_rejects_nearly_dependent_constraints() {
         let values = [1.0, -1.0, 2.0, 0.5];
         let weights = [1.0, 1.0, 1.0, 1.0];
-        let constraints = vec![
-            vec![1.0, 1.0, 1.0, 1.0],
-            vec![1.0, 1.0 + 1.0e-14, 1.0, 1.0],
-        ];
+        let constraints = vec![vec![1.0, 1.0, 1.0, 1.0], vec![1.0, 1.0 + 1.0e-14, 1.0, 1.0]];
         assert_eq!(
             project_weighted_micro_fluctuation(&values, &constraints, &weights, 1.0e-10),
             Err(ContractError::InvalidProjectionBasis)
