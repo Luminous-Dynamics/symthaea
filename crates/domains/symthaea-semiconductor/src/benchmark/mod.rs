@@ -149,3 +149,16 @@ pub use gated_streaming_adapter::{
     StreamingUpdateReceiptV1, create_gated_streaming_adapter_engine_v1,
     deliver_qualified_stream_label_v1, predict_and_register_stream_sample_v1,
 };
+
+pub use capacity_aware_ocrc::{
+    CA_OCRC_ENGINE_SCHEMA_V1, CA_OCRC_FEEDBACK_RECEIPT_SCHEMA_V1, CA_OCRC_FEEDBACK_SCHEMA_V1,
+    CA_OCRC_POLICY_SCHEMA_V1, CA_OCRC_ROUND_INPUT_SCHEMA_V1, CA_OCRC_ROUND_RECEIPT_SCHEMA_V1,
+    CaoOcrcAdmissionV1, CaoOcrcBernoulliOptimizerResultV1, CaoOcrcBoundRegimeV1,
+    CaoOcrcEngineV1, CaoOcrcErrorV1, CaoOcrcFeedbackDispositionV1, CaoOcrcFeedbackInputV1,
+    CaoOcrcFeedbackReasonV1, CaoOcrcFeedbackReceiptV1, CaoOcrcPolicyV1,
+    CaoOcrcRiskBoundV1, CaoOcrcRoundInputV1, CaoOcrcRoundReceiptV1,
+    CaoOcrcRoundRecordV1, CaoOcrcTrackedRoundV1, CaoOcrcTrivialSetV1,
+    advance_ca_ocrc_round_v1, compute_ca_ocrc_risk_bound_v1, create_ca_ocrc_engine_v1,
+    full_tracking_proxy_survival_v1, optimize_ca_ocrc_bernoulli_proxy_v1,
+    optimized_bernoulli_proxy_survival_v1,
+};
