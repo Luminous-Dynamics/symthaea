@@ -162,6 +162,18 @@ fn json_sha256<T: Serialize + ?Sized>(value: &T) -> Result<String, ContinuousMet
     Ok(sha256_hex(&bytes))
 }
 
+/// Computes the canonical digest for the complete frozen prediction frame.
+pub fn compute_continuous_audit_frame_sha256_v1(
+    frame_id: &str,
+    target_measurand_id: &str,
+    unit: &str,
+    predictions: &[ContinuousMetrologyPredictionV1],
+) -> Result<String, ContinuousMetrologyAuditErrorV1> {
+    let mut ordered = predictions.to_vec();
+    ordered.sort_by(|left, right| left.candidate_id.cmp(&right.candidate_id));
+    json_sha256(&(frame_id, target_measurand_id, unit, ordered.as_slice()))
+}
+
 fn selection_digest(
     selection: &MetrologyAuditSelectionReportV1,
 ) -> Result<String, ContinuousMetrologyAuditErrorV1> {
@@ -216,7 +228,7 @@ fn unknown_report(
         frame_id: input.frame_id.clone(),
         frame_sha256: input.frame_sha256.clone(),
         selection_sha256: input.selection.selection_sha256.clone(),
-        graph_sha256: input.graph.source_artifact_sha256.clone(),
+        graph_sha256: json_sha256(&input.graph)?,
         cutoff_id: input.cutoff.cutoff_id.clone(),
         target_measurand_id: input.target_measurand_id.clone(),
         unit: input.unit.clone(),
@@ -282,13 +294,12 @@ pub fn estimate_continuous_metrology_audit_v1(
     canonical
         .outcomes
         .sort_by(|left, right| left.candidate_id.cmp(&right.candidate_id));
-    let frame_material = (
-        input.frame_id.as_str(),
-        input.target_measurand_id.as_str(),
-        input.unit.as_str(),
+    if compute_continuous_audit_frame_sha256_v1(
+        &input.frame_id,
+        &input.target_measurand_id,
+        &input.unit,
         &canonical.predictions,
-    );
-    if json_sha256(&frame_material)? != input.frame_sha256 {
+    )? != input.frame_sha256 {
         return Err(ContinuousMetrologyAuditErrorV1(
             "population frame digest does not match the frozen candidate prediction frame".into(),
         ));
@@ -534,6 +545,10 @@ pub fn estimate_continuous_metrology_audit_v1(
                     || !valid_sha256(&report.qualification_report_sha256)
                     || !valid_sha256(&report.requalification_report_sha256)
                     || !valid_sha256(&report.requalification_frontier_sha256)
+                    || !valid_sha256(&report.measurement_sha256)
+                    || report.calibration_certificate_id.trim().is_empty()
+                    || report.training_snapshot_mutated
+                    || report.equipment_control_authority
                     || report.measurement_event_id != prediction.measurement_event_id
                 {
                     return Err(ContinuousMetrologyAuditErrorV1(format!(
@@ -887,7 +902,7 @@ mod tests {
                 unit: "nm".into(),
                 vm_prediction_value: 10.0,
                 predicted_absolute_error: 1.0 + 0.25 * index as f64,
-                prediction_receipt_sha256: digest(char::from(b'd' + (index % 20) as u8)),
+                prediction_receipt_sha256: digest(char::from(b'd' + (index % 3) as u8)),
             })
             .collect()
     }
@@ -1018,12 +1033,12 @@ mod tests {
         let selection = selection(full_census);
         let predictions = predictions();
         let frame_id = "film-thickness-frame-2026w47".to_string();
-        let frame_sha256 = json_sha256(&(
-            frame_id.as_str(),
+        let frame_sha256 = compute_continuous_audit_frame_sha256_v1(
+            &frame_id,
             "film-thickness",
             "nm",
             &predictions,
-        ))
+        )
         .unwrap();
         let selected_indices: Vec<usize> = selection
             .rows
@@ -1167,7 +1182,14 @@ mod tests {
     #[test]
     fn unit_mismatch_and_tampered_label_payload_reject() {
         let mut wrong_unit = input(false);
-        wrong_unit.unit = "angstrom".into();
+        wrong_unit.predictions[0].unit = "angstrom".into();
+        wrong_unit.frame_sha256 = compute_continuous_audit_frame_sha256_v1(
+            &wrong_unit.frame_id,
+            &wrong_unit.target_measurand_id,
+            &wrong_unit.unit,
+            &wrong_unit.predictions,
+        )
+        .unwrap();
         assert!(estimate_continuous_metrology_audit_v1(&wrong_unit).is_err());
 
         let mut tampered = input(false);
