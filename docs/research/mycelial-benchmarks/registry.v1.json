@@ -100,31 +100,71 @@
         "notes": "Paper states main-analysis and figure source data are on Figshare and analysis code is MIT. Record the data artifact's own license and any third-party restrictions per file before redistribution."
       },
       "ingestion_status": "metadata_only_not_ingested",
-      "published_sample_summary": "Study tracked more than 500,000 fungal nodes and linked approximately 100,000 bidirectional cytoplasmic-flow trajectories to growing network coordinates across three AM fungal strains.",
+      "published_sample_summary": "Three arbuscular-mycorrhizal fungal strains were studied: Rhizophagus irregularis A5 (DAOM664344), R. irregularis C2 (DAOM664346), and Rhizophagus aggregatum. A typical longitudinal network experiment acquired about 150 stitched-field images per replicate at 2-hour intervals in a split Petri plate that constrained the growing extraradical network to a 2D imaging plane. The paper reports tracking more than 500,000 fungal nodes across replicates (about 40,000 nodes per plate) and mapping approximately 100,000 bidirectional cytoplasmic-flow trajectories to coordinates in the evolving graph. The flow analysis used more than 1,600 high-magnification videos from 28 biological samples/plates, typically 20–25 frames/s for 20–60 s and 20–100 sampled positions per plate. The article reports rich within-hypha bidirectional and antiparallel streams, velocity variation across time/space, and direction switching. The paper provides source data for main analyses/figures at Figshare; the associated code README says the archive includes figure source data and a subsample of raw data to demonstrate the pipeline, not necessarily the full original microscopy/video acquisition archive.",
       "benchmark_tasks": [
-        "dynamic graph growth",
-        "trajectory-to-edge association",
-        "forward/reverse flow speed prediction",
-        "travelling-wave and growth-front prediction",
-        "temporal flow/topology coupling"
+        "longitudinal 2D network reconstruction",
+        "node identity tracking across timepoints",
+        "hyphal edge identity and temporal graph reconstruction",
+        "tip, branch, junction and anastomosis event detection",
+        "traveling-wave front position and speed prediction",
+        "spatial filament-density and growing-tip-density profile prediction",
+        "trajectory-to-edge and acquisition-coordinate registration",
+        "bidirectional cytoplasmic particle trajectory tracking",
+        "antiparallel stream detection within a single hypha",
+        "flow direction and velocity distribution prediction",
+        "flow direction-switch event detection",
+        "spatiotemporal flow/topology coupling",
+        "root-directed and global geometric efficiency",
+        "cost-efficiency position relative to minimum-spanning-tree and Delaunay-triangulation limits",
+        "robustness and route-shortcut changes after observed anastomosis",
+        "strain, host-status and treatment transfer where source metadata support a clean split"
       ],
-      "independent_unit": "Independent fungal network/plate and strain/experimental cohort; exact replicate map must be recovered from source files.",
+      "independent_unit": "Biological fungal network / split-Petri-plate replicate is the primary grouping unit. The >100,000 trajectories, image frames, tracked nodes, edges and sampled positions are nested measurements, not independent biological replicates. Strain is a separate transfer/domain axis: within-strain replicate-disjoint generalization and leave-one-strain-out transfer must be reported independently. Exact plate, strain, host status, treatment, timepoint and flow-video joins must be recovered from source metadata before splitting.",
       "split_requirements": [
-        "Keep all frames and trajectories from one network/plate in one split.",
-        "Hold out biological replicate and, separately, fungal strain for transfer tests.",
-        "Retain simultaneous antiparallel stream observations as separate directional series."
+        "Recover exact Figshare file, plate/network, biological replicate, strain, host status, treatment, timepoint, image and flow-video mappings before assigning splits.",
+        "Keep every timepoint, frame, node track, edge track, image crop, flow video and particle trajectory from one biological network/plate in one partition.",
+        "Use replicate/network-disjoint splits for within-strain generalization.",
+        "Report leave-one-strain-out transfer separately across R. irregularis A5, R. irregularis C2 and R. aggregatum; three strains are too few to claim broad cross-species generality.",
+        "Do not treat 100,000 trajectories or 500,000 nodes as the statistical sample size; uncertainty must cluster at the independent network/plate level.",
+        "Preserve the difference between 2D split-plate imaging geometry and 3D soil-network topology; no unqualified 3D ground truth claim.",
+        "Preserve trajectory direction, simultaneous antiparallel streams, track censoring and the 10-frame minimum trajectory rule used by the source pipeline; re-evaluate short-trajectory bias separately.",
+        "Separate source-data reproductions from any new test subset; do not use published figure-source data for both model tuning and final held-out scoring.",
+        "Freeze all preprocessing, segmentation, tracking and kymograph thresholds using training/development networks only."
       ],
       "known_limitations": [
-        "Plate-based network growth is constrained to 2D and is not full 3D soil-network truth.",
-        "Figure/source data are not automatically equivalent to all raw microscopy acquisitions.",
-        "No cross-split leakage from tracks, crops or frames from the same network."
+        "The extraradical network was constrained to a two-dimensional split-Petri-plate imaging plane; it is not complete three-dimensional soil-network ground truth.",
+        "The paper describes over 1,600 high-magnification flow videos from 28 biological samples/plates, with multiple positions and trajectories nested within each biological sample.",
+        "The high-magnification bright-field flow observations are label-free contrast-particle trajectories; they are not direct isotope delivery measurements or a complete mass-flux measurement.",
+        "The paper's flow analysis excludes tracks shorter than ten consecutive frames, creating a documented detection window and possible short-event selection bias that should be measured.",
+        "Manual review was used to validate detected kymograph trajectories; exact annotator-level agreement and full inter-rater reliability are not established by the paper alone.",
+        "The Figshare archive and code README distinguish source data for figure reproduction from a subsample of raw data that demonstrates the pipeline; do not assume the entire original microscope image/video archive is included.",
+        "The code repository is a frozen publication-reproducibility version and documents external setup dependencies (including Fiji for stitching and anisotropic filtering for the optimal skeleton segmentation path); a clean modern environment must be created for fair computational benchmarking.",
+        "The paper's graph efficiency comparison uses minimum-spanning-tree and Delaunay-triangulation limiting networks; it does not establish that either is a sufficient functional transport model.",
+        "Results from three AM fungal strains do not justify a species-general fungal growth or cytoplasmic-flow model."
       ],
       "source_manifest_requirements": [
-        "Figshare article version and file digests",
-        "Git commit/tag of analysis code",
-        "Network/plate/strain/timepoint mapping",
-        "Coordinate systems and trajectory-to-network registration",
-        "Per-file data license"
+        "Article DOI and version: 10.1038/s41586-025-08614-x",
+        "Figshare article version, file manifest, per-file SHA-256/BLAKE3 and per-file data license",
+        "Exact frozen AMFTravellingWave Git commit and MIT license copy",
+        "Plate/network/biological replicate/strain/host-status/treatment/timepoint map",
+        "2-hour imaging schedule, image stitching transforms, pixel size and coordinate frame",
+        "Per-video acquisition coordinates, objective magnification, frame rate, duration and ROI-to-network registration",
+        "Raw/processed kymograph provenance, KymoButler version/checkpoint and trajectory filtering thresholds",
+        "Manual flow-review and trajectory adjudication protocol",
+        "Network edge/node identity tracking and graph extraction parameter history",
+        "Clear distinction between data needed for figure reproduction and any subset of raw demonstration data"
+      ],
+      "published_dataset_url": "https://doi.org/10.6084/m9.figshare.27889143",
+      "recommended_baselines": [
+        "Frozen AMFTravellingWave / AMFTrack published pipeline and figure-source outputs",
+        "Persistence of previous graph and previous flow velocity",
+        "Local geometry/distance-to-root regression",
+        "Morphology-only growth-front and tip-density model",
+        "Topology-only shortest-path / centrality model",
+        "BARE travelling-wave model used/extended in the source paper",
+        "Minimum-spanning-tree and Delaunay-triangulation limiting graph references",
+        "Independent flow-speed distribution and directional histogram baselines",
+        "Shuffled trajectory-to-edge registration and reversed-time negative controls"
       ]
     },
     {
