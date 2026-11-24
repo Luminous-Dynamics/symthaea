@@ -2,6 +2,7 @@
 
 pub mod binary_metrics;
 pub mod calibration_requalification;
+pub mod capacity_aware_ocrcc;
 pub mod delayed_aci;
 pub mod dtco_manifest;
 pub mod label_consumption_guard;
@@ -150,4 +151,16 @@ pub use delayed_aci::{
     close_delayed_aci_stream_v1, create_delayed_aci_engine_v1, delay_to_memory_ratio_v1,
     delayed_aci_finite_horizon_miscoverage_bound_v1, deliver_delayed_aci_label_v1,
     issue_delayed_aci_prediction_v1, resolve_degenerate_aci_interval_v1,
+};
+
+pub use capacity_aware_ocrcc::{
+    CA_OCRC_DELIVERY_SCHEMA_V1, CA_OCRC_POLICY_SCHEMA_V1, CA_OCRC_ROUND_INPUT_SCHEMA_V1,
+    CA_OCRC_ROUND_RECEIPT_SCHEMA_V1, CA_OCRC_SCHEMA_V1, CaOcrcAdmissionV1,
+    CaOcrcEngineV1, CaOcrcErrorV1, CaOcrcFeedbackDispositionV1, CaOcrcFeedbackReasonV1,
+    CaOcrcGuaranteeStateV1, CaOcrcLabelDeliveryV1, CaOcrcPolicyV1,
+    CaOcrcPredictionReceiptV1, CaOcrcProxyDelayDistributionV1, CaOcrcRoundInputV1,
+    CaOcrcRoundReceiptV1, CaOcrcSetKindV1,
+    arbitrary_delay_ca_ocrc_risk_bound_v1, bernoulli_proxy_distribution_v1,
+    create_ca_ocrc_engine_v1, optimal_arbitrary_proxy_survival_v1,
+    process_ca_ocrc_round_v1, proxy_survival_probability_v1, proxy_tracking_load_v1,
 };
