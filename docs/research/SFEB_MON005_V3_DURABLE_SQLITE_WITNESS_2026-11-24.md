@@ -88,3 +88,19 @@ DBOS Go's RunAsTransaction is the fair same-database atomic workflow baseline; D
 - DBOS Go transaction tutorial: https://docs.dbos.dev/golang/tutorials/transaction-tutorial
 - DBOS Rust step tutorial: https://docs.dbos.dev/rust/tutorials/step-tutorial
 - Temporal event history: https://docs.temporal.io/encyclopedia/event-history
+
+
+## Native-baseline coverage follow-up
+
+A current DBOS Java documentation check identifies **transactional step factories**: the application database work and step output are committed within the same transaction, so recovery can return the recorded output instead of re-executing the database write. This is a stronger database-side-effect baseline than a regular at-least-once step and must be measured separately where the Java runtime is in scope.
+
+The matched benchmark matrix should therefore identify runtime-specific DBOS arms explicitly:
+
+- DBOS Go datasource RunAsTransaction (same-datasource app writes + DBOS durability row).
+- DBOS Java transactional step factory (application DB transaction + step output checkpoint).
+- DBOS Rust regular steps (at-least-once; no transactional Rust step documented in its tutorial).
+- Temporal native event-history/activity arm.
+
+For each native transaction capability, include a paired SFEB-augmented arm using the identical external idempotent sink, stable operation identity, fault trace and readback contract. SFEB's differentiator remains independently verifiable source/authority/external-effect evidence, not duplicating the database transaction guarantee.
+
+DBOS Java transactional step factory documentation: https://docs.dbos.dev/java/tutorials/step-factory-tutorial
