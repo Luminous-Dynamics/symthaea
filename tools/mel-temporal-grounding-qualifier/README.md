@@ -51,3 +51,16 @@ The matched-evidence API returns per-experiment-unit paired contrasts. For infer
 A computable interval is not automatically confirmatory. The report exposes a proposed 30-source-work floor and separate booleans for ordinary and one-to-many cohorts. The floor is a minimum reporting warning, not a substitute for preregistered power analysis; a credible study may need more clusters. Do not treat two synthetic source works as evidence of model improvement.
 
 V2 runtime identity, decoding-configuration, output-token budget, actual token use and wall-time fields are included in reports and matched-arm checks. They remain self-reported unless bound to an independently authenticated execution receipt.
+
+
+## Declared-action vs observed-edit consistency
+
+V2 reports an observed edit class and a scorer-derived edit delta (predicted-count, TP/FP/FN and start/end boundary MAE changes). For declared actions other than Other, it checks the action against that observed delta:
+
+- AddOccurrence / SplitMergedOccurrence must increase predicted count and true positives.
+- RemoveOccurrence / MergeDuplicateOccurrence must decrease predicted count and false positives without reducing true positives.
+- AdjustStartBoundary / AdjustEndBoundary must preserve predicted count and improve the corresponding matched-boundary MAE.
+- NoChange requires identical raw prediction objects.
+- Other remains unclassified rather than being treated as verified.
+
+These checks reuse the production scorer's existing matches and TP/FP/FN; they do not introduce a second interval matcher. They assess whether the declared action is consistent with the observed change, not whether the model's internal reasoning was authentic or whether the named sub-action (for example, split vs add) is causally correct.
