@@ -51,7 +51,7 @@ The new `src/sequential.rs` module adds a finite-horizon, prior-free policy-tree
 - Component-wise integer resource budgets and explicit result deadlines.
 - A bounded backward dynamic programme and a separately written exhaustive policy-tree enumerator.
 - Explicit terminal decisions and a root risk-gate status; no implicit abstain action or execution authorization.
-- A 16-state non-myopic branch-unlock fixture in the linked research PR.
+- A 16-state non-myopic branch-unlock fixture and formal policy contract in [PR #13569](https://github.com/Luminous-Dynamics/symthaea/pull/13569). The Rust implementation is tracked in [PR #13571](https://github.com/Luminous-Dynamics/symthaea/pull/13571).
 
 **Qualification status: uncompiled / untested.** Eight Rust test functions have been authored, including dynamic-programme versus exhaustive-enumerator comparison, nuisance dead-end handling, overlapping supports, deadline rejection and component-wise budget enforcement. No Rust formatter, compiler, test runner or strict Clippy result has yet been obtained for this module. Do not use it as a qualified evaluator until exact-head Rust 1.96 formatting, compilation, tests and strict Clippy pass.
 
