@@ -1070,12 +1070,12 @@ mod tests {
         let report = deliver_qualified_stream_label_v1(
             &mut engine,
             &delivery(
-            ("sample-1", "event-1", "label-1"),
-            1,
-            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
-            LabelEvidenceFrontierV1::CurrentAtK1,
-            (102, 102),
-        ),
+                ("sample-1", "event-1", "label-1"),
+                1,
+                LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+                LabelEvidenceFrontierV1::CurrentAtK1,
+                (102, 102),
+            ),
         )
         .unwrap();
 
@@ -1385,12 +1385,12 @@ mod tests {
             deliver_qualified_stream_label_v1(
                 &mut engine,
                 &delivery(
-            ("sample-1", "event-1", "label-1"),
-            1,
-            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
-            LabelEvidenceFrontierV1::CurrentAtK1,
-            (110, 112),
-        ),
+                    ("sample-1", "event-1", "label-1"),
+                    1,
+                    LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+                    LabelEvidenceFrontierV1::CurrentAtK1,
+                    (110, 112),
+                ),
             )
             .is_err()
         );
