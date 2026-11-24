@@ -190,6 +190,7 @@ jobs:
             and .evaluator_only.global_use_adjudication.target_warrant_id == .candidate.global_stage.scope_binding.warrant_id
             and .evaluator_only.global_use_adjudication.reviewed_entire_plan == true
             and (.evaluator_only.global_use_adjudication.node_evidence | length) == 1
+            and .evaluator_only.global_use_adjudication.node_evidence[0].mention_id == "MENTION-W-P-TO-Q-001"
             and .evaluator_only.global_use_adjudication.node_evidence[0].relation == "uses_as_rule"
             and .evaluator_only.global_use_adjudication.node_evidence[0].material_use == true
             and (.evaluator_only.global_use_adjudication as $g | ($g.evidence_refs | index($g.node_evidence[0].rationale_ref)) != null)
@@ -216,6 +217,12 @@ jobs:
             and ([.pairs[] | select(.evaluator_only.transformation_class == "proof_route_only" and .evaluator_only.oracle_relation == "equivalent" and .candidate.base.sequent_sha256 == .candidate.variant.sequent_sha256)] | length) == 1' \
             docs/research/MATH_METAMORPHIC_PAIR_V1.json >/dev/null
           echo "MATH_METAMORPHIC_FIXTURE_ASSERTIONS_PASS"
+
+          jq -e '."$schema" == "https://json-schema.org/draft/2020-12/schema"
+            and getpath(["$defs","evaluator","required"]) | index("global_use_adjudication") != null
+            and getpath(["$defs","globalUseNodeEvidence","required"]) | index("mention_id") != null' \
+            docs/research/LOCAL_GLOBAL_PAIR_V1.schema.json >/dev/null
+          echo "LOCAL_GLOBAL_USE_SCHEMA_PASS"
 
           jq -e '."$schema" == "https://json-schema.org/draft/2020-12/schema" and getpath(["$defs","evaluator","properties","oracle_relation","enum"]) == ["equivalent","base_entails_variant","variant_entails_base","incomparable","unknown"]' \
             docs/research/MATH_METAMORPHIC_PAIR_V1.schema.json >/dev/null
