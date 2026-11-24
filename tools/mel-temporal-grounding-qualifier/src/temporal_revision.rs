@@ -661,6 +661,7 @@ pub fn audit_revision(case: &RevisionCaseV1) -> Result<RevisionReportV1, String>
         return Err(format!("unsupported temporal revision schema: {}", case.schema));
     }
     require_text(&case.case_id, "case_id")?;
+    require_text(&case.experiment_unit_id, "experiment_unit_id")?;
     validate_digest(&case.model_identity_sha256, "model_identity_sha256")?;
     validate_digest(&case.prompt_sha256, "prompt_sha256")?;
     validate_digest(&case.adapter_sha256, "adapter_sha256")?;
@@ -1350,7 +1351,7 @@ mod tests {
                 .as_ref()
                 .unwrap()
                 .estimate,
-            1.0
+            0.5
         );
     }
 
@@ -1374,11 +1375,11 @@ mod tests {
         assert_eq!(contrast.local_minus_yoked_f1, Some(0.5));
         assert_eq!(
             contrast.local_minus_no_evidence_count_gated_f1,
-            Some(1.0)
+            Some(0.5)
         );
         assert_eq!(
             contrast.local_minus_yoked_count_gated_f1,
-            Some(1.0)
+            Some(0.5)
         );
         assert_eq!(contrast.local_beats_yoked, Some(true));
         assert_eq!(contrast.local_output_tokens, 128);
@@ -1416,10 +1417,24 @@ mod tests {
         let report = audit_revision_v2(&case).unwrap();
         assert_eq!(report.draft.f1, Some(0.5));
         assert_eq!(report.final_score.f1, Some(1.0));
+        assert_eq!(report.draft.count_gated_f1, Some(0.5));
+        assert_eq!(report.final_score.count_gated_f1, Some(1.0));
+        assert_eq!(report.count_gated_f1_delta, Some(0.5));
+        assert_eq!(report.helpful_revision, Some(true));
+    }
+
+    #[test]
+    fn v2_wrong_predicted_occurrence_count_is_gated_to_zero() {
+        let case = revision_case_v2(
+            vec![interval(100, 200), interval(500, 600)],
+            vec![interval(100, 200)],
+            vec![interval(100, 200), interval(500, 600)],
+        );
+        let report = audit_revision_v2(&case).unwrap();
+        assert_eq!(report.draft.f1, Some(2.0 / 3.0));
         assert_eq!(report.draft.count_gated_f1, Some(0.0));
         assert_eq!(report.final_score.count_gated_f1, Some(1.0));
         assert_eq!(report.count_gated_f1_delta, Some(1.0));
-        assert_eq!(report.helpful_revision, Some(true));
     }
 
     #[test]
@@ -1477,11 +1492,11 @@ mod tests {
             source_sample_rate_hz: 48_000,
             evidence_payload_sha256: EVIDENCE.into(),
             retrieval_config_sha256: RETRIEVAL.into(),
-            start_frame: 47_000,
-            end_frame: 49_000,
+            start_frame: 2_879_900,
+            end_frame: 2_880_100,
         });
         assert!(audit_revision_v2(&case).is_err());
-        case.evidence.as_mut().unwrap().end_frame = 48_000;
+        case.evidence.as_mut().unwrap().end_frame = 2_880_000;
         assert!(audit_revision_v2(&case).is_ok());
     }
 
@@ -1533,9 +1548,9 @@ mod tests {
         assert_eq!(report.f1_delta, Some(0.5));
         assert_eq!(report.helpful_revision, Some(true));
         assert_eq!(report.harmful_revision, Some(false));
-        assert_eq!(report.draft.count_gated_f1, Some(0.0));
+        assert_eq!(report.draft.count_gated_f1, Some(0.5));
         assert_eq!(report.final_score.count_gated_f1, Some(1.0));
-        assert_eq!(report.count_gated_f1_delta, Some(1.0));
+        assert_eq!(report.count_gated_f1_delta, Some(0.5));
     }
 
     #[test]
