@@ -413,6 +413,41 @@ class MaceLongMemEvalV2IngressTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "orphan or unreferenced"):
                 memory._verify_persisted_candidate_evidence()
 
+    def test_candidates_returned_is_an_acquisition_status_not_sufficiency(self) -> None:
+        trace = {
+            "schema_version": "mace_retrieval_trace_receipt_v1",
+            "run_id": "run-acquisition",
+            "query_invocation_id": "opaque-acquisition-1",
+            "domain_id": "web",
+            "environment_revision_sha256": "e" * 64,
+            "tool_profile_sha256": "b" * 64,
+            "query_sha256": "f" * 64,
+            "candidate_set_sha256": "a" * 64,
+            "operations": [{
+                "tool_id": "trajectory.bm25.search",
+                "tool_revision_sha256": "b" * 64,
+                "action_template_sha256": "c" * 64,
+                "observed_evidence_ids": ["source:evidence-1"],
+                "outcome": "evidence_observed",
+                "elapsed_ns": 17,
+                "inspected_bytes": 0,
+                "inspected_bytes_measured": False,
+            }],
+            "stop_reason": "candidates_returned",
+            "tool_call_budget": 1,
+            "tool_calls_used": 1,
+            "elapsed_ns": 17,
+            "inspected_bytes": 0,
+            "inspected_bytes_complete": False,
+            "created_at_unix": 100,
+        }
+        acquisition_digest = MaceLongMemEvalV2Memory._retrieval_trace_digest_from_json(trace)
+        legacy_trace = dict(trace, stop_reason="evidence_sufficient")
+        legacy_digest = MaceLongMemEvalV2Memory._retrieval_trace_digest_from_json(legacy_trace)
+        self.assertEqual(len(acquisition_digest), 64)
+        self.assertEqual(len(legacy_digest), 64)
+        self.assertNotEqual(acquisition_digest, legacy_digest)
+
     def test_retrieval_trace_is_independently_verified_and_persisted(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
