@@ -113,7 +113,8 @@
               "SpectralTail",
               "FutureResponse",
               "Both",
-              "ResponseUnknown"
+              "ResponseUnknown",
+              "SpectralTailAndResponseUnknown"
             ]
           },
           "expected_qualification": {
