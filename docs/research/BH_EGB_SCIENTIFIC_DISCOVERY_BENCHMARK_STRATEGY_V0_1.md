@@ -159,7 +159,17 @@ https://doi.org/10.1103/jrnh-wsxw
 
 ### Track A — Stage A research-action allocation
 
-Use the blind episode protocol and existing owners (#8721, #11171, #11060, #5476, #5478). Compare the same model/backbone and inclusive budgets:
+Use the blind episode protocol and existing owners (#8721, #11171, #11060, #5476, #5478). An exact finite-world control is now authored at [BH_EGB_STAGE_A_ACTION_ALLOCATION_CONTROL_V0_1.json](BH_EGB_STAGE_A_ACTION_ALLOCATION_CONTROL_V0_1.json), with its [method and known answers](BH_EGB_STAGE_A_ACTION_ALLOCATION_CONTROL_V0_1.md). It contains:
+
+- a cheap symbolic derivation that identifies which of two states is true and changes the optimal decision (gross EVSI 0.50, cost 0.10, net +0.40);
+- a degenerate-parameter BVP and a precision refinement that do not distinguish the states (zero EVSI, negative net value);
+- a perfectly discriminating but uneconomic BVP (gross 0.50, cost 0.70, net -0.20);
+- a high-net-value action that must still be vetoed because worst-case loss 0.80 breaches the frozen 0.40 risk limit;
+- a perfect diagnostic that gains one bit of information but cannot change the optimal downstream decision (EVSI 0, net -0.04).
+
+The fixture uses explicit finite-world priors and deterministic likelihoods to make the expected values exactly checkable. It is a synthetic policy control, not an EGB prior, real action-cost estimate, or calibrated Symthaea VoC forecast. Use it to test the decision-value contract before attempting to calibrate the live predictor.
+
+Compare the same model/backbone and inclusive budgets:
 
 1. no optional tool;
 2. fixed schedule;
