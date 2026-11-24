@@ -376,3 +376,5 @@ The initial seed is source-pinned to Lean 4 core and is explicitly not expert-re
 - [Mathematical invariance and intervention-sensitivity benchmark](MATH_METAMORPHIC_V1.md) — paired metamorphic tests for harmless reformulations, semantics-changing mutations, proof-route-only changes and unknown cases; tracked by issue [#13547](https://github.com/Luminous-Dynamics/symthaea/issues/13547).
 
 - [Minimum sufficient mathematical explanation protocol](MATH_MIN_SUFFICIENT_EXPLANATION_V1.md) — optimizes explanation cost under hard theorem/assumption/side-condition fidelity and measured human transfer constraints; tracked by issue [#13548](https://github.com/Luminous-Dynamics/symthaea/issues/13548).
+
+- [Metamorphic pair schema](MATH_METAMORPHIC_PAIR_V1.schema.json) and [finite fixtures](MATH_METAMORPHIC_PAIR_V1.json) — exact typed sequent digests and finite truth-table controls for equivalent rewrites, changed hypotheses and proof-route-only changes; executable Rust validator and `math-metamorphic` CLI; issue [#13547](https://github.com/Luminous-Dynamics/symthaea/issues/13547).
