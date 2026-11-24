@@ -388,20 +388,51 @@ pub fn estimate_continuous_metrology_audit_v1(
                 row.candidate_id
             )));
         }
+        let method_consistent = match &row.method {
+            MetrologySelectionMethodV1::DeterministicExploit => {
+                row.selected && (row.inclusion_probability - 1.0).abs() <= 1.0e-12
+            }
+            MetrologySelectionMethodV1::RandomizedAudit => row.selected,
+            MetrologySelectionMethodV1::NotSelected => !row.selected,
+        };
         if !row.inclusion_probability.is_finite()
             || row.inclusion_probability <= 0.0
             || row.inclusion_probability > 1.0
-            || matches!(
-                &row.method,
-                MetrologySelectionMethodV1::DeterministicExploit
-            ) != (row.inclusion_probability == 1.0)
-            || matches!(&row.method, MetrologySelectionMethodV1::NotSelected) == row.selected
-            || matches!(&row.method, MetrologySelectionMethodV1::RandomizedAudit) != row.selected
+            || !method_consistent
         {
             return Err(ContinuousMetrologyAuditErrorV1(format!(
-                "candidate {} lacks positive known inclusion probability",
+                "candidate {} has invalid selection disposition or inclusion probability",
                 row.candidate_id
             )));
+        }
+    }
+
+    let mut design_by_stratum: BTreeMap<&str, (usize, usize)> = BTreeMap::new();
+    for row in &input.selection.rows {
+        if row.method != MetrologySelectionMethodV1::DeterministicExploit {
+            let counts = design_by_stratum.entry(row.stratum_id.as_str()).or_default();
+            counts.0 += 1;
+            if row.method == MetrologySelectionMethodV1::RandomizedAudit {
+                counts.1 += 1;
+            }
+        }
+    }
+    for (stratum_id, (residual_count, audit_count)) in design_by_stratum {
+        if audit_count == 0 || audit_count > residual_count {
+            return Err(ContinuousMetrologyAuditErrorV1(format!(
+                "stratum {stratum_id} lacks positive randomized audit support"
+            )));
+        }
+        let expected_probability = audit_count as f64 / residual_count as f64;
+        for row in input.selection.rows.iter().filter(|row| {
+            row.stratum_id == stratum_id
+                && row.method != MetrologySelectionMethodV1::DeterministicExploit
+        }) {
+            if (row.inclusion_probability - expected_probability).abs() > 1.0e-12 {
+                return Err(ContinuousMetrologyAuditErrorV1(format!(
+                    "stratum {stratum_id} row propensity disagrees with the logged SRSWOR design"
+                )));
+            }
         }
     }
 
