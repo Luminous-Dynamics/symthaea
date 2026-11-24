@@ -11,8 +11,7 @@ use symthaea_semiconductor::benchmark::{
     MetrologyCandidateV1, MetrologyDecisionActionV1, MetrologyDecisionLossInputV1,
     MetrologyDecisionLossModelV1, MetrologyDecisionLossPolicyV1, MetrologyDecisionStateV1,
     MetrologyReadinessEvidenceV1, MetrologyReadinessStatusV1,
-    compute_expected_value_of_sample_information_v1,
-    optimize_metrology_decision_loss_portfolio_v1,
+    compute_expected_value_of_sample_information_v1, optimize_metrology_decision_loss_portfolio_v1,
 };
 
 fn hash_json<T: Serialize>(value: &T) -> String {
@@ -200,12 +199,16 @@ fn independent_portfolio_oracle(
     let mut ordered = candidates.to_vec();
     ordered.sort_by(|left, right| left.candidate_id.cmp(&right.candidate_id));
 
-    let nets: Vec<f64> = ordered.iter().map(|candidate| {
-        let (before, after) = reference_evsi(&candidate.decision_loss_model);
-        before - after
-            - candidate.measurement_cost
-            - policy.delay_cost_per_second * candidate.turnaround_seconds as f64
-    }).collect();
+    let nets: Vec<f64> = ordered
+        .iter()
+        .map(|candidate| {
+            let (before, after) = reference_evsi(&candidate.decision_loss_model);
+            before
+                - after
+                - candidate.measurement_cost
+                - policy.delay_cost_per_second * candidate.turnaround_seconds as f64
+        })
+        .collect();
 
     let mut best_ids = Vec::new();
     let mut best_value = f64::NEG_INFINITY;
@@ -240,9 +243,12 @@ fn independent_portfolio_oracle(
             *groups.entry(candidate.group_key.clone()).or_default() += 1;
         }
 
-        if !feasible || policy.minimum_group_coverage.iter().any(|(group, minimum)| {
-            groups.get(group).copied().unwrap_or(0) < *minimum
-        }) {
+        if !feasible
+            || policy
+                .minimum_group_coverage
+                .iter()
+                .any(|(group, minimum)| groups.get(group).copied().unwrap_or(0) < *minimum)
+        {
             continue;
         }
 
@@ -258,7 +264,10 @@ fn independent_portfolio_oracle(
         }
     }
 
-    assert!(found, "oracle fixture must have at least one feasible portfolio");
+    assert!(
+        found,
+        "oracle fixture must have at least one feasible portfolio"
+    );
     (best_ids, best_value, best_cost, best_groups)
 }
 
@@ -276,10 +285,7 @@ fn exact_portfolio_optimizer_matches_independent_exhaustive_subset_oracle() {
         revision: 1,
         measurement_budget_units: 3,
         delay_cost_per_second: 0.01,
-        minimum_group_coverage: BTreeMap::from([
-            ("chamber-1".into(), 1),
-            ("chamber-2".into(), 1),
-        ]),
+        minimum_group_coverage: BTreeMap::from([("chamber-1".into(), 1), ("chamber-2".into(), 1)]),
         maximum_exact_candidates: 20,
     };
     let input = MetrologyDecisionLossInputV1 {
