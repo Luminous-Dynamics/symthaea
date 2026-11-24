@@ -85,7 +85,9 @@ pub enum ContractError {
     MissingResponseEntry,
     #[error("response reference matrix has zero norm")]
     ZeroResponseReferenceNorm,
-    #[error("response signature requires non-empty contract, structure, intervention and QoI identities")]
+    #[error(
+        "response signature requires non-empty contract, structure, intervention and QoI identities"
+    )]
     InvalidResponseSignatureIdentity,
     #[error("response signature contains duplicate intervention or QoI identities")]
     DuplicateResponseSignatureAxis,
@@ -1034,9 +1036,7 @@ impl KineticResponseSignature {
         if has_duplicate_strings(&intervention_ids) || has_duplicate_strings(&qoi_ids) {
             return Err(ContractError::DuplicateResponseSignatureAxis);
         }
-        if time_samples
-            .iter()
-            .any(|time| !time.is_finite())
+        if time_samples.iter().any(|time| !time.is_finite())
             || time_samples.windows(2).any(|window| window[1] <= window[0])
         {
             return Err(ContractError::InvalidResponseSignatureTimes);
@@ -1135,8 +1135,8 @@ impl KineticResponseSignature {
         } else {
             0.0
         };
-        let normalized_response_distance = (measured_entry_count > 0)
-            .then_some(rms_response_error / normalization_scale);
+        let normalized_response_distance =
+            (measured_entry_count > 0).then_some(rms_response_error / normalization_scale);
         if normalized_response_distance.is_some_and(|distance| !distance.is_finite()) {
             return Err(ContractError::InvalidGramianArithmetic);
         }
@@ -4867,18 +4867,17 @@ mod tests {
                 Some(ComplexResponse::new(value, 0.0).unwrap()),
                 Some(ComplexResponse::new(value, 0.0).unwrap()),
             ],
-            vec![
-                branch_id.map(str::to_owned),
-                branch_id.map(str::to_owned),
-            ],
+            vec![branch_id.map(str::to_owned), branch_id.map(str::to_owned)],
         )
         .unwrap()
     }
 
     #[test]
     fn kinetic_response_signature_comparison_is_symmetric_with_fixed_contract_scale() {
-        let left = make_kinetic_response_signature(1.0, "contract-a", "hamiltonian-class-a", Some("echo"));
-        let right = make_kinetic_response_signature(1.5, "contract-a", "hamiltonian-class-a", Some("echo"));
+        let left =
+            make_kinetic_response_signature(1.0, "contract-a", "hamiltonian-class-a", Some("echo"));
+        let right =
+            make_kinetic_response_signature(1.5, "contract-a", "hamiltonian-class-a", Some("echo"));
         let forward = left.compare(&right, 1.0).unwrap();
         let reverse = right.compare(&left, 1.0).unwrap();
         assert_eq!(forward.normalized_response_distance, Some(0.5));
@@ -4891,8 +4890,12 @@ mod tests {
 
     #[test]
     fn kinetic_response_signature_has_a_reproducible_json_receipt() {
-        let signature =
-            make_kinetic_response_signature(0.25, "contract-v1", "structure-class-v1", Some("echo"));
+        let signature = make_kinetic_response_signature(
+            0.25,
+            "contract-v1",
+            "structure-class-v1",
+            Some("echo"),
+        );
         let value = serde_json::to_value(&signature).unwrap();
         assert_eq!(value["contract_id"], "contract-v1");
         assert_eq!(value["structure_class_id"], "structure-class-v1");
@@ -4951,11 +4954,20 @@ mod tests {
 
     #[test]
     fn kinetic_response_signature_keeps_structure_and_branch_identity_as_separate_gates() {
-        let base = make_kinetic_response_signature(1.0, "contract-a", "hamiltonian-class-a", Some("echo"));
-        let other_structure =
-            make_kinetic_response_signature(1.0, "contract-a", "different-structure-class", Some("echo"));
-        let other_branch =
-            make_kinetic_response_signature(1.0, "contract-a", "hamiltonian-class-a", Some("trapped"));
+        let base =
+            make_kinetic_response_signature(1.0, "contract-a", "hamiltonian-class-a", Some("echo"));
+        let other_structure = make_kinetic_response_signature(
+            1.0,
+            "contract-a",
+            "different-structure-class",
+            Some("echo"),
+        );
+        let other_branch = make_kinetic_response_signature(
+            1.0,
+            "contract-a",
+            "hamiltonian-class-a",
+            Some("trapped"),
+        );
         let structure_comparison = base.compare(&other_structure, 1.0).unwrap();
         let branch_comparison = base.compare(&other_branch, 1.0).unwrap();
         assert!(!structure_comparison.structure_class_compatible);
@@ -4967,7 +4979,8 @@ mod tests {
     #[test]
     fn approximate_pairwise_response_compatibility_is_not_transitive() {
         let state_a = make_kinetic_response_signature(0.0, "contract-a", "class-a", Some("branch"));
-        let state_b = make_kinetic_response_signature(0.75, "contract-a", "class-a", Some("branch"));
+        let state_b =
+            make_kinetic_response_signature(0.75, "contract-a", "class-a", Some("branch"));
         let state_c = make_kinetic_response_signature(1.5, "contract-a", "class-a", Some("branch"));
         let ab = state_a.compare(&state_b, 1.0).unwrap();
         let bc = state_b.compare(&state_c, 1.0).unwrap();
@@ -4995,8 +5008,7 @@ mod tests {
             .unwrap_err(),
             ContractError::InvalidResponseSignatureTimes
         );
-        let signature =
-            make_kinetic_response_signature(1.0, "contract", "class", Some("branch"));
+        let signature = make_kinetic_response_signature(1.0, "contract", "class", Some("branch"));
         assert_eq!(
             signature.compare(&signature, 0.0),
             Err(ContractError::InvalidResponseSignatureScale)
