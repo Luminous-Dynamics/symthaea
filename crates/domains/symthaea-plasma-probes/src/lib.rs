@@ -23,6 +23,8 @@ const APPLICATION_SEMANTICS: &str = "instantaneous_canonical_velocity_kick";
 const TAU: f64 = std::f64::consts::TAU;
 const PI: f64 = std::f64::consts::PI;
 const MAX_PERIODIC_LIFT_HARMONICS: usize = 4_096;
+const MAX_MEASURE_PARTICLES: usize = 1_000_000;
+const MAX_FOURIER_MEASURE_WORK: usize = 16_777_216;
 const DIGEST_DOMAIN: &[u8] = b"symthaea.akpd.pulse-candidate.v0.1\0";
 
 /// Errors returned while parsing, validating or enumerating probe contracts.
@@ -101,6 +103,12 @@ pub enum ContractError {
     InvalidHarmonicBudget,
     #[error("open-boundary coordinate must lie in [0, 1]")]
     InvalidOpenBoundaryCoordinate,
+    #[error("particle position and weight arrays must be non-empty and have equal lengths")]
+    InvalidParticleMeasureShape,
+    #[error("particle measure weights must be finite, non-negative and have positive total mass")]
+    InvalidParticleMeasureWeights,
+    #[error("particle measure sample exceeds the bounded work budget")]
+    ParticleMeasureWorkBudgetExceeded,
     #[error("spectral refinement signal or threshold is invalid")]
     InvalidRefinementSignal,
     #[error("memory budget is smaller than the reserved headroom")]
@@ -1484,6 +1492,119 @@ fn linspace(minimum: f64, maximum: f64, steps: usize) -> Result<Vec<f64>, Contra
         values.push(canonical_zero(value));
     }
     Ok(values)
+}
+
+/// Low-order Fourier moments of a weighted empirical particle measure on a torus.
+///
+/// For modes k=1..K this computes
+/// \`m_k = sum_i (w_i / sum_j w_j) exp(i 2*pi*k*x_i)\`.
+/// It is invariant to particle ordering and exact co-located particle split/merge
+/// in the represented empirical measure. A finite K is only a band-limited
+/// observable embedding; it is not a unique reconstruction of an arbitrary
+/// continuous or discrete measure.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct WeightedFourierMeasureEmbedding {
+    max_harmonic: usize,
+}
+
+impl WeightedFourierMeasureEmbedding {
+    /// Construct a bounded Fourier-moment embedding.
+    pub fn new(max_harmonic: usize) -> Result<Self, ContractError> {
+        if max_harmonic == 0 || max_harmonic > MAX_PERIODIC_LIFT_HARMONICS {
+            return Err(ContractError::InvalidHarmonicBudget);
+        }
+        Ok(Self { max_harmonic })
+    }
+
+    /// Compute normalized complex Fourier moments for a weighted particle sample.
+    ///
+    /// Coordinates are wrapped modulo one. Weights are normalized using a
+    /// max-scaled sum to avoid overflowing when all finite weights are large.
+    /// The operation budget is bounded before allocating the output vector.
+    pub fn moments(
+        &self,
+        positions: &[f64],
+        weights: &[f64],
+    ) -> Result<Vec<ComplexResponse>, ContractError> {
+        if positions.is_empty()
+            || positions.len() != weights.len()
+            || positions.len() > MAX_MEASURE_PARTICLES
+        {
+            return Err(ContractError::InvalidParticleMeasureShape);
+        }
+        if positions.iter().any(|position| !position.is_finite()) {
+            return Err(ContractError::NonFiniteNormalizationCoordinate);
+        }
+        if weights
+            .iter()
+            .any(|weight| !weight.is_finite() || *weight < 0.0)
+        {
+            return Err(ContractError::InvalidParticleMeasureWeights);
+        }
+        let work = positions
+            .len()
+            .checked_mul(self.max_harmonic)
+            .ok_or(ContractError::ParticleMeasureWorkBudgetExceeded)?;
+        if work > MAX_FOURIER_MEASURE_WORK {
+            return Err(ContractError::ParticleMeasureWorkBudgetExceeded);
+        }
+
+        let maximum_weight = weights.iter().copied().fold(0.0_f64, f64::max);
+        if maximum_weight <= 0.0 {
+            return Err(ContractError::InvalidParticleMeasureWeights);
+        }
+        let scaled_total = weights
+            .iter()
+            .map(|weight| weight / maximum_weight)
+            .sum::<f64>();
+        if !scaled_total.is_finite() || scaled_total <= 0.0 {
+            return Err(ContractError::InvalidParticleMeasureWeights);
+        }
+
+        let normalized_weights = weights
+            .iter()
+            .map(|weight| (weight / maximum_weight) / scaled_total)
+            .collect::<Vec<_>>();
+        let wrapped_positions = positions
+            .iter()
+            .map(|position| position.rem_euclid(1.0))
+            .collect::<Vec<_>>();
+
+        let mut moments = Vec::with_capacity(self.max_harmonic);
+        for harmonic in 1..=self.max_harmonic {
+            let mut real_sum = 0.0;
+            let mut real_compensation = 0.0;
+            let mut imag_sum = 0.0;
+            let mut imag_compensation = 0.0;
+            for (position, weight) in wrapped_positions.iter().zip(&normalized_weights) {
+                let phase = TAU * harmonic as f64 * position;
+                kahan_add(
+                    weight * phase.cos(),
+                    &mut real_sum,
+                    &mut real_compensation,
+                );
+                kahan_add(
+                    weight * phase.sin(),
+                    &mut imag_sum,
+                    &mut imag_compensation,
+                );
+            }
+            moments.push(ComplexResponse::new(real_sum, imag_sum)?);
+        }
+        Ok(moments)
+    }
+
+    pub fn max_harmonic(&self) -> usize {
+        self.max_harmonic
+    }
+}
+
+/// Compensated summation for bounded empirical Fourier moments.
+fn kahan_add(value: f64, sum: &mut f64, compensation: &mut f64) {
+    let adjusted = value - *compensation;
+    let next = *sum + adjusted;
+    *compensation = (next - *sum) - adjusted;
+    *sum = next;
 }
 
 /// Periodic Fourier-character feature lift for a normalized torus coordinate.
@@ -3580,6 +3701,122 @@ mod tests {
                 ..
             })
         ));
+    }
+
+    #[test]
+    fn weighted_fourier_measure_embedding_is_permutation_invariant() {
+        let embedding = WeightedFourierMeasureEmbedding::new(8).unwrap();
+        let positions = [0.05, 0.23, 0.61, 0.94];
+        let weights = [0.1, 0.2, 0.3, 0.4];
+        let permutation = [0.61, 0.05, 0.94, 0.23];
+        let permuted_weights = [0.3, 0.1, 0.4, 0.2];
+        let original = embedding.moments(&positions, &weights).unwrap();
+        let permuted = embedding
+            .moments(&permutation, &permuted_weights)
+            .unwrap();
+        for (left, right) in original.iter().zip(&permuted) {
+            assert!((left.real - right.real).abs() < 1.0e-12);
+            assert!((left.imag - right.imag).abs() < 1.0e-12);
+        }
+    }
+
+    #[test]
+    fn weighted_fourier_measure_embedding_is_invariant_to_exact_coincident_split_merge() {
+        let embedding = WeightedFourierMeasureEmbedding::new(12).unwrap();
+        let original = embedding
+            .moments(&[0.2, 0.7], &[0.4, 0.6])
+            .unwrap();
+        let split = embedding
+            .moments(&[0.2, 0.2, 0.7], &[0.1, 0.3, 0.6])
+            .unwrap();
+        let merged = embedding
+            .moments(&[0.7, 0.2], &[0.6, 0.4])
+            .unwrap();
+        for expected in [&split, &merged] {
+            for (left, right) in original.iter().zip(expected.iter()) {
+                assert!((left.real - right.real).abs() < 1.0e-12);
+                assert!((left.imag - right.imag).abs() < 1.0e-12);
+            }
+        }
+    }
+
+    #[test]
+    fn weighted_fourier_measure_embedding_is_invariant_to_global_weight_scale() {
+        let embedding = WeightedFourierMeasureEmbedding::new(6).unwrap();
+        let base = embedding
+            .moments(&[0.13, 0.42, 0.81], &[1.0, 2.0, 7.0])
+            .unwrap();
+        let scaled = embedding
+            .moments(&[0.13, 0.42, 0.81], &[1.0e200, 2.0e200, 7.0e200])
+            .unwrap();
+        for (left, right) in base.iter().zip(&scaled) {
+            assert!((left.real - right.real).abs() < 1.0e-12);
+            assert!((left.imag - right.imag).abs() < 1.0e-12);
+        }
+    }
+
+    #[test]
+    fn weighted_fourier_measure_embedding_transforms_equivariantly_under_torus_translation() {
+        let embedding = WeightedFourierMeasureEmbedding::new(5).unwrap();
+        let positions = [0.11, 0.34, 0.77];
+        let weights = [0.2, 0.5, 0.3];
+        let shift = 0.173;
+        let original = embedding.moments(&positions, &weights).unwrap();
+        let translated_positions = positions.map(|position| position + shift);
+        let translated = embedding
+            .moments(&translated_positions, &weights)
+            .unwrap();
+        for (index, (before, after)) in original.iter().zip(&translated).enumerate() {
+            let phase = TAU * (index + 1) as f64 * shift;
+            let expected_real = before.real * phase.cos() - before.imag * phase.sin();
+            let expected_imag = before.real * phase.sin() + before.imag * phase.cos();
+            assert!((after.real - expected_real).abs() < 1.0e-12);
+            assert!((after.imag - expected_imag).abs() < 1.0e-12);
+        }
+    }
+
+    #[test]
+    fn weighted_fourier_measure_embedding_rejects_invalid_shapes_weights_and_budgets() {
+        let embedding = WeightedFourierMeasureEmbedding::new(3).unwrap();
+        assert_eq!(
+            embedding.moments(&[], &[]),
+            Err(ContractError::InvalidParticleMeasureShape)
+        );
+        assert_eq!(
+            embedding.moments(&[0.2, 0.4], &[1.0]),
+            Err(ContractError::InvalidParticleMeasureShape)
+        );
+        assert_eq!(
+            embedding.moments(&[0.2, 0.4], &[0.0, 0.0]),
+            Err(ContractError::InvalidParticleMeasureWeights)
+        );
+        assert_eq!(
+            embedding.moments(&[0.2, 0.4], &[1.0, -1.0]),
+            Err(ContractError::InvalidParticleMeasureWeights)
+        );
+        assert_eq!(
+            embedding.moments(&[0.2, 0.4], &[1.0, f64::NAN]),
+            Err(ContractError::InvalidParticleMeasureWeights)
+        );
+        assert_eq!(
+            embedding.moments(&[0.2, f64::INFINITY], &[1.0, 1.0]),
+            Err(ContractError::NonFiniteNormalizationCoordinate)
+        );
+        assert_eq!(
+            WeightedFourierMeasureEmbedding::new(0),
+            Err(ContractError::InvalidHarmonicBudget)
+        );
+    }
+
+    #[test]
+    fn weighted_fourier_measure_embedding_rejects_excessive_work_before_allocation() {
+        let embedding = WeightedFourierMeasureEmbedding::new(MAX_PERIODIC_LIFT_HARMONICS).unwrap();
+        let positions = vec![0.5; MAX_MEASURE_PARTICLES];
+        let weights = vec![1.0; MAX_MEASURE_PARTICLES];
+        assert_eq!(
+            embedding.moments(&positions, &weights),
+            Err(ContractError::ParticleMeasureWorkBudgetExceeded)
+        );
     }
 
     #[test]
