@@ -225,6 +225,12 @@ jobs:
           Draft202012Validator.check_schema(schema)
           Draft202012Validator(schema).validate(fixture)
           assert len(fixture["cases"]) == 6
+          paired = [case for case in fixture["cases"] if case.get("matched_pair_id") == "same-tail-different-response-risk"]
+          assert len(paired) == 2
+          assert paired[0]["spectral_tail_measure"] == paired[1]["spectral_tail_measure"]
+          assert paired[0]["response_risk_upper_bound"] < fixture["thresholds"]["response_risk_threshold"]
+          assert paired[1]["response_risk_upper_bound"] >= fixture["thresholds"]["response_risk_threshold"]
+          assert paired[0]["expected_decision"] == "Hold" and paired[1]["expected_decision"] == "Refine"
           assert fixture["claim_boundary"]["spectral_solver_evaluated"] is False
           print("adaptive_refinement_schema_validation=PASS")
           PY
