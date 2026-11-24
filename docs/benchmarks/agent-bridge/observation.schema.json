@@ -1,0 +1,179 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/agent-bridge-observation-0.1.json",
+  "title": "Symthaea tool observation and reconciliation",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocol_version",
+        "kind",
+        "turn_id",
+        "run_id",
+        "call_id",
+        "tool_name",
+        "status",
+        "observation_digest",
+        "external_side_effect",
+        "reversible"
+      ],
+      "properties": {
+        "protocol_version": {
+          "const": "symthaea-agent-bridge/0.1"
+        },
+        "kind": {
+          "const": "tool_observation"
+        },
+        "turn_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "call_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tool_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "success",
+            "failure",
+            "permission_denied",
+            "unknown"
+          ]
+        },
+        "content": {
+          "type": "string"
+        },
+        "structured_result": {
+          "type": "object"
+        },
+        "error": {
+          "type": "string"
+        },
+        "observation_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "precondition_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "postcondition_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "external_side_effect": {
+          "type": "boolean"
+        },
+        "reversible": {
+          "type": "boolean"
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "success",
+                  "failure"
+                ]
+              },
+              "external_side_effect": {
+                "const": true
+              }
+            },
+            "required": [
+              "status",
+              "external_side_effect"
+            ]
+          },
+          "then": {
+            "required": [
+              "postcondition_digest"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "unknown"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "not": {
+              "required": [
+                "postcondition_digest"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocol_version",
+        "kind",
+        "turn_id",
+        "run_id",
+        "call_id",
+        "reconciled_status",
+        "state_digest",
+        "observer"
+      ],
+      "properties": {
+        "protocol_version": {
+          "const": "symthaea-agent-bridge/0.1"
+        },
+        "kind": {
+          "const": "execution_reconciled"
+        },
+        "turn_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "call_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reconciled_status": {
+          "enum": [
+            "success",
+            "failure",
+            "not_executed"
+          ]
+        },
+        "state_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "observer": {
+          "enum": [
+            "tool",
+            "environment",
+            "evaluator"
+          ]
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  ]
+}

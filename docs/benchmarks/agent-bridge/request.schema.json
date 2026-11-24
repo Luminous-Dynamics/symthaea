@@ -1,0 +1,215 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/agent-bridge-request-0.1.json",
+  "title": "Symthaea agent turn request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocol_version",
+    "kind",
+    "turn_id",
+    "run_id",
+    "principal_id",
+    "task",
+    "constraints",
+    "available_tools",
+    "history",
+    "authority",
+    "budget"
+  ],
+  "properties": {
+    "protocol_version": {
+      "const": "symthaea-agent-bridge/0.1"
+    },
+    "kind": {
+      "const": "agent_turn"
+    },
+    "turn_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "principal_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_id",
+        "environment_id",
+        "role",
+        "goal",
+        "brief"
+      ],
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "environment_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "type": "string",
+          "minLength": 1
+        },
+        "goal": {
+          "type": "string",
+          "minLength": 1
+        },
+        "brief": {
+          "type": "string",
+          "minLength": 1
+        },
+        "domain": {
+          "type": "string"
+        },
+        "qcat": {
+          "type": "string"
+        }
+      }
+    },
+    "constraints": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "available_tools": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "description",
+          "input_schema"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string"
+          },
+          "input_schema": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    "history": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "event_id",
+          "actor",
+          "kind",
+          "content",
+          "trust_class"
+        ],
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "actor": {
+            "enum": [
+              "human",
+              "agent",
+              "tool",
+              "environment",
+              "system"
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "minLength": 1
+          },
+          "content": {
+            "type": "string"
+          },
+          "trust_class": {
+            "enum": [
+              "trusted_instruction",
+              "task_data",
+              "tool_observation",
+              "agent_output",
+              "evaluator_annotation"
+            ]
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role_id",
+        "allowed_actions",
+        "policy_digest"
+      ],
+      "properties": {
+        "role_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "allowed_actions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "tool_call",
+              "ask",
+              "defer",
+              "final_answer"
+            ]
+          }
+        },
+        "policy_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tool_calls_remaining",
+        "max_output_tokens",
+        "deadline_ms_remaining"
+      ],
+      "properties": {
+        "tool_calls_remaining": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_output_tokens": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "deadline_ms_remaining": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  }
+}

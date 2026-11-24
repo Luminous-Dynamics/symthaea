@@ -1,0 +1,86 @@
+[
+  {
+    "participant_id": "p-low-c-01",
+    "baseline_stratum": "low_baseline",
+    "condition": "collaborative",
+    "pre_score": 0.1,
+    "post_score": 0.2
+  },
+  {
+    "participant_id": "p-low-c-02",
+    "baseline_stratum": "low_baseline",
+    "condition": "collaborative",
+    "pre_score": 0.2,
+    "post_score": 0.25
+  },
+  {
+    "participant_id": "p-low-c-03",
+    "baseline_stratum": "low_baseline",
+    "condition": "collaborative",
+    "pre_score": 0.3,
+    "post_score": 0.4
+  },
+  {
+    "participant_id": "p-low-x-01",
+    "baseline_stratum": "low_baseline",
+    "condition": "control",
+    "pre_score": 0.1,
+    "post_score": 0.15
+  },
+  {
+    "participant_id": "p-low-x-02",
+    "baseline_stratum": "low_baseline",
+    "condition": "control",
+    "pre_score": 0.2,
+    "post_score": 0.3
+  },
+  {
+    "participant_id": "p-low-x-03",
+    "baseline_stratum": "low_baseline",
+    "condition": "control",
+    "pre_score": 0.3,
+    "post_score": 0.35
+  },
+  {
+    "participant_id": "p-high-c-01",
+    "baseline_stratum": "high_baseline",
+    "condition": "collaborative",
+    "pre_score": 0.7,
+    "post_score": 0.6
+  },
+  {
+    "participant_id": "p-high-c-02",
+    "baseline_stratum": "high_baseline",
+    "condition": "collaborative",
+    "pre_score": 0.75,
+    "post_score": 0.8
+  },
+  {
+    "participant_id": "p-high-c-03",
+    "baseline_stratum": "high_baseline",
+    "condition": "collaborative",
+    "pre_score": 0.8,
+    "post_score": 0.82
+  },
+  {
+    "participant_id": "p-high-x-01",
+    "baseline_stratum": "high_baseline",
+    "condition": "control",
+    "pre_score": 0.7,
+    "post_score": 0.75
+  },
+  {
+    "participant_id": "p-high-x-02",
+    "baseline_stratum": "high_baseline",
+    "condition": "control",
+    "pre_score": 0.75,
+    "post_score": 0.8
+  },
+  {
+    "participant_id": "p-high-x-03",
+    "baseline_stratum": "high_baseline",
+    "condition": "control",
+    "pre_score": 0.8,
+    "post_score": 0.82
+  }
+]

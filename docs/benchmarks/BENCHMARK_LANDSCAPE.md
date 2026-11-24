@@ -1,0 +1,127 @@
+# Benchmark Landscape and Positioning
+
+**Research snapshot:** 24 November 2026  
+**Purpose:** choose fair comparators and identify what SympoeticBench must add rather than duplicate.
+
+## 1. Adjacent benchmarks and studies
+
+| Work | What it measures well | Public scale / design reported | What SympoeticBench should add |
+|---|---|---|---|
+| AOBench v0.4.1 | Role-aware HPC agent operations, tool sequence, grounding, RBAC, workflow, robustness, cost and latency | 88 tasks, 29 environment bundles, five roles, ten QCATs, seven weighted dimensions | Do not duplicate operations testing. Use as an external operations baseline; add real consequence, concurrency, and site-specific qualification only as separately named extensions |
+| Common Ground Benchmark (2026) | Shared goals, referential coordination, joint action, situation awareness and repair | Interactive collaborative puzzle with human-AI validation | Broaden beyond puzzle coordination to creative, engineering, scientific, pluralistic and longitudinal collaboration |
+| AgentWorld (2026) | Long-horizon collaboration, role asymmetry, resource sharing, communication and causal contribution | 100 human-annotated tasks plus 100 augmented variants; 3–20 agents; 50+ interaction rounds | Extend causal contribution analysis to human-AI dyads and multi-stakeholder creation, with individual agency and consent measures |
+| The Collaboration Gap (COLM 2026) | Solo-to-team performance degradation, homogeneous/heterogeneous pairings, partner order and relay inference | Evaluates 32 leading open- and closed-source models in solo and paired conditions | Bring solo/team gap and relay-order tests into human-AI collaboration, with agency and consent gates |
+| Multi-agent AI creativity study (2026) | Novelty and usefulness in multi-agent idea generation | 4,541 AI-team ideas and 341 human-team ideas across six tasks; reported Cohen's d=1.50 | Test AI-only multi-agent teams as a reference, while separately evaluating human-AI agency and population-level diversity |
+| Human Creativity Benchmark (2026) | Separates professional convergence on verifiable quality from legitimate divergence in taste | 15,000 professional judgments across five creative domains and three workflow phases | Preserve rater disagreement and evaluate the interaction process, not only the artifact |
+| CHI 2026 co-creation experiment | Compares model-led rewriting with reflective human-led interaction and measures quality, diversity and ownership | Randomized study with 486 participants and a separate replication with 640 participants | Turn the interaction-mode finding into repeatable, cross-domain, longitudinal benchmark tasks |
+| Symthaea Psych-Bench | Broad cognitive and psychometric architectural tests | Existing suite with synthetic and externally grounded components | Keep as a separate cognitive suite; do not relabel it as evidence of human-AI collaboration |
+
+| Capability Amplification (SympoeticBench extension) | Whether co-creation builds independent human capability, not only a better in-session artifact | Development protocol and a 15th seed scenario; no human-subject results yet | Measure pre/post gain, delayed retention, and transfer against matched controls; keep agency and self-efficacy separate |
+
+| KaBLE (Stanford AI Index 2026) | Distinguishing knowledge from belief, including first-person false-belief framing | 13,000 questions across 13 tasks; evaluated on 24 leading models | Extend epistemic reliability into human-AI collaboration: provenance, belief revision, confidence, and verification of partner claims |
+| Metacognitive sensitivity (J. Mathematical Psychology, 2026) | Whether confidence discriminates correct from incorrect judgments, beyond calibration alone | Analytical signal-detection account with naturalistic classification application | Add separate Brier/ECE calibration and AUC-style sensitivity for both human and AI judgments |
+| OHAI persistent human-AI teams (Frontiers, Oct 2026) | Collective functioning and collective intelligence across repeated interdependent cycles | Theoretical framework; calls for configuration and measurement qualification before longitudinal CI claims | Separate one-shot feasibility from multi-cycle team-level evidence and CI trajectories |
+
+| OHAI persistent human-AI teams (Frontiers, Oct 2026) | Distinguishes system configuration, enacted collective functioning, and multi-task collective intelligence over repeated cycles | Theoretical framework with a staged empirical programme; direct longitudinal team evidence remains limited | Add versioned team-cycle receipts, state continuity, membership/authority changes, consent-scoped memory, and a separate evidential threshold for CI claims |
+
+| CMU Human-AI Complementarity research (2026) | Individual persistence and unaided capability after AI withdrawal; team-level AI × transactive-memory interaction | Randomized individual trials (N=1,222) plus a controlled 2×2 experiment with 159 teams; the programme reports short-term assistance benefits alongside post-withdrawal capability costs and preservation of unique member-held information by TMS | Reproduce the four-arm AI × TMS design with immediate, delayed and transfer tests; distinguish assisted output from retained team capability |
+| [HiddenBench (ICML 2026)](https://proceedings.mlr.press/v306/li26ej.html) | Collective reasoning when evidence is distributed across agents | 65 hidden-profile tasks; 15 frontier LLMs; 30.1% multi-agent accuracy under distributed information versus 80.7% for a single agent given complete information in the paper's comparison | Add hidden-profile elicitation, latent-information coverage and explicit information-asymmetry reasoning; treat the full-information result as a different information condition, not a matched baseline |
+| [GroupMemBench (May 2026)](https://www.microsoft.com/en-us/research/publication/groupmembench-benchmarking-llm-agent-memory-in-multi-party-conversations/) | Multi-party memory, speaker-grounded beliefs, knowledge updates, ambiguity, temporal reasoning and abstention | 715 adversarial questions across six categories; strongest tested memory system reported 46.0% average accuracy, with 27.1% on knowledge updates and 37.7% on term ambiguity; BM25 matched or exceeded most evaluated agent-memory systems | Include a strong low-cost BM25 baseline, speaker-scoped provenance, temporal updates, ambiguity and abstention; do not assume an LLM memory layer is better because it is more elaborate |
+| [Ennion & McLellan (13 Nov 2026)](https://doi.org/10.1111/bjet.70100) | Learner responses to challenge under human tutoring, GenAI tutoring and unguided search | Randomized between-subjects experiment with 16–18-year-old students; challenge-seeking did not differ by support condition and was more associated with baseline disposition | Separate attempt, effort, perceived difficulty, support requests, voluntary stopping and delayed transfer; never use persistence or struggle as a proxy for learning |
+| [AI brain-to-speech systematic review (2026)](https://doi.org/10.1186/s12911-026-03552-8) | Speech decoding across invasive/non-invasive neural interfaces and evaluation designs | 115 studies (2019–2025); 84.3% subject-dependent; only 4.3% exclusively subject-independent; 62.6% high risk of patient-selection bias | Require separate held-out session/user/task/device/site reporting, declare target-data access and adaptation burden; do not compare raw accuracy across unmatched tasks/populations |
+| [Generalizable neural decoding review (23 Oct 2026)](https://www.nature.com/articles/s44385-026-00119-0) | Deployment shifts and adaptation across sessions, participants, tasks, devices, sites and modalities | Review emphasizes that performance transfer on one axis does not establish transfer on others | Report a deployment-generalization matrix and calibration/recalibration cost; connect technical performance to sustained user function |
+| [Agents of Humanity — Agent Sovereignty Benchmark](https://agentsofhumanity.ai/) | Portable, transparent, auditable, verifiable, modifiable and controllable agents | Public preview, criteria v1.1 dated 10 Nov 2026; six criteria and 26 evidence-scored tests | Add a rights/sovereignty audit alongside capability measures; treat this as a useful emerging external benchmark, not a universal or peer-reviewed standard |
+
+For concrete release gates, pilot targets, and external comparison requirements, see the [Competitive Benchmark Targets](sympoetic/COMPETITIVE_BENCHMARK_TARGETS.md) protocol.
+
+## 2. Findings that shape our design
+
+The 2026 common-ground benchmark formalizes shared assumptions, goals, situation awareness, joint action and repair as core conditions for collaboration. This is a strong reference for SympoeticBench's common-ground and repair tasks.
+
+AgentWorld reports long-horizon failures in communication, role tracking and shared-plan maintenance, and introduces Causal Collaboration Effectiveness to ask whether agent actions actually contributed to a team's outcome. SympoeticBench should adopt the general lesson that activity volume is not contribution, while measuring individual agency and artifact provenance in addition to group completion.
+
+The COLM 2026 *Collaboration Gap* study shows that strong solo model performance can degrade in paired collaboration, and that partner order and relay strategy can matter. SympoeticBench therefore adds matched solo and paired baselines, counterbalanced A→B/B→A ordering, specialist role-loss tests, and structured handoff evaluation. The May 2026 multi-agent creativity study reports that AI-agent teams can outperform human teams on its creativity measure, driven by novelty with comparable usefulness. We should reproduce its distinction between novelty and usefulness where possible, while not treating AI-only team results as proof of superior human-AI collaboration.
+
+The Stanford AI Index 2026's summary of KaBLE highlights that models can collapse the distinction between first-person false beliefs and established facts. SympoeticBench now tests that failure within a collaborative exchange, where the participant's belief must be represented accurately without being promoted to external truth. A May 2026 mathematical-psychology paper further motivates separating confidence calibration from metacognitive sensitivity: an agent should not only be calibrated on average, it should assign lower confidence to the judgments it gets wrong.
+
+A 2026 review of AI brain-to-speech decoding (115 studies published 2019–2025) found that 84.3% of studies relied exclusively on subject-dependent evaluation; only 4.3% used exclusively subject-independent evaluation, and 62.6% had high patient-selection risk of bias. A separate October 2026 review stresses that cross-session, cross-participant, cross-task, cross-device, cross-site and cross-modality tests are distinct; adaptation using target-user data must be reported separately from zero-shot transfer. For Luminous' neurosemantic/BCI track, the first objective should therefore be deployment generalization and calibration burden—not raw accuracy on a single subject's sessions. Sources: https://doi.org/10.1186/s12911-026-03552-8 ; https://www.nature.com/articles/s44385-026-00119-0.
+
+A randomized study first published 13 November 2026 compared human tutoring, GenAI tutoring and unguided internet search for challenging mathematics among 16–18-year-olds. It found different effort, perceived difficulty and attempt patterns, but subsequent challenge-seeking did not differ by support condition and was more closely associated with pre-existing disposition. This is a reason to separate challenge-process measures from learning outcomes and to report voluntary stops, help requests and self-reported burden. It does not justify making tasks harder or withholding requested help. Source: https://doi.org/10.1111/bjet.70100.
+
+The November 2026 CMU Human-AI Complementarity programme makes withdrawal testing a priority rather than a niche extension. It reports randomized trials with 1,222 participants in which AI support improved short-term performance but reduced persistence and unassisted performance, with effects emerging after brief exposure. Its separate 159-team 2×2 experiment reports that AI access can accelerate accurate decisions while available, but teams that had used AI made less accurate decisions after withdrawal; transactive-memory systems preserved unique member-held information. These are programme-reported research findings and should be reproduced with our own matched tasks and independent analysis, not copied as a guaranteed effect size. The new team-retention evaluator is intended to make that replication testable.
+
+HiddenBench exposes a different bottleneck: pooling individually available facts is not the same as discovering what other participants know but have not yet shared. In its specific 65-task evaluation, multi-agent systems reached 30.1% accuracy under distributed information, compared with 80.7% for a single agent given the complete information profile. The conditions differ in information access, so this is a diagnostic gap rather than a head-to-head leaderboard comparison. The important design lesson is to measure elicitation coverage, minority-held fact use, source attribution and structured inquiry—not just answer accuracy.
+
+GroupMemBench adds a hard baseline for collective memory. Its strongest tested system reported 46.0% average accuracy and much lower performance on knowledge updates and term ambiguity; a simple BM25 retrieval baseline matched or outperformed most evaluated systems. Mycelix's memory and knowledge pipeline should therefore be compared against BM25, exact provenance retrieval and human transactive-memory baselines before adding more complex semantic memory layers.
+
+The public-preview Agent Sovereignty Benchmark offers an adjacent audit model: six criteria—portability, transparency, auditability, verifiability, modifiability and controllability—across 26 evidence-scored tests. We should map our own controls to these dimensions, while retaining a clear distinction between an emerging public benchmark and a validated regulatory standard.
+
+The October 2026 OHAI framework adds an important inference boundary. A one-shot collaboration task can qualify measures and test local relationships, but it cannot establish collective intelligence in a persistent human-AI team. Our reporting will distinguish component capability, enacted collective functioning, and cross-task collective capacity. Longitudinal claims require multi-cycle, comparable multi-task evidence.
+
+The Human Creativity Benchmark argues that professional agreement and disagreement carry different information: technical correctness can invite convergence, while aesthetic direction and conceptual risk legitimately diverge. SympoeticBench should not collapse all rater disagreement into noise or force one universally preferred output.
+
+The CHI 2026 experiment found that model-led rewriting improved idea quality while reducing idea diversity and perceived ownership; reflective human-led conditions also improved quality while preserving diversity and ownership. This motivates matched interaction conditions rather than a single generic "AI-assisted" condition.
+
+A 2026 systematic review and meta-analysis of 19 studies and 61 effect sizes reported a small but statistically significant homogenisation effect associated with generative-AI use (reported d = 0.334). This makes population-level diversity a first-class outcome, not a cosmetic novelty score.
+
+## 3. The distinctive research gap
+
+No benchmark should claim that the adjacent work is absent. The opportunity is to integrate its strongest constructs into one evidence-qualified human-AI co-creation protocol:
+
+1. Task-level outcome quality and constraint satisfaction.
+2. Synergy against matched human-only and AI-only controls.
+3. Participant agency and control across the process.
+4. Common ground, uncertainty, and repair.
+5. Constructive divergence and preservation of plural outcomes.
+6. Individual and population-level diversity at matched quality.
+7. Event-level contribution provenance and counterfactual contribution impact.
+8. Consent scope, revocation, reuse limits, and truthful memory reporting.
+9. Longitudinal adaptation across repeated sessions.
+10. Cost, latency, human time, workload, accessibility, and rework.
+11. Collaboration gap, partner-order sensitivity, and handoff recovery.
+12. Adaptive intervention policy: when to ask, suggest, challenge, delegate, synthesize, preserve disagreement, or step back.
+13. Human capability amplification: independent learning, delayed retention, and transfer after collaboration.
+14. Epistemic resilience: knowledge/belief distinction, confidence calibration, evidence provenance, contradiction handling, and human verification.
+15. Persistent-team collective functioning across multiple cycles; collective-intelligence claims require comparable multi-task longitudinal evidence.
+16. Team continuity and configuration audit: membership, roles, authority, memory policy, and consent changes must be explicit across cycles.
+17. AI withdrawal and capability persistence at both individual and team level, including immediate, delayed and transfer outcomes.
+18. Hidden-profile information discovery: whether participants solicit, surface, attribute and preserve unique information that other members have not yet contributed.
+19. Multi-party memory quality against BM25, source-exact retrieval and human transactive-memory baselines, including knowledge updates, temporal reasoning, ambiguity and abstention.
+20. Agent sovereignty: portability, transparency, auditability, verifiability, modifiability and controllability, each with evidence rather than self-reported claims.
+21. Coalition contribution allocation with exact Shapley values when every required counterfactual coalition is identifiable.
+
+The benchmark's contribution is the integrated measurement protocol and reproducible corpus, not a claim that any one of these constructs is newly invented.
+
+## 4. How to compare fairly
+
+- Reproduce an adjacent benchmark's published task and protocol before claiming superiority on that construct.
+- Pin benchmark release, task split, judge, model snapshot, agent harness, and resource budget.
+- Use identical or explicitly matched interaction time, information, tools, and participant instructions.
+- Report all conditions and per-domain performance, not only a chosen aggregate.
+- Use confidence intervals and prospective power calculations.
+- Preserve expert disagreement where the task has legitimate plural outcomes.
+- Separate direct benchmark results from local extensions and simulated proxies.
+- Do not claim "better than SOTA" from a new score on a different task or rubric.
+
+## 5. Research targets
+
+The first goal is construct validity and reproducibility, not leaderboard rank. A later competitive claim should require:
+
+- At least one faithful replication on Common Ground-style tasks.
+- A matched interaction-mode comparison informed by the CHI 2026 protocol.
+- A creative-diversity evaluation consistent with HCB's separation of convergence and divergence.
+- A long-horizon contribution analysis comparable in spirit to AgentWorld's CCE.
+- A matched solo/pair and counterbalanced relay evaluation inspired by The Collaboration Gap.
+- An adaptive-intervention comparison measuring overreach, missed critical warnings, and unnecessary interruption.
+- An epistemic-resilience slice with first-person false beliefs, stale evidence, non-independent sources, contradictory telemetry, and prompt injection in untrusted evidence.
+- A faithful replication of the CMU AI × transactive-memory 2×2 design, including AI-off, delayed and transfer tests.
+- A HiddenBench-style distributed-information task set with a full-information reference condition and explicit information-elicitation outcomes.
+- A GroupMemBench-style multi-party memory comparison including BM25, source-exact retrieval, updates, ambiguity and abstention.
+- A sovereignty audit mapped to the six public-preview Agent Sovereignty Benchmark criteria, with evidence-backed pass/partial/fail/unverified results.
+- A longitudinal persistent-team study before any claim about collective-intelligence trajectories.
+- A multi-cycle test of role turnover, authority revalidation, memory consent, and shared-plan continuity.
+- An external human study with preregistered outcomes and blinded raters.
+- A learning/transfer study showing independent human capability gain versus matched practice controls, including delayed retention.
+- An independent replication on a held-out scenario set.
+
+A SympoeticBench result should be considered stronger than a baseline only when it improves the intended outcome without violating its declared non-inferiority or hard-gate constraints.

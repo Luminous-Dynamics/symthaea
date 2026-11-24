@@ -1,0 +1,522 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/sympoetic-trace-0.1.json",
+  "title": "SympoeticBench session trace",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "scenario_id",
+    "events"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "sympoetic-trace/0.1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scenario_id": {
+      "type": "string",
+      "pattern": "^SP-[A-Z]{3}-[0-9]{3}$"
+    },
+    "trace_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "events": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "event_id",
+          "sequence",
+          "elapsed_ms",
+          "actor",
+          "event_type",
+          "parent_event_ids",
+          "payload_digest",
+          "payload_storage",
+          "consent_scope",
+          "external_side_effect",
+          "reversible"
+        ],
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sequence": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "elapsed_ms": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "actor": {
+            "enum": [
+              "human",
+              "agent",
+              "tool",
+              "environment",
+              "evaluator"
+            ]
+          },
+          "event_type": {
+            "enum": [
+              "user_intent",
+              "assistant_proposal",
+              "assistant_question",
+              "assistant_challenge",
+              "user_revision",
+              "user_acceptance",
+              "user_rejection",
+              "clarification_request",
+              "clarification_answer",
+              "constraint_added",
+              "constraint_removed",
+              "permission_granted",
+              "permission_revoked",
+              "tool_invocation",
+              "tool_result",
+              "artifact_created",
+              "artifact_revised",
+              "evaluator_annotation",
+              "session_end",
+              "execution_reconciled",
+              "intervention_decision",
+              "participant_assessment",
+              "scaffold_adjustment",
+              "independent_assessment",
+              "retention_assessment",
+              "transfer_assessment",
+              "confidence_assessment",
+              "claim_verification",
+              "source_attribution",
+              "belief_revision",
+              "contradiction_resolution",
+              "human_planning",
+              "human_monitoring",
+              "human_reflection",
+              "independent_reasoning_attempt",
+              "ai_core_step_supplied",
+              "team_cycle_started",
+              "shared_plan_revised",
+              "membership_change",
+              "role_transition",
+              "team_reflection",
+              "authority_revalidated",
+              "team_state_snapshot",
+              "memory_policy_changed"
+            ]
+          },
+          "parent_event_ids": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "payload_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "payload_storage": {
+            "enum": [
+              "metadata_only",
+              "encrypted_consented_reference"
+            ]
+          },
+          "consent_scope": {
+            "enum": [
+              "none",
+              "session_only",
+              "persistent_opt_in",
+              "revoked"
+            ]
+          },
+          "artifact_digest_before": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "artifact_digest_after": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "external_side_effect": {
+            "type": "boolean"
+          },
+          "reversible": {
+            "type": "boolean"
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "tool_execution": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "tool_name",
+              "status"
+            ],
+            "properties": {
+              "tool_name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "status": {
+                "enum": [
+                  "success",
+                  "failure",
+                  "unknown",
+                  "not_applicable"
+                ]
+              },
+              "idempotency_key": {
+                "type": "string"
+              },
+              "precondition_digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "postcondition_digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          },
+          "attribution": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "contributor",
+                "contribution_type",
+                "artifact_ref",
+                "attribution_confidence"
+              ],
+              "properties": {
+                "contributor": {
+                  "enum": [
+                    "human",
+                    "agent",
+                    "external_source",
+                    "joint"
+                  ]
+                },
+                "contribution_type": {
+                  "enum": [
+                    "idea",
+                    "constraint",
+                    "question",
+                    "critique",
+                    "design",
+                    "text",
+                    "music",
+                    "edit",
+                    "synthesis",
+                    "fact",
+                    "other"
+                  ]
+                },
+                "artifact_ref": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "attribution_confidence": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "permission_ref": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "annotation": {
+            "type": "string"
+          },
+          "reconciled_status": {
+            "enum": [
+              "success",
+              "failure",
+              "not_executed"
+            ]
+          },
+          "reconciliation_state_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "intervention_action": {
+            "enum": [
+              "ask",
+              "suggest",
+              "challenge",
+              "delegate",
+              "synthesize",
+              "preserve_divergence",
+              "defer",
+              "proceed",
+              "step_back"
+            ]
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "event_type": {
+                  "const": "execution_reconciled"
+                }
+              },
+              "required": [
+                "event_type"
+              ]
+            },
+            "then": {
+              "required": [
+                "reconciled_status",
+                "reconciliation_state_digest"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "event_type": {
+                  "const": "intervention_decision"
+                }
+              },
+              "required": [
+                "event_type"
+              ]
+            },
+            "then": {
+              "required": [
+                "intervention_action"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "event_type": {
+                  "const": "confidence_assessment"
+                }
+              },
+              "required": [
+                "event_type"
+              ]
+            },
+            "then": {
+              "required": [
+                "confidence"
+              ],
+              "properties": {
+                "actor": {
+                  "enum": [
+                    "human",
+                    "agent"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "event_type": {
+                  "const": "claim_verification"
+                }
+              },
+              "required": [
+                "event_type"
+              ]
+            },
+            "then": {
+              "properties": {
+                "actor": {
+                  "enum": [
+                    "human",
+                    "agent",
+                    "evaluator"
+                  ]
+                },
+                "parent_event_ids": {
+                  "minItems": 1
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "event_type": {
+                  "const": "source_attribution"
+                }
+              },
+              "required": [
+                "event_type"
+              ]
+            },
+            "then": {
+              "properties": {
+                "attribution": {
+                  "minItems": 1
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "event_type": {
+                  "const": "belief_revision"
+                }
+              },
+              "required": [
+                "event_type"
+              ]
+            },
+            "then": {
+              "properties": {
+                "actor": {
+                  "enum": [
+                    "human",
+                    "agent"
+                  ]
+                },
+                "parent_event_ids": {
+                  "minItems": 1
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "event_type": {
+                  "const": "contradiction_resolution"
+                }
+              },
+              "required": [
+                "event_type"
+              ]
+            },
+            "then": {
+              "properties": {
+                "parent_event_ids": {
+                  "minItems": 2
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "event_type": {
+                  "const": "human_planning"
+                }
+              },
+              "required": [
+                "event_type"
+              ]
+            },
+            "then": {
+              "properties": {
+                "actor": {
+                  "const": "human"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "event_type": {
+                  "const": "human_monitoring"
+                }
+              },
+              "required": [
+                "event_type"
+              ]
+            },
+            "then": {
+              "properties": {
+                "actor": {
+                  "const": "human"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "event_type": {
+                  "const": "human_reflection"
+                }
+              },
+              "required": [
+                "event_type"
+              ]
+            },
+            "then": {
+              "properties": {
+                "actor": {
+                  "const": "human"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "event_type": {
+                  "const": "independent_reasoning_attempt"
+                }
+              },
+              "required": [
+                "event_type"
+              ]
+            },
+            "then": {
+              "properties": {
+                "actor": {
+                  "const": "human"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "event_type": {
+                  "const": "ai_core_step_supplied"
+                }
+              },
+              "required": [
+                "event_type"
+              ]
+            },
+            "then": {
+              "properties": {
+                "actor": {
+                  "const": "agent"
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}
