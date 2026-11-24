@@ -73,7 +73,6 @@ pub struct EvidenceQualificationRequestBindingV1 {
     pub qualification_policy_sha256: String,
     pub lifecycle_snapshot_sha256: String,
     pub verifier_profile_sha256: String,
-    pub now_unix: u64,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -414,7 +413,6 @@ fn build_request(
         qualification_policy_sha256: context.qualification_policy_sha256.clone(),
         lifecycle_snapshot_sha256: context.lifecycle_snapshot_sha256.clone(),
         verifier_profile_sha256: context.verifier_profile_sha256.clone(),
-        now_unix: context.now_unix,
     };
     let candidate_batch_jsonl = batch.to_jsonl()
         .map_err(IndependentQualificationExchangeRejectV1::CandidateBatch)?;
@@ -644,7 +642,6 @@ mod tests {
             qualification_policy_sha256: A.into(),
             lifecycle_snapshot_sha256: B.into(),
             verifier_profile_sha256: profile_sha256,
-            now_unix: 100,
         }
     }
 
@@ -700,7 +697,7 @@ mod tests {
         let batch = batch();
         let (issuer, verifier, context) = setup(EvidenceDispositionV1::Indeterminate, false);
         let result = independently_qualify_candidate_batch_v1(
-            &batch, &context, &expected(&batch), &issuer, &verifier,
+            &batch, &context, &expected(&batch), &issuer, &verifier, &test_clock(),
         ).expect("valid signed receipt");
         assert!(matches!(result, CandidateEvidenceProjectionV1::Abstained(_)));
     }
@@ -712,7 +709,7 @@ mod tests {
         issuer.failure = Some(QualificationIssuerErrorV1::Unavailable);
         assert_eq!(
             independently_qualify_candidate_batch_v1(
-                &batch, &context, &expected(&batch), &issuer, &verifier,
+                &batch, &context, &expected(&batch), &issuer, &verifier, &test_clock(),
             ),
             Err(IndependentQualificationExchangeRejectV1::IssuerUnavailable),
         );
