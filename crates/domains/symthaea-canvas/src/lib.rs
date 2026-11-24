@@ -39,6 +39,7 @@ pub mod mycelial_mesh;
 pub mod mycelial_model;
 pub mod mycelial_network;
 pub mod mycelial_photobiological_exposure;
+pub mod mycelial_observer_effect_trial;
 pub mod mycelial_presence;
 pub mod mycelial_reconstruction_calibration;
 pub mod mycelial_reconstruction_metrics;
@@ -243,6 +244,21 @@ pub use mycelial_photobiological_exposure::{
     MycelialPhotobiologicalObservationWindow, MycelialPhotobiologicalResponseObservation,
     MycelialPhotobiologicalStage, MycelialPhotoperiodPhase, mycelial_illumination_schedule_digest,
     mycelial_photobiological_footprint_digest,
+};
+pub use mycelial_observer_effect_trial::{
+    MAX_MYCELIAL_OBSERVER_EFFECT_ARMS, MAX_MYCELIAL_OBSERVER_EFFECT_DESCRIPTION_BYTES,
+    MAX_MYCELIAL_OBSERVER_EFFECT_ENDPOINTS, MAX_MYCELIAL_OBSERVER_EFFECT_ID_BYTES,
+    MAX_MYCELIAL_OBSERVER_EFFECT_OBSERVATIONS, MAX_MYCELIAL_OBSERVER_EFFECT_UNITS,
+    MYCELIAL_OBSERVER_EFFECT_REPORT_SCHEMA_VERSION,
+    MYCELIAL_OBSERVER_EFFECT_TRIAL_SCHEMA_VERSION, MycelialObserverEffectArm,
+    MycelialObserverEffectArmKind, MycelialObserverEffectAssignment,
+    MycelialObserverEffectEndpointCoverage, MycelialObserverEffectEndpointDefinition,
+    MycelialObserverEffectEndpointKind, MycelialObserverEffectEndpointObservation,
+    MycelialObserverEffectEstimand, MycelialObserverEffectEstimandKind,
+    MycelialObserverEffectRandomizationStrategy, MycelialObserverEffectTrial,
+    MycelialObserverEffectTrialError, MycelialObserverEffectTrialReport,
+    mycelial_observer_effect_assignment_digest, mycelial_observer_effect_trial_digest,
+    mycelial_observer_effect_trial_report_digest,
 };
 pub use mycelial_presence::{
     build_mycelial_presence, build_mycelial_presence_with_mode, render_mycelial_presence,
