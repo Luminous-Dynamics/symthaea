@@ -78,4 +78,4 @@ No V2 run or score is claimed.
 
 ## Retrieval receipt semantics
 
-A non-empty result is recorded as `candidates_returned`; it is not evidence-qualified or decision-sufficient. The legacy `evidence_sufficient` spelling remains readable for replay but is interpreted only as a historical candidate-return observation. Repeated retrieval observations create `Exploratory` strategy notes, which are not returned by the policy-eligible `applicable_notes()` API. See [MACE retrieval observation semantics](docs/MACE_RETRIEVAL_OBSERVATION_SEMANTICS_V1.md) for the boundary and remaining qualification requirements.
+A non-empty result is recorded as `candidates_returned`; it is not evidence-qualified or decision-sufficient. The legacy `evidence_sufficient` spelling remains readable for replay but is interpreted only as a historical candidate-return observation. Repeated retrieval observations create `Exploratory` strategy notes, which are not returned by the policy-eligible `applicable_notes()` API. See [MACE retrieval observation semantics](../docs/MACE_RETRIEVAL_OBSERVATION_SEMANTICS_V1.md) for the boundary and remaining qualification requirements.
