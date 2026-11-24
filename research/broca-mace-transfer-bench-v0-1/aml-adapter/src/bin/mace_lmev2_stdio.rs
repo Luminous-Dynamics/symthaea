@@ -593,7 +593,9 @@ fn handle_request(
             let stop_reason = if observed_evidence_ids.is_empty() {
                 RetrievalStopReasonV1::NoCandidateEvidence
             } else {
-                RetrievalStopReasonV1::EvidenceSufficient
+                // Retrieval completion means candidates were returned, not
+                // that they were qualified or sufficient for the decision.
+                RetrievalStopReasonV1::CandidatesReturned
             };
             let query_elapsed_ns = u64::try_from(query_started.elapsed().as_nanos())
                 .unwrap_or(u64::MAX);
