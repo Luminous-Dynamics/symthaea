@@ -222,7 +222,8 @@
     "HDC_only",
     "CfC_LTC_only",
     "HDC_plus_CfC_LTC",
-    "matched_GRU_or_RSSM_when_reproducible"
+    "matched_GRU_or_RSSM_when_reproducible",
+    "standard_RSSM_with_shared_branch_point_latent"
   ],
   "ownership": {
     "effect_arithmetic": "Symthaea #13520",
@@ -243,5 +244,11 @@
     "No physical experiment or simulator result generated.",
     "No SOTA or resource advantage demonstrated.",
     "Semantic fixtures test the protocol only and are not hidden empirical qualification."
-  ]
+  ],
+  "prior_art_boundary": {
+    "same_exogenous_u": "Okita formalizes counterfactual pairs by holding the same individual-specific exogenous u and factual history fixed across interventions (Eq. 10). This is established semantics, not a PCIR novelty claim.",
+    "abduction_posterior": "Okita defines abduction as P(U | factual observations) and maps the RSSM posterior q_phi(z_t | h_t, o_t) to this role structurally; numerical correspondence between learned z and physical U is an empirical question.",
+    "pcir_scope": "An auditable Symthaea implementation/ablation protocol for explicit stable-trait posterior/sample identity versus a standard RSSM-style branch-point latent copied across sibling action branches.",
+    "required_control": "A9 standard RSSM-style posterior latent with identical branch-point deterministic/stochastic state cloned across sibling action branches."
+  }
 }
