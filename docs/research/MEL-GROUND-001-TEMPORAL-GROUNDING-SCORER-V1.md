@@ -71,7 +71,7 @@ For query i, this is:
 
 `gated_f1_i = f1_i × 1[predicted_count_i == ground_truth_count_i]`
 
-The count gate is intentionally strict. A query with two nearby/repeated entrances cannot score as a complete retrieval by returning one broad merged interval, nor can a high-overlap extra duplicate pass as a correct event list. The original F1 and count-accuracy values remain available, so the joint score does not hide which component failed. Non-one-to-many, negative, ambiguous and not-estimable queries do not enter this cohort; an empty cohort returns `None`, not zero.
+The count gate is intentionally strict. A query with two nearby/repeated entrances cannot score as a complete retrieval by returning one broad merged interval, nor can a high-overlap extra duplicate pass as a correct event list. A separate equal-count duplicate control confirms that two predictions around one truth cannot claim the second truth: the one-to-one matcher still yields one TP, one FP and one FN. The original F1 and count-accuracy values remain available, so the joint score does not hide which component failed. Non-one-to-many, negative, ambiguous and not-estimable queries do not enter this cohort; an empty cohort returns `None`, not zero.
 
 This is a Melothaea-specific diagnostic, **not a claim to reproduce the ICML 2026 OMTG paper's official Effective Temporal F1**. OMTG studies video. Its relevant methodological lesson is that interval overlap alone can obscure count errors; its video leaderboard is not used as a music baseline. See https://proceedings.mlr.press/v306/xu26cc.html.
 
