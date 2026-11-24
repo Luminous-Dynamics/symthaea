@@ -218,6 +218,17 @@ For the three-cycle longitudinal *Agaricus* series, leave-one-cycle-out evaluati
 | Sten methods | Explicit filament-overlap and 3D z-stack reconstruction reference methods | Reproduce published narrow evaluations before extending the benchmark |
 | Smart-microscopy ecosystems | Hardware interfaces, acquisition orchestration and interoperable formats | Reuse useq-schema, OME-TIFF/OME-Zarr and recorded-session adapters; Symthaea owns evidence qualification and advisory decisions |
 
+### 8.1 Capability snapshot at 24 November 2026
+
+The comparison is intentionally a division of labor, not a claim that open software automatically outperforms commercial platforms.
+
+- ZEISS arivis Pro 4.6 (released 2 October 2026) advertises annotation-to-cloud training workflows, use of externally trained 3D ONNX semantic models, and analysis tools in its 4D viewer. This is a meaningful segmentation and workflow capability; Mycelial should accept its outputs and independently qualify their provenance and downstream biological consequences. Release notes: https://knowledge.zeiss.com/rms/en/arivis-pro/release-notes/arivis-pro-4-6
+- Imaris 11.1 (released 8 September 2026) adds a Training Hub and native CZI reader integration; its release history also lists machine-learning filters for spots and surfaces in 11.0. It is a mature visualization and analysis environment, not a weak straw-man baseline. Release notes: https://imaris.oxinst.com/support/imaris-release-notes/
+- Fiji SNT provides automated and semi-automated tracing, multidimensional data support, 3D visualization, time-lapse workflows, scripting and a big-data mode described as experimental for TB-scale datasets. It is a useful open tracing and curation reference, although its primary design domain is neuronal morphology. Documentation: https://imagej.net/plugins/snt/
+- Fungal Network Analysis (FNA) is a specialist reference for fungal image processing: noise/background correction, network enhancement, segmentation, skeletonization, width estimation and graph representation. Reproduce its standard pipeline and preserve parameters rather than treating graph metrics as a substitute for function. Record: https://zenodo.org/records/14931863
+
+The field-level opportunity is the gap between image-analysis outputs and scientific claims. A commercial or open segmentation package may provide a very good graph; Mycelial should test whether that graph is adequately supported by the acquired source, whether alternative structures remain plausible, and whether the graph predicts independent functional outcomes.
+
 The defensible competitive position is not “better at every image-processing operation.” It is:
 
 **A scientific evidence and decision layer that can explain what was acquired, what remains unresolved, which biological hypotheses fit, what each hypothesis predicts, which measurement is worth acquiring next, and whether an independent intervention supports the prediction.**
