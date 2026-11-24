@@ -15,7 +15,8 @@
     "actions",
     "root_declaration",
     "claim_ceiling",
-    "negative_control"
+    "negative_control",
+    "axiom_negative_control"
   ],
   "properties": {
     "schema_version": {
@@ -192,6 +193,31 @@
         },
         "expected_result": {
           "const": "lean_type_error"
+        }
+      }
+    },
+    "axiom_negative_control": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256",
+        "expected_observed_axiom",
+        "expected_result"
+      ],
+      "properties": {
+        "path": {
+          "const": "scripts/research/lean-proof-extractor/ProofActionCertificateAndCommAxiomNegative.lean"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "expected_observed_axiom": {
+          "const": "ProofActionCertificateAxiomControl.injected_premise"
+        },
+        "expected_result": {
+          "const": "axiom_dependency_reported"
         }
       }
     }
