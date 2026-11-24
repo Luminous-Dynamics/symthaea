@@ -38,6 +38,8 @@ EXCLUDES=(
   "crates/domains/symthaea-dishwasher-design"
   "crates/domains/symthaea-rea-compat"
   "crates/domains/symthaea-rea-evidence-verifier"
+  "crates/domains/symthaea-experiment-design"
+  "crates/domains/symthaea-marine-geometry"
 )
 
 is_excluded() {
