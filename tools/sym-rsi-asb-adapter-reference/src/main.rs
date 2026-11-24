@@ -76,7 +76,9 @@ fn validate_api_fixtures() -> Result<serde_json::Value, String> {
             || pinned.budget.total != expected_budget
             || !pinned.is_shared_pool_catalog()
         {
-            return Err(format!("{label}: pinned campaign identity, design field or budget mismatch"));
+            return Err(format!(
+                "{label}: pinned campaign identity, design field or budget mismatch"
+            ));
         }
         pinned_campaign_reports.push(serde_json::json!({
             "campaign": label,
