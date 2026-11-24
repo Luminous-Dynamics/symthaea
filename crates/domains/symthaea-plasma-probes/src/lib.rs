@@ -4715,8 +4715,7 @@ mod tests {
     );
 
     fn scalar_unstable_mode_contract() -> ScalarUnstableModeContract {
-        let value: serde_json::Value =
-            serde_json::from_str(SCALAR_UNSTABLE_MODE_FIXTURE).unwrap();
+        let value: serde_json::Value = serde_json::from_str(SCALAR_UNSTABLE_MODE_FIXTURE).unwrap();
         let model = &value["model"];
         let diagnostic = &value["diagnostic"];
         let actuator = &value["actuator"];
@@ -4729,26 +4728,20 @@ mod tests {
             diagnostic_gain: diagnostic["gain"].as_f64().unwrap(),
             diagnostic_noise_std: diagnostic["noise_std"].as_f64().unwrap(),
             diagnostic_bandwidth_hz: diagnostic["bandwidth_hz"].as_f64().unwrap(),
-            diagnostic_sampling_stride_steps: diagnostic["sampling_stride_steps"]
-                .as_u64()
-                .unwrap() as u32,
-            diagnostic_delivery_delay_steps: diagnostic["delivery_delay_steps"]
-                .as_u64()
-                .unwrap() as u32,
+            diagnostic_sampling_stride_steps: diagnostic["sampling_stride_steps"].as_u64().unwrap()
+                as u32,
+            diagnostic_delivery_delay_steps: diagnostic["delivery_delay_steps"].as_u64().unwrap()
+                as u32,
             actuator_gain: actuator["gain"].as_f64().unwrap(),
             actuator_bandwidth_hz: actuator["bandwidth_hz"].as_f64().unwrap(),
             actuator_update_stride_steps: actuator["update_stride_steps"].as_u64().unwrap() as u32,
-            actuator_delivery_delay_steps: actuator["delivery_delay_steps"]
-                .as_u64()
-                .unwrap() as u32,
+            actuator_delivery_delay_steps: actuator["delivery_delay_steps"].as_u64().unwrap()
+                as u32,
             controller_execution_latency_seconds: controller["execution_latency_seconds"]
                 .as_f64()
                 .unwrap(),
-            minimum_bandwidth_multiple: controller["minimum_bandwidth_multiple"]
-                .as_f64()
-                .unwrap(),
-            maximum_loop_latency_efold_fraction: controller
-                ["maximum_loop_latency_efold_fraction"]
+            minimum_bandwidth_multiple: controller["minimum_bandwidth_multiple"].as_f64().unwrap(),
+            maximum_loop_latency_efold_fraction: controller["maximum_loop_latency_efold_fraction"]
                 .as_f64()
                 .unwrap(),
         }
