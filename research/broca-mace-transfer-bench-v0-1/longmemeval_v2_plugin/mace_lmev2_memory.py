@@ -135,7 +135,7 @@ class MaceLongMemEvalV2Memory(Memory):
                     "bm25_k1": self.bm25_k1,
                     "bm25_b": self.bm25_b,
                     "tokenizer_version": "unicode_alphanumeric_v1",
-                    "retrieval_mode": retrieval_mode,
+                    "retrieval_mode": "hybrid_bm25_entity_literal_with_original_image_evidence",
                     "retrieval_channels": [
                         "trajectory_bm25_search_v1",
                         "trajectory_entity_literal_search_v1",
@@ -733,7 +733,7 @@ class MaceLongMemEvalV2Memory(Memory):
             "candidate_set_sha256": candidate_set_sha256,
             "candidate_jsonl_sha256": hashlib.sha256(candidate_bytes).hexdigest(),
             "candidate_file": candidate_filename,
-            "retrieval_mode": "hybrid_bm25_entity_literal_with_original_image_evidence",
+            "retrieval_mode": retrieval_mode,
         }
         receipt_bytes = json.dumps(
             receipt, ensure_ascii=False, sort_keys=True, separators=(",", ":")
