@@ -7,10 +7,10 @@
 This is the first runnable-interface bridge for the official LongMemEval-V2 `Memory` API. It consists of:
 
 - `mace_lmev2_memory.py`: a thin Python `Memory.insert/query` shim registered with the benchmark's `memory_modules.memory.register_memory`.
-- `mace_lmev2_stdio.rs`: a persistent Rust JSONL sidecar that owns trajectory parsing, BM25 indexing, neighbor expansion and context-item construction.
+- `mace_lmev2_stdio.rs`: a persistent Rust JSONL sidecar that owns trajectory parsing, BM25 and structured-literal indexes, RRF fusion, neighbor expansion and context-item construction.
 - `longmemeval_v2.rs`: source-preserving trajectory/state adapter and screenshot-path/digest checks.
 
-The first arm is **text BM25 retrieval with original screenshot evidence returned for selected states**. It accepts the official optional `query_image` argument but intentionally does not use the question-image pixels in ranking. It is not a multimodal retrieval result and must not be submitted or described as such.
+The current V2 arm combines **BM25 prose retrieval** with **exact structured-literal retrieval** over trajectory IDs, URLs, numeric state/step values and structured action fields. The ranked lists are fused with reciprocal-rank fusion (RRF, `k=60`, equal channel weights). Original screenshot evidence is returned for selected states. The optional `query_image` argument is accepted but does not affect ranking; this remains a text/structured-literal retriever, not a multimodal image-query result.
 
 ## Pin the official benchmark contract
 
@@ -47,13 +47,13 @@ Copy `mace_lmev2_memory.py` into the official checkout's `memory_modules/` direc
 from .mace_lmev2_memory import MaceLongMemEvalV2Memory  # noqa: E402,F401
 ```
 
-The official harness then discovers `mace_lmev2_bm25_text` through its normal memory registry.
+The official harness then discovers `mace_lmev2_hybrid_bm25_entity_literal` through its normal memory registry.
 
 ## Example memory configuration
 
 ```json
 {
-  "memory_type": "mace_lmev2_bm25_text",
+  "memory_type": "mace_lmev2_hybrid_bm25_entity_literal",
   "memory_params": {
     "sidecar_binary": "/absolute/path/to/mace_lmev2_stdio",
     "source_screenshot_root": "/absolute/path/to/trajectory_screenshot_assets",
@@ -70,7 +70,7 @@ The official harness then discovers `mace_lmev2_bm25_text` through its normal me
 }
 ```
 
-Use a separate clean workspace and unique `run_id` for each benchmark execution. Supply `environment_revision_sha256` as the digest of the pinned environment manifest (site/application snapshot, browser/runtime image, permissions and relevant API/schema revisions); do not use a guessed or mutable label. The configured screenshot root must contain all source screenshot files. The bridge computes `sidecar_binary_sha256` from the exact executable bytes, then computes `backend_revision_sha256` over the binary digest plus domain, BM25 parameters, tokenizer version, top-k, slice/neighbor radii and retrieval mode. Both are passed into the Rust sidecar; the retrieval backend does not self-supply either digest. The shim rejects absolute or relative screenshot references that resolve outside that root, copies selected source bytes into a private workspace, and records both the canonical source-trajectory digest and each copied screenshot's SHA-256.
+Use a separate clean workspace and unique `run_id` for each benchmark execution. Supply `environment_revision_sha256` as the digest of the pinned environment manifest (site/application snapshot, browser/runtime image, permissions and relevant API/schema revisions); do not use a guessed or mutable label. The configured screenshot root must contain all source screenshot files. The bridge computes `sidecar_binary_sha256` from the exact executable bytes, then computes `backend_revision_sha256` over the binary digest, domain, BM25 parameters, structured-literal schema and field weights, RRF version/k/channel weights, top-k, slice/neighbor radii and retrieval mode. Both are passed into the Rust sidecar; the retrieval backend does not self-supply either digest. The shim rejects absolute or relative screenshot references that resolve outside that root, copies selected source bytes into a private workspace, and records both the canonical source-trajectory digest and each copied screenshot's SHA-256.
 
 For ingress, the plugin pins the configured screenshot root with a directory descriptor. It opens each intermediate directory and the final file relative to that descriptor using no-follow semantics; it rejects symlink replacement at both file and directory components. It reads through the opened file descriptor, requires a regular file, applies the byte cap while reading, and compares file identity, size, modification time and change time before/after the read. This closes the ordinary path-check/read symlink-swap window. The configured root itself must still be trusted, and the official reader's later open remains a separate boundary protected by the private evaluation workspace and sidecar pixel-digest verification.
 
@@ -92,10 +92,12 @@ Each official query must carry the harness's opaque `query_invocation_id` from `
 
 The Rust sidecar now emits a canonical MACE candidate-evidence JSONL envelope alongside the official reader context:
 - each original trajectory state is emitted as a structured source node bound to its raw-state SHA-256;
-- each BM25 text hit references those explicit state-node IDs and carries the deterministic state-window/chunk digest as its derivation receipt;
+- each fused hybrid text hit references those explicit state-node IDs and carries the deterministic state-window/chunk digest as its derivation receipt;
 - each attached screenshot is a separate image candidate whose parent is its source-state node and whose derivation receipt binds the state digest, screenshot pixel digest and original reference;
 - the adapter rejects unresolved parent links and missing screenshot pixel digests;
-- temporal neighbor expansion is represented on a separate retrieval channel with no inherited BM25 score;
+- temporal neighbor expansion is represented on a separate retrieval channel with no inherited BM25 or RRF score;
+- the retrieval trace records BM25 and entity-literal actions as separate operations, including each channel's observed evidence IDs, outcome, action-template digest and measured query latency;
+- the returned candidate text records identify the fused `hybrid_rrf_bm25_entity` channel, while the trace preserves the per-channel basis.
 - images repeated across overlapping windows are deduplicated by trajectory, state ordinal and image digest.
 
 The envelope binds `run_id`, the opaque query invocation ID, exact query SHA-256, domain scope, backend identifier and a deterministic execution-profile digest that includes the sidecar executable digest and all retrieval-affecting configuration. The Python adapter independently recomputes the Rust candidate-set SHA-256 from canonical JSONL using the same domain-separated binary encoding, checks duplicate IDs/ranks and requires every parent to resolve in the batch. It repeats this graph-closure and digest check when candidate receipts are restored. The Python bridge checks these fields and persists the JSONL plus a receipt under `workspace_dir/candidate_evidence/` before returning context to the reader. Files are create-once, owner-only and invocation-keyed; a repeated invocation ID that produces different evidence is rejected. Empty-retrieval queries also receive a receipt with a zero candidate count. On save/load, the plugin verifies receipt schemas, run/domain/backend binding, invocation-derived filenames, JSONL byte digests, candidate counts, query/backend identity and absence of orphan payloads. A candidate JSONL changed without a matching receipt is rejected before saved state is reused.
@@ -116,13 +118,13 @@ See the adapter-level contract in ../aml-adapter/RETRIEVAL_POLICY_TRACE_STORE_V0
 
 Each query now emits a typed retrieval trace receipt alongside its candidate-evidence envelope. The Rust sidecar records the official opaque query invocation ID, run, domain, environment revision, execution-profile digest, exact query digest, candidate-set digest, operation/tool/action-template identities, observed evidence IDs, stop reason and query wall time.
 
-The sidecar's current V2 arm executes **one operation**: `trajectory.bm25.search`. It records this real single-step trace in `RetrievalPolicyMemoryV1` and durably publishes the canonical receipt to the shared `retrieval_traces/` directory. At startup it strictly reloads all receipts into policy memory, so trace history survives sidecar restarts. It does not automatically promote a strategy note or select alternative search tools; therefore this is trace capture, not an online multi-step policy learner and not an AgentRunbook-C V2 replication.
+The sidecar's current V2 arm executes **two retrieval operations** per query: `trajectory.bm25.search` and `trajectory.entity_literal.search`. Their ranked hit lists are fused using RRF (`k=60`), and the canonical trace records each action separately before durable publication to the shared `retrieval_traces/` directory. At startup it strictly reloads all receipts into policy memory, so trace history survives sidecar restarts. It does not automatically promote a strategy note or adaptively select an action; this is a fixed two-channel hybrid, not yet an online multi-step policy learner and not an AgentRunbook-C V2 replication.
 
 The BM25 adapter does not expose posting/index bytes read. The trace explicitly records `inspected_bytes_measured=false` and `inspected_bytes_complete=false`; the corresponding zero is an unmeasured placeholder, not zero cost. Query latency is measured. Full index I/O/RSS and total infrastructure cost remain pending instrumentation.
 
 The Rust sidecar writes one create-once trace JSON per invocation under `workspace_dir/retrieval_traces/` using a temporary file, fsync, atomic hard-link publication and owner-only file permissions on Unix. Python receives the same directory, independently recomputes the Rust trace-receipt SHA-256 using the versioned binary encoding and checks a fixed cross-language reference vector. It verifies the exact persisted bytes, pairs the trace with the candidate receipt, and repeats the checks during save/load. Query text is not included; only its SHA-256 is retained. The environment revision is a required run input and must be identical when replaying the trace.
 
-The Rust policy memory is reconstructed from the durable local trace receipts on each sidecar start. No strategy notes are automatically promoted yet; the current V2 baseline still performs one BM25 operation per query. Local files are not a rollback-resistant independent witness: restoring the memory store and trace directory together can roll both back. A separately administered witness is still required for adversarial provenance and whole-store rollback resistance; a multi-step controller and promotion service remain future work.
+The Rust policy memory is reconstructed from the durable local trace receipts on each sidecar start. No strategy notes are automatically promoted yet; the current V2 sidecar performs a fixed BM25-plus-entity-literal sequence rather than learned action selection. Local files are not a rollback-resistant independent witness: restoring the memory store and trace directory together can roll both back. A separately administered witness is still required for adversarial provenance and whole-store rollback resistance; a multi-step controller and promotion service remain future work.
 
 ## Retrieval and accounting
 
