@@ -47,6 +47,7 @@ pub enum StreamingUpdateReasonV1 {
     LabelNotEligible,
     DownstreamConsumptionNotAllowed,
     LabelIdentityMismatch,
+    LabelRevisionMismatch,
     MeasurementEventMismatch,
     LabelPayloadDigestMismatch,
     EligibilityReportDigestMismatch,
@@ -698,6 +699,9 @@ pub fn deliver_qualified_stream_label_v1(
     }
     if report.label_id != delivery.label_id {
         reasons.push(StreamingUpdateReasonV1::LabelIdentityMismatch);
+    }
+    if report.label_revision != delivery.label_revision {
+        reasons.push(StreamingUpdateReasonV1::LabelRevisionMismatch);
     }
     if report.measurement_event_id != delivery.measurement_event_id {
         reasons.push(StreamingUpdateReasonV1::MeasurementEventMismatch);
@@ -1444,6 +1448,39 @@ mod tests {
         assert_eq!(adapter_state_digest(&engine.adapter_state).unwrap(), before);
         assert!(engine.pending_predictions.contains_key("sample-1"));
         assert!(engine.accepted_label_revisions.is_empty());
+    }
+
+    #[test]
+    fn delivery_revision_must_match_revision_attested_by_eligibility_report() {
+        let mut engine = engine();
+        predict_and_register_stream_sample_v1(
+            &mut engine,
+            &prediction("sample-1", "event-1", 100, 102, None, vec![1.0, 1.0]),
+        )
+        .unwrap();
+        let before = adapter_state_digest(&engine.adapter_state).unwrap();
+        let mut wrong_revision = delivery(
+            "sample-1",
+            "event-1",
+            "label-1",
+            2,
+            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            LabelEvidenceFrontierV1::CurrentAtK1,
+            110,
+            112,
+        );
+        wrong_revision.eligibility_report.label_revision = 1;
+        wrong_revision.eligibility_report.report_sha256 =
+            eligibility_report_digest(&wrong_revision.eligibility_report).unwrap();
+
+        let receipt = deliver_qualified_stream_label_v1(&mut engine, &wrong_revision).unwrap();
+        assert_eq!(receipt.disposition, StreamingUpdateDispositionV1::Rejected);
+        assert!(
+            receipt
+                .reasons
+                .contains(&StreamingUpdateReasonV1::LabelRevisionMismatch)
+        );
+        assert_eq!(adapter_state_digest(&engine.adapter_state).unwrap(), before);
     }
 
     #[test]
