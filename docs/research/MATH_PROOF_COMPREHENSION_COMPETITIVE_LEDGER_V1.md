@@ -485,3 +485,38 @@ The best opportunity is a *proof-comprehension reliability benchmark*, not anoth
 - a human study whose primary endpoint is delayed transfer and whose baselines include raw source, generic explanation and an interactive formally-backed explorable proof arm where reproducible.
 
 The study must separate immediate interface comprehension from durable learning. Existing n=16 evidence is a valuable pilot baseline, not a substitute for a powered replication on held-out theorem families.
+
+## 17. New external frontier: hard-mode proving, live research and benchmark saturation (2026-11-24)
+
+The current literature makes one competitive conclusion unavoidable: raw theorem-proving is already a crowded and rapidly advancing axis. Goedel-Prover-V2 reports 90.4% MiniF2F pass@32 with self-correction and 86 PutnamBench problems at pass@184; Goedel-Architect reports 99.2% MiniF2F pass@1 and 75.6% PutnamBench pass@1, with higher results when seeded by natural-language proofs; Discover and Prove reports 36 PutnamBench Hard formal proofs and a large answer-accuracy versus proof-success gap. IMO-Bench separates answer, natural-language proof, grading and Lean-proof tasks, while FormalProofBench and LemmaBench extend evaluation toward graduate and research-level mathematics. Formal Conjectures provides an evolving repository of open and solved research statements.
+
+The current PutnamBench leaderboard displays a featured Lean ranking with all 672 tasks solved, while also separating answer-placeholder and no-answer variants and warning that some new tasks have not been rerun across all methods. Its own notes make exact benchmark commit, no-answer status and compute budget mandatory reporting fields. This is a concrete example of why benchmark saturation and non-matched compute can make raw leaderboard claims misleading.
+
+**New strategic boundary:** Symthaea must not claim novelty for theorem decomposition, formal dependency graphs, proof search, generic proof quality or interactive proof interfaces. The defensible target is a proof-comprehension reliability layer that is formally bound to source and assumptions, validates explanation/plan claims, tests intervention consequences, tracks unknowns, and demonstrates delayed human transfer. Existing provers should be integration baselines and downstream consumers.
+
+The benchmark matrix was updated with the current public comparison points and revised targets. See [the current SOTA / benchmark matrix](MATH_PROOF_COMPREHENSION_BENCHMARK_MATRIX_V1.md), especially §12. The external figures are references from different task sets and inference budgets—not a directly comparable combined ranking.
+
+### Sources added to the competitive ledger
+
+- Goedel-Prover-V2 (ICLR 2026): https://proceedings.iclr.cc/paper_files/paper/2026/hash/13e8be77982beb73d7ed0bbf122f9f3c-Abstract-Conference.html
+- Goedel-Architect: https://arxiv.org/abs/2606.06468
+- Discover and Prove / DAP (ACL 2026): https://aclanthology.org/2026.acl-long.3/
+- IMO-Bench: https://imobench.github.io/
+- FormalProofBench: https://arxiv.org/abs/2603.26996
+- LemmaBench: https://arxiv.org/abs/2602.24173
+- Formal Conjectures: https://arxiv.org/abs/2605.13171
+- Lean Finder V2 / Legendre leaderboard: https://www.legendre-leaderboard.com/
+- LeanGraphSearch: https://arxiv.org/abs/2610.22339
+- PutnamBench leaderboard: https://trishullab.github.io/PutnamBench/leaderboard
+- Stanford AI Index 2026: https://hai.stanford.edu/assets/files/ai_index_report_2026_chapter_2_technical.pdf
+
+### Immediate new research increment
+
+Open a dedicated matched-baseline task for:
+1. PutnamBench no-answer versus answer-provided paired evaluation;
+2. DAP-style answer discovery versus formal proof closure;
+3. theorem-sandwich statement fidelity and downstream successor testing;
+4. live LemmaBench / Formal Conjectures temporal holdouts;
+5. proof-plan role correctness and human transfer after successful formal proving.
+
+The first four are machine/formal tasks; item five is a separate human-study authority. None may be collapsed into a single proof-comprehension score.

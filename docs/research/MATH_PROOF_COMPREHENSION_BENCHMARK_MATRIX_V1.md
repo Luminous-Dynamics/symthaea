@@ -235,3 +235,65 @@ The inspected current source snapshot Luminous-Dynamics/symthaea@bc915c485402eaf
 The HDC/CfC study must introduce a typed Lean/ProofPlan adapter, binder-normalized alpha-equivalent AST inputs, exact evidence IDs outside vector similarity, and a declared fixed-dimension projection from HDC to CfC input. CfC must be compared against parameter-matched MLP, GRU, LSTM and temporal-convolution baselines. Use unit dt in the primary discrete proof-plan task; irregular dt is a separate controlled experiment, not wall-clock timing leakage. See the implementation-readiness and adapter contract in MATH_PROOF_COMPREHENSION_HDC_CFC_ABLATION_V1.md, issue #13440.
 
 These constraints materially change the claim boundary: available HDC/CfC components are not evidence of an integrated mathematical proof-comprehension system, and no accuracy/latency/GPU advantage is claimed.
+
+## 12. Updated theorem-proving frontier and benchmark saturation audit (2026-11-24)
+
+This update separates **formal proof construction**, **answer discovery**, **premise retrieval**, **proof grading**, **statement fidelity**, and **human proof comprehension**. These are related capabilities, not one leaderboard.
+
+### Current external reference points
+
+| System / source | Reported result or scope | What to compare | Claim boundary |
+|---|---|---|---|
+| [Goedel-Architect](https://arxiv.org/abs/2606.06468) | 99.2% MiniF2F-test pass@1 and 75.6% PutnamBench pass@1; optional natural-language blueprint seeding raises the paper's report to 100% MiniF2F and 88.8% PutnamBench (597/672), plus 4/6 IMO 2025, 11/12 Putnam 2025 and 3/6 USAMO 2026 | Blueprint decomposition/refinement, multi-lemma parallel proof closure, formal proof outcomes and cost under the same exact task/compute protocol | Authors' framework result. It already uses a formal lemma-dependency blueprint, so dependency graphs or proof decomposition alone are not our novelty |
+| [Goedel-Prover-V2 (ICLR 2026)](https://proceedings.iclr.cc/paper_files/paper/2026/hash/13e8be77982beb73d7ed0bbf122f9f3c-Abstract-Conference.html) | 8B model: 84.6% MiniF2F pass@32; 32B: 88.1% pass@32 standard and 90.4% with self-correction; 86 PutnamBench problems at pass@184 | Self-correction, scaffolded synthesis, Lean feedback, pass@k and total compute | Different test-time budgets; pass@1 and pass@32/184 are not interchangeable |
+| [Discover and Prove / DAP (ACL 2026)](https://aclanthology.org/2026.acl-long.3/) | 10 CombiBench solves versus 7 previous SOTA at Pass@16; first reported 36 formal PutnamBench Hard proofs; its paper reports >80% answer accuracy on the same hard problems where formal proving remains below 10% | Hard-mode answer discovery before formal proof, and answer-to-formalization gap | A key comparator for our own discovery-versus-proof split; don't count answer accuracy as verified proof success |
+| [IMO-Bench](https://imobench.github.io/) | Four tasks: 400 answer questions, 60 natural-language proof tasks, 1,000 grading examples and 60 Lean proof tasks. Its public Advanced ProofBench leaderboard lists Aletheia at 91.9% and GPT-5.5 Pro at 88.1% in the displayed snapshot | Independent axes for answer correctness, proof writing, grading and Lean proving | Distinct task sets and grading. A natural-language proof score cannot be compared to a Lean pass rate |
+| [FormalProofBench](https://arxiv.org/abs/2603.26996) | Graduate-level theorem suite; the paper reports 33.5% for its best foundation model under its agentic harness | Formal proof generation beyond olympiad-level tasks; cost, tool use and domain breakdown | Private benchmark; only a published reference until a matched evaluation is available |
+| [LemmaBench](https://arxiv.org/abs/2602.24173) | Live benchmark of extracted research-paper lemmas, with current reported pass@1 around 10–15% | Research-level theorem proving on a rolling time-based holdout | Its automatic extraction and assumption reconstruction need a separate formalization-quality audit |
+| [Formal Conjectures](https://arxiv.org/abs/2605.13171) | 2,615 Lean 4 statements, including 1,029 open research conjectures and 836 solved problems in the described snapshot | Rolling research-problem discovery, conjecture proving, and contamination-resistant evaluation | Dataset coverage is not a result; each task's formal statement and proof status must be version-pinned |
+| [Lean Finder v2 / Legendre leaderboard](https://www.legendre-leaderboard.com/) | On 894 resolved MathlibQR queries: Recall@10 89.4%, Recall@100 97.3%, nDCG@10 0.725 | Premise retrieval against a common query cohort | Not the same as LeanGraphSearch's 810-query fair subset. Keep cohort metrics separate |
+| [LeanGraphSearch](https://arxiv.org/abs/2610.22339) | Its MathlibQR fair subset reports Recall@100 94.7% against LeanSearch v2 82.7% | Multi-hop dependency-aware retrieval and reranking | A distinct 810-query comparison set; do not blend with the 894-query Legendre leaderboard |
+| [PutnamBench leaderboard](https://trishullab.github.io/PutnamBench/leaderboard) | The current featured Lean ranking displays all 672 problems solved. The page separates answer-placeholder-filled and no-answer variants; 346/672 tasks contain an answer placeholder that must be inferred in no-answer mode | Benchmark saturation, answer-discovery versus proof-construction, exact benchmark commit and compute | The page notes that some later-added problems have not been rerun across all methods, and that compute budgets differ. A 672/672 headline is not a uniform, no-answer, same-budget comparison |
+
+The Stanford [AI Index 2026 technical performance chapter](https://hai.stanford.edu/assets/files/ai_index_report_2026_chapter_2_technical.pdf) also reports IMO-ProofBench scores including Aletheia 91.9%, Gemini 3 Deep Think 76.7% and GPT-5.2 Thinking (high) 35.7%, while its proof auto-grader correlates with expert scores at Pearson 0.96 on basic and 0.93 on advanced solutions. These remain benchmark-specific results, not evidence that an automatic judge can authorize mathematical truth.
+
+### What this changes in our competitive strategy
+
+1. **Raw theorem-proving is now an external baseline, not the primary novelty claim.** Goedel-Architect already uses a formally stated blueprint dependency graph; DAP explicitly separates hard-mode answer discovery from proof construction; Goedel-Prover-V2 shows strong self-correction and test-time scaling. Symthaea should interoperate with these styles of prover rather than claim to replace them based on a four-theorem pilot.
+2. **Track answer discovery, statement formalization, proof construction and proof comprehension as separate stages.** A system may identify the right answer but fail to formalize or prove it; it may prove a weakened statement; it may produce a formal term but fail to reconstruct why its steps work. Hard-mode and theorem-sandwich tests expose these gaps.
+3. **Use live research corpora for rolling held-out evaluation.** LemmaBench and Formal Conjectures suggest an evolving task source rather than another fixed contest-only test. Preserve temporal cutoffs, source commit, theorem identity, hidden test families and adjudicated formalization quality.
+4. **Treat theorem-statement faithfulness as a first-class reliability gate.** For each natural-language/formal pair, preserve the exact assumptions, quantify upper/lower theorem-sandwich obligations, and run downstream successor tests. A kernel-accepted proof of the wrong proposition remains a benchmark failure.
+5. **Treat proof-plan comprehension as the differentiated layer.** Formal dependency extraction (type, value, helper, recursor, trust closure) is evidence input. The plan layer must explain which mathematical transformation each dependency supports, what side conditions are consumed, what subgoals are created, and which alternatives remain valid. Expert role labels and counterfactual tests are required; graph centrality or lemma retrieval is not proof understanding.
+6. **Measure durable learning, not just interactive fluency.** Keep immediate comprehension, plan reconstruction, proof validation, near transfer and delayed cross-family transfer distinct. A strong interface or fluent explanation does not establish retention.
+
+### Revised benchmark targets
+
+All values below are prospective targets. No Symthaea score is implied.
+
+| Axis | First rigorous milestone | Stretch target |
+|---|---:|---:|
+| Theorem/source/hypothesis identity | 100% exact on all admitted tasks | 100% with tamper-evident preimage and environment replay |
+| False formal-proof or false statement acceptance | 0 observed on frozen negative controls | 0 observed across rolling temporal holdouts, with confidence bounds |
+| Premise retrieval | Matched replication on the exact 894-query Lean Finder v2 cohort and separate 810-query LeanGraphSearch cohort | Beat the strongest matched baseline in Recall@k or nDCG without loss of complete-route coverage |
+| Proof-plan role classification | ≥90% precision / ≥85% recall on independently reviewed roles | ≥95% / ≥90% |
+| Plan reconstruction | ≥80% two-expert acceptance on held-out theorem families | ≥90%, with reviewer agreement and route alternatives reported |
+| Side-condition / subgoal coverage | ≥90% | ≥95% |
+| Counterfactual disposition | ≥90% on seeded mutations, with valid route-only negatives | ≥95%; 100% validity of all supplied finite witnesses |
+| CIRR | ≤5% on ≥100 eligible pairs, nonzero denominator, report 95% CI and unresolved bounds | ≤2% on ≥500 pairs across theorem-family holdouts |
+| Evaluator calibration | ≥95% defect precision, ≥90% defect recall; report Brier/ECE and risk-coverage | Positive bias ≤0.10 rubric points and matched ProofGrader/QEDBench evaluator agreement |
+| Human learning | Powered pilot; report immediate, near and delayed effects separately | ≥10 percentage-point delayed near-transfer improvement and positive cross-family transfer versus strongest matched comparator |
+| Efficiency | Exact token/tool/wall-clock/memory and reviewer-time accounting | Better accuracy/transfer-cost Pareto frontier than the matched baseline, not merely fewer generated tokens |
+
+For retrieval, run the 894-query and 810-query cohorts independently. For theorem proving, record pass@1 and pass@k, candidate count, model snapshot, Lean version, context, search/parallelism, tool budgets and total inference/verification cost. For hard mode, publish both answer accuracy and Lean proof success. For live research benchmarks, use a time-based hidden holdout and freeze snapshots; never claim a SOTA result from random splits or a public task after it has entered training.
+
+### Specific implementation priorities
+
+- Add a **hard-mode task adapter** that records natural-language answer discovery, candidate formal statement, theorem-sandwich result, Lean proof outcome and human-review outcome as separate linked receipts.
+- Add a **live-lemma intake protocol** sourced from LemmaBench / Formal Conjectures, but do not ingest their gold evaluator artifacts into model-visible context.
+- Extend theorem-sandwich mutation controls to cover equivalent reformulations, strengthened statements, weakened statements, missing hypotheses, vacuous axioms/admissions, and namespace/notation changes.
+- Add a **proof-plan bridge evaluation**: given a formal proof term, a model must reconstruct alternative valid plans, dependency roles and conditions, then survive plan-node mutations without claiming that a proof-route change refutes the theorem.
+- Re-run strong public baselines on precisely the same held-out theorem families before any “better than SOTA” statement. Cross-paper table values are context, not a leaderboard victory.
+
+### Claim boundary
+
+The external results above establish that current theorem-proving and retrieval performance is substantially ahead of our small proof-comprehension pilot. They do not establish that those systems solve proof comprehension, delayed transfer or local-to-global warrant consistency. Conversely, our current typed extraction and finite-receipt tests do not establish better theorem-proving accuracy. The defensible contribution is a new, independently testable reliability-and-comprehension layer composed with existing provers—provided the future matched experiments show benefit.
