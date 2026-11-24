@@ -1007,3 +1007,40 @@ The differentiated benchmark should now compare:
 
 Use delay normalized by the measured modal e-fold time and oscillation period, not only an absolute \(\tau\). Include stochastic jitter, sample age, derivative-noise amplification, bounded actuator magnitude/slew, mode transfer, full kinetic \(L^2\) error, electromagnetic energy, control work, Maxwell constraints and coupled unstable-subspace authority (#13564). A controller that lowers field energy while increasing the full kinetic perturbation is not a pass.
 
+
+
+## Additional particle and phase-space representation baselines
+
+Three additional particle methods change the competitive landscape and should be included in the same matched-cohort tournament.
+
+### Structure-preserving decorated particles
+
+Quashie, Burby, Christlieb & Tang (2026), [A Structure-Preserving Decorated Particle Method for the Vlasov–Poisson System](https://arxiv.org/abs/2605.21794), revisit the Scovel–Weinstein reduction. Their macro-particles carry extra shape degrees of freedom while retaining a finite-dimensional Hamiltonian structure inherited from Vlasov–Poisson. The abstract reports that fewer decorated particles can replace standard PIC macro-particles at comparable accuracy on the tested examples.
+
+Required comparison: standard PIC vs source-faithful decorated PIC vs response-aware decoration. Count particle markers, shape DOFs, Hamiltonian/Poisson structure, shape update, serialized state bytes, transition cost and future-response fidelity separately. The proposed extension is response-conditioned local shape/rank allocation and structure-qualified split/merge, not a claim that decorated particles are a new idea. New programme: [#13572](https://github.com/Luminous-Dynamics/symthaea/issues/13572).
+
+### Hierarchical sparse-grid Galerkin particle method
+
+Deluzet, Guillet & Narski (2026), [A hierarchical sparse-grid particle method for the Vlasov–Poisson system](https://arxiv.org/abs/2607.19898), formulate field deposition as a variational Galerkin projection onto hierarchical B-spline sparse-grid spaces rather than standard grid deposition. Their analysis separates grid bias and statistical particle noise; under mixed-derivative regularity, it gives an \(L^2\) density bias scaling of \(O(h^{p+1}|\log h|^{d-1})\) and an \(L^1\) statistical term of \(O(|\log h|^{(d-1)/2}(Nh)^{-1/2})\). This should be benchmarked on anisotropic / limited-regularity cohorts where sparse-grid assumptions and error decomposition matter.
+
+Required comparison: standard PIC deposition, sparse-grid Galerkin projection, and response-aware hierarchical refinement. Report grid bias, particle noise, support/geometry, refinement cost and physical response fidelity separately.
+
+### Entropic variance-reduced PIC
+
+Windhab, Adelmann & Sadr (2026), [VR-PIC: An entropic variance-reduction method for particle-in-cell solutions of the Vlasov–Poisson equation](https://arxiv.org/abs/2602.15041), introduce importance-weight variance reduction with a maximum-cross-entropy correction. Their paper describes a frozen-weight approximation during the velocity kick that is stable but biased, followed by a weight correction to restore conservation while limiting bias. This is an important low-signal baseline because particle noise can dominate weak kinetic responses.
+
+Required comparison: standard PIC, frozen-weight variance reduction, and entropically corrected weights. Measure variance reduction and bias separately, along with conservation drift, particle effective sample size, tail coverage and future-response distortion. A lower-variance estimator is not a win if its bias suppresses a weak but later echo-visible feature.
+
+### Consequence for the representation tournament
+
+The particle family is no longer one baseline. At minimum, the matched tournament must distinguish:
+- standard PIC (particle sampling/deposition baseline);
+- decorated particles (structure-preserving shape DOFs);
+- hierarchical sparse-grid Galerkin PIC (grid approximation + sampling decomposition);
+- entropic VR-PIC (variance/bias and weight evolution);
+- NEOPIC (particle-measure field operator and sample-coordinate normalization);
+- adaptive symplectic particle MOR / Hamiltonian hyper-reduction;
+- VlasovTT and adaptive Hermite/Fourier Eulerian alternatives.
+
+Compare only on matched physical equations, initial measures, time integration tolerance and observables. Keep their distinct error decompositions; do not compress all results into a single “effective particle count”.
+
