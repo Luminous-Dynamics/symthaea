@@ -6528,8 +6528,8 @@ mod tests {
             [1.0, 1.0],
         ))
         .unwrap();
-        assert_eq!(report.minimum_unstable_eigenvalue_modulus, 1.1);
-        assert_eq!(report.spectral_radius, 1.2);
+        assert!((report.minimum_unstable_eigenvalue_modulus - 1.1).abs() < 1.0e-12);
+        assert!((report.spectral_radius - 1.2).abs() < 1.0e-12);
         assert_eq!(report.observation_sample_count, 12);
         assert_eq!(report.actuator_command_count, 12);
         assert!(report.observable);
