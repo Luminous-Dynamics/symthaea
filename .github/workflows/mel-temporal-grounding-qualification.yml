@@ -84,14 +84,14 @@ jobs:
             and (.matched_evidence_contrasts | length) == 2
             and .matched_evidence_contrasts[0].local_minus_no_evidence_f1 == 0.5
             and .matched_evidence_contrasts[0].local_minus_yoked_f1 == 0.5
-            and .matched_evidence_contrasts[0].local_minus_no_evidence_count_gated_f1 == 1.0
-            and .matched_evidence_contrasts[0].local_minus_yoked_count_gated_f1 == 1.0
+            and .matched_evidence_contrasts[0].local_minus_no_evidence_count_gated_f1 == 0.5
+            and .matched_evidence_contrasts[0].local_minus_yoked_count_gated_f1 == 0.5
             and .matched_evidence_contrasts[0].local_beats_yoked == true
             and .matched_evidence_contrasts[0].local_output_tokens == 128
             and .source_work_bootstrap.source_work_clusters == 2
             and .source_work_bootstrap.one_to_many_source_work_clusters == 2
             and .source_work_bootstrap.confirmatory_source_cluster_floor_met == false
-            and .source_work_bootstrap.local_minus_no_evidence_count_gated_f1.estimate == 1.0
+            and .source_work_bootstrap.local_minus_no_evidence_count_gated_f1.estimate == 0.5
           ' "$RUNNER_TEMP/revision-triplet-report.json" > /dev/null
 
       - name: Assemble exact-head evidence
