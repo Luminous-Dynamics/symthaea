@@ -289,6 +289,18 @@ jobs:
               and (.trust_profile.transitive_declaration_count > 0)
               and (if $declaration == "Nat.choose_pos" then ((.helper_nodes | length) > 0 and all(.helper_nodes[]; .trust_profile.closure_status == "complete" and (.trust_profile.unresolved_declarations | length) == 0 and .value_kind == "definition_body" and (.proof_value_dependencies | length) == 0 and .value_dependencies == .definition_value_dependencies)) else true end)' "$file" >/dev/null
           done
+          for declaration in List List.nil List.cons List.rec; do
+            file="proof-comprehension-extract-${declaration}.json"
+            test -s "$file"
+            jq -e --arg declaration "$declaration" '.declaration == $declaration
+              and (.unresolved_dependencies | length) == 0
+              and .trust_profile.closure_status == "complete"
+              and (.trust_profile.unresolved_declarations | length) == 0
+              and (if $declaration == "List" then (.declaration_kind == "inductive" and any(.edges[]; .relation == "inductive_constructor" and .target == "List.nil") and any(.edges[]; .relation == "inductive_constructor" and .target == "List.cons")) else true end)
+              and (if $declaration == "List.nil" or $declaration == "List.cons" then (.declaration_kind == "constructor" and any(.edges[]; .relation == "constructor_of" and .target == "List")) else true end)
+              and (if $declaration == "List.rec" then (.declaration_kind == "recursor" and any(.edges[]; .relation == "recursor_for_inductive" and .target == "List") and any(.edges[]; .relation == "recursor_rule_constructor")) else true end)' "$file" >/dev/null
+          done
+          echo "MATHLIB_STRUCTURAL_CALIBRATION_PASS"
           echo "MATHLIB_ELABORATED_DEPENDENCY_EXTRACTION_PASS"
 
       - name: Preserve extracted graph artifacts
@@ -350,6 +362,18 @@ jobs:
             test -s "$file"
             jq -e --arg declaration "$declaration" '.schema_version == "1.0.0" and .source_revision == "8a178386ffc0f5fef0b77738bb5449d50efeea95" and .lean_revision == "98dc76e3c0a9b856c9b98726b713fb04fab16740" and .declaration == $declaration and (.unresolved_dependencies | length) == 0 and (.edges | length) > 0 and .value_kind == "theorem_proof" and .value_dependencies == .proof_value_dependencies and (.definition_value_dependencies | length) == 0 and (.opaque_value_dependencies | length) == 0 and .trust_profile.closure_status == "complete" and (.trust_profile.unresolved_declarations | length) == 0 and (.trust_profile.transitive_declaration_count > 0) and (if $declaration == "Nat.choose_pos" then ((.helper_nodes | length) > 0 and all(.helper_nodes[]; .trust_profile.closure_status == "complete" and (.trust_profile.unresolved_declarations | length) == 0 and .value_kind == "definition_body" and (.proof_value_dependencies | length) == 0 and .value_dependencies == .definition_value_dependencies)) else true end)' "$file" >/dev/null
           done
+          for declaration in List List.nil List.cons List.rec; do
+            file="proof-comprehension-extract-${declaration}.json"
+            test -s "$file"
+            jq -e --arg declaration "$declaration" '.declaration == $declaration
+              and (.unresolved_dependencies | length) == 0
+              and .trust_profile.closure_status == "complete"
+              and (.trust_profile.unresolved_declarations | length) == 0
+              and (if $declaration == "List" then (.declaration_kind == "inductive" and any(.edges[]; .relation == "inductive_constructor" and .target == "List.nil") and any(.edges[]; .relation == "inductive_constructor" and .target == "List.cons")) else true end)
+              and (if $declaration == "List.nil" or $declaration == "List.cons" then (.declaration_kind == "constructor" and any(.edges[]; .relation == "constructor_of" and .target == "List")) else true end)
+              and (if $declaration == "List.rec" then (.declaration_kind == "recursor" and any(.edges[]; .relation == "recursor_for_inductive" and .target == "List") and any(.edges[]; .relation == "recursor_rule_constructor")) else true end)' "$file" >/dev/null
+          done
+          echo "MATHLIB_V429_STRUCTURAL_CALIBRATION_PASS"
           echo "MATHLIB_V429_DIRECT_EXTRACTION_PASS"
 
       - name: Preserve v4.29.0 comparison artifacts

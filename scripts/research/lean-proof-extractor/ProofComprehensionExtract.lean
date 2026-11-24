@@ -261,3 +261,7 @@ elab "#emit_proof_comprehension " declaration:ident : command => do
 #emit_proof_comprehension Set.countable_union
 #emit_proof_comprehension Multiset.map_id
 #emit_proof_comprehension Finset.card_map
+#emit_proof_comprehension List
+#emit_proof_comprehension List.nil
+#emit_proof_comprehension List.cons
+#emit_proof_comprehension List.rec

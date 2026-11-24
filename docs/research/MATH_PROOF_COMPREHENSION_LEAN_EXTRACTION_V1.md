@@ -167,3 +167,13 @@ ConstantInfo.value? is not synonymous with a theorem proof. The extractor classi
 Every output carries a generic value_dependencies array for reconciling the complete type/value closure; proof_value_dependencies is now strictly theorem proof content. Generated/private helpers are traversed using generic value references, so a helper definition's body is no longer mislabelled as proof reasoning.
 
 The v4.37 and v4.29 focused workflow jobs assert that the four root pilot declarations are theorem-proof values and generated Nat.choose_pos helper nodes are definition bodies with no theorem-proof references. The source-snapshot comparator tests generic-value closure, theorem-only proof edges and definition-body helper expansion independently.
+
+## 10. Structural relation calibration
+
+The extractor's special relation emitters must be exercised independently of ordinary theorem type/value references. Both pinned Mathlib cohorts now include four structural calibration declarations:
+
+- List — must emit inductive_constructor edges to List.nil and List.cons;
+- List.nil and List.cons — must emit constructor_of edges to List;
+- List.rec — must emit recursor_for_inductive and recursor_rule_constructor edges.
+
+These cases exercise the InductiveVal, ConstructorVal and RecursorVal branches of Lean ConstantInfo, rather than merely type-checking those branches as dead paths. The CI assertions require the declaration kind, expected target and complete environment-name resolution in both the v4.29.0 and v4.37.0-rc1 cohorts. This is still source/environment structural extraction; it does not mean a human has judged every edge mathematically necessary.
