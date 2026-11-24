@@ -97,7 +97,7 @@ Include a *human-led reflective* interface arm (questions or optional alternativ
 
 **Do not create one agency scalar.** Publish veto correctness, time-to-control-restoration, steering effort, branch survival, creative diversity, ownership, workload and musical quality separately.
 
-**Reducer boundary:** the current v1 Rust reducer qualifies the pre-admission veto path (veto followed by YIELD, with no newly authorized output). It does not yet model a veto arriving after an earlier output was queued or admitted to a callback. That extension must join #10382's event sequence/output epoch and report residual already-admitted output; queue invalidation must never be described as physical silence.
+**Reducer boundary:** the episode reducer now accepts a stage-aware `veto_race` projection for the late-veto path. It distinguishes pre-veto callback admission followed by post-veto CPAL/loopback observation from old-epoch application output discarded at a callback after the epoch fence, and it rejects any reported new admission after veto. The authoritative action/effect receipt owner is [#10659](https://github.com/Luminous-Dynamics/symthaea/pull/10659); [#10800](https://github.com/Luminous-Dynamics/symthaea/pull/10800) is a separate frame-range race oracle. This composition validates the shape, chronology and epoch semantics of supplied projections only: it does not authenticate or replay upstream receipts, connect the production callback, or prove physical silence. Pre-veto callback admissions remain potentially in flight and must be reported as residual output, not retroactively cancelled.
 
 ### Track C — Independent output and event observation
 
@@ -216,12 +216,21 @@ A proposed superiority claim requires at least a five-percentage-point absolute 
 
 ## 8. Immediate no-runner execution
 
-- Keep the v1 schema and synthetic fixtures as the contract baseline.
-- Implement and locally reason about the deterministic Rust reducer; run exact-head pinned Rust format/tests/Clippy when the workflow becomes available.
-- Add adversarial tests for veto races, sequence/frame loss, identity collapse, payload substitution, forecast expiry and complete-capture detector misses.
-- Extend the reducer only through existing upstream verifier APIs and replay receipts; do not accept self-reported \`verified=true\`.
-- Build a public MMAE/SMEBench materialization plan with source-license and rights review before acquiring audio.
-- Start symbolic Track A counterfactual experiments with public-domain, owned or synthetic material while real loopback/human access is arranged.
+The current implementation increment has added strict late-veto composition to the episode reducer without introducing a competing turn/effect state machine:
+- the effect carries a typed `veto_race` projection with admission/veto/report sequences, old/new epoch, callback disposition, exact callback/stale-discard counts and an owner receipt reference;
+- a callback admitted under the old epoch before veto can be followed by a later CPAL prediction or loopback observation, and is reported as residual output;
+- a callback observing the new epoch after veto is represented as a stale discard, never as successful playback;
+- post-veto admissions, sequence inversion and incorrect epoch advancement fail closed;
+- the upstream action/effect and race reducers remain independently owned; the episode reducer does not claim to authenticate or replay their receipts.
+
+The previous exact head passed the dedicated Rust 1.96 workflow (98 tests, schema/fixture validation, Clippy and four synthetic CLI replays). This new change requires its own exact-head run; do not carry the previous pass forward to the new commit.
+
+Continue in parallel without waiting for that run:
+- implement receipt-byte resolution and owner-verifier replay using #10659/#13348/#10265/#13254 outputs; never accept a self-reported `verified=true`;
+- consume the #10391 runner→CPAL→predicted-playback mappings with explicit uncertainty/validity status, not assumed shared origins;
+- prioritize a Linux PipeWire explicit-sink smoke capture under #13349, then native WASAPI/CoreAudio adapters; use the platform-specific capture owner rather than a synthetic substitute;
+- prepare public MMAE/SMEBench evaluation materialization with source-license and rights review before acquiring audio;
+- start symbolic Track A counterfactual experiments with public-domain, owned or synthetic material while real loopback/human access is arranged.
 
 ## 9. Claim boundary
 
