@@ -732,6 +732,35 @@ mod tests {
             input.push_str(&line);
         }
         assert!(parse_tsv(&input).is_ok());
+
+        let missing_ai_assisted_score = input.replace(
+            "\thuman_ai\t0.5\t0.8\t0.5",
+            "\thuman_ai\t0.5\tNA\t0.5",
+        );
+        assert!(
+            parse_tsv(&missing_ai_assisted_score)
+                .unwrap_err()
+                .contains("assisted_accuracy")
+        );
+        let human_only_with_assisted_score = input.replace(
+            "\thuman_only\t0.5\tNA\t0.5",
+            "\thuman_only\t0.5\t0.8\t0.5",
+        );
+        assert!(
+            parse_tsv(&human_only_with_assisted_score)
+                .unwrap_err()
+                .contains("assisted_accuracy")
+        );
+        let changed_ai_configuration = input.replacen(
+            &repeated_hash('c'),
+            &repeated_hash('e'),
+            1,
+        );
+        assert!(
+            parse_tsv(&changed_ai_configuration)
+                .unwrap_err()
+                .contains("AI configuration digest differs")
+        );
         assert!(parse_tsv(&input.replace("VERIFIED", "UNKNOWN")).is_err());
         assert!(parse_tsv(&input.replace(&repeated_hash('d'), "NA")).is_err());
         let mismatched_tms = input.replacen(&repeated_hash('d'), &repeated_hash('e'), 1);
