@@ -392,7 +392,7 @@ The five synthetic controls now cover:
 
 The Rust validator recomputes typed sequent digests, derives two-way finite entailment, enforces transformation-class consistency, and serializes candidate inputs separately from evaluator-only labels. It is limited to the Boolean AST and its 16-atom budget.
 
-**Qualification boundary:** the earlier exact-head run [45463952889](https://github.com/Luminous-Dynamics/symthaea/actions/runs/45463952889) passed the first three-pair implementation with **100 Rust tests passed / 0 failed**. The new hypothesis-order and incomparable controls, plus their two additional tests, were committed afterward and are not covered by that earlier pass. They require the latest exact-head run. No Lean kernel result, model evaluation, human review or empirical CIRR result is claimed. See protocol [MATH_METAMORPHIC_V1.md](MATH_METAMORPHIC_V1.md) and issue [#13547](https://github.com/Luminous-Dynamics/symthaea/issues/13547).
+**Five-pair finite qualification:** exact-head finite-reference passed on code-bearing head `a8e907025c4021ab417abb35c6bb29d353191359` (run [45465358113](https://github.com/Luminous-Dynamics/symthaea/actions/runs/45465358113)): rustfmt passed, the standalone crate reported **102 passed / 0 failed**, and the CLI validated all five pairs, including hypothesis-order invariance and incomparability. The two Lean extraction/differential lanes in that run were still in progress. No Lean kernel result for the metamorphic pairs, model evaluation, human review or empirical CIRR result is claimed. See protocol [MATH_METAMORPHIC_V1.md](MATH_METAMORPHIC_V1.md) and issue [#13547](https://github.com/Luminous-Dynamics/symthaea/issues/13547).
 
 
 ## 12. Proof-carrying explanation: local action certificates (2026-11-24)
@@ -406,3 +406,16 @@ This provides a compositional assurance chain:
 **root theorem identity → local action certificates → subgoal accounting → final kernel proof → reviewed mathematical interpretation → human transfer evaluation.**
 
 Prospective targets include 100% exact context binding and kernel replay for actions labelled kernel-checked, zero observed false local-action acceptance on seeded negative controls, ≥95% side-condition/subgoal coverage, and ≥80% independent expert acceptance of the plan-to-proof mapping. No local-action certificate implementation or result has yet been produced.
+
+
+## 13. Exact-head extraction and cross-version differential qualification (2026-11-24)
+
+The earlier Mathlib/proof-plan focused pipeline passed all four intended jobs on exact head `da35bc584c5dfed8923654fda83c2c2319ebd338` in workflow run [45463952889](https://github.com/Luminous-Dynamics/symthaea/actions/runs/45463952889):
+- finite-reference: passed, including the then-current 100-test Rust contract suite;
+- pinned Lean 4.37 Mathlib elaborated dependency extraction: passed;
+- Lean 4.29 LeanGraph-compatible direct type/proof-value extraction: passed;
+- four-theorem v4.29/v4.37 direct-dependency differential: passed.
+
+The differential's input artifacts retain eight extraction records per version (four target theorems plus four structural calibration entries), while the comparison stages only the exact four-theorem cohort. The structural records are preserved rather than discarded.
+
+This establishes deterministic extraction and differential execution for the pinned seed, not general mathematical equivalence or semantic dependency necessity. The later five-pair metamorphic implementation is a separate code update with its own finite-reference pass; its own Lean extraction/differential lanes were still in progress at the last status check.
